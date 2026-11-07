@@ -10,7 +10,7 @@
 import type { ClassifierReceipt } from "./classifier.ts";
 
 /** Must equal image_pipeline_stages.required_version for the stage (migration 20261112090000). */
-export const STAGE_VERSION: Record<string, number> = { classifier: 1, engine_bay: 1, receipt_ocr: 1 };
+export const STAGE_VERSION: Record<string, number> = { classifier: 1, filing: 1, evidence: 1, engine_bay: 1, receipt_ocr: 1 };
 /** #3024 stage_unavailable entries are keyed by edge-function name; the registry keys by stage. */
 export const FUNCTION_TO_STAGE: Record<string, string> = { "analyze-engine-bay": "engine_bay", "receipt-photo-ocr": "receipt_ocr" };
 export const UNAVAILABLE_RETRY_SECONDS = 3600;   // an undeployed function is rechecked hourly, not every tick
@@ -57,6 +57,23 @@ export function unavailableReceipts(imageId: string, functionNames: string[] | u
     if (r) out.push(r);
   }
   return out;
+}
+
+/** Phase of the pipeline after the classifier answered; each maps to its own registry stage. */
+export type PostClassifierPhase = "filing" | "evidence";
+
+/**
+ * A failure after the classifier produced an answer (vehicle filing, route handlers, observation / field-evidence
+ * writes, state persist). The classifier DID succeed, so it is receipted succeeded (the reconciler must not re-pay it)
+ * and the failure is receipted on the phase's own stage, typed.
+ */
+export function postClassifierFailureReceipts(imageId: string, phase: PostClassifierPhase, errorClass: string,
+  classification?: { image_type?: string; model?: string | null }): StageReceiptArgs[] {
+  const out = [
+    buildStageReceipt(imageId, "classifier", "succeeded", { detail: { classification: classification?.image_type ?? null, model: classification?.model ?? null, later_phase_failed: phase } }),
+    buildStageReceipt(imageId, phase, "failed", { errorClass, detail: { after: "classifier_succeeded" } }),
+  ];
+  return out.filter((r): r is StageReceiptArgs => r !== null);
 }
 
 export async function recordStageReceipt(db: { rpc: (fn: string, args: Record<string, unknown>) => any },

@@ -1,4 +1,4 @@
-import { buildStageReceipt, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts, UNAVAILABLE_RETRY_SECONDS } from "./stageReceipts.ts";
+import { postClassifierFailureReceipts, buildStageReceipt, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts, UNAVAILABLE_RETRY_SECONDS } from "./stageReceipts.ts";
 import { runStageWorker, type WorkItem } from "./stageWorker.ts";
 
 function eq(a: unknown, b: unknown) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`); }
@@ -82,4 +82,12 @@ Deno.test("worker stops at its deadline and reports an empty queue", async () =>
   eq(out.stopped, "deadline");
   const e: any = await runStageWorker(fakeDb({ enabled: true }).db, { stage: "classifier" }, () => Promise.resolve({ ok: true }), Date.now, noSleep);
   eq(e.stopped, "queue_empty");
+});
+
+Deno.test("failure after a successful classification: classifier succeeded + failure on its own stage", () => {
+  const rs = postClassifierFailureReceipts("img", "evidence", "pipeline_operation_failed", { image_type: "engine_bay", model: "m" });
+  eq(rs.map((r) => [r.p_stage, r.p_outcome]), [["classifier", "succeeded"], ["evidence", "failed"]]);
+  eq(rs[1].p_error_class, "pipeline_operation_failed");
+  eq(rs.some((r) => r.p_stage === "classifier" && r.p_outcome === "failed"), false);
+  eq(postClassifierFailureReceipts("img", "filing", "x")[1].p_stage, "filing");
 });

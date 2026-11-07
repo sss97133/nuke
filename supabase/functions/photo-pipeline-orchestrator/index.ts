@@ -22,7 +22,7 @@ import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { clearRetry, isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
-import { buildStageReceipt, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts } from "./stageReceipts.ts";
+import { buildStageReceipt, postClassifierFailureReceipts, type PostClassifierPhase, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts } from "./stageReceipts.ts";
 import { runStageWorker } from "./stageWorker.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -80,6 +80,8 @@ Deno.serve(async (req) => {
   const startedAt = Date.now();
   const attemptId = crypto.randomUUID();
   let processingImageId: string | null = null;
+  // set once the classifier has answered: later throws belong to filing / evidence, never to the classifier stage
+  let afterClassifier: { phase: PostClassifierPhase; classification: Record<string, any> } | null = null;
   let processingSource: { image_url: string; vehicle_id: string | null } | undefined;
   const receipt = (imageId: string, outcome: PipelineReceipt["outcome"]): PipelineReceipt => ({
     receipt_id: `${attemptId}:${imageId}:${outcome}`,
@@ -410,6 +412,7 @@ Deno.serve(async (req) => {
     if (appleLabels.length > 0 && !classification.vehicle_hints?.make) {
       classification.description = `${classification.description} [Apple ML: ${appleLabels.join(', ')}]`;
     }
+    afterClassifier = { phase: "filing", classification };
     console.log(`[photo-pipeline] Classified as: ${classification.image_type} (${classification.confidence})`);
 
     // Step 3: If no vehicle_id, try to resolve. A resolved vehicle is filed here, before any
@@ -429,6 +432,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    afterClassifier = { phase: "evidence", classification };
     // Step 4: Route to appropriate handler
     const routeResult = await routeByType(
       classification,
@@ -547,8 +551,13 @@ Deno.serve(async (req) => {
         await persistImageState(processingImageId, {
           ...receipt(processingImageId, "failed"), failure_phase: "pipeline",
           error_class: "pipeline_operation_failed",
-        }, { ai_processing_status: "failed" }, { pipeline_error: "pipeline_operation_failed" }, processingSource);
-        await classifierReceipt(processingImageId, "failed", { errorClass: "pipeline_operation_failed" });
+        }, { ai_processing_status: "failed" },
+        // keep the paid classification: a later retry of filing / evidence must not need the classifier again
+        { pipeline_error: "pipeline_operation_failed", ...(afterClassifier ? { classification: afterClassifier.classification, failed_phase: afterClassifier.phase } : {}) }, processingSource);
+        if (afterClassifier) {
+          for (const r of postClassifierFailureReceipts(processingImageId, afterClassifier.phase, "pipeline_operation_failed",
+            { image_type: afterClassifier.classification?.image_type, model: afterClassifier.classification?.classifier_receipt?.model })) await recordStageReceipt(supabase, r);
+        } else await classifierReceipt(processingImageId, "failed", { errorClass: "pipeline_operation_failed" });
       }
     } catch (_) { /* best-effort */ }
 

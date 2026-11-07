@@ -313,11 +313,13 @@ Deno.test("success with an undeployed stage: one succeeded + one unavailable rec
   assert(clearRetryBodies.length === 1);
 });
 
-Deno.test("a stage failure after a paid classification is a pipeline failure, not a succeeded receipt", async () => {
+Deno.test("a failure after a paid classification is receipted on its own stage; the classifier is not marked failed", async () => {
   globalThis.fetch = fixtureFetch;
   reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key"); intakeSuccess = false;
   await handler(request());
-  assert(stageReceipts.every((r) => r.p_outcome !== "succeeded") && stageReceipts.length === 1 && stageReceipts[0].p_outcome === "failed");
+  const by = stageReceipts.map((r) => `${r.p_stage}:${r.p_outcome}`).sort();
+  assert(JSON.stringify(by) === JSON.stringify(["classifier:succeeded", "evidence:failed"]));   // reconciler never re-pays the classifier
+  assert(!stageReceipts.some((r) => r.p_stage === "classifier" && r.p_outcome === "failed"));
 });
 
 Deno.test("a non-rate-limit classifier error is still a failure", async () => {
