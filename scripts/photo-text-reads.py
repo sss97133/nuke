@@ -151,7 +151,8 @@ def main():
     seen = set()
     with Pool(args.workers, initializer=_init) as pool:
         while True:
-            batch = [b for b in fetch_batch(args.user, args.limit) if b["image_id"] not in seen]
+            # frames whose bytes could not be read stay unread in the work list; ask past them, never spin on them
+            batch = [b for b in fetch_batch(args.user, min(1000, args.limit + len(seen))) if b["image_id"] not in seen][:args.limit]
             if not batch:
                 break
             t0 = time.time()
