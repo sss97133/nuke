@@ -257,6 +257,22 @@ Deno.test("a 429 on an unfiled photo is still deferred when the sanctioned filin
   assert(!(row.ai_scan_metadata as Record<string, Record<string, unknown>>).photo_pipeline.last_failure);
 });
 
+Deno.test("a 429 on an unfiled photo that GPS filed during the outage is still deferred and reported to the breaker", async () => {
+  globalThis.fetch = fixtureFetch;
+  unfiledPhoto(); modelStatus = 429; gpsMatch = { vehicle_id: "held-vehicle", confidence: 0.9 };
+  const response = await handler(request({ vehicle_id: null, user_id: "owner" })); const result = await response.json();
+  assert(response.status === 200 && result.rate_limited === true && result.requeued === true);
+  assert(row.vehicle_id === "held-vehicle" && row.ai_processing_status === "pending");   // filed, and back in the queue (not stuck 'processing')
+  assert(noteFailureBody?.p_http_status === 429);
+});
+
+Deno.test("a classifier failure on a photo filed during the run records failed, not a stuck 'processing'", async () => {
+  globalThis.fetch = fixtureFetch;
+  unfiledPhoto(); modelStatus = 500; gpsMatch = { vehicle_id: "held-vehicle", confidence: 0.9 };
+  const result = await (await handler(request({ vehicle_id: null, user_id: "owner" }))).json();
+  assert(result.classifier_ok === false && row.vehicle_id === "held-vehicle" && row.ai_processing_status === "failed");
+});
+
 Deno.test("a successful classification closes the retry state and the breaker (clear_retry)", async () => {
   globalThis.fetch = fixtureFetch;
   reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key");
