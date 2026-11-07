@@ -349,6 +349,8 @@ Deno.serve(async (req) => {
           // A filing error must not turn a provider rate limit into a failed photo: defer first, file on the retry.
           try { failedAttribution = await fileResolvedVehicle(image_id, resolved); }
           catch (e) { if (!isRateLimited(detail)) throw e; console.warn("[photo-pipeline] filing skipped during rate limit"); }
+          // The row now carries the filed vehicle; the state write below checks the source, so follow it.
+          if (failedAttribution?.filed) processingSource = { image_url: imageRow.image_url, vehicle_id: resolved.vehicle_id };
         }
       }
       if (isRateLimited(detail)) {
