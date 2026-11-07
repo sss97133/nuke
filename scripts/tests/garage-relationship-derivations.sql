@@ -12,16 +12,19 @@ CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT curren
 CREATE TABLE public.profiles(id uuid PRIMARY KEY);
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY, user_id uuid, merged_into_vehicle_id uuid, year integer, make text, model text,
  trim text, primary_image_url text, purchase_price numeric, image_count integer, is_public boolean, deleted_at timestamptz,
- vin text, bat_seller text, origin_metadata jsonb);
+ vin text, bat_seller text, origin_metadata jsonb, bat_auction_url text, listing_url text);
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, user_id uuid, documented_by_user_id uuid,
  image_url text, created_at timestamptz DEFAULT now(), taken_at timestamptz, latitude numeric, longitude numeric,
- device_fingerprint text, ai_detected_vehicle jsonb, vehicle_year integer, image_vehicle_match_status text, merged_from_vehicle_id uuid);
+ device_fingerprint text, source text,
+ exif_data jsonb DEFAULT '{"camera_make":"Apple","camera_model":"iPhone 15 Pro","source_type":"user_library"}',
+ ai_detected_vehicle jsonb, vehicle_year integer, image_vehicle_match_status text, merged_from_vehicle_id uuid);
 CREATE TABLE public.platform_config(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), config_key text UNIQUE NOT NULL,
  config_value jsonb NOT NULL, description text, updated_at timestamptz DEFAULT now());
-CREATE TABLE public.organizations(id uuid PRIMARY KEY, latitude numeric, longitude numeric);
+CREATE TABLE public.organizations(id uuid PRIMARY KEY, name text, business_name text, slug text, website text, latitude numeric, longitude numeric);
 CREATE TABLE public.organization_vehicles(vehicle_id uuid, organization_id uuid);
 CREATE TABLE public.organization_contributors(organization_id uuid, user_id uuid, status text DEFAULT 'active', end_date date);
-CREATE TABLE public.bat_listings(vehicle_id uuid, organization_id uuid, seller_username text, seller_external_identity_id uuid, bat_listing_url text);
+CREATE TABLE public.bat_listings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, organization_id uuid, seller_username text,
+ seller_external_identity_id uuid, bat_listing_url text, bat_lot_number text, bat_listing_title text, raw_data jsonb, scraped_at timestamptz DEFAULT now());
 CREATE TABLE public.external_listings(vehicle_id uuid, organization_id uuid, listing_url text);
 CREATE TABLE public.ownership_verifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, user_id uuid,
  status text, title_document_url text, revoked_at timestamptz, created_at timestamptz DEFAULT now());
@@ -48,6 +51,8 @@ GRANT INSERT,UPDATE ON ALL TABLES IN SCHEMA public TO service_role;
 \! cp supabase/migrations/20261111180000_garage_evidence_chain.sql /tmp/vrd_fixture_chain.sql
 \i /tmp/vrd_fixture_chain.sql
 \i supabase/migrations/20261111190000_vehicle_duplicate_gates.sql
+\! sed '/DO \$guard\$/,/END \$guard\$;/d' supabase/migrations/20261111200000_garage_listing_org_evidence.sql > /tmp/vrd_fixture_listing_org.sql
+\i /tmp/vrd_fixture_listing_org.sql
 CREATE TRIGGER fixture_evidence BEFORE INSERT OR UPDATE ON vehicle_user_permissions
  FOR EACH ROW EXECUTE FUNCTION enforce_user_vehicle_evidence();
 
@@ -139,6 +144,7 @@ SELECT fixture_assert((SELECT count(*) FROM vehicle_relationship_derivations)>0,
 RESET ROLE;
 
 -- ===== ordered evidence chain (steps 1-5) =====
+SELECT set_config('fixture.role','service_role',false);
 \set viva c433d27e-2159-4f8c-b4ae-32a5e44a77cf
 \set ernies e796ca48-0000-4000-8000-000000000002
 \set orgx aaaaaaaa-0000-4000-8000-000000000001
@@ -189,17 +195,44 @@ SELECT fixture_assert((SELECT reason FROM derive_vehicle_relationships(:'u',fx(6
 SELECT fx_photo(7); INSERT INTO external_listings(vehicle_id,organization_id,listing_url) VALUES (fx(7),:'orgx','https://example.test/l');
 SELECT fixture_assert(fx_role(7)='contributor' AND fx_step(7,2)->'evidence'->'sources'->0->>'source'='external_listings.organization_id','external_listings step 2');
 
--- step 3: GPS alone is a low-confidence hypothesis; Viva and Ernies are ~24 m apart
-INSERT INTO organizations VALUES (:'viva',36.17000,-115.14000),(:'ernies',36.17022,-115.14000);
+-- step 3: GPS at an organization alone never makes inventory; a shoot-shaped pattern does. Viva and Ernies are ~24 m apart.
+CREATE FUNCTION fx_burst(n int, k int, start_ts timestamptz, lat numeric, lon numeric, gap interval DEFAULT interval '1 minute') RETURNS void LANGUAGE sql AS $$
+ INSERT INTO vehicle_images(vehicle_id,user_id,image_url,taken_at,latitude,longitude,device_fingerprint)
+ SELECT fx(n),'00000000-0000-4000-8000-000000000001','p',start_ts + g*gap,lat,lon,'dev-1' FROM generate_series(1,k) g $$;
 INSERT INTO organization_vehicles VALUES (fx(8),:'viva'),(fx(9),:'viva');
-SELECT fx_photo(8, now() - interval '30 months', 36.17010, -115.14000);
-SELECT fixture_assert(fx_step(8,3)->'evidence'->>'organization_id'=:'viva','gps hypothesis names the nearest linked org');
-SELECT fixture_assert((fx_step(8,3)->'evidence'->>'ambiguous')::boolean AND NOT (fx_step(8,3)->'evidence'->>'decides')::boolean,'neighbour org makes it ambiguous; never decides');
+-- 8: one dense burst at Viva, vehicle linked to Viva, no listing -> contributor at the organization, not ambiguous
+SELECT fx_burst(8, 6, now() - interval '5 months', 36.17010, -115.14000);
+SELECT fixture_assert(fx_step(8,3)->'evidence'->>'organization_id'=:'viva' AND fx_step(8,3)->'evidence'->>'pattern'='shop_shoot','shoot burst names the linked organization');
+SELECT fixture_assert((fx_step(8,3)->'evidence'->>'organizations_in_range')::int=2 AND NOT (fx_step(8,3)->'evidence'->>'ambiguous')::boolean,'two orgs in range; the linked one wins');
+SELECT fixture_assert((fx_step(8,3)->'evidence'->>'decides')::boolean AND (fx_step(8,3)->>'confidence')::numeric=0.5,'shoot decides at 0.5 without a listing');
+SELECT fixture_assert(fx_role(8)='contributor','shoot without a listing: contributor at the organization');
 SELECT fixture_assert((SELECT evidence->>'organization_inventory' FROM derive_vehicle_relationships(:'u',fx(8))) IS NULL,'GPS alone never makes org inventory');
-SELECT fixture_assert((fx_step(8,3)->>'confidence')::numeric <= 0.3,'gps confidence capped at 0.3');
-SELECT fixture_assert(fx_role(8)='previously_documented','2017-style old photo at org is previously_documented, not org inventory');
-SELECT fx_photo(9, now() - interval '2 days', 36.17010, -115.14000);
-SELECT fixture_assert(fx_role(9)='documenting' AND (fx_step(9,3)->>'confidence')::numeric=0.15,'recent gps photo: documenting, hypothesis 0.15 (ambiguous)');
+-- 11: same burst, vehicle not linked to either organization -> ambiguous, confidence halved
+SELECT fx_burst(11, 6, now() - interval '5 months', 36.17010, -115.14000);
+SELECT fixture_assert((fx_step(11,3)->'evidence'->>'ambiguous')::boolean AND (fx_step(11,3)->>'confidence')::numeric=0.25,'unlinked vehicle between two orgs is ambiguous, halved');
+-- 12: same burst and Viva lists the vehicle -> business_handling
+INSERT INTO bat_listings(vehicle_id,organization_id,bat_listing_url) VALUES (fx(12),:'viva','https://bringatrailer.com/listing/y/');
+SELECT fx_burst(12, 6, now() - interval '5 months', 36.17010, -115.14000);
+SELECT fixture_assert(fx_role(12)='business_handling' AND (fx_step(12,3)->>'confidence')::numeric=0.7,'shoot at the listing organization: business_handling');
+-- 9: long span, photos at Viva and far away -> long-term personal, no inventory, still documenting
+SELECT fx_burst(9, 3, now() - interval '3 years', 36.17010, -115.14000);
+SELECT fx_burst(9, 3, now() - interval '2 days', 36.50000, -115.50000);
+SELECT fixture_assert(fx_step(9,3)->'evidence'->>'pattern'='long_term_personal' AND NOT (fx_step(9,3)->'evidence'->>'decides')::boolean,'multi-year span away from the org is personal');
+SELECT fixture_assert(fx_role(9)='documenting','long-term personal pattern stays documenting');
+-- too few photos, or more than two sessions, are not a shoot
+CREATE FUNCTION fx_vehicles(a int, b int) RETURNS void LANGUAGE sql AS $$
+ INSERT INTO vehicles(id,is_public,year,make,model) SELECT fx(g), true, 2001, 'Fixturemake', 'Fixture' FROM generate_series(a,b) g $$;
+SELECT fx_vehicles(13,60);
+SELECT fx_burst(13, 3, now() - interval '5 months', 36.17010, -115.14000);
+SELECT fixture_assert(fx_role(13)='documenting' AND fx_step(13,3)->'evidence'->>'pattern'='at_organization','three photos at an org is not a shoot');
+SELECT fx_burst(14, 3, now() - interval '5 months', 36.17010, -115.14000);
+SELECT fx_burst(14, 3, now() - interval '5 months' + interval '3 days', 36.17010, -115.14000);
+SELECT fx_burst(14, 3, now() - interval '5 months' + interval '6 days', 36.17010, -115.14000);
+SELECT fixture_assert(fx_role(14)='documenting' AND (fx_step(14,3)->'evidence'->>'sessions')::int=3,'three sessions is not a shoot');
+-- rules come from platform_config
+UPDATE platform_config SET config_value=config_value || '{"min_photos": 3, "max_sessions": 3}' WHERE config_key='garage_shop_shoot_rules';
+SELECT fixture_assert(fx_role(13)='contributor' AND fx_role(14)='contributor','shoot thresholds come from platform_config');
+UPDATE platform_config SET config_value=config_value || '{"min_photos": 5, "max_sessions": 2}' WHERE config_key='garage_shop_shoot_rules';
 
 -- time decay: 18 months by default, from platform_config
 SELECT fx_photo(10, now() - interval '30 months'); SELECT fx_photo(10, now() - interval '28 months');
@@ -212,6 +245,113 @@ UPDATE platform_config SET config_value='{"months": 18}' WHERE config_key='garag
 SELECT count(*) FROM derive_vehicle_relationships(:'u',fx(10),gen_random_uuid(),false);
 SELECT fixture_assert((SELECT derived_role='previously_documented' AND documented_from IS NOT NULL AND documented_to > documented_from
   FROM vehicle_relationship_derivations WHERE vehicle_id=fx(10) AND superseded_at IS NULL),'previously_documented row persists with documented_from/to');
+-- (fixture hygiene: fx(10) now carries a derivation for the account; keep it out of the duplicate-candidate fixtures below)
+UPDATE vehicles SET make='Fixturemake' WHERE id=fx(10);
+
+-- ===== duplicate organizations are one organization =====
+\set ernies2 40deadd4-0000-4000-8000-000000000003
+\set ernies3 a37266f3-0000-4000-8000-000000000004
+INSERT INTO organizations(id,name) VALUES (:'ernies2','Ernie''s Upholstery'),(:'ernies3','Ernie''s Custom Upholstery, LLC');
+INSERT INTO bat_listings(vehicle_id,organization_id,bat_listing_url) VALUES (fx(41),:'ernies3','https://bringatrailer.com/listing/z/');
+SELECT fx_photo(41);
+SELECT fixture_assert((SELECT evidence->>'organization_inventory' FROM derive_vehicle_relationships(:'u',fx(41)))=:'ernies','listing org collapses to the duplicate with GPS');
+SELECT fixture_assert((SELECT count(*) FROM organizations)=4 AND (SELECT name FROM organizations WHERE id=:'ernies3')='Ernie''s Custom Upholstery, LLC','organization rows are not edited');
+-- neighbouring but different businesses (24 m apart) are not collapsed
+SELECT fixture_assert((SELECT count(*) FROM propose_organization_aliases(100,gen_random_uuid(),true) WHERE (alias_org_id=:'viva' OR canonical_org_id=:'viva') AND score>=0.6)=0,'GPS neighbours are not aliases');
+SELECT fixture_assert((SELECT count(*) FROM propose_organization_aliases(100,gen_random_uuid(),true)
+  WHERE score>=0.6 AND canonical_org_id=:'ernies' AND alias_org_id IN (:'ernies2'::uuid,:'ernies3'::uuid))=2,'name variants are proposed as aliases of the one with GPS');
+SELECT fixture_assert((SELECT score FROM propose_organization_aliases(100,gen_random_uuid(),true) WHERE alias_org_id=:'viva' AND canonical_org_id=:'ernies' OR alias_org_id=:'ernies' AND canonical_org_id=:'viva')=0.3,'GPS alone is a 0.3 candidate');
+SELECT fixture_assert((SELECT count(*) FROM organization_aliases)=0,'dry run writes nothing');
+SELECT count(*) FROM propose_organization_aliases(100,gen_random_uuid(),false);
+SELECT fixture_assert((SELECT count(*) FROM organization_aliases WHERE superseded_at IS NULL)>=3,'proposals stored');
+SELECT fixture_fails($q$DELETE FROM organization_aliases$q$);
+SELECT fixture_fails($q$UPDATE organization_aliases SET score=1$q$);
+
+-- ===== seller handle with no alias row resolves to the organization that carries it =====
+\set orgw cccccccc-0000-4000-8000-000000000005
+INSERT INTO organizations(id,name,slug,website) VALUES (:'orgw','Dealer Xyz Motors','dealer-xyz','https://www.dealerxyz.com/inventory');
+SELECT fx_photo(42); UPDATE vehicles SET bat_seller='DealerXYZ' WHERE id=fx(42);
+SELECT fixture_assert((SELECT evidence->>'organization_inventory' FROM derive_vehicle_relationships(:'u',fx(42)))=:'orgw' AND (fx_step(42,2)->>'confidence')::numeric=0.55,'seller handle inferred from website host (0.70 - 0.15)');
+
+-- ===== listing -> vehicle matching =====
+UPDATE vehicles SET user_id=:'u', year=1979, make='GMC', model='K1500 Sierra Classic', bat_auction_url='https://bringatrailer.com/listing/1979-gmc-k1500-8' WHERE id=fx(43);
+SELECT fx_photo(43);
+INSERT INTO bat_listings(vehicle_id,seller_username,bat_listing_url,bat_listing_title,raw_data)
+ VALUES (NULL,NULL,'HTTPS://bringatrailer.com/listing/1979-gmc-k1500-8/?utm=x','1979 GMC K1500 Sierra Classic 4×4','{"seller_username":"DealerXYZ"}');
+SELECT fixture_assert((fx_step(43,2)->'evidence'->'inline_matches'->0->>'score')::numeric=0.95 AND fx_step(43,2)->'evidence'->'inline_matches'->0->'signals' ? 'url','URL equality matches an unlinked listing (0.95)');
+SELECT fixture_assert((SELECT evidence->>'organization_inventory' FROM derive_vehicle_relationships(:'u',fx(43)))=:'orgw' AND fx_role(43)='contributor','matched listing seller (raw_data) resolves to the organization');
+-- VIN in raw_data
+UPDATE vehicles SET vin='1GTEK14H5BJ500123' WHERE id=fx(44); SELECT fx_photo(44);
+INSERT INTO bat_listings(vehicle_id,bat_listing_url,raw_data) VALUES (NULL,'https://bringatrailer.com/listing/other/','{"vin":"1gtek14h5bj500123","seller":"someone"}');
+SELECT fixture_assert((fx_step(44,2)->'evidence'->'inline_matches'->0->>'score')::numeric=0.95,'VIN in raw_data matches (0.95)');
+-- title alone is low and only when unique among the account's vehicles
+UPDATE vehicles SET user_id=:'u', year=1987, make='Toyota', model='Land Cruiser' WHERE id=fx(45); SELECT fx_photo(45);
+INSERT INTO bat_listings(vehicle_id,bat_listing_url,bat_listing_title) VALUES (NULL,'https://bringatrailer.com/listing/lc/','1987 Toyota Land Cruiser FJ60');
+SELECT fixture_assert(jsonb_array_length(fx_step(45,2)->'evidence'->'inline_matches')=0,'title-only match is not used by the chain');
+SELECT fixture_assert((SELECT score FROM match_bat_listings_to_vehicles(100,:'u') WHERE vehicle_id=fx(45))=0.35,'title-only proposal scores 0.35');
+UPDATE vehicles SET user_id=:'u', year=1987, make='Toyota', model='Land Cruiser' WHERE id=fx(46);
+SELECT fixture_assert((SELECT count(*) FROM match_bat_listings_to_vehicles(100,:'u') WHERE vehicle_id IN (fx(45),fx(46)))=0,'title match proposes nothing when two of the account''s vehicles fit');
+UPDATE vehicles SET user_id=NULL WHERE id=fx(46);
+SELECT fixture_assert((SELECT count(*) FROM listing_vehicle_matches)=0 AND (SELECT count(*) FROM bat_listings WHERE vehicle_id IS NULL)=3,'proposing writes no match and links no listing');
+SELECT count(*) FROM match_bat_listings_to_vehicles(100,:'u',gen_random_uuid(),false);
+SELECT fixture_assert((SELECT count(*) FROM listing_vehicle_matches WHERE superseded_at IS NULL)>=3 AND (SELECT count(*) FROM bat_listings WHERE vehicle_id IS NULL)=3,'matches stored; bat_listings untouched');
+SELECT fixture_fails($q$DELETE FROM listing_vehicle_matches$q$);
+-- seller backfill: raw_data first, stored apart from bat_listings
+SELECT fixture_assert((SELECT count(*) FROM derive_listing_sellers(100) WHERE seller_username='dealerxyz' AND source='bat_listings.raw_data')=1,'seller read from raw_data (lowercased)');
+SELECT count(*) FROM derive_listing_sellers(100,gen_random_uuid(),false);
+SELECT fixture_assert((SELECT count(*) FROM listing_seller_derivations WHERE superseded_at IS NULL)=2,'seller derivations stored');
+SET ROLE authenticated;
+SELECT fixture_fails($q$SELECT * FROM listing_vehicle_matches$q$);
+SELECT fixture_fails($q$SELECT * FROM match_bat_listings_to_vehicles(10)$q$);
+RESET ROLE;
+
+-- ===== own-device test: camera EXIF plus a user_library / relay / known-fingerprint source =====
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,device_fingerprint) VALUES
+ (fx(47),:'u','p',NULL,'Apple-iPhone-Unknown-scraper'),
+ (fx(48),:'u','p','{"camera_make":"Apple","camera_model":"iPhone","source_type":"scraper"}',NULL),
+ (fx(49),:'u','p','{"camera_make":"Apple","camera_model":"iPhone","source_type":"x"}','relay-dev'),
+ (fx(50),:'u','p','{"camera_make":"Apple","camera_model":"iPhone","synced_by":"capture-relay-ios"}',NULL),
+ (fx(51),:'u','p','{"camera_make":"Apple","source_type":"user_library"}',NULL);
+SELECT fixture_assert(fx_role(47)='imported_by_user' AND fx_role(48)='imported_by_user','no camera EXIF, or EXIF without an own-device source: imported_by_user');
+SELECT fixture_assert(fx_role(49)='imported_by_user','fingerprint not yet seen on a relay upload: imported');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,device_fingerprint,source) VALUES (fx(52),:'u','p','relay-dev','capture_relay_ios');
+SELECT fixture_assert(fx_role(49)='documenting','fingerprint seen on the account''s capture_relay_ios uploads makes it own-device');
+SELECT fixture_assert(fx_role(50)='documenting','synced_by capture-relay-ios with camera EXIF is own-device');
+SELECT fixture_assert(fx_role(51)='imported_by_user','camera_model missing: not own-device');
+SELECT fixture_assert((fx_step(47,1)->'evidence'->>'own_device_photo_count')::int=0 AND (fx_step(47,1)->'evidence'->>'imported_photo_count')::int=1 AND (fx_step(47,1)->'eliminated') ? 'documenting','step 1 reports imports and eliminates documenting');
+-- an import with a statement, a title or an organization link is not hidden
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data) VALUES (fx(53),:'u','p',NULL);
+SELECT fx_obs(53, fixture_claim('{owner_current}'), 'I own it');
+SELECT fixture_assert(fx_role(53)='owner_reported','import with a first-person statement keeps its role');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data) VALUES (fx(54),:'u','p',NULL);
+INSERT INTO bat_listings(vehicle_id,organization_id,bat_listing_url) VALUES (fx(54),:'orgm','https://bringatrailer.com/listing/q/');
+SELECT fixture_assert(fx_role(54)='contributor','import with an organization link is not imported_by_user');
+-- the garage hides imported_by_user
+SELECT count(*) FROM derive_vehicle_relationships(:'u',fx(47),gen_random_uuid(),false);
+SELECT count(*) FROM derive_vehicle_relationships(:'u',fx(50),gen_random_uuid(),false);
+SELECT fixture_assert(NOT EXISTS (SELECT 1 FROM get_user_garage(:'u') WHERE vehicle_id=fx(47)) AND EXISTS (SELECT 1 FROM get_user_garage(:'u') WHERE vehicle_id=fx(50)),'garage hides imported_by_user and keeps documenting');
+
+-- ===== statement precedence =====
+CREATE FUNCTION fx_stmt(n int, roles text[], actor text, at_ts timestamptz, excerpt text, speaker uuid DEFAULT NULL, start_date text DEFAULT NULL) RETURNS void LANGUAGE sql AS $$
+ INSERT INTO vehicle_observations(vehicle_id,submitted_by_user_id,content_text,observed_at,structured_data)
+ VALUES (fx(n),'00000000-0000-4000-8000-000000000001',excerpt,at_ts,
+  jsonb_build_object('claim_contract','garage_owner_correction_v1','intake_actor',actor,'speaker_user_id',speaker,
+   'correction',jsonb_build_object('relationship',fixture_claim(roles,false,false,start_date)))) $$;
+SELECT fx_photo(55);
+SELECT fx_stmt(55,'{business_handling}','authorized_agent',now()-interval '2 days','agent: he handles it for the shop');
+SELECT fx_stmt(55,'{owner_current}','owner',now()-interval '1 day','I own it');
+SELECT fixture_assert(fx_role(55)='owner_reported' AND (fx_step(55,5)->'evidence'->>'first_person')::boolean,'newer first-person statement supersedes an older agent paraphrase');
+SELECT fx_photo(56);
+SELECT fx_stmt(56,'{owner_current}','owner',now()-interval '3 days','I own it');
+SELECT fx_stmt(56,'{business_handling}','authorized_agent',now()-interval '1 day','agent paraphrase');
+SELECT fixture_assert(fx_role(56)='owner_reported','an agent paraphrase does not outrank the owner''s own words');
+-- an agent paraphrase of a long tenure is capped; the owner''s own long-tenure words with own-device photos reach 0.85
+SELECT fx_photo(57);
+SELECT fx_stmt(57,'{owner_current}','authorized_agent',now(),'agent paraphrase','00000000-0000-4000-8000-000000000002','2010-01-01');
+SELECT fixture_assert((SELECT confidence FROM derive_vehicle_relationships(:'u',fx(57)))=0.75,'agent paraphrase with long tenure and own photos is 0.75');
+SELECT fx_photo(58);
+SELECT fx_stmt(58,'{owner_current}','authorized_agent',now(),'I have owned it since 2010',:'u','2010-01-01');
+SELECT fixture_assert((SELECT confidence FROM derive_vehicle_relationships(:'u',fx(58)))=0.85 AND (fx_step(58,5)->'evidence'->>'first_person')::boolean,'quoted first-person statement attributed to the account counts as first-person');
 
 -- every row carries the five-step chain with an eliminated list
 SELECT fixture_assert(NOT EXISTS (SELECT 1 FROM derive_vehicle_relationships(:'u') d
@@ -232,6 +372,8 @@ SELECT fixture_assert(NOT EXISTS (SELECT 1 FROM prev p FULL JOIN derive_vehicle_
      OR f.confidence IS DISTINCT FROM p.confidence OR f.reason IS DISTINCT FROM p.reason OR f.evidence IS DISTINCT FROM p.evidence),
   'preview file and function return identical rows');
 
+\set same `node scripts/garage/build-chain-function.mjs --check >/dev/null 2>&1 && echo t || echo f`
+SELECT fixture_assert(:'same' = 't','migration function body is byte-identical to the preview');
 -- alias table is not readable by accounts
 SET ROLE authenticated;
 SELECT fixture_fails($q$SELECT * FROM org_seller_aliases$q$);
@@ -338,5 +480,5 @@ SELECT fixture_assert((SELECT count(*) FROM vehicle_images WHERE id='00000000-00
 SELECT fixture_assert((SELECT vehicle_id FROM vehicle_images WHERE id='00000000-0000-4000-8000-000000000b01')=fd(31)
   AND (SELECT count(*) FROM vehicles WHERE deleted_at IS NOT NULL AND year=1985 AND user_id=:'u')=1,'split inverse returns the image and retires the new row (no delete)');
 
-SELECT 'PASS: evidence chain, org listings, GPS hypothesis, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
+SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 
