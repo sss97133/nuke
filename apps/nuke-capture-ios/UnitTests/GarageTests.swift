@@ -121,6 +121,13 @@ final class GarageTests: XCTestCase {
         XCTAssertEqual(s.other.map(\.label), ["Previously documented"])
     }
 
+    func testImportedByUserHasItsOwnLabelAndIsNotOwned() throws {
+        var v = try XCTUnwrap(try garage().first)
+        v.relationship = "imported_by_user"
+        XCTAssertEqual(v.relationshipLabel, "Imported by you")
+        XCTAssertFalse(GarageRelation.isOwned(v))
+    }
+
     func testOwnerStatementKeepsServerOwner() throws {
         let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(ownerStatement("1").utf8))
         let rows = GarageVehicle.applying(corrections, to: try garage())
