@@ -183,6 +183,42 @@ BEGIN
   PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('l-stat', jsonb_build_array(
     pg_temp.labor_item('lstat', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
       jsonb_build_object('payload', jsonb_set(l1->'payload', '{observed,status}', '"verified_on_site"')))))::text), 'claim-versus-observation');
+  -- leaf values are scalars: only the named containers may be objects or arrays
+  FOREACH k IN ARRAY ARRAY['observed.frames_in_scope', 'observed.hours_lower', 'observed.note', 'claim.computed_labor', 'claim.claimed_hours',
+      'claim.service_period.start', 'relation', 'reconciliation_key'] LOOP
+    PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('s-' || k, jsonb_build_array(
+      pg_temp.labor_item('ls-' || k, (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+        jsonb_build_object('payload', jsonb_set(jsonb_set(l1->'payload', '{claim,service_period}', '{"start":"2016-01-01","end":"2016-02-01"}'),
+          string_to_array(k, '.'), '{"hours_spent":"9","labor_hours_confirmed":{"x":1}}'::jsonb))))))::text), 'labor payload');
+  END LOOP;
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('s-cat', jsonb_build_array(
+    pg_temp.labor_item('lscat', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+      jsonb_build_object('payload', jsonb_set(l1->'payload', '{claim,categories}', '[{"category":"a","hours":{"v":"1"}}]')))))::text), 'labor payload');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('s-clu', jsonb_build_array(
+    pg_temp.labor_item('lsclu', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+      jsonb_build_object('payload', jsonb_set(l1->'payload', '{observed,clusters}', '[{"start":"a","end":"b","frames":{"n":1}}]')))))::text), 'labor payload');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('s-day', jsonb_build_array(
+    pg_temp.labor_item('lsday', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
+      jsonb_build_object('payload', jsonb_set(l1->'payload', '{observed,camera_local_review}', '{"clock_offset":"unknown","days":[{"camera_local_day":"d","frames":[1]}]}')))))::text), 'labor payload');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('s-img', jsonb_build_array(
+    pg_temp.img_item('si1', jsonb_build_object('payload', jsonb_set(i1->'payload', '{origin_class}', '{"hours_spent":"9"}')))))::text), 'unknown keys');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('s-img2', jsonb_build_array(
+    pg_temp.img_item('si2', jsonb_build_object('payload', jsonb_set(i1->'payload', '{identity,basis}', '{"labor_hours_confirmed":"9"}')))))::text), 'observation contract');
+  -- holds get the same content scan as every other payload
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('hd1', jsonb_build_array(
+    pg_temp.img_item('hd1', '{"holds":["DE89370400440532013000"]}'))))::text), 'bank identifier');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('hd2', jsonb_build_array(
+    pg_temp.img_item('hd2', '{"holds":["someone@example.invalid"]}'))))::text), 'e-mail address');
+  -- evidence refs: bank-shaped identifiers refused (also in an RFC Message-ID); realistic lowercase sha256 and a clean Message-ID pass
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('rf1', jsonb_build_array(
+    pg_temp.img_item('rf1', '{"evidence_refs":[{"kind":"source_message","origin_key":"gmail:acct:DE89370400440532013000:p1"}]}'))))::text), 'bank identifier');
+  PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('rf2', jsonb_build_array(
+    pg_temp.img_item('rf2', '{"evidence_refs":[{"kind":"source_message","origin_key":"gmail:acct:m1:p1","rfc_message_id":"<GB82WEST12345698765432@x.test>"}]}'))))::text), 'bank identifier');
+  r := ingest_private_work_projection(a, pg_temp.rev('rf3', jsonb_build_array(
+    pg_temp.img_item('rf3', jsonb_build_object('evidence_refs', jsonb_build_array(
+      jsonb_build_object('kind', 'image', 'sha256', encode(extensions.digest(convert_to('synthetic image bytes', 'UTF8'), 'sha256'), 'hex')),
+      jsonb_build_object('kind', 'source_message', 'origin_key', 'gmail:acct:m1:p1', 'rfc_message_id', '<CAF3k9xQ2b7d@mail.example.test>')))))));
+  IF r->'results'->0->>'status' <> 'created' THEN RAISE EXCEPTION 'realistic sha256 / clean Message-ID refused %', r; END IF;
   -- registered producer route and exact run trace
   PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a,
     (pg_temp.rev('p1', jsonb_build_array(pg_temp.img_item('pr1'))) || '{"producer":"free_text"}')::text), 'invalid private work projection envelope');
@@ -230,7 +266,7 @@ BEGIN
     '[{"kind":"image","sha256":"%s"}]','{}',%L)$f$, a, 'pwp:' || repeat('1', 48) || ':' || md5('raw2'), repeat('1',64), repeat('2',64),
     'pwp:' || repeat('1', 16), repeat('a',64), a), 'registered projection route');
   SELECT count(*) INTO n FROM private_work_projections;
-  IF n <> 4 THEN RAISE EXCEPTION 'unexpected row count %', n; END IF;
+  IF n <> 5 THEN RAISE EXCEPTION 'unexpected row count %', n; END IF;
 END $$;
 
 RESET ROLE;
@@ -245,7 +281,7 @@ DO $$ BEGIN
   BEGIN PERFORM count(*) FROM private_work_projections; RAISE EXCEPTION 'anon read'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM ingest_private_work_projection('11111111-1111-4111-8111-111111111111', '{}'); RAISE EXCEPTION 'anon wrote'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM read_private_work_projections('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'anon rpc read'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
-  BEGIN PERFORM private_work_account_ok('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'anon probed accounts'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN PERFORM private_work_internal.account_ok('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'anon probed accounts'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
 SELECT set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
@@ -255,7 +291,7 @@ DO $$ BEGIN
   BEGIN INSERT INTO private_work_projections(owner_id) VALUES ('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'owner wrote directly'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM ingest_private_work_projection('11111111-1111-4111-8111-111111111111', '{}'); RAISE EXCEPTION 'authenticated wrote'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM read_private_work_projections('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'authenticated rpc read'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
-  BEGIN PERFORM private_work_account_ok('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'authenticated probed accounts'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN PERFORM private_work_internal.account_ok('11111111-1111-4111-8111-111111111111'); RAISE EXCEPTION 'authenticated probed accounts'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
 -- A signed-in (non-service) session cannot reach the writer even with the privilege, and the store grants no vehicle permission.
@@ -266,14 +302,23 @@ DO $$ BEGIN
      OR has_table_privilege('service_role', 'private_work_projections', 'truncate') THEN RAISE EXCEPTION 'service role may rewrite history'; END IF;
   IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.private_work_projections'::regclass) THEN RAISE EXCEPTION 'RLS off'; END IF;
   IF EXISTS (SELECT 1 FROM pg_policy WHERE polrelid = 'public.private_work_projections'::regclass) THEN RAISE EXCEPTION 'unexpected policy'; END IF;
-  -- exactly one SECURITY DEFINER object: the narrow account helper, pinned search_path, service role only, boolean out
-  IF (SELECT array_agg(proname ORDER BY proname) FROM pg_proc WHERE pronamespace = 'public'::regnamespace
-        AND (proname LIKE 'private_work%' OR proname IN ('ingest_private_work_projection', 'read_private_work_projections')) AND prosecdef)
-     IS DISTINCT FROM ARRAY['private_work_account_ok']::name[] THEN RAISE EXCEPTION 'unexpected security definer set'; END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'private_work_account_ok' AND prorettype = 'boolean'::regtype
+  -- zero SECURITY DEFINER functions in public from this migration; exactly one private helper in a dedicated, non-exposed schema
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'public'::regnamespace
+        AND (proname LIKE 'private_work%' OR proname IN ('ingest_private_work_projection', 'read_private_work_projections')) AND prosecdef) THEN
+    RAISE EXCEPTION 'security definer function in public'; END IF;
+  IF (SELECT array_agg(proname ORDER BY proname) FROM pg_proc WHERE pronamespace = 'private_work_internal'::regnamespace)
+     IS DISTINCT FROM ARRAY['account_ok']::name[] OR NOT (SELECT prosecdef FROM pg_proc WHERE oid = 'private_work_internal.account_ok(uuid)'::regprocedure)
+     THEN RAISE EXCEPTION 'unexpected helper set'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE oid = 'private_work_internal.account_ok(uuid)'::regprocedure AND prorettype = 'boolean'::regtype
                  AND proconfig::text LIKE '%search_path=pg_catalog, pg_temp%') THEN RAISE EXCEPTION 'helper search_path not pinned'; END IF;
-  IF has_function_privilege('anon', 'public.private_work_account_ok(uuid)', 'execute') OR has_function_privilege('authenticated', 'public.private_work_account_ok(uuid)', 'execute')
-     OR NOT has_function_privilege('service_role', 'public.private_work_account_ok(uuid)', 'execute') THEN RAISE EXCEPTION 'helper grants wrong'; END IF;
+  IF has_function_privilege('anon', 'private_work_internal.account_ok(uuid)', 'execute') OR has_function_privilege('authenticated', 'private_work_internal.account_ok(uuid)', 'execute')
+     OR NOT has_function_privilege('service_role', 'private_work_internal.account_ok(uuid)', 'execute')
+     OR has_schema_privilege('anon', 'private_work_internal', 'usage') OR has_schema_privilege('authenticated', 'private_work_internal', 'usage')
+     OR NOT has_schema_privilege('service_role', 'private_work_internal', 'usage')
+     OR EXISTS (SELECT 1 FROM pg_namespace n, aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) a
+                WHERE n.nspname = 'private_work_internal' AND a.grantee = 0) THEN RAISE EXCEPTION 'helper namespace grants wrong'; END IF;
+  IF NOT (SELECT bool_and(NOT has_function_privilege('anon', p.oid, 'execute') AND NOT has_function_privilege('authenticated', p.oid, 'execute'))
+          FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname LIKE '%private_work%') THEN RAISE EXCEPTION 'public function exposed to anon or authenticated'; END IF;
   IF has_table_privilege('service_role', 'auth.users', 'select') THEN RAISE EXCEPTION 'service role may read accounts directly'; END IF;
   RAISE NOTICE 'PASS private work projections';
 END $$;

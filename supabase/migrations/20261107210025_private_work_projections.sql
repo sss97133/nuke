@@ -57,17 +57,21 @@ GRANT SELECT, INSERT ON public.private_work_projections TO service_role;  -- nev
 
 -- Account admission without widening the service role. Deployed fact (read-only privilege probe, 2026-11-07): service_role has
 -- USAGE on schema auth and extensions, SELECT on financial_documents and EXECUTE on extensions.digest, but NO SELECT on auth.users.
--- The invoker functions below therefore never read auth.users. This one narrow helper does, as its owner, exactly like the
--- deployed ingest_financial_evidence / read_financial_evidence do: it answers one boolean for one uuid, only for a service_role
--- session, and it is not granted to PUBLIC, anon or authenticated. It is the only SECURITY DEFINER object in this migration.
-CREATE FUNCTION public.private_work_account_ok(p_owner uuid) RETURNS boolean
+-- The invoker functions below therefore never read auth.users. The one account read lives in a NEW dedicated schema that is not in
+-- the API's exposed schemas (supabase/config.toml: public, graphql_public), so PostgREST does not publish it as an RPC. Every function in
+-- public stays SECURITY INVOKER; this migration creates no SECURITY DEFINER object in public. The helper answers one boolean for one
+-- uuid, only for a service_role session, like the deployed ingest_financial_evidence does as its owner. No existing schema ACL is changed.
+CREATE SCHEMA private_work_internal;
+REVOKE ALL ON SCHEMA private_work_internal FROM PUBLIC, anon, authenticated;
+GRANT USAGE ON SCHEMA private_work_internal TO service_role;   -- usage on this schema only, nothing on auth.users
+CREATE FUNCTION private_work_internal.account_ok(p_owner uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
   SELECT coalesce(auth.role(), '') = 'service_role' AND p_owner IS NOT NULL AND EXISTS (
     SELECT 1 FROM auth.users u WHERE u.id = p_owner AND u.deleted_at IS NULL AND u.is_anonymous IS NOT TRUE
-      AND (u.banned_until IS NULL OR u.banned_until <= now()))
+      AND (u.banned_until IS NULL OR u.banned_until <= pg_catalog.now()))
 $$;
-REVOKE ALL ON FUNCTION public.private_work_account_ok(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.private_work_account_ok(uuid) TO service_role;
+REVOKE ALL ON FUNCTION private_work_internal.account_ok(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private_work_internal.account_ok(uuid) TO service_role;
 
 -- Registered producer route. A new producer or version is a new migration (reviewed), never caller free text.
 -- Mirrors scripts/client_evidence/projection.py PRODUCER / METHOD / VERSION (parity is tested).
@@ -113,6 +117,32 @@ LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $$
 $$;
 REVOKE ALL ON FUNCTION public.private_work_keys_within(jsonb, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.private_work_keys_within(jsonb, text) TO service_role;
+
+-- Keys whose value may be a nested object or array, per closed object. Every other value must be a JSON scalar, so a leaf cannot
+-- smuggle a nested object. Mirrored by scripts/client_evidence/projection.py CONTAINER_KEYS (parity is tested).
+CREATE FUNCTION public.private_work_container_keys(p_name text) RETURNS text[]
+LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, pg_temp AS $$
+  SELECT CASE p_name
+    -- parity:container_keys
+    WHEN 'image' THEN ARRAY['time', 'capture', 'identity']
+    WHEN 'labor' THEN ARRAY['claim', 'observed', 'holds', 'rate_provenance', 'conflicts']
+    WHEN 'labor_claim' THEN ARRAY['service_period', 'categories']
+    WHEN 'labor_observed' THEN ARRAY['window', 'observed_days', 'clusters', 'camera_local_review']
+    WHEN 'labor_local_review' THEN ARRAY['days']
+    ELSE ARRAY[]::text[] END
+$$;
+REVOKE ALL ON FUNCTION public.private_work_container_keys(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.private_work_container_keys(text) TO service_role;
+
+-- Closed key set AND scalar leaves: only the named containers may be objects or arrays. NULL input is false (fail closed).
+CREATE FUNCTION public.private_work_closed_scalar(j jsonb, p_name text) RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $$
+  SELECT public.private_work_keys_within(j, p_name) AND NOT EXISTS (
+    SELECT 1 FROM jsonb_each(CASE WHEN jsonb_typeof(j) = 'object' THEN j ELSE '{}'::jsonb END) e
+    WHERE e.key <> ALL (public.private_work_container_keys(p_name)) AND jsonb_typeof(e.value) IN ('object', 'array'))
+$$;
+REVOKE ALL ON FUNCTION public.private_work_closed_scalar(jsonb, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.private_work_closed_scalar(jsonb, text) TO service_role;
 
 -- Content scan shared by the trigger: credentials, raw text carriers, bank identifiers, e-mail addresses, and any key that
 -- would assert verified hours, payment or ownership. Returns the first problem or NULL.
@@ -165,17 +195,17 @@ DECLARE ok boolean; cap jsonb; st text; e jsonb; v jsonb;
 BEGIN
   IF jsonb_typeof(p) IS DISTINCT FROM 'object' THEN RETURN 'projection payload must be an object'; END IF;
   IF p_kind = 'image_timeline_event' THEN
-    IF public.private_work_keys_within(p, 'image') IS NOT TRUE THEN RETURN 'image timeline payload has unknown keys'; END IF;
+    IF public.private_work_closed_scalar(p, 'image') IS NOT TRUE THEN RETURN 'image timeline payload has unknown keys'; END IF;
     ok := (p ?& ARRAY['event_key', 'stance', 'time', 'capture', 'identity', 'origin_class', 'intent', 'assertion_status', 'completed_work_asserted'])
       AND p->'stance' = '"visual_observed"'::jsonb
       AND p->'completed_work_asserted' = 'false'::jsonb               -- the JSON boolean false, not the string "false"
       AND jsonb_typeof(p->'event_key') = 'string' AND jsonb_typeof(p->'origin_class') = 'string' AND jsonb_typeof(p->'intent') = 'string'
       AND jsonb_typeof(p->'assertion_status') = 'string' AND (p->>'assertion_status') IN ('observation_unverified', 'held')
-      AND public.private_work_keys_within(p->'identity', 'image_identity') AND (p->'identity') ? 'state'
+      AND public.private_work_closed_scalar(p->'identity', 'image_identity') AND (p->'identity') ? 'state'
       AND jsonb_typeof(p->'identity'->'state') = 'string' AND (p->'identity'->>'state') IN ('confirmed', 'unconfirmed', 'context_only', 'unknown')
-      AND public.private_work_keys_within(p->'capture', 'image_capture') AND (p->'capture') ?& ARRAY['source', 'offset_state']
+      AND public.private_work_closed_scalar(p->'capture', 'image_capture') AND (p->'capture') ?& ARRAY['source', 'offset_state']
       AND jsonb_typeof(p->'capture'->'offset_state') = 'string' AND (p->'capture'->>'offset_state') IN ('known', 'unknown')
-      AND public.private_work_keys_within(p->'time', 'image_time') AND (p->'time') ? 'kind'
+      AND public.private_work_closed_scalar(p->'time', 'image_time') AND (p->'time') ? 'kind'
       AND jsonb_typeof(p->'time'->'kind') = 'string' AND (p->'time'->>'kind') IN ('instant', 'unknown');
     IF ok IS NOT TRUE THEN RETURN 'image timeline payload breaks the observation contract'; END IF;
     cap := p->'capture';
@@ -196,18 +226,18 @@ BEGIN
     END IF;
     RETURN NULL;
   ELSIF p_kind = 'labor_reconciliation' THEN
-    IF public.private_work_keys_within(p, 'labor') IS NOT TRUE THEN RETURN 'labor payload has unknown keys'; END IF;
+    IF public.private_work_closed_scalar(p, 'labor') IS NOT TRUE THEN RETURN 'labor payload has unknown keys'; END IF;
     ok := (p ?& ARRAY['reconciliation_key', 'claim', 'observed', 'holds', 'rate_provenance', 'conflicts', 'relation', 'additive', 'hours_verified'])
       AND jsonb_typeof(p->'reconciliation_key') = 'string'
       AND p->'additive' = 'false'::jsonb AND p->'hours_verified' = 'false'::jsonb            -- JSON booleans, never strings
       AND (NOT (p ? 'billable_hours') OR jsonb_typeof(p->'billable_hours') = 'null')
-      AND public.private_work_keys_within(p->'claim', 'labor_claim')
+      AND public.private_work_closed_scalar(p->'claim', 'labor_claim')
       AND p->'claim'->'source_claim' = 'true'::jsonb AND p->'claim'->'verified' = 'false'::jsonb
       AND (p->'claim') ? 'claimed_hours' AND jsonb_typeof(p->'claim'->'claimed_hours') = 'string'
-      AND public.private_work_keys_within(p->'observed', 'labor_observed') AND (p->'observed') ? 'status'
+      AND public.private_work_closed_scalar(p->'observed', 'labor_observed') AND (p->'observed') ? 'status'
       AND jsonb_typeof(p->'observed'->'status') = 'string'
       AND (p->'observed'->>'status') IN ('not_supplied', 'not_assessable', 'no_evidence', 'presence_only', 'review_camera_local_only', 'estimated_from_photos')
-      AND public.private_work_keys_within(p->'holds', 'labor_holds')
+      AND public.private_work_closed_scalar(p->'holds', 'labor_holds')
       AND jsonb_typeof(p->'rate_provenance') = 'array' AND jsonb_typeof(p->'conflicts') = 'array'
       AND jsonb_typeof(p->'relation') = 'string'
       AND (p->>'relation') IN ('not_assessable', 'no_hours', 'photo_lower_bound_exceeds_claim', 'photo_lower_bound_within_claim_not_corroboration_of_total');
@@ -217,21 +247,21 @@ BEGIN
     END LOOP;
     -- Claim: closed shape; the claimed hours stay a source claim.
     IF (p->'claim') ? 'service_period' AND jsonb_typeof(p->'claim'->'service_period') <> 'null'
-       AND public.private_work_keys_within(p->'claim'->'service_period', 'labor_period') IS NOT TRUE THEN
+       AND public.private_work_closed_scalar(p->'claim'->'service_period', 'labor_period') IS NOT TRUE THEN
       RETURN 'labor payload breaks the claim-versus-observation contract (service period)';
     END IF;
     IF (p->'claim') ? 'categories' THEN
       IF jsonb_typeof(p->'claim'->'categories') IS DISTINCT FROM 'array' OR jsonb_array_length(p->'claim'->'categories') > 60 THEN
         RETURN 'labor payload breaks the claim-versus-observation contract (claim categories)'; END IF;
       FOR e IN SELECT x FROM jsonb_array_elements(p->'claim'->'categories') x LOOP
-        IF public.private_work_keys_within(e, 'labor_category') IS NOT TRUE THEN
+        IF public.private_work_closed_scalar(e, 'labor_category') IS NOT TRUE THEN
           RETURN 'labor payload breaks the claim-versus-observation contract (claim category)'; END IF;
       END LOOP;
     END IF;
     IF jsonb_array_length(p->'rate_provenance') > 60 OR jsonb_array_length(p->'conflicts') > 100 THEN
       RETURN 'labor payload breaks the claim-versus-observation contract (size)'; END IF;
     FOR e IN SELECT x FROM jsonb_array_elements(p->'rate_provenance') x LOOP
-      IF public.private_work_keys_within(e, 'labor_rate') IS NOT TRUE THEN
+      IF public.private_work_closed_scalar(e, 'labor_rate') IS NOT TRUE THEN
         RETURN 'labor payload breaks the claim-versus-observation contract (rate provenance)'; END IF;
     END LOOP;
     FOR e IN SELECT x FROM jsonb_array_elements(p->'conflicts') x LOOP
@@ -239,7 +269,7 @@ BEGIN
     END LOOP;
     -- Observation: closed shape at every level. Only a photo-derived lower bound may carry hours, and only with aware frames.
     v := p->'observed';
-    IF v ? 'window' AND jsonb_typeof(v->'window') <> 'null' AND public.private_work_keys_within(v->'window', 'labor_period') IS NOT TRUE THEN
+    IF v ? 'window' AND jsonb_typeof(v->'window') <> 'null' AND public.private_work_closed_scalar(v->'window', 'labor_period') IS NOT TRUE THEN
       RETURN 'labor payload breaks the claim-versus-observation contract (observed window)'; END IF;
     IF v ? 'observed_days' AND (jsonb_typeof(v->'observed_days') IS DISTINCT FROM 'array' OR jsonb_array_length(v->'observed_days') > 400) THEN
       RETURN 'labor payload breaks the claim-versus-observation contract (observed days)'; END IF;
@@ -252,16 +282,16 @@ BEGIN
       IF jsonb_typeof(v->'clusters') IS DISTINCT FROM 'array' OR jsonb_array_length(v->'clusters') > 400 THEN
         RETURN 'labor payload breaks the claim-versus-observation contract (clusters)'; END IF;
       FOR e IN SELECT x FROM jsonb_array_elements(v->'clusters') x LOOP
-        IF public.private_work_keys_within(e, 'labor_cluster') IS NOT TRUE THEN
+        IF public.private_work_closed_scalar(e, 'labor_cluster') IS NOT TRUE THEN
           RETURN 'labor payload breaks the claim-versus-observation contract (cluster)'; END IF;
       END LOOP;
     END IF;
     IF v ? 'camera_local_review' AND jsonb_typeof(v->'camera_local_review') <> 'null' THEN
-      IF public.private_work_keys_within(v->'camera_local_review', 'labor_local_review') IS NOT TRUE
+      IF public.private_work_closed_scalar(v->'camera_local_review', 'labor_local_review') IS NOT TRUE
          OR jsonb_typeof(v->'camera_local_review'->'days') IS DISTINCT FROM 'array' OR jsonb_array_length(v->'camera_local_review'->'days') > 400 THEN
         RETURN 'labor payload breaks the claim-versus-observation contract (camera-local review)'; END IF;
       FOR e IN SELECT x FROM jsonb_array_elements(v->'camera_local_review'->'days') x LOOP
-        IF public.private_work_keys_within(e, 'labor_local_day') IS NOT TRUE THEN
+        IF public.private_work_closed_scalar(e, 'labor_local_day') IS NOT TRUE THEN
           RETURN 'labor payload breaks the claim-versus-observation contract (camera-local day)'; END IF;
       END LOOP;
     END IF;
@@ -287,7 +317,7 @@ BEGIN
   IF coalesce(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'private work projections require service admission' USING ERRCODE = '42501';
   END IF;
-  IF public.private_work_account_ok(NEW.owner_id) IS NOT TRUE THEN
+  IF private_work_internal.account_ok(NEW.owner_id) IS NOT TRUE THEN
     RAISE EXCEPTION 'authenticated account required' USING ERRCODE = '42501';
   END IF;
   -- Registered producer route and an exact run trace, on every insert path (not only the writer).
@@ -305,6 +335,8 @@ BEGIN
     prob := public.private_work_payload_problem(coalesce((SELECT jsonb_agg(e - 'rfc_message_id') FROM jsonb_array_elements(NEW.evidence_refs) e
                                                           WHERE jsonb_typeof(e) = 'object'), '[]'::jsonb));
   END IF;
+  IF prob IS NOT NULL THEN RAISE EXCEPTION 'projection content refused: %', prob; END IF;
+  prob := public.private_work_payload_problem(NEW.holds);   -- holds get the same content scan as every other payload
   IF prob IS NOT NULL THEN RAISE EXCEPTION 'projection content refused: %', prob; END IF;
   FOR h IN SELECT jsonb_array_elements(NEW.holds) LOOP
     IF jsonb_typeof(h) <> 'string' OR length(h #>> '{}') > 80 THEN RAISE EXCEPTION 'holds must be short strings'; END IF;
@@ -380,7 +412,7 @@ DECLARE
   v_content text; v_request text; v_item_key text; v_id uuid; v_results jsonb := '[]'; v_writes integer := 0;
   v_supersedes uuid; v_has_head boolean; v_rev integer;
 BEGIN
-  IF coalesce(auth.role(), '') <> 'service_role' OR public.private_work_account_ok(p_owner_id) IS NOT TRUE
+  IF coalesce(auth.role(), '') <> 'service_role' OR private_work_internal.account_ok(p_owner_id) IS NOT TRUE
   THEN RAISE EXCEPTION 'authenticated account required' USING ERRCODE = '42501'; END IF;
   IF jsonb_typeof(p_actor_context) IS DISTINCT FROM 'object' OR octet_length(p_actor_context::text) > 500
      OR EXISTS (SELECT 1 FROM jsonb_object_keys(p_actor_context) k WHERE k NOT IN ('kind', 'agent_id'))

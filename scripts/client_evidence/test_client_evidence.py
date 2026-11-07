@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Synthetic-fixture tests: python3 -I scripts/client_evidence/test_client_evidence.py  (run by scripts/ci/verify.sh).
 No network, no credentials, no real data: every id, hash and amount here is invented."""
-import copy, io, json, os, sys, tempfile, unittest
+import copy, hashlib, io, json, os, sys, tempfile, unittest
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -1005,6 +1005,48 @@ class PrivateProjection(unittest.TestCase):
             projection.check_item(c)
         self.assertIn('opaque namespace', str(cm.exception))
 
+    def test_leaf_values_are_scalars_and_cannot_smuggle_nested_objects(self):
+        img, lab = self._pair()
+        nested = {'hours_spent': '9', 'labor_hours_confirmed': {'x': 1}}
+        def mut(base, f):
+            c = copy.deepcopy(base); f(c['payload']); return c
+        cases = [mut(img, lambda p: p.update(origin_class=nested)), mut(img, lambda p: p['identity'].update(basis=nested)),
+                 mut(img, lambda p: p['capture'].update(camera_local=nested)), mut(img, lambda p: p['time'].update(basis=[1])),
+                 mut(lab, lambda p: p.update(relation=nested)), mut(lab, lambda p: p.update(reconciliation_key=nested)),
+                 mut(lab, lambda p: p['claim'].update(claimed_hours=nested)), mut(lab, lambda p: p['claim'].update(computed_labor=nested)),
+                 mut(lab, lambda p: p['claim'].update(service_period={'start': nested, 'end': 'x'})),
+                 mut(lab, lambda p: p['claim'].update(categories=[{'category': 'a', 'hours': nested}])),
+                 mut(lab, lambda p: p['observed'].update(frames_in_scope=nested)), mut(lab, lambda p: p['observed'].update(hours_lower=nested)),
+                 mut(lab, lambda p: p['observed'].update(note=nested)), mut(lab, lambda p: p['observed'].update(window={'start': nested})),
+                 mut(lab, lambda p: p['observed'].update(clusters=[{'start': 'a', 'end': 'b', 'frames': nested}])),
+                 mut(lab, lambda p: p['observed'].update(camera_local_review={'clock_offset': nested, 'days': []})),
+                 mut(lab, lambda p: p['observed'].update(camera_local_review={'clock_offset': 'unknown', 'days': [{'camera_local_day': 'd', 'frames': [1]}]}))]
+        for i, c in enumerate(cases):
+            with self.assertRaises(ContractError, msg=f'case {i}'):
+                projection.check_item(c)
+        projection.check_item(img); projection.check_item(lab)
+
+    def test_holds_and_refs_get_the_databases_content_scan(self):
+        img, _ = self._pair()
+        for hold in ('DE89370400440532013000', 'someone@example.invalid', 'x' * 81):
+            c = copy.deepcopy(img); c['holds'] = c['holds'] + [hold]
+            with self.assertRaises(ContractError, msg=hold):
+                projection.check_item(c)
+        real_sha = hashlib.sha256(b'synthetic image bytes').hexdigest()
+        bank = [{'kind': 'source_message', 'origin_key': 'gmail:acct:DE89370400440532013000:p1'},
+                {'kind': 'source_message', 'origin_key': 'gmail:acct:m1:p1', 'rfc_message_id': '<GB82WEST12345698765432@x.test>'}]
+        for ref in bank:
+            c = copy.deepcopy(img); c['evidence_refs'].append(ref)
+            with self.assertRaises(ContractError, msg=str(ref)):
+                projection.check_item(c)
+        c = copy.deepcopy(img)
+        c['evidence_refs'] = [{'kind': 'image', 'sha256': real_sha},
+                              {'kind': 'source_message', 'origin_key': 'gmail:acct:m1:p1', 'rfc_message_id': '<CAF3k9xQ2b7d@mail.example.test>'}]
+        projection.check_item(c)                                    # lowercase sha256 and a clean RFC Message-ID stay valid
+        for n in range(300):                                        # ordinary synthetic bytes: no lowercase hash is ever bank-shaped
+            c['evidence_refs'] = [{'kind': 'image', 'sha256': hashlib.sha256(b'bytes-%d' % n).hexdigest()}]
+            projection.check_item(c)
+
     def test_registered_route_and_run_trace_shape(self):
         self.assertEqual(projection.REGISTERED_PRODUCERS, {('client_evidence_projector', 'image_labor_projection', '2026-11-07a')})
         pcs = self.labor_pipeline(self.images())['private_projection_changeset']
@@ -1026,6 +1068,12 @@ class PrivateProjection(unittest.TestCase):
         rx = re.findall(r"lower\(k\) ~ '\(([^']*)\)'", sql)
         self.assertIn(projection.FORBIDDEN_RE.pattern.strip('()'), rx)
         self.assertIn(projection.CLAIM_AS_WORK_RE.pattern.strip('()'), rx)
+        cb = sql.split('-- parity:container_keys', 1)[1].split('ELSE ARRAY', 1)[0]
+        self.assertEqual({m.group(1): set(q(m.group(2))) for m in re.finditer(r"WHEN '(\w+)' THEN ARRAY\[(.*?)\]", cb)}, projection.CONTAINER_KEYS)
+        self.assertIn(projection.IBAN_SQL.pattern, sql)
+        self.assertNotIn('SECURITY DEFINER', sql.split('CREATE FUNCTION public.', 1)[1])      # no definer function in public
+        self.assertEqual(sql.count('SECURITY DEFINER SET'), 1)
+        self.assertIn('CREATE FUNCTION private_work_internal.account_ok', sql)
         # registered producer, status and relation vocabularies
         reg = sql.split('-- parity:producer_registry', 1)[1].split('))', 1)[0]
         self.assertEqual({tuple(q(t)) for t in re.findall(r"\(([^()]*)\)", reg + ')')}, projection.REGISTERED_PRODUCERS)

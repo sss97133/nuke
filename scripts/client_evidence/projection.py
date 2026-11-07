@@ -43,6 +43,15 @@ ALLOWED_KEYS = {
                     'outside_vehicle_date_range', 'non_install_intent', 'intent_unclassified', 'intent_not_billable'},
     'labor_rate': {'category', 'rate', 'rate_source'},
 }
+# Keys whose value may be a nested object or array; every other value must be a JSON scalar (mirrors public.private_work_container_keys).
+CONTAINER_KEYS = {
+    'image': {'time', 'capture', 'identity'},
+    'labor': {'claim', 'observed', 'holds', 'rate_provenance', 'conflicts'},
+    'labor_claim': {'service_period', 'categories'},
+    'labor_observed': {'window', 'observed_days', 'clusters', 'camera_local_review'},
+    'labor_local_review': {'days'},
+}
+IBAN_SQL = re.compile(r'[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}')   # the database's private_work_payload_problem bank-identifier scan, exactly
 IMAGE_KEYS, LABOR_KEYS = ALLOWED_KEYS['image'], ALLOWED_KEYS['labor']
 REGISTERED_PRODUCERS = {(PRODUCER, METHOD, VERSION)}       # mirrors public.private_work_producer_registered
 LABOR_STATUS = {'not_supplied', 'not_assessable', 'no_evidence', 'presence_only', 'review_camera_local_only', 'estimated_from_photos'}
@@ -214,9 +223,15 @@ def check_item(it):
     bad = [k for k in _walk_keys(scanned) if k.lower() in FORBIDDEN or FORBIDDEN_RE.search(k.lower()) or CLAIM_AS_WORK_RE.search(k.lower())]
     if bad or privacy_scan(p):
         raise ContractError(f'projection content refused: {bad or privacy_scan(p)[:3]}')
+    if privacy_scan(it['holds']) or _sql_text_problem(it['holds']):
+        raise ContractError('projection content refused: a hold looks like a bank identifier, e-mail address or raw text')
     for r in refs:
         if r.get('kind') == 'source_message' and EMAIL_RE.search(str(r.get('origin_key'))):
             raise ContractError('a source message origin key looks like an e-mail address; account_ref must be an opaque namespace without "@"')
+    for r in refs:
+        # same scan as the database: every ref string for bank shape; an RFC Message-ID looks like an address and is exempt from e-mail only
+        if any(_sql_text_problem([v], email=(k != 'rfc_message_id')) for k, v in r.items() if isinstance(v, str)):
+            raise ContractError('projection content refused: an evidence ref looks like a bank identifier or e-mail address')
     if it['kind'] == 'image_timeline_event':
         _check_image(it, p)
     else:
@@ -224,7 +239,18 @@ def check_item(it):
 
 
 def _within(o, name):
-    return isinstance(o, dict) and set(o) <= ALLOWED_KEYS[name]
+    """Closed key set AND scalar leaves: only the named containers may be objects or lists (mirrors private_work_closed_scalar)."""
+    return isinstance(o, dict) and set(o) <= ALLOWED_KEYS[name] \
+        and all(isinstance(v, (str, int, float, bool, type(None))) for k, v in o.items() if k not in CONTAINER_KEYS.get(name, ()))
+
+
+def _sql_text_problem(strings, email=True):
+    """The database's string scan (bank identifier, e-mail address, oversized text), run at plan time so a dry run cannot pass
+    what apply would refuse."""
+    for t in strings:
+        if len(t) > 500 or IBAN_SQL.search(t) or (email and EMAIL_RE.search(t)):
+            return True
+    return False
 
 
 def _is(o, key, value):
