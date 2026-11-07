@@ -335,6 +335,10 @@ BEGIN
     prob := public.private_work_payload_problem(coalesce((SELECT jsonb_agg(e - 'rfc_message_id') FROM jsonb_array_elements(NEW.evidence_refs) e
                                                           WHERE jsonb_typeof(e) = 'object'), '[]'::jsonb));
   END IF;
+  IF prob IS NULL AND EXISTS (SELECT 1 FROM jsonb_array_elements(NEW.evidence_refs) e   -- the Message-ID keeps only its e-mail exemption: bank shape and size still refuse
+      WHERE e->>'rfc_message_id' ~ '[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}' OR length(e->>'rfc_message_id') > 500) THEN
+    prob := 'bank identifier';
+  END IF;
   IF prob IS NOT NULL THEN RAISE EXCEPTION 'projection content refused: %', prob; END IF;
   prob := public.private_work_payload_problem(NEW.holds);   -- holds get the same content scan as every other payload
   IF prob IS NOT NULL THEN RAISE EXCEPTION 'projection content refused: %', prob; END IF;

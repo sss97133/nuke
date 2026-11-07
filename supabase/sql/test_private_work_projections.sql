@@ -189,7 +189,7 @@ BEGIN
     PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('s-' || k, jsonb_build_array(
       pg_temp.labor_item('ls-' || k, (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
         jsonb_build_object('payload', jsonb_set(jsonb_set(l1->'payload', '{claim,service_period}', '{"start":"2016-01-01","end":"2016-02-01"}'),
-          string_to_array(k, '.'), '{"hours_spent":"9","labor_hours_confirmed":{"x":1}}'::jsonb))))))::text), 'labor payload');
+          string_to_array(k, '.'), '{"hours_spent":"9","labor_hours_confirmed":{"x":1}}'::jsonb)))))::text), 'labor payload');
   END LOOP;
   PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('s-cat', jsonb_build_array(
     pg_temp.labor_item('lscat', (da->>'document_id')::uuid, (da->>'extraction_run_id')::uuid, sha_a, 'rev-a',
@@ -206,14 +206,14 @@ BEGIN
     pg_temp.img_item('si2', jsonb_build_object('payload', jsonb_set(i1->'payload', '{identity,basis}', '{"labor_hours_confirmed":"9"}')))))::text), 'observation contract');
   -- holds get the same content scan as every other payload
   PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('hd1', jsonb_build_array(
-    pg_temp.img_item('hd1', '{"holds":["DE89370400440532013000"]}'))))::text), 'bank identifier');
+    pg_temp.img_item('hd1', '{"holds":["DE89370400440532013000"]}')))::text), 'bank identifier');
   PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('hd2', jsonb_build_array(
-    pg_temp.img_item('hd2', '{"holds":["someone@example.invalid"]}'))))::text), 'e-mail address');
+    pg_temp.img_item('hd2', '{"holds":["someone@example.invalid"]}')))::text), 'e-mail address');
   -- evidence refs: bank-shaped identifiers refused (also in an RFC Message-ID); realistic lowercase sha256 and a clean Message-ID pass
   PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('rf1', jsonb_build_array(
-    pg_temp.img_item('rf1', '{"evidence_refs":[{"kind":"source_message","origin_key":"gmail:acct:DE89370400440532013000:p1"}]}'))))::text), 'bank identifier');
+    pg_temp.img_item('rf1', '{"evidence_refs":[{"kind":"source_message","origin_key":"gmail:acct:DE89370400440532013000:p1"}]}')))::text), 'bank identifier');
   PERFORM pg_temp.fails(format('SELECT ingest_private_work_projection(%L, %L::jsonb)', a, pg_temp.rev('rf2', jsonb_build_array(
-    pg_temp.img_item('rf2', '{"evidence_refs":[{"kind":"source_message","origin_key":"gmail:acct:m1:p1","rfc_message_id":"<GB82WEST12345698765432@x.test>"}]}'))))::text), 'bank identifier');
+    pg_temp.img_item('rf2', '{"evidence_refs":[{"kind":"source_message","origin_key":"gmail:acct:m1:p1","rfc_message_id":"<GB82WEST12345698765432@x.test>"}]}')))::text), 'bank identifier');
   r := ingest_private_work_projection(a, pg_temp.rev('rf3', jsonb_build_array(
     pg_temp.img_item('rf3', jsonb_build_object('evidence_refs', jsonb_build_array(
       jsonb_build_object('kind', 'image', 'sha256', encode(extensions.digest(convert_to('synthetic image bytes', 'UTF8'), 'sha256'), 'hex')),
