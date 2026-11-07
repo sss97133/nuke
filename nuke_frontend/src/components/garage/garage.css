@@ -4,6 +4,8 @@
 .garage-page h3 { margin: 0 0 8px; font-size: 16px; }
 .garage-heading, .garage-toolbar-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .garage-heading { margin-bottom: 20px; }
+.garage-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.garage-heading-actions .btn-base { min-height: 44px; display: inline-flex; align-items: center; }
 .garage-heading p { margin: 4px 0 0; color: var(--text-secondary); }
 .garage-toolbar, .garage-notice, .garage-empty, .garage-unresolved { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); margin-bottom: 20px; }
 .garage-toolbar-heading { margin-bottom: 16px; }
