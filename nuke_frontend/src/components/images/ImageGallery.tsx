@@ -1272,9 +1272,13 @@ const ImageGallery = ({
         const posB = (typeof b?.position === 'number' && Number.isFinite(b.position)) ? b.position : Number.POSITIVE_INFINITY;
         if (posA !== posB) return posA - posB;
 
+        // Ties on position (e.g. most rows default to position 0) must honor the
+        // selected date mode. Ascending-only tie-break buried the newest uploads
+        // past MAX_INITIAL_DISPLAY on large galleries (all position=0 rows sorted
+        // oldest-first, so a 1.6k-photo vehicle never showed its latest set).
         const ca = new Date(a?.taken_at || a?.created_at || 0).getTime();
         const cb = new Date(b?.taken_at || b?.created_at || 0).getTime();
-        if (ca !== cb) return ca - cb;
+        if (ca !== cb) return mode === 'date_asc' ? ca - cb : cb - ca;
 
         return String(a?.id || '').localeCompare(String(b?.id || ''));
       });
@@ -4396,7 +4400,10 @@ const ImageGallery = ({
       {/* Image Lightbox - Using proper ImageLightbox component with tags */}
       {lightboxOpen && currentImage && (
         <ImageLightbox
-          imageUrl={getOptimalImageUrl(currentImage, 'full')}
+          imageUrl={/\.(heic|heif)(\?|$)/i.test(String(currentImage?.image_url || currentImage?.storage_path || ''))
+            // HEIC originals don't render in Chrome/Firefox; display a derivative (downloads keep the original).
+            ? (currentImage.large_url || currentImage.medium_url || currentImage.thumbnail_url || getOptimalImageUrl(currentImage, 'full'))
+            : getOptimalImageUrl(currentImage, 'full')}
           imageId={lightboxImageId}
           vehicleId={vehicleId}
           isOpen={lightboxOpen}

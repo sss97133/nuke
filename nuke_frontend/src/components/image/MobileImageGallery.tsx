@@ -11,6 +11,8 @@ interface VehicleImage {
   id: string;
   image_url: string;
   large_url?: string;
+  medium_url?: string;
+  thumbnail_url?: string;
   caption?: string;
   angle_tag?: string;
   created_at: string;
@@ -39,7 +41,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
   const loadImages = async (vehicleId: string, isCancelled: () => boolean) => {
     const { data, error } = await supabase
       .from('vehicle_images')
-      .select('id, image_url, large_url, caption, angle_tag, created_at')
+      .select('id, image_url, large_url, medium_url, thumbnail_url, caption, angle_tag, created_at')
       .eq('vehicle_id', vehicleId)
       .order('is_primary', { ascending: false })
       // Capture time, not ingestion time — backfilled photos get created_at=now.
@@ -106,7 +108,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
   };
 
   const currentImage = images[currentIndex];
-  const imageUrl = currentImage?.image_url || leadImageUrl || undefined;
+  const imageUrl = currentImage?.medium_url || currentImage?.large_url || currentImage?.thumbnail_url || currentImage?.image_url || leadImageUrl || undefined;
 
   return (
     <div

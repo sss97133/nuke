@@ -985,7 +985,7 @@ function CompactCard({ vehicle }: { vehicle: GarageVehicle }) {
           </span>
         </HoverData>
         <span style={{ ...LABEL, fontSize: 'var(--text-caption)', flexShrink: 0 }}>
-          {formatRelativeTime(vehicle.updated_at)}
+          {formatRelativeTime(vehicle.last_activity_at ?? vehicle.updated_at)}
         </span>
       </div>
     </Link>
