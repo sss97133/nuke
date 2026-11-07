@@ -21,7 +21,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
-import { isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
+import { clearRetry, isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
 import { buildStageReceipt, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts } from "./stageReceipts.ts";
 import { runStageWorker } from "./stageWorker.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -371,7 +371,11 @@ Deno.serve(async (req) => {
       let failedAttribution: AttributionReceipt | null = null;
       if (!vehicle_id) {
         const resolved = await resolveVehicle(image_id, user_id, classification);
-        if (resolved) failedAttribution = await fileResolvedVehicle(image_id, resolved);
+        if (resolved) {
+          // A filing error must not turn a provider rate limit into a failed photo: defer first, file on the retry.
+          try { failedAttribution = await fileResolvedVehicle(image_id, resolved); }
+          catch (e) { if (!isRateLimited(detail)) throw e; console.warn("[photo-pipeline] filing skipped during rate limit"); }
+        }
       }
       if (isRateLimited(detail)) {
         // Provider-wide condition, not a verdict on the photo: requeue with a backoff instead of failing it.
@@ -502,6 +506,8 @@ Deno.serve(async (req) => {
     // Receipts after the state write: the classifier succeeded; each stage #3024 found undeployed is retryable in an hour.
     await classifierReceipt(image_id, "succeeded", { detail: { classification: classification.image_type, model: classification.classifier_receipt?.model ?? null } });
     for (const r of unavailableReceipts(image_id, routeResult.stage_unavailable)) await recordStageReceipt(supabase, r);
+    // A real model answer closes this image's retry state and the provider breaker (AIMD +1). Nothing else calls it.
+    await clearRetry(supabase, image_id);
 
     // Late-resolution dedup pass: Step 1.5 could only see this row in the
     // detector's corpus if it was INSERTed with a vehicle_id. When the vehicle

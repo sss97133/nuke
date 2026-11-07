@@ -19,13 +19,13 @@ let gpsMatch: { vehicle_id: string; confidence: number } | null = null;
 let attributeResult: Record<string, unknown> = { success: true };
 let attributeBody: Record<string, unknown> | null = null;
 let patchBodies: Record<string, unknown>[] = [], uploadClockReads = 0;
-let modelStatus = 200, noteFailureBody: Record<string, unknown> | null = null;
+let modelStatus = 200, noteFailureBody: Record<string, unknown> | null = null, attributeHttpFails = false, clearRetryBodies: Record<string, unknown>[] = [];
 let stageReceipts: Record<string, unknown>[] = [];
 function reset() {
   patches = 0; calls = []; rejectWrite = false;
   classificationType = "other"; intakeSuccess = true; intakeDuplicate = false; rejectEvidence = false; intakeBody = null;
   gpsMatch = null; attributeResult = { success: true }; attributeBody = null; patchBodies = []; uploadClockReads = 0;
-  modelStatus = 200; noteFailureBody = null; stageReceipts = [];
+  modelStatus = 200; noteFailureBody = null; attributeHttpFails = false; clearRetryBodies = []; stageReceipts = [];
   Deno.env.delete("GEMINI_API_KEY");
   row = { id: "image", image_url: "https://example.invalid/image.jpg", vehicle_id: "vehicle",
     updated_at: "2026-01-01T00:00:00.000Z", ai_scan_metadata: { byok_deep_analysis: { original: true }, on_device_vision: { version: "local-v1" } },
@@ -49,6 +49,9 @@ globalThis.fetch = (async (input, init) => {
       intakeBody = JSON.parse(String(options?.body));
       return Response.json({ success: intakeSuccess, observation_id: intakeSuccess ? "observation" : null, duplicate: intakeDuplicate });
     }
+    if (url.origin === project && url.pathname === "/functions/v1/analyze-engine-bay") {
+      return new Response('{"code":"NOT_FOUND","message":"Requested function was not found"}', { status: 404 });
+    }
     if (url.origin === project && url.pathname === "/functions/v1/part-number-ocr") return Response.json({ parts: [{ number: "synthetic-part" }], parts_found: 1 });
     if (url.origin === project && url.pathname === "/rest/v1/vehicle_field_evidence") {
       return rejectEvidence ? Response.json({ message: "synthetic evidence rejection" }, { status: 400 }) : Response.json([]);
@@ -59,9 +62,13 @@ globalThis.fetch = (async (input, init) => {
     if (url.origin === project && url.pathname === "/rest/v1/rpc/photo_pipeline_note_failure") {
       noteFailureBody = JSON.parse(String(options?.body)); return Response.json({ status: "pending" });
     }
+    if (url.origin === project && url.pathname === "/rest/v1/rpc/photo_pipeline_clear_retry") {
+      clearRetryBodies.push(JSON.parse(String(options?.body))); return Response.json(null);
+    }
     if (url.origin === project && url.pathname === "/rest/v1/rpc/attribute_testimony") {
       // The live writer files only an unfiled row, and its UPDATE moves the updated_at token.
       attributeBody = JSON.parse(String(options?.body));
+      if (attributeHttpFails) return Response.json({ message: "synthetic writer failure" }, { status: 500 });
       if (attributeResult.success === true) {
         row = { ...row, vehicle_id: attributeBody?.p_target_vehicle_id,
           updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
@@ -238,6 +245,63 @@ Deno.test("provider 429 requeues the image, honours Retry-After, never marks it 
   // the same outcome is a rate_limited stage receipt with a retry time (note_failure mock returns none, so Retry-After is used)
   assert(stageReceipts.length === 1 && stageReceipts[0].p_outcome === "rate_limited" && stageReceipts[0].p_retry_after_seconds === 120
     && stageReceipts[0].p_http_status === 429 && stageReceipts[0].p_error_class === "classifier_rate_limited");
+});
+
+Deno.test("a 429 on an unfiled photo is still deferred when the sanctioned filing writer errors", async () => {
+  globalThis.fetch = fixtureFetch;
+  unfiledPhoto(); modelStatus = 429; gpsMatch = { vehicle_id: "held-vehicle", confidence: 0.9 }; attributeHttpFails = true;
+  const response = await handler(request({ vehicle_id: null, user_id: "owner" })); const result = await response.json();
+  // provider condition wins: requeued with a backoff, breaker told, never failed because filing hiccuped
+  assert(result.rate_limited === true && result.requeued === true && row.ai_processing_status === "pending");
+  assert(noteFailureBody?.p_http_status === 429);
+  assert(!(row.ai_scan_metadata as Record<string, Record<string, unknown>>).photo_pipeline.last_failure);
+});
+
+Deno.test("a successful classification closes the retry state and the breaker (clear_retry)", async () => {
+  globalThis.fetch = fixtureFetch;
+  reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key");
+  const result = await (await handler(request())).json();
+  assert(result.success === true && row.ai_processing_status === "completed");
+  assert(clearRetryBodies.length === 1 && clearRetryBodies[0].p_image_id === "image");
+});
+
+Deno.test("a 429 never calls clear_retry; a failed completion never calls it", async () => {
+  globalThis.fetch = fixtureFetch;
+  reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key"); modelStatus = 429;
+  await (await handler(request())).json(); assert(clearRetryBodies.length === 0);
+  reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key"); intakeSuccess = false;
+  await (await handler(request())).json(); assert(clearRetryBodies.length === 0);
+});
+
+Deno.test("429: exactly one rate_limited receipt, no succeeded/unavailable receipt, no clear_retry, programmatic filing still ran", async () => {
+  globalThis.fetch = fixtureFetch;
+  unfiledPhoto(); modelStatus = 429; gpsMatch = { vehicle_id: "held-vehicle", confidence: 0.9 };
+  const result = await (await handler(request({ vehicle_id: null, user_id: "owner" }))).json();
+  assert(result.rate_limited === true && row.ai_processing_status === "pending");
+  assert(row.vehicle_id === "held-vehicle");            // the provider outage did not block VIN/GPS filing
+  assert(stageReceipts.length === 1 && stageReceipts[0].p_outcome === "rate_limited" && stageReceipts[0].p_stage === "classifier");
+  assert(clearRetryBodies.length === 0 && intakeBody === null);   // no observation from an unclassified photo
+});
+
+Deno.test("success with an undeployed stage: one succeeded + one unavailable receipt at registry versions, then clear_retry once", async () => {
+  globalThis.fetch = fixtureFetch;
+  reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key"); classificationType = "engine_bay";
+  const result = await (await handler(request())).json();
+  assert(result.success === true && row.ai_processing_status === "completed");
+  const byStage = stageReceipts.map((r) => `${r.p_stage}:${r.p_outcome}:v${r.p_producer_version}`).sort();
+  assert(JSON.stringify(byStage) === JSON.stringify(["classifier:succeeded:v1", "engine_bay:unavailable:v1"]));
+  const un = stageReceipts.find((r) => r.p_stage === "engine_bay")!;
+  assert(un.p_retry_after_seconds === 3600 && un.p_error_class === "edge_function_not_deployed" && un.p_http_status === null);
+  const sm = (row.ai_scan_metadata as Record<string, unknown>).stage_unavailable as { stage: string }[];
+  assert(sm.length === 1 && sm[0].stage === "analyze-engine-bay");   // #3024 metadata and #3027 receipt agree
+  assert(clearRetryBodies.length === 1);
+});
+
+Deno.test("a stage failure after a paid classification is a pipeline failure, not a succeeded receipt", async () => {
+  globalThis.fetch = fixtureFetch;
+  reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key"); intakeSuccess = false;
+  await handler(request());
+  assert(stageReceipts.every((r) => r.p_outcome !== "succeeded") && stageReceipts.length === 1 && stageReceipts[0].p_outcome === "failed");
 });
 
 Deno.test("a non-rate-limit classifier error is still a failure", async () => {
