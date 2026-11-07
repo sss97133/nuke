@@ -444,6 +444,11 @@ Deno.serve(async (req) => {
       classifier_failed: classifierFailed, // queryable top-level flag, not buried in nested JSON
     };
     if (attribution) scanMeta.attribution = attribution;
+    if (routeResult.stage_unavailable?.length) {
+      scanMeta.stage_unavailable = routeResult.stage_unavailable.map((stage) => ({
+        stage, status: "unavailable", reason: "edge_function_not_deployed", retryable: true, at: new Date().toISOString(),
+      }));
+    }
     // P3.2: stamp the observable deep-queue marker in the owned patch here —
     // it only flips the gate column, the real prepare() selection key). NOT
     // byok_deep_analysis, which would make prepare() think the deep work is done.
@@ -684,6 +689,8 @@ interface RouteResult {
   response_data?: any;
   /** Set when the frame was marked eligible for the BYOK deep queue (P3.2). */
   deep_enqueued?: boolean;
+  /** Stages whose edge function is not deployed. Recorded in ai_scan_metadata.stage_unavailable so a later pass can retry them. */
+  stage_unavailable?: string[];
 }
 
 async function routeByType(
@@ -730,7 +737,8 @@ async function routeByType(
       const engine = engineResult.status === "fulfilled" ? engineResult.value : null;
 
       return {
-        summary: `engine_bay: analyze-image ${analyze ? "ok" : "failed"}, analyze-engine-bay ${engine ? "ok" : "failed"}`,
+        stage_unavailable: engine?.stage_unavailable,
+        summary: `engine_bay: analyze-image ${analyze ? "ok" : "failed"}, analyze-engine-bay ${engine?.stage_unavailable ? "unavailable" : engine ? "ok" : "failed"}`,
         handler: "analyze-image + analyze-engine-bay",
         extracted_fields: {
           ...(analyze?.extracted_fields || {}),
@@ -869,6 +877,28 @@ async function enqueueDeepByok(imageId: string, vehicleId: string): Promise<bool
 // EDGE FUNCTION CALLERS
 // ============================================================
 
+/** The edge gateway answers 404 NOT_FOUND for a slug that was never deployed; a deployed function's own 404 carries its own body. */
+export class StageUnavailableError extends Error {
+  constructor(public functionName: string) {
+    super(`${functionName} is not deployed`);
+    this.name = "StageUnavailableError";
+  }
+}
+
+export function isFunctionNotDeployed(status: number, body: string): boolean {
+  if (status !== 404) return false;
+  return /NOT_FOUND|Requested function was not found/i.test(body);
+}
+
+function unavailable(fn: string): RouteResult {
+  console.warn(`[photo-pipeline] stage unavailable: ${fn} not deployed; recorded for retry`);
+  return {
+    summary: `${fn}: stage unavailable (not deployed), retry later`,
+    handler: fn,
+    stage_unavailable: [fn],
+  };
+}
+
 async function callEdgeFunction(
   functionName: string,
   body: Record<string, any>,
@@ -887,6 +917,7 @@ async function callEdgeFunction(
 
   if (!response.ok) {
     const errorText = await response.text();
+    if (isFunctionNotDeployed(response.status, errorText)) throw new StageUnavailableError(functionName);
     throw new Error(`${functionName} returned ${response.status}: ${errorText}`);
   }
 
@@ -945,6 +976,7 @@ async function callAnalyzeEngineBay(
       response_data: data,
     };
   } catch (error: any) {
+    if (error instanceof StageUnavailableError) return unavailable("analyze-engine-bay");
     console.warn(`[photo-pipeline] analyze-engine-bay failed: ${error.message}`);
     return {
       summary: `analyze-engine-bay: failed (${error.message})`,
@@ -972,6 +1004,7 @@ async function callPartNumberOcr(
       response_data: data,
     };
   } catch (error: any) {
+    if (error instanceof StageUnavailableError) return unavailable("part-number-ocr");
     console.warn(`[photo-pipeline] part-number-ocr failed: ${error.message}`);
     // Fallback: run standard analysis instead
     return {
@@ -1002,6 +1035,7 @@ async function callReceiptPhotoOcr(
       response_data: data,
     };
   } catch (error: any) {
+    if (error instanceof StageUnavailableError) return unavailable("receipt-photo-ocr");
     console.warn(`[photo-pipeline] receipt-photo-ocr failed: ${error.message}`);
     return {
       summary: `receipt-photo-ocr: failed (${error.message})`,

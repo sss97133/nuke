@@ -284,3 +284,10 @@ Deno.test("a non-rate-limit classifier error is still a failure", async () => {
 });
 
 Deno.test("restore fetch after rate-limit tests", () => { globalThis.fetch = originalFetch; });
+
+Deno.test("undeployed edge functions are reported as unavailable, not as failures", async () => {
+  const { isFunctionNotDeployed } = await import("./index.ts");
+  if (!isFunctionNotDeployed(404, '{"code":"NOT_FOUND","message":"Requested function was not found"}')) throw new Error("gateway 404 must count as undeployed");
+  if (isFunctionNotDeployed(404, '{"error":"receipt not found"}')) throw new Error("a deployed function's own 404 is not undeployed");
+  if (isFunctionNotDeployed(500, "NOT_FOUND")) throw new Error("only 404 counts");
+});
