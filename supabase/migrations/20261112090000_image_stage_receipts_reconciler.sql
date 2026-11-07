@@ -157,14 +157,41 @@ end $$;
 
 -- ---------------------------------------------------------------- legacy evidence (reads, never writes)
 -- true = an output for this stage already exists on the row, so the stage is not paid for again.
--- Paths follow the receipts written by photo-pipeline-orchestrator (ai_scan_metadata.photo_pipeline.receipt.outcome,
--- classification.classifier_ok). VERIFY against live rows before enabling: the library-coverage doc found 12,502 rows
--- with byok_deep_analysis but only 11,893 indexed, so presence of a key is weaker than a receipt.
+-- Classifier shapes seen on live completed rows (parent read-only sample, 2026-11-07 05:05 AST; a sample, not a census):
+--   A  classification.classifier_ok = true                      (~60%, newest orchestrator)
+--   B  photo_pipeline.receipt.outcome = 'completed'             (orchestrator receipt)
+--   C  classification{image_type, confidence} + pipeline_version ('v2' mostly, some 'v1'); no classifier_ok, no receipt
+--      (the rest of completed rows; extra keys such as description, is_automotive, detected_text, vin_detected vary)
+--   none: no pipeline_version / no classification (~3%) => a real gap.
+-- Shape C needs all three: image_type a non-empty string, confidence a JSON number, pipeline_version a non-empty string.
+-- A bare classification object without pipeline_version is not evidence of a finished run.
+-- Legacy v1 vs required_version: required_version counts receipt versions (image_stage_receipts.producer_version), a
+-- different scale from the legacy pipeline_version label. v1 produced the same fields (image_type + confidence) the
+-- consumers read, so it is NOT outdated; re-paying the classifier on it would buy no field it lacks. A real quality
+-- change is declared by bumping required_version AND writing receipts; legacy evidence never invents a receipt.
+-- image_stage_legacy_version() names the legacy producer ('legacy-v1', 'legacy-v2') for reports; it is a read, not a receipt.
+create or replace function public.image_stage_legacy_version(p_stage text, p_meta jsonb)
+returns text language sql immutable as $$
+  select case p_stage
+    when 'classifier' then
+      case when coalesce(p_meta #>> '{photo_pipeline,receipt,outcome}', '') = 'completed'
+                or coalesce(p_meta #>> '{classification,classifier_ok}', '') = 'true'
+             then 'orchestrator-receipt'
+           when jsonb_typeof(p_meta -> 'classification') = 'object'
+                and jsonb_typeof(p_meta #> '{classification,image_type}') = 'string'
+                and btrim(p_meta #>> '{classification,image_type}') <> ''
+                and jsonb_typeof(p_meta #> '{classification,confidence}') = 'number'
+                and jsonb_typeof(p_meta -> 'pipeline_version') = 'string'
+                and btrim(p_meta ->> 'pipeline_version') <> ''
+             then 'legacy-' || btrim(p_meta ->> 'pipeline_version')
+           else null end
+    else null end
+$$;
+
 create or replace function public.image_stage_legacy_evidence(p_stage text, p_meta jsonb, p_exif jsonb)
 returns boolean language sql immutable as $$
   select case p_stage
-    when 'classifier' then coalesce(p_meta #>> '{photo_pipeline,receipt,outcome}', '') = 'completed'
-                        or coalesce(p_meta #>> '{classification,classifier_ok}', '') = 'true'
+    when 'classifier' then public.image_stage_legacy_version('classifier', p_meta) is not null
     when 'exif' then p_exif is not null and p_exif <> '{}'::jsonb
     else false end
 $$;
@@ -335,10 +362,10 @@ revoke all on function public.image_stage_gaps(uuid[]) from public, anon, authen
 revoke all on function public.reconcile_image_stages(integer) from public, anon, authenticated;
 revoke all on function public.claim_image_stage_work(text, integer, integer) from public, anon, authenticated;
 revoke all on function public.release_expired_image_stage_work() from public, anon, authenticated;
-revoke all on function public.image_stage_legacy_evidence(text, jsonb, jsonb), public.image_stage_legacy_unavailable(jsonb, text) from public, anon, authenticated;
+revoke all on function public.image_stage_legacy_version(text, jsonb), public.image_stage_legacy_evidence(text, jsonb, jsonb), public.image_stage_legacy_unavailable(jsonb, text) from public, anon, authenticated;
 grant execute on function public.record_image_stage_receipt(uuid, text, integer, text, text, integer, integer, text, jsonb),
   public.image_stage_gaps(uuid[]), public.reconcile_image_stages(integer), public.claim_image_stage_work(text, integer, integer),
-  public.release_expired_image_stage_work(), public.image_stage_legacy_evidence(text, jsonb, jsonb), public.image_stage_legacy_unavailable(jsonb, text) to service_role;
+  public.release_expired_image_stage_work(), public.image_stage_legacy_version(text, jsonb), public.image_stage_legacy_evidence(text, jsonb, jsonb), public.image_stage_legacy_unavailable(jsonb, text) to service_role;
 
 -- ---------------------------------------------------------------- cron (inert until platform_config enabled=true)
 select cron.schedule('image-stage-reconciler', '*/5 * * * *',

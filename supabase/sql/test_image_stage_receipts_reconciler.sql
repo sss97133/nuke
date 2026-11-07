@@ -69,6 +69,9 @@ SELECT pg_temp.mk(11, interval '1 hour');                                       
 SELECT pg_temp.mk(12, interval '1 hour');                                                         -- live, inside #3025 backoff
 SELECT pg_temp.mk(13, interval '1 hour');                                                         -- live, blocked_input
 SELECT pg_temp.mk(14, interval '10 days');                                                        -- backfill, missing
+SELECT pg_temp.mk(16, interval '1 hour', '{"pipeline_version":"v2","classification":{"image_type":"exterior","confidence":0.91,"description":"x","is_automotive":true}}');  -- legacy shape C, v2
+SELECT pg_temp.mk(17, interval '1 hour', '{"pipeline_version":"v1","classification":{"image_type":"engine_bay","confidence":0.5}}');   -- legacy shape C, v1
+SELECT pg_temp.mk(18, interval '1 hour', '{"photo_pipeline":{"receipt":{"outcome":"completed"}}}');                                    -- shape B
 SELECT pg_temp.mk(15, interval '5 minutes');                                                      -- too new: inside min_age grace
 INSERT INTO photo_pipeline_retry_state VALUES (pg_temp.img(12), false, now() + interval '1 hour');
 
@@ -110,10 +113,24 @@ SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(1)])) =
 SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(5)])) = 'retryable_outcome', 'unavailable past retry_after => retryable');
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(4)])), 'rate_limited before retry_after is not a gap');
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(2), pg_temp.img(3), pg_temp.img(6), pg_temp.img(11), pg_temp.img(13)])), 'succeeded, legacy evidence, policy_skip, failed, blocked_input are not gaps');
+-- legacy shapes (live sample 2026-11-07): shapes A/B/C satisfy the stage; incomplete shapes stay gaps
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(16), pg_temp.img(17), pg_temp.img(18)])), 'legacy v2 / v1 classification and orchestrator receipt are not gaps');
+SELECT pg_temp.ok(NOT image_stage_legacy_evidence('classifier', m, NULL), 'incomplete legacy shape is not evidence: ' || m::text)
+  FROM unnest(ARRAY[
+    '{"classification":{"image_type":"exterior","confidence":0.9}}',
+    '{"pipeline_version":"v2"}',
+    '{"pipeline_version":"v2","classification":{"image_type":"","confidence":0.9}}',
+    '{"pipeline_version":"v2","classification":{"image_type":"exterior","confidence":"high"}}',
+    '{"pipeline_version":"v2","classification":"exterior"}',
+    '{"pipeline_version":"","classification":{"image_type":"exterior","confidence":0.9}}',
+    '{}']::jsonb[]) AS m;
+SELECT pg_temp.ok(image_stage_legacy_version('classifier', (SELECT ai_scan_metadata FROM vehicle_images WHERE id = pg_temp.img(16))) = 'legacy-v2', 'legacy producer version v2 recorded');
+SELECT pg_temp.ok(image_stage_legacy_version('classifier', (SELECT ai_scan_metadata FROM vehicle_images WHERE id = pg_temp.img(17))) = 'legacy-v1', 'legacy producer version v1 recorded');
+SELECT pg_temp.ok(image_stage_legacy_version('classifier', (SELECT ai_scan_metadata FROM vehicle_images WHERE id = pg_temp.img(3))) = 'orchestrator-receipt', 'classifier_ok is the orchestrator shape');
 -- outdated: bump the registry version, nothing is blanket-updated
 UPDATE image_pipeline_stages SET required_version = 2 WHERE stage = 'classifier';
 SELECT pg_temp.ok((SELECT reason || target_version FROM image_stage_gaps(ARRAY[pg_temp.img(2)])) = 'outdated2', 'v1 receipt under required v2 => outdated');
-SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(3)])), 'legacy evidence satisfies an outdated stage');
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(3), pg_temp.img(16), pg_temp.img(17)])), 'legacy evidence (incl. v1) satisfies an outdated stage');
 SELECT record_image_stage_receipt(pg_temp.img(2), 'classifier', 2, 'succeeded');
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(2)])), 'a v2 receipt clears the outdated gap');
 UPDATE image_pipeline_stages SET required_version = 1 WHERE stage = 'classifier';
