@@ -22,12 +22,20 @@ import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { clearRetry, isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
+import { buildStageReceipt, postClassifierFailureReceipts, type PostClassifierPhase, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts } from "./stageReceipts.ts";
+import { probeStageAvailability, runStageWorker } from "./stageWorker.ts";
+import { runPostClassifierStage, type Classification, type PostClassifierDeps } from "./postClassifier.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = projectSecretKey() ?? "";
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+/** Classifier-stage receipt (PR #3027 image_stage_receipts); best effort, never fails the photo. */
+const classifierReceipt = (imageId: string, outcome: "succeeded" | "policy_skip" | "rate_limited" | "failed",
+  opts: Parameters<typeof buildStageReceipt>[3] = {}) =>
+  recordStageReceipt(supabase, buildStageReceipt(imageId, "classifier", outcome, opts));
 
 async function persistImageState(
   imageId: string, receipt: PipelineReceipt, state: Record<string, unknown>,
@@ -58,6 +66,47 @@ interface PipelineInput {
   user_id: string | null;
 }
 
+/** Post-classifier stage runner wiring (postClassifier.ts): the steps are the same functions the live path uses, below. */
+const postClassifierDeps: PostClassifierDeps = {
+  async loadSaved(imageId) {
+    const { data, error } = await supabase.from("vehicle_images").select("ai_scan_metadata, vehicle_id, image_url").eq("id", imageId).single();
+    if (error || !data) throw new Error("photo_pipeline_image_read_failed");
+    return { classification: (data.ai_scan_metadata as { classification?: Classification } | null)?.classification ?? null,
+      vehicle_id: data.vehicle_id, image_url: data.image_url };
+  },
+  async latestOutcome(imageId, stage) {
+    const { data } = await supabase.from("image_stage_current").select("outcome").eq("image_id", imageId).eq("stage", stage).maybeSingle();
+    return (data as { outcome?: string } | null)?.outcome ?? null;
+  },
+  async fileVehicle(imageId, userId, classification) {
+    const resolved = await resolveVehicle(imageId, userId, classification as ClassificationResult);
+    if (!resolved) return null;
+    const attribution = await fileResolvedVehicle(imageId, resolved);
+    return attribution.filed ? resolved.vehicle_id : null;
+  },
+  async gatherEvidence(item, imageUrl, vehicleId, classification) {
+    const cls = classification as ClassificationResult;
+    const routeResult = await routeByType(cls, item.image_id, imageUrl, vehicleId, item.user_id);
+    if (vehicleId) await createObservation(cls, item.image_id, imageUrl, vehicleId, routeResult);
+    if (vehicleId && routeResult.extracted_fields) await updateFieldEvidence(vehicleId, item.image_id, routeResult.extracted_fields, cls);
+    for (const r of unavailableReceipts(item.image_id, routeResult.stage_unavailable)) await recordStageReceipt(supabase, r);
+  },
+  async markCompleted(imageId) {
+    // only a row the failure left 'failed' is flipped back; a fresh attempt id needs the processing write first (stale-attempt guard)
+    const { data } = await supabase.from("vehicle_images").select("ai_processing_status, image_url, vehicle_id").eq("id", imageId).single();
+    if (!data || data.ai_processing_status !== "failed") return;
+    const src = { image_url: data.image_url, vehicle_id: data.vehicle_id };
+    const attemptId = crypto.randomUUID(); const startedAt = new Date().toISOString();
+    const rc = (outcome: PipelineReceipt["outcome"]): PipelineReceipt => ({ receipt_id: `${attemptId}:${imageId}:${outcome}`, attempt_id: attemptId, image_id: imageId,
+      method: "photo-pipeline-orchestrator", pipeline_version: "v2", receipt_version: 1, outcome, processing_started_at: startedAt,
+      processing_finished_at: outcome === "processing" ? null : new Date().toISOString() });
+    await persistImageState(imageId, rc("processing"), { ai_processing_status: "processing", ai_processing_started_at: startedAt }, {}, src);
+    await persistImageState(imageId, rc("completed"), { ai_processing_status: "completed", ai_processing_completed_at: new Date().toISOString() },
+      { stage_worker_completed_post_classifier: true }, src);
+  },
+  record: (r) => recordStageReceipt(supabase, r),
+};
+
 // ============================================================
 // MAIN HANDLER
 // ============================================================
@@ -73,6 +122,8 @@ Deno.serve(async (req) => {
   const startedAt = Date.now();
   const attemptId = crypto.randomUUID();
   let processingImageId: string | null = null;
+  // set once the classifier has answered: later throws belong to filing / evidence, never to the classifier stage
+  let afterClassifier: { phase: PostClassifierPhase; classification: Record<string, any> } | null = null;
   let processingSource: { image_url: string; vehicle_id: string | null } | undefined;
   const receipt = (imageId: string, outcome: PipelineReceipt["outcome"]): PipelineReceipt => ({
     receipt_id: `${attemptId}:${imageId}:${outcome}`,
@@ -86,6 +137,30 @@ Deno.serve(async (req) => {
     const input = await req.json();
 
     if (input?.action === "classifier_assay") return await runClassifierAssay(req, input, supabase);
+
+    // Availability probe (one OPTIONS per stage seen unavailable); see stageWorker.ts.
+    if (input?.action === "probe_stages") {
+      const out = await probeStageAvailability(supabase, SUPABASE_URL);
+      return new Response(JSON.stringify(out), { status: (out as { success: boolean }).success ? 200 : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Single-stage worker: claims image_stage_work for one stage and runs only that stage (see stageWorker.ts).
+    if (input?.action === "run_stage") {
+      const out = await runStageWorker(supabase, input, async (item, stage) => {
+        // filing / evidence: post-classifier steps only, from the saved classification (never the paid classifier)
+        if (stage !== "classifier") return await runPostClassifierStage(postClassifierDeps, stage, item);
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/photo-pipeline-orchestrator`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_ROLE_KEY}` },
+          body: JSON.stringify({ image_id: item.image_id, image_url: item.image_url, vehicle_id: item.vehicle_id, user_id: item.user_id }),
+        });
+        const result = await resp.json();
+        return { ok: resp.ok && result.success === true, rate_limited: result.rate_limited === true };
+      });
+      return new Response(JSON.stringify(out), { status: (out as { status?: number }).status ?? 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
@@ -224,6 +299,7 @@ Deno.serve(async (req) => {
             { ai_processing_status: "processing" }, {}, source);
           await persistImageState(imageId, receipt(imageId, "policy_skip"),
             { ai_processing_status: "completed" }, { pipeline_version: "v2", skipped: "junk_url_batch" }, source);
+          await classifierReceipt(imageId, "policy_skip", { detail: { skipped: "junk_url_batch" } });
         } catch {
           const result = results.find(r => r.image_id === imageId);
           if (result) result.success = false;
@@ -269,6 +345,7 @@ Deno.serve(async (req) => {
     if (JUNK_PATTERNS.some(p => p.test(image_url))) {
       await persistImageState(image_id, receipt(image_id, "policy_skip"),
         { ai_processing_status: "completed" }, { pipeline_version: "v2", skipped: "junk_url" }, processingSource);
+      await classifierReceipt(image_id, "policy_skip", { detail: { skipped: "junk_url" } });
       return new Response(
         JSON.stringify({ success: true, image_id, classification: "junk_url", skipped: true, duration_ms: Date.now() - startedAt }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -303,6 +380,7 @@ Deno.serve(async (req) => {
           await persistImageState(image_id, receipt(image_id, "policy_skip"),
             { ai_processing_status: "completed" },
             { pipeline_version: "v2", skipped: "cross_sweep_duplicate" }, processingSource);
+          await classifierReceipt(image_id, "policy_skip", { detail: { skipped: "cross_sweep_duplicate" } });
           return new Response(
             JSON.stringify({ success: true, image_id, classification: "cross_sweep_duplicate", skipped: true, duration_ms: Date.now() - startedAt }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -324,6 +402,7 @@ Deno.serve(async (req) => {
           apple_ml_labels: appleLabels,
           vehicle_score: vehicleScore,
         }, processingSource);
+      await classifierReceipt(image_id, "policy_skip", { detail: { skipped: "apple_ml_non_automotive" } });
       return new Response(
         JSON.stringify({ success: true, image_id, classification: "non_automotive_apple_ml", skipped: true, duration_ms: Date.now() - startedAt }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -362,6 +441,8 @@ Deno.serve(async (req) => {
         }, { ai_processing_status: "pending" },
         { pipeline_version: "v2", classifier_deferred: true, attribution: failedAttribution }, processingSource);
         const retry = await recordRateLimit(supabase, image_id, detail);
+        await classifierReceipt(image_id, "rate_limited", { errorClass: detail?.error_class, httpStatus: detail?.http_status,
+          retryAfterSeconds: rateLimitRetrySeconds(retry, detail), detail: { attempts: detail?.attempts ?? 0, model: detail?.model ?? null } });
         return new Response(JSON.stringify({ success: false, image_id, classifier_ok: false, rate_limited: true, requeued: true,
           state_persisted: true, error_class: detail?.error_class, retry }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -372,6 +453,8 @@ Deno.serve(async (req) => {
         error_class: detail?.error_class, http_status: detail?.http_status,
       }, { ai_processing_status: "failed", ai_processing_completed_at: new Date().toISOString() },
       { pipeline_version: "v2", classifier_failed: true, classification, attribution: failedAttribution }, processingSource);
+      await classifierReceipt(image_id, "failed", { errorClass: detail?.error_class ?? "classifier_failed", httpStatus: detail?.http_status,
+        detail: { attempts: detail?.attempts ?? 0, model: detail?.model ?? null } });
       return new Response(JSON.stringify({ success: false, image_id, classifier_ok: false,
         state_persisted: true, error_class: detail?.error_class, classifier_attempts: detail?.attempts ?? 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -380,6 +463,7 @@ Deno.serve(async (req) => {
     if (appleLabels.length > 0 && !classification.vehicle_hints?.make) {
       classification.description = `${classification.description} [Apple ML: ${appleLabels.join(', ')}]`;
     }
+    afterClassifier = { phase: "filing", classification };
     console.log(`[photo-pipeline] Classified as: ${classification.image_type} (${classification.confidence})`);
 
     // Step 3: If no vehicle_id, try to resolve. A resolved vehicle is filed here, before any
@@ -399,6 +483,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    afterClassifier = { phase: "evidence", classification };
     // Step 4: Route to appropriate handler
     const routeResult = await routeByType(
       classification,
@@ -475,6 +560,9 @@ Deno.serve(async (req) => {
       observation_id: observation?.id,
       observation_status: observation?.status ?? "no_vehicle",
     }, updatePayload, scanMeta, processingSource);
+    // Receipts after the state write: the classifier succeeded; each stage #3024 found undeployed is retryable in an hour.
+    await classifierReceipt(image_id, "succeeded", { detail: { classification: classification.image_type, model: classification.classifier_receipt?.model ?? null } });
+    for (const r of unavailableReceipts(image_id, routeResult.stage_unavailable)) await recordStageReceipt(supabase, r);
     // A real model answer closes this image's retry state and the provider breaker (AIMD +1). Nothing else calls it.
     await clearRetry(supabase, image_id);
 
@@ -514,7 +602,13 @@ Deno.serve(async (req) => {
         await persistImageState(processingImageId, {
           ...receipt(processingImageId, "failed"), failure_phase: "pipeline",
           error_class: "pipeline_operation_failed",
-        }, { ai_processing_status: "failed" }, { pipeline_error: "pipeline_operation_failed" }, processingSource);
+        }, { ai_processing_status: "failed" },
+        // keep the paid classification: a later retry of filing / evidence must not need the classifier again
+        { pipeline_error: "pipeline_operation_failed", ...(afterClassifier ? { classification: afterClassifier.classification, failed_phase: afterClassifier.phase } : {}) }, processingSource);
+        if (afterClassifier) {
+          for (const r of postClassifierFailureReceipts(processingImageId, afterClassifier.phase, "pipeline_operation_failed",
+            { image_type: afterClassifier.classification?.image_type, model: afterClassifier.classification?.classifier_receipt?.model })) await recordStageReceipt(supabase, r);
+        } else await classifierReceipt(processingImageId, "failed", { errorClass: "pipeline_operation_failed" });
       }
     } catch (_) { /* best-effort */ }
 
