@@ -22,12 +22,19 @@ import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
+import { buildStageReceipt, rateLimitRetrySeconds, recordStageReceipt, unavailableReceipts } from "./stageReceipts.ts";
+import { runStageWorker } from "./stageWorker.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = projectSecretKey() ?? "";
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+/** Classifier-stage receipt (PR #3027 image_stage_receipts); best effort, never fails the photo. */
+const classifierReceipt = (imageId: string, outcome: "succeeded" | "policy_skip" | "rate_limited" | "failed",
+  opts: Parameters<typeof buildStageReceipt>[3] = {}) =>
+  recordStageReceipt(supabase, buildStageReceipt(imageId, "classifier", outcome, opts));
 
 async function persistImageState(
   imageId: string, receipt: PipelineReceipt, state: Record<string, unknown>,
@@ -86,6 +93,21 @@ Deno.serve(async (req) => {
     const input = await req.json();
 
     if (input?.action === "classifier_assay") return await runClassifierAssay(req, input, supabase);
+
+    // Single-stage worker: claims image_stage_work for one stage and runs only that stage (see stageWorker.ts).
+    if (input?.action === "run_stage") {
+      const out = await runStageWorker(supabase, input, async (item) => {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/photo-pipeline-orchestrator`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_ROLE_KEY}` },
+          body: JSON.stringify({ image_id: item.image_id, image_url: item.image_url, vehicle_id: item.vehicle_id, user_id: item.user_id }),
+        });
+        const result = await resp.json();
+        return { ok: resp.ok && result.success === true, rate_limited: result.rate_limited === true };
+      });
+      return new Response(JSON.stringify(out), { status: (out as { status?: number }).status ?? 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
@@ -224,6 +246,7 @@ Deno.serve(async (req) => {
             { ai_processing_status: "processing" }, {}, source);
           await persistImageState(imageId, receipt(imageId, "policy_skip"),
             { ai_processing_status: "completed" }, { pipeline_version: "v2", skipped: "junk_url_batch" }, source);
+          await classifierReceipt(imageId, "policy_skip", { detail: { skipped: "junk_url_batch" } });
         } catch {
           const result = results.find(r => r.image_id === imageId);
           if (result) result.success = false;
@@ -269,6 +292,7 @@ Deno.serve(async (req) => {
     if (JUNK_PATTERNS.some(p => p.test(image_url))) {
       await persistImageState(image_id, receipt(image_id, "policy_skip"),
         { ai_processing_status: "completed" }, { pipeline_version: "v2", skipped: "junk_url" }, processingSource);
+      await classifierReceipt(image_id, "policy_skip", { detail: { skipped: "junk_url" } });
       return new Response(
         JSON.stringify({ success: true, image_id, classification: "junk_url", skipped: true, duration_ms: Date.now() - startedAt }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -303,6 +327,7 @@ Deno.serve(async (req) => {
           await persistImageState(image_id, receipt(image_id, "policy_skip"),
             { ai_processing_status: "completed" },
             { pipeline_version: "v2", skipped: "cross_sweep_duplicate" }, processingSource);
+          await classifierReceipt(image_id, "policy_skip", { detail: { skipped: "cross_sweep_duplicate" } });
           return new Response(
             JSON.stringify({ success: true, image_id, classification: "cross_sweep_duplicate", skipped: true, duration_ms: Date.now() - startedAt }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -324,6 +349,7 @@ Deno.serve(async (req) => {
           apple_ml_labels: appleLabels,
           vehicle_score: vehicleScore,
         }, processingSource);
+      await classifierReceipt(image_id, "policy_skip", { detail: { skipped: "apple_ml_non_automotive" } });
       return new Response(
         JSON.stringify({ success: true, image_id, classification: "non_automotive_apple_ml", skipped: true, duration_ms: Date.now() - startedAt }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -356,6 +382,8 @@ Deno.serve(async (req) => {
         }, { ai_processing_status: "pending" },
         { pipeline_version: "v2", classifier_deferred: true, attribution: failedAttribution }, processingSource);
         const retry = await recordRateLimit(supabase, image_id, detail);
+        await classifierReceipt(image_id, "rate_limited", { errorClass: detail?.error_class, httpStatus: detail?.http_status,
+          retryAfterSeconds: rateLimitRetrySeconds(retry, detail), detail: { attempts: detail?.attempts ?? 0, model: detail?.model ?? null } });
         return new Response(JSON.stringify({ success: false, image_id, classifier_ok: false, rate_limited: true, requeued: true,
           state_persisted: true, error_class: detail?.error_class, retry }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -366,6 +394,8 @@ Deno.serve(async (req) => {
         error_class: detail?.error_class, http_status: detail?.http_status,
       }, { ai_processing_status: "failed", ai_processing_completed_at: new Date().toISOString() },
       { pipeline_version: "v2", classifier_failed: true, classification, attribution: failedAttribution }, processingSource);
+      await classifierReceipt(image_id, "failed", { errorClass: detail?.error_class ?? "classifier_failed", httpStatus: detail?.http_status,
+        detail: { attempts: detail?.attempts ?? 0, model: detail?.model ?? null } });
       return new Response(JSON.stringify({ success: false, image_id, classifier_ok: false,
         state_persisted: true, error_class: detail?.error_class, classifier_attempts: detail?.attempts ?? 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -469,6 +499,9 @@ Deno.serve(async (req) => {
       observation_id: observation?.id,
       observation_status: observation?.status ?? "no_vehicle",
     }, updatePayload, scanMeta, processingSource);
+    // Receipts after the state write: the classifier succeeded; each stage #3024 found undeployed is retryable in an hour.
+    await classifierReceipt(image_id, "succeeded", { detail: { classification: classification.image_type, model: classification.classifier_receipt?.model ?? null } });
+    for (const r of unavailableReceipts(image_id, routeResult.stage_unavailable)) await recordStageReceipt(supabase, r);
 
     // Late-resolution dedup pass: Step 1.5 could only see this row in the
     // detector's corpus if it was INSERTed with a vehicle_id. When the vehicle
@@ -507,6 +540,7 @@ Deno.serve(async (req) => {
           ...receipt(processingImageId, "failed"), failure_phase: "pipeline",
           error_class: "pipeline_operation_failed",
         }, { ai_processing_status: "failed" }, { pipeline_error: "pipeline_operation_failed" }, processingSource);
+        await classifierReceipt(processingImageId, "failed", { errorClass: "pipeline_operation_failed" });
       }
     } catch (_) { /* best-effort */ }
 

@@ -20,11 +20,12 @@ let attributeResult: Record<string, unknown> = { success: true };
 let attributeBody: Record<string, unknown> | null = null;
 let patchBodies: Record<string, unknown>[] = [], uploadClockReads = 0;
 let modelStatus = 200, noteFailureBody: Record<string, unknown> | null = null;
+let stageReceipts: Record<string, unknown>[] = [];
 function reset() {
   patches = 0; calls = []; rejectWrite = false;
   classificationType = "other"; intakeSuccess = true; intakeDuplicate = false; rejectEvidence = false; intakeBody = null;
   gpsMatch = null; attributeResult = { success: true }; attributeBody = null; patchBodies = []; uploadClockReads = 0;
-  modelStatus = 200; noteFailureBody = null;
+  modelStatus = 200; noteFailureBody = null; stageReceipts = [];
   Deno.env.delete("GEMINI_API_KEY");
   row = { id: "image", image_url: "https://example.invalid/image.jpg", vehicle_id: "vehicle",
     updated_at: "2026-01-01T00:00:00.000Z", ai_scan_metadata: { byok_deep_analysis: { original: true }, on_device_vision: { version: "local-v1" } },
@@ -68,6 +69,9 @@ globalThis.fetch = (async (input, init) => {
       return Response.json(attributeResult);
     }
   }
+  if (url.origin === project && url.pathname === "/rest/v1/rpc/record_image_stage_receipt") {
+    stageReceipts.push(JSON.parse(String(options?.body))); return Response.json(1);
+  }
   if (url.origin !== project || url.pathname !== "/rest/v1/vehicle_images") throw new Error("unexpected image/model/observation request");
   if (options?.method === "PATCH") {
     const body = JSON.parse(String(options.body)); patchBodies.push(body);
@@ -100,7 +104,10 @@ Deno.test("missing classifier persists failure but emits no claim or fallback", 
   assert(metadata.byok_deep_analysis && metadata.on_device_vision);
   const receipt = (metadata.photo_pipeline as Record<string, Record<string, unknown>>).receipt;
   assert(receipt.error_class === "classifier_key_missing" && receipt.classifier_attempts === 0);
-  assert(calls.every(c => c.endsWith("/rest/v1/vehicle_images")));
+  assert(calls.filter(c => !c.endsWith("/rest/v1/rpc/record_image_stage_receipt")).every(c => c.endsWith("/rest/v1/vehicle_images")));
+  // the failure is also a typed stage receipt with the registry's version
+  assert(stageReceipts.length === 1 && stageReceipts[0].p_stage === "classifier" && stageReceipts[0].p_outcome === "failed"
+    && stageReceipts[0].p_error_class === "classifier_key_missing" && stageReceipts[0].p_producer_version === 1);
 });
 
 Deno.test("database rejection cannot return a successful or completed receipt", async () => {
@@ -228,6 +235,9 @@ Deno.test("provider 429 requeues the image, honours Retry-After, never marks it 
   assert(receipt.outcome === "deferred" && receipt.retry_after_seconds === 120 && receipt.error_class === "classifier_rate_limited");
   assert(!(row.ai_scan_metadata as Record<string, Record<string, unknown>>).photo_pipeline.last_failure);
   assert(noteFailureBody?.p_retry_after_seconds === 120 && noteFailureBody?.p_http_status === 429);
+  // the same outcome is a rate_limited stage receipt with a retry time (note_failure mock returns none, so Retry-After is used)
+  assert(stageReceipts.length === 1 && stageReceipts[0].p_outcome === "rate_limited" && stageReceipts[0].p_retry_after_seconds === 120
+    && stageReceipts[0].p_http_status === 429 && stageReceipts[0].p_error_class === "classifier_rate_limited");
 });
 
 Deno.test("a non-rate-limit classifier error is still a failure", async () => {
@@ -235,6 +245,7 @@ Deno.test("a non-rate-limit classifier error is still a failure", async () => {
   reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key"); modelStatus = 500;
   const result = await (await handler(request())).json();
   assert(result.success === false && !result.rate_limited && row.ai_processing_status === "failed" && noteFailureBody === null);
+  assert(stageReceipts.length === 1 && stageReceipts[0].p_outcome === "failed" && stageReceipts[0].p_retry_after_seconds === null);
 });
 
 Deno.test("restore fetch after rate-limit tests", () => { globalThis.fetch = originalFetch; });
