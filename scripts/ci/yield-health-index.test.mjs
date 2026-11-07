@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const sql = readFileSync(new URL('../../supabase/migrations/20261111120000_vehicle_images_ai_completed_at_index.sql', import.meta.url), 'utf8');
+const sql = readFileSync(new URL('../../supabase/migrations/20261111122500_vehicle_images_ai_completed_at_index.sql', import.meta.url), 'utf8');
 const code = sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
 
 test('partial index matches the loop query predicate', () => {
