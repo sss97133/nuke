@@ -68,3 +68,15 @@ export async function recordRateLimit(db: { rpc: (fn: string, args: Record<strin
     return data ?? null;
   } catch { console.warn("[photo-pipeline] rate-limit bookkeeping threw"); return null; }
 }
+
+/**
+ * A model call succeeded: drop the image's retry row (and its claim lease), close the breaker and raise concurrency
+ * one step. Without a caller the AIMD never climbs back after the first 429 and the throttle sticks at 1.
+ * Best effort and loud: the photo is already completed.
+ */
+export async function clearRetry(db: { rpc: (fn: string, args: Record<string, unknown>) => any }, imageId: string): Promise<void> {
+  try {
+    const { error } = await db.rpc("photo_pipeline_clear_retry", { p_image_id: imageId });
+    if (error) console.warn("[photo-pipeline] clear_retry failed:", error.code ?? "rpc_error");
+  } catch { console.warn("[photo-pipeline] clear_retry threw"); }
+}
