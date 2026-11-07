@@ -19,10 +19,12 @@ let gpsMatch: { vehicle_id: string; confidence: number } | null = null;
 let attributeResult: Record<string, unknown> = { success: true };
 let attributeBody: Record<string, unknown> | null = null;
 let patchBodies: Record<string, unknown>[] = [], uploadClockReads = 0;
+let modelStatus = 200, noteFailureBody: Record<string, unknown> | null = null;
 function reset() {
   patches = 0; calls = []; rejectWrite = false;
   classificationType = "other"; intakeSuccess = true; intakeDuplicate = false; rejectEvidence = false; intakeBody = null;
   gpsMatch = null; attributeResult = { success: true }; attributeBody = null; patchBodies = []; uploadClockReads = 0;
+  modelStatus = 200; noteFailureBody = null;
   Deno.env.delete("GEMINI_API_KEY");
   row = { id: "image", image_url: "https://example.invalid/image.jpg", vehicle_id: "vehicle",
     updated_at: "2026-01-01T00:00:00.000Z", ai_scan_metadata: { byok_deep_analysis: { original: true }, on_device_vision: { version: "local-v1" } },
@@ -35,6 +37,7 @@ globalThis.fetch = (async (input, init) => {
   if (Deno.env.get("GEMINI_API_KEY") === "synthetic-model-key") {
     if (url.origin === "https://generativelanguage.googleapis.com") {
       if (url.pathname.endsWith(":countTokens")) return Response.json({ totalTokens: 1024 });
+      if (modelStatus !== 200) return new Response("{}", { status: modelStatus, headers: { "retry-after": "120" } });
       return Response.json({ usageMetadata: { promptTokenCount: 1024, candidatesTokenCount: 100, totalTokenCount: 1124 }, candidates: [{ content: { parts: [{ text: JSON.stringify({
         image_type: classificationType, image_medium: "photograph", is_automotive: true, description: "Synthetic image classification", confidence: 0.8,
       }) }] } }] });
@@ -51,6 +54,9 @@ globalThis.fetch = (async (input, init) => {
     }
     if (url.origin === project && url.pathname === "/rest/v1/rpc/auto_match_image_to_vehicles") {
       return Response.json(gpsMatch ? [gpsMatch] : []);
+    }
+    if (url.origin === project && url.pathname === "/rest/v1/rpc/photo_pipeline_note_failure") {
+      noteFailureBody = JSON.parse(String(options?.body)); return Response.json({ status: "pending" });
     }
     if (url.origin === project && url.pathname === "/rest/v1/rpc/attribute_testimony") {
       // The live writer files only an unfiled row, and its UPDATE moves the updated_at token.
@@ -209,4 +215,26 @@ Deno.test("attribution the writer refuses leaves the photo unfiled and the handl
   assert(attribution.filed === false && attribution.refusal === "file_hash_exists_on_target");
 });
 
+const fixtureFetch = globalThis.fetch;
 Deno.test("restore handler-test fetch fixture", () => { globalThis.fetch = originalFetch; });
+
+Deno.test("provider 429 requeues the image, honours Retry-After, never marks it failed", async () => {
+  globalThis.fetch = fixtureFetch;
+  reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key"); modelStatus = 429;
+  const response = await handler(request()); const result = await response.json();
+  assert(result.success === false && result.rate_limited === true && result.requeued === true);
+  assert(row.ai_processing_status === "pending");               // back in the queue, not 'failed'
+  const receipt = ((row.ai_scan_metadata as Record<string, unknown>).photo_pipeline as Record<string, Record<string, unknown>>).receipt;
+  assert(receipt.outcome === "deferred" && receipt.retry_after_seconds === 120 && receipt.error_class === "classifier_rate_limited");
+  assert(!(row.ai_scan_metadata as Record<string, Record<string, unknown>>).photo_pipeline.last_failure);
+  assert(noteFailureBody?.p_retry_after_seconds === 120 && noteFailureBody?.p_http_status === 429);
+});
+
+Deno.test("a non-rate-limit classifier error is still a failure", async () => {
+  globalThis.fetch = fixtureFetch;
+  reset(); Deno.env.set("GEMINI_API_KEY", "synthetic-model-key"); modelStatus = 500;
+  const result = await (await handler(request())).json();
+  assert(result.success === false && !result.rate_limited && row.ai_processing_status === "failed" && noteFailureBody === null);
+});
+
+Deno.test("restore fetch after rate-limit tests", () => { globalThis.fetch = originalFetch; });

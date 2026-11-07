@@ -21,6 +21,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
+import { isRateLimited, readProviderGate, recordRateLimit } from "./providerBackoff.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -89,6 +90,13 @@ Deno.serve(async (req) => {
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
       const limit = input.limit || 5;
+      // Provider cooling down: model work waits, nothing is claimed or marked failed. Programmatic stages
+      // (EXIF, VIN/GPS filing, grouping) do not run through this loop and are unaffected.
+      const gate = await readProviderGate(supabase);
+      if (gate.blocked) {
+        return new Response(JSON.stringify({ success: true, deferred: true, reason: "provider_cooldown",
+          blocked_until: gate.blocked_until, processed: 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
       // 2026-07-06 perf fix: this used to be a single query ordered by
       // (user_id DESC NULLS LAST, created_at DESC). That combined ORDER BY has
@@ -115,7 +123,14 @@ Deno.serve(async (req) => {
         throw new Error("photo_pipeline_owner_queue_read_failed");
       }
 
-      let pendingImages = ownerPending ?? [];
+      // Rows requeued after a rate limit carry a retry time; do not hand them back before it.
+      const waiting = new Set<string>();
+      {
+        const { data: held } = await supabase.from("photo_pipeline_retry_state").select("image_id")
+          .gt("next_attempt_at", new Date().toISOString()).limit(5000);
+        for (const r of held ?? []) waiting.add(r.image_id);
+      }
+      let pendingImages = (ownerPending ?? []).filter((r) => !waiting.has(r.id)).slice(0, gate.max_concurrency);
 
       if (pendingImages.length < limit) {
         const seenIds = new Set(pendingImages.map((r) => r.id));
@@ -139,11 +154,11 @@ Deno.serve(async (req) => {
         }
 
         for (const row of backlogPending ?? []) {
-          if (!seenIds.has(row.id)) {
+          if (!seenIds.has(row.id) && !waiting.has(row.id)) {
             pendingImages.push(row);
             seenIds.add(row.id);
           }
-          if (pendingImages.length >= limit) break;
+          if (pendingImages.length >= Math.min(limit, gate.max_concurrency)) break;
         }
       }
 
@@ -192,7 +207,9 @@ Deno.serve(async (req) => {
           );
           const result = await resp.json();
           results.push({ image_id: img.id, success: resp.ok && result.success === true,
-            classification: result.classification, classifier_ok: result.classifier_ok });
+            classification: result.classification, classifier_ok: result.classifier_ok, requeued: result.requeued === true });
+          // The provider said stop: do not spend the rest of the batch on calls that will also be refused.
+          if (result.rate_limited === true) break;
         } catch (err: any) {
           results.push({ image_id: img.id, success: false, error: err.message });
         }
@@ -329,6 +346,19 @@ Deno.serve(async (req) => {
       if (!vehicle_id) {
         const resolved = await resolveVehicle(image_id, user_id, classification);
         if (resolved) failedAttribution = await fileResolvedVehicle(image_id, resolved);
+      }
+      if (isRateLimited(detail)) {
+        // Provider-wide condition, not a verdict on the photo: requeue with a backoff instead of failing it.
+        await persistImageState(image_id, {
+          ...receipt(image_id, "deferred"), classifier_model: detail?.model ?? null,
+          classifier_attempts: detail?.attempts ?? 0, failure_phase: detail?.failure_phase,
+          error_class: detail?.error_class, http_status: detail?.http_status, retry_after_seconds: detail?.retry_after_seconds,
+        }, { ai_processing_status: "pending" },
+        { pipeline_version: "v2", classifier_deferred: true, attribution: failedAttribution }, processingSource);
+        const retry = await recordRateLimit(supabase, image_id, detail);
+        return new Response(JSON.stringify({ success: false, image_id, classifier_ok: false, rate_limited: true, requeued: true,
+          state_persisted: true, error_class: detail?.error_class, retry }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       await persistImageState(image_id, {
         ...receipt(image_id, "failed"), classifier_model: detail?.model ?? null,
