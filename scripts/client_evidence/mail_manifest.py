@@ -27,7 +27,14 @@ CLAIM_KINDS = {  # distinct assertions; none is a posting
     'payment_request': 'none', 'payment_assertion': 'none',
     'labor_claim': 'none', 'work_report': 'none', 'completion_report': 'none'}
 MAX_FIELDS, MAX_CONCERNS, MAX_LINES = 100, 30, 500
-CONCERN_TYPE = 'client_evidence_conflict'   # NOT verified against any financial_review_queue constraint; see docs
+# Producer concern class -> deployed financial_review_queue_concern_type_check value (read-only metadata, 2026-11-07).
+# The producer's own class is kept as a prefix of `detail`; 'client_evidence_conflict' is NOT an accepted value.
+ALLOWED_CONCERN_TYPES = frozenset({'montant_non_corrobore', 'ecart_arithmetique', 'ecart_tva', 'doublon_suspect',
+                                   'piece_illisible', 'tiers_non_identifie', 'hors_perimetre', 'cut_off'})
+CONCERN_CLASS_TO_TYPE = {'claim_slot_conflict': 'montant_non_corrobore', 'amount_conflict': 'montant_non_corrobore',
+                         'composite_unmatched': 'ecart_arithmetique', 'composite_repeat': 'doublon_suspect',
+                         'rollup': 'doublon_suspect', 'custody_path_conflict': 'doublon_suspect',
+                         'truncated': 'montant_non_corrobore'}
 ID_RE = re.compile(r'^[A-Za-z0-9_.@<>=+-]{1,200}$')
 CLOCK_CELL = 'clock.ingest'
 
@@ -269,25 +276,27 @@ def idempotency_key(owner_id, account_ref, sha, chash):
 def concerns_for(sha, edges, recs, claim_conflicts, items, ref_conflicts):
     out = []
     for cf in claim_conflicts:
-        out.append(('high', f"forwarded claims disagree at {cf['slot']}: claims {cf['claim_ids']} (all kept, none preferred)"))
+        out.append(('high', 'claim_slot_conflict', f"forwarded claims disagree at {cf['slot']}: claims {cf['claim_ids']} (all kept, none preferred)"))
     for it in items:
         if any(o['sha256'] == sha for o in it['origins']):
             for x in it['conflicts']:
-                out.append(('high', f"{it['kind']} {it['economic_key']}: {x}"))
+                out.append(('high', 'composite_unmatched' if x.startswith('composite claim') else 'amount_conflict',
+                            f"{it['kind']} {it['economic_key']}: {x}"))
             if it['aliases'] and not it['rollup_of']:
-                out.append(('medium', f"composite repeats component: {it['kind']} {it['economic_key']} also stated as {it['aliases']}; counted once"))
+                out.append(('medium', 'composite_repeat', f"composite repeats component: {it['kind']} {it['economic_key']} also stated as {it['aliases']}; counted once"))
             if it['rollup_of']:
-                out.append(('medium', f"{it['kind']} {it['economic_key']} is a rollup of {it['rollup_of']}; not additive"))
+                out.append(('medium', 'rollup', f"{it['kind']} {it['economic_key']} is a rollup of {it['rollup_of']}; not additive"))
     for x in ref_conflicts:
-        out.append(('medium', x))
+        out.append(('medium', 'custody_path_conflict', x))
     seen, res = set(), []
-    for pr, d in out:
+    for pr, cls, d in out:
         if d not in seen:
             seen.add(d)
-            res.append({'concern_type': CONCERN_TYPE, 'priority': pr, 'detail': d[:1900], 'resolver': 'owner'})
+            res.append({'concern_type': CONCERN_CLASS_TO_TYPE[cls], 'priority': pr,
+                        'detail': f'[client_evidence:{cls}] {d}'[:1900], 'resolver': 'owner'})
     if len(res) > MAX_CONCERNS:
-        res = res[:MAX_CONCERNS - 1] + [{'concern_type': CONCERN_TYPE, 'priority': 'high',
-                                         'detail': f'{len(res) - MAX_CONCERNS + 1} further concerns truncated at the writer cap', 'resolver': 'owner'}]
+        res = res[:MAX_CONCERNS - 1] + [{'concern_type': CONCERN_CLASS_TO_TYPE['truncated'], 'priority': 'high',
+                                         'detail': f'[client_evidence:truncated] {len(res) - MAX_CONCERNS + 1} further concerns truncated at the writer cap', 'resolver': 'owner'}]
     return res
 
 
@@ -382,6 +391,9 @@ def validate_changeset(cs, owner_id):
             raise ContractError('revision carries keys the writer does not accept')
         if not 1 <= len(rev['fields']) <= MAX_FIELDS or len(rev.get('concerns') or []) > MAX_CONCERNS or len(rev.get('lines') or []) > MAX_LINES:
             raise ContractError('revision exceeds writer caps')
+        if any(c.get('concern_type') not in ALLOWED_CONCERN_TYPES or c.get('priority') not in ('low', 'medium', 'high', 'critical')
+               for c in rev.get('concerns') or []):
+            raise ContractError('concern_type/priority outside the deployed financial_review_queue check constraints')
         keys = [f['field_key'] for f in rev['fields']]
         if len(set(keys)) != len(keys):
             raise ContractError('duplicate field keys')

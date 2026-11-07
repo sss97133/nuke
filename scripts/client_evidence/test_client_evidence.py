@@ -45,8 +45,12 @@ class FakeWriter:
         if not d:
             return None
         live = d['runs'][-1]['fields'] if d['runs'] else []
+        # Shape of read_financial_accounting = read_financial_evidence || {lines, accounting_status, tax_ready, ...}
+        # (deployed definition read 2026-11-07): the document keeps attributes.runs.
         return {'document': {'id': d['id'], 'attributes': {'runs': [{k: r[k] for k in ('run_id', 'key', 'supersedes_run_id')} for r in d['runs']]}},
-                'fields': [{'field_key': k, 'value_raw': v} for k, v in live]}
+                'fields': [{'field_key': k, 'value_raw': v} for k, v in live], 'concerns': [], 'lines': [],
+                'accounting_status': 'retained_evidence_not_posted', 'tax_ready': False,
+                'purchase_deduplication': 'not_assessed', 'payment_reconciliation': 'not_assessed'}
 
     def submit(self, body):
         self.calls.append(copy.deepcopy(body))
@@ -107,6 +111,26 @@ class MailPlan(unittest.TestCase):
         self.assertEqual(sum(f['field_key'].startswith('claim.') for f in rev['fields']), 2)
         self.assertTrue(any('disagree' in c['detail'] for c in rev['concerns']))
         self.assertTrue(any('amount' in c['detail'] for c in rev['concerns']))
+
+    def test_every_emitted_concern_matches_deployed_constraint(self):
+        allowed = {'montant_non_corrobore', 'ecart_arithmetique', 'ecart_tva', 'doublon_suspect',
+                   'piece_illisible', 'tiers_non_identifie', 'hors_perimetre', 'cut_off'}   # deployed check, read-only metadata
+        self.assertEqual(set(mm.ALLOWED_CONCERN_TYPES), allowed)
+        self.assertNotIn('client_evidence_conflict', allowed)
+        self.assertTrue(set(mm.CONCERN_CLASS_TO_TYPE.values()) <= allowed)
+        m = manifest([msg('m1', [att(claims=[claim(amount='100.00')])]), msg('m2', [att(part='p2', claims=[claim(amount='150.00')])]),
+                      msg('m3', [att(SHA_B, path=f'{OWNER}/o/b.pdf'), att(SHA_B, path=f'{OWNER}/o/a.pdf', part='p9')])])
+        cs = [c for e in plan_for(m)['envelopes'] for c in e['revision']['concerns']]
+        self.assertTrue(cs)
+        for c in cs:
+            self.assertIn(c['concern_type'], allowed)
+            self.assertIn(c['priority'], ('low', 'medium', 'high', 'critical'))
+            self.assertRegex(c['detail'], r'^\[client_evidence:[a-z_]+\] ')   # producer's own class kept in detail
+            self.assertLessEqual(len(c['detail']), 2000)
+        bad = copy.deepcopy(plan_for(m))
+        bad['envelopes'][0]['revision']['concerns'][0]['concern_type'] = 'client_evidence_conflict'
+        with self.assertRaisesRegex(ContractError, 'concern_type/priority'):
+            mm.validate_changeset(bad, OWNER)
 
     def test_same_bytes_different_size_refused_and_path_conflict_flagged(self):
         with self.assertRaises(ContractError):

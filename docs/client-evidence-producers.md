@@ -14,7 +14,8 @@ cited claims) -> `mail_manifest.plan` (financial_evidence_v1 envelopes) -> `time
 this repo; no mail credential or app database is read here, and original bytes are never moved.
 
 ## Writer contract it is built against
-Read from `supabase/migrations/20261028161800` (`ingest_financial_evidence`); parity with the deployed function is **unverified**.
+Read from `supabase/migrations/20261028161800` (`ingest_financial_evidence`); the deployed `ingest_financial_evidence` SQL was read as metadata on 2026-11-07 (SELECT only; the producer was never run against it) and its
+idempotency, supersession and field/concern caps match. Concern types are mapped below.
 - A key already in a document's runs replays only if the whole payload digest is equal, else the writer raises
   `idempotency key payload conflict`. The key here is `hash(owner, account_ref, sha256, method, version, content_hash)`; the content
   hash covers every cell, line and concern except the ingest clock. A later forward, a changed claim or another owner is a new key.
@@ -62,9 +63,18 @@ privacy-hold, person and protected origins are held and never auto-confirmed.
   **no migration or table was written** and none is applied.
 
 ## Limits and unverified items
-- Writer source vs deployed parity; the accepted `concern_type` values of `financial_review_queue` (`client_evidence_conflict` is
-  unverified, a refusal would stop apply safely); the exact shape of the `read` response (`apply` fails closed on anything unrecognised);
-  whether the caller's credential type is accepted for `read`/`submit` scopes.
+- Verified read-only 2026-11-07: `financial_review_queue_concern_type_check` allows only `montant_non_corrobore`, `ecart_arithmetique`,
+  `ecart_tva`, `doublon_suspect`, `piece_illisible`, `tiers_non_identifie`, `hors_perimetre`, `cut_off` (priority: low/medium/high/critical).
+  `client_evidence_conflict` is not valid. The producer maps its classes (`claim_slot_conflict`, `amount_conflict` -> `montant_non_corrobore`;
+  `composite_unmatched` -> `ecart_arithmetique`; `composite_repeat`, `rollup`, `custody_path_conflict` -> `doublon_suspect`) and keeps
+  the class as a `[client_evidence:<class>]` prefix of `detail`. Tests assert every emitted concern is in the deployed set and
+  `validate_changeset` refuses any other.
+- Verified read-only 2026-11-07: the `read` action returns `read_financial_accounting`, which is `read_financial_evidence || {lines, ...}`,
+  so `document.attributes.runs` is present and `state_summary` reads it; the test fixture has that shape.
+- Still unverified: whether the caller's credential type is accepted for `read`/`submit` scopes; no live execution of backup/apply.
+- A corrected claim amount gets a new `claim.<h>` key and drops the old one, so `apply` refuses it ("would drop prior field keys",
+  fail closed). Only a forward that adds an origin is a supported revision.
+- Image-derived events and invoice-vs-photo reconciliation are NOT persisted (local output only), and nothing goes to the public timeline.
 - PDF-to-claim parsing and the connector export are not in this repo. No real-data run was made for this PR.
 - Max 100 cells and 500 lines per original; larger documents are refused, not truncated.
 - `process-receipt`, `smart-receipt-linker`, `daily-receipt` span fallbacks and `mail_attachments.py` are deliberately not reused.
