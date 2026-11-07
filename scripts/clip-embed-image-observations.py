@@ -107,9 +107,10 @@ def fetch_batch_resilient(n, retries=5):
     return []
 
 done = fail = 0
+dead = set()   # rows whose bytes could not be read this run: the RPC keeps returning them, so ask past them
 remaining = args.limit if not args.all else 10**9
 while remaining > 0:
-    rows = fetch_batch_resilient(min(args.batch, remaining))
+    rows = [r for r in fetch_batch_resilient(min(500, max(args.batch, remaining) + len(dead))) if r[0] not in dead][:min(args.batch, remaining)]
     if not rows:
         break
     for obs_id, image_url, storage_path in rows:
@@ -121,6 +122,7 @@ while remaining > 0:
             print(f"  OK  {obs_id[:8]}  {int((time.time()-t0)*1000)}ms  dim={vec.shape[0]}", flush=True)
         except Exception as e:
             fail += 1
+            dead.add(obs_id)
             print(f"  FAIL {obs_id[:8]}  {str(e)[:100]}", flush=True)
         remaining -= 1
         if remaining <= 0:
