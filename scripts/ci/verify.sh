@@ -100,6 +100,8 @@ if node --test "$ROOT/scripts/books/expense-footprints.test.mjs" >"$CI_TMP_DIR/c
 else red "  ✗ expense-footprints collector contract FAILED"; cat "$CI_TMP_DIR/ci_expense_footprints_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/invalid-indexes.test.mjs" >"$CI_TMP_DIR/ci_invalid_indexes_tests.out" 2>&1; then grn "  ✓ invalid-index detector contract"
 else red "  ✗ invalid-index detector contract FAILED"; cat "$CI_TMP_DIR/ci_invalid_indexes_tests.out"; fail=1; fi
+if node --test "$ROOT/scripts/ci/function-drift-check.test.mjs" >"$CI_TMP_DIR/ci_fn_drift_tests.out" 2>&1; then grn "  ✓ function drift detector contract"
+else red "  ✗ function drift detector contract FAILED"; cat "$CI_TMP_DIR/ci_fn_drift_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/owner-writable-views.test.mjs" >"$CI_TMP_DIR/ci_owner_writable_views_tests.out" 2>&1; then grn "  ✓ owner-writable view detector contract"
 else red "  ✗ owner-writable view detector contract FAILED"; cat "$CI_TMP_DIR/ci_owner_writable_views_tests.out"; fail=1; fi
 if node --test "$GD/no-pii-exposure.test.mjs" >"$CI_TMP_DIR/ci_pii_exposure_tests.out" 2>&1; then grn "  ✓ pii-exposure detector contract"
