@@ -34,6 +34,8 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    superseded by a newer run or with nothing left unfiled (`evidence.resolved = {how, by, at}`), and re-arms up to 200 user-days whose newest
    open row predates the user's newest gate-passed filing (new visual anchors), skipping days already pending. `v_capture_review_backlog`
    shows what remains per user.
+6. **One scorer** (`20261111150000`): `capture_sets_score_evidence` (the arrival loop's 5-arg scorer, never called by the pipeline) is dropped;
+   its legs live in v3 (`20261111120000` lettering, `20261111130000` gated anchors). The revert file carries its last body.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.
