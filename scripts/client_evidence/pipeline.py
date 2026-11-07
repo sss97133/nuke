@@ -1,0 +1,59 @@
+"""Connector manifest -> financial envelopes -> cited timeline cells -> invoice/labor reconciliation, in one dry-run.
+
+Persisted (only through the private financial_evidence_v1 revision of the SOURCE document): origins, claims, lines, concerns,
+timeline events derived from that document's claims, and labor source-claim arithmetic. Local only (printed, never written):
+image-derived events, camera-clock review and invoice-vs-photo reconciliation, because images have no private owner store
+and the public timeline/work_sessions tables are not private."""
+from common import ContractError, canon, dec, sha256_hex
+import mail_manifest as mm, timeline, labor
+
+
+def _cell_event(ev):
+    norm = {**ev, 'producer': {k: v for k, v in ev['producer'].items() if k != 'run_id'}}   # run id is not content
+    return mm._cell(f"timeline.{ev['event_key'][:16]}", f"{ev['stance']}:{ev['event_key']}", norm)
+
+
+def labor_input(rec):
+    c, lab = rec['claim'], rec['claim'].get('labor') or {}
+    start, end = c.get('service_period_start'), c.get('service_period_end')
+    on = start or c.get('document_date')
+    return {'categories': [{'name': x['name'], 'hours': x['hours'], **({'rate': x['rate']} if x.get('rate') is not None else {})}
+                           for x in lab['categories']],
+            'claimed_total_hours': lab.get('claimed_total_hours'), 'stated_labor_amount': lab.get('stated_labor_amount'),
+            'as_of': on[:10] if on else None, 'service_period': {'start': start, 'end': end} if start and end else None}
+
+
+def build(manifest, owner_id, run_clock, rates=(), images=(), vehicle_id=None, current_rate=None, vehicle_range=None):
+    run_id = 'run:' + sha256_hex(canon([owner_id, run_clock]))[:16]
+    labor_results = {}
+
+    def extras(sha, edges, recs):
+        origins = [{'origin_key': e['origin_key'], 'sent_at': e['sent_at']} for e in edges]
+        cells = [_cell_event(ev) for ev in timeline.events_from_claims(sha, origins, recs, run_id)]
+        for r in recs:
+            if r['claim']['kind'] == 'labor_claim':
+                res = labor.invoice_labor(labor_input(r), list(rates), current_rate)
+                labor_results[r['cid']] = (r, res)
+                cells.append(mm._cell(f"labor.{r['cid']}", f"labor_claim:{r['claim']['economic_key']}",
+                                      {**res, 'citations': r['citations'], 'assertion_status': 'claim_unverified'}))
+        return cells
+
+    cs = mm.plan(manifest, owner_id, run_clock, extras)
+    recon = []
+    for cid, (r, res) in sorted(labor_results.items()):
+        inp = labor_input(r)
+        entry = {'claim_id': cid, 'economic_key': r['claim']['economic_key'], 'invoice': res}
+        if not images:
+            entry['photos'] = {'status': 'not_supplied'}
+        elif not inp['service_period'] or not vehicle_id:
+            entry['photos'] = {'status': 'not_assessable', 'reason': 'service period or vehicle id missing; photos are never windowed by guess'}
+        else:
+            ph = labor.photo_sessions(list(images), vehicle_id, {'start': inp['service_period']['start'], 'end': inp['service_period']['end']},
+                                      vehicle_range=vehicle_range)
+            entry['photos'] = ph
+            entry['reconciliation'] = labor.reconcile(res, ph, (r['claim'].get('labor') or {}).get('claimed_days'))
+        recon.append(entry)
+    img_events = [e for e in (timeline.event_from_image(i, run_id) for i in images) if e]
+    return {'changeset': cs, 'labor_reconciliation': recon, 'local_image_events': img_events,
+            'publication': 'refused: no private projection store; public timeline_events/work_sessions are not written',
+            'persisted_only_via': 'private financial_evidence_v1 revision cells of the source document'}
