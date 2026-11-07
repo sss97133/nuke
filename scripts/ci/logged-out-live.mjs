@@ -33,10 +33,11 @@ const VEHICLES = (process.env.LIVE_VEHICLES ||
 const PROFILE = process.env.LIVE_PROFILE || '01718395-bd19-47d3-b701-9867b653dd5b';
 const PAGES = ['/', '/market', `/profile/${PROFILE}`, ...VEHICLES.map(v => `/vehicle/${v}`)];
 // Pages that belong to the signed-in owner. A visitor is redirected to /login; nothing of the books may load for them.
-const PRIVATE_PAGES = ['/accounting', '/publishing/finance', '/profile'];
-// The books readers: the accounting RPCs and the book's views and tables. A visitor's page load must not call any of them.
-const BOOKS_READERS = /supabase\.co\/rest\/v1\/(rpc\/(accounting_|books_|get_user_reconciliation|related_party|list_accounting_access|owner_working_notes)|(v_books_|v_financial_|financial_documents|financial_document_|financial_review_queue|accounting_access_grants))/;
-const PRIVATE_TEXT = /Books docket|Finish your taxes|Your private office|Open the books docket/;
+const PRIVATE_PAGES = ['/accounting', '/publishing/finance', '/profile', '/capture/ledger'];
+// The books readers: the accounting RPCs and the book's views and tables, and the owner's capture ledger. A visitor's page
+// load must not call any of them.
+const BOOKS_READERS = /supabase\.co\/rest\/v1\/(rpc\/(accounting_|books_|get_user_reconciliation|related_party|list_accounting_access|owner_working_notes|get_capture_ledger|request_capture_rescan)|(v_books_|v_financial_|financial_documents|financial_document_|financial_review_queue|accounting_access_grants|capture_skips|capture_rescan_requests))/;
+const PRIVATE_TEXT = /Books docket|Finish your taxes|Your private office|Open the books docket|Capture ledger|Re-scan my library/;
 // Reads a stranger's browser makes that no page load reliably triggers: policy-guarded tables and the gate on its own.
 const ANON_READS = ['observation_witnesses?select=id&witness_role=eq.derived&limit=1'];
 const ERROR_TEXT = /Failed to load|permission denied|Something went wrong|Application error/i;

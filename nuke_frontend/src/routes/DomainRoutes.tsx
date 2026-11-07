@@ -69,6 +69,7 @@ const UserProfile = React.lazy(() => import('../pages/UserProfile'));
 
 // Legacy pages (still used by navigation components)
 const Capture = React.lazy(() => import('../pages/Capture'));
+const CaptureLedger = React.lazy(() => import('../pages/CaptureLedger'));
 const Capsule = React.lazy(() => import('../pages/Capsule'));
 const Library = React.lazy(() => import('../pages/Library'));
 const AuctionMarketplace = React.lazy(() => import('../pages/AuctionMarketplace'));
@@ -275,6 +276,7 @@ export const DomainRoutes = () => {
 
           {/* Personal workspace */}
           <Route path="/capture" element={<Capture />} />
+          <Route path="/capture/ledger" element={<CaptureLedger />} />
           <Route path="/library" element={<Library />} />
           <Route path="/capsule" element={<Capsule />} />
           <Route path="/notifications" element={<Notifications />} />

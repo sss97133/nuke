@@ -36,6 +36,16 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    shows what remains per user.
 6. **One scorer** (`20261111150000`): `capture_sets_score_evidence` (the arrival loop's 5-arg scorer, never called by the pipeline) is dropped;
    its legs live in v3 (`20261111120000` lettering, `20261111130000` gated anchors). The revert file carries its last body.
+7. **Capture ledger** (`20261111170000`): one record per photo from the phone's gate to the vehicle, read the same way by the
+   website (`/capture/ledger`, owner only) and the capture app. Owner, 2026-11-07: "why's the website so disconnected functionally
+   [from iOS]? they are not well aligned": the site read none of the capture tables, the phone kept its gate decisions in an
+   on-device log. States, one per frame: `on_vehicle`, `unverified`, `waiting`, `held`, `pulled`, `private`, `unsorted`, `failed`,
+   plus `skipped` (a `capture_skips` row the phone wrote through `report_capture_skips`, dropped once the frame arrives with the
+   same exif uuid). Readers `get_capture_ledger(tz, from, to, limit)` (days, default the last 365; all time measured 6.7 s on
+   29,749 frames vs 143 ms for a year) and `get_capture_ledger_day(day, tz)` (frames, reasons, the scorer's top-3 for a held
+   set, the day's skips; no thumbnail for a private frame). "Re-scan my library" is a `capture_rescan_requests` row
+   (`request_capture_rescan` from any surface, `claim_capture_rescan` / `finish_capture_rescan` by the phone). Nothing writes
+   testimony. The page's words are the app's ingest bar (`CaptureIngestStatus.swift`). Contract `test_capture_ledger.sql`.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.
