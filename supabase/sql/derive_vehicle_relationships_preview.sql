@@ -139,7 +139,7 @@ pp AS MATERIALIZED (
   SELECT vi.id, vi.vehicle_id AS vid, coalesce(vi.taken_at, vi.created_at) AS t,
          vi.latitude::float8 AS lat, vi.longitude::float8 AS lon,
          x.j->>'device_fingerprint' AS dev,
-         o2.origin,
+         o2.origin, o2.unk, sc.m AS scraped_match,
          o2.origin OR coalesce(nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NOT NULL
           AND nullif(btrim(x.j->'exif_data'->>'camera_model'), '') IS NOT NULL
           AND (x.j->'exif_data'->>'source_type' = 'user_library'
@@ -147,10 +147,31 @@ pp AS MATERIALIZED (
                OR x.j->>'device_fingerprint' IN (SELECT fp.dev FROM fp)), false) AS own
     FROM cand_all ca JOIN vehicle_images vi ON vi.vehicle_id = ca.vid CROSS JOIN cfg
          CROSS JOIN LATERAL (SELECT to_jsonb(vi) AS j) x
-         CROSS JOIN LATERAL (SELECT coalesce(own_origin_source(
-             CASE WHEN nullif(btrim(x.j->>'automation_script'), '') IS NOT NULL THEN coalesce(x.j->>'source', '') || '#automated'
+         -- Origin unknown: a user_upload row stored at the bucket root ('<uuid>.jpg') or under 'unorganized/' with no camera
+         -- make / model, no taken_at, no GPS and no original_filename. It is not own-device and not own library.
+         CROSS JOIN LATERAL (SELECT coalesce(regexp_replace(lower(btrim(x.j->>'source')), '[-\s]+', '_', 'g') = 'user_upload'
+             AND lower(coalesce(x.j->>'storage_path', '')) ~ '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]+|unorganized/.*)$'
+             AND nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NULL AND nullif(btrim(x.j->'exif_data'->>'camera_model'), '') IS NULL
+             AND vi.taken_at IS NULL AND vi.latitude IS NULL AND vi.longitude IS NULL
+             AND nullif(btrim(x.j->>'original_filename'), '') IS NULL, false) AS unk) u2
+         CROSS JOIN LATERAL (SELECT coalesce(NOT u2.unk AND own_origin_source(
+             CASE WHEN nullif(btrim((SELECT iv.automation_script FROM vehicles iv WHERE iv.id = vi.vehicle_id)), '') IS NOT NULL THEN coalesce(x.j->>'source', '') || '#automated'
                   ELSE x.j->>'source' END,
-             x.j->>'storage_path', vi.user_id, cfg.u), false) AS origin) o2
+             x.j->>'storage_path', vi.user_id, cfg.u), false) AS origin, u2.unk) o2
+         -- An origin-unknown photo that shares file_hash / dhash with an image from an external scrape is scraped (cited).
+         LEFT JOIN LATERAL (
+           SELECT jsonb_build_object('image_id', vi.id, 'matched_image_id', q.id, 'matched_source', q.source, 'via', q.via) AS m
+             FROM (SELECT s.id, s.source, 'file_hash' AS via, (SELECT sv.automation_script FROM vehicles sv WHERE sv.id = s.vehicle_id) AS automation_script FROM vehicle_images s
+                    WHERE vi.file_hash IS NOT NULL AND s.file_hash = vi.file_hash AND s.id <> vi.id
+                   UNION ALL
+                   SELECT s.id, s.source, 'dhash', (SELECT sv.automation_script FROM vehicles sv WHERE sv.id = s.vehicle_id) AS automation_script FROM vehicle_images s
+                    WHERE vi.dhash IS NOT NULL AND s.dhash = vi.dhash AND s.id <> vi.id) q
+            WHERE o2.unk
+              AND (regexp_replace(lower(btrim(coalesce(q.source, ''))), '[-\s]+', '_', 'g')
+                     IN ('bat', 'mecum', 'classic_com', 'classiccom', 'craigslist', 'url_scraper')
+                   OR (regexp_replace(lower(btrim(coalesce(q.source, ''))), '[-\s]+', '_', 'g') = 'dropbox_import'
+                       AND nullif(btrim(q.automation_script), '') IS NOT NULL))
+            ORDER BY q.id LIMIT 1) sc ON true
    WHERE vi.user_id = cfg.u
 ),
 -- Step 3: capture sessions of own-device photos (a new session after a gap of r_gap_h hours).
@@ -319,26 +340,38 @@ vlink AS MATERIALIZED (
       UNION SELECT el.organization_id FROM external_listings el WHERE el.vehicle_id = ca.vid) x
    WHERE x.org IS NOT NULL
 ),
-refs AS (
+refs AS MATERIALIZED (
   SELECT pto.org_id FROM pto
   UNION SELECT lsrc.org FROM lsrc
   UNION SELECT vlink.org FROM vlink
 ),
+-- Only the referenced organizations are expanded (a), before any join against the full organization list.
+orga AS MATERIALIZED (
+  SELECT n.* FROM orgn n WHERE n.id IN (SELECT r.org_id FROM refs r)
+),
 -- Duplicate organizations are one: same normalized name (not 25 km apart when both have GPS) or same website host.
 -- canon = the member with GPS, then the lowest id. organization rows are never edited.
+-- Three equi-joins (self, name hash join, host hash join) instead of one OR join; the latitude band (25 km is under
+-- 0.2249 degrees of latitude) is a superset prefilter in front of the exact distance.
 orgmap AS MATERIALIZED (
-  SELECT r.org_id, (array_agg(m.id ORDER BY (m.lat IS NULL), m.id::text))[1] AS canon
-    FROM refs r
-    JOIN orgn a ON a.id = r.org_id
-    JOIN orgn m ON m.id = a.id
-      OR (a.nn <> '' AND length(a.nn) >= 6 AND a.nn_c <= 5 AND m.nn = a.nn
-          AND (a.lat IS NULL OR m.lat IS NULL
-               OR 12742000 * asin(sqrt(least(1, power(sin(radians(m.lat - a.lat) / 2), 2)
-                    + cos(radians(a.lat)) * cos(radians(m.lat)) * power(sin(radians(m.lon - a.lon) / 2), 2)))) <= 25000))
-      OR (a.host <> '' AND a.host_c <= 5 AND m.host = a.host)
-   GROUP BY r.org_id
+  SELECT p.org_id, (array_agg(m.id ORDER BY (m.lat IS NULL), m.id::text))[1] AS canon
+    FROM (
+      SELECT a.id AS org_id, a.id AS mid FROM orga a
+      UNION
+      SELECT a.id, m.id FROM orga a JOIN orgn m ON m.nn = a.nn
+       WHERE a.nn <> '' AND length(a.nn) >= 6 AND a.nn_c <= 5
+         AND (a.lat IS NULL OR m.lat IS NULL
+              OR (abs(m.lat - a.lat) <= 0.225
+                  AND 12742000 * asin(sqrt(least(1, power(sin(radians(m.lat - a.lat) / 2), 2)
+                        + cos(radians(a.lat)) * cos(radians(m.lat)) * power(sin(radians(m.lon - a.lon) / 2), 2)))) <= 25000))
+      UNION
+      SELECT a.id, m.id FROM orga a JOIN orgn m ON m.host = a.host
+       WHERE a.host <> '' AND a.host_c <= 5
+    ) p
+    JOIN orgn m ON m.id = p.mid
+   GROUP BY p.org_id
 ),
-lsc AS (
+lsc AS MATERIALIZED (
   SELECT lsrc.vid, coalesce(om.canon, lsrc.org) AS org, lsrc.org AS listed_org, lsrc.conf, lsrc.src, lsrc.ref
     FROM lsrc LEFT JOIN orgmap om ON om.org_id = lsrc.org
 ),
@@ -349,7 +382,7 @@ poc AS MATERIALIZED (
     LEFT JOIN orgmap om ON om.org_id = pto.org_id
    GROUP BY ps2.id, ps2.vid, coalesce(om.canon, pto.org_id)
 ),
-orgt AS (
+orgt AS MATERIALIZED (
   SELECT poc.vid, poc.canon, count(*) AS n_at, min(poc.m) AS min_m,
          EXISTS (SELECT 1 FROM organization_vehicles ov LEFT JOIN orgmap om ON om.org_id = ov.organization_id
                   WHERE ov.vehicle_id = poc.vid AND coalesce(om.canon, ov.organization_id) = poc.canon) AS ov_rel
@@ -357,7 +390,7 @@ orgt AS (
 ),
 -- Session co-occurrence: other vehicles of the account photographed (own device) within the sessions of this vehicle
 -- (its first to last capture, widened by the session gap), and the organizations those vehicles are linked / listed at.
-cooc AS (
+cooc AS MATERIALIZED (
   SELECT r.vid, coalesce(om.canon, l.org) AS canon, count(DISTINCT p2.vid) AS n
     FROM (SELECT ps2.vid, min(ps2.t) AS a, max(ps2.t) AS b FROM ps2 GROUP BY ps2.vid) r CROSS JOIN cfg
     JOIN ps2 p2 ON p2.vid <> r.vid
@@ -366,7 +399,7 @@ cooc AS (
     LEFT JOIN orgmap om ON om.org_id = l.org
    GROUP BY r.vid, coalesce(om.canon, l.org)
 ),
-st AS (
+st AS MATERIALIZED (
   SELECT ps2.vid, max(ps2.sess) AS n_sess,
          extract(epoch FROM max(ps2.t) - min(ps2.t)) / 86400.0 AS span_days,
          count(DISTINCT (ps2.t AT TIME ZONE 'UTC')::date) AS n_days,
@@ -380,7 +413,7 @@ f AS (
          ver.id AS ver_id,
          perm.co_by_other, perm.self_granted, perm.owner_perm, perm.any_perm,
          obs.id AS obs_id, obs.stmt_vid, obs.content_text, obs.structured_data, obs.first_person,
-         ph.n AS photos, ph.n_own, ph.n_origin, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices,
+         ph.n AS photos, ph.n_own, ph.n_origin, ph.n_unk, ph.n_scraped, ph.scraped_cite, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices,
          ol.t AS obs_last,
          EXISTS (SELECT 1 FROM vehicle_contributors vc WHERE vc.vehicle_id = cand.vid AND vc.user_id = cfg.u) AS contrib,
          EXISTS (SELECT 1 FROM vehicle_ownerships vo WHERE vo.vehicle_id = cand.vid AND vo.owner_profile_id = cfg.u
@@ -441,6 +474,8 @@ f AS (
   -- Step 1 evidence: the account's photos; capture facts count only for own-device photos.
   LEFT JOIN LATERAL (
     SELECT count(*) AS n, count(*) FILTER (WHERE p.own) AS n_own, count(*) FILTER (WHERE p.origin) AS n_origin,
+           count(*) FILTER (WHERE p.unk) AS n_unk, count(*) FILTER (WHERE p.scraped_match IS NOT NULL) AS n_scraped,
+           (jsonb_agg(p.scraped_match ORDER BY p.id) FILTER (WHERE p.scraped_match IS NOT NULL))->0 AS scraped_cite,
            min(p.t) FILTER (WHERE p.own) AS first_t, max(p.t) FILTER (WHERE p.own) AS last_t,
            count(*) FILTER (WHERE p.own AND p.lat IS NOT NULL AND p.lon IS NOT NULL) AS gps_n,
            count(*) FILTER (WHERE p.own AND p.lat IS NOT NULL AND p.lon IS NOT NULL
@@ -489,7 +524,7 @@ g3 AS (
          greatest(g2.last_t, g2.obs_last) AS act_last
   FROM g2
 ),
-g4 AS (
+g4 AS MATERIALIZED (
   SELECT g3.*,
          g3.disputed_raw AND g3.cited AS disputed,
          (g3.denied_raw OR g3.disputed_raw) AND NOT g3.cited AS uncited_ignored,
@@ -604,7 +639,8 @@ SELECT h.vid AS vehicle_id,
          'chain', jsonb_build_array(
            jsonb_build_object('step', 1, 'name', 'origin_facts', 'confidence', CASE WHEN h.own_n > 0 THEN 0.4 ELSE 0.3 END,
              'evidence', jsonb_build_object('uploader_photo_count', h.n_photos, 'own_device_photo_count', h.own_n,
-               'imported_photo_count', h.n_photos - h.own_n, 'own_origin_photo_count', coalesce(h.n_origin, 0), 'device_count', h.devices,
+               'imported_photo_count', h.n_photos - h.own_n, 'own_origin_photo_count', coalesce(h.n_origin, 0),
+               'origin_unknown_photo_count', coalesce(h.n_unk, 0), 'scraped_photo_count', coalesce(h.n_scraped, 0), 'scraped_example', h.scraped_cite, 'device_count', h.devices,
                'first_capture', h.first_t, 'last_capture', h.last_t, 'gps_photo_count', coalesce(h.gps_n, 0),
                'last_activity', h.act_last, 'decay_months', h.months, 'decayed', h.decayed),
              'eliminated', CASE WHEN h.own_n = 0 THEN '["documenting","previously_documented"]'::jsonb ELSE '[]'::jsonb END),
