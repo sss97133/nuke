@@ -3839,3 +3839,32 @@ What the machine takes from it (the owner's figures above are his declaration of
   phone, the asset exists with him as creator, it shows on `/assets/:id` with "no public sale recorded" and its presentation
   ledger empty, and the Mannerheim gallery organization row can later be named as a presenter without the profile exposing the
   inventory.
+
+### 21.2 The fair is where allocated money meets the work (owner, 2026-11-08)
+
+Owner, verbatim: "when i think of art fairs i could envision art dealers and financial advisors talking about how and what to do
+with a clients money thats been allocated to use for acquisition."
+
+The fair, in the machine's words, is the demand-side venue. A client has set aside capital for acquisition; an advisor holds the
+mandate (the budget, the taste, the constraints); a dealer stands in a booth with works and asking prices; the conversation
+between them is the market moment, and it leaves almost no public record. This is the same posture the owner described for
+himself on 2026-10-15 (O16, `project_advisor_relations_curation_face`): at Viva he is the buyers' advisor, not the house's
+salesman, and a deal discovered through him runs through him.
+
+What Nuke is in that conversation, and what it is not:
+- **The advisor's briefing book, before the fair.** For a work on the booth's wall: the artist's production and presentation
+  ledger (shows, books, bookings, representation), the public figures where they exist (the artist's auction history as the
+  houses stated it, like-for-like movement with n), and the printed provenance of comparable works. For a work with no public
+  sale: that fact, stated, beside the ledger of events. The reader exists in parts today (`asset_creators`, `asset_profile_read`);
+  the fair-side view is those readers keyed by the exhibitor's list.
+- **The record, after the fair.** The acquisition is a holding fold (asset × party × share × as-of) with its evidence: the
+  invoice, the certificate, the condition report, the shipping paper, each a document frame attributed to its source, the way a
+  vehicle's receipts land. The asking price was a claim by the dealer ("asking, not a sale"); the paid price is private to the
+  parties and masked on the public shape. The mandate itself (client, budget, criteria) is private data of the advisor's
+  organization, held like the deal pipeline holds a vehicle deal, never a public row.
+- **Not a marketplace.** Nuke does not price the work, broker the offer or take the money (dead-features autopsy, §VII).
+  The grant model of 2026-07-07 is the only outbound surface: the advisor shows a counterpart the curation, not the plumbing.
+
+Shape to build when the first real mandate arrives, in this order: the presentation observation for a fair (exhibitor,
+venue, dates, works shown), the holding fold with evidence frames, a private mandate record under the advisor's organization,
+and a reader that lists an exhibitor's works beside their public figures. Nothing is minted for it today.
