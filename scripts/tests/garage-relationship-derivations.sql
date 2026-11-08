@@ -574,6 +574,16 @@ SELECT fixture_assert((SELECT count(*) FROM vehicles WHERE merged_into_vehicle_i
 SELECT fixture_assert(normalize_vehicle_model_family('K15 Suburban')='suburban' AND normalize_vehicle_model_family('Suburban 1500')='suburban'
   AND normalize_vehicle_model_family('Jimmy')=normalize_vehicle_model_family('K5 Blazer') AND normalize_vehicle_model_family('C10')='ck-truck'
   AND normalize_vehicle_model_family('Camaro')='camaro' AND normalize_vehicle_model_family('')IS NULL,'model family normalization');
+SELECT fixture_assert(normalize_vehicle_model_family('K15 SWB')=normalize_vehicle_model_family('K10')
+  AND normalize_vehicle_model_family('K10')=normalize_vehicle_model_family('K1500 Sierra Classic')
+  AND normalize_vehicle_model_family('C1500 Short Bed')=normalize_vehicle_model_family('C10 Stepside')
+  AND normalize_vehicle_model_family('K25 Long Bed')=normalize_vehicle_model_family('K2500 Silverado')
+  AND normalize_vehicle_model_family('K20')=normalize_vehicle_model_family('K2500 Silverado')
+  AND normalize_vehicle_model_family('C30 Scottsdale')=normalize_vehicle_model_family('K3500 Cheyenne')
+  AND normalize_vehicle_model_family('K15 SWB')<>normalize_vehicle_model_family('K25 Long Bed')
+  AND normalize_vehicle_model_family('K15 Suburban SWB')='suburban' AND normalize_vehicle_model_family('K15 Suburban')=normalize_vehicle_model_family('Suburban')
+  AND normalize_vehicle_model_family('K1500 Sierra Classic') NOT LIKE '%sierra%' AND normalize_vehicle_model_family('SWB') IS NULL
+  AND normalize_vehicle_model_family('Sierra 1500')='sierra','C/K load classes and bed words');
 SET ROLE authenticated;
 SELECT fixture_fails($q$SELECT * FROM find_vehicle_duplicate_candidates('00000000-0000-4000-8000-000000000301')$q$);
 RESET ROLE;

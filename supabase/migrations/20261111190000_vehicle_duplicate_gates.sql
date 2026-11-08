@@ -1,6 +1,8 @@
 -- Duplicate / mixed-record gates. Nothing here merges or moves anything.
---  1. normalize_vehicle_model_family(model): chassis codes and trim words dropped, so 'K15 Suburban' = 'Suburban',
---     'K5 Blazer' = 'Jimmy' (one blazer-jimmy family). Conservative: unknown models normalize to themselves.
+--  1. normalize_vehicle_model_family(model): chassis codes, trim words and bed / wheelbase words (swb, lwb, short bed,
+--     long bed, stepside, fleetside, wideside, bed) dropped, so 'K15 Suburban' = 'Suburban', 'K5 Blazer' = 'Jimmy' (one
+--     blazer-jimmy family), and a GM C/K truck is named by its load class: K10 = K15 = K1500 = 'K15 SWB' = 'K1500 Sierra
+--     Classic' (ck-truck, likewise C; 20/25/2500 = ck-truck-2500; 30/35/3500 = ck-truck-3500). Unknown models normalize to themselves.
 --  2. find_vehicle_duplicate_candidates(vehicle): READ-ONLY candidates for a review queue. Same user relation, same
 --     make, year within 1, same model family, VINs compatible (either missing, or equal). Never auto-merges.
 --  3. vehicle_image_filing_gate: BEFORE INSERT / UPDATE OF vehicle_id on vehicle_images. When the flag
@@ -16,17 +18,28 @@ SET LOCAL lock_timeout = '5s';
 
 CREATE FUNCTION public.normalize_vehicle_model_family(p_model text)
 RETURNS text LANGUAGE plpgsql IMMUTABLE AS $fn$
-DECLARE s text; s0 text;
+DECLARE s text; s0 text; ck text;
 BEGIN
   s0 := lower(btrim(coalesce(p_model, '')));
   IF s0 = '' THEN RETURN NULL; END IF;
   s0 := regexp_replace(s0, '[^a-z0-9 ]', ' ', 'g');
+  -- bed / wheelbase words describe a configuration, not a model
+  s0 := btrim(regexp_replace(regexp_replace(s0,
+          '\m(short ?bed|long ?bed|step ?side|fleet ?side|wide ?side|swb|lwb|bed)\M', ' ', 'g'), '\s+', ' ', 'g'));
+  IF s0 = '' THEN RETURN NULL; END IF;
+  -- GM C/K (2WD / 4WD) full-size truck by load class: 10 = 15 = 1500, 20 = 25 = 2500, 30 = 35 = 3500
+  ck := CASE WHEN s0 ~ '\m[ck](10|15|1500)\M' THEN 'ck-truck'
+             WHEN s0 ~ '\m[ck](20|25|2500)\M' THEN 'ck-truck-2500'
+             WHEN s0 ~ '\m[ck](30|35|3500)\M' THEN 'ck-truck-3500' END;
   s := regexp_replace(s0, '\m[ckrv][0-9]{1,2}\M', ' ', 'g');                       -- chassis codes k15, c10, k5
+  s := regexp_replace(s, '\m[ckrv](1500|2500|3500)\M', ' ', 'g');                  -- k1500, c2500
   s := regexp_replace(s, '\m[0-9]{3,4}\M', ' ', 'g');                              -- 1500, 2500
   s := regexp_replace(s, '\m(series|truck|pickup|sport|utility|wagon|4x4|4wd|2wd|custom|deluxe)\M', ' ', 'g');
   s := btrim(regexp_replace(s, '\s+', ' ', 'g'));
   IF s ~ '\msuburban\M' THEN RETURN 'suburban'; END IF;
   IF s ~ '\m(jimmy|blazer)\M' THEN RETURN 'blazer-jimmy'; END IF;
+  -- a C/K load class names the family; trim names (sierra, silverado, scottsdale, cheyenne, classic ...) and cab words stay out of it
+  IF ck IS NOT NULL THEN RETURN ck; END IF;
   IF s = '' THEN
     RETURN CASE WHEN s0 ~ '\m[ckrv][0-9]{2}\M' THEN 'ck-truck' END;
   END IF;
