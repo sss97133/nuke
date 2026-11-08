@@ -2,6 +2,8 @@
 /**
  * extract-bat-core
  *
+ * Version: 4.5.9 — read every publisher category; a Parts + Race Cars bundle remains a vehicle.
+ *   Re-extraction corrects the same canonical lot and records the category decision in its fetch receipt.
  * Version: 4.5.8 — vehicles.description stores the full post body (was a 480-char summary + "…"); a stored legacy
  *   cut of the same body is replaced, never a longer/different text; sets description_truncated / description_length_source (2026-10-25)
  * Version: 4.5.2 — the lot's own "Private Party or Dealer" line lands in auction_events.seller_type (raw text in raw_data.party_type_raw) (2026-10-20)
@@ -40,6 +42,7 @@
 
 import { fullDescriptionText, shouldReplaceDescription } from "./descriptionText.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { batListingClassification, listingKindUpdate } from "./listingKind.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { decideLotAttribution, mergeEventMetadata, monitorForSeller, type BatEventRow } from "./sellerAttribution.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
@@ -64,7 +67,7 @@ import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.8';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.9';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -1339,7 +1342,7 @@ Deno.serve(async (req) => {
         fetchedAt: sourceFetchedAt,
         errorMessage: null,
         html,
-        metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
+        metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent, listing_classification: batListingClassification(html) },
       });
     }
 
@@ -1362,7 +1365,7 @@ Deno.serve(async (req) => {
         console.warn(`extract-bat-core terminal evidence: ${terminalCapture.reason}`);
       if (htmlSource === "direct" && terminalCapture.status === "not_terminal") await trySaveHtmlSnapshot({
         supabase, listingUrl: listingUrlNorm, httpStatus, success: true, fetchedAt: sourceFetchedAt,
-        errorMessage: null, html, metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
+        errorMessage: null, html, metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent, listing_classification: batListingClassification(html) },
       });
     }
     // the comments JSON, parsed once: the first comment or bid is the auction's public start, the sale /
@@ -1414,7 +1417,8 @@ Deno.serve(async (req) => {
     let bidsWritten = 0;
 
     const batCategory = essentials.listing_category ? String(essentials.listing_category).trim() : null;
-    const listingKind = batCategory && batCategory.toLowerCase() === "parts" ? "non_vehicle_item" : "vehicle";
+    const listingClassification = batListingClassification(html);
+    const listingKind = listingClassification.kind ?? "vehicle";
     const descriptionRaw = extractDescription(html);
     const description = fullDescriptionText(descriptionRaw);
     const images = extractImages(html);
@@ -1622,8 +1626,9 @@ Deno.serve(async (req) => {
         listing_url: existing?.listing_url || listingUrlCanonical,
         listing_source: existing?.listing_source || "bat",
         platform_source: existing?.platform_source || "bringatrailer", // C7: fill the platform key when missing
-        // Prefer to only mark non-vehicle, never downgrade.
-        ...(listingKind === "non_vehicle_item" ? { listing_kind: "non_vehicle_item" } : {}),
+        // Re-read all source categories; correct prior Parts-only classification
+        // only for this canonical presentation, never a different source/lot.
+        ...listingKindUpdate(listingClassification, existing?.listing_url || existing?.discovery_url, listingUrlCanonical),
         updated_at: new Date().toISOString(),
         extractor_version: EXTRACTOR_VERSION,
       };
