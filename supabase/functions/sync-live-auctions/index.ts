@@ -34,6 +34,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { pcarBidCapture, pcarBidObservation } from "./pcarBidCapture.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
@@ -546,9 +547,11 @@ async function ingestPcarBids(
   out.deferred = linked.length > maxLots;
   for (const lot of linked.slice(0, maxLots)) {
     if (Date.now() >= deadline || out.attempted >= 20) { out.deferred = true; break; }
-    const { html, error } = await archiveFetch(lot.url.replace("https://pcarmarket.com/", "https://www.pcarmarket.com/"), {
+    const fetched = await archiveFetch(lot.url.replace("https://pcarmarket.com/", "https://www.pcarmarket.com/"), {
       platform: "pcarmarket", skipCache: true, useFirecrawl: false, callerName: "sync-live-auctions",
     });
+    const receivedAt = new Date().toISOString();
+    const { html, error } = fetched;
     if (error || !html) { out.errors.push(`${lot.url}: ${error ?? "no HTML"}`); continue; }
     out.lots++;
     const bids = parsePcarBids(html);
@@ -558,6 +561,10 @@ async function ingestPcarBids(
       .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").not("is_superseded", "is", true).in("source_identifier", ids);
     if (heldError) { out.errors.push(`held check: ${heldError.message}`); continue; }
     const have = new Set((held ?? []).map((r: { source_identifier: string }) => r.source_identifier));
+    if (bids.every(b => have.has(`pcarmarket-bid:${b.id}`))) continue;
+    let capture;
+    try { capture = await pcarBidCapture(supabase, fetched, receivedAt); }
+    catch (error) { out.errors.push(`${lot.url}: ${error instanceof Error ? error.message : String(error)}`); continue; }
     for (const b of bids) {
       const sid = `pcarmarket-bid:${b.id}`;
       if (have.has(sid)) continue;
@@ -566,18 +573,7 @@ async function ingestPcarBids(
       const res = await fetch(`${base}/functions/v1/ingest-observation`, {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_slug: "pcarmarket",
-          kind: "bid",
-          observed_at: b.at,
-          source_url: lot.url,
-          source_identifier: sid,
-          content_text: `Bid $${b.amount.toLocaleString("en-US")}`,
-          structured_data: { bid_id: b.id, amount: b.amount, currency: "USD", bidder: b.bidder, bid_status: b.status, clock: "source_event_time" },
-          vehicle_id: lot.vehicle_id,
-          extraction_method: "pcarmarket_ssr_bids_v1",
-          defer_analysis: true,
-        }),
+        body: JSON.stringify(pcarBidObservation(b, lot, capture)),
       });
       if (res.ok) out.posted++;
       else out.errors.push(`${sid}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
