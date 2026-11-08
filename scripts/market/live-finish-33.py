@@ -47,7 +47,7 @@ Run: dotenvx run -- python3 scripts/market/live-finish-33.py [--dry-run] [--out 
 Needs: python3 with numpy, pandas and scikit-learn, the duckdb CLI; VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and
 SUPABASE_SERVICE_ROLE_KEY (the service key only for the inputs read and the write).
 """
-import argparse, email.utils, json, math, os, pickle, re, subprocess, sys, time, urllib.error, urllib.request
+import argparse, json, math, os, pickle, re, subprocess, sys, time, urllib.error, urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from io import StringIO
@@ -634,13 +634,7 @@ def load_artifacts(art=ART):
 
 
 # ------------------------------------------------------------------------------------------------- PostgREST
-# The server's clock, from each response's Date header: a laptop clock can be hours off (2026-11-07: 3 h 35 min slow),
-# and a wrong clock stamps every row early and puts each lot at the wrong horizon.
-SERVER_NOW = None
-
-
 def rest(path, key, method='GET', body=None, prefer=None, timeout=60):
-    global SERVER_NOW
     url = os.environ['VITE_SUPABASE_URL']
     headers = {'apikey': key, 'Authorization': f'Bearer {key}', 'Content-Type': 'application/json', 'X-Nuke-Writer': WRITER}
     if prefer:
@@ -649,10 +643,6 @@ def rest(path, key, method='GET', body=None, prefer=None, timeout=60):
                                  data=None if body is None else json.dumps(body, default=str).encode())
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            try:
-                SERVER_NOW = email.utils.parsedate_to_datetime(r.headers['Date']).timestamp()
-            except (TypeError, ValueError):
-                pass
             raw = r.read()
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as e:
@@ -663,7 +653,7 @@ def board(anon):
     d = rest('rpc/market_pulse_live', anon, 'POST', {})
     cols = d.get('columns') or []
     L = pd.DataFrame([dict(zip(cols, r)) for r in d.get('auctions', [])]).rename(columns={'id': 'vehicle_id'})
-    return L
+    return L, d.get('synced_at')
 
 
 def latest_rows(anon, ids):
@@ -865,10 +855,12 @@ def run(args):
     if not os.environ.get('VITE_SUPABASE_URL') or not anon or not service:
         raise SystemExit('VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are required (dotenvx run --)')
     a = load_artifacts()
-    lots = board(anon)
-    now = SERVER_NOW or time.time()
-    if abs(now - time.time()) > 120:
-        log(f'clock: this machine is {time.time() - now:.0f} s off the server; using the server\'s')
+    # The moment comes from the source, never a machine's clock: the board's synced_at is the latest read of BaT's live
+    # page, so hours to close count from then and a stalled sync ages the rows out of the reader (see live-finish.mjs).
+    lots, synced_at = board(anon)
+    now = epoch(synced_at)
+    if not isinstance(now, float) or math.isnan(now):
+        raise SystemExit('market_pulse_live has no synced_at; nothing is written without the source time')
     lots['moment'] = now
     lots['ends'] = [epoch(e) for e in lots.ends_at]
     lots['hours_left'] = (lots.ends - lots.moment) / 3600.0

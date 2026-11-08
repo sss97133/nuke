@@ -45,17 +45,12 @@ const dir = mkdtempSync(join(tmpdir(), 'live-finish-'));
 const pulseJson = join(dir, 'pulse.json');
 const outJson = join(dir, 'rows.json');
 
-// The server's clock, from each response's Date header: a laptop clock can be hours off (2026-11-07: 3 h 35 min slow),
-// and a wrong clock stamps every row early and puts each lot at the wrong horizon.
-let serverNow = null;
 const rest = async (path, { key = SERVICE, method = 'GET', body, prefer } = {}) => {
   const res = await fetch(`${URL}/rest/v1/${path}`, {
     method,
     headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(prefer ? { Prefer: prefer } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const date = Date.parse(res.headers.get('date') ?? '');
-  if (Number.isFinite(date)) serverNow = new Date(date);
   if (!res.ok) throw new Error(`${method} ${path.slice(0, 80)}: ${res.status} ${(await res.text()).slice(0, 300)}`);
   return res.status === 204 || res.headers.get('content-length') === '0' ? null : res.json();
 };
@@ -75,8 +70,12 @@ for (let i = 0; i < ids.length; i += 200) {
 writeFileSync(kindsJson, JSON.stringify(kinds));
 
 // 2. estimates from the archive (local, read-only)
-const now = serverNow ?? new Date();
-if (Math.abs(now - Date.now()) > 120_000) console.error(`clock: this machine is ${Math.round((Date.now() - now) / 1000)} s off the server; using the server's`);
+// The moment comes from the source, never a machine's clock: the board's synced_at is the latest read of BaT's live
+// page (sync-live-auctions, every 15 min), so a row says "the bid as BaT showed it then" and its hours to close are
+// counted from then. A stalled sync makes the rows age out of live_finish_estimates() instead of passing as fresh.
+// (2026-11-07: the Mac's clock ran 3 h 35 min slow and every row was stamped hours early.)
+const now = new Date(pulse?.synced_at ?? NaN);
+if (!Number.isFinite(now.getTime())) throw new Error('market_pulse_live has no synced_at; nothing is written without the source time');
 execFileSync('python3', [PY, '--lots', pulseJson, '--kinds', kindsJson, '--archive', ARCHIVE, '--cache', CACHE, '--coverage', COVERAGE, '--now', now.toISOString(), '--out', outJson],
   { stdio: ['ignore', 'inherit', 'inherit'] });
 // The estimator writes {rows, skipped} (each skipped lot with its reason); an older build wrote the row list alone, with
