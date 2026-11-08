@@ -47,7 +47,7 @@ Run: dotenvx run -- python3 scripts/market/live-finish-33.py [--dry-run] [--out 
 Needs: python3 with numpy, pandas and scikit-learn, the duckdb CLI; VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and
 SUPABASE_SERVICE_ROLE_KEY (the service key only for the inputs read and the write).
 """
-import argparse, json, math, os, pickle, re, subprocess, sys, time, urllib.error, urllib.request
+import argparse, email.utils, json, math, os, pickle, re, subprocess, sys, time, urllib.error, urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from io import StringIO
@@ -634,7 +634,13 @@ def load_artifacts(art=ART):
 
 
 # ------------------------------------------------------------------------------------------------- PostgREST
+# The server's clock, from each response's Date header: a laptop clock can be hours off (2026-11-07: 3 h 35 min slow),
+# and a wrong clock stamps every row early and puts each lot at the wrong horizon.
+SERVER_NOW = None
+
+
 def rest(path, key, method='GET', body=None, prefer=None, timeout=60):
+    global SERVER_NOW
     url = os.environ['VITE_SUPABASE_URL']
     headers = {'apikey': key, 'Authorization': f'Bearer {key}', 'Content-Type': 'application/json', 'X-Nuke-Writer': WRITER}
     if prefer:
@@ -643,6 +649,10 @@ def rest(path, key, method='GET', body=None, prefer=None, timeout=60):
                                  data=None if body is None else json.dumps(body, default=str).encode())
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
+            try:
+                SERVER_NOW = email.utils.parsedate_to_datetime(r.headers['Date']).timestamp()
+            except (TypeError, ValueError):
+                pass
             raw = r.read()
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as e:
@@ -856,7 +866,9 @@ def run(args):
         raise SystemExit('VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are required (dotenvx run --)')
     a = load_artifacts()
     lots = board(anon)
-    now = time.time()
+    now = SERVER_NOW or time.time()
+    if abs(now - time.time()) > 120:
+        log(f'clock: this machine is {time.time() - now:.0f} s off the server; using the server\'s')
     lots['moment'] = now
     lots['ends'] = [epoch(e) for e in lots.ends_at]
     lots['hours_left'] = (lots.ends - lots.moment) / 3600.0
