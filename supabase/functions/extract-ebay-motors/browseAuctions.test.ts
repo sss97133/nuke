@@ -35,6 +35,7 @@ function fakeSb(w: World) {
     if (table === "listing_page_snapshots") return { data: w.snapshots.map((k) => ({ listing_url: `https://www.ebay.com/itm/${k}` })).filter((r) => inList.includes(r.listing_url)), error: null };
     if (table === "vehicles" && has("in", "listing_url")) return { data: w.vehicles.filter((v) => inList.includes(v.listing_url)), error: null };
     if (table === "vehicles" && has("eq", "sale_status")) return { data: w.vehicles.filter((v) => v.sale_status === "auction_live" && v.platform_source === "ebay-motors"), error: null };
+    if (table === "vehicle_events" && has("in", "source_listing_id")) return { data: (w.episodes ?? []).filter(e => ((has("in", "source_listing_id")?.args[1] ?? []) as string[]).includes(e.source_listing_id)), error: null };
     if (table === "vehicle_events" && has("contains")) return { data: w.episodes ?? [], error: null };
     if (table === "vehicle_events" && has("eq", "source_listing_id")) return { data: [{ id: "ev1", metadata: {}, sold_at: null, ended_at: null }], error: null };
     return { data: [], error: null };
@@ -74,6 +75,7 @@ const held = (id: string, extra: Record<string, unknown> = {}) => ({
   year: 1969, make: "Chevrolet", model: "Camaro", ...extra,
 });
 const world = (w: Partial<World>): World => ({ snapshots: [], vehicles: [], rpcs: [], updates: [], ...w });
+const admitted = async (_sb: any, input: any) => ({ observationId: "observation-fixture", snapshotId: "snapshot-fixture", observedAt: input.observedAt });
 const open = { take: async () => null };                  // a ledger with room left today
 
 // ---- the live state ---------------------------------------------------------------------------------------------------
@@ -90,7 +92,7 @@ Deno.test("the live row keeps the vehicle's own URL and metadata, and is null wh
     ["https://ebay.com/itm/100000000001", "auction_live", "active", 7100, at(5), "ebay-motors"]);
   const om = r.origin_metadata as any;
   assertEquals([om.import_source, om.currency, om.bid_count, om.current_bid_kind, om.external_id], ["ingest", "USD", 3, "high_bid", "100000000001"]);
-  assertEquals(liveRow(held("100000000001", { sale_status: "auction_live", auction_status: "active", high_bid: 7100, auction_end_date: at(5) }), s, at(0)), null);
+  assertEquals(liveRow(held("100000000001", { sale_status: "auction_live", auction_status: "active", high_bid: 7100, auction_end_date: at(5), origin_metadata: { ...om, auction_observation_id: "held-observation" } }), s, at(0)), null);
   assertEquals(liveRow(held("100000000001", { sale_status: "auction_live", auction_status: "active", high_bid: 7000, auction_end_date: at(5) }), s, at(0))?.sale_price, 7100);
 });
 
@@ -104,11 +106,12 @@ Deno.test("a partial pass writes held lots' live state and ends nothing, even a 
     ],
   });
   const client = fakeClient([[lot("100000000001", { bids: 2, bid: "4100.00" })], [lot("100000000003")]]);
-  const rep = await auctions(fakeSb(w), client, { maxPages: 1, maxItems: 0, now: () => NOW, ledger: open });
+  const rep = await auctions(fakeSb(w), client, { maxPages: 1, maxItems: 0, now: () => NOW, ledger: open, snapshotWriter: admitted });
   assertEquals([rep.auctions.complete, rep.auctions.pages_read, rep.auctions.held_rows], [false, 1, 1]);
   assertEquals(w.rpcs.map((r) => r.name), ["upsert_live_auction_vehicles"]);
   assertEquals(w.rpcs[0].args.p_rows.map((r: any) => [r.listing_url, r.sale_price]), [["https://ebay.com/itm/100000000001", 4100]]);
-  assertEquals(w.updates.length, 0);                                   // no listing episode ended
+  assertEquals(w.updates.length, 1);                                   // admitted episode state, no listing episode ended
+  assertEquals(w.updates[0].patch.event_status, undefined); // existing status preserved
   assertEquals(rep.calls, 1);                                          // the two rate-limit reads are not Browse calls
 });
 
@@ -116,14 +119,14 @@ Deno.test("ended is written only after a complete pass: absent and past its end,
   const w = world({
     snapshots: ["100000000001"],
     vehicles: [
-      held("100000000001", { sale_status: "auction_live", auction_status: "active", high_bid: 4100, auction_end_date: at(3) }),
+      held("100000000001", { sale_status: "auction_live", auction_status: "active", high_bid: 4100, auction_end_date: at(3), origin_metadata: { bid_count: 2, currency: "USD", current_bid: "4100.00", current_bid_kind: "high_bid", buy_it_now: null, buying_options: ["AUCTION"], auction_observation_id: "held-observation" } }),
       { ...held("100000000008"), sale_status: "auction_live", auction_end_date: at(6) },      // absent, still before its end: stays
       { ...held("100000000009"), sale_status: "auction_live", auction_end_date: at(-2) },     // absent and past its end: ends
     ],
     episodes: [{ vehicle_id: "veh-100000000009", source_listing_id: "100000000009", source_url: "https://www.ebay.com/itm/100000000009", metadata: { listing_ends_at: at(-2) } }],
   });
   const client = fakeClient([[lot("100000000001", { bids: 2, bid: "4100.00" })], [lot("100000000002", { ends: at(30) })]]);
-  const rep = await auctions(fakeSb(w), client, { maxPages: 5, maxItems: 0, now: () => NOW, ledger: open });
+  const rep = await auctions(fakeSb(w), client, { maxPages: 5, maxItems: 0, now: () => NOW, ledger: open, snapshotWriter: admitted });
   assertEquals([rep.auctions.complete, rep.auctions.pages_read, rep.auctions.unchanged], [true, 2, 1]);
   const end = w.rpcs.find((r) => r.name === "end_live_auctions_absent")!;
   assertEquals(end.args.p_platform, "ebay-motors");
@@ -141,7 +144,7 @@ Deno.test("the call budget stops the action: the floor caps searches, a partial 
   const w = world({ vehicles: [{ ...held("100000000009"), sale_status: "auction_live", auction_end_date: at(-2) }] });
   const pages = Array.from({ length: 18 }, (_, i) => [lot(String(200000000000 + i))]);
   const client = fakeClient(pages, { remaining: 103 });
-  const rep = await auctions(fakeSb(w), client, { maxPages: 20, maxItems: 0, floor: 100, now: () => NOW, ledger: open });
+  const rep = await auctions(fakeSb(w), client, { maxPages: 20, maxItems: 0, floor: 100, now: () => NOW, ledger: open, snapshotWriter: admitted });
   assertEquals([client.searches.length, rep.auctions.complete, rep.calls], [3, false, 3]);
   assertEquals(rep.stopped?.startsWith("budget"), true);
   assertEquals(w.rpcs.some((r) => r.name === "end_live_auctions_absent"), false);
@@ -162,7 +165,7 @@ Deno.test("the daily cap stops the action: each Browse call is counted in the da
 
 Deno.test("under the floor nothing is called", async () => {
   const client = fakeClient([[lot("100000000001")]], { remaining: 90 });
-  const rep = await auctions(fakeSb(world({})), client, { floor: 100, now: () => NOW, ledger: open });
+  const rep = await auctions(fakeSb(world({})), client, { floor: 100, now: () => NOW, ledger: open, snapshotWriter: admitted });
   assertEquals([client.searches.length, client.items.length, rep.stopped?.startsWith("quota")], [0, 0, true]);
 });
 
@@ -174,7 +177,7 @@ Deno.test("max_calls caps landings; unheld lots land vintage first, then ending 
     lot("300000000004", { title: "1966 Ford Mustang", ends: at(0.2) }),   // ends inside 30 minutes: not worth a getItem
   ];
   const client = fakeClient([page]);
-  const rep = await auctions(fakeSb(world({})), client, { maxPages: 1, maxItems: 5, maxCalls: 3, now: () => NOW, ledger: open });
+  const rep = await auctions(fakeSb(world({})), client, { maxPages: 1, maxItems: 5, maxCalls: 3, now: () => NOW, ledger: open, snapshotWriter: admitted });
   assertEquals(client.items, ["v1|300000000002|0", "v1|300000000003|0"]);   // 1 search + 2 getItem = the cap
   assertEquals([rep.calls, rep.auctions.unheld.vintage, rep.auctions.unheld.other], [3, 3, 1]);
   assertEquals(rep.auctions.left, { vintage: 1, other: 1 });
@@ -183,7 +186,59 @@ Deno.test("max_calls caps landings; unheld lots land vintage first, then ending 
 Deno.test("a lot linked to another source's vehicle is never written or landed", async () => {
   const w = world({ snapshots: ["400000000001"], vehicles: [] });              // captured, but its vehicle is a BaT row under the VIN
   const client = fakeClient([[lot("400000000001", { bids: 5, bid: "22000.00" })]]);
-  const rep = await auctions(fakeSb(w), client, { maxPages: 1, maxItems: 2, now: () => NOW, ledger: open });
+  const rep = await auctions(fakeSb(w), client, { maxPages: 1, maxItems: 2, now: () => NOW, ledger: open, snapshotWriter: admitted });
   assertEquals([rep.auctions.held_elsewhere, rep.auctions.written_live, client.items.length], [1, 0, 0]);
   assertEquals(w.rpcs.length, 0);
+});
+
+Deno.test("a count-only or sub-dollar change requires a retained admission before projection", async () => {
+  const s = lot("100000000001", { bids: 2, bid: "4100.10" });
+  const initial = liveRow(held("100000000001"), s, at(0))!;
+  const v = held("100000000001", { sale_status: "auction_live", auction_status: "active", high_bid: 4100,
+    auction_end_date: at(3), origin_metadata: { ...(initial.origin_metadata as any), auction_observation_id: "old" } });
+  for (const next of [lot("100000000001", { bids: 3, bid: "4100.10" }), lot("100000000001", { bids: 2, bid: "4100.20" })]) {
+    const w = world({ vehicles: [v] });
+    const rep = await auctions(fakeSb(w), fakeClient([[next]]), { maxItems: 0, now: () => NOW, ledger: open,
+      snapshotWriter: async () => { throw new Error("admission unavailable"); } });
+    assertEquals(w.rpcs.some(r => r.name === "upsert_live_auction_vehicles"), false);
+    assertEquals(rep.ok, false);
+    assertEquals(rep.auctions.unchanged, 0);
+    assertEquals(rep.errors.some(e => e.includes("admission unavailable")), true);
+  }
+});
+
+Deno.test("snapshot admission cap counts deferred changes and only projects admitted provenance", async () => {
+  const ids = ["100000000001", "100000000002"];
+  const w = world({ vehicles: ids.map(id => held(id)) });
+  const rep = await auctions(fakeSb(w), fakeClient([ids.map(id => lot(id))]), { maxItems: 0, maxSnapshots: 1,
+    now: () => NOW, ledger: open, snapshotWriter: admitted });
+  assertEquals([rep.auctions.snapshots_admitted, rep.auctions.snapshots_deferred, rep.auctions.written_live], [1, 1, 1]);
+  const meta = w.rpcs.find(r => r.name === "upsert_live_auction_vehicles")!.args.p_rows[0].origin_metadata;
+  assertEquals([meta.auction_observation_id, meta.auction_snapshot_id, meta.source_observed_at], ["observation-fixture", "snapshot-fixture", at(0)]);
+});
+
+Deno.test("a shared car's eBay episode gets canonical state without rewriting its PCarMarket vehicle", async () => {
+  const id = "800885752134", vehicleId = "73562607-cf9e-418f-8a6c-65b156bb762f";
+  const w = world({ snapshots: [id], episodes: [{ vehicle_id: vehicleId, source_listing_id: id,
+    source_url: itemUrls(id)[1], event_status: "active", metadata: {}, ended_at: null, sold_at: null }],
+    vehicles: [{ ...held(id), id: vehicleId, listing_url: "https://www.pcarmarket.com/auction/1984-911-cab", platform_source: "pcarmarket" }] });
+  let observed: any;
+  const rep = await auctions(fakeSb(w), fakeClient([[lot(id, { bids: 7, bid: "42100.25" })]]), {
+    maxItems: 0, now: () => NOW, ledger: open, snapshotWriter: async (sb, input) => { observed = input; return admitted(sb, input); },
+  });
+  assertEquals([observed.vehicleId, observed.url], [vehicleId, itemUrls(id)[1]]);
+  assertEquals([rep.auctions.held_elsewhere, rep.auctions.snapshots_admitted, rep.auctions.written_episodes], [1, 1, 1]);
+  assertEquals(w.rpcs.some(r => r.name === "upsert_live_auction_vehicles"), false);
+  assertEquals(w.updates.map(u => [u.table, u.patch.current_price, u.patch.bid_count, u.patch.metadata.currency]), [["vehicle_events", 42100.25, 7, "USD"]]);
+  assertEquals(w.vehicles[0].listing_url, "https://www.pcarmarket.com/auction/1984-911-cab");
+});
+
+Deno.test("unknown or zero bids do not write opening prices as current episode bids", async () => {
+  for (const bidCount of [0, undefined]) {
+    const id = "800885752134", s = { ...lot(id), bidCount };
+    const w = world({ vehicles: [held(id)] });
+    await auctions(fakeSb(w), fakeClient([[s]]), { maxItems: 0, now: () => NOW, ledger: open, snapshotWriter: admitted });
+    assertEquals(w.updates[0].patch.current_price, null);
+    assertEquals(w.updates[0].patch.bid_count, bidCount ?? null);
+  }
 });
