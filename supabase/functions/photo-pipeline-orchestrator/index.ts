@@ -17,8 +17,9 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
+import { classifyImageRouted } from "./classifierProvider.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -48,6 +49,108 @@ async function persistImageState(
       return data?.length === 1;
     },
   }, receipt, state, metadata, source);
+}
+
+// ===== v98: capture-step reporting + safe v98 column writes (both best-effort; never throw) =====
+async function reportStep(imageId: string, step: string, detail: Record<string, unknown> = {}): Promise<void> {
+  try {
+    const { error } = await supabase.rpc("report_capture_step", { p_image_id: imageId, p_step: step, p_detail: { ...detail, by: "photo-pipeline-orchestrator", v: "v100" } });
+    if (error) console.warn(`[photo-pipeline] report_capture_step(${step}) failed`);
+  } catch { console.warn(`[photo-pipeline] report_capture_step(${step}) threw`); }
+}
+
+// ===== v99: retry bookkeeping (see migration photo_pipeline_retry_state_and_claim_v99) =====
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+interface FailureVerdict { status: "pending" | "failed"; transient: boolean; attempts: number; next_attempt_at: string | null }
+/** Decides in SQL whether a failure is transient (back to 'pending' with exponential next_attempt_at) or terminal ('failed'). */
+async function noteFailure(imageId: string, errorClass: string, httpStatus: number | null, fallbackClass: string | null): Promise<FailureVerdict> {
+  try {
+    const { data, error } = await supabase.rpc("photo_pipeline_note_failure", {
+      p_image_id: imageId, p_error_class: errorClass, p_http_status: httpStatus, p_fallback_error_class: fallbackClass });
+    if (!error && data?.status) return data as FailureVerdict;
+  } catch { /* fall through */ }
+  return { status: "failed", transient: false, attempts: 0, next_attempt_at: null };  // RPC unavailable: pre-v99 behaviour
+}
+
+/** Writes only: is_document/document_category (doc, conf>=0.85), vehicle_vin(+confidence) (checksum-valid, conf>=0.8, never overwrites,
+ *  AI confidence capped at 0.79 so an AI read cannot trip the >=0.9 auto-filing in resolveVehicle), ai_detected_angle(+confidence).
+ *  Never writes image_type or vehicle_id. Separate UPDATE after the CAS persist so a failure here cannot fail classification. */
+async function persistV98Columns(imageId: string, c: ClassificationResult): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {};
+  try {
+    const x = c.v2;
+    if (!x) return out;
+    const { data: row, error } = await supabase.from("vehicle_images")
+      .select("is_document, document_category, vehicle_vin, ai_detected_angle").eq("id", imageId).maybeSingle();
+    if (error || !row) return out;
+    const patch: Record<string, unknown> = {};
+    const isDoc = x.is_document && c.image_type === "receipt_document" && c.confidence >= 0.85 && !!x.document_category;
+    if (isDoc) {
+      if (row.is_document !== true) patch.is_document = true;
+      if (row.document_category == null) patch.document_category = x.document_category;
+    }
+    if (x.vin && x.vin.checksum_ok && (x.vin.confidence ?? 0) >= 0.8 && !row.vehicle_vin) {
+      patch.vehicle_vin = x.vin.value;
+      patch.vehicle_vin_confidence = Math.min(x.vin.confidence ?? 0.8, 0.79);
+    }
+    if (x.angle && (x.angle.confidence ?? 0) >= 0.6 && !isDoc && !row.ai_detected_angle) {
+      patch.ai_detected_angle = x.angle.value;
+      patch.ai_detected_angle_confidence = x.angle.confidence;
+    }
+    if (Object.keys(patch).length === 0) return out;
+    const { error: upErr } = await supabase.from("vehicle_images").update(patch).eq("id", imageId);
+    if (upErr) { console.warn("[photo-pipeline] v98 column write failed (classification unaffected)"); return { error: true }; }
+    return patch;
+  } catch { console.warn("[photo-pipeline] v98 column write threw (classification unaffected)"); return out; }
+}
+
+
+/** v99 (Part B): lands what the classifier READ (VIN + classifier vehicle_fields such as year/model/transmission/color/plate; casting numbers stay in text_lines until a casting rule table exists) as cited, weighted evidence.
+ *  - field_evidence (status 'pending', raw_extraction_data.photo_id + quote + confidence): the existing `cited-evidence-accept` cron fills
+ *    only EMPTY vehicle columns, marks disagreements 'conflicted' and records provenance. Nothing here overwrites a vehicle column.
+ *  - vehicle_identifiers via land_identifier_claims (source_kind 'photo', quote + source_image_id + confidence): feeds identifier_consensus.
+ *  Only when the photo is already filed to a vehicle (no new filing behaviour). Best effort: never fails classification. */
+async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: string, c: ClassificationResult): Promise<Record<string, number>> {
+  const out = { field_evidence: 0, identifiers: 0 };
+  try {
+    const x = c.v2;
+    if (!x || !vehicleId) return out;
+    const rows: Record<string, unknown>[] = [];
+    for (const f of x.vehicle_fields ?? []) {
+      if ((f.confidence ?? 0) < 0.6 || !f.evidence || !f.value) continue;
+      rows.push({
+        vehicle_id: vehicleId, field_name: f.field_name, proposed_value: f.value, source_type: "ai_visual",
+        source_confidence: Math.round((f.confidence ?? 0) * 100),
+        extraction_context: `photo-pipeline v99: ${f.evidence}`.slice(0, 400),
+        raw_extraction_data: { photo_id: imageId, image_id: imageId, quote: f.evidence, confidence: f.confidence, extractor: "photo-pipeline-orchestrator", prompt_version: x.prompt_version, image_url: imageUrl },
+      });
+    }
+    if (x.vin && x.vin.checksum_ok && (x.vin.confidence ?? 0) >= 0.8) {
+      rows.push({
+        vehicle_id: vehicleId, field_name: "vin", proposed_value: x.vin.value, source_type: "ai_visual",
+        source_confidence: Math.round(Math.min(x.vin.confidence ?? 0.8, 0.79) * 100),
+        extraction_context: `photo-pipeline v99 VIN (checksum ok): ${x.vin.evidence ?? ""}`.slice(0, 400),
+        raw_extraction_data: { photo_id: imageId, image_id: imageId, quote: x.vin.evidence, confidence: x.vin.confidence, checksum_ok: true, extractor: "photo-pipeline-orchestrator", prompt_version: x.prompt_version, image_url: imageUrl },
+      });
+    }
+    if (rows.length) {
+      const { error } = await supabase.from("field_evidence").upsert(rows, { onConflict: "vehicle_id,field_name,source_type,proposed_value", ignoreDuplicates: true });
+      if (error) console.warn("[photo-pipeline] cited field_evidence write failed (classification unaffected)");
+      else out.field_evidence = rows.length;
+    }
+    const ids: Array<Record<string, unknown>> = [];
+    if (x.vin && x.vin.checksum_ok && (x.vin.confidence ?? 0) >= 0.8) {
+      ids.push({ kind: "vin", value: x.vin.value, quote: x.vin.evidence ?? "VIN read from photo", confidence: Math.min(x.vin.confidence ?? 0.8, 0.79) });
+    }
+    if (ids.length) {
+      const { error } = await supabase.rpc("land_identifier_claims", {
+        p_vehicle_id: vehicleId, p_read: { identifiers: ids }, p_source_url: imageUrl, p_extractor: "photo-pipeline-orchestrator-v99",
+        p_source_kind: "photo", p_source_image_id: imageId, p_run_id: null });
+      if (error) console.warn("[photo-pipeline] identifier landing failed (classification unaffected)");
+      else out.identifiers = ids.length;
+    }
+  } catch { console.warn("[photo-pipeline] cited evidence landing threw (classification unaffected)"); }
+  return out;
 }
 
 interface PipelineInput {
@@ -88,63 +191,74 @@ Deno.serve(async (req) => {
 
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
-      const limit = input.limit || 5;
-
-      // 2026-07-06 perf fix: this used to be a single query ordered by
-      // (user_id DESC NULLS LAST, created_at DESC). That combined ORDER BY has
-      // no supporting index over a table where ~32.7M rows are
-      // ai_processing_status='pending' (mostly scraped/NULL-user backlog), so
-      // Postgres fell back to a Parallel Seq Scan + Sort across all of them,
-      // which blew the statement timeout on every single invocation. The error
-      // was swallowed by `if (!pendingImages...)`, so this action silently
-      // no-op'd as "No pending images" on every cron tick (job 478, */5 min)
-      // instead of ever draining the queue. Split into two indexed passes that
-      // preserve the same "owner uploads first" intent:
-      //   1. idx_vehicle_images_pending_user (user_id IS NOT NULL AND status='pending')
-      //   2. idx_vehicle_images_pending_processing (status='pending'), top-up only
-      const { data: ownerPending, error: ownerErr } = await supabase
-        .from("vehicle_images")
-        .select("id, image_url, vehicle_id, user_id")
-        .eq("ai_processing_status", "pending")
-        .not("user_id", "is", null)
-        .eq("is_duplicate", false)
-        .not("image_url", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      if (ownerErr) {
-        throw new Error("photo_pipeline_owner_queue_read_failed");
-      }
-
-      let pendingImages = ownerPending ?? [];
-
-      if (pendingImages.length < limit) {
-        const seenIds = new Set(pendingImages.map((r) => r.id));
-        // Fetch a full `limit` rows (not just the remaining gap) as a buffer:
-        // the backlog query has no user_id filter, so it can re-surface rows
-        // already in pendingImages (owner rows are a subset of "pending"
-        // overall) — the dedup loop below drops those, and over-fetching by
-        // seenIds.size keeps this batch at `limit` total after dedup instead
-        // of falling short and needing another cron tick to catch up.
-        const { data: backlogPending, error: backlogErr } = await supabase
+      // v99: bounded batch (<=12), atomic claim with a 5-minute lease so overlapping cron ticks never double-process,
+      // rows in retry backoff (photo_pipeline_retry_state.next_attempt_at > now()) are skipped.
+      const limit = Math.min(Math.max(Number(input.limit) || 6, 1), 12);
+      const concurrency = Math.min(Math.max(Number(input.concurrency) || 3, 1), 4);
+      const deadline = startedAt + 100_000;
+      let pendingImages: any[] = [];
+      const { data: claimed, error: claimErr } = await supabase.rpc("claim_photo_pipeline_batch", { p_limit: limit, p_lease_seconds: 300 });
+      if (!claimErr) {
+        pendingImages = claimed ?? [];
+      } else {
+        console.warn("[photo-pipeline] claim RPC unavailable; using legacy queue read");
+        // 2026-07-06 perf fix: this used to be a single query ordered by
+        // (user_id DESC NULLS LAST, created_at DESC). That combined ORDER BY has
+        // no supporting index over a table where ~32.7M rows are
+        // ai_processing_status='pending' (mostly scraped/NULL-user backlog), so
+        // Postgres fell back to a Parallel Seq Scan + Sort across all of them,
+        // which blew the statement timeout on every single invocation. The error
+        // was swallowed by `if (!pendingImages...)`, so this action silently
+        // no-op'd as "No pending images" on every cron tick (job 478, */5 min)
+        // instead of ever draining the queue. Split into two indexed passes that
+        // preserve the same "owner uploads first" intent:
+        //   1. idx_vehicle_images_pending_user (user_id IS NOT NULL AND status='pending')
+        //   2. idx_vehicle_images_pending_processing (status='pending'), top-up only
+        const { data: ownerPending, error: ownerErr } = await supabase
           .from("vehicle_images")
           .select("id, image_url, vehicle_id, user_id")
           .eq("ai_processing_status", "pending")
+          .not("user_id", "is", null)
           .eq("is_duplicate", false)
           .not("image_url", "is", null)
           .order("created_at", { ascending: false })
           .limit(limit);
-
-        if (backlogErr) {
-          throw new Error("photo_pipeline_backlog_queue_read_failed");
+        if (ownerErr) {
+          throw new Error("photo_pipeline_owner_queue_read_failed");
         }
 
-        for (const row of backlogPending ?? []) {
-          if (!seenIds.has(row.id)) {
-            pendingImages.push(row);
-            seenIds.add(row.id);
+        pendingImages = ownerPending ?? [];
+
+        if (pendingImages.length < limit) {
+          const seenIds = new Set(pendingImages.map((r) => r.id));
+          // Fetch a full `limit` rows (not just the remaining gap) as a buffer:
+          // the backlog query has no user_id filter, so it can re-surface rows
+          // already in pendingImages (owner rows are a subset of "pending"
+          // overall) — the dedup loop below drops those, and over-fetching by
+          // seenIds.size keeps this batch at `limit` total after dedup instead
+          // of falling short and needing another cron tick to catch up.
+          const { data: backlogPending, error: backlogErr } = await supabase
+            .from("vehicle_images")
+            .select("id, image_url, vehicle_id, user_id")
+            .eq("ai_processing_status", "pending")
+            .eq("is_duplicate", false)
+            .not("image_url", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(limit);
+
+          if (backlogErr) {
+            throw new Error("photo_pipeline_backlog_queue_read_failed");
           }
-          if (pendingImages.length >= limit) break;
+
+          for (const row of backlogPending ?? []) {
+            if (!seenIds.has(row.id)) {
+              pendingImages.push(row);
+              seenIds.add(row.id);
+            }
+            if (pendingImages.length >= limit) break;
+          }
         }
+
       }
 
       if (!pendingImages || pendingImages.length === 0) {
@@ -154,7 +268,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const results = [];
+      const results: any[] = [];
       // Process junk URLs inline (fast), real images via self-call
       const JUNK_RE = [
         /facebook\.com\/tr/i, /googleads/i, /doubleclick/i,
@@ -162,41 +276,42 @@ Deno.serve(async (req) => {
         /\.gif\?/, /pixel\./, /beacon\./,
       ];
       const junkIds: string[] = [];
-
+      const real: any[] = [];
       for (const img of pendingImages) {
         if (JUNK_RE.some(p => p.test(img.image_url))) {
           junkIds.push(img.id);
           results.push({ image_id: img.id, success: true, classification: "junk_url" });
-          continue;
-        }
-        try {
-          // Stagger requests to avoid Gemini 429 rate limiting
-          if (results.length > 0) {
-            await new Promise((r) => setTimeout(r, 2000));
-          }
-          const resp = await fetch(
-            `${SUPABASE_URL}/functions/v1/photo-pipeline-orchestrator`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
-              },
-              body: JSON.stringify({
-                image_id: img.id,
-                image_url: img.image_url,
-                vehicle_id: img.vehicle_id,
-                user_id: img.user_id,
-              }),
-            },
-          );
-          const result = await resp.json();
-          results.push({ image_id: img.id, success: resp.ok && result.success === true,
-            classification: result.classification, classifier_ok: result.classifier_ok });
-        } catch (err: any) {
-          results.push({ image_id: img.id, success: false, error: err.message });
-        }
+        } else real.push(img);
       }
+      // v99: small worker pool (default 3) instead of strictly serial 2s-staggered calls; staggered starts, hard deadline.
+      let cursor = 0;
+      const worker = async (slot: number) => {
+        await sleep(slot * 700);
+        while (Date.now() < deadline) {
+          const img = real[cursor++];
+          if (!img) return;
+          try {
+            const resp = await fetch(
+              `${SUPABASE_URL}/functions/v1/photo-pipeline-orchestrator`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_ROLE_KEY}` },
+                body: JSON.stringify({ image_id: img.id, image_url: img.image_url, vehicle_id: img.vehicle_id, user_id: img.user_id }),
+                signal: AbortSignal.timeout(120_000),
+              },
+            );
+            const result = await resp.json();
+            results.push({ image_id: img.id, success: resp.ok && result.success === true,
+              classification: result.classification, classifier_ok: result.classifier_ok,
+              requeued: result.requeued ?? undefined, error_class: result.error_class ?? undefined });
+          } catch (err: any) {
+            results.push({ image_id: img.id, success: false, error: err.message });
+          }
+          await sleep(300 + Math.floor(Math.random() * 400));
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(concurrency, real.length) }, (_, i) => worker(i)));
+      const notStarted = Math.max(0, real.length - cursor);
 
       // Policy skips preserve concurrent producers' metadata too.
       for (const imageId of junkIds) {
@@ -215,7 +330,8 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: results.every(r => r.success),
-          processed: results.filter(r => r.success).length, attempted: results.length, results }),
+          processed: results.filter(r => r.success).length, attempted: results.length, not_started: notStarted,
+          requeued: results.filter(r => r.requeued).length, duration_ms: Date.now() - startedAt, results }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -242,6 +358,7 @@ Deno.serve(async (req) => {
     processingImageId = image_id;
     await persistImageState(image_id, receipt(image_id, "processing"),
       { ai_processing_status: "processing", ai_processing_started_at: new Date(startedAt).toISOString() }, {}, processingSource);
+    await reportStep(image_id, "downloading", { phase: "pipeline_claimed" });
 
     // Skip garbage URLs (tracking pixels, ads, non-image URLs)
     const JUNK_PATTERNS = [
@@ -313,20 +430,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 2: Classify image type (Gemini Flash)
-    const classification = await classifyImage(image_url,
+    // Step 2: Classify image type (OpenAI primary, Gemini fallback; see classifierProvider.ts)
+    await reportStep(image_id, "classifying", { provider_route: "openai_primary" });
+    const classification = await classifyImageRouted(image_url,
       Deno.env.get("GOOGLE_AI_API_KEY") ?? Deno.env.get("GEMINI_API_KEY") ??
       Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("free_api_key"));
     // A missing classifier is operational failure, not visual testimony. No
     // second paid model or deep queue is automatically invoked to rescue it.
     if (classification.classifier_ok === false) {
       const detail = classification.classifier_receipt;
-      // A classifier outage is not evidence against the photo's own capture signals. Before 2026-10-22 this
-      // branch returned before Step 3, so 3,534 unfiled phone photos never got a VIN or GPS attempt
-      // (nuke-strategy/image-linking-review.md). Resolution here uses only signals that do not depend on
-      // the classifier: the uploaded VIN read and the possession-gated GPS matcher, filed by attribute_testimony.
+      // v99: a transient failure (rate limit, 402/5xx, timeout, network) goes back to 'pending' with attempts + exponential
+      // next_attempt_at; only exhausted budgets and genuinely invalid inputs (404, bad mime, undownscalable) become 'failed'.
+      const verdict = await noteFailure(image_id, detail?.error_class ?? "unknown", detail?.http_status ?? null, detail?.fallback_error_class ?? null);
+      const requeue = verdict.status === "pending";
+      await reportStep(image_id, requeue ? "classifying" : "failed", { error_class: detail?.error_class ?? null, phase: detail?.failure_phase ?? null,
+        ...(requeue ? { retry_scheduled: true, attempts: verdict.attempts, next_attempt_at: verdict.next_attempt_at } : {}) });
+      // A classifier outage is not evidence against the photo's own capture signals; for a TERMINAL failure the existing
+      // signal-only resolution (uploaded VIN / possession-gated GPS, filed by attribute_testimony) still runs. A requeued photo
+      // gets the full path on retry, so nothing is filed twice or earlier than before.
       let failedAttribution: AttributionReceipt | null = null;
-      if (!vehicle_id) {
+      if (!vehicle_id && !requeue) {
         const resolved = await resolveVehicle(image_id, user_id, classification);
         if (resolved) failedAttribution = await fileResolvedVehicle(image_id, resolved);
       }
@@ -334,10 +457,13 @@ Deno.serve(async (req) => {
         ...receipt(image_id, "failed"), classifier_model: detail?.model ?? null,
         classifier_attempts: detail?.attempts ?? 0, failure_phase: detail?.failure_phase,
         error_class: detail?.error_class, http_status: detail?.http_status,
-      }, { ai_processing_status: "failed", ai_processing_completed_at: new Date().toISOString() },
-      { pipeline_version: "v2", classifier_failed: true, classification, attribution: failedAttribution }, processingSource);
+      }, requeue ? { ai_processing_status: "pending" }
+                 : { ai_processing_status: "failed", ai_processing_completed_at: new Date().toISOString() },
+      { pipeline_version: "v2", classifier_failed: true, classification, attribution: failedAttribution,
+        retry: { transient: verdict.transient, attempts: verdict.attempts, next_attempt_at: verdict.next_attempt_at, requeued: requeue } }, processingSource);
       return new Response(JSON.stringify({ success: false, image_id, classifier_ok: false,
-        state_persisted: true, error_class: detail?.error_class, classifier_attempts: detail?.attempts ?? 0 }),
+        state_persisted: true, error_class: detail?.error_class, classifier_attempts: detail?.attempts ?? 0,
+        requeued: requeue, next_attempt_at: verdict.next_attempt_at }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     // Merge Apple ML hints into classification if Gemini didn't detect vehicle hints
@@ -345,6 +471,12 @@ Deno.serve(async (req) => {
       classification.description = `${classification.description} [Apple ML: ${appleLabels.join(', ')}]`;
     }
     console.log(`[photo-pipeline] Classified as: ${classification.image_type} (${classification.confidence})`);
+    if (classification.v2?.text_lines?.length || classification.v2?.is_document) {
+      await reportStep(image_id, "reading_text", { lines: classification.v2?.text_lines?.length ?? 0, is_document: !!classification.v2?.is_document });
+    }
+    if (classification.v2 && (classification.v2.document || classification.v2.vehicle_fields.length || classification.v2.vin)) {
+      await reportStep(image_id, "extracting_fields", { document_type: classification.v2.document_type, vehicle_fields: classification.v2.vehicle_fields.length, vin: !!classification.v2.vin });
+    }
 
     // Step 3: If no vehicle_id, try to resolve. A resolved vehicle is filed here, before any
     // handler runs on it, through the sanctioned first-attribution writer attribute_testimony,
@@ -353,6 +485,7 @@ Deno.serve(async (req) => {
     let resolvedVehicleId = vehicle_id;
     let attribution: AttributionReceipt | null = null;
     if (!resolvedVehicleId) {
+      await reportStep(image_id, "matching_vehicle", { image_type: classification.image_type });
       const resolved = await resolveVehicle(image_id, user_id, classification);
       if (resolved) {
         attribution = await fileResolvedVehicle(image_id, resolved);
@@ -435,6 +568,14 @@ Deno.serve(async (req) => {
       observation_status: observation?.status ?? "no_vehicle",
     }, updatePayload, scanMeta, processingSource);
 
+    supabase.rpc("photo_pipeline_clear_retry", { p_image_id: image_id }).then(() => {}, () => {});
+    // v98: persist the new columns (separate best-effort write) and close the capture-step trail.
+    const v98Written = await persistV98Columns(image_id, classification);
+    const cited = resolvedVehicleId ? await landCitedEvidence(resolvedVehicleId, image_id, image_url, classification) : { field_evidence: 0, identifiers: 0 };
+    await reportStep(image_id, "done", { image_type: classification.image_type, confidence: classification.confidence,
+      model: classification.classifier_receipt?.model ?? null, prompt_version: classification.classifier_receipt?.prompt_version ?? "legacy",
+      v98_columns: Object.keys(v98Written), cited_field_evidence: cited.field_evidence, cited_identifiers: cited.identifiers });
+
     // Late-resolution dedup pass: Step 1.5 could only see this row in the
     // detector's corpus if it was INSERTed with a vehicle_id. When the vehicle
     // was resolved during this run (VIN/GPS), the row only just acquired its
@@ -468,12 +609,15 @@ Deno.serve(async (req) => {
     // Try to mark as failed
     try {
       if (processingImageId && processingSource && !["photo_pipeline_source_changed", "photo_pipeline_stale_attempt"].includes(error?.message)) {
+        const verdict = await noteFailure(processingImageId, "pipeline_operation_failed", null, null);
         await persistImageState(processingImageId, {
           ...receipt(processingImageId, "failed"), failure_phase: "pipeline",
           error_class: "pipeline_operation_failed",
-        }, { ai_processing_status: "failed" }, { pipeline_error: "pipeline_operation_failed" }, processingSource);
+        }, { ai_processing_status: verdict.status }, { pipeline_error: "pipeline_operation_failed",
+          retry: { transient: verdict.transient, attempts: verdict.attempts, next_attempt_at: verdict.next_attempt_at, requeued: verdict.status === "pending" } }, processingSource);
       }
     } catch (_) { /* best-effort */ }
+    if (processingImageId) await reportStep(processingImageId, "failed", { error_class: "pipeline_operation_failed" });
 
     return new Response(
       JSON.stringify({ success: false, error: "photo_pipeline_operation_failed" }),
