@@ -41,7 +41,8 @@ const FAILURE: Record<string, string> = { timeout: 'it took too long', network: 
   too_large: 'the photo is too large', unreadable: 'the photo was hard to read', not_receipt: "it didn't look like a receipt",
   not_found: "the photo couldn't be found", auth: "we couldn't sign in to check it", server: 'our server had a hiccup' };
 const HELD: Record<string, string> = { no_clear_lead: 'no clear match', score_below_threshold: 'not sure enough', score_below_2_5: 'not sure enough',
-  multi_vin_segment: 'more than one VIN in the set', color_era_conflict: "color or era doesn't fit" };
+  multi_vin_segment: 'more than one VIN in the set', color_era_conflict: "color or era doesn't fit",
+  priors_only: "only the day's pattern pointed to it, nothing in the photo" };
 const SKIP: Record<string, string> = { no_location: 'no location on the photo', off_site: 'outside a work site', screenshot: 'a screenshot',
   not_library: 'not in the photo library', not_own_camera: "not from this phone's camera", personal: 'held as personal on the phone', gave_up: 'stopped retrying' };
 const words = (table: Record<string, string>, key: string | null | undefined, fallback: string) =>
