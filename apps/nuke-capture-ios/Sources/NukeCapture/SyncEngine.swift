@@ -573,17 +573,22 @@ final class SyncEngine: ObservableObject {
                 gates[reason, default: 0] += 1
                 VisionDecisionLog.shared.record(.init(assetId: asset.localIdentifier, source: "sync",
                     category: VisionDecisionRecord.gateCategory, reason: reason))
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: reason, takenAt: asset.creationDate)
             case .notOwnCamera:
                 skipped += 1
                 gates["not_own_camera", default: 0] += 1
                 VisionDecisionLog.shared.record(.init(assetId: asset.localIdentifier, source: "sync",
                     category: VisionDecisionRecord.gateCategory, reason: "not_own_camera"))
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "not_own_camera", takenAt: asset.creationDate)
             case .heldPrivate:
                 heldPrivate += 1
+                // the ledger learns that a photo was held (id and clock only; what it showed stays on the phone)
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "personal", takenAt: asset.creationDate)
             case .deduped:
                 deduped += 1
             case .gaveUp:
                 gates["gave_up", default: 0] += 1   // failed Config.maxAttemptsPerAsset times; holds nothing back
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "gave_up", takenAt: asset.creationDate)
             case .deferred:
                 // In iCloud only: the background job downloads it on Wi-Fi. Not an attempt against
                 // the photo, and not a failure that holds the watermark.
@@ -628,6 +633,9 @@ final class SyncEngine: ObservableObject {
         totalSkippedOffShop += skipped
         defaults.set(totalSkippedOffShop, forKey: Key.totalSkipped)
         recordHeldPrivate(heldPrivate)
+        // The ledger: what this pass decided not to upload, and the re-scan request this pass served (if one was claimed).
+        await CaptureLedgerReporter.shared.flush()
+        await CaptureLedgerReporter.shared.finishRescan(uploaded: uploaded, skipped: skipped + heldPrivate, failed: failed)
 
         // Silent-failure law (same as the daemon): advance the watermark ONLY
         // when nothing failed — a failed asset must be retried next pass.
@@ -868,12 +876,18 @@ final class SyncEngine: ObservableObject {
                     // returns through the uploader's own retry, never through this queue.
                     uploaded += 1
                     settled.insert(asset.localIdentifier)
-                case .offSite, .notOwnCamera:
+                case .offSite(let reason):
                     skipped += 1
                     settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: reason, takenAt: asset.creationDate)
+                case .notOwnCamera:
+                    skipped += 1
+                    settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "not_own_camera", takenAt: asset.creationDate)
                 case .heldPrivate:
                     heldPrivate += 1
                     settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "personal", takenAt: asset.creationDate)
                 case .deduped:
                     deduped += 1
                     settled.insert(asset.localIdentifier)
@@ -900,7 +914,7 @@ final class SyncEngine: ObservableObject {
             if uploaded > 0, mins > 0.05 { uploadsPerMinute = Double(uploaded) / mins }
             await Task.yield()
         }
-
+        await CaptureLedgerReporter.shared.flush()
     }
 
     // ─── Unified background drain (BUG #1: ingest with the screen off) ───────
