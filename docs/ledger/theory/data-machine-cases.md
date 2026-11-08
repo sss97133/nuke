@@ -3714,3 +3714,79 @@ budget left and the expiry.
 agent, with the source document"? The reviewers recommend the second: it is his name on a record buyers bid on, and
 counsel reads the seller as making the representation whoever typed it. (2) Whether a BaT buyer's agent may hold a
 read grant to private line items (a share from owner to buyer, not a lend); proposed: not in the first slice.
+
+## 21. Art is the second asset class: the artwork is the endpoint (owner, 2026-11-08)
+
+Owner, 2026-11-08 morning, opening the phase ("i need to plan and initiate the phase of our system that is ingestion and data
+modeling of art"), then on the model, verbatim: "the artwork is the endpoint the artwork carries its history. its production
+timeframe and its events of presentation and association in use cases. the artwork has many to many folds and keys the artwork
+is a part of a group, next the artwork is a creation of the artist, the technician, the artist is the one with the highest claim
+to origin. the artist can be an entity or org or user. the artist takes on the same shape as the user it is a user. the user can
+become an entity if the ownership of certain assets is transferred to the org like when an artist sells their "rights" so its of
+value for an org to still maintain significant integration with its origin user. likewise an org can exist as the foundation
+for an artists works and the furthering use of thw works in shows and presentation actions. like the keith haring or mapplethorpe
+foundation. so yeah all the underlying sturcture of data model is a shape that overlaps cuz cars and art assets act quite the
+same. they are physical objects with provenance if the provenance is recorded."
+
+Earlier anchors this rests on: O01 (the product is the data model), O10 (artists keep their work local; masking by audience),
+the 10-11 direction (a provenance archive for automotive and art through one entrance; the photographer's archive as the first
+art case), the 10-16 direction (non-vehicle items are asset entities a holder develops; "help an entity justify developing their
+assets"), and AGENTS.md: artist, buyer and researcher are roles evidenced in context, never permanent person types.
+
+### The shape, in the machine's words
+- **Entity.** An artwork is an `assets` row (`asset_type = 'artwork'`; `automobilia` and `memorabilia` beside it), the same
+  registry a shoot, a tool and a part already use. Its identity at creation is the presentation that brought it in
+  (`identity_basis = 'lot_presentation'`); the same object seen again is resolved by supersession, exactly as a vehicle seen at
+  two houses is. Editions are the art-specific identity case: the same edition number is the same object, a different number is
+  a sibling under one parent work (the `edition_parents` semantics of the entity-resolution theory), an unknown number is a
+  candidate only.
+- **Log.** Everything the artwork "carries" is testimony in `asset_observations`, each row with source, method, clocks and trust:
+  a lot (`auction_lot`: the house, the sale, the estimate, the hammer as stated), later an exhibition, a publication, a
+  conservation report, a photo sighting (already live for tools). The production timeframe is a dated claim with a precision
+  ("1965", "circa 1965", "1960s"), never a bare year column.
+- **Folds, many-to-many, each as-of.** Three bridges the vehicle side already names (`data-machine-cases.md` line 407: asset ×
+  party × share × as-of) and the art side needs first: **creation** (asset × party × role `creator` | `technician` | `printer` |
+  `foundry` | `publisher`; the creator is the party with the highest claim to origin), **holding** (asset × party × share ×
+  from/to; auctions name sellers and buyers, not holders, so a holder is a claim with its own evidence), **membership** (asset ×
+  group: series, edition parent, collection, exhibition, catalogue raisonné). A column on `assets` is only ever the current fold
+  of the latest claim.
+- **The artist is a party, shaped like a user.** A person (user), an organization (estate, foundation, gallery) or an external
+  identity (a name the house printed, not yet a user) can stand in the creator role. The rights transfer the owner describes
+  (artist → foundation) is a holding fold on the rights, not a change of creator: the Haring or Mapplethorpe foundation holds
+  and presents, the artist remains origin. So "artist" is never an `asset_type` or a user type; it is the creator edge, and a
+  person becomes "an artist" by accruing creator claims, the way a shop becomes a restorer by accruing work sessions.
+- **One shape, two classes.** Cars and artworks differ in the identity key (VIN vs. edition and catalogue number), the event
+  vocabulary (lot, exhibition, publication vs. lot, title, work session) and the masking rules (O10: a collector's inventory is
+  masked by audience, the shape stays public). The layers (log → state → baselines → features → predictions) and the readers'
+  obligations (population, n, as-of, keys) are the same.
+
+### What is initiated today (lane skylar-14, worktree art-ingest)
+1. **Migration `20261108170000_asset_lots.sql`** (contract `supabase/sql/test_asset_lots.sql`, PG17): the three types, the
+   identity-key index, the writer `record_asset_lots`, the cursor `asset_lot_walk_cursor`, the coverage reader
+   `asset_lot_coverage`. Design and the 10-16 divergence (asset log vs. polymorphic log): `asset-entity-model.md`, 2026-11-08.
+2. **Source 1, Bonhams**, through the extractor that already reads its index for cars: `extract-bonhams-typesense` modes
+   `art_census` (the house's department facet as the denominator) and `art_land` (one department a run, bounded, cursor-resumed).
+   Facet read 2026-11-08: 3,482,440 lots in the index, 2,524,687 with a published hammer; Fine Art 159,145 (108,695 priced),
+   Prints & Multiples 86,450 (61,399), Post-War & Contemporary 18,266 (12,303), Impressionist & Modern 9,254 (5,922),
+   Photographs 9,600 (6,124), Automobilia 85,090 (70,766 across MOT-AUT and COL-AUT). These are the house's counts on that day;
+   the reader shows them beside what landed.
+3. **The source gate** (never a house name): lot-level category from the house itself, a published result per lot, a readable
+   index or retained pages. Mecum passes from the retained 2026-10-14 index (79,494 Road Art lots, zero fetch) and is source 2
+   through the same writer. RM Sotheby's, Christie's, Sotheby's and Phillips do not pass today.
+
+### Acceptance (fleet-relative, per AGENTS.md)
+1. `asset_lot_coverage('bonhams')` returns, per department, the house's lot count and priced count with their census date beside
+   the landed count; the first report leads with the whole index (3.48M) and the slice (the art and automobilia departments),
+   then landed.
+2. A lot that the index first shows upcoming and later shows hammered has two `auction_lot` rows, the first superseded by the
+   second, and one `assets` row.
+3. An anonymous reader can call the coverage reader and nothing else; the writer refuses anon and authenticated callers.
+4. No new table. No artist, edition or medium column until a reader needs it and a contract covers it.
+
+### Next slices, in order, each behind the one before
+Mecum Road Art from the retained index (automobilia) → the creation fold (the artist line from the catalogue as an attributed
+claim to an external identity, with the party shaped like a user) → group membership (edition parent/child, series) → the
+local archive lane (the photographer's drives: sha256 identity, pHash candidates, the shoot asset, Blur's session clustering;
+local-first per O10) → museum open-access catalogues (Met, Art Institute of Chicago, Cleveland: CC0 bulk data as reference
+baselines for artist identity and medium vocabulary, not as market events) → a holder's own collection (private by default,
+masked shape public).
