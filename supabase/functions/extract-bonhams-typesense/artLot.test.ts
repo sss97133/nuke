@@ -93,3 +93,10 @@ Deno.test("catalogue lines and the department filter", () => {
   assertEquals(catalogueLines({ id: "1" }), []);
   assertEquals(artDepartmentFilter("PIC-GEN"), "department.code:=PIC-GEN && flags.isResultPublished:true");
 });
+
+Deno.test("catalogue text: tags are removed to a fixed point and entities decode once", () => {
+  const rec = artLotFromDoc({
+    ...fontana, catalogDesc: "<div>Signed &amp;lt;b&amp;gt; dated <<b>i</b>>script> 50 &#215; 70 cm &quot;Ovale&quot;</div>",
+  }, { readAt: "2026-11-08T15:00:00.000Z", page: 1, pass: 0 });
+  assertEquals(rec?.catalog_text, 'Signed &lt;b&gt; dated script> 50 × 70 cm "Ovale"');
+});

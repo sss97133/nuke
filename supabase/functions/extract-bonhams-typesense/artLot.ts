@@ -78,15 +78,26 @@ export interface ArtLotRecord {
 export const ART_LOT_METHOD = "bonhams_index_art_v1";
 
 function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/div>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&nbsp;/gi, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  let text = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/div>/gi, "\n");
+  // Remove tags until none remain, so a tag split by another tag is not left behind.
+  let before: string;
+  do {
+    before = text;
+    text = text.replace(/<[^<>]*>/g, "");
+  } while (text !== before);
+  // Entities in one pass: a decoded result is never decoded again.
+  text = text.replace(/&(#(\d{1,6})|amp|lt|gt|quot|apos|nbsp);/gi, (_m, name: string, num?: string) => {
+    if (num) { const n = Number(num); return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : ""; }
+    switch (name.toLowerCase()) {
+      case "amp": return "&";
+      case "lt": return "<";
+      case "gt": return ">";
+      case "quot": return '"';
+      case "apos": return "'";
+      default: return " ";
+    }
+  });
+  return text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /** The index wraps some strings in literal quotes ("\"Lucio Fontana ...\""); the house's text is inside them. */
