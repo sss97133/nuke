@@ -52,6 +52,7 @@ VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
 \ir ../migrations/20261108233000_asset_creation_fold_layouts.sql
 \ir ../migrations/20261108234500_asset_creators_current_lot.sql
 \ir ../migrations/20261108235500_asset_creators_materialized.sql
+\ir ../migrations/20261109000000_asset_profile_read.sql
 
 -- 1. Anon cannot write.
 DO $$ BEGIN
@@ -249,6 +250,36 @@ DO $$ DECLARE a record; r jsonb; BEGIN
   IF (r->>'observations_superseded')::int <> 1 THEN RAISE EXCEPTION 'the hammer must supersede the upcoming row: %', r; END IF;
   SELECT * INTO a FROM public.asset_creators('bonhams', 50) WHERE name_as_printed = 'Alex Katz';
   IF a.priced_lots <> 1 OR (a.by_currency->'GBP'->>'median')::numeric <> 5200 THEN RAISE EXCEPTION 'the published hammer must reach the artist view: %', a; END IF;
+END $$;
+
+-- 6f. The profile read: one typed document for the page, public, with the house's footnotes as headed sections.
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+DO $$ DECLARE p jsonb; sec jsonb; BEGIN
+  PERFORM public.record_asset_lots('bonhams', $j$[{"identity_key":"bonhams:8000008","asset_type":"artwork","title":"BRIDGET RILEY (B. 1931) Ka 4","source_identifier":"8000008",
+    "source_url":"https://www.bonhams.com/auction/32184/lot/7/x","observed_at":"2026-10-15T22:59:59Z","observed_at_basis":"hammer_time","department_code":"PIC-CON","department_name":"Post-War and Contemporary Art",
+    "lot_number":"7","sale_key":"bonhams-32184","result":"sold","price_basis":"hammer","hammer_price":720000,"hammer_premium":915500,"estimate_low":550000,"estimate_high":750000,"currency":"GBP",
+    "lines":["BRIDGET RILEY","(B. 1931)","Ka 4"],"catalog_text":"oil on linen\n76.2 x 67.3cm","image_url":"https://images1.bonhams.com/image?src=x.jpg",
+    "footnotes":"Provenance\nJuda Rowan Gallery, London\nPrivate Collection, London\n\nLiterature\nRobert Kudielka (ed.), Bridget Riley, The Complete Paintings, no. BR207\n\nWith the Ka paintings of 1980, Riley gave the stripe a new chromatic intensity."}]$j$::jsonb);
+  PERFORM public.fold_asset_creation_claims('bonhams', 100);
+  PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+  p := public.asset_profile_read((SELECT id FROM public.assets WHERE attributes->>'identity_key' = 'bonhams:8000008'));
+  IF p IS NULL THEN RAISE EXCEPTION 'anon must read a public artwork profile'; END IF;
+  IF p->'asset'->>'asset_type' <> 'artwork' OR p->'asset'->>'house_category' <> 'Post-War and Contemporary Art' THEN RAISE EXCEPTION 'asset block wrong: %', p->'asset'; END IF;
+  IF p->>'image_url' <> 'https://images1.bonhams.com/image?src=x.jpg' THEN RAISE EXCEPTION 'image url wrong'; END IF;
+  IF jsonb_array_length(p->'lots') <> 1 OR (p->'lots'->0->>'hammer_price')::numeric <> 720000 OR p->'lots'->0->>'result' <> 'sold' OR p->'lots'->0->'source'->>'slug' <> 'bonhams' THEN
+    RAISE EXCEPTION 'lot block wrong: %', p->'lots'; END IF;
+  sec := p->'lots'->0->'printed_sections';
+  IF jsonb_array_length(sec) <> 3 OR sec->0->>'heading' <> 'Provenance' OR jsonb_array_length(sec->0->'lines') <> 2 OR sec->0->'lines'->>0 <> 'Juda Rowan Gallery, London'
+     OR sec->1->>'heading' <> 'Literature' OR (sec->2 ? 'heading') THEN RAISE EXCEPTION 'printed sections wrong: %', sec; END IF;
+  IF jsonb_array_length(p->'creation') <> 1 OR p->'creation'->0->>'attribution' <> 'direct' OR p->'creation'->0->'party'->>'display_name' <> 'BRIDGET RILEY'
+     OR (p->'creation'->0->'party'->>'claimed')::boolean OR (p->'creation'->0->'party'->>'lots_direct')::int <> 1 OR (p->'creation'->0->'party'->>'priced_lots')::int <> 1 THEN
+    RAISE EXCEPTION 'creation block wrong: %', p->'creation'; END IF;
+  IF (p->'coverage'->>'presentations')::int <> 1 OR (p->'coverage'->>'statements')::int <> 1 OR (p->'coverage'->>'claims')::int <> 1 THEN RAISE EXCEPTION 'coverage wrong: %', p->'coverage'; END IF;
+  -- The Katz lot above has two statements (upcoming, then the hammer): history keeps both, lots shows the current one.
+  p := public.asset_profile_read((SELECT id FROM public.assets WHERE attributes->>'identity_key' = 'bonhams:8000007'));
+  IF jsonb_array_length(p->'history') <> 2 OR (p->'history'->0->>'superseded')::boolean IS NOT TRUE OR jsonb_array_length(p->'lots') <> 1 OR (p->'lots'->0->>'hammer_price')::numeric <> 5200 THEN
+    RAISE EXCEPTION 'history must keep the superseded statement: %', p->'history'; END IF;
+  IF public.asset_profile_read('00000000-0000-0000-0000-000000000000') IS NOT NULL THEN RAISE EXCEPTION 'unknown id must be null'; END IF;
 END $$;
 
 -- 7. The type list admits the three new types and still refuses an unknown one.
