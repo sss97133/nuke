@@ -39,7 +39,8 @@ SELECT assert_contract(NOT EXISTS(SELECT FROM jsonb_array_elements(market_pulse_
 SET ROLE anon;
 SELECT assert_contract(EXISTS(SELECT FROM jsonb_array_elements(market_pulse_live()->'auctions') a WHERE right(a->>0,6)='000006' AND a->>4='75000'),'anonymous board shows witnessed current BaT episode');
 SELECT assert_contract(EXISTS(SELECT FROM jsonb_array_elements(market_pulse_live()->'auctions') a WHERE right(a->>0,6)='000016' AND a->4='null'::jsonb),'historical sale cannot fill unknown current bid');
-SELECT assert_contract(NOT EXISTS(SELECT FROM jsonb_array_elements(market_pulse_live()->'auctions') a WHERE right(a->>0,6)::int BETWEEN 7 AND 15),'wrong episode, closed, malformed/stale/future witness, private/deleted/nonvehicle stay excluded');
+SELECT assert_contract(NOT EXISTS(SELECT FROM jsonb_array_elements(market_pulse_live()->'auctions') a WHERE right(a->>0,6)::int IN (7,8,9,10,11,12,13,15)),'wrong episode, closed, malformed/future witness, private/deleted/nonvehicle stay excluded');
 SELECT assert_contract(jsonb_array_length(market_lot_activity(ARRAY['00000000-0000-0000-0000-000000000006'::uuid])->'lots')=1,'same witnessed episode opens existing evidence reader');
+SELECT assert_contract(EXISTS(SELECT FROM jsonb_array_elements(market_pulse_live()->'auctions') a WHERE right(a->>0,6)='000014'),'unchanged native state older than six hours retains episode identity without asserting source freshness');
 RESET ROLE;
 SELECT assert_contract((SELECT platform_source='barrett-jackson' AND sale_price=121000 FROM vehicles WHERE right(id::text,6)='000006'),'vehicle source identity and historical sale remain unchanged');

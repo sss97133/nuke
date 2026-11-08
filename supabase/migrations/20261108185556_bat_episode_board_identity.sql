@@ -1,5 +1,5 @@
 -- A vehicle keeps its earlier source identity while a later BaT listing becomes current.
--- Qualify that listing from its exact active episode AND the bounded native inventory witness;
+-- Qualify that listing from its exact active episode AND the native inventory identity witness;
 -- never rewrite the vehicle's platform or borrow its historical sale price as a current bid.
 BEGIN;
 SET LOCAL lock_timeout = '3s';
@@ -15,8 +15,9 @@ DECLARE
         v.listing_url ~ '^https://bringatrailer[.]com/listing/[^/?#]+/?$'
         AND v.origin_metadata->>'platform' = 'bringatrailer'
         AND v.origin_metadata->>'source' = 'bat_auctions_page'
+        -- last_sync advances on changed scalar state only; it proves identity, not read freshness.
         AND CASE WHEN pg_input_is_valid(v.origin_metadata->>'last_sync', 'timestamp with time zone')
-          THEN (v.origin_metadata->>'last_sync')::timestamptz BETWEEN now()-interval '6 hours' AND now()+interval '1 minute'
+          THEN (v.origin_metadata->>'last_sync')::timestamptz <= now()+interval '1 minute'
           ELSE false END
         AND EXISTS (
           SELECT 1 FROM public.vehicle_events current_episode
