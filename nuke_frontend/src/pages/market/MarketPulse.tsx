@@ -6,8 +6,8 @@ import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence from './AuctionEvidence';
-import { BAT_HOUSE, BID_BUCKETS, currentBidDistribution, fxNote, fxSourceName, houseName, listingKey, lotBidBucket, moneyIn, recordedUsdBid, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, usdBid, type BidBucket, type BidCurve, type HouseStatus, type LiveAuction } from './useMarketPulse';
-import { HouseMark, HouseMarket, houseWeekChange, useHouseShare } from './HouseShare';
+import { BAT_HOUSE, BID_BUCKETS, currentBidDistribution, fxNote, fxSourceName, houseName, listingKey, lotBidBucket, moneyIn, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, usdBid, type BidBucket, type BidCurve, type HouseStatus, type LiveAuction } from './useMarketPulse';
+import { HouseMark, HouseMarket, houseWeekChange, shareOnBasis, useHouseShare } from './HouseShare';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { displayMake, selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -807,12 +807,14 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   ].filter((n): n is string => n != null);
   // Week on week, house by house. BaT's comparison is its own long history (BAT-LIVE-BIDS); every other house is compared
   // with its own reading from a week ago, which exists only once its own recording is a week old (live_board_snapshots).
-  // Those readings add dollar-denominated bids only, so the comparison does too.
+  // Dollars are compared in the unit both readings share: dollar-denominated bids only until converted readings are a
+  // week old, then converted dollars (shareOnBasis).
   const otherHouses = boardHouses.filter(h => h !== BAT_HOUSE);
   const houseWeek = (measure: 'bids' | 'lots'): string[] => {
     if (make != null || house != null || otherHouses.length === 0) return [];
-    const nowOf = (h: string) => live.filter(a => a.house === h).reduce((n, a) => n + (measure === 'bids' ? (recordedUsdBid(a) ?? 0) : (a.currentBid != null ? 1 : 0)), 0);
-    const have = otherHouses.map(h => ({ h, pct: houseWeekChange(h, nowOf(h), measure === 'bids' ? 'bids' : 'lots', share.data) })).filter(x => x.pct != null);
+    const basis = shareOnBasis(share.data, now, measure);
+    const nowOf = (h: string) => live.filter(a => a.house === h).reduce((n, a) => n + (measure === 'bids' ? basis.bidOf(a) : (a.currentBid != null ? 1 : 0)), 0);
+    const have = otherHouses.map(h => ({ h, pct: houseWeekChange(h, nowOf(h), measure === 'bids' ? 'bids' : 'lots', basis.data) })).filter(x => x.pct != null);
     const lacking = otherHouses.filter(h => !have.some(x => x.h === h));
     const since = lacking.map(h => share.data?.firstAtByHouse[h]).filter((t): t is number => t != null);
     return [
