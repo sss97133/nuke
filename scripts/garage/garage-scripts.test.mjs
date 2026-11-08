@@ -199,7 +199,7 @@ test('label-scenes: one retry on invalid output, then a cited failure; a good re
 });
 
 import { readFileSync as readText } from 'node:fs';
-import { buildPairsSql, normalizePair, pairKey, buildPrompt as dupPrompt, parseJudgment, toJudgment, valuesCte as dupCte, judgePair } from './compare-duplicates.mjs';
+import { buildPairsSql, normalizePair, pairKey, buildPrompt as dupPrompt, parseJudgment, toJudgment, valuesCte as dupCte, judgePair, combineViewers, spreadPick, listingUrls } from './compare-duplicates.mjs';
 
 const W = '22222222-2222-4222-8222-222222222222';
 
@@ -488,4 +488,32 @@ test('compare-duplicates: a year gap of one with a listed VIN is a review pair 0
   assert.match(sql, /'vin_matches_listing'/);
   assert.doesNotMatch(buildPairsSql('00000000-0000-4000-8000-000000000001'), /unnest\(ARRAY/);
   assert.doesNotMatch(sql, /\b(insert|update|delete|drop|alter)\b\s/i);
+});
+
+test('compare-duplicates deep: combineViewers is true only when both say true, false on a confident false, else unsure', () => {
+  const v = (same_vehicle, confidence) => ({ same_vehicle, confidence, rationale: 'r', contradictions: [] });
+  assert.deepEqual(pick(combineViewers([v(true, 0.9), v(true, 0.8)])), { same_vehicle: true, confidence: 0.8 });
+  assert.deepEqual(pick(combineViewers([v(true, 0.9), v('unsure', 0.6)])), { same_vehicle: 'unsure', confidence: 0.6 });
+  assert.deepEqual(pick(combineViewers([v(true, 0.95), v(false, 0.7)])), { same_vehicle: false, confidence: 0.7 });
+  assert.deepEqual(pick(combineViewers([v(true, 0.95), v(false, 0.69)])), { same_vehicle: 'unsure', confidence: 0.69 });
+  assert.deepEqual(pick(combineViewers([v(false, 0.9), v(false, 0.75)])), { same_vehicle: false, confidence: 0.75 });
+  assert.deepEqual(pick(combineViewers([v(false, 0.5), v(false, 0.6)])), { same_vehicle: 'unsure', confidence: 0.5 });
+  assert.throws(() => combineViewers([]));
+  const c = combineViewers([{ ...v(false, 0.8), contradictions: ['wheels'] }, { ...v(true, 0.9), contradictions: ['wheels', 'paint'] }]);
+  assert.deepEqual(c.contradictions, ['wheels', 'paint']);
+  assert.match(c.rationale, /Viewer 1 \(false, 0.8\)/);
+});
+const pick = (c) => ({ same_vehicle: c.same_vehicle, confidence: c.confidence });
+
+test('compare-duplicates deep: photos spread across sessions; listing url by pair field or history VIN', () => {
+  const items = [...Array(10).keys()].map((i) => ({ url: `s1-${i}`, session: 's1' })).concat([{ url: 's2-0', session: 's2' }, { url: 's3-0', session: 's3' }]);
+  const got = spreadPick(items, 4).map((x) => x.url);
+  assert.equal(got.length, 4);
+  assert.ok(got.includes('s2-0') && got.includes('s3-0'));
+  assert.equal(spreadPick([{ url: 'a' }], 4).length, 1);
+  const flat = spreadPick([...Array(30).keys()].map((i) => ({ url: `u${i}` })), 5).map((x) => x.url);
+  assert.deepEqual([flat[0], flat[4]], ['u0', 'u29']);
+  const pair = normalizePair({ a_id: V, b_id: W, a_samples: ['x'], b_samples: ['y'], listing_url: 'https://bringatrailer.com/listing/x/', listing_side: 'b', fields: { a: { vin: 'ABC12345678901234' } } });
+  assert.deepEqual(listingUrls(pair, []), { a: null, b: 'https://bringatrailer.com/listing/x/' });
+  assert.equal(listingUrls(pair, [{ vin: 'abc1-2345678901234', url: 'https://bringatrailer.com/listing/h/' }]).a, 'https://bringatrailer.com/listing/h/');
 });

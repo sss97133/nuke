@@ -1365,6 +1365,72 @@ shopc AS MATERIALIZED (
            GROUP BY x.vid, x.canon, sg.wd, sg.ws HAVING count(*) >= 2) y
    ORDER BY y.vid, y.n_sess DESC, y.canon::text
 ),
+-- Shop-then-dealer sequence: the vehicle (as its duplicate cluster) has counted shop-scene sessions in range of a shop-kind organization (the vote
+-- there reads shop) and a LATER listing attributed to a dealer-kind organization (bat_listings / external_listings organization, a bat seller handle
+-- via org_seller_aliases, or a matched listing incl. hist_listings), whose end / listed date is after the first shop session. shopt = the shop
+-- organization (most sessions) with the first shop-session time; dlst = dated dealer-organization listings; seqx = the earliest such listing.
+shopt AS MATERIALIZED (
+  SELECT y.vid, y.canon, y.n_sess, y.first_t, y.cites
+    FROM (SELECT z.vid, z.canon, z.n_sess, min(z.first_t) OVER (PARTITION BY z.vid) AS first_t, z.cites,
+                 row_number() OVER (PARTITION BY z.vid ORDER BY z.n_sess DESC, z.first_t, z.canon::text) AS rn
+            FROM (SELECT x.vid, x.canon, count(*) AS n_sess, min(x.t) AS first_t,
+                         jsonb_agg(x.cite || jsonb_build_object('organization_id', x.canon, 'first_photo_at', x.t)
+                                   ORDER BY x.t, x.session_key, x.vehicle_id::text) AS cites
+                    FROM (SELECT sc.vid, poc.canon, sc.vehicle_id, sc.session_key, sc.confidence, sc.cite, min(p.t) AS t
+                            FROM sc
+                            JOIN ps2 p ON p.mvid = sc.vehicle_id AND (p.id = ANY (coalesce(sc.image_ids, '{}'::uuid[])) OR p.id::text = sc.session_key)
+                            JOIN poc ON poc.photo_id = p.id AND (sc.pm_canon IS NULL OR sc.pm_canon = poc.canon)
+                            JOIN orgn o ON o.id = poc.canon AND o.okind = 'shop'
+                           WHERE sc.dropped IS NULL AND sc.sk = 'shop'
+                           GROUP BY sc.vid, poc.canon, sc.vehicle_id, sc.session_key, sc.confidence, sc.cite) x
+                    JOIN sorg sg ON sg.vid = x.vid AND sg.canon = x.canon AND sg.kind = 'shop'
+                   GROUP BY x.vid, x.canon) z) y
+   WHERE y.rn = 1
+),
+dlst AS MATERIALIZED (
+  SELECT cm.ck AS vid, coalesce(om.canon, d.org) AS org, d.src, d.ref, d.dt
+    FROM (SELECT bl.vehicle_id AS mv, bl.organization_id AS org, 'bat_listings.organization_id' AS src, bl.bat_listing_url AS ref,
+                 coalesce(bl.auction_end_date, bl.sale_date)::timestamptz AS dt
+            FROM bat_listings bl JOIN candx cx ON cx.vid = bl.vehicle_id WHERE bl.organization_id IS NOT NULL
+          UNION ALL
+          SELECT el.vehicle_id, el.organization_id, 'external_listings.organization_id', el.listing_url,
+                 coalesce(el.end_date, el.sold_at, el.start_date)::timestamptz
+            FROM external_listings el JOIN candx cx ON cx.vid = el.vehicle_id WHERE el.organization_id IS NOT NULL
+          UNION ALL
+          SELECT bl.vehicle_id, a.organization_id, 'bat_listings.seller_username via org_seller_aliases', bl.bat_listing_url,
+                 coalesce(bl.auction_end_date, bl.sale_date)::timestamptz
+            FROM bat_listings bl JOIN candx cx ON cx.vid = bl.vehicle_id
+            JOIN org_seller_aliases a ON a.platform = 'bat' AND a.seller_username = lower(btrim(bl.seller_username))
+           WHERE bl.organization_id IS NULL
+          UNION ALL
+          SELECT ml.vid, coalesce(ml.organization_id, a.organization_id), 'matched listing (' || array_to_string(ml.sigs, '+') || ')', ml.ref,
+                 coalesce(b.auction_end_date, b.sale_date, h.end_date)::timestamptz
+            FROM ml
+            LEFT JOIN bat_listings b ON b.id = ml.listing_id
+            LEFT JOIN hist_listings h ON md5(h.url)::uuid = ml.listing_id
+            LEFT JOIN org_seller_aliases a ON ml.organization_id IS NULL AND a.platform = 'bat' AND a.seller_username = ml.seller
+           WHERE coalesce(ml.organization_id, a.organization_id) IS NOT NULL) d
+    JOIN clm cm ON cm.vid = d.mv
+    LEFT JOIN orgmap om ON om.org_id = d.org
+    JOIN orgn o ON o.id = coalesce(om.canon, d.org) AND o.okind = 'dealer'
+   WHERE d.dt IS NOT NULL
+),
+seqx AS MATERIALIZED (
+  SELECT DISTINCT ON (s.vid) s.vid, s.canon AS shop_org, s.n_sess, s.first_t, s.cites, d.org AS dealer_org, d.src, d.ref, d.dt
+    FROM shopt s JOIN dlst d ON d.vid = s.vid AND d.dt > s.first_t
+   ORDER BY s.vid, d.dt, d.org::text, d.ref
+),
+-- Dealer-kind organizations also in range of the vehicle's counted shop-scene photos (a place match to one organization narrows the session to it).
+shopd AS MATERIALIZED (
+  SELECT x.vid, array_agg(DISTINCT x.canon ORDER BY x.canon) AS dorgs
+    FROM (SELECT DISTINCT sc.vid, poc.canon
+            FROM sc
+            JOIN ps2 p ON p.mvid = sc.vehicle_id AND (p.id = ANY (coalesce(sc.image_ids, '{}'::uuid[])) OR p.id::text = sc.session_key)
+            JOIN poc ON poc.photo_id = p.id AND (sc.pm_canon IS NULL OR sc.pm_canon = poc.canon)
+            JOIN orgn o ON o.id = poc.canon AND o.okind = 'dealer'
+           WHERE sc.dropped IS NULL AND sc.sk = 'shop') x
+   GROUP BY x.vid
+),
 -- Span (days) of the vehicle's own-device photos taken at geotagged places within range of no organization: a long-term personal pattern.
 awayc AS MATERIALIZED (
   SELECT p.vid, extract(epoch FROM max(p.t) - min(p.t)) / 86400.0 AS span
@@ -1629,9 +1695,12 @@ g5 AS (
 g5w AS (
   SELECT g5.*, g5.s_org IS NOT NULL AND coalesce(g5.s_sx, false) AND NOT (coalesce(g5.s_listed, false) OR coalesce(g5.s_rel, false)) AS scene_w,
          pa.cites AS pa_cites, pa.orgs AS pa_orgs, pa.aggs AS pa_aggs, aw.span AS away_span,
-         sh.canon AS cust_org, sh.n_sess AS cust_n, sh.cites AS cust_cites, sh.wd AS cust_wd, sh.ws AS cust_ws, ac.span AS cust_away
+         sh.canon AS cust_org, sh.n_sess AS cust_n, sh.cites AS cust_cites, sh.wd AS cust_wd, sh.ws AS cust_ws, ac.span AS cust_away,
+         sq.dealer_org AS seq_dealer, sq.shop_org AS seq_shop, sq.n_sess AS seq_n, sq.first_t AS seq_first_t, sq.cites AS seq_cites,
+         sq.src AS seq_src, sq.ref AS seq_ref, sq.dt AS seq_dt, sd.dorgs AS cust_dorgs
   FROM g5 LEFT JOIN pa ON pa.vid = g5.vid LEFT JOIN away aw ON aw.vid = g5.vid
   LEFT JOIN shopc sh ON sh.vid = g5.vid LEFT JOIN awayc ac ON ac.vid = g5.vid
+  LEFT JOIN seqx sq ON sq.vid = g5.vid LEFT JOIN shopd sd ON sd.vid = g5.vid
 ),
 g6 AS (
   SELECT g5w.*,
@@ -1644,6 +1713,10 @@ g6 AS (
          -- shop custody: >= 2 shop-scene sessions at one shop organization, unless the vehicle's own-device photos at places within range of no
          -- organization span more than the shop-shoot window (a long-term personal pattern)
          g5w.cust_org IS NOT NULL AND coalesce(g5w.cust_away, 0) <= g5w.r_max_span AS custody,
+         -- shop-then-dealer sequence: shop-scene sessions, then a later dealer-organization listing (the dealer is the custodian, the shop the work provider)
+         g5w.seq_dealer IS NOT NULL AS seq,
+         -- shop custody would fire but a dealer-kind organization is in range of the same shop scenes as well
+         g5w.cust_org IS NOT NULL AND coalesce(g5w.cust_away, 0) <= g5w.r_max_span AND cardinality(coalesce(g5w.cust_dorgs, '{}'::uuid[])) > 0 AS cust_amb,
          g5w.s_org IS NOT NULL AND g5w.s_other > 0 AND NOT (g5w.s_listed OR g5w.s_rel) AND NOT coalesce(g5w.tb_decided, false) AS amb
   FROM g5w
 ),
@@ -1676,6 +1749,10 @@ h AS (
       WHEN g6.cur_own AND NOT g6.denied AND g6.org_id IS NULL
         THEN jsonb_build_array('owner_reported', 0.5, 'current ownership record without title verification')
       WHEN g6.disc_prev THEN jsonb_build_array('previously_owned', 0.5, 'discovered previously_owned')
+      -- shop work first, dealer listing later: the dealer organization holds the vehicle (custodian); the shop is the work provider. Above the
+      -- organization-listing rungs, since the dealer listing is what makes this vehicle organization-listed
+      WHEN g6.seq
+        THEN jsonb_build_array('business_handling', 0.6, 'pre-auction inventory: shop-scene sessions at a shop organization (work provider) before the vehicle was listed by a dealer organization (custodian)', 'pre_auction_inventory')
       WHEN g6.org_member THEN jsonb_build_array('business_handling', 0.6, 'member of the organization that lists the vehicle')
       WHEN g6.shoot AND g6.s_listed AND g6.org_id IS NOT NULL
         THEN jsonb_build_array('business_handling', 0.7, 'inventory shoot at the organization that lists the vehicle')
@@ -1691,6 +1768,8 @@ h AS (
       WHEN g6.pre_auc
         THEN jsonb_build_array('business_handling', 0.6, 'pre-auction inventory: own-device photos on a dealer lot / showroom at a dealer or consignor organization; no listing, title or statement; no long-term pattern', 'pre_auction_inventory')
       -- below listing, title and statement evidence (all above): the vehicle was in a shop's custody (client work), even if the photos are not shoot-shaped
+      WHEN g6.cust_amb
+        THEN jsonb_build_array('contributor', 0.2, 'contributor: org_ambiguous, shop scenes in range of both a shop and a dealer organization and no later dealer listing; not ownership', 'org_ambiguous')
       WHEN g6.custody
         THEN jsonb_build_array('business_handling', 0.6, 'shop custody: shop-interior / upholstery / paint scenes in ' || g6.cust_n || ' sessions at a shop organization; client work, not ownership', 'shop_custody')
       WHEN g6.shoot
@@ -1720,6 +1799,8 @@ SELECT m.vid AS vehicle_id,
          'documented_from', h.first_t, 'documented_to', h.last_t,
          'organization_inventory', h.org_id,
          'sub_reason', h.d->>3,
+         'custodian_organization_id', CASE WHEN h.seq THEN h.seq_dealer END,
+         'work_provider', CASE WHEN h.seq THEN jsonb_build_object('organization_id', h.seq_shop, 'sessions', h.seq_cites) END,
          -- duplicate cluster: the members are ONE subject here (never merged); every member row carries the same derived role and the
          -- evidence of all members, each item saying which member it came from
          'cluster', CASE WHEN cardinality(h.members) > 1 THEN jsonb_build_object(
@@ -1731,7 +1812,7 @@ SELECT m.vid AS vehicle_id,
              'review_pairs_joined', (SELECT coalesce(jsonb_agg(e), '[]'::jsonb) FROM rvc, jsonb_array_elements(rvc.cites) e
                                       WHERE rvc.ck = h.vid AND (e->>'joined')::boolean)) END,
          'duplicate_review', (SELECT rvc.cites FROM rvc WHERE rvc.ck = h.vid),
-         'flags', CASE WHEN h.amb THEN '["org_ambiguous"]'::jsonb ELSE '[]'::jsonb END,
+         'flags', CASE WHEN h.amb OR h.d->>3 = 'org_ambiguous' THEN '["org_ambiguous"]'::jsonb ELSE '[]'::jsonb END,
          'title_denied', h.title_denied,
          'chain', jsonb_build_array(
            jsonb_build_object('step', 1, 'name', 'origin_facts', 'confidence', CASE WHEN h.own_n > 0 THEN 0.4 ELSE 0.3 END,
@@ -1776,7 +1857,14 @@ SELECT m.vid AS vehicle_id,
                'pre_auction', jsonb_build_object('conditions_met', coalesce(h.pre_auc, false), 'decides', coalesce(h.d->>3 = 'pre_auction_inventory', false),
                  'organizations', to_jsonb(h.pa_orgs), 'scenes', coalesce(h.pa_cites, '[]'::jsonb), 'aggregates', coalesce(h.pa_aggs, '[]'::jsonb),
                  'own_pattern_outside_organization_days', round(h.away_span::numeric, 1), 'long_term_personal', coalesce(h.personal, false)),
-               'shop_custody', jsonb_build_object('conditions_met', coalesce(h.custody, false), 'decides', coalesce(h.d->>3 = 'shop_custody', false),
+               'sequence', jsonb_build_object('conditions_met', coalesce(h.seq, false), 'decides', coalesce(h.seq AND h.d->>3 = 'pre_auction_inventory', false),
+                 'custodian_organization_id', h.seq_dealer,
+                 'work_provider', CASE WHEN h.seq THEN jsonb_build_object('organization_id', h.seq_shop, 'sessions', h.seq_cites, 'session_count', h.seq_n,
+                                                                         'first_session_photo_at', h.seq_first_t) END,
+                 'listing', CASE WHEN h.seq THEN jsonb_build_object('source', h.seq_src, 'ref', h.seq_ref, 'date', h.seq_dt) END),
+               'shop_custody', jsonb_build_object(
+                 'ambiguous_organizations', CASE WHEN h.cust_amb THEN to_jsonb(array_prepend(h.cust_org, h.cust_dorgs)) END,
+                 'conditions_met', coalesce(h.custody, false), 'decides', coalesce(h.d->>3 = 'shop_custody', false),
                  'organization_id', h.cust_org, 'sessions', coalesce(h.cust_cites, '[]'::jsonb), 'session_count', h.cust_n,
                  'aggregate', CASE WHEN h.cust_org IS NOT NULL THEN jsonb_build_object('scope', 'organization', 'kind', 'shop', 'dealer_weight', h.cust_wd, 'shop_weight', h.cust_ws) END,
                  'own_pattern_outside_organizations_days', round(h.cust_away::numeric, 1), 'long_term_personal_exception', h.cust_org IS NOT NULL AND NOT coalesce(h.custody, false)),
