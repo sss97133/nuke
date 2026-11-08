@@ -6,7 +6,7 @@ import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence from './AuctionEvidence';
-import { BAT_HOUSE, BID_BUCKETS, bidBucket, currentBidDistribution, houseName, listingKey, moneyIn, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, usdBid, type BidBucket, type BidCurve, type HouseStatus, type LiveAuction } from './useMarketPulse';
+import { BAT_HOUSE, BID_BUCKETS, currentBidDistribution, fxNote, fxSourceName, houseName, listingKey, lotBidBucket, moneyIn, recordedUsdBid, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, usdBid, type BidBucket, type BidCurve, type HouseStatus, type LiveAuction } from './useMarketPulse';
 import { HouseMark, HouseMarket, houseWeekChange, useHouseShare } from './HouseShare';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo, VehicleIdentity } from '../../components/common/MakeIdentity';
@@ -46,9 +46,9 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'newest', label: 'Newest' },
 ];
 
-// Dollar figures: the headline, the bid ranges and the map add only bids recorded in US dollars (Bring a Trailer runs in
-// USD; Collecting Cars lists EUR, GBP, AUD, NZD and USD, and no rate table exists, so a foreign bid is shown in its own
-// currency and never added in).
+// Dollar figures: the headline, the bid ranges, the sort and the map add bids in US dollars (Bring a Trailer runs in
+// USD; Collecting Cars lists EUR, GBP, AUD, NZD and USD). A foreign bid is shown in its own currency and added at the
+// published rate of the board's read date (fx_usd_rate); a currency with no published rate is listed, not added.
 function bidNumber(n: number | null | undefined, compact = false): string {
   if (n == null) return '—';
   if (compact && Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -159,6 +159,29 @@ function RangeBar({ value, readings, fmt, weekdayUtc, weeks, bare = false }: { v
 
 function count(n: number): string {
   return Math.round(n).toLocaleString('en-US');
+}
+
+const lotsWord = (n: number) => `${count(n)} lot${n === 1 ? '' : 's'}`;
+const listOf = (xs: string[]) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+
+/** What the dollar figures do with bids in another currency: which were converted, at whose rates of which date, and
+ *  which were left out for want of a published rate. Currencies are listed by lots, most first. */
+export function foreignNote(foreign: LiveAuction[]): string[] {
+  const byLots = (m: Map<string, number>) => [...m.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])).map(([c]) => c);
+  const groups = new Map<string, { lots: number; currencies: Map<string, number> }>();
+  const missing = new Map<string, number>();
+  for (const a of foreign) {
+    if (!a.fx || a.fx.currency !== a.currency) { missing.set(a.currency, (missing.get(a.currency) ?? 0) + 1); continue; }
+    const key = `${fxSourceName(a.fx)} of ${a.fx.rateDate}`;
+    const g = groups.get(key) ?? { lots: 0, currencies: new Map() };
+    g.lots += 1; g.currencies.set(a.currency, (g.currencies.get(a.currency) ?? 0) + 1);
+    groups.set(key, g);
+  }
+  const converted = [...groups.entries()].sort((x, y) => y[1].lots - x[1].lots)
+    .map(([key, g]) => `${lotsWord(g.lots)} bid in ${listOf(byLots(g.currencies))} added in dollars at the ${key}`);
+  const unpriced = missing.size
+    ? [`${lotsWord([...missing.values()].reduce((s, n) => s + n, 0))} bid in ${listOf(byLots(missing))} listed but not added: no published rate`] : [];
+  return [...converted, ...unpriced];
 }
 
 // A headline number: the figure, what it counts, where it sits against the same hour in earlier weeks, and the map of
@@ -299,7 +322,7 @@ const STALE_MS = 45 * 60_000;
 function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boolean; stale: boolean }) {
   return (
     <Text role="measure"
-      title={`Recorded current bid. Record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
+      title={`${fxNote(auction) ? `${fxNote(auction)}. ` : ''}Recorded current bid. Record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
       className={`market-bid${risen ? ' market-bid--risen' : stale ? ' market-bid--stale' : ''}`}
     >
       {moneyIn(auction.currentBid, auction.currency)}
@@ -667,6 +690,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   // BaT's lots in this scope, and not at all when the scope is another house.
   const cohortBids = useMemo(() => cohort.reduce((s, a) => s + (usdBid(a) ?? 0), 0), [cohort]);
   const foreignBids = useMemo(() => cohort.filter(a => a.currentBid != null && a.currency !== 'USD'), [cohort]);
+  const fxNoteLine = useMemo(() => foreignNote(foreignBids), [foreignBids]);
   const batInScope = useMemo(() => cohort.filter(a => a.house === BAT_HOUSE), [cohort]);
   const baselineApplies = house == null || house === BAT_HOUSE;
   const mixedScope = house == null && cohort.some(a => a.house !== BAT_HOUSE);
@@ -695,7 +719,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   // The map shows the lots after the window and bid-range filters; a chosen make narrows it to that make's lots.
   const mappedInventory = useMemo(() => live.filter(a => inWindow(a, win, now)
     && (house == null || a.house === house)
-    && (selectedBid == null || bidBucket(a.currentBid, a.currency) === selectedBid)), [live, win, now, selectedBid, house]);
+    && (selectedBid == null || lotBidBucket(a) === selectedBid)), [live, win, now, selectedBid, house]);
 
   const mapAuctions = useMemo(() => mappedInventory.filter(a => (make == null || a.make === make)
     && (model != null || matchesFamilyScope(a, familyName))
@@ -707,7 +731,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const mapFilterPending = needsTaxonomy && !taxonomyQuery.isSuccess && inventoryLens.focus != null;
 
   const board = useMemo(() => {
-    const rows = scoped.filter(a => (selectedBid == null || bidBucket(a.currentBid, a.currency) === selectedBid)
+    const rows = scoped.filter(a => (selectedBid == null || lotBidBucket(a) === selectedBid)
       && matchesModelScope(a, model)
       && matchesMapLens(a, inventoryLens, taxonomy));
     // Keep an inspected lot reachable while the board rolls past its deadline.
@@ -772,19 +796,20 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     : (r.byMake?.[make] ? [{ day: r.day, v: Number(r.byMake[make][1]) }] : []));
   const lotRank = lotReadings.length ? rankOf(bidded, lotReadings) : null;
   const lotWeekPct = data?.weekAgo && make == null && baselineApplies && data.weekAgo.n > 0 ? pctChange(bidded, data.weekAgo.n) : null;
-  // What the headline leaves out, said once under it: lots bid in another currency, and houses held off the board.
+  // What the headline converts or leaves out, said once under it: lots bid in another currency, and houses held off the board.
   const heldOff = (data?.houses ?? []).filter((h: HouseStatus) => !h.onBoard);
   const boardNotes = [
-    foreignBids.length > 0 ? `${count(foreignBids.length)} lots bid in another currency are listed but not added to the dollar total` : null,
+    ...fxNoteLine,
     ...heldOff.map((h: HouseStatus) => `${houseName(h.house)}: ${count(h.lots)} lots held off, last read ${h.readAt ? new Date(h.readAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'never'}`),
     data?.housesFailed ? 'Other houses could not be read; showing Bring a Trailer only' : null,
   ].filter((n): n is string => n != null);
   // Week on week, house by house. BaT's comparison is its own long history (BAT-LIVE-BIDS); every other house is compared
   // with its own reading from a week ago, which exists only once its own recording is a week old (live_board_snapshots).
+  // Those readings add dollar-denominated bids only, so the comparison does too.
   const otherHouses = boardHouses.filter(h => h !== BAT_HOUSE);
   const houseWeek = (measure: 'bids' | 'lots'): string[] => {
     if (make != null || house != null || otherHouses.length === 0) return [];
-    const nowOf = (h: string) => live.filter(a => a.house === h).reduce((n, a) => n + (measure === 'bids' ? (usdBid(a) ?? 0) : (a.currentBid != null ? 1 : 0)), 0);
+    const nowOf = (h: string) => live.filter(a => a.house === h).reduce((n, a) => n + (measure === 'bids' ? (recordedUsdBid(a) ?? 0) : (a.currentBid != null ? 1 : 0)), 0);
     const have = otherHouses.map(h => ({ h, pct: houseWeekChange(h, nowOf(h), measure === 'bids' ? 'bids' : 'lots', share.data) })).filter(x => x.pct != null);
     const lacking = otherHouses.filter(h => !have.some(x => x.h === h));
     const since = lacking.map(h => share.data?.firstAtByHouse[h]).filter((t): t is number => t != null);
@@ -817,7 +842,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const figure = view === 'inventory' ? (
     <section className="k-section market-figure" aria-label="The live board in numbers">
       <Figure value={isLoading ? '…' : bidNumber(cohortBids, true)} label="Bid now" open={mapMeasure === 'bids'} onToggle={() => toggleMap('bids')}
-        title={`Current bids recorded in US dollars, added across ${house ? houseName(house) : 'every house on the board'}${data?.source ? ` (${data.source})` : ''}. Bids in another currency are not converted or added.${data?.weekAgo && baselineApplies ? ` A week ago on BaT: ${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)}${data.weekAgo.source === 'archive' ? ', rebuilt from BaT bid history (96% of auctions)' : ''}.` : ''}`}
+        title={`Current bids recorded in US dollars, added across ${house ? houseName(house) : 'every house on the board'}${data?.source ? ` (${data.source})` : ''}. ${fxNoteLine.length ? `${fxNoteLine.join('. ')}.` : ''}${data?.weekAgo && baselineApplies ? ` A week ago on BaT: ${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)}${data.weekAgo.source === 'archive' ? ', rebuilt from BaT bid history (96% of auctions)' : ''}.` : ''}`}
         relative={[weekAgoPct != null ? `${mixedScope ? 'BaT ' : ''}${data?.weekAgo?.source === 'archive' ? '≈' : ''}${signed(weekAgoPct)} on a week ago` : null, rank?.text ? `${mixedScope ? 'BaT ' : ''}${at(rank)}` : null, ...houseWeek('bids')]}
         bar={data?.sameHour && boardReadings.length > 0 ? <RangeBar bare value={batBids} readings={boardReadings} fmt={bidNumber}
           weekdayUtc={data.sameHour.weekdayUtc} weeks={boardReadings.length} /> : undefined} />
@@ -955,7 +980,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 }
 
 // The current bids as a histogram: one column per dollar range, its height the lots in it, each column a filter. Lots
-// with no bid or a bid in another currency are not on the dollar axis; they are listed under it. A range with no lots
+// with no bid or a bid in a currency with no published rate are not on the dollar axis; they are listed under it. A range with no lots
 // is not offered.
 function BidDistribution({ distribution, lots, selected, onSelect }: {
   distribution: ReturnType<typeof currentBidDistribution>; lots: number;
@@ -979,7 +1004,7 @@ function BidDistribution({ distribution, lots, selected, onSelect }: {
   };
   return (
     <section aria-label="Current bid distribution" className="market-filter__group market-distribution"
-      title={`${distribution.recorded.toLocaleString('en-US')} of ${lots.toLocaleString('en-US')} lots have a bid recorded in US dollars`}>
+      title={`${distribution.recorded.toLocaleString('en-US')} of ${lots.toLocaleString('en-US')} lots have a bid in US dollars, recorded or converted at a published rate`}>
       <Text role="label" as="div" className="market-filter__title">Current bid</Text>
       {lots === 0 && <Text role="caption">No open lots in this scope.</Text>}
       <div role="group" aria-label="Filter by current bid">
@@ -996,7 +1021,7 @@ function BoardNotes({ fetchedAt }: { fetchedAt: number }) {
     <details className="market-notes">
       <summary><Text role="label">How this board is counted</Text></summary>
       <Text role="body" as="p">Every lot open now at Bring a Trailer, Collecting Cars and PCarMarket with its closing time still ahead.</Text>
-      <Text role="body" as="p">Bids are current bids, not sale prices or values. A bid in euros or pounds is shown in its own currency and never converted or added to dollar totals.</Text>
+      <Text role="body" as="p">Bids are current bids, not sale prices or values. A bid in euros, pounds or another currency is shown in its own currency; dollar totals, bid ranges and the highest-bid sort add it at the central-bank reference rate published for the board's read date (kept daily, never overwritten), and the bid's hover gives the rate, its publisher and its date. A currency with no published rate is listed but not added.</Text>
       <Text role="body" as="p">Board read {clock(fetchedAt)}. The houses are read on a schedule (BaT every minute, the others every five), so a bid can trail the house by a few minutes.</Text>
     </details>
   );

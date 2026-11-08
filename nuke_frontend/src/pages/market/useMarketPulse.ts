@@ -25,7 +25,14 @@ export interface LiveAuction {
   // The verdict the read computed (market_pulse_live v3, slot 17, heat_of() with the server's clock); null when the
   // read made none. Absent on older payloads, where the page computes it with heatOf.
   serverHeat?: ServerHeat | null;
+  /** The published rate a bid in another currency is converted to dollars at; absent for dollar lots and for a
+   *  currency with no published rate in the read's window. */
+  fx?: FxRate | null;
 }
+
+/** USD per one unit of a currency as fx_usd_rate(currency, date) returns it: the most-preferred provider's latest
+ *  reference date on or before the date asked, within 7 days (fx_rates, appended daily from the ECB file). */
+export interface FxRate { currency: string; rate: number; rateDate: string; source: string; sourceUrl: string | null }
 
 export interface ServerHeat { ratio: number; state: 'hot' | 'cold' | 'in line'; typicalNow: number; share: number; hoursLeft: number }
 
@@ -91,10 +98,58 @@ export function houseName(house: string, short = false): string {
   return (short ? HOUSE_SHORT : HOUSE_NAMES)[house] ?? SENT_LABELS.get(house) ?? house;
 }
 
-/** The bid in US dollars, or null when the lot is not bid in dollars or has no bid. No rate table exists, so a
- *  foreign-currency bid is never converted or added into a dollar figure. */
-export function usdBid(a: Pick<LiveAuction, 'currentBid' | 'currency'>): number | null {
+/** The bid in US dollars: a dollar bid as recorded, a bid in another currency at its published rate (a.fx), or null
+ *  when the lot has no bid or its currency has no rate. A converted bid is a derived value; its rate travels with it. */
+export function usdBid(a: Pick<LiveAuction, 'currentBid' | 'currency' | 'fx'>): number | null {
+  if (a.currentBid == null) return null;
+  if (a.currency === 'USD') return a.currentBid;
+  return a.fx && a.fx.currency === a.currency ? Math.round(a.currentBid * a.fx.rate) : null;
+}
+
+/** The bid as recorded in US dollars, never converted: the unit live_board_snapshots keeps (bid_usd), so a comparison
+ *  with those readings stays like for like. */
+export function recordedUsdBid(a: Pick<LiveAuction, 'currentBid' | 'currency'>): number | null {
   return a.currency === 'USD' ? a.currentBid : null;
+}
+
+const FX_PROVIDERS: [RegExp, string][] = [
+  [/ecb\.europa\.eu/, 'ECB reference rate'], [/bankofengland\.co\.uk/, 'Bank of England'], [/(federalreserve\.gov|stlouisfed\.org)/, 'Federal Reserve H.10'],
+];
+/** The publisher of a rate in a few words, from its source URL; otherwise the source text it was recorded with. */
+export function fxSourceName(fx: Pick<FxRate, 'source' | 'sourceUrl'>): string {
+  return FX_PROVIDERS.find(([re]) => re.test(fx.sourceUrl ?? ''))?.[1] ?? fx.source;
+}
+
+/** "≈ $52,140 at 1.3385 USD per GBP (ECB reference rate, 2026-11-06)", or null for a dollar lot or one not converted. */
+export function fxNote(a: Pick<LiveAuction, 'currentBid' | 'currency' | 'fx'>): string | null {
+  const usd = usdBid(a);
+  if (usd == null || a.currency === 'USD' || !a.fx) return null;
+  return `≈ ${moneyIn(usd, 'USD')} at ${Number(a.fx.rate.toPrecision(5))} USD per ${a.currency} (${fxSourceName(a.fx)}, ${a.fx.rateDate})`;
+}
+
+/** The rate for each currency on a date, one fx_usd_rate read per currency. A currency whose read fails or finds no
+ *  rate in the window is left out, and its lots stay unconverted. */
+export async function fetchFxRates(currencies: string[], on: string): Promise<Map<string, FxRate>> {
+  const read = await Promise.all(currencies.map(async (currency): Promise<FxRate | null> => {
+    try {
+      const { data, error } = await supabase.rpc('fx_usd_rate', { p_currency: currency, p_on: on });
+      const r = !error && Array.isArray(data) ? data[0] : null;
+      const rate = Number(r?.rate);
+      if (!r || !(rate > 0) || typeof r.rate_date !== 'string') return null;
+      return { currency, rate, rateDate: r.rate_date, source: String(r.source ?? ''), sourceUrl: r.source_url ?? null };
+    } catch {
+      return null;
+    }
+  }));
+  return new Map(read.filter((r): r is FxRate => r != null).map((r) => [r.currency, r]));
+}
+
+/** Each lot bid in another currency with the rate of the board's read date (UTC), when one is published. */
+export async function withFx(auctions: LiveAuction[], at: number): Promise<LiveAuction[]> {
+  const currencies = [...new Set(auctions.filter((a) => a.currency !== 'USD').map((a) => a.currency))].sort();
+  if (!currencies.length) return auctions;
+  const rates = await fetchFxRates(currencies, new Date(at).toISOString().slice(0, 10));
+  return auctions.map((a) => (a.currency !== 'USD' && rates.has(a.currency) ? { ...a, fx: rates.get(a.currency) } : a));
 }
 
 /** A bid in its own currency, e.g. "£44,694" or "€38,250"; dollars read "$65,000". */
@@ -112,7 +167,8 @@ export function moneyIn(n: number | null | undefined, currency: string, compact 
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
 export const NO_MAKE = 'NO MAKE';
 
-// Disjoint ranges of the current bid in US dollars; missing is not zero.
+// Disjoint ranges of the current bid in US dollars (a foreign bid at its published rate); missing is not zero.
+// 'Other currency' holds only bids in a currency with no published rate.
 export const BID_BUCKETS = [
   { id: 'under10k', label: 'Under $10K' },
   { id: '10k25k', label: '$10K–25K' },
@@ -134,13 +190,19 @@ export function bidBucket(bid: number | null, currency = 'USD'): BidBucket {
   return '100kplus';
 }
 
+/** A lot's range: its dollar bid, converted when its currency has a rate; otherwise as recorded. */
+export function lotBidBucket(a: Pick<LiveAuction, 'currentBid' | 'currency' | 'fx'>): BidBucket {
+  const usd = usdBid(a);
+  return usd != null ? bidBucket(usd) : bidBucket(a.currentBid, a.currency);
+}
+
 export function currentBidDistribution(auctions: LiveAuction[]) {
   const counts = Object.fromEntries(BID_BUCKETS.map(b => [b.id, 0])) as Record<BidBucket, number>;
   const bids: number[] = [];
   for (const a of auctions) {
-    const bucket = bidBucket(a.currentBid, a.currency);
+    const bucket = lotBidBucket(a);
     counts[bucket] += 1;
-    if (bucket !== 'unknown' && bucket !== 'otherCurrency') bids.push(a.currentBid as number);
+    if (bucket !== 'unknown' && bucket !== 'otherCurrency') bids.push(usdBid(a) as number);
   }
   bids.sort((a, b) => a - b);
   const mid = Math.floor(bids.length / 2);
@@ -267,15 +329,17 @@ export async function fetchHouses(): Promise<{ auctions: LiveAuction[]; houses: 
   };
 }
 
-/** Every live auction on the board: BaT's (with its bands, verdicts and baseline) and the other houses' beside it.
- *  Without the other houses' read the board is BaT's alone and says so. */
+/** Every live auction on the board: BaT's (with its bands, verdicts and baseline) and the other houses' beside it,
+ *  each bid in another currency carrying the published rate of the board's read date. Without the other houses' read
+ *  the board is BaT's alone and says so. */
 export async function fetchBoard(): Promise<MarketPulse> {
   const [bat, others] = await Promise.all([fetchPulse(), fetchHouses().then((h) => ({ ok: true as const, ...h }), () => ({ ok: false as const }))]);
   if (!others.ok) return { ...bat, housesFailed: true };
   const batHouse: HouseStatus = { house: BAT_HOUSE, lots: bat.auctions.length, readAt: bat.syncedAt, onBoard: true };
+  const priced = await withFx(others.auctions, bat.syncedAt ?? Date.now());
   return {
     ...bat,
-    auctions: [...bat.auctions, ...others.auctions].sort((a, b) => a.endsAt - b.endsAt),
+    auctions: [...bat.auctions, ...priced].sort((a, b) => a.endsAt - b.endsAt),
     houses: [batHouse, ...others.houses],
   };
 }
