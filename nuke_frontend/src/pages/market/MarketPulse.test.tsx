@@ -451,6 +451,17 @@ describe('where a lot should finish', () => {
     expect(line.getAttribute('title')).toContain('448 of 555 finished inside the range, half within 17%');
     expect(line.textContent).toBe('likely $33K · +32% to go · $26K–$45K');
   });
+  it('gives another house\'s estimate no BaT track record', async () => {
+    fixture.pulse.data.auctions = fixture.pulse.data.auctions.map((x: any) => x.id === 'later' ? { ...x, house: 'pcarmarket' } : x);
+    fixture.finish.set('later', { vehicleId: 'later', estimate: 33000, low: 25500, high: 45100, grade: 'A', coverage: 0.8,
+      sentence: null, estimatedAt: Date.now(), bidAtEstimate: 25000, compsThrough: '2026-09-27', model: 32 });
+    fixture.track = [{ model: 32, fromHours: 0, toHours: null, lots: 721, inside: 575, medianMissPct: 20,
+      firstClose: Date.parse('2026-10-17T20:00:00Z'), lastClose: Date.parse('2026-10-20T21:00:00Z') }];
+    await render();
+    const line = container.querySelector('[data-vehicle-id="later"] .market-lot-finish');
+    expect(line).not.toBeNull();
+    expect(line!.getAttribute('title')).toBeNull();
+  });
 });
 
 describe('the board in time sections', () => {
