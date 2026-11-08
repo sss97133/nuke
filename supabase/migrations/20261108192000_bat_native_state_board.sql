@@ -15,6 +15,10 @@ DECLARE
    v.created_at listed_at,v.primary_image_url image_url,v.listing_url,v.sale_status,
    coalesce((v.origin_metadata->>'no_reserve')::boolean,false) no_reserve,
    e.id auction_event_id,e.outcome,e.high_bid native_bid,e.auction_end_date ends_at,
+   EXISTS(SELECT 1 FROM public.auction_events_canonical closed
+     WHERE closed.vehicle_id=v.id AND closed.source='bat'
+       AND closed.source_url IN(rtrim(v.listing_url,'/'),rtrim(v.listing_url,'/')||'/')
+       AND closed.outcome IN('sold','reserve_not_met','cancelled')) has_terminal,
    o.id observation_id,o.observed_at source_observed_at,o.ingested_at,
    receipt.received_at received_at
  FROM recent_native recent JOIN public.vehicles v ON v.id=recent.vehicle_id
@@ -59,7 +63,7 @@ BEGIN
  definition:=replace(definition,'(CASE WHEN v.platform_source = ''bringatrailer'' THEN COALESCE(v.high_bid, v.sale_price) ELSE v.high_bid END)',
    '(CASE WHEN n.id IS NOT NULL THEN n.native_bid WHEN v.platform_source = ''bringatrailer'' THEN COALESCE(v.high_bid, v.sale_price) ELSE v.high_bid END)');
  definition:=replace(definition,'AND v.auction_end_date IS NOT NULL AND v.auction_end_date::timestamptz > s.as_of',
-   'AND (n.id IS NULL OR n.outcome=''live'') AND CASE WHEN n.id IS NOT NULL THEN n.ends_at ELSE v.auction_end_date::timestamptz END > s.as_of');
+   'AND (n.id IS NULL OR (n.outcome=''live'' AND NOT n.has_terminal)) AND CASE WHEN n.id IS NOT NULL THEN n.ends_at ELSE v.auction_end_date::timestamptz END > s.as_of');
  definition:=replace(definition,'''current_bid_at_capture'', current_bid_at_capture,',
    '''current_bid_at_capture'', current_bid_at_capture, ''native_current_state'', (SELECT jsonb_build_object(''observation_id'',n.observation_id,''auction_event_id'',n.auction_event_id,''received_at'',n.received_at,''ingested_at'',n.ingested_at,''source_observed_at'',n.source_observed_at,''basis'',''canonical_native_fold'',''currency'',''USD'') FROM native n WHERE n.id=lots.id),');
  EXECUTE definition;
@@ -82,11 +86,7 @@ BEGIN
      SELECT predicted_low,predicted_hammer,predicted_high,price_tier,comp_count FROM public.hammer_predictions h
      WHERE h.vehicle_id=n.id AND h.model_version=31 ORDER BY h.predicted_at DESC LIMIT 1
    ) hp ON true
-   WHERE n.outcome='live' AND n.sale_status='auction_live' AND n.ends_at>now()
-     AND NOT EXISTS(SELECT 1 FROM public.auction_events_canonical closed
-       WHERE closed.vehicle_id=n.id AND closed.source='bat'
-         AND closed.source_url IN(rtrim(n.listing_url,'/'),rtrim(n.listing_url,'/')||'/')
-         AND closed.outcome IN('sold','reserve_not_met','cancelled'))
+   WHERE n.outcome='live' AND NOT n.has_terminal AND n.sale_status='auction_live' AND n.ends_at>now()
  ), rows AS (
    SELECT a FROM base,jsonb_array_elements(p->'auctions') a
      WHERE (a->>5)::timestamptz>now() AND NOT EXISTS(SELECT 1 FROM native n WHERE n.id::text=a->>0)

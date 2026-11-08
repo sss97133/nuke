@@ -37,7 +37,10 @@ SELECT assert_contract(NOT EXISTS(SELECT FROM jsonb_array_elements(market_pulse_
 SELECT assert_contract(market_pulse_live()#>>'{native_state,00000000-0000-0000-0000-000000000100,basis}'='canonical_native_fold','state provenance retained without raw/session data');
 SELECT assert_contract(market_lot_activity(ARRAY['00000000-0000-0000-0000-000000000100'::uuid])#>>'{lots,0,current_bid_at_capture}'='9000','extended lot evidence uses same current amount');
 RESET ROLE;
-UPDATE auction_events SET outcome='sold' WHERE right(vehicle_id::text,6)='000100';
+-- Both canonical rows can exist under slash aliases; a live receipt must not outrank a terminal outcome.
+INSERT INTO auction_events(vehicle_id,source_url,outcome)
+ SELECT id,listing_url||'/','sold' FROM vehicles WHERE right(id::text,6)='000100';
 SET ROLE anon;
 SELECT assert_contract(NOT EXISTS(SELECT FROM jsonb_array_elements(market_pulse_live()->'auctions')a WHERE right(a->>0,6)='000100'),'terminal outcome removes native state without waiting for cache');
+SELECT assert_contract(jsonb_array_length(market_lot_activity(ARRAY['00000000-0000-0000-0000-000000000100'::uuid])->'lots')=0,'duplicate live and terminal episode cannot remain eligible in evidence reader');
 RESET ROLE;
