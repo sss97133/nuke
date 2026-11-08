@@ -101,7 +101,7 @@ function SaleTrack({ sale, now, horizon }: { sale: CalendarSale; now: number; ho
   </svg>;
 }
 
-function LotRow({ lot, house }: { lot: RosterLot; house: string }) {
+function LotRow({ lot, house, compact = false }: { lot: RosterLot; house: string; compact?: boolean }) {
   const image = vehicleImage(lot.image);
   const identity = [lot.year, lot.make, lot.model].filter(Boolean).join(' ');
   const page = houseLink(house, lot.source_url);
@@ -124,12 +124,12 @@ function LotRow({ lot, house }: { lot: RosterLot; house: string }) {
           return <li key={`${p.house}-${p.on}-${i}`}><Text role="caption">{href
             ? <a href={href} target="_blank" rel="noopener noreferrer">{priorText(p)}</a> : priorText(p)}</Text></li>; })}
       </ul>
-      : <Text role="caption" as="div">No earlier record of this vehicle on Nuke</Text>}
+      : !compact && <Text role="caption" as="div">No earlier record of this vehicle on Nuke</Text>}
   </li>;
 }
 
-function Roster({ sale, now, scopeMake, scopeFamilyName, scopeModel, scopeYear, scopeEra }: {
-  sale: CalendarSale; now: number;
+function Roster({ sale, now, compact = false, scopeMake, scopeFamilyName, scopeModel, scopeYear, scopeEra }: {
+  sale: CalendarSale; now: number; compact?: boolean;
   scopeMake?: string | null; scopeFamilyName?: string | null; scopeModel?: string | null; scopeYear?: number | null; scopeEra?: string | null;
 }) {
   const query = useSaleRoster({ house: sale.house, key: sale.sale_key });
@@ -177,7 +177,7 @@ function Roster({ sale, now, scopeMake, scopeFamilyName, scopeModel, scopeYear, 
         <Text role="label">{dayLabel(day)}</Text>
         <Text role="caption">{count(hasMarketScope && scopedRows.length > 0 ? lots.length : (byDay.get(day) ?? lots.length))} lots · {runTimer(day, now)}</Text>
       </div>
-      <ul className="auction-roster__lots">{lots.map(lot => <LotRow key={lot.event_id} lot={lot} house={sale.house} />)}</ul>
+      <ul className="auction-roster__lots">{lots.map(lot => <LotRow key={lot.event_id} lot={lot} house={sale.house} compact={compact} />)}</ul>
     </Fragment>)}
     {query.hasNextPage && <button type="button" className="market-control" disabled={query.isFetchingNextPage}
       onClick={e => { moreFocus.current = { button: e.currentTarget, previousLots: new Set(rosterRef.current?.querySelectorAll('.auction-lot')) }; void query.fetchNextPage(); }}><Text role="label">{query.isFetchingNextPage ? 'Reading…' : 'More lots'}</Text></button>}
@@ -198,7 +198,7 @@ export type SaleScope = { make?: string | null; familyName?: string | null; mode
 
 /** The scheduled sales, one row each: the timer and days, the house and sale, its lots. Given a horizon, the run days
  *  are drawn on the calendar's axis; compact (the live board's last section) leaves the house's census and the
- *  series' history to the calendar. A sale opens its roster in place, narrowed to the scope. */
+ *  series' history to the calendar, and a lot says only an earlier record it has. A sale opens its roster in place, narrowed to the scope. */
 export function SaleTable({ sales, now, selected, onChoose, scope = {}, horizon, compact = false }: {
   sales: CalendarSale[]; now: number; selected: string | null; onChoose: (key: string | null) => void;
   scope?: SaleScope; horizon?: number; compact?: boolean;
@@ -206,7 +206,7 @@ export function SaleTable({ sales, now, selected, onChoose, scope = {}, horizon,
   const columns = horizon != null ? 4 : 3;
   return <div className="market-listings__scroll"><table className={`market-listings auction-calendar${horizon == null ? ' auction-calendar--bare' : ''}`}>
     <thead><tr>
-      <th scope="col"><Text role="label">Gavel</Text></th>
+      <th scope="col"><Text role="label">When</Text></th>
       <th scope="col"><Text role="label">Sale</Text></th>
       <th scope="col"><Text role="label">Roster</Text></th>
       {horizon != null && <th scope="col" className="auction-calendar__axis"><Axis now={now} horizon={horizon} /></th>}
@@ -238,7 +238,7 @@ export function SaleTable({ sales, now, selected, onChoose, scope = {}, horizon,
             </>}</td>
           {horizon != null && <td className="auction-calendar__axis"><SaleTrack sale={sale} now={now} horizon={horizon} /></td>}
         </tr>
-        {open && <tr className="auction-sale__roster"><td colSpan={columns}><Roster sale={sale} now={now} scopeMake={scope.make} scopeFamilyName={scope.familyName}
+        {open && <tr className="auction-sale__roster"><td colSpan={columns}><Roster sale={sale} now={now} compact={compact} scopeMake={scope.make} scopeFamilyName={scope.familyName}
           scopeModel={scope.model} scopeYear={scope.year} scopeEra={scope.era} /></td></tr>}
       </Fragment>;
     })}</tbody>

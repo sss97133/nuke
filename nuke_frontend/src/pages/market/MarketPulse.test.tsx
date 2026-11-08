@@ -529,6 +529,9 @@ describe('the scheduled sales at the end of the board', () => {
     const roster = container.querySelector('.market-board-scheduled .auction-roster')!;
     expect(roster.querySelector('a[href="/vehicle/rv1"]')).not.toBeNull();
     expect(roster.querySelector('a[href="/vehicle/rv2"]')).toBeNull();
+    // A lot with no earlier record says nothing on the board; the calendar keeps the line.
+    expect(roster.textContent).not.toContain('No earlier record');
+    expect(container.querySelector('.market-board-scheduled th')?.textContent).toBe('When');
   });
   it('shows only in close order, outside a house, window or bid-range filter, and not at all without sales', async () => {
     await render('sort=bid');
