@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('../hooks/usePageTitle', () => ({ usePageTitle: () => undefined }));
-import AssetProfilePage, { headline, money, type AssetProfile } from './AssetProfile';
+import AssetProfilePage, { foldNotes, headline, money, type AssetProfile } from './AssetProfile';
 
 // The shape asset_profile_read returns for a sold print with a creation claim (synthetic values, the live shape of 2026-11-08).
 const riley: AssetProfile = {
@@ -18,7 +18,8 @@ const riley: AssetProfile = {
     high_bid: null, estimate_low: 550000, estimate_high: 750000, currency: 'GBP', observed_at: '2026-10-15T22:59:59Z', observed_at_basis: 'hammer_time',
     url: 'https://www.bonhams.com/auction/32184/lot/7/x', lines: ['BRIDGET RILEY', '(B. 1931)', 'Ka 4'], catalog_text: 'oil on linen\n76.2 x 67.3cm',
     printed_sections: [{ heading: 'Provenance', lines: ['Juda Rowan Gallery, London', 'Private Collection, London'] }, { heading: 'Literature', lines: ['The Complete Paintings, no. BR207'] },
-      { heading: null, lines: ['With the Ka paintings of 1980, Riley gave the stripe a new chromatic intensity.'] }],
+      { heading: null, lines: ['With the Ka paintings of 1980, Riley gave the stripe a new chromatic intensity.'] },
+      { heading: null, lines: ['In the winter of 1979 to 80 Riley spent several weeks in Egypt.'] }],
     symbols: ['AR'], image_url: 'https://images1.bonhams.com/image?src=x.jpg', country: 'United Kingdom', landed_at: '2026-11-08T16:07:00Z' }],
   history: [{ statement_id: 's0', source: 'bonhams', observed_at: '2026-09-01T12:00:00Z', observed_at_basis: 'index_read', result: 'upcoming', hammer_price: null, high_bid: null,
     estimate_low: 550000, estimate_high: 750000, currency: 'GBP', landed_at: '2026-09-01T12:00:00Z', superseded: true },
@@ -60,6 +61,13 @@ it('renders the artwork from the one typed read: identity, hammer as a claim, cr
   expect(img?.getAttribute('height')).toBe('900');
   expect(node.textContent).toContain('Nuke holds 1 presentation, 2 statements and 1 creation claim');
   expect(node.querySelector('[style]')).toBeNull();
+  expect(Array.from(node.querySelectorAll('h3')).filter(h => h.textContent === "The house's note").length).toBe(1);
+  expect(node.textContent).toContain("Sale (the house's key)");
+});
+
+it('folds consecutive unheaded blocks into one note and leaves headed sections alone', () => {
+  const folded = foldNotes([{ heading: 'Provenance', lines: ['a'] }, { heading: null, lines: ['p1'] }, { heading: null, lines: ['p2'] }, { heading: 'Literature', lines: ['b'] }, { heading: null, lines: ['p3'] }]);
+  expect(folded).toEqual([{ heading: 'Provenance', lines: ['a'] }, { heading: null, lines: ['p1', 'p2'] }, { heading: 'Literature', lines: ['b'] }, { heading: null, lines: ['p3'] }]);
 });
 
 it('says so when nothing public is recorded, and never calls the reader for a malformed id', async () => {
