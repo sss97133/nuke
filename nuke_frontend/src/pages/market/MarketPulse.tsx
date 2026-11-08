@@ -8,7 +8,7 @@ import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence from './AuctionEvidence';
 import { BAT_HOUSE, BID_BUCKETS, currentBidDistribution, fxNote, fxSourceName, houseName, listingKey, lotBidBucket, moneyIn, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, usdBid, type BidBucket, type BidCurve, type HouseStatus, type LiveAuction } from './useMarketPulse';
-import { HouseMark, HouseMarket, houseWeekChange, shareOnBasis, useHouseShare } from './HouseShare';
+import { HouseMark, HouseMarket, shareOnBasis, Spark, totalSeries, useHouseShare } from './HouseShare';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { displayMake, selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -137,27 +137,6 @@ function rankOf(value: number, readings: { v: number }[]): { below: number; abov
   return { below, above, n, text };
 }
 
-function RangeBar({ value, readings, fmt, weekdayUtc, weeks, bare = false }: { value: number; readings: { day: string; v: number }[]; fmt: (n: number, compact?: boolean) => string; weekdayUtc: string; weeks: number; bare?: boolean }) {
-  const lo = Math.min(value, ...readings.map((r) => r.v));
-  const hi = Math.max(value, ...readings.map((r) => r.v));
-  const span = hi - lo;
-  const x = (v: number) => (span > 0 ? (v - lo) / span : 0.5) * 160;
-  const { n, text: rank } = rankOf(value, readings);
-  return (
-    <span className="market-range">
-      {!bare && <Text role="label">Same time on {weekdayUtc}s · {n === weeks ? `last ${weeks} weeks` : `${n} of the last ${weeks} weeks`}</Text>}
-      <Text role="measure" dense>{fmt(lo, true)}</Text>
-      <svg className="market-range__bar" viewBox="0 0 160 12" width="160" height="12" aria-hidden="true">
-        <rect className="market-range__track" x="0" y="5" width="160" height="2" />
-        {readings.map((r) => <rect key={r.day} className="market-range__tick" x={x(r.v) - 1} y="2" width="2" height="8"><title>{`${r.day}: ${fmt(r.v)}`}</title></rect>)}
-        <rect className="market-range__now" x={x(value) - 3} y="0" width="6" height="12"><title>{`Now: ${fmt(value)}`}</title></rect>
-      </svg>
-      <Text role="measure" dense>{fmt(hi, true)}</Text>
-      {rank && !bare && <Text role="label" className="market-range__verdict">{rank} {weekdayUtc}s at this hour</Text>}
-    </span>
-  );
-}
-
 function count(n: number): string {
   return Math.round(n).toLocaleString('en-US');
 }
@@ -185,19 +164,30 @@ export function foreignNote(foreign: LiveAuction[]): string[] {
   return [...converted, ...unpriced];
 }
 
-// A headline number: the figure, what it counts, where it sits against the same hour in earlier weeks, and the map of
-// what it is made of, one press away.
-function Figure({ value, label, open, onToggle, relative, bar, title }: {
-  value: string; label: string; open: boolean; onToggle: () => void; relative: (string | null)[]; bar?: React.ReactNode; title?: string;
+/** A headline number as a ticker reads it: one signed change against the same moment a week ago and the line it moved
+ *  along, ending now. `base` is the week-ago level (the dotted line). `house` is set when the comparison counts one house
+ *  while the figure counts several; its mark stands beside the change. `says` is the hover: what was compared, from where. */
+export interface Ticker { pct: number | null; approx: boolean; series: { t: number; v: number }[]; base: number | null; house: string | null; says: string }
+
+// A headline number: what it counts, the figure, its change on last week and its line. The map of what it is made of is
+// one press away; the hover says where every number comes from.
+function Figure({ value, label, open, onToggle, ticker, title }: {
+  value: string; label: string; open: boolean; onToggle: () => void; ticker: Ticker | null; title?: string;
 }) {
-  const said = relative.filter((r): r is string => !!r);
+  const up = ticker?.pct == null ? null : ticker.pct >= 0;
   return <div className="market-figure__item">
-    <button type="button" className="market-figure__value" aria-expanded={open} aria-controls="market-composition" onClick={onToggle} title={title}>
+    <button type="button" className="market-figure__value" aria-expanded={open} aria-controls="market-composition" onClick={onToggle}
+      title={[title, ticker?.says].filter(Boolean).join(' ')}
+      aria-label={`${value} ${label.toLowerCase()}${ticker?.pct != null ? `, ${signed(ticker.pct)} vs last week${ticker.house ? ` on ${houseName(ticker.house, true)}` : ''}` : ''}`}>
+      <Text role="label">{label} <span aria-hidden="true">{open ? '▴' : '▾'}</span></Text>
       <Text role="figure">{value}</Text>
-      <Text role="label">{label} · inspect {open ? '▴' : '▾'}</Text>
+      {ticker?.pct != null && <span className={`market-figure__chg ${up ? 'is-up' : 'is-down'}`}>
+        <span className="market-figure__pct">{up ? '▲' : '▼'} {ticker.approx ? '≈' : ''}{Math.abs(ticker.pct).toFixed(1)}%</span>
+        {ticker.house && <HouseMark house={ticker.house} height={12} />}
+        <Text role="label">vs last week</Text>
+      </span>}
+      {ticker && ticker.series.length > 1 && <Spark className="market-figure__chart" series={ticker.series} up={up} base={ticker.base} />}
     </button>
-    {said.length > 0 && <Text role="body" as="div">{said.join(' · ')}</Text>}
-    {bar}
   </div>;
 }
 
@@ -689,8 +679,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const history = useBoardHistory(cohort, JSON.stringify([make, familyName, era, model != null, house]), !!data && !isLoading && !isError);
   const todayUtc = new Date(now).toISOString().slice(0, 10);
   const sameHour = useSameHourReadings(data?.sameHour?.hourUtc ?? '', todayUtc);
-  // The headline adds dollar bids only. The weekly comparison is BaT's own history (BAT-LIVE-BIDS), so it is made on
-  // BaT's lots in this scope, and not at all when the scope is another house.
+  // The headline adds dollar bids, foreign bids at the published rate.
   const cohortBids = useMemo(() => cohort.reduce((s, a) => s + (usdBid(a) ?? 0), 0), [cohort]);
   const foreignBids = useMemo(() => cohort.filter(a => a.currentBid != null && a.currency !== 'USD'), [cohort]);
   const fxNoteLine = useMemo(() => foreignNote(foreignBids), [foreignBids]);
@@ -698,12 +687,6 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const baselineApplies = house == null || house === BAT_HOUSE;
   const mixedScope = house == null && cohort.some(a => a.house !== BAT_HOUSE);
   const batBids = useMemo(() => batInScope.reduce((s, a) => s + (usdBid(a) ?? 0), 0), [batInScope]);
-  const boardReadings = useMemo(() => (sameHour.data ?? []).flatMap((r) => {
-    if (!baselineApplies) return [];
-    if (make == null) return [{ day: r.day, v: r.bids }];
-    const bm = r.byMake?.[make];
-    return bm ? [{ day: r.day, v: Number(bm[0]) }] : [];
-  }), [sameHour.data, make, baselineApplies]);
   // The largest open cohort opens the recorded-sales view when no make is chosen, so the view never opens empty.
   const largestMake = useMemo(() => {
     const counts = new Map<string, number>();
@@ -787,41 +770,64 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   }, [page, pages, isLoading, mapFilterPending]);
 
 
-  // The page as a document. The venue is the entity. Its live total is the page's one figure, stated once against the
-  // same hour in earlier weeks, and it opens into what it is made of (the map, by dollars). The lot count takes the
-  // viewer to the lots. The clock says live, or how far behind the last board read is, and reads again on a press.
-  const weekAgoPct = data?.weekAgo && make == null && baselineApplies ? pctChange(batBids, data.weekAgo.bids) : null;
-  const rank = boardReadings.length ? rankOf(batBids, boardReadings) : null;
-  // The lot count is compared as lots with a bid, the unit the hourly readings keep.
+  // The page as a document. The venue is the entity. Its two figures read as tickers: the number, one change on the
+  // same moment last week, and the line it moved along; each opens into what it is made of (the house watchlist, which
+  // carries each house's own week on week, and the map). The clock says how far behind the last board read is.
   const bidded = batInScope.filter(a => a.currentBid != null).length;
-  const lotReadings = !baselineApplies ? [] : (sameHour.data ?? []).flatMap((r) => make == null
-    ? (r.n != null ? [{ day: r.day, v: r.n as number }] : [])
-    : (r.byMake?.[make] ? [{ day: r.day, v: Number(r.byMake[make][1]) }] : []));
-  const lotRank = lotReadings.length ? rankOf(bidded, lotReadings) : null;
-  const lotWeekPct = data?.weekAgo && make == null && baselineApplies && data.weekAgo.n > 0 ? pctChange(bidded, data.weekAgo.n) : null;
-  // What the headline converts or leaves out, said once under it: lots bid in another currency, and houses held off the board.
+  // Only what the visitor needs to read the headline at all stays visible: a house held off the board, or every other
+  // house unread. The currency conversion is in the dollar figure's hover.
   const heldOff = (data?.houses ?? []).filter((h: HouseStatus) => !h.onBoard);
   const boardNotes = [
-    ...fxNoteLine,
     ...heldOff.map((h: HouseStatus) => `${houseName(h.house)}: ${count(h.lots)} lots held off, last read ${h.readAt ? new Date(h.readAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'never'}`),
     data?.housesFailed ? 'Other houses could not be read; showing Bring a Trailer only' : null,
   ].filter((n): n is string => n != null);
-  // Week on week, house by house. BaT's comparison is its own long history (BAT-LIVE-BIDS); every other house is compared
-  // with its own reading from a week ago, which exists only once its own recording is a week old (live_board_snapshots).
-  // Dollars are compared in the unit both readings share: dollar-denominated bids only until converted readings are a
-  // week old, then converted dollars (shareOnBasis).
-  const otherHouses = boardHouses.filter(h => h !== BAT_HOUSE);
-  const houseWeek = (measure: 'bids' | 'lots'): string[] => {
-    if (make != null || house != null || otherHouses.length === 0) return [];
-    const basis = shareOnBasis(share.data, now, measure);
-    const nowOf = (h: string) => live.filter(a => a.house === h).reduce((n, a) => n + (measure === 'bids' ? basis.bidOf(a) : (a.currentBid != null ? 1 : 0)), 0);
-    const have = otherHouses.map(h => ({ h, pct: houseWeekChange(h, nowOf(h), measure === 'bids' ? 'bids' : 'lots', basis.data) })).filter(x => x.pct != null);
-    const lacking = otherHouses.filter(h => !have.some(x => x.h === h));
-    const since = lacking.map(h => share.data?.firstAtByHouse[h]).filter((t): t is number => t != null);
-    return [
-      have.length ? `week on week: ${have.map(x => `${houseName(x.h, true)} ${signed(x.pct as number)}`).join(' · ')}` : null,
-      lacking.length ? `${lacking.map(h => houseName(h, true)).join(', ')}: no week of history yet${since.length ? ` (recorded since ${new Date(Math.min(...since)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : ''}` : null,
-    ].filter((t): t is string => t != null);
+  const day = (ms: number) => new Date(ms).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  // Each figure's change, from the series that counts the same population:
+  //  - the whole board, or one house: every house's own reading a week ago (live_board_share over live_board_snapshots,
+  //    every 15 minutes since 2026-10-20), summed over the houses whose own series is a week old, in the unit both
+  //    readings share (shareOnBasis: dollar-denominated bids until converted readings are a week old);
+  //  - a make: BaT's hourly index (BAT-LIVE-BIDS) per make, the only series kept by make, so the BaT mark stands beside it.
+  // A family, era or another house's make has no series and shows no change.
+  const ticker = (measure: 'bids' | 'lots'): Ticker | null => {
+    const fmt = (n: number) => measure === 'bids' ? bidNumber(n, true) : count(n);
+    const unit = measure === 'bids' ? 'bids' : 'open lots';
+    if (familyName != null || era != null) return null;
+    if (make == null) {
+      if (!share.data && !share.isError) return null;
+      const basis = shareOnBasis(share.data, now, measure);
+      const week = basis.data?.weekAgo ?? {};
+      const counted = (house ? [house] : boardHouses).filter(h => week[h]);
+      if (counted.length) {
+        const nowV = live.filter(a => counted.includes(a.house)).reduce((n, a) => n + (measure === 'bids' ? basis.bidOf(a) : 1), 0);
+        const before = counted.reduce((n, h) => n + (measure === 'bids' ? week[h].bidUsd : week[h].lots), 0);
+        const from = Math.min(...counted.map(h => week[h].at));
+        const series = [...totalSeries((basis.data?.points ?? []).filter(p => p.at >= from && counted.includes(p.house)), measure), { t: now, v: nowV }];
+        const missing = house ? [] : boardHouses.filter(h => !counted.includes(h));
+        return { pct: pctChange(nowV, before), approx: false, series, base: before,
+          house: !house && counted.length === 1 && boardHouses.length > 1 ? counted[0] : null,
+          says: `Change: ${counted.map(h => houseName(h, true)).join(', ')} now (${fmt(nowV)}) against their own readings at ${day(from)} (${fmt(before)})`
+            + `${measure === 'bids' ? `, ${basis.converted ? 'foreign bids converted at published rates' : 'bids recorded in dollars only, the unit week-old readings keep'}` : ''}.`
+            + `${missing.length ? ` ${missing.map(h => houseName(h, true)).join(', ')}: no week of readings yet, not in the change.` : ''}`
+            + ` Line: every 15-minute reading since (live_board_share); dotted, a week ago.` };
+      }
+      if (house && house !== BAT_HOUSE) return null;
+    } else if (!baselineApplies) return null;
+    // BaT's own index at this UTC hour on each earlier week, then now.
+    const hour = data?.sameHour?.hourUtc;
+    const pick = (r: { bids: number; n: number | null; byMake: Record<string, [number, number]> | null }) => make == null
+      ? (measure === 'bids' ? r.bids : r.n)
+      : r.byMake?.[make] ? Number(r.byMake[make][measure === 'bids' ? 0 : 1]) : null;
+    const readings = !hour ? [] : (sameHour.data ?? []).flatMap(r => { const v = pick(r); return v == null ? [] : [{ t: Date.parse(`${r.day}T${hour}:00:00Z`), v }]; });
+    const nowV = measure === 'bids' ? batBids : bidded;
+    const before = data?.weekAgo ? pick(data.weekAgo) : null;
+    if (!readings.length && before == null) return null;
+    const rank = readings.length ? rankOf(nowV, readings).text : null;
+    return { pct: before != null ? pctChange(nowV, before) : null, approx: before != null && data?.weekAgo?.source === 'archive', series: [...readings, { t: now, v: nowV }], base: before,
+      house: mixedScope ? BAT_HOUSE : null,
+      says: `Change: ${make ? `${displayMake(make)} on ` : ''}BaT ${unit}${measure === 'lots' ? ' with a bid' : ''} now (${fmt(nowV)})`
+        + `${before != null ? ` against ${day(data!.weekAgo!.at)} (${fmt(before)}${data?.weekAgo?.source === 'archive' ? ', rebuilt from BaT bid history' : ''})` : ''}.`
+        + `${rank && data?.sameHour ? ` Now ${rank} ${data.sameHour.weekdayUtc}s at this hour.` : ''}`
+        + ` Line: BaT's hourly index (BAT-LIVE-BIDS) at ${hour ?? '—'}:00 UTC each week, then now${before != null ? '; dotted, a week ago' : ''}.` };
   };
   const mapMeasure: 'bids' | 'lots' | null = params.get('map') === 'lots' ? 'lots' : params.get('map') ? 'bids' : null;
   const [reading, setReading] = useState(false);
@@ -843,27 +849,25 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       </span> : <Text role="entity" as="h1">Recorded sales</Text>}
     </Masthead>
   );
-  const at = (r: ReturnType<typeof rankOf> | null) => r?.text ? `${r.text} weeks at this hour` : null;
   const figure = view === 'inventory' ? (
     <section className="k-section market-figure" aria-label="The live board in numbers">
       <Figure value={isLoading ? '…' : bidNumber(cohortBids, true)} label="Bid now" open={mapMeasure === 'bids'} onToggle={() => toggleMap('bids')}
-        title={`Current bids in US dollars, added across ${house ? houseName(house) : 'every house on the board'}${data?.source ? ` (${data.source})` : ''}. ${fxNoteLine.length ? `${fxNoteLine.join('. ')}.` : ''}${data?.weekAgo && baselineApplies ? ` A week ago on BaT: ${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)}${data.weekAgo.source === 'archive' ? ', rebuilt from BaT bid history (96% of auctions)' : ''}.` : ''}`}
-        relative={[weekAgoPct != null ? `${mixedScope ? 'BaT ' : ''}${data?.weekAgo?.source === 'archive' ? '≈' : ''}${signed(weekAgoPct)} on a week ago` : null, rank?.text ? `${mixedScope ? 'BaT ' : ''}${at(rank)}` : null, ...houseWeek('bids')]}
-        bar={data?.sameHour && boardReadings.length > 0 ? <RangeBar bare value={batBids} readings={boardReadings} fmt={bidNumber}
-          weekdayUtc={data.sameHour.weekdayUtc} weeks={boardReadings.length} /> : undefined} />
+        ticker={isLoading ? null : ticker('bids')}
+        title={`${bidNumber(cohortBids)}: current bids in US dollars, added across ${make ? `${displayMake(make)} lots at ` : ''}${house ? houseName(house) : 'every house on the board'}${data?.source ? ` (${data.source})` : ''}.${fxNoteLine.length ? ` ${fxNoteLine.join('. ')}.` : ''}`} />
       <Figure value={isLoading ? '…' : count(cohort.length)} label="Open lots" open={mapMeasure === 'lots'} onToggle={() => toggleMap('lots')}
-        title={`Open lots on the board, every house. Compared with earlier weeks as BaT lots with a recorded bid number, $0 included (${count(bidded)} now), the unit the hourly readings keep.`}
-        relative={[lotWeekPct != null ? `${mixedScope ? 'BaT ' : ''}${signed(lotWeekPct)} on a week ago` : null, lotRank?.text ? `${mixedScope ? 'BaT ' : ''}${at(lotRank)}` : null, ...houseWeek('lots')]} />
+        ticker={isLoading ? null : ticker('lots')}
+        title={`Open ${make ? `${displayMake(make)} ` : ''}lots on the board, ${house ? houseName(house) : 'every house'}.`} />
       {boardNotes.length > 0 && <Text role="caption" as="p" className="market-figure__note">{boardNotes.join(' · ')}</Text>}
     </section>
   ) : null;
+  // The market's other views as plain tab words: the one shown is underlined. The make is chosen from the rows and the
+  // map; recorded sales keeps its scope select, where its comparison groupings live.
   const scope = (
-    <details className="market-navigation">
-    <summary><Text role="label">Explore market · {view === 'inventory' ? 'Live auctions' : 'Recorded sales'}</Text></summary>
-    <div className="k-section k-strip market-scope" role="group" aria-label="Market scope">
-      <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} view={view} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
-    </div>
-    </details>
+    <nav className="market-navigation" aria-label="Market views">
+      <div className="k-section k-strip market-scope market-scope--tabs" role="group" aria-label="Market scope">
+        <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} view={view} makeSelect={view === 'sales'} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
+      </div>
+    </nav>
   );
 
   if (!data && isError && view === 'inventory' && !activityId) return <>
