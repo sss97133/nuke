@@ -251,6 +251,8 @@ function extractTitleFromUrlSlug(url: string): string | null {
 }
 
 function detectSource(url: string): SourceMatch {
+  const purplewave = url.match(/^https:\/\/(?:www\.)?purplewave\.com\/auction\/(\d{6}[A-Z]?)\/item\/([A-Z]{2}\d{4})\/?$/);
+  if (purplewave) return { platform: "purplewave", externalId: `${purplewave[1]}:${purplewave[2]}` };
   const dealer = dealerListing(url);
   if (dealer) return { platform: dealer.platform, externalId: dealer.stock_id };
   const gateway = gatewayListing(url);
