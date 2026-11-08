@@ -545,10 +545,10 @@ async function ingestPcarBids(
     if (error || !html) { out.errors.push(`${lot.url}: ${error ?? "no HTML"}`); continue; }
     out.lots++;
     const bids = parsePcarBids(html);
-    if (!bids.length) continue;
+    if (!bids.length) { out.errors.push(`${lot.url}: no bid history parsed; capture remains pending`); continue; }
     const ids = bids.map((b) => `pcarmarket-bid:${b.id}`);
     const { data: held, error: heldError } = await supabase.from("vehicle_observations").select("source_identifier")
-      .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").eq("is_superseded", false).in("source_identifier", ids);
+      .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").not("is_superseded", "is", true).in("source_identifier", ids);
     if (heldError) { out.errors.push(`held check: ${heldError.message}`); continue; }
     const have = new Set((held ?? []).map((r: { source_identifier: string }) => r.source_identifier));
     for (const b of bids) {
