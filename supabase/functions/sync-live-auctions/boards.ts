@@ -345,6 +345,8 @@ export function amTimedLot(doc: AmLotDoc, sale: AmSale, now: number): AmTimedLot
 // parseBonhamsBidStates; the bid count (live_bid_timed_count) comes only in the widget/lots answer the lot page's bid
 // box reads. Identity (slug, year, make, model, item type, reserve, images) is the house catalog's
 // (cdn.goodingco.com/graphql getVehicles, the index its /lots page reads), keyed by the platform ids it carries.
+// Since 2026-10-28 bid.goodingco.com no longer resolves (its CNAME, goodingco-webmodule.auctionmobility.com, points to
+// "nowhere."), so the catalog is asked first whether any timed sale is ahead (goodingTimedSaleAhead).
 
 /** A lot document of the lot list: the platform's lot, with the sale summary the list embeds in each lot. */
 export interface GoodingAmLot extends AmLotDoc {
@@ -466,6 +468,26 @@ export interface GoodingCatalogLot {
   auctionAuctionMobilityId?: string | null;
   upcomingAuctionEndDate?: string | null;
   cloudinaryImages?: { public_id: string }[] | null;
+}
+
+/** Catalog lots of sales still ahead carry that sale's end; private-sale and realized lots carry these sentinels. */
+const GOODING_NO_END_AHEAD = 9_999_999_999_998;
+
+/**
+ * Whether a timed sale is open or ahead, from the catalog's Online Only lot ending soonest (getVehicles, auctionType
+ * "Online Only", ENDING_SOONEST): its end still ahead = a timed sale the bidding platform holds; a sentinel = every
+ * timed sale has ended, and `newest` names the one that ended last (the catalog's first Online Only lot then).
+ */
+export function goodingTimedSaleAhead(json: unknown, now: number): { ahead: boolean; sale: string | null; ends: string | null } {
+  const doc = (json ?? {}) as { data?: { getVehicles?: { vehicles?: (GoodingCatalogLot & { auctionName?: string | null; auctionEndDate?: string | null })[] } } };
+  const vs = doc.data?.getVehicles?.vehicles;
+  if (!Array.isArray(vs)) throw new Error("Gooding catalog: no vehicles in its Online Only answer");
+  const first = vs[0];
+  if (!first) return { ahead: false, sale: null, ends: null };
+  const upcoming = Number(first.upcomingAuctionEndDate);
+  const ahead = Number.isFinite(upcoming) && upcoming < GOODING_NO_END_AHEAD && upcoming > now;
+  const end = ahead ? upcoming : Number(first.auctionEndDate);
+  return { ahead, sale: first.auctionName?.trim() || null, ends: Number.isFinite(end) && end > 0 ? new Date(end).toISOString() : null };
 }
 
 /** The catalog lot for a platform lot: by the platform lot id it carries, else by its sale id and lot number. */

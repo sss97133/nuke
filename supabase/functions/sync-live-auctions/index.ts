@@ -44,7 +44,7 @@ import {
 } from "./boards.ts";
 import {
   goodingBoardLot, type GoodingCatalogLot, goodingCatalogFor, goodingLinkPlan, type GoodingLot, goodingUrlVariants,
-  type GoodingVehicleRow, goodingWithBidState, parseGoodingLots,
+  type GoodingVehicleRow, goodingTimedSaleAhead, goodingWithBidState, parseGoodingLots,
 } from "./boards.ts";
 
 const corsHeaders = {
@@ -97,6 +97,7 @@ interface SyncResult {
   board?: Record<string, unknown> | null;
   bid_snapshots?: number;
   error: string | null;
+  state?: string | null;
   duration_ms: number;
 }
 
@@ -744,6 +745,9 @@ const GOODING_CATALOG_QUERY = `query GetVehiclesAndFilters($filtersInput: Filter
     vehicles { slug title itemType make model modelYear lotNumber hasReservePrice upcomingAuctionEndDate lotAuctionMobilityId auctionAuctionMobilityId cloudinaryImages { public_id } }
   }
 }`;
+const GOODING_TIMED_QUERY = `{ getVehicles(filtersInput: {auctionType: ["Online Only"]}, pageNumber: 0, sortBy: ENDING_SOONEST, updateFilters: false, hitsPerPage: 1) {
+  vehicles { auctionName auctionEndDate upcomingAuctionEndDate }
+} }`;
 
 // deno-lint-ignore no-explicit-any
 type GoodingDb = { from: (table: string) => any }; // the vehicles reads and fill-only writes below
@@ -765,13 +769,31 @@ async function goodingJson(url: string, init: { method?: string; headers?: Recor
  * vehicle lot carries its catalog identity and the catalog lot URL in the spelling vehicles hold; a vehicle that holds the
  * lot only as discovery_url gets it as listing_url first, so the live upsert updates that vehicle rather than minting a
  * twin (goodingLinkPlan). The list is complete: lots that left it leave the schedule in live_auction_board_sync.
+ * The catalog is asked first (one request) whether an Online Only sale is still ahead; with none, the platform is not
+ * read and the empty board says so (state). bid.goodingco.com stopped resolving on 2026-10-28, so a timed sale ahead
+ * with the platform unreachable is a failure: the bid source has moved.
  */
 async function syncGooding(
   supabase: GoodingDb,
   link: boolean,
-): Promise<{ auctions: LiveAuction[]; error: string | null; write_errors?: string[] }> {
+): Promise<{ auctions: LiveAuction[]; error: string | null; write_errors?: string[]; state?: string }> {
   try {
     const now = Date.now();
+    let timed: ReturnType<typeof goodingTimedSaleAhead> | null = null;
+    try {
+      timed = goodingTimedSaleAhead(await goodingJson(GOODING_CATALOG, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer" }, body: JSON.stringify({ query: GOODING_TIMED_QUERY }),
+      }), now);
+    } catch (e) {
+      if (e instanceof Error && e.message.includes(GOODING_BLOCKED)) throw e;
+      console.warn(`[sync-live-auctions] Gooding catalog gate: ${e instanceof Error ? e.message : String(e)}; reading the platform`);
+    }
+    if (timed && !timed.ahead) {
+      const state = `no timed sale open: the catalog lists no Online Only sale ahead` +
+        (timed.sale ? ` (newest: ${timed.sale}, ended ${timed.ends?.slice(0, 10) ?? "date unknown"})` : "");
+      console.log(`[sync-live-auctions] Gooding: ${state}`);
+      return { auctions: [], error: null, state };
+    }
     const page = (params: Record<string, string>, o: number) => goodingJson(`${GOODING_BID}/ajax/lots/?${new URLSearchParams({
       n: "100", order_by: "auction_date lot_number", order: "asc asc", fieldset: GOODING_LOT_FIELDS, paramsType: "server", ...params, o: String(o),
     })}`);
@@ -794,7 +816,7 @@ async function syncGooding(
     const listed = lots.filter((l) => l.phase === "open");
     const phases = lots.reduce((m, l) => ({ ...m, [l.phase]: (m[l.phase] ?? 0) + 1 }), {} as Record<string, number>);
     console.log(`[sync-live-auctions] Gooding: ${lots.length} timed-sale lots on bid.goodingco.com ${JSON.stringify(phases)}`);
-    if (!listed.length) return { auctions: [], error: null };
+    if (!listed.length) return { auctions: [], error: null, state: `no lot open on bid.goodingco.com (${lots.length} timed-sale lots listed)` };
 
     // The open lots' bid box state (widget/lots, the call the lot page makes; 50 lots a call, 0.6 s apart): the leading
     // bid, the bid count and the close each extension moved. If it fails, the lot list's bids stand without a count.
@@ -890,7 +912,9 @@ async function syncGooding(
       `${catalogError ? ` (catalog: ${catalogError})` : ""}${widgetError ? ` (bid box: ${widgetError})` : ""}`);
     return { auctions, error: null, write_errors: writeErrors };
   } catch (e: unknown) {
-    return { auctions: [], error: `Gooding sync failed: ${e instanceof Error ? e.message : String(e)}` };
+    const msg = e instanceof Error ? e.message : String(e);
+    const moved = /dns error|failed to lookup address/i.test(msg) ? "source moved, not readable: bid.goodingco.com does not resolve; " : "";
+    return { auctions: [], error: `Gooding sync failed: ${moved}${msg}` };
   }
 }
 
@@ -1512,7 +1536,7 @@ Deno.serve(async (req) => {
         }
 
         const startTime = Date.now();
-        let syncResult: { auctions: LiveAuction[]; error: string | null; write_errors?: string[] };
+        let syncResult: { auctions: LiveAuction[]; error: string | null; write_errors?: string[]; state?: string };
 
         // Fetch from platform
         switch (platform) {
@@ -1618,6 +1642,7 @@ Deno.serve(async (req) => {
                 current_bid: a.current_bid, bid_count: a.bid_count, currency: a.currency ?? null,
               })),
               p_complete: true,
+              ...(syncResult.state ? { p_state: syncResult.state } : {}),
             });
           if (bsErr) dbStats.write_errors.push(`live_auction_board_sync: ${bsErr.message}`);
           board = (bs as Record<string, unknown>) ?? null;
@@ -1655,6 +1680,7 @@ Deno.serve(async (req) => {
           ended_count: dbStats.ended_count,
           bid_snapshots: bidSnapshotCount,
           error: syncResult.error,
+          state: syncResult.state ?? null,
           duration_ms: Date.now() - startTime,
         });
       }
