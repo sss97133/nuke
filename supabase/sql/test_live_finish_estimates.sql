@@ -1,6 +1,6 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_live_finish_estimates -f this-file.sql
--- Contract for 20261015100000_live_finish_estimates.sql and 20261018010000_live_finish_estimates_model_33.sql (the
--- definition in force). Synthetic rows only; never production.
+-- Contract for 20261015100000_live_finish_estimates.sql, 20261018010000_live_finish_estimates_model_33.sql and
+-- 20261111220000_live_finish_estimates_houses.sql (the definition in force). Synthetic rows only; never production.
 -- vehicles and hammer_predictions keep the columns the reader uses, with their live types (2026-10-15):
 --   * one row per public live BaT lot, from its latest model 32 prediction; models 31 and 24 are never read;
 --   * private, deleted, non-vehicle, ended, other-venue and not-live lots are left out;
@@ -10,7 +10,9 @@
 --   * anon executes it while reading no prediction column it could not read before; it is a definer with a pinned path;
 --   * model 33: a lot's latest model 33 row while that writer ran within two hours, unless its model 32 row is more than an
 --     hour newer; model 32 for the rest; a 'model' and a 'factors' column after the ten that were there; no sentence
---     and no other notes key from model 33; model 32 alone again when the model 33 writer stops.
+--     and no other notes key from model 33; model 32 alone again when the model 33 writer stops;
+--   * houses: a live lot of an enabled board house (by platform_source or by its listing URL's host) is read like a BaT
+--     lot; a house that is not on the board, or is disabled, is not; a board house's lot with no row reads nothing.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -34,7 +36,12 @@ CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE 
 END $$;
 
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean, deleted_at timestamptz, listing_kind text,
-  sale_status text, platform_source text, auction_end_date text);
+  sale_status text, platform_source text, auction_end_date text, listing_url text);
+CREATE TABLE public.live_board_houses (house text PRIMARY KEY, label text, host_pattern text, enabled boolean);
+INSERT INTO public.live_board_houses VALUES
+  ('pcarmarket', 'PCarMarket', '^https?://([a-z0-9-]+\.)*pcarmarket\.com/', true),
+  ('collecting-cars', 'Collecting Cars', '^https?://([a-z0-9-]+\.)*collectingcars\.com/', true),
+  ('broad-arrow', 'Broad Arrow', '^https?://([a-z0-9-]+\.)*broadarrowauctions\.com/', false);
 CREATE TABLE public.hammer_predictions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, current_bid numeric,
   model_version integer, predicted_hammer numeric, predicted_low numeric, predicted_high numeric, confidence_score numeric,
   predicted_at timestamptz, notes text, price_tier text, comp_count integer);
@@ -73,6 +80,8 @@ INSERT INTO public.hammer_predictions (vehicle_id, current_bid, model_version, p
 \ir ../migrations/20261015100000_live_finish_estimates.sql
 \ir ../migrations/20261018010000_live_finish_estimates_model_33.sql
 \ir ../migrations/20261018010000_live_finish_estimates_model_33.sql
+\ir ../migrations/20261111220000_live_finish_estimates_houses.sql
+\ir ../migrations/20261111220000_live_finish_estimates_houses.sql
 
 DO $$
 DECLARE b jsonb := public.live_finish_estimates();
@@ -193,6 +202,38 @@ BEGIN
 END $$;
 UPDATE public.hammer_predictions SET predicted_at = predicted_at + interval '3 hours' WHERE model_version IN (32, 33);
 SELECT pg_temp.ok('no prediction left in the future', (SELECT max(predicted_at) FROM public.hammer_predictions) <= now());
+
+-- Houses. Lot 11: PCarMarket by platform_source, a model 32 row. Lot 12: PCarMarket by its listing URL alone (no
+-- platform_source), a model 32 row. Lot 13: Collecting Cars, no row. Lot 14: Mecum (not a board house), a model 32 row.
+-- Lot 15: Broad Arrow (a disabled board house), a model 32 row.
+INSERT INTO public.vehicles (id, is_public, deleted_at, listing_kind, sale_status, platform_source, auction_end_date, listing_url) VALUES
+  ('00000000-0000-4000-8000-000000000011', true, NULL, NULL, 'auction_live', 'pcarmarket', (now() + interval '2 hours')::text, 'https://www.pcarmarket.com/auction/a'),
+  ('00000000-0000-4000-8000-000000000012', true, NULL, NULL, 'auction_live', NULL, (now() + interval '1 hour')::text, 'https://pcarmarket.com/auction/b'),
+  ('00000000-0000-4000-8000-000000000013', true, NULL, NULL, 'auction_live', 'collecting-cars', (now() + interval '2 hours')::text, 'https://collectingcars.com/for-sale/c'),
+  ('00000000-0000-4000-8000-000000000014', true, NULL, NULL, 'auction_live', 'mecum', (now() + interval '2 hours')::text, 'https://www.mecum.com/lots/d'),
+  ('00000000-0000-4000-8000-000000000015', true, NULL, NULL, 'auction_live', 'broad-arrow', (now() + interval '2 hours')::text, 'https://www.broadarrowauctions.com/e');
+INSERT INTO public.hammer_predictions (vehicle_id, current_bid, model_version, predicted_hammer, predicted_low, predicted_high,
+  confidence_score, predicted_at, notes) VALUES
+  ('00000000-0000-4000-8000-000000000011', 26000, 32, 49400, 32900, 75300, 0.772, now() - interval '15 minutes',
+   '{"grade":"B","sentence":"About 3 in 4 cars like this finished inside this range.","comps_through":"2026-11-07","house":"pcarmarket","coverage_house_n":57}'),
+  ('00000000-0000-4000-8000-000000000012', 4000, 32, 7500, 5300, 10800, 0.816, now() - interval '15 minutes', '{"grade":"A","house":"pcarmarket"}'),
+  ('00000000-0000-4000-8000-000000000014', 1, 32, 2, 1, 3, 0.5, now() - interval '5 minutes', '{"grade":"C"}'),
+  ('00000000-0000-4000-8000-000000000015', 1, 32, 2, 1, 3, 0.5, now() - interval '5 minutes', '{"grade":"C"}');
+DO $$
+DECLARE b jsonb := public.live_finish_estimates();
+  r jsonb;
+BEGIN
+  PERFORM pg_temp.ok('houses: both PCarMarket lots read, by platform_source and by listing URL; no Collecting Cars, Mecum or disabled-house row',
+    (SELECT array_agg(x->>0 ORDER BY x->>0) FROM jsonb_array_elements(b->'rows') x WHERE x->>0 > '00000000-0000-4000-8000-000000000010')
+      = ARRAY['00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000012']);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = '00000000-0000-4000-8000-000000000011';
+  PERFORM pg_temp.ok('a PCarMarket lot: its model 32 estimate, range, grade, coverage, sentence and bid, in the same columns',
+    (r->>1)::numeric = 49400 AND (r->>2)::numeric = 32900 AND (r->>3)::numeric = 75300 AND r->>4 = 'B'
+    AND (r->>5)::numeric = 0.772 AND r->>6 LIKE 'About 3 in 4%' AND (r->>8)::numeric = 26000 AND (r->>10)::int = 32);
+  PERFORM pg_temp.ok('the house note never leaves', position('coverage_house_n' IN b::text) = 0);
+END $$;
+DELETE FROM public.hammer_predictions WHERE vehicle_id > '00000000-0000-4000-8000-000000000010';
+DELETE FROM public.vehicles WHERE id > '00000000-0000-4000-8000-000000000010';
 
 SELECT pg_temp.ok('PUBLIC cannot execute; anon, authenticated and service_role can',
   NOT has_function_privilege('public', 'public.live_finish_estimates(uuid[])', 'execute')

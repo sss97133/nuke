@@ -6,7 +6,9 @@
 // hours to close (same no-reserve flag, a near bid, a near position of the bid against where its model page usually
 // finishes; same page, make and model year preferred) in the local BaT archive, and estimates the finish as the bid
 // times their weighted median rise, with an 80% range calibrated per hours to close, no-reserve flag and grade.
-// The board reads the rows through live_finish_estimates() (migration 20261015100000).
+// The board reads the rows through live_finish_estimates() (migration 20261015100000; other houses 20261111220000).
+// Another house's open lots (market_pulse_live_houses) are estimated the same way, moved by that house's own replay
+// (live-finish-houses.py, the "houses" block of live-finish-coverage.json), and only for a house and hours it passed.
 //
 // Measured offline (2026-10-15, report kept with the session logs): on 25,673 car lots closed 2026-04..09, never used
 // for tuning, the median miss was 16.7% a day before the close and 11.7% at ten minutes, and 80% ranges held 79-80%;
@@ -57,11 +59,37 @@ const rest = async (path, { key = SERVICE, method = 'GET', body, prefer } = {}) 
 
 // 1. the public live board
 const pulse = await rest('rpc/market_pulse_live', { key: ANON, method: 'POST', body: {} });
-writeFileSync(pulseJson, JSON.stringify(pulse));
-const live = Array.isArray(pulse?.auctions) ? pulse.auctions.length : 0;
+const now = new Date(pulse?.synced_at ?? NaN);
+if (!Number.isFinite(now.getTime())) throw new Error('market_pulse_live has no synced_at; nothing is written without the source time');
+const batCols = Array.isArray(pulse?.columns) ? pulse.columns : null;
+const lotsIn = (Array.isArray(pulse?.auctions) ? pulse.auctions : []).map((a) => batCols
+  ? { ...Object.fromEntries(batCols.map((c, i) => [c, a[i]])), house: 'bringatrailer' } : a);
+// 1b. the other houses' open lots (market_pulse_live_houses, anon), only for the houses whose own backtest passed
+// (live-finish-coverage.json "houses", written by live-finish-houses.py; collecting-cars and ebay-motors say why not).
+// Each is read at its house reader's last successful read (live_auction_sources, service key; the board's newest lot
+// write for that house in a dry run): the bid as the house showed it then, its hours to close counted from then.
+const houses = JSON.parse(readFileSync(COVERAGE, 'utf8')).houses ?? {};
+const shown = Object.keys(houses).filter((h) => houses[h].show);
+const perHouse = {};
+if (shown.length && batCols) {
+  const hp = await rest('rpc/market_pulse_live_houses', { key: ANON, method: 'POST', body: {} });
+  const readAt = Object.fromEntries((hp?.houses ?? []).map((h) => [h.house, h.read_at]));
+  if (!DRY) {
+    const src = await rest(`live_auction_sources?select=slug,last_successful_sync&slug=in.(${shown.join(',')})`);
+    for (const s of src ?? []) if (s.last_successful_sync) readAt[s.slug] = s.last_successful_sync;
+  }
+  for (const a of hp?.auctions ?? []) {
+    const lot = Object.fromEntries(hp.columns.map((c, i) => [c, a[i]]));
+    if (!shown.includes(lot.house) || !readAt[lot.house]) continue;
+    lotsIn.push({ ...lot, as_of: new Date(readAt[lot.house]).toISOString() });
+    perHouse[lot.house] = (perHouse[lot.house] ?? 0) + 1;
+  }
+}
+writeFileSync(pulseJson, JSON.stringify(batCols ? lotsIn : pulse));
+const live = lotsIn.length;
 // The lots prod lists as motorcycles (vehicles.canonical_vehicle_type, anon-readable) are never priced as cars.
 const kindsJson = join(dir, 'kinds.json');
-const ids = Array.isArray(pulse?.auctions) ? pulse.auctions.map((a) => a[0]).filter(Boolean) : [];
+const ids = lotsIn.map((a) => (Array.isArray(a) ? a[0] : a.id)).filter(Boolean);
 const kinds = {};
 for (let i = 0; i < ids.length; i += 200) {
   const got = await rest(`vehicles?select=id,canonical_vehicle_type&id=in.(${ids.slice(i, i + 200).join(',')})`, { key: ANON });
@@ -73,9 +101,8 @@ writeFileSync(kindsJson, JSON.stringify(kinds));
 // The moment comes from the source, never a machine's clock: the board's synced_at is the latest read of BaT's live
 // page (sync-live-auctions, every 15 min), so a row says "the bid as BaT showed it then" and its hours to close are
 // counted from then. A stalled sync makes the rows age out of live_finish_estimates() instead of passing as fresh.
-// (2026-11-07: the Mac's clock ran 3 h 35 min slow and every row was stamped hours early.)
-const now = new Date(pulse?.synced_at ?? NaN);
-if (!Number.isFinite(now.getTime())) throw new Error('market_pulse_live has no synced_at; nothing is written without the source time');
+// (2026-11-07: the Mac's clock ran 3 h 35 min slow and every row was stamped hours early.) (now: step 1.) Another
+// house's lot carries its own read moment (as_of, step 1b).
 execFileSync('python3', [PY, '--lots', pulseJson, '--kinds', kindsJson, '--archive', ARCHIVE, '--cache', CACHE, '--coverage', COVERAGE, '--now', now.toISOString(), '--out', outJson],
   { stdio: ['ignore', 'inherit', 'inherit'] });
 // The estimator writes {rows, skipped} (each skipped lot with its reason); an older build wrote the row list alone, with
@@ -110,13 +137,16 @@ const out = due.map((r) => ({ ...r, model_version: MODEL_VERSION, time_window: '
   notes: typeof r.notes === 'string' ? r.notes : JSON.stringify(r.notes ?? {}) }));
 
 // 4. write
+const houseOf = new Map(lotsIn.flatMap((a) => (Array.isArray(a) || a.house === 'bringatrailer' ? [] : [[a.id, a.house]])));
+const byHouse = Object.fromEntries(Object.entries(perHouse).map(([h, n]) => [h, { live: n,
+  estimated: rows.filter((r) => houseOf.get(r.vehicle_id) === h).length, written: out.filter((r) => houseOf.get(r.vehicle_id) === h).length }]));
 if (DRY) {
-  console.log(JSON.stringify({ dry_run: true, live, estimated: rows.length, skipped: skipped.length, would_write: out.length,
+  console.log(JSON.stringify({ dry_run: true, live, houses: byHouse, estimated: rows.length, skipped: skipped.length, would_write: out.length,
     sample: out.slice(0, 3).map((r) => ({ vehicle_id: r.vehicle_id, bid: r.current_bid, hours: r.hours_remaining,
       estimate: r.predicted_hammer, low: r.predicted_low, high: r.predicted_high })) }));
 } else {
   for (let i = 0; i < out.length; i += 500) {
     await rest('hammer_predictions', { method: 'POST', body: out.slice(i, i + 500), prefer: 'return=minimal' });
   }
-  console.log(JSON.stringify({ live, estimated: rows.length, skipped: skipped.length, already_current: rows.length - due.length, written: out.length }));
+  console.log(JSON.stringify({ live, houses: byHouse, estimated: rows.length, skipped: skipped.length, already_current: rows.length - due.length, written: out.length }));
 }
