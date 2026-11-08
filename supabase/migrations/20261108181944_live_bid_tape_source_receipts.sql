@@ -24,13 +24,14 @@ WITH raw AS MATERIALIZED (
 ), shaped AS (
   SELECT *, CASE WHEN house='bringatrailer' THEN d #>> '{public_live_frame,data,comment,bidAmount}' WHEN house='ebay-motors' THEN d->>'current_bid' ELSE d->>'amount' END amount_text,
     CASE WHEN house='bringatrailer' THEN 'USD' ELSE d->>'currency' END currency,
-    CASE WHEN house='bringatrailer' THEN 'bid' ELSE 'bid_snapshot' END event_kind,
+    CASE WHEN house='bringatrailer' THEN 'bid'
+      WHEN house='ebay-motors' AND coalesce(d->>'bid_count','') !~ '^[1-9][0-9]{0,8}$' THEN 'price_snapshot'
+      ELSE 'bid_snapshot' END event_kind,
     CASE WHEN house='bringatrailer' THEN source_id::text||':'||comment_id ELSE source_id::text||':'||source_identifier END receipt_key
   FROM raw WHERE house IS NOT NULL
 ), bids AS (
   SELECT DISTINCT ON (receipt_key) * FROM shaped
   WHERE CASE WHEN amount_text ~ '^[0-9]{1,10}([.][0-9]{1,8})?$' THEN amount_text::numeric>0 ELSE false END
-    AND (house<>'ebay-motors' OR (d->>'bid_count' ~ '^[1-9][0-9]{0,8}$'))
     AND currency ~ '^[A-Z]{3}$'
     AND source_url ~ CASE house WHEN 'bringatrailer' THEN '^https://(www[.])?bringatrailer[.]com/listing/'
       WHEN 'collecting-cars' THEN '^https://(www[.])?collectingcars[.]com/for-sale/'
@@ -46,7 +47,7 @@ SELECT jsonb_build_object('receipt_version',2,'as_of',statement_timestamp(),'min
    'state',CASE WHEN nullif(s.scraping_config #>> '{live_board,last_run,state}','') IS NOT NULL THEN 'source_scope_limited' END,
    'has_error',s.last_sync_error IS NOT NULL) ORDER BY h.house)
    FROM public.live_board_houses h LEFT JOIN public.live_auction_sources s ON s.slug=h.house WHERE h.enabled),
- 'source','Public bid receipts admitted during this window; snapshots are not individual bids; source completeness is unverified',
+ 'source','Public auction receipts admitted during this window; snapshots are not individual bids; source completeness is unverified',
  'bids',coalesce((SELECT jsonb_agg(jsonb_build_object(
    'id',receipt_key,'observation_id',observation_id,'vehicle_id',vehicle_id,'house',house,'source_url',source_url,
    'amount',amount_text::numeric,'currency',currency,'event_kind',event_kind,
@@ -55,8 +56,9 @@ SELECT jsonb_build_object('receipt_version',2,'as_of',statement_timestamp(),'min
    'bid_count',CASE WHEN d->>'bid_count' ~ '^[0-9]{1,9}$' THEN (d->>'bid_count')::int END,
    'end_at',CASE WHEN house='bringatrailer' AND d #>> '{public_live_frame,data,comment,end_timestamp}' ~ '^[0-9]{9,11}$'
      THEN to_timestamp((d #>> '{public_live_frame,data,comment,end_timestamp}')::bigint) END,
+   'listing_end_at',CASE WHEN house='ebay-motors' THEN d->>'item_end_date' WHEN house='collecting-cars' THEN d->>'ends' END,
    'source_event_id',coalesce(comment_id,d->>'auction_id',d->>'item_id'),
    'projection_error',CASE WHEN nullif(d->>'projection_error','') IS NOT NULL THEN 'Projection pending' END,'transport',d->>'transport',
    'recovered',house='bringatrailer' AND coalesce(d->>'transport','')<>'public_pusher') ORDER BY ingested_at DESC,receipt_key) FROM bids),'[]'::jsonb));
 $function$;
-COMMENT ON FUNCTION public.live_bid_tape(integer) IS 'Public, undeleted vehicle bid receipts by ingestion window, deduplicated by source and native event identity. BaT native bids, Collecting Cars and eBay high-bid snapshots retain source URL, currency, source and admission clocks. Does not assert source completeness or expose bidder names/raw frames. Existing anon execute contract retained.';
+COMMENT ON FUNCTION public.live_bid_tape(integer) IS 'Public, undeleted vehicle bid receipts by ingestion window, deduplicated by source and native event identity. BaT native bids, Collecting Cars and eBay high-bid snapshots and qualified opening/unknown price quotes retain source URL, currency, source and admission clocks. Does not assert source completeness or expose bidder names/raw frames. Existing anon execute contract retained.';

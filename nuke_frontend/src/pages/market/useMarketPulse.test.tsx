@@ -54,6 +54,7 @@ describe('live bids from the stream', () => {
     expect(withTapeBids([lot], best)[0]).toMatchObject({ currentBid: 150, endsAt: 2000, updatedAt: 20 });
     expect(withTapeBids([{ ...lot, currentBid: 200 }], best)[0]).toMatchObject({ currentBid: 200, endsAt: 1000 });
     expect(withTapeBids([lot], new Map())[0]).toBe(lot);
+    expect(withTapeBids([lot], new Map([['quote',{...best.get('v')!,eventKind:'price_snapshot'}]]))[0]).toBe(lot);
     expect(withTapeBids([{ ...lot, listingUrl: 'https://bringatrailer.com/listing/other' }], best)[0].currentBid).toBe(100);
     expect(withTapeBids([{ ...lot, currency: 'EUR' }], best)[0].currentBid).toBe(100);
     expect(withTapeBids([{ ...lot, house: 'ebay-motors' }], best)[0].currentBid).toBe(100);

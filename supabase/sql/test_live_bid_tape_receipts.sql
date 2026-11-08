@@ -25,10 +25,11 @@ SELECT pg_temp.add_receipt(1,'public-live:1:comment:48:a','bid','{"public_live_f
 \ir ../migrations/20261108181944_live_bid_tape_source_receipts.sql
 DO $$ DECLARE r jsonb; BEGIN
  r:=live_bid_tape(5);
- IF jsonb_array_length(r->'bids')<>4 THEN RAISE EXCEPTION 'Expected4 eligible deduplicated receipts: %',r; END IF;
+ IF jsonb_array_length(r->'bids')<>5 THEN RAISE EXCEPTION 'Expected5 eligible deduplicated receipts: %',r; END IF;
  IF r::text LIKE '%SECRET_%' THEN RAISE EXCEPTION 'Bidder leak'; END IF;
  IF NOT EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'house'='ebay-motors' AND b->>'amount'='1100.25' AND b->>'event_kind'='bid_snapshot') THEN RAISE EXCEPTION 'Lost exact eBay snapshot'; END IF;
  IF NOT EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'recovered'='true' AND (b->>'bid_at')::timestamptz < now()-interval '1 day') THEN RAISE EXCEPTION 'Recovered history must retain original clock'; END IF;
  IF EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'ingested_at' IS NULL OR b->>'observation_id' IS NULL OR b->>'source_url' IS NULL) THEN RAISE EXCEPTION 'Missing receipt'; END IF;
- RAISE NOTICE 'PASS source receipts, privacy, clocks, recovery, decimal amount and opening-price exclusion';
+ IF NOT EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'house'='ebay-motors' AND b->>'bid_count'='0' AND b->>'event_kind'='price_snapshot') THEN RAISE EXCEPTION 'Opening price must stay a quote'; END IF;
+ RAISE NOTICE 'PASS source receipts, privacy, clocks, recovery, decimal amount and opening-price qualification';
 END $$;

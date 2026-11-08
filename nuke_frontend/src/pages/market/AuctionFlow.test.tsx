@@ -16,9 +16,10 @@ it('separates snapshots and recovery, retains quiet-source uncertainty, and puls
  const render=async(bids:TapeBid[],error=false)=>act(async()=>root.render(<AuctionFlow bids={bids} houses={[]} auctions={[]} configuredSources={['ebay-motors','gooding']} now={now} error={error} updatedAt={now} onInspect={()=>{}}/>));
  try {
   await render([bid()]); expect(host.querySelector('.auction-flow__source--arrival')).toBeNull();
-  await render([bid(),bid({id:'snapshot',house:'ebay-motors',eventKind:'bid_snapshot'}),bid({id:'recovery',recovered:true,bidAt:now-86400000})]);
+  await render([bid(),bid({id:'snapshot',house:'ebay-motors',eventKind:'bid_snapshot'}),bid({id:'quote',house:'ebay-motors',eventKind:'price_snapshot'}),bid({id:'recovery',recovered:true,bidAt:now-86400000})]);
   expect(host.textContent).toContain('1 bids · 0 snapshots · 1 recovered');
-  expect(host.textContent).toContain('0 bids · 1 snapshots');
+  expect(host.textContent).toContain('0 bids · 1 snapshots · 1 price quotes');
+  expect(host.textContent).toContain('Price quote · bid/opening unknown');
   expect(host.textContent).toContain('No receipts in window · coverage unverified');
   expect(host.querySelectorAll('.auction-flow__source--arrival')).toHaveLength(1);
   expect(host.textContent).toContain('Recovered evidence');

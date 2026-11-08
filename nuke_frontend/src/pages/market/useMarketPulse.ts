@@ -453,7 +453,7 @@ const TAPE_MS = 15_000;
 export interface TapeBid {
   id: string; vehicleId: string; amount: number; bidAt: number; endAt: number | null;
   observationId?: string; house?: string; sourceUrl?: string; currency?: string;
-  eventKind?: 'bid' | 'bid_snapshot'; recovered?: boolean; ingestedAt?: number; receivedAt?: number;
+  eventKind?: 'bid' | 'bid_snapshot' | 'price_snapshot'; recovered?: boolean; ingestedAt?: number; receivedAt?: number;
   clockBasis?: string; bidCount?: number; sourceEventId?: string; projectionError?: string;
 }
 
@@ -461,7 +461,7 @@ export const tapeEpisode = (url: string | null | undefined) => {
   try { const u = new URL(url ?? ''); return `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/$/, '')}`; } catch { return null; }
 };
 export function tapeMatches(a: LiveAuction, b: TapeBid): boolean {
-  return a.id === b.vehicleId && b.house === a.house && b.currency === a.currency
+  return b.eventKind !== 'price_snapshot' && a.id === b.vehicleId && b.house === a.house && b.currency === a.currency
     && tapeEpisode(a.listingUrl) != null && tapeEpisode(a.listingUrl) === tapeEpisode(b.sourceUrl) && !b.projectionError;
 }
 
@@ -472,7 +472,7 @@ export function parseTape(data: unknown): TapeBid[] {
     const r = (b ?? {}) as Record<string, unknown>;
     const amount = Number(r.amount);
     const bidAt = Date.parse(String(r.bid_at ?? ''));
-    const endAt = r.end_at ? Date.parse(String(r.end_at)) : NaN;
+    const endAt = Date.parse(String(r.end_at ?? r.listing_end_at ?? ''));
     if (typeof r.id !== 'string' || typeof r.vehicle_id !== 'string' || !(amount > 0) || !Number.isFinite(bidAt)) return [];
     const extra: Partial<TapeBid> = {};
     for (const [wire, field] of [['observation_id', 'observationId'], ['house', 'house'], ['source_url', 'sourceUrl'], ['currency', 'currency'],
@@ -480,7 +480,7 @@ export function parseTape(data: unknown): TapeBid[] {
       if (typeof r[wire] === 'string') extra[field] = r[wire] as string;
     }
     if (typeof r.recovered === 'boolean') extra.recovered = r.recovered;
-    if (r.event_kind === 'bid' || r.event_kind === 'bid_snapshot') extra.eventKind = r.event_kind;
+    if (r.event_kind === 'bid' || r.event_kind === 'bid_snapshot' || r.event_kind === 'price_snapshot') extra.eventKind = r.event_kind;
     for (const [wire, field] of [['ingested_at', 'ingestedAt'], ['received_at', 'receivedAt']] as const) {
       const at = Date.parse(String(r[wire] ?? '')); if (Number.isFinite(at)) extra[field] = at;
     }
@@ -563,7 +563,7 @@ export function useMarketPulse() {
       setTapeTick((t) => t + 1);
       return;
     }
-    setNewBids(fresh.filter(b => !b.recovered && b.bidAt <= Date.now() && Date.now() - b.bidAt < 60_000));
+    setNewBids(fresh.filter(b => b.eventKind !== 'price_snapshot' && !b.recovered && b.bidAt <= Date.now() && Date.now() - b.bidAt < 60_000));
     for (const b of fresh) {
       const play = () => {
         land(b);
