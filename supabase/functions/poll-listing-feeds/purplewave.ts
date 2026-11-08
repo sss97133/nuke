@@ -54,7 +54,7 @@ export function purplewaveObservation(lot: ReturnType<typeof purplewaveLot>, veh
 export function purplewaveProjection(lot: ReturnType<typeof purplewaveLot>, row: any, observationId: string) {
   if (row?.platform_source !== "purplewave" || typeof row.listing_url !== "string"
     || row.listing_url.replace("https://purplewave.com/", "https://www.purplewave.com/").replace(/\/$/, "") !== lot.url
-    || row.deleted_at != null || ["sold", "not_sold", "reserve_not_met", "cancelled", "withdrawn"].includes(row.sale_status)) return null;
+    || row.deleted_at != null || ["sold", "not_sold", "no_sale", "reserve_not_met", "cancelled", "withdrawn"].includes(row.sale_status)) return null;
   const prior = Date.parse(row.origin_metadata?.purplewave_observed_at ?? "");
   if (Number.isFinite(prior) && prior > Date.parse(lot.readAt)) return null;
   return { high_bid: lot.count > 0 ? Math.floor(lot.bid) : null, auction_end_date: lot.end,
@@ -114,6 +114,7 @@ export async function landPurplewaveLot(client: any, lot: ReturnType<typeof purp
   if (patch) {
     let update = db.from("vehicles").update(patch).eq("id", vehicleId).eq("platform_source", "purplewave")
       .eq("listing_url", vehicle.data.listing_url).is("deleted_at", null);
+    update = vehicle.data.sale_status == null ? update.is("sale_status", null) : update.eq("sale_status", vehicle.data.sale_status);
     update = vehicle.data.origin_metadata == null ? update.is("origin_metadata", null) : update.eq("origin_metadata", JSON.stringify(vehicle.data.origin_metadata));
     const projection = await update.select("id");
     if (projection.error || projection.data?.length !== 1) throw Error("PurpleWave auction projection changed concurrently; retry");

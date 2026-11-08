@@ -82,6 +82,7 @@ Deno.test("scalar projection preserves other source ownership, freshness and ope
   const lot = purplewaveLot(raw, clock);
   const held = { platform_source: "purplewave", listing_url: lot.url, origin_metadata: { keep: true }, deleted_at: null };
   equal(purplewaveProjection(lot, { ...held, platform_source: "bat" }, "obs"), null);
+  equal(purplewaveProjection(lot, { ...held, sale_status: "no_sale" }, "obs"), null);
   equal(purplewaveProjection(lot, { ...held, listing_url: lot.url + "other" }, "obs"), null);
   equal(purplewaveProjection(lot, { ...held, origin_metadata: { purplewave_observed_at: "2026-11-09T00:00:00Z" } }, "obs"), null);
   equal(purplewaveProjection(purplewaveLot({ ...raw, bid_count: 0 }, clock), held, "obs")?.high_bid, null);
