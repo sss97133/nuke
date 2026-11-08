@@ -28,6 +28,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { batBoardReceipt, updateVehicleEvents } from "./batEpisodeState.ts";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
@@ -96,6 +97,7 @@ interface SyncResult {
   write_errors?: string[];
   board?: Record<string, unknown> | null;
   bid_snapshots?: number;
+  episode_sync?: Record<string, unknown> | null;
   error: string | null;
   state?: string | null;
   duration_ms: number;
@@ -119,13 +121,13 @@ interface BaTAuctionItem {
   active: boolean;
 }
 
-async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
+async function syncBaT(supabase: Parameters<typeof batBoardReceipt>[0]): Promise<{ auctions: LiveAuction[]; error: string | null }> {
   try {
     console.log("[sync-live-auctions] Fetching BaT live auctions page...");
 
     // Use archiveFetch so the page is stored in listing_page_snapshots for replay.
     // skipCache: true because live auction data changes every ~15 min (this cron runs every 15 min).
-    const { html: batHtml, error: fetchError } = await archiveFetch(
+    const { html: batHtml, error: fetchError, snapshotId } = await archiveFetch(
       "https://bringatrailer.com/auctions/",
       {
         platform: "bat",
@@ -139,6 +141,8 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
     }
 
     const html = batHtml;
+    // Pin the source clock to retained bytes, including unchanged-body dedup.
+    const boardReceipt = await batBoardReceipt(supabase, html, snapshotId);
 
     // Extract the JSON data from the page
     const match = html.match(/var\s+auctionsCurrentInitialData\s*=\s*(\{[\s\S]*?\});/);
@@ -193,6 +197,8 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
           external_id: String(item.id),
           raw_data: {
             source: "bat_auctions_page",
+            source_snapshot_id: boardReceipt.id,
+            source_read_at: boardReceipt.fetched_at,
             timestamp_end: item.timestamp_end,
             country: item.country,
             currency: item.currency,
@@ -1327,54 +1333,6 @@ async function syncToDatabase(
 // run. A lot's bid history comes from its comment thread: extract-bat-core writes every bid with its timestamp
 // (bat-data coverage audit, docs/ledger/2026-09-30_bat-data-coverage-audit.md).
 
-/**
- * Updates vehicle_events with fresh bid data from the BaT sync.
- * The prediction engine reads current_price from vehicle_events, so keeping
- * this fresh is critical for accuracy. Only ~48 active BaT rows — very fast.
- */
-async function updateVehicleEvents(
-  supabase: ReturnType<typeof createClient>,
-  auctions: LiveAuction[]
-): Promise<number> {
-  const biddable = auctions.filter(a => a.current_bid && a.current_bid > 0);
-  if (biddable.length === 0) return 0;
-
-  const auctionByUrl = new Map<string, LiveAuction>();
-  for (const a of biddable) auctionByUrl.set(a.url, a);
-
-  // Get all active BaT vehicle_events (small set ~48 rows)
-  const { data: events } = await supabase
-    .from("vehicle_events")
-    .select("id, source_url")
-    .eq("source_platform", "bat")
-    .eq("event_status", "active");
-
-  if (!events || events.length === 0) return 0;
-
-  let updated = 0;
-  const now = new Date().toISOString();
-
-  for (const ve of events) {
-    const auction = ve.source_url ? auctionByUrl.get(ve.source_url) : null;
-    if (!auction) continue;
-
-    const updateData: Record<string, unknown> = {
-      current_price: auction.current_bid,
-      updated_at: now,
-    };
-    if (auction.bid_count !== null) updateData.bid_count = auction.bid_count;
-
-    const { error } = await supabase
-      .from("vehicle_events")
-      .update(updateData)
-      .eq("id", ve.id);
-
-    if (!error) updated++;
-  }
-
-  return updated;
-}
-
 async function updateSourceRegistry(
   supabase: ReturnType<typeof createClient>,
   platform: string,
@@ -1549,7 +1507,7 @@ Deno.serve(async (req) => {
         switch (platform) {
           case "bat":
           case "bringatrailer":
-            syncResult = await syncBaT();
+            syncResult = await syncBaT(supabase);
             break;
           case "cc":
           case "collecting-cars":
@@ -1591,12 +1549,17 @@ Deno.serve(async (req) => {
 
         // Refresh the live lots' event rows first (fast, read by predictions). Bid snapshots are retired (see above).
         const bidSnapshotCount = 0;
+        let episodeSync: Awaited<ReturnType<typeof updateVehicleEvents>> | null = null;
+        const episodeErrors: string[] = [];
         if (normalizedPlatform === "bringatrailer" && !syncResult.error && syncResult.auctions.length > 0) {
           try {
-            const veUpdated = await updateVehicleEvents(supabase, syncResult.auctions);
-            console.log(`[sync-live-auctions] Updated ${veUpdated} vehicle_events rows`);
+            episodeSync = await updateVehicleEvents(supabase, syncResult.auctions, 64, functionStartTime + 45_000);
+            episodeErrors.push(...episodeSync.errors);
+            if (episodeSync.deferred || episodeSync.read_limit_reached)
+              episodeErrors.push(`BaT episode projection deferred: ${episodeSync.deferred} changed rows; read_limit=${episodeSync.read_limit_reached}`);
+            console.log(`[sync-live-auctions] Episode state: ${JSON.stringify(episodeSync)}`);
           } catch (e) {
-            console.error("[sync-live-auctions] Vehicle events update error (non-fatal):", e);
+            episodeErrors.push(`BaT episode projection failed: ${e instanceof Error ? e.message : String(e)}`);
           }
         }
 
@@ -1631,6 +1594,7 @@ Deno.serve(async (req) => {
         if (!skipVehicleSync && !syncResult.error) {
           dbStats = await syncToDatabase(supabase, syncResult.auctions, normalizedPlatform);
         }
+        dbStats.write_errors.push(...episodeErrors);
         if (normalizedPlatform === "gooding" && !skipVehicleSync && !syncResult.error) {
           dbStats.write_errors.push(...(syncResult.write_errors ?? []), ...await goodingFillDiscovery(supabase, syncResult.auctions));
         }
@@ -1681,6 +1645,7 @@ Deno.serve(async (req) => {
         await updateSourceRegistry(supabase, normalizedPlatform, !syncResult.error);
 
         results.push({
+          episode_sync: episodeSync,
           board,
           platform: normalizedPlatform,
           success: !syncResult.error && dbStats.write_errors.length === 0,
