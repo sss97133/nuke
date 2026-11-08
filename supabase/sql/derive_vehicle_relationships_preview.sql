@@ -161,6 +161,15 @@ scene_labels AS (
          t(run_id, vehicle_id, session_key, image_ids, scene_label, model, confidence, rationale, photo_count)
    WHERE false -- (scene_labels)
 ),
+-- SECOND-VIEWER SCENE PLACEHOLDER (empty by default; keep this CTE when generating the function). Same columns as scene_labels: the rows of an
+-- independent second viewer (scripts/garage/label-scenes.mjs --second-viewer, written when the first viewer's confidence was below 0.7). A
+-- session with both is counted only when the two labels agree (confidence = the lower one); when they disagree it decides nothing.
+scene_labels_v2 AS (
+  SELECT t.run_id, t.vehicle_id, t.session_key, t.image_ids, t.scene_label, t.model, t.confidence, t.rationale, t.photo_count
+    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::text, NULL::text, NULL::numeric, NULL::text, NULL::int))
+         t(run_id, vehicle_id, session_key, image_ids, scene_label, model, confidence, rationale, photo_count)
+   WHERE false -- (scene_labels_v2)
+),
 -- PLACE MATCH PLACEHOLDER (empty by default; keep this CTE when generating the function). One row per (session, viewer): a vision model
 -- was shown the session's photos and reference photos of each organization in range and answered which known place the session was
 -- taken at (org_id) or neither (org_id NULL); confidence 0..1; viewer 1 / 2 (scripts/garage/match-places.mjs writes the VALUES rows).
@@ -682,6 +691,11 @@ orgt AS MATERIALIZED (
 ),
 -- Place matches (scripts/garage/match-places.mjs): one row per (vehicle, session, viewer) -> one decision per session. Two viewers count
 -- only when they agree (same organization, or both 'neither'); the confidence is then the lower one. A decision is usable at confidence >= 0.7.
+slv AS MATERIALIZED (
+  SELECT DISTINCT ON (x.vehicle_id, x.session_key, x.viewer) x.*
+    FROM (SELECT sl.*, 1 AS viewer FROM scene_labels sl UNION ALL SELECT s2.*, 2 FROM scene_labels_v2 s2) x
+   ORDER BY x.vehicle_id, x.session_key, x.viewer, x.confidence DESC NULLS LAST, x.run_id::text
+),
 plv AS MATERIALIZED (
   SELECT DISTINCT ON (p.vehicle_id, p.session_key, coalesce(p.viewer, 1)) p.run_id, p.vehicle_id, p.session_key, p.image_ids, p.photo_count,
          p.org_id, p.confidence, p.model, coalesce(p.viewer, 1) AS viewer, p.rationale
@@ -757,21 +771,28 @@ sc AS MATERIALIZED (
          jsonb_build_object('run_id', d.run_id, 'session_key', d.session_key, 'scene_label', d.scene_label, 'model', d.model,
                             'confidence', d.confidence, 'rationale', d.rationale, 'member_vehicle_id', d.vehicle_id,
                             'photos', greatest(1, coalesce(d.photo_count, nullif(cardinality(d.image_ids), 0), 1)),
-                            'place_match_status', d.pm_st, 'place_match', d.pm_cite) AS cite
+                            'place_match_status', d.pm_st, 'place_match', d.pm_cite, 'viewers', d.vcite) AS cite
     FROM (SELECT cm.ck AS vid, c.run_id, c.vehicle_id, c.session_key, c.image_ids, c.scene_label, c.model, c.confidence, c.rationale, c.photo_count,
-                 c.n_viewers, c.agree, pm.st AS pm_st, pm.canon AS pm_c, pm.cite AS pm_cite, og.okind AS pm_kind
-            FROM (SELECT DISTINCT ON (sl.vehicle_id, sl.session_key) sl.run_id, sl.vehicle_id, sl.session_key, sl.image_ids, sl.scene_label, sl.model,
-                         sl.confidence, sl.rationale, sl.photo_count, 1 AS n_viewers, true AS agree
-                    FROM scene_labels sl
-                   ORDER BY sl.vehicle_id, sl.session_key, sl.confidence DESC NULLS LAST, sl.run_id::text) c
+                 c.n_viewers, c.agree, c.vcite, pm.st AS pm_st, pm.canon AS pm_c, pm.cite AS pm_cite, og.okind AS pm_kind
+            FROM (SELECT f.run_id, f.vehicle_id, f.session_key, f.image_ids, f.scene_label, f.model,
+                         CASE WHEN a.n_viewers >= 2 AND a.agree THEN a.min_conf ELSE f.confidence END AS confidence,
+                         f.rationale, f.photo_count, a.n_viewers, a.agree, a.vcite
+                    FROM (SELECT DISTINCT ON (x.vehicle_id, x.session_key) x.vehicle_id, x.session_key, x.run_id, x.image_ids, x.scene_label, x.model,
+                                 x.confidence, x.rationale, x.photo_count
+                            FROM slv x ORDER BY x.vehicle_id, x.session_key, x.viewer) f
+                    JOIN (SELECT x.vehicle_id, x.session_key, count(*) AS n_viewers, count(DISTINCT x.scene_label) = 1 AS agree, min(x.confidence) AS min_conf,
+                                 jsonb_agg(jsonb_build_object('viewer', x.viewer, 'run_id', x.run_id, 'scene_label', x.scene_label, 'model', x.model,
+                                             'confidence', x.confidence, 'rationale', x.rationale) ORDER BY x.viewer) AS vcite
+                            FROM slv x GROUP BY x.vehicle_id, x.session_key) a ON a.vehicle_id = f.vehicle_id AND a.session_key = f.session_key
+                  ) c
             JOIN clm cm ON cm.vid = c.vehicle_id
             LEFT JOIN pmx pm ON pm.vehicle_id = c.vehicle_id AND pm.session_key = c.session_key
             LEFT JOIN orgn og ON og.id = pm.canon
           UNION ALL
           SELECT pm.vid, (pm.cite->0->>'run_id')::uuid, pm.vehicle_id, pm.session_key, pm.image_ids, NULL::text, pm.cite->0->>'model', pm.conf,
-                 pm.cite->0->>'rationale', pm.photo_count, 1, true, pm.st, pm.canon, pm.cite, og.okind
+                 pm.cite->0->>'rationale', pm.photo_count, 1, true, NULL::jsonb, pm.st, pm.canon, pm.cite, og.okind
             FROM pmx pm LEFT JOIN orgn og ON og.id = pm.canon
-           WHERE NOT EXISTS (SELECT 1 FROM scene_labels sl WHERE sl.vehicle_id = pm.vehicle_id AND sl.session_key = pm.session_key)) d
+           WHERE NOT EXISTS (SELECT 1 FROM slv sl WHERE sl.vehicle_id = pm.vehicle_id AND sl.session_key = pm.session_key)) d
 ),
 -- Scene kind of each candidate vehicle: photo-weighted vote of its counted sessions (sk: dealer / shop). A vehicle whose sessions read as both
 -- without a 2:1 majority has no kind.

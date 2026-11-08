@@ -1067,5 +1067,20 @@ SELECT fixture_assert((:'gz_p'::jsonb->(gz(66))::text->'ev'->'chain'->2->'eviden
 SELECT fixture_assert((:'gz_p'::jsonb->(gz(67))::text->'ev'->'chain'->2->'evidence'->>'ambiguous')::boolean,'without a place match the same two organizations stay ambiguous');
 
 
+-- second viewer (scene_labels_v2): two viewers count only when they agree (confidence = the lower one)
+SELECT gz_burst(68, 6, now() - interval '5 months', 36.40000, -115.40000);   -- viewers agree: dealer_lot 0.65 and 0.8
+SELECT gz_burst(69, 6, now() - interval '5 months', 36.40000, -115.40000);   -- viewers disagree: dealer_lot vs shop_interior
+\set gz_v_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), gz(68), 'v68', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(68)), 'dealer_lot', 'm', 0.65::numeric, 'cars in rows', 6 UNION ALL SELECT gen_random_uuid(), gz(69), 'v69', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(69)), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows', 6/" -e "s/^   WHERE false -- (scene_labels_v2)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), gz(68), 'v68', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(68)), 'dealer_lot', 'm#viewer2', 0.8::numeric, 'a lot', 6 UNION ALL SELECT gen_random_uuid(), gz(69), 'v69', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(69)), 'shop_interior', 'm#viewer2', 0.9::numeric, 'bays', 6/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('role', d.derived_role, 'ev', d.evidence))
+          FROM (:gz_v_sql) d WHERE d.vehicle_id BETWEEN gz(68) AND gz(69)) AS gz_v \gset
+SELECT fixture_assert(:'gz_v'::jsonb->(gz(68))::text->'ev'->>'sub_reason'='pre_auction_inventory'
+  AND (SELECT (e->>'confidence')::numeric FROM jsonb_array_elements(:'gz_v'::jsonb->(gz(68))::text->'ev'->'chain'->2->'evidence'->'pre_auction'->'scenes') e)=0.65
+  AND (SELECT jsonb_array_length(e->'viewers') FROM jsonb_array_elements(:'gz_v'::jsonb->(gz(68))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'sessions') e)=2,
+  'two viewers that agree count once, at the lower confidence, with both cited');
+SELECT fixture_assert(:'gz_v'::jsonb->(gz(69))::text->'ev'->>'sub_reason' IS DISTINCT FROM 'pre_auction_inventory'
+  AND (SELECT e->>'dropped' FROM jsonb_array_elements(:'gz_v'::jsonb->(gz(69))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'dropped_sessions') e)='viewer_disagreement'
+  AND (SELECT jsonb_array_length(e->'viewers') FROM jsonb_array_elements(:'gz_v'::jsonb->(gz(69))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'dropped_sessions') e)=2,
+  'two viewers that disagree: the session decides nothing and both are cited');
+
 SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 

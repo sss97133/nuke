@@ -5,6 +5,7 @@ import { parseCards, parseMemberHtml, parseAjax, parseDetail, parseResultText, b
 import { buildSql, publicUrl, shapeSessions } from './scene-sessions.mjs';
 import { orgKind, normName, distinctOrgs, representatives, parseGallery, pickWide, sceneExemplars, mergeExemplars, buildExemplarRows } from './build-place-exemplars.mjs';
 import { shuffle, candidatesFor, buildPrompt as placePrompt, parseMatch, toRow as placeRow, needsSecondViewer, valuesCte as placeCte, matchSession } from './match-places.mjs';
+import { buildPromptV2, shuffle as sceneShuffle } from './label-scenes.mjs';
 import { normalizeSession, buildPrompt, parseLabel, toInference, valuesCte as sceneCte, applyBody, isHeic, labelSession, SCENE_LABELS } from './label-scenes.mjs';
 
 const card = (slug, title, ts, result) => `<div class="listing-card listing-card-separate listing-card-h" data-listing_id="1" data-timestamp_end="${ts}">
@@ -369,4 +370,25 @@ test('match-places: viewer 2 uses a different sample selection when the session 
   const r = await matchSession(s, cands, { backend, cacheDir: '/x', viewer: 2, fetchFn: async (u) => { fetched.push(u); return `/f/${u}`; }, sheetFn: (files, letter) => `/sheet-${letter}-${files.length}` });
   assert.equal(calls.length, 2); assert.ok(fetched.includes('a1') && fetched.includes('a2') && !fetched.includes('p1'));
   assert.ok(['A', 'B'].includes(Object.keys(r.letterToOrg)[0])); assert.equal(r.match.place, 'A');
+});
+
+test('second viewer (label-scenes): fresh prompt with shuffled labels, alternative samples, CTE under its own name, scene-sessions emits alternatives', async () => {
+  const labels = sceneShuffle(SCENE_LABELS, 'seed');
+  const p2 = buildPromptV2(['/a.jpg'], labels);
+  assert.notEqual(p2, buildPrompt(['/a.jpg'])); assert.ok(SCENE_LABELS.every((l) => p2.includes(l)));
+  assert.deepEqual([...labels].sort(), [...SCENE_LABELS].sort());
+  const fetched = []; const prompts = [];
+  const backend = async ({ prompt }) => { prompts.push(prompt); return '{"scene_label":"showroom","confidence":0.8,"rationale":"floor"}'; };
+  const s = normalizeSession({ vehicle_id: V1, session_key: 'k', sample_urls: ['p1'], alt_sample_urls: ['a1', 'a2'] });
+  assert.deepEqual(s.alt_sample_urls, ['a1', 'a2']);
+  const l = await labelSession(s, { backend, cacheDir: '/x', viewer: 2, fetchFn: async (u) => { fetched.push(u); return `/f/${u}`; } });
+  assert.equal(l.scene_label, 'showroom'); assert.ok(fetched.every((u) => u.startsWith('a'))); assert.equal(prompts.length, 1); assert.ok(prompts[0] !== undefined);
+  const row = toInference(s, l, { runId: V1, model: 'm#viewer2', viewer: 2 });
+  assert.equal(row.viewer, 2);
+  assert.match(sceneCte([row], 'scene_labels_v2'), /^scene_labels_v2 AS \(/); assert.match(sceneCte([], 'scene_labels_v2'), /WHERE false -- \(scene_labels_v2\)/);
+  const shaped = shapeSessions([{ vehicle_id: V1, session_key: 'k', samples: [{ image_id: O1, image_url: 'https://a/1.jpg', primary: true }, { image_id: O2, image_url: 'https://a/2.jpg', primary: false }] }]);
+  assert.deepEqual(shaped[0].sample_urls, ['https://a/1.jpg']); assert.deepEqual(shaped[0].alt_sample_urls, ['https://a/2.jpg']);
+  const { readFileSync } = await import('node:fs');
+  const pre = readFileSync(new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url), 'utf8');
+  assert.ok(pre.includes(sceneCte([], 'scene_labels_v2')));
 });

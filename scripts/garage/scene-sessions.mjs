@@ -74,8 +74,10 @@ SELECT coalesce(jsonb_agg(jsonb_build_object(
     SELECT t.vehicle_id, t.sess, t.n_orgs, t.photos_in_range, t.orgs,
            (array_agg(r.id ORDER BY r.rn))[1]::text AS session_key, min(r.t) AS started_at, max(r.t) AS ended_at, max(r.n) AS photos,
            jsonb_agg(r.id ORDER BY r.rn) AS image_ids,
-           jsonb_agg(jsonb_build_object('image_id', r.id, 'image_url', r.image_url, 'storage_path', r.storage_path, 'taken_at', r.t) ORDER BY r.rn)
-             FILTER (WHERE r.rn IN (1, 1 + (r.n - 1) / 3, 1 + 2 * (r.n - 1) / 3, r.n)) AS samples
+           -- primary samples (first, a third, two thirds, last) and alternative samples (a sixth, the middle, five sixths) for a second viewer
+           jsonb_agg(jsonb_build_object('image_id', r.id, 'image_url', r.image_url, 'storage_path', r.storage_path, 'taken_at', r.t,
+                       'primary', r.rn IN (1, 1 + (r.n - 1) / 3, 1 + 2 * (r.n - 1) / 3, r.n)) ORDER BY r.rn)
+             FILTER (WHERE r.rn IN (1, 1 + (r.n - 1) / 3, 1 + 2 * (r.n - 1) / 3, r.n, 1 + (r.n - 1) / 6, 1 + (r.n - 1) / 2, 1 + 5 * (r.n - 1) / 6)) AS samples
       FROM in_range t JOIN rk r ON r.vehicle_id = t.vehicle_id AND r.sess = t.sess
      GROUP BY t.vehicle_id, t.sess, t.n_orgs, t.photos_in_range, t.orgs) x;
 `;
@@ -93,8 +95,10 @@ export function shapeSessions(sessions, supabaseUrl) {
     vehicle_id: s.vehicle_id, session_key: s.session_key, started_at: s.started_at, ended_at: s.ended_at,
     photos: s.photos, photos_in_range: s.photos_in_range, organizations: s.organizations,
     image_ids: s.image_ids ?? (s.samples ?? []).map((x) => x.image_id),
-    sample_urls: (s.samples ?? []).map((x) => publicUrl(x, supabaseUrl)).filter(Boolean).slice(0, 4),
-    sample_image_ids: (s.samples ?? []).map((x) => x.image_id).slice(0, 4),
+    // primary samples (a sample without the flag counts as primary); the others are alternatives for a second viewer
+    sample_urls: (s.samples ?? []).filter((x) => x.primary !== false).map((x) => publicUrl(x, supabaseUrl)).filter(Boolean).slice(0, 4),
+    sample_image_ids: (s.samples ?? []).filter((x) => x.primary !== false).map((x) => x.image_id).slice(0, 4),
+    alt_sample_urls: (s.samples ?? []).filter((x) => x.primary === false).map((x) => publicUrl(x, supabaseUrl)).filter(Boolean).slice(0, 4),
   }));
 }
 

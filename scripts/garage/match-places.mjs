@@ -17,7 +17,8 @@ import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BACKENDS, fetchSample, normalizeSession } from './label-scenes.mjs';
+import { BACKENDS, fetchSample, normalizeSession, shuffle } from './label-scenes.mjs';
+export { shuffle };
 import { DEALER_LABELS, SHOP_LABELS, distinctOrgs, representatives } from './build-place-exemplars.mjs';
 
 export const PRODUCER = 'scripts/garage/match-places.mjs';
@@ -25,15 +26,6 @@ const LETTERS = 'ABCDEFGHIJKLMNOP';
 export const SECOND_VIEWER_BELOW = 0.7;
 
 // ---- pure helpers (tested) -------------------------------------------------------------------------------------------------
-
-// Deterministic shuffle (mulberry32 seeded by a string) so a rerun of viewer 2 reproduces its order.
-export function shuffle(arr, seed) {
-  let s = parseInt(createHash('sha256').update(String(seed)).digest('hex').slice(0, 8), 16) >>> 0;
-  const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-  return a;
-}
 
 // Candidate places of a session: its distinct in-range organizations that have exemplars. Same-name ids are one place (exemplars unioned).
 export function candidatesFor(session, exemplarRows, rep = null) {

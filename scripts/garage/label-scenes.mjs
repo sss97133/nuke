@@ -5,8 +5,13 @@
 //
 //   node scripts/garage/label-scenes.mjs --sessions-json /workspace/scene_sessions.json
 //        [--out /workspace/scene_labels.jsonl] [--cte-out /workspace/scene_labels.cte.sql] [--cache-dir /tmp/label-scenes-cache]
-//        [--backend claude-cli] [--model <name>] [--limit n] [--apply]
+//        [--backend claude-cli] [--model <name>] [--limit n] [--apply] [--second-viewer] [--cte2-out f.sql]
 //
+// --second-viewer: when the first viewer's confidence is < 0.7, an independent second call is made (fresh prompt wording, shuffled label and
+// sample order, the session's alternative samples when it has them) and both rows are kept (viewer 1 / 2). Viewer-2 rows go to their own run
+// id, to the `scene_labels_v2` VALUES CTE (--cte2-out) and, with --apply, to the table under that run id. The preview uses two viewers
+// only when they agree (confidence = the lower one); on disagreement the session decides nothing and both are cited.
+
 // Input rows (from scripts/garage/scene-sessions.mjs): vehicle_id, session_key, image_ids, photos (the session's photo count: the weight of its
 // vote when derive_vehicle_relationships aggregates a vehicle's sessions; image_ids length when absent), sample_urls (up to 4 are used).
 // Per session: download the samples to the cache dir (HEIC -> JPEG with python3 + pillow_heif, else sharp when installed), then ask
@@ -39,8 +44,44 @@ export function normalizeSession(r) {
   if (!r.session_key) throw new Error(`session ${r.vehicle_id} has no session_key`);
   // photos in the whole session (the weight of its vote); scene-sessions.mjs calls it `photos`
   const pc = Number(r.photo_count ?? r.photos);
-  return { vehicle_id: r.vehicle_id.toLowerCase(), session_key: String(r.session_key), image_ids: ids.filter((i) => UUID.test(i)), sample_urls: urls,
+  const alt = (r.alt_sample_urls ?? []).filter((u) => typeof u === 'string' && u).slice(0, MAX_SAMPLES);
+  return { vehicle_id: r.vehicle_id.toLowerCase(), session_key: String(r.session_key), image_ids: ids.filter((i) => UUID.test(i)), sample_urls: urls, alt_sample_urls: alt,
     photo_count: Number.isInteger(pc) && pc > 0 ? pc : null };
+}
+
+// Deterministic shuffle (mulberry32 seeded by a string) so a rerun of viewer 2 reproduces its order.
+export function shuffle(arr, seed) {
+  let s = parseInt(createHash('sha256').update(String(seed)).digest('hex').slice(0, 8), 16) >>> 0;
+  const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+export const SECOND_VIEWER_BELOW = 0.7;
+const LABEL_LINES = {
+  dealer_lot: 'dealer_lot: cars parked outside in rows or on a sales lot, price boards or dealer signage',
+  showroom: 'showroom: indoor display floor, polished floor, staged cars in a sales space',
+  shop_interior: 'shop_interior: workshop bays, lifts, tool chests, a car on stands or partly disassembled',
+  upholstery_work: 'upholstery_work: seats, door cards, headliner, trim or leather being cut, sewn or fitted',
+  paint_body: 'paint_body: body filler, sanding, masking, primer or a paint booth',
+  outdoor_street: 'outdoor_street: ordinary street, driveway, parking lot or scenery with no business setting',
+  other: 'other: none of the above, or you cannot tell',
+};
+
+// Fresh wording for the independent second viewer: the labels in a different (given) order, no mention of a first opinion.
+export function buildPromptV2(files, order = SCENE_LABELS) {
+  return `Look at the photos below, which come from one photo session of a vehicle, and decide what kind of place they were taken in. Open every file with the Read tool first. Judge only from what is visible: buildings, signage, floors, lifts, tools, other cars, backdrops.
+
+Files:
+${files.map((f) => `- ${f}`).join('\n')}
+
+Pick the single best scene_label for the whole session:
+${order.map((l) => `- ${LABEL_LINES[l]}`).join('\n')}
+If the images are unreadable or uninformative, use "other" with a low confidence.
+
+Reply with ONLY one JSON object on one line, no markdown:
+{"scene_label":"<one of ${SCENE_LABELS.join('|')}>","confidence":<0 to 1>,"rationale":"<one or two sentences naming what you saw>"}`;
 }
 
 export function buildPrompt(files) {
@@ -78,24 +119,24 @@ export function parseLabel(text) {
   return { scene_label: j.scene_label, confidence: c, rationale: rationale.slice(0, 1000) };
 }
 
-export function toInference(session, label, { runId, model, createdAt = new Date().toISOString() }) {
+export function toInference(session, label, { runId, model, viewer = 1, createdAt = new Date().toISOString() }) {
   return { run_id: runId, vehicle_id: session.vehicle_id, session_key: session.session_key, image_ids: session.image_ids,
     scene_label: label.scene_label, model, confidence: label.confidence, rationale: label.rationale, photo_count: session.photo_count ?? null,
-    producer: PRODUCER, created_at: createdAt };
+    producer: PRODUCER, created_at: createdAt, ...(viewer === 1 ? {} : { viewer }) };
 }
 
 const q = (t) => (t == null ? 'NULL::text' : `'${String(t).replace(/'/g, "''")}'`);
 
 // The scene_labels CTE, same columns as the placeholder in the preview (WHERE true marks it as filled).
-export function valuesCte(rows) {
-  const head = 'scene_labels AS (\n  SELECT t.run_id, t.vehicle_id, t.session_key, t.image_ids, t.scene_label, t.model, t.confidence, t.rationale, t.photo_count\n';
+export function valuesCte(rows, name = 'scene_labels') {
+  const head = `${name} AS (\n  SELECT t.run_id, t.vehicle_id, t.session_key, t.image_ids, t.scene_label, t.model, t.confidence, t.rationale, t.photo_count\n`;
   const cols = 't(run_id, vehicle_id, session_key, image_ids, scene_label, model, confidence, rationale, photo_count)';
   if (!rows.length) {
-    return head + `    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::text, NULL::text, NULL::numeric, NULL::text, NULL::int))\n         ${cols}\n   WHERE false -- (scene_labels)\n),`;
+    return head + `    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::text, NULL::text, NULL::numeric, NULL::text, NULL::int))\n         ${cols}\n   WHERE false -- (${name})\n),`;
   }
   const vals = rows.map((r) => `(${q(r.run_id)}::uuid, ${q(r.vehicle_id)}::uuid, ${q(r.session_key)}, `
     + `${r.image_ids.length ? `ARRAY[${r.image_ids.map((i) => `${q(i)}::uuid`).join(', ')}]` : 'ARRAY[]::uuid[]'}, ${q(r.scene_label)}, ${q(r.model)}, ${Number(r.confidence)}::numeric, ${q(r.rationale)}, ${r.photo_count == null ? 'NULL::int' : `${Number(r.photo_count)}::int`})`);
-  return head + `    FROM (VALUES\n      ${vals.join(',\n      ')})\n         ${cols}\n   WHERE true -- (scene_labels)\n),`;
+  return head + `    FROM (VALUES\n      ${vals.join(',\n      ')})\n         ${cols}\n   WHERE true -- (${name})\n),`;
 }
 
 // Body of the PostgREST insert for --apply (vehicle_photo_session_scenes columns only).
@@ -158,14 +199,18 @@ export const BACKENDS = {
   },
 };
 
-export async function labelSession(session, { backend, cacheDir, model, fetchFn = fetchSample }) {
-  if (!session.sample_urls.length) throw new Error('session has no sample urls');
+export async function labelSession(session, { backend, cacheDir, model, fetchFn = fetchSample, viewer = 1 }) {
+  // viewer 2: the session's alternative samples when it has them (else the same ones), shuffled, with a fresh prompt and a shuffled label order
+  const seed = `${session.vehicle_id}|${session.session_key}|v${viewer}`;
+  const urls = viewer === 1 ? session.sample_urls : shuffle(session.alt_sample_urls?.length ? session.alt_sample_urls : session.sample_urls, seed);
+  if (!urls.length) throw new Error('session has no sample urls');
   const files = [];
-  for (const u of session.sample_urls) { try { files.push(await fetchFn(u, cacheDir)); } catch (e) { console.error(`  skip sample: ${e.message}`); } }
+  for (const u of urls) { try { files.push(await fetchFn(u, cacheDir)); } catch (e) { console.error(`  skip sample: ${e.message}`); } }
   if (!files.length) throw new Error('no sample image could be downloaded');
+  const prompt = viewer === 1 ? undefined : buildPromptV2(files, shuffle(SCENE_LABELS, seed));
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) { // one retry on invalid output
-    try { return parseLabel(await backend({ files, cacheDir, model })); } catch (e) { lastErr = e; }
+    try { return parseLabel(await backend({ files, cacheDir, model, prompt })); } catch (e) { lastErr = e; }
   }
   throw new Error(`invalid model output after retry: ${lastErr.message}`);
 }
@@ -185,25 +230,35 @@ async function main() {
   const cacheDir = opt('cache-dir', '/tmp/label-scenes-cache');
   mkdirSync(cacheDir, { recursive: true });
   const limit = Number(opt('limit', '0')) || Infinity;
-  const apply = args.includes('--apply');
+  const apply = args.includes('--apply'); const second = args.includes('--second-viewer');
+  const cte2Out = opt('cte2-out', out.replace(/\.jsonl$/, '') + '.viewer2.cte.sql');
   const modelOpt = opt('model');
   const model = `${backendName}:${modelOpt ?? 'default'}`;
   const sessions = JSON.parse(readFileSync(inFile, 'utf8')).map(normalizeSession).slice(0, limit);
-  const runId = randomUUID();
+  const runId = randomUUID(); const runId2 = randomUUID(); // viewer-2 rows get their own run id (the table's unique key is run, vehicle, session)
   // Resumable: rows already in --out (same vehicle + session) are kept and skipped; each new row is appended as it is produced.
   const rows = existsSync(out) ? readFileSync(out, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
-  const done = new Set(rows.map((r) => `${r.vehicle_id}|${r.session_key}`)); const failed = [];
+  const done = new Set(rows.map((r) => `${r.vehicle_id}|${r.session_key}|${r.viewer ?? 1}`)); const failed = [];
+  const one = async (s, viewer, tag) => {
+    const label = await labelSession(s, { backend, cacheDir, model: modelOpt, viewer });
+    const row = toInference(s, label, { runId: viewer === 1 ? runId : runId2, model: viewer === 1 ? model : `${model}#viewer2`, viewer });
+    rows.push(row); done.add(`${s.vehicle_id}|${s.session_key}|${viewer}`); appendFileSync(out, JSON.stringify(row) + '\n');
+    console.error(`${tag} ${s.session_key} viewer ${viewer} -> ${label.scene_label} (${label.confidence})`);
+    return row;
+  };
   for (const [i, s] of sessions.entries()) {
-    if (done.has(`${s.vehicle_id}|${s.session_key}`)) continue;
+    const tag = `[${i + 1}/${sessions.length}]`;
     try {
-      const label = await labelSession(s, { backend, cacheDir, model: modelOpt });
-      const row = toInference(s, label, { runId, model }); rows.push(row); appendFileSync(out, JSON.stringify(row) + '\n');
-      console.error(`[${i + 1}/${sessions.length}] ${s.session_key} -> ${label.scene_label} (${label.confidence})`);
-    } catch (e) { failed.push({ session_key: s.session_key, vehicle_id: s.vehicle_id, error: e.message }); console.error(`[${i + 1}/${sessions.length}] ${s.session_key} FAILED: ${e.message}`); }
+      let r1 = rows.find((r) => r.vehicle_id === s.vehicle_id && r.session_key === s.session_key && (r.viewer ?? 1) === 1);
+      if (!r1) r1 = await one(s, 1, tag);
+      if (second && r1.confidence < SECOND_VIEWER_BELOW && !done.has(`${s.vehicle_id}|${s.session_key}|2`)) await one(s, 2, tag);
+    } catch (e) { failed.push({ session_key: s.session_key, vehicle_id: s.vehicle_id, error: e.message }); console.error(`${tag} ${s.session_key} FAILED: ${e.message}`); }
   }
   writeFileSync(out, rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''));
-  writeFileSync(cteOut, valuesCte(rows) + '\n');
-  console.error(`run ${runId}: ${rows.length} labelled, ${failed.length} failed -> ${out}, ${cteOut}${apply ? '' : ' (dry run, no database write)'}`);
+  const v1 = rows.filter((r) => (r.viewer ?? 1) === 1); const v2 = rows.filter((r) => r.viewer === 2);
+  writeFileSync(cteOut, valuesCte(v1) + '\n');
+  if (second) writeFileSync(cte2Out, valuesCte(v2, 'scene_labels_v2') + '\n');
+  console.error(`run ${runId}: ${rows.length} labelled (${v2.length} by a second viewer), ${failed.length} failed -> ${out}, ${cteOut}${second ? `, ${cte2Out}` : ''}${apply ? '' : ' (dry run, no database write)'}`);
   if (apply && rows.length) {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!key) { console.error('--apply needs SUPABASE_SERVICE_ROLE_KEY'); process.exit(2); }
