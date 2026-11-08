@@ -180,3 +180,27 @@ is a later, separate decision; nothing is dropped.
 org or external identity; the artist's claim to origin), group membership (series, edition parent/child, collection,
 exhibition), holder claims, images as `image_identities` rows keyed by sha256 with pHash candidates, the local archive lane
 (the shoot asset and Blur's session clustering). Each needs lots in the log first; the writer above is what they extend.
+
+### 2026-11-08, later the same day: the walk runs, Mecum lands, the creation fold
+
+- **The walk is scheduled** (`20261108200000_asset_lot_walk.sql`): cron `asset-lots-bonhams-walk` every 10 minutes calls `art_land`
+  with two pages of 250; the department is chosen by `asset_lot_next_department` (the slice department furthest behind the
+  house's own count), and `asset_lot_walk_health(source)` is the rows-landed check beside it. The writer keeps an unsold lot's
+  high bid (`structured_data.high_bid`).
+- **Mecum Road Art** lands from the retained 2026-10-14 index through the same writer (`scripts/data/land_mecum_road_art.py`,
+  one-off): `department_code = 'Road Art'` (the house's `lot_type`), `house_group` = the house's model label, the result as the
+  house's `sale_result` label, the price as `highest_bid_or_price` (the index does not say hammer vs high bid; recorded as the
+  basis). Type: automobilia; memorabilia when the model label names a guitar, framed art, poster or photograph.
+- **The creation fold** (`20261108230000_asset_creation_claims.sql`) is the first fold of section 3's bridges. The party is an
+  `external_identities` row (`platform = 'art_catalogue'`, handle = printed name + printed dates): the shape a party has before
+  it is a user, claimable through the existing `request_external_identity_claim`, so an artist, estate or foundation takes the
+  row over without touching the claims. The claim is an `asset_observations` row of kind `creation_claim`: role creator, the
+  house's attribution word kept as a word (`direct`, `after`, `attributed_to`, `circle_of`, `school_of`, `follower_of`,
+  `manner_of`, `studio_of`, `workshop_of`, `style_of`: the trade's own ladder of claim strength, never a number), and the
+  executor when the house prints "by <name> (dates)" after the artist (Chagall's lithographs by Charles Sorlier: the
+  technician the owner named). Only the house's laid-out lines are read (first line the artist, second the qualifier); no
+  free text is parsed. Readers: `asset_creators(source)` (lots direct / after / other, priced lots, hammer min, median and max
+  per currency as stated, sale years: the market by party, as the make table is for cars) and `asset_creation_read(asset)`.
+- **Still open from section 3:** holding (asset × party × share × as-of) and membership (edition parent/child, series,
+  collection; Bonhams prints "from the edition of 250" in the title and Mecum prints the collection in `collection_tax`, both
+  retained on the lot row, neither folded yet).
