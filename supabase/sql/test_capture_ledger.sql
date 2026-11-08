@@ -1,4 +1,4 @@
--- Capture ledger: one state per frame shared by the day list and the day detail; the phone's skips land with their reason
+-- Capture ledger (20261111170000 + the grouped reader 20261111180000): one state per frame shared by the day list and the day detail; the phone's skips land with their reason
 -- and vanish once the frame arrives; the re-scan request is made by the owner, claimed once by a phone and closed; anon
 -- reaches nothing; the revert removes it all.
 \set ON_ERROR_STOP on
@@ -36,6 +36,7 @@ CREATE FUNCTION pg_temp.assert_true(ok boolean, msg text) RETURNS void LANGUAGE 
 BEGIN IF NOT coalesce(ok, false) THEN RAISE EXCEPTION 'contract failed: %', msg; END IF; END $$;
 
 \i supabase/migrations/20261111170000_capture_ledger.sql
+\i supabase/migrations/20261111180000_capture_ledger_fast.sql
 
 -- Fixture (synthetic, a disposable database): one owner, two vehicles, one day with every state, a second day of skips.
 -- ALLOW_RAW_TESTIMONY_WRITE
