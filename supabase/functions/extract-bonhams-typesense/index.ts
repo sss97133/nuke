@@ -64,6 +64,12 @@ function okJson(body: unknown, status = 200): Response {
   });
 }
 
+/** One read of the Bonhams search index (a JSON search API with the site's public search key, not a page: archiveFetch does not apply). */
+function typesenseSearch(params: Record<string, string>): Promise<Response> {
+  const url = `${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams(params)}`;
+  return fetch(url, { headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" } }); // guardrail-allow: raw-fetch
+}
+
 function stripHtml(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
@@ -400,11 +406,10 @@ Deno.serve(async (req) => {
     //   POST { "mode": "art_census" }
     if (mode === "art_census") {
       const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "");
-      const headers = { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" };
       const facet = async (filter?: string) => {
         const params: Record<string, string> = { q: "*", query_by: "title", per_page: "0", facet_by: "department.code,department.name", max_facet_values: "250" };
         if (filter) params.filter_by = filter;
-        const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams(params)}`, { headers });
+        const res = await typesenseSearch(params);
         if (!res.ok) throw new Error(`Typesense HTTP ${res.status}`);
         return await res.json() as { found: number; facet_counts?: Array<{ field_name: string; counts: Array<{ value: string; count: number }> }> };
       };
@@ -460,10 +465,9 @@ Deno.serve(async (req) => {
         pass = Number(c.pass) || 0;
         pageNo = (Number(c.last_page) || 0) + 1;
       }
-      const headers = { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" };
-      const fetchPage = (n: number) => fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams({
+      const fetchPage = (n: number) => typesenseSearch({
         q: "*", query_by: "title", per_page: String(size), page: String(n), filter_by: artDepartmentFilter(department), sort_by: SORT,
-      })}`, { headers });
+      });
 
       const receipts: Record<string, unknown>[] = [];
       let pagesRead = 0; let found = 0; let totalPages = 0; let mapped = 0; let outside = 0;
