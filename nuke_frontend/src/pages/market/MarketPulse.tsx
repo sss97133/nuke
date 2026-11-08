@@ -1,4 +1,3 @@
-import { AuctionFlow } from './AuctionFlow';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -497,7 +496,7 @@ export function matchesModelScope(a: LiveAuction, model: string | null): boolean
 
 export default function MarketPulse({ onUnavailable, collection }: { onUnavailable?: React.ReactNode; collection?: React.ReactNode }) {
   usePageTitle('Market');
-  const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt, newBids, tape, tapeSources, tapeStatus, tapeError, tapeUpdatedAt } = useMarketPulse();
+  const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt, newBids } = useMarketPulse();
   const share = useHouseShare();
   // A bell for each bid as it lands, off until the viewer turns it on.
   const [sound, setSound] = useState(false);
@@ -884,8 +883,6 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     <div className="market-explorer">
       {masthead}
       {figure}
-      {view === 'inventory' && data && <AuctionFlow bids={tape ?? []} sourceStatus={tapeStatus ?? []} configuredSources={tapeSources ?? []} houses={data.houses ?? []} auctions={data.auctions} now={now}
-        error={tapeError ?? false} updatedAt={tapeUpdatedAt ?? 0} onInspect={a => openActivity(a, 'auction')} />}
 
       {activityId && (view !== 'inventory' || !pageRows.some(a => a.id === activityId)) &&
         <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
