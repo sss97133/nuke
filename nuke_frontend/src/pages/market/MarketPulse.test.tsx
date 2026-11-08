@@ -497,34 +497,59 @@ describe('how far a lot has to run', () => {
 });
 
 describe('the board in its own history', () => {
-  it('places each figure against the same hour on earlier weeks, once, and keeps no second copy of the totals', async () => {
-    fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
-    fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 86_400_000, bids: 100_000, n: 3, byMake: null, source: 'live' };
-    fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 50_000 + i * 1_000, n: 2, byMake: null, source: i === 0 ? 'archive' : 'live' }));
+  // Every house's own reading a week ago and its 15-minute line since (live_board_share).
+  const weekOfShare = (bidsAgo: number, lotsAgo: number) => {
+    const t0 = Date.now() - 7 * 86_400_000;
+    return { isError: false, data: { firstAt: t0, convertedFirstAt: null, firstAtByHouse: { bringatrailer: t0 },
+      weekAgo: { bringatrailer: { at: t0, bidUsd: bidsAgo, lots: lotsAgo, lotsWithBid: lotsAgo, bidUsdConverted: null } },
+      points: [0, 1, 2].map(i => ({ at: t0 + i * 3 * 86_400_000, house: 'bringatrailer', bidUsd: bidsAgo + i * 5_000, lots: lotsAgo, lotsWithBid: lotsAgo, bidUsdConverted: null })) } };
+  };
+  it('reads each figure as a ticker: the number, one change on last week, and the line it moved along', async () => {
+    fixture.share = weekOfShare(100_000, 3);
     await render('make=all');
     const [bids, lots] = [...container.querySelectorAll('.market-figure__item')];
     expect(bids.querySelector('.k-figure')?.textContent).toBe('$125K');
-    expect(bids.textContent).toContain('+25.0% on a week ago · higher than all 7 weeks at this hour');
-    expect(bids.querySelectorAll('.market-range__tick')).toHaveLength(7);
+    const chg = bids.querySelector('.market-figure__chg')!;
+    expect(chg.className).toContain('is-up');
+    expect(chg.textContent).toBe('▲ 25.0%vs last week');
+    // the line: three readings and now, with last week's level dotted
+    expect(bids.querySelector('.market-figure__chart polyline')?.getAttribute('points')?.split(' ')).toHaveLength(4);
+    expect(bids.querySelector('.market-stock__spark-base')).toBeTruthy();
+    expect(bids.querySelector('button')?.getAttribute('aria-label')).toBe('$125K bid now, +25.0% vs last week');
+    expect(bids.querySelector('button')?.getAttribute('title')).toContain('against their own readings');
     expect(lots.querySelector('.k-figure')?.textContent).toBe('4');
-    expect(lots.textContent).toContain('+0.0% on a week ago · higher than all 7 weeks at this hour');
-    // Said once: no second, longer copy of the total on the page (hover titles aside).
-    const visible = container.cloneNode(true) as HTMLElement;
-    visible.querySelectorAll('title').forEach(t => t.remove());
-    expect(visible.textContent).not.toContain('$125,000');
-    expect(container.querySelector('[aria-label="Edges of the board\'s own history"]')).toBeNull();
-    expect(container.querySelector('[aria-label="The board in its own history"]')).toBeNull();
-  });
-  it('says nothing comparative without readings, and says ties as level', async () => {
-    await render();
-    expect(container.querySelector('.market-range')).toBeNull();
-    expect(container.querySelector('.market-figure')?.textContent).not.toContain('weeks at this hour');
-    fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
-    fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 100_000 + i * 10_000, n: 3, byMake: null, source: 'live' }));
+    expect(lots.querySelector('.market-figure__chg')?.textContent).toBe('▲ 33.3%vs last week');
+    // One change per figure: no ranks, no house-by-house list, no second, longer copy of the total under the headline.
+    const visible = container.querySelector('.market-figure')!.textContent!;
+    expect(visible).not.toMatch(/weeks at this hour|week on week|on a week ago|\$125,000/);
+    fixture.share = weekOfShare(150_000, 5);
     await render('make=all');
+    expect(container.querySelector('.market-figure__chg')?.className).toContain('is-down');
+    expect(container.querySelector('.market-figure__chg')?.textContent).toBe('▼ 16.7%vs last week');
+  });
+  it('compares a make on BaT\'s own hourly index, with the readings at this hour on earlier weeks as its line', async () => {
+    fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
+    fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 86_400_000, bids: 900_000, n: 30, byMake: { PORSCHE: [20_000, 2] }, source: 'live' };
+    fixture.sameHour = Array.from({ length: 4 }, (_, i) => ({ day: `2026-09-${12 + i * 7}`, bids: 1, n: 1, byMake: { PORSCHE: [10_000 + i * 1_000, 2] }, source: 'live' }));
+    await render('make=PORSCHE');
     const [bids, lots] = [...container.querySelectorAll('.market-figure__item')];
-    expect(bids.textContent).toContain('lower than 4 of 7 weeks at this hour');
-    expect(lots.textContent).toContain('level with all 7 weeks at this hour');
+    expect(bids.querySelector('.market-figure__chg')?.textContent).toBe('▲ 25.0%vs last week');
+    expect(bids.querySelector('.market-figure__chg img')).toBeNull();
+    expect(bids.querySelector('.market-figure__chart polyline')?.getAttribute('points')?.split(' ')).toHaveLength(5);
+    expect(bids.querySelector('button')?.getAttribute('title')).toContain('Now higher than all 4 Saturdays at this hour');
+    expect(lots.querySelector('.market-figure__chg')?.textContent).toBe('▲ 0.0%vs last week');
+  });
+  it('says nothing comparative without a reading a week old, and draws no line', async () => {
+    await render();
+    expect(container.querySelector('.market-figure__chg')).toBeNull();
+    expect(container.querySelector('.market-figure__chart')).toBeNull();
+    fixture.share = { isError: true, data: undefined };
+    await render();
+    expect(container.querySelector('.market-figure__chg')).toBeNull();
+    // a family has no series of its own
+    fixture.share = weekOfShare(100_000, 3);
+    await render('make=PORSCHE&family_name=911');
+    expect(container.querySelector('.market-figure__chg')).toBeNull();
   });
   it('opens the map of what each figure is made of, by dollars or by lots, and closes it again', async () => {
     await render();
@@ -759,7 +784,7 @@ describe('headline movement inspection', () => {
     await click('Choose Ford cohort');
     expect(container.querySelector('[aria-label="Bid total movement"]')?.textContent).toContain('Starting observation');
     expect(container.querySelector('.market-history__change')).toBeNull();
-    expect(container.querySelector('.market-navigation > summary')?.textContent).toContain('Explore market');
+    expect(container.querySelector('nav[aria-label="Market views"] [aria-label="Market scope"]')).toBeTruthy();
     const select = container.querySelector<HTMLSelectElement>('[aria-label="Sort lots"]')!;
     await act(async () => { select.value = 'bid'; select.dispatchEvent(new Event('change', { bubbles: true })); });
     expect(window.location.search).toContain('sort=bid');
@@ -800,8 +825,9 @@ describe('every live house on one board', () => {
     await render();
     expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$60K');
     const note = container.querySelector('.market-figure__note')!.textContent!;
-    expect(note).toContain('2 lots bid in EUR and GBP listed but not added: no published rate');
+    expect(note).not.toContain('not added');
     expect(note).toContain('Cars & Bids: 188 lots held off, last read Oct 1');
+    expect(container.querySelector('.market-figure__value')?.getAttribute('title')).toContain('2 lots bid in EUR and GBP listed but not added: no published rate');
   });
   it('adds a foreign bid at its published rate, names the rate and its date, and keeps the house figure as the bid', async () => {
     const ecb = (currency: string, rate: number) => ({ currency, rate, rateDate: '2026-11-06', source: `ECB euro foreign exchange reference rates 2026-11-06 (${currency})`,
@@ -811,9 +837,9 @@ describe('every live house on one board', () => {
     await render();
     // $60,000 in dollars + £44,694 x 1.338488281 ($59,822) + €38,250 x 1.1165 ($42,706)
     expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$163K');
-    const note = container.querySelector('.market-figure__note')!.textContent!;
-    expect(note).toContain('2 lots bid in EUR and GBP added in dollars at the ECB reference rate of 2026-11-06');
-    expect(note).not.toContain('not added');
+    const hover = container.querySelector('.market-figure__value')!.getAttribute('title')!;
+    expect(hover).toContain('2 lots bid in EUR and GBP added in dollars at the ECB reference rate of 2026-11-06');
+    expect(hover).not.toContain('not added');
     const gbp = container.querySelector('[data-vehicle-id="cc-gbp"]')!;
     expect(gbp.textContent).toContain('£44,694');
     expect(gbp.querySelector('.market-bid')?.getAttribute('title')).toContain('≈ $59,822 at 1.3385 USD per GBP (ECB reference rate, 2026-11-06)');
@@ -844,12 +870,16 @@ describe('every live house on one board', () => {
     await click('All houses');
     expect(window.location.search).not.toContain('house=');
   });
-  it('compares with last week on BaT lots only, and says so', async () => {
+  it('compares on BaT alone when no house history can be read, and shows the BaT mark beside the change', async () => {
+    fixture.share = { isError: true, data: undefined };
     fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 24 * HOUR, bids: 25_000, n: 2, byMake: null, source: 'live' };
     await render();
-    expect(container.textContent).toContain('BaT +100.0% on a week ago');
+    const chg = container.querySelector('.market-figure__chg')!;
+    expect(chg.textContent).toContain('100.0%');
+    expect(chg.querySelector('img')?.getAttribute('alt')).toBe('BaT');
+    expect(container.querySelector('.market-figure__value')?.getAttribute('aria-label')).toBe('$60K bid now, +100.0% vs last week on BaT');
     await click('Collecting Cars, 2 lots');
-    expect(container.textContent).not.toContain('on a week ago');
+    expect(container.querySelector('.market-figure__chg')).toBeNull();
   });
   it('bids high to low by dollars; a bid in another currency is its own range, never an unrecorded one', async () => {
     await render();
@@ -916,13 +946,22 @@ describe('every live house on one board', () => {
     expect(stock.textContent).toContain('Recording starts now');
     expect(stock.querySelector('polyline')).toBeNull();
   });
-  it('compares each house with its own week-ago reading, and says which houses have no week of history yet', async () => {
+  it('compares each house with its own week-ago reading in the watchlist, and marks the houses with no week of history yet', async () => {
     const t0 = Date.parse('2026-09-26T12:00:00Z');
     fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { pcarmarket: Date.parse('2026-10-02T12:00:00Z'), 'collecting-cars': t0 }, points: [],
       weekAgo: { 'collecting-cars': { at: t0, bidUsd: 0, lots: 1, lotsWithBid: 1 } } } };
-    await render();
-    const text = container.querySelector('.market-figure')!.textContent!;
-    expect(text).toContain('PCarMarket: no week of history yet (recorded since Oct 2)');
+    await render('map=lots');
+    const row = (alt: string) => [...container.querySelectorAll('.market-stock__watch tbody tr')].find(r => r.querySelector(`img[alt="${alt}"]`))!;
+    const week = (alt: string) => row(alt).querySelectorAll('td')[3];
+    expect(week('Collecting Cars').textContent).toBe('+100.00%');
+    expect(week('Collecting Cars').className).toBe('is-up');
+    expect(week('PCarMarket').textContent).toBe('—');
+    expect(week('PCarMarket').getAttribute('title')).toContain('No week of readings yet (recorded since Oct 2');
+    // the headline lots compare only the house with a week of readings, under its mark; the hover names the rest
+    const lots = container.querySelectorAll('.market-figure__item')[1];
+    expect(lots.querySelector('.market-figure__chg img')?.getAttribute('alt')).toBe('Collecting Cars');
+    expect(lots.querySelector('button')?.getAttribute('title')).toContain('BaT, PCarMarket: no week of readings yet, not in the change');
+    expect(container.querySelector('.market-figure')!.textContent).not.toContain('no week of history');
   });
   it('keeps the price axis readable: neighbouring ticks differ even when the range is a sliver of the total', async () => {
     const t0 = Date.parse('2026-10-03T08:00:00Z');

@@ -225,12 +225,24 @@ export function PriceChart({ series, measure, up }: { series: { t: number; v: nu
   );
 }
 
-function Spark({ series, up }: { series: { t: number; v: number }[]; up: boolean }) {
-  if (series.length < 2) return <span className="market-stock__spark market-stock__spark--none" aria-hidden="true">—</span>;
-  const lo = Math.min(...series.map(x => x.v)), hi = Math.max(...series.map(x => x.v));
+/** A trend line without axes. `base` draws the comparison level as a dotted line (a stock app's previous close); `up` null
+ *  draws it in the text colour, for a line with no comparison behind it. The caller sizes it with `className`. */
+export function Spark({ series, up, base, className, label }: {
+  series: { t: number; v: number }[]; up: boolean | null; base?: number | null; className?: string; label?: string;
+}) {
+  const cls = `market-stock__spark${className ? ` ${className}` : ''}`;
+  if (series.length < 2) return <span className={`${cls} market-stock__spark--none`} aria-hidden="true">—</span>;
+  const values = [...series.map(x => x.v), ...(base != null ? [base] : [])];
+  const lo = Math.min(...values), hi = Math.max(...values);
   const t0 = series[0].t, t1 = series[series.length - 1].t;
-  const pts = series.map(x => `${(((x.t - t0) / Math.max(1, t1 - t0)) * 80).toFixed(1)},${(22 - ((x.v - lo) / Math.max(1e-9, hi - lo)) * 20).toFixed(1)}`).join(' ');
-  return <svg className="market-stock__spark" viewBox="0 0 80 24" aria-hidden="true"><polyline points={pts} style={{ stroke: up ? 'var(--success)' : 'var(--error)' }} /></svg>;
+  const y = (v: number) => (22 - ((v - lo) / Math.max(1e-9, hi - lo)) * 20).toFixed(2);
+  const pts = series.map(x => `${(((x.t - t0) / Math.max(1, t1 - t0)) * 80).toFixed(2)},${y(x.v)}`).join(' ');
+  const stroke = up == null ? 'var(--text)' : up ? 'var(--success)' : 'var(--error)';
+  return <svg className={cls} viewBox="0 0 80 24" preserveAspectRatio="none" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+    {label && <title>{label}</title>}
+    {base != null && <line className="market-stock__spark-base" x1="0" x2="80" y1={y(base)} y2={y(base)} />}
+    <polyline points={pts} style={{ stroke }} />
+  </svg>;
 }
 
 /** What the clicked figure opens into, laid out like a market screen: the board's total as a price chart with range
@@ -276,18 +288,25 @@ export function HouseMarket({ measure, live, data: read, isError, now }: {
         {series.length >= 2 ? ` Showing ${span(series[series.length - 1].t - series[0].t)}.` : ''}
       </Text>
       <table className="market-stock__watch" aria-label="Houses">
-        <thead><tr><th scope="col">House</th><th scope="col">{unit}</th><th scope="col">Share</th><th scope="col">Change</th><th scope="col" aria-label="Trend" /></tr></thead>
+        <thead><tr><th scope="col">House</th><th scope="col">{unit}</th><th scope="col">Share</th><th scope="col">Change</th><th scope="col">Week</th><th scope="col" aria-label="Trend" /></tr></thead>
         <tbody>
           {rows.map(([h, v]) => {
             const hs = inRange(houseSeries(data?.points ?? [], h, measure), range);
             const hc = change(hs);
             const hup = (hc?.abs ?? 0) >= 0;
+            // Week on week: the house now against its own reading seven days ago, in the unit that reading keeps.
+            const wk = houseWeekChange(h, v, measure, data);
+            const since = read?.firstAtByHouse[h];
             return (
               <tr key={h}>
                 <th scope="row"><HouseMark house={h} /></th>
                 <td><Text role="measure" dense>{valueText(v, measure, 2)}</Text></td>
                 <td><Text role="measure" dense>{total > 0 ? `${((v / total) * 100).toFixed(1)}%` : '—'}</Text></td>
                 <td className={hc ? (hup ? 'is-up' : 'is-down') : ''}><Text role="measure" dense>{hc ? `${hup ? '▲' : '▼'} ${signedPct(hc.pct)}` : '—'}</Text></td>
+                <td className={wk == null ? '' : wk >= 0 ? 'is-up' : 'is-down'}
+                  title={wk != null ? `Now against its own reading at ${stamp(data!.weekAgo[h].at)}` : `No week of readings yet${since ? ` (recorded since ${stamp(since)})` : ''}`}>
+                  <Text role="measure" dense>{wk == null ? '—' : signedPct(wk)}</Text>
+                </td>
                 <td><Spark series={hs} up={hup} /></td>
               </tr>
             );
