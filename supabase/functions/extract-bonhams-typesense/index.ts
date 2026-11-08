@@ -511,11 +511,19 @@ Deno.serve(async (req) => {
         pageNo += 1;
       }
       const sum = (k: string) => receipts.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+      // The creation fold follows the landing: the house's first two catalogue lines become the party and its claim
+      // (fold_asset_creation_claims, bounded to this run's lots plus a small backlog). Its failure is reported, never swallowed.
+      let creation: Record<string, unknown> | null = null;
+      if (assetTypeForDepartment(department) === "artwork" && sum("observations_new") > 0) {
+        const { data: fold, error: foldErr } = await supabase.rpc("fold_asset_creation_claims", { p_source_slug: "bonhams", p_limit: Math.min(sum("observations_new") + 100, 1000) });
+        creation = foldErr ? { error: foldErr.message } : (fold as Record<string, unknown>);
+        if (foldErr) console.error(`[bonhams-typesense] creation fold failed: ${foldErr.message}`);
+      }
       return okJson({
         success: true, mode: "art_land", department, asset_type: assetTypeForDepartment(department), found, total_pages: totalPages,
         pages_read: pagesRead, last_page: pageNo, pass, mapped, outside_slice: outside,
         assets_new: sum("assets_new"), assets_existing: sum("assets_existing"), observations_new: sum("observations_new"),
-        observations_same: sum("observations_same"), observations_superseded: sum("observations_superseded"), refused: sum("refused"), receipts,
+        observations_same: sum("observations_same"), observations_superseded: sum("observations_superseded"), refused: sum("refused"), creation, receipts,
       });
     }
 
