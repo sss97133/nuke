@@ -45,7 +45,9 @@ const deps: Deps = {
   },
   extract: (url, docType) => callFn("document-ocr-worker", { mode: "extract", storage_path: url, document_type_hint: docType }),
   fetchBytes: async (url) => {
-    const r = await fetch(url);
+    // The frame's own storage object on this project; a page on any other host is refused, never fetched.
+    if (!url.startsWith(`${SUPABASE_URL}/storage/`)) throw new Error("frame url is not on this project's storage");
+    const r = await fetch(url); // SUPABASE_URL storage object, not a page scrape
     if (!r.ok) throw new Error(`frame fetch failed: ${r.status}`);
     return { bytes: new Uint8Array(await r.arrayBuffer()), contentType: r.headers.get("content-type") ?? "" };
   },
