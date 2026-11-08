@@ -448,10 +448,16 @@ Deno.serve(async (req) => {
     // to page 1 as a new pass (a revisit, so published hammers supersede upcoming rows).
     //   POST { "mode": "art_land", "department": "PIC-GEN", "pages": 2 }        -> resume the department's walk
     //   POST { "mode": "art_land", "department": "PIC-GEN", "page": 7 }         -> one named page (a repair)
-    //   POST { "mode": "art_land" }                                             -> the slice's first department (PIC-GEN)
+    //   POST { "mode": "art_land", "pages": 2 }                                 -> the cron: the slice department furthest behind
     if (mode === "art_land") {
       const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "");
-      const department = String(body.department ?? ART_DEPARTMENTS[0]).toUpperCase();
+      let department = String(body.department ?? "").toUpperCase();
+      if (!department) {
+        // No department named (the cron): the slice department furthest behind the house's own count.
+        const { data: nxt, error: nxtErr } = await supabase.rpc("asset_lot_next_department", { p_source_slug: "bonhams", p_departments: [...ART_DEPARTMENTS] });
+        if (nxtErr) return okJson({ success: false, error: `next department read failed: ${nxtErr.message}` }, 503);
+        department = typeof nxt === "string" && nxt ? nxt : ART_DEPARTMENTS[0];
+      }
       if (!assetTypeForDepartment(department)) return okJson({ success: false, error: `department ${department} is outside the art/automobilia slice` }, 400);
       const pages = Math.min(Math.max(Number(body.pages) || 1, 1), 4);
       const size = 250;
