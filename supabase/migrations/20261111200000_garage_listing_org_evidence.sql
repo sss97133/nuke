@@ -1144,7 +1144,12 @@ st AS MATERIALIZED (
 -- The account's live statements (stored and inline), one row per statement, read as a relationship claim; shared by every member of a
 -- duplicate cluster. A superseded statement is already excluded (is_superseded is set by the sanctioned writer from 'supersedes').
 stm AS MATERIALIZED (
-  SELECT o.id, o.vehicle_id, o.observed_at, o.ingested_at, o.content_text, o.sd, fpx.v AS fp
+  SELECT o.id, o.vehicle_id, o.observed_at, o.ingested_at, o.content_text, o.sd, fpx.v AS fp, rr.roles,
+         coalesce((o.sd->'correction'->'relationship'->>'disputed')::boolean, false) OR 'claimed_interest' = ANY (rr.roles) AS disputed_flag,
+         coalesce((o.sd->'correction'->'relationship'->>'ownership_denied')::boolean, false) AS denied_flag,
+         coalesce(jsonb_array_length(CASE WHEN jsonb_typeof(o.sd->'correction'->'evidence_ids') = 'array'
+                                          THEN o.sd->'correction'->'evidence_ids' END), 0) > 0
+           OR nullif(btrim(coalesce(o.content_text, '')), '') IS NOT NULL AS cited
     FROM cfg
     CROSS JOIN LATERAL (
         -- stored statements and the inline (unstored) set; an owner_statement_v1 row is read as a relationship claim
@@ -1172,11 +1177,14 @@ stm AS MATERIALIZED (
     CROSS JOIN LATERAL (SELECT (coalesce(o.sd->>'intake_actor', '') <> 'authorized_agent'
                                 OR (o.sd->>'speaker_user_id' = cfg.u::text
                                     AND coalesce(o.content_text, '') ~* '^[\s"“'']*(i|we|my|me|i''m|i''ve|i''d)\M')) AS v) fpx
+    CROSS JOIN LATERAL (SELECT ARRAY(SELECT x FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(o.sd->'correction'->'relationship'->'roles') = 'array'
+                                                    THEN o.sd->'correction'->'relationship'->'roles' ELSE '[]'::jsonb END) x) AS roles) rr
    WHERE o.sd->'correction' ? 'relationship' OR o.sd->>'claim_contract' = 'owner_statement_v1'
 ),
 f AS (
   SELECT cl.ck AS vid, cl.members, cfg.u, cfg.months, cfg.r_max_s, cfg.r_max_span, cfg.r_min_ph, cfg.r_min_geo, cfg.r_pers_span,
          ver.id AS ver_id, ver.ver_vid,
+         dsp.id AS dsp_id, dsp.observed_at AS dsp_t, dsp.vehicle_id AS dsp_vid, ows.id AS ows_id, ows.observed_at AS ows_t, ows.vehicle_id AS ows_vid,
          perm.co_by_other, perm.self_granted, perm.owner_perm, perm.any_perm,
          obs.id AS obs_id, obs.stmt_vid, obs.content_text, obs.structured_data, obs.first_person,
          ph.n AS photos, ph.n_own, ph.n_origin, ph.n_unk, ph.n_scraped, ph.n_imp, ph.n_fact, ph.imp_cites, ph.scraped_cite, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices, ph.by_member,
@@ -1222,6 +1230,16 @@ f AS (
     SELECT o.id, o.content_text, o.sd AS structured_data, o.fp AS first_person, o.vehicle_id AS stmt_vid
       FROM stm o WHERE o.vehicle_id = ANY (cl.members)
      ORDER BY o.fp DESC, o.observed_at DESC NULLS LAST, o.ingested_at DESC, o.id::text LIMIT 1) obs ON true
+  -- Statement recency: the newest CITED dispute (any speaker) and the newest first-person ownership statement (not itself a dispute or a
+  -- denial) of the cluster. A first-person ownership statement observed AFTER the dispute supersedes it; an older one does not.
+  LEFT JOIN LATERAL (
+    SELECT o.id, o.observed_at, o.vehicle_id FROM stm o
+     WHERE o.vehicle_id = ANY (cl.members) AND o.disputed_flag AND o.cited
+     ORDER BY o.observed_at DESC NULLS LAST, o.ingested_at DESC, o.id::text LIMIT 1) dsp ON true
+  LEFT JOIN LATERAL (
+    SELECT o.id, o.observed_at, o.vehicle_id FROM stm o
+     WHERE o.vehicle_id = ANY (cl.members) AND o.fp AND 'owner_current' = ANY (o.roles) AND NOT o.denied_flag AND NOT o.disputed_flag
+     ORDER BY o.observed_at DESC NULLS LAST, o.ingested_at DESC, o.id::text LIMIT 1) ows ON true
   -- Step 1 evidence: the account's photos; capture facts count only for own-device photos.
   LEFT JOIN LATERAL (
     SELECT count(*) AS n, count(*) FILTER (WHERE p.own) AS n_own, count(*) FILTER (WHERE p.origin) AS n_origin,
@@ -1277,6 +1295,7 @@ g3 AS (
          -- a downgrade (denial, dispute, claimed_interest) counts only when it cites evidence
          g2.denied_raw AND g2.cited AS denied,
          (coalesce((g2.claim->>'disputed')::boolean, false) OR 'claimed_interest' = ANY (g2.roles)) AS disputed_raw,
+         g2.dsp_id IS NOT NULL AND g2.ows_id IS NOT NULL AND g2.ows_t > g2.dsp_t AS dsp_sup,
          coalesce(g2.photos, 0) AS n_photos,
          coalesce(g2.n_own, 0) AS own_n,
          coalesce(g2.n_imp, 0) AS imp_n,
@@ -1285,7 +1304,8 @@ g3 AS (
 ),
 g4 AS MATERIALIZED (
   SELECT g3.*,
-         g3.disputed_raw AND g3.cited AS disputed,
+         -- a cited dispute stands unless a newer first-person ownership statement supersedes it
+         g3.dsp_id IS NOT NULL AND NOT g3.dsp_sup AS disputed,
          (g3.denied_raw OR g3.disputed_raw) AND NOT g3.cited AS uncited_ignored,
          g3.act_last IS NOT NULL AND g3.act_last < now() - make_interval(months => g3.months) AS decayed,
          g3.own_n > 0 OR (g3.n_photos > 0 AND g3.obs_id IS NOT NULL) AS doc_ok,
@@ -1364,7 +1384,7 @@ h AS (
         CASE WHEN g6.co_by_other AND NOT g6.owner_perm THEN 'co_owner_verified' ELSE 'owner_verified' END,
         CASE WHEN g6.org_id IS NOT NULL THEN 0.7 ELSE 0.98 END,
         'approved ownership verification with title document')
-      WHEN g6.disputed AND g6.cited THEN jsonb_build_array('claimed_interest', 0.6, 'cited dispute')
+      WHEN g6.disputed THEN jsonb_build_array('claimed_interest', 0.6, 'cited dispute')
       WHEN 'transfer_pending' = ANY (g6.roles) OR g6.claim->>'title_status' = 'transfer_pending'
         THEN jsonb_build_array('transfer_pending', 0.6, 'account states transfer pending')
       WHEN 'owner_current' = ANY (g6.roles) AND NOT g6.denied AND g6.org_id IS NULL THEN jsonb_build_array('owner_reported',
@@ -1490,14 +1510,19 @@ SELECT m.vid AS vehicle_id,
                'statement_from_duplicate', h.stmt_vid IS NOT NULL AND h.stmt_vid <> m.vid, 'roles', to_jsonb(h.roles), 'cited', h.cited,
                'first_person', h.first_person,
                'intake_actor', h.structured_data->>'intake_actor',
-               'uncited_downgrade_ignored', h.uncited_ignored, 'long_tenure', h.tenure, 'title_denied', h.title_denied),
+               'uncited_downgrade_ignored', h.uncited_ignored, 'long_tenure', h.tenure, 'title_denied', h.title_denied,
+               'dispute', CASE WHEN h.dsp_id IS NOT NULL THEN jsonb_build_object('observation_id', h.dsp_id, 'observed_at', h.dsp_t,
+                   'vehicle_id', h.dsp_vid, 'superseded', h.dsp_sup, 'superseded_by_observation_id', CASE WHEN h.dsp_sup THEN h.ows_id END) END,
+               'ownership_statement', CASE WHEN h.ows_id IS NOT NULL THEN jsonb_build_object('observation_id', h.ows_id,
+                   'observed_at', h.ows_t, 'vehicle_id', h.ows_vid, 'first_person', true) END),
              'eliminated', CASE WHEN h.uncited_ignored THEN '["claimed_interest"]'::jsonb
                                 WHEN h.obs_id IS NOT NULL AND h.ver_id IS NULL AND h.d->>0 IN ('owner_reported','previously_owned')
                                   THEN '["contributor","documenting","profile_record","imported_by_user"]'::jsonb
                                 ELSE '[]'::jsonb END))
        ) AS evidence,
        (h.d->>2) || CASE WHEN notes.t <> '' THEN ' (' || notes.t || ')' ELSE '' END AS reason,
-       ARRAY(SELECT i FROM unnest(ARRAY[h.obs_id, h.ver_id]) i WHERE i IS NOT NULL) AS evidence_ids,
+       ARRAY(SELECT x.i FROM (SELECT u.i, min(u.o) AS o FROM unnest(ARRAY[h.obs_id, h.ver_id, h.dsp_id, h.ows_id]) WITH ORDINALITY u(i, o)
+                               WHERE u.i IS NOT NULL GROUP BY u.i) x ORDER BY x.o) AS evidence_ids,
        h.ver_id AS title_verification_id,
        CASE WHEN h.own_n > 0 THEN h.first_t END AS documented_from,
        CASE WHEN h.own_n > 0 THEN h.last_t END AS documented_to
@@ -1508,6 +1533,7 @@ LEFT JOIN cur ON cur.vid = m.vid
 CROSS JOIN LATERAL (SELECT concat_ws('; ',
     CASE WHEN h.self_granted THEN 'self-granted permission ignored' END,
     CASE WHEN h.uncited_ignored THEN 'uncited downgrade ignored' END,
+    CASE WHEN h.dsp_sup THEN 'cited dispute ' || h.dsp_id || ' superseded by the newer first-person ownership statement ' || h.ows_id END,
     CASE WHEN h.org_id IS NOT NULL AND h.ver_id IS NULL AND 'owner_current' = ANY (h.roles)
          THEN 'owner statement set aside: listing shows organization inventory' END,
     CASE WHEN h.org_id IS NOT NULL AND h.ver_id IS NOT NULL THEN 'CONFLICT: title verification vs organization listing' END,

@@ -867,5 +867,42 @@ SELECT fixture_assert(:'gz_c'::jsonb->(gz(40))::text->>'role'='business_handling
   'a scene on one member applies to the cluster (pre-auction on both rows), citing the member it was recorded on');
 SELECT fixture_assert((SELECT count(*) FROM vehicles WHERE merged_into_vehicle_id IS NOT NULL AND id BETWEEN gz(30) AND gz(41))=0,'clusters never merge records');
 
+-- (d) statement recency: a first-person ownership statement newer than a cited dispute supersedes it; an older one does not
+CREATE FUNCTION gz_stmt(n int, ago interval, contract text, sd jsonb, txt text) RETURNS uuid LANGUAGE sql AS $$
+ INSERT INTO vehicle_observations(vehicle_id,submitted_by_user_id,content_text,structured_data,observed_at,ingested_at)
+ VALUES (gz(n),'00000000-0000-4000-8000-000000000001',txt,jsonb_build_object('claim_contract',contract)||sd,now()-ago,now()-ago) RETURNING id $$;
+CREATE FUNCTION gz_dispute(n int, ago interval, txt text) RETURNS uuid LANGUAGE sql AS $$
+ SELECT gz_stmt(n, ago, 'garage_owner_correction_v1', jsonb_build_object('correction', jsonb_build_object('relationship', fixture_claim('{claimed_interest}', false, true))), txt) $$;
+CREATE FUNCTION gz_owns(n int, ago interval, txt text) RETURNS uuid LANGUAGE sql AS $$
+ SELECT gz_stmt(n, ago, 'owner_statement_v1', jsonb_build_object('facts', jsonb_build_object('ownership_claim', true)), txt) $$;
+SELECT gz_dispute(42, interval '10 days', 'seller disputes my title') AS d42, gz_owns(42, interval '2 days', 'I own it') AS o42 \gset
+SELECT gz_dispute(43, interval '2 days', 'seller disputes my title') AS d43, gz_owns(43, interval '10 days', 'I own it') AS o43 \gset
+SELECT gz_dispute(44, interval '10 days', 'seller disputes my title') AS d44,
+       gz_stmt(44, interval '2 days', 'garage_owner_correction_v1', jsonb_build_object('intake_actor', 'authorized_agent',
+         'correction', jsonb_build_object('relationship', fixture_claim('{owner_current}'))), 'He owns it') AS o44 \gset
+SELECT gz_dispute(45, interval '10 days', NULL) AS d45, gz_owns(45, interval '2 days', 'I own it') AS o45 \gset
+\set gz_d_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('role', d.derived_role, 'conf', d.confidence, 'ids', to_jsonb(d.evidence_ids), 'reason', d.reason,
+          's5', (SELECT c->'evidence' FROM jsonb_array_elements(d.evidence->'chain') c WHERE (c->>'step')::int=5)))
+          FROM (:gz_d_sql) d WHERE d.vehicle_id BETWEEN gz(42) AND gz(45)) AS gz_d \gset
+SELECT fixture_assert(:'gz_d'::jsonb->(gz(42))::text->>'role'='owner_reported'
+  AND (:'gz_d'::jsonb->(gz(42))::text->'s5'->'dispute'->>'superseded')::boolean
+  AND :'gz_d'::jsonb->(gz(42))::text->'s5'->'dispute'->>'observation_id'=:'d42'
+  AND :'gz_d'::jsonb->(gz(42))::text->'s5'->'dispute'->>'superseded_by_observation_id'=:'o42'
+  AND :'gz_d'::jsonb->(gz(42))::text->'s5'->'ownership_statement'->>'observation_id'=:'o42'
+  AND :'gz_d'::jsonb->(gz(42))::text->'ids' @> to_jsonb(ARRAY[:'d42',:'o42'])
+  AND :'gz_d'::jsonb->(gz(42))::text->>'reason' LIKE '%superseded by the newer first-person ownership statement%',
+  'a first-person ownership statement newer than the cited dispute supersedes it; both are cited');
+SELECT fixture_assert(:'gz_d'::jsonb->(gz(43))::text->>'role'='claimed_interest'
+  AND NOT (:'gz_d'::jsonb->(gz(43))::text->'s5'->'dispute'->>'superseded')::boolean
+  AND :'gz_d'::jsonb->(gz(43))::text->'s5'->'dispute'->>'observation_id'=:'d43'
+  AND :'gz_d'::jsonb->(gz(43))::text->'s5'->'ownership_statement'->>'observation_id'=:'o43','an older ownership statement does not supersede the dispute');
+SELECT fixture_assert(:'gz_d'::jsonb->(gz(44))::text->>'role'='claimed_interest'
+  AND jsonb_typeof(:'gz_d'::jsonb->(gz(44))::text->'s5'->'ownership_statement')='null'
+  AND NOT (:'gz_d'::jsonb->(gz(44))::text->'s5'->'dispute'->>'superseded')::boolean,'a newer agent paraphrase is not a first-person statement: the dispute stands');
+SELECT fixture_assert(:'gz_d'::jsonb->(gz(45))::text->>'role'='owner_reported'
+  AND jsonb_typeof(:'gz_d'::jsonb->(gz(45))::text->'s5'->'dispute')='null'
+  AND NOT (:'gz_d'::jsonb->(gz(45))::text->'s5'->>'uncited_downgrade_ignored')::boolean,'an uncited dispute is not a cited dispute: not recorded, role unchanged');
+
 SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 
