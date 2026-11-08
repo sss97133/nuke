@@ -13,6 +13,8 @@
 // several -> skipped. Rows are deduped per (vehicle, session, org); a session whose rows name different organizations is skipped.
 // The CTE `sign_matches` fills the placeholder of the same name in supabase/sql/derive_vehicle_relationships_preview.sql.
 import { readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { createSink, fromSignRead } from './derivation-evidence.mjs';
 import { normName, representatives } from './build-place-exemplars.mjs';
 
 export const PRODUCER = 'scripts/garage/mine-sign-evidence.mjs';
@@ -131,7 +133,10 @@ async function main() {
   const rows = mineSigns(placeRows, sessionsByKey, rep, aliasesByOrg);
   writeFileSync(out, rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''));
   writeFileSync(cteOut, valuesCte(rows) + '\n');
-  console.error(`${placeRows.length} place rows -> ${rows.length} sign rows -> ${out}, ${cteOut} (no database write)`);
+  const sink = createSink({ script: PRODUCER, args }); const runId = randomUUID(); const createdAt = new Date().toISOString();
+  await sink.write(rows.map((r) => fromSignRead({ ...r, run_id: runId, created_at: createdAt }, sink.ctx)));
+  if (!sink.finish()) process.exitCode = 1;
+  console.error(`${placeRows.length} place rows -> ${rows.length} sign rows -> ${out}, ${cteOut}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e.message); process.exit(1); });

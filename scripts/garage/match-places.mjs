@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createSink, fromPlaceMatch } from './derivation-evidence.mjs';
 import { BACKENDS, fetchSample, normalizeSession, shuffle } from './label-scenes.mjs';
 export { shuffle };
 import { DEALER_LABELS, SHOP_LABELS, distinctOrgs, representatives } from './build-place-exemplars.mjs';
@@ -192,6 +193,7 @@ async function main() {
   }
   const sessions = raw.map((r) => ({ ...normalizeSession(r), organizations: r.organizations ?? [],
     alt_sample_urls: (r.alt_sample_urls ?? []).filter((u) => typeof u === 'string' && u).slice(0, 4) })).slice(0, limit);
+  const sink = createSink({ script: PRODUCER, args });
   const runId = randomUUID();
   const rows = existsSync(out) ? readFileSync(out, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
   const done = new Set(rows.map((r) => `${r.vehicle_id}|${r.session_key}|${r.viewer}`)); const failed = []; let skipped = 0;
@@ -199,6 +201,7 @@ async function main() {
     const { match, letterToOrg } = await matchSession(s, cands, { backend, cacheDir, model: modelOpt, viewer });
     const row = toRow(s, match, letterToOrg, { runId, model, viewer, candidates: cands.map((c) => c.org_id) });
     rows.push(row); appendFileSync(out, JSON.stringify(row) + '\n');
+    await sink.write(fromPlaceMatch(row, sink.ctx));
     console.error(`${tag} ${s.session_key} viewer ${viewer} -> ${row.org_id ?? 'neither'} (${row.confidence})`);
     return row;
   };
@@ -216,8 +219,8 @@ async function main() {
     } catch (e) { failed.push({ session_key: s.session_key, error: e.message }); console.error(`${tag} ${s.session_key} FAILED: ${e.message}`); }
   }
   writeFileSync(cteOut, valuesCte(rows) + '\n');
-  console.error(`run ${runId}: ${rows.length} rows, ${failed.length} failed, ${skipped} sessions without a candidate place with exemplars -> ${out}, ${cteOut} (no database write)`);
-  if (failed.length) process.exitCode = 1;
+  console.error(`run ${runId}: ${rows.length} rows, ${failed.length} failed, ${skipped} sessions without a candidate place with exemplars -> ${out}, ${cteOut} `);
+  if (!sink.finish() || failed.length) process.exitCode = 1;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e.message); process.exit(1); });

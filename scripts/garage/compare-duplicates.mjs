@@ -29,6 +29,7 @@
 // each pair is judged, so a rerun resumes. The CTE is the `visual_dup_judgments` VALUES block for the placeholder in
 // supabase/sql/derive_vehicle_relationships_preview.sql. Nothing is written to the database.
 import { randomUUID } from 'node:crypto';
+import { createSink, fromDuplicateJudgment } from './derivation-evidence.mjs';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { BACKENDS, fetchSample, shuffle } from './label-scenes.mjs';
 import { parseGallery } from './build-place-exemplars.mjs';
@@ -327,6 +328,7 @@ async function main() {
   const histFile = opt('hist-jsonl');
   const histRows = deep && histFile && existsSync(histFile) ? readFileSync(histFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
   const pairs = JSON.parse(readFileSync(inFile, 'utf8')).map(normalizePair).slice(0, limit);
+  const sink = createSink({ script: PRODUCER, args });
   const runId = randomUUID();
   // Resumable: pairs already in --out (either order) are kept and skipped; each new row is appended as it is produced.
   const rows = existsSync(out) ? readFileSync(out, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
@@ -336,12 +338,13 @@ async function main() {
     try {
       const j = deep ? await judgePairDeep(p, { backend, cacheDir, model: modelOpt, perSide, histRows }) : await judgePair(p, { backend, cacheDir, model: modelOpt });
       const row = toJudgment(p, j, { runId, model }); if (j.cite) row.cite = j.cite; rows.push(row); appendFileSync(out, JSON.stringify(row) + '\n');
+      await sink.write(fromDuplicateJudgment(row, sink.ctx));
       console.error(`[${i + 1}/${pairs.length}] ${p.a_id} ~ ${p.b_id} -> ${j.same_vehicle} (${j.confidence})`);
     } catch (e) { failed.push({ a_id: p.a_id, b_id: p.b_id, error: e.message }); console.error(`[${i + 1}/${pairs.length}] ${p.a_id} ~ ${p.b_id} FAILED: ${e.message}`); }
   }
   writeFileSync(cteOut, valuesCte(rows) + '\n');
-  console.error(`run ${runId}: ${rows.length} judged, ${failed.length} failed -> ${out}, ${cteOut} (no database write)`);
-  if (failed.length) process.exitCode = 1;
+  console.error(`run ${runId}: ${rows.length} judged, ${failed.length} failed -> ${out}, ${cteOut}`);
+  if (!sink.finish() || failed.length) process.exitCode = 1;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e.message); process.exit(1); });

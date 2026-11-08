@@ -27,6 +27,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createSink, fromSceneLabel } from './derivation-evidence.mjs';
 
 export const SCENE_LABELS = ['dealer_lot', 'showroom', 'shop_interior', 'upholstery_work', 'paint_body', 'outdoor_street', 'other'];
 export const PRODUCER = 'scripts/garage/label-scenes.mjs';
@@ -235,6 +236,7 @@ async function main() {
   const modelOpt = opt('model');
   const model = `${backendName}:${modelOpt ?? 'default'}`;
   const sessions = JSON.parse(readFileSync(inFile, 'utf8')).map(normalizeSession).slice(0, limit);
+  const sink = createSink({ script: PRODUCER, args });
   const runId = randomUUID(); const runId2 = randomUUID(); // viewer-2 rows get their own run id (the table's unique key is run, vehicle, session)
   // Resumable: rows already in --out (same vehicle + session) are kept and skipped; each new row is appended as it is produced.
   const rows = existsSync(out) ? readFileSync(out, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
@@ -243,6 +245,7 @@ async function main() {
     const label = await labelSession(s, { backend, cacheDir, model: modelOpt, viewer });
     const row = toInference(s, label, { runId: viewer === 1 ? runId : runId2, model: viewer === 1 ? model : `${model}#viewer2`, viewer });
     rows.push(row); done.add(`${s.vehicle_id}|${s.session_key}|${viewer}`); appendFileSync(out, JSON.stringify(row) + '\n');
+    await sink.write(fromSceneLabel(row, sink.ctx)); // the signed database row is the record; the file is scratch
     console.error(`${tag} ${s.session_key} viewer ${viewer} -> ${label.scene_label} (${label.confidence})`);
     return row;
   };
@@ -269,7 +272,7 @@ async function main() {
     console.error(res.ok ? `inserted ${rows.length} rows` : `insert failed: ${res.status} ${await res.text()}`);
     if (!res.ok) process.exit(1);
   }
-  if (failed.length) process.exitCode = 1;
+  if (!sink.finish() || failed.length) process.exitCode = 1;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e.message); process.exit(1); });

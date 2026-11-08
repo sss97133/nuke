@@ -21,6 +21,7 @@
 // Run both in one migration/transaction (reactivate after the first, unique index allows one active row each).
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { createSink, fromRelationshipRole } from './derivation-evidence.mjs';
 
 const args = process.argv.slice(2);
 const opt = (n) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
@@ -73,6 +74,11 @@ if (apply) {
 }
 
 const rows = apply ? await call(false) : preview();
+// Each derived role is a signed conclusion in garage_derivation_evidence (a dry-run preview is recorded as mode 'dry_run').
+const sink = createSink({ script: 'scripts/garage/replay-relationship-derivations.mjs', args });
+const observedAt = new Date().toISOString();
+await sink.write(rows.map((r) => fromRelationshipRole(r, { runId, userId: user, observedAt, mode: apply ? 'applied' : 'dry_run' }, sink.ctx)));
+if (!sink.finish()) process.exitCode = 1;
 console.log(`run_id: \`${runId}\`  mode: ${apply ? 'APPLIED' : 'dry-run'}  user: \`${user}\`\n`);
 console.log('| vehicle | old | derived | confidence | reason |\n|---|---|---|---|---|');
 for (const r of rows) {

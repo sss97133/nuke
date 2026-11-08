@@ -14,6 +14,7 @@
 // Polite: one request per second (--delay-ms), retries with back-off, stops on 403 / 429, raw responses cached under
 // --cache-dir (default /workspace/bat-cache) so a rerun does not fetch again. Default mode is a dry run.
 import { randomUUID } from 'node:crypto';
+import { createSink, fromSellerHistory } from './derivation-evidence.mjs';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseBatListing } from './enrich-bat-listing.mjs';
 
@@ -194,6 +195,7 @@ async function main() {
     }
     throw last;
   };
+  const sink = createSink({ script: PRODUCER, args });
   const rows = [];
   for (const handle of handles) {
     const hl = handle.toLowerCase();
@@ -216,11 +218,14 @@ async function main() {
       rows.push({ handle: hl, bat_user_id: member.userId, url: c.url, page: c.page, ...d,
         title: d.title ?? c.title, end_date: d.end_date ?? c.end_date, result: d.result ?? c.result,
         seller_username: d.seller_username ?? null, fetched_with: PRODUCER });
+      // A history card is retained as an unmatched listing (no vehicle is guessed here); resolution is a later, separate conclusion.
+      await sink.write(fromSellerHistory(rows[rows.length - 1], { runId, observedAt: new Date().toISOString() }, sink.ctx));
     }
   }
   writeFileSync(out, rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''));
   if (valuesOut) writeFileSync(valuesOut, buildValuesSql(rows));
   console.error(`wrote ${rows.length} rows to ${out}${valuesOut ? ` and ${valuesOut}` : ''} (run ${runId}; ${apply ? 'APPLY' : 'dry run, no database write'})`);
+  if (!sink.finish()) process.exitCode = 1;
   if (apply) {
     const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? PROJECT_URL; const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!key) { console.error('--apply needs SUPABASE_SERVICE_ROLE_KEY'); process.exit(2); }

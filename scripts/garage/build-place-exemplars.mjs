@@ -36,6 +36,8 @@
 // is always placed after vin_matched_session when the organization has any (and see the mixed fallback above). Read-only; nothing is written to a database.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { listingSlug } from './ingest-bat-seller-history.mjs';
+import { randomUUID } from 'node:crypto';
+import { createSink, fromPlaceExemplar } from './derivation-evidence.mjs';
 
 const UA = 'Mozilla/5.0';
 const PROJECT_URL = 'https://qkgaybvrernstplzjaam.supabase.co';
@@ -305,6 +307,10 @@ async function main() {
 
   const rows = buildExemplarRows([...orgs.values()], batByOrg, sceneByOrg, max, { vinByOrg, signByOrg, prefer, minVin });
   writeFileSync(out, JSON.stringify(rows, null, 2));
+  // Each chosen exemplar is a signed conclusion ("this photo shows this place"), written once per build run.
+  const sink = createSink({ script: 'scripts/garage/build-place-exemplars.mjs', args }); const runId = randomUUID(); const observedAt = new Date().toISOString();
+  await sink.write(rows.flatMap((r) => r.exemplars.map((ex) => fromPlaceExemplar(r, ex, { runId, observedAt }, sink.ctx))));
+  if (!sink.finish()) process.exitCode = 1;
   console.error(`${orgs.size} places in range of the sessions, ${rows.length} with exemplars (${rows.reduce((n, r) => n + r.exemplars.length, 0)} photos) -> ${out}`);
 }
 
