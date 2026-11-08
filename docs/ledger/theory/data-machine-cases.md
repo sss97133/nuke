@@ -3790,3 +3790,52 @@ local archive lane (the photographer's drives: sha256 identity, pHash candidates
 local-first per O10) → museum open-access catalogues (Met, Art Institute of Chicago, Cleveland: CC0 bulk data as reference
 baselines for artist identity and medium vocabulary, not as market events) → a holder's own collection (private by default,
 masked shape public).
+
+### 21.1 The owner's own archive is the first holder case (owner, 2026-11-08, afternoon)
+
+Owner, verbatim: "i can think of sources like artcurial, sothebys, christies, phillips, what other reputable house are there. what
+about art fairs, how should prices and value be handled and worded, when i think of it. an artist like me, how long will it be til
+my works are valued. im a working photographer i book work, are occasionally sell works in a gallery setting... im a bad example
+but thats what makes me interesting. what about me makes me worth acquiring. for now its mostly that im around and producing. im
+not explaining this well and theres no data to look at.. so lets just look at the numbers... i have lets say around 30 paintings
+produced, 20 billboards, many drawings, and 1000s of photos that would be exhibitable and a photo library of 100ks... i have 2
+books ive made but not published. i have 2 more book concepts ready to produce one on fashion and one on art snap shots."
+
+What the machine takes from it (the owner's figures above are his declaration of 2026-11-08, not rows; nothing is landed from them):
+
+- **Sources are of three species, and only one publishes prices.** Auction houses publish estimates and hammers per lot (the
+  block-house species: Christie's, Sotheby's, Phillips, Bonhams, Artcurial, Dorotheum, Lempertz, Grisebach, Ketterer, Van Ham,
+  Koller, Piasa, Tajan, Bukowskis, Bruun Rasmussen (now Bonhams), Swann, Doyle, Freeman's | Hindman, Wright and Rago, Heritage,
+  Poly, China Guardian, Seoul Auction, Saffronart, Strauss & Co; for photographs the dedicated sales at Phillips, Christie's,
+  Sotheby's, Swann, Lempertz, Grisebach, OstLicht). Galleries and art fairs are **presentation events**: a booth at Paris Photo,
+  AIPAD, Photo London, Unseen, Art Basel, Frieze, TEFAF, Paris+, Independent, NADA or the Armory says who showed what, where and
+  with whom; the asking price is rarely printed and a sale is reported, if at all, by the dealer. Each passes the same gate as a
+  house: lot-level identity from the source itself, a published figure where one exists, a readable index or retained pages. A fair
+  lands as `presentation` observations (venue, dates, exhibitor, works shown), never as sale data.
+- **Wording.** A figure is named by what the source called it and nothing more: *estimate as stated by the house*; *hammer,
+  premium not included*; *with premium*; *high bid, not sold*; *asking, not a sale* (a gallery or fair price); *private sale,
+  figure not published*. "Worth" is never a column. A band appears only from a reader over comparable lots with its keys, n and
+  as-of date (the like-for-like rule of 2026-10-16), and below the floor the page says *too few comparable sales to tell*. An
+  artist with no public sale has **no market figure**, and the profile says so; what it shows instead is the production and
+  presentation ledger below.
+- **"When will my works be valued" is a question about consecration, not about time.** The library's rule
+  (`the-illegible-asset.md`): art is existence-legible and valuation-illegible; worth is conferred by presentation and acquisition
+  events (a show, a publication, a representation, an institutional purchase, a secondary sale), never by engagement. For a
+  working photographer the observable events are bookings (an editorial shoot is a commissioned production with a contract and a
+  publication), exhibitions, books, and primary sales. The first secondary sale is the first public figure; until then the
+  record is the ledger of events, which is exactly what Nuke can hold completely from the start, and what a house or collector
+  reads when it asks "what about this artist is worth acquiring".
+- **The owner's case is the case study.** His production ledger, as he declared it: about 30 paintings, 20 billboards, many
+  drawings, thousands of exhibitable photographs inside a library of hundreds of thousands, two books made and unpublished, two
+  book concepts (fashion; art snapshots), plus the commissioned shoots the shoot layer already describes (one `shoot` asset,
+  the 2023-08-02 specimen). Nothing of this is in the database as works. The path is the archive lane named in §21: the files
+  are the assets (sha256 identity, pHash candidates, `image_identities`), each physical work is one `assets` row declared by its
+  holder (a Sign: a photograph of the work, medium, dimensions, year as he states them, `creator` edge to his user), each book
+  is a `publication` asset with its works as members, each booking and show a `presentation` observation. The counts above become
+  readers over those rows, by medium × year × state (held, exhibited, published, sold), with the holder's inventory private by
+  default and its shape public (O10).
+- **What this changes in the plan.** The holder's own collection moves from last to next, ahead of membership and holding,
+  because it is the only slice with a real holder in the room. Its first acceptance: the owner photographs one painting on the
+  phone, the asset exists with him as creator, it shows on `/assets/:id` with "no public sale recorded" and its presentation
+  ledger empty, and the Mannerheim gallery organization row can later be named as a presenter without the profile exposing the
+  inventory.
