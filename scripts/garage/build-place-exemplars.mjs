@@ -7,7 +7,7 @@
 //        [--history-jsonl /workspace/bat_history.jsonl] [--aliases-json f.json | --from-aliases]
 //        [--labels-jsonl /workspace/scene_labels.jsonl] [--out /workspace/place_exemplars.json]
 //        [--cache-dir /workspace/bat-cache] [--delay-ms 1000] [--max-per-org 6] [--bat-listings-per-org 4]
-//        [--garage-vins-json f.json] [--min-vin-exemplars 4] [--exclude-vehicles-json f.json] [--prefer-sources vin_matched_session,scene_session,bat_listing]
+//        [--garage-vins-json f.json] [--min-vin-exemplars 4] [--sign-jsonl sign.jsonl] [--exclude-vehicles-json f.json] [--prefer-sources vin_matched_session,scene_session,bat_listing]
 //
 // Organizations come from the sessions file (its `organizations` lists: id, name, business_type; same normalized name = one place).
 // (a) BaT: the organization's own listings (history JSONL rows from ingest-bat-seller-history.mjs whose seller handle is an
@@ -27,6 +27,9 @@
 //     Cross-organization exclusion: a vehicle VIN-matched to organization X is never an exemplar source (any source) for another organization.
 //     Mixed fallback: an organization with fewer than --min-vin-exemplars (default 4) vin_matched_session exemplars gets its remaining
 //     --max-per-org slots filled with its bat_listing exemplars, after the vin ones.
+// (d) sign_session (--sign-jsonl, rows from mine-sign-evidence.mjs {vehicle_id, session_key, org_id, quote, source_run_id}): a session on which a readable
+//     sign names the organization. Its sample photo is an exemplar for that organization, filling FIRST (before vin_matched_session), at most 2 per
+//     vehicle, cite {vehicle_id, session_key, quote, source_run_id}; the same --exclude-vehicles-json list and the cross-organization VIN rule apply.
 // Output: JSON [{org_id, org_name, org_kind, exemplars:[{url, source:'bat_listing'|'scene_session'|'vin_matched_session', cite}]}], up to
 // --max-per-org each. Without --prefer-sources, vin_matched_session fill first and BaT and scene exemplars are interleaved after them (BaT
 // and scene alone are interleaved, BaT first). With --prefer-sources (comma list) the sources fill the cap in that order; bat_listing
@@ -141,6 +144,26 @@ export function vinMatchedExemplars(orgs, listingsByOrg, garageVins, sessions, l
   return out;
 }
 
+// sign_session exemplars: Map(place org id -> [exemplar]). A sign row's org id is mapped to its place (`rep`: name key -> id; `idsToPlace`: any
+// org id -> place id). Skips excluded vehicles, vehicles VIN-matched to another place (`owners`), sessions without a sample photo; at most
+// `perVehicle` per vehicle; deterministic order (vehicle, session).
+export function signExemplars(signRows, sessions, { exclude = [], owners = null, perVehicle = 2, placeOf = (id) => id, orgOf = () => null } = {}) {
+  const byKey = new Map(sessions.map((s) => [`${s.vehicle_id}|${s.session_key}`, s]));
+  const out = new Map(); const perV = new Map();
+  const rows = [...signRows].sort((a, b) => (`${a.vehicle_id}|${a.session_key}` < `${b.vehicle_id}|${b.session_key}` ? -1 : 1));
+  for (const r of rows) {
+    const s = byKey.get(`${r.vehicle_id}|${r.session_key}`); const url = s && sampleUrl(s);
+    const pid = placeOf(r.org_id);
+    if (!url || !pid || isExcluded(r.vehicle_id, exclude) || ownedElsewhere(owners, r.vehicle_id, orgOf(pid) ?? { id: pid })) continue;
+    const n = perV.get(`${pid}|${r.vehicle_id}`) ?? 0; const list = out.get(pid) ?? [];
+    if (n >= perVehicle || list.some((e) => e.url === url)) continue;
+    perV.set(`${pid}|${r.vehicle_id}`, n + 1);
+    list.push({ url, source: 'sign_session', cite: { vehicle_id: r.vehicle_id, session_key: r.session_key, quote: r.quote ?? null, source_run_id: r.source_run_id ?? null } });
+    out.set(pid, list);
+  }
+  return out;
+}
+
 const labelKind = (l) => (DEALER_LABELS.includes(l) ? 'dealer' : SHOP_LABELS.includes(l) ? 'shop' : null);
 
 // Scene-session exemplars: confident labels (>= minConf) whose session is at exactly one place. Returns Map(org_id -> [exemplar]).
@@ -174,7 +197,11 @@ export function mergeExemplars(bat, scene, max = 6) {
 
 // Fill `max` slots from the sources in `prefer` order (a source's exemplars are taken in their own order). bat_listing never precedes
 // vin_matched_session. With no `prefer`: vin first, then BaT/scene interleaved.
-export function mergeBySources({ bat = [], scene = [], vin = [] }, max = 6, prefer = null, minVin = 4) {
+export function mergeBySources({ bat = [], scene = [], vin = [], sign = [] }, max = 6, prefer = null, minVin = 4) {
+  if (sign.length) { // sign_session exemplars fill first; the rest of the slots follow the usual rules
+    const first = sign.slice(0, max);
+    return [...first, ...mergeBySources({ bat, scene, vin }, Math.max(0, max - first.length), prefer, minVin)];
+  }
   if (vin.length && vin.length < minVin) return [...vin, ...bat].slice(0, max); // mixed fallback: bat_listing fills what vin leaves
   if (!vin.length) return prefer?.length ? fillInOrder({ bat_listing: bat, scene_session: scene }, prefer, max) : mergeExemplars(bat, scene, max);
   if (!prefer?.length) return [...vin.slice(0, max), ...mergeExemplars(bat, scene, Math.max(0, max - vin.length))];
@@ -189,9 +216,9 @@ function fillInOrder(bySource, order, max) {
   return out;
 }
 
-export function buildExemplarRows(orgs, batByOrg, sceneByOrg, max = 6, { vinByOrg = new Map(), prefer = null, minVin = 4 } = {}) {
+export function buildExemplarRows(orgs, batByOrg, sceneByOrg, max = 6, { vinByOrg = new Map(), signByOrg = new Map(), prefer = null, minVin = 4 } = {}) {
   return orgs.map((o) => ({ org_id: o.id, org_name: o.name ?? null, org_kind: orgKind(o.business_type),
-    exemplars: mergeBySources({ bat: batByOrg.get(o.id) ?? [], scene: sceneByOrg.get(o.id) ?? [], vin: vinByOrg.get(o.id) ?? [] }, max, prefer, minVin) })).filter((r) => r.exemplars.length);
+    exemplars: mergeBySources({ bat: batByOrg.get(o.id) ?? [], scene: sceneByOrg.get(o.id) ?? [], vin: vinByOrg.get(o.id) ?? [], sign: signByOrg.get(o.id) ?? [] }, max, prefer, minVin) })).filter((r) => r.exemplars.length);
 }
 
 // ---- main ------------------------------------------------------------------------------------------------------------------
@@ -202,7 +229,7 @@ async function main() {
   const args = process.argv.slice(2);
   const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 && args[i + 1] !== undefined && !args[i + 1].startsWith('--') ? args[i + 1] : d; };
   const sessFile = opt('sessions-json');
-  if (!sessFile) { console.error('usage: build-place-exemplars.mjs --sessions-json <file> [--history-jsonl f] [--aliases-json f | --from-aliases] [--labels-jsonl f] [--out f] [--cache-dir d] [--delay-ms 1000] [--max-per-org 6] [--garage-vins-json f] [--exclude-vehicles-json f] [--prefer-sources a,b,c] [--min-vin-exemplars 4]'); process.exit(2); }
+  if (!sessFile) { console.error('usage: build-place-exemplars.mjs --sessions-json <file> [--history-jsonl f] [--aliases-json f | --from-aliases] [--labels-jsonl f] [--out f] [--cache-dir d] [--delay-ms 1000] [--max-per-org 6] [--garage-vins-json f] [--exclude-vehicles-json f] [--prefer-sources a,b,c] [--min-vin-exemplars 4] [--sign-jsonl f]'); process.exit(2); }
   const out = opt('out', '/workspace/place_exemplars.json');
   const cacheDir = opt('cache-dir', '/workspace/bat-cache'); mkdirSync(cacheDir, { recursive: true });
   const delay = Number(opt('delay-ms', 1000)); const max = Number(opt('max-per-org', 6)); const perOrgListings = Number(opt('bat-listings-per-org', 4));
@@ -270,9 +297,13 @@ async function main() {
   const sceneByOrg = sceneExemplars(sessions, labels, { rep, exclude, owners });
   const minVin = Number(opt('min-vin-exemplars', 4));
   const vinByOrg = garageVins.length ? vinMatchedExemplars(orgList, orgListings, garageVins, sessions, labels, { exclude }) : new Map();
+  const signRows = opt('sign-jsonl') && existsSync(opt('sign-jsonl')) ? readFileSync(opt('sign-jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  const placeIdOf = new Map(); // any org id -> the place's representative id
+  for (const [k, ids] of idsByName) for (const id of ids) placeIdOf.set(id, rep.get(k) ?? id);
+  const signByOrg = signExemplars(signRows, sessions, { exclude, owners, placeOf: (id) => placeIdOf.get(id) ?? null, orgOf: (pid) => orgList.find((o) => o.id === pid) ?? null });
   const prefer = opt('prefer-sources') ? opt('prefer-sources').split(',').map((x) => x.trim()).filter(Boolean) : null;
 
-  const rows = buildExemplarRows([...orgs.values()], batByOrg, sceneByOrg, max, { vinByOrg, prefer, minVin });
+  const rows = buildExemplarRows([...orgs.values()], batByOrg, sceneByOrg, max, { vinByOrg, signByOrg, prefer, minVin });
   writeFileSync(out, JSON.stringify(rows, null, 2));
   console.error(`${orgs.size} places in range of the sessions, ${rows.length} with exemplars (${rows.reduce((n, r) => n + r.exemplars.length, 0)} photos) -> ${out}`);
 }

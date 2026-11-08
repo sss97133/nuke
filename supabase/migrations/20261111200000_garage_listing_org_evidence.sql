@@ -663,6 +663,15 @@ place_matches AS (
          t(run_id, vehicle_id, session_key, image_ids, photo_count, org_id, confidence, model, viewer, rationale)
    WHERE false -- (place_matches)
 ),
+-- SIGN EVIDENCE PLACEHOLDER (empty by default; keep this CTE when generating the function). One row per (vehicle, session): a readable business
+-- name in the session's photos (a viewer's sign_text, rationale or cues) that names exactly one organization in range of that session
+-- (scripts/garage/mine-sign-evidence.mjs writes the VALUES rows); quote = the matched snippet, source_run_id = the place-match run it came from.
+sign_matches AS (
+  SELECT t.vehicle_id, t.session_key, t.org_id, t.quote, t.source_run_id
+    FROM (VALUES (NULL::uuid, NULL::text, NULL::uuid, NULL::text, NULL::uuid))
+         t(vehicle_id, session_key, org_id, quote, source_run_id)
+   WHERE false -- (sign_matches)
+),
 -- VISUAL DUPLICATE JUDGMENT PLACEHOLDER (empty by default; keep this CTE when generating the function). One row per judged pair of
 -- vehicles, from an independent viewer that compared their photos (scripts/garage/compare-duplicates.mjs writes the VALUES rows):
 -- verdict 'true' (same vehicle) | 'false' | 'unsure', confidence 0..1. Used only for the duplicate REVIEW pairs below; never merges.
@@ -1198,6 +1207,22 @@ plv AS MATERIALIZED (
     FROM place_matches p
    ORDER BY p.vehicle_id, p.session_key, coalesce(p.viewer, 1), p.confidence DESC NULLS LAST, p.run_id::text
 ),
+-- Sign evidence: a session with a sign row whose organization is within range of the session's own-device photos (same test as pmo) is decided by the
+-- sign alone (status sign_in_range): it counts as an agreed usable match to that organization and replaces every viewer result of the session (neither,
+-- disagreement, needs_second_viewer included). Its confidence 0.7 is only the usable threshold, not a measurement. A sign row for an organization not
+-- in range is cited (sign_not_in_range) and the viewer decision stands.
+sgi AS MATERIALIZED (
+  SELECT DISTINCT ON (r.vehicle_id, r.session_key) r.vehicle_id, r.session_key, r.org_id, r.quote, r.source_run_id, r.image_ids, r.photo_count, r.in_range
+    FROM (SELECT s.vehicle_id, s.session_key, s.org_id, s.quote, s.source_run_id, pv.image_ids, pv.photo_count,
+                 EXISTS (SELECT 1 FROM ps2 p JOIN poc ON poc.photo_id = p.id
+                          WHERE p.mvid = s.vehicle_id AND (p.id = ANY (coalesce(pv.image_ids, '{}'::uuid[])) OR p.id::text = s.session_key)
+                            AND poc.canon = coalesce(om.canon, s.org_id)) AS in_range
+            FROM sign_matches s
+            LEFT JOIN orgmap om ON om.org_id = s.org_id
+            LEFT JOIN LATERAL (SELECT x.image_ids, x.photo_count FROM plv x WHERE x.vehicle_id = s.vehicle_id AND x.session_key = s.session_key
+                                ORDER BY x.viewer LIMIT 1) pv ON true) r
+   ORDER BY r.vehicle_id, r.session_key, r.in_range DESC, r.org_id::text, r.source_run_id::text
+),
 plc AS MATERIALIZED (
   SELECT cm.ck AS vid, g.vehicle_id, g.session_key, g.image_ids, g.photo_count, g.n_viewers, g.agree, g.org_id, g.conf,
          g.conf >= 0.7 AND (g.n_viewers = 1 OR g.agree)
@@ -1216,8 +1241,15 @@ plc AS MATERIALIZED (
                          count(DISTINCT coalesce(x.org_id::text, 'none')) = 1 AS agree, min(x.confidence) AS min_conf,
                          jsonb_agg(jsonb_build_object('viewer', x.viewer, 'run_id', x.run_id, 'organization_id', x.org_id, 'confidence', x.confidence,
                                      'model', x.model, 'rationale', x.rationale) ORDER BY x.viewer) AS cite
-                    FROM plv x GROUP BY x.vehicle_id, x.session_key) a ON a.vehicle_id = f.vehicle_id AND a.session_key = f.session_key) g
+                    FROM plv x GROUP BY x.vehicle_id, x.session_key) a ON a.vehicle_id = f.vehicle_id AND a.session_key = f.session_key
+           WHERE NOT EXISTS (SELECT 1 FROM sgi i WHERE i.in_range AND i.vehicle_id = f.vehicle_id AND i.session_key = f.session_key)) g
     JOIN clm cm ON cm.vid = g.vehicle_id
+  UNION ALL
+  SELECT cm.ck, i.vehicle_id, i.session_key, i.image_ids, i.photo_count, 2, true, i.org_id, 0.7::numeric, true, false,
+         jsonb_build_array(jsonb_build_object('source', 'sign', 'run_id', i.source_run_id, 'organization_id', i.org_id, 'quote', i.quote,
+                                              'rationale', i.quote))
+    FROM sgi i JOIN clm cm ON cm.vid = i.vehicle_id
+   WHERE i.in_range
 ),
 -- A usable match counts when the matched organization is within range of the session's own-device photos (poc); otherwise it is cited and ignored.
 pmo AS MATERIALIZED (
@@ -1232,7 +1264,9 @@ pmo AS MATERIALIZED (
 -- Status of every place decision (cited whether or not it was used).
 pmx AS MATERIALIZED (
   SELECT k.vid, k.vehicle_id, k.session_key, k.conf, k.cite, k.org_id, k.n_viewers, k.image_ids, k.photo_count,
-         CASE WHEN k.n_viewers >= 2 AND NOT k.agree THEN 'viewer_disagreement'
+         CASE WHEN EXISTS (SELECT 1 FROM sgi i WHERE i.in_range AND i.vehicle_id = k.vehicle_id AND i.session_key = k.session_key)
+                   AND EXISTS (SELECT 1 FROM pmo o WHERE o.vehicle_id = k.vehicle_id AND o.session_key = k.session_key) THEN 'sign_in_range'
+              WHEN k.n_viewers >= 2 AND NOT k.agree THEN 'viewer_disagreement'
               WHEN k.needs_v2 THEN 'needs_second_viewer'
               WHEN NOT k.ok THEN 'below_confidence'
               WHEN k.org_id IS NULL AND k.n_viewers >= 2 THEN 'neither'
@@ -1251,8 +1285,14 @@ pmagg AS MATERIALIZED (
 ),
 pmd AS MATERIALIZED (
   SELECT x.vid, jsonb_agg(jsonb_build_object('session_key', x.session_key, 'member_vehicle_id', x.vehicle_id, 'status', x.st,
-                     'confidence', x.conf, 'photos', x.w, 'viewers', x.cite) ORDER BY x.session_key, x.vehicle_id::text) AS cites
-    FROM pmx x GROUP BY x.vid
+                     'confidence', x.conf, 'photos', x.w, 'viewers', x.cite) ORDER BY x.session_key, x.vehicle_id::text, x.st) AS cites
+    FROM (SELECT y.vid, y.session_key, y.vehicle_id, y.st, y.conf, y.w, y.cite FROM pmx y
+          UNION ALL
+          SELECT cm.ck, i.vehicle_id::uuid, i.session_key, 'sign_not_in_range', NULL::numeric,
+                 greatest(1, coalesce(i.photo_count, nullif(cardinality(i.image_ids), 0), 1)),
+                 jsonb_build_array(jsonb_build_object('source', 'sign', 'run_id', i.source_run_id, 'organization_id', i.org_id, 'quote', i.quote))
+            FROM sgi i JOIN clm cm ON cm.vid = i.vehicle_id WHERE NOT i.in_range) x
+   GROUP BY x.vid
 ),
 -- Scene sessions of each cluster, one row per (vehicle, session): a session labelled more than once by one viewer counts once (its most confident
 -- label); when two viewers labelled it they count only if they agree (same label, confidence = the lower one), else the session is DROPPED
@@ -1264,16 +1304,16 @@ pmd AS MATERIALIZED (
 -- (neither_single_viewer) is cited but does not veto a confident scene label. A place-matched session without a generic label is a row too.
 sc AS MATERIALIZED (
   SELECT d.*, greatest(1, coalesce(d.photo_count, nullif(cardinality(d.image_ids), 0), 1)) AS w,
-         CASE WHEN d.pm_st = 'matched_in_range' AND d.pm_kind IS NOT NULL THEN d.pm_kind
+         CASE WHEN d.pm_st IN ('matched_in_range', 'sign_in_range') AND d.pm_kind IS NOT NULL THEN d.pm_kind
               WHEN d.scene_label IN ('dealer_lot', 'showroom') THEN 'dealer'
               WHEN d.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body') THEN 'shop' END AS sk,
-         CASE WHEN d.pm_st = 'matched_in_range' AND d.pm_kind IS NOT NULL THEN NULL
+         CASE WHEN d.pm_st IN ('matched_in_range', 'sign_in_range') AND d.pm_kind IS NOT NULL THEN NULL
               WHEN d.pm_st = 'neither' THEN 'place_neither'
               WHEN d.scene_label IS NULL THEN 'non_informative'
               WHEN d.n_viewers >= 2 AND NOT d.agree THEN 'viewer_disagreement'
               WHEN coalesce(d.confidence, 0) < 0.6 THEN 'below_confidence_floor'
               WHEN d.scene_label IN ('outdoor_street', 'other') THEN 'non_informative' END AS dropped,
-         CASE WHEN d.pm_st = 'matched_in_range' THEN d.pm_c END AS pm_canon,
+         CASE WHEN d.pm_st IN ('matched_in_range', 'sign_in_range') THEN d.pm_c END AS pm_canon,
          jsonb_build_object('run_id', d.run_id, 'session_key', d.session_key, 'scene_label', d.scene_label, 'model', d.model,
                             'confidence', d.confidence, 'rationale', d.rationale, 'member_vehicle_id', d.vehicle_id,
                             'photos', greatest(1, coalesce(d.photo_count, nullif(cardinality(d.image_ids), 0), 1)),

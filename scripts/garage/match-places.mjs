@@ -49,10 +49,10 @@ ${sampleFiles.map((f) => `- ${f}`).join('\n')}
 Known places, one contact sheet each (the letter is only a label; a sheet shows several reference photos of that place):
 ${sheets.map((s) => `- Place ${s.letter}: ${s.file}`).join('\n')}
 
-Question: which of these known places is the photo session taken at, or neither? Compare the SURROUNDINGS, not the vehicle: buildings and rooflines, ground surface and paint, fences, signage, backdrops, lifts and benches, neighbouring lots and skyline. A different vehicle, season or lighting is normal. Answer a letter only when specific surroundings match the same place; resemblance of a generic lot or workshop is not a match. If no place matches, or the photos show too little of the surroundings, answer "none".
+Question: which of these known places is the photo session taken at, or neither? Compare the SURROUNDINGS, not the vehicle: buildings and rooflines, ground surface and paint, fences, signage, backdrops, lifts and benches, neighbouring lots and skyline. A different vehicle, season or lighting is normal. Answer a letter only when specific surroundings match the same place; resemblance of a generic lot or workshop is not a match. If no place matches, or the photos show too little of the surroundings, answer "none". Separately, report in sign_text any business name you can actually read on a sign, banner, building or vehicle lettering in the session photos (verbatim, never guessed from the surroundings).
 
 Answer with ONLY one JSON object on one line, no markdown and no other text:
-{"place":"<${sheets.map((s) => s.letter).join('|')}|none>","confidence":<0 to 1, how sure you are of that answer>,"rationale":"<one or two sentences naming what matched or differed>","cues":["<each matching or contradicting surrounding you used>"]}`;
+{"place":"<${sheets.map((s) => s.letter).join('|')}|none>","confidence":<0 to 1, how sure you are of that answer>,"rationale":"<one or two sentences naming what matched or differed>","cues":["<each matching or contradicting surrounding you used>"],"sign_text":<any readable business sign or business name visible in the session photos, copied verbatim, or null if none is readable>}`;
 }
 
 // Validate a reply against the letters offered. Returns {place: letter|null, confidence, rationale, cues}.
@@ -72,12 +72,13 @@ export function parseMatch(text, letters) {
   const rationale = typeof j.rationale === 'string' ? j.rationale.trim() : '';
   if (!rationale) throw new Error('rationale is required');
   if (j.cues != null && !Array.isArray(j.cues)) throw new Error('cues must be an array');
-  return { place, confidence: c, rationale: rationale.slice(0, 1000), cues: (j.cues ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20) };
+  const sign = typeof j.sign_text === 'string' ? j.sign_text.trim() : Array.isArray(j.sign_text) ? j.sign_text.map((x) => String(x).trim()).filter(Boolean).join('; ') : '';
+  return { place, confidence: c, rationale: rationale.slice(0, 1000), sign_text: sign ? sign.slice(0, 500) : null, cues: (j.cues ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20) };
 }
 
 export function toRow(session, match, letterToOrg, { runId, model, viewer, candidates, createdAt = new Date().toISOString() }) {
   return { run_id: runId, vehicle_id: session.vehicle_id, session_key: session.session_key, image_ids: session.image_ids, photo_count: session.photo_count ?? null,
-    org_id: match.place ? letterToOrg[match.place] : null, confidence: match.confidence, model, viewer, rationale: match.rationale, cues: match.cues,
+    org_id: match.place ? letterToOrg[match.place] : null, confidence: match.confidence, model, viewer, rationale: match.rationale, cues: match.cues, sign_text: match.sign_text ?? null, // sign_text is kept on the row, not in the CTE columns
     candidate_org_ids: candidates, producer: PRODUCER, created_at: createdAt };
 }
 

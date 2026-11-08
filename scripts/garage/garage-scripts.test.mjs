@@ -3,7 +3,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCards, parseMemberHtml, parseAjax, parseDetail, parseResultText, buildValuesSql, toBatListingRow, listingSlug } from './ingest-bat-seller-history.mjs';
 import { buildSql, publicUrl, shapeSessions } from './scene-sessions.mjs';
-import { orgKind, normName, distinctOrgs, representatives, parseGallery, pickWide, sceneExemplars, mergeExemplars, buildExemplarRows, vinMatchedExemplars, mergeBySources, isExcluded, vinOwners } from './build-place-exemplars.mjs';
+import { orgKind, normName, distinctOrgs, representatives, parseGallery, pickWide, sceneExemplars, mergeExemplars, buildExemplarRows, vinMatchedExemplars, mergeBySources, isExcluded, vinOwners, signExemplars } from './build-place-exemplars.mjs';
+import { namePhrases, organizationsNamed, mineSigns, valuesCte as signCte } from './mine-sign-evidence.mjs';
+import { readFileSync as readSql } from 'node:fs';
 import { shuffle, candidatesFor, buildPrompt as placePrompt, parseMatch, toRow as placeRow, needsSecondViewer, valuesCte as placeCte, matchSession } from './match-places.mjs';
 import { sessionVerdicts, classifyVehicle, selectSessions } from './select-sessions.mjs';
 import { buildPromptV2, shuffle as sceneShuffle } from './label-scenes.mjs';
@@ -390,7 +392,7 @@ test('match-places: candidates are the in-range places with exemplars; the promp
 
 test('match-places: parseMatch accepts a letter offered or none; rejects other letters, bad confidence, missing rationale', () => {
   const ok = parseMatch('```json\n{"place":"b","confidence":0.8,"rationale":"same gate","cues":["gate"]}\n```', ['A', 'B']);
-  assert.deepEqual(ok, { place: 'B', confidence: 0.8, rationale: 'same gate', cues: ['gate'] });
+  assert.deepEqual(ok, { place: 'B', confidence: 0.8, rationale: 'same gate', sign_text: null, cues: ['gate'] });
   assert.equal(parseMatch('{"place":"none","confidence":"0.9","rationale":"no"}', ['A']).place, null);
   assert.throws(() => parseMatch('{"place":"C","confidence":0.5,"rationale":"x"}', ['A', 'B']), /not one of/);
   assert.throws(() => parseMatch('{"place":"A","confidence":2,"rationale":"x"}', ['A']), /confidence/);
@@ -517,4 +519,73 @@ test('compare-duplicates deep: photos spread across sessions; listing url by pai
   const pair = normalizePair({ a_id: V, b_id: W, a_samples: ['x'], b_samples: ['y'], listing_url: 'https://bringatrailer.com/listing/x/', listing_side: 'b', fields: { a: { vin: 'ABC12345678901234' } } });
   assert.deepEqual(listingUrls(pair, []), { a: null, b: 'https://bringatrailer.com/listing/x/' });
   assert.equal(listingUrls(pair, [{ vin: 'abc1-2345678901234', url: 'https://bringatrailer.com/listing/h/' }]).a, 'https://bringatrailer.com/listing/h/');
+});
+
+const SGN = { v: '11111111-1111-4111-8111-111111111111', r: '22222222-2222-4222-8222-222222222222', a: 'aaaaaaaa-0000-4000-8000-000000000001', b: 'bbbbbbbb-0000-4000-8000-000000000002', b2: 'bbbbbbbb-0000-4000-8000-000000000003' };
+
+test('mine-sign-evidence: name phrases keep the distinctive token sequence and drop generic words', () => {
+  assert.deepEqual(namePhrases('Viva Las Vegas Autos'), [['viva', 'las', 'vegas', 'autos'], ['viva']]);
+  assert.ok(namePhrases("Ernie's Upholstery").some((p) => p.join(' ') === 'ernies'));
+  assert.ok(namePhrases("Ernie's Upholstery").some((p) => p.join(' ') === 'ernie s'));
+  assert.deepEqual(namePhrases('Las Vegas Autos Inc'), []); // only generic words
+  assert.deepEqual(namePhrases('Acme Motors', ['acme_motors']).map((p) => p.join(' ')), ['acme motors', 'acme']);
+});
+
+test('mine-sign-evidence: one organization named -> quote <= 160 chars; several -> none; whole words only', () => {
+  const places = [{ id: SGN.a, name: 'Viva Las Vegas Autos' }, { id: SGN.b, name: "Ernie's Upholstery" }];
+  assert.deepEqual(organizationsNamed(places, ['A banner reading VIVA LAS VEGAS AUTOS above the gate']), [{ org_id: SGN.a, quote: 'A banner reading VIVA LAS VEGAS AUTOS above the gate' }]);
+  assert.equal(organizationsNamed(places, ["Sign says Ernie's on the door"])[0].org_id, SGN.b);
+  assert.equal(organizationsNamed(places, ['Ernies Upholstery sign'])[0].org_id, SGN.b);
+  assert.equal(organizationsNamed(places, ['a vivacious crowd', 'revived lot']).length, 0);
+  assert.equal(organizationsNamed(places, ['Viva sign next to Ernie s shop']).length, 2);
+  const long = 'x '.repeat(200) + 'Viva Las Vegas Autos' + ' y'.repeat(200);
+  const [hit] = organizationsNamed(places, [long]);
+  assert.ok(hit.quote.length <= 160 && /Viva Las Vegas Autos/.test(hit.quote));
+  assert.deepEqual(organizationsNamed([{ id: SGN.a, name: 'Foo Bar', aliases: ['vivacars'] }], ['VivaCars lot']), [{ org_id: SGN.a, quote: 'VivaCars lot' }]);
+});
+
+test('mine-sign-evidence: rows come from sign_text, cues or rationale; ambiguous and out-of-range names are skipped; deduped per org', () => {
+  const sess = { vehicle_id: SGN.v, session_key: 's1', organizations: [{ id: SGN.a, name: 'Viva Las Vegas Autos' }, { id: SGN.b, name: "Ernie's Upholstery" }, { id: SGN.b2, name: "Ernie's Upholstery" }] };
+  const rep = representatives([sess]);
+  const m = new Map([[`${SGN.v}|s1`, sess]]);
+  const row = (o) => ({ run_id: SGN.r, vehicle_id: SGN.v, session_key: 's1', viewer: 1, rationale: 'generic lot', cues: [], ...o });
+  const rows = mineSigns([row({ sign_text: 'VIVA LAS VEGAS AUTOS' }), row({ viewer: 2, cues: ['viva sign'] }), row({ session_key: 's2', sign_text: 'Viva' })], m, rep);
+  assert.equal(rows.length, 1);
+  assert.deepEqual({ ...rows[0], quote: undefined }, { vehicle_id: SGN.v, session_key: 's1', org_id: SGN.a, quote: undefined, source_run_id: SGN.r, source_viewer: 1, producer: 'scripts/garage/mine-sign-evidence.mjs' });
+  assert.equal(mineSigns([row({ sign_text: 'Viva and Ernie s' })], m, rep).length, 0); // two organizations in one row
+  assert.equal(mineSigns([row({ sign_text: 'Viva' }), row({ viewer: 2, rationale: 'sign: Ernies Upholstery' })], m, rep).length, 0); // rows contradict
+  assert.equal(mineSigns([row({ rationale: 'a sign for Unknown Place Motors' })], m, rep).length, 0); // not in range: no organization to name
+  assert.equal(mineSigns([row({ sign_text: "Ernie's" })], m, rep)[0].org_id, rep.get(normName("Ernie's Upholstery"))); // same-name ids are one place
+});
+
+test('mine-sign-evidence: the empty CTE is byte-identical to the preview placeholder; a filled CTE has the placeholder columns', () => {
+  const sql = readSql(new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url), 'utf8');
+  assert.ok(sql.includes(signCte([])));
+  const f = signCte([{ vehicle_id: SGN.v, session_key: "s'1", org_id: SGN.a, quote: "Ernie's", source_run_id: SGN.r }]);
+  assert.match(f, /WHERE true -- \(sign_matches\)/);
+  assert.ok(f.includes("'Ernie''s'") && f.includes('t(vehicle_id, session_key, org_id, quote, source_run_id)'));
+  assert.ok(signCte([{ vehicle_id: SGN.v, session_key: 's', org_id: SGN.a, quote: 'q', source_run_id: null }]).includes('WHERE false')); // no citation, no row
+});
+
+test('match-places: the viewer is asked for sign_text and the row keeps it (not a CTE column)', () => {
+  assert.match(placePrompt({ sampleFiles: ['a.jpg'], sheets: [{ letter: 'A', file: 'A.jpg' }] }), /"sign_text"/);
+  const m = parseMatch('{"place":"none","confidence":0.8,"rationale":"r","cues":[],"sign_text":" ERNIE\'S "}', ['A']);
+  assert.equal(m.sign_text, "ERNIE'S");
+  assert.equal(parseMatch('{"place":"A","confidence":0.8,"rationale":"r","sign_text":null}', ['A']).sign_text, null);
+  const row = placeRow({ vehicle_id: SGN.v, session_key: 's', image_ids: [] }, m, {}, { runId: SGN.r, model: 'm', viewer: 1, candidates: [] });
+  assert.equal(row.sign_text, "ERNIE'S");
+  assert.ok(!placeCte([row]).includes('sign_text'));
+});
+
+test('build-place-exemplars: sign_session exemplars fill first, 2 per vehicle, honor exclusions and the cross-org VIN rule', () => {
+  const sess = (v, k, u) => ({ vehicle_id: v, session_key: k, sample_urls: [u] });
+  const sessions = [sess('veh-1', 's1', 'u1'), sess('veh-1', 's2', 'u2'), sess('veh-1', 's3', 'u3'), sess('veh-2', 's1', 'u4'), sess('veh-3', 's1', 'u5'), sess('veh-4', 's1', 'u6'), sess('veh-5', 's1', 'u7')];
+  const sign = ['veh-1|s1', 'veh-1|s2', 'veh-1|s3', 'veh-2|s1', 'veh-3|s1', 'veh-4|s1', 'veh-5|s1'].map((k) => ({ vehicle_id: k.split('|')[0], session_key: k.split('|')[1], org_id: 'org-a', quote: 'Viva', source_run_id: 'run-1' }));
+  const owners = new Map([['veh-3', new Set(['someone else'])]]);
+  const by = signExemplars(sign, sessions, { exclude: ['veh-4'], owners, orgOf: () => ({ id: 'org-a', name: 'Viva Las Vegas Autos' }) });
+  assert.deepEqual(by.get('org-a').map((e) => e.url), ['u1', 'u2', 'u4', 'u7']);
+  assert.deepEqual(by.get('org-a')[0], { url: 'u1', source: 'sign_session', cite: { vehicle_id: 'veh-1', session_key: 's1', quote: 'Viva', source_run_id: 'run-1' } });
+  const bat = [{ url: 'b1', source: 'bat_listing', cite: {} }]; const vin = [{ url: 'v1', source: 'vin_matched_session', cite: {} }];
+  assert.deepEqual(mergeBySources({ bat, vin, sign: by.get('org-a') }, 6, null, 1).map((e) => e.url), ['u1', 'u2', 'u4', 'u7', 'v1', 'b1']);
+  assert.deepEqual(buildExemplarRows([{ id: 'org-a', name: 'A' }], new Map(), new Map(), 2, { signByOrg: by })[0].exemplars.map((e) => e.url), ['u1', 'u2']);
 });
