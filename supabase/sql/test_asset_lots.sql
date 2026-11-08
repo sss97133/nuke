@@ -43,6 +43,7 @@ INSERT INTO public.observation_sources (id, slug, display_name, base_trust_score
 VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
 
 \ir ../migrations/20261108170000_asset_lots.sql
+\ir ../migrations/20261108200000_asset_lot_walk.sql
 
 -- 1. Anon cannot write.
 DO $$ BEGIN
@@ -136,6 +137,35 @@ DO $$ DECLARE prt record; pho record; aut record; BEGIN
      OR prt.first_sale_year <> 2025 OR prt.department_name <> 'Prints & Multiples' THEN RAISE EXCEPTION 'PIC-PRT coverage wrong: %', prt; END IF;
   IF pho.house_lots <> 9600 OR pho.landed_lots <> 0 THEN RAISE EXCEPTION 'PHO coverage wrong: %', pho; END IF;
   IF aut.house_lots IS NOT NULL OR aut.landed_lots <> 1 OR aut.landed_priced_lots <> 1 THEN RAISE EXCEPTION 'MOT-AUT coverage wrong: %', aut; END IF;
+END $$;
+
+-- 6b. The walk takes the slice department furthest behind the house; names fall back to landed rows; health counts land.
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+DO $$ DECLARE nxt text; h jsonb; aut record; BEGIN
+  nxt := public.asset_lot_next_department('bonhams', ARRAY['PIC-PRT','PHO','MOT-AUT']);
+  IF nxt <> 'PHO' THEN RAISE EXCEPTION 'PHO (0 of 9600) must come before PIC-PRT (1 of 86450): got %', nxt; END IF;
+  nxt := public.asset_lot_next_department('bonhams', ARRAY['MOT-AUT']);
+  IF nxt IS NOT NULL THEN RAISE EXCEPTION 'a department without a census row cannot be chosen: got %', nxt; END IF;
+  SELECT * INTO aut FROM public.asset_lot_coverage('bonhams') WHERE department_code = 'MOT-AUT';
+  IF aut.department_name <> 'Automobilia' THEN RAISE EXCEPTION 'department name must fall back to the landed rows: %', aut; END IF;
+  h := public.asset_lot_walk_health('bonhams');
+  IF (h->>'observations')::int <> 3 OR (h->>'assets')::int <> 2 OR (h->>'landed_last_hour')::int <> 3 THEN RAISE EXCEPTION 'health wrong: %', h; END IF;
+  PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+  IF public.asset_lot_next_department('bonhams', ARRAY['PHO']) IS NOT NULL THEN RAISE EXCEPTION 'anon must not steer the walk'; END IF;
+  IF (public.asset_lot_walk_health('bonhams')->>'assets')::int <> 2 THEN RAISE EXCEPTION 'anon may read health counts'; END IF;
+END $$;
+
+-- 6c. An unsold lot keeps its high bid, and a later high bid is a new statement that supersedes.
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+DO $$ DECLARE r jsonb; BEGIN
+  r := public.record_asset_lots('bonhams', $j$[{"identity_key":"bonhams:7000003","asset_type":"memorabilia","title":"A race poster","source_identifier":"7000003",
+    "observed_at":"2026-10-01T12:00:00Z","observed_at_basis":"hammer_time","department_code":"COL-ENT","department_name":"Popular Culture","result":"not_sold","high_bid":300,"currency":"GBP"}]$j$::jsonb);
+  IF (r->>'observations_new')::int <> 1 THEN RAISE EXCEPTION 'high-bid lot must land: %', r; END IF;
+  IF (SELECT structured_data->>'high_bid' FROM public.asset_observations WHERE source_identifier = '7000003' AND superseded_by IS NULL) <> '300' THEN
+    RAISE EXCEPTION 'high_bid must be kept'; END IF;
+  r := public.record_asset_lots('bonhams', $j$[{"identity_key":"bonhams:7000003","asset_type":"memorabilia","title":"A race poster","source_identifier":"7000003",
+    "observed_at":"2026-10-01T12:00:00Z","observed_at_basis":"hammer_time","department_code":"COL-ENT","department_name":"Popular Culture","result":"not_sold","high_bid":320,"currency":"GBP"}]$j$::jsonb);
+  IF (r->>'observations_new')::int <> 1 OR (r->>'observations_superseded')::int <> 1 THEN RAISE EXCEPTION 'a changed high bid supersedes: %', r; END IF;
 END $$;
 
 -- 7. The type list admits the three new types and still refuses an unknown one.
