@@ -16,6 +16,8 @@ import { trackFor, trackSentence, useFinishEstimates, useFinishTrackRecord, type
 import { ringBids, startBidChime } from './bidChime';
 import { matchesEraRange } from '../../lib/market/familyEras';
 import { matchesFamilyScope } from './scopeMatch';
+import { SaleTable, useOpenSale, type SaleScope } from './AuctionCalendar';
+import { daysUntil, useAuctionCalendar } from './useAuctionCalendar';
 export { matchesFamilyScope } from './scopeMatch';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
@@ -478,6 +480,24 @@ function Board({ rows, risenIds, stale, showHouse, activityId, finishes, inspect
       })}
     </div>
   );
+}
+
+// The board in close order ends with the scheduled sales (owner plan, 2026-11-08), so every live auction surfaces in one
+// place: the in-room sales on the auction calendar still to run, in date order, each opening its roster in place as the
+// calendar does. The calendar reader counts a sale's lots, not its makes, so a make scope narrows the opened roster only.
+function ScheduledSales({ now, scope }: { now: number; scope: SaleScope }) {
+  const calendar = useAuctionCalendar();
+  const [selected, choose] = useOpenSale();
+  const sales = (calendar.data?.sales ?? [])
+    .filter(s => daysUntil(s.ends_on, now) >= 0 && (s.lots > 0 || (s.lots_listed ?? 0) > 0))
+    .sort((x, y) => x.starts_on.localeCompare(y.starts_on) || x.ends_on.localeCompare(y.ends_on));
+  if (sales.length === 0) return null;
+  return <section className="market-board-scheduled" aria-label="Scheduled sales">
+    <h2 className="market-board-group market-board-group--scheduled">
+      <Text role="label">Scheduled sales</Text> <Text role="measure" dense>{sales.length.toLocaleString('en-US')} {sales.length === 1 ? 'sale' : 'sales'}</Text>
+    </h2>
+    <SaleTable sales={sales} now={now} selected={selected} onChoose={choose} scope={scope} compact />
+  </section>;
 }
 
 function inWindow(a: LiveAuction, w: Window, now: number): boolean {
@@ -982,6 +1002,9 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
               : <Text role="caption">All {board.length.toLocaleString('en-US')} {board.length === 1 ? 'lot' : 'lots'} shown</Text>}
           </div>
         )}
+        {/* After the last time section; a house, window or bid-range filter is a scope the scheduled sales are not in. */}
+        {!isLoading && !mapFilterPending && sections && page >= pages && house == null && win === 'all' && selectedBid == null &&
+          <ScheduledSales now={now} scope={{ make, familyName, model, era }} />}
         {!isLoading && <BoardNotes fetchedAt={dataUpdatedAt} />}
       </section>
       </div>

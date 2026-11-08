@@ -1,6 +1,8 @@
 /* The auction calendar: one row per scheduled sale, its run days drawn on one shared axis (today at the left edge).
    Positions are SVG percentages, so the axis stretches with the column and the text stays at the kit's sizes. */
 .auction-calendar { min-width: 760px; }
+/* Without the axis (the live board's scheduled sales) the three columns fit the board's width. */
+.auction-calendar--bare { min-width: 0; }
 .auction-calendar__axis { width: 46%; min-width: 280px; }
 .auction-axis, .auction-track { display: block; overflow: visible; }
 .auction-axis__online, .auction-track__online { fill: var(--surface); }
