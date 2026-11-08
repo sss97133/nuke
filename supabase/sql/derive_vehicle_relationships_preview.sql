@@ -724,7 +724,14 @@ plv AS MATERIALIZED (
 ),
 plc AS MATERIALIZED (
   SELECT cm.ck AS vid, g.vehicle_id, g.session_key, g.image_ids, g.photo_count, g.n_viewers, g.agree, g.org_id, g.conf,
-         g.conf >= 0.7 AND (g.n_viewers = 1 OR g.agree) AS ok, g.cite
+         g.conf >= 0.7 AND (g.n_viewers = 1 OR g.agree)
+           -- an organization match that would decide the organization alone (no informative scene label >= 0.6 on the session) needs two agreeing viewers
+           AND (g.org_id IS NULL OR g.n_viewers >= 2
+                OR EXISTS (SELECT 1 FROM slv l WHERE l.vehicle_id = g.vehicle_id AND l.session_key = g.session_key
+                              AND l.scene_label IN ('dealer_lot', 'showroom', 'shop_interior', 'upholstery_work', 'paint_body') AND l.confidence >= 0.6)) AS ok,
+         g.org_id IS NOT NULL AND g.n_viewers = 1 AND g.conf >= 0.7
+           AND NOT EXISTS (SELECT 1 FROM slv l WHERE l.vehicle_id = g.vehicle_id AND l.session_key = g.session_key
+                              AND l.scene_label IN ('dealer_lot', 'showroom', 'shop_interior', 'upholstery_work', 'paint_body') AND l.confidence >= 0.6) AS needs_v2, g.cite
     FROM (SELECT f.vehicle_id, f.session_key, f.image_ids, f.photo_count, f.org_id, a.n_viewers, a.agree,
                  CASE WHEN a.n_viewers >= 2 AND a.agree THEN a.min_conf ELSE f.confidence END AS conf, a.cite
             FROM (SELECT DISTINCT ON (x.vehicle_id, x.session_key) x.vehicle_id, x.session_key, x.image_ids, x.photo_count, x.org_id, x.confidence
@@ -750,6 +757,7 @@ pmo AS MATERIALIZED (
 pmx AS MATERIALIZED (
   SELECT k.vid, k.vehicle_id, k.session_key, k.conf, k.cite, k.org_id, k.n_viewers, k.image_ids, k.photo_count,
          CASE WHEN k.n_viewers >= 2 AND NOT k.agree THEN 'viewer_disagreement'
+              WHEN k.needs_v2 THEN 'needs_second_viewer'
               WHEN NOT k.ok THEN 'below_confidence'
               WHEN k.org_id IS NULL AND k.n_viewers >= 2 THEN 'neither'
               WHEN k.org_id IS NULL THEN 'neither_single_viewer'

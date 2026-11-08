@@ -407,7 +407,8 @@ test('match-places: row maps the letter to the organization; shuffle is determin
   assert.deepEqual(needsSecondViewer({ confidence: 0.6, org_id: O1 }, null, kinds), { call: true, why: 'low_confidence' });
   assert.deepEqual(needsSecondViewer({ confidence: 0.9, org_id: O1 }, 'shop_interior', kinds), { call: true, why: 'scene_kind_disagrees' });
   assert.equal(needsSecondViewer({ confidence: 0.9, org_id: O1 }, 'showroom', kinds).call, false);
-  assert.equal(needsSecondViewer({ confidence: 0.9, org_id: O1 }, 'outdoor_street', kinds).call, false);
+  assert.deepEqual(needsSecondViewer({ confidence: 0.9, org_id: O1 }, 'outdoor_street', kinds), { call: true, why: 'sole_decider' });
+  assert.equal(needsSecondViewer({ confidence: 0.9, org_id: null }, 'outdoor_street', kinds).call, false);
 });
 
 test('match-places: the empty CTE is byte-identical to the preview placeholder; a filled CTE has the placeholder columns', async () => {

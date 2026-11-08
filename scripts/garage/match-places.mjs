@@ -83,11 +83,14 @@ export function toRow(session, match, letterToOrg, { runId, model, viewer, candi
 
 const labelKind = (l) => (DEALER_LABELS.includes(l) ? 'dealer' : SHOP_LABELS.includes(l) ? 'shop' : null);
 
-// Does viewer 2 get called? Low confidence, or the generic scene label's kind disagrees with the matched place's kind.
+// Does viewer 2 get called? Low confidence, the generic scene label's kind disagrees with the matched place's kind, or the match would decide
+// the organization alone (an organization match and no informative dealer/shop scene label).
 export function needsSecondViewer(row, genericLabel, orgKindOf) {
   if (!(row.confidence >= SECOND_VIEWER_BELOW)) return { call: true, why: 'low_confidence' };
   const gk = labelKind(genericLabel); const ok = row.org_id ? orgKindOf.get(row.org_id) ?? null : null;
   if (gk && ok && gk !== ok) return { call: true, why: 'scene_kind_disagrees' };
+  // An organization match with no informative generic scene label would decide the organization alone: it needs a second viewer.
+  if (row.org_id && !gk) return { call: true, why: 'sole_decider' };
   return { call: false, why: null };
 }
 
