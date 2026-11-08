@@ -831,7 +831,8 @@ UPDATE vehicles SET make='Custe', year=1989, model='Blazer', vin='GZVIN400000000
 -- C1: one member carries the VIN-matched dealer listing, the other the account's own photos at the dealer (score edge)
 INSERT INTO bat_listings(vehicle_id,organization_id,seller_username,bat_listing_url) VALUES (gz(30),:'gz_dealer','gzdealer','https://bringatrailer.com/listing/gz30/');
 SELECT gz_burst(31, 6, now() - interval '5 months', 36.40000, -115.40000);
--- C2: same shape, but the model text differs (0.65) and nothing else is shared: NOT grouped (reported, not loosened)
+-- C2: same shape, but the model text differs (0.65): a review pair; both sides have photos (the listing side one non-camera photo), no judgment: NOT grouped
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data) VALUES (gz(32),:'u','p','{}');
 INSERT INTO bat_listings(vehicle_id,organization_id,seller_username,bat_listing_url) VALUES (gz(32),:'gz_dealer','gzdealer','https://bringatrailer.com/listing/gz32/');
 SELECT gz_burst(33, 6, now() - interval '5 months', 36.40000, -115.40000);
 -- C2b: the same pair with a shared photo file (file_hash): grouped by shared strong evidence
@@ -861,8 +862,9 @@ SELECT fixture_assert(:'gz_c'::jsonb->(gz(30))::text->'ev'->'cluster'->'members'
   AND (:'gz_c'::jsonb->(gz(31))::text->'ev'->'cluster'->'evidence_from'->'photos_by_member'->(gz(31)::text)->>'own_device')::int=6,
   'each member row keeps its vehicle_id and cites the cluster members and the member each evidence came from');
 SELECT fixture_assert(jsonb_typeof(:'gz_c'::jsonb->(gz(32))::text->'ev'->'cluster')='null' AND jsonb_typeof(:'gz_c'::jsonb->(gz(33))::text->'ev'->'cluster')='null'
-  AND :'gz_c'::jsonb->(gz(32))::text->>'role' IS DISTINCT FROM :'gz_c'::jsonb->(gz(33))::text->>'role',
-  'same year + family but different model text (0.65) and no shared file: not grouped');
+  AND NOT (:'gz_c'::jsonb->(gz(32))::text->'ev'->'duplicate_review'->0->>'joined')::boolean
+  AND :'gz_c'::jsonb->(gz(32))::text->'ev'->'duplicate_review'->0->>'basis' IS NULL,
+  'same year + family but different model text (0.65), photos on both sides and no judgment: a review pair that is not grouped');
 SELECT fixture_assert(:'gz_c'::jsonb->(gz(34))::text->'ev'->'cluster'->'members'=jsonb_build_array(gz(34),gz(35))
   AND :'gz_c'::jsonb->(gz(34))::text->>'role'=:'gz_c'::jsonb->(gz(35))::text->>'role','a shared file_hash groups a same-year, same-family pair; roles equal');
 SELECT fixture_assert(:'gz_c'::jsonb->(gz(36))::text->>'role'='owner_reported' AND :'gz_c'::jsonb->(gz(37))::text->>'role'='owner_reported'
@@ -913,6 +915,58 @@ SELECT fixture_assert(:'gz_d'::jsonb->(gz(44))::text->>'role'='claimed_interest'
 SELECT fixture_assert(:'gz_d'::jsonb->(gz(45))::text->>'role'='owner_reported'
   AND jsonb_typeof(:'gz_d'::jsonb->(gz(45))::text->'s5'->'dispute')='null'
   AND NOT (:'gz_d'::jsonb->(gz(45))::text->'s5'->>'uncited_downgrade_ignored')::boolean,'an uncited dispute is not a cited dispute: not recorded, role unchanged');
+
+-- ===== duplicate review pairs: visual judgment or absence of contradiction joins a cluster (rv_*) =====
+ALTER TABLE vehicles ADD COLUMN color text, ADD COLUMN body_style text, ADD COLUMN engine text, ADD COLUMN transmission text;
+CREATE FUNCTION rv(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ SELECT ('a7a7a7a7-0000-4000-8000-0000000000'||lpad(n::text,2,'0'))::uuid $$;
+CREATE FUNCTION rv_veh(n int, yr int, mk text, mdl text, vin text, photos boolean, col text DEFAULT NULL, trm text DEFAULT NULL) RETURNS void LANGUAGE sql AS $$
+ WITH v AS (INSERT INTO vehicles(id,user_id,year,make,model,vin,color,trim,is_public) VALUES (rv(n),'00000000-0000-4000-8000-000000000001',yr,mk,mdl,vin,col,trm,true) RETURNING id)
+ INSERT INTO vehicle_images(vehicle_id,user_id,image_url) SELECT v.id,'00000000-0000-4000-8000-000000000001','p' FROM v WHERE photos $$;
+-- P1 same year, family K10 = K15 = K1500, VIN on one side only, A has no photo, colours equal after normalizing: joins by absence of contradiction
+SELECT rv_veh(1,1985,'Rvone','K15 SWB',NULL,false,'Red'); SELECT rv_veh(2,1985,'Rvone','K1500 Sierra Classic','RVVIN0000000001',true,' red');
+-- P2 same, but the colours conflict
+SELECT rv_veh(3,1985,'Rvtwo','K15 SWB',NULL,false,'Red'); SELECT rv_veh(4,1985,'Rvtwo','K1500 Sierra Classic','RVVIN0000000002',true,'Blue');
+-- P3 both have photos and no judgment
+SELECT rv_veh(5,1985,'Rvthree','K15 SWB',NULL,true); SELECT rv_veh(6,1985,'Rvthree','K1500 Sierra Classic','RVVIN0000000003',true);
+-- P4 year gap of one (identical model text, score 0.60), the zero-photo rule does not apply
+SELECT rv_veh(7,1985,'Rvfour','K10',NULL,false); SELECT rv_veh(8,1986,'Rvfour','K10','RVVIN0000000004',true);
+-- P5 both photos, visual judgment true 0.9 (recorded in the other order)
+SELECT rv_veh(9,1985,'Rvfive','K15 SWB',NULL,true); SELECT rv_veh(10,1985,'Rvfive','K1500 Sierra Classic',NULL,true);
+-- P6 visual true but 0.5
+SELECT rv_veh(11,1985,'Rvsix','K15 SWB',NULL,true); SELECT rv_veh(12,1985,'Rvsix','K1500 Sierra Classic',NULL,true);
+-- P7 year gap of one, both photos, visual true 0.8
+SELECT rv_veh(13,1985,'Rvseven','K10',NULL,true); SELECT rv_veh(14,1986,'Rvseven','K10',NULL,true);
+-- P8 would join by absence of contradiction, but a confident visual 'false' blocks it
+SELECT rv_veh(15,1985,'Rveight','K15 SWB',NULL,false); SELECT rv_veh(16,1985,'Rveight','K1500 Sierra Classic','RVVIN0000000008',true);
+-- P9 no VIN on either side
+SELECT rv_veh(17,1985,'Rvnine','K15 SWB',NULL,false); SELECT rv_veh(18,1985,'Rvnine','K1500 Sierra Classic',NULL,true);
+-- P10 a trim present on both sides differs
+SELECT rv_veh(19,1985,'Rvten','K15 SWB',NULL,false,NULL,'Scottsdale'); SELECT rv_veh(20,1985,'Rvten','K1500 Sierra Classic','RVVIN0000000010',true,NULL,'Cheyenne');
+\set rv_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (visual_dup_judgments)\$/   WHERE false UNION ALL SELECT rv(10), rv(9), 'true', 0.9::numeric, 'm', 'same wheels and dent', gen_random_uuid() UNION ALL SELECT rv(11), rv(12), 'true', 0.5::numeric, 'm', 'maybe', gen_random_uuid() UNION ALL SELECT rv(13), rv(14), 'true', 0.8::numeric, 'm', 'same truck', gen_random_uuid() UNION ALL SELECT rv(15), rv(16), 'false', 0.9::numeric, 'm', 'different bed', gen_random_uuid()/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('n', coalesce(jsonb_array_length(d.evidence->'cluster'->'members'), 1), 'rev', d.evidence->'duplicate_review',
+          'cj', d.evidence->'cluster'->'review_pairs_joined'))
+          FROM (:rv_sql) d WHERE d.vehicle_id BETWEEN rv(1) AND rv(20)) AS rv \gset
+SELECT fixture_assert((:'rv'::jsonb->(rv(1))::text->>'n')::int=2 AND (:'rv'::jsonb->(rv(2))::text->>'n')::int=2
+  AND :'rv'::jsonb->(rv(1))::text->'rev'->0->>'basis'='absence_of_contradiction' AND (:'rv'::jsonb->(rv(1))::text->'rev'->0->>'score')::numeric=0.65
+  AND jsonb_array_length(:'rv'::jsonb->(rv(1))::text->'cj')=1 AND :'rv'::jsonb->(rv(1))::text->'rev'->0->'vehicles_without_photos'=to_jsonb(ARRAY[rv(1)]),
+  'review pair, same year, family K10=K15=K1500, one VIN, a zero-photo side, no conflicting field: joins as absence_of_contradiction');
+SELECT fixture_assert((:'rv'::jsonb->(rv(3))::text->>'n')::int=1 AND NOT (:'rv'::jsonb->(rv(3))::text->'rev'->0->>'joined')::boolean
+  AND :'rv'::jsonb->(rv(3))::text->'rev'->0->'conflicting_fields'='["color"]'::jsonb,'a colour present on both sides and different: not joined, the conflict is cited');
+SELECT fixture_assert((:'rv'::jsonb->(rv(5))::text->>'n')::int=1 AND NOT (:'rv'::jsonb->(rv(5))::text->'rev'->0->>'joined')::boolean,'both sides have photos and no judgment: not joined');
+SELECT fixture_assert((:'rv'::jsonb->(rv(7))::text->>'n')::int=1 AND (:'rv'::jsonb->(rv(7))::text->'rev'->0->>'score')::numeric=0.6,'a year gap of one is not joined by absence of contradiction');
+SELECT fixture_assert((:'rv'::jsonb->(rv(9))::text->>'n')::int=2 AND :'rv'::jsonb->(rv(9))::text->'rev'->0->>'basis'='visual'
+  AND :'rv'::jsonb->(rv(9))::text->'cj'->0->'judgments'->0->>'rationale'='same wheels and dent' AND (:'rv'::jsonb->(rv(9))::text->'cj'->0->'judgments'->0->>'confidence')::numeric=0.9,
+  'a visual same_vehicle=true at 0.9 joins (either order), the judgment row is cited in evidence.cluster');
+SELECT fixture_assert((:'rv'::jsonb->(rv(11))::text->>'n')::int=1 AND jsonb_array_length(:'rv'::jsonb->(rv(11))::text->'rev'->0->'judgments')=1,'visual true below 0.7: not joined, the judgment is still cited');
+SELECT fixture_assert((:'rv'::jsonb->(rv(13))::text->>'n')::int=2 AND :'rv'::jsonb->(rv(13))::text->'rev'->0->>'basis'='visual','a year gap of one joins on a visual judgment');
+SELECT fixture_assert((:'rv'::jsonb->(rv(15))::text->>'n')::int=1 AND :'rv'::jsonb->(rv(15))::text->'rev'->0->'judgments'->0->>'verdict'='false','a confident visual false blocks absence of contradiction');
+SELECT fixture_assert((:'rv'::jsonb->(rv(17))::text->>'n')::int=1,'no VIN on either side: not joined');
+SELECT fixture_assert((:'rv'::jsonb->(rv(19))::text->>'n')::int=1 AND :'rv'::jsonb->(rv(19))::text->'rev'->0->'conflicting_fields'='["trim"]'::jsonb,'different trims: not joined');
+\set rv_pairs_sql `node scripts/garage/compare-duplicates.mjs --pairs-sql-out - --user-id 00000000-0000-4000-8000-000000000001 | sed '$ s/;[[:space:]]*$//'`
+SELECT fixture_assert((SELECT count(*) FROM (:rv_pairs_sql) p WHERE p.a_id BETWEEN rv(1) AND rv(20))=4
+  AND (SELECT array_agg(p.a_id ORDER BY p.a_id) FROM (:rv_pairs_sql) p WHERE p.a_id BETWEEN rv(1) AND rv(20))=ARRAY[rv(5),rv(9),rv(11),rv(13)],
+  'pairs SQL: the review pairs with photos on both sides (pairs with a photo-less side, conflicting or not, are left to absence of contradiction)');
+SELECT fixture_assert((SELECT count(*) FROM vehicles WHERE merged_into_vehicle_id IS NOT NULL AND id BETWEEN rv(1) AND rv(20))=0,'review pairs never merge records');
 
 SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 

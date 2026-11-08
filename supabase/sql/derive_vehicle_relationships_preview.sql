@@ -63,8 +63,14 @@
 -- name), scene labels, photos and capture sessions of every member are unioned; each member row keeps its own vehicle_id, carries the same
 -- derived role and confidence, and evidence.cluster says which member each piece came from (evidence.chain[2].sources[].member_vehicle_id,
 -- chain[3].scene_context.sessions[].member_vehicle_id, chain[4] / chain[5] vehicle ids, cluster.evidence_from.photos_by_member).
--- NOT grouped (reported, not loosened): a pair that only shares a VIN-matched listing on one side and, on the other, the same year + model
--- family with same-account photos at the same organization, when the model text differs (score 0.65 < 0.70) and no file / title is shared.
+-- Review pairs (same make, year within one, same model family, VIN equal or one missing, score >= 'dup_review_min_score' (0.60) and < dup_min_score):
+-- a review pair joins the cluster when (a) an independent viewer judged the two vehicles' photos the same vehicle (visual_dup_judgments:
+-- verdict 'true', confidence >= 'dup_visual_min_confidence' (0.70), no confident 'false' verdict), or (b) one side has no photo at all, the year
+-- is the same, the VIN is present on exactly one side and no colour / trim / body_style / engine / transmission present on both sides differs
+-- (basis 'absence_of_contradiction'). A year gap of one joins under (a) only. Every review pair, joined or not, with its basis, conflicting fields
+-- and judgment rows is cited in evidence.duplicate_review; the joined ones also in evidence.cluster.review_pairs_joined.
+-- NOT grouped: a pair that is neither a high-score duplicate, nor shares a file / title, nor passes its review judgment (for example the same
+-- year + family with different model text when both sides have photos and no viewer judged them the same vehicle).
 -- Shoot at two organizations: the organization listing / linked to the vehicle wins; then the one with more listing /
 -- organization_vehicles links among the account's OTHER vehicles photographed in the same sessions (co-occurrence);
 -- then, for a vehicle that appears in a listing, business_type dealer/auction before restoration; else ambiguous
@@ -94,7 +100,7 @@ WITH cfg AS (
          nullif(:'vehicle_id', '')::uuid AS only_v,
          coalesce((SELECT (pc.config_value->>'months')::int FROM platform_config pc
                     WHERE pc.config_key = 'garage_documenting_decay_months'), 18) AS months,
-         rr.r_radius, rr.r_gap_h, rr.r_max_s, rr.r_max_span, rr.r_min_ph, rr.r_min_geo, rr.r_pers_span, rr.r_dup
+         rr.r_radius, rr.r_gap_h, rr.r_max_s, rr.r_max_span, rr.r_min_ph, rr.r_min_geo, rr.r_pers_span, rr.r_dup, rr.r_dup_rev, rr.r_vis
   FROM (SELECT
           coalesce((pc.config_value->>'org_radius_m')::float8, 60) AS r_radius,
           coalesce((pc.config_value->>'session_gap_hours')::float8, 2) AS r_gap_h,
@@ -103,7 +109,9 @@ WITH cfg AS (
           coalesce((pc.config_value->>'min_photos')::int, 5) AS r_min_ph,
           coalesce((pc.config_value->>'min_geotag_share')::float8, 0.8) AS r_min_geo,
           coalesce((pc.config_value->>'personal_span_days')::float8, 365) AS r_pers_span,
-          coalesce((pc.config_value->>'dup_min_score')::float8, 0.7) AS r_dup
+          coalesce((pc.config_value->>'dup_min_score')::float8, 0.7) AS r_dup,
+          coalesce((pc.config_value->>'dup_review_min_score')::float8, 0.6) AS r_dup_rev,
+          coalesce((pc.config_value->>'dup_visual_min_confidence')::float8, 0.7) AS r_vis
         FROM (SELECT 1) one LEFT JOIN platform_config pc ON pc.config_key = 'garage_shop_shoot_rules') rr
 ),
 -- INLINE STATEMENTS PLACEHOLDER (empty by default; keep this CTE when generating the function). To preview statements that
@@ -133,6 +141,15 @@ scene_labels AS (
          t(run_id, vehicle_id, session_key, image_ids, scene_label, model, confidence, rationale)
    WHERE false -- (scene_labels)
 ),
+-- VISUAL DUPLICATE JUDGMENT PLACEHOLDER (empty by default; keep this CTE when generating the function). One row per judged pair of
+-- vehicles, from an independent viewer that compared their photos (scripts/garage/compare-duplicates.mjs writes the VALUES rows):
+-- verdict 'true' (same vehicle) | 'false' | 'unsure', confidence 0..1. Used only for the duplicate REVIEW pairs below; never merges.
+visual_dup_judgments AS (
+  SELECT t.a_id, t.b_id, t.verdict, t.confidence, t.model, t.rationale, t.run_id
+    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::numeric, NULL::text, NULL::text, NULL::uuid))
+         t(a_id, b_id, verdict, confidence, model, rationale, run_id)
+   WHERE false -- (visual_dup_judgments)
+),
 cand_all AS (
   SELECT DISTINCT c.vid FROM cfg CROSS JOIN LATERAL (
       SELECT ov.vehicle_id AS vid FROM ownership_verifications ov WHERE ov.user_id = cfg.u
@@ -155,7 +172,14 @@ cand AS (
 -- Duplicate clusters among ALL the account's vehicles (find_vehicle_duplicate_candidates logic, score recomputed inline).
 dv AS MATERIALIZED (
   SELECT v.id AS vid, v.year, lower(btrim(v.make)) AS mk, lower(btrim(v.model)) AS model,
-         normalize_vehicle_model_family(v.model) AS fam, nullif(upper(btrim(v.vin)), '') AS vin
+         normalize_vehicle_model_family(v.model) AS fam, nullif(upper(btrim(v.vin)), '') AS vin,
+         -- descriptive fields compared for contradictions between review pairs (normalized; NULL when absent)
+         nullif(regexp_replace(lower(coalesce(to_jsonb(v)->>'color', '')), '[^a-z0-9]', '', 'g'), '') AS f_color,
+         nullif(regexp_replace(lower(coalesce(to_jsonb(v)->>'trim', '')), '[^a-z0-9]', '', 'g'), '') AS f_trim,
+         nullif(regexp_replace(lower(coalesce(to_jsonb(v)->>'body_style', '')), '[^a-z0-9]', '', 'g'), '') AS f_body,
+         nullif(regexp_replace(lower(coalesce(to_jsonb(v)->>'engine', '')), '[^a-z0-9]', '', 'g'), '') AS f_engine,
+         nullif(regexp_replace(lower(coalesce(to_jsonb(v)->>'transmission', '')), '[^a-z0-9]', '', 'g'), '') AS f_trans,
+         NOT EXISTS (SELECT 1 FROM vehicle_images vi WHERE vi.vehicle_id = v.id) AS no_photos
     FROM cand_all ca JOIN vehicles v ON v.id = ca.vid WHERE v.deleted_at IS NULL AND v.merged_into_vehicle_id IS NULL
 ),
 dup AS MATERIALIZED (
@@ -167,6 +191,51 @@ dup AS MATERIALIZED (
    WHERE 0.50 + CASE WHEN b.year = a.year THEN 0.15 ELSE 0.05 END
          + CASE WHEN a.vin IS NOT NULL AND a.vin = b.vin THEN 0.30 ELSE 0 END
          + CASE WHEN b.model = a.model THEN 0.05 ELSE 0 END >= cfg.r_dup - 1e-9
+),
+-- Duplicate REVIEW pairs: the same gates as dup (same make, year within one, same model family, VIN equal or one missing) with a score in
+-- [dup_review_min_score (0.60), dup_min_score (0.70)). One row per pair (a < b by text).
+revp AS MATERIALIZED (
+  SELECT a.vid AS a, b.vid AS b, s.score, a.year AS a_year, b.year AS b_year,
+         (a.vin IS NULL) <> (b.vin IS NULL) AS one_vin, a.no_photos AS a_no_photos, b.no_photos AS b_no_photos,
+         array_remove(ARRAY[
+           CASE WHEN a.f_color IS NOT NULL AND b.f_color IS NOT NULL AND a.f_color <> b.f_color THEN 'color' END,
+           CASE WHEN a.f_trim IS NOT NULL AND b.f_trim IS NOT NULL AND a.f_trim <> b.f_trim THEN 'trim' END,
+           CASE WHEN a.f_body IS NOT NULL AND b.f_body IS NOT NULL AND a.f_body <> b.f_body THEN 'body_style' END,
+           CASE WHEN a.f_engine IS NOT NULL AND b.f_engine IS NOT NULL AND a.f_engine <> b.f_engine THEN 'engine' END,
+           CASE WHEN a.f_trans IS NOT NULL AND b.f_trans IS NOT NULL AND a.f_trans <> b.f_trans THEN 'transmission' END], NULL) AS conflicts,
+         cfg.r_vis
+    FROM dv a CROSS JOIN cfg JOIN dv b ON b.vid::text > a.vid::text AND a.mk <> '' AND b.mk = a.mk
+     AND a.year IS NOT NULL AND b.year IS NOT NULL AND abs(b.year - a.year) <= 1
+     AND a.fam IS NOT NULL AND b.fam = a.fam
+     AND (a.vin IS NULL OR b.vin IS NULL OR a.vin = b.vin)
+    CROSS JOIN LATERAL (SELECT 0.50 + CASE WHEN b.year = a.year THEN 0.15 ELSE 0.05 END
+         + CASE WHEN a.vin IS NOT NULL AND a.vin = b.vin THEN 0.30 ELSE 0 END
+         + CASE WHEN b.model = a.model THEN 0.05 ELSE 0 END AS score) s
+   WHERE s.score >= cfg.r_dup_rev - 1e-9 AND s.score < cfg.r_dup - 1e-9
+),
+-- Visual judgments of each review pair (either order): a confident 'same vehicle' and a confident 'different vehicle' verdict.
+vdj AS MATERIALIZED (
+  SELECT r.a, r.b,
+         bool_or(j.verdict = 'true' AND coalesce(j.confidence, 0) >= r.r_vis) AS yes,
+         bool_or(j.verdict = 'false' AND coalesce(j.confidence, 0) >= r.r_vis) AS no,
+         jsonb_agg(jsonb_build_object('verdict', j.verdict, 'confidence', j.confidence, 'model', j.model, 'rationale', j.rationale,
+                     'run_id', j.run_id) ORDER BY j.confidence DESC NULLS LAST, j.run_id::text) AS js
+    FROM revp r JOIN visual_dup_judgments j ON (j.a_id = r.a AND j.b_id = r.b) OR (j.a_id = r.b AND j.b_id = r.a)
+   GROUP BY r.a, r.b
+),
+-- A review pair joins a cluster when (visual) an independent viewer judged the photos the same vehicle at confidence >= dup_visual_min_confidence
+-- (and no confident 'different' verdict), or (absence_of_contradiction) one side has no photo at all, the year is the same, exactly one side
+-- carries a VIN, and no colour / trim / body / engine / transmission present on both sides differs (and no confident 'different' verdict).
+-- A year gap of one joins by the visual judgment only.
+revx AS MATERIALIZED (
+  SELECT x.*, CASE WHEN x.vis_ok THEN 'visual' WHEN x.abs_ok THEN 'absence_of_contradiction' END AS basis,
+         x.vis_ok OR x.abs_ok AS joined
+    FROM (SELECT r.a, r.b, r.score, r.a_year, r.b_year, r.a_no_photos, r.b_no_photos, r.conflicts, r.one_vin,
+                 coalesce(d.js, '[]'::jsonb) AS js,
+                 coalesce(d.yes, false) AND NOT coalesce(d.no, false) AS vis_ok,
+                 r.a_year = r.b_year AND r.one_vin AND (r.a_no_photos OR r.b_no_photos) AND cardinality(r.conflicts) = 0
+                   AND NOT coalesce(d.no, false) AS abs_ok
+            FROM revp r LEFT JOIN vdj d ON d.a = r.a AND d.b = r.b) x
 ),
 -- Shared strong evidence between two vehicles of the account that agree on make, year, model family and VIN (compatible): the same
 -- file (file_hash) in photos the account uploaded to both, or the same approved title document.
@@ -189,9 +258,12 @@ shev AS MATERIALIZED (
    WHERE va.mk <> '' AND vb.mk = va.mk AND va.year IS NOT NULL AND vb.year = va.year AND va.fam IS NOT NULL AND vb.fam = va.fam
      AND (va.vin IS NULL OR vb.vin IS NULL OR va.vin = vb.vin)
 ),
--- Duplicate cluster edges (symmetric): a high-score duplicate pair (dup) or a pair with shared strong evidence (shev). Nothing is merged.
+-- Duplicate cluster edges (symmetric): a high-score duplicate pair (dup), a review pair that passed its judgment (revx) or a pair with
+-- shared strong evidence (shev). Nothing is merged.
 cedge AS MATERIALIZED (
   SELECT d.a, d.b FROM dup d
+  UNION SELECT x.a, x.b FROM revx x WHERE x.joined
+  UNION SELECT x.b, x.a FROM revx x WHERE x.joined
   UNION SELECT s.a, s.b FROM shev s
   UNION SELECT s.b, s.a FROM shev s
 ),
@@ -208,6 +280,16 @@ cl AS MATERIALIZED (SELECT DISTINCT k.ck, k.members FROM clk k),
 -- member -> cluster key, for every member of every requested cluster
 clm AS MATERIALIZED (SELECT DISTINCT k.ck, mm.vid FROM cl k CROSS JOIN LATERAL unnest(k.members) AS mm(vid)),
 candx AS MATERIALIZED (SELECT DISTINCT m.vid FROM clm m),
+-- The review pairs that touch each cluster, with their judgments (cited in evidence.cluster / evidence.duplicate_review).
+rvc AS MATERIALIZED (
+  SELECT q.ck, jsonb_agg(jsonb_build_object('a', q.a, 'b', q.b, 'score', q.score, 'joined', q.joined, 'basis', q.basis,
+           'years', jsonb_build_array(q.a_year, q.b_year), 'vehicles_without_photos',
+           to_jsonb(ARRAY(SELECT z FROM (SELECT q.a AS z WHERE q.a_no_photos UNION ALL SELECT q.b WHERE q.b_no_photos) zz)),
+           'one_side_has_vin', q.one_vin, 'conflicting_fields', to_jsonb(q.conflicts), 'judgments', q.js)
+         ORDER BY q.a::text, q.b::text) AS cites
+    FROM (SELECT DISTINCT cm.ck, x.* FROM revx x JOIN clm cm ON cm.vid IN (x.a, x.b)) q
+   GROUP BY q.ck
+),
 cur AS MATERIALIZED (
   SELECT g.vehicle_id AS vid, g.relationship FROM get_user_garage((SELECT cfg.u FROM cfg)) g
 ),
@@ -941,7 +1023,10 @@ SELECT m.vid AS vehicle_id,
              'evidence_from', jsonb_build_object(
                'title_verification_vehicle_id', h.ver_vid, 'statement_vehicle_id', h.stmt_vid,
                'listing_member_vehicle_ids', (SELECT coalesce(jsonb_agg(DISTINCT e->>'member_vehicle_id'), '[]'::jsonb) FROM jsonb_array_elements(coalesce(h.srcs, '[]'::jsonb)) e),
-               'photos_by_member', coalesce(h.by_member, '{}'::jsonb))) END,
+               'photos_by_member', coalesce(h.by_member, '{}'::jsonb)),
+             'review_pairs_joined', (SELECT coalesce(jsonb_agg(e), '[]'::jsonb) FROM rvc, jsonb_array_elements(rvc.cites) e
+                                      WHERE rvc.ck = h.vid AND (e->>'joined')::boolean)) END,
+         'duplicate_review', (SELECT rvc.cites FROM rvc WHERE rvc.ck = h.vid),
          'flags', CASE WHEN h.amb THEN '["org_ambiguous"]'::jsonb ELSE '[]'::jsonb END,
          'title_denied', h.title_denied,
          'chain', jsonb_build_array(

@@ -189,3 +189,87 @@ test('label-scenes: one retry on invalid output, then a cited failure; a good re
   assert.equal(calls, 2);
   await assert.rejects(labelSession({ ...sess, sample_urls: [] }, { backend: flaky, cacheDir: '/cache', fetchFn }), /no sample urls/);
 });
+
+import { readFileSync as readText } from 'node:fs';
+import { buildPairsSql, normalizePair, pairKey, buildPrompt as dupPrompt, parseJudgment, toJudgment, valuesCte as dupCte, judgePair } from './compare-duplicates.mjs';
+
+const W = '22222222-2222-4222-8222-222222222222';
+
+test('compare-duplicates: pair rows, at most four photos per side, same-vehicle pair refused', () => {
+  const p = normalizePair({ a_id: V.toUpperCase(), b_id: W, a_samples: ['1', '2', '3', '4', '5'], b_samples: ['x'], fields: { a: { color: 'red' } } });
+  assert.equal(p.a_id, V);
+  assert.equal(p.a_samples.length, 4);
+  assert.deepEqual(p.fields, { a: { color: 'red' } });
+  assert.equal(pairKey(V, W), pairKey(W, V));
+  assert.throws(() => normalizePair({ a_id: V, b_id: V }));
+  assert.throws(() => normalizePair({ a_id: 'x', b_id: W }));
+});
+
+test('compare-duplicates: pairs SQL is one read-only SELECT with the dup scoring, the review band and photos on both sides', () => {
+  const sql = buildPairsSql(V);
+  assert.match(sql, /normalize_vehicle_model_family\(v\.model\)/);
+  assert.match(sql, /abs\(b\.year - a\.year\) <= 1/);
+  assert.match(sql, /s\.score >= 0\.6 - 1e-9 AND s\.score < 0\.7 - 1e-9/);
+  assert.match(sql, /cardinality\(a\.samples\) > 0 AND cardinality\(b\.samples\) > 0/);
+  assert.match(sql, new RegExp(`user_id = '${V}'`));
+  assert.doesNotMatch(sql, /\b(insert|update|delete|drop|alter|create|truncate)\b\s/i);
+  assert.throws(() => buildPairsSql("x'; drop table vehicles; --"), /uuid/);
+  assert.match(buildPairsSql(V, { reviewMin: 0.55, dupMin: 0.8 }), /s\.score >= 0\.55 - 1e-9 AND s\.score < 0\.8 - 1e-9/);
+});
+
+test('compare-duplicates: the viewer sees photos only (no record fields) and is asked for strict JSON', () => {
+  const p = dupPrompt(['/c/a1.jpg'], ['/c/b1.jpg', '/c/b2.jpg']);
+  assert.match(p, /vehicle A:\n- \/c\/a1\.jpg/);
+  assert.match(p, /vehicle B:\n- \/c\/b1\.jpg\n- \/c\/b2\.jpg/);
+  assert.match(p, /same_vehicle/);
+  assert.match(p, /Read tool/);
+  assert.doesNotMatch(p, /\b(VIN|year|model)\s*[:=]/i);
+});
+
+test('compare-duplicates: parseJudgment validates true / false / "unsure", confidence, rationale and contradictions', () => {
+  assert.deepEqual(parseJudgment('{"same_vehicle":true,"confidence":0.9,"rationale":"same dent","contradictions":[]}'),
+    { same_vehicle: true, confidence: 0.9, rationale: 'same dent', contradictions: [] });
+  assert.equal(parseJudgment('```json\n{"same_vehicle":"unsure","confidence":"0.3","rationale":"no detail"}\n```').same_vehicle, 'unsure');
+  assert.equal(parseJudgment('{"same_vehicle":"False","confidence":0.8,"rationale":"x","contradictions":["bed length"]}').contradictions[0], 'bed length');
+  assert.throws(() => parseJudgment('{"same_vehicle":"maybe","confidence":0.5,"rationale":"x"}'), /same_vehicle/);
+  assert.throws(() => parseJudgment('{"same_vehicle":true,"confidence":2,"rationale":"x"}'), /confidence/);
+  assert.throws(() => parseJudgment('{"same_vehicle":true,"confidence":0.5}'), /rationale/);
+  assert.throws(() => parseJudgment('{"same_vehicle":true,"confidence":0.5,"rationale":"x","contradictions":"red"}'), /contradictions/);
+  assert.throws(() => parseJudgment('nothing'), /no JSON/);
+});
+
+test('compare-duplicates: judgment row and visual_dup_judgments CTE match the preview placeholder columns', () => {
+  const pair = normalizePair({ a_id: V, b_id: W, a_samples: ['a'], b_samples: ['b'], fields: { a: { vin: 'X' } } });
+  const row = toJudgment(pair, { same_vehicle: false, confidence: 0.85, rationale: "o'neil's truck", contradictions: ['bed length', 'wheels'] },
+    { runId: I, model: 'claude-cli:default', createdAt: '2026-11-08T00:00:00.000Z' });
+  assert.equal(row.verdict, 'false');
+  assert.equal(row.producer, 'scripts/garage/compare-duplicates.mjs');
+  const cte = dupCte([row, toJudgment(pair, { same_vehicle: true, confidence: 0.9, rationale: 'same dent', contradictions: [] }, { runId: I, model: 'm' })]);
+  assert.match(cte, /^visual_dup_judgments AS \(\n  SELECT t\.a_id, t\.b_id, t\.verdict, t\.confidence, t\.model, t\.rationale, t\.run_id/);
+  assert.match(cte, /'false', 0\.85::numeric, 'claude-cli:default', 'o''neil''s truck Contradictions: bed length; wheels', '11111111-1111-4111-8111-111111111111'::uuid\)/);
+  assert.match(cte, /'true', 0\.9::numeric/);
+  assert.match(cte, /WHERE true -- \(visual_dup_judgments\)/);
+  assert.match(dupCte([]), /WHERE false -- \(visual_dup_judgments\)/);
+  assert.doesNotMatch(cte, /\b(insert|update|delete|drop)\b\s/i);
+});
+
+test('compare-duplicates: both sides downloaded, one retry on invalid output, a side without photos is not guessed', async () => {
+  const pair = normalizePair({ a_id: V, b_id: W, a_samples: ['https://x/a1.jpg', 'https://x/a2.jpg'], b_samples: ['https://x/b1.jpg'] });
+  const fetchFn = async (u) => `/cache/${u.split('/').pop()}`;
+  let calls = 0; let prompt;
+  const flaky = async (o) => { calls++; prompt = o.prompt; return calls === 1 ? 'hmm' : '{"same_vehicle":true,"confidence":0.8,"rationale":"same wheels"}'; };
+  const j = await judgePair(pair, { backend: flaky, cacheDir: '/cache', fetchFn });
+  assert.equal(calls, 2);
+  assert.equal(j.same_vehicle, true);
+  assert.match(prompt, /- \/cache\/a1\.jpg\n- \/cache\/a2\.jpg/);
+  assert.match(prompt, /- \/cache\/b1\.jpg/);
+  await assert.rejects(judgePair({ ...pair, b_samples: [] }, { backend: flaky, cacheDir: '/cache', fetchFn }), /no photo/);
+  calls = 0;
+  await assert.rejects(judgePair(pair, { backend: async () => { calls++; return 'nope'; }, cacheDir: '/cache', fetchFn }), /after retry/);
+  assert.equal(calls, 2);
+});
+
+test('compare-duplicates: the empty CTE is byte-identical to the placeholder in the preview (so a filled CTE replaces it cleanly)', () => {
+  const preview = readText(new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url), 'utf8');
+  assert.ok(preview.includes(dupCte([])), 'placeholder block differs from valuesCte([])');
+});

@@ -141,14 +141,14 @@ export async function fetchSample(url, cacheDir) {
 
 // Each backend: async ({ files, cacheDir, model }) -> raw reply text. Add a backend here; the rest of the script is unchanged.
 export const BACKENDS = {
-  'claude-cli': async ({ files, cacheDir, model, bin = process.env.CLAUDE_BIN ?? join(homedir(), '.local/bin/claude') }) => {
+  'claude-cli': async ({ files, cacheDir, model, prompt, bin = process.env.CLAUDE_BIN ?? join(homedir(), '.local/bin/claude') }) => {
     const args = ['-p', '--allowedTools', 'Read', '--add-dir', cacheDir, '--output-format', 'text'];
     if (model) args.push('--model', model);
     return await new Promise((resolve, reject) => {
       const p = execFile(bin, args, { env: process.env, maxBuffer: 1 << 24, timeout: 240000 }, (err, stdout, stderr) => {
         if (err) reject(new Error(`claude -p failed: ${err.message}${stderr ? ` | ${String(stderr).slice(0, 300)}` : ''}`)); else resolve(stdout);
       });
-      p.stdin.end(buildPrompt(files));
+      p.stdin.end(prompt ?? buildPrompt(files)); // prompt: other producers (compare-duplicates.mjs) reuse this backend with their own
     });
   },
 };
