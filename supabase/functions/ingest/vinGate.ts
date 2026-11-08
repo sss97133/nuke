@@ -9,7 +9,21 @@
  * American check digit, and a mistyped one proves nothing about the make.
  */
 import { vinCheckDigitOk } from "../_shared/batAuctionRecord.ts";
+import { normalizeMake } from "../_shared/normalizeVehicle.ts";
+import type { VINDecodeResult } from "../_shared/vin-decoder.ts";
 
 export function vinMakeCheckApplies(vin: unknown): boolean {
   return typeof vin === "string" && vinCheckDigitOk(vin) === true;
+}
+
+
+/** Compatibility check only. An ambiguous manufacturer never becomes a vehicle make. */
+export function vinMakeConflict(vin: unknown, claimed: unknown, decoded: VINDecodeResult) {
+  if (!vinMakeCheckApplies(vin) || typeof claimed !== "string") return null;
+  const claimedMake = normalizeMake(claimed);
+  const candidates = decoded.make ? [decoded.make] : decoded.manufacturer_make_candidates ?? [];
+  const supported = candidates.map(value => normalizeMake(value)).filter(Boolean);
+  if (!claimedMake || !supported.length || supported.includes(claimedMake)) return null;
+  return { expected: supported.join(" / "), claimed: claimedMake,
+    basis: decoded.make ? "VIN prefix" : "WMI manufacturer compatibility" };
 }
