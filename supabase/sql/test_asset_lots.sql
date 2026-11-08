@@ -50,6 +50,7 @@ VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
 \ir ../migrations/20261108200000_asset_lot_walk.sql
 \ir ../migrations/20261108230000_asset_creation_claims.sql
 \ir ../migrations/20261108233000_asset_creation_fold_layouts.sql
+\ir ../migrations/20261108234500_asset_creators_current_lot.sql
 
 -- 1. Anon cannot write.
 DO $$ BEGIN
@@ -230,6 +231,23 @@ DO $$ DECLARE r jsonb; a record; e record; BEGIN
     PERFORM public.fold_asset_creation_claims('bonhams', 1);
     RAISE EXCEPTION 'anon fold must fail';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+
+-- 6e. A hammer published after the fold reaches the artist view: the claim reads the lot's current statement.
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+DO $$ DECLARE a record; r jsonb; BEGIN
+  PERFORM public.record_asset_lots('bonhams', $j$[{"identity_key":"bonhams:8000007","asset_type":"artwork","title":"Alex Katz (born 1927) Give Me Tomorrow","source_identifier":"8000007",
+    "observed_at":"2026-11-08T12:00:00Z","observed_at_basis":"index_read","department_code":"PIC-PRT","department_name":"Prints & Multiples","result":"upcoming",
+    "estimate_low":4000,"estimate_high":6000,"currency":"GBP","lines":["Alex Katz","(born 1927)","Give Me Tomorrow"]}]$j$::jsonb);
+  PERFORM public.fold_asset_creation_claims('bonhams', 100);
+  SELECT * INTO a FROM public.asset_creators('bonhams', 50) WHERE name_as_printed = 'Alex Katz';
+  IF a.lots_direct <> 1 OR a.priced_lots <> 0 THEN RAISE EXCEPTION 'upcoming lot: one direct, none priced: %', a; END IF;
+  r := public.record_asset_lots('bonhams', $j$[{"identity_key":"bonhams:8000007","asset_type":"artwork","title":"Alex Katz (born 1927) Give Me Tomorrow","source_identifier":"8000007",
+    "observed_at":"2026-12-17T12:01:00Z","observed_at_basis":"hammer_time","department_code":"PIC-PRT","department_name":"Prints & Multiples","result":"sold","price_basis":"hammer",
+    "hammer_price":5200,"hammer_premium":6656,"estimate_low":4000,"estimate_high":6000,"currency":"GBP","lines":["Alex Katz","(born 1927)","Give Me Tomorrow"]}]$j$::jsonb);
+  IF (r->>'observations_superseded')::int <> 1 THEN RAISE EXCEPTION 'the hammer must supersede the upcoming row: %', r; END IF;
+  SELECT * INTO a FROM public.asset_creators('bonhams', 50) WHERE name_as_printed = 'Alex Katz';
+  IF a.priced_lots <> 1 OR (a.by_currency->'GBP'->>'median')::numeric <> 5200 THEN RAISE EXCEPTION 'the published hammer must reach the artist view: %', a; END IF;
 END $$;
 
 -- 7. The type list admits the three new types and still refuses an unknown one.
