@@ -11,6 +11,21 @@ BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
 
+-- Same body as in 20261111200000_garage_listing_org_evidence.sql (CREATE OR REPLACE there too), so either order works.
+CREATE OR REPLACE FUNCTION public.derived_rows_append_only() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION '% is append-only: supersede, never delete', TG_TABLE_NAME USING ERRCODE = '42501';
+  END IF;
+  IF OLD.superseded_at IS NOT NULL
+     OR (to_jsonb(NEW) - 'superseded_at' - 'superseded_by' - 'superseded_reason')
+        IS DISTINCT FROM (to_jsonb(OLD) - 'superseded_at' - 'superseded_by' - 'superseded_reason') THEN
+    RAISE EXCEPTION '% is append-only: only an active row can be superseded', TG_TABLE_NAME USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END
+$fn$;
+
 CREATE TABLE public.garage_derivation_evidence (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   kind text NOT NULL CHECK (kind IN ('scene_label', 'place_match', 'place_exemplar', 'sign_read', 'duplicate_judgment',

@@ -42,7 +42,7 @@ VALUES ('garage_shop_shoot_rules',
         'Thresholds for telling a shop shoot (few dense sessions at an organization) from long-term personal capture (derive_vehicle_relationships step 3).')
 ON CONFLICT (config_key) DO NOTHING;
 
-CREATE FUNCTION public.derived_rows_append_only() RETURNS trigger LANGUAGE plpgsql AS $fn$
+CREATE OR REPLACE FUNCTION public.derived_rows_append_only() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION '% is append-only: supersede, never delete', TG_TABLE_NAME USING ERRCODE = '42501';
