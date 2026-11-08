@@ -1288,7 +1288,7 @@ pmd AS MATERIALIZED (
                      'confidence', x.conf, 'photos', x.w, 'viewers', x.cite) ORDER BY x.session_key, x.vehicle_id::text, x.st) AS cites
     FROM (SELECT y.vid, y.session_key, y.vehicle_id, y.st, y.conf, y.w, y.cite FROM pmx y
           UNION ALL
-          SELECT cm.ck, i.vehicle_id::uuid, i.session_key, 'sign_not_in_range', NULL::numeric,
+          SELECT cm.ck, i.session_key, i.vehicle_id::uuid, 'sign_not_in_range', NULL::numeric,
                  greatest(1, coalesce(i.photo_count, nullif(cardinality(i.image_ids), 0), 1)),
                  jsonb_build_array(jsonb_build_object('source', 'sign', 'run_id', i.source_run_id, 'organization_id', i.org_id, 'quote', i.quote))
             FROM sgi i JOIN clm cm ON cm.vid = i.vehicle_id WHERE NOT i.in_range) x
