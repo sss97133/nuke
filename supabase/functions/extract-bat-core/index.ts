@@ -60,14 +60,14 @@ import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type E
 import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
 import { handoffBatLiveCollection } from "./liveStream.ts";
-import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
+import { admitBatHtmlRecovery } from "./batHtmlRecovery.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/archiveFetch.ts";
 import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.9';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.10';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -2872,25 +2872,28 @@ Deno.serve(async (req) => {
     // (vehicle_id, content_hash); bids also into bat_bids when the lot has a bat_listings row. Skylar's rule:
     // a BaT auction's comments, bids, open and close belong on the vehicle's timeline at their precise moments.
     const closingCommentMonitor = vehicleId && auction.parsed ? await supabase.from("monitored_auctions")
-      .select("id,auction_end_time,stream_state").eq("vehicle_id",vehicleId).in("external_auction_url",urlCandidates).limit(1).maybeSingle() : null;
+      .select("id,auction_end_time,stream_state,is_live").eq("vehicle_id",vehicleId).in("external_auction_url",urlCandidates).limit(1).maybeSingle() : null;
+    if (closingCommentMonitor?.error) throw new Error(`BaT native recovery monitor lookup failed: ${closingCommentMonitor.error.message}`);
     const closingCommentId = closingCommentMonitor?.data?.id;
     const nativeClosingIntake = closingCommentId && (streamOwnsAuction ||
       (Date.parse(closingCommentMonitor!.data!.auction_end_time) <= Date.now()+15*60000
         && Date.parse(closingCommentMonitor!.data!.auction_end_time) > Date.now()-24*60*60000));
-    if (nativeClosingIntake) {
+    const scheduledBidRecovery = closingCommentId && closingCommentMonitor?.data?.is_live === true;
+    if (nativeClosingIntake || scheduledBidRecovery) {
       // Shared front door and monitor lock with the WebSocket reader. An HTML
       // fallback cannot race its native comment/profile INSERT or create a fork.
-      for (let at=0;at<rawComments.length;at+=50) {
+      await admitBatHtmlRecovery({ monitorId: closingCommentId, comments: rawComments,
+        receivedAt: sourceFetchedAt, bidsOnly: !nativeClosingIntake, admit: async body => {
         const response = await fetch(`${supabaseUrl}/functions/v1/ingest-observation`, {
           method:"POST",headers:{Authorization:`Bearer ${serviceRoleKey}`,"Content-Type":"application/json"},
-          body:JSON.stringify({mode:BAT_LIVE_MODE,heartbeats:[],frames:rawComments.slice(at,at+50).map((comment:any)=>({
-            monitored_auction_id:closingCommentId,event:"comment-added",data:{post_id:Number(comment.post),comment},
-            received_at:sourceFetchedAt || new Date().toISOString(),transport:"direct_html"}))}),
+          body:JSON.stringify(body),
           signal:AbortSignal.timeout(15000),
         });
-        if (!response.ok || (await response.json()).success!==true) throw new Error("Closing HTML native intake failed; no raw comment fallback");
-      }
-    } else if (vehicleId && auction.parsed && !streamOwnsAuction) {
+        if (!response.ok) throw new Error("BaT HTML native intake failed; no lossy bid fallback");
+        return await response.json();
+      }});
+    }
+    if (!nativeClosingIntake && vehicleId && auction.parsed && !streamOwnsAuction) {
       try {
         const endAt = essentials.auction_end_at ? new Date(essentials.auction_end_at) : (auction.recordAt ? new Date(auction.recordAt) : null);
         // one builder for the reader and the archive loader (_shared/batAuctionRecord.ts); every comment lands,
