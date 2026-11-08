@@ -440,7 +440,8 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, group,
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
         <BidCell auction={bidReading} risen={risen} stale={stale} />
-        {finish && <FinishLine e={finish} bid={a.currentBid} endsAt={a.endsAt} />}
+        {/* The track record grades BaT lots only (the lot grader keys BaT lot slugs); another house's estimate shows none. */}
+        {finish && <FinishLine e={finish} bid={a.currentBid} endsAt={a.house === BAT_HOUSE ? a.endsAt : null} />}
       </button>
     </div>
   );
