@@ -49,6 +49,7 @@ VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
 \ir ../migrations/20261108170000_asset_lots.sql
 \ir ../migrations/20261108200000_asset_lot_walk.sql
 \ir ../migrations/20261108230000_asset_creation_claims.sql
+\ir ../migrations/20261108233000_asset_creation_fold_layouts.sql
 
 -- 1. Anon cannot write.
 DO $$ BEGIN
@@ -190,10 +191,27 @@ DO $$ DECLARE r jsonb; a record; e record; BEGIN
      "observed_at":"2025-07-01T12:06:00Z","observed_at_basis":"hammer_time","department_code":"PIC-GEN","department_name":"Fine Art","result":"not_sold","lines":["A framed map"]}
   ]$j$::jsonb);
   r := public.fold_asset_creation_claims('bonhams', 100);
-  IF (r->>'lots_read')::int <> 5 OR (r->>'claims_new')::int <> 4 OR (r->>'skipped_no_party_line')::int <> 1 OR (r->>'parties_new')::int <> 3 THEN
+  IF (r->>'lots_read')::int <> 5 OR (r->>'claims_new')::int <> 4 OR (r->>'no_party_printed')::int <> 1 OR (r->>'parties_new')::int <> 3 THEN
     RAISE EXCEPTION 'fold receipt wrong (5 artwork lots: Fontana, Chagall/Sorlier, Warhol x2, a map): %', r; END IF;
   r := public.fold_asset_creation_claims('bonhams', 100);
-  IF (r->>'lots_read')::int <> 1 OR (r->>'claims_new')::int <> 0 THEN RAISE EXCEPTION 'fold must be idempotent (only the map is re-read): %', r; END IF;
+  IF (r->>'lots_read')::int <> 0 THEN RAISE EXCEPTION 'fold must be idempotent and the map (no party printed) must not be re-read: %', r; END IF;
+  IF (SELECT structured_data->>'attribution' FROM public.asset_observations WHERE kind = 'creation_claim' AND source_identifier = '8000004') <> 'none_printed' THEN
+    RAISE EXCEPTION 'the house''s silence is recorded once'; END IF;
+  -- Layout B: the Copenhagen sales print "Name: description" and repeat the description on the second line.
+  PERFORM public.record_asset_lots('bonhams', $j$[
+    {"identity_key":"bonhams:8000005","asset_type":"artwork","title":"Anna Ancher: A mother in a garden in Skagen. Signed A. Ancher. Oil on panel. 46 x 37 cm.","source_identifier":"8000005",
+     "observed_at":"2025-09-01T12:00:00Z","observed_at_basis":"hammer_time","department_code":"PIC-GEN","department_name":"Fine Art","result":"sold","price_basis":"hammer","hammer_price":40000,"currency":"DKK",
+     "lines":["Anna Ancher: A mother in a garden in Skagen. Signed A. Ancher. Oil on panel. 46 x 37 cm.","A mother in a garden in Skagen. Signed A. Ancher. Oil on panel. 46 x 37 cm."]},
+    {"identity_key":"bonhams:8000006","asset_type":"artwork","title":"Various Artists; Los Angeles Olympics Portfolio; (15)","source_identifier":"8000006",
+     "observed_at":"2025-09-01T12:01:00Z","observed_at_basis":"hammer_time","department_code":"PIC-PRT","department_name":"Prints & Multiples","result":"sold","price_basis":"hammer","hammer_price":5000,"currency":"USD",
+     "lines":["Various Artists","(American, 20th century)","Los Angeles Olympics Portfolio"]}
+  ]$j$::jsonb);
+  r := public.fold_asset_creation_claims('bonhams', 100);
+  IF (r->>'lots_read')::int <> 2 OR (r->>'claims_new')::int <> 1 OR (r->>'no_party_printed')::int <> 1 OR (r->>'parties_new')::int <> 1 THEN
+    RAISE EXCEPTION 'layout B and the Various Artists exclusion: %', r; END IF;
+  IF (SELECT handle FROM public.external_identities WHERE display_name = 'Anna Ancher') <> 'anna ancher' THEN RAISE EXCEPTION 'layout B party key is the name alone'; END IF;
+  IF (SELECT structured_data->>'layout' FROM public.asset_observations WHERE kind = 'creation_claim' AND source_identifier = '8000005') <> 'name_colon_description' THEN
+    RAISE EXCEPTION 'layout must be recorded'; END IF;
   SELECT * INTO e FROM public.external_identities WHERE platform = 'art_catalogue' AND handle = 'andy warhol|1928-1987';
   IF e.id IS NULL OR e.display_name <> 'Andy Warhol' THEN RAISE EXCEPTION 'party row missing'; END IF;
   IF (SELECT count(*) FROM public.asset_observations WHERE kind = 'creation_claim' AND (structured_data->>'party_identity_id')::uuid = e.id) <> 2 THEN
