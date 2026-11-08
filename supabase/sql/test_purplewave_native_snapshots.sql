@@ -11,6 +11,7 @@ CREATE TABLE public.observation_sources(slug text PRIMARY KEY, display_name text
  species source_species, species_set source_species[], species_evidence jsonb);
 CREATE TABLE public.listing_feeds(id uuid PRIMARY KEY,source_slug text,feed_url text,search_criteria jsonb,
  enabled boolean,poll_interval_minutes int,updated_at timestamptz);
+CREATE TABLE public.live_board_houses(house text PRIMARY KEY,label text,host_pattern text,enabled boolean,note text);
 INSERT INTO listing_feeds VALUES('2b413532-64b4-4756-9840-7ec8ffd45f6e','purplewave','https://www.purplewave.com/search',
  '{"fetch_strategy":"firecrawl_html","unrelated":"keep"}',false,60,now());
 \ir ../migrations/20261108191000_purplewave_native_snapshots.sql

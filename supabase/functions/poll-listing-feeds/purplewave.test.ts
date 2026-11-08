@@ -1,4 +1,4 @@
-import { purplewaveLot, purplewaveObservation, purplewavePageUrl, landPurplewaveLot, pollPurplewave } from "./purplewave.ts";
+import { purplewaveLot, purplewaveObservation, purplewavePageUrl, purplewaveProjection, landPurplewaveLot, pollPurplewave } from "./purplewave.ts";
 const equal = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 const clock = "2026-11-08T19:00:00.000Z";
 const raw = { auction: "261111", item: "EX2391", year: 2012, make: "Dodge", model: "Ram 2500", industry_category_id: 277,
@@ -34,7 +34,9 @@ function fixture(failAdmission = false) {
     let action = "read";
     const result = () => ({ data: table === "observation_sources" ? { species: "timed_auction", supported_observations: ["listing"] }
       : table === "vehicle_observations" ? { id: "observation", ...saved }
-      : table === "vehicle_events" ? (action === "insert" ? [{ id: "episode" }] : []) : null, error: null });
+      : table === "vehicle_events" ? (action === "insert" ? [{ id: "episode" }] : [])
+      : table === "vehicles" ? (action === "update" ? [{ id: "vehicle" }] : { id: "vehicle", platform_source: "purplewave", listing_url: `https://www.purplewave.com/auction/${raw.auction}/item/${raw.item}`, origin_metadata: null, deleted_at: null })
+      : null, error: null });
     const q: any = { select: () => q, eq: () => q, is: () => q, limit: () => q, maybeSingle: async () => result(), single: async () => result(),
       update: (body: any) => { action = "update"; writes.push({ table, body }); return q; },
       insert: (body: any) => { action = "insert"; writes.push({ table, body }); return q; },
@@ -57,19 +59,34 @@ Deno.test("failed admission never projects an episode or high bid", async () => 
   try { await landPurplewaveLot(f.db, purplewaveLot(raw, clock)); } catch { failed = true; }
   equal(failed, true); equal(f.writes.length, 0);
 });
+Deno.test("an exhausted grant stops before any identity or testimony write", async () => {
+  const f = fixture(); let failed = false;
+  try { await landPurplewaveLot(f.db, purplewaveLot(raw, clock), AbortSignal.abort()); } catch { failed = true; }
+  equal(failed, true); equal(f.calls, []); equal(f.writes, []);
+});
 Deno.test("missing source identity stays unresolved rather than inventing a vehicle", async () => {
   const f = fixture(); const result = await landPurplewaveLot(f.db, purplewaveLot({ ...raw, year: 0 }, clock));
   equal(result.vehicle_id, null); equal(f.calls.map(c => c.name), ["ingest-observation"]); equal(f.writes, []);
 });
 Deno.test("feed advances only admitted bounded slots and preserves controls", async () => {
   const f = fixture(); let reservations = 0;
-  const budget = { refusal: () => null, reserve: () => (++reservations <= 1 ? { timeout_ms: 5000 } : null) } as any;
+  const budget = { refusal: () => null, reserve: () => (++reservations <= 1 ? { timeout_ms: 5000 } : null), record: () => {} } as any;
   const feed = { id: "feed", enabled: true, display_name: "PurpleWave", search_criteria: { native_page: 1, native_offset: 0, kept: true } };
   const result = await pollPurplewave(f.db, feed, budget, 1, async () => new Response(JSON.stringify([raw, { ...raw, item: "EX2392" }])));
   equal(result.snapshots_admitted, 1); equal(result.error, null);
   const progress = f.writes.find(w => w.table === "listing_feeds")!.body;
   equal(progress.search_criteria.native_offset, 1); equal(progress.search_criteria.kept, true);
   equal("poll_interval_minutes" in progress, false); equal("enabled" in progress, false);
+});
+Deno.test("scalar projection preserves other source ownership, freshness and opening-price semantics", () => {
+  const lot = purplewaveLot(raw, clock);
+  const held = { platform_source: "purplewave", listing_url: lot.url, origin_metadata: { keep: true }, deleted_at: null };
+  equal(purplewaveProjection(lot, { ...held, platform_source: "bat" }, "obs"), null);
+  equal(purplewaveProjection(lot, { ...held, listing_url: lot.url + "other" }, "obs"), null);
+  equal(purplewaveProjection(lot, { ...held, origin_metadata: { purplewave_observed_at: "2026-11-09T00:00:00Z" } }, "obs"), null);
+  equal(purplewaveProjection(purplewaveLot({ ...raw, bid_count: 0 }, clock), held, "obs")?.high_bid, null);
+  equal(purplewaveProjection(purplewaveLot({ ...raw, current_bid: 8300.75 }, clock), held, "obs")?.high_bid, 8300);
+  equal(purplewaveProjection(lot, held, "obs")?.origin_metadata.keep, true);
 });
 Deno.test("public API refusal does not invoke a renderer or intake", async () => {
   const f = fixture();

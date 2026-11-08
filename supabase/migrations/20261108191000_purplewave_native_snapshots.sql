@@ -17,6 +17,11 @@ VALUES ('purplewave', 'Purple Wave', 'auction', 'https://www.purplewave.com', 0.
     'listing_rule', '/auction/YYMMDD[optional letter]/item/AA1234 is a timed lot; inventory scope is publisher industry_category_id 277'))
 ON CONFLICT (slug) DO NOTHING;
 
+INSERT INTO public.live_board_houses(house,label,host_pattern,enabled,note)
+VALUES ('purplewave','Purple Wave','^https://(www[.])?purplewave[.]com/auction/',true,
+  'Existing listing-feed cadence and allocation; bounded public API passenger-vehicle snapshots, not a complete bid stream. Source currency USD per publisher payment terms.')
+ON CONFLICT (house) DO NOTHING;
+
 -- Replace only the broken existing renderer route. Do not enable feeds or alter budgets/cadence.
 UPDATE public.listing_feeds SET search_criteria = search_criteria || jsonb_build_object(
   'fetch_strategy', 'purplewave_public_json', 'native_page', 1, 'native_offset', 0), updated_at = now()

@@ -2,6 +2,8 @@ import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
 import type { IntakeBudget } from "./ledger.ts";
 
 export const PURPLEWAVE_METHOD = "purplewave_public_snapshot_v1";
+// Publisher payment terms inspected 2026-11-08; this is house currency evidence, not an API currency field.
+const CURRENCY_SOURCE = "https://www.purplewave.com/auction/legal/terms";
 const PAGE_SIZE = 25;
 const writeEpisode = vehicleEventWriterFor("poll-listing-feeds:purplewave");
 type Row = Record<string, unknown>;
@@ -42,14 +44,39 @@ export function purplewaveObservation(lot: ReturnType<typeof purplewaveLot>, veh
     content_text: lot.description || lot.title,
     structured_data: { capture_kind: "auction_state_snapshot", individual_bid: false, source_claims_only: true,
       auction_id: lot.auction, native_item_id: lot.item, current_bid: lot.bid, bid_count: lot.count,
+      currency: "USD", currency_source: CURRENCY_SOURCE,
       auction_end_date: lot.end, latest_bid_at: lot.bidAt, source_event_time_status: "snapshot_not_event",
       source_payload: lot.raw },
     extraction_metadata: { clock_basis: "public_api_received_at", received_at: lot.readAt,
       coverage: "paged_passenger_vehicle_inventory; not complete bid history", paid_calls: 0 } };
 }
 
+export function purplewaveProjection(lot: ReturnType<typeof purplewaveLot>, row: any, observationId: string) {
+  if (row?.platform_source !== "purplewave" || typeof row.listing_url !== "string"
+    || row.listing_url.replace("https://purplewave.com/", "https://www.purplewave.com/").replace(/\/$/, "") !== lot.url
+    || row.deleted_at != null || ["sold", "not_sold", "reserve_not_met", "cancelled", "withdrawn"].includes(row.sale_status)) return null;
+  const prior = Date.parse(row.origin_metadata?.purplewave_observed_at ?? "");
+  if (Number.isFinite(prior) && prior > Date.parse(lot.readAt)) return null;
+  return { high_bid: lot.count > 0 ? Math.floor(lot.bid) : null, auction_end_date: lot.end,
+    auction_status: lot.closed ? "ended" : "active", sale_status: lot.closed ? "ended" : "auction_live",
+    origin_metadata: { ...(row.origin_metadata ?? {}), purplewave_observed_at: lot.readAt,
+      purplewave_observation_id: observationId, current_bid: lot.bid, bid_count: lot.count, currency: "USD", currency_source: CURRENCY_SOURCE }, updated_at: lot.readAt };
+}
+
+/** Apply the same invocation deadline to every query, including the shared episode writer. */
+function boundedDb(db: any, signal: AbortSignal) {
+  return { functions: { invoke: (name: string, options: any) => db.functions.invoke(name, { ...options, signal }) },
+    from: (table: string) => new Proxy(db.from(table), { get(target, name) {
+      const member = target[name];
+      if (typeof member !== "function") return member;
+      return (...args: unknown[]) => { const next = member.apply(target, args); return next?.abortSignal ? next.abortSignal(signal) : next; };
+    } }) };
+}
+
 /** Reuse the intake's identity resolver; never submit the current bid as an asking/sale price. */
-export async function landPurplewaveLot(db: any, lot: ReturnType<typeof purplewaveLot>) {
+export async function landPurplewaveLot(client: any, lot: ReturnType<typeof purplewaveLot>, signal = AbortSignal.timeout(30_000)) {
+  signal.throwIfAborted();
+  const db = boundedDb(client, signal);
   if (!lot.year || !lot.make || !lot.model) {
     // A source with an unknown year/make stays an attributed unresolved blip.
     // Do not invent identity from an equipment title or use a fuzzy YMM match.
@@ -73,16 +100,24 @@ export async function landPurplewaveLot(db: any, lot: ReturnType<typeof purplewa
     || read.data?.structured_data?.current_bid !== lot.bid) throw Error("PurpleWave snapshot readback failed");
   const episode = await writeEpisode(db, { vehicle_id: vehicleId, source_platform: "purplewave",
     source_listing_id: lot.key, source_url: lot.url, event_type: "auction", event_status: lot.closed ? "ended" : "active",
-    current_price: lot.bid, high_bid: lot.bid, bid_count: lot.count,
+    current_price: lot.count > 0 ? lot.bid : null, high_bid: lot.count > 0 ? lot.bid : null, bid_count: lot.count,
+    currency_code: "USD", currency_source: CURRENCY_SOURCE,
     metadata: { source_observation_id: observationId, source_observed_at: lot.readAt,
-      auction_end_date: lot.end, latest_bid_at: lot.bidAt, capture_kind: "auction_state_snapshot", sale_outcome: "unknown" },
+      auction_end_date: lot.end, latest_bid_at: lot.bidAt, currency: "USD", currency_source: CURRENCY_SOURCE,
+      capture_kind: "auction_state_snapshot", sale_outcome: "unknown" },
   }, { sourceObservedAt: lot.readAt });
   if (!("id" in episode) || !episode.id) throw Error("PurpleWave episode projection failed");
   // Mutable discovery projection, only after the attributed observation and episode were acknowledged.
-  const projection = await db.from("vehicles").update({ high_bid: lot.bid, auction_end_date: lot.end,
-    auction_status: lot.closed ? "ended" : "active", sale_status: lot.closed ? "ended" : "auction_live",
-    platform_source: "purplewave", updated_at: lot.readAt }).eq("id", vehicleId);
-  if (projection.error) throw Error("PurpleWave auction projection failed");
+  const vehicle = await db.from("vehicles").select("id,platform_source,listing_url,sale_status,origin_metadata,deleted_at").eq("id", vehicleId).maybeSingle();
+  if (vehicle.error || !vehicle.data) throw Error("PurpleWave vehicle ownership read failed");
+  const patch = purplewaveProjection(lot, vehicle.data, observationId);
+  if (patch) {
+    let update = db.from("vehicles").update(patch).eq("id", vehicleId).eq("platform_source", "purplewave")
+      .eq("listing_url", vehicle.data.listing_url).is("deleted_at", null);
+    update = vehicle.data.origin_metadata == null ? update.is("origin_metadata", null) : update.eq("origin_metadata", JSON.stringify(vehicle.data.origin_metadata));
+    const projection = await update.select("id");
+    if (projection.error || projection.data?.length !== 1) throw Error("PurpleWave auction projection changed concurrently; retry");
+  }
   return { vehicle_id: vehicleId, observation_id: observationId, episode_id: episode.id, created: identity.data.status === "created" };
 }
 
@@ -107,9 +142,18 @@ export async function pollPurplewave(db: any, feed: any, budget: IntakeBudget, a
     const lots = raw.map(r => purplewaveLot(r, readAt));
     let attempts = 0;
     while (offset < lots.length && attempts < allocation) {
-      if (!budget.reserve("purplewave")) break;
+      const grant = budget.reserve("purplewave");
+      if (!grant) break;
       attempts++;
-      const landed = await landPurplewaveLot(db, lots[offset]);
+      const started = Date.now();
+      let landed: Awaited<ReturnType<typeof landPurplewaveLot>>;
+      try {
+        landed = await landPurplewaveLot(db, lots[offset], AbortSignal.timeout(grant.timeout_ms));
+        budget.record("purplewave", Date.now() - started, { status: landed.created ? "created" : "matched", vehicle_id: landed.vehicle_id ?? undefined });
+      } catch (error) {
+        budget.record("purplewave", Date.now() - started, { status: "error", error: error instanceof Error ? error.message : String(error) });
+        throw error;
+      }
       if (!landed.vehicle_id) result.unresolved++;
       if (landed.created) result.new_ingested++;
       result.snapshots_admitted++;
