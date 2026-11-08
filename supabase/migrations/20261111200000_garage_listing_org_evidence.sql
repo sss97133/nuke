@@ -690,7 +690,8 @@ dhash_matches AS (
     FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::int)) t(image_id, matched_image_id, matched_source, hamming_distance)
    WHERE false -- (dhash_matches)
 ),
--- Exact dhash equality with a scraped listing image (distance 0) joined to the offline rows; the nearest match per photo wins.
+-- Perceptual matches come only from the offline dhash_matches rows (vehicle_images.dhash has no index, so an in-query
+-- equality join scans the whole table); the nearest match per photo wins.
 dhm AS MATERIALIZED (
   SELECT DISTINCT ON (m.image_id) m.image_id, m.matched_id, m.matched_source, m.matched_created_at, m.dist
     FROM (
@@ -698,14 +699,6 @@ dhm AS MATERIALIZED (
              s.created_at AS matched_created_at, d.hamming_distance AS dist
         FROM dhash_matches d LEFT JOIN vehicle_images s ON s.id = d.matched_image_id
        WHERE d.image_id IS NOT NULL AND d.hamming_distance <= 6
-      UNION ALL
-      SELECT vi.id, s.id, s.source, s.created_at, 0
-        FROM cand_all ca JOIN vehicle_images vi ON vi.vehicle_id = ca.vid CROSS JOIN cfg
-        JOIN vehicle_images s ON s.dhash = vi.dhash AND s.id <> vi.id
-       WHERE vi.user_id = cfg.u AND vi.dhash IS NOT NULL
-         AND (regexp_replace(lower(btrim(coalesce(s.source, ''))), '[-\s]+', '_', 'g')
-                IN ('bat', 'mecum', 'classic_com', 'classiccom', 'craigslist', 'url_scraper', 'cars_and_bids', 'carsandbids')
-              OR lower(coalesce(s.image_url, '')) ~ '^https?://([a-z0-9-]+\.)*(bringatrailer|carsandbids|mecum|classic|craigslist|hemmings|pcarmarket|cargurus|autotrader)\.(com|org)(/|$)')
     ) m
    ORDER BY m.image_id, m.dist, m.matched_id::text
 ),
@@ -723,7 +716,7 @@ pp AS MATERIALIZED (
                OR x.j->'exif_data'->>'synced_by' ~* '^(capture[-_ ]?relay|photo[-_ ]?(auto[-_ ]?)?sync)'
                OR x.j->>'device_fingerprint' IN (SELECT fp.dev FROM fp)), false)) AND NOT im.imp AS own
     FROM cand_all ca JOIN vehicle_images vi ON vi.vehicle_id = ca.vid CROSS JOIN cfg
-         CROSS JOIN LATERAL (SELECT to_jsonb(vi) AS j) x
+         CROSS JOIN LATERAL (SELECT to_jsonb(vi) AS j OFFSET 0) x  -- OFFSET 0: build the row json once, not once per reference
          -- Origin unknown: a user_upload row stored at the bucket root ('<uuid>.jpg') or under 'unorganized/' with no camera
          -- make / model, no taken_at, no GPS and no original file name (a '<uuid>.jpg' name is storage-generated, not original). It is not own-device and not own library.
          CROSS JOIN LATERAL (SELECT coalesce(regexp_replace(lower(btrim(x.j->>'source')), '[-\s]+', '_', 'g') = 'user_upload'
@@ -731,25 +724,22 @@ pp AS MATERIALIZED (
              AND nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NULL AND nullif(btrim(x.j->'exif_data'->>'camera_model'), '') IS NULL
              AND vi.taken_at IS NULL AND vi.latitude IS NULL AND vi.longitude IS NULL
              AND NOT EXISTS (SELECT 1 FROM unnest(ARRAY[x.j->>'file_name', x.j->>'filename']) f(n)
-                             WHERE nullif(btrim(f.n), '') IS NOT NULL AND lower(btrim(f.n)) !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\.[a-z0-9]+)?$'), false) AS unk) u2
+                             WHERE nullif(btrim(f.n), '') IS NOT NULL AND lower(btrim(f.n)) !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\.[a-z0-9]+)?$'), false) AS unk OFFSET 0) u2
          CROSS JOIN LATERAL (SELECT coalesce(NOT u2.unk AND own_origin_source(
              CASE WHEN nullif(btrim((SELECT iv.automation_script FROM vehicles iv WHERE iv.id = vi.vehicle_id)), '') IS NOT NULL THEN coalesce(x.j->>'source', '') || '#automated'
                   ELSE x.j->>'source' END,
-             x.j->>'storage_path', vi.user_id, cfg.u), false) AS origin, u2.unk) o2
+             x.j->>'storage_path', vi.user_id, cfg.u), false) AS origin, u2.unk OFFSET 0) o2
          -- An origin-unknown photo that shares file_hash / dhash with an image from an external scrape is scraped (cited).
          LEFT JOIN LATERAL (
            SELECT jsonb_build_object('image_id', vi.id, 'matched_image_id', q.id, 'matched_source', q.source, 'via', q.via) AS m
              FROM (SELECT s.id, s.source, 'file_hash' AS via, (SELECT sv.automation_script FROM vehicles sv WHERE sv.id = s.vehicle_id) AS automation_script FROM vehicle_images s
-                    WHERE vi.file_hash IS NOT NULL AND s.file_hash = vi.file_hash AND s.id <> vi.id
-                   UNION ALL
-                   SELECT s.id, s.source, 'dhash', (SELECT sv.automation_script FROM vehicles sv WHERE sv.id = s.vehicle_id) AS automation_script FROM vehicle_images s
-                    WHERE vi.dhash IS NOT NULL AND s.dhash = vi.dhash AND s.id <> vi.id) q
+                    WHERE vi.file_hash IS NOT NULL AND s.file_hash = vi.file_hash AND s.id <> vi.id) q
             WHERE o2.unk
               AND (regexp_replace(lower(btrim(coalesce(q.source, ''))), '[-\s]+', '_', 'g')
                      IN ('bat', 'mecum', 'classic_com', 'classiccom', 'craigslist', 'url_scraper')
                    OR (regexp_replace(lower(btrim(coalesce(q.source, ''))), '[-\s]+', '_', 'g') = 'dropbox_import'
                        AND nullif(btrim(q.automation_script), '') IS NOT NULL))
-            ORDER BY q.id LIMIT 1) sc ON true
+            ORDER BY q.id::text LIMIT 1) sc ON true
          -- Import provenance: the same file (file_hash) as an image from a listing scrape
          LEFT JOIN LATERAL (
            SELECT s.id, s.source, s.created_at FROM vehicle_images s
@@ -757,7 +747,7 @@ pp AS MATERIALIZED (
               AND (regexp_replace(lower(btrim(coalesce(s.source, ''))), '[-\s]+', '_', 'g')
                      IN ('bat', 'mecum', 'classic_com', 'classiccom', 'craigslist', 'url_scraper', 'cars_and_bids', 'carsandbids')
                    OR lower(coalesce(s.image_url, '')) ~ '^https?://([a-z0-9-]+\.)*(bringatrailer|carsandbids|mecum|classic|craigslist|hemmings|pcarmarket|cargurus|autotrader)\.(com|org)(/|$)')
-            ORDER BY s.id LIMIT 1) fh ON true
+            ORDER BY s.id::text LIMIT 1) fh ON true  -- ::text keeps the planner on the file_hash index (an id-ordered scan with a filter never ends)
          LEFT JOIN dhm ON dhm.image_id = vi.id
          -- Import provenance: path / source, file name, web export size without camera EXIF, and the hash matches above
          CROSS JOIN LATERAL (SELECT
@@ -773,7 +763,7 @@ pp AS MATERIALIZED (
                WHERE q.v ~ '^[0-9]{1,5}$') AS w,
              (SELECT max(q.v::int) FROM unnest(ARRAY[x.j->>'height', x.j->>'height_px', x.j->>'image_height', x.j->'exif_data'->>'height',
                 x.j->'exif_data'->>'ImageHeight', x.j->'exif_data'->>'PixelYDimension', x.j->'exif_data'->>'image_height']) q(v)
-               WHERE q.v ~ '^[0-9]{1,5}$') AS hgt) ib
+               WHERE q.v ~ '^[0-9]{1,5}$') AS hgt OFFSET 0) ib
          CROSS JOIN LATERAL (SELECT array_remove(ARRAY[
              CASE WHEN ib.src ~ '(^|_)(download|downloaded|url_scraper|screenshot|screenshots|url_import|web_import|import_url|imported)(_|$)'
                     OR ib.sp ~ '(^|/)(downloads?|url[-_]?scraper|screenshots?|web[-_]?imports?|imports?|imported)(/|$)' THEN 'path_or_source' END,
@@ -784,7 +774,7 @@ pp AS MATERIALIZED (
                     AND x.j->'exif_data'->>'DateTimeOriginal' IS NULL THEN 'web_size_no_camera_exif' END,
              CASE WHEN fh.id IS NOT NULL AND NOT (ib.cam AND vi.taken_at IS NOT NULL AND vi.created_at < fh.created_at) THEN 'file_hash' END,
              CASE WHEN dhm.dist IS NOT NULL AND NOT (ib.cam AND vi.taken_at IS NOT NULL AND vi.created_at < dhm.matched_created_at) THEN 'dhash' END
-           ], NULL) AS sigs) sg
+           ], NULL) AS sigs OFFSET 0) sg
          CROSS JOIN LATERAL (SELECT cardinality(sg.sigs) > 0 AS imp,
              CASE WHEN cardinality(sg.sigs) > 0 THEN jsonb_build_object('image_id', vi.id, 'signals', to_jsonb(sg.sigs),
                'via', CASE WHEN 'dhash' = ANY (sg.sigs) THEN 'dhash' WHEN 'file_hash' = ANY (sg.sigs) THEN 'file_hash' END,
