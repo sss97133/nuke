@@ -172,6 +172,10 @@ jobs:
         run: createdb dm_refinement_canonical_inputs_ci
       - name: Verify actual canonical trigger dependencies without row replay
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_canonical_inputs_ci -f supabase/sql/test_vehicle_canonical_trigger_inputs.sql
+      - name: Create current BaT episode reader database
+        run: createdb dm_refinement_bat_episode_reader_ci
+      - name: Verify source episode eligibility, anonymous evidence and historical price isolation
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_episode_reader_ci -f supabase/sql/test_bat_episode_board_identity.sql
       - name: Create disposable live-pull slot database
         run: createdb dm_bat_live_pull_slots_ci
       - name: Verify the live pull's closing-slot cap, config slot count and pacing guards
