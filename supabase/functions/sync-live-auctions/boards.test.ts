@@ -4,7 +4,8 @@ import {
 } from "./boards.ts";
 import { type AmLotDoc, type AmSale, amIsVehicleLot, amOpenTimedSales, amSales, amTimedLot } from "./boards.ts";
 import {
-  goodingBoardLot, type GoodingCatalogLot, goodingCatalogFor, goodingLinkPlan, goodingWithBidState, parseGoodingLots,
+  goodingBoardLot, type GoodingCatalogLot, goodingCatalogFor, goodingLinkPlan, goodingTimedSaleAhead, goodingWithBidState,
+  parseGoodingLots,
 } from "./boards.ts";
 // Gooding, captured from the house (each file names its source): its bidding platform's lot documents while a timed sale
 // was open (Internet Archive capture), after a timed sale with cars closed, and today's board; its catalog for those lots.
@@ -14,6 +15,7 @@ import amToday from "./fixtures/gooding_am_upcoming_2026-10-20.json" with { type
 import catDec23 from "./fixtures/gooding_catalog_2023-12.json" with { type: "json" };
 import catSpring25 from "./fixtures/gooding_catalog_2025-04.json" with { type: "json" };
 import amWidget from "./fixtures/gooding_am_widget_2023-12.json" with { type: "json" };
+import catOnline from "./fixtures/gooding_catalog_online_only_2026-11-08.json" with { type: "json" };
 
 // Trimmed from https://www.pcarmarket.com/auctions?auctionType=live&page=1 (2026-10-18): the Basta query cache.
 const BOARD = `queries:$R[22]=[$R[30]={state:$R[31]={data:$R[32]={search:$R[33]={pageInfo:$R[34]={page:1,pageSize:24,totalPages:3,hasNextPage:!0},` +
@@ -264,6 +266,15 @@ Deno.test("amIsVehicleLot: a model-year title in a car sale, not a year-led part
   assertEquals(amIsVehicleLot("1992 Original Lotus 107C Rear Wing Element", "Global Icons: Memorabilia Online 2026"), false);
   assertEquals(amIsVehicleLot("Ralf Schumacher 2004 Original Williams Gloves", "Global Icons: Memorabilia Online 2026"), false);
   assertEquals(amTimedLot(GLOVES, MEMO, READ_AT).vehicle, false);
+});
+
+Deno.test("Gooding catalog gate: no Online Only sale ahead names the newest timed sale and its end (2026-11-08)", () => {
+  const now = Date.parse("2026-11-08T19:00:00Z");
+  assertEquals(goodingTimedSaleAhead(catOnline, now), { ahead: false, sale: "Geared Online | Spring Automobilia", ends: "2025-04-18T17:00:00.000Z" });
+  // a timed sale still ahead carries its own end instead of the sentinel
+  const ahead = { data: { getVehicles: { vehicles: [{ ...catOnline.data.getVehicles.vehicles[0], auctionName: "Geared Online | Test", upcomingAuctionEndDate: String(now + 86_400_000) }] } } };
+  assertEquals(goodingTimedSaleAhead(ahead, now), { ahead: true, sale: "Geared Online | Test", ends: new Date(now + 86_400_000).toISOString() });
+  assertEquals(goodingTimedSaleAhead({ data: { getVehicles: { vehicles: [] } } }, now), { ahead: false, sale: null, ends: null });
 });
 
 Deno.test("Gooding today: no lot of a timed sale is open or upcoming on its bidding platform (2026-10-20)", () => {
