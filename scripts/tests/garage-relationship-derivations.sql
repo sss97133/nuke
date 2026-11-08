@@ -951,6 +951,29 @@ SELECT fixture_assert(:'sa'::jsonb->(gz(50))::text->>'sub'='pre_auction_inventor
   AND (:'sa'::jsonb->(gz(50))::text->'s3'->'pre_auction'->'scenes'->0->>'photos')::int=4,
   '4 dealer photos vs 2 shop photos at the dealer: pre-auction inventory, the aggregate and the session weights are cited');
 
+-- ===== shop custody: >= 2 shop-scene sessions at one shop organization (sc_*) =====
+INSERT INTO vehicles(id,is_public,year,make,model) SELECT gz(g), true, 1990, 'Gzmake'||g, 'Gzmodel' FROM generate_series(51,54) g;
+CREATE FUNCTION sc_sessions(n int, start_ts timestamptz, lat numeric, lon numeric) RETURNS void LANGUAGE sql AS $$
+ SELECT gz_burst(n, 3, start_ts, lat, lon); SELECT gz_burst(n, 3, start_ts + interval '1 day', lat, lon); SELECT gz_burst(n, 3, start_ts + interval '2 days', lat, lon) $$;
+SELECT sc_sessions(51, now() - interval '5 months', 36.30000, -115.30000);   -- three shop-scene sessions at the restoration shop (3 sessions: not shoot-shaped)
+SELECT sc_sessions(52, now() - interval '5 months', 36.30000, -115.30000);   -- one shop session + one outdoor session
+SELECT sc_sessions(53, now() - interval '5 months', 36.30000, -115.30000);   -- two shop sessions, but 40 days of own photos away from every organization
+SELECT gz_burst(53, 1, now() - interval '5 months' + interval '10 days', 36.50000, -115.50000);
+SELECT gz_burst(53, 1, now() - interval '5 months' + interval '50 days', 36.50000, -115.50000);
+SELECT sc_sessions(54, now() - interval '5 months', 36.40000, -115.40000);   -- two shop sessions at the DEALER organization
+\set sc_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), gz(51), 'a51', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(51)))[1:3], 'shop_interior', 'm', 0.9::numeric, 'seen', NULL::int UNION ALL SELECT gen_random_uuid(), gz(51), 'b51', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(51)))[4:6], 'upholstery_work', 'm', 0.9::numeric, 'seen', NULL::int UNION ALL SELECT gen_random_uuid(), gz(51), 'c51', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(51)))[7:9], 'paint_body', 'm', 0.9::numeric, 'seen', NULL::int UNION ALL SELECT gen_random_uuid(), gz(52), 'a52', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(52)))[1:3], 'shop_interior', 'm', 0.9::numeric, 'seen', NULL::int UNION ALL SELECT gen_random_uuid(), gz(52), 'b52', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(52)))[4:6], 'outdoor_street', 'm', 0.9::numeric, 'seen', NULL::int UNION ALL SELECT gen_random_uuid(), gz(53), 'a53', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(53)))[1:3], 'shop_interior', 'm', 0.9::numeric, 'seen', NULL::int UNION ALL SELECT gen_random_uuid(), gz(53), 'b53', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(53)))[4:6], 'paint_body', 'm', 0.9::numeric, 'seen', NULL::int UNION ALL SELECT gen_random_uuid(), gz(54), 'a54', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(54)))[1:3], 'shop_interior', 'm', 0.9::numeric, 'seen', NULL::int UNION ALL SELECT gen_random_uuid(), gz(54), 'b54', ((SELECT array_agg(id ORDER BY taken_at) FROM vehicle_images WHERE vehicle_id=gz(54)))[4:6], 'shop_interior', 'm', 0.9::numeric, 'seen', NULL::int/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('s3', c->'evidence', 'role', d.derived_role, 'conf', d.confidence, 'sub', d.evidence->>'sub_reason'))
+          FROM (:sc_sql) d, jsonb_array_elements(d.evidence->'chain') c WHERE (c->>'step')::int=3 AND d.vehicle_id BETWEEN gz(51) AND gz(54)) AS sc \gset
+SELECT fixture_assert(:'sc'::jsonb->(gz(51))::text->>'role'='business_handling' AND (:'sc'::jsonb->(gz(51))::text->>'conf')::numeric=0.6
+  AND :'sc'::jsonb->(gz(51))::text->>'sub'='shop_custody' AND :'sc'::jsonb->(gz(51))::text->'s3'->>'pattern' IS DISTINCT FROM 'shop_shoot'
+  AND :'sc'::jsonb->(gz(51))::text->'s3'->'shop_custody'->>'organization_id'=:'gz_shop'
+  AND (:'sc'::jsonb->(gz(51))::text->'s3'->'shop_custody'->>'session_count')::int=3
+  AND jsonb_array_length(:'sc'::jsonb->(gz(51))::text->'s3'->'shop_custody'->'sessions')=3,
+  'three shop-scene sessions at a restoration shop, not shoot-shaped: business_handling 0.6, shop_custody, sessions and organization cited');
+SELECT fixture_assert(coalesce(:'sc'::jsonb->(gz(52))::text->>'sub','') <> 'shop_custody' AND NOT (:'sc'::jsonb->(gz(52))::text->'s3'->'shop_custody'->>'conditions_met')::boolean,'one informative shop session (the other is outdoor_street, dropped) is not custody');
+SELECT fixture_assert(coalesce(:'sc'::jsonb->(gz(53))::text->>'sub','') <> 'shop_custody' AND (:'sc'::jsonb->(gz(53))::text->'s3'->'shop_custody'->>'long_term_personal_exception')::boolean,'own photos away from every organization spanning more than 30 days: long-term personal, not custody');
+SELECT fixture_assert(coalesce(:'sc'::jsonb->(gz(54))::text->>'sub','') <> 'shop_custody' AND :'sc'::jsonb->(gz(54))::text->'s3'->'shop_custody'->>'organization_id' IS NULL,'shop scenes at a dealer organization are not shop custody');
+
 -- ===== duplicate review pairs: visual judgment or absence of contradiction joins a cluster (rv_*) =====
 ALTER TABLE vehicles ADD COLUMN color text, ADD COLUMN body_style text, ADD COLUMN engine text, ADD COLUMN transmission text;
 CREATE FUNCTION rv(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ SELECT ('a7a7a7a7-0000-4000-8000-0000000000'||lpad(n::text,2,'0'))::uuid $$;

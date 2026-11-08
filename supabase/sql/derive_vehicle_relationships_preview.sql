@@ -100,6 +100,11 @@
 -- 0.6) for a session whose own-device photos sit at an organization of kind dealer / auction / consignor, and the vehicle has no own
 -- long-term pattern (not long_term_personal; own-device photos taken anywhere but at that organization span <= max_span_days) ->
 -- business_handling, confidence 0.6, evidence.sub_reason 'pre_auction_inventory', scene rows and organization cited in chain[3].
+-- Shop custody (below listing / title / statement, above the shoot-shaped contributor rule): counted shop_interior / upholstery_work / paint_body
+-- scenes in >= 2 distinct sessions photographed at the same shop-kind organization (restoration / upholstery / paint / body / mechanic) and the
+-- vote there reading shop -> business_handling, confidence 0.6, evidence.sub_reason 'shop_custody' (client work), sessions and organization cited in
+-- chain[3].shop_custody - even when the photos are not shoot-shaped - UNLESS the vehicle's own-device photos at geotagged places within range of no
+-- organization span more than max_span_days (long-term personal; cited as long_term_personal_exception).
 -- Time decay: documenting with no own photo or activity for platform_config 'garage_documenting_decay_months'
 -- ({"months": n}, default 18 here) -> previously_documented, with documented_from / documented_to = min / max
 -- capture time of the account's own-device photos.
@@ -538,11 +543,11 @@ orgn AS MATERIALIZED (
     CROSS JOIN LATERAL (SELECT lower(coalesce(to_jsonb(o)->>'business_type', '') || ' ' || coalesce(to_jsonb(o)->>'entity_type', '')) AS tf,
                                lower(coalesce(to_jsonb(o)->>'services_offered', '')) AS sf) kt
     CROSS JOIN LATERAL (SELECT CASE
-        WHEN kt.tf ~ '(dealer|auction|consign)' AND kt.tf !~ '(restor|upholster|body_shop|paint|fabricat|garage|builder)' THEN 'dealer'
-        WHEN kt.tf ~ '(restor|upholster|body_shop|paint|fabricat|garage|builder)' AND kt.tf !~ '(dealer|auction|consign)' THEN 'shop'
-        WHEN kt.tf !~ '(dealer|auction|consign|restor|upholster|body_shop|paint|fabricat|garage|builder)' THEN
-          CASE WHEN kt.sf ~ '(dealer|auction|consign)' AND kt.sf !~ '(restor|upholster|body_shop|paint|fabricat|garage|builder)' THEN 'dealer'
-               WHEN kt.sf ~ '(restor|upholster|body_shop|paint|fabricat|garage|builder)' AND kt.sf !~ '(dealer|auction|consign)' THEN 'shop' END
+        WHEN kt.tf ~ '(dealer|auction|consign)' AND kt.tf !~ '(restor|upholster|body_shop|paint|fabricat|garage|builder|mechanic)' THEN 'dealer'
+        WHEN kt.tf ~ '(restor|upholster|body_shop|paint|fabricat|garage|builder|mechanic)' AND kt.tf !~ '(dealer|auction|consign)' THEN 'shop'
+        WHEN kt.tf !~ '(dealer|auction|consign|restor|upholster|body_shop|paint|fabricat|garage|builder|mechanic)' THEN
+          CASE WHEN kt.sf ~ '(dealer|auction|consign)' AND kt.sf !~ '(restor|upholster|body_shop|paint|fabricat|garage|builder|mechanic)' THEN 'dealer'
+               WHEN kt.sf ~ '(restor|upholster|body_shop|paint|fabricat|garage|builder|mechanic)' AND kt.sf !~ '(dealer|auction|consign)' THEN 'shop' END
         END AS okind) kk
     CROSS JOIN LATERAL (SELECT btrim(regexp_replace(
         regexp_replace(regexp_replace(regexp_replace(lower(coalesce(o.name, '')), '[''’`]', '', 'g'),
@@ -730,6 +735,29 @@ pa AS MATERIALIZED (
                    ORDER BY r.confidence DESC, r.session_key, r.org::text, r.member_vid::text) AS cites,
          jsonb_agg(DISTINCT jsonb_build_object('organization_id', r.org, 'kind', r.kind, 'dealer_weight', r.wd, 'shop_weight', r.ws)) AS aggs
     FROM pa_rows r GROUP BY r.vid
+),
+-- Shop custody: counted shop_interior / upholstery_work / paint_body sessions photographed (own device) at the same shop-kind organization
+-- (orgn.okind = 'shop'), in at least 2 distinct sessions, where the vote at that organization reads shop. One organization per vehicle: the
+-- one with most sessions.
+shopc AS MATERIALIZED (
+  SELECT DISTINCT ON (y.vid) y.vid, y.canon, y.n_sess, y.cites, y.wd, y.ws
+    FROM (SELECT x.vid, x.canon, count(*) AS n_sess, sg.wd, sg.ws,
+                 jsonb_agg(x.cite || jsonb_build_object('organization_id', x.canon) ORDER BY x.confidence DESC, x.session_key, x.vehicle_id::text) AS cites
+            FROM (SELECT DISTINCT sc.vid, poc.canon, sc.vehicle_id, sc.session_key, sc.confidence, sc.cite
+                    FROM sc
+                    JOIN ps2 p ON p.mvid = sc.vehicle_id AND (p.id = ANY (coalesce(sc.image_ids, '{}'::uuid[])) OR p.id::text = sc.session_key)
+                    JOIN poc ON poc.photo_id = p.id
+                    JOIN orgn o ON o.id = poc.canon AND o.okind = 'shop'
+                   WHERE sc.dropped IS NULL AND sc.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')) x
+            JOIN sorg sg ON sg.vid = x.vid AND sg.canon = x.canon AND sg.kind = 'shop'
+           GROUP BY x.vid, x.canon, sg.wd, sg.ws HAVING count(*) >= 2) y
+   ORDER BY y.vid, y.n_sess DESC, y.canon::text
+),
+-- Span (days) of the vehicle's own-device photos taken at geotagged places within range of no organization: a long-term personal pattern.
+awayc AS MATERIALIZED (
+  SELECT p.vid, extract(epoch FROM max(p.t) - min(p.t)) / 86400.0 AS span
+    FROM ps2 p WHERE p.lat IS NOT NULL AND p.lon IS NOT NULL AND NOT EXISTS (SELECT 1 FROM poc WHERE poc.photo_id = p.id)
+   GROUP BY p.vid
 ),
 -- Span (days) of the vehicle's own-device photos taken anywhere but at those organizations: an own long-term pattern if it exceeds
 -- the shop-shoot window (max_span_days).
@@ -985,8 +1013,10 @@ g5 AS (
 -- that lists or is linked to the vehicle keeps its attribution (a listing outranks a model label); a matching scene supports it.
 g5w AS (
   SELECT g5.*, g5.s_org IS NOT NULL AND coalesce(g5.s_sx, false) AND NOT (coalesce(g5.s_listed, false) OR coalesce(g5.s_rel, false)) AS scene_w,
-         pa.cites AS pa_cites, pa.orgs AS pa_orgs, pa.aggs AS pa_aggs, aw.span AS away_span
+         pa.cites AS pa_cites, pa.orgs AS pa_orgs, pa.aggs AS pa_aggs, aw.span AS away_span,
+         sh.canon AS cust_org, sh.n_sess AS cust_n, sh.cites AS cust_cites, sh.wd AS cust_wd, sh.ws AS cust_ws, ac.span AS cust_away
   FROM g5 LEFT JOIN pa ON pa.vid = g5.vid LEFT JOIN away aw ON aw.vid = g5.vid
+  LEFT JOIN shopc sh ON sh.vid = g5.vid LEFT JOIN awayc ac ON ac.vid = g5.vid
 ),
 g6 AS (
   SELECT g5w.*,
@@ -996,6 +1026,9 @@ g6 AS (
          -- pre-auction inventory: a dealer scene at a dealer / consignor organization and no own long-term pattern of the account
          g5w.pa_cites IS NOT NULL AND NOT (g5w.span_days >= g5w.r_pers_span AND g5w.geo_n - g5w.at_any_org > 0)
            AND coalesce(g5w.away_span, 0) <= g5w.r_max_span AS pre_auc,
+         -- shop custody: >= 2 shop-scene sessions at one shop organization, unless the vehicle's own-device photos at places within range of no
+         -- organization span more than the shop-shoot window (a long-term personal pattern)
+         g5w.cust_org IS NOT NULL AND coalesce(g5w.cust_away, 0) <= g5w.r_max_span AS custody,
          g5w.s_org IS NOT NULL AND g5w.s_other > 0 AND NOT (g5w.s_listed OR g5w.s_rel) AND NOT coalesce(g5w.tb_decided, false) AS amb
   FROM g5w
 ),
@@ -1042,6 +1075,9 @@ h AS (
       -- below listing, title and statement evidence (all above): inventory photographed on a dealer lot / showroom before its listing
       WHEN g6.pre_auc
         THEN jsonb_build_array('business_handling', 0.6, 'pre-auction inventory: own-device photos on a dealer lot / showroom at a dealer or consignor organization; no listing, title or statement; no long-term pattern', 'pre_auction_inventory')
+      -- below listing, title and statement evidence (all above): the vehicle was in a shop's custody (client work), even if the photos are not shoot-shaped
+      WHEN g6.custody
+        THEN jsonb_build_array('business_handling', 0.6, 'shop custody: shop-interior / upholstery / paint scenes in ' || g6.cust_n || ' sessions at a shop organization; client work, not ownership', 'shop_custody')
       WHEN g6.shoot
         THEN jsonb_build_array('contributor', CASE WHEN g6.amb THEN 0.2 ELSE 0.5 END,
           CASE WHEN g6.amb THEN 'contributor: org_ambiguous, two organizations in range and nothing breaks the tie; not ownership'
@@ -1123,6 +1159,10 @@ SELECT m.vid AS vehicle_id,
                'pre_auction', jsonb_build_object('conditions_met', coalesce(h.pre_auc, false), 'decides', coalesce(h.d->>3 = 'pre_auction_inventory', false),
                  'organizations', to_jsonb(h.pa_orgs), 'scenes', coalesce(h.pa_cites, '[]'::jsonb), 'aggregates', coalesce(h.pa_aggs, '[]'::jsonb),
                  'own_pattern_outside_organization_days', round(h.away_span::numeric, 1), 'long_term_personal', coalesce(h.personal, false)),
+               'shop_custody', jsonb_build_object('conditions_met', coalesce(h.custody, false), 'decides', coalesce(h.d->>3 = 'shop_custody', false),
+                 'organization_id', h.cust_org, 'sessions', coalesce(h.cust_cites, '[]'::jsonb), 'session_count', h.cust_n,
+                 'aggregate', CASE WHEN h.cust_org IS NOT NULL THEN jsonb_build_object('scope', 'organization', 'kind', 'shop', 'dealer_weight', h.cust_wd, 'shop_weight', h.cust_ws) END,
+                 'own_pattern_outside_organizations_days', round(h.cust_away::numeric, 1), 'long_term_personal_exception', h.cust_org IS NOT NULL AND NOT coalesce(h.custody, false)),
                'recent_photos', coalesce(h.recent_gps_n, 0) > 0,
                'hypothesis', CASE WHEN h.shoot THEN 'shop shoot at organization'
                                   WHEN h.s_org IS NOT NULL AND NOT h.scene_w THEN 'photographed at organization' END,
