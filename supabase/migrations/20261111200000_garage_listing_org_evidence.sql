@@ -657,16 +657,16 @@ pp AS MATERIALIZED (
              AND vi.taken_at IS NULL AND vi.latitude IS NULL AND vi.longitude IS NULL
              AND nullif(btrim(x.j->>'original_filename'), '') IS NULL, false) AS unk) u2
          CROSS JOIN LATERAL (SELECT coalesce(NOT u2.unk AND own_origin_source(
-             CASE WHEN nullif(btrim(x.j->>'automation_script'), '') IS NOT NULL THEN coalesce(x.j->>'source', '') || '#automated'
+             CASE WHEN nullif(btrim((SELECT iv.automation_script FROM vehicles iv WHERE iv.id = vi.vehicle_id)), '') IS NOT NULL THEN coalesce(x.j->>'source', '') || '#automated'
                   ELSE x.j->>'source' END,
              x.j->>'storage_path', vi.user_id, cfg.u), false) AS origin, u2.unk) o2
          -- An origin-unknown photo that shares file_hash / dhash with an image from an external scrape is scraped (cited).
          LEFT JOIN LATERAL (
            SELECT jsonb_build_object('image_id', vi.id, 'matched_image_id', q.id, 'matched_source', q.source, 'via', q.via) AS m
-             FROM (SELECT s.id, s.source, 'file_hash' AS via, s.automation_script FROM vehicle_images s
+             FROM (SELECT s.id, s.source, 'file_hash' AS via, (SELECT sv.automation_script FROM vehicles sv WHERE sv.id = s.vehicle_id) AS automation_script FROM vehicle_images s
                     WHERE vi.file_hash IS NOT NULL AND s.file_hash = vi.file_hash AND s.id <> vi.id
                    UNION ALL
-                   SELECT s.id, s.source, 'dhash', s.automation_script FROM vehicle_images s
+                   SELECT s.id, s.source, 'dhash', (SELECT sv.automation_script FROM vehicles sv WHERE sv.id = s.vehicle_id) AS automation_script FROM vehicle_images s
                     WHERE vi.dhash IS NOT NULL AND s.dhash = vi.dhash AND s.id <> vi.id) q
             WHERE o2.unk
               AND (regexp_replace(lower(btrim(coalesce(q.source, ''))), '[-\s]+', '_', 'g')
