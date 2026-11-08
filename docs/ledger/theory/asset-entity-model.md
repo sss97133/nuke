@@ -187,7 +187,7 @@ exhibition), holder claims, images as `image_identities` rows keyed by sha256 wi
   with two pages of 250; the department is chosen by `asset_lot_next_department` (the slice department furthest behind the
   house's own count), and `asset_lot_walk_health(source)` is the rows-landed check beside it. The writer keeps an unsold lot's
   high bid (`structured_data.high_bid`).
-- **Mecum Road Art** lands from the retained 2026-10-14 index through the same writer (`scripts/data/land_mecum_road_art.py`,
+- **Mecum Road Art** lands from the retained 2026-10-14 index through the same writer (`scripts/extractors/land_mecum_road_art.py`,
   one-off): `department_code = 'Road Art'` (the house's `lot_type`), `house_group` = the house's model label, the result as the
   house's `sale_result` label, the price as `highest_bid_or_price` (the index does not say hammer vs high bid; recorded as the
   basis). Type: automobilia; memorabilia when the model label names a guitar, framed art, poster or photograph.
