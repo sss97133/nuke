@@ -40,6 +40,9 @@ import {
 } from "./boards.ts";
 import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
 import {
+  type CcClosedLot, type CcSoldDoc, ccBidObservation, ccResultObservations, type ObservationPost,
+} from "./boards.ts";
+import {
   goodingBoardLot, type GoodingCatalogLot, goodingCatalogFor, goodingLinkPlan, type GoodingLot, goodingUrlVariants,
   type GoodingVehicleRow, goodingWithBidState, parseGoodingLots,
 } from "./boards.ts";
@@ -567,6 +570,112 @@ async function ingestPcarBids(
     }
   }
   return out;
+}
+
+/**
+ * Posts observations through ingest-observation, skipping those already held (same kind and source_identifier), a few
+ * at a time, until the deadline; what is left is posted on a later run (it is still not held then).
+ */
+async function postObservations(
+  supabase: ReturnType<typeof createClient>,
+  posts: ObservationPost[],
+  deadline: number,
+): Promise<{ candidates: number; held: number; posted: number; deferred: number; errors: string[] }> {
+  const out = { candidates: posts.length, held: 0, posted: 0, deferred: 0, errors: [] as string[] };
+  const have = new Set<string>();
+  for (let i = 0; i < posts.length; i += 100) {
+    const chunk = posts.slice(i, i + 100);
+    for (const kind of new Set(chunk.map((p) => p.kind))) {
+      const { data, error } = await supabase.from("vehicle_observations").select("source_identifier").eq("kind", kind)
+        .in("source_identifier", chunk.filter((p) => p.kind === kind).map((p) => p.source_identifier));
+      if (error) { out.errors.push(`held check: ${error.message}`); return out; }
+      for (const r of (data ?? []) as { source_identifier: string }[]) have.add(`${kind}|${r.source_identifier}`);
+    }
+  }
+  const todo = posts.filter((p) => !have.has(`${p.kind}|${p.source_identifier}`));
+  out.held = posts.length - todo.length;
+  const base = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = projectSecretKey() ?? "";
+  for (let i = 0; i < todo.length; i += 6) {
+    if (Date.now() > deadline) { out.deferred = todo.length - i; break; }
+    await Promise.all(todo.slice(i, i + 6).map(async (p) => {
+      const res = await fetch(`${base}/functions/v1/ingest-observation`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify(p),
+      });
+      if (res.ok) out.posted++;
+      else out.errors.push(`${p.source_identifier}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
+    }));
+  }
+  return out;
+}
+
+/**
+ * Collecting Cars' bid path and results, which the house keeps nowhere Nuke can read later: each lot's bid as this board
+ * read saw it (once per distinct bid), and each closed lot's outcome (ccResultObservations). The finish estimator
+ * (scripts/market/live-finish-houses.py) needs both before it can measure itself on this house.
+ */
+async function ingestCcPath(
+  supabase: ReturnType<typeof createClient>,
+  auctions: LiveAuction[],
+  resultsDays: number,
+  deadline: number,
+): Promise<Record<string, unknown>> {
+  const readAt = String(auctions[0]?.raw_data?.synced_at ?? new Date().toISOString());
+  const vehicleOf = new Map<string, string>();
+  const lookup = async (urls: string[]) => {
+    const need = [...new Set(urls)].filter((u) => !vehicleOf.has(u));
+    for (let i = 0; i < need.length; i += 100) {
+      const { data } = await supabase.from("vehicles").select("id, listing_url").in("listing_url", need.slice(i, i + 100))
+        .is("deleted_at", null);
+      for (const v of (data ?? []) as { id: string; listing_url: string }[]) vehicleOf.set(v.listing_url, v.id);
+    }
+  };
+  await lookup(auctions.map((a) => a.url));
+  const bidPosts = auctions.flatMap((a) => {
+    const vid = vehicleOf.get(a.url);
+    const p = vid ? ccBidObservation({ url: a.url, external_id: a.external_id, current_bid: a.current_bid, bid_count: a.bid_count,
+      currency: a.currency ?? null, ends: a.auction_end_date }, vid, readAt) : null;
+    return p ? [p] : [];
+  });
+  const bids = await postObservations(supabase, bidPosts, deadline);
+
+  // results: the sold index since the window's start, and the lots Nuke followed that closed in it
+  const now = Date.now();
+  const since = Math.floor((now - resultsDays * 86_400_000) / 1000);
+  const sold: CcSoldDoc[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, { // guardrail-allow: raw-fetch (house JSON API)
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ searches: [{ collection: TYPESENSE_COLLECTION, q: "*", query_by: "title", per_page: 250, page,
+        filter_by: `stage:=sold && lotType:=car && tsAuctionEndedUTC:>=${since}`,
+        include_fields: "auctionId,slug,priceSold,currentBid,noBids,reserveMet,reserveLowered,noReserve,isSoldPriceHidden,currencyCode,dtAuctionEndedUTC,dtSoldUTC,priceNormalisedUSD" }] }),
+    });
+    if (!res.ok) return { bids, results: { error: `sold index HTTP ${res.status}` } };
+    const hits = ((await res.json()).results?.[0]?.hits ?? []) as { document: CcSoldDoc }[];
+    sold.push(...hits.map((h) => h.document));
+    if (hits.length < 250) break;
+  }
+  const src = (await supabase.from("live_auction_sources").select("id").eq("slug", "collecting-cars").maybeSingle()).data as { id: string } | null;
+  const closed: CcClosedLot[] = [];
+  if (src?.id) {
+    const { data, error } = await supabase.from("monitored_auctions")
+      .select("external_auction_id, external_auction_url, vehicle_id, auction_end_time, current_bid_cents, bid_count, stream_state")
+      .eq("source_id", src.id).gte("auction_end_time", new Date(since * 1000).toISOString())
+      .lte("auction_end_time", new Date(now).toISOString()).limit(2000);
+    if (error) return { bids, results: { error: `monitored_auctions: ${error.message}` } };
+    for (const m of (data ?? []) as Record<string, any>[]) {
+      closed.push({ external_id: String(m.external_auction_id), url: m.external_auction_url, vehicle_id: m.vehicle_id,
+        ends: m.auction_end_time, last_bid: m.current_bid_cents != null ? Number(m.current_bid_cents) / 100 : null,
+        bid_count: m.bid_count, currency: m.stream_state?.currency ?? null, bid_read_at: m.stream_state?.bid_changed_at ?? null });
+    }
+  }
+  const followed = new Set(closed.map((c) => c.external_id));
+  await lookup(sold.filter((d) => !followed.has(String(d.auctionId))).map((d) => `https://collectingcars.com/for-sale/${d.slug}`));
+  const results = await postObservations(supabase, ccResultObservations(sold, closed, vehicleOf, now, 12 * 3_600_000), deadline);
+  return { read_at: readAt, bids, results: { ...results, sold_index: sold.length, followed_closed: closed.length, days: resultsDays } };
 }
 
 // ============================================
@@ -1506,6 +1615,12 @@ Deno.serve(async (req) => {
             if (bids.errors.length) console.warn(`[sync-live-auctions] PCarMarket bid reads: ${bids.errors.slice(0, 3).join("; ")}`);
           } else if (board) {
             board = { ...board, moved: moved.length };
+          }
+          if (normalizedPlatform === "collecting-cars" && !syncResult.error && board) {
+            const days = Math.min(30, Math.max(1, Number(body.cc_results_days) || 2));
+            const cc = await ingestCcPath(supabase, syncResult.auctions, days,
+              functionStartTime + (platforms.length > 1 ? 25_000 : 45_000));
+            board = { ...board, cc_path: cc };
           }
         }
 
