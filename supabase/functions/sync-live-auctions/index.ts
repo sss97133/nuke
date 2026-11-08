@@ -548,7 +548,7 @@ async function ingestPcarBids(
     if (!bids.length) continue;
     const ids = bids.map((b) => `pcarmarket-bid:${b.id}`);
     const { data: held, error: heldError } = await supabase.from("vehicle_observations").select("source_identifier")
-      .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").in("source_identifier", ids);
+      .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").eq("is_superseded", false).in("source_identifier", ids);
     if (heldError) { out.errors.push(`held check: ${heldError.message}`); continue; }
     const have = new Set((held ?? []).map((r: { source_identifier: string }) => r.source_identifier));
     for (const b of bids) {

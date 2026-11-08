@@ -8,7 +8,7 @@ CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
 CREATE TABLE live_auction_sources(id uuid PRIMARY KEY,slug text);
 CREATE TABLE vehicles(id uuid PRIMARY KEY,deleted_at timestamptz);
 CREATE TABLE monitored_auctions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),source_id uuid,vehicle_id uuid,external_auction_url text,bid_count integer,is_live boolean,auction_end_time timestamptz);
-CREATE TABLE vehicle_observations(vehicle_id uuid,kind text,source_identifier text,source_url text);
+CREATE TABLE vehicle_observations(vehicle_id uuid,kind text,source_identifier text,source_url text,is_superseded boolean DEFAULT false);
 CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE plpgsql AS $$ BEGIN
  IF condition IS NOT TRUE THEN RAISE EXCEPTION 'FAIL %',label; END IF; RAISE NOTICE 'PASS %',label; END $$;
 INSERT INTO live_auction_sources VALUES ('00000000-0000-0000-0000-000000000001','pcarmarket'),('00000000-0000-0000-0000-000000000002','other');
@@ -18,12 +18,15 @@ INSERT INTO monitored_auctions(source_id,vehicle_id,external_auction_url,bid_cou
 \ir ../migrations/20261108183800_pcar_bid_capture_backlog.sql
 SELECT pg_temp.ok('default cap8',(SELECT count(*)=8 FROM pcarmarket_bid_capture_backlog()));
 SELECT pg_temp.ok('failed/capped read remains eligible',(SELECT count(*)=12 FROM pcarmarket_bid_capture_backlog(32)));
-INSERT INTO vehicle_observations SELECT vehicle_id,'bid','pcarmarket-bid:one-'||vehicle_id,url FROM pcarmarket_bid_capture_backlog(32);
+INSERT INTO vehicle_observations(vehicle_id,kind,source_identifier,source_url) SELECT vehicle_id,'bid','pcarmarket-bid:one-'||vehicle_id,url FROM pcarmarket_bid_capture_backlog(32);
 SELECT pg_temp.ok('partial admission still debt',(SELECT count(*)=12 AND min(retained_bids)=1 FROM pcarmarket_bid_capture_backlog(32)));
-INSERT INTO vehicle_observations SELECT vehicle_id,kind,source_identifier,source_url FROM vehicle_observations;
-INSERT INTO vehicle_observations SELECT id,'bid','pcarmarket-bid:other-'||id,'https://pcarmarket.com/auction/other' FROM vehicles;
+INSERT INTO vehicle_observations(vehicle_id,kind,source_identifier,source_url) SELECT vehicle_id,kind,source_identifier,source_url FROM vehicle_observations;
+INSERT INTO vehicle_observations(vehicle_id,kind,source_identifier,source_url) SELECT id,'bid','pcarmarket-bid:other-'||id,'https://pcarmarket.com/auction/other' FROM vehicles;
 SELECT pg_temp.ok('exact lot and distinct ids',(SELECT count(*)=12 AND max(retained_bids)=1 FROM pcarmarket_bid_capture_backlog(32)));
-INSERT INTO vehicle_observations SELECT vehicle_id,'bid','pcarmarket-bid:two-'||vehicle_id,replace(url,'https://','https://www.')||'/' FROM pcarmarket_bid_capture_backlog(8);
+INSERT INTO vehicle_observations(vehicle_id,kind,source_identifier,source_url) SELECT vehicle_id,'bid','pcarmarket-bid:two-'||vehicle_id,replace(url,'https://','https://www.')||'/' FROM pcarmarket_bid_capture_backlog(8);
+UPDATE vehicle_observations SET is_superseded=true WHERE source_identifier LIKE 'pcarmarket-bid:two-%';
+SELECT pg_temp.ok('superseded evidence does not repay debt',(SELECT count(*)=12 FROM pcarmarket_bid_capture_backlog(32)));
+UPDATE vehicle_observations SET is_superseded=false;
 SELECT pg_temp.ok('next run drains remainder despite unchanged board count',(SELECT count(*)=4 FROM pcarmarket_bid_capture_backlog(32)));
 UPDATE monitored_auctions SET is_live=false,auction_end_time=now()-interval '1 hour';
 SELECT pg_temp.ok('recent close retains known debt',(SELECT count(*)=4 FROM pcarmarket_bid_capture_backlog(32)));
