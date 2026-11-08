@@ -172,6 +172,7 @@ function fakeClient(pages: Record<string, any[]>, o: { remaining?: number; years
           { localizedAspectName: "Make", aspectValueDistributions: [{ localizedAspectValue: "Ford", matchCount: 3 }, { localizedAspectValue: "Porsche", matchCount: 1 }] },
         ] };
       }
+      assertEquals((q.offset ?? 0) % 200, 0, "eBay requires offset to be a multiple of limit");
       c.reads.push(`${q.aspectFilter}@${q.offset}`);
       const all = pages[q.aspectFilter ?? ""] ?? [];
       const items = all.slice(q.offset ?? 0, (q.offset ?? 0) + 200);
@@ -213,7 +214,7 @@ Deno.test("a held listing whose price or bid count moved is updated, not landed 
   assertEquals(w.updates.map((u) => u.current_price), [47500, 150]);
   assertEquals(w.priceLog.map((p) => [p.vehicle_id, p.value, p.price_type]), [["veh-3001", 47500, "asking"]]);   // a bid is not an asking price
   assertEquals([rec.landed.length, rec.landed[0].item.legacyItemId, rec.landed[0].opts.hashRawData], [1, "3003", true]);
-  assertEquals(compare(sum("9", { price: "1.00" }) as any, { kind: "episode", vehicle_id: "v", price: 1, bids: null, status: "ended" }), "skip");
+  assertEquals(compare(sum("9", { price: "1.00" }) as any, { kind: "episode", vehicle_id: "v", price: 1, bids: null, status: "ended", orig: null, origCur: null }), "skip");
 });
 
 Deno.test("a converted listing is compared on the seller's own price, not eBay's USD figure of the day", async () => {
@@ -278,7 +279,7 @@ Deno.test("caps stop the action: calls per run, the day's ledger, the quota floo
   w = world(); c = fakeClient(pages, { years });
   const store = memStore(), rec = recorder(w);
   r = await bulk(fakeSb(w), c, { maxLand: 50, ledger: open, store, gate: gateOpen, land: rec.land as any });
-  assertEquals([rec.landed.length, r.bulk.pages[0].complete, store.get().pass.offset, r.stopped?.startsWith("cap")], [50, false, 10, true]);
+  assertEquals([rec.landed.length, r.bulk.pages[0].complete, store.get().pass.offset, r.stopped?.startsWith("cap")], [50, false, 0, true]);
 });
 
 Deno.test("cursor resume: each run continues where the last stopped, re-reading a cut page, until the pass completes", async () => {
@@ -292,10 +293,10 @@ Deno.test("cursor resume: each run continues where the last stopped, re-reading 
     return r;
   };
   await run({ maxCalls: 2, maxLand: 1000 });              // plan + page @0 (200 landed)
-  await run({ maxCalls: 1, maxLand: 120 });               // page @190 (overlap 10): 10 held, 120 of 190 new land, cut
+  await run({ maxCalls: 1, maxLand: 120 });               // page @200: 120 of 200 new land, cut
   await run({ maxCalls: 1, maxLand: 1000 });              // the same page again: the rest land
-  const last = await run({ maxCalls: 2, maxLand: 1000 }); // page @380 (the last), then the pass completes
-  assertEquals(reads, [`${FILTER}@0`, `${FILTER}@190`, `${FILTER}@190`, `${FILTER}@380`]);
+  const last = await run({ maxCalls: 2, maxLand: 1000 }); // page @400 (the last), then the pass completes
+  assertEquals(reads, [`${FILTER}@0`, `${FILTER}@200`, `${FILTER}@200`, `${FILTER}@400`]);
   assertEquals(new Set(rec.landed.map((l) => l.item.legacyItemId)).size, 450);
   assertEquals(rec.landed.length, 450);                   // nothing landed twice
   assertEquals([last.bulk.pass_done, store.get().pass.finished_at !== null, store.get().pass.counts.landed], [true, true, 450]);
@@ -319,7 +320,7 @@ Deno.test("a throttled landing waits out the trace window and is tried again; on
   const w2 = world(), store2 = memStore();
   const r2 = await bulk(fakeSb(w2), fakeClient(pages), { ledger: open, store: store2, gate: gateOpen, budgetMs: 1000, concurrency: 1,
     land: (async () => { throw new Error("Rate limit exceeded for trace 01a2. Retry after 60000ms."); }) as any });
-  assertEquals([r2.bulk.pages[0].complete, store2.get().pass.offset, r2.ok], [false, 10, true]);
+  assertEquals([r2.bulk.pages[0].complete, store2.get().pass.offset, r2.ok], [false, 0, true]);
 });
 
 // ---- which listings get a full read first (the sweep) ----------------------------------------------------------------------
@@ -329,4 +330,35 @@ Deno.test("full reads go vintage first, then auctions ending soonest, private se
   const ranked = [c("dealer-t2", 2, null, "likely_dealer", 0), c("lv-t1", 1, null, "unknown", 0), c("auc-late", 1, 2000, "likely_dealer", 5),
     c("auc-soon", 1, 1000, "likely_dealer", 5), c("priv-t1", 1, null, "likely_private", 9), c("far-t1", 1, null, "unknown", 9)].sort(byDetailPriority);
   assertEquals(ranked.map((x) => x.key), ["auc-soon", "auc-late", "priv-t1", "lv-t1", "far-t1", "dealer-t2"]);
+});
+
+Deno.test("legacy unaligned cursor replays its containing page then advances even with one call per run", async () => {
+  const pages = { [FILTER]: Array.from({ length: 450 }, (_, i) => sum(String(17000 + i))) };
+  const w = world(), store = memStore(), rec = recorder(w), sb = fakeSb(w);
+  await bulk(sb, fakeClient(pages, { years: { "1967": 450 } }),
+    { ledger: open, store, gate: gateOpen, land: rec.land as any, maxCalls: 2, maxLand: 1000 });
+  // Old code could persist 190 + 200 after a completed overlap page.
+  await store.write({ ...store.get(), pass: { ...store.get().pass, offset: 390 } });
+  const reads: string[] = [];
+  for (let i = 0; i < 2; i++) {
+    const c = fakeClient(pages, { years: { "1967": 450 } });
+    await bulk(sb, c, { ledger: open, store, gate: gateOpen, land: rec.land as any, maxCalls: 1, maxLand: 1000 });
+    reads.push(...c.reads);
+  }
+  assertEquals(reads, [`${FILTER}@200`, `${FILTER}@400`]);
+  assertEquals(new Set(rec.landed.map((l) => l.item.legacyItemId)).size, 450);
+  assertEquals(rec.landed.length, 450);
+  assertEquals(store.get().pass.i, 1);
+});
+
+Deno.test("legacy partial-page marker resumes the same page without duplicating its landed items", async () => {
+  const pages = { [FILTER]: Array.from({ length: 30 }, (_, i) => sum(String(18000 + i))) };
+  const w = world(), store = memStore(), rec = recorder(w), sb = fakeSb(w);
+  await bulk(sb, fakeClient(pages, { years: { "1967": 30 } }),
+    { ledger: open, store, gate: gateOpen, land: rec.land as any, maxLand: 10 });
+  await store.write({ ...store.get(), pass: { ...store.get().pass, offset: 10 } });
+  const c = fakeClient(pages, { years: { "1967": 30 } });
+  await bulk(sb, c, { ledger: open, store, gate: gateOpen, land: rec.land as any, maxLand: 1000 });
+  assertEquals(c.reads, [`${FILTER}@0`]);
+  assertEquals(rec.landed.length, 30);
 });

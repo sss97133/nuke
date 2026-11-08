@@ -51,7 +51,6 @@ export const METHOD = "ebay_browse_search_v1";
 export const FETCH_METHOD = "ebay_browse_search_page";
 const PAGE = 200;
 const MAX_OFFSET = 10_000;                           // Browse refuses offset + limit beyond 10,000
-const RESUME_OVERLAP = 10;                           // a page resumed in a later run starts this many earlier (ended listings shift it)
 const BUCKET = "listing-snapshots";
 const PRIVATE = "Private Seller";
 
@@ -426,7 +425,12 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
     b.pass_id = pass.id; b.pass_started_at = pass.started_at; b.planned = pass.plan.planned; b.ebay_total = pass.plan.total;
     const makes = new Set(pass.plan.makes.map(mkKey));
     const lookup = deletedLookup(supabase);
-    let landedRun = 0, updatedRun = 0, errorsBefore = rep.errors.length, resumed = state.pass?.id === pass.id && pass.offset > 0, pauseUntil = 0;
+    // Recover old cursors (including the former +10 partial-page marker) by
+    // replaying their containing page. Browse requires offset % limit === 0.
+    // Keep this page boundary across capped runs; subtracting an overlap on
+    // every resume can both violate that contract and prevent forward progress.
+    pass.offset = Math.max(0, Math.floor(pass.offset / PAGE) * PAGE);
+    let landedRun = 0, updatedRun = 0, errorsBefore = rep.errors.length, pauseUntil = 0;
     const runs = (state.runs ?? 0) + 1;                  // runs that read a page, across passes
 
     while (!rep.stopped) {
@@ -439,8 +443,7 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
       const why = await take();
       if (why) { rep.stopped = why; break; }
       const filter = chunkFilter(pass.plan, chunk);
-      const offset = resumed ? Math.max(0, pass.offset - RESUME_OVERLAP) : pass.offset;
-      resumed = false;
+      const offset = pass.offset;
       const tf = now();
       const page = await client.search({ aspectFilter: filter, offset, limit: PAGE });
       const fetchedAt = new Date(now()).toISOString();
@@ -564,7 +567,7 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
         const next = offset + PAGE;
         if (!page.next || next >= page.total || page.itemSummaries.length === 0 || next + PAGE > MAX_OFFSET) { pass.i++; pass.offset = 0; }   // a chunk past 10,000 would be cut here (none was: the largest year held 4,648 on 2026-10-20)
         else pass.offset = next;
-      } else pass.offset = offset + RESUME_OVERLAP;      // read from here again (less the overlap): what landed is held now
+      } else pass.offset = offset;                       // replay the cut page: what landed is held now
       b.chunk = `${pass.i + 1}/${pass.plan.chunks.length}`;
       b.position = `${pass.plan.chunks[pass.i]?.y ?? "-"}${pass.plan.chunks[pass.i]?.fsb ? ` / ${pass.plan.chunks[pass.i]!.fsb}` : ""} @ ${pass.offset}`;
       if (!o.dryRun) await store.write({ ...state, pass, runs });
