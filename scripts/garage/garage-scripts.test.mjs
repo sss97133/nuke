@@ -3,6 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCards, parseMemberHtml, parseAjax, parseDetail, parseResultText, buildValuesSql, toBatListingRow, listingSlug } from './ingest-bat-seller-history.mjs';
 import { buildSql, publicUrl, shapeSessions } from './scene-sessions.mjs';
+import { orgKind, normName, distinctOrgs, representatives, parseGallery, pickWide, sceneExemplars, mergeExemplars, buildExemplarRows } from './build-place-exemplars.mjs';
+import { shuffle, candidatesFor, buildPrompt as placePrompt, parseMatch, toRow as placeRow, needsSecondViewer, valuesCte as placeCte, matchSession } from './match-places.mjs';
 import { normalizeSession, buildPrompt, parseLabel, toInference, valuesCte as sceneCte, applyBody, isHeic, labelSession, SCENE_LABELS } from './label-scenes.mjs';
 
 const card = (slug, title, ts, result) => `<div class="listing-card listing-card-separate listing-card-h" data-listing_id="1" data-timestamp_end="${ts}">
@@ -276,4 +278,95 @@ test('compare-duplicates: both sides downloaded, one retry on invalid output, a 
 test('compare-duplicates: the empty CTE is byte-identical to the placeholder in the preview (so a filled CTE replaces it cleanly)', () => {
   const preview = readText(new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url), 'utf8');
   assert.ok(preview.includes(dupCte([])), 'placeholder block differs from valuesCte([])');
+});
+
+// ---- place exemplars and place matching ----------------------------------------------------------------------------------------
+const O1 = 'a0a0a0a0-0000-4000-8000-000000000001'; const O2 = 'a0a0a0a0-0000-4000-8000-000000000002'; const V1 = '00000000-0000-4000-8000-000000000001';
+
+test('build-place-exemplars: organization kind mirrors the preview; same normalized name is one place', () => {
+  assert.equal(orgKind('dealer'), 'dealer'); assert.equal(orgKind('restoration_shop'), 'shop'); assert.equal(orgKind('dealer restoration'), null); assert.equal(orgKind(null), null);
+  assert.equal(normName("Gz Custom Classic, LLC"), 'gz classic');
+  const orgs = [{ id: O2, name: 'Gz Classic LLC' }, { id: O1, name: 'GZ Classic' }];
+  assert.equal(distinctOrgs(orgs).length, 1);
+  assert.equal(representatives([{ organizations: orgs }]).get('gz classic'), O1);
+  assert.equal(distinctOrgs(orgs, representatives([{ organizations: orgs }]))[0].id, O1);
+});
+
+test('build-place-exemplars: BaT gallery parse and wide-shot pick (front of the gallery, landscape, spread)', () => {
+  const items = [{ large: { url: 'https://x/1.jpg', width: 1500, height: 1000 } }, { large: { url: 'https://x/2.jpg', width: 1000, height: 1500 } },
+    { large: { url: 'https://x/3.jpg', width: 1500, height: 1000 } }, { large: { url: 'https://x/4.jpg', width: 1500, height: 1000 } }, { dimensions: '800x500', large: { url: 'https://x/5.jpg', width: 800, height: 500 } }];
+  const html = `<div data-gallery-items="${JSON.stringify(items).replace(/"/g, '&quot;').replace(/\//g, '\\/')}"></div>`;
+  const g = parseGallery(html);
+  assert.equal(g.length, 5); assert.equal(g[0].url, 'https://x/1.jpg');
+  const w = pickWide(g, 2);
+  assert.deepEqual(w.map((x) => x.url), ['https://x/1.jpg', 'https://x/4.jpg']);
+  assert.deepEqual(parseGallery('<p>none</p>'), []);
+});
+
+test('build-place-exemplars: scene exemplars need confidence >= 0.85, an informative label, and exactly one place (or one shop for a shop label)', () => {
+  const s = (k, orgs, extra = {}) => ({ vehicle_id: V1, session_key: k, organizations: orgs, sample_urls: [`https://p/${k}.jpg`], ...extra });
+  const sessions = [s('a', [{ id: O1, name: 'One', business_type: 'dealer' }]), s('b', [{ id: O1, name: 'One', business_type: 'dealer' }, { id: O2, name: 'Two', business_type: 'restoration_shop' }]),
+    s('c', [{ id: O1, name: 'One', business_type: 'dealer' }, { id: O2, name: 'Two', business_type: 'restoration_shop' }]), s('d', [{ id: O1, name: 'One', business_type: 'dealer' }])];
+  const L = (k, label, confidence) => ({ vehicle_id: V1, session_key: k, scene_label: label, confidence });
+  const m = sceneExemplars(sessions, [L('a', 'dealer_lot', 0.9), L('b', 'shop_interior', 0.9), L('c', 'dealer_lot', 0.95), L('d', 'dealer_lot', 0.8)]);
+  assert.deepEqual([...m.keys()].sort(), [O1, O2]);
+  assert.equal(m.get(O1).length, 1); assert.equal(m.get(O1)[0].source, 'scene_session'); assert.equal(m.get(O1)[0].cite.session_key, 'a');
+  assert.equal(m.get(O2)[0].cite.session_key, 'b'); // a shop label with exactly one shop-kind place; session c (dealer label, two places) and d (0.8) give nothing
+  assert.equal(sceneExemplars(sessions, [L('a', 'outdoor_street', 0.99)]).size, 0);
+});
+
+test('build-place-exemplars: exemplars interleave BaT and scene photos, max per organization, empty organizations dropped', () => {
+  const b = [1, 2, 3, 4].map((i) => ({ url: `b${i}`, source: 'bat_listing' })); const sc = [1, 2, 3].map((i) => ({ url: `s${i}`, source: 'scene_session' }));
+  assert.deepEqual(mergeExemplars(b, sc, 6).map((e) => e.url), ['b1', 's1', 'b2', 's2', 'b3', 's3']);
+  const rows = buildExemplarRows([{ id: O1, name: 'One', business_type: 'dealer' }, { id: O2, name: 'Two' }], new Map([[O1, b]]), new Map(), 6);
+  assert.equal(rows.length, 1); assert.equal(rows[0].org_kind, 'dealer'); assert.equal(rows[0].exemplars.length, 4);
+});
+
+test('match-places: candidates are the in-range places with exemplars; the prompt names no organization, id or vehicle', () => {
+  const ex = [{ org_id: O1, org_kind: 'dealer', exemplars: [{ url: 'u1' }] }, { org_id: O2, org_kind: 'shop', exemplars: [] }];
+  const c = candidatesFor({ organizations: [{ id: O1, name: 'Secret Dealer Name' }, { id: O2, name: 'Other' }] }, ex);
+  assert.deepEqual(c.map((x) => x.org_id), [O1]);
+  const p = placePrompt({ sampleFiles: ['/tmp/s1.jpg'], sheets: [{ letter: 'A', file: '/tmp/a.jpg' }, { letter: 'B', file: '/tmp/b.jpg' }] });
+  assert.match(p, /Place A: \/tmp\/a\.jpg/); assert.match(p, /or neither/); assert.doesNotMatch(p, /Secret Dealer Name|a0a0a0a0|00000000-0000/);
+});
+
+test('match-places: parseMatch accepts a letter offered or none; rejects other letters, bad confidence, missing rationale', () => {
+  const ok = parseMatch('```json\n{"place":"b","confidence":0.8,"rationale":"same gate","cues":["gate"]}\n```', ['A', 'B']);
+  assert.deepEqual(ok, { place: 'B', confidence: 0.8, rationale: 'same gate', cues: ['gate'] });
+  assert.equal(parseMatch('{"place":"none","confidence":"0.9","rationale":"no"}', ['A']).place, null);
+  assert.throws(() => parseMatch('{"place":"C","confidence":0.5,"rationale":"x"}', ['A', 'B']), /not one of/);
+  assert.throws(() => parseMatch('{"place":"A","confidence":2,"rationale":"x"}', ['A']), /confidence/);
+  assert.throws(() => parseMatch('{"place":"A","confidence":0.5}', ['A']), /rationale/);
+});
+
+test('match-places: row maps the letter to the organization; shuffle is deterministic; second viewer on low confidence or kind disagreement', () => {
+  const s = { vehicle_id: V1, session_key: 'k', image_ids: [], photo_count: 5 };
+  const r = placeRow(s, { place: 'A', confidence: 0.8, rationale: 'r', cues: [] }, { A: O1 }, { runId: V1, model: 'm', viewer: 1, candidates: [O1] });
+  assert.equal(r.org_id, O1); assert.equal(r.viewer, 1);
+  assert.equal(placeRow(s, { place: null, confidence: 0.8, rationale: 'r', cues: [] }, { A: O1 }, { runId: V1, model: 'm', viewer: 1, candidates: [O1] }).org_id, null);
+  assert.deepEqual(shuffle([1, 2, 3, 4, 5, 6], 'x'), shuffle([1, 2, 3, 4, 5, 6], 'x'));
+  const kinds = new Map([[O1, 'dealer'], [O2, 'shop']]);
+  assert.deepEqual(needsSecondViewer({ confidence: 0.6, org_id: O1 }, null, kinds), { call: true, why: 'low_confidence' });
+  assert.deepEqual(needsSecondViewer({ confidence: 0.9, org_id: O1 }, 'shop_interior', kinds), { call: true, why: 'scene_kind_disagrees' });
+  assert.equal(needsSecondViewer({ confidence: 0.9, org_id: O1 }, 'showroom', kinds).call, false);
+  assert.equal(needsSecondViewer({ confidence: 0.9, org_id: O1 }, 'outdoor_street', kinds).call, false);
+});
+
+test('match-places: the empty CTE is byte-identical to the preview placeholder; a filled CTE has the placeholder columns', async () => {
+  const { readFileSync } = await import('node:fs');
+  const pre = readFileSync(new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url), 'utf8');
+  assert.ok(pre.includes(placeCte([]).replace(/^/, '')), 'empty CTE matches the placeholder');
+  const c = placeCte([{ run_id: V1, vehicle_id: V1, session_key: "k'1", image_ids: [O1], photo_count: 4, org_id: O1, confidence: 0.9, model: 'm', viewer: 2, rationale: 'r', cues: ['a'] }]);
+  assert.match(c, /WHERE true -- \(place_matches\)/); assert.match(c, /'k''1'/); assert.match(c, /, 2::int, 'r Cues: a'\)/);
+});
+
+test('match-places: viewer 2 uses a different sample selection when the session has one, a shuffled place order, and retries once', async () => {
+  const calls = [];
+  const backend = async ({ prompt }) => { calls.push(prompt); return calls.length === 1 ? 'garbage' : '{"place":"A","confidence":0.8,"rationale":"gate"}'; };
+  const s = { vehicle_id: V1, session_key: 'k', sample_urls: ['p1', 'p2'], alt_sample_urls: ['a1', 'a2'] };
+  const cands = [{ org_id: O1, exemplars: [{ url: 'e1' }, { url: 'e2' }] }, { org_id: O2, exemplars: [{ url: 'e3' }] }];
+  const fetched = [];
+  const r = await matchSession(s, cands, { backend, cacheDir: '/x', viewer: 2, fetchFn: async (u) => { fetched.push(u); return `/f/${u}`; }, sheetFn: (files, letter) => `/sheet-${letter}-${files.length}` });
+  assert.equal(calls.length, 2); assert.ok(fetched.includes('a1') && fetched.includes('a2') && !fetched.includes('p1'));
+  assert.ok(['A', 'B'].includes(Object.keys(r.letterToOrg)[0])); assert.equal(r.match.place, 'A');
 });

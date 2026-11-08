@@ -105,6 +105,13 @@
 -- vote there reading shop -> business_handling, confidence 0.6, evidence.sub_reason 'shop_custody' (client work), sessions and organization cited in
 -- chain[3].shop_custody - even when the photos are not shoot-shaped - UNLESS the vehicle's own-device photos at geotagged places within range of no
 -- organization span more than max_span_days (long-term personal; cited as long_term_personal_exception).
+-- Place matches (scripts/garage/match-places.mjs; the place_matches CTE): a vision model was shown a session's photos and reference photos of each
+-- organization in range and named the known place the session was taken at, or neither. A match at confidence >= 0.7 to an organization within
+-- range of the session's own-device photos is the strongest scene evidence: it breaks an organization tie above the generic scene kind (scene_context.
+-- place_matched_organization), is never contradicted by a generic label, and sets the session's kind (the organization's kind: dealer for pre-auction
+-- inventory, shop for shop custody) in place of the generic label, restricted to that organization. An answer of neither (>= 0.7) drops the session
+-- from every scene rule (place_neither): the scene attributes nothing. A match below 0.7, to an organization not in range, or on which two viewers
+-- disagree is cited (scene_context.place_match_decisions, with every viewer) and ignored; the generic label then stands as before.
 -- Time decay: documenting with no own photo or activity for platform_config 'garage_documenting_decay_months'
 -- ({"months": n}, default 18 here) -> previously_documented, with documented_from / documented_to = min / max
 -- capture time of the account's own-device photos.
@@ -153,6 +160,16 @@ scene_labels AS (
     FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::text, NULL::text, NULL::numeric, NULL::text, NULL::int))
          t(run_id, vehicle_id, session_key, image_ids, scene_label, model, confidence, rationale, photo_count)
    WHERE false -- (scene_labels)
+),
+-- PLACE MATCH PLACEHOLDER (empty by default; keep this CTE when generating the function). One row per (session, viewer): a vision model
+-- was shown the session's photos and reference photos of each organization in range and answered which known place the session was
+-- taken at (org_id) or neither (org_id NULL); confidence 0..1; viewer 1 / 2 (scripts/garage/match-places.mjs writes the VALUES rows).
+-- A match at confidence >= 0.7 to an organization within range of the session's own-device photos is the strongest scene evidence.
+place_matches AS (
+  SELECT t.run_id, t.vehicle_id, t.session_key, t.image_ids, t.photo_count, t.org_id, t.confidence, t.model, t.viewer, t.rationale
+    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::int, NULL::uuid, NULL::numeric, NULL::text, NULL::int, NULL::text))
+         t(run_id, vehicle_id, session_key, image_ids, photo_count, org_id, confidence, model, viewer, rationale)
+   WHERE false -- (place_matches)
 ),
 -- VISUAL DUPLICATE JUDGMENT PLACEHOLDER (empty by default; keep this CTE when generating the function). One row per judged pair of
 -- vehicles, from an independent viewer that compared their photos (scripts/garage/compare-duplicates.mjs writes the VALUES rows):
@@ -557,35 +574,6 @@ orgn AS MATERIALIZED (
     CROSS JOIN LATERAL (SELECT regexp_replace(split_part(split_part(split_part(
         regexp_replace(lower(coalesce(o.website, '')), '^[a-z]+://', ''), '/', 1), '?', 1), ':', 1), '^www\.', '') AS host) h
 ),
--- Scene sessions of each cluster, one row per (vehicle, session): a session labelled more than once counts once (its most confident label). A session
--- votes with the number of its photos (photo_count, else the length of its image_ids, at least 1). It is DROPPED, not counted, and cited as
--- dropped when its label is non-informative (outdoor_street, other) or its confidence is below the floor of 0.6.
-sc AS MATERIALIZED (
-  SELECT d.*, greatest(1, coalesce(d.photo_count, nullif(cardinality(d.image_ids), 0), 1)) AS w,
-         CASE WHEN coalesce(d.confidence, 0) < 0.6 THEN 'below_confidence_floor'
-              WHEN d.scene_label IN ('outdoor_street', 'other') THEN 'non_informative' END AS dropped,
-         jsonb_build_object('run_id', d.run_id, 'session_key', d.session_key, 'scene_label', d.scene_label, 'model', d.model,
-                            'confidence', d.confidence, 'rationale', d.rationale, 'member_vehicle_id', d.vehicle_id,
-                            'photos', greatest(1, coalesce(d.photo_count, nullif(cardinality(d.image_ids), 0), 1))) AS cite
-    FROM (SELECT DISTINCT ON (sl.vehicle_id, sl.session_key) cm.ck AS vid, sl.run_id, sl.vehicle_id, sl.session_key, sl.image_ids,
-                 sl.scene_label, sl.model, sl.confidence, sl.rationale, sl.photo_count
-            FROM scene_labels sl JOIN clm cm ON cm.vid = sl.vehicle_id
-           ORDER BY sl.vehicle_id, sl.session_key, sl.confidence DESC NULLS LAST, sl.run_id::text) d
-),
--- Scene kind of each candidate vehicle: photo-weighted vote of its counted sessions. dealer_lot / showroom -> dealer;
--- shop_interior / upholstery_work / paint_body -> shop. A vehicle whose sessions read as both without a 2:1 majority has no kind.
-vscene AS MATERIALIZED (
-  SELECT k.vid, k.wd, k.ws,
-         CASE WHEN k.wd > 0 AND k.wd >= 2 * k.ws THEN 'dealer' WHEN k.ws > 0 AND k.ws >= 2 * k.wd THEN 'shop' END AS kind,
-         k.cites, k.dropped_cites
-    FROM (SELECT sc.vid,
-                 coalesce(sum(sc.w) FILTER (WHERE sc.dropped IS NULL AND sc.scene_label IN ('dealer_lot', 'showroom')), 0) AS wd,
-                 coalesce(sum(sc.w) FILTER (WHERE sc.dropped IS NULL AND sc.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')), 0) AS ws,
-                 jsonb_agg(sc.cite ORDER BY sc.confidence DESC, sc.session_key, sc.vehicle_id::text) FILTER (WHERE sc.dropped IS NULL) AS cites,
-                 jsonb_agg(sc.cite || jsonb_build_object('dropped', sc.dropped) ORDER BY sc.confidence DESC, sc.session_key, sc.vehicle_id::text)
-                   FILTER (WHERE sc.dropped IS NOT NULL) AS dropped_cites
-            FROM sc GROUP BY sc.vid) k
-),
 -- Seller handles the evidence names for each candidate vehicle: [vehicle, handle, confidence, source, ref].
 sel AS MATERIALIZED (
   SELECT cand.vid, s.seller, s.conf, s.src, s.ref FROM candx cand CROSS JOIN LATERAL (
@@ -692,24 +680,131 @@ orgt AS MATERIALIZED (
                     AND coalesce(om.canon, ov.organization_id) = poc.canon) AS ov_rel
     FROM poc GROUP BY poc.vid, poc.canon
 ),
+-- Place matches (scripts/garage/match-places.mjs): one row per (vehicle, session, viewer) -> one decision per session. Two viewers count
+-- only when they agree (same organization, or both 'neither'); the confidence is then the lower one. A decision is usable at confidence >= 0.7.
+plv AS MATERIALIZED (
+  SELECT DISTINCT ON (p.vehicle_id, p.session_key, coalesce(p.viewer, 1)) p.run_id, p.vehicle_id, p.session_key, p.image_ids, p.photo_count,
+         p.org_id, p.confidence, p.model, coalesce(p.viewer, 1) AS viewer, p.rationale
+    FROM place_matches p
+   ORDER BY p.vehicle_id, p.session_key, coalesce(p.viewer, 1), p.confidence DESC NULLS LAST, p.run_id::text
+),
+plc AS MATERIALIZED (
+  SELECT cm.ck AS vid, g.vehicle_id, g.session_key, g.image_ids, g.photo_count, g.n_viewers, g.agree, g.org_id, g.conf,
+         g.conf >= 0.7 AND (g.n_viewers = 1 OR g.agree) AS ok, g.cite
+    FROM (SELECT f.vehicle_id, f.session_key, f.image_ids, f.photo_count, f.org_id, a.n_viewers, a.agree,
+                 CASE WHEN a.n_viewers >= 2 AND a.agree THEN a.min_conf ELSE f.confidence END AS conf, a.cite
+            FROM (SELECT DISTINCT ON (x.vehicle_id, x.session_key) x.vehicle_id, x.session_key, x.image_ids, x.photo_count, x.org_id, x.confidence
+                    FROM plv x ORDER BY x.vehicle_id, x.session_key, x.viewer) f
+            JOIN (SELECT x.vehicle_id, x.session_key, count(*) AS n_viewers,
+                         count(DISTINCT coalesce(x.org_id::text, 'none')) = 1 AS agree, min(x.confidence) AS min_conf,
+                         jsonb_agg(jsonb_build_object('viewer', x.viewer, 'run_id', x.run_id, 'organization_id', x.org_id, 'confidence', x.confidence,
+                                     'model', x.model, 'rationale', x.rationale) ORDER BY x.viewer) AS cite
+                    FROM plv x GROUP BY x.vehicle_id, x.session_key) a ON a.vehicle_id = f.vehicle_id AND a.session_key = f.session_key) g
+    JOIN clm cm ON cm.vid = g.vehicle_id
+),
+-- A usable match counts when the matched organization is within range of the session's own-device photos (poc); otherwise it is cited and ignored.
+pmo AS MATERIALIZED (
+  SELECT DISTINCT k.vid, poc.canon, k.vehicle_id, k.session_key, k.conf, k.n_viewers, k.cite,
+         greatest(1, coalesce(k.photo_count, nullif(cardinality(k.image_ids), 0), 1)) AS w
+    FROM plc k
+    LEFT JOIN orgmap om ON om.org_id = k.org_id
+    JOIN ps2 p ON p.mvid = k.vehicle_id AND (p.id = ANY (coalesce(k.image_ids, '{}'::uuid[])) OR p.id::text = k.session_key)
+    JOIN poc ON poc.photo_id = p.id
+   WHERE k.ok AND k.org_id IS NOT NULL AND poc.canon = coalesce(om.canon, k.org_id)
+),
+-- Status of every place decision (cited whether or not it was used).
+pmx AS MATERIALIZED (
+  SELECT k.vid, k.vehicle_id, k.session_key, k.conf, k.cite, k.org_id, k.n_viewers, k.image_ids, k.photo_count,
+         CASE WHEN k.n_viewers >= 2 AND NOT k.agree THEN 'viewer_disagreement'
+              WHEN NOT k.ok THEN 'below_confidence'
+              WHEN k.org_id IS NULL THEN 'neither'
+              WHEN EXISTS (SELECT 1 FROM pmo o WHERE o.vehicle_id = k.vehicle_id AND o.session_key = k.session_key) THEN 'matched_in_range'
+              ELSE 'organization_not_in_range' END AS st,
+         (SELECT o.canon FROM pmo o WHERE o.vehicle_id = k.vehicle_id AND o.session_key = k.session_key LIMIT 1) AS canon,
+         greatest(1, coalesce(k.photo_count, nullif(cardinality(k.image_ids), 0), 1)) AS w
+    FROM plc k
+),
+pmagg AS MATERIALIZED (
+  SELECT o.vid, o.canon, count(*) AS n_sess, sum(o.w) AS w,
+         jsonb_agg(jsonb_build_object('session_key', o.session_key, 'member_vehicle_id', o.vehicle_id, 'confidence', o.conf, 'photos', o.w,
+                     'organization_id', o.canon, 'viewers', o.cite) ORDER BY o.conf DESC, o.session_key, o.vehicle_id::text) AS cites
+    FROM pmo o GROUP BY o.vid, o.canon
+),
+pmd AS MATERIALIZED (
+  SELECT x.vid, jsonb_agg(jsonb_build_object('session_key', x.session_key, 'member_vehicle_id', x.vehicle_id, 'status', x.st,
+                     'confidence', x.conf, 'photos', x.w, 'viewers', x.cite) ORDER BY x.session_key, x.vehicle_id::text) AS cites
+    FROM pmx x GROUP BY x.vid
+),
+-- Scene sessions of each cluster, one row per (vehicle, session): a session labelled more than once by one viewer counts once (its most confident
+-- label); when two viewers labelled it they count only if they agree (same label, confidence = the lower one), else the session is DROPPED
+-- (viewer_disagreement) and both are cited. A session votes with the number of its photos (photo_count, else the length of its image_ids, at
+-- least 1). It is DROPPED, not counted, and cited as dropped when its label is non-informative (outdoor_street, other) or its confidence is below
+-- the floor of 0.6. Its kind (sk) is dealer (dealer_lot / showroom) or shop (shop_interior / upholstery_work / paint_body); a usable place match to
+-- an organization in range overrides it with that organization's kind and restricts the session's vote to that organization (pm_canon); a
+-- usable 'neither' drops the session (place_neither): the scene then attributes nothing. A place-matched session without a generic label is a row too.
+sc AS MATERIALIZED (
+  SELECT d.*, greatest(1, coalesce(d.photo_count, nullif(cardinality(d.image_ids), 0), 1)) AS w,
+         CASE WHEN d.pm_st = 'matched_in_range' AND d.pm_kind IS NOT NULL THEN d.pm_kind
+              WHEN d.scene_label IN ('dealer_lot', 'showroom') THEN 'dealer'
+              WHEN d.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body') THEN 'shop' END AS sk,
+         CASE WHEN d.pm_st = 'matched_in_range' AND d.pm_kind IS NOT NULL THEN NULL
+              WHEN d.pm_st = 'neither' THEN 'place_neither'
+              WHEN d.scene_label IS NULL THEN 'non_informative'
+              WHEN d.n_viewers >= 2 AND NOT d.agree THEN 'viewer_disagreement'
+              WHEN coalesce(d.confidence, 0) < 0.6 THEN 'below_confidence_floor'
+              WHEN d.scene_label IN ('outdoor_street', 'other') THEN 'non_informative' END AS dropped,
+         CASE WHEN d.pm_st = 'matched_in_range' THEN d.pm_c END AS pm_canon,
+         jsonb_build_object('run_id', d.run_id, 'session_key', d.session_key, 'scene_label', d.scene_label, 'model', d.model,
+                            'confidence', d.confidence, 'rationale', d.rationale, 'member_vehicle_id', d.vehicle_id,
+                            'photos', greatest(1, coalesce(d.photo_count, nullif(cardinality(d.image_ids), 0), 1)),
+                            'place_match_status', d.pm_st, 'place_match', d.pm_cite) AS cite
+    FROM (SELECT cm.ck AS vid, c.run_id, c.vehicle_id, c.session_key, c.image_ids, c.scene_label, c.model, c.confidence, c.rationale, c.photo_count,
+                 c.n_viewers, c.agree, pm.st AS pm_st, pm.canon AS pm_c, pm.cite AS pm_cite, og.okind AS pm_kind
+            FROM (SELECT DISTINCT ON (sl.vehicle_id, sl.session_key) sl.run_id, sl.vehicle_id, sl.session_key, sl.image_ids, sl.scene_label, sl.model,
+                         sl.confidence, sl.rationale, sl.photo_count, 1 AS n_viewers, true AS agree
+                    FROM scene_labels sl
+                   ORDER BY sl.vehicle_id, sl.session_key, sl.confidence DESC NULLS LAST, sl.run_id::text) c
+            JOIN clm cm ON cm.vid = c.vehicle_id
+            LEFT JOIN pmx pm ON pm.vehicle_id = c.vehicle_id AND pm.session_key = c.session_key
+            LEFT JOIN orgn og ON og.id = pm.canon
+          UNION ALL
+          SELECT pm.vid, (pm.cite->0->>'run_id')::uuid, pm.vehicle_id, pm.session_key, pm.image_ids, NULL::text, pm.cite->0->>'model', pm.conf,
+                 pm.cite->0->>'rationale', pm.photo_count, 1, true, pm.st, pm.canon, pm.cite, og.okind
+            FROM pmx pm LEFT JOIN orgn og ON og.id = pm.canon
+           WHERE NOT EXISTS (SELECT 1 FROM scene_labels sl WHERE sl.vehicle_id = pm.vehicle_id AND sl.session_key = pm.session_key)) d
+),
+-- Scene kind of each candidate vehicle: photo-weighted vote of its counted sessions (sk: dealer / shop). A vehicle whose sessions read as both
+-- without a 2:1 majority has no kind.
+vscene AS MATERIALIZED (
+  SELECT k.vid, k.wd, k.ws,
+         CASE WHEN k.wd > 0 AND k.wd >= 2 * k.ws THEN 'dealer' WHEN k.ws > 0 AND k.ws >= 2 * k.wd THEN 'shop' END AS kind,
+         k.cites, k.dropped_cites
+    FROM (SELECT sc.vid,
+                 coalesce(sum(sc.w) FILTER (WHERE sc.dropped IS NULL AND sc.sk = 'dealer'), 0) AS wd,
+                 coalesce(sum(sc.w) FILTER (WHERE sc.dropped IS NULL AND sc.sk = 'shop'), 0) AS ws,
+                 jsonb_agg(sc.cite ORDER BY sc.confidence DESC, sc.session_key, sc.vehicle_id::text) FILTER (WHERE sc.dropped IS NULL) AS cites,
+                 jsonb_agg(sc.cite || jsonb_build_object('dropped', sc.dropped) ORDER BY sc.confidence DESC, sc.session_key, sc.vehicle_id::text)
+                   FILTER (WHERE sc.dropped IS NOT NULL) AS dropped_cites
+            FROM sc GROUP BY sc.vid) k
+),
 -- The same vote per organization: counted sessions whose photos (scene image_ids, or the session_key photo) were taken, on an own device, within
 -- range of that organization. Where a vehicle has such sessions at an organization, they - not the vehicle-wide vote - say what kind of scene
 -- it was photographed in there.
 sorg AS MATERIALIZED (
   SELECT x.vid, x.canon,
-         coalesce(sum(x.w) FILTER (WHERE x.scene_label IN ('dealer_lot', 'showroom')), 0) AS wd,
-         coalesce(sum(x.w) FILTER (WHERE x.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')), 0) AS ws,
-         CASE WHEN sum(x.w) FILTER (WHERE x.scene_label IN ('dealer_lot', 'showroom')) > 0
-                   AND coalesce(sum(x.w) FILTER (WHERE x.scene_label IN ('dealer_lot', 'showroom')), 0)
-                       >= 2 * coalesce(sum(x.w) FILTER (WHERE x.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')), 0) THEN 'dealer'
-              WHEN sum(x.w) FILTER (WHERE x.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')) > 0
-                   AND coalesce(sum(x.w) FILTER (WHERE x.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')), 0)
-                       >= 2 * coalesce(sum(x.w) FILTER (WHERE x.scene_label IN ('dealer_lot', 'showroom')), 0) THEN 'shop' END AS kind,
+         coalesce(sum(x.w) FILTER (WHERE x.sk = 'dealer'), 0) AS wd,
+         coalesce(sum(x.w) FILTER (WHERE x.sk = 'shop'), 0) AS ws,
+         CASE WHEN sum(x.w) FILTER (WHERE x.sk = 'dealer') > 0
+                   AND coalesce(sum(x.w) FILTER (WHERE x.sk = 'dealer'), 0)
+                       >= 2 * coalesce(sum(x.w) FILTER (WHERE x.sk = 'shop'), 0) THEN 'dealer'
+              WHEN sum(x.w) FILTER (WHERE x.sk = 'shop') > 0
+                   AND coalesce(sum(x.w) FILTER (WHERE x.sk = 'shop'), 0)
+                       >= 2 * coalesce(sum(x.w) FILTER (WHERE x.sk = 'dealer'), 0) THEN 'shop' END AS kind,
          jsonb_agg(x.cite || jsonb_build_object('organization_id', x.canon) ORDER BY x.confidence DESC, x.session_key, x.vehicle_id::text) AS cites
-    FROM (SELECT DISTINCT sc.vid, poc.canon, sc.vehicle_id, sc.session_key, sc.scene_label, sc.w, sc.confidence, sc.cite
+    FROM (SELECT DISTINCT sc.vid, poc.canon, sc.vehicle_id, sc.session_key, sc.sk, sc.w, sc.confidence, sc.cite
             FROM sc
             JOIN ps2 p ON p.mvid = sc.vehicle_id AND (p.id = ANY (coalesce(sc.image_ids, '{}'::uuid[])) OR p.id::text = sc.session_key)
-            JOIN poc ON poc.photo_id = p.id
+            JOIN poc ON poc.photo_id = p.id AND (sc.pm_canon IS NULL OR sc.pm_canon = poc.canon)
            WHERE sc.dropped IS NULL) x
    GROUP BY x.vid, x.canon
 ),
@@ -720,12 +815,12 @@ pa_rows AS MATERIALIZED (
          sg.wd, sg.ws, sg.kind
     FROM sc
     JOIN ps2 p ON p.mvid = sc.vehicle_id AND (p.id = ANY (coalesce(sc.image_ids, '{}'::uuid[])) OR p.id::text = sc.session_key)
-    JOIN poc ON poc.photo_id = p.id
+    JOIN poc ON poc.photo_id = p.id AND (sc.pm_canon IS NULL OR sc.pm_canon = poc.canon)
     JOIN orgn o ON o.id = poc.canon AND o.okind = 'dealer'
     -- the photo-weighted vote at that organization must read dealer, and the vehicle-wide vote must not read shop
     JOIN sorg sg ON sg.vid = p.vid AND sg.canon = poc.canon AND sg.kind = 'dealer'
     LEFT JOIN vscene vs ON vs.vid = p.vid
-   WHERE sc.scene_label IN ('dealer_lot', 'showroom') AND sc.dropped IS NULL AND vs.kind IS DISTINCT FROM 'shop'
+   WHERE sc.sk = 'dealer' AND sc.dropped IS NULL AND vs.kind IS DISTINCT FROM 'shop'
    GROUP BY p.vid, sc.vehicle_id, sc.run_id, sc.session_key, sc.scene_label, sc.model, sc.confidence, sc.rationale, poc.canon, sc.w, sg.wd, sg.ws, sg.kind
 ),
 pa AS MATERIALIZED (
@@ -746,9 +841,9 @@ shopc AS MATERIALIZED (
             FROM (SELECT DISTINCT sc.vid, poc.canon, sc.vehicle_id, sc.session_key, sc.confidence, sc.cite
                     FROM sc
                     JOIN ps2 p ON p.mvid = sc.vehicle_id AND (p.id = ANY (coalesce(sc.image_ids, '{}'::uuid[])) OR p.id::text = sc.session_key)
-                    JOIN poc ON poc.photo_id = p.id
+                    JOIN poc ON poc.photo_id = p.id AND (sc.pm_canon IS NULL OR sc.pm_canon = poc.canon)
                     JOIN orgn o ON o.id = poc.canon AND o.okind = 'shop'
-                   WHERE sc.dropped IS NULL AND sc.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')) x
+                   WHERE sc.dropped IS NULL AND sc.sk = 'shop') x
             JOIN sorg sg ON sg.vid = x.vid AND sg.canon = x.canon AND sg.kind = 'shop'
            GROUP BY x.vid, x.canon, sg.wd, sg.ws HAVING count(*) >= 2) y
    ORDER BY y.vid, y.n_sess DESC, y.canon::text
@@ -968,11 +1063,12 @@ g4 AS MATERIALIZED (
 -- co-occurrence, then (listed vehicles only) dealer/auction before restoration, then most photos.
 g5 AS (
   SELECT g4.*, so.s_org, round(so.min_m::numeric) AS s_m, so.n_at AS s_n_at, so.s_listed, so.ov_rel AS s_rel, so.s_other,
-         so.tb_decided, so.s_orgs, so.s_cooc, so.s_okind, so.s_sm, so.s_sx, so.s_vkind, so.s_scites, so.s_sagg, so.s_sdrop,
+         so.tb_decided, so.s_orgs, so.s_cooc, so.s_okind, so.s_sm, so.s_sx, so.s_vkind, so.s_scites, so.s_sagg, so.s_sdrop, so.s_pmc, pd.cites AS s_pmd,
          st.n_sess, st.span_days, st.n_days, st.n_months, st.geo_n, st.at_any_org,
          (SELECT count(*) FROM orgmap om WHERE om.canon = so.s_org AND om.org_id <> om.canon) AS s_aliases
   FROM g4
   LEFT JOIN st ON st.vid = g4.vid
+  LEFT JOIN pmd pd ON pd.vid = g4.vid
   LEFT JOIN LATERAL (
     SELECT q.canon AS s_org, q.n_at, q.min_m, q.ov_rel, q.listed AS s_listed, q.cooc AS s_cooc,
            q.cnt - 1 AS s_other,
@@ -980,9 +1076,9 @@ g5 AS (
            -- other, and an organization whose kind contradicts the scene never wins a tie
            (NOT q.sx AND ((q.cooc > q.next_cooc AND q.sm >= q.next_sm)
                           OR (q.cooc = q.next_cooc AND (q.sm > q.next_sm OR (q.sm = q.next_sm AND q.bt < q.next_bt))))) AS tb_decided,
-           q.orgs AS s_orgs, q.okind AS s_okind, q.sm AS s_sm, q.sx AS s_sx, q.vkind AS s_vkind, q.scites AS s_scites, q.sagg AS s_sagg, q.sdrop AS s_sdrop
+           q.orgs AS s_orgs, q.okind AS s_okind, q.sm AS s_sm, q.sx AS s_sx, q.vkind AS s_vkind, q.scites AS s_scites, q.sagg AS s_sagg, q.sdrop AS s_sdrop, q.pmc AS s_pmc
       FROM (SELECT t.canon, t.n_at, t.min_m, t.ov_rel, (t.canon IS NOT DISTINCT FROM g4.org_id) AS listed,
-                   coalesce(cc.n, 0) AS cooc, z.sm, z.sx, o.okind, ek.kind AS vkind, ek.cites AS scites, ek.agg AS sagg, vs.dropped_cites AS sdrop,
+                   coalesce(cc.n, 0) AS cooc, z.sm, z.sx, o.okind, ek.kind AS vkind, ek.cites AS scites, ek.agg AS sagg, vs.dropped_cites AS sdrop, pm.cites AS pmc,
                    lead(z.sm) OVER w AS next_sm,
                    CASE WHEN g4.v_listed THEN o.bt_rank ELSE 2 END AS bt,
                    row_number() OVER w AS rn, count(*) OVER () AS cnt,
@@ -994,6 +1090,7 @@ g5 AS (
               LEFT JOIN cooc cc ON cc.vid = t.vid AND cc.canon = t.canon
               LEFT JOIN vscene vs ON vs.vid = t.vid
               LEFT JOIN sorg sg ON sg.vid = t.vid AND sg.canon = t.canon
+              LEFT JOIN pmagg pm ON pm.vid = t.vid AND pm.canon = t.canon
               -- scene aggregate for this organization: the vote of the sessions photographed there, else the vehicle-wide vote
               CROSS JOIN LATERAL (SELECT CASE WHEN sg.vid IS NOT NULL THEN sg.kind ELSE vs.kind END AS kind,
                                          CASE WHEN sg.vid IS NOT NULL THEN sg.cites ELSE vs.cites END AS cites,
@@ -1001,8 +1098,9 @@ g5 AS (
                                                 'kind', sg.kind, 'dealer_weight', sg.wd, 'shop_weight', sg.ws)
                                               WHEN vs.vid IS NOT NULL THEN jsonb_build_object('scope', 'vehicle', 'kind', vs.kind,
                                                 'dealer_weight', vs.wd, 'shop_weight', vs.ws) END AS agg) ek
-              CROSS JOIN LATERAL (SELECT CASE WHEN ek.kind IS NOT NULL AND o.okind = ek.kind THEN 1 ELSE 0 END AS sm,
-                                         (ek.kind IS NOT NULL AND o.okind IS NOT NULL AND o.okind <> ek.kind) AS sx) z
+              -- a usable place match at this organization (sm = 2) outranks the generic scene kind (sm = 1) and is never contradicted by it
+              CROSS JOIN LATERAL (SELECT CASE WHEN pm.vid IS NOT NULL THEN 2 WHEN ek.kind IS NOT NULL AND o.okind = ek.kind THEN 1 ELSE 0 END AS sm,
+                                         (pm.vid IS NULL AND ek.kind IS NOT NULL AND o.okind IS NOT NULL AND o.okind <> ek.kind) AS sx) z
              WHERE t.vid = g4.vid
             WINDOW w AS (ORDER BY (t.canon IS NOT DISTINCT FROM g4.org_id) DESC, t.ov_rel DESC, coalesce(cc.n, 0) DESC, z.sm DESC,
                                   CASE WHEN g4.v_listed THEN o.bt_rank ELSE 2 END, t.n_at DESC, t.min_m, t.canon::text)) q
@@ -1151,7 +1249,9 @@ SELECT m.vid AS vehicle_id,
                'ambiguous', coalesce(h.amb, false), 'tie_break_decided', coalesce(h.tb_decided, false),
                'session_cooccurrence_links', h.s_cooc,
                'scene_context', jsonb_build_object('vehicle_scene_kind', h.s_vkind, 'selected_organization_kind', h.s_okind,
-                 'scene_matches_organization', h.s_sm = 1, 'scene_supports_organization', coalesce(h.s_sm = 1, false),
+                 'scene_matches_organization', h.s_sm >= 1, 'scene_supports_organization', coalesce(h.s_sm >= 1, false),
+                 'place_matched_organization', coalesce(h.s_sm = 2, false), 'place_matches', coalesce(h.s_pmc, '[]'::jsonb),
+                 'place_match_decisions', coalesce(h.s_pmd, '[]'::jsonb),
                  'scene_contradicts_organization', coalesce(h.s_sx, false), 'attribution_withheld_by_scene', coalesce(h.scene_w, false),
                  'aggregate', h.s_sagg, 'vote_rule', 'photo-weighted, sessions below confidence 0.6 and outdoor_street / other dropped, 2:1 majority',
                  'dropped_sessions', coalesce(h.s_sdrop, '[]'::jsonb),

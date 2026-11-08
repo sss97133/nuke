@@ -1026,5 +1026,46 @@ SELECT fixture_assert((SELECT count(*) FROM (:rv_pairs_sql) p WHERE p.a_id BETWE
   'pairs SQL: the review pairs with photos on both sides (pairs with a photo-less side, conflicting or not, are left to absence of contradiction)');
 SELECT fixture_assert((SELECT count(*) FROM vehicles WHERE merged_into_vehicle_id IS NOT NULL AND id BETWEEN rv(1) AND rv(20))=0,'review pairs never merge records');
 
+-- ===== place matches (scripts/garage/match-places.mjs): the strongest scene evidence, above generic scene labels =====
+INSERT INTO vehicles(id,is_public,year,make,model) SELECT gz(g), true, 1990, 'Gzmake'||g, 'Gzmodel' FROM generate_series(60,69) g;
+\set gp_x b0b0b0b0-0000-4000-8000-000000000001
+\set gp_y b0b0b0b0-0000-4000-8000-000000000002
+INSERT INTO organizations(id,name,latitude,longitude) VALUES (:'gp_x','Gp Alpha Place',36.60000,-115.60000),(:'gp_y','Gp Bravo Place',36.60030,-115.60000);
+SELECT gz_burst(60, 6, now() - interval '5 months', 36.40000, -115.40000);   -- place match to the dealer, no generic label
+SELECT gz_burst(61, 6, now() - interval '5 months', 36.40000, -115.40000);   -- dealer_lot label, but the place answer is 'neither'
+SELECT gz_burst(62, 6, now() - interval '5 months', 36.40000, -115.40000);   -- dealer_lot label, place match below 0.7: ignored
+SELECT gz_burst(63, 6, now() - interval '5 months', 36.40000, -115.40000);   -- dealer_lot label, viewers disagree on the place
+SELECT gz_burst(64, 6, now() - interval '5 months', 36.40000, -115.40000);   -- two viewers agree on the dealer
+SELECT gz_burst(65, 6, now() - interval '5 months', 36.30000, -115.30000);   -- matched organization (dealer) is not in range of the shop photos
+SELECT gz_burst(66, 6, now() - interval '5 months', 36.60000, -115.60000);   -- two organizations in range, place match to the second
+SELECT gz_burst(67, 6, now() - interval '5 months', 36.60000, -115.60000);   -- two organizations in range, nothing separates them
+\set gz_p_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), gz(61), 'p61', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(61)), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows', 6 UNION ALL SELECT gen_random_uuid(), gz(62), 'p62', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(62)), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows', 6 UNION ALL SELECT gen_random_uuid(), gz(63), 'p63', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(63)), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows', 6/" -e "s/^   WHERE false -- (place_matches)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), gz(60), 'p60', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(60)), 6, 'a0a0a0a0-0000-4000-8000-000000000002'::uuid, 0.9::numeric, 'm', 1, 'same fence and gate' UNION ALL SELECT gen_random_uuid(), gz(61), 'p61', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(61)), 6, NULL::uuid, 0.9::numeric, 'm', 1, 'none of the places' UNION ALL SELECT gen_random_uuid(), gz(62), 'p62', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(62)), 6, 'a0a0a0a0-0000-4000-8000-000000000002'::uuid, 0.5::numeric, 'm', 1, 'maybe' UNION ALL SELECT gen_random_uuid(), gz(63), 'p63', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(63)), 6, 'a0a0a0a0-0000-4000-8000-000000000002'::uuid, 0.9::numeric, 'm', 1, 'dealer' UNION ALL SELECT gen_random_uuid(), gz(63), 'p63', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(63)), 6, NULL::uuid, 0.9::numeric, 'm', 2, 'none' UNION ALL SELECT gen_random_uuid(), gz(64), 'p64', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(64)), 6, 'a0a0a0a0-0000-4000-8000-000000000002'::uuid, 0.9::numeric, 'm', 1, 'dealer' UNION ALL SELECT gen_random_uuid(), gz(64), 'p64', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(64)), 6, 'a0a0a0a0-0000-4000-8000-000000000002'::uuid, 0.8::numeric, 'm', 2, 'dealer' UNION ALL SELECT gen_random_uuid(), gz(65), 'p65', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(65)), 6, 'a0a0a0a0-0000-4000-8000-000000000002'::uuid, 0.9::numeric, 'm', 1, 'dealer' UNION ALL SELECT gen_random_uuid(), gz(66), 'p66', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(66)), 6, 'b0b0b0b0-0000-4000-8000-000000000002'::uuid, 0.9::numeric, 'm', 1, 'bravo'/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('role', d.derived_role, 'ev', d.evidence, 'reason', d.reason))
+          FROM (:gz_p_sql) d WHERE d.vehicle_id BETWEEN gz(60) AND gz(67)) AS gz_p \gset
+SELECT fixture_assert(:'gz_p'::jsonb->(gz(60))::text->>'role'='business_handling' AND :'gz_p'::jsonb->(gz(60))::text->'ev'->>'sub_reason'='pre_auction_inventory',
+  'a place match to the dealer in range, with no generic label, is pre-auction inventory');
+SELECT fixture_assert(:'gz_p'::jsonb->(gz(61))::text->>'role'<>'business_handling'
+  AND (SELECT e->>'status' FROM jsonb_array_elements(:'gz_p'::jsonb->(gz(61))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'place_match_decisions') e)='neither',
+  'a place answer of neither drops the generic dealer label: no attribution from the scene');
+SELECT fixture_assert(:'gz_p'::jsonb->(gz(62))::text->'ev'->>'sub_reason'='pre_auction_inventory'
+  AND (SELECT e->>'status' FROM jsonb_array_elements(:'gz_p'::jsonb->(gz(62))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'place_match_decisions') e)='below_confidence',
+  'a place match below 0.7 is cited and ignored; the generic label stands');
+SELECT fixture_assert(NOT coalesce((:'gz_p'::jsonb->(gz(63))::text->'ev'->'chain'->2->'evidence'->'scene_context'->>'place_matched_organization')::boolean, false)
+  AND (SELECT e->>'status' FROM jsonb_array_elements(:'gz_p'::jsonb->(gz(63))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'place_match_decisions') e)='viewer_disagreement'
+  AND (SELECT jsonb_array_length(e->'viewers') FROM jsonb_array_elements(:'gz_p'::jsonb->(gz(63))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'place_match_decisions') e)=2,
+  'two viewers that disagree: the place decision is cited with both and is no place evidence (the generic label stands on its own)');
+SELECT fixture_assert(:'gz_p'::jsonb->(gz(64))::text->'ev'->>'sub_reason'='pre_auction_inventory'
+  AND (SELECT (e->>'confidence')::numeric FROM jsonb_array_elements(:'gz_p'::jsonb->(gz(64))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'place_match_decisions') e)=0.8,
+  'two viewers that agree: usable, confidence is the lower one');
+SELECT fixture_assert(:'gz_p'::jsonb->(gz(65))::text->>'role'<>'business_handling'
+  AND (SELECT e->>'status' FROM jsonb_array_elements(:'gz_p'::jsonb->(gz(65))::text->'ev'->'chain'->2->'evidence'->'scene_context'->'place_match_decisions') e)='organization_not_in_range',
+  'a match to an organization that is not in range of the photos is ignored');
+SELECT fixture_assert((:'gz_p'::jsonb->(gz(66))::text->'ev'->'chain'->2->'evidence'->>'tie_break_decided')::boolean
+  AND :'gz_p'::jsonb->(gz(66))::text->'ev'->'chain'->2->'evidence'->>'organization_id'=:'gp_y'
+  AND (:'gz_p'::jsonb->(gz(66))::text->'ev'->'chain'->2->'evidence'->'scene_context'->>'place_matched_organization')::boolean,
+  'a place match breaks the tie between two organizations in range');
+SELECT fixture_assert((:'gz_p'::jsonb->(gz(67))::text->'ev'->'chain'->2->'evidence'->>'ambiguous')::boolean,'without a place match the same two organizations stay ambiguous');
+
+
 SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 
