@@ -95,6 +95,12 @@ export function priceOf(item: EbayItem): { amount: number | null; kind: "buy_it_
   return { amount: Number.isFinite(n) && n > 0 ? n : null, kind: src ? (bid ? "current_bid" : "buy_it_now") : "unknown", currency: src?.currency ?? null };
 }
 
+/** An opening price is not a bid; fixed-price listings still carry their asking amount. */
+export function currentEpisodePrice(item: EbayItem): number | null {
+  if (item.buyingOptions?.includes("AUCTION") && !(Number.isInteger(item.bidCount) && Number(item.bidCount) > 0)) return null;
+  return priceOf(item).amount;
+}
+
 export function locationOf(item: EbayItem): string | null {
   const l = item.itemLocation;
   const s = [l?.city, l?.stateOrProvince].filter(Boolean).join(", ");
@@ -236,7 +242,7 @@ export function toLanding(item: EbayItem, htmlToText: (h: string) => string, sou
   const ingestInput = year && make && model
     ? {
       url, year, make, model, enrich: false,
-      price: price.amount ?? undefined, description: description || item.title || "(no description)",
+      price: price.kind === "buy_it_now" ? price.amount ?? undefined : undefined, description: description || item.title || "(no description)",
       image_urls: images, mileage: mileage ?? undefined,
       engine: engine ?? undefined, transmission: transmission ?? undefined, color: color ?? undefined,
       body_style: a["body type"] ?? undefined, title_status: a["vehicle title"] ?? undefined,

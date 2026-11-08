@@ -4,7 +4,7 @@
 // itemEndDate, condition). Item ids, sellers and prices are invented.
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { buildPlan, bulk, categoryOf, compare, type Chunk, filterIgnored, pageLookup, storedBody, summaryIdentity, traceRetryMs, yearRank } from "./browseBulk.ts";
-import { toLanding } from "./browseMap.ts";
+import { currentEpisodePrice, toLanding } from "./browseMap.ts";
 import { byDetailPriority, type Cand } from "./browseSweep.ts";
 import { handleHash } from "./deletedMembers.ts";
 
@@ -149,7 +149,7 @@ function recorder(w: World) {
     const key = item.legacyItemId, price = Number(item.buyingOptions?.includes("AUCTION") ? item.currentBidPrice?.value : item.price?.value);
     const o = opts.extra?.price_original ?? {};
     if (opts.identity?.year && opts.identity?.make && opts.identity?.model) {
-      w.episodes.push({ source_url: `https://www.ebay.com/itm/${key}`, vehicle_id: `veh-${key}`, current_price: price, event_status: "active", bids: item.bidCount ?? null,
+      w.episodes.push({ source_url: `https://www.ebay.com/itm/${key}`, vehicle_id: `veh-${key}`, current_price: item.buyingOptions?.includes("AUCTION") && !(item.bidCount > 0) ? null : price, event_status: "active", bids: item.bidCount ?? null,
         ppo: o.amount == null ? undefined : String(o.amount), ppc: o.currency });
       return "landed" as const;
     }
@@ -361,4 +361,13 @@ Deno.test("legacy partial-page marker resumes the same page without duplicating 
   await bulk(sb, c, { ledger: open, store, gate: gateOpen, land: rec.land as any, maxLand: 1000 });
   assertEquals(c.reads, [`${FILTER}@0`]);
   assertEquals(rec.landed.length, 30);
+});
+
+Deno.test("opening prices and live bids never become ingest asking prices", () => {
+  for (const bids of [0, 2]) {
+    const s = sum("1009", { auction: true, price: "4100.25", bids });
+    assertEquals(currentEpisodePrice(s), bids > 0 ? 4100.25 : null);
+    assertEquals(toLanding(s, h => h, "ebay-browse-search", { year: 1967, make: "Ford", model: "Mustang" })!.ingestInput!.price, undefined);
+  }
+  assertEquals(currentEpisodePrice(sum("1010", { price: "45000.00" })), 45000);
 });

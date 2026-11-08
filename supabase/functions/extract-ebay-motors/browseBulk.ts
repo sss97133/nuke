@@ -40,7 +40,7 @@ import { normalizeMake } from "../_shared/normalizeVehicle.ts";
 import { parseVehicleTitle } from "../ingest/vehicleTitle.ts";
 import { aspectFilterFor, type BrowseClient, CATEGORY_CARS_TRUCKS, QuotaExceeded, type SearchPage, type SearchSummary } from "./browseApi.ts";
 import { VINTAGE_MAX_YEAR, zip3Of } from "./browseCensus.ts";
-import { type IdentityClaim, listingKey, priceOf, tierOfYear } from "./browseMap.ts";
+import { type IdentityClaim, currentEpisodePrice, listingKey, priceOf, tierOfYear } from "./browseMap.ts";
 import { emptyReport, landItem, PLATFORM, pool, type Report } from "./browseSweep.ts";
 import { auctionLedger, type CallLedger } from "./browseAuctions.ts";
 import { deletedLookup, handleHash, handleHashes, type Lookup, tombstoneItem } from "./deletedMembers.ts";
@@ -286,8 +286,9 @@ export function compare(s: SearchSummary, h: Held | undefined): "new" | "current
   if (h.kind === "blip") return h.method === METHOD && samePrice(s, h) ? "current" : "changed";
   if (h.status === "ended" || h.status === "sold") return "skip";            // an ended episode is not reopened from a summary
   const auction = s.buyingOptions?.includes("AUCTION") ?? false;
-  const bidsSame = !auction || (h.bids ?? 0) === Number(s.bidCount ?? 0);
-  return samePrice(s, h) && bidsSame ? "current" : "changed";
+  const bidsSame = !auction || h.bids === (s.bidCount == null ? null : Number(s.bidCount));
+  const priceSame = auction && currentEpisodePrice(s) == null ? h.price == null : samePrice(s, h);
+  return priceSame && bidsSame ? "current" : "changed";
 }
 
 // ---- the stored page -----------------------------------------------------------------------------------------------------
@@ -488,9 +489,10 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
           // the seller's price moved (a converted listing whose seller's price we had not recorded is recorded, not a move)
           const moved = o.converted ? h.orig != null && h.origCur === o.currency && h.orig !== o.amount : p.amount !== h.price;
           const ev = await writeVehicleEventByKey(supabase, {
-            vehicle_id: h.vehicle_id, source_platform: PLATFORM, source_listing_id: key, source_url: itemUrl(key), event_type: "listing", updated_at: fetchedAt,
-            ...(p.amount != null ? { current_price: p.amount } : {}),   // eBay's USD figure today; the seller's own is price_original
-            metadata: { source_observed_at: fetchedAt, last_checked_at: fetchedAt, bid_count: w.s.bidCount ?? null, listing_ends_at: w.s.itemEndDate ?? null,
+            vehicle_id: h.vehicle_id, source_platform: PLATFORM, source_listing_id: key, source_url: itemUrl(key), event_type: "listing", updated_at: fetchedAt, currency_code: p.currency,
+            ...(Number.isInteger(w.s.bidCount) && Number(w.s.bidCount) >= 0 ? { bid_count: w.s.bidCount } : {}),
+            current_price: currentEpisodePrice(w.s),   // eBay's USD figure today; the seller's own is price_original
+            metadata: { source_observed_at: fetchedAt, last_checked_at: fetchedAt, currency: p.currency, bid_count: w.s.bidCount ?? null, listing_ends_at: w.s.itemEndDate ?? null,
               price_snapshot_id: snapshotId, price_original: o, ...(moved ? { price_changed_at: fetchedAt, price_before: h.price, price_original_before: h.orig } : {}) },
           }, { preserveEventStatus: true, sourceObservedAt: fetchedAt });
           if (ev.action === "error") { rep.errors.push(`update ${key}: ${ev.error}`.slice(0, 300)); return; }
