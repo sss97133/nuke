@@ -428,7 +428,7 @@ test('compare-duplicates: a year gap of one with a listed VIN is a review pair 0
   const sql = buildPairsSql('00000000-0000-4000-8000-000000000001', { histVins: ['rv-vin 0000000014', 'short', "x'; drop table t;--"] });
   assert.match(sql, /abs\(b\.year - a\.year\) = 1 AND \(a\.vin_listing OR b\.vin_listing\)/);
   assert.match(sql, /s\.score >= 0\.6 - 0\.05 - 1e-9 AND s\.score < 0\.6 - 1e-9/);
-  assert.match(sql, /bat_listings bl/); assert.match(sql, /ARRAY\['RVVIN0000000014'\]/); assert.doesNotMatch(sql, /drop table/i);
+  assert.match(sql, /bat_listings bl/); assert.match(sql, /ARRAY\['RVVIN0000000014', 'XDROPTABLET'\]/); assert.doesNotMatch(sql, /drop table|;\s*drop/i); // 'short' is dropped; punctuation is stripped, never quoted through
   assert.match(sql, /'vin_matches_listing'/);
   assert.doesNotMatch(buildPairsSql('00000000-0000-4000-8000-000000000001'), /unnest\(ARRAY/);
   assert.doesNotMatch(sql, /\b(insert|update|delete|drop|alter)\b\s/i);
