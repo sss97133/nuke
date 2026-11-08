@@ -728,5 +728,45 @@ INSERT INTO vehicle_photo_session_scenes(run_id,vehicle_id,session_key,scene_lab
 SELECT fixture_fails($$INSERT INTO vehicle_photo_session_scenes(run_id,vehicle_id,session_key,scene_label,model) VALUES (gen_random_uuid(),'00000000-0000-4000-8000-000000000001','s','kitchen','m')$$);
 SELECT fixture_fails($$DELETE FROM vehicle_photo_session_scenes$$);
 
+-- ===== self-contained fixtures for the scene producer, pre-auction, cluster and statement-recency rules (gz_*) =====
+-- These seed their own organizations and vehicles (no dependence on the sections above) and use inline scene_labels rows.
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS business_type text;
+\set gz_shop a0a0a0a0-0000-4000-8000-000000000001
+\set gz_dealer a0a0a0a0-0000-4000-8000-000000000002
+INSERT INTO organizations(id,name,latitude,longitude,business_type) VALUES
+  (:'gz_shop','Gz Restoration Works',36.30000,-115.30000,'restoration_shop'),
+  (:'gz_dealer','Gz Classic Dealer',36.40000,-115.40000,'dealer');
+CREATE FUNCTION gz(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ SELECT ('00000000-0000-4000-8000-0000000003'||lpad(n::text,2,'0'))::uuid $$;
+CREATE FUNCTION gz_burst(n int, k int, start_ts timestamptz, lat numeric, lon numeric, gap interval DEFAULT interval '1 minute') RETURNS void LANGUAGE sql AS $$
+ INSERT INTO vehicle_images(vehicle_id,user_id,image_url,taken_at,latitude,longitude,device_fingerprint)
+ SELECT gz(n),'00000000-0000-4000-8000-000000000001','p',start_ts + g*gap,lat,lon,'dev-1' FROM generate_series(1,k) g $$;
+INSERT INTO vehicles(id,is_public,year,make,model) SELECT gz(g), true, 1990, 'Gzmake'||g, 'Gzmodel' FROM generate_series(1,40) g;
+
+-- (a) scene context also applies to ONE organization in range
+SELECT gz_burst(1, 6, now() - interval '5 months', 36.30000, -115.30000);   -- no scene
+SELECT gz_burst(2, 6, now() - interval '5 months', 36.30000, -115.30000);   -- dealer_lot scene at a restoration shop: contradicts
+SELECT gz_burst(3, 6, now() - interval '5 months', 36.30000, -115.30000);   -- shop_interior scene at a restoration shop: supports
+SELECT gz_burst(4, 6, now() - interval '5 months', 36.30000, -115.30000);   -- dealer_lot scene, but the shop is linked to the vehicle
+SELECT gz_burst(5, 6, now() - interval '5 months', 36.30000, -115.30000);   -- dealer_lot scene below the confidence floor
+INSERT INTO organization_vehicles(vehicle_id,organization_id) VALUES (gz(4),:'gz_shop');
+\set gz_a_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), gz(2), 'k2', ARRAY[]::uuid[], 'dealer_lot', 'm', 0.9::numeric, 'cars in rows' UNION ALL SELECT gen_random_uuid(), gz(3), 'k3', ARRAY[]::uuid[], 'shop_interior', 'm', 0.9::numeric, 'lift and tools' UNION ALL SELECT gen_random_uuid(), gz(4), 'k4', ARRAY[]::uuid[], 'dealer_lot', 'm', 0.9::numeric, 'cars in rows' UNION ALL SELECT gen_random_uuid(), gz(5), 'k5', ARRAY[]::uuid[], 'dealer_lot', 'm', 0.4::numeric, 'unsure'/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('s3', c->'evidence', 'role', d.derived_role))
+          FROM (:gz_a_sql) d, jsonb_array_elements(d.evidence->'chain') c WHERE (c->>'step')::int=3 AND d.vehicle_id BETWEEN gz(1) AND gz(5)) AS gz_a \gset
+SELECT fixture_assert(:'gz_a'::jsonb->(gz(1))::text->'s3'->>'pattern'='shop_shoot' AND :'gz_a'::jsonb->(gz(1))::text->>'role'='contributor'
+  AND NOT (:'gz_a'::jsonb->(gz(1))::text->'s3'->'scene_context'->>'attribution_withheld_by_scene')::boolean,'one organization, no scene: shop shoot as before');
+SELECT fixture_assert((:'gz_a'::jsonb->(gz(2))::text->'s3'->'scene_context'->>'attribution_withheld_by_scene')::boolean
+  AND :'gz_a'::jsonb->(gz(2))::text->'s3'->>'organization_id' IS NULL AND :'gz_a'::jsonb->(gz(2))::text->'s3'->>'withheld_organization_id'=:'gz_shop'
+  AND :'gz_a'::jsonb->(gz(2))::text->'s3'->>'pattern' IS NULL AND :'gz_a'::jsonb->(gz(2))::text->>'role'='documenting'
+  AND jsonb_array_length(:'gz_a'::jsonb->(gz(2))::text->'s3'->'scene_context'->'sessions')=1,
+  'a dealer_lot scene at a shop-only organization withholds the attribution, cites the scene and the withheld organization');
+SELECT fixture_assert((:'gz_a'::jsonb->(gz(3))::text->'s3'->'scene_context'->>'scene_supports_organization')::boolean
+  AND :'gz_a'::jsonb->(gz(3))::text->'s3'->>'organization_id'=:'gz_shop' AND :'gz_a'::jsonb->(gz(3))::text->'s3'->>'pattern'='shop_shoot',
+  'a shop_interior scene at the shop supports the attribution');
+SELECT fixture_assert(NOT (:'gz_a'::jsonb->(gz(4))::text->'s3'->'scene_context'->>'attribution_withheld_by_scene')::boolean
+  AND (:'gz_a'::jsonb->(gz(4))::text->'s3'->'scene_context'->>'scene_contradicts_organization')::boolean
+  AND :'gz_a'::jsonb->(gz(4))::text->'s3'->>'organization_id'=:'gz_shop','an organization linked to the vehicle keeps the attribution; the contradiction is still cited');
+SELECT fixture_assert(NOT (:'gz_a'::jsonb->(gz(5))::text->'s3'->'scene_context'->>'attribution_withheld_by_scene')::boolean
+  AND :'gz_a'::jsonb->(gz(5))::text->'s3'->>'pattern'='shop_shoot','a scene below confidence 0.6 is ignored');
+
 SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 

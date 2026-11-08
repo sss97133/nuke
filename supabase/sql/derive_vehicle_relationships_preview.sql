@@ -70,7 +70,7 @@
 -- scraped copy (the original that the listing republished). An imported photo is never own-device. A vehicle whose photos are
 -- predominantly imported (more than half) derives imported_by_user, citing the matches (evidence.chain[1].imported_examples).
 -- (vehicle_images has file_hash and dhash as text; phash_hex lives on image_identities and is not used here.)
--- Scene context (step 3 tie-break): see the tie-break note below; scene labels come from the scene_labels placeholder CTE
+-- Scene context (step 3: tie-break, single-organization support / contradiction): see the notes below; scene labels come from the scene_labels placeholder CTE
 -- (rows of vehicle_photo_session_scenes), organization kinds from organizations.business_type / entity_type / services_offered.
 -- Time decay: documenting with no own photo or activity for platform_config 'garage_documenting_decay_months'
 -- ({"months": n}, default 18 here) -> previously_documented, with documented_from / documented_to = min / max
@@ -110,7 +110,9 @@ hist_listings AS (
 ),
 -- SCENE PLACEHOLDER (empty by default; keep this CTE when generating the function). One row per photo session, labelled by a
 -- vision model (table vehicle_photo_session_scenes; scene_label in dealer_lot, showroom, shop_interior, upholstery_work,
--- paint_body, outdoor_street, other). Read only to break an organization tie, never to create one.
+-- paint_body, outdoor_street, other). Never creates an organization attribution: it breaks a tie, supports a single organization
+-- whose kind matches, withholds the GPS attribution when its kind contradicts (unless the organization lists / is linked to the
+-- vehicle), and feeds the pre-auction rule (scripts/garage/label-scenes.mjs produces the rows).
 scene_labels AS (
   SELECT t.run_id, t.vehicle_id, t.session_key, t.image_ids, t.scene_label, t.model, t.confidence, t.rationale
     FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::text, NULL::text, NULL::numeric, NULL::text))
@@ -729,13 +731,20 @@ g5 AS (
                                   CASE WHEN g4.v_listed THEN o.bt_rank ELSE 2 END, t.n_at DESC, t.min_m, t.canon::text)) q
      WHERE q.rn = 1) so ON true
 ),
-g6 AS (
-  SELECT g5.*,
-         g5.s_org IS NOT NULL AND g5.n_sess <= g5.r_max_s AND g5.span_days <= g5.r_max_span
-           AND g5.own_n >= g5.r_min_ph AND g5.geo_n >= g5.r_min_geo * g5.own_n AND g5.s_n_at = g5.geo_n AS shoot,
-         g5.span_days >= g5.r_pers_span AND g5.geo_n - g5.at_any_org > 0 AS personal,
-         g5.s_org IS NOT NULL AND g5.s_other > 0 AND NOT (g5.s_listed OR g5.s_rel) AND NOT coalesce(g5.tb_decided, false) AS amb
+-- Scene context also applies to a single organization in range: a scene whose kind contradicts the organization's kind (a dealer
+-- lot at a shop-only organization) withholds the GPS attribution to it (cited as attribution_withheld_by_scene); an organization
+-- that lists or is linked to the vehicle keeps its attribution (a listing outranks a model label); a matching scene supports it.
+g5w AS (
+  SELECT g5.*, g5.s_org IS NOT NULL AND coalesce(g5.s_sx, false) AND NOT (coalesce(g5.s_listed, false) OR coalesce(g5.s_rel, false)) AS scene_w
   FROM g5
+),
+g6 AS (
+  SELECT g5w.*,
+         g5w.s_org IS NOT NULL AND NOT g5w.scene_w AND g5w.n_sess <= g5w.r_max_s AND g5w.span_days <= g5w.r_max_span
+           AND g5w.own_n >= g5w.r_min_ph AND g5w.geo_n >= g5w.r_min_geo * g5w.own_n AND g5w.s_n_at = g5w.geo_n AS shoot,
+         g5w.span_days >= g5w.r_pers_span AND g5w.geo_n - g5w.at_any_org > 0 AS personal,
+         g5w.s_org IS NOT NULL AND g5w.s_other > 0 AND NOT (g5w.s_listed OR g5w.s_rel) AND NOT coalesce(g5w.tb_decided, false) AS amb
+  FROM g5w
 ),
 h AS (
   SELECT g6.*,
@@ -787,7 +796,7 @@ h AS (
         THEN jsonb_build_array('imported_by_user', 0.3, 'no own-device photo, organization link, title or statement; photos, contributor and permission rows are not evidence')
       ELSE jsonb_build_array('profile_record', 0.3, 'creator of the profile')
     END AS d,
-    CASE WHEN g6.s_org IS NULL THEN NULL
+    CASE WHEN g6.s_org IS NULL OR g6.scene_w THEN NULL
          ELSE (CASE WHEN g6.shoot THEN (CASE WHEN g6.s_listed THEN 0.7 ELSE 0.5 END) ELSE 0.15 END)
               * (CASE WHEN g6.amb THEN 0.5 ELSE 1 END) END AS s_conf
   FROM g6
@@ -823,9 +832,10 @@ SELECT h.vid AS vehicle_id,
                                 WHEN h.ver_id IS NULL THEN '["owner_verified","co_owner_verified","owner_reported"]'::jsonb
                                 ELSE '["owner_reported"]'::jsonb END),
            jsonb_build_object('step', 3, 'name', 'organization_gps', 'confidence', h.s_conf,
-             'evidence', jsonb_build_object('organization_id', h.s_org, 'distance_m', h.s_m,
+             'evidence', jsonb_build_object('organization_id', CASE WHEN h.scene_w THEN NULL ELSE h.s_org END,
+               'withheld_organization_id', CASE WHEN h.scene_w THEN h.s_org END, 'distance_m', h.s_m,
                'pattern', CASE WHEN h.shoot THEN 'shop_shoot' WHEN h.personal THEN 'long_term_personal'
-                               WHEN h.s_org IS NOT NULL THEN 'at_organization' END,
+                               WHEN h.s_org IS NOT NULL AND NOT h.scene_w THEN 'at_organization' END,
                'sessions', h.n_sess, 'span_days', round(h.span_days::numeric, 1),
                'distinct_days', h.n_days, 'distinct_months', h.n_months,
                'geotagged_photos', h.geo_n, 'photos_at_organization', h.s_n_at,
@@ -837,11 +847,12 @@ SELECT h.vid AS vehicle_id,
                'ambiguous', coalesce(h.amb, false), 'tie_break_decided', coalesce(h.tb_decided, false),
                'session_cooccurrence_links', h.s_cooc,
                'scene_context', jsonb_build_object('vehicle_scene_kind', h.s_vkind, 'selected_organization_kind', h.s_okind,
-                 'scene_matches_organization', h.s_sm = 1, 'scene_contradicts_organization', coalesce(h.s_sx, false),
+                 'scene_matches_organization', h.s_sm = 1, 'scene_supports_organization', coalesce(h.s_sm = 1, false),
+                 'scene_contradicts_organization', coalesce(h.s_sx, false), 'attribution_withheld_by_scene', coalesce(h.scene_w, false),
                  'sessions', coalesce(h.s_scites, '[]'::jsonb)), 'organizations', to_jsonb(h.s_orgs),
                'recent_photos', coalesce(h.recent_gps_n, 0) > 0,
                'hypothesis', CASE WHEN h.shoot THEN 'shop shoot at organization'
-                                  WHEN h.s_org IS NOT NULL THEN 'photographed at organization' END,
+                                  WHEN h.s_org IS NOT NULL AND NOT h.scene_w THEN 'photographed at organization' END,
                'decides', coalesce(h.shoot, false)),
              'eliminated', '[]'::jsonb),
            jsonb_build_object('step', 4, 'name', 'titles', 'confidence', CASE WHEN h.ver_id IS NOT NULL THEN 0.98 END,

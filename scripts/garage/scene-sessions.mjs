@@ -1,10 +1,13 @@
 #!/usr/bin/env node
-// Lists, for one account, the photo sessions that sit within range of two or more (distinct) organizations, each with up to four
-// sample image URLs, so a vision model (or a person) can label the session's scene (dealer_lot, showroom, shop_interior,
-// upholstery_work, paint_body, outdoor_street, other) and the label can be stored in vehicle_photo_session_scenes.
+// Lists, for one account, the photo sessions that sit within range of ONE OR MORE (distinct) organizations, each with all its
+// image ids and up to four sample image URLs, so a vision model (or a person) can label the session's scene (dealer_lot,
+// showroom, shop_interior, upholstery_work, paint_body, outdoor_street, other) and the label can be stored in
+// vehicle_photo_session_scenes (scripts/garage/label-scenes.mjs reads this script's --out file as its --sessions-json).
 // Read-only: one SELECT. Nothing is written to a database; --dry-run is the only mode.
 //
-//   node scripts/garage/scene-sessions.mjs --dry-run --user <uuid> [--out /workspace/tie_sessions.json] [--print-sql]
+//   node scripts/garage/scene-sessions.mjs --dry-run --user <uuid> [--out /workspace/scene_sessions.json]
+//        [--print-sql] [--sessions-sql-out <file>]
+//   --sessions-sql-out <file>  write the SELECT to <file> and print it; nothing is run (no credentials needed)
 //
 // How the SQL runs (first that is available): psql with DATABASE_URL (read-only session), or the Supabase management API with
 // SUPABASE_ACCESS_TOKEN (the path scripts/data/q.sh uses). With neither, the SQL is printed (and written next to --out as .sql).
@@ -49,21 +52,22 @@ near AS (
    WHERE 12742000 * asin(sqrt(least(1, power(sin(radians(o.latitude::float8 - rk.lat) / 2), 2)
            + cos(radians(rk.lat)) * cos(radians(o.latitude::float8)) * power(sin(radians(o.longitude::float8 - rk.lon) / 2), 2)))) <= cfg.r
 ),
-ties AS (
+in_range AS (
   SELECT n.vehicle_id, n.sess, count(DISTINCT n.nn) AS n_orgs, count(DISTINCT n.image_id) AS photos_in_range,
          jsonb_agg(DISTINCT jsonb_build_object('id', n.org_id, 'name', n.name, 'business_type', n.business_type)) AS orgs
-    FROM near n GROUP BY n.vehicle_id, n.sess HAVING count(DISTINCT n.nn) >= 2
+    FROM near n GROUP BY n.vehicle_id, n.sess HAVING count(DISTINCT n.nn) >= 1
 )
 SELECT coalesce(jsonb_agg(jsonb_build_object(
          'vehicle_id', x.vehicle_id, 'session_key', x.session_key, 'started_at', x.started_at, 'ended_at', x.ended_at,
-         'photos', x.photos, 'photos_in_range', x.photos_in_range, 'organizations', x.orgs, 'samples', x.samples)
+         'photos', x.photos, 'photos_in_range', x.photos_in_range, 'organizations', x.orgs, 'image_ids', x.image_ids, 'samples', x.samples)
        ORDER BY x.started_at DESC), '[]'::jsonb) AS sessions
   FROM (
     SELECT t.vehicle_id, t.sess, t.n_orgs, t.photos_in_range, t.orgs,
            (array_agg(r.id ORDER BY r.rn))[1]::text AS session_key, min(r.t) AS started_at, max(r.t) AS ended_at, max(r.n) AS photos,
+           jsonb_agg(r.id ORDER BY r.rn) AS image_ids,
            jsonb_agg(jsonb_build_object('image_id', r.id, 'image_url', r.image_url, 'storage_path', r.storage_path, 'taken_at', r.t) ORDER BY r.rn)
              FILTER (WHERE r.rn IN (1, 1 + (r.n - 1) / 3, 1 + 2 * (r.n - 1) / 3, r.n)) AS samples
-      FROM ties t JOIN rk r ON r.vehicle_id = t.vehicle_id AND r.sess = t.sess
+      FROM in_range t JOIN rk r ON r.vehicle_id = t.vehicle_id AND r.sess = t.sess
      GROUP BY t.vehicle_id, t.sess, t.n_orgs, t.photos_in_range, t.orgs) x;
 `;
 }
@@ -79,7 +83,8 @@ export function shapeSessions(sessions, supabaseUrl) {
   return sessions.map((s) => ({
     vehicle_id: s.vehicle_id, session_key: s.session_key, started_at: s.started_at, ended_at: s.ended_at,
     photos: s.photos, photos_in_range: s.photos_in_range, organizations: s.organizations,
-    sample_image_urls: (s.samples ?? []).map((x) => publicUrl(x, supabaseUrl)).filter(Boolean).slice(0, 4),
+    image_ids: s.image_ids ?? (s.samples ?? []).map((x) => x.image_id),
+    sample_urls: (s.samples ?? []).map((x) => publicUrl(x, supabaseUrl)).filter(Boolean).slice(0, 4),
     sample_image_ids: (s.samples ?? []).map((x) => x.image_id).slice(0, 4),
   }));
 }
@@ -105,9 +110,11 @@ async function runSql(sql) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : d; };
-  const out = opt('out', '/workspace/tie_sessions.json');
+  const out = opt('out', '/workspace/scene_sessions.json');
   let sql;
   try { sql = buildSql(opt('user')); } catch (e) { console.error(e.message); process.exit(2); }
+  const sqlOut = opt('sessions-sql-out');
+  if (sqlOut) { writeFileSync(sqlOut, sql); console.error(`SELECT written to ${sqlOut}; nothing was run`); console.log(sql); process.exit(0); }
   if (args.includes('--print-sql')) { console.log(sql); process.exit(0); }
   const sessions = await runSql(sql);
   if (!sessions) {
@@ -119,5 +126,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   const shaped = shapeSessions(sessions, process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL);
   writeFileSync(out, JSON.stringify(shaped, null, 2));
-  console.error(`${shaped.length} sessions with an organization tie -> ${out}`);
+  console.error(`${shaped.length} sessions within range of an organization -> ${out}`);
 }

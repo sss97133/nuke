@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCards, parseMemberHtml, parseAjax, parseDetail, parseResultText, buildValuesSql, toBatListingRow, listingSlug } from './ingest-bat-seller-history.mjs';
 import { buildSql, publicUrl, shapeSessions } from './scene-sessions.mjs';
+import { normalizeSession, buildPrompt, parseLabel, toInference, valuesCte as sceneCte, applyBody, isHeic, labelSession, SCENE_LABELS } from './label-scenes.mjs';
 
 const card = (slug, title, ts, result) => `<div class="listing-card listing-card-separate listing-card-h" data-listing_id="1" data-timestamp_end="${ts}">
 <div class="thumbnail"><a class="image-overlay" href="https://bringatrailer.com/listing/${slug}/"></a></div>
@@ -92,12 +93,15 @@ test('scene-sessions: SQL needs a uuid, is one read-only SELECT, URLs come from 
   const sql = buildSql('0B9F107A-D124-49DE-9DED-94698F63C1C4');
   assert.match(sql, /'0b9f107a-d124-49de-9ded-94698f63c1c4'::uuid/);
   assert.doesNotMatch(sql, /\b(insert|update|delete|drop|alter)\b\s/i);
-  assert.match(sql, /HAVING count\(DISTINCT n\.nn\) >= 2/);
+  assert.match(sql, /HAVING count\(DISTINCT n\.nn\) >= 1/); // one OR MORE organizations in range, not only ties
+  assert.doesNotMatch(sql, />= 2/);
+  assert.match(sql, /'image_ids', x\.image_ids/);
   assert.equal(publicUrl({ image_url: 'https://cdn.example/a.jpg', storage_path: 'x' }), 'https://cdn.example/a.jpg');
   assert.equal(publicUrl({ image_url: 'p', storage_path: 'u/a b.jpg' }, 'https://s.example'), 'https://s.example/storage/v1/object/public/vehicle-photos/u/a%20b.jpg');
   assert.equal(publicUrl({ image_url: null, storage_path: null }), null);
   const s = shapeSessions([{ vehicle_id: 'v', session_key: 'k', samples: [1, 2, 3, 4, 5].map((i) => ({ image_id: `i${i}`, image_url: `https://x/${i}.jpg` })) }]);
-  assert.equal(s[0].sample_image_urls.length, 4);
+  assert.equal(s[0].sample_urls.length, 4);
+  assert.deepEqual(s[0].image_ids, ['i1', 'i2', 'i3', 'i4', 'i5']);
 });
 
 import { dhashFromGray9x8, hamming, matchAll, valuesCte, candidatesSql, unknownPhotosSql } from './dhash-match.mjs';
@@ -116,4 +120,72 @@ test('dhash-match: dhash, hamming, nearest match and VALUES CTE', () => {
   assert.match(valuesCte(m), /\('a'::uuid, 'c2'::uuid, 'bat', 5\)/);
   assert.throws(() => unknownPhotosSql('nope'));
   assert.match(candidatesSql({ year: 1985, make: "o'x", family: null }), /BETWEEN 1984 AND 1986[\s\S]*IS NOT DISTINCT FROM NULL/);
+});
+
+const V = '0b9f107a-d124-49de-9ded-94698f63c1c4';
+const I = '11111111-1111-4111-8111-111111111111';
+
+test('label-scenes: sessions from scene-sessions (sample_urls) or the older shape; at most four samples', () => {
+  const n = normalizeSession({ vehicle_id: V.toUpperCase(), session_key: 'k', image_ids: [I, 'nope'], sample_urls: ['a', 'b', 'c', 'd', 'e'] });
+  assert.equal(n.vehicle_id, V);
+  assert.deepEqual(n.image_ids, [I]);
+  assert.equal(n.sample_urls.length, 4);
+  assert.deepEqual(normalizeSession({ vehicle_id: V, session_key: 'k', sample_image_urls: ['a'], sample_image_ids: [I] }).sample_urls, ['a']);
+  assert.throws(() => normalizeSession({ vehicle_id: 'x', session_key: 'k' }));
+  assert.throws(() => normalizeSession({ vehicle_id: V }));
+});
+
+test('label-scenes: prompt names the files and every allowed label; no vehicle or organization input', () => {
+  const p = buildPrompt(['/c/a.jpg', '/c/b.jpg']);
+  assert.match(p, /- \/c\/a\.jpg\n- \/c\/b\.jpg/);
+  for (const l of SCENE_LABELS) assert.ok(p.includes(l), l);
+  assert.match(p, /Read tool/);
+  assert.doesNotMatch(p, new RegExp(V));
+});
+
+test('label-scenes: parseLabel validates strict JSON (fenced or with stray text), label, confidence and rationale', () => {
+  assert.deepEqual(parseLabel('{"scene_label":"showroom","confidence":0.8,"rationale":"polished floor"}'),
+    { scene_label: 'showroom', confidence: 0.8, rationale: 'polished floor' });
+  assert.equal(parseLabel('```json\n{"scene_label":"dealer_lot","confidence":"0.7","rationale":"rows of cars"}\n```').confidence, 0.7);
+  assert.throws(() => parseLabel('no json here'), /no JSON/);
+  assert.throws(() => parseLabel('{"scene_label":"kitchen","confidence":0.5,"rationale":"x"}'), /scene_label/);
+  assert.throws(() => parseLabel('{"scene_label":"other","confidence":1.5,"rationale":"x"}'), /confidence/);
+  assert.throws(() => parseLabel('{"scene_label":"other","confidence":0.5}'), /rationale/);
+  assert.throws(() => parseLabel('{"scene_label":"other","confidence":null,"rationale":"x"}'), /confidence/);
+});
+
+test('label-scenes: inference carries run, model, producer and the session; CTE and apply body match the table columns', () => {
+  const s = normalizeSession({ vehicle_id: V, session_key: 'k', image_ids: [I], sample_urls: ['u'] });
+  const inf = toInference(s, { scene_label: 'paint_body', confidence: 0.9, rationale: "o'brien's masking" }, { runId: I, model: 'claude-cli:default', createdAt: '2026-11-07T00:00:00.000Z' });
+  assert.deepEqual(Object.keys(inf), ['run_id', 'vehicle_id', 'session_key', 'image_ids', 'scene_label', 'model', 'confidence', 'rationale', 'producer', 'created_at']);
+  assert.equal(inf.producer, 'scripts/garage/label-scenes.mjs');
+  const cte = sceneCte([inf]);
+  assert.match(cte, /^scene_labels AS \(/);
+  assert.match(cte, /ARRAY\['11111111-1111-4111-8111-111111111111'::uuid\]/);
+  assert.match(cte, /'o''brien''s masking'\)/);
+  assert.match(cte, /WHERE true -- \(scene_labels\)/);
+  assert.match(sceneCte([]), /WHERE false -- \(scene_labels\)/);
+  assert.doesNotMatch(cte, /\b(insert|update|delete|drop)\b\s/i);
+  assert.deepEqual(Object.keys(applyBody([inf])[0]), ['run_id', 'vehicle_id', 'session_key', 'image_ids', 'scene_label', 'model', 'confidence', 'rationale']);
+});
+
+test('label-scenes: HEIC is recognised by its ftyp brand', () => {
+  assert.ok(isHeic(Buffer.from('\0\0\0\x18ftypheic\0\0\0\0mif1heic')));
+  assert.ok(!isHeic(Buffer.from('\xff\xd8\xff\xe0\0\x10JFIF\0\x01\x01\x01\0')));
+});
+
+test('label-scenes: one retry on invalid output, then a cited failure; a good reply is returned as parsed', async () => {
+  const sess = normalizeSession({ vehicle_id: V, session_key: 'k', image_ids: [I], sample_urls: ['https://x/1.jpg', 'https://x/2.jpg'] });
+  const fetchFn = async (u) => `/cache/${u.split('/').pop()}`;
+  let calls = 0;
+  const seen = [];
+  const flaky = async ({ files }) => { seen.push(files); calls++; return calls === 1 ? 'sorry, I cannot' : '{"scene_label":"outdoor_street","confidence":0.55,"rationale":"curb and trees"}'; };
+  const ok = await labelSession(sess, { backend: flaky, cacheDir: '/cache', fetchFn });
+  assert.equal(calls, 2);
+  assert.deepEqual(seen[0], ['/cache/1.jpg', '/cache/2.jpg']);
+  assert.equal(ok.scene_label, 'outdoor_street');
+  calls = 0;
+  await assert.rejects(labelSession(sess, { backend: async () => { calls++; return 'nope'; }, cacheDir: '/cache', fetchFn }), /after retry/);
+  assert.equal(calls, 2);
+  await assert.rejects(labelSession({ ...sess, sample_urls: [] }, { backend: flaky, cacheDir: '/cache', fetchFn }), /no sample urls/);
 });
