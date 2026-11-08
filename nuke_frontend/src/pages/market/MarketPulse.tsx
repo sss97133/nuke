@@ -11,7 +11,7 @@ import { HouseMark, HouseMarket, houseWeekChange, useHouseShare } from './HouseS
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { displayMake, selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
-import { useFinishEstimates, type FinishEstimate } from './useFinishEstimates';
+import { trackFor, trackSentence, useFinishEstimates, useFinishTrackRecord, type FinishEstimate } from './useFinishEstimates';
 import { ringBids, startBidChime } from './bidChime';
 import { matchesEraRange } from '../../lib/market/familyEras';
 import { matchesFamilyScope } from './scopeMatch';
@@ -270,7 +270,7 @@ function BoardHistory({ samples, measure }: { samples: BoardSample[]; measure: '
         {measure === 'bids' && <Text role="caption">{c.kind === 'bid' ? `${bidNumber(c.before)} → ${bidNumber(c.after)}` : bidNumber(c.kind === 'entered' ? c.after : c.before)}</Text>}
       </button>)}
     </div> : <Text role="body" as="p">{prev ? 'No change in this observation.' : 'Starting observation. New changes will appear here as the board updates.'}</Text>}
-    {lot && lot.at === selected.at && <AuctionEvidence key={`${lot.auction.id}:${lot.auction.listingUrl}`} vehicleId={lot.auction.id} sourceUrl={lot.auction.listingUrl} compact onClose={() => setLot(null)} />}
+    {lot && lot.at === selected.at && <AuctionEvidence key={`${lot.auction.id}:${lot.auction.listingUrl}`} vehicleId={lot.auction.id} sourceUrl={lot.auction.listingUrl} endsAt={lot.auction.endsAt} compact onClose={() => setLot(null)} />}
   </section>;
 }
 
@@ -359,14 +359,15 @@ export function finishGap(bid: number | null | undefined, e: Pick<FinishEstimate
 
 // The finish under the bid: the likely number and how far there is to go, then a bar: the range eight in ten such lots
 // finished inside (shaded), the likely finish (tick) and where the bid stands now (bar), so a lot that must still run
-// reads at a glance.
-export function FinishLine({ e, bid }: { e: FinishEstimate; bid?: number | null }) {
+// reads at a glance. Hover says how often estimates made this far from the close finished inside their range.
+export function FinishLine({ e, bid, endsAt }: { e: FinishEstimate; bid?: number | null; endsAt?: number | null }) {
+  const track = trackFor(useFinishTrackRecord().data, e, endsAt);
   const gap = finishGap(bid, e);
   const now = bid && bid > 0 ? bid : null;
   const lo = Math.min(e.low, now ?? e.low), hi = Math.max(e.high, now ?? e.high);
   const pad = (hi - lo) * 0.06 || hi * 0.05 || 1;
   const x = (v: number) => ((v - lo + pad) / (hi - lo + 2 * pad)) * 100;
-  return <div className="market-lot-finish" title={e.sentence ?? undefined}>
+  return <div className="market-lot-finish" title={[e.sentence, track && trackSentence(track)].filter(Boolean).join(' ') || undefined}>
     <Text role="caption" as="div">likely <strong>{bidNumber(e.estimate, true)}</strong>{gap ? ` · ${gap}` : ''} · {bidNumber(e.low, true)}–{bidNumber(e.high, true)}</Text>
     <svg className="market-lot-finish__bar" viewBox="0 0 100 8" preserveAspectRatio="none" role="img"
       aria-label={`likely ${bidNumber(e.estimate, true)}, range ${bidNumber(e.low, true)} to ${bidNumber(e.high, true)}${now ? `, bid ${bidNumber(now, true)}` : ''}`}>
@@ -439,7 +440,7 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, group,
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
         <BidCell auction={bidReading} risen={risen} stale={stale} />
-        {finish && <FinishLine e={finish} bid={a.currentBid} />}
+        {finish && <FinishLine e={finish} bid={a.currentBid} endsAt={a.endsAt} />}
       </button>
     </div>
   );
@@ -479,7 +480,7 @@ function Board({ rows, risenIds, stale, showHouse, activityId, finishes, inspect
             </h2>}
             <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} finish={finishes?.get(a.id)} showHouse={showHouse} group={group} scope={scope} onInspect={onInspect} onDrill={onDrill} />
             {expanded && <AuctionEvidence key={a.id} vehicleId={a.id} compact inspection={inspection} summary={detail}
-              sourceUrl={a.listingUrl} onInspectionChange={onInspectionChange} onClose={onClose} />}
+              sourceUrl={a.listingUrl} endsAt={a.endsAt} onInspectionChange={onInspectionChange} onClose={onClose} />}
           </div>
         );
       })}

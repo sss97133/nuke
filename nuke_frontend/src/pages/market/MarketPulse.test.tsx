@@ -4,12 +4,15 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ share: { data: undefined as any, isError: false }, pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any> }));
+const fixture = vi.hoisted(() => ({ share: { data: undefined as any, isError: false }, pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any>, track: undefined as any }));
 vi.mock('./HouseShare', async importOriginal => ({
   ...await importOriginal<typeof import('./HouseShare')>(),
   useHouseShare: () => fixture.share,
 }));
-vi.mock('./useFinishEstimates', () => ({ useFinishEstimates: () => ({ data: { fresh: true, writerAt: null, byId: fixture.finish } }) }));
+vi.mock('./useFinishEstimates', async importOriginal => ({
+  ...await importOriginal<typeof import('./useFinishEstimates')>(),
+  useFinishEstimates: () => ({ data: { fresh: true, writerAt: null, byId: fixture.finish } }), useFinishTrackRecord: () => ({ data: fixture.track }),
+}));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
   useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: fixture.sameHour }), useInventoryTaxonomy: () => fixture.taxonomy,
@@ -74,7 +77,7 @@ beforeEach(() => {
     observe() { this.callback([{ contentRect: { width: window.innerWidth } }]); }
     disconnect() {}
   });
-  fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = []; fixture.finish = new Map();
+  fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = []; fixture.finish = new Map(); fixture.track = undefined;
   fixture.taxonomy = { data: [], isLoading: false, isError: false, isSuccess: true, refetch: fixture.retry };
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { fn(); return 0; });
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -437,6 +440,16 @@ describe('where a lot should finish', () => {
     expect(line.querySelector('svg')?.getAttribute('aria-label')).toBe('likely $33K, range $26K to $45K, bid $25K');
     expect(line.querySelectorAll('svg line')).toHaveLength(2);
     expect(container.querySelector('[data-vehicle-id="first"] .market-lot-finish')).toBeNull();
+  });
+  it('says on hover how often estimates made this far out finished inside their range', async () => {
+    fixture.finish.set('later', { vehicleId: 'later', estimate: 33000, low: 25500, high: 45100, grade: 'A', coverage: 0.8,
+      sentence: null, estimatedAt: Date.now(), bidAtEstimate: 25000, compsThrough: '2026-09-27', model: 33 });
+    fixture.track = [{ model: 33, fromHours: 0, toHours: null, lots: 555, inside: 448, medianMissPct: 16.6,
+      firstClose: Date.parse('2026-10-17T20:00:00Z'), lastClose: Date.parse('2026-10-20T21:00:00Z') }];
+    await render();
+    const line = container.querySelector('[data-vehicle-id="later"] .market-lot-finish')!;
+    expect(line.getAttribute('title')).toContain('448 of 555 finished inside the range, half within 17%');
+    expect(line.textContent).toBe('likely $33K · +32% to go · $26K–$45K');
   });
 });
 

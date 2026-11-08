@@ -559,6 +559,16 @@ What that commits the estimate to:
 - **Acceptance case:** the Camaro above; model 33 must state what it would have said at 1 h and 10 min, with its
   contributions.
 
+### The track record beside each estimate, November 8
+
+`finish_track_record()` (migration 20261108213000, anon-executable, aggregates only) grades the live estimates the lot
+grader keyed: per model and per window of hours before the close (under 1 h, 1-6 h, 6-24 h, 1-3 days, over 3 days),
+each lot once by its last estimate in the window, against the final bid (the hammer, or the high bid when the reserve
+was not met). The board row's hover and the drawer's line under the range read the window the shown estimate was made
+in: "So far, estimated 1-3 days out: 448 of 555 finished inside the range, half within 17% (lots closed Oct 17-Oct 20)."
+Rows stamped by a writer whose clock was wrong are held out by their stamp window and named in the payload's
+`held_out` (2026-11-07 21:24Z, 2,355 rows, clock 3 h 35 min slow). The record grows only as the grader runs.
+
 
 ## One scope drives the market page, and search sets it — owner direction, October 16
 
