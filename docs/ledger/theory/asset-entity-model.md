@@ -204,3 +204,12 @@ exhibition), holder claims, images as `image_identities` rows keyed by sha256 wi
 - **Still open from section 3:** holding (asset × party × share × as-of) and membership (edition parent/child, series,
   collection; Bonhams prints "from the edition of 250" in the title and Mecum prints the collection in `collection_tax`, both
   retained on the lot row, neither folded yet).
+
+**Known limits after the first live day (2026-11-08, for the next reader):**
+- A layout-B party key is the printed name alone (the Copenhagen sales print no dates), so two artists who share a name
+  become one `external_identities` row until a claim separates them; the reverse (two spellings, two rows) is already noted.
+- The house facet is a snapshot (`art_census` run by hand at 07:22 PT). The walk's department choice divides landed lots by
+  it, and the walk's own universe is the published lots (82,904 prints against 86,450 in the facet), so the ratio never reaches
+  one and revisits begin near 0.96. Re-run `art_census` on each wrap, or weekly; a later reader can carry both denominators.
+- `asset_creators` reads the lot's current statement (`20261108234500`), not the row the claim was folded from, so a hammer
+  published after the fold reaches the artist view.
