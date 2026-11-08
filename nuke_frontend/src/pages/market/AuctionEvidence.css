@@ -276,7 +276,13 @@
 .market-lot-finish__band { fill: var(--border); }
 .market-lot-finish__likely { stroke: var(--text-secondary); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .market-lot-finish__bid { stroke: var(--text); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
-@media (max-width: 760px) { .market-lot-finish { justify-items: start; } }
+/* On a phone a row with a finish line gives the name the full width and puts the bid and the finish under it, side by
+   side (stacked when narrower): beside the name, the finish caption squeezed it to a word a line. */
+@media (max-width: 760px) {
+  .market-lot-row:has(.market-lot-finish) { grid-template-columns: minmax(0,1fr); grid-template-areas: "image" "name" "metrics"; }
+  .market-lot-row:has(.market-lot-finish) .market-lot-metrics { flex-direction: row; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 4px 12px; text-align: left; }
+  .market-lot-finish { text-align: right; }
+}
 
 /* The houses: each by its own mark (public/source-logos); the name only when no mark is hosted. */
 .market-house-mark { display: inline-block; vertical-align: middle; height: 18px; width: auto; max-width: 96px; object-fit: contain; }
