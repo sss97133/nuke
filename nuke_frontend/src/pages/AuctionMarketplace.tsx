@@ -53,6 +53,16 @@ const PLATFORM_NAMES: Record<string, string> = {
   mecum: 'Mecum',
 };
 
+const RECENT_AUCTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Recent membership uses the terminal episode clock, never a future scheduled source close. */
+export function recentAuctionEnd(rawEnd: unknown, asOf: number): string | null {
+  if (typeof rawEnd !== 'string' || !Number.isFinite(asOf)) return null;
+  const end = Date.parse(rawEnd);
+  return Number.isFinite(end) && end <= asOf && end >= asOf - RECENT_AUCTION_WINDOW_MS
+    ? new Date(end).toISOString() : null;
+}
+
 export interface MarketplaceAuction {
   id: string;
   vehicle_id: string;
@@ -352,13 +362,15 @@ export default function AuctionMarketplace() {
     // and useful context even when live auctions exist
     {
       try {
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const recentNow = Date.now();
+        const thirtyDaysAgo = new Date(recentNow - RECENT_AUCTION_WINDOW_MS).toISOString();
         const { data: recentEvents } = await supabase
           .from('vehicle_events')
           .select(EVENT_SELECT)
           .in('source_platform', [...AUCTION_PLATFORMS])
           .in('event_status', ['sold', 'ended', 'no_sale', 'reserve_not_met'])
           .gte('ended_at', thirtyDaysAgo)
+          .lte('ended_at', new Date(recentNow).toISOString())
           // NULLS LAST matches idx_vehicle_events_ended (ended_at DESC NULLS LAST), so the read stops at 50 rows;
           // plain DESC sorts nulls first, matched no index and read every event of the month (9 s cold, 5 ms after)
           .order('ended_at', { ascending: false, nullsFirst: false })
@@ -369,9 +381,8 @@ export default function AuctionMarketplace() {
           for (const ev of recentEvents as any[]) {
             const v = ev.vehicle;
             if (!v?.id || !v?.year || !v?.make) continue;
-            const rawEnd = ev.source_platform === 'purplewave' ? ev.source_end : ev.ended_at ?? ev.end_date;
-            const endDate = rawEnd ? new Date(rawEnd) : null;
-            const endMs = endDate && Number.isFinite(endDate.getTime()) ? endDate.getTime() : null;
+            const endTime = recentAuctionEnd(ev.ended_at, recentNow);
+            if (!endTime) continue;
             const rawPrice = ev.current_price ?? ev.current_bid;
             const priceCents = rawPrice ? Math.round(Number(rawPrice) * 100) : null;
             const currCode = resolveCurrencyCode(
@@ -384,7 +395,7 @@ export default function AuctionMarketplace() {
               vehicle_id: ev.vehicle_id,
               platform: ev.source_platform,
               source_url: ev.source_url ?? null,
-              end_time: endMs !== null ? endDate!.toISOString() : null,
+              end_time: endTime,
               current_price_cents: Number.isFinite(priceCents) && priceCents! > 0 ? priceCents : null,
               currency_code: currCode,
               bid_count: typeof ev.bid_count === 'number' ? ev.bid_count : null,
