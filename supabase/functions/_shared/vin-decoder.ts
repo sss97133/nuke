@@ -5,6 +5,8 @@
 export interface VINDecodeResult {
   year: number | null;
   make: string | null;
+  /** Manufacturer compatibility only; never a VIN-exact make assertion. */
+  manufacturer_make_candidates?: string[];
   model: string | null;
   trim: string | null;
   engine_size: string | null;
@@ -349,6 +351,7 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['1C6', 'Dodge', 'Dodge'],
     ['1C', 'Chrysler', 'Chrysler'],
     ['2C', 'Chrysler Canada', 'Chrysler'],
+    ['3C6', 'CHRYSLER DE MEXICO TOLUCA', null], // multi-marque manufacturer, not Chrysler marque
     ['3C', 'Chrysler Mexico', 'Chrysler'],
     ['1N', 'Nissan', 'Nissan'],
     ['1D', 'Dodge', 'Dodge'],
@@ -385,6 +388,12 @@ function decodeModernVin(vin: string): VINDecodeResult {
       break;
     }
   }
+
+  // NHTSA DecodeWMI/3C6 lists this manufacturer's possible marques, not the
+  // exact make of each VIN. Exact 3C6LD5AT0CG145618 decodes DODGE, not CHRYSLER.
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/3C6?format=json
+  if (wmi === '3C6') result.manufacturer_make_candidates =
+    ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia'];
 
   // Model year (position 10)
   const yearChar = vin.charAt(9);

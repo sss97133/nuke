@@ -18,7 +18,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { flagPlaceholderMileage } from "../_shared/odometer.ts";
-import { normalizeVehicleFields, normalizeMake } from "../_shared/normalizeVehicle.ts";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 import { decodeVin } from "../_shared/vin-decoder.ts";
@@ -31,7 +31,7 @@ import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craig
 import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
-import { vinMakeCheckApplies } from "./vinGate.ts";
+import { vinMakeConflict } from "./vinGate.ts";
 import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
 import { findCraigslistRepost } from "./repostMatch.ts";
 import { slugStubRejection } from "./slugStub.ts";
@@ -1551,13 +1551,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length >= 6) {
       const decoded = decodeVin(candidateData.vin);
       // Only a 17-character VIN with a valid check digit is decoded for make (./vinGate.ts); a chassis number is a claim.
-      if (vinMakeCheckApplies(candidateData.vin) && decoded.make && candidateData.make) {
-        const vinMake = normalizeMake(decoded.make);
-        const claimedMake = normalizeMake(candidateData.make);
-        if (vinMake && claimedMake && vinMake !== claimedMake) {
-          vinIssues.push(`vin_make_mismatch: VIN prefix indicates ${vinMake}, claimed ${claimedMake}`);
-          suggestions.make = `VIN indicates ${vinMake}, not ${claimedMake}`;
-        }
+      const makeConflict = vinMakeConflict(candidateData.vin, candidateData.make, decoded);
+      if (makeConflict) {
+        vinIssues.push(`vin_make_mismatch: ${makeConflict.basis} indicates ${makeConflict.expected}, claimed ${makeConflict.claimed}`);
+        suggestions.make = `${makeConflict.basis} is incompatible with ${makeConflict.claimed}`;
       }
       // Pre-1981: if VIN decoded a model, cross-check against claimed model
       if (decoded.is_pre_1981 && decoded.model && candidateData.model) {

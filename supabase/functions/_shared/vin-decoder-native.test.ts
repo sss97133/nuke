@@ -10,3 +10,10 @@ Deno.test("NHTSA-supported Canadian Pontiac WMI is distinct from Chevrolet", () 
 Deno.test("an OEM-only GM prefix preserves manufacturer and unknown marque", () => {
   for (const prefix of ["1GZ", "2GZ", "3GZ"]) assertEquals(decodeVin(vin(prefix)).make, null);
 });
+
+Deno.test("3C6 retains manufacturer without falsely projecting Chrysler as the marque", () => {
+  const decoded = decodeVin("3C6LD5AT0CG145618");
+  assertEquals(decoded.make, null);
+  assertEquals(decoded.manufacturer, "CHRYSLER DE MEXICO TOLUCA");
+  assertEquals(decoded.manufacturer_make_candidates, ["Dodge", "Chrysler", "Volkswagen", "Jeep", "Fiat", "RAM", "Lancia"]);
+});

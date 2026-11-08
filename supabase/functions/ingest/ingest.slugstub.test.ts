@@ -659,3 +659,31 @@ Deno.test({
     } finally { cachedArchive = null; handler = ingestHandler; }
   },
 });
+
+Deno.test({
+  name: "PurpleWave EX2391 admits the source Dodge and complete VIN through the real quality gate",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    persistedVehicle = null; clWorld = null;
+    const { result } = await ingest({ url: "https://www.purplewave.com/auction/261111/item/EX2391",
+      year: 2012, make: "Dodge", model: "Ram 2500", vin: "3C6LD5AT0CG145618", enrich: false,
+      description: "2012 Dodge Ram 2500 bale bed pickup truck. Miles: 157,236 on odometer. VIN: 3C6LD5AT0CG145618. Engine: 5.7L V8 gas. Automatic transmission. Four wheel drive. Kansas title." });
+    equal(result.status, "created");
+    const row = JSON.parse(vehicleInserts()[0].body!);
+    equal([row.make, row.vin], ["Dodge", "3C6LD5AT0CG145618"]);
+    equal(extractorCalls(), []);
+  },
+});
+Deno.test({
+  name: "PurpleWave incompatible Ford claim with the same VIN is rejected before vehicle writes",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    persistedVehicle = null; clWorld = null;
+    const { result } = await ingest({ url: "https://www.purplewave.com/auction/261111/item/EX2391",
+      year: 2012, make: "Ford", model: "F-250", vin: "3C6LD5AT0CG145618", enrich: false,
+      description: "Claimed Ford pickup truck with explicit VIN 3C6LD5AT0CG145618. Automatic transmission, four wheel drive, Kansas title." });
+    equal(result.status, "rejected");
+    assert(result.reason.includes("vin_make_mismatch"), "genuine manufacturer mismatch remains blocked");
+    equal(vehicleInserts().length, 0);
+  },
+});
