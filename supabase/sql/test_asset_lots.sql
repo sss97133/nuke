@@ -36,6 +36,10 @@ CREATE TABLE public.source_census(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   universe_total integer, universe_active integer, census_method text NOT NULL, census_confidence numeric, census_url text, census_notes text,
   census_at timestamptz NOT NULL DEFAULT now(), by_year jsonb DEFAULT '{}', by_make jsonb DEFAULT '{}', by_category jsonb DEFAULT '{}',
   raw_response jsonb, created_at timestamptz DEFAULT now());
+CREATE TABLE public.external_identities(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), platform text NOT NULL, handle text NOT NULL, profile_url text,
+  display_name text, claimed_by_user_id uuid, claimed_at timestamptz, claim_confidence integer DEFAULT 0, first_seen_at timestamptz DEFAULT now(),
+  last_seen_at timestamptz DEFAULT now(), metadata jsonb DEFAULT '{}'::jsonb, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(), user_id uuid,
+  CONSTRAINT external_identities_platform_handle_key UNIQUE (platform, handle));
 ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.asset_observations ENABLE ROW LEVEL SECURITY;
 
@@ -44,6 +48,7 @@ VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
 
 \ir ../migrations/20261108170000_asset_lots.sql
 \ir ../migrations/20261108200000_asset_lot_walk.sql
+\ir ../migrations/20261108230000_asset_creation_claims.sql
 
 -- 1. Anon cannot write.
 DO $$ BEGIN
@@ -166,6 +171,47 @@ DO $$ DECLARE r jsonb; BEGIN
   r := public.record_asset_lots('bonhams', $j$[{"identity_key":"bonhams:7000003","asset_type":"memorabilia","title":"A race poster","source_identifier":"7000003",
     "observed_at":"2026-10-01T12:00:00Z","observed_at_basis":"hammer_time","department_code":"COL-ENT","department_name":"Popular Culture","result":"not_sold","high_bid":320,"currency":"GBP"}]$j$::jsonb);
   IF (r->>'observations_new')::int <> 1 OR (r->>'observations_superseded')::int <> 1 THEN RAISE EXCEPTION 'a changed high bid supersedes: %', r; END IF;
+END $$;
+
+-- 6d. The creation fold: the party from the house's first line, the attribution word, the executor from "by <name>".
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+DO $$ DECLARE r jsonb; a record; e record; BEGIN
+  PERFORM public.record_asset_lots('bonhams', $j$[
+    {"identity_key":"bonhams:8000001","asset_type":"artwork","title":"After Marc Chagall (1887-1985) by Charles Sorlier (1921-1990) L'Oiseau bleu","source_identifier":"8000001",
+     "observed_at":"2025-06-01T12:00:00Z","observed_at_basis":"hammer_time","department_code":"PIC-PRT","department_name":"Prints & Multiples","result":"sold","price_basis":"hammer",
+     "hammer_price":2000,"currency":"GBP","lines":["After Marc Chagall","(1887-1985) by Charles Sorlier (1921-1990)","L'Oiseau bleu (The Blue Bird)"]},
+    {"identity_key":"bonhams:8000002","asset_type":"artwork","title":"Andy Warhol (American, 1928-1987) Flowers","source_identifier":"8000002",
+     "observed_at":"2025-06-01T12:05:00Z","observed_at_basis":"hammer_time","department_code":"PIC-PRT","department_name":"Prints & Multiples","result":"sold","price_basis":"hammer",
+     "hammer_price":9000,"currency":"GBP","lines":["Andy Warhol","(American, 1928-1987)","Flowers"]},
+    {"identity_key":"bonhams:8000003","asset_type":"artwork","title":"Andy Warhol (American, 1928-1987) Mao","source_identifier":"8000003",
+     "observed_at":"2025-07-01T12:05:00Z","observed_at_basis":"hammer_time","department_code":"PIC-PRT","department_name":"Prints & Multiples","result":"sold","price_basis":"hammer",
+     "hammer_price":11000,"currency":"USD","lines":["Andy Warhol","(American, 1928-1987)","Mao"]},
+    {"identity_key":"bonhams:8000004","asset_type":"artwork","title":"A framed map","source_identifier":"8000004",
+     "observed_at":"2025-07-01T12:06:00Z","observed_at_basis":"hammer_time","department_code":"PIC-GEN","department_name":"Fine Art","result":"not_sold","lines":["A framed map"]}
+  ]$j$::jsonb);
+  r := public.fold_asset_creation_claims('bonhams', 100);
+  IF (r->>'lots_read')::int <> 5 OR (r->>'claims_new')::int <> 4 OR (r->>'skipped_no_party_line')::int <> 1 OR (r->>'parties_new')::int <> 3 THEN
+    RAISE EXCEPTION 'fold receipt wrong (5 artwork lots: Fontana, Chagall/Sorlier, Warhol x2, a map): %', r; END IF;
+  r := public.fold_asset_creation_claims('bonhams', 100);
+  IF (r->>'lots_read')::int <> 1 OR (r->>'claims_new')::int <> 0 THEN RAISE EXCEPTION 'fold must be idempotent (only the map is re-read): %', r; END IF;
+  SELECT * INTO e FROM public.external_identities WHERE platform = 'art_catalogue' AND handle = 'andy warhol|1928-1987';
+  IF e.id IS NULL OR e.display_name <> 'Andy Warhol' THEN RAISE EXCEPTION 'party row missing'; END IF;
+  IF (SELECT count(*) FROM public.asset_observations WHERE kind = 'creation_claim' AND (structured_data->>'party_identity_id')::uuid = e.id) <> 2 THEN
+    RAISE EXCEPTION 'two Warhol lots must point at one party'; END IF;
+  SELECT * INTO a FROM public.asset_creators('bonhams', 10) WHERE name_as_printed = 'Andy Warhol';
+  IF a.lots_direct <> 2 OR a.priced_lots <> 2 OR (a.by_currency->'GBP'->>'n')::int <> 1 OR (a.by_currency->'USD'->>'median')::numeric <> 11000 OR a.first_sale_year <> 2025 THEN
+    RAISE EXCEPTION 'creators reader wrong for Warhol: %', a; END IF;
+  SELECT * INTO a FROM public.asset_creators('bonhams', 10) WHERE name_as_printed = 'Marc Chagall';
+  IF a.lots_direct <> 0 OR a.lots_after <> 1 THEN RAISE EXCEPTION 'After Chagall must count as after, not direct: %', a; END IF;
+  IF (SELECT (x->'executor'->>'name_as_printed') FROM public.asset_creation_read((SELECT id FROM public.assets WHERE attributes->>'identity_key' = 'bonhams:8000001')) x) <> 'Charles Sorlier' THEN
+    RAISE EXCEPTION 'the executor must be read from "by <name>"'; END IF;
+  IF (SELECT handle FROM public.external_identities WHERE display_name = 'Charles Sorlier') <> 'charles sorlier|1921-1990' THEN RAISE EXCEPTION 'executor key wrong'; END IF;
+  PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+  IF (SELECT count(*) FROM public.asset_creators('bonhams', 10)) < 3 THEN RAISE EXCEPTION 'anon may read creators'; END IF;
+  BEGIN
+    PERFORM public.fold_asset_creation_claims('bonhams', 1);
+    RAISE EXCEPTION 'anon fold must fail';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 
 -- 7. The type list admits the three new types and still refuses an unknown one.
