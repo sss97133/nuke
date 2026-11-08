@@ -768,5 +768,41 @@ SELECT fixture_assert(NOT (:'gz_a'::jsonb->(gz(4))::text->'s3'->'scene_context'-
 SELECT fixture_assert(NOT (:'gz_a'::jsonb->(gz(5))::text->'s3'->'scene_context'->>'attribution_withheld_by_scene')::boolean
   AND :'gz_a'::jsonb->(gz(5))::text->'s3'->>'pattern'='shop_shoot','a scene below confidence 0.6 is ignored');
 
+-- (b) pre-auction inventory: dealer_lot / showroom scene at a dealer organization, no own long-term pattern, below listing / statement
+SELECT gz_burst(10, 6, now() - interval '5 months', 36.40000, -115.40000);   -- dealer_lot scene, session_key = first photo
+SELECT gz_burst(11, 6, now() - interval '5 months', 36.40000, -115.40000);   -- showroom scene, image_ids
+SELECT gz_burst(12, 6, now() - interval '5 months', 36.40000, -115.40000);   -- same, but 3.5 months of own photos elsewhere
+SELECT gz_burst(12, 1, now() - interval '9 months', 36.50000, -115.50000);
+SELECT gz_burst(12, 1, now() - interval '6 months', 36.50000, -115.50000);
+SELECT gz_burst(13, 6, now() - interval '5 months', 36.40000, -115.40000);   -- scene confidence 0.5
+SELECT gz_burst(14, 6, now() - interval '5 months', 36.40000, -115.40000);   -- shop_interior scene at the dealer
+SELECT gz_burst(15, 6, now() - interval '5 months', 36.30000, -115.30000);   -- dealer_lot scene at the restoration shop
+SELECT gz_burst(16, 6, now() - interval '5 months', 36.40000, -115.40000);   -- dealer_lot scene + first-person owner statement
+SELECT gz_burst(17, 6, now() - interval '5 months', 36.40000, -115.40000);   -- dealer_lot scene + a BaT listing by the dealer
+SELECT gz_burst(18, 6, now() - interval '5 months', 36.40000, -115.40000);   -- dealer_lot scene + 10 days of photos elsewhere
+SELECT gz_burst(18, 1, now() - interval '5 months' - interval '10 days', 36.50000, -115.50000);
+INSERT INTO vehicle_observations(vehicle_id,submitted_by_user_id,content_text,structured_data)
+ VALUES (gz(16),'00000000-0000-4000-8000-000000000001','I own it',
+  jsonb_build_object('claim_contract','garage_owner_correction_v1','correction',jsonb_build_object('relationship',fixture_claim('{owner_current}'))));
+INSERT INTO bat_listings(vehicle_id,organization_id,seller_username,bat_listing_url) VALUES (gz(17),:'gz_dealer','gzdealer','https://bringatrailer.com/listing/gz17/');
+\set gz_b_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), gz(10), (SELECT id::text FROM vehicle_images WHERE vehicle_id=gz(10) ORDER BY taken_at, id LIMIT 1), ARRAY[]::uuid[], 'dealer_lot', 'm', 0.9::numeric, 'cars in rows' UNION ALL SELECT gen_random_uuid(), gz(11), 'k11', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(11)), 'showroom', 'm', 0.8::numeric, 'polished floor' UNION ALL SELECT gen_random_uuid(), gz(12), 'k12', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(12) AND latitude=36.4), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows' UNION ALL SELECT gen_random_uuid(), gz(13), 'k13', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(13)), 'dealer_lot', 'm', 0.5::numeric, 'unsure' UNION ALL SELECT gen_random_uuid(), gz(14), 'k14', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(14)), 'shop_interior', 'm', 0.9::numeric, 'lift' UNION ALL SELECT gen_random_uuid(), gz(15), 'k15', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(15)), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows' UNION ALL SELECT gen_random_uuid(), gz(16), 'k16', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(16)), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows' UNION ALL SELECT gen_random_uuid(), gz(17), 'k17', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(17)), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows' UNION ALL SELECT gen_random_uuid(), gz(18), 'k18', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(18) AND latitude=36.4), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows'/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('role', d.derived_role, 'conf', d.confidence, 'ev', d.evidence, 'reason', d.reason))
+          FROM (:gz_b_sql) d WHERE d.vehicle_id BETWEEN gz(10) AND gz(18)) AS gz_b \gset
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(10))::text->>'role'='business_handling' AND (:'gz_b'::jsonb->(gz(10))::text->>'conf')::numeric=0.6
+  AND :'gz_b'::jsonb->(gz(10))::text->'ev'->>'sub_reason'='pre_auction_inventory',
+  'dealer_lot scene (session_key = first photo) at a dealer: business_handling 0.6, sub-reason pre_auction_inventory');
+SELECT fixture_assert((SELECT c->'evidence'->'pre_auction' FROM jsonb_array_elements(:'gz_b'::jsonb->(gz(10))::text->'ev'->'chain') c WHERE (c->>'step')::int=3)->'scenes'->0->>'scene_label'='dealer_lot'
+  AND (SELECT c->'evidence'->'pre_auction' FROM jsonb_array_elements(:'gz_b'::jsonb->(gz(10))::text->'ev'->'chain') c WHERE (c->>'step')::int=3)->'scenes'->0->>'organization_id'=:'gz_dealer'
+  AND (SELECT c->'evidence'->'pre_auction' FROM jsonb_array_elements(:'gz_b'::jsonb->(gz(10))::text->'ev'->'chain') c WHERE (c->>'step')::int=3)->>'decides'='true','the scene row and the organization are cited');
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(11))::text->>'role'='business_handling' AND :'gz_b'::jsonb->(gz(11))::text->'ev'->>'sub_reason'='pre_auction_inventory','showroom scene (image_ids) also qualifies');
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(12))::text->>'role'<>'business_handling' AND :'gz_b'::jsonb->(gz(12))::text->'ev'->>'sub_reason' IS NULL,'own photos elsewhere spanning more than the shop-shoot window: an own pattern, not pre-auction');
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(13))::text->'ev'->>'sub_reason' IS NULL,'a scene below confidence 0.6 does not qualify');
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(14))::text->'ev'->>'sub_reason' IS NULL,'a shop scene does not qualify');
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(15))::text->'ev'->>'sub_reason' IS NULL,'a dealer scene at a restoration shop does not qualify');
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(16))::text->>'role'='owner_reported' AND :'gz_b'::jsonb->(gz(16))::text->'ev'->>'sub_reason' IS NULL,'a first-person owner statement outranks pre-auction');
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(17))::text->>'role'='business_handling' AND (:'gz_b'::jsonb->(gz(17))::text->>'conf')::numeric=0.7
+  AND :'gz_b'::jsonb->(gz(17))::text->'ev'->>'sub_reason' IS NULL,'a listing by the organization outranks pre-auction (0.7 inventory shoot, no sub-reason)');
+SELECT fixture_assert(:'gz_b'::jsonb->(gz(18))::text->>'role'='business_handling' AND :'gz_b'::jsonb->(gz(18))::text->'ev'->>'sub_reason'='pre_auction_inventory','ten days of photos elsewhere are inside the window');
+
 SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 

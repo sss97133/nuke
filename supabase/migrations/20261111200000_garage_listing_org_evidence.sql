@@ -1049,6 +1049,33 @@ orgt AS MATERIALIZED (
                   WHERE ov.vehicle_id = poc.vid AND coalesce(om.canon, ov.organization_id) = poc.canon) AS ov_rel
     FROM poc GROUP BY poc.vid, poc.canon
 ),
+-- Pre-auction inventory: dealer_lot / showroom scenes (confidence >= 0.6) whose session photos (scene image_ids, or the session_key
+-- photo) were taken, on an own device, at a dealer / auction / consignor organization (orgn.okind = 'dealer').
+pa_rows AS MATERIALIZED (
+  SELECT sl.vehicle_id AS vid, sl.run_id, sl.session_key, sl.scene_label, sl.model, sl.confidence, sl.rationale, poc.canon AS org
+    FROM scene_labels sl
+    JOIN ps2 p ON p.vid = sl.vehicle_id AND (p.id = ANY (coalesce(sl.image_ids, '{}'::uuid[])) OR p.id::text = sl.session_key)
+    JOIN poc ON poc.photo_id = p.id
+    JOIN orgn o ON o.id = poc.canon AND o.okind = 'dealer'
+   WHERE sl.scene_label IN ('dealer_lot', 'showroom') AND coalesce(sl.confidence, 0) >= 0.6
+     AND sl.vehicle_id IN (SELECT cand.vid FROM cand)
+   GROUP BY sl.vehicle_id, sl.run_id, sl.session_key, sl.scene_label, sl.model, sl.confidence, sl.rationale, poc.canon
+),
+pa AS MATERIALIZED (
+  SELECT r.vid, array_agg(DISTINCT r.org) AS orgs,
+         jsonb_agg(jsonb_build_object('run_id', r.run_id, 'session_key', r.session_key, 'scene_label', r.scene_label, 'model', r.model,
+                     'confidence', r.confidence, 'rationale', r.rationale, 'organization_id', r.org)
+                   ORDER BY r.confidence DESC, r.session_key, r.org::text) AS cites
+    FROM pa_rows r GROUP BY r.vid
+),
+-- Span (days) of the vehicle's own-device photos taken anywhere but at those organizations: an own long-term pattern if it exceeds
+-- the shop-shoot window (max_span_days).
+away AS MATERIALIZED (
+  SELECT p.vid, extract(epoch FROM max(p.t) - min(p.t)) / 86400.0 AS span
+    FROM ps2 p JOIN pa ON pa.vid = p.vid
+   WHERE NOT EXISTS (SELECT 1 FROM poc WHERE poc.photo_id = p.id AND poc.canon = ANY (pa.orgs))
+   GROUP BY p.vid
+),
 -- Session co-occurrence: other vehicles of the account photographed (own device) within the sessions of this vehicle
 -- (its first to last capture, widened by the session gap), and the organizations those vehicles are linked / listed at.
 cooc AS MATERIALIZED (
@@ -1255,14 +1282,18 @@ g5 AS (
 -- lot at a shop-only organization) withholds the GPS attribution to it (cited as attribution_withheld_by_scene); an organization
 -- that lists or is linked to the vehicle keeps its attribution (a listing outranks a model label); a matching scene supports it.
 g5w AS (
-  SELECT g5.*, g5.s_org IS NOT NULL AND coalesce(g5.s_sx, false) AND NOT (coalesce(g5.s_listed, false) OR coalesce(g5.s_rel, false)) AS scene_w
-  FROM g5
+  SELECT g5.*, g5.s_org IS NOT NULL AND coalesce(g5.s_sx, false) AND NOT (coalesce(g5.s_listed, false) OR coalesce(g5.s_rel, false)) AS scene_w,
+         pa.cites AS pa_cites, pa.orgs AS pa_orgs, aw.span AS away_span
+  FROM g5 LEFT JOIN pa ON pa.vid = g5.vid LEFT JOIN away aw ON aw.vid = g5.vid
 ),
 g6 AS (
   SELECT g5w.*,
          g5w.s_org IS NOT NULL AND NOT g5w.scene_w AND g5w.n_sess <= g5w.r_max_s AND g5w.span_days <= g5w.r_max_span
            AND g5w.own_n >= g5w.r_min_ph AND g5w.geo_n >= g5w.r_min_geo * g5w.own_n AND g5w.s_n_at = g5w.geo_n AS shoot,
          g5w.span_days >= g5w.r_pers_span AND g5w.geo_n - g5w.at_any_org > 0 AS personal,
+         -- pre-auction inventory: a dealer scene at a dealer / consignor organization and no own long-term pattern of the account
+         g5w.pa_cites IS NOT NULL AND NOT (g5w.span_days >= g5w.r_pers_span AND g5w.geo_n - g5w.at_any_org > 0)
+           AND coalesce(g5w.away_span, 0) <= g5w.r_max_span AS pre_auc,
          g5w.s_org IS NOT NULL AND g5w.s_other > 0 AND NOT (g5w.s_listed OR g5w.s_rel) AND NOT coalesce(g5w.tb_decided, false) AS amb
   FROM g5w
 ),
@@ -1306,6 +1337,9 @@ h AS (
           || ' carry a download, screenshot, web-export or listing-scrape signal); not ownership')
       WHEN g6.org_id IS NOT NULL AND g6.n_photos > 0
         THEN jsonb_build_array('contributor', CASE WHEN g6.amb THEN 0.2 ELSE 0.45 END, 'own photos of an organization-listed vehicle; not ownership')
+      -- below listing, title and statement evidence (all above): inventory photographed on a dealer lot / showroom before its listing
+      WHEN g6.pre_auc
+        THEN jsonb_build_array('business_handling', 0.6, 'pre-auction inventory: own-device photos on a dealer lot / showroom at a dealer or consignor organization; no listing, title or statement; no long-term pattern', 'pre_auction_inventory')
       WHEN g6.shoot
         THEN jsonb_build_array('contributor', CASE WHEN g6.amb THEN 0.2 ELSE 0.5 END,
           CASE WHEN g6.amb THEN 'contributor: org_ambiguous, two organizations in range and nothing breaks the tie; not ownership'
@@ -1332,6 +1366,7 @@ SELECT h.vid AS vehicle_id,
          'co_owner_grant_by_other', h.co_by_other, 'long_tenure', h.tenure,
          'documented_from', h.first_t, 'documented_to', h.last_t,
          'organization_inventory', h.org_id,
+         'sub_reason', h.d->>3,
          'flags', CASE WHEN h.amb THEN '["org_ambiguous"]'::jsonb ELSE '[]'::jsonb END,
          'title_denied', h.title_denied,
          'chain', jsonb_build_array(
@@ -1370,6 +1405,9 @@ SELECT h.vid AS vehicle_id,
                  'scene_matches_organization', h.s_sm = 1, 'scene_supports_organization', coalesce(h.s_sm = 1, false),
                  'scene_contradicts_organization', coalesce(h.s_sx, false), 'attribution_withheld_by_scene', coalesce(h.scene_w, false),
                  'sessions', coalesce(h.s_scites, '[]'::jsonb)), 'organizations', to_jsonb(h.s_orgs),
+               'pre_auction', jsonb_build_object('conditions_met', coalesce(h.pre_auc, false), 'decides', coalesce(h.d->>3 = 'pre_auction_inventory', false),
+                 'organizations', to_jsonb(h.pa_orgs), 'scenes', coalesce(h.pa_cites, '[]'::jsonb),
+                 'own_pattern_outside_organization_days', round(h.away_span::numeric, 1), 'long_term_personal', coalesce(h.personal, false)),
                'recent_photos', coalesce(h.recent_gps_n, 0) > 0,
                'hypothesis', CASE WHEN h.shoot THEN 'shop shoot at organization'
                                   WHEN h.s_org IS NOT NULL AND NOT h.scene_w THEN 'photographed at organization' END,
