@@ -3,6 +3,7 @@
 // image ids and up to four sample image URLs, so a vision model (or a person) can label the session's scene (dealer_lot,
 // showroom, shop_interior, upholstery_work, paint_body, outdoor_street, other) and the label can be stored in
 // vehicle_photo_session_scenes (scripts/garage/label-scenes.mjs reads this script's --out file as its --sessions-json).
+// Which of these sessions to label (cap per vehicle, all sessions for vehicles whose vote is low-information): scripts/garage/select-sessions.mjs.
 // Read-only: one SELECT. Nothing is written to a database; --dry-run is the only mode.
 //
 //   node scripts/garage/scene-sessions.mjs --dry-run --user <uuid> [--out /workspace/scene_sessions.json]

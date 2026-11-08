@@ -5,6 +5,7 @@ import { parseCards, parseMemberHtml, parseAjax, parseDetail, parseResultText, b
 import { buildSql, publicUrl, shapeSessions } from './scene-sessions.mjs';
 import { orgKind, normName, distinctOrgs, representatives, parseGallery, pickWide, sceneExemplars, mergeExemplars, buildExemplarRows } from './build-place-exemplars.mjs';
 import { shuffle, candidatesFor, buildPrompt as placePrompt, parseMatch, toRow as placeRow, needsSecondViewer, valuesCte as placeCte, matchSession } from './match-places.mjs';
+import { sessionVerdicts, classifyVehicle, selectSessions } from './select-sessions.mjs';
 import { buildPromptV2, shuffle as sceneShuffle } from './label-scenes.mjs';
 import { normalizeSession, buildPrompt, parseLabel, toInference, valuesCte as sceneCte, applyBody, isHeic, labelSession, SCENE_LABELS } from './label-scenes.mjs';
 
@@ -391,4 +392,33 @@ test('second viewer (label-scenes): fresh prompt with shuffled labels, alternati
   const { readFileSync } = await import('node:fs');
   const pre = readFileSync(new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url), 'utf8');
   assert.ok(pre.includes(sceneCte([], 'scene_labels_v2')));
+});
+
+test('select-sessions: low-information vehicles (no informative label, < 50% informative photos, one labelled session) get all sessions; others the cap', () => {
+  const V = (n) => `00000000-0000-4000-8000-0000000000${n}`;
+  const S = (v, k, photos) => ({ vehicle_id: V(v), session_key: k, photos });
+  const L = (v, k, label, confidence, viewer) => ({ vehicle_id: V(v), session_key: k, scene_label: label, confidence, ...(viewer ? { viewer } : {}) });
+  const sessions = [
+    ...['a', 'b', 'c', 'd'].map((k) => S(11, k, 10)),             // 11: informative everywhere -> cap
+    ...['a', 'b', 'c', 'd'].map((k) => S(12, k, 10)),             // 12: only street labels -> low information
+    S(13, 'a', 10), S(13, 'b', 40),                               // 13: informative 10 of 50 photos -> low information
+    S(14, 'a', 10), S(14, 'b', 10),                               // 14: one session labelled -> low information
+    ...['a', 'b', 'c'].map((k) => S(15, k, 5)),                   // 15: no labels yet -> first pass, cap
+    S(16, 'a', 10), S(16, 'b', 10)];                              // 16: viewers disagree -> not informative -> low information
+  const labels = [L(11, 'a', 'dealer_lot', 0.9), L(11, 'b', 'showroom', 0.8), L(11, 'c', 'dealer_lot', 0.7),
+    L(12, 'a', 'outdoor_street', 0.9), L(12, 'b', 'other', 0.9), L(13, 'a', 'shop_interior', 0.9), L(13, 'b', 'outdoor_street', 0.9),
+    L(14, 'a', 'dealer_lot', 0.9), L(16, 'a', 'dealer_lot', 0.9), L(16, 'a', 'shop_interior', 0.9, 2), L(16, 'b', 'dealer_lot', 0.5)];
+  const v = sessionVerdicts(labels);
+  assert.equal(v.get(`${V(16)}|a`).informative, false);
+  assert.equal(v.get(`${V(11)}|c`).informative, true);
+  const { toLabel, report } = selectSessions(sessions, labels, { cap: 2, allForLowInfo: true });
+  const r = (n) => report.find((x) => x.vehicle_id === V(n));
+  assert.deepEqual(r(11).reasons, []); assert.equal(r(11).rule, 'cap_2'); assert.equal(r(11).to_label, 0); // a, b chosen and both labelled
+  assert.deepEqual(r(12).reasons, ['no_informative_label']); assert.equal(r(12).rule, 'all_sessions'); assert.equal(r(12).to_label, 2); // c, d still to label
+  assert.deepEqual(r(13).reasons, ['informative_weight_below_half']); assert.equal(r(14).reasons.join(), 'only_one_session_labelled');
+  assert.equal(r(15).judged, false); assert.equal(r(15).rule, 'cap_2'); assert.equal(r(15).to_label, 2);
+  assert.ok(r(16).low_information);
+  assert.equal(toLabel.filter((s) => s.vehicle_id === V(14)).length, 1); // only b
+  assert.equal(selectSessions(sessions, labels, { cap: 2 }).report.find((x) => x.vehicle_id === V(12)).rule, 'cap_2'); // without --all-for-low-info the cap holds
+  assert.equal(classifyVehicle([S(20, 'a', 3), S(20, 'b', 3)], new Map(), { forced: true }).low_information, true); // --low-info-json
 });
