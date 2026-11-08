@@ -4,7 +4,16 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ share: { data: undefined as any, isError: false }, pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any>, track: undefined as any }));
+const fixture = vi.hoisted(() => ({ share: { data: undefined as any, isError: false }, pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any>, track: undefined as any, calendar: { data: undefined } as any, rosterFor: vi.fn() }));
+vi.mock('./useAuctionCalendar', async importOriginal => ({
+  ...await importOriginal<typeof import('./useAuctionCalendar')>(),
+  useAuctionCalendar: () => fixture.calendar,
+  useSaleRoster: (sale: any) => { fixture.rosterFor(sale); return { isPending: false, isError: false, hasNextPage: false, isFetchingNextPage: false,
+    data: { pages: [{ roster: { lots: 2, rows: [
+      { event_id: 'r1', vehicle_id: 'rv1', run_on: '2026-10-08', year: 1967, make: 'Porsche', model: '911', prior: [], vin_present: true },
+      { event_id: 'r2', vehicle_id: 'rv2', run_on: '2026-10-08', year: 1970, make: 'Ford', model: 'Mustang', prior: [], vin_present: true },
+    ] } }] } }; },
+}));
 vi.mock('./HouseShare', async importOriginal => ({
   ...await importOriginal<typeof import('./HouseShare')>(),
   useHouseShare: () => fixture.share,
@@ -77,6 +86,7 @@ beforeEach(() => {
     observe() { this.callback([{ contentRect: { width: window.innerWidth } }]); }
     disconnect() {}
   });
+  fixture.calendar = { data: undefined }; fixture.rosterFor.mockReset();
   fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = []; fixture.finish = new Map(); fixture.track = undefined;
   fixture.taxonomy = { data: [], isLoading: false, isError: false, isSuccess: true, refetch: fixture.retry };
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { fn(); return 0; });
@@ -483,6 +493,53 @@ describe('the board in time sections', () => {
     const select = container.querySelector<HTMLSelectElement>('[aria-label="Sort lots"]')!;
     await act(async () => { select.value = 'bid'; select.dispatchEvent(new Event('change', { bubbles: true })); });
     expect(container.querySelector('.market-board-group')).toBeNull();
+  });
+});
+
+describe('the scheduled sales at the end of the board', () => {
+  // System time is 2026-10-03 12:00Z: an ended sale, a sale running today, two ahead (given out of order) and an empty one.
+  const sale = (sale_key: string, starts_on: string, ends_on: string, lots: number, lots_listed: number | null = null) => ({
+    house: 'mecum', sale_key, sale_name: `Fixture ${sale_key}`, location: null, starts_on, ends_on, lots, lots_listed, listed_at: null,
+    seen_before: 1, no_reserve: 2, first_seen_at: null, first_seen_7d: 3, updated_at: null, run_days: [{ day: starts_on, lots }] });
+  beforeEach(() => {
+    fixture.calendar = { data: { as_of: '2026-10-03T12:00:00Z', horizon_days: 200, population: {}, roster: null, sales: [
+      sale('ended', '2026-09-20', '2026-09-22', 40),
+      { ...sale('later', '2026-11-12', '2026-11-14', 165, 169), listed_at: '2026-10-03T10:00:00Z', updated_at: '2026-10-03T11:48:00Z' },
+      sale('soon', '2026-10-08', '2026-10-08', 25), sale('today', '2026-10-02', '2026-10-04', 12), sale('empty', '2026-10-20', '2026-10-21', 0, 0)] } };
+  });
+  it('lists the sales still to run in date order after the last time section, each datum once, and opens a roster in place', async () => {
+    await render('make=PORSCHE');
+    const heads = [...container.querySelectorAll('.market-board-group')].map(h => h.textContent);
+    expect(heads[heads.length - 1]).toBe('Scheduled sales 3 sales');
+    const rows = [...container.querySelectorAll('.market-board-scheduled tr.auction-sale')];
+    expect(rows.map(r => r.querySelector('.k-entity')?.textContent)).toEqual(['Fixture today', 'Fixture soon', 'Fixture later']);
+    expect(rows[0].textContent).toContain('running · day 2 of 3');
+    expect(rows[1].textContent).toContain('in 5 days');
+    expect(rows[2].textContent).toContain('165 of 169 lots');
+    // The census and landing clocks stay one hover away.
+    expect(rows[2].querySelector('.k-measure[title]')?.getAttribute('title')).toBe('Mecum lists 169, read 2 h ago · lots updated 12 min ago');
+    // Compact: the calendar's census and history lines stay on the calendar.
+    expect(rows[2].textContent).not.toMatch(/lists 169|first seen|no reserve/);
+    expect(container.querySelector('.market-board-scheduled .auction-track')).toBeNull();
+    expect(fixture.rosterFor).not.toHaveBeenCalled();
+    await act(async () => rows[1].querySelector<HTMLButtonElement>('button.auction-sale__open')!.click());
+    expect(new URLSearchParams(window.location.search).get('sale')).toBe('mecum:soon');
+    expect(fixture.rosterFor).toHaveBeenLastCalledWith({ house: 'mecum', key: 'soon' });
+    // The board's make scope narrows the opened roster.
+    const roster = container.querySelector('.market-board-scheduled .auction-roster')!;
+    expect(roster.querySelector('a[href="/vehicle/rv1"]')).not.toBeNull();
+    expect(roster.querySelector('a[href="/vehicle/rv2"]')).toBeNull();
+  });
+  it('shows only in close order, outside a house, window or bid-range filter, and not at all without sales', async () => {
+    await render('sort=bid');
+    expect(container.querySelector('.market-board-scheduled')).toBeNull();
+    await render('live=nr');
+    expect(container.querySelector('.market-board-scheduled')).toBeNull();
+    await render('');
+    expect(container.querySelector('.market-board-scheduled')).not.toBeNull();
+    fixture.calendar = { data: { ...fixture.calendar.data, sales: [sale('ended', '2026-09-20', '2026-09-22', 40)] } };
+    await render('');
+    expect(container.querySelector('.market-board-scheduled')).toBeNull();
   });
 });
 

@@ -212,6 +212,9 @@
 .market-board-group .k-label { font-size: 13px; letter-spacing: .02em; text-transform: uppercase; color: var(--text); }
 .market-board-group .k-measure { color: var(--text-secondary); font-size: 12px; }
 .market-board-group--hour .k-label { color: var(--danger, #d7263d); }
+/* The scheduled sales close the board in the calendar's own table, inset like the lot rows. */
+.market-board-scheduled .market-listings__scroll { padding: 0 16px; }
+@media (max-width: 760px) { .market-board-scheduled .market-listings__scroll { padding: 0 8px; } }
 /* The answer is the bid: the row's largest number. */
 .market-lot-row .market-lot-metrics .market-bid { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .market-board__empty { padding: 12px; }

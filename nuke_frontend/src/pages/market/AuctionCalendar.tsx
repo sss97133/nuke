@@ -184,13 +184,74 @@ function Roster({ sale, now, scopeMake, scopeFamilyName, scopeModel, scopeYear, 
   </div>;
 }
 
+/** The open sale, named in the URL (sale=house:key) so a link reopens its roster; choosing it again closes it. */
+export function useOpenSale(): [string | null, (key: string | null) => void] {
+  const [params, setParams] = useSearchParams();
+  return [params.get('sale'), (key: string | null) => {
+    const next = new URLSearchParams(params);
+    if (key) next.set('sale', key); else next.delete('sale');
+    setParams(next, { replace: true, preventScrollReset: true });
+  }];
+}
+
+export type SaleScope = { make?: string | null; familyName?: string | null; model?: string | null; year?: number | null; era?: string | null };
+
+/** The scheduled sales, one row each: the timer and days, the house and sale, its lots. Given a horizon, the run days
+ *  are drawn on the calendar's axis; compact (the live board's last section) leaves the house's census and the
+ *  series' history to the calendar. A sale opens its roster in place, narrowed to the scope. */
+export function SaleTable({ sales, now, selected, onChoose, scope = {}, horizon, compact = false }: {
+  sales: CalendarSale[]; now: number; selected: string | null; onChoose: (key: string | null) => void;
+  scope?: SaleScope; horizon?: number; compact?: boolean;
+}) {
+  const columns = horizon != null ? 4 : 3;
+  return <div className="market-listings__scroll"><table className={`market-listings auction-calendar${horizon == null ? ' auction-calendar--bare' : ''}`}>
+    <thead><tr>
+      <th scope="col"><Text role="label">Gavel</Text></th>
+      <th scope="col"><Text role="label">Sale</Text></th>
+      <th scope="col"><Text role="label">Roster</Text></th>
+      {horizon != null && <th scope="col" className="auction-calendar__axis"><Axis now={now} horizon={horizon} /></th>}
+    </tr></thead>
+    <tbody>{sales.map(sale => {
+      const key = `${sale.house}:${sale.sale_key}`;
+      const open = selected === key;
+      return <Fragment key={key}>
+        <tr className="auction-sale">
+          <td><button type="button" className="auction-sale__open" aria-expanded={open} onClick={() => onChoose(open ? null : key)}
+            aria-label={`${open ? 'Close' : 'Open'} the roster of ${houseName(sale.house)} ${sale.sale_name}`}>
+            <Text role="measure" dense as="div">{saleTimer(sale.starts_on, sale.ends_on, now)}</Text>
+            <Text role="caption" as="div">{span(sale)}</Text>
+          </button></td>
+          <td><button type="button" className="auction-sale__open" aria-expanded={open} onClick={() => onChoose(open ? null : key)}>
+            <Text role="label" as="div">{houseName(sale.house)}</Text>
+            <Text role="entity" dense as="div">{sale.sale_name}</Text>
+            {sale.location && <Text role="caption" as="div">{sale.location}</Text>}</button></td>
+          <td><Text role="measure" dense as="div" title={compact ? [sale.lots_listed != null
+              ? `${houseName(sale.house)} lists ${count(sale.lots_listed)}, ${updatedAgo(sale.listed_at, now).replace('updated', 'read')}` : null,
+              sale.lots > 0 ? `lots ${updatedAgo(sale.updated_at, now)}` : null].filter(Boolean).join(' · ') || undefined : undefined}>{sale.lots_listed != null && sale.lots_listed !== sale.lots
+              ? `${count(sale.lots)} of ${count(sale.lots_listed)} lots` : `${count(sale.lots)} ${sale.lots === 1 ? 'lot' : 'lots'}`}</Text>
+            {!compact && <>
+            {sale.lots_listed != null && <Text role="caption" as="div">{houseName(sale.house)} lists {count(sale.lots_listed)}, {updatedAgo(sale.listed_at, now).replace('updated', 'read')}</Text>}
+            {priorSaleLine(sale.house, sale.prior_sale) && <Text role="caption" as="div">{priorSaleLine(sale.house, sale.prior_sale)}</Text>}
+            {/* A sale with no lot landed has nothing to count beyond what the house lists. */}
+            {sale.lots > 0 && <Text role="caption" as="div">{count(sale.first_seen_7d)} first seen in the last 7 days · {updatedAgo(sale.updated_at, now)}</Text>}
+            {sale.lots > 0 && <Text role="caption" as="div">{count(sale.seen_before)} with an earlier record · {count(sale.no_reserve)} no reserve</Text>}
+            </>}</td>
+          {horizon != null && <td className="auction-calendar__axis"><SaleTrack sale={sale} now={now} horizon={horizon} /></td>}
+        </tr>
+        {open && <tr className="auction-sale__roster"><td colSpan={columns}><Roster sale={sale} now={now} scopeMake={scope.make} scopeFamilyName={scope.familyName}
+          scopeModel={scope.model} scopeYear={scope.year} scopeEra={scope.era} /></td></tr>}
+      </Fragment>;
+    })}</tbody>
+  </table></div>;
+}
+
 export default function AuctionCalendar({ collection }: { collection?: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const now = useMinute();
   const query = useAuctionCalendar();
   const data = query.data;
   const population = data?.population;
-  const selected = params.get('sale');
+  const [selected, choose] = useOpenSale();
   const scopeMake = params.get('make')?.trim() || null;
   const scopeFamilyName = params.get('family_name')?.trim() || null;
   const scopeModel = params.get('model')?.trim() || null;
@@ -203,11 +264,6 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
   const clearMarketScope = () => {
     const next = new URLSearchParams(params);
     ['make', 'family', 'family_name', 'model', 'year', 'era'].forEach((k) => next.delete(k));
-    setParams(next, { replace: true });
-  };
-  const choose = (key: string | null) => {
-    const next = new URLSearchParams(params);
-    if (key) next.set('sale', key); else next.delete('sale');
     setParams(next, { replace: true });
   };
   // Draw to the last sale landed (plus a week), never past the reader's horizon.
@@ -248,40 +304,8 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
     {query.isError && <p role="status" className="k-body">The calendar could not be read. <button type="button" className="market-control"
       onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>}
     {data && data.sales.length === 0 && <p role="status" className="k-body">No scheduled sale has a lot landed for the next {data.horizon_days} days.</p>}
-    {data && data.sales.length > 0 && <div className="market-listings__scroll"><table className="market-listings auction-calendar">
-      <thead><tr>
-        <th scope="col"><Text role="label">Gavel</Text></th>
-        <th scope="col"><Text role="label">Sale</Text></th>
-        <th scope="col"><Text role="label">Roster</Text></th>
-        <th scope="col" className="auction-calendar__axis"><Axis now={now} horizon={horizon} /></th>
-      </tr></thead>
-      <tbody>{data.sales.map(sale => {
-        const key = `${sale.house}:${sale.sale_key}`;
-        const open = selected === key;
-        return <Fragment key={key}>
-          <tr className="auction-sale">
-            <td><button type="button" className="auction-sale__open" aria-expanded={open} onClick={() => choose(open ? null : key)}
-              aria-label={`${open ? 'Close' : 'Open'} the roster of ${houseName(sale.house)} ${sale.sale_name}`}>
-              <Text role="measure" dense as="div">{saleTimer(sale.starts_on, sale.ends_on, now)}</Text>
-              <Text role="caption" as="div">{span(sale)}</Text>
-            </button></td>
-            <td><button type="button" className="auction-sale__open" aria-expanded={open} onClick={() => choose(open ? null : key)}>
-              <Text role="label" as="div">{houseName(sale.house)}</Text>
-              <Text role="entity" dense as="div">{sale.sale_name}</Text>
-              {sale.location && <Text role="caption" as="div">{sale.location}</Text>}</button></td>
-            <td><Text role="measure" dense as="div">{sale.lots_listed != null && sale.lots_listed !== sale.lots
-                ? `${count(sale.lots)} of ${count(sale.lots_listed)} lots` : `${count(sale.lots)} ${sale.lots === 1 ? 'lot' : 'lots'}`}</Text>
-              {sale.lots_listed != null && <Text role="caption" as="div">{houseName(sale.house)} lists {count(sale.lots_listed)}, {updatedAgo(sale.listed_at, now).replace('updated', 'read')}</Text>}
-              {priorSaleLine(sale.house, sale.prior_sale) && <Text role="caption" as="div">{priorSaleLine(sale.house, sale.prior_sale)}</Text>}
-              {/* A sale with no lot landed has nothing to count beyond what the house lists. */}
-              {sale.lots > 0 && <Text role="caption" as="div">{count(sale.first_seen_7d)} first seen in the last 7 days · {updatedAgo(sale.updated_at, now)}</Text>}
-              {sale.lots > 0 && <Text role="caption" as="div">{count(sale.seen_before)} with an earlier record · {count(sale.no_reserve)} no reserve</Text>}</td>
-            <td className="auction-calendar__axis"><SaleTrack sale={sale} now={now} horizon={horizon} /></td>
-          </tr>
-          {open && <tr className="auction-sale__roster"><td colSpan={4}><Roster sale={sale} now={now} scopeMake={scopeMake} scopeFamilyName={scopeFamilyName} scopeModel={scopeModel} scopeYear={scopeYear} scopeEra={scopeEra} /></td></tr>}
-        </Fragment>;
-      })}</tbody>
-    </table></div>}
+    {data && data.sales.length > 0 && <SaleTable sales={data.sales} now={now} horizon={horizon} selected={selected} onChoose={choose}
+      scope={{ make: scopeMake, familyName: scopeFamilyName, model: scopeModel, year: scopeYear, era: scopeEra }} />}
     {data?.unplaced && data.unplaced.length > 0 && <Text role="caption" as="p" className="auction-unplaced">
       Also listed, days and lots not landed yet: {data.unplaced.map(u => `${houseName(u.house)} ${u.sale_name}, ${count(u.lots_listed)} lots`).join(' · ')}
     </Text>}
