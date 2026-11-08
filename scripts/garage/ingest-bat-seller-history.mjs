@@ -9,7 +9,7 @@
 //   ... --parse-only <html file>   print what the parser reads from a saved member or listing page
 //
 // Flow per handle: GET /member/<handle>/ ; data-user-id of the "Show more" button ; page 1 listings from that HTML ;
-// POST /wp-admin/admin-ajax.php action=bat_profile_more_items&itemType=listings_past&itemPaged=N&userId=<id> until itemMore is
+// POST /wp-admin/admin-ajax.php action=bat_profile_more_items&itemType=listings_past&itemPaged=N&userID=<id> (case-sensitive; userId is ignored and returns site-wide listings) until itemMore is
 // false ; then every listing URL's detail page (lot, VIN / chassis, seller, title, end date, sale price / status).
 // Polite: one request per second (--delay-ms), retries with back-off, stops on 403 / 429, raw responses cached under
 // --cache-dir (default /workspace/bat-cache) so a rerun does not fetch again. Default mode is a dry run.
@@ -199,7 +199,7 @@ async function main() {
     const cards = new Map(member.cards.map((c) => [c.url, { ...c, page: 1 }]));
     let page = member.nextPage ?? 2;
     for (let guard = 0; guard < 500 && member.nextPage; guard++) {
-      const body = new URLSearchParams({ action: 'bat_profile_more_items', itemType: 'listings_past', itemPaged: String(page), userId: member.userId });
+      const body = new URLSearchParams({ action: 'bat_profile_more_items', itemType: 'listings_past', itemPaged: String(page), userID: member.userId });
       const j = parseAjax(await get(`ajax-${hl}-${page}.json`, () => fetch(`${BASE}/wp-admin/admin-ajax.php`, { method: 'POST', headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body })));
       for (const c of j.cards) if (!cards.has(c.url)) cards.set(c.url, { ...c, page });
       if (!j.more || !j.nextPage || j.nextPage === page) break;
