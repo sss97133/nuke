@@ -2,6 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Deploy skew: a page served by the previous deployment names an entry bundle the new one no longer has, and the
+         SPA fallback answers it with HTML, so the app never mounts (src/main.tsx's chunk reload cannot run). Reload once;
+         the guard stops a loop when the bundle is truly broken. 2026-11-08: 6 of 309 post-deploy live checks. -->
+    <script>
+      window.addEventListener('error', function (e) {
+        var s = e.target;
+        if (!s || s.tagName !== 'SCRIPT' || s.type !== 'module' || (s.src || '').indexOf('/assets/') < 0) return;
+        try {
+          var k = '__nuke_boot_reload__', last = Number(sessionStorage.getItem(k) || 0);
+          if (Date.now() - last < 60000) return;
+          sessionStorage.setItem(k, String(Date.now()));
+        } catch (_) { return; }
+        location.reload();
+      }, true);
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=5" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#000000" />
