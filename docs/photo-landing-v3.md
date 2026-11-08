@@ -54,6 +54,14 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    pattern and alone hold the set as `priors_only` (ledger word: "only the day's pattern pointed to it, nothing in the photo").
    Measured 2026-11-08 over the 103 cleared sets: priors-only winners were wrong on 26 of 49 viewed frames, evidence-backed on
    52 of 217. Contract `test_capture_landing_priors_only.sql`.
+9. **The document route exists** (`supabase/functions/receipt-photo-ocr`): the orchestrator's `receipt_document` route called a
+   function that was never deployed, so every photographed document failed with 404 (owner: 299 frames, 2026-11-03 onward) and
+   the classifier's fields went nowhere. The function reads the page with `document-ocr-worker` (classify, extract), copies the
+   bytes into the private `user-documents` bucket under the owner, records one `capture_document_pages` row (type, confidence,
+   date, sanitized extraction: no card numbers, e-mails or OCR dumps), and when the frame has a vehicle and the document is a
+   money record lands it through `land_document_pages` (the binder's writer) and bridges it with `ingest-receipts-as-observations`.
+   A frame with no vehicle keeps its page and waits. Backfill: `scripts/photo-pipeline/reroute-document-frames.mjs`.
+   Tests: `receipt-photo-ocr/core.test.ts` (mocked deps).
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.
