@@ -99,3 +99,21 @@ test('scene-sessions: SQL needs a uuid, is one read-only SELECT, URLs come from 
   const s = shapeSessions([{ vehicle_id: 'v', session_key: 'k', samples: [1, 2, 3, 4, 5].map((i) => ({ image_id: `i${i}`, image_url: `https://x/${i}.jpg` })) }]);
   assert.equal(s[0].sample_image_urls.length, 4);
 });
+
+import { dhashFromGray9x8, hamming, matchAll, valuesCte, candidatesSql, unknownPhotosSql } from './dhash-match.mjs';
+
+test('dhash-match: dhash, hamming, nearest match and VALUES CTE', () => {
+  const rising = Uint8Array.from({ length: 72 }, (_, i) => (i % 9) * 10);   // left < right everywhere: all bits 0
+  const falling = Uint8Array.from({ length: 72 }, (_, i) => 100 - (i % 9) * 10); // left > right: all bits 1
+  assert.equal(dhashFromGray9x8(rising), '0000000000000000');
+  assert.equal(dhashFromGray9x8(falling), 'ffffffffffffffff');
+  assert.equal(hamming('f0f0f0f0f0f0f0f0', 'f0f0f0f0f0f0f0ef'), 5);
+  const m = matchAll([{ image_id: 'a', dhash: 'f0f0f0f0f0f0f0f0' }],
+    () => [{ id: 'c2', source: 'bat', dhash: 'f0f0f0f0f0f0f0ef' }, { id: 'c1', source: 'mecum', dhash: 'f0f0f0f0f0f0f08f' }, { id: 'a', source: 'x', dhash: 'f0f0f0f0f0f0f0f0' }], 6);
+  assert.deepEqual(m, [{ image_id: 'a', matched_image_id: 'c2', matched_source: 'bat', hamming_distance: 5 }]);
+  assert.equal(matchAll([{ image_id: 'a', dhash: '0000000000000000' }], () => [{ id: 'c', source: 'bat', dhash: 'ffffffffffffffff' }]).length, 0);
+  assert.match(valuesCte([]), /WHERE false -- \(dhash_matches\)/);
+  assert.match(valuesCte(m), /\('a'::uuid, 'c2'::uuid, 'bat', 5\)/);
+  assert.throws(() => unknownPhotosSql('nope'));
+  assert.match(candidatesSql({ year: 1985, make: "o'x", family: null }), /BETWEEN 1984 AND 1986[\s\S]*IS NOT DISTINCT FROM NULL/);
+});

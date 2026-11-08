@@ -12,13 +12,13 @@ CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT curren
 CREATE TABLE public.profiles(id uuid PRIMARY KEY);
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY, user_id uuid, merged_into_vehicle_id uuid, year integer, make text, model text,
  trim text, primary_image_url text, purchase_price numeric, image_count integer, is_public boolean, deleted_at timestamptz,
- vin text, bat_seller text, origin_metadata jsonb, bat_auction_url text, listing_url text, automation_script text);
+ vin text, bat_seller text, origin_metadata jsonb, bat_auction_url text, listing_url text, automation_script text, source text, discovery_url text);
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, user_id uuid, documented_by_user_id uuid,
  image_url text, created_at timestamptz DEFAULT now(), taken_at timestamptz, latitude numeric, longitude numeric,
  device_fingerprint text, source text, storage_path text, automation_script text,
  exif_data jsonb DEFAULT '{"camera_make":"Apple","camera_model":"iPhone 15 Pro","source_type":"user_library"}',
  ai_detected_vehicle jsonb, vehicle_year integer, image_vehicle_match_status text, merged_from_vehicle_id uuid,
- file_hash text, dhash text, file_name text, original_filename text, width integer, height integer);
+ file_hash text, dhash text, file_name text, filename text, width integer, height integer);
 CREATE TABLE public.platform_config(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), config_key text UNIQUE NOT NULL,
  config_value jsonb NOT NULL, description text, updated_at timestamptz DEFAULT now());
 CREATE TABLE public.organizations(id uuid PRIMARY KEY, name text, business_name text, slug text, website text, latitude numeric, longitude numeric);
@@ -656,22 +656,41 @@ SELECT fixture_assert((SELECT vehicle_id FROM vehicle_images WHERE id='00000000-
 
 -- ===== import provenance: download / screenshot / web-export / hash match to a listing scrape =====
 SELECT fx_vehicles(95,99);
-INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,original_filename) VALUES (fx(95),:'u','p',NULL,'Screenshot 2026-01-01.png');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,file_name) VALUES (fx(95),:'u','p',NULL,'Screenshot 2026-01-01.png');
 INSERT INTO vehicle_images(vehicle_id,user_id,image_url,source,storage_path) VALUES (fx(95),:'u','p','user_upload','downloads/x.jpg');
 INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,width,height) VALUES (fx(95),:'u','p',NULL,1600,900);
-INSERT INTO vehicle_images(vehicle_id,user_id,image_url,dhash) VALUES (fx(95),:'u','p','f0f0f0f0f0f0f0ef');   -- 5 bits from the bat image below
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,dhash) VALUES (fx(95),:'u','p','f0f0f0f0f0f0f0f0');   -- equal to the bat image below (indexed equality)
 INSERT INTO vehicle_images(vehicle_id,user_id,image_url,source,dhash,created_at) VALUES (fx(99),NULL,'https://bringatrailer.com/wp-content/x.jpg','bat','f0f0f0f0f0f0f0f0','2026-01-01');
 INSERT INTO vehicle_images(vehicle_id,user_id,image_url) VALUES (fx(96),:'u','p');
-INSERT INTO vehicle_images(vehicle_id,user_id,image_url,dhash) VALUES (fx(96),:'u','p','f0f0f0f0f0f0f08f');     -- 7 bits away: no match
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,dhash) VALUES (fx(96),:'u','p','f0f0f0f0f0f0f08f');     -- near but not equal: SQL does not scan Hamming distance; only dhash_matches rows count
 INSERT INTO vehicle_images(vehicle_id,user_id,image_url,taken_at,dhash,created_at) VALUES (fx(97),:'u','p','2020-01-01','f0f0f0f0f0f0f0ef','2020-01-02');  -- camera original stored before the scrape
 SELECT fixture_assert(fx_role(95)='imported_by_user' AND (fx_step(95,1)->'evidence'->>'imported_marked_photo_count')::int=4
   AND (fx_step(95,1)->'evidence'->>'predominantly_imported')::boolean AND (fx_step(95,1)->'evidence'->>'own_device_photo_count')::int=0,
   'screenshot name, downloads/ path, web-export size without EXIF and a dhash match: all four are imports, vehicle is imported_by_user');
 SELECT fixture_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(fx_step(95,1)->'evidence'->'imported_examples') e
-    WHERE e->>'via'='dhash' AND (e->>'hamming_distance')::int=5 AND e->>'matched_source'='bat'),'the perceptual match is cited with its distance and source');
-SELECT fixture_assert(fx_role(96)='documenting' AND (fx_step(96,1)->'evidence'->>'imported_marked_photo_count')::int=0,'Hamming distance 7 is not a match');
+    WHERE e->>'via'='dhash' AND (e->>'hamming_distance')::int=0 AND e->>'matched_source'='bat'),'the perceptual match is cited with its distance and source');
+SELECT fixture_assert(fx_role(96)='documenting' AND (fx_step(96,1)->'evidence'->>'imported_marked_photo_count')::int=0,'a near (not equal) dhash is not matched in SQL');
 SELECT fixture_assert((fx_step(97,1)->'evidence'->>'imported_marked_photo_count')::int=0 AND (fx_step(97,1)->'evidence'->>'own_device_photo_count')::int=1,
   'an upload with camera make / model and taken_at stored before the scraped copy is the original, not an import');
+
+-- dhash_matches rows (computed offline) are the perceptual-match signal; and the original-name rule: '<uuid>.jpg' is storage-generated
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,dhash,file_name) VALUES (fx(96),:'u','p','0f0f0f0f0f0f0f0f','00000000-0000-4000-8000-0000000000aa.jpg');
+SELECT id AS dh_img FROM vehicle_images WHERE vehicle_id=fx(96) AND dhash='0f0f0f0f0f0f0f0f' \gset
+\set dhm_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s|^   WHERE false -- (dhash_matches)\$|   WHERE false UNION ALL SELECT '$dh_img'::uuid, gen_random_uuid(), 'bat', 4|" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT c->'evidence' FROM (:dhm_sql) d, jsonb_array_elements(d.evidence->'chain') c WHERE d.vehicle_id=fx(96) AND (c->>'step')::int=1) AS dhm_ev \gset
+SELECT fixture_assert((:'dhm_ev'::jsonb->>'imported_marked_photo_count')::int=1 AND :'dhm_ev'::jsonb->'imported_examples'->0->>'hamming_distance'='4',
+  'a dhash_matches row marks the photo imported, citing distance and source');
+
+-- ===== origin-fact import rule: listing-scrape vehicle, listing URL, photos without camera / taken_at / GPS =====
+SELECT fx_vehicles(88,90);
+UPDATE vehicles SET source='craigslist', discovery_url='https://lasvegas.craigslist.org/cto/d/x/123.html' WHERE id IN (fx(88),fx(89));
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data) VALUES (fx(88),:'u','p',NULL);
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url) VALUES (fx(89),:'u','p');      -- default exif: camera make / model present
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data) VALUES (fx(90),:'u','p',NULL);   -- no scrape source
+SELECT fixture_assert(fx_role(88)='imported_by_user' AND (fx_step(88,1)->'evidence'->>'listing_scrape_import')::boolean
+  AND fx_step(88,1)->'evidence'->>'listing_url' LIKE 'https://lasvegas.craigslist.org/%','scrape vehicle with a listing URL and capture-fact-free photos is imported_by_user, citing the URL');
+SELECT fixture_assert(fx_role(89)<>'imported_by_user' OR NOT (fx_step(89,1)->'evidence'->>'listing_scrape_import')::boolean,'real own-device photos are not overridden');
+SELECT fixture_assert(NOT (fx_step(90,1)->'evidence'->>'listing_scrape_import')::boolean,'no scrape source: the rule does not apply');
 
 -- ===== scene context breaks an organization tie only when it agrees and nothing contradicts =====
 UPDATE organizations SET business_type='restoration_shop' WHERE id=:'viva';
