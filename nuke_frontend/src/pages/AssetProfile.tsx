@@ -95,7 +95,7 @@ function Presentation({ lot, single }: { lot: Lot; single: boolean }) {
     <Rows title="As stated by the house">
       {lot.house_category && <Row label="Department">{lot.house_category}</Row>}
       {lot.house_group && <Row label="House group">{lot.house_group}</Row>}
-      {(lot.sale_name || lot.sale_key) && <Row label="Sale">{lot.sale_name ?? lot.sale_key}</Row>}
+      {(lot.sale_name || lot.sale_key) && <Row label={lot.sale_name ? 'Sale' : "Sale (the house's key)"}>{lot.sale_name ?? lot.sale_key}</Row>}
       {lot.lot_number && <Row label="Lot">{lot.lot_number}</Row>}
       {lot.sale_ends_at && <Row label="Sale ends">{day(lot.sale_ends_at)}</Row>}
       {(lot.estimate_low || lot.estimate_high) && <Row label="Estimate" role="measure">{[lot.estimate_low, lot.estimate_high].filter((v): v is number => v != null).map(v => money(v, lot.currency)).join(' to ')}</Row>}
@@ -108,8 +108,19 @@ function Presentation({ lot, single }: { lot: Lot; single: boolean }) {
       {lot.url && <Row label="Source" role="caption"><a className="ap-link" href={lot.url} target="_blank" rel="noopener noreferrer">{lot.source.name ?? lot.source.slug ?? 'the lot'}</a></Row>}
     </Rows>
     {lot.catalog_text && <div className="ap-printed"><Text role="label" as="h3">Catalogue entry</Text><Text role="body" as="p" className="ap-prose">{lot.catalog_text}</Text></div>}
-    {(lot.printed_sections ?? []).map((section, i) => <PrintedBlock key={`${lot.statement_id}-${i}`} section={section} />)}
+    {foldNotes(lot.printed_sections ?? []).map((section, i) => <PrintedBlock key={`${lot.statement_id}-${i}`} section={section} />)}
   </Section>;
+}
+
+/** The house separates paragraphs of one note with blank lines; consecutive unheaded blocks are one note, headed blocks stand alone. */
+export function foldNotes(sections: PrintedSection[]): PrintedSection[] {
+  const out: PrintedSection[] = [];
+  for (const section of sections) {
+    const last = out[out.length - 1];
+    if (!section.heading && last && !last.heading) last.lines = [...last.lines, ...section.lines];
+    else out.push({ heading: section.heading ?? null, lines: [...section.lines] });
+  }
+  return out;
 }
 
 function PrintedBlock({ section }: { section: PrintedSection }) {
