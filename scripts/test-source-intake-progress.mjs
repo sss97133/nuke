@@ -10,6 +10,7 @@ import * as ledger from '../supabase/functions/poll-listing-feeds/ledger.ts';
 import { captureLedgerFields } from '../supabase/functions/poll-listing-feeds/captureLedger.ts';
 import { fetchCraigslistFeed } from '../supabase/functions/poll-listing-feeds/feedFetch.ts';
 import { emptySearchHtml } from '../supabase/functions/poll-listing-feeds/fixtures/empty-search.ts';
+import { vehicleEventWriterFor } from '../supabase/functions/_shared/vehicleEventWrite.ts';
 const require = createRequire(new URL('../nuke_frontend/package.json', import.meta.url));
 const ts = require('typescript');
 const { createClient } = require('@supabase/supabase-js');
@@ -100,6 +101,16 @@ export function fixture(options = {}) {
     auth: { persistSession: false }, global: { fetch: transport },
   });
   const module = { exports: {} };
+  // Execute the native reader too, under the same HTTP/clock fixture. Never
+  // stub it to success or let its default fetch escape to the real publisher.
+  const purplewave = { exports: {} };
+  vm.runInNewContext(compile(readFileSync(new URL('../supabase/functions/poll-listing-feeds/purplewave.ts', import.meta.url), 'utf8')), {
+    exports: purplewave.exports, module: purplewave, URLSearchParams, AbortSignal, Date: runtimeDate, fetch: transport,
+    require(name) {
+      if (name.endsWith('/vehicleEventWrite.ts')) return { vehicleEventWriterFor };
+      throw new Error(`Unexpected PurpleWave import ${name}`);
+    },
+  });
   const source = options.source ?? readFileSync(new URL('../supabase/functions/poll-listing-feeds/index.ts', import.meta.url), 'utf8');
   vm.runInNewContext(compile(source + '\nexport { pollFirecrawlHtmlFeed };'), {
     exports: module.exports, module, Request, Response, URL, AbortSignal, AbortController, Date: runtimeDate, crypto: webcrypto,
@@ -113,6 +124,7 @@ export function fixture(options = {}) {
       if (name.endsWith('/ledger.ts')) return { ...ledger,
         createIntakeBudget: (throttle, start) => ledger.createIntakeBudget(throttle, start, runtimeDate.now) };
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
+      if (name.endsWith('/purplewave.ts')) return purplewave.exports;
       if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
       if (name.endsWith('/gatewayParser.ts')) return { gatewayInventoryUrls: options.browserUrls ?? (() => { throw new Error('unexpected browser inventory'); }) };
       if (name.endsWith('/gatewayCapture.ts')) return { readGatewayBrowserCapture: options.browserCapture ?? (() => { throw new Error('unexpected browser capture'); }) };

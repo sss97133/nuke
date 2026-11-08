@@ -192,6 +192,10 @@ jobs:
         run: createdb dm_live_board_sync_ci
       - name: Verify the board-synced houses' schedule writer, bid moves, complete-board ending and health
         run: psql -X -v ON_ERROR_STOP=1 -d dm_live_board_sync_ci -f supabase/sql/test_live_auction_board_sync.sql
+      - name: Create source receipt contract database
+        run: createdb dm_refinement_auction_receipts_ci
+      - name: Verify source receipt identity, clocks, decimals and privacy
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_auction_receipts_ci -f supabase/sql/test_live_bid_tape_receipts.sql
       - name: Create disposable comment author key database
         run: createdb dm_refinement_comment_author_keys_ci
       - name: Verify comment author keys at insert and by bounded backfill; retired twin untouched
