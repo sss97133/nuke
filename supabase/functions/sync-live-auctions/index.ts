@@ -522,7 +522,7 @@ async function syncPCarMarket(): Promise<{ auctions: LiveAuction[]; error: strin
 }
 
 /**
- * Bids of PCarMarket lots whose bid count moved, from the lot page's own bid history (Basta id, time, amount,
+ * Bids of PCarMarket lots whose retained history trails the board count, from the lot page's own bid history (Basta id, time, amount,
  * bidder), admitted through ingest-observation as kind 'bid' with observed_at = the bid's own time. A bid already
  * held for the vehicle is not posted again.
  */
@@ -530,12 +530,15 @@ async function ingestPcarBids(
   supabase: ReturnType<typeof createClient>,
   moved: { url: string; vehicle_id: string | null }[],
   maxLots: number,
-): Promise<{ lots: number; posted: number; errors: string[] }> {
-  const out = { lots: 0, posted: 0, errors: [] as string[] };
+  deadline: number,
+): Promise<{ lots: number; posted: number; attempted: number; deferred: boolean; errors: string[] }> {
+  const out = { lots: 0, posted: 0, attempted: 0, deferred: false, errors: [] as string[] };
   const base = Deno.env.get("SUPABASE_URL") ?? "";
   const key = projectSecretKey() ?? "";
   const linked = moved.flatMap((m) => (m.vehicle_id ? [{ url: m.url, vehicle_id: m.vehicle_id }] : []));
+  out.deferred = linked.length > maxLots;
   for (const lot of linked.slice(0, maxLots)) {
+    if (Date.now() >= deadline || out.attempted >= 20) { out.deferred = true; break; }
     const { html, error } = await archiveFetch(lot.url.replace("https://pcarmarket.com/", "https://www.pcarmarket.com/"), {
       platform: "pcarmarket", skipCache: true, useFirecrawl: false, callerName: "sync-live-auctions",
     });
@@ -544,12 +547,15 @@ async function ingestPcarBids(
     const bids = parsePcarBids(html);
     if (!bids.length) continue;
     const ids = bids.map((b) => `pcarmarket-bid:${b.id}`);
-    const { data: held } = await supabase.from("vehicle_observations").select("source_identifier")
+    const { data: held, error: heldError } = await supabase.from("vehicle_observations").select("source_identifier")
       .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").in("source_identifier", ids);
+    if (heldError) { out.errors.push(`held check: ${heldError.message}`); continue; }
     const have = new Set((held ?? []).map((r: { source_identifier: string }) => r.source_identifier));
     for (const b of bids) {
       const sid = `pcarmarket-bid:${b.id}`;
       if (have.has(sid)) continue;
+      if (Date.now() >= deadline || out.attempted >= 20) { out.deferred = true; break; }
+      out.attempted++;
       const res = await fetch(`${base}/functions/v1/ingest-observation`, {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -563,6 +569,7 @@ async function ingestPcarBids(
           structured_data: { bid_id: b.id, amount: b.amount, currency: "USD", bidder: b.bidder, bid_status: b.status, clock: "source_event_time" },
           vehicle_id: lot.vehicle_id,
           extraction_method: "pcarmarket_ssr_bids_v1",
+          defer_analysis: true,
         }),
       });
       if (res.ok) out.posted++;
@@ -1622,8 +1629,12 @@ Deno.serve(async (req) => {
           if (bsErr) dbStats.write_errors.push(`live_auction_board_sync: ${bsErr.message}`);
           board = (bs as Record<string, unknown>) ?? null;
           const moved = Array.isArray(board?.moved) ? board!.moved as { url: string; vehicle_id: string | null }[] : [];
-          if (normalizedPlatform === "pcarmarket" && moved.length && Date.now() - functionStartTime < 30_000) {
-            const bids = await ingestPcarBids(supabase, moved, 8);
+          if (normalizedPlatform === "pcarmarket" && !syncResult.error && Date.now() - functionStartTime < 30_000) {
+            // Board counters advance before bid capture. Retained evidence keeps failed/capped reads retryable.
+            const { data: pending, error: pendingError } = await supabase.rpc("pcarmarket_bid_capture_backlog", { p_limit: 9 });
+            const bids = pendingError
+              ? { lots: 0, posted: 0, attempted: 0, deferred: false, errors: [`capture backlog: ${pendingError.message}`] }
+              : await ingestPcarBids(supabase, pending ?? [], 8, functionStartTime + 45_000);
             board = { ...board, moved: moved.length, bid_reads: bids };
             if (bids.errors.length) console.warn(`[sync-live-auctions] PCarMarket bid reads: ${bids.errors.slice(0, 3).join("; ")}`);
           } else if (board) {
