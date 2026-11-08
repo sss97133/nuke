@@ -49,6 +49,11 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    `20261111190000`: the readers bound the window for the planner (the "from may be null" test made every read scan all of a
    person's frames), and the day list reads `capture_ledger_states` over `idx_vehicle_images_capture_ledger` (user, taken day,
    exif uuid; the five columns the states need) instead of the heap; the day detail keeps `capture_ledger_frames`.
+8. **No clear on priors alone** (`20261111200000`): `capture_landing_plan_step` clears a set only when the winner's signals carry an
+   evidence leg (visual, vin, plate, badge or model > 0); session, cell, recent, work-session and prev-day are priors from the day's
+   pattern and alone hold the set as `priors_only` (ledger word: "only the day's pattern pointed to it, nothing in the photo").
+   Measured 2026-11-08 over the 103 cleared sets: priors-only winners were wrong on 26 of 49 viewed frames, evidence-backed on
+   52 of 217. Contract `test_capture_landing_priors_only.sql`.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.

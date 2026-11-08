@@ -123,6 +123,7 @@ it('words: the app\'s stage labels', () => {
   expect(stageLabel({ ...base, state: 'unverified', vehicle: '1966 Ford Mustang' })).toBe('On 1966 Ford Mustang, not yet checked');
   expect(stageLabel({ ...base, state: 'waiting' })).toBe('Waiting on a check');
   expect(stageLabel({ ...base, state: 'held', reason: 'score_below_threshold' })).toBe('Held: not sure enough');
+  expect(stageLabel({ ...base, state: 'held', reason: 'priors_only' })).toBe("Held: only the day's pattern pointed to it, nothing in the photo");
   expect(stageLabel({ ...base, state: 'unsorted' })).toBe('Not sorted yet');
   expect(summaryLine({ taken: 1, on_vehicle: 0, unverified: 0, waiting: 0, held: 0, pulled: 0, private: 0, unsorted: 0, failed: 0, skipped: 0 }, [])).toBe('1 photo');
 });
