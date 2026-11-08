@@ -398,6 +398,24 @@ SELECT fixture_assert(fx_role(68)='owner_reported' AND (fx_step(68,5)->'evidence
   AND (fx_step(68,5)->'evidence'->>'statement_from_duplicate')::boolean,'statement on a photo-less duplicate reaches the photo-rich record');
 SELECT fixture_assert(fx_role(69)='documenting','a vehicle that is not a duplicate does not inherit the statement');
 
+-- owner statement phrasings seen in a real preview run
+SELECT fixture_assert((parse_owner_statement('the 1971 GMC Suburban is my truck, owned 11 years')->>'ownership_claim')::boolean
+  AND (parse_owner_statement('the 1971 GMC Suburban is my truck, owned 11 years')->>'tenure_years')::numeric=11,'"is my <noun>, owned N years" is an ownership claim with tenure');
+SELECT fixture_assert((parse_owner_statement('none of them are titled to me')->>'title_denied')::boolean
+  AND parse_owner_statement('none of them are titled to me')->>'title_denial_scope'='all_listed'
+  AND NOT (parse_owner_statement('none of them are titled to me')->>'ownership_claim')::boolean
+  AND (parse_owner_statement('none of them are titled to me')->>'tenure_years') IS NULL,'"none of them are titled to me" denies title, claims nothing');
+SELECT fixture_assert((parse_owner_statement('That car is mine')->>'ownership_claim')::boolean
+  AND (parse_owner_statement('I own it')->>'ownership_claim')::boolean
+  AND (parse_owner_statement('I''ve owned it')->>'ownership_claim')::boolean
+  AND (parse_owner_statement('owned it 4 years, mine')->>'tenure_years')::numeric=4
+  AND (parse_owner_statement('I had it 7 years')->>'tenure_years')::numeric=7
+  AND (parse_owner_statement('I owned it for 3 years')->>'tenure_years')::numeric=3
+  AND (parse_owner_statement('had it for 9 yrs, mine')->>'tenure_years')::numeric=9
+  AND NOT (parse_owner_statement('that one is not mine')->>'ownership_claim')::boolean
+  AND NOT (parse_owner_statement('I worked there for 5 years')->>'ownership_claim')::boolean
+  AND (parse_owner_statement('I worked there for 5 years')->>'tenure_years') IS NULL,'mine / I own / I''ve owned / owned (it|for) N years / had it N years; negations and unrelated "for N years" do not');
+
 -- ===== own-origin photos count as own-device without EXIF; scraped sources do not =====
 SELECT fixture_assert(own_origin_source('iphoto',NULL,NULL,:'u') AND own_origin_source('iphoto_60d',NULL,NULL,:'u')
   AND own_origin_source('user_upload',NULL,NULL,:'u') AND own_origin_source('capture_relay_ios',NULL,NULL,:'u')
@@ -414,6 +432,8 @@ SELECT fixture_assert(own_origin_source('image_intake',NULL,:'u',:'u') AND NOT o
   AND own_origin_source(NULL,'users/'||:'u'||'/capture-relay/a.jpg',NULL,:'u') AND own_origin_source(NULL,'users/'||:'u'||'/photo-sync/a.jpg',NULL,:'u')
   AND NOT own_origin_source(NULL,'users/00000000-0000-4000-8000-000000000002/photo-sync/a.jpg',NULL,:'u')
   AND own_origin_source(NULL,'00000000-0000-4000-8000-000000000299/iphoto/a.jpg',NULL,:'u')
+  AND own_origin_source(NULL,'00000000-0000-4000-8000-000000000299/hd-archive/a.jpg',:'u',:'u')
+  AND NOT own_origin_source(NULL,'00000000-0000-4000-8000-000000000299/hd-archive/a.jpg','00000000-0000-4000-8000-000000000002',:'u')
   AND NOT own_origin_source(NULL,'vehicles/x/bat/a.jpg',NULL,:'u'),'image_intake needs the account as uploader; storage paths under the account or <vehicle>/iphoto');
 SELECT fx_vehicles(71,76);
 INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,source) VALUES (fx(71),:'u','p',NULL,'iphoto'),(fx(72),:'u','p',NULL,'bat');
@@ -423,6 +443,22 @@ INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,storage_path) 
 SELECT fixture_assert(fx_role(71)='documenting' AND fx_role(74)='documenting' AND fx_role(75)='documenting','own-origin photos without EXIF are own-device');
 SELECT fixture_assert(fx_role(72)='imported_by_user' AND fx_role(73)='imported_by_user','bat source, or dropbox_import with automation_script, stays an import');
 SELECT fixture_assert((fx_step(71,1)->'evidence'->>'own_origin_photo_count')::int=1 AND (fx_step(72,1)->'evidence'->>'own_origin_photo_count')::int=0,'step 1 reports own-origin photos');
+
+-- hd-archive path uploaded by the account is own library; origin-unknown scraped-image uploads are not own-device
+SELECT fx_vehicles(91,94);
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,source,storage_path) VALUES (fx(91),:'u','p',NULL,'image_intake',fx(91)::text||'/hd-archive/1.jpg');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,source,storage_path,taken_at,file_hash) VALUES
+  (fx(92),:'u','p',NULL,'user_upload','11111111-1111-4111-8111-111111111111.jpg',NULL,'h-unknown'),
+  (fx(93),:'u','p',NULL,'user_upload','unorganized/2.jpg',NULL,'h-scraped'),
+  (fx(94),:'u','p','{"camera_make":"A","camera_model":"B","source_type":"user_library"}'::jsonb,'user_upload','22222222-2222-4222-8222-222222222222.jpg',NULL,NULL);
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,source,file_hash) VALUES (fx(72),:'u','p','bat','h-scraped');
+SELECT fixture_assert(fx_role(91)='documenting','hd-archive path uploaded by the account is own library');
+SELECT fixture_assert(fx_role(92)='imported_by_user' AND (fx_step(92,1)->'evidence'->>'origin_unknown_photo_count')::int=1
+  AND (fx_step(92,1)->'evidence'->>'scraped_photo_count')::int=0,'root-path user_upload without EXIF / time / GPS / filename is origin unknown, not own-device');
+SELECT fixture_assert(fx_role(93)='imported_by_user' AND (fx_step(93,1)->'evidence'->>'scraped_photo_count')::int=1
+  AND (fx_step(93,1)->'evidence'->'scraped_example'->>'matched_source')='bat'
+  AND (fx_step(93,1)->'evidence'->'scraped_example'->>'via')='file_hash','origin-unknown photo sharing a hash with a bat image is marked scraped, with the match cited');
+SELECT fixture_assert(fx_role(94)<>'imported_by_user' AND (fx_step(94,1)->'evidence'->>'origin_unknown_photo_count')::int=0,'a root-path upload with camera EXIF is not origin unknown');
 
 -- ===== owner statements: parser =====
 SELECT fixture_assert((parse_owner_statement('I''ve owned these for 10 years but none of them are titled to me')->>'ownership_claim')::boolean
