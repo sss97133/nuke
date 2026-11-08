@@ -74,9 +74,12 @@ export function parseDetail(html) {
   const info = (html.match(/class="listing-available-info"[\s\S]*?<\/div>/i) || [])[0] ?? '';
   const end = (info.match(/data-timestamp="(\d+)"/) || html.match(/class="date date-localize" data-timestamp="(\d+)"/) || [])[1];
   const lotTitle = (html.match(/<title>[^<]*\(Lot\s*#\s*([\d,]+)\)/i) || [])[1];
+  // Fallbacks for the listing-essentials block: '<strong>Lot</strong> #255909' and the Seller member link.
+  const lotItem = (html.match(/<strong>Lot<\/strong>\s*#\s*([\d,]+)/i) || [])[1];
+  const sellerItem = (html.match(/item-seller"><strong>Seller<\/strong>:\s*<a href="https:\/\/bringatrailer\.com\/member\/([^/"]+)\/?"/i) || [])[1];
   return {
-    title: p.title, lot_number: p.lot_number ?? (lotTitle ? lotTitle.replace(/,/g, '') : null),
-    vin: p.chassis, seller_username: p.seller_username, end_date: isoDate(end), result: info ? parseResultText(info) : null,
+    title: p.title, lot_number: p.lot_number ?? ((lotTitle ?? lotItem) ? (lotTitle ?? lotItem).replace(/,/g, '') : null),
+    vin: p.chassis, seller_username: p.seller_username ?? (sellerItem ? decodeURIComponent(sellerItem).toLowerCase() : null), end_date: isoDate(end), result: info ? parseResultText(info) : null,
   };
 }
 
@@ -194,13 +197,13 @@ async function main() {
   const rows = [];
   for (const handle of handles) {
     const hl = handle.toLowerCase();
-    const member = parseMemberHtml(await get(`member-${hl}.html`, () => fetch(`${BASE}/member/${handle}/`, { headers: { 'User-Agent': UA } })));
+    const member = parseMemberHtml(await get(`member-${hl}.html`, () => fetch(`${BASE}/member/${handle}/`, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) })));
     if (!member.userId) { console.error(`${handle}: no data-user-id on the member page; skipped`); continue; }
     const cards = new Map(member.cards.map((c) => [c.url, { ...c, page: 1 }]));
     let page = member.nextPage ?? 2;
     for (let guard = 0; guard < 500 && member.nextPage; guard++) {
       const body = new URLSearchParams({ action: 'bat_profile_more_items', itemType: 'listings_past', itemPaged: String(page), userID: member.userId });
-      const j = parseAjax(await get(`ajax-${hl}-${page}.json`, () => fetch(`${BASE}/wp-admin/admin-ajax.php`, { method: 'POST', headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body })));
+      const j = parseAjax(await get(`ajax-${hl}-${page}.json`, () => fetch(`${BASE}/wp-admin/admin-ajax.php`, { method: 'POST', headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(30000) })));
       for (const c of j.cards) if (!cards.has(c.url)) cards.set(c.url, { ...c, page });
       if (!j.more || !j.nextPage || j.nextPage === page) break;
       page = j.nextPage;
@@ -209,7 +212,7 @@ async function main() {
     let n = 0;
     for (const c of cards.values()) {
       if (limit && n++ >= limit) break;
-      const d = parseDetail(await get(`listing-${listingSlug(c.url)}.html`, () => fetch(c.url, { headers: { 'User-Agent': UA } })));
+      const d = parseDetail(await get(`listing-${listingSlug(c.url)}.html`, () => fetch(c.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000) })));
       rows.push({ handle: hl, bat_user_id: member.userId, url: c.url, page: c.page, ...d,
         title: d.title ?? c.title, end_date: d.end_date ?? c.end_date, result: d.result ?? c.result,
         seller_username: d.seller_username ?? null, fetched_with: PRODUCER });
