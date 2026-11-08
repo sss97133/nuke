@@ -33,6 +33,7 @@
  * `floor` left by eBay's own counter; max_land landings and max_updates updates a run; budget_ms of wall time; nothing while
  * the database IO gate (firecrawl_io_gate) is closed. A page cut short by a cap is read again next run.
  */
+import { admitAuctionSnapshot, snapshotFields, type SnapshotWriter } from "./auctionSnapshot.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
 const writeVehicleEventByKey = vehicleEventWriterFor("extract-ebay-motors:browse-bulk");
@@ -213,7 +214,7 @@ export function systemStateStore(supabase: any): StateStore {
 /** The seller's own price as we last recorded it (metadata.price_original), for listings eBay converts to USD. */
 interface Orig { orig: number | null; origCur: string | null }
 export type Held =
-  | ({ kind: "episode"; vehicle_id: string; price: number | null; bids: number | null; status: string | null } & Orig)
+  | ({ kind: "episode"; vehicle_id: string; price: number | null; bids: number | null; status: string | null; observationId?: string | null } & Orig)
   | ({ kind: "blip"; price: number | null; observed_at: string; method: string | null } & Orig)
   | { kind: "other"; why: string };
 const num = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -236,7 +237,7 @@ export async function heldListings(supabase: any, keys: string[], sourceId: stri
   const held = new Map<string, Held>();
   if (!keys.length) return held;
   const ev = mustWrite("held episodes read", await supabase.from("vehicle_events")
-    .select("source_url,vehicle_id,current_price,event_status,bids:metadata->>bid_count,po:metadata->price_original->>amount,pc:metadata->price_original->>currency,ppo:metadata->page->price_original->>amount,ppc:metadata->page->price_original->>currency")
+    .select("source_url,vehicle_id,current_price,event_status,observation_id:metadata->>auction_observation_id,bids:metadata->>bid_count,po:metadata->price_original->>amount,pc:metadata->price_original->>currency,ppo:metadata->page->price_original->>amount,ppc:metadata->page->price_original->>currency")
     .in("source_url", keys.map(itemUrl)).eq("source_platform", PLATFORM).eq("event_type", "listing").limit(1000));
   const byKey = new Map<string, any[]>();
   for (const r of ev.data ?? []) {
@@ -247,7 +248,7 @@ export async function heldListings(supabase: any, keys: string[], sourceId: stri
     const linked = rows.filter((r) => r.vehicle_id);
     const r = linked[0];
     held.set(k, linked.length === 1
-      ? { kind: "episode", vehicle_id: r.vehicle_id, price: num(r.current_price), bids: num(r.bids), status: r.event_status ?? null,
+      ? { kind: "episode", vehicle_id: r.vehicle_id, price: num(r.current_price), bids: num(r.bids), status: r.event_status ?? null, observationId: r.observation_id ?? null,
           orig: num(r.po ?? r.ppo), origCur: (r.po != null ? r.pc : r.ppc) ?? null }   // an update's record is newer than the landing's
       : { kind: "other", why: `${rows.length} episodes` });
   }
@@ -343,6 +344,7 @@ export async function pageLookup(lookup: Lookup, items: SearchSummary[]): Promis
 // ---- the run -------------------------------------------------------------------------------------------------------------
 
 export interface BulkOptions {
+  snapshotWriter?: SnapshotWriter; // tests; production canonical admission for changed auctions
   maxCalls?: number;       // Browse calls this run (plan + pages)
   dailyCap?: number;       // Browse calls this action may spend in a Pacific day (rate_limits ebay-bulk:browse:<date>)
   floor?: number;          // calls left today (eBay's counter) this run never goes under
@@ -364,7 +366,7 @@ export interface PageRow { chunk: string; offset: number; total: number; items: 
 export interface BulkReport extends Report {
   bulk: { pass_id: string | null; pass_started_at: string | null; chunk: string | null; position: string | null; planned: number | null; ebay_total: number | null;
     pages: PageRow[]; browse_calls: number; landed_new: number; updated: number; pass_done: boolean; pass_counts: PassCounts | null; gate: unknown; ms: number;
-    trace_waits: number };
+    trace_waits: number; snapshots_admitted: number; snapshots_deferred: number };
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
@@ -395,9 +397,12 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
   const store = o.store ?? systemStateStore(supabase);
   const gate = o.gate ?? (() => ioGate(supabase));
   const land = o.land ?? landItem;
+  const snapshotWriter = o.snapshotWriter ?? admitAuctionSnapshot;
   const b: BulkReport["bulk"] = { pass_id: null, pass_started_at: null, chunk: null, position: null, planned: null, ebay_total: null, pages: [],
-    browse_calls: 0, landed_new: 0, updated: 0, pass_done: false, pass_counts: null, gate: null, ms: 0, trace_waits: 0 };
+    browse_calls: 0, landed_new: 0, updated: 0, pass_done: false, pass_counts: null, gate: null, ms: 0, trace_waits: 0, snapshots_admitted: 0, snapshots_deferred: 0 };
   const rep: BulkReport = { ...emptyReport(o.dryRun ? "bulk_dry_run" : "bulk"), bulk: b };
+  let snapshotAttempts = 0, admissionStopped = false;
+  const admissionDeadline = Date.now() + 45_000;
   let c0 = client.calls;
   const browse = () => client.calls - c0;
   const late = () => now() - t0 > budgetMs;
@@ -483,18 +488,38 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
         // 3. held listings whose price or bids moved: the episode (and the asking-price log for a fixed price); a blip: a new observation
         const tu = now();
         const upd = work.filter((w) => w.kind === "changed" && w.h?.kind === "episode").slice(0, Math.max(0, maxUpdates - updatedRun));
+        let pendingUpdates = 0;
         await pool(upd, 4, async (w) => {
           const h = w.h as Extract<Held, { kind: "episode" }>;
           const key = listingKey(w.s)!, p = priceOf(w.s), o = originalPrice(w.s);
           // the seller's price moved (a converted listing whose seller's price we had not recorded is recorded, not a move)
           const moved = o.converted ? h.orig != null && h.origCur === o.currency && h.orig !== o.amount : p.amount !== h.price;
+          let sourceAt = fetchedAt;
+          let auctionMetadata: Record<string, unknown> = {};
+          if (w.s.buyingOptions?.includes("AUCTION")) {
+            if (admissionStopped || snapshotAttempts >= 20 || Date.now() >= admissionDeadline) {
+              pendingUpdates++; b.snapshots_deferred++; return;
+            }
+            snapshotAttempts++;
+            try {
+              const receipt = await snapshotWriter(supabase, { vehicleId: h.vehicle_id,
+                url: itemUrl(key), summary: w.s, observedAt: fetchedAt, previousObservationId: h.observationId ?? null });
+              b.snapshots_admitted++;
+              sourceAt = receipt.observedAt;
+              auctionMetadata = { ...snapshotFields(w.s, sourceAt), auction_observation_id: receipt.observationId,
+                auction_snapshot_id: receipt.snapshotId };
+            } catch (e) {
+              admissionStopped = true; pendingUpdates++; b.snapshots_deferred++;
+              rep.errors.push(`auction evidence ${key}: ${(e as Error).message}`.slice(0, 300)); return;
+            }
+          }
           const ev = await writeVehicleEventByKey(supabase, {
             vehicle_id: h.vehicle_id, source_platform: PLATFORM, source_listing_id: key, source_url: itemUrl(key), event_type: "listing", updated_at: fetchedAt, currency_code: p.currency,
-            ...(Number.isInteger(w.s.bidCount) && Number(w.s.bidCount) >= 0 ? { bid_count: w.s.bidCount } : {}),
+            bid_count: Number.isInteger(w.s.bidCount) && Number(w.s.bidCount) >= 0 ? w.s.bidCount : null,
             current_price: currentEpisodePrice(w.s),   // eBay's USD figure today; the seller's own is price_original
-            metadata: { source_observed_at: fetchedAt, last_checked_at: fetchedAt, currency: p.currency, bid_count: w.s.bidCount ?? null, listing_ends_at: w.s.itemEndDate ?? null,
+            metadata: { ...auctionMetadata, source_observed_at: sourceAt, last_checked_at: sourceAt, currency: p.currency, bid_count: w.s.bidCount ?? null, listing_ends_at: w.s.itemEndDate ?? null,
               price_snapshot_id: snapshotId, price_original: o, ...(moved ? { price_changed_at: fetchedAt, price_before: h.price, price_original_before: h.orig } : {}) },
-          }, { preserveEventStatus: true, sourceObservedAt: fetchedAt });
+          }, { preserveEventStatus: true, sourceObservedAt: sourceAt });
           if (ev.action === "error") { rep.errors.push(`update ${key}: ${ev.error}`.slice(0, 300)); return; }
           updatedRun++;                                    // a skipped write (a newer read is on the episode) still used its turn
           if (ev.action === "skipped") return;
@@ -558,7 +583,7 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
         landedRun += done;
         row.ms.land = now() - tl;
         // complete when every listing settled (landed, or failed with an error); one throttled or not reached is read again next run
-        row.complete = done === lands.length && upd.length === work.filter((w) => w.kind === "changed" && w.h?.kind === "episode").length;
+        row.complete = pendingUpdates === 0 && done === lands.length && upd.length === work.filter((w) => w.kind === "changed" && w.h?.kind === "episode").length;
         pass.counts.landed += row.landed; pass.counts.blips += row.blips; pass.counts.rejected += row.rejected; pass.counts.skipped += row.skipped; pass.counts.updated += row.updated;
       }
       pass.counts.errors = (pass.counts.errors ?? 0) + rep.errors.length - errorsBefore;

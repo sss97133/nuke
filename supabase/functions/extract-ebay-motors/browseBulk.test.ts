@@ -8,6 +8,7 @@ import { currentEpisodePrice, toLanding } from "./browseMap.ts";
 import { byDetailPriority, type Cand } from "./browseSweep.ts";
 import { handleHash } from "./deletedMembers.ts";
 
+const admitted = async (_sb: any, input: any) => ({ observationId: "obs-auction", snapshotId: "snap-auction", observedAt: input.observedAt });
 const FILTER = "categoryId:6001,Model Year:{1967}";
 const MAKES = new Set(["ford", "chevrolet", "austinhealey", "porsche", "internationalharvester"]);
 const cat = (make: string | null, model: string, leaf = "100") => [
@@ -91,7 +92,7 @@ Deno.test("a chunk eBay answers unfiltered is skipped with an error, and the pas
   const w = world(), store = memStore(), rec = recorder(w);
   const unfiltered = Array.from({ length: 900 }, (_, i) => sum(String(8000 + i)));
   const c = fakeClient({ [FILTER]: unfiltered }, { years: { "1967": 3 } });
-  const r = await bulk(fakeSb(w), c, { ledger: open, store, gate: gateOpen, land: rec.land as any });
+  const r = await bulk(fakeSb(w), c, { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any });
   assertEquals([r.bulk.pages[0].ignored, rec.landed.length, w.snapshots.length, store.get().pass.i, r.ok], [true, 0, 0, 1, false]);
 });
 
@@ -189,7 +190,7 @@ const gateOpen = async () => ({ open: true });
 Deno.test("new listings land once, the page is stored once and every landing names it; the same page again writes nothing", async () => {
   const w = world(), sb = fakeSb(w), store = memStore(), rec = recorder(w);
   const pages = { [FILTER]: [sum("2001"), sum("2002", { title: "1967 Porsche 912", make: "Ford" }), sum("2003", { auction: true, price: "100.00" })] };
-  const run = (restart = false) => bulk(sb, fakeClient(pages), { ledger: open, store, gate: gateOpen, land: rec.land as any, restart });
+  const run = (restart = false) => bulk(sb, fakeClient(pages), { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any, restart });
   const r1 = await run();
   assertEquals([r1.bulk.pages[0].new, r1.bulk.pages[0].landed, r1.bulk.pages[0].blips, w.snapshots.length, w.uploads.length], [3, 2, 1, 1, 1]);
   assert(rec.landed.every((l) => l.opts.snapshotId === "snap-1" && l.opts.source === "ebay-browse-search" && l.opts.method === "ebay_browse_search_v1"));
@@ -209,7 +210,7 @@ Deno.test("a held listing whose price or bid count moved is updated, not landed 
   w.episodes.push({ source_url: "https://www.ebay.com/itm/3002", vehicle_id: "veh-3002", current_price: 100, event_status: "active", bids: 0 });
   w.blips.push({ source_identifier: "3003", vehicle_id: null, observed_at: "2026-10-19T00:00:00Z", amount: "9000" });
   const pages = { [FILTER]: [sum("3001", { price: "47500.00" }), sum("3002", { auction: true, price: "150.00", bids: 2 }), sum("3003", { price: "8500.00", make: null, model: "Other Makes" })] };
-  const r = await bulk(sb, fakeClient(pages), { ledger: open, store, gate: gateOpen, land: rec.land as any });
+  const r = await bulk(sb, fakeClient(pages), { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any });
   assertEquals([r.bulk.pages[0].changed, r.bulk.pages[0].updated, r.bulk.pages[0].new], [3, 2, 0]);
   assertEquals(w.updates.map((u) => u.current_price), [47500, 150]);
   assertEquals(w.priceLog.map((p) => [p.vehicle_id, p.value, p.price_type]), [["veh-3001", 47500, "asking"]]);   // a bid is not an asking price
@@ -231,7 +232,7 @@ Deno.test("a converted listing is compared on the seller's own price, not eBay's
   w.episodes.push({ source_url: "https://www.ebay.com/itm/3101", vehicle_id: "veh-3101", current_price: 28000, event_status: "active", bids: null });
   w.episodes.push({ source_url: "https://www.ebay.com/itm/3102", vehicle_id: "veh-3102", current_price: 15999, event_status: "active", bids: null, ppo: "22500", ppc: "CAD" });
   const pages = { [FILTER]: [cad("3101", "28343.14", "39995.00"), cad("3102", "13819.01", "19500.00")] };
-  const r = await bulk(fakeSb(w), fakeClient(pages), { ledger: open, store, gate: gateOpen, land: rec.land as any });
+  const r = await bulk(fakeSb(w), fakeClient(pages), { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any });
   assertEquals([r.bulk.pages[0].changed, r.bulk.pages[0].updated], [2, 2]);
   assertEquals(w.updates.map((u) => [u.metadata.price_original, u.metadata.price_changed_at != null]),
     [[{ amount: 39995, currency: "CAD", converted: true }, false], [{ amount: 19500, currency: "CAD", converted: true }, true]]);
@@ -242,7 +243,7 @@ Deno.test("a deleted member is redacted before anything is stored or landed, wit
   const w = world(), sb = fakeSb(w), store = memStore(), rec = recorder(w);
   w.gone.add(await handleHash("gone_member"));
   const pages = { [FILTER]: [sum("4001", { seller: "gone_member", title: "1967 Ford Mustang from gone_member" }), sum("4002", { seller: "kept_member" })] };
-  await bulk(sb, fakeClient(pages), { ledger: open, store, gate: gateOpen, land: rec.land as any });
+  await bulk(sb, fakeClient(pages), { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any });
   assertEquals(w.lookups, 1);
   const gone = rec.landed.find((l) => l.item.legacyItemId === "4001")!.item;
   assertEquals([gone.seller, gone.title.includes("gone_member")], [{}, false]);
@@ -260,7 +261,7 @@ Deno.test("caps stop the action: calls per run, the day's ledger, the quota floo
   const years = { "1967": 450 };
   // calls per run: the plan (1) + one page
   let w = world(); let c = fakeClient(pages, { years });
-  let r = await bulk(fakeSb(w), c, { maxCalls: 2, ledger: open, store: memStore(), gate: gateOpen, land: recorder(w).land as any, maxLand: 1000 });
+  let r = await bulk(fakeSb(w), c, { maxCalls: 2, snapshotWriter: admitted, ledger: open, store: memStore(), gate: gateOpen, land: recorder(w).land as any, maxLand: 1000 });
   assertEquals([r.bulk.browse_calls, r.bulk.pages.length, r.stopped?.startsWith("budget")], [2, 1, true]);
   // the day's ledger
   let n = 0;
@@ -269,16 +270,16 @@ Deno.test("caps stop the action: calls per run, the day's ledger, the quota floo
   assertEquals([r.bulk.pages.length, r.stopped], [0, "daily cap: used"]);
   // the floor: eBay says 900 left, 1,000 kept
   w = world(); c = fakeClient(pages, { years, remaining: 900 });
-  r = await bulk(fakeSb(w), c, { ledger: open, store: memStore(), gate: gateOpen, land: recorder(w).land as any });
+  r = await bulk(fakeSb(w), c, { snapshotWriter: admitted, ledger: open, store: memStore(), gate: gateOpen, land: recorder(w).land as any });
   assertEquals([r.bulk.browse_calls, r.stopped?.startsWith("quota")], [0, true]);
   // the IO gate closed: nothing read
   w = world(); c = fakeClient(pages, { years });
-  r = await bulk(fakeSb(w), c, { ledger: open, store: memStore(), gate: async () => ({ open: false, io_waiters: 9 }), land: recorder(w).land as any });
+  r = await bulk(fakeSb(w), c, { snapshotWriter: admitted, ledger: open, store: memStore(), gate: async () => ({ open: false, io_waiters: 9 }), land: recorder(w).land as any });
   assertEquals([c.calls, r.stopped?.startsWith("io_gate")], [0, true]);
   // landings per run: the page stops part-way and the cursor stays on it
   w = world(); c = fakeClient(pages, { years });
   const store = memStore(), rec = recorder(w);
-  r = await bulk(fakeSb(w), c, { maxLand: 50, ledger: open, store, gate: gateOpen, land: rec.land as any });
+  r = await bulk(fakeSb(w), c, { maxLand: 50, snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any });
   assertEquals([rec.landed.length, r.bulk.pages[0].complete, store.get().pass.offset, r.stopped?.startsWith("cap")], [50, false, 0, true]);
 });
 
@@ -288,7 +289,7 @@ Deno.test("cursor resume: each run continues where the last stopped, re-reading 
   const reads: string[] = [];
   const run = async (o: Record<string, unknown>) => {
     const c = fakeClient(pages, { years: { "1967": 450 } });
-    const r = await bulk(sb, c, { ledger: open, store, gate: gateOpen, land: rec.land as any, ...o });
+    const r = await bulk(sb, c, { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any, ...o });
     reads.push(...c.reads);
     return r;
   };
@@ -313,12 +314,12 @@ Deno.test("a throttled landing waits out the trace window and is tried again; on
     return await (rec.land as any)(...a);
   };
   const pages = { [FILTER]: [sum("9001"), sum("9002"), sum("9003"), sum("9004")] };
-  const r = await bulk(fakeSb(w), fakeClient(pages), { ledger: open, store, gate: gateOpen, land: land as any, concurrency: 1 });
+  const r = await bulk(fakeSb(w), fakeClient(pages), { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: land as any, concurrency: 1 });
   assertEquals([r.bulk.trace_waits, r.bulk.pages[0].landed, r.bulk.pages[0].skipped, r.bulk.pages[0].complete, store.get().pass.i], [1, 3, 1, true, 1]);
   assertEquals([new Set(rec.landed.map((l) => l.item.legacyItemId)).size, r.errors.length], [3, 1]);   // 9002 landed on its retry; 9003 is the one error
   // a window that opens after the run's time budget: the throttled listing waits for the next run, and the page is read again
   const w2 = world(), store2 = memStore();
-  const r2 = await bulk(fakeSb(w2), fakeClient(pages), { ledger: open, store: store2, gate: gateOpen, budgetMs: 1000, concurrency: 1,
+  const r2 = await bulk(fakeSb(w2), fakeClient(pages), { snapshotWriter: admitted, ledger: open, store: store2, gate: gateOpen, budgetMs: 1000, concurrency: 1,
     land: (async () => { throw new Error("Rate limit exceeded for trace 01a2. Retry after 60000ms."); }) as any });
   assertEquals([r2.bulk.pages[0].complete, store2.get().pass.offset, r2.ok], [false, 0, true]);
 });
@@ -336,13 +337,13 @@ Deno.test("legacy unaligned cursor replays its containing page then advances eve
   const pages = { [FILTER]: Array.from({ length: 450 }, (_, i) => sum(String(17000 + i))) };
   const w = world(), store = memStore(), rec = recorder(w), sb = fakeSb(w);
   await bulk(sb, fakeClient(pages, { years: { "1967": 450 } }),
-    { ledger: open, store, gate: gateOpen, land: rec.land as any, maxCalls: 2, maxLand: 1000 });
+    { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any, maxCalls: 2, maxLand: 1000 });
   // Old code could persist 190 + 200 after a completed overlap page.
   await store.write({ ...store.get(), pass: { ...store.get().pass, offset: 390 } });
   const reads: string[] = [];
   for (let i = 0; i < 2; i++) {
     const c = fakeClient(pages, { years: { "1967": 450 } });
-    await bulk(sb, c, { ledger: open, store, gate: gateOpen, land: rec.land as any, maxCalls: 1, maxLand: 1000 });
+    await bulk(sb, c, { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any, maxCalls: 1, maxLand: 1000 });
     reads.push(...c.reads);
   }
   assertEquals(reads, [`${FILTER}@200`, `${FILTER}@400`]);
@@ -355,10 +356,10 @@ Deno.test("legacy partial-page marker resumes the same page without duplicating 
   const pages = { [FILTER]: Array.from({ length: 30 }, (_, i) => sum(String(18000 + i))) };
   const w = world(), store = memStore(), rec = recorder(w), sb = fakeSb(w);
   await bulk(sb, fakeClient(pages, { years: { "1967": 30 } }),
-    { ledger: open, store, gate: gateOpen, land: rec.land as any, maxLand: 10 });
+    { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any, maxLand: 10 });
   await store.write({ ...store.get(), pass: { ...store.get().pass, offset: 10 } });
   const c = fakeClient(pages, { years: { "1967": 30 } });
-  await bulk(sb, c, { ledger: open, store, gate: gateOpen, land: rec.land as any, maxLand: 1000 });
+  await bulk(sb, c, { snapshotWriter: admitted, ledger: open, store, gate: gateOpen, land: rec.land as any, maxLand: 1000 });
   assertEquals(c.reads, [`${FILTER}@0`]);
   assertEquals(rec.landed.length, 30);
 });
@@ -370,4 +371,15 @@ Deno.test("opening prices and live bids never become ingest asking prices", () =
     assertEquals(toLanding(s, h => h, "ebay-browse-search", { year: 1967, make: "Ford", model: "Mustang" })!.ingestInput!.price, undefined);
   }
   assertEquals(currentEpisodePrice(sum("1010", { price: "45000.00" })), 45000);
+});
+
+Deno.test("bulk auction admission failure preserves its page and never updates an unproven quote", async () => {
+  const w = world(), store = memStore();
+  w.episodes.push({ source_url: "https://www.ebay.com/itm/3101", vehicle_id: "veh-3101", current_price: 4000, event_status: "active", bids: 2 });
+  const c = fakeClient({ [FILTER]: [sum("3101", { auction: true, price: "4100.25", bids: 3 })] });
+  const r = await bulk(fakeSb(w), c, { ledger: open, store, gate: gateOpen,
+    snapshotWriter: async () => { throw new Error("canonical admission unavailable"); } });
+  assertEquals([w.updates.length, r.bulk.snapshots_admitted, r.bulk.snapshots_deferred, store.get().pass.offset], [0, 0, 1, 0]);
+  assertEquals(r.bulk.pages[0].complete, false);
+  assertEquals(r.ok, false);
 });
