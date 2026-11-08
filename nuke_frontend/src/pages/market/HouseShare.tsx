@@ -2,17 +2,21 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { Text } from '../../kit';
-import { houseName, recordedUsdBid, type LiveAuction } from './useMarketPulse';
+import { houseName, recordedUsdBid, usdBid, type LiveAuction } from './useMarketPulse';
 import { sourceLogoInk } from './sourceLogoInk';
 
 // Each house's share of the board over time, and each house's own week-over-week comparison. Both read one series:
 // live_board_snapshots (migration 20261022073000), recorded every 15 minutes from its first day. Nothing is backfilled:
 // the chart says where its history starts, and a house has a week-ago comparison only once its own series is a week old.
 
-export interface SharePoint { at: number; house: string; bidUsd: number; lots: number; lotsWithBid: number }
-export interface HouseWeekAgo { at: number; bidUsd: number; lots: number; lotsWithBid: number }
+// bidUsd is the dollar-denominated bids only; bidUsdConverted adds bids in other currencies at the rate of the reading's
+// date (null on readings before converted recording began, 2026-11-08; nothing is backfilled).
+export interface SharePoint { at: number; house: string; bidUsd: number; lots: number; lotsWithBid: number; bidUsdConverted: number | null }
+export interface HouseWeekAgo { at: number; bidUsd: number; lots: number; lotsWithBid: number; bidUsdConverted: number | null }
 export interface HouseShareData {
   firstAt: number | null;
+  /** The first reading with converted dollars, or null before any. */
+  convertedFirstAt: number | null;
   firstAtByHouse: Record<string, number>;
   points: SharePoint[];
   weekAgo: Record<string, HouseWeekAgo>;
@@ -21,16 +25,46 @@ export interface HouseShareData {
 export async function fetchHouseShare(): Promise<HouseShareData> {
   const { data, error } = await supabase.rpc('live_board_share', { p_hours: 168 });
   if (error) throw error;
-  const rows = (Array.isArray(data?.points) ? data.points : []) as [string, string, number | string, number, number][];
-  const week = (data?.week_ago ?? {}) as Record<string, { at: string; bid_usd: number | string; lots: number; lots_with_bid: number }>;
+  const rows = (Array.isArray(data?.points) ? data.points : []) as [string, string, number | string, number, number, (number | string | null)?][];
+  const week = (data?.week_ago ?? {}) as Record<string, { at: string; bid_usd: number | string; lots: number; lots_with_bid: number; bid_usd_converted?: number | string | null }>;
+  const num = (v: unknown) => (v == null ? null : Number(v));
   const firsts = (data?.first_at_by_house ?? {}) as Record<string, string>;
   return {
     firstAt: data?.first_at ? Date.parse(data.first_at) : null,
+    convertedFirstAt: data?.converted_first_at ? Date.parse(data.converted_first_at) : null,
     firstAtByHouse: Object.fromEntries(Object.entries(firsts).map(([h, t]) => [h, Date.parse(t)])),
-    points: rows.map(r => ({ at: Date.parse(r[0]), house: r[1], bidUsd: Number(r[2]), lots: Number(r[3]), lotsWithBid: Number(r[4]) }))
+    points: rows.map(r => ({ at: Date.parse(r[0]), house: r[1], bidUsd: Number(r[2]), lots: Number(r[3]), lotsWithBid: Number(r[4]), bidUsdConverted: num(r[5]) }))
       .filter(p => Number.isFinite(p.at)),
     weekAgo: Object.fromEntries(Object.entries(week).map(([h, w]) => [h, {
-      at: Date.parse(w.at), bidUsd: Number(w.bid_usd), lots: Number(w.lots), lotsWithBid: Number(w.lots_with_bid) }])),
+      at: Date.parse(w.at), bidUsd: Number(w.bid_usd), lots: Number(w.lots), lotsWithBid: Number(w.lots_with_bid), bidUsdConverted: num(w.bid_usd_converted) }])),
+  };
+}
+
+const WEEK_MS = 7 * 86_400_000;
+
+/** The dollar basis the history and week on week use: converted dollars once their own readings are a week old, so a week
+ *  ago exists in the same unit; until then dollar-denominated bids only, the unit every older reading keeps. */
+export function convertedBasis(data: HouseShareData | undefined, now: number): boolean {
+  return data?.convertedFirstAt != null && now - data.convertedFirstAt >= WEEK_MS;
+}
+
+/** The share data in converted dollars: readings without them are left out, never mixed with dollar-only ones. */
+export function onConvertedBasis(data: HouseShareData): HouseShareData {
+  return {
+    ...data,
+    points: data.points.filter(p => p.bidUsdConverted != null).map(p => ({ ...p, bidUsd: p.bidUsdConverted as number })),
+    weekAgo: Object.fromEntries(Object.entries(data.weekAgo).filter(([, w]) => w.bidUsdConverted != null)
+      .map(([h, w]) => [h, { ...w, bidUsd: w.bidUsdConverted as number }])),
+  };
+}
+
+/** The share data and a lot's dollar value on the basis now in force. Lot counts keep every reading. */
+export function shareOnBasis(data: HouseShareData | undefined, now: number, measure: ShareMeasure = 'bids') {
+  const converted = measure === 'bids' && convertedBasis(data, now);
+  return {
+    converted,
+    data: converted && data ? onConvertedBasis(data) : data,
+    bidOf: (a: LiveAuction) => (converted ? usdBid(a) : recordedUsdBid(a)) ?? 0,
   };
 }
 
@@ -116,6 +150,13 @@ function valueText(n: number, measure: ShareMeasure, places = 2): string {
 }
 function signedPct(p: number): string { return `${p >= 0 ? '+' : ''}${p.toFixed(2)}%`; }
 
+/** What unit the dollar history is in, and from which day converted readings exist. */
+export function basisNote(converted: boolean, convertedFirstAt: number | null): string {
+  const day = convertedFirstAt != null ? new Date(convertedFirstAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+  if (converted && day) return `Dollars include bids in other currencies at the published rate of each reading's date; converted readings start ${day}, and earlier readings are not shown in this unit.`;
+  return `Bids recorded in dollars only, the unit these readings keep; the headline also adds bids in other currencies at published rates.${day ? ` Converted readings start ${day}; the history switches to them once they hold a week.` : ''}`;
+}
+
 const H = 260, PAD_R = 70, PAD_B = 22, PAD_T = 10;
 
 /** Decimals for an axis in millions or thousands so neighbouring ticks never read the same. */
@@ -195,11 +236,12 @@ function Spark({ series, up }: { series: { t: number; v: number }[]; up: boolean
 /** What the clicked figure opens into, laid out like a market screen: the board's total as a price chart with range
  *  tabs, and under it a watchlist of the houses (mark, value, share, change, trend). The history starts the day it began
  *  recording and says so; a house with fewer than two readings in the range shows no change. */
-export function HouseMarket({ measure, live, data, isError, now }: {
+export function HouseMarket({ measure, live, data: read, isError, now }: {
   measure: ShareMeasure; live: LiveAuction[]; data: HouseShareData | undefined; isError: boolean; now: number;
 }) {
   const [range, setRange] = useState<RangeId>('1d');
-  const valueOf = (a: LiveAuction) => (measure === 'bids' ? (recordedUsdBid(a) ?? 0) : 1);
+  const { converted, data, bidOf } = shareOnBasis(read, now, measure);
+  const valueOf = (a: LiveAuction) => (measure === 'bids' ? bidOf(a) : 1);
   const nowBy = new Map<string, number>();
   for (const a of live) nowBy.set(a.house, (nowBy.get(a.house) ?? 0) + valueOf(a));
   const total = [...nowBy.values()].reduce((a, b) => a + b, 0);
@@ -230,7 +272,7 @@ export function HouseMarket({ measure, live, data, isError, now }: {
       )}
       <Text role="caption" as="div" className="market-stock__note">
         {data?.firstAt ? `Recorded every 15 minutes since ${stamp(data.firstAt)} (${span(now - data.firstAt)} of history). Nothing before that is estimated.` : ''}
-        {measure === 'bids' ? ' Bids recorded in dollars only, the unit these readings keep; the headline also adds bids in other currencies at published rates.' : ''}
+        {measure === 'bids' ? ` ${basisNote(converted, read?.convertedFirstAt ?? null)}` : ''}
         {series.length >= 2 ? ` Showing ${span(series[series.length - 1].t - series[0].t)}.` : ''}
       </Text>
       <table className="market-stock__watch" aria-label="Houses">
