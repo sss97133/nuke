@@ -155,16 +155,20 @@ test('label-scenes: parseLabel validates strict JSON (fenced or with stray text)
 });
 
 test('label-scenes: inference carries run, model, producer and the session; CTE and apply body match the table columns', () => {
-  const s = normalizeSession({ vehicle_id: V, session_key: 'k', image_ids: [I], sample_urls: ['u'] });
+  const s = normalizeSession({ vehicle_id: V, session_key: 'k', image_ids: [I], sample_urls: ['u'], photos: 14 });
+  assert.equal(s.photo_count, 14);
+  assert.equal(normalizeSession({ vehicle_id: V, session_key: 'k' }).photo_count, null);
   const inf = toInference(s, { scene_label: 'paint_body', confidence: 0.9, rationale: "o'brien's masking" }, { runId: I, model: 'claude-cli:default', createdAt: '2026-11-07T00:00:00.000Z' });
-  assert.deepEqual(Object.keys(inf), ['run_id', 'vehicle_id', 'session_key', 'image_ids', 'scene_label', 'model', 'confidence', 'rationale', 'producer', 'created_at']);
+  assert.deepEqual(Object.keys(inf), ['run_id', 'vehicle_id', 'session_key', 'image_ids', 'scene_label', 'model', 'confidence', 'rationale', 'photo_count', 'producer', 'created_at']);
   assert.equal(inf.producer, 'scripts/garage/label-scenes.mjs');
   const cte = sceneCte([inf]);
   assert.match(cte, /^scene_labels AS \(/);
   assert.match(cte, /ARRAY\['11111111-1111-4111-8111-111111111111'::uuid\]/);
-  assert.match(cte, /'o''brien''s masking'\)/);
+  assert.match(cte, /'o''brien''s masking', 14::int\)/);
   assert.match(cte, /WHERE true -- \(scene_labels\)/);
   assert.match(sceneCte([]), /WHERE false -- \(scene_labels\)/);
+  assert.match(sceneCte([{ ...inf, photo_count: null }]), /NULL::int\)/);
+  assert.ok(readText(new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url), 'utf8').includes(sceneCte([])), 'empty scene CTE equals the preview placeholder');
   assert.doesNotMatch(cte, /\b(insert|update|delete|drop)\b\s/i);
   assert.deepEqual(Object.keys(applyBody([inf])[0]), ['run_id', 'vehicle_id', 'session_key', 'image_ids', 'scene_label', 'model', 'confidence', 'rationale']);
 });

@@ -7,7 +7,8 @@
 //        [--out /workspace/scene_labels.jsonl] [--cte-out /workspace/scene_labels.cte.sql] [--cache-dir /tmp/label-scenes-cache]
 //        [--backend claude-cli] [--model <name>] [--limit n] [--apply]
 //
-// Input rows (from scripts/garage/scene-sessions.mjs): vehicle_id, session_key, image_ids, sample_urls (up to 4 are used).
+// Input rows (from scripts/garage/scene-sessions.mjs): vehicle_id, session_key, image_ids, photos (the session's photo count: the weight of its
+// vote when derive_vehicle_relationships aggregates a vehicle's sessions; image_ids length when absent), sample_urls (up to 4 are used).
 // Per session: download the samples to the cache dir (HEIC -> JPEG with python3 + pillow_heif, else sharp when installed), then ask
 // the backend. Backend 'claude-cli' (default) runs `claude -p` (~/.local/bin/claude; CLAUDE_CODE_OAUTH_TOKEN comes from the
 // caller's environment) with the image paths in the prompt and the Read tool allowed; it must answer strict JSON
@@ -36,7 +37,10 @@ export function normalizeSession(r) {
   const ids = r.image_ids ?? r.sample_image_ids ?? [];
   if (!UUID.test(r.vehicle_id ?? '')) throw new Error(`session without a valid vehicle_id: ${JSON.stringify(r).slice(0, 120)}`);
   if (!r.session_key) throw new Error(`session ${r.vehicle_id} has no session_key`);
-  return { vehicle_id: r.vehicle_id.toLowerCase(), session_key: String(r.session_key), image_ids: ids.filter((i) => UUID.test(i)), sample_urls: urls };
+  // photos in the whole session (the weight of its vote); scene-sessions.mjs calls it `photos`
+  const pc = Number(r.photo_count ?? r.photos);
+  return { vehicle_id: r.vehicle_id.toLowerCase(), session_key: String(r.session_key), image_ids: ids.filter((i) => UUID.test(i)), sample_urls: urls,
+    photo_count: Number.isInteger(pc) && pc > 0 ? pc : null };
 }
 
 export function buildPrompt(files) {
@@ -76,20 +80,21 @@ export function parseLabel(text) {
 
 export function toInference(session, label, { runId, model, createdAt = new Date().toISOString() }) {
   return { run_id: runId, vehicle_id: session.vehicle_id, session_key: session.session_key, image_ids: session.image_ids,
-    scene_label: label.scene_label, model, confidence: label.confidence, rationale: label.rationale, producer: PRODUCER, created_at: createdAt };
+    scene_label: label.scene_label, model, confidence: label.confidence, rationale: label.rationale, photo_count: session.photo_count ?? null,
+    producer: PRODUCER, created_at: createdAt };
 }
 
 const q = (t) => (t == null ? 'NULL::text' : `'${String(t).replace(/'/g, "''")}'`);
 
 // The scene_labels CTE, same columns as the placeholder in the preview (WHERE true marks it as filled).
 export function valuesCte(rows) {
-  const head = 'scene_labels AS (\n  SELECT t.run_id, t.vehicle_id, t.session_key, t.image_ids, t.scene_label, t.model, t.confidence, t.rationale\n';
-  const cols = 't(run_id, vehicle_id, session_key, image_ids, scene_label, model, confidence, rationale)';
+  const head = 'scene_labels AS (\n  SELECT t.run_id, t.vehicle_id, t.session_key, t.image_ids, t.scene_label, t.model, t.confidence, t.rationale, t.photo_count\n';
+  const cols = 't(run_id, vehicle_id, session_key, image_ids, scene_label, model, confidence, rationale, photo_count)';
   if (!rows.length) {
-    return head + `    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::text, NULL::text, NULL::numeric, NULL::text))\n         ${cols}\n   WHERE false -- (scene_labels)\n),`;
+    return head + `    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::text, NULL::text, NULL::numeric, NULL::text, NULL::int))\n         ${cols}\n   WHERE false -- (scene_labels)\n),`;
   }
   const vals = rows.map((r) => `(${q(r.run_id)}::uuid, ${q(r.vehicle_id)}::uuid, ${q(r.session_key)}, `
-    + `${r.image_ids.length ? `ARRAY[${r.image_ids.map((i) => `${q(i)}::uuid`).join(', ')}]` : 'ARRAY[]::uuid[]'}, ${q(r.scene_label)}, ${q(r.model)}, ${Number(r.confidence)}::numeric, ${q(r.rationale)})`);
+    + `${r.image_ids.length ? `ARRAY[${r.image_ids.map((i) => `${q(i)}::uuid`).join(', ')}]` : 'ARRAY[]::uuid[]'}, ${q(r.scene_label)}, ${q(r.model)}, ${Number(r.confidence)}::numeric, ${q(r.rationale)}, ${r.photo_count == null ? 'NULL::int' : `${Number(r.photo_count)}::int`})`);
   return head + `    FROM (VALUES\n      ${vals.join(',\n      ')})\n         ${cols}\n   WHERE true -- (scene_labels)\n),`;
 }
 
