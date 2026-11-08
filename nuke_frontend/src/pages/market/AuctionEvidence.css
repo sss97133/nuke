@@ -72,6 +72,14 @@
 .market-lot-identity { min-width: 0; }
 .market-lot-row .market-lot-name { display: block; overflow-wrap: anywhere; }
 .market-lot-row .market-lot-name .k-entity { font-size: 21px; line-height: 1.2; letter-spacing: -0.015em; }
+/* The title reads as one line of text; its year, make and model underline on hover and each re-scope the board.
+   The rest of the row opens the lot. */
+.market-lot-row .market-lot-identity { cursor: pointer; }
+.market-lot-name .vehicle-identity[data-period-artwork="false"],
+.market-lot-name .vehicle-identity[data-period-artwork="false"] > span:not(.sr-only),
+.market-lot-name .vehicle-identity[data-period-artwork="false"] .vehicle-identity__explore { display: inline; }
+.market-lot-name .vehicle-identity[data-period-artwork="false"] :is(.vehicle-identity__year, .vehicle-identity__maker) { margin-right: .28em; }
+.market-lot-row .market-lot-name .vehicle-identity__explore { min-height: 0; text-underline-offset: 3px; }
 .market-lot-row .market-lot-facts .k-body { font-size: 14px; color: var(--text-secondary); }
 .market-lot-facts { display: flex; flex-wrap: wrap; column-gap: 14px; row-gap: 2px; margin-top: 4px; }
 .market-lot-facts:empty { display: none; }
@@ -127,6 +135,7 @@
 @media (pointer: coarse) {
   .market-lot-name, .market-lot-image, .market-lot-metrics, .market-inspection-header button { min-height: 44px; }
   .market-lot-facts button, .market-lot-context button, .market-inspection-more > summary { padding-block: 8px; }
+  .market-lot-row .market-lot-name .vehicle-identity__explore { padding-block: 8px; }
 }
 
 /* The board's pager: one page of lots at a time, the page named in the URL. */

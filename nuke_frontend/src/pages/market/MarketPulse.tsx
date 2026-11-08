@@ -9,7 +9,7 @@ import AuctionEvidence from './AuctionEvidence';
 import { BAT_HOUSE, BID_BUCKETS, bidBucket, currentBidDistribution, houseName, listingKey, moneyIn, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, usdBid, type BidBucket, type BidCurve, type HouseStatus, type LiveAuction } from './useMarketPulse';
 import { HouseMark, HouseMarket, houseWeekChange, useHouseShare } from './HouseShare';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
-import { MakeLogo } from '../../components/common/MakeIdentity';
+import { MakeLogo, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { displayMake, selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 import { useFinishEstimates, type FinishEstimate } from './useFinishEstimates';
 import { ringBids, startBidChime } from './bidChime';
@@ -354,9 +354,22 @@ export function FinishLine({ e, bid }: { e: FinishEstimate; bid?: number | null 
   </div>;
 }
 
-function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, group, onInspect }: {
+// The board's scope as a row's title reads it: pressing the year, make or model already in scope widens it again.
+export type RowScope = { make: string | null; model: string | null; era: string | null };
+export type RowDrill = 'year' | 'make' | 'model';
+const yearEra = (year: number | null) => year == null ? null : `${year}-${year}`;
+// A single-year scope reads as its year.
+const eraLabel = (era: string) => /^(\d{4})-\1$/.test(era) ? era.slice(0, 4) : era.replace('-', '–');
+function drillLabel(a: LiveAuction, field: string, scope: RowScope): string {
+  const make = displayMake(a.make);
+  if (field === 'year') return scope.era === yearEra(a.year) ? 'Show every year' : `Show ${a.year} lots`;
+  if (field === 'make') return scope.make === a.make ? 'Show every make' : `Show ${make} lots`;
+  return scope.model === recordedModel(a) ? `Show every ${make} model` : `Show ${make} ${recordedModel(a)} lots`;
+}
+
+function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, group, scope, onInspect, onDrill }: {
   a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean; finish?: FinishEstimate; showHouse: boolean;
-  group: CloseGroup | null; onInspect: (a: LiveAuction, view: LotInspection) => void;
+  group: CloseGroup | null; scope: RowScope; onInspect: (a: LiveAuction, view: LotInspection) => void; onDrill: (a: LiveAuction, field: RowDrill) => void;
 }) {
   const [rowRef, seen] = useSeen<HTMLDivElement>();
   const reached = (seen || expanded) && !!detail;
@@ -370,15 +383,25 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, group,
   // the answer: the bid and where it should finish. Inside a time section the row gives its closing clock; the last
   // hour (and a board in another order) ticks.
   const ticking = group == null || group === 'hour';
+  // The title's year, make and model each re-scope the board in place (the shared VehicleIdentity); the rest of the row
+  // opens the lot. The title stays text: the catalogue's period lettering is headline-scale, and at row size (2026-11-08)
+  // the 1963 Chevrolet badge read as an illegible bowtie in a boxed panel that wrapped a phone title one word a line.
+  const drillable = a.make !== NO_MAKE && !!a.model?.trim();
+  const openFromRow = (e: React.MouseEvent) => {
+    if ((e.target as Element).closest('button, a') || window.getSelection()?.toString()) return;
+    onInspect(a, 'auction');
+  };
   return (
-    <div ref={rowRef} className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
+    <div ref={rowRef} className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded} onClick={openFromRow}>
       <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect ${title(a)}`} aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>
         <Thumb src={a.imageUrl} />
       </button>
       <div className="market-lot-identity">
-        <button type="button" className="market-lot-name" onClick={() => onInspect(a, 'auction')}
-          aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}><Text role="entity">{title(a)}</Text></button>
+        <div className="market-lot-name"><Text role="entity">{drillable
+          ? <VehicleIdentity compact artwork={false} year={a.year} make={displayMake(a.make)} model={a.model!.trim()}
+            onExplore={field => onDrill(a, field as RowDrill)} exploreLabel={field => drillLabel(a, field, scope)} />
+          : title(a)}</Text></div>
         <div className="market-lot-facts">
           {facts.map(f => <Text role="body" key={f.field} title={`${f.label}: ${f.value}${f.conflict ? ' · reports differ' : ''}`}>{f.value}</Text>)}
         </div>
@@ -403,9 +426,9 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, group,
 // document never grows past one page. A shared link to a lot opens the page that holds it.
 export const PAGE = 24;
 
-function Board({ rows, risenIds, stale, showHouse, activityId, finishes, inspection, sections, onInspect, onInspectionChange, onClose }: {
+function Board({ rows, risenIds, stale, showHouse, activityId, finishes, inspection, sections, scope, onInspect, onDrill, onInspectionChange, onClose }: {
   rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; showHouse: boolean; activityId: string | null; finishes?: Map<string, FinishEstimate>;
-  inspection: LotInspection; onInspect: (a: LiveAuction, view: LotInspection) => void;
+  inspection: LotInspection; scope: RowScope; onInspect: (a: LiveAuction, view: LotInspection) => void; onDrill: (a: LiveAuction, field: RowDrill) => void;
   // In close order: the time section of each lot and the lots each section holds on the whole board, not only those loaded.
   sections: { now: number; counts: Record<CloseGroup, number> } | null;
   onInspectionChange: (view: LotInspection) => void; onClose: () => void;
@@ -431,7 +454,7 @@ function Board({ rows, risenIds, stale, showHouse, activityId, finishes, inspect
             {heading && <h2 className={`market-board-group market-board-group--${heading.id}`}>
               <Text role="label">{heading.label}</Text> <Text role="measure" dense>{sections!.counts[heading.id].toLocaleString('en-US')} {sections!.counts[heading.id] === 1 ? 'lot' : 'lots'}</Text>
             </h2>}
-            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} finish={finishes?.get(a.id)} showHouse={showHouse} group={group} onInspect={onInspect} />
+            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} finish={finishes?.get(a.id)} showHouse={showHouse} group={group} scope={scope} onInspect={onInspect} onDrill={onDrill} />
             {expanded && <AuctionEvidence key={a.id} vehicleId={a.id} compact inspection={inspection} summary={detail}
               sourceUrl={a.listingUrl} onInspectionChange={onInspectionChange} onClose={onClose} />}
           </div>
@@ -480,14 +503,14 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const make = makeParam === 'ALL' ? defaultMake : makeParam ?? defaultMake;
   const model = make ? params.get('model') : null;
   const familyName = make ? params.get('family_name')?.trim() || null : null;
-  const era = make ? params.get('era')?.trim() || null : null;
+  const era = params.get('era')?.trim() || null;
   const inventoryLens = mapLens(params, make);
   const lotParam = params.get('lot');
   const activityId = lotParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lotParam) ? lotParam : null;
   const mapInspection = useRef<string | null>(null);
   useEffect(() => {
     if (!activityId || mapInspection.current !== activityId) return;
-    const row = document.querySelector<HTMLButtonElement>(`[data-vehicle-id="${activityId}"] .market-lot-name`);
+    const row = document.querySelector<HTMLButtonElement>(`[data-vehicle-id="${activityId}"] .market-lot-image`);
     row?.scrollIntoView({ block: 'center' });
     row?.focus({ preventScroll: true });
     mapInspection.current = null;
@@ -514,8 +537,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const closeActivity = () => {
     const active = activityId;
     const next = new URLSearchParams(params); next.delete('lot'); next.delete('inspect'); setParams(next, { preventScrollReset: true });
-    if (active) requestAnimationFrame(() => (document.querySelector<HTMLButtonElement>(`[data-vehicle-id="${active}"] .market-lot-name`)
-      ?? document.querySelector<HTMLButtonElement>('.market-lot-name'))?.focus({ preventScroll: true }));
+    if (active) requestAnimationFrame(() => (document.querySelector<HTMLButtonElement>(`[data-vehicle-id="${active}"] .market-lot-image`)
+      ?? document.querySelector<HTMLButtonElement>('.market-lot-image'))?.focus({ preventScroll: true }));
   };
   const salesDay = params.get('day');
   const salesLens: MarketSalesLens = {
@@ -556,6 +579,31 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
     next.delete('lot');
     setParams(next);
+  };
+  // A row's year, make or model re-scopes the board in place; pressing the scope already shown widens it again. The
+  // pressed row keeps its place on screen (drillAnchor) so the board changes shape around it.
+  const drillAnchor = useRef<{ id: string; top: number } | null>(null);
+  const drillRow = (a: LiveAuction, field: RowDrill) => {
+    const next = new URLSearchParams(params);
+    const lotModel = recordedModel(a);
+    if (field === 'year') {
+      const y = yearEra(a.year);
+      if (y == null || era === y) next.delete('era'); else next.set('era', y);
+    } else if (field === 'make' && make === a.make) {
+      next.set('make', 'all');
+      ['model', 'family', 'family_name', 'mapBy'].forEach(k => next.delete(k));
+    } else if (field === 'model' && model === lotModel) {
+      next.delete('model');
+    } else {
+      if (make !== a.make) ['mapBy', 'bidRange'].forEach(k => next.delete(k));
+      next.set('make', a.make);
+      ['model', 'family', 'family_name'].forEach(k => next.delete(k));
+      if (field === 'model') next.set('model', lotModel);
+    }
+    ['lot', 'inspect', 'board', 'year', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
+    const top = document.querySelector(`[data-vehicle-id="${a.id}"]`)?.getBoundingClientRect().top;
+    drillAnchor.current = top == null ? null : { id: a.id, top };
+    setParams(next, { preventScrollReset: true });
   };
   const setInventoryLens = (change: Partial<InventoryMapLens>) => {
     const next = new URLSearchParams(params);
@@ -678,6 +726,18 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const page = Math.max(Number.isInteger(boardParam) && boardParam >= 1 ? Math.min(boardParam, pages) : 1,
     selectedIndex >= 0 ? Math.floor(selectedIndex / PAGE) + 1 : 1);
   const pageRows = useMemo(() => board.slice(0, page * PAGE), [board, page]);
+  useLayoutEffect(() => {
+    const anchor = drillAnchor.current;
+    if (!anchor) return;
+    const row = document.querySelector(`[data-vehicle-id="${anchor.id}"]`);
+    if (row) { window.scrollBy(0, row.getBoundingClientRect().top - anchor.top); drillAnchor.current = null; return; }
+    // A wider scope can put the pressed lot past the first page: load through it, then hold it in place.
+    const i = board.findIndex(x => x.id === anchor.id);
+    if (i < 0) { drillAnchor.current = null; return; }
+    if (i < pageRows.length) return;
+    const next = new URLSearchParams(params); next.set('board', String(Math.floor(i / PAGE) + 1));
+    setParams(next, { replace: true, preventScrollReset: true });
+  }, [board, pageRows]);
   const sections = useMemo(() => {
     if (sort !== 'ending') return null;
     const counts: Record<CloseGroup, number> = { hour: 0, today: 0, tomorrow: 0, week: 0, later: 0 };
@@ -748,7 +808,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     </button> : undefined}>
       {view === 'inventory' ? <span className="market-venue">
         {house && <img className="market-venue__mark" src={house === BAT_HOUSE ? '/vendor/bat/favicon.ico' : `/source-logos/${house}.png`} alt="" width={32} height={32} />}
-        <Text role="entity" as="h1">{house ? houseName(house) : 'Live auctions'}{make ? ` · ${displayMake(make)}${familyName && !model ? ` · ${familyName}` : ''}${era ? ` · ${era.replace('-', '–')}` : ''}` : ''}</Text>
+        <Text role="entity" as="h1">{house ? houseName(house) : 'Live auctions'}{make ? ` · ${displayMake(make)}${familyName && !model ? ` · ${familyName}` : ''}` : ''}{era ? ` · ${eraLabel(era)}` : ''}</Text>
         {house ? <Text role="label">Live auctions</Text> : <span className="market-venue__marks" aria-label={boardHouses.map(h => houseName(h, true)).join(', ')}>{boardHouses.map(h => <HouseMark key={h} house={h} height={16} />)}</span>}
       </span> : <Text role="entity" as="h1">Recorded sales</Text>}
     </Masthead>
@@ -864,7 +924,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
         </div>
         {filtered && !mapFilterPending && <div className="market-board__scope">
           <Text role="body"><strong>{board.filter(a => a.endsAt > now).length.toLocaleString('en-US')}</strong> of {live.length.toLocaleString('en-US')} live lots</Text>
-          <Text role="caption">{[house ? houseName(house, true) : null, make ? displayMake(make) : null, model,
+          <Text role="caption">{[house ? houseName(house, true) : null, make ? displayMake(make) : null, model, era ? eraLabel(era) : null,
             win !== 'all' ? WINDOWS.find((w) => w.id === win)?.label : null,
             selectedBid ? BID_BUCKETS.find(b => b.id === selectedBid)?.label : null].filter(Boolean).join(' · ')}</Text>
         </div>}
@@ -877,7 +937,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
           setParams(next, { replace: true });
         }}><Text role="label">Clear market filters</Text></button></div>}
         {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind} showHouse={boardHouses.length > 1}
-          activityId={activityId} finishes={finish.data?.byId} inspection={inspection} sections={sections} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
+          activityId={activityId} finishes={finish.data?.byId} inspection={inspection} sections={sections} scope={{ make, model, era }}
+          onInspect={openActivity} onDrill={drillRow} onInspectionChange={setInspection} onClose={closeActivity} />}
         {!isLoading && !mapFilterPending && board.length > 0 && (
           <div ref={moreRef} className="market-board-more">
             {page < pages

@@ -1226,9 +1226,6 @@
   .vp-header-departments { justify-content: flex-start; }
   .vp-financial-entry summary { flex-wrap: wrap; gap: 4px; }
 }
-.vehicle-identity__explore { appearance: none; display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.vehicle-identity__explore:hover { text-decoration: underline; text-underline-offset: 5px; }
-.vehicle-identity__explore:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
 .vehicle-profile-page .vp-header-configuration { position: relative; margin-left: auto; font: var(--text-callout)/1.4 var(--font-family); }
 .vehicle-profile-page .vp-header-configuration > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 .vehicle-profile-page .vp-header-configuration[open] .vp-header-facets { position: absolute; right: 0; width: min(500px, calc(100vw - 32px)); padding: 8px; background: var(--surface); border: 1px solid var(--border); }
