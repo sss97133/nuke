@@ -38,19 +38,22 @@ s2 AS (
                  OVER (PARTITION BY s1.vehicle_id ORDER BY s1.t, s1.id) AS sess
     FROM s1 CROSS JOIN cfg
 ),
-rk AS (
+rk AS MATERIALIZED (
   SELECT s2.*, row_number() OVER (PARTITION BY s2.vehicle_id, s2.sess ORDER BY s2.t, s2.id) AS rn,
          count(*) OVER (PARTITION BY s2.vehicle_id, s2.sess) AS n
     FROM s2
 ),
-near AS (
-  SELECT rk.vehicle_id, rk.sess, rk.id AS image_id, o.id AS org_id, o.name, to_jsonb(o)->>'business_type' AS business_type,
+orgs AS MATERIALIZED (
+  SELECT o.id, o.name, to_jsonb(o)->>'business_type' AS business_type, o.latitude::float8 AS olat, o.longitude::float8 AS olon
+    FROM organizations o WHERE o.latitude IS NOT NULL AND o.longitude IS NOT NULL
+),
+near AS MATERIALIZED (
+  SELECT rk.vehicle_id, rk.sess, rk.id AS image_id, o.id AS org_id, o.name, o.business_type,
          regexp_replace(lower(coalesce(o.name, '')), '[^a-z0-9]+', '', 'g') AS nn
     FROM rk CROSS JOIN cfg
-    JOIN organizations o ON o.latitude IS NOT NULL AND o.longitude IS NOT NULL
-     AND abs(o.latitude::float8 - rk.lat) < 0.002 AND abs(o.longitude::float8 - rk.lon) < 0.003
-   WHERE 12742000 * asin(sqrt(least(1, power(sin(radians(o.latitude::float8 - rk.lat) / 2), 2)
-           + cos(radians(rk.lat)) * cos(radians(o.latitude::float8)) * power(sin(radians(o.longitude::float8 - rk.lon) / 2), 2)))) <= cfg.r
+    JOIN orgs o ON abs(o.olat - rk.lat) < 0.002 AND abs(o.olon - rk.lon) < 0.003
+   WHERE 12742000 * asin(sqrt(least(1, power(sin(radians(o.olat - rk.lat) / 2), 2)
+           + cos(radians(rk.lat)) * cos(radians(o.olat)) * power(sin(radians(o.olon - rk.lon) / 2), 2)))) <= cfg.r
 ),
 in_range AS (
   SELECT n.vehicle_id, n.sess, count(DISTINCT n.nn) AS n_orgs, count(DISTINCT n.image_id) AS photos_in_range,

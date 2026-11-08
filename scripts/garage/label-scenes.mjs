@@ -18,7 +18,7 @@
 // with SUPABASE_SERVICE_ROLE_KEY (append-only table, UNIQUE (run_id, vehicle_id, session_key)); without --apply nothing is written.
 import { execFile, execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -32,7 +32,7 @@ const MAX_SAMPLES = 4;
 
 // A session row from scene-sessions.mjs (sample_urls / image_ids) or from an older file (sample_image_urls / sample_image_ids).
 export function normalizeSession(r) {
-  const urls = (r.sample_urls ?? r.sample_image_urls ?? []).filter((u) => typeof u === 'string' && u).slice(0, MAX_SAMPLES);
+  const urls = (r.sample_urls ?? r.sample_image_urls ?? (r.samples ?? []).map((x) => x?.image_url)).filter((u) => typeof u === 'string' && u).slice(0, MAX_SAMPLES);
   const ids = r.image_ids ?? r.sample_image_ids ?? [];
   if (!UUID.test(r.vehicle_id ?? '')) throw new Error(`session without a valid vehicle_id: ${JSON.stringify(r).slice(0, 120)}`);
   if (!r.session_key) throw new Error(`session ${r.vehicle_id} has no session_key`);
@@ -185,11 +185,14 @@ async function main() {
   const model = `${backendName}:${modelOpt ?? 'default'}`;
   const sessions = JSON.parse(readFileSync(inFile, 'utf8')).map(normalizeSession).slice(0, limit);
   const runId = randomUUID();
-  const rows = []; const failed = [];
+  // Resumable: rows already in --out (same vehicle + session) are kept and skipped; each new row is appended as it is produced.
+  const rows = existsSync(out) ? readFileSync(out, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  const done = new Set(rows.map((r) => `${r.vehicle_id}|${r.session_key}`)); const failed = [];
   for (const [i, s] of sessions.entries()) {
+    if (done.has(`${s.vehicle_id}|${s.session_key}`)) continue;
     try {
       const label = await labelSession(s, { backend, cacheDir, model: modelOpt });
-      rows.push(toInference(s, label, { runId, model }));
+      const row = toInference(s, label, { runId, model }); rows.push(row); appendFileSync(out, JSON.stringify(row) + '\n');
       console.error(`[${i + 1}/${sessions.length}] ${s.session_key} -> ${label.scene_label} (${label.confidence})`);
     } catch (e) { failed.push({ session_key: s.session_key, vehicle_id: s.vehicle_id, error: e.message }); console.error(`[${i + 1}/${sessions.length}] ${s.session_key} FAILED: ${e.message}`); }
   }
