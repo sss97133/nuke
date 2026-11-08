@@ -453,8 +453,8 @@ const TAPE_MS = 15_000;
 export interface TapeBid {
   id: string; vehicleId: string; amount: number; bidAt: number; endAt: number | null;
   observationId?: string; house?: string; sourceUrl?: string; currency?: string;
-  eventKind?: 'bid' | 'bid_snapshot' | 'price_snapshot'; recovered?: boolean; ingestedAt?: number; receivedAt?: number;
-  clockBasis?: string; bidCount?: number; sourceEventId?: string; projectionError?: string;
+  eventKind?: 'bid' | 'bid_snapshot' | 'price_snapshot'; recovered?: boolean; ingestedAt?: number; receivedAt?: number; latestBidAt?: number;
+  transport?: string; clockBasis?: string; bidCount?: number; sourceEventId?: string; projectionError?: string;
 }
 
 export const tapeEpisode = (url: string | null | undefined) => {
@@ -476,12 +476,12 @@ export function parseTape(data: unknown): TapeBid[] {
     if (typeof r.id !== 'string' || typeof r.vehicle_id !== 'string' || !(amount > 0) || !Number.isFinite(bidAt)) return [];
     const extra: Partial<TapeBid> = {};
     for (const [wire, field] of [['observation_id', 'observationId'], ['house', 'house'], ['source_url', 'sourceUrl'], ['currency', 'currency'],
-      ['clock_basis', 'clockBasis'], ['source_event_id', 'sourceEventId'], ['projection_error', 'projectionError']] as const) {
+      ['clock_basis', 'clockBasis'], ['transport', 'transport'], ['source_event_id', 'sourceEventId'], ['projection_error', 'projectionError']] as const) {
       if (typeof r[wire] === 'string') extra[field] = r[wire] as string;
     }
     if (typeof r.recovered === 'boolean') extra.recovered = r.recovered;
     if (r.event_kind === 'bid' || r.event_kind === 'bid_snapshot' || r.event_kind === 'price_snapshot') extra.eventKind = r.event_kind;
-    for (const [wire, field] of [['ingested_at', 'ingestedAt'], ['received_at', 'receivedAt']] as const) {
+    for (const [wire, field] of [['ingested_at', 'ingestedAt'], ['received_at', 'receivedAt'], ['latest_bid_at', 'latestBidAt']] as const) {
       const at = Date.parse(String(r[wire] ?? '')); if (Number.isFinite(at)) extra[field] = at;
     }
     if (typeof r.bid_count === 'number' && Number.isInteger(r.bid_count) && r.bid_count >= 0) extra.bidCount = r.bid_count;
@@ -518,7 +518,9 @@ export function withTapeBids(auctions: LiveAuction[], best: ReadonlyMap<string, 
   if (!best.size) return auctions;
   return auctions.map((a) => {
     const b = [...best.values()].filter(b => tapeMatches(a, b)).sort((x, y) => y.bidAt - x.bidAt)[0];
-    if (!b || !(b.amount > (a.currentBid ?? 0))) return a;
+    // updatedAt is a conservative row-write clock, not proof of a bid. Withhold an overlay
+    // unless its source observation is strictly newer; this also permits qualified corrections downward.
+    if (!b || !Number.isFinite(a.updatedAt) || a.updatedAt <= 0 || !(b.bidAt > a.updatedAt)) return a;
     return { ...a, currentBid: b.amount, updatedAt: Math.max(a.updatedAt, b.bidAt),
       endsAt: b.endAt != null && b.endAt > a.endsAt ? b.endAt : a.endsAt };
   });
@@ -584,7 +586,7 @@ export function useMarketPulse() {
     if (!d) return d;
     // A tape bid stops lifting its lot once the board's own read has caught up with it.
     for (const [key, b] of best.current) {
-      if ((b.ingestedAt != null && Date.now() - b.ingestedAt > 1800_000) || d.auctions.some(a => tapeMatches(a, b) && (a.currentBid ?? 0) >= b.amount)) best.current.delete(key);
+      if ((b.ingestedAt != null && Date.now() - b.ingestedAt > 1800_000) || d.auctions.some(a => tapeMatches(a, b) && a.updatedAt >= b.bidAt)) best.current.delete(key);
     }
     return { ...d, auctions: withTapeBids(d.auctions, best.current) };
     // eslint-disable-next-line react-hooks/exhaustive-deps

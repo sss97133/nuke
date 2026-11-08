@@ -52,12 +52,22 @@ describe('live bids from the stream', () => {
     const lot = { id: 'v', house: 'bringatrailer', currency: 'USD', listingUrl: 'https://bringatrailer.com/listing/v', currentBid: 100, endsAt: 1000, updatedAt: 10 } as any;
     const best = new Map([['v', { id: '1', vehicleId: 'v', house: 'bringatrailer', currency: 'USD', sourceUrl: 'https://bringatrailer.com/listing/v', amount: 150, bidAt: 20, endAt: 2000 }]]);
     expect(withTapeBids([lot], best)[0]).toMatchObject({ currentBid: 150, endsAt: 2000, updatedAt: 20 });
-    expect(withTapeBids([{ ...lot, currentBid: 200 }], best)[0]).toMatchObject({ currentBid: 200, endsAt: 1000 });
+    expect(withTapeBids([{ ...lot, currentBid: 200, updatedAt: 30 }], best)[0]).toMatchObject({ currentBid: 200, endsAt: 1000 });
     expect(withTapeBids([lot], new Map())[0]).toBe(lot);
+    expect(withTapeBids([{...lot,currentBid:200}],best)[0].currentBid).toBe(150);
+    expect(withTapeBids([{...lot,currentBid:90,updatedAt:30}],best)[0].currentBid).toBe(90);
     expect(withTapeBids([lot], new Map([['quote',{...best.get('v')!,eventKind:'price_snapshot'}]]))[0]).toBe(lot);
     expect(withTapeBids([{ ...lot, listingUrl: 'https://bringatrailer.com/listing/other' }], best)[0].currentBid).toBe(100);
     expect(withTapeBids([{ ...lot, currency: 'EUR' }], best)[0].currentBid).toBe(100);
     expect(withTapeBids([{ ...lot, house: 'ebay-motors' }], best)[0].currentBid).toBe(100);
+  });
+
+  it('uses clocks for corrected bids and withholds historical recovery over newer board state', () => {
+    const lot = { id:'v',house:'bringatrailer',currency:'USD',listingUrl:'https://bringatrailer.com/listing/v',currentBid:90,updatedAt:30,endsAt:1000 } as any;
+    const receipt = { id:'r',vehicleId:'v',house:'bringatrailer',currency:'USD',sourceUrl:lot.listingUrl,amount:100,bidAt:20,endAt:null,recovered:true };
+    expect(withTapeBids([lot],new Map([['r',receipt]]))[0].currentBid).toBe(90);
+    expect(withTapeBids([{...lot,currentBid:100,updatedAt:10}],new Map([['r',{...receipt,amount:90,recovered:false}]]))[0].currentBid).toBe(90);
+    expect(withTapeBids([{...lot,updatedAt:0}],new Map([['r',receipt]]))[0]).toMatchObject({currentBid:90});
   });
 
   it('pulses a lot once when a new bid lands, and hands the bid back when the board catches up', async () => {
@@ -67,7 +77,7 @@ describe('live bids from the stream', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const container = document.createElement('div'); document.body.appendChild(container);
     const root = createRoot(container);
-    const row = (bid: number) => ['fixture', 1995, 'Ford', 'Mustang', bid, '2026-10-20T00:00:00Z', '2026-10-10T00:00:00Z', '2026-10-09T00:00:00Z', null, false, 'https://bringatrailer.com/listing/fixture/'];
+    const row = (bid: number) => ['fixture', 1995, 'Ford', 'Mustang', bid, '2026-10-20T00:00:00Z', bid === 200 ? '2026-10-15T19:00:30Z' : '2026-10-10T00:00:00Z', '2026-10-09T00:00:00Z', null, false, 'https://bringatrailer.com/listing/fixture/'];
     let board = 100;
     let tape: any[] = [];
     fixture.rpc.mockImplementation(async (name: string) => (name === 'live_bid_tape'

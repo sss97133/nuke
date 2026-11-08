@@ -43,7 +43,7 @@ export function AuctionFlow({ bids, houses, auctions, configuredSources, sourceS
   const rows = recent.filter(b => !selected || b.house === selected).sort((a, b) => (b.ingestedAt ?? 0) - (a.ingestedAt ?? 0));
   return <section className="auction-flow" aria-label="Auction data arriving">
     <div className="auction-flow__heading"><h2>Arriving now</h2><span>{stale ? 'Receipt refresh unavailable' : `Receipts read ${clock(updatedAt)}`}</span></div>
-    <p>Last five minutes of admitted evidence. A snapshot records a high bid when polled; it is not an individual bid. Price quotes with zero or unknown bids are counted separately. Recovered history is listed separately and does not light up current activity. No arrivals does not prove a quiet source.</p>
+    <p>Priced auction evidence admitted in the last five minutes. A snapshot records a high bid when polled; it is not an individual bid. Price quotes with zero or unknown bids are counted separately. Recovered history is listed separately and does not light up current activity. No arrivals does not prove a quiet source.</p>
     <div className="auction-flow__sources">
       {sources.map(house => {
         const status = sourceStatus.find(s => s.house === house);
@@ -61,7 +61,7 @@ export function AuctionFlow({ bids, houses, auctions, configuredSources, sourceS
           <span className="auction-flow__bars" aria-label={`Admitted updates in successive minutes: ${bins.join(', ')}`}>
             {bins.map((n, i) => <span key={i} title={`${n} admitted updates`} style={{ height: `${Math.max(2, n / scale * 24)}px`, opacity: n ? 1 : 0.2 }} />)}
           </span>
-          {status && <small>{status.hasError ? 'Source reader reports an error' : status.readAt == null ? 'Source reader has no measured check' : now - status.readAt > 900_000 ? 'Source reader check is stale' : `Reader found ${status.lots ?? 'unknown'} lots`}{status.readAt != null ? ` · ${new Date(status.readAt).toLocaleString()}` : ''}{status.state ? ` · ${status.state.replaceAll('_', ' ')}` : ''}</small>}
+          {status && <small>{status.hasError ? 'Inventory reader reports an error' : status.readAt == null ? 'Inventory check not recorded' : now - status.readAt > 900_000 ? 'Inventory check is stale' : `Reader found ${status.lots ?? 'unknown'} lots`}{status.readAt != null ? ` · ${new Date(status.readAt).toLocaleString()}` : ''}{status.state ? ` · ${status.state.replaceAll('_', ' ')}` : ''}</small>}
           <small>{stale ? 'Last received evidence' : held && !held.onBoard ? 'Board freshness gate holds this source' : group.length ? 'Arrivals observed · completeness unverified' : 'No receipts in window · coverage unverified'}</small>
         </button>;
       })}
@@ -75,8 +75,10 @@ export function AuctionFlow({ bids, houses, auctions, configuredSources, sourceS
             <div><strong>{houseName(b.house ?? 'Unrecorded source')} · {receiptMoney(b)}</strong> <span>{b.recovered || b.bidAt <= now - 300_000 ? 'Recovered evidence' : b.eventKind === 'bid' ? 'Bid' : b.eventKind === 'price_snapshot' ? (b.bidCount === 0 ? 'Opening price quote' : 'Price quote · bid/opening unknown') : 'High-bid snapshot'}</span></div>
             {lot ? <button className="market-control" onClick={() => onInspect(lot)}>{lot.title ?? [lot.year, lot.make, lot.model].filter(Boolean).join(' ')} · inspect evidence</button>
               : <span>Listing outside the current board</span>}
-            <div>Observed {new Date(b.bidAt).toLocaleDateString()} {clock(b.bidAt)} · admitted {clock(b.ingestedAt!)} · {lag >= 0 ? `${(lag / 1000).toFixed(1)}s observation-to-admission` : 'Clock discrepancy'}{b.clockBasis ? ` · ${b.clockBasis === 'native_comment_timestamp' ? 'source event clock' : 'poll observation clock'}` : ''}</div>
-            {b.sourceEventId && <div>Source event {b.sourceEventId}{b.endAt != null ? ` · closes ${new Date(b.endAt).toLocaleString()}` : ''}</div>}
+            <div>Observed {new Date(b.bidAt).toLocaleDateString()} {clock(b.bidAt)} · admitted {clock(b.ingestedAt!)} · {lag >= 0 ? `${(lag / 1000).toFixed(1)}s observation-to-admission` : 'Clock discrepancy'}{b.clockBasis ? ` · ${['native_comment_timestamp','source_event_time'].includes(b.clockBasis) ? 'source event clock' : 'poll observation clock'}` : ''}</div>
+            {b.transport === 'polled_history' && <div>Native bid history captured by polling; intervening coverage unverified.</div>}
+            {b.sourceEventId && <div>{b.eventKind === 'bid' ? 'Source event' : 'Source lot/item'} {b.sourceEventId}{b.endAt != null ? ` · closes ${new Date(b.endAt).toLocaleString()}` : ''}</div>}
+            {b.latestBidAt != null && <div>Source reports latest bid {new Date(b.latestBidAt).toLocaleString()}; this receipt remains a snapshot.</div>}
             {b.bidCount != null && <div>Source reports {b.bidCount} total bids; this receipt does not recover intervening bids.</div>}
             {b.receivedAt != null && <div>Received {clock(b.receivedAt)} · {((b.ingestedAt! - b.receivedAt) / 1000).toFixed(1)}s receipt-to-admission</div>}
             {b.projectionError && <div role="status">Projection incomplete: {b.projectionError}</div>}

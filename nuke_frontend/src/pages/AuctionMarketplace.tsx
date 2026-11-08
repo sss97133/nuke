@@ -11,7 +11,7 @@ import { optimizeImageUrl } from '../lib/imageOptimizer';
 
 const AUCTION_PLATFORMS = [
   'bat', 'cars_and_bids', 'collecting_cars', 'broad_arrow',
-  'rmsothebys', 'gooding', 'sbx', 'barrettjackson', 'mecum', 'ebay_motors', 'pcarmarket',
+  'rmsothebys', 'gooding', 'sbx', 'barrettjackson', 'mecum', 'ebay_motors', 'pcarmarket', 'purplewave',
 ] as const;
 
 // vehicle_events has no reserve or currency columns; they live in metadata and are read by path, so the photo
@@ -19,6 +19,7 @@ const AUCTION_PLATFORMS = [
 const EVENT_SELECT = `
   id, vehicle_id, source_platform, source_url, ended_at, current_price, bid_count, event_status,
   currency:metadata->>currency, currency_code:metadata->>currency_code, price_currency:metadata->>priceCurrency,
+  source_end:metadata->>auction_end_date, source_observed_at:metadata->>source_observed_at,
   no_reserve:metadata->no_reserve, reserve_status:metadata->>reserve_status,
   vehicle:vehicles (
     id, year, make, model, trim, mileage, primary_image_url,
@@ -27,7 +28,7 @@ const EVENT_SELECT = `
 `;
 
 const PLATFORM_LABELS: Record<string, string> = {
-  ebay_motors: 'EBAY', pcarmarket: 'PCAR',
+  ebay_motors: 'EBAY', pcarmarket: 'PCAR', purplewave: 'PW',
   bat: 'BAT',
   cars_and_bids: 'C&B',
   collecting_cars: 'CC',
@@ -40,7 +41,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 const PLATFORM_NAMES: Record<string, string> = {
-  ebay_motors: 'eBay Motors', pcarmarket: 'PCarMarket',
+  ebay_motors: 'eBay Motors', pcarmarket: 'PCarMarket', purplewave: 'Purple Wave',
   bat: 'Bring a Trailer',
   cars_and_bids: 'Cars & Bids',
   collecting_cars: 'Collecting Cars',
@@ -61,6 +62,7 @@ export interface MarketplaceAuction {
   current_price_cents: number | null;
   currency_code: string | null;
   bid_count: number | null;
+  source_observed_at?: string | null;
   comment_count: number | null;
   no_reserve: boolean;
   vehicle: {
@@ -79,8 +81,12 @@ type SortType = 'ending_soon' | 'most_bids' | 'price_low' | 'price_high' | 'newe
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
 
+const HOUSE_TO_PLATFORM: Record<string,string> = { 'ebay-motors':'ebay_motors', bringatrailer:'bat', 'collecting-cars':'collecting_cars', 'cars-and-bids':'cars_and_bids', 'broad-arrow':'broad_arrow' };
+export const auctionPlatform = (house: string) => HOUSE_TO_PLATFORM[house] ?? house;
+export const auctionHouse = (platform: string) => Object.entries(HOUSE_TO_PLATFORM).find(([,value])=>value===platform)?.[0] ?? platform;
+
 export function mergeMarketplaceAuctions(eventAuctions: MarketplaceAuction[], board: MarketPulse, bids: TapeBid[], nowTick: number): MarketplaceAuction[] {
-    const platform = (house: string) => ({ 'ebay-motors': 'ebay_motors', bringatrailer: 'bat', 'collecting-cars': 'collecting_cars', 'cars-and-bids': 'cars_and_bids' } as Record<string,string>)[house] ?? house;
+    const platform = auctionPlatform;
     const owned = new Set(board.houses.map(h => platform(h.house)));
     const fresh = withTapeBids(board.auctions, new Map(bids.map(b => [b.id, b]))).filter(a => a.endsAt > nowTick).map(a => {
       const old = eventAuctions.find(e => e.vehicle_id === a.id && e.platform === platform(a.house) && e.source_url === a.listingUrl);
@@ -89,7 +95,16 @@ export function mergeMarketplaceAuctions(eventAuctions: MarketplaceAuction[], bo
         currency_code: a.currency, bid_count: old?.bid_count ?? null, comment_count: old?.comment_count ?? null, no_reserve: a.noReserve,
         vehicle: { id:a.id, year:a.year ?? 0, make:a.make, model:a.model ?? '', trim:old?.vehicle.trim ?? null, mileage:old?.vehicle.mileage ?? null, primary_image_url:a.imageUrl } };
     });
-    return [...eventAuctions.filter(a => !owned.has(a.platform) || (a.platform === 'ebay_motors' && board.houses.some(h => h.house === 'ebay-motors' && h.onBoard) && !fresh.some(b => b.vehicle_id === a.vehicle_id && b.platform === a.platform && b.source_url === a.source_url))), ...fresh];
+    return [...eventAuctions.filter(a => {
+      if (a.end_time && Date.parse(a.end_time) <= nowTick) return false;
+      if (!owned.has(a.platform)) return true;
+      // A canonical vehicle board is not an inventory census of independently captured episodes.
+      // Retain freshly witnessed eBay/PW episodes even when that board has no equivalent lot.
+      const witnessedAt = Date.parse(a.source_observed_at ?? '');
+      return ['ebay_motors','purplewave'].includes(a.platform) && Number.isFinite(witnessedAt)
+        && witnessedAt <= nowTick && nowTick - witnessedAt < 6 * 60 * 60_000
+        && !fresh.some(b => b.vehicle_id === a.vehicle_id && b.platform === a.platform && b.source_url === a.source_url);
+    }), ...fresh];
 }
 
 export default function AuctionMarketplace() {
@@ -115,7 +130,7 @@ export default function AuctionMarketplace() {
     currentBid: a.current_price_cents == null ? null : a.current_price_cents / 100,
     endsAt: a.end_time ? Date.parse(a.end_time) : 0, updatedAt: 0, listedAt: 0,
     imageUrl: a.vehicle.primary_image_url, noReserve: a.no_reserve, listingUrl: a.source_url,
-    title: null, house: ({ ebay_motors: 'ebay-motors', bat: 'bringatrailer', collecting_cars: 'collecting-cars', cars_and_bids: 'cars-and-bids' } as Record<string,string>)[a.platform] ?? a.platform,
+    title: null, house: auctionHouse(a.platform),
     currency: a.currency_code ?? '', band: null,
   })), [auctions]);
 
@@ -162,11 +177,21 @@ export default function AuctionMarketplace() {
         const { data: page } = await supabase
           .from('vehicle_events')
           .select(EVENT_SELECT)
-          .in('source_platform', [...AUCTION_PLATFORMS])
+          .in('source_platform', AUCTION_PLATFORMS.filter(p => p !== 'purplewave'))
           .gt('ended_at', nowIso)
           .order('ended_at', { ascending: true })
           .order('id', { ascending: true })
           .range(from, from + 999);
+        if (!page) break;
+        events.push(...page);
+        if (page.length < 1000) break;
+      }
+
+      // Purple Wave preserves its moving close clock on its listing episode, not in the terminal ended_at field.
+      for (let from = 0; from < 3000; from += 1000) {
+        const { data: page } = await supabase.from('vehicle_events').select(EVENT_SELECT)
+          .eq('source_platform', 'purplewave').in('event_status', ['active', 'live'])
+          .gt('metadata->>auction_end_date', nowIso).order('id', { ascending: true }).range(from, from + 999);
         if (!page) break;
         events.push(...page);
         if (page.length < 1000) break;
@@ -180,7 +205,7 @@ export default function AuctionMarketplace() {
           if (!v?.id || !v?.year || !v?.make) continue;
 
           // Parse end time
-          const rawEnd = ev.ended_at ?? ev.end_date;
+          const rawEnd = ev.source_platform === 'purplewave' ? ev.source_end : ev.ended_at ?? ev.end_date;
           const endDate = rawEnd ? new Date(rawEnd) : null;
           const endMs = endDate && Number.isFinite(endDate.getTime()) ? endDate.getTime() : null;
 
@@ -220,6 +245,7 @@ export default function AuctionMarketplace() {
             id: ev.id,
             vehicle_id: ev.vehicle_id,
             platform,
+            source_observed_at: ev.source_observed_at ?? null,
             source_url: ev.source_url ?? null,
             end_time: endMs !== null ? endDate!.toISOString() : null,
             current_price_cents: Number.isFinite(priceCents) && priceCents! > 0 ? priceCents : null,
@@ -343,7 +369,7 @@ export default function AuctionMarketplace() {
           for (const ev of recentEvents as any[]) {
             const v = ev.vehicle;
             if (!v?.id || !v?.year || !v?.make) continue;
-            const rawEnd = ev.ended_at ?? ev.end_date;
+            const rawEnd = ev.source_platform === 'purplewave' ? ev.source_end : ev.ended_at ?? ev.end_date;
             const endDate = rawEnd ? new Date(rawEnd) : null;
             const endMs = endDate && Number.isFinite(endDate.getTime()) ? endDate.getTime() : null;
             const rawPrice = ev.current_price ?? ev.current_bid;
