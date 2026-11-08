@@ -44,5 +44,295 @@
    "median_miss": 0.2273,
    "window": "prod vehicle lots closed 2026-09-28..2026-10-14 (2857 lots, each read at 3 moments 10 min..160 h before close; with bid and comment rows; scored 2026-10-15)"
   }
+ },
+ "houses": {
+  "pcarmarket": {
+   "show": true,
+   "currency": "USD",
+   "max_hours": 3.0,
+   "window": "pcarmarket lots closed 2026-04-20..2026-09-25 (held out; calibration fitted on 2025-07-01..2026-04-20)",
+   "fitted": "2025-07-01..2026-09-25, 932 lots",
+   "pooled": {
+    "coverage": 0.778,
+    "median_miss": 0.212,
+    "n": 3221,
+    "lots": 373,
+    "raw_coverage": 0.667,
+    "raw_median_miss": 0.217
+   },
+   "by_h": {
+    "0.166667": {
+     "shift": -0.022,
+     "widen": 0.0063,
+     "fit_n": 932,
+     "coverage": 0.761,
+     "median_miss": 0.14,
+     "n": 373,
+     "raw_coverage": 0.718,
+     "raw_median_miss": 0.147,
+     "by_grade": {
+      "A": {
+       "coverage": 0.786,
+       "median_miss": 0.14,
+       "n": 201
+      },
+      "B": {
+       "coverage": 0.761,
+       "median_miss": 0.16,
+       "n": 46
+      },
+      "C": {
+       "coverage": 0.722,
+       "median_miss": 0.13,
+       "n": 126
+      }
+     }
+    },
+    "1": {
+     "shift": -0.0087,
+     "widen": 0.0259,
+     "fit_n": 932,
+     "coverage": 0.772,
+     "median_miss": 0.178,
+     "n": 373,
+     "raw_coverage": 0.713,
+     "raw_median_miss": 0.178,
+     "by_grade": {
+      "A": {
+       "coverage": 0.79,
+       "median_miss": 0.177,
+       "n": 195
+      },
+      "B": {
+       "coverage": 0.75,
+       "median_miss": 0.229,
+       "n": 52
+      },
+      "C": {
+       "coverage": 0.754,
+       "median_miss": 0.163,
+       "n": 126
+      }
+     }
+    },
+    "3": {
+     "shift": 0.0,
+     "widen": 0.059,
+     "fit_n": 931,
+     "coverage": 0.777,
+     "median_miss": 0.197,
+     "n": 372,
+     "raw_coverage": 0.688,
+     "raw_median_miss": 0.193,
+     "by_grade": {
+      "A": {
+       "coverage": 0.816,
+       "median_miss": 0.181,
+       "n": 190
+      },
+      "B": {
+       "coverage": 0.772,
+       "median_miss": 0.232,
+       "n": 57
+      },
+      "C": {
+       "coverage": 0.72,
+       "median_miss": 0.187,
+       "n": 125
+      }
+     }
+    },
+    "6": {
+     "shift": 0.0373,
+     "widen": 0.0807,
+     "fit_n": 925,
+     "coverage": 0.722,
+     "median_miss": 0.212,
+     "n": 371,
+     "raw_coverage": 0.642,
+     "raw_median_miss": 0.217,
+     "by_grade": {
+      "A": {
+       "coverage": 0.762,
+       "median_miss": 0.202,
+       "n": 181
+      },
+      "B": {
+       "coverage": 0.662,
+       "median_miss": 0.324,
+       "n": 65
+      },
+      "C": {
+       "coverage": 0.696,
+       "median_miss": 0.21,
+       "n": 125
+      }
+     }
+    },
+    "12": {
+     "shift": 0.0539,
+     "widen": 0.0854,
+     "fit_n": 922,
+     "coverage": 0.765,
+     "median_miss": 0.226,
+     "n": 370,
+     "raw_coverage": 0.632,
+     "raw_median_miss": 0.224,
+     "by_grade": {
+      "A": {
+       "coverage": 0.804,
+       "median_miss": 0.188,
+       "n": 179
+      },
+      "B": {
+       "coverage": 0.758,
+       "median_miss": 0.339,
+       "n": 66
+      },
+      "C": {
+       "coverage": 0.712,
+       "median_miss": 0.229,
+       "n": 125
+      }
+     }
+    },
+    "24": {
+     "shift": 0.0438,
+     "widen": 0.111,
+     "fit_n": 915,
+     "coverage": 0.801,
+     "median_miss": 0.236,
+     "n": 366,
+     "raw_coverage": 0.645,
+     "raw_median_miss": 0.245,
+     "by_grade": {
+      "A": {
+       "coverage": 0.831,
+       "median_miss": 0.212,
+       "n": 178
+      },
+      "B": {
+       "coverage": 0.73,
+       "median_miss": 0.329,
+       "n": 63
+      },
+      "C": {
+       "coverage": 0.792,
+       "median_miss": 0.233,
+       "n": 125
+      }
+     }
+    },
+    "48": {
+     "shift": 0.0595,
+     "widen": 0.1089,
+     "fit_n": 892,
+     "coverage": 0.809,
+     "median_miss": 0.263,
+     "n": 356,
+     "raw_coverage": 0.652,
+     "raw_median_miss": 0.263,
+     "by_grade": {
+      "A": {
+       "coverage": 0.844,
+       "median_miss": 0.231,
+       "n": 167
+      },
+      "B": {
+       "coverage": 0.806,
+       "median_miss": 0.382,
+       "n": 67
+      },
+      "C": {
+       "coverage": 0.762,
+       "median_miss": 0.271,
+       "n": 122
+      }
+     }
+    },
+    "72": {
+     "shift": 0.0918,
+     "widen": 0.1112,
+     "fit_n": 865,
+     "coverage": 0.775,
+     "median_miss": 0.267,
+     "n": 342,
+     "raw_coverage": 0.658,
+     "raw_median_miss": 0.266,
+     "by_grade": {
+      "A": {
+       "coverage": 0.8,
+       "median_miss": 0.223,
+       "n": 160
+      },
+      "B": {
+       "coverage": 0.823,
+       "median_miss": 0.356,
+       "n": 62
+      },
+      "C": {
+       "coverage": 0.717,
+       "median_miss": 0.289,
+       "n": 120
+      }
+     }
+    },
+    "120": {
+     "shift": 0.1517,
+     "widen": 0.1142,
+     "fit_n": 744,
+     "coverage": 0.832,
+     "median_miss": 0.299,
+     "n": 298,
+     "raw_coverage": 0.648,
+     "raw_median_miss": 0.316,
+     "by_grade": {
+      "A": {
+       "coverage": 0.852,
+       "median_miss": 0.26,
+       "n": 135
+      },
+      "B": {
+       "coverage": 0.873,
+       "median_miss": 0.365,
+       "n": 55
+      },
+      "C": {
+       "coverage": 0.787,
+       "median_miss": 0.315,
+       "n": 108
+      }
+     }
+    }
+   },
+   "replay": {
+    "pages": 18318,
+    "excluded": {
+     "no model year (not a vehicle lot)": 6676,
+     "closed outside the window": 10394,
+     "not closed": 75,
+     "no bid": 95,
+     "a bid after the close": 117,
+     "bid list incomplete": 10
+    },
+    "reads": 8222,
+    "lots": 951,
+    "window": "2025-07-01..2026-11-08"
+   },
+   "skipped_reads": {
+    "no model page and no archive car lots of its make": 95,
+    "not a car lot ": 69
+   },
+   "scored": "2026-11-08",
+   "rule": "per horizon on the held-out lots (>= 150): 75-85% inside the range and a median miss <= 20%; shown up to the longest horizon below which every horizon passes"
+  },
+  "collecting-cars": {
+   "show": false,
+   "reason": "no bid path in Nuke for closed Collecting Cars lots (latest bid only), so the read cannot be replayed"
+  },
+  "ebay-motors": {
+   "show": false,
+   "reason": "no final price in Nuke for ended eBay auctions (the Browse API does not report it), so nothing can be scored"
+  }
  }
 }
