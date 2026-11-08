@@ -46,6 +46,9 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    set, the day's skips; no thumbnail for a private frame). "Re-scan my library" is a `capture_rescan_requests` row
    (`request_capture_rescan` from any surface, `claim_capture_rescan` / `finish_capture_rescan` by the phone). Nothing writes
    testimony. The page's words are the app's ingest bar (`CaptureIngestStatus.swift`). Contract `test_capture_ledger.sql`.
+   `20261111190000`: the readers bound the window for the planner (the "from may be null" test made every read scan all of a
+   person's frames), and the day list reads `capture_ledger_states` over `idx_vehicle_images_capture_ledger` (user, taken day,
+   exif uuid; the five columns the states need) instead of the heap; the day detail keeps `capture_ledger_frames`.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.

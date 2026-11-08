@@ -1,4 +1,4 @@
--- Capture ledger (20261111170000 + the grouped reader 20261111180000): one state per frame shared by the day list and the day detail; the phone's skips land with their reason
+-- Capture ledger (20261111170000, the grouped reader 20261111180000, the index-backed day list 20261111190000): one state per frame shared by the day list and the day detail; the phone's skips land with their reason
 -- and vanish once the frame arrives; the re-scan request is made by the owner, claimed once by a phone and closed; anon
 -- reaches nothing; the revert removes it all.
 \set ON_ERROR_STOP on
@@ -37,6 +37,7 @@ BEGIN IF NOT coalesce(ok, false) THEN RAISE EXCEPTION 'contract failed: %', msg;
 
 \i supabase/migrations/20261111170000_capture_ledger.sql
 \i supabase/migrations/20261111180000_capture_ledger_fast.sql
+\i supabase/migrations/20261111190000_capture_ledger_index.sql
 
 -- Fixture (synthetic, a disposable database): one owner, two vehicles, one day with every state, a second day of skips.
 -- ALLOW_RAW_TESTIMONY_WRITE
@@ -69,6 +70,9 @@ SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.report_cap
 SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.request_capture_rescan(date, text)', 'EXECUTE'), 'anon cannot ask for a re-scan');
 SELECT pg_temp.assert_true(NOT has_table_privilege('anon', 'public.capture_skips', 'SELECT'), 'anon cannot select skips');
 SELECT pg_temp.assert_true(NOT has_function_privilege('authenticated', 'public.capture_ledger_frames(uuid, text, date, date)', 'EXECUTE'), 'the frame reader is internal');
+SELECT pg_temp.assert_true(NOT has_function_privilege('authenticated', 'public.capture_ledger_states(uuid, text, date, date)', 'EXECUTE'), 'the lean classifier is internal');
+SELECT pg_temp.assert_true((SELECT i.indisvalid AND i.indisready AND i.indpred IS NOT NULL FROM pg_index i WHERE i.indexrelid = 'public.idx_vehicle_images_capture_ledger'::regclass), 'the covering index is valid, ready and partial');
+SELECT pg_temp.assert_true(position('capture_ledger_states' IN pg_get_functiondef('public.get_capture_ledger(text, date, date, integer)'::regprocedure)) > 0, 'the day list reads the lean classifier');
 
 -- signed out: an empty ledger, no error
 SELECT set_config('request.jwt.claims', '', false);
@@ -147,6 +151,9 @@ SELECT pg_temp.assert_true(public.finish_capture_rescan(((:'q1')::jsonb->>'id'):
 SELECT pg_temp.assert_true((SELECT count(*) FROM vehicle_images WHERE vehicle_id IS NOT NULL) = 4, 'vehicle_images untouched');
 
 -- the revert removes it all
+\i supabase/sql/revert_20261111190000_capture_ledger_index.sql
+SELECT pg_temp.assert_true(to_regclass('public.idx_vehicle_images_capture_ledger') IS NULL AND to_regprocedure('public.capture_ledger_states(uuid, text, date, date)') IS NULL
+  AND position('capture_ledger_frames' IN pg_get_functiondef('public.get_capture_ledger(text, date, date, integer)'::regprocedure)) > 0, 'revert of the index step restores the frames-backed day list');
 \i supabase/sql/revert_20261111170000_capture_ledger.sql
 SELECT pg_temp.assert_true(to_regclass('public.capture_skips') IS NULL AND to_regclass('public.capture_rescan_requests') IS NULL
   AND to_regprocedure('public.get_capture_ledger(text, date, date, integer)') IS NULL, 'revert removes the ledger');
