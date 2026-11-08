@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { Text } from '../../kit';
-import { houseName, usdBid, type LiveAuction } from './useMarketPulse';
+import { houseName, recordedUsdBid, type LiveAuction } from './useMarketPulse';
 import { sourceLogoInk } from './sourceLogoInk';
 
 // Each house's share of the board over time, and each house's own week-over-week comparison. Both read one series:
@@ -199,7 +199,7 @@ export function HouseMarket({ measure, live, data, isError, now }: {
   measure: ShareMeasure; live: LiveAuction[]; data: HouseShareData | undefined; isError: boolean; now: number;
 }) {
   const [range, setRange] = useState<RangeId>('1d');
-  const valueOf = (a: LiveAuction) => (measure === 'bids' ? (usdBid(a) ?? 0) : 1);
+  const valueOf = (a: LiveAuction) => (measure === 'bids' ? (recordedUsdBid(a) ?? 0) : 1);
   const nowBy = new Map<string, number>();
   for (const a of live) nowBy.set(a.house, (nowBy.get(a.house) ?? 0) + valueOf(a));
   const total = [...nowBy.values()].reduce((a, b) => a + b, 0);
@@ -230,7 +230,7 @@ export function HouseMarket({ measure, live, data, isError, now }: {
       )}
       <Text role="caption" as="div" className="market-stock__note">
         {data?.firstAt ? `Recorded every 15 minutes since ${stamp(data.firstAt)} (${span(now - data.firstAt)} of history). Nothing before that is estimated.` : ''}
-        {measure === 'bids' ? ' Dollar bids only; a bid in another currency is not added.' : ''}
+        {measure === 'bids' ? ' Bids recorded in dollars only, the unit these readings keep; the headline also adds bids in other currencies at published rates.' : ''}
         {series.length >= 2 ? ` Showing ${span(series[series.length - 1].t - series[0].t)}.` : ''}
       </Text>
       <table className="market-stock__watch" aria-label="Houses">

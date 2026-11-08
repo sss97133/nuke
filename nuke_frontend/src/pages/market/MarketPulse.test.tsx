@@ -333,8 +333,8 @@ describe('market answer -> supporting lots', () => {
   });
   it('uses the make for headline denominator and graph, opens all supporting lots in close order', async () => {
     await render('make=PORSCHE');
-    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('2 of 3 lots have a bid recorded in US dollars');
-    expect(container.textContent).toContain('never converted or added to dollar totals');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('2 of 3 lots have a bid in US dollars, recorded or converted at a published rate');
+    expect(container.textContent).toContain("the bid's hover gives the rate, its publisher and its date");
     expect(container.querySelector('.market-bid')?.textContent).toMatch(/^\$[\d,]+$/);
     expect(cohortCount()).toBe('3');
     expect(container.querySelector('.market-board__scope')?.textContent).toBe('3 of 4 live lotsPorsche');
@@ -356,7 +356,7 @@ describe('market answer -> supporting lots', () => {
     expect(boardTitles()).toEqual(['unknown']);
     await click('Ending in 24 h');
     expect(window.location.search).not.toContain('bidRange');
-    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('1 of 2 lots have a bid recorded in US dollars');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('1 of 2 lots have a bid in US dollars, recorded or converted at a published rate');
     expect(container.querySelector('button[aria-label="Local fixture: 2 captured lots. Filter this recorded model"]')).toBeTruthy();
     expect(container.querySelector('a[href*="bringatrailer.com/listing"]')).toBeNull();
     expect(container.textContent).toContain('a bid can trail the house by a few minutes');
@@ -378,7 +378,7 @@ describe('market answer -> supporting lots', () => {
     expect(container.textContent).toContain('Existing feed fallback');
     fixture.pulse.data = { auctions: [lot('cached', 'PORSCHE', 10_000, 2)] };
     await render('make=PORSCHE'); expect(container.textContent).toContain('Refresh failed');
-    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('1 of 1 lots have a bid recorded in US dollars');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('1 of 1 lots have a bid in US dollars, recorded or converted at a published rate');
   });
   it('shows no hot or cold verdict, and marks no reserve in the row and in the filters', async () => {
     fixture.pulse.data.curve = { fixture: [[120, 0.2], [0, 1]] };
@@ -772,12 +772,32 @@ describe('every live house on one board', () => {
     expect(container.querySelector('.market-venue__marks img')?.getAttribute('src')).toBe('/source-logos/bat.png');
     expect(cohortCount()).toBe('5');
   });
-  it('adds only dollar bids into the headline, and says what it left out and which house is held off', async () => {
+  it('adds only dollar bids into the headline when no rate is published, and says what it left out and which house is held off', async () => {
     await render();
     expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$60K');
     const note = container.querySelector('.market-figure__note')!.textContent!;
-    expect(note).toContain('2 lots bid in another currency are listed but not added to the dollar total');
+    expect(note).toContain('2 lots bid in EUR and GBP listed but not added: no published rate');
     expect(note).toContain('Cars & Bids: 188 lots held off, last read Oct 1');
+  });
+  it('adds a foreign bid at its published rate, names the rate and its date, and keeps the house figure as the bid', async () => {
+    const ecb = (currency: string, rate: number) => ({ currency, rate, rateDate: '2026-11-06', source: `ECB euro foreign exchange reference rates 2026-11-06 (${currency})`,
+      sourceUrl: 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml' });
+    fixture.pulse.data.auctions = fixture.pulse.data.auctions.map((a: LiveAuction) => a.currency === 'GBP' ? { ...a, fx: ecb('GBP', 1.338488281) }
+      : a.currency === 'EUR' ? { ...a, fx: ecb('EUR', 1.1165) } : a);
+    await render();
+    // $60,000 in dollars + £44,694 x 1.338488281 ($59,822) + €38,250 x 1.1165 ($42,706)
+    expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$163K');
+    const note = container.querySelector('.market-figure__note')!.textContent!;
+    expect(note).toContain('2 lots bid in EUR and GBP added in dollars at the ECB reference rate of 2026-11-06');
+    expect(note).not.toContain('not added');
+    const gbp = container.querySelector('[data-vehicle-id="cc-gbp"]')!;
+    expect(gbp.textContent).toContain('£44,694');
+    expect(gbp.querySelector('.market-bid')?.getAttribute('title')).toContain('≈ $59,822 at 1.3385 USD per GBP (ECB reference rate, 2026-11-06)');
+    const d = currentBidDistribution(fixture.pulse.data.auctions);
+    expect(d.counts.otherCurrency).toBe(0);
+    expect(d.counts['50k100k']).toBe(1);
+    expect(d.counts['25k50k']).toBe(2);
+    expect(d.total).toBe(60_000 + 59_822 + 42_706);
   });
   it('shows each lot in its own currency with its house', async () => {
     await render();
@@ -836,7 +856,7 @@ describe('every live house on one board', () => {
     const stock = container.querySelector('[aria-label="Dollars bid, every house"]')!;
     expect(stock).toBeTruthy();
     expect(stock.textContent).toContain('Nothing before that is estimated');
-    expect(stock.textContent).toContain('Dollar bids only');
+    expect(stock.textContent).toContain('Bids recorded in dollars only, the unit these readings keep');
     // the total went from $60,000 to $61,500: up, drawn as a green line with a last-price tag
     expect(stock.querySelector('.market-stock__chg')?.className).toContain('is-up');
     expect(stock.querySelector('.market-stock__chg')?.textContent).toContain('+2.50%');
