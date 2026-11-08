@@ -709,7 +709,10 @@ pp AS MATERIALIZED (
          x.j->>'device_fingerprint' AS dev,
          o2.origin, o2.unk, sc.m AS scraped_match, im.imp, im.cite AS imp_cite,
          (nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NOT NULL OR nullif(btrim(x.j->'exif_data'->>'camera_model'), '') IS NOT NULL
-          OR vi.taken_at IS NOT NULL OR vi.latitude IS NOT NULL OR vi.longitude IS NOT NULL) AS has_fact,
+          -- taken_at / GPS count as capture facts only when the row carries EXIF; on an EXIF-less row they were filled from
+          -- the upload or the listing (e.g. a scraped listing's location), not read from a camera.
+          OR ((vi.taken_at IS NOT NULL OR vi.latitude IS NOT NULL OR vi.longitude IS NOT NULL)
+              AND coalesce(x.j->'exif_data', '{}'::jsonb) NOT IN ('{}'::jsonb, 'null'::jsonb))) AS has_fact,
          (o2.origin OR coalesce(nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NOT NULL
           AND nullif(btrim(x.j->'exif_data'->>'camera_model'), '') IS NOT NULL
           AND (x.j->'exif_data'->>'source_type' = 'user_library'
@@ -1200,7 +1203,7 @@ g4 AS MATERIALIZED (
          g3.act_last IS NOT NULL AND g3.act_last < now() - make_interval(months => g3.months) AS decayed,
          g3.own_n > 0 OR (g3.n_photos > 0 AND g3.obs_id IS NOT NULL) AS doc_ok,
          g3.n_photos > 0 AND g3.imp_n * 2 > g3.n_photos AS pred_imp,
-         coalesce(g3.src_listing, false) AND g3.n_photos > 0 AND coalesce(g3.n_fact, 0) = 0 AND g3.own_n = 0 AS src_imp,
+         coalesce(g3.src_listing, false) AND g3.n_photos > 0 AND coalesce(g3.n_fact, 0) = 0 AS src_imp,
          g3.org_id IS NOT NULL AND EXISTS (SELECT 1 FROM organization_contributors oc
             WHERE oc.user_id = g3.u AND oc.status = 'active'
               AND (oc.end_date IS NULL OR oc.end_date >= current_date)
