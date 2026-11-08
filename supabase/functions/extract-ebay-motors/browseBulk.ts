@@ -524,7 +524,7 @@ export async function bulk(supabase: any, client: BrowseClient, o: BulkOptions =
           updatedRun++;                                    // a skipped write (a newer read is on the episode) still used its turn
           if (ev.action === "skipped") return;
           row.updated++;
-          if (p.kind === "buy_it_now" && p.amount != null && moved) {
+          if (!w.s.buyingOptions?.includes("AUCTION") && p.kind === "buy_it_now" && p.amount != null && moved) {
             softWrite(`price log ${key}`, await supabase.from("vehicle_price_history").insert({
               vehicle_id: h.vehicle_id, price_type: "asking", value: p.amount, source: PLATFORM, as_of: fetchedAt, confidence: 70,
               proof_type: "listing", proof_url: itemUrl(key),

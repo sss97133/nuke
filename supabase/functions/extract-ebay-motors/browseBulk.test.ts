@@ -383,3 +383,10 @@ Deno.test("bulk auction admission failure preserves its page and never updates a
   assertEquals(r.bulk.pages[0].complete, false);
   assertEquals(r.ok, false);
 });
+
+Deno.test("a missing auction currentBidPrice never falls back to the Buy It Now amount", () => {
+  const s = { ...sum("1011", { auction: true, price: "50000", bids: 2 }),
+    buyingOptions: ["AUCTION", "FIXED_PRICE"], currentBidPrice: undefined, price: { value: "50000", currency: "USD" } };
+  assertEquals(currentEpisodePrice(s), null);
+  assertEquals(toLanding(s, h => h, "ebay-browse-search", { year: 1967, make: "Ford", model: "Mustang" })!.ingestInput!.price, undefined);
+});

@@ -196,7 +196,7 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
         ...(opts.extra ? { page: opts.extra } : {}), observation_id: obs.observationId, snapshot_id: snapshotId, source_observed_at: now, last_checked_at: now },
     }, { preserveEventStatus: true, sourceObservedAt: now });
     if (ev.action === "error") rep.errors.push(`listing event ${landing.listingKey}: ${ev.error}`);
-    if (landing.price.amount != null && landing.price.kind === "buy_it_now") {
+    if (!raw.buyingOptions?.includes("AUCTION") && landing.price.amount != null && landing.price.kind === "buy_it_now") {
       softWrite(`price log ${landing.listingKey}`, await supabase.from("vehicle_price_history").insert({
         vehicle_id: vehicleId, price_type: "asking", value: landing.price.amount, source: PLATFORM, as_of: now, confidence: 70,
         proof_type: "listing", proof_url: landing.url, notes: `ebay item ${landing.listingKey}`,
