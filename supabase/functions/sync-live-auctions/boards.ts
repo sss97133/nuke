@@ -529,3 +529,134 @@ export function goodingLinkPlan(url: string, rows: GoodingVehicleRow[]): { url: 
   if (claim) return { url, link: "claim", vehicle_id: claim.id };
   return byDiscovery.length ? { url, link: "other", vehicle_id: null } : { url, link: "new", vehicle_id: null };
 }
+
+// ---------------------------------------------------------------------------------------------- Collecting Cars
+/** The observation ingest-observation takes (the fields these writers fill). */
+export interface ObservationPost {
+  source_slug: string;
+  kind: "bid" | "sale_result";
+  observed_at: string;
+  source_url: string;
+  source_identifier: string;
+  content_text: string;
+  structured_data: Record<string, unknown>;
+  vehicle_id: string;
+  extraction_method: string;
+}
+
+/** A Collecting Cars lot as the live board read it (Typesense production_listings, every five minutes). */
+export interface CcBoardLot {
+  url: string;
+  external_id: string | null;
+  current_bid: number | null;
+  bid_count: number | null;
+  currency: string | null;
+  ends: string | null;
+}
+
+const money = (n: number, cur: string | null) => `${(cur ?? "").toUpperCase() || "?"} ${Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * The bid a Collecting Cars lot showed at one board read. The house publishes no bid history Nuke can read (its lot pages
+ * are behind Cloudflare), so the bid path is the board itself: one row per lot per distinct (bid count, bid), observed at
+ * the read that first saw it. The bid was placed at or before that read (clock: board_read). The identifier is the lot and
+ * that bid, so a re-read of the same bid posts nothing, and the first read of a lot with a bid posts one.
+ */
+export function ccBidObservation(lot: CcBoardLot, vehicleId: string, readAt: string): ObservationPost | null {
+  if (!lot.external_id || lot.current_bid == null || !(lot.current_bid > 0)) return null;
+  const cur = lot.currency ? lot.currency.toUpperCase() : null;
+  return {
+    source_slug: "collecting-cars",
+    kind: "bid",
+    observed_at: readAt,
+    source_url: lot.url,
+    source_identifier: `collecting-cars-bid:${lot.external_id}:${lot.bid_count ?? "?"}:${lot.current_bid}`,
+    content_text: `Bid ${money(lot.current_bid, cur)} (${lot.bid_count ?? "?"} bids) on the board`,
+    structured_data: { amount: lot.current_bid, currency: cur, bid_count: lot.bid_count, auction_id: lot.external_id,
+      ends: lot.ends, clock: "board_read", basis: "the live board (Typesense production_listings) as sync-live-auctions read it" },
+    vehicle_id: vehicleId,
+    extraction_method: "cc_typesense_board_bid_v1",
+  };
+}
+
+/** A sold lot in the house's sold index (Typesense production_listings, stage sold). Unsold lots leave the index. */
+export interface CcSoldDoc {
+  auctionId: number;
+  slug: string;
+  priceSold?: number;
+  currentBid?: number;
+  noBids?: number;
+  reserveMet?: boolean;
+  reserveLowered?: boolean;
+  noReserve?: boolean | string;
+  isSoldPriceHidden?: boolean;
+  currencyCode?: string;
+  dtAuctionEndedUTC?: string;
+  dtSoldUTC?: string;
+  priceNormalisedUSD?: number;
+}
+
+/** A closed lot Nuke followed on the board (monitored_auctions), with its last read. */
+export interface CcClosedLot {
+  external_id: string;
+  url: string;
+  vehicle_id: string | null;
+  ends: string;               // the close the board last showed
+  last_bid: number | null;    // the board's last read before the close
+  bid_count: number | null;
+  currency: string | null;
+  bid_read_at: string | null; // when that bid was first read
+}
+
+const ccTime = (s?: string) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
+
+/**
+ * Each closed lot's result, once: sold from the sold index (price, high bid, reserve, the house's close time), or not sold
+ * when a lot Nuke followed has been closed `settleMs` and is absent from the index (its high bid is the board's last
+ * read, which can miss bids in the final minutes). The identifiers differ, so a later sale (an accepted offer) is still
+ * recorded after a not-sold row.
+ */
+export function ccResultObservations(sold: CcSoldDoc[], closed: CcClosedLot[], vehicleOf: Map<string, string>, now: number,
+  settleMs: number): ObservationPost[] {
+  const out: ObservationPost[] = [];
+  const soldIds = new Set(sold.map((d) => String(d.auctionId)));
+  const closedById = new Map(closed.map((c) => [c.external_id, c]));
+  for (const d of sold) {
+    const id = String(d.auctionId);
+    const url = `https://collectingcars.com/for-sale/${d.slug}`;
+    const vid = closedById.get(id)?.vehicle_id ?? vehicleOf.get(url);
+    const at = ccTime(d.dtSoldUTC) ?? ccTime(d.dtAuctionEndedUTC);
+    if (!vid || !at || !Number.isFinite(at.getTime())) continue;
+    const cur = d.currencyCode ? d.currencyCode.toUpperCase() : null;
+    const price = d.isSoldPriceHidden ? null : (d.priceSold && d.priceSold > 0 ? d.priceSold : null);
+    out.push({
+      source_slug: "collecting-cars", kind: "sale_result", observed_at: at.toISOString(), source_url: url,
+      source_identifier: `collecting-cars-result:${id}:sold`,
+      content_text: price != null ? `Sold for ${money(price, cur)}` : "Sold (price not shown)",
+      structured_data: { auction_outcome: "sold", sale_status: "sold", sale_price: price, final_bid: d.currentBid ?? null,
+        currency: cur, bid_count: d.noBids ?? null, reserve_met: d.reserveMet ?? null, reserve_lowered: d.reserveLowered ?? null,
+        no_reserve: d.noReserve === true || d.noReserve === "true", price_hidden: d.isSoldPriceHidden === true,
+        auction_end_date: ccTime(d.dtAuctionEndedUTC)?.toISOString() ?? null, auction_id: id,
+        price_normalised_usd_by_house: d.priceNormalisedUSD ?? null, clock: "source_event_time",
+        basis: "the house's sold index (Typesense production_listings, stage sold)" },
+      vehicle_id: vid, extraction_method: "cc_typesense_sold_v1",
+    });
+  }
+  for (const c of closed) {
+    const end = new Date(c.ends).getTime();
+    if (soldIds.has(c.external_id) || !c.vehicle_id || !Number.isFinite(end) || now - end < settleMs) continue;
+    const cur = c.currency ? c.currency.toUpperCase() : null;
+    out.push({
+      source_slug: "collecting-cars", kind: "sale_result", observed_at: new Date(end).toISOString(), source_url: c.url,
+      source_identifier: `collecting-cars-result:${c.external_id}:not_sold`,
+      content_text: c.last_bid != null ? `Not sold; last bid read ${money(c.last_bid, cur)}` : "Not sold; no bid read",
+      structured_data: { auction_outcome: "not_sold", sale_status: "not_sold", sale_price: null, final_bid: c.last_bid,
+        final_bid_read_at: c.bid_read_at, currency: cur, bid_count: c.bid_count, auction_end_date: new Date(end).toISOString(),
+        auction_id: c.external_id, clock: "source_event_time",
+        basis: `absent from the house's sold index ${Math.round(settleMs / 3_600_000)} h after the close; final_bid is the ` +
+          "board's last read before the close and can miss bids in the final minutes" },
+      vehicle_id: c.vehicle_id, extraction_method: "cc_typesense_sold_absent_v1",
+    });
+  }
+  return out;
+}

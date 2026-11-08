@@ -328,7 +328,8 @@
   },
   "collecting-cars": {
    "show": false,
-   "reason": "no bid path in Nuke for closed Collecting Cars lots (latest bid only), so the read cannot be replayed"
+   "reason": "no bid path in Nuke for closed Collecting Cars lots (latest bid only), so the read cannot be replayed",
+   "measurable": "recording from 2026-11-08: each lot's bid at every board read that saw it change (vehicle_observations kind bid, cc_typesense_board_bid_v1) and each closed lot's result (kind sale_result: sold from the house's sold index, not sold when absent from it 12 h after the close). Lots listed from then on carry a whole path; the first close 2026-11-15 (7-day auctions). At 17-31 closes a day (monitored_auctions, 2026-11-01..06), about 375 lots with paths (150 held out) close by about 2026-11-30; then give live-finish-houses.py a reader of these rows and replay it per currency."
   },
   "ebay-motors": {
    "show": false,

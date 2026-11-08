@@ -350,3 +350,47 @@ Deno.test("Gooding link plan: write under the spelling a vehicle holds, claim a 
   ]), { url: "https://goodingco.com/lot/1990-ferrari-348-tb", link: "other", vehicle_id: null });
   assertEquals(goodingLinkPlan("https://goodingco.com/lot/not-held", []), { url: "https://goodingco.com/lot/not-held", link: "new", vehicle_id: null });
 });
+
+// Collecting Cars: the board's bid path and the closed lots' results. The sold document is trimmed from the house's
+// Typesense sold index (2015 Aston Martin Rapide S, read 2026-11-08).
+import { type CcClosedLot, type CcSoldDoc, ccBidObservation, ccResultObservations } from "./boards.ts";
+
+Deno.test("cc bid: one row per lot and distinct bid, at the board read, never without a bid", () => {
+  const lot = { url: "https://collectingcars.com/for-sale/a", external_id: "91855", current_bid: 35000, bid_count: 71, currency: "gbp", ends: "2026-11-05T19:21:33Z" };
+  const p = ccBidObservation(lot, "v1", "2026-11-05T19:20:12.410Z")!;
+  assertEquals(p.kind, "bid");
+  assertEquals(p.observed_at, "2026-11-05T19:20:12.410Z");
+  assertEquals(p.source_identifier, "collecting-cars-bid:91855:71:35000");
+  assertEquals(p.structured_data.currency, "GBP");
+  assertEquals(p.structured_data.clock, "board_read");
+  assertEquals(ccBidObservation({ ...lot, current_bid: null }, "v1", "x"), null);
+  assertEquals(ccBidObservation({ ...lot, external_id: null }, "v1", "x"), null);
+  assertEquals(ccBidObservation({ ...lot, current_bid: 36000, bid_count: 72 }, "v1", "y")!.source_identifier, "collecting-cars-bid:91855:72:36000");
+});
+
+Deno.test("cc results: sold from the index; not sold only when followed, absent and settled", () => {
+  const sold: CcSoldDoc[] = [{ auctionId: 91855, slug: "2015-aston-martin-rapide-s-2", priceSold: 35000, currentBid: 35000, noBids: 71,
+    reserveMet: true, reserveLowered: true, noReserve: true, isSoldPriceHidden: false, currencyCode: "gbp",
+    dtAuctionEndedUTC: "2026-11-05 19:21:39", dtSoldUTC: "2026-11-05 19:21:39", priceNormalisedUSD: 47173 }];
+  const now = Date.parse("2026-11-08T12:00:00Z");
+  const closed: CcClosedLot[] = [
+    { external_id: "91855", url: "https://collectingcars.com/for-sale/2015-aston-martin-rapide-s-2", vehicle_id: "v1", ends: "2026-11-05T19:21:33Z", last_bid: 35000, bid_count: 71, currency: "GBP", bid_read_at: null },
+    { external_id: "2", url: "https://collectingcars.com/for-sale/b", vehicle_id: "v2", ends: "2026-11-07T19:00:00Z", last_bid: 21750, bid_count: 29, currency: "EUR", bid_read_at: "2026-11-07T18:58:00Z" },
+    { external_id: "3", url: "https://collectingcars.com/for-sale/c", vehicle_id: "v3", ends: "2026-11-08T05:00:00Z", last_bid: 1000, bid_count: 3, currency: "AUD", bid_read_at: null },
+    { external_id: "4", url: "https://collectingcars.com/for-sale/d", vehicle_id: null, ends: "2026-11-06T19:00:00Z", last_bid: 1, bid_count: 1, currency: "GBP", bid_read_at: null },
+  ];
+  const out = ccResultObservations(sold, closed, new Map(), now, 12 * 3_600_000);
+  assertEquals(out.map((o) => o.source_identifier), ["collecting-cars-result:91855:sold", "collecting-cars-result:2:not_sold"]);
+  assertEquals(out[0].observed_at, "2026-11-05T19:21:39.000Z");
+  assertEquals(out[0].structured_data.sale_price, 35000);
+  assertEquals(out[0].structured_data.currency, "GBP");
+  assertEquals(out[0].vehicle_id, "v1");
+  assertEquals(out[1].structured_data.auction_outcome, "not_sold");
+  assertEquals(out[1].structured_data.final_bid, 21750);
+  // a sold lot Nuke did not follow is recorded only when its vehicle is known by its URL; a hidden price is not a price
+  const other: CcSoldDoc = { ...sold[0], auctionId: 5, slug: "e", isSoldPriceHidden: true };
+  assertEquals(ccResultObservations([other], [], new Map(), now, 0).length, 0);
+  const known = ccResultObservations([other], [], new Map([["https://collectingcars.com/for-sale/e", "v5"]]), now, 0);
+  assertEquals(known[0].structured_data.sale_price, null);
+  assertEquals(known[0].vehicle_id, "v5");
+});
