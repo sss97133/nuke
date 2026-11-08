@@ -49,15 +49,19 @@ describe('live bids from the stream', () => {
   });
 
   it('lifts a lot only while a tape bid is newer than its recorded bid', () => {
-    const lot = { id: 'v', currentBid: 100, endsAt: 1000, updatedAt: 10 } as any;
-    const best = new Map([['v', { id: '1', vehicleId: 'v', amount: 150, bidAt: 20, endAt: 2000 }]]);
+    const lot = { id: 'v', house: 'bringatrailer', currency: 'USD', listingUrl: 'https://bringatrailer.com/listing/v', currentBid: 100, endsAt: 1000, updatedAt: 10 } as any;
+    const best = new Map([['v', { id: '1', vehicleId: 'v', house: 'bringatrailer', currency: 'USD', sourceUrl: 'https://bringatrailer.com/listing/v', amount: 150, bidAt: 20, endAt: 2000 }]]);
     expect(withTapeBids([lot], best)[0]).toMatchObject({ currentBid: 150, endsAt: 2000, updatedAt: 20 });
     expect(withTapeBids([{ ...lot, currentBid: 200 }], best)[0]).toMatchObject({ currentBid: 200, endsAt: 1000 });
     expect(withTapeBids([lot], new Map())[0]).toBe(lot);
+    expect(withTapeBids([{ ...lot, listingUrl: 'https://bringatrailer.com/listing/other' }], best)[0].currentBid).toBe(100);
+    expect(withTapeBids([{ ...lot, currency: 'EUR' }], best)[0].currentBid).toBe(100);
+    expect(withTapeBids([{ ...lot, house: 'ebay-motors' }], best)[0].currentBid).toBe(100);
   });
 
   it('pulses a lot once when a new bid lands, and hands the bid back when the board catches up', async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(Date.parse('2026-10-15T19:00:00Z'));
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const container = document.createElement('div'); document.body.appendChild(container);
@@ -66,7 +70,7 @@ describe('live bids from the stream', () => {
     let board = 100;
     let tape: any[] = [];
     fixture.rpc.mockImplementation(async (name: string) => (name === 'live_bid_tape'
-      ? { data: { bids: tape }, error: null } : { data: { auctions: [row(board)] }, error: null }));
+      ? { data: { receipt_version: 2, bids: tape }, error: null } : { data: { auctions: [row(board)] }, error: null }));
     let latest: ReturnType<typeof useMarketPulse>;
     function Probe() {
       latest = useMarketPulse();
@@ -76,7 +80,7 @@ describe('live bids from the stream', () => {
       await act(async () => { root.render(<QueryClientProvider client={client}><Probe /></QueryClientProvider>); });
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(container.textContent).toBe('100||0');
-      tape = [{ id: 'b1', vehicle_id: 'fixture', amount: 150, bid_at: '2026-10-15T19:00:00Z', end_at: '2026-10-21T00:00:00Z' }];
+      tape = [{ id: 'b1', vehicle_id: 'fixture', house: 'bringatrailer', currency: 'USD', source_url: 'https://bringatrailer.com/listing/fixture/', amount: 150, bid_at: '2026-10-15T19:00:00Z', end_at: '2026-10-21T00:00:00Z' }];
       await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
       expect(container.textContent).toBe('150|fixture|1');
       expect(latest!.data?.auctions[0].endsAt).toBe(Date.parse('2026-10-21T00:00:00Z'));
@@ -91,8 +95,8 @@ describe('live bids from the stream', () => {
   });
 });
 
-describe('tape bids play back at their own moments', () => {
-  it('spaces two bids read together as far apart as they were placed, and the board does not flash them again', async () => {
+describe('tape bids display at actual arrival', () => {
+  it('shows the whole received batch immediately without simulated timing, and does not flash it again', async () => {
     vi.useFakeTimers();
     const t0 = Date.parse('2026-10-18T04:00:00Z');
     vi.setSystemTime(t0);
@@ -104,7 +108,7 @@ describe('tape bids play back at their own moments', () => {
     let board = [row('a', 100), row('b', 100)];
     let tape: any[] = [];
     fixture.rpc.mockImplementation(async (name: string) => (name === 'live_bid_tape'
-      ? { data: { bids: tape }, error: null } : { data: { auctions: board }, error: null }));
+      ? { data: { receipt_version: 2, bids: tape }, error: null } : { data: { auctions: board }, error: null }));
     let latest: ReturnType<typeof useMarketPulse>;
     const played: string[] = [];
     function Probe() {
@@ -116,11 +120,11 @@ describe('tape bids play back at their own moments', () => {
     try {
       await act(async () => { root.render(<QueryClientProvider client={client}><Probe /></QueryClientProvider>); });
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-      // Placed at +2 s and +8 s; the stream records them about a minute late, so the 15 s read at +75 s sees both.
-      tape = [{ id: 'x', vehicle_id: 'a', amount: 150, bid_at: at(2) }, { id: 'y', vehicle_id: 'b', amount: 160, bid_at: at(8) }];
+      // Two recent source events arrive in the same read at +75 s; both display immediately.
+      tape = [{ id: 'x', vehicle_id: 'a', house: 'bringatrailer', currency: 'USD', source_url: 'https://bringatrailer.com/listing/a/', amount: 150, bid_at: at(62) }, { id: 'y', vehicle_id: 'b', house: 'bringatrailer', currency: 'USD', source_url: 'https://bringatrailer.com/listing/b/', amount: 160, bid_at: at(68) }];
       await act(async () => { await vi.advanceTimersByTimeAsync(74_999); });
       for (let s = 0; s < 10; s++) await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-      expect(played).toEqual(['a@75', 'b@81']);
+      expect(played).toEqual(['a@75', 'b@75']);
       board = [row('a', 150), row('b', 160)];
       await act(async () => { await latest!.refetch(); await vi.advanceTimersByTimeAsync(1); });
       expect(container.textContent).toBe('');

@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
 import { formatCurrencyFromCents, resolveCurrencyCode } from '../utils/currency';
 import '../styles/unified-design-system.css';
+import { AuctionFlow } from './market/AuctionFlow';
+import { useAuctionReceipts, fetchBoard, withTapeBids, type MarketPulse, type TapeBid, type LiveAuction as ReceiptAuction } from './market/useMarketPulse';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
 
 const AUCTION_PLATFORMS = [
   'bat', 'cars_and_bids', 'collecting_cars', 'broad_arrow',
-  'rmsothebys', 'gooding', 'sbx', 'barrettjackson', 'mecum',
+  'rmsothebys', 'gooding', 'sbx', 'barrettjackson', 'mecum', 'ebay_motors', 'pcarmarket',
 ] as const;
 
 // vehicle_events has no reserve or currency columns; they live in metadata and are read by path, so the photo
@@ -25,6 +27,7 @@ const EVENT_SELECT = `
 `;
 
 const PLATFORM_LABELS: Record<string, string> = {
+  ebay_motors: 'EBAY', pcarmarket: 'PCAR',
   bat: 'BAT',
   cars_and_bids: 'C&B',
   collecting_cars: 'CC',
@@ -37,6 +40,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 const PLATFORM_NAMES: Record<string, string> = {
+  ebay_motors: 'eBay Motors', pcarmarket: 'PCarMarket',
   bat: 'Bring a Trailer',
   cars_and_bids: 'Cars & Bids',
   collecting_cars: 'Collecting Cars',
@@ -48,7 +52,7 @@ const PLATFORM_NAMES: Record<string, string> = {
   mecum: 'Mecum',
 };
 
-interface LiveAuction {
+export interface MarketplaceAuction {
   id: string;
   vehicle_id: string;
   platform: string;
@@ -56,7 +60,7 @@ interface LiveAuction {
   end_time: string | null;
   current_price_cents: number | null;
   currency_code: string | null;
-  bid_count: number;
+  bid_count: number | null;
   comment_count: number | null;
   no_reserve: boolean;
   vehicle: {
@@ -75,18 +79,50 @@ type SortType = 'ending_soon' | 'most_bids' | 'price_low' | 'price_high' | 'newe
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
 
+export function mergeMarketplaceAuctions(eventAuctions: MarketplaceAuction[], board: MarketPulse, bids: TapeBid[], nowTick: number): MarketplaceAuction[] {
+    const platform = (house: string) => ({ 'ebay-motors': 'ebay_motors', bringatrailer: 'bat', 'collecting-cars': 'collecting_cars', 'cars-and-bids': 'cars_and_bids' } as Record<string,string>)[house] ?? house;
+    const owned = new Set(board.houses.map(h => platform(h.house)));
+    const fresh = withTapeBids(board.auctions, new Map(bids.map(b => [b.id, b]))).filter(a => a.endsAt > nowTick).map(a => {
+      const old = eventAuctions.find(e => e.vehicle_id === a.id && e.platform === platform(a.house) && e.source_url === a.listingUrl);
+      return { id: old?.id ?? `${a.house}:${a.id}`, vehicle_id: a.id, platform: platform(a.house), source_url: a.listingUrl,
+        end_time: new Date(a.endsAt).toISOString(), current_price_cents: a.currentBid == null ? null : Math.round(a.currentBid * 100),
+        currency_code: a.currency, bid_count: old?.bid_count ?? null, comment_count: old?.comment_count ?? null, no_reserve: a.noReserve,
+        vehicle: { id:a.id, year:a.year ?? 0, make:a.make, model:a.model ?? '', trim:old?.vehicle.trim ?? null, mileage:old?.vehicle.mileage ?? null, primary_image_url:a.imageUrl } };
+    });
+    return [...eventAuctions.filter(a => !owned.has(a.platform) || (a.platform === 'ebay_motors' && board.houses.some(h => h.house === 'ebay-motors' && h.onBoard) && !fresh.some(b => b.vehicle_id === a.vehicle_id && b.platform === a.platform && b.source_url === a.source_url))), ...fresh];
+}
+
 export default function AuctionMarketplace() {
-  const [auctions, setAuctions] = useState<LiveAuction[]>([]);
-  const [recentAuctions, setRecentAuctions] = useState<LiveAuction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const receipts = useAuctionReceipts();
+  const navigate = useNavigate();
+  const [eventAuctions, setAuctions] = useState<MarketplaceAuction[]>([]);
+  const [recentAuctions, setRecentAuctions] = useState<MarketplaceAuction[]>([]);
+  const [eventsLoading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
   const [sort, setSort] = useState<SortType>('ending_soon');
   const [nowTick, setNowTick] = useState(Date.now());
 
+  const board = useQuery({ queryKey: ['market-pulse-board'], queryFn: fetchBoard, refetchInterval: 30_000, staleTime: 15_000, retry: 1 });
+  const loading = eventsLoading && !board.data;
+  const auctions = useMemo<MarketplaceAuction[]>(() => {
+    if (!board.data || board.isError) return eventAuctions;
+    return mergeMarketplaceAuctions(eventAuctions, board.data, receipts.data?.bids ?? [], nowTick);
+  }, [eventAuctions, board.data, board.isError, nowTick, receipts.data]);
+
+  const receiptAuctions = useMemo<ReceiptAuction[]>(() => auctions.map(a => ({
+    id: a.vehicle_id, year: a.vehicle.year, make: a.vehicle.make, model: a.vehicle.model,
+    currentBid: a.current_price_cents == null ? null : a.current_price_cents / 100,
+    endsAt: a.end_time ? Date.parse(a.end_time) : 0, updatedAt: 0, listedAt: 0,
+    imageUrl: a.vehicle.primary_image_url, noReserve: a.no_reserve, listingUrl: a.source_url,
+    title: null, house: ({ ebay_motors: 'ebay-motors', bat: 'bringatrailer', collecting_cars: 'collecting-cars', cars_and_bids: 'cars-and-bids' } as Record<string,string>)[a.platform] ?? a.platform,
+    currency: a.currency_code ?? '', band: null,
+  })), [auctions]);
+
   useEffect(() => {
     loadAuctions();
 
+    const polling = window.setInterval(loadAuctions, 60_000);
     let scheduled = false;
     const scheduleReload = () => {
       if (scheduled) return;
@@ -103,7 +139,7 @@ export default function AuctionMarketplace() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_listings', filter: 'status=eq.active' }, scheduleReload)
       .subscribe();
 
-    return () => { channel.unsubscribe(); };
+    return () => { window.clearInterval(polling); channel.unsubscribe(); };
   }, []);
 
   // Tick timer for countdowns
@@ -115,7 +151,7 @@ export default function AuctionMarketplace() {
   const loadAuctions = async () => {
     setLoading(true);
     const nowIso = new Date().toISOString();
-    const results: LiveAuction[] = [];
+    const results: MarketplaceAuction[] = [];
 
     try {
       // 1. External auctions from vehicle_events — real auction platforms only. A lot is live while its end time
@@ -188,7 +224,7 @@ export default function AuctionMarketplace() {
             end_time: endMs !== null ? endDate!.toISOString() : null,
             current_price_cents: Number.isFinite(priceCents) && priceCents! > 0 ? priceCents : null,
             currency_code: currCode,
-            bid_count: typeof ev.bid_count === 'number' ? ev.bid_count : 0,
+            bid_count: typeof ev.bid_count === 'number' ? ev.bid_count : null,
             comment_count: typeof v.bat_comments === 'number' ? v.bat_comments : null,
             no_reserve: noReserve,
             vehicle: {
@@ -237,7 +273,7 @@ export default function AuctionMarketplace() {
             end_time: endMs !== null ? endDate!.toISOString() : null,
             current_price_cents: nl.current_high_bid_cents ?? null,
             currency_code: null,
-            bid_count: nl.bid_count ?? 0,
+            bid_count: nl.bid_count ?? null,
             comment_count: null,
             no_reserve: nl.no_reserve === true,
             vehicle: {
@@ -303,7 +339,7 @@ export default function AuctionMarketplace() {
           .limit(50);
 
         if (recentEvents) {
-          const recent: LiveAuction[] = [];
+          const recent: MarketplaceAuction[] = [];
           for (const ev of recentEvents as any[]) {
             const v = ev.vehicle;
             if (!v?.id || !v?.year || !v?.make) continue;
@@ -325,7 +361,7 @@ export default function AuctionMarketplace() {
               end_time: endMs !== null ? endDate!.toISOString() : null,
               current_price_cents: Number.isFinite(priceCents) && priceCents! > 0 ? priceCents : null,
               currency_code: currCode,
-              bid_count: typeof ev.bid_count === 'number' ? ev.bid_count : 0,
+              bid_count: typeof ev.bid_count === 'number' ? ev.bid_count : null,
               comment_count: typeof v.bat_comments === 'number' ? v.bat_comments : null,
               no_reserve: ev.no_reserve === true || ev.reserve_status === 'no_reserve',
               vehicle: {
@@ -447,6 +483,11 @@ export default function AuctionMarketplace() {
             )}
           </div>
 
+          <AuctionFlow bids={receipts.data?.bids ?? []} sourceStatus={receipts.data?.status ?? []} configuredSources={receipts.data?.sources ?? []}
+            houses={board.data?.houses ?? []} auctions={receiptAuctions} now={nowTick} error={receipts.isError} updatedAt={receipts.dataUpdatedAt}
+            onInspect={a => navigate(`/vehicle/${a.id}`)} />
+
+          {board.isError && <p role="status">Live board refresh unavailable. Event listings may lag behind source bids.</p>}
           {/* Search */}
           <input
             type="text"
@@ -744,7 +785,7 @@ function ChipButton({ active, onClick, children }: {
 
 /* ─── Auction Card ─── */
 
-function AuctionCard({ auction, now }: { auction: LiveAuction; now: number }) {
+function AuctionCard({ auction, now }: { auction: MarketplaceAuction; now: number }) {
   const v = auction.vehicle;
   const imageUrl = v.primary_image_url;
   const platformLabel = PLATFORM_LABELS[auction.platform] || auction.platform.toUpperCase();
@@ -899,7 +940,7 @@ function AuctionCard({ auction, now }: { auction: LiveAuction; now: number }) {
           </span>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-            {auction.bid_count > 0 && (
+            {(auction.bid_count ?? 0) > 0 && (
               <span style={{
                 fontFamily: '"Courier New", monospace',
                 fontSize: 'var(--fs-8)',
