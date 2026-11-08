@@ -1,7 +1,7 @@
 // Signed derivation evidence: maps every garage producer conclusion to a row of public.garage_derivation_evidence
-// (migration 20261111210000) and writes it through PostgREST as the conclusion is made.
+// (migration 20261111195000) and writes it through PostgREST as the conclusion is made.
 //
-//   const sink = createSink({ script: PRODUCER, args });          // writes when SUPABASE_SERVICE_ROLE_KEY is set and --no-db is absent
+//   const sink = createSink({ script: PRODUCER, args });          // writes when SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) is set and --no-db is absent
 //   await sink.write(fromPlaceMatch(row, sink.ctx));              // never throws: a failed write is counted, the local scratch row stays
 //   process.exitCode = sink.finish() ? 0 : 1;
 //
@@ -123,11 +123,11 @@ export async function insertRows(rows, { url, key, fetchFn = fetch }) {
 
 // Writes to the database when a service-role key is present and --no-db is absent; otherwise reports once and does nothing.
 export function createSink({ script, args = process.argv.slice(2), env = process.env, fetchFn = fetch, log = (m) => console.error(m) } = {}) {
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
   const enabled = !args.includes('--no-db') && Boolean(key);
   const url = env.SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? PROJECT_URL;
   const stats = { written: 0, failed: 0, errors: [] };
-  if (!enabled) log(args.includes('--no-db') ? 'derivation evidence: --no-db, conclusions stay in local scratch only' : 'derivation evidence: no SUPABASE_SERVICE_ROLE_KEY, conclusions stay in local scratch only');
+  if (!enabled) log(args.includes('--no-db') ? 'derivation evidence: --no-db, conclusions stay in local scratch only' : 'derivation evidence: no service-role key in the environment, conclusions stay in local scratch only');
   return {
     enabled, stats, ctx: { version: producerVersion(script) },
     async write(rowOrRows) {

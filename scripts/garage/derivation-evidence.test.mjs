@@ -80,10 +80,10 @@ test('sink: off without a key or with --no-db; counts failures and never throws'
   const logs = [];
   const off = createSink({ script: 's', args: [], env: {}, log: (m) => logs.push(m) });
   assert.equal(off.enabled, false); assert.deepEqual(await off.write(fromSceneLabel(scene, ctx)), { ok: true, sent: 0 }); assert.equal(off.finish(), true);
-  const noDb = createSink({ script: 's', args: ['--no-db'], env: { SUPABASE_SERVICE_ROLE_KEY: 'k' }, log: (m) => logs.push(m) });
+  const noDb = createSink({ script: 's', args: ['--no-db'], env: { SUPABASE_SECRET_KEY: 'k' }, log: (m) => logs.push(m) });
   assert.equal(noDb.enabled, false);
   const calls = [];
-  const on = createSink({ script: 's', args: [], env: { SUPABASE_SERVICE_ROLE_KEY: 'k', SUPABASE_URL: 'https://p' }, fetchFn: async (u) => { calls.push(u); return { ok: false, status: 500, text: async () => 'down' }; }, log: (m) => logs.push(m) });
+  const on = createSink({ script: 's', args: [], env: { SUPABASE_SECRET_KEY: 'k', SUPABASE_URL: 'https://p' }, fetchFn: async (u) => { calls.push(u); return { ok: false, status: 500, text: async () => 'down' }; }, log: (m) => logs.push(m) });
   await on.write(fromSceneLabel(scene, on.ctx)); assert.equal(on.stats.failed, 1); assert.equal(on.finish(), false);
   const thrower = createSink({ script: 's', args: [], env: { SUPABASE_SERVICE_ROLE_KEY: 'k' }, fetchFn: async () => { throw new Error('net'); }, log: () => {} });
   assert.equal((await thrower.write(fromSceneLabel(scene, thrower.ctx))).ok, false);
@@ -113,7 +113,7 @@ test('importer: classification, deterministic run ids, per-file mapping and idem
 });
 
 test('migration: append-only, service-role only, rollback by run supersedes and never deletes', () => {
-  const sql = readFileSync(new URL('../../supabase/migrations/20261111210000_garage_derivation_evidence.sql', import.meta.url), 'utf8');
+  const sql = readFileSync(new URL('../../supabase/migrations/20261111195000_garage_derivation_evidence.sql', import.meta.url), 'utf8');
   for (const k of KINDS) assert.ok(sql.includes(`'${k}'`), k);
   assert.match(sql, /UNIQUE \(dedupe_key\)/); assert.match(sql, /derived_rows_append_only/); assert.match(sql, /REVOKE ALL ON public\.garage_derivation_evidence FROM anon, authenticated/);
   assert.match(sql, /rollback_garage_derivation_run/); assert.match(sql, /SET superseded_at = now\(\)/); assert.ok(!/DELETE FROM/i.test(sql)); assert.match(sql, /producer_agent text NOT NULL DEFAULT 'injestion'/);

@@ -54,8 +54,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(JSON.stringify({ url: u, status, ...parseBatListing(html) }, null, 2));
     process.exit(status === 200 ? 0 : 1);
   }
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL; const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) { console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required (run under dotenvx)'); process.exit(2); }
+  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL; const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) { console.error('SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) required (run under dotenvx)'); process.exit(2); }
   const apply = args.includes('--apply'); const limit = Math.min(Number(opt('limit', 20)), 200); const runId = randomUUID();
   const h = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
   const rest = (path, init = {}) => fetch(`${url}/rest/v1/${path}`, { ...init, headers: { ...h, ...(init.headers ?? {}) } });

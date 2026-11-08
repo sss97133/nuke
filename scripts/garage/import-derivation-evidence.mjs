@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Idempotent importer: existing local garage outputs -> public.garage_derivation_evidence (migration 20261111210000).
+// Idempotent importer: existing local garage outputs -> public.garage_derivation_evidence (migration 20261111195000).
 // Dry run by default (reads files, validates, prints counts per kind and run; no network). --apply sends the rows through PostgREST with
-// SUPABASE_SERVICE_ROLE_KEY, `on conflict (dedupe_key) do nothing`, so re-running it, or importing a file twice, adds nothing.
+// SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY), `on conflict (dedupe_key) do nothing`, so re-running it, or importing a file twice, adds nothing.
 //
 //   node scripts/garage/import-derivation-evidence.mjs --workspace /workspace [--manifest /workspace/garage-artifact-inventory-*.json]
 //   node scripts/garage/import-derivation-evidence.mjs --scene-labels a.jsonl,b.jsonl --place-matches p.jsonl --duplicates d.jsonl \
@@ -97,9 +97,9 @@ async function main() {
   const apply = args.includes('--apply');
   const jobs = [];
   // With --manifest, a workspace file is imported only if the inventory lists it (the workspace holds many superseded drafts, e.g. preview_out3..21),
-  // except place-match outputs: the run_match7*.sh scripts write place7*_N.jsonl, which the inventory lists only as scripts and empty .out files.
+  // except sign files (imported with a warning when unhashed) and place-match outputs: the run_match7*.sh scripts write place7*_N.jsonl, which the inventory lists only as scripts and empty .out files.
   const listed = opt('manifest') ? new Set((JSON.parse(readFileSync(opt('manifest'), 'utf8')).files ?? []).map((f) => basename(f.path))) : null;
-  if (opt('workspace')) jobs.push(...discover(opt('workspace')).filter((j) => !listed || j.kind === 'place_match' || listed.has(basename(j.file))));
+  if (opt('workspace')) jobs.push(...discover(opt('workspace')).filter((j) => !listed || j.kind === 'place_match' || j.kind === 'sign_read' || listed.has(basename(j.file))));
   const explicit = { scene_label: 'scene-labels', place_match: 'place-matches', duplicate_judgment: 'duplicates', seller_history_match: 'seller-history',
     place_exemplar: 'exemplars', sign_read: 'sign', relationship_role: 'relationship-preview' };
   for (const [kind, flag] of Object.entries(explicit)) for (const file of list(flag)) jobs.push({ file, kind });
@@ -107,6 +107,7 @@ async function main() {
   const seen = new Set(); const uniq = jobs.filter((j) => (seen.has(j.file) ? false : seen.add(j.file)));
   const vinFile = opt('vin-matches') ?? (opt('workspace') && existsSync(join(opt('workspace'), 'viva_vin_matches.json')) ? join(opt('workspace'), 'viva_vin_matches.json') : null);
   const vinMatches = new Map(vinFile ? JSON.parse(readFileSync(vinFile, 'utf8')).filter((m) => m.url && UUID.test(m.vehicle_id ?? '')).map((m) => [m.url, m]) : []);
+  if (listed) for (const j of uniq) if (j.kind === 'sign_read' && !listed.has(basename(j.file))) console.error(`manifest has no hash for ${basename(j.file)}: imported as sign_read without verification`);
   if (opt('manifest')) for (const d of manifestDrift(opt('manifest'), uniq.map((j) => j.file))) console.error(`manifest ${d.listed === d.current ? 'matches' : 'DRIFTED'}: ${d.file}`);
 
   const all = new Map(); const perKind = {}; const perRun = new Map(); let skipped = 0; let bad = 0;
@@ -128,9 +129,9 @@ async function main() {
   console.error(`\n${rows.length} distinct conclusions (${uniq.length} files, ${perRun.size} runs, ${skipped} skipped)`);
   for (const [k, v] of Object.entries(perKind)) console.error(`  ${k}: ${v.files} files, ${v.rows} rows`);
   if (bad) { console.error(`${bad} file(s) could not be read; nothing sent`); process.exit(1); }
-  if (!apply) { console.error('dry run: nothing sent. Add --apply (needs SUPABASE_SERVICE_ROLE_KEY) to write; rerunning is safe.'); return; }
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) { console.error('--apply needs SUPABASE_SERVICE_ROLE_KEY'); process.exit(2); }
+  if (!apply) { console.error('dry run: nothing sent. Add --apply (needs SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY) to write; rerunning is safe.'); return; }
+  const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) { console.error('--apply needs SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY'); process.exit(2); }
   const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? PROJECT_URL;
   let sent = 0;
   for (let i = 0; i < rows.length; i += 200) {

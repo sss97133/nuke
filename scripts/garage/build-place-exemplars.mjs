@@ -12,7 +12,7 @@
 // Organizations come from the sessions file (its `organizations` lists: id, name, business_type; same normalized name = one place).
 // (a) BaT: the organization's own listings (history JSONL rows from ingest-bat-seller-history.mjs whose seller handle is an
 //     org_seller_aliases alias of the organization; --aliases-json is [{organization_id, seller_username}] or --from-aliases reads the
-//     table through PostgREST with SUPABASE_SERVICE_ROLE_KEY): each listing page is fetched (cache /workspace/bat-cache, the same
+//     table through PostgREST with SUPABASE_SECRET_KEY, falling back to SUPABASE_SERVICE_ROLE_KEY): each listing page is fetched (cache /workspace/bat-cache, the same
 //     `listing-<slug>.html` files the history ingest writes; 1 request per second), its gallery (data-gallery-items) is read and a few
 //     WIDE shots from the front of the gallery are kept (BaT galleries open with exterior shots, which a dealer takes on its own lot).
 // (b) scene sessions already at the organization: label rows (--labels-jsonl, confidence >= 0.85) whose session is in range of exactly
@@ -247,7 +247,7 @@ async function main() {
   let aliases = [];
   if (opt('aliases-json')) aliases = JSON.parse(readFileSync(opt('aliases-json'), 'utf8'));
   else if (args.includes('--from-aliases')) {
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY; if (!key) { console.error('--from-aliases needs SUPABASE_SERVICE_ROLE_KEY (run under dotenvx)'); process.exit(2); }
+    const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY; if (!key) { console.error('--from-aliases needs SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) (run under dotenvx)'); process.exit(2); }
     const base = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? PROJECT_URL;
     const res = await fetch(`${base}/rest/v1/org_seller_aliases?select=organization_id,seller_username&platform=eq.bat`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
     if (!res.ok) { console.error(`org_seller_aliases read failed: ${res.status}`); process.exit(2); }
