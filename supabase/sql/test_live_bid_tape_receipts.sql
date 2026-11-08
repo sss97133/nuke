@@ -15,6 +15,8 @@ VALUES (('00000000-0000-4000-8000-'||lpad(vid::text,12,'0'))::uuid,'00000000-000
 SELECT pg_temp.add_receipt(1,'public-live:1:comment:42:a','bid','{"transport":"public_pusher","public_live_frame":{"data":{"comment":{"id":42,"bidAmount":5000,"authorName":"SECRET_NAME"}}}}');
 SELECT pg_temp.add_receipt(1,'public-live:1:comment:42:b','bid','{"transport":"missed_comments","public_live_frame":{"data":{"comment":{"id":42,"bidAmount":5000,"authorName":"SECRET_NAME"}}}}');
 SELECT pg_temp.add_receipt(1,'public-live:1:comment:43:a','bid','{"transport":"missed_comments","public_live_frame":{"data":{"comment":{"id":43,"bidAmount":4000}}}}',interval '7 days');
+SELECT pg_temp.add_receipt(1,'public-live:1:comment:49:a','bid',jsonb_build_object('transport','direct_html','clock_basis','native_comment_timestamp','received_at',now()-interval '2 seconds','native_post_id',125706455,
+ 'public_live_frame',jsonb_build_object('data',jsonb_build_object('comment',jsonb_build_object('id',49,'bidAmount',75000,'authorName','SECRET_RECOVERED_BIDDER','end_timestamp',extract(epoch from now()+interval '4 days')::bigint)))),interval '2 days');
 SELECT pg_temp.add_receipt(2,'public-live:1:comment:44:a','bid','{"public_live_frame":{"data":{"comment":{"id":44,"bidAmount":9000}}}}');
 SELECT pg_temp.add_receipt(3,'public-live:1:comment:45:a','bid','{"public_live_frame":{"data":{"comment":{"id":45,"bidAmount":9000}}}}');
 SELECT pg_temp.add_receipt(1,'public-live:1:comment:46:a','bid','{"private":true,"public_live_frame":{"data":{"comment":{"id":46,"bidAmount":9000}}}}');
@@ -27,10 +29,15 @@ SELECT pg_temp.add_receipt(1,'purplewave-state','listing','{"capture_kind":"auct
 \ir ../migrations/20261108181944_live_bid_tape_source_receipts.sql
 DO $$ DECLARE r jsonb; BEGIN
  r:=live_bid_tape(5);
- IF jsonb_array_length(r->'bids')<>7 THEN RAISE EXCEPTION 'Expected7 eligible deduplicated receipts: %',r; END IF;
+ IF jsonb_array_length(r->'bids')<>8 THEN RAISE EXCEPTION 'Expected8 eligible deduplicated receipts: %',r; END IF;
  IF r::text LIKE '%SECRET_%' THEN RAISE EXCEPTION 'Bidder leak'; END IF;
  IF NOT EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'house'='ebay-motors' AND b->>'amount'='1100.25' AND b->>'event_kind'='bid_snapshot') THEN RAISE EXCEPTION 'Lost exact eBay snapshot'; END IF;
  IF NOT EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'recovered'='true' AND (b->>'bid_at')::timestamptz < now()-interval '1 day') THEN RAISE EXCEPTION 'Recovered history must retain original clock'; END IF;
+ IF NOT EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'source_event_id'='49' AND b->>'transport'='direct_html'
+  AND b->>'recovered'='true' AND b->>'currency'='USD' AND b->>'amount'='75000' AND b->>'event_kind'='bid'
+  AND b->>'clock_basis'='native_comment_timestamp' AND (b->>'bid_at')::timestamptz < now()-interval '1 day'
+  AND (b->>'received_at')::timestamptz > now()-interval '1 minute' AND b->>'end_at' IS NOT NULL) THEN
+  RAISE EXCEPTION 'Scheduled HTML bid lost its recovery distinction, native clock, end claim or receipt'; END IF;
  IF EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'ingested_at' IS NULL OR b->>'observation_id' IS NULL OR b->>'source_url' IS NULL) THEN RAISE EXCEPTION 'Missing receipt'; END IF;
  IF NOT EXISTS(SELECT FROM jsonb_array_elements(r->'bids') b WHERE b->>'house'='ebay-motors' AND b->>'bid_count'='0' AND b->>'event_kind'='price_snapshot') THEN RAISE EXCEPTION 'Opening price must stay a quote'; END IF;
  RAISE NOTICE 'PASS source receipts, privacy, clocks, recovery, decimal amount and opening-price qualification';
