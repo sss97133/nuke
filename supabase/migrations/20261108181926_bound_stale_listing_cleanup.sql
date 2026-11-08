@@ -1,11 +1,27 @@
 -- Bound both existing expiry projections so trigger fan-out can commit each cycle.
--- No schedule, grants, timeout, sale outcome or source evidence changes.
+-- No schedule, grants, timeout, sale-price or source evidence changes.
 SET statement_timeout = '10s';
 SET lock_timeout = '2s';
 
 CREATE INDEX IF NOT EXISTS idx_external_listings_active_end
   ON public.external_listings (end_date, id)
   WHERE listing_status = 'active';
+
+-- Expiring a listing must not claim its undisclosed reserve was met. Preserve
+-- the deployed trigger's other behavior/ACL/config while fixing this expression.
+DO $repair$
+DECLARE
+  body text := pg_get_functiondef('public.track_auction_phase_transitions()'::regprocedure);
+  old_expression text := 'COALESCE(NEW.current_bid, 0) >= COALESCE(NEW.reserve_price, 0)';
+  new_expression text := '(NEW.current_bid >= NEW.reserve_price)';
+BEGIN
+  IF strpos(body, old_expression) > 0 THEN
+    EXECUTE replace(body, old_expression, new_expression);
+  ELSIF strpos(body, new_expression) = 0 THEN
+    RAISE EXCEPTION 'Unexpected auction transition reserve expression; review before replacing';
+  END IF;
+END;
+$repair$;
 
 CREATE OR REPLACE FUNCTION public.cleanup_stale_listings()
 RETURNS integer
