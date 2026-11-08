@@ -47,11 +47,17 @@ orgs AS MATERIALIZED (
   SELECT o.id, o.name, to_jsonb(o)->>'business_type' AS business_type, o.latitude::float8 AS olat, o.longitude::float8 AS olon
     FROM organizations o WHERE o.latitude IS NOT NULL AND o.longitude IS NOT NULL
 ),
+-- Grid cells (0.002 deg lat x 0.003 deg lon) with each organization copied into its 3x3 neighbourhood, so the photo join is a
+-- hash join on cell keys instead of a photos x organizations nested loop.
+ocell AS MATERIALIZED (
+  SELECT o.*, floor(o.olat / 0.002)::int + dx AS cx, floor(o.olon / 0.003)::int + dy AS cy
+    FROM orgs o CROSS JOIN generate_series(-1, 1) dx CROSS JOIN generate_series(-1, 1) dy
+),
 near AS MATERIALIZED (
   SELECT rk.vehicle_id, rk.sess, rk.id AS image_id, o.id AS org_id, o.name, o.business_type,
          regexp_replace(lower(coalesce(o.name, '')), '[^a-z0-9]+', '', 'g') AS nn
     FROM rk CROSS JOIN cfg
-    JOIN orgs o ON abs(o.olat - rk.lat) < 0.002 AND abs(o.olon - rk.lon) < 0.003
+    JOIN ocell o ON o.cx = floor(rk.lat / 0.002)::int AND o.cy = floor(rk.lon / 0.003)::int
    WHERE 12742000 * asin(sqrt(least(1, power(sin(radians(o.olat - rk.lat) / 2), 2)
            + cos(radians(rk.lat)) * cos(radians(o.olat)) * power(sin(radians(o.olon - rk.lon) / 2), 2)))) <= cfg.r
 ),
