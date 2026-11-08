@@ -580,6 +580,7 @@ async function postObservations(
   supabase: ReturnType<typeof createClient>,
   posts: ObservationPost[],
   deadline: number,
+  maxPosts: number,
 ): Promise<{ candidates: number; held: number; posted: number; deferred: number; errors: string[] }> {
   const out = { candidates: posts.length, held: 0, posted: 0, deferred: 0, errors: [] as string[] };
   const have = new Set<string>();
@@ -596,16 +597,28 @@ async function postObservations(
   out.held = posts.length - todo.length;
   const base = Deno.env.get("SUPABASE_URL") ?? "";
   const key = projectSecretKey() ?? "";
-  for (let i = 0; i < todo.length; i += 6) {
-    if (Date.now() > deadline) { out.deferred = todo.length - i; break; }
-    await Promise.all(todo.slice(i, i + 6).map(async (p) => {
-      const res = await fetch(`${base}/functions/v1/ingest-observation`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify(p),
-      });
-      if (res.ok) out.posted++;
-      else out.errors.push(`${p.source_identifier}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
+  // Function-to-function calls share the platform's per-trace budget (2026-11-08: a 200-post first run was refused at
+  // about 60 and the refusal took the whole sync with it), so a run posts at most maxPosts, three at a time, and stops
+  // at the first refusal; the rest are still not held and post on a later run.
+  let stop = false;
+  for (let i = 0; i < todo.length; i += 3) {
+    if (stop || Date.now() > deadline || i >= maxPosts) { out.deferred = todo.length - i; break; }
+    await Promise.all(todo.slice(i, Math.min(i + 3, maxPosts)).map(async (p) => {
+      try {
+        const res = await fetch(`${base}/functions/v1/ingest-observation`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify(p),
+        });
+        if (res.ok) out.posted++;
+        else {
+          out.errors.push(`${p.source_identifier}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
+          if (res.status === 429 || res.status >= 500) stop = true;
+        }
+      } catch (e) {
+        out.errors.push(`${p.source_identifier}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200));
+        stop = true;
+      }
     }));
   }
   return out;
@@ -639,7 +652,7 @@ async function ingestCcPath(
       currency: a.currency ?? null, ends: a.auction_end_date }, vid, readAt) : null;
     return p ? [p] : [];
   });
-  const bids = await postObservations(supabase, bidPosts, deadline);
+  const bids = await postObservations(supabase, bidPosts, deadline, 40);
 
   // results: the sold index since the window's start, and the lots Nuke followed that closed in it
   const now = Date.now();
@@ -674,7 +687,7 @@ async function ingestCcPath(
   }
   const followed = new Set(closed.map((c) => c.external_id));
   await lookup(sold.filter((d) => !followed.has(String(d.auctionId))).map((d) => `https://collectingcars.com/for-sale/${d.slug}`));
-  const results = await postObservations(supabase, ccResultObservations(sold, closed, vehicleOf, now, 12 * 3_600_000), deadline);
+  const results = await postObservations(supabase, ccResultObservations(sold, closed, vehicleOf, now, 12 * 3_600_000), deadline, 20);
   return { read_at: readAt, bids, results: { ...results, sold_index: sold.length, followed_closed: closed.length, days: resultsDays } };
 }
 
@@ -1618,9 +1631,13 @@ Deno.serve(async (req) => {
           }
           if (normalizedPlatform === "collecting-cars" && !syncResult.error && board) {
             const days = Math.min(30, Math.max(1, Number(body.cc_results_days) || 2));
-            const cc = await ingestCcPath(supabase, syncResult.auctions, days,
-              functionStartTime + (platforms.length > 1 ? 25_000 : 45_000));
-            board = { ...board, cc_path: cc };
+            try {
+              const cc = await ingestCcPath(supabase, syncResult.auctions, days,
+                functionStartTime + (platforms.length > 1 ? 25_000 : 45_000));
+              board = { ...board, cc_path: cc };
+            } catch (e) {   // the bid path never costs the board its sync, nor the houses after it theirs
+              board = { ...board, cc_path: { error: (e instanceof Error ? e.message : String(e)).slice(0, 300) } };
+            }
           }
         }
 
