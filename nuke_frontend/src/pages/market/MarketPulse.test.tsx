@@ -163,7 +163,7 @@ describe('market answer -> supporting lots', () => {
     expect(container.querySelector('[aria-label="Listing activity evidence"]')?.textContent).toContain(id);
     const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
     expect(row.nextElementSibling?.id).toBe(`lot-inspection-${id}`);
-    expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
+    expect(document.activeElement).toBe(row.querySelector('.market-lot-image'));
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
   });
   it('keeps smaller brands reachable and drills from an explicit brand view into models', async () => {
@@ -608,7 +608,7 @@ describe('inline market row inspection', () => {
     expect([...container.querySelectorAll(`[data-vehicle-id="${id}"] .market-lot-facts button`)]).toHaveLength(0);
     await click('Close listing evidence');
     expect(window.location.search).not.toContain('lot=');
-    expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
+    expect(document.activeElement).toBe(row.querySelector('.market-lot-image'));
   });
   it('scopes live auctions to a drilled model family from the URL and shows the family in the heading', async () => {
     fixture.pulse.data.auctions = [
@@ -622,6 +622,62 @@ describe('inline market row inspection', () => {
 
     await render('make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang&model=Mustang+GT');
     expect(boardTitles()).toEqual(['m-1']);
+  });
+});
+
+describe("a row's title drills the board in place", () => {
+  const scope = () => new URLSearchParams(window.location.search);
+  it('re-scopes to the make, the model and the year, each a toggle, without opening the lot', async () => {
+    await render();
+    const row = container.querySelector('[data-vehicle-id="later"]')!;
+    expect(row.querySelector('.market-lot-name button[aria-haspopup]')).toBeNull();
+    await click('Show Ford lots');
+    expect(scope().get('make')).toBe('FORD');
+    expect(scope().get('lot')).toBeNull();
+    expect(boardTitles()).toEqual(['other-make']);
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · Ford');
+    await click('Show every make');
+    expect(scope().get('make')).toBe('all');
+    await click('Show Porsche Local fixture lots');
+    expect(scope().get('make')).toBe('PORSCHE');
+    expect(scope().get('model')).toBe('Local fixture');
+    expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
+    await click('Show 2000 lots');
+    expect(scope().get('era')).toBe('2000-2000');
+    expect(scope().get('model')).toBe('Local fixture');
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · Porsche · 2000');
+    await click('Show every year');
+    expect(scope().get('era')).toBeNull();
+    await click('Show every Porsche model');
+    expect(scope().get('model')).toBeNull();
+    expect(scope().get('make')).toBe('PORSCHE');
+  });
+  it('scopes to a year across every make', async () => {
+    fixture.pulse.data.auctions[3] = { ...fixture.pulse.data.auctions[3], year: 1967 };
+    await render();
+    await click('Show 1967 lots');
+    expect(scope().get('era')).toBe('1967-1967');
+    expect(scope().get('make')).toBeNull();
+    expect(boardTitles()).toEqual(['other-make']);
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · 1967');
+  });
+  it('opens the lot from the rest of the row, and keeps text for a lot without a recorded model', async () => {
+    const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
+    fixture.pulse.data.auctions[0] = { ...lot(id, 'BMW', 42000, 2), year: 2004, model: null };
+    await render();
+    const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
+    expect(row.querySelector('.market-lot-name')?.textContent).toBe('2004 BMW');
+    expect(row.querySelector('.market-lot-name button')).toBeNull();
+    await act(async () => row.querySelector<HTMLElement>('.market-lot-close')!.click());
+    expect(scope().get('lot')).toBe(id);
+  });
+  it('keeps the title as text even where the catalogue has headline-scale period lettering', async () => {
+    fixture.pulse.data.auctions = [{ ...lot('k5', 'CHEVROLET', 20000, 2), year: 1985, model: 'K5 Blazer' }];
+    await render();
+    const name = container.querySelector('[data-vehicle-id="k5"] .market-lot-name')!;
+    expect(name.querySelector('.vehicle-identity')?.getAttribute('data-period-artwork')).toBe('false');
+    expect(name.querySelector('.vehicle-identity__art')).toBeNull();
+    expect(name.querySelector('.sr-only')?.textContent).toBe('1985 Chevrolet K5 Blazer');
   });
 });
 

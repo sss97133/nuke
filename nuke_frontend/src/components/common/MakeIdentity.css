@@ -31,6 +31,10 @@
 .vehicle-identity__art--emblem { width:28px; }
 .vehicle-identity__variant { font-size:14px; font-weight:400; }
 .vehicle-identity__art--variant { width:112px; }
+/* A part that drills into its cohort (profile explore dialog, live board scope). */
+.vehicle-identity__explore { appearance: none; display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.vehicle-identity__explore:hover { text-decoration: underline; text-underline-offset: 5px; }
+.vehicle-identity__explore:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
 .vehicle-identity--compact { gap:6px; font:inherit; }
 .vehicle-identity--compact .vehicle-identity__maker,
 .vehicle-identity--compact .vehicle-identity__model,

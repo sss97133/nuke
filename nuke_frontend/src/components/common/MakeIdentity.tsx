@@ -53,7 +53,11 @@ export function MakeIdentity({ make, inverse = false, compact = false }: { make:
 }
 
 export type ModelIdentityArtwork = { path: string; width: number; height: number; description: string };
-type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[]; compact?: boolean; onExplore?: (field: string, value: string) => void; modelArtwork?: ModelIdentityArtwork | null };
+type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[]; compact?: boolean; onExplore?: (field: string, value: string) => void;
+  /** What pressing a part does, when it is not the profile's explore dialog (the live board re-scopes in place). */
+  exploreLabel?: (field: string, value: string) => string; modelArtwork?: ModelIdentityArtwork | null;
+  /** False keeps text where the catalogue's headline-scale lettering would be illegible (a live board row). */
+  artwork?: boolean };
 type VehicleArtwork = (typeof vehicleArtwork)[number];
 
 /** Match structured identity only. Unknown years/models never inherit another era's badge. */
@@ -82,17 +86,19 @@ function VehicleArtworkImage({ asset, fallback }: { asset: VehicleArtwork; fallb
 }
 
 /** The vehicle's own nameplate, selected by year/make/model, with a readable fallback. */
-export function VehicleIdentity({ make, model, year, variants = [], compact = false, onExplore, modelArtwork }: VehicleIdentityProps) {
+export function VehicleIdentity({ make, model, year, variants = [], compact = false, onExplore, exploreLabel, modelArtwork, artwork = true }: VehicleIdentityProps) {
   const [failedArtwork, setFailedArtwork] = useState<string | null>(null);
-  const sourcedModel = modelArtwork && failedArtwork !== modelArtwork.path ? modelArtwork : null;
-  const assets = resolveVehicleArtwork({ make, model, year, variants });
+  const sourcedModel = artwork && modelArtwork && failedArtwork !== modelArtwork.path ? modelArtwork : null;
+  const assets = artwork ? resolveVehicleArtwork({ make, model, year, variants }) : [];
   const maker = assets.find(asset => asset.role === 'make');
   const script = assets.find(asset => asset.role === 'model');
   const emblem = assets.find(asset => asset.role === 'emblem');
   const variantScript = assets.find(asset => asset.role === 'variant');
   const variantName = variants.filter(token => token.kind === 'series' || token.kind === 'trim').map(token => token.value).join(' ');
   const part = (field: string, value: string, content: React.ReactNode) => onExplore
-    ? <button type="button" className="vehicle-identity__explore" aria-haspopup="dialog" aria-label={`Explore ${value} in this profile`} onClick={() => onExplore(field, value)}>{content}</button>
+    ? <button type="button" className="vehicle-identity__explore" aria-haspopup={exploreLabel ? undefined : 'dialog'}
+      aria-label={exploreLabel ? exploreLabel(field, value) : `Explore ${value} in this profile`} title={exploreLabel?.(field, value)}
+      onClick={() => onExplore(field, value)}>{content}</button>
     : content;
   return <span className={`vehicle-identity${compact ? ' vehicle-identity--compact' : ''}`} data-period-artwork={assets.length > 0 || !!sourcedModel} data-variant-artwork={!!variantScript}>
     {compact && year && <span className="vehicle-identity__year" aria-hidden={onExplore ? undefined : true}>{part('year', String(year), year)}</span>}
