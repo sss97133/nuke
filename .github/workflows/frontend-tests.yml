@@ -176,6 +176,10 @@ jobs:
         run: createdb dm_refinement_bat_episode_reader_ci
       - name: Verify source episode eligibility, anonymous evidence and historical price isolation
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_episode_reader_ci -f supabase/sql/test_bat_episode_board_identity.sql
+      - name: Create native BaT board database
+        run: createdb dm_refinement_bat_native_board_ci
+      - name: Verify native extended lots, corrections and terminal exclusions
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_bat_native_board_ci -f supabase/sql/test_bat_native_state_board.sql
       - name: Create disposable live-pull slot database
         run: createdb dm_bat_live_pull_slots_ci
       - name: Verify the live pull's closing-slot cap, config slot count and pacing guards
