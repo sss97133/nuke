@@ -131,3 +131,52 @@ not appear on the vehicle calendar by design.
 6. The Road Art branch in `extract-mecum`.
 
 No table is minted. `asset_observations` stays deprecated unless the owner revives it.
+
+## 2026-11-08: what changed since 10-16, and the art slice
+
+Owner direction, 2026-11-08 (verbatim in `data-machine-cases.md` §21): the artwork is the endpoint and carries its history;
+its production timeframe and its events of presentation and association; many-to-many folds (group, creation, holder); the
+artist has the highest claim to origin and takes the shape of a user; an org (estate, foundation) can hold the rights and the
+furthering use of the works; cars and art are the same shape, physical objects with provenance when it is recorded.
+
+**What the live system says now (read 2026-11-08, catalog + counts).** `assets` holds 1,750 rows: equipment 415, goods 264,
+material 32, part 731, tool 307, shoot 1. The photo work ledger (`20261028203000`, `20261028233000`) widened `asset_type` by
+`equipment, tool, part, material, goods`, revived `asset_observations` (8,855 `photo_sighting` rows; the DEPRECATED comment is
+gone) and writes it from a SQL writer, `record_photo_work_readings`, with its own unique key on the asset. `vehicle_observations`
+holds 14.6M rows (17 GB) and still has no `(subject_type, subject_id)` index; the deploy role's 10 s statement timeout cannot
+build one (`reference_deploy_role_10s_no_concurrent_index`, 2026-10-19: two INVALID indexes). No `assets` row of a non-vehicle
+lot exists; `upsert_asset` and `asset_lot` were CLEAR in `check-capability-before-mint` on 2026-11-08; `artwork` STOPs there only
+because the emblem-vector capability uses the word, so no function carries that name.
+
+**Section 2 revisited.** The 10-16 choice (lots as `vehicle_observations` rows with `subject_type = 'asset'`) stands as the
+keystone the owner approved on 06-17, and it is not the path taken for the first slice, for two measured reasons: the subject
+index it requires cannot be built through supabase-deploy at 14.6M rows, and the 10-28 lane already made `asset_observations` the
+asset's testimony log with a writer in the same shape. The slice writes `asset_observations` (`kind = 'auction_lot'`). The open
+inconsistency is recorded, not fixed: assets have their own log while organizations and users testify in
+`vehicle_observations`. Closing it (a fold of `asset_observations` into the polymorphic log once the index exists, or the reverse)
+is a later, separate decision; nothing is dropped.
+
+**The art slice (shipped as migration `20261108170000_asset_lots.sql`, contract `supabase/sql/test_asset_lots.sql`).**
+- `asset_type` gains `artwork, automobilia, memorabilia`. The house's label stays a claim (`attributes.house_category`).
+- `assets_identity_key_uidx`: one row per presentation, `attributes.identity_key = '<source>:<lot id>'`, `identity_basis =
+  'lot_presentation'`. Recurrence (the same print or sign across sales) resolves later by supersession.
+- `record_asset_lots(source_slug, lots)`: the sanctioned writer (service-only, 500 lots a call, receipted, refuses unknown
+  sources, foreign identity keys, types outside the three, lots without clocks). One `auction_lot` row per asset × lot × method ×
+  content hash; a changed result appends and supersedes; prices are the house's figures with their basis, premium not adjusted.
+- `asset_lot_walk_cursor`: where a department's walk stopped. `asset_lot_coverage(source)`: lots landed against the house's own
+  department facet (latest `source_census` row, `census_method = 'house_department_facet'`), counts and years only, anon-readable.
+- Source 1, Bonhams: its search index (already read by `extract-bonhams-typesense` for cars, public search key) carries every
+  department. Facet read 2026-11-08 ~07:00 PT: 3,482,440 lots, 2,524,687 with a published hammer. Modes `art_census` (writes the
+  facet as the denominator) and `art_land` (one department, ≤ 4 pages of 250 a run, 2 s between reads, backs off on 403/429,
+  cursor-resumed, wraps as a new pass). Department → type: `PIC-*`, `PHO`, `WOA` → artwork; `MOT-AUT`, `COL-AUT` → automobilia.
+  Nothing is parsed into artist, medium or edition columns: the catalogue lines, description and footnotes are retained as the
+  house printed them (discovery-first; the fields crystallise from use). Image URLs only, never bytes.
+- The gate any house passes to be source 2: lot-level category from the house itself and a published result per lot. Mecum
+  passes from the retained index (79,494 Road Art lots, zero fetch) and lands through the same writer as automobilia. RM Sotheby's
+  (numeric category_id, no results on the current rosters), Christie's, Sotheby's and Phillips (no readable index) do not pass
+  today; they rise when their data does, never by name.
+
+**Not in the slice, named so it is not forgotten:** the creation fold (asset × party × role `creator` × as-of, the party a user,
+org or external identity; the artist's claim to origin), group membership (series, edition parent/child, collection,
+exhibition), holder claims, images as `image_identities` rows keyed by sha256 with pHash candidates, the local archive lane
+(the shoot asset and Blur's session clustering). Each needs lots in the log first; the writer above is what they extend.
