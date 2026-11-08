@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCards, parseMemberHtml, parseAjax, parseDetail, parseResultText, buildValuesSql, toBatListingRow, listingSlug } from './ingest-bat-seller-history.mjs';
 import { buildSql, publicUrl, shapeSessions } from './scene-sessions.mjs';
-import { orgKind, normName, distinctOrgs, representatives, parseGallery, pickWide, sceneExemplars, mergeExemplars, buildExemplarRows, vinMatchedExemplars, mergeBySources, isExcluded } from './build-place-exemplars.mjs';
+import { orgKind, normName, distinctOrgs, representatives, parseGallery, pickWide, sceneExemplars, mergeExemplars, buildExemplarRows, vinMatchedExemplars, mergeBySources, isExcluded, vinOwners } from './build-place-exemplars.mjs';
 import { shuffle, candidatesFor, buildPrompt as placePrompt, parseMatch, toRow as placeRow, needsSecondViewer, valuesCte as placeCte, matchSession } from './match-places.mjs';
 import { sessionVerdicts, classifyVehicle, selectSessions } from './select-sessions.mjs';
 import { buildPromptV2, shuffle as sceneShuffle } from './label-scenes.mjs';
@@ -324,34 +324,58 @@ test('build-place-exemplars: exemplars interleave BaT and scene photos, max per 
   assert.equal(rows.length, 1); assert.equal(rows[0].org_kind, 'dealer'); assert.equal(rows[0].exemplars.length, 4);
 });
 
-test('build-place-exemplars: vin_matched_session uses sessions of garage vehicles whose VIN equals a history VIN (in range first, label fallback, 2 per vehicle, exclusions)', () => {
+test('build-place-exemplars: vin_matched_session uses only dealer_lot/showroom sessions of VIN-matched vehicles (2 per vehicle, exclusions, no cross-org)', () => {
   const VA = 'aaaaaaaa-0000-4000-8000-000000000001'; const VB = 'bbbbbbbb-0000-4000-8000-000000000002'; const VC = 'cccccccc-0000-4000-8000-000000000003';
   const org = { id: O1, name: 'One', business_type: 'dealer' };
   const ses = (v, k, orgs) => ({ vehicle_id: v, session_key: k, organizations: orgs, sample_urls: [`https://p/${v.slice(0, 2)}${k}.jpg`] });
-  const sessions = [ses(VA, '1', [org]), ses(VA, '2', [org]), ses(VA, '3', [org]), ses(VA, '4', []), ses(VB, '1', []), ses(VB, '2', []), ses(VC, '1', [org])];
-  const labels = [{ vehicle_id: VB, session_key: '2', scene_label: 'outdoor_street' }, { vehicle_id: VB, session_key: '1', scene_label: 'other' }];
+  const sessions = [ses(VA, '1', [org]), ses(VA, '2', [org]), ses(VA, '3', [org]), ses(VA, '4', [org]), ses(VB, '1', []), ses(VB, '2', []), ses(VB, '3', []), ses(VC, '1', [org])];
+  const L = (v, k, scene_label) => ({ vehicle_id: v, session_key: k, scene_label });
+  const labels = [L(VA, '1', 'dealer_lot'), L(VA, '2', 'showroom'), L(VA, '3', 'dealer_lot'), L(VA, '4', 'outdoor_street'), L(VB, '1', 'shop_interior'), L(VB, '2', 'outdoor_street'), L(VB, '3', 'showroom'), L(VC, '1', 'dealer_lot')];
   const listings = new Map([[O1, [{ url: 'https://bat/a', vin: 'vin-aaaaaaaaa1' }, { url: 'https://bat/b', vin: 'VINBBBBBBBBB2' }, { url: 'https://bat/c', vin: 'VINCCCCCCCCC3' }]]]);
   const garage = [{ id: VA, vin: 'vinaaaaaaaaa1' }, { id: VB, vin: 'VINBBBBBBBBB2' }, { id: VC, vin: 'VINCCCCCCCCC3' }, { id: 'dd', vin: 'NOMATCH00000' }];
   const m = vinMatchedExemplars([{ id: O1, name: 'One' }], listings, garage, sessions, labels, { exclude: ['cccccccc'] });
   const ex = m.get(O1);
-  assert.equal(ex.filter((e) => e.cite.vehicle_id === VA).length, 2); // capped at 2 per vehicle, in-range sessions only
-  assert.deepEqual(ex.filter((e) => e.cite.vehicle_id === VA).map((e) => e.cite.session_key), ['1', '2']);
-  assert.deepEqual(ex.filter((e) => e.cite.vehicle_id === VB).map((e) => e.cite.session_key), ['2']); // none in range -> outdoor label
+  assert.deepEqual(ex.filter((e) => e.cite.vehicle_id === VA).map((e) => e.cite.session_key), ['1', '2']); // capped at 2; outdoor never
+  assert.deepEqual(ex.filter((e) => e.cite.vehicle_id === VB).map((e) => e.cite.session_key), ['3']); // only the showroom session, not shop/outdoor
   assert.ok(!ex.some((e) => e.cite.vehicle_id === VC)); // excluded by prefix
   assert.deepEqual(ex[0].cite, { vehicle_id: VA, session_key: '1', vin: 'VINAAAAAAAAA1', listing_url: 'https://bat/a', source: 'vin_matched_session' });
   assert.equal(ex[0].source, 'vin_matched_session');
+  // no dealer/showroom label -> nothing, even for an in-range session
+  assert.equal(vinMatchedExemplars([{ id: O1, name: 'One' }], listings, garage, sessions, [L(VA, '1', 'outdoor_street')]).size, 0);
   assert.equal(vinMatchedExemplars([{ id: O1, name: 'One' }], listings, [], sessions, labels).size, 0);
   assert.ok(isExcluded('abc123', ['ABC']) && !isExcluded('abc123', ['x']) && !isExcluded('abc', ['']));
   const sc = sceneExemplars([ses(VA, '1', [org])], [{ vehicle_id: VA, session_key: '1', scene_label: 'dealer_lot', confidence: 0.9 }], { exclude: [VA] });
   assert.equal(sc.size, 0);
+  // cross-org: VA is matched to One, so Two gets neither a vin nor a scene exemplar from it
+  const O3 = 'dddddddd-0000-4000-8000-0000000000d3';
+  const two = { id: O3, name: 'Two' };
+  const lm = new Map([[O1, [{ url: 'https://bat/a', vin: 'VINAAAAAAAAA1' }]], [O3, [{ url: 'https://bat/y', vin: 'VINBBBBBBBBB2' }]]]);
+  const owners = vinOwners([{ id: O1, name: 'One' }, two], new Map([[O1, lm.get(O1)]]), garage);
+  assert.deepEqual([...owners.get(VA)], ['one']);
+  const both = vinMatchedExemplars([{ id: O1, name: 'One' }, two], new Map([[O1, lm.get(O1)], [O3, [{ url: 'https://bat/y', vin: 'VINBBBBBBBBB2' }]]]), garage, sessions, labels);
+  assert.ok(both.get(O1).every((e) => e.cite.vehicle_id === VA)); assert.deepEqual(both.get(O3).map((e) => e.cite.vehicle_id), [VB]); // each place gets only its own vehicle
+  const ses2 = sceneExemplars([ses(VA, '1', [two])], [{ vehicle_id: VA, session_key: '1', scene_label: 'dealer_lot', confidence: 0.9 }], { owners });
+  assert.equal(ses2.size, 0);
+  assert.equal(sceneExemplars([ses(VA, '1', [org])], [{ vehicle_id: VA, session_key: '1', scene_label: 'dealer_lot', confidence: 0.9 }], { owners }).size, 1);
+});
+
+test('build-place-exemplars: fewer than min vin exemplars -> bat_listing fills the remaining slots after them', () => {
+  const mk = (src, n) => Array.from({ length: n }, (_, i) => ({ url: `${src}${i}`, source: src }));
+  const src = { bat: mk('bat_listing', 5), scene: mk('scene_session', 2), vin: mk('vin_matched_session', 2) };
+  assert.deepEqual(mergeBySources(src, 6).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'bat_listing0', 'bat_listing1', 'bat_listing2', 'bat_listing3']);
+  assert.deepEqual(mergeBySources({ ...src, vin: mk('vin_matched_session', 4) }, 6).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'vin_matched_session2', 'vin_matched_session3', 'bat_listing0', 'scene_session0']); // at the minimum: old fill
+  assert.equal(mergeBySources(src, 6, null, 2).filter((e) => e.source === 'bat_listing').length, 2); // min 2 reached: old fill (interleaved)
+  const rows = buildExemplarRows([{ id: O1, name: 'One', business_type: 'dealer' }], new Map([[O1, src.bat]]), new Map(), 6, { vinByOrg: new Map([[O1, src.vin]]), minVin: 4 });
+  assert.equal(rows[0].exemplars.length, 6);
 });
 
 test('build-place-exemplars: --prefer-sources orders the fill; BaT never precedes vin_matched_session', () => {
   const mk = (src, n) => Array.from({ length: n }, (_, i) => ({ url: `${src}${i}`, source: src }));
   const src = { bat: mk('bat_listing', 3), scene: mk('scene_session', 2), vin: mk('vin_matched_session', 2) };
-  assert.deepEqual(mergeBySources(src, 4).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'bat_listing0', 'scene_session0']);
-  assert.deepEqual(mergeBySources(src, 5, ['vin_matched_session', 'scene_session', 'bat_listing']).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'scene_session0', 'scene_session1', 'bat_listing0']);
-  assert.deepEqual(mergeBySources(src, 4, ['bat_listing', 'vin_matched_session']).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'bat_listing0', 'bat_listing1']);
+  assert.deepEqual(mergeBySources(src, 4, null, 2).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'bat_listing0', 'scene_session0']);
+  assert.deepEqual(mergeBySources(src, 4).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'bat_listing0', 'bat_listing1']); // below the default minimum of 4: bat fills
+  assert.deepEqual(mergeBySources(src, 5, ['vin_matched_session', 'scene_session', 'bat_listing'], 2).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'scene_session0', 'scene_session1', 'bat_listing0']);
+  assert.deepEqual(mergeBySources(src, 4, ['bat_listing', 'vin_matched_session'], 2).map((e) => e.url), ['vin_matched_session0', 'vin_matched_session1', 'bat_listing0', 'bat_listing1']);
   assert.deepEqual(mergeBySources({ ...src, vin: [] }, 4).map((e) => e.url), ['bat_listing0', 'scene_session0', 'bat_listing1', 'scene_session1']); // unchanged without vin exemplars
   assert.deepEqual(mergeBySources({ ...src, vin: [] }, 4, ['scene_session', 'bat_listing']).map((e) => e.url), ['scene_session0', 'scene_session1', 'bat_listing0', 'bat_listing1']);
 });
