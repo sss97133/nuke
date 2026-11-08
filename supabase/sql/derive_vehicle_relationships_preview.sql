@@ -751,7 +751,8 @@ pmx AS MATERIALIZED (
   SELECT k.vid, k.vehicle_id, k.session_key, k.conf, k.cite, k.org_id, k.n_viewers, k.image_ids, k.photo_count,
          CASE WHEN k.n_viewers >= 2 AND NOT k.agree THEN 'viewer_disagreement'
               WHEN NOT k.ok THEN 'below_confidence'
-              WHEN k.org_id IS NULL THEN 'neither'
+              WHEN k.org_id IS NULL AND k.n_viewers >= 2 THEN 'neither'
+              WHEN k.org_id IS NULL THEN 'neither_single_viewer'
               WHEN EXISTS (SELECT 1 FROM pmo o WHERE o.vehicle_id = k.vehicle_id AND o.session_key = k.session_key) THEN 'matched_in_range'
               ELSE 'organization_not_in_range' END AS st,
          (SELECT o.canon FROM pmo o WHERE o.vehicle_id = k.vehicle_id AND o.session_key = k.session_key LIMIT 1) AS canon,
@@ -775,7 +776,8 @@ pmd AS MATERIALIZED (
 -- least 1). It is DROPPED, not counted, and cited as dropped when its label is non-informative (outdoor_street, other) or its confidence is below
 -- the floor of 0.6. Its kind (sk) is dealer (dealer_lot / showroom) or shop (shop_interior / upholstery_work / paint_body); a usable place match to
 -- an organization in range overrides it with that organization's kind and restricts the session's vote to that organization (pm_canon); a
--- usable 'neither' drops the session (place_neither): the scene then attributes nothing. A place-matched session without a generic label is a row too.
+-- usable 'neither' on which two viewers agree drops the session (place_neither): the scene then attributes nothing; a single viewer's 'neither'
+-- (neither_single_viewer) is cited but does not veto a confident scene label. A place-matched session without a generic label is a row too.
 sc AS MATERIALIZED (
   SELECT d.*, greatest(1, coalesce(d.photo_count, nullif(cardinality(d.image_ids), 0), 1)) AS w,
          CASE WHEN d.pm_st = 'matched_in_range' AND d.pm_kind IS NOT NULL THEN d.pm_kind
