@@ -11,6 +11,7 @@ import { captureLedgerFields } from '../supabase/functions/poll-listing-feeds/ca
 import { fetchCraigslistFeed } from '../supabase/functions/poll-listing-feeds/feedFetch.ts';
 import { emptySearchHtml } from '../supabase/functions/poll-listing-feeds/fixtures/empty-search.ts';
 import { vehicleEventWriterFor } from '../supabase/functions/_shared/vehicleEventWrite.ts';
+import { purplewaveDescription } from '../supabase/functions/poll-listing-feeds/purplewaveDescription.ts';
 const require = createRequire(new URL('../nuke_frontend/package.json', import.meta.url));
 const ts = require('typescript');
 const { createClient } = require('@supabase/supabase-js');
@@ -108,6 +109,7 @@ export function fixture(options = {}) {
     exports: purplewave.exports, module: purplewave, URLSearchParams, AbortSignal, Date: runtimeDate, fetch: transport,
     require(name) {
       if (name.endsWith('/vehicleEventWrite.ts')) return { vehicleEventWriterFor };
+      if (name === './purplewaveDescription.ts') return { purplewaveDescription };
       throw new Error(`Unexpected PurpleWave import ${name}`);
     },
   });

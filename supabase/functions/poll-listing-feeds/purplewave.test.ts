@@ -95,3 +95,32 @@ Deno.test("public API refusal does not invoke a renderer or intake", async () =>
     async () => new Response("denied", { status: 403 }));
   equal(result.error, "PurpleWave HTTP 403; no fallback"); equal(f.calls, []);
 });
+
+Deno.test("native call cap preserves the partial page for the next invocation", async () => {
+  const f = fixture();
+  const budget = { refusal: () => null, reserve: () => ({ timeout_ms: 5000 }), record: () => {} } as any;
+  const feed = { id: "feed", enabled: true, display_name: "PurpleWave", search_criteria: { native_page: 1, native_offset: 0 } };
+  const rows = Array.from({ length: 25 }, (_, i) => ({ ...raw, item: `EX${String(i).padStart(4, "0")}` }));
+  const fetcher = async () => new Response(JSON.stringify(rows));
+  const first = await pollPurplewave(f.db, feed, budget, 40, fetcher);
+  equal(first.error, null); equal(first.snapshots_admitted, 8); equal(f.calls.length, 16);
+  const saved = f.writes.filter(w => w.table === "listing_feeds").at(-1)!.body.search_criteria;
+  equal(saved.native_page, 1); equal(saved.native_offset, 8);
+  const second = await pollPurplewave(f.db, { ...feed, search_criteria: saved }, budget, 40, fetcher);
+  equal(second.error, null); equal(second.snapshots_admitted, 8);
+  const resumed = f.calls.filter(c => c.name === "ingest")[8].body.url;
+  equal(resumed.endsWith("/item/EX0008"), true);
+  equal(f.writes.filter(w => w.table === "listing_feeds").at(-1)!.body.search_criteria.native_offset, 16);
+});
+
+Deno.test("explicit native VIN reaches intake and raw source HTML remains attributed", async () => {
+  const source = { ...raw, vin: "1GT19LE74NF216181", new_description: "<b>GMC Sierra</b><li>VIN: 1GT19LE74NF216181</li>" };
+  const lot = purplewaveLot(source, clock), f = fixture();
+  await landPurplewaveLot(f.db, lot);
+  equal(f.calls[0].body.vin, source.vin);
+  equal(f.calls[0].body.description.includes("<"), false);
+  equal(f.calls[1].body.structured_data.source_payload.new_description, source.new_description);
+  const owned = { platform_source: "purplewave", listing_url: lot.url, description: source.new_description };
+  equal(purplewaveProjection(lot, owned, "obs")?.description, lot.description);
+  equal(purplewaveProjection(lot, { ...owned, description: "Owner's separate description" }, "obs")?.description, undefined);
+});

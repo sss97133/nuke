@@ -1,10 +1,15 @@
 import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
 import type { IntakeBudget } from "./ledger.ts";
+import { purplewaveDescription } from "./purplewaveDescription.ts";
 
 export const PURPLEWAVE_METHOD = "purplewave_public_snapshot_v1";
 // Publisher payment terms inspected 2026-11-08; this is house currency evidence, not an API currency field.
 const CURRENCY_SOURCE = "https://www.purplewave.com/auction/legal/terms";
 const PAGE_SIZE = 25;
+// A lot invokes identity intake plus observation intake (and their nested calls).
+// The first live pass hit the platform trace limit at attempt18. Leave headroom
+// under that shared call budget; the existing cursor resumes the same page.
+const MAX_NATIVE_LOTS = 8;
 const writeEpisode = vehicleEventWriterFor("poll-listing-feeds:purplewave");
 type Row = Record<string, unknown>;
 const text = (v: unknown) => typeof v === "string" && v.trim() ? v.trim() : null;
@@ -32,7 +37,7 @@ export function purplewaveLot(raw: unknown, readAt: string) {
   const url = `https://www.purplewave.com/auction/${auction}/item/${item}`;
   return { raw: r, auction, item, key: `${auction}:${item}`, url, year, make, model, end, bid, count,
     title: [year || null, make, model].filter(Boolean).join(" ") || `PurpleWave ${item}`, readAt, bidAt: time(r.winning_bid_time),
-    description: text(r.new_description), image: null,
+    ...purplewaveDescription(r.new_description, r.vin), image: null,
     // Soft-close extension clocks can move. Only the publisher's terminal flags end a lot.
     closed: r.closed === 1 || r.auction_closed === 1 };
 }
@@ -45,6 +50,7 @@ export function purplewaveObservation(lot: ReturnType<typeof purplewaveLot>, veh
     structured_data: { capture_kind: "auction_state_snapshot", individual_bid: false, source_claims_only: true,
       auction_id: lot.auction, native_item_id: lot.item, current_bid: lot.bid, bid_count: lot.count,
       currency: "USD", currency_source: CURRENCY_SOURCE,
+      vin: lot.vin, vin_evidence: lot.vin_evidence,
       auction_end_date: lot.end, latest_bid_at: lot.bidAt, source_event_time_status: "snapshot_not_event",
       source_payload: lot.raw },
     extraction_metadata: { clock_basis: "public_api_received_at", received_at: lot.readAt,
@@ -58,6 +64,8 @@ export function purplewaveProjection(lot: ReturnType<typeof purplewaveLot>, row:
   const prior = Date.parse(row.origin_metadata?.purplewave_observed_at ?? "");
   if (Number.isFinite(prior) && prior > Date.parse(lot.readAt)) return null;
   return { high_bid: lot.count > 0 ? Math.floor(lot.bid) : null, auction_end_date: lot.end,
+    ...(lot.description && row.description === lot.raw.new_description && row.description !== lot.description
+      ? { description: lot.description } : {}),
     auction_status: lot.closed ? "ended" : "active", sale_status: lot.closed ? "ended" : "auction_live",
     origin_metadata: { ...(row.origin_metadata ?? {}), purplewave_observed_at: lot.readAt,
       purplewave_observation_id: observationId, current_bid: lot.bid, bid_count: lot.count, currency: "USD", currency_source: CURRENCY_SOURCE }, updated_at: lot.readAt };
@@ -86,6 +94,7 @@ export async function landPurplewaveLot(client: any, lot: ReturnType<typeof purp
   }
   const identity = await db.functions.invoke("ingest", { body: { url: lot.url, enrich: false,
     year: lot.year, make: lot.make, model: lot.model, description: lot.description || lot.title,
+    ...(lot.vin ? { vin: lot.vin } : {}),
     ...(lot.image ? { image_url: lot.image } : {}) } });
   const vehicleId = identity.data?.vehicle_id;
   if (identity.error || !vehicleId || !["created", "matched", "updated", "duplicate"].includes(identity.data?.status))
@@ -108,13 +117,14 @@ export async function landPurplewaveLot(client: any, lot: ReturnType<typeof purp
   }, { sourceObservedAt: lot.readAt });
   if (!("id" in episode) || !episode.id) throw Error("PurpleWave episode projection failed");
   // Mutable discovery projection, only after the attributed observation and episode were acknowledged.
-  const vehicle = await db.from("vehicles").select("id,platform_source,listing_url,sale_status,origin_metadata,deleted_at").eq("id", vehicleId).maybeSingle();
+  const vehicle = await db.from("vehicles").select("id,platform_source,listing_url,sale_status,origin_metadata,deleted_at,description").eq("id", vehicleId).maybeSingle();
   if (vehicle.error || !vehicle.data) throw Error("PurpleWave vehicle ownership read failed");
   const patch = purplewaveProjection(lot, vehicle.data, observationId);
   if (patch) {
     let update = db.from("vehicles").update(patch).eq("id", vehicleId).eq("platform_source", "purplewave")
       .eq("listing_url", vehicle.data.listing_url).is("deleted_at", null);
     update = vehicle.data.sale_status == null ? update.is("sale_status", null) : update.eq("sale_status", vehicle.data.sale_status);
+    if (patch.description) update = update.eq("description", vehicle.data.description);
     update = vehicle.data.origin_metadata == null ? update.is("origin_metadata", null) : update.eq("origin_metadata", JSON.stringify(vehicle.data.origin_metadata));
     const projection = await update.select("id");
     if (projection.error || projection.data?.length !== 1) throw Error("PurpleWave auction projection changed concurrently; retry");
@@ -125,7 +135,7 @@ export async function landPurplewaveLot(client: any, lot: ReturnType<typeof purp
 /** Rotating bounded snapshots under the existing feed allocation; not a full-stream coverage claim. */
 export async function pollPurplewave(db: any, feed: any, budget: IntakeBudget, allocation: number, fetcher = fetch) {
   const result = { feed: feed.display_name, source: "purplewave", items_found: 0, new_ingested: 0,
-    snapshots_admitted: 0, unresolved: 0, error: null as string | null, coverage: "paged snapshots; individual bids and full inventory unverified" };
+    snapshots_admitted: 0, unresolved: 0, native_limit: MAX_NATIVE_LOTS, error: null as string | null, coverage: "paged snapshots; individual bids and full inventory unverified" };
   const config = feed.search_criteria ?? {};
   let page = Number(config.native_page ?? 1), offset = Number(config.native_offset ?? 0);
   try {
@@ -142,7 +152,7 @@ export async function pollPurplewave(db: any, feed: any, budget: IntakeBudget, a
     // Validate the entire returned page before any write. No silent dropped source rows.
     const lots = raw.map(r => purplewaveLot(r, readAt));
     let attempts = 0;
-    while (offset < lots.length && attempts < allocation) {
+    while (offset < lots.length && attempts < Math.min(allocation, MAX_NATIVE_LOTS)) {
       const grant = budget.reserve("purplewave");
       if (!grant) break;
       attempts++;
