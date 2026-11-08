@@ -32,7 +32,10 @@ export function candidatesFor(session, exemplarRows, rep = null) {
   const byId = new Map(exemplarRows.map((r) => [r.org_id, r]));
   const out = [];
   for (const o of distinctOrgs(session.organizations, rep)) {
-    const r = byId.get(o.id); if (r?.exemplars?.length) out.push({ org_id: o.id, org_kind: r.org_kind ?? null, exemplars: r.exemplars });
+    const r = byId.get(o.id);
+    // Never show a vehicle its own sessions as a reference: an exemplar cut from this vehicle's photos would make the match circular.
+    const ex = (r?.exemplars ?? []).filter((e) => !(e?.cite?.vehicle_id && e.cite.vehicle_id === session.vehicle_id));
+    if (ex.length) out.push({ org_id: o.id, org_kind: r.org_kind ?? null, exemplars: ex });
   }
   return out;
 }

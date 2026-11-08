@@ -6,7 +6,10 @@
 // No vehicle id, user label or organization name is an input except through the pair rows themselves.
 //
 //   node scripts/garage/compare-duplicates.mjs --pairs-sql-out [file] --user-id <uuid>
+//        [--hist-jsonl /workspace/bat_history.jsonl]
 //        print (or write) a READ-ONLY SELECT that produces the pair rows for an account; run it through scripts/data/q.sh and save the JSON.
+//        A year gap of one is also a review pair, 0.05 below the band floor, when one side's VIN is on a listing (bat_listings, or the VINs of
+//        --hist-jsonl rows); such a pair joins a cluster only through a visual 'same vehicle' judgment (the preview has no other path for it).
 //   node scripts/garage/compare-duplicates.mjs --pairs-json /workspace/dup_pairs.json
 //        [--out /workspace/visual_dup_judgments.jsonl] [--cte-out /workspace/visual_dup_judgments.cte.sql] [--cache-dir /tmp/label-scenes-cache]
 //        [--backend claude-cli] [--model <name>] [--limit n]
@@ -30,14 +33,23 @@ const MAX_SAMPLES = 4;
 // Read-only SELECT of the review pairs of ONE account: the dup score of find_vehicle_duplicate_candidates / the preview (same make,
 // year within one, same model family, VIN equal or one missing; 0.50 + year + VIN + identical model text), score in
 // [reviewMin, dupMin), and photos on BOTH sides (a pair with a side that has no photo cannot be compared by eye).
-export function buildPairsSql(userId, { reviewMin = 0.6, dupMin = 0.7 } = {}) {
+export function buildPairsSql(userId, { reviewMin = 0.6, dupMin = 0.7, histVins = [] } = {}) {
   if (!UUID.test(userId ?? '')) throw new Error('--user-id must be a uuid');
   if (!(reviewMin >= 0 && dupMin <= 1 && reviewMin < dupMin)) throw new Error('bad score band');
   const u = userId.toLowerCase();
+  const hv = [...new Set(histVins.map((x) => String(x).toUpperCase().replace(/[^A-Z0-9]/g, '')).filter((x) => /^[A-Z0-9]{9,17}$/.test(x)))];
+  const histSql = hv.length ? `\n          UNION ALL SELECT x FROM unnest(ARRAY[${hv.map((x) => `'${x}'`).join(', ')}]) x` : '';
   return `-- READ-ONLY: duplicate review pairs of one account with up to ${MAX_SAMPLES} photo urls per side (for scripts/garage/compare-duplicates.mjs)
-WITH dv AS (
+WITH lv AS (
+  -- VINs on a listing (bat_listings vin column or raw_data${hv.length ? `; ${hv.length} from seller-history rows` : ''}): a year gap of one is reviewed when one side's VIN is here
+  SELECT DISTINCT x.vin FROM (
+    SELECT upper(regexp_replace(coalesce(to_jsonb(bl)->>'vin', bl.raw_data->>'vin', bl.raw_data->>'VIN', ''), '[^A-Za-z0-9]', '', 'g')) AS vin FROM bat_listings bl${histSql} ) x
+   WHERE length(x.vin) >= 9
+),
+dv AS (
   SELECT v.id AS vid, v.year, lower(btrim(v.make)) AS mk, lower(btrim(v.model)) AS model,
          normalize_vehicle_model_family(v.model) AS fam, nullif(upper(btrim(v.vin)), '') AS vin,
+         EXISTS (SELECT 1 FROM lv WHERE lv.vin = upper(regexp_replace(coalesce(v.vin, ''), '[^A-Za-z0-9]', '', 'g'))) AS vin_listing,
          jsonb_build_object('year', v.year, 'make', v.make, 'model', v.model, 'vin', nullif(btrim(v.vin), ''),
            'color', to_jsonb(v)->>'color', 'trim', to_jsonb(v)->>'trim', 'body_style', to_jsonb(v)->>'body_style',
            'engine', to_jsonb(v)->>'engine', 'transmission', to_jsonb(v)->>'transmission') AS fields,
@@ -51,7 +63,7 @@ WITH dv AS (
                   UNION SELECT p.vehicle_id FROM vehicle_user_permissions p WHERE p.user_id = '${u}' AND p.revoked_at IS NULL)
 )
 SELECT a.vid AS a_id, b.vid AS b_id, round(s.score::numeric, 2) AS score, a.samples AS a_samples, b.samples AS b_samples,
-       jsonb_build_object('a', a.fields, 'b', b.fields) AS fields
+       jsonb_build_object('a', a.fields, 'b', b.fields, 'vin_matches_listing', a.vin_listing OR b.vin_listing) AS fields
   FROM dv a JOIN dv b ON b.vid::text > a.vid::text AND a.mk <> '' AND b.mk = a.mk
    AND a.year IS NOT NULL AND b.year IS NOT NULL AND abs(b.year - a.year) <= 1
    AND a.fam IS NOT NULL AND b.fam = a.fam
@@ -59,7 +71,8 @@ SELECT a.vid AS a_id, b.vid AS b_id, round(s.score::numeric, 2) AS score, a.samp
   CROSS JOIN LATERAL (SELECT 0.50 + CASE WHEN b.year = a.year THEN 0.15 ELSE 0.05 END
          + CASE WHEN a.vin IS NOT NULL AND a.vin = b.vin THEN 0.30 ELSE 0 END
          + CASE WHEN b.model = a.model THEN 0.05 ELSE 0 END AS score) s
- WHERE s.score >= ${reviewMin} - 1e-9 AND s.score < ${dupMin} - 1e-9
+ WHERE ((s.score >= ${reviewMin} - 1e-9 AND s.score < ${dupMin} - 1e-9)
+        OR (abs(b.year - a.year) = 1 AND (a.vin_listing OR b.vin_listing) AND s.score >= ${reviewMin} - 0.05 - 1e-9 AND s.score < ${reviewMin} - 1e-9))
    AND cardinality(a.samples) > 0 AND cardinality(b.samples) > 0
  ORDER BY s.score DESC, a.vid, b.vid`;
 }
@@ -149,7 +162,8 @@ async function main() {
   const args = process.argv.slice(2);
   const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 && args[i + 1] !== undefined && !args[i + 1].startsWith('--') ? args[i + 1] : d; };
   if (args.includes('--pairs-sql-out')) {
-    const sql = buildPairsSql(opt('user-id'));
+    const hist = opt('hist-jsonl'); const histVins = hist && existsSync(hist) ? readFileSync(hist, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l).vin).filter(Boolean) : [];
+    const sql = buildPairsSql(opt('user-id'), { histVins });
     const dest = opt('pairs-sql-out');
     if (dest && dest !== '-') { writeFileSync(dest, sql + ';\n'); console.error(`wrote ${dest}`); } else console.log(sql + ';');
     return;

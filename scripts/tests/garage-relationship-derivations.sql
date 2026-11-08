@@ -1026,6 +1026,28 @@ SELECT fixture_assert((SELECT count(*) FROM (:rv_pairs_sql) p WHERE p.a_id BETWE
   'pairs SQL: the review pairs with photos on both sides (pairs with a photo-less side, conflicting or not, are left to absence of contradiction)');
 SELECT fixture_assert((SELECT count(*) FROM vehicles WHERE merged_into_vehicle_id IS NOT NULL AND id BETWEEN rv(1) AND rv(20))=0,'review pairs never merge records');
 
+-- P11-P13 a year gap of one with different model text (score 0.55, below the band) is a review pair only when one side's VIN is on a listing
+SELECT rv_veh(21,1985,'Rveleven','K15 SWB',NULL,true); SELECT rv_veh(22,1986,'Rveleven','K1500 Sierra Classic','RVVIN0000000011',true);   -- listed VIN, visual true 0.9
+SELECT rv_veh(23,1985,'Rvtwelve','K15 SWB',NULL,true); SELECT rv_veh(24,1986,'Rvtwelve','K1500 Sierra Classic','RVVIN0000000012',true);   -- no listing
+SELECT rv_veh(25,1985,'Rvthirteen','K15 SWB',NULL,true); SELECT rv_veh(26,1986,'Rvthirteen','K1500 Sierra Classic','RVVIN0000000013',true); -- listed VIN, no judgment
+SELECT rv_veh(27,1985,'Rvfourteen','K15 SWB',NULL,true); SELECT rv_veh(28,1986,'Rvfourteen','K1500 Sierra Classic','RVVIN0000000014',true); -- VIN on a seller-history row (hist_listings)
+INSERT INTO bat_listings(vehicle_id,organization_id,seller_username,bat_listing_url,raw_data) VALUES
+  (NULL,NULL,'rvseller','https://bringatrailer.com/listing/rv11/','{"vin":"RVVIN0000000011"}'),(NULL,NULL,'rvseller','https://bringatrailer.com/listing/rv13/','{"vin":"RVVIN0000000013"}');
+\set rv2_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (visual_dup_judgments)\$/   WHERE false UNION ALL SELECT rv(21), rv(22), 'true', 0.9::numeric, 'm', 'same dent', gen_random_uuid() UNION ALL SELECT rv(27), rv(28), 'true', 0.9::numeric, 'm', 'same dent', gen_random_uuid()/" -e "s/^   WHERE false -- (hist_listings)\$/   WHERE false UNION ALL SELECT 'https:\/\/bringatrailer.com\/listing\/rv14\/', NULL, 'RVVIN0000000014', 'rvseller', 'x', NULL::date/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('n', coalesce(jsonb_array_length(d.evidence->'cluster'->'members'), 1), 'rev', d.evidence->'duplicate_review'))
+          FROM (:rv2_sql) d WHERE d.vehicle_id BETWEEN rv(21) AND rv(28)) AS rv2 \gset
+SELECT fixture_assert((:'rv2'::jsonb->(rv(21))::text->>'n')::int=2 AND :'rv2'::jsonb->(rv(21))::text->'rev'->0->>'basis'='visual'
+  AND (:'rv2'::jsonb->(rv(21))::text->'rev'->0->>'vin_matches_listing')::boolean AND (:'rv2'::jsonb->(rv(21))::text->'rev'->0->>'score')::numeric=0.55,
+  'a year gap of one with a VIN on a listing is a review pair below the band and joins on a visual judgment');
+SELECT fixture_assert((:'rv2'::jsonb->(rv(23))::text->>'n')::int=1 AND jsonb_typeof(:'rv2'::jsonb->(rv(23))::text->'rev')='null','the same pair without a listing VIN is not a review pair');
+SELECT fixture_assert((:'rv2'::jsonb->(rv(25))::text->>'n')::int=1 AND NOT (:'rv2'::jsonb->(rv(25))::text->'rev'->0->>'joined')::boolean
+  AND :'rv2'::jsonb->(rv(25))::text->'rev'->0->>'basis' IS NULL,'a listed-VIN year-gap pair without a visual judgment is cited and not joined (no absence-of-contradiction path)');
+SELECT fixture_assert((:'rv2'::jsonb->(rv(27))::text->>'n')::int=2 AND (:'rv2'::jsonb->(rv(27))::text->'rev'->0->>'vin_matches_listing')::boolean,'a VIN on a seller-history (hist_listings) row counts as a listing VIN');
+\set rv2_pairs_sql `node scripts/garage/compare-duplicates.mjs --pairs-sql-out - --user-id 00000000-0000-4000-8000-000000000001 | sed '$ s/;[[:space:]]*$//'`
+SELECT fixture_assert((SELECT array_agg(p.a_id ORDER BY p.a_id) FROM (:rv2_pairs_sql) p WHERE p.a_id BETWEEN rv(21) AND rv(28))=ARRAY[rv(21),rv(25)]
+  AND (SELECT bool_and((p.fields->>'vin_matches_listing')::boolean) FROM (:rv2_pairs_sql) p WHERE p.a_id BETWEEN rv(21) AND rv(28)),
+  'pairs SQL: the listed-VIN year-gap pairs are produced (the seller-history one only with --hist-jsonl), the unlisted one is not');
+
 -- ===== place matches (scripts/garage/match-places.mjs): the strongest scene evidence, above generic scene labels =====
 INSERT INTO vehicles(id,is_public,year,make,model) SELECT gz(g), true, 1990, 'Gzmake'||g, 'Gzmodel' FROM generate_series(60,69) g;
 \set gp_x b0b0b0b0-0000-4000-8000-000000000001

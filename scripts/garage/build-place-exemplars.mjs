@@ -99,10 +99,10 @@ export function sceneExemplars(sessions, labels, { minConf = 0.85, rep = null } 
     let org = null;
     if (places.length === 1) org = places[0];
     else if (lk === 'shop') { const shops = places.filter((o) => orgKind(o.business_type) === 'shop'); if (shops.length === 1) org = shops[0]; }
-    const url = (s.sample_urls ?? s.sample_image_urls ?? []).find((u) => typeof u === 'string' && u);
+    const url = (s.sample_urls ?? s.sample_image_urls ?? (s.samples ?? []).map((x) => x?.image_url)).find((u) => typeof u === 'string' && u);
     if (!org || !url) continue;
-    const list = out.get(org.id) ?? []; if (list.some((e) => e.url === url)) continue;
-    list.push({ url, source: 'scene_session', cite: { session_key: s.session_key, scene_label: l.scene_label, confidence: Number(l.confidence), run_id: l.run_id ?? null, model: l.model ?? null } });
+    const list = out.get(org.id) ?? []; if (list.some((e) => e.url === url || e.cite?.vehicle_id === s.vehicle_id)) continue; // one exemplar per vehicle
+    list.push({ url, source: 'scene_session', cite: { vehicle_id: s.vehicle_id, session_key: s.session_key, scene_label: l.scene_label, confidence: Number(l.confidence), run_id: l.run_id ?? null, model: l.model ?? null } });
     out.set(org.id, list);
   }
   return out;
