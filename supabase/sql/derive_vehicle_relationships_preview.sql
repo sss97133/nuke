@@ -60,6 +60,18 @@
 -- then, for a vehicle that appears in a listing, business_type dealer/auction before restoration; else ambiguous
 -- (role contributor, confidence <= 0.2, flag 'org_ambiguous' in evidence.flags, both organizations cited in
 -- chain[3].evidence.organizations).
+-- Import provenance (step 1): a user photo is marked IMPORTED, with its signals cited, when any of: its source / storage path
+-- says download / import / url_scraper / screenshot; its original filename is a download / screenshot / web-export name
+-- (screenshot, download, '<digits>_<id>_o.jpg', 'name-<w>x<h>.jpg', IMG-<date>-WA<n>); it has no camera make / model and a
+-- web export size (long side 640 / 800 / 1024 / 1200 / 1280 / 1600 / 2048); its file_hash equals, or its dhash (64-bit hex,
+-- vehicle_images.dhash) is within Hamming distance 6 of, an image from a listing scrape (source bat / mecum / classic_com /
+-- craigslist / url_scraper / cars_and_bids / carsandbids, or an image_url on a listing CDN). The perceptual match is the
+-- strongest signal. A hash match does not mark an upload that has camera make + model + taken_at and was stored BEFORE the
+-- scraped copy (the original that the listing republished). An imported photo is never own-device. A vehicle whose photos are
+-- predominantly imported (more than half) derives imported_by_user, citing the matches (evidence.chain[1].imported_examples).
+-- (vehicle_images has file_hash and dhash as text; phash_hex lives on image_identities and is not used here.)
+-- Scene context (step 3 tie-break): see the tie-break note below; scene labels come from the scene_labels placeholder CTE
+-- (rows of vehicle_photo_session_scenes), organization kinds from organizations.business_type / entity_type / services_offered.
 -- Time decay: documenting with no own photo or activity for platform_config 'garage_documenting_decay_months'
 -- ({"months": n}, default 18 here) -> previously_documented, with documented_from / documented_to = min / max
 -- capture time of the account's own-device photos.
@@ -87,6 +99,23 @@ inline_stmts AS (
   SELECT t.id, t.vehicle_id, t.observed_at, t.content_text, t.structured_data
     FROM (VALUES (NULL::uuid, NULL::uuid, NULL::timestamptz, NULL::text, NULL::jsonb)) t(id, vehicle_id, observed_at, content_text, structured_data)
    WHERE false
+),
+-- HISTORY PLACEHOLDER (empty by default; keep this CTE when generating the function). Listings read from public pages
+-- (scripts/garage/ingest-bat-seller-history.mjs writes a hist_listings VALUES CTE with these columns). Read like a
+-- bat_listings row with no vehicle and no organization: the matcher below uses url / VIN / lot / title and the seller handle.
+hist_listings AS (
+  SELECT t.url, t.lot, t.vin, t.seller, t.title, t.end_date
+    FROM (VALUES (NULL::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::date)) t(url, lot, vin, seller, title, end_date)
+   WHERE false -- (hist_listings)
+),
+-- SCENE PLACEHOLDER (empty by default; keep this CTE when generating the function). One row per photo session, labelled by a
+-- vision model (table vehicle_photo_session_scenes; scene_label in dealer_lot, showroom, shop_interior, upholstery_work,
+-- paint_body, outdoor_street, other). Read only to break an organization tie, never to create one.
+scene_labels AS (
+  SELECT t.run_id, t.vehicle_id, t.session_key, t.image_ids, t.scene_label, t.model, t.confidence, t.rationale
+    FROM (VALUES (NULL::uuid, NULL::uuid, NULL::text, NULL::uuid[], NULL::text, NULL::text, NULL::numeric, NULL::text))
+         t(run_id, vehicle_id, session_key, image_ids, scene_label, model, confidence, rationale)
+   WHERE false -- (scene_labels)
 ),
 cand_all AS (
   SELECT DISTINCT c.vid FROM cfg CROSS JOIN LATERAL (
@@ -134,17 +163,47 @@ fp AS MATERIALIZED (
    WHERE vi.user_id = cfg.u AND to_jsonb(vi)->>'source' = 'capture_relay_ios'
      AND nullif(btrim(to_jsonb(vi)->>'device_fingerprint'), '') IS NOT NULL
 ),
+-- dhash (64 bits as 16 hex characters) of the account's photos on candidate vehicles, and of every scraped listing image.
+-- Hamming distance <= 6 is found without a cross join: split the 64 bits into 7 parts; two hashes within 6 bits differ in at
+-- most 6 parts, so at least one part is equal (7 equi-joins, then the exact distance).
+uph AS MATERIALIZED (
+  SELECT vi.id, ('x' || lower(vi.dhash))::bit(64) AS b, vi.created_at
+    FROM cand_all ca JOIN vehicle_images vi ON vi.vehicle_id = ca.vid CROSS JOIN cfg
+   WHERE vi.user_id = cfg.u AND lower(vi.dhash) ~ '^[0-9a-f]{16}$'
+),
+sch AS MATERIALIZED (
+  SELECT s.id, s.source, s.image_url, ('x' || lower(s.dhash))::bit(64) AS b, s.created_at
+    FROM vehicle_images s
+   WHERE EXISTS (SELECT 1 FROM uph) AND lower(s.dhash) ~ '^[0-9a-f]{16}$'
+     AND (regexp_replace(lower(btrim(coalesce(s.source, ''))), '[-\s]+', '_', 'g')
+            IN ('bat', 'mecum', 'classic_com', 'classiccom', 'craigslist', 'url_scraper', 'cars_and_bids', 'carsandbids')
+          OR lower(coalesce(s.image_url, '')) ~ '^https?://([a-z0-9-]+\.)*(bringatrailer|carsandbids|mecum|classic|craigslist|hemmings|pcarmarket|cargurus|autotrader)\.(com|org)(/|$)')
+),
+dhc AS (
+  SELECT u.id AS image_id, s.id AS matched_id, s.source, s.created_at AS matched_created_at, u.b # s.b AS x FROM uph u JOIN sch s ON s.id <> u.id AND substring(u.b from 1 for 9) = substring(s.b from 1 for 9)
+  UNION ALL SELECT u.id, s.id, s.source, s.created_at, u.b # s.b FROM uph u JOIN sch s ON s.id <> u.id AND substring(u.b from 10 for 9) = substring(s.b from 10 for 9)
+  UNION ALL SELECT u.id, s.id, s.source, s.created_at, u.b # s.b FROM uph u JOIN sch s ON s.id <> u.id AND substring(u.b from 19 for 9) = substring(s.b from 19 for 9)
+  UNION ALL SELECT u.id, s.id, s.source, s.created_at, u.b # s.b FROM uph u JOIN sch s ON s.id <> u.id AND substring(u.b from 28 for 9) = substring(s.b from 28 for 9)
+  UNION ALL SELECT u.id, s.id, s.source, s.created_at, u.b # s.b FROM uph u JOIN sch s ON s.id <> u.id AND substring(u.b from 37 for 9) = substring(s.b from 37 for 9)
+  UNION ALL SELECT u.id, s.id, s.source, s.created_at, u.b # s.b FROM uph u JOIN sch s ON s.id <> u.id AND substring(u.b from 46 for 9) = substring(s.b from 46 for 9)
+  UNION ALL SELECT u.id, s.id, s.source, s.created_at, u.b # s.b FROM uph u JOIN sch s ON s.id <> u.id AND substring(u.b from 55 for 9) = substring(s.b from 55 for 9)
+),
+dhm AS MATERIALIZED (
+  SELECT DISTINCT ON (c.image_id) c.image_id, c.matched_id, c.source AS matched_source, c.matched_created_at, bit_count(c.x) AS dist
+    FROM dhc c WHERE bit_count(c.x) <= 6
+   ORDER BY c.image_id, bit_count(c.x), c.matched_id::text
+),
 -- Step 1: every photo the account uploaded to a candidate vehicle, flagged own-device or import.
 pp AS MATERIALIZED (
   SELECT vi.id, vi.vehicle_id AS vid, coalesce(vi.taken_at, vi.created_at) AS t,
          vi.latitude::float8 AS lat, vi.longitude::float8 AS lon,
          x.j->>'device_fingerprint' AS dev,
-         o2.origin, o2.unk, sc.m AS scraped_match,
-         o2.origin OR coalesce(nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NOT NULL
+         o2.origin, o2.unk, sc.m AS scraped_match, im.imp, im.cite AS imp_cite,
+         (o2.origin OR coalesce(nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NOT NULL
           AND nullif(btrim(x.j->'exif_data'->>'camera_model'), '') IS NOT NULL
           AND (x.j->'exif_data'->>'source_type' = 'user_library'
                OR x.j->'exif_data'->>'synced_by' ~* '^(capture[-_ ]?relay|photo[-_ ]?(auto[-_ ]?)?sync)'
-               OR x.j->>'device_fingerprint' IN (SELECT fp.dev FROM fp)), false) AS own
+               OR x.j->>'device_fingerprint' IN (SELECT fp.dev FROM fp)), false)) AND NOT im.imp AS own
     FROM cand_all ca JOIN vehicle_images vi ON vi.vehicle_id = ca.vid CROSS JOIN cfg
          CROSS JOIN LATERAL (SELECT to_jsonb(vi) AS j) x
          -- Origin unknown: a user_upload row stored at the bucket root ('<uuid>.jpg') or under 'unorganized/' with no camera
@@ -172,6 +231,47 @@ pp AS MATERIALIZED (
                    OR (regexp_replace(lower(btrim(coalesce(q.source, ''))), '[-\s]+', '_', 'g') = 'dropbox_import'
                        AND nullif(btrim(q.automation_script), '') IS NOT NULL))
             ORDER BY q.id LIMIT 1) sc ON true
+         -- Import provenance: the same file (file_hash) as an image from a listing scrape
+         LEFT JOIN LATERAL (
+           SELECT s.id, s.source, s.created_at FROM vehicle_images s
+            WHERE vi.file_hash IS NOT NULL AND s.file_hash = vi.file_hash AND s.id <> vi.id
+              AND (regexp_replace(lower(btrim(coalesce(s.source, ''))), '[-\s]+', '_', 'g')
+                     IN ('bat', 'mecum', 'classic_com', 'classiccom', 'craigslist', 'url_scraper', 'cars_and_bids', 'carsandbids')
+                   OR lower(coalesce(s.image_url, '')) ~ '^https?://([a-z0-9-]+\.)*(bringatrailer|carsandbids|mecum|classic|craigslist|hemmings|pcarmarket|cargurus|autotrader)\.(com|org)(/|$)')
+            ORDER BY s.id LIMIT 1) fh ON true
+         LEFT JOIN dhm ON dhm.image_id = vi.id
+         -- Import provenance: path / source, file name, web export size without camera EXIF, and the hash matches above
+         CROSS JOIN LATERAL (SELECT
+             regexp_replace(lower(btrim(coalesce(x.j->>'source', ''))), '[-\s]+', '_', 'g') AS src,
+             lower(coalesce(x.j->>'storage_path', '')) AS sp,
+             lower(btrim(coalesce(x.j->>'original_filename', ''))) AS fn1, lower(btrim(coalesce(x.j->>'file_name', ''))) AS fn2,
+             (nullif(btrim(x.j->'exif_data'->>'camera_make'), '') IS NOT NULL
+              AND nullif(btrim(x.j->'exif_data'->>'camera_model'), '') IS NOT NULL) AS cam,
+             (SELECT max(q.v::int) FROM unnest(ARRAY[x.j->>'width', x.j->>'width_px', x.j->>'image_width', x.j->'exif_data'->>'width',
+                x.j->'exif_data'->>'ImageWidth', x.j->'exif_data'->>'PixelXDimension', x.j->'exif_data'->>'image_width']) q(v)
+               WHERE q.v ~ '^[0-9]{1,5}$') AS w,
+             (SELECT max(q.v::int) FROM unnest(ARRAY[x.j->>'height', x.j->>'height_px', x.j->>'image_height', x.j->'exif_data'->>'height',
+                x.j->'exif_data'->>'ImageHeight', x.j->'exif_data'->>'PixelYDimension', x.j->'exif_data'->>'image_height']) q(v)
+               WHERE q.v ~ '^[0-9]{1,5}$') AS hgt) ib
+         CROSS JOIN LATERAL (SELECT array_remove(ARRAY[
+             CASE WHEN ib.src ~ '(^|_)(download|downloaded|url_scraper|screenshot|screenshots|url_import|web_import|import_url|imported)(_|$)'
+                    OR ib.sp ~ '(^|/)(downloads?|url[-_]?scraper|screenshots?|web[-_]?imports?|imports?|imported)(/|$)' THEN 'path_or_source' END,
+             CASE WHEN EXISTS (SELECT 1 FROM unnest(ARRAY[ib.fn1, ib.fn2]) f(n)
+                                WHERE f.n ~ 'screen[ _-]?shot' OR f.n ~ '(^|[^a-z])download' OR f.n ~ '^[0-9]+_[a-z0-9_]+_o\.(jpe?g|png)$'
+                                   OR f.n ~ '-[0-9]{2,4}x[0-9]{2,4}\.(jpe?g|png|webp)$' OR f.n ~ '^img-[0-9]{8}-wa[0-9]+') THEN 'filename' END,
+             CASE WHEN NOT ib.cam AND greatest(coalesce(ib.w, 0), coalesce(ib.hgt, 0)) IN (640, 800, 1024, 1200, 1280, 1600, 2048)
+                    AND x.j->'exif_data'->>'DateTimeOriginal' IS NULL THEN 'web_size_no_camera_exif' END,
+             CASE WHEN fh.id IS NOT NULL AND NOT (ib.cam AND vi.taken_at IS NOT NULL AND vi.created_at < fh.created_at) THEN 'file_hash' END,
+             CASE WHEN dhm.dist IS NOT NULL AND NOT (ib.cam AND vi.taken_at IS NOT NULL AND vi.created_at < dhm.matched_created_at) THEN 'dhash' END
+           ], NULL) AS sigs) sg
+         CROSS JOIN LATERAL (SELECT cardinality(sg.sigs) > 0 AS imp,
+             CASE WHEN cardinality(sg.sigs) > 0 THEN jsonb_build_object('image_id', vi.id, 'signals', to_jsonb(sg.sigs),
+               'via', CASE WHEN 'dhash' = ANY (sg.sigs) THEN 'dhash' WHEN 'file_hash' = ANY (sg.sigs) THEN 'file_hash' END,
+               'hamming_distance', CASE WHEN 'dhash' = ANY (sg.sigs) THEN dhm.dist END,
+               'matched_image_id', CASE WHEN 'dhash' = ANY (sg.sigs) THEN dhm.matched_id WHEN 'file_hash' = ANY (sg.sigs) THEN fh.id END,
+               'matched_source', CASE WHEN 'dhash' = ANY (sg.sigs) THEN dhm.matched_source WHEN 'file_hash' = ANY (sg.sigs) THEN fh.source END,
+               'original_filename', nullif(coalesce(nullif(ib.fn1, ''), ib.fn2), ''), 'source', x.j->>'source',
+               'storage_path', x.j->>'storage_path', 'width', ib.w, 'height', ib.hgt) END AS cite) im
    WHERE vi.user_id = cfg.u
 ),
 -- Step 3: capture sessions of own-device photos (a new session after a gap of r_gap_h hours).
@@ -230,6 +330,19 @@ ul AS MATERIALIZED (
                         WHERE e.superseded_at IS NULL AND e.listing_id = bl.id
                         ORDER BY e.created_at DESC LIMIT 1) en ON true
    WHERE bl.vehicle_id IS NULL AND EXISTS (SELECT 1 FROM cv)
+  UNION ALL
+  -- listings read from public seller pages that are not bat_listings rows (the placeholder above; empty by default)
+  SELECT md5(h.url)::uuid, NULL::uuid,
+         regexp_replace(regexp_replace(lower(btrim(coalesce(h.url, ''))), '[?#].*$', ''), '/+$', ''),
+         upper(regexp_replace(coalesce(h.vin, ''), '[^A-Za-z0-9]', '', 'g')),
+         upper(regexp_replace(coalesce(h.vin, ''), '[^A-Za-z0-9]', '', 'g')),
+         nullif(btrim(h.lot), ''),
+         (regexp_match(coalesce(h.title, ''), '\m(19[0-9]{2}|20[0-4][0-9])\M'))[1]::int,
+         btrim(regexp_replace(lower(coalesce(h.title, '')), '[^a-z0-9]+', ' ', 'g')),
+         lower(btrim(h.seller)), h.url
+    FROM hist_listings h
+   WHERE h.url IS NOT NULL AND EXISTS (SELECT 1 FROM cv)
+     AND NOT EXISTS (SELECT 1 FROM bat_listings b2 WHERE b2.bat_listing_url = h.url)
 ),
 -- One row per matching signal. Strong signals are global; a title match counts only when the listing matches exactly
 -- one of the account's candidate vehicles by title.
@@ -267,6 +380,7 @@ ml AS (
 orgn AS MATERIALIZED (
   SELECT o.id, o.latitude::float8 AS lat, o.longitude::float8 AS lon, n2.nn,
          h.host, regexp_replace(lower(coalesce(o.slug, '')), '[^a-z0-9]', '', 'g') AS slug_n,
+         kk.okind,
          CASE WHEN lower(coalesce(to_jsonb(o)->>'business_type', '')) ~ '(dealer|auction)' THEN 0
               WHEN lower(coalesce(to_jsonb(o)->>'business_type', '')) ~ 'restor' THEN 1 ELSE 2 END AS bt_rank,
          regexp_replace(split_part(h.host, '.', 1), '[^a-z0-9]', '', 'g') AS host_n,
@@ -275,6 +389,17 @@ orgn AS MATERIALIZED (
          CASE WHEN h.host = '' THEN 0 ELSE count(*) OVER (PARTITION BY h.host) END AS host_c,
          CASE WHEN n2.nn = '' THEN 0 ELSE count(*) OVER (PARTITION BY n2.nn) END AS nn_c
     FROM organizations o
+    -- Business kind from the organization's own classification: type fields decide, services_offered only when they are silent;
+    -- a record that reads as both stays unclassified (NULL).
+    CROSS JOIN LATERAL (SELECT lower(coalesce(to_jsonb(o)->>'business_type', '') || ' ' || coalesce(to_jsonb(o)->>'entity_type', '')) AS tf,
+                               lower(coalesce(to_jsonb(o)->>'services_offered', '')) AS sf) kt
+    CROSS JOIN LATERAL (SELECT CASE
+        WHEN kt.tf ~ '(dealer|auction|consign)' AND kt.tf !~ '(restor|upholster|body_shop|paint|fabricat|garage|builder)' THEN 'dealer'
+        WHEN kt.tf ~ '(restor|upholster|body_shop|paint|fabricat|garage|builder)' AND kt.tf !~ '(dealer|auction|consign)' THEN 'shop'
+        WHEN kt.tf !~ '(dealer|auction|consign|restor|upholster|body_shop|paint|fabricat|garage|builder)' THEN
+          CASE WHEN kt.sf ~ '(dealer|auction|consign)' AND kt.sf !~ '(restor|upholster|body_shop|paint|fabricat|garage|builder)' THEN 'dealer'
+               WHEN kt.sf ~ '(restor|upholster|body_shop|paint|fabricat|garage|builder)' AND kt.sf !~ '(dealer|auction|consign)' THEN 'shop' END
+        END AS okind) kk
     CROSS JOIN LATERAL (SELECT btrim(regexp_replace(
         regexp_replace(regexp_replace(regexp_replace(lower(coalesce(o.name, '')), '[''’`]', '', 'g'),
                                       '[^a-z0-9]+', ' ', 'g'),
@@ -282,6 +407,24 @@ orgn AS MATERIALIZED (
         '\s+', ' ', 'g')) AS nn) n2
     CROSS JOIN LATERAL (SELECT regexp_replace(split_part(split_part(split_part(
         regexp_replace(lower(coalesce(o.website, '')), '^[a-z]+://', ''), '/', 1), '?', 1), ':', 1), '^www\.', '') AS host) h
+),
+-- Scene kind of each candidate vehicle's photo sessions (confidence >= 0.6): dealer_lot / showroom -> dealer;
+-- shop_interior / upholstery_work / paint_body -> shop. A vehicle whose sessions read as both without a 2:1 majority has no kind.
+vscene AS MATERIALIZED (
+  SELECT k.vid,
+         CASE WHEN k.wd > 0 AND k.wd >= 2 * k.ws THEN 'dealer' WHEN k.ws > 0 AND k.ws >= 2 * k.wd THEN 'shop' END AS kind,
+         k.cites
+    FROM (SELECT sl.vehicle_id AS vid,
+                 coalesce(sum(sl.confidence) FILTER (WHERE sl.scene_label IN ('dealer_lot', 'showroom')), 0) AS wd,
+                 coalesce(sum(sl.confidence) FILTER (WHERE sl.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')), 0) AS ws,
+                 jsonb_agg(jsonb_build_object('run_id', sl.run_id, 'session_key', sl.session_key, 'scene_label', sl.scene_label,
+                             'model', sl.model, 'confidence', sl.confidence, 'rationale', sl.rationale)
+                           ORDER BY sl.confidence DESC, sl.session_key) AS cites
+            FROM scene_labels sl
+           WHERE sl.vehicle_id IN (SELECT cand.vid FROM cand)
+             AND sl.scene_label IN ('dealer_lot', 'showroom', 'shop_interior', 'upholstery_work', 'paint_body')
+             AND coalesce(sl.confidence, 0) >= 0.6
+           GROUP BY sl.vehicle_id) k
 ),
 -- Seller handles the evidence names for each candidate vehicle: [vehicle, handle, confidence, source, ref].
 sel AS MATERIALIZED (
@@ -413,7 +556,7 @@ f AS (
          ver.id AS ver_id,
          perm.co_by_other, perm.self_granted, perm.owner_perm, perm.any_perm,
          obs.id AS obs_id, obs.stmt_vid, obs.content_text, obs.structured_data, obs.first_person,
-         ph.n AS photos, ph.n_own, ph.n_origin, ph.n_unk, ph.n_scraped, ph.scraped_cite, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices,
+         ph.n AS photos, ph.n_own, ph.n_origin, ph.n_unk, ph.n_scraped, ph.n_imp, ph.imp_cites, ph.scraped_cite, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices,
          ol.t AS obs_last,
          EXISTS (SELECT 1 FROM vehicle_contributors vc WHERE vc.vehicle_id = cand.vid AND vc.user_id = cfg.u) AS contrib,
          EXISTS (SELECT 1 FROM vehicle_ownerships vo WHERE vo.vehicle_id = cand.vid AND vo.owner_profile_id = cfg.u
@@ -475,6 +618,9 @@ f AS (
   LEFT JOIN LATERAL (
     SELECT count(*) AS n, count(*) FILTER (WHERE p.own) AS n_own, count(*) FILTER (WHERE p.origin) AS n_origin,
            count(*) FILTER (WHERE p.unk) AS n_unk, count(*) FILTER (WHERE p.scraped_match IS NOT NULL) AS n_scraped,
+           count(*) FILTER (WHERE p.imp) AS n_imp,
+           (SELECT jsonb_agg(e.c) FROM (SELECT p2.imp_cite AS c FROM pp p2 WHERE p2.vid = cand.vid AND p2.imp
+                                         ORDER BY (p2.imp_cite->>'via') IS NULL, p2.id LIMIT 3) e) AS imp_cites,
            (jsonb_agg(p.scraped_match ORDER BY p.id) FILTER (WHERE p.scraped_match IS NOT NULL))->0 AS scraped_cite,
            min(p.t) FILTER (WHERE p.own) AS first_t, max(p.t) FILTER (WHERE p.own) AS last_t,
            count(*) FILTER (WHERE p.own AND p.lat IS NOT NULL AND p.lon IS NOT NULL) AS gps_n,
@@ -521,6 +667,7 @@ g3 AS (
          (coalesce((g2.claim->>'disputed')::boolean, false) OR 'claimed_interest' = ANY (g2.roles)) AS disputed_raw,
          coalesce(g2.photos, 0) AS n_photos,
          coalesce(g2.n_own, 0) AS own_n,
+         coalesce(g2.n_imp, 0) AS imp_n,
          greatest(g2.last_t, g2.obs_last) AS act_last
   FROM g2
 ),
@@ -530,6 +677,7 @@ g4 AS MATERIALIZED (
          (g3.denied_raw OR g3.disputed_raw) AND NOT g3.cited AS uncited_ignored,
          g3.act_last IS NOT NULL AND g3.act_last < now() - make_interval(months => g3.months) AS decayed,
          g3.own_n > 0 OR (g3.n_photos > 0 AND g3.obs_id IS NOT NULL) AS doc_ok,
+         g3.n_photos > 0 AND g3.imp_n * 2 > g3.n_photos AS pred_imp,
          g3.org_id IS NOT NULL AND EXISTS (SELECT 1 FROM organization_contributors oc
             WHERE oc.user_id = g3.u AND oc.status = 'active'
               AND (oc.end_date IS NULL OR oc.end_date >= current_date)
@@ -541,7 +689,7 @@ g4 AS MATERIALIZED (
 -- co-occurrence, then (listed vehicles only) dealer/auction before restoration, then most photos.
 g5 AS (
   SELECT g4.*, so.s_org, round(so.min_m::numeric) AS s_m, so.n_at AS s_n_at, so.s_listed, so.ov_rel AS s_rel, so.s_other,
-         so.tb_decided, so.s_orgs, so.s_cooc,
+         so.tb_decided, so.s_orgs, so.s_cooc, so.s_okind, so.s_sm, so.s_sx, so.s_vkind, so.s_scites,
          st.n_sess, st.span_days, st.n_days, st.n_months, st.geo_n, st.at_any_org,
          (SELECT count(*) FROM orgmap om WHERE om.canon = so.s_org AND om.org_id <> om.canon) AS s_aliases
   FROM g4
@@ -549,10 +697,14 @@ g5 AS (
   LEFT JOIN LATERAL (
     SELECT q.canon AS s_org, q.n_at, q.min_m, q.ov_rel, q.listed AS s_listed, q.cooc AS s_cooc,
            q.cnt - 1 AS s_other,
-           (q.cooc > q.next_cooc OR (q.cooc = q.next_cooc AND q.bt < q.next_bt)) AS tb_decided,
-           q.orgs AS s_orgs
+           -- decided by session co-occurrence (c) or by scene + organization kind (a + b); each must not be contradicted by the
+           -- other, and an organization whose kind contradicts the scene never wins a tie
+           (NOT q.sx AND ((q.cooc > q.next_cooc AND q.sm >= q.next_sm)
+                          OR (q.cooc = q.next_cooc AND (q.sm > q.next_sm OR (q.sm = q.next_sm AND q.bt < q.next_bt))))) AS tb_decided,
+           q.orgs AS s_orgs, q.okind AS s_okind, q.sm AS s_sm, q.sx AS s_sx, q.vkind AS s_vkind, q.scites AS s_scites
       FROM (SELECT t.canon, t.n_at, t.min_m, t.ov_rel, (t.canon IS NOT DISTINCT FROM g4.org_id) AS listed,
-                   coalesce(cc.n, 0) AS cooc,
+                   coalesce(cc.n, 0) AS cooc, z.sm, z.sx, o.okind, vs.kind AS vkind, vs.cites AS scites,
+                   lead(z.sm) OVER w AS next_sm,
                    CASE WHEN g4.v_listed THEN o.bt_rank ELSE 2 END AS bt,
                    row_number() OVER w AS rn, count(*) OVER () AS cnt,
                    lead(coalesce(cc.n, 0)) OVER w AS next_cooc,
@@ -561,8 +713,11 @@ g5 AS (
               FROM orgt t
               JOIN orgn o ON o.id = t.canon
               LEFT JOIN cooc cc ON cc.vid = t.vid AND cc.canon = t.canon
+              LEFT JOIN vscene vs ON vs.vid = t.vid
+              CROSS JOIN LATERAL (SELECT CASE WHEN vs.kind IS NOT NULL AND o.okind = vs.kind THEN 1 ELSE 0 END AS sm,
+                                         (vs.kind IS NOT NULL AND o.okind IS NOT NULL AND o.okind <> vs.kind) AS sx) z
              WHERE t.vid = g4.vid
-            WINDOW w AS (ORDER BY (t.canon IS NOT DISTINCT FROM g4.org_id) DESC, t.ov_rel DESC, coalesce(cc.n, 0) DESC,
+            WINDOW w AS (ORDER BY (t.canon IS NOT DISTINCT FROM g4.org_id) DESC, t.ov_rel DESC, coalesce(cc.n, 0) DESC, z.sm DESC,
                                   CASE WHEN g4.v_listed THEN o.bt_rank ELSE 2 END, t.n_at DESC, t.min_m, t.canon::text)) q
      WHERE q.rn = 1) so ON true
 ),
@@ -606,6 +761,9 @@ h AS (
       WHEN g6.org_member THEN jsonb_build_array('business_handling', 0.6, 'member of the organization that lists the vehicle')
       WHEN g6.shoot AND g6.s_listed AND g6.org_id IS NOT NULL
         THEN jsonb_build_array('business_handling', 0.7, 'inventory shoot at the organization that lists the vehicle')
+      WHEN g6.pred_imp
+        THEN jsonb_build_array('imported_by_user', 0.3, 'user photos are predominantly imported (' || g6.imp_n || ' of ' || g6.n_photos
+          || ' carry a download, screenshot, web-export or listing-scrape signal); not ownership')
       WHEN g6.org_id IS NOT NULL AND g6.n_photos > 0
         THEN jsonb_build_array('contributor', CASE WHEN g6.amb THEN 0.2 ELSE 0.45 END, 'own photos of an organization-listed vehicle; not ownership')
       WHEN g6.shoot
@@ -640,7 +798,8 @@ SELECT h.vid AS vehicle_id,
            jsonb_build_object('step', 1, 'name', 'origin_facts', 'confidence', CASE WHEN h.own_n > 0 THEN 0.4 ELSE 0.3 END,
              'evidence', jsonb_build_object('uploader_photo_count', h.n_photos, 'own_device_photo_count', h.own_n,
                'imported_photo_count', h.n_photos - h.own_n, 'own_origin_photo_count', coalesce(h.n_origin, 0),
-               'origin_unknown_photo_count', coalesce(h.n_unk, 0), 'scraped_photo_count', coalesce(h.n_scraped, 0), 'scraped_example', h.scraped_cite, 'device_count', h.devices,
+               'origin_unknown_photo_count', coalesce(h.n_unk, 0),
+               'imported_marked_photo_count', h.imp_n, 'predominantly_imported', h.pred_imp, 'imported_examples', coalesce(h.imp_cites, '[]'::jsonb), 'scraped_photo_count', coalesce(h.n_scraped, 0), 'scraped_example', h.scraped_cite, 'device_count', h.devices,
                'first_capture', h.first_t, 'last_capture', h.last_t, 'gps_photo_count', coalesce(h.gps_n, 0),
                'last_activity', h.act_last, 'decay_months', h.months, 'decayed', h.decayed),
              'eliminated', CASE WHEN h.own_n = 0 THEN '["documenting","previously_documented"]'::jsonb ELSE '[]'::jsonb END),
@@ -665,7 +824,10 @@ SELECT h.vid AS vehicle_id,
                'duplicate_organizations_collapsed', coalesce(h.s_aliases, 0),
                'listed', coalesce(h.s_listed, false), 'linked', coalesce(h.s_rel, false),
                'ambiguous', coalesce(h.amb, false), 'tie_break_decided', coalesce(h.tb_decided, false),
-               'session_cooccurrence_links', h.s_cooc, 'organizations', to_jsonb(h.s_orgs),
+               'session_cooccurrence_links', h.s_cooc,
+               'scene_context', jsonb_build_object('vehicle_scene_kind', h.s_vkind, 'selected_organization_kind', h.s_okind,
+                 'scene_matches_organization', h.s_sm = 1, 'scene_contradicts_organization', coalesce(h.s_sx, false),
+                 'sessions', coalesce(h.s_scites, '[]'::jsonb)), 'organizations', to_jsonb(h.s_orgs),
                'recent_photos', coalesce(h.recent_gps_n, 0) > 0,
                'hypothesis', CASE WHEN h.shoot THEN 'shop shoot at organization'
                                   WHEN h.s_org IS NOT NULL THEN 'photographed at organization' END,

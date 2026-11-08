@@ -12,12 +12,13 @@ CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT curren
 CREATE TABLE public.profiles(id uuid PRIMARY KEY);
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY, user_id uuid, merged_into_vehicle_id uuid, year integer, make text, model text,
  trim text, primary_image_url text, purchase_price numeric, image_count integer, is_public boolean, deleted_at timestamptz,
- vin text, bat_seller text, origin_metadata jsonb, bat_auction_url text, listing_url text);
+ vin text, bat_seller text, origin_metadata jsonb, bat_auction_url text, listing_url text, automation_script text);
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, user_id uuid, documented_by_user_id uuid,
  image_url text, created_at timestamptz DEFAULT now(), taken_at timestamptz, latitude numeric, longitude numeric,
  device_fingerprint text, source text, storage_path text, automation_script text,
  exif_data jsonb DEFAULT '{"camera_make":"Apple","camera_model":"iPhone 15 Pro","source_type":"user_library"}',
- ai_detected_vehicle jsonb, vehicle_year integer, image_vehicle_match_status text, merged_from_vehicle_id uuid);
+ ai_detected_vehicle jsonb, vehicle_year integer, image_vehicle_match_status text, merged_from_vehicle_id uuid,
+ file_hash text, dhash text, file_name text, original_filename text, width integer, height integer);
 CREATE TABLE public.platform_config(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), config_key text UNIQUE NOT NULL,
  config_value jsonb NOT NULL, description text, updated_at timestamptz DEFAULT now());
 CREATE TABLE public.organizations(id uuid PRIMARY KEY, name text, business_name text, slug text, website text, latitude numeric, longitude numeric);
@@ -652,6 +653,61 @@ SELECT fixture_assert((SELECT count(*) FROM vehicle_images WHERE id='00000000-00
 \i /tmp/garage_split_inverse.sql
 SELECT fixture_assert((SELECT vehicle_id FROM vehicle_images WHERE id='00000000-0000-4000-8000-000000000b01')=fd(31)
   AND (SELECT count(*) FROM vehicles WHERE deleted_at IS NOT NULL AND year=1985 AND user_id=:'u')=1,'split inverse returns the image and retires the new row (no delete)');
+
+-- ===== import provenance: download / screenshot / web-export / hash match to a listing scrape =====
+SELECT fx_vehicles(95,99);
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,original_filename) VALUES (fx(95),:'u','p',NULL,'Screenshot 2026-01-01.png');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,source,storage_path) VALUES (fx(95),:'u','p','user_upload','downloads/x.jpg');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,exif_data,width,height) VALUES (fx(95),:'u','p',NULL,1600,900);
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,dhash) VALUES (fx(95),:'u','p','f0f0f0f0f0f0f0ef');   -- 5 bits from the bat image below
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,source,dhash,created_at) VALUES (fx(99),NULL,'https://bringatrailer.com/wp-content/x.jpg','bat','f0f0f0f0f0f0f0f0','2026-01-01');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url) VALUES (fx(96),:'u','p');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,dhash) VALUES (fx(96),:'u','p','f0f0f0f0f0f0f08f');     -- 7 bits away: no match
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,taken_at,dhash,created_at) VALUES (fx(97),:'u','p','2020-01-01','f0f0f0f0f0f0f0ef','2020-01-02');  -- camera original stored before the scrape
+SELECT fixture_assert(fx_role(95)='imported_by_user' AND (fx_step(95,1)->'evidence'->>'imported_marked_photo_count')::int=4
+  AND (fx_step(95,1)->'evidence'->>'predominantly_imported')::boolean AND (fx_step(95,1)->'evidence'->>'own_device_photo_count')::int=0,
+  'screenshot name, downloads/ path, web-export size without EXIF and a dhash match: all four are imports, vehicle is imported_by_user');
+SELECT fixture_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(fx_step(95,1)->'evidence'->'imported_examples') e
+    WHERE e->>'via'='dhash' AND (e->>'hamming_distance')::int=5 AND e->>'matched_source'='bat'),'the perceptual match is cited with its distance and source');
+SELECT fixture_assert(fx_role(96)='documenting' AND (fx_step(96,1)->'evidence'->>'imported_marked_photo_count')::int=0,'Hamming distance 7 is not a match');
+SELECT fixture_assert((fx_step(97,1)->'evidence'->>'imported_marked_photo_count')::int=0 AND (fx_step(97,1)->'evidence'->>'own_device_photo_count')::int=1,
+  'an upload with camera make / model and taken_at stored before the scraped copy is the original, not an import');
+
+-- ===== scene context breaks an organization tie only when it agrees and nothing contradicts =====
+UPDATE organizations SET business_type='restoration_shop' WHERE id=:'viva';
+UPDATE organizations SET business_type='dealer' WHERE id=:'ernies';
+SELECT fx_burst(98, 6, now() - interval '41 months', 36.17010, -115.14000);
+SELECT fixture_assert((fx_step(98,3)->'evidence'->>'ambiguous')::boolean AND (fx_step(98,3)->'evidence'->'scene_context'->>'vehicle_scene_kind') IS NULL,'no scene label: two organizations in range stay ambiguous');
+\set scn_up `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), fx(98), 's1', ARRAY[]::uuid[], 'upholstery_work', 'vision-model', 0.9::numeric, 'sample'/" supabase/sql/derive_vehicle_relationships_preview.sql`
+\set scn_show `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), fx(98), 's1', ARRAY[]::uuid[], 'showroom', 'vision-model', 0.9::numeric, 'sample'/" supabase/sql/derive_vehicle_relationships_preview.sql`
+\set scn_out `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), fx(98), 's1', ARRAY[]::uuid[], 'outdoor_street', 'vision-model', 0.9::numeric, 'sample'/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT c->'evidence' FROM (:scn_up) d, jsonb_array_elements(d.evidence->'chain') c WHERE d.vehicle_id=fx(98) AND (c->>'step')::int=3) AS up_ev \gset
+SELECT (SELECT c->'evidence' FROM (:scn_show) d, jsonb_array_elements(d.evidence->'chain') c WHERE d.vehicle_id=fx(98) AND (c->>'step')::int=3) AS show_ev \gset
+SELECT (SELECT c->'evidence' FROM (:scn_out) d, jsonb_array_elements(d.evidence->'chain') c WHERE d.vehicle_id=fx(98) AND (c->>'step')::int=3) AS out_ev \gset
+SELECT fixture_assert(:'up_ev'::jsonb->>'organization_id'=:'viva' AND NOT (:'up_ev'::jsonb->>'ambiguous')::boolean
+  AND (:'up_ev'::jsonb->'scene_context'->>'scene_matches_organization')::boolean AND jsonb_array_length(:'up_ev'::jsonb->'scene_context'->'sessions')=1,
+  'upholstery scene + restoration shop organization decides, with the scene cited');
+SELECT fixture_assert(:'show_ev'::jsonb->>'organization_id'=:'ernies' AND NOT (:'show_ev'::jsonb->>'ambiguous')::boolean,'showroom scene + dealer organization decides');
+SELECT fixture_assert((:'out_ev'::jsonb->>'ambiguous')::boolean,'an outdoor scene does not break the tie');
+INSERT INTO organization_vehicles(vehicle_id,organization_id) VALUES (fx(99),:'viva');
+SELECT fx_burst(99, 2, now() - interval '41 months' + interval '2 minutes', 36.17010, -115.14000);
+SELECT fixture_assert(fx_step(98,3)->'evidence'->>'organization_id'=:'viva' AND (fx_step(98,3)->'evidence'->>'tie_break_decided')::boolean,'a co-shot car linked to one organization decides without a scene');
+SELECT (SELECT c->'evidence' FROM (:scn_show) d, jsonb_array_elements(d.evidence->'chain') c WHERE d.vehicle_id=fx(98) AND (c->>'step')::int=3) AS clash_ev \gset
+SELECT fixture_assert(NOT (:'clash_ev'::jsonb->>'tie_break_decided')::boolean AND (:'clash_ev'::jsonb->'scene_context'->>'scene_contradicts_organization')::boolean,
+  'a showroom scene contradicts the co-shot organization (restoration shop): not decided');
+UPDATE organizations SET business_type=NULL WHERE id IN (:'viva',:'ernies');
+
+-- ===== hist_listings: a listing read from a public seller page names the organization through the seller handle =====
+UPDATE vehicles SET vin='1G1YY25R995700001' WHERE id=fx(96);
+INSERT INTO org_seller_aliases(platform,seller_username,organization_id) VALUES ('bat','histseller',:'viva') ON CONFLICT DO NOTHING;
+\set hist_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s|^   WHERE false -- (hist_listings)\$|   WHERE false UNION ALL SELECT 'https://bringatrailer.com/listing/hist-1/', '9', '1G1YY25R995700001', 'histseller', '2001 Fixture', DATE '2026-01-01'|" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT c->'evidence' FROM (:hist_sql) d, jsonb_array_elements(d.evidence->'chain') c WHERE d.vehicle_id=fx(96) AND (c->>'step')::int=2) AS hist_ev \gset
+SELECT fixture_assert(:'hist_ev'::jsonb->>'organization_id'=:'viva' AND jsonb_array_length(:'hist_ev'::jsonb->'inline_matches')=1,'a hist_listings VIN match gives the seller organization');
+SELECT fixture_assert(jsonb_array_length(fx_step(96,2)->'evidence'->'inline_matches')=0,'without hist_listings nothing matches');
+-- the scene table exists, is append-only and checks its labels
+INSERT INTO vehicle_photo_session_scenes(run_id,vehicle_id,session_key,scene_label,model,confidence) VALUES (gen_random_uuid(),fx(98),'s1','showroom','m',0.9);
+SELECT fixture_fails($$INSERT INTO vehicle_photo_session_scenes(run_id,vehicle_id,session_key,scene_label,model) VALUES (gen_random_uuid(),'00000000-0000-4000-8000-000000000001','s','kitchen','m')$$);
+SELECT fixture_fails($$DELETE FROM vehicle_photo_session_scenes$$);
 
 SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 
