@@ -22,6 +22,9 @@
 --                                   organization kind agree, supports a single organization whose kind matches, withholds the GPS
 --                                   attribution when the kind contradicts (unless the organization lists / is linked to the vehicle);
 --                                   nothing in the function reads this table yet (scripts/garage/label-scenes.mjs fills it).
+--    Duplicate clusters (high-score duplicate pairs, or the same file / title document on same-year, same-family vehicles) are
+--    derived as ONE subject: evidence is unioned across members, every member row keeps its vehicle_id and gets the same role;
+--    evidence.cluster cites the members. Records are never merged.
 --    Also in the chain: import provenance for user photos (download / screenshot / web-export / hash match to a listing scrape),
 --    hist_listings placeholder (listings read from public seller pages), organization kind for the tie-break.
 --  5 garage_shop_shoot_rules        platform_config row with the shoot / personal-pattern thresholds; change the row, not the code.
@@ -670,11 +673,50 @@ dup AS MATERIALIZED (
      AND a.year IS NOT NULL AND b.year IS NOT NULL AND abs(b.year - a.year) <= 1
      AND a.fam IS NOT NULL AND b.fam = a.fam
      AND (a.vin IS NULL OR b.vin IS NULL OR a.vin = b.vin)
-   WHERE a.vid IN (SELECT cand.vid FROM cand)
-     AND 0.50 + CASE WHEN b.year = a.year THEN 0.15 ELSE 0.05 END
+   WHERE 0.50 + CASE WHEN b.year = a.year THEN 0.15 ELSE 0.05 END
          + CASE WHEN a.vin IS NOT NULL AND a.vin = b.vin THEN 0.30 ELSE 0 END
          + CASE WHEN b.model = a.model THEN 0.05 ELSE 0 END >= cfg.r_dup - 1e-9
 ),
+-- Shared strong evidence between two vehicles of the account that agree on make, year, model family and VIN (compatible): the same
+-- file (file_hash) in photos the account uploaded to both, or the same approved title document.
+shev AS MATERIALIZED (
+  SELECT DISTINCT x.a, x.b
+    FROM (
+      SELECT p.vehicle_id AS a, q.vehicle_id AS b
+        FROM vehicle_images p CROSS JOIN cfg
+        CROSS JOIN LATERAL (SELECT q0.vehicle_id FROM vehicle_images q0
+                             WHERE q0.file_hash = p.file_hash AND q0.vehicle_id <> p.vehicle_id AND q0.user_id = cfg.u OFFSET 0) q
+       WHERE p.user_id = cfg.u AND p.file_hash IS NOT NULL
+      UNION ALL
+      SELECT v1.vehicle_id, v2.vehicle_id
+        FROM ownership_verifications v1 CROSS JOIN cfg
+        JOIN ownership_verifications v2 ON v2.title_document_url = v1.title_document_url AND v2.vehicle_id <> v1.vehicle_id
+         AND v2.user_id = cfg.u AND v2.status = 'approved' AND to_jsonb(v2)->>'revoked_at' IS NULL
+       WHERE v1.user_id = cfg.u AND v1.status = 'approved' AND to_jsonb(v1)->>'revoked_at' IS NULL AND v1.title_document_url ~ '^https://'
+    ) x
+    JOIN dv va ON va.vid = x.a JOIN dv vb ON vb.vid = x.b
+   WHERE va.mk <> '' AND vb.mk = va.mk AND va.year IS NOT NULL AND vb.year = va.year AND va.fam IS NOT NULL AND vb.fam = va.fam
+     AND (va.vin IS NULL OR vb.vin IS NULL OR va.vin = vb.vin)
+),
+-- Duplicate cluster edges (symmetric): a high-score duplicate pair (dup) or a pair with shared strong evidence (shev). Nothing is merged.
+cedge AS MATERIALIZED (
+  SELECT d.a, d.b FROM dup d
+  UNION SELECT s.a, s.b FROM shev s
+  UNION SELECT s.b, s.a FROM shev s
+),
+-- Cluster of each requested vehicle: everything reachable over cedge. ck = the smallest member id (text order), members sorted.
+clk AS MATERIALIZED (
+  SELECT m.vid, (array_agg(m.member ORDER BY m.member::text))[1] AS ck, array_agg(m.member ORDER BY m.member::text) AS members
+    FROM (WITH RECURSIVE r(vid, member) AS (
+            SELECT c.vid, c.vid FROM cand c
+            UNION SELECT r.vid, e.b FROM r JOIN cedge e ON e.a = r.member)
+          SELECT r.vid, r.member FROM r) m
+   GROUP BY m.vid
+),
+cl AS MATERIALIZED (SELECT DISTINCT k.ck, k.members FROM clk k),
+-- member -> cluster key, for every member of every requested cluster
+clm AS MATERIALIZED (SELECT DISTINCT k.ck, mm.vid FROM cl k CROSS JOIN LATERAL unnest(k.members) AS mm(vid)),
+candx AS MATERIALIZED (SELECT DISTINCT m.vid FROM clm m),
 cur AS MATERIALIZED (
   SELECT g.vehicle_id AS vid, g.relationship FROM get_user_garage((SELECT cfg.u FROM cfg)) g
 ),
@@ -793,11 +835,14 @@ pp AS MATERIALIZED (
    WHERE vi.user_id = cfg.u
 ),
 -- Step 3: capture sessions of own-device photos (a new session after a gap of r_gap_h hours).
+-- vid here is the cluster key (the vehicle itself when it is in no cluster); mvid is the vehicle the photo is filed on.
 ps1 AS (
-  SELECT pp.*, lag(pp.t) OVER (PARTITION BY pp.vid ORDER BY pp.t, pp.id) AS prev_t FROM pp WHERE pp.own
+  SELECT pp.id, pp.vid AS mvid, coalesce(cm.ck, pp.vid) AS vid, pp.t, pp.lat, pp.lon,
+         lag(pp.t) OVER (PARTITION BY coalesce(cm.ck, pp.vid) ORDER BY pp.t, pp.id) AS prev_t
+    FROM pp LEFT JOIN clm cm ON cm.vid = pp.vid WHERE pp.own
 ),
 ps2 AS MATERIALIZED (
-  SELECT ps1.id, ps1.vid, ps1.t, ps1.lat, ps1.lon,
+  SELECT ps1.id, ps1.vid, ps1.mvid, ps1.t, ps1.lat, ps1.lon,
          sum(CASE WHEN ps1.prev_t IS NULL OR ps1.t - ps1.prev_t > make_interval(secs => cfg.r_gap_h * 3600) THEN 1 ELSE 0 END)
            OVER (PARTITION BY ps1.vid ORDER BY ps1.t, ps1.id) AS sess
     FROM ps1 CROSS JOIN cfg
@@ -828,7 +873,7 @@ cv AS MATERIALIZED (
                  FROM unnest(ARRAY[v.bat_auction_url, v.listing_url, v.origin_metadata->>'bat_auction_url',
                                    v.origin_metadata->>'listing_url', v.origin_metadata->>'url']) u(x)
                 WHERE nullif(btrim(u.x), '') IS NOT NULL) AS urls
-    FROM cand JOIN vehicles v ON v.id = cand.vid
+    FROM candx cand JOIN vehicles v ON v.id = cand.vid
 ),
 -- Listings not yet attached to any vehicle: identifiers read from the listing and its raw_data.
 ul AS MATERIALIZED (
@@ -932,21 +977,20 @@ vscene AS MATERIALIZED (
   SELECT k.vid,
          CASE WHEN k.wd > 0 AND k.wd >= 2 * k.ws THEN 'dealer' WHEN k.ws > 0 AND k.ws >= 2 * k.wd THEN 'shop' END AS kind,
          k.cites
-    FROM (SELECT sl.vehicle_id AS vid,
+    FROM (SELECT cm.ck AS vid,
                  coalesce(sum(sl.confidence) FILTER (WHERE sl.scene_label IN ('dealer_lot', 'showroom')), 0) AS wd,
                  coalesce(sum(sl.confidence) FILTER (WHERE sl.scene_label IN ('shop_interior', 'upholstery_work', 'paint_body')), 0) AS ws,
                  jsonb_agg(jsonb_build_object('run_id', sl.run_id, 'session_key', sl.session_key, 'scene_label', sl.scene_label,
-                             'model', sl.model, 'confidence', sl.confidence, 'rationale', sl.rationale)
-                           ORDER BY sl.confidence DESC, sl.session_key) AS cites
-            FROM scene_labels sl
-           WHERE sl.vehicle_id IN (SELECT cand.vid FROM cand)
-             AND sl.scene_label IN ('dealer_lot', 'showroom', 'shop_interior', 'upholstery_work', 'paint_body')
+                             'model', sl.model, 'confidence', sl.confidence, 'rationale', sl.rationale, 'member_vehicle_id', sl.vehicle_id)
+                           ORDER BY sl.confidence DESC, sl.session_key, sl.vehicle_id::text) AS cites
+            FROM scene_labels sl JOIN clm cm ON cm.vid = sl.vehicle_id
+           WHERE sl.scene_label IN ('dealer_lot', 'showroom', 'shop_interior', 'upholstery_work', 'paint_body')
              AND coalesce(sl.confidence, 0) >= 0.6
-           GROUP BY sl.vehicle_id) k
+           GROUP BY cm.ck) k
 ),
 -- Seller handles the evidence names for each candidate vehicle: [vehicle, handle, confidence, source, ref].
 sel AS MATERIALIZED (
-  SELECT cand.vid, s.seller, s.conf, s.src, s.ref FROM cand CROSS JOIN LATERAL (
+  SELECT cand.vid, s.seller, s.conf, s.src, s.ref FROM candx cand CROSS JOIN LATERAL (
       SELECT lower(btrim(bl.seller_username)) AS seller, 0.80 AS conf, 'bat_listings.seller_username' AS src, bl.bat_listing_url AS ref
         FROM bat_listings bl
        WHERE bl.vehicle_id = cand.vid AND bl.organization_id IS NULL AND nullif(btrim(bl.seller_username), '') IS NOT NULL
@@ -971,7 +1015,7 @@ sel AS MATERIALIZED (
 ),
 -- Step 2 organization evidence before duplicate collapse: [vehicle, organization, confidence, source, ref].
 lsrc AS MATERIALIZED (
-  SELECT cand.vid, x.org, x.conf, x.src, x.ref FROM cand CROSS JOIN LATERAL (
+  SELECT cand.vid, x.org, x.conf, x.src, x.ref FROM candx cand CROSS JOIN LATERAL (
       SELECT bl.organization_id AS org, 0.90 AS conf, 'bat_listings.organization_id' AS src, bl.bat_listing_url AS ref
         FROM bat_listings bl WHERE bl.vehicle_id = cand.vid AND bl.organization_id IS NOT NULL
       UNION ALL
@@ -1046,26 +1090,27 @@ poc AS MATERIALIZED (
 orgt AS MATERIALIZED (
   SELECT poc.vid, poc.canon, count(*) AS n_at, min(poc.m) AS min_m,
          EXISTS (SELECT 1 FROM organization_vehicles ov LEFT JOIN orgmap om ON om.org_id = ov.organization_id
-                  WHERE ov.vehicle_id = poc.vid AND coalesce(om.canon, ov.organization_id) = poc.canon) AS ov_rel
+                  WHERE ov.vehicle_id IN (SELECT m.vid FROM clm m WHERE m.ck = poc.vid UNION SELECT poc.vid)
+                    AND coalesce(om.canon, ov.organization_id) = poc.canon) AS ov_rel
     FROM poc GROUP BY poc.vid, poc.canon
 ),
 -- Pre-auction inventory: dealer_lot / showroom scenes (confidence >= 0.6) whose session photos (scene image_ids, or the session_key
 -- photo) were taken, on an own device, at a dealer / auction / consignor organization (orgn.okind = 'dealer').
 pa_rows AS MATERIALIZED (
-  SELECT sl.vehicle_id AS vid, sl.run_id, sl.session_key, sl.scene_label, sl.model, sl.confidence, sl.rationale, poc.canon AS org
+  SELECT p.vid, sl.vehicle_id AS member_vid, sl.run_id, sl.session_key, sl.scene_label, sl.model, sl.confidence, sl.rationale, poc.canon AS org
     FROM scene_labels sl
-    JOIN ps2 p ON p.vid = sl.vehicle_id AND (p.id = ANY (coalesce(sl.image_ids, '{}'::uuid[])) OR p.id::text = sl.session_key)
+    JOIN ps2 p ON p.mvid = sl.vehicle_id AND (p.id = ANY (coalesce(sl.image_ids, '{}'::uuid[])) OR p.id::text = sl.session_key)
     JOIN poc ON poc.photo_id = p.id
     JOIN orgn o ON o.id = poc.canon AND o.okind = 'dealer'
    WHERE sl.scene_label IN ('dealer_lot', 'showroom') AND coalesce(sl.confidence, 0) >= 0.6
-     AND sl.vehicle_id IN (SELECT cand.vid FROM cand)
-   GROUP BY sl.vehicle_id, sl.run_id, sl.session_key, sl.scene_label, sl.model, sl.confidence, sl.rationale, poc.canon
+     AND sl.vehicle_id IN (SELECT m.vid FROM clm m)
+   GROUP BY p.vid, sl.vehicle_id, sl.run_id, sl.session_key, sl.scene_label, sl.model, sl.confidence, sl.rationale, poc.canon
 ),
 pa AS MATERIALIZED (
   SELECT r.vid, array_agg(DISTINCT r.org) AS orgs,
          jsonb_agg(jsonb_build_object('run_id', r.run_id, 'session_key', r.session_key, 'scene_label', r.scene_label, 'model', r.model,
-                     'confidence', r.confidence, 'rationale', r.rationale, 'organization_id', r.org)
-                   ORDER BY r.confidence DESC, r.session_key, r.org::text) AS cites
+                     'confidence', r.confidence, 'rationale', r.rationale, 'organization_id', r.org, 'member_vehicle_id', r.member_vid)
+                   ORDER BY r.confidence DESC, r.session_key, r.org::text, r.member_vid::text) AS cites
     FROM pa_rows r GROUP BY r.vid
 ),
 -- Span (days) of the vehicle's own-device photos taken anywhere but at those organizations: an own long-term pattern if it exceeds
@@ -1083,7 +1128,7 @@ cooc AS MATERIALIZED (
     FROM (SELECT ps2.vid, min(ps2.t) AS a, max(ps2.t) AS b FROM ps2 GROUP BY ps2.vid) r CROSS JOIN cfg
     JOIN ps2 p2 ON p2.vid <> r.vid
      AND p2.t BETWEEN r.a - make_interval(secs => cfg.r_gap_h * 3600) AND r.b + make_interval(secs => cfg.r_gap_h * 3600)
-    JOIN vlink l ON l.vid = p2.vid
+    JOIN vlink l ON l.vid = p2.mvid
     LEFT JOIN orgmap om ON om.org_id = l.org
    GROUP BY r.vid, coalesce(om.canon, l.org)
 ),
@@ -1096,52 +1141,12 @@ st AS MATERIALIZED (
          count(*) FILTER (WHERE EXISTS (SELECT 1 FROM poc WHERE poc.photo_id = ps2.id)) AS at_any_org
     FROM ps2 GROUP BY ps2.vid
 ),
-f AS (
-  SELECT cand.vid, cfg.u, cfg.months, cfg.r_max_s, cfg.r_max_span, cfg.r_min_ph, cfg.r_min_geo, cfg.r_pers_span,
-         ver.id AS ver_id,
-         perm.co_by_other, perm.self_granted, perm.owner_perm, perm.any_perm,
-         obs.id AS obs_id, obs.stmt_vid, obs.content_text, obs.structured_data, obs.first_person,
-         ph.n AS photos, ph.n_own, ph.n_origin, ph.n_unk, ph.n_scraped, ph.n_imp, ph.n_fact, ph.imp_cites, ph.scraped_cite, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices,
-         ol.t AS obs_last,
-         EXISTS (SELECT 1 FROM vehicle_contributors vc WHERE vc.vehicle_id = cand.vid AND vc.user_id = cfg.u) AS contrib,
-         EXISTS (SELECT 1 FROM vehicle_ownerships vo WHERE vo.vehicle_id = cand.vid AND vo.owner_profile_id = cfg.u
-                   AND vo.is_current = true) AS cur_own,
-         EXISTS (SELECT 1 FROM discovered_vehicles dv WHERE dv.vehicle_id = cand.vid AND dv.user_id = cfg.u
-                   AND dv.is_active = true AND dv.relationship_type = 'previously_owned') AS disc_prev,
-         EXISTS (SELECT 1 FROM bat_listings bl WHERE bl.vehicle_id = cand.vid)
-           OR EXISTS (SELECT 1 FROM external_listings el WHERE el.vehicle_id = cand.vid)
-           OR EXISTS (SELECT 1 FROM ml WHERE ml.vid = cand.vid) AS v_listed,
-         org.org_id, org.org_conf, org.n_orgs, org.srcs, mt.matches,
-         lu.listing_url AS src_listing_url, lu.source AS src_source,
-         lu.src_listing AS src_listing
-  FROM cand CROSS JOIN cfg
-  -- Origin-fact import rule (step 1): a vehicle created by a listing scrape, with a listing URL, whose photos from the account
-  -- carry no camera make / model, taken_at or GPS, was imported by the account from that listing.
-  LEFT JOIN LATERAL (
-    SELECT v.source, coalesce(nullif(btrim(v.discovery_url), ''), nullif(btrim(v.listing_url), '')) AS listing_url,
-           regexp_replace(lower(btrim(coalesce(v.source, ''))), '[-\s]+', '_', 'g')
-             IN ('craigslist', 'bat', 'mecum', 'classic_com', 'cars_and_bids', 'facebook_marketplace', 'ebay', 'url_scraper')
-           AND coalesce(nullif(btrim(v.discovery_url), ''), nullif(btrim(v.listing_url), '')) ~* '^https?://[^/\s]+\.[^/\s]+/.+'
-           AS src_listing
-      FROM vehicles v WHERE v.id = cand.vid) lu ON true
-  -- Step 4 evidence: approved, https document, not revoked (revoked_at read defensively; the column may not exist).
-  LEFT JOIN LATERAL (
-    SELECT ov.id FROM ownership_verifications ov
-     WHERE ov.vehicle_id = cand.vid AND ov.user_id = cfg.u AND ov.status = 'approved'
-       AND ov.title_document_url ~ '^https://' AND to_jsonb(ov)->>'revoked_at' IS NULL
-     ORDER BY ov.created_at DESC LIMIT 1) ver ON true
-  -- A grant counts only if someone other than the account itself made it.
-  LEFT JOIN LATERAL (
-    SELECT coalesce(bool_or(p.role = 'co_owner' AND p.revoked_at IS NULL AND coalesce(p.is_active, true)
-                            AND p.granted_by IS NOT NULL AND p.granted_by <> p.user_id), false) AS co_by_other,
-           coalesce(bool_or(p.granted_by = p.user_id AND p.role IN ('owner','co_owner') AND p.revoked_at IS NULL), false) AS self_granted,
-           coalesce(bool_or(p.role = 'owner' AND p.revoked_at IS NULL), false) AS owner_perm,
-           count(*) > 0 AS any_perm
-      FROM vehicle_user_permissions p WHERE p.vehicle_id = cand.vid AND p.user_id = cfg.u) perm ON true
-  -- Step 5 evidence: the live account statement, on this vehicle or on a high-score duplicate of it. A first-person statement outranks an agent paraphrase; newest first.
-  -- (A superseded statement is already excluded: is_superseded is set by the sanctioned writer from 'supersedes'.)
-  LEFT JOIN LATERAL (
-    SELECT o.id, o.content_text, o.sd AS structured_data, fpx.v AS first_person, o.vehicle_id AS stmt_vid FROM (
+-- The account's live statements (stored and inline), one row per statement, read as a relationship claim; shared by every member of a
+-- duplicate cluster. A superseded statement is already excluded (is_superseded is set by the sanctioned writer from 'supersedes').
+stm AS MATERIALIZED (
+  SELECT o.id, o.vehicle_id, o.observed_at, o.ingested_at, o.content_text, o.sd, fpx.v AS fp
+    FROM cfg
+    CROSS JOIN LATERAL (
         -- stored statements and the inline (unstored) set; an owner_statement_v1 row is read as a relationship claim
         -- built from its parsed facts (ownership claim + tenure -> owner_current + start_date; title denial -> flag).
         SELECT s0.id, s0.vehicle_id, s0.observed_at, s0.ingested_at, s0.content_text, s0.structured_data,
@@ -1164,40 +1169,91 @@ f AS (
                 UNION ALL
                 SELECT i.id, i.vehicle_id, i.observed_at, i.observed_at, i.content_text, i.structured_data FROM inline_stmts i) s0
       ) o
-     CROSS JOIN LATERAL (SELECT (coalesce(o.sd->>'intake_actor', '') <> 'authorized_agent'
-                                 OR (o.sd->>'speaker_user_id' = cfg.u::text
-                                     AND coalesce(o.content_text, '') ~* '^[\s"“'']*(i|we|my|me|i''m|i''ve|i''d)\M')) AS v) fpx
-     WHERE (o.vehicle_id = cand.vid OR o.vehicle_id IN (SELECT d.b FROM dup d WHERE d.a = cand.vid))
-       AND (o.sd->'correction' ? 'relationship' OR o.sd->>'claim_contract' = 'owner_statement_v1')
-     ORDER BY fpx.v DESC, (o.vehicle_id = cand.vid) DESC, o.observed_at DESC NULLS LAST, o.ingested_at DESC LIMIT 1) obs ON true
+    CROSS JOIN LATERAL (SELECT (coalesce(o.sd->>'intake_actor', '') <> 'authorized_agent'
+                                OR (o.sd->>'speaker_user_id' = cfg.u::text
+                                    AND coalesce(o.content_text, '') ~* '^[\s"“'']*(i|we|my|me|i''m|i''ve|i''d)\M')) AS v) fpx
+   WHERE o.sd->'correction' ? 'relationship' OR o.sd->>'claim_contract' = 'owner_statement_v1'
+),
+f AS (
+  SELECT cl.ck AS vid, cl.members, cfg.u, cfg.months, cfg.r_max_s, cfg.r_max_span, cfg.r_min_ph, cfg.r_min_geo, cfg.r_pers_span,
+         ver.id AS ver_id, ver.ver_vid,
+         perm.co_by_other, perm.self_granted, perm.owner_perm, perm.any_perm,
+         obs.id AS obs_id, obs.stmt_vid, obs.content_text, obs.structured_data, obs.first_person,
+         ph.n AS photos, ph.n_own, ph.n_origin, ph.n_unk, ph.n_scraped, ph.n_imp, ph.n_fact, ph.imp_cites, ph.scraped_cite, ph.first_t, ph.last_t, ph.gps_n, ph.recent_gps_n, ph.devices, ph.by_member,
+         ol.t AS obs_last,
+         EXISTS (SELECT 1 FROM vehicle_contributors vc WHERE vc.vehicle_id = ANY (cl.members) AND vc.user_id = cfg.u) AS contrib,
+         EXISTS (SELECT 1 FROM vehicle_ownerships vo WHERE vo.vehicle_id = ANY (cl.members) AND vo.owner_profile_id = cfg.u
+                   AND vo.is_current = true) AS cur_own,
+         EXISTS (SELECT 1 FROM discovered_vehicles dv WHERE dv.vehicle_id = ANY (cl.members) AND dv.user_id = cfg.u
+                   AND dv.is_active = true AND dv.relationship_type = 'previously_owned') AS disc_prev,
+         EXISTS (SELECT 1 FROM bat_listings bl WHERE bl.vehicle_id = ANY (cl.members))
+           OR EXISTS (SELECT 1 FROM external_listings el WHERE el.vehicle_id = ANY (cl.members))
+           OR EXISTS (SELECT 1 FROM ml WHERE ml.vid = ANY (cl.members)) AS v_listed,
+         org.org_id, org.org_conf, org.n_orgs, org.srcs, mt.matches,
+         lu.listing_url AS src_listing_url, lu.source AS src_source,
+         lu.src_listing AS src_listing
+  FROM cl CROSS JOIN cfg
+  -- Origin-fact import rule (step 1): a vehicle created by a listing scrape, with a listing URL, whose photos from the account
+  -- carry no camera make / model, taken_at or GPS, was imported by the account from that listing.
+  LEFT JOIN LATERAL (
+    SELECT v.source, coalesce(nullif(btrim(v.discovery_url), ''), nullif(btrim(v.listing_url), '')) AS listing_url,
+           regexp_replace(lower(btrim(coalesce(v.source, ''))), '[-\s]+', '_', 'g')
+             IN ('craigslist', 'bat', 'mecum', 'classic_com', 'cars_and_bids', 'facebook_marketplace', 'ebay', 'url_scraper')
+           AND coalesce(nullif(btrim(v.discovery_url), ''), nullif(btrim(v.listing_url), '')) ~* '^https?://[^/\s]+\.[^/\s]+/.+'
+           AS src_listing
+      FROM vehicles v WHERE v.id = ANY (cl.members) ORDER BY src_listing DESC, v.id::text LIMIT 1) lu ON true
+  -- Step 4 evidence: approved, https document, not revoked (revoked_at read defensively; the column may not exist).
+  LEFT JOIN LATERAL (
+    SELECT ov.id, ov.vehicle_id AS ver_vid FROM ownership_verifications ov
+     WHERE ov.vehicle_id = ANY (cl.members) AND ov.user_id = cfg.u AND ov.status = 'approved'
+       AND ov.title_document_url ~ '^https://' AND to_jsonb(ov)->>'revoked_at' IS NULL
+     ORDER BY ov.created_at DESC, ov.id::text LIMIT 1) ver ON true
+  -- A grant counts only if someone other than the account itself made it.
+  LEFT JOIN LATERAL (
+    SELECT coalesce(bool_or(p.role = 'co_owner' AND p.revoked_at IS NULL AND coalesce(p.is_active, true)
+                            AND p.granted_by IS NOT NULL AND p.granted_by <> p.user_id), false) AS co_by_other,
+           coalesce(bool_or(p.granted_by = p.user_id AND p.role IN ('owner','co_owner') AND p.revoked_at IS NULL), false) AS self_granted,
+           coalesce(bool_or(p.role = 'owner' AND p.revoked_at IS NULL), false) AS owner_perm,
+           count(*) > 0 AS any_perm
+      FROM vehicle_user_permissions p WHERE p.vehicle_id = ANY (cl.members) AND p.user_id = cfg.u) perm ON true
+  -- Step 5 evidence: the live account statement on any member of the duplicate cluster (the cluster is one subject). A first-person
+  -- statement outranks an agent paraphrase; newest first.
+  LEFT JOIN LATERAL (
+    SELECT o.id, o.content_text, o.sd AS structured_data, o.fp AS first_person, o.vehicle_id AS stmt_vid
+      FROM stm o WHERE o.vehicle_id = ANY (cl.members)
+     ORDER BY o.fp DESC, o.observed_at DESC NULLS LAST, o.ingested_at DESC, o.id::text LIMIT 1) obs ON true
   -- Step 1 evidence: the account's photos; capture facts count only for own-device photos.
   LEFT JOIN LATERAL (
     SELECT count(*) AS n, count(*) FILTER (WHERE p.own) AS n_own, count(*) FILTER (WHERE p.origin) AS n_origin,
            count(*) FILTER (WHERE p.unk) AS n_unk, count(*) FILTER (WHERE p.scraped_match IS NOT NULL) AS n_scraped,
            count(*) FILTER (WHERE p.imp) AS n_imp, count(*) FILTER (WHERE p.has_fact) AS n_fact,
-           (SELECT jsonb_agg(e.c) FROM (SELECT p2.imp_cite AS c FROM pp p2 WHERE p2.vid = cand.vid AND p2.imp
+           (SELECT jsonb_agg(e.c) FROM (SELECT p2.imp_cite AS c FROM pp p2 WHERE p2.vid = ANY (cl.members) AND p2.imp
                                          ORDER BY (p2.imp_cite->>'via') IS NULL, p2.id LIMIT 3) e) AS imp_cites,
            (jsonb_agg(p.scraped_match ORDER BY p.id) FILTER (WHERE p.scraped_match IS NOT NULL))->0 AS scraped_cite,
            min(p.t) FILTER (WHERE p.own) AS first_t, max(p.t) FILTER (WHERE p.own) AS last_t,
            count(*) FILTER (WHERE p.own AND p.lat IS NOT NULL AND p.lon IS NOT NULL) AS gps_n,
            count(*) FILTER (WHERE p.own AND p.lat IS NOT NULL AND p.lon IS NOT NULL
                               AND p.t >= now() - make_interval(months => cfg.months)) AS recent_gps_n,
-           count(DISTINCT p.dev) FILTER (WHERE p.own) AS devices
-      FROM pp p WHERE p.vid = cand.vid) ph ON true
+           count(DISTINCT p.dev) FILTER (WHERE p.own) AS devices,
+           (SELECT jsonb_object_agg(q.vid, jsonb_build_object('photos', q.n, 'own_device', q.n_own))
+              FROM (SELECT p3.vid, count(*) AS n, count(*) FILTER (WHERE p3.own) AS n_own FROM pp p3
+                     WHERE p3.vid = ANY (cl.members) GROUP BY p3.vid) q) AS by_member
+      FROM pp p WHERE p.vid = ANY (cl.members)) ph ON true
   LEFT JOIN LATERAL (
     SELECT max(o.observed_at) AS t FROM vehicle_observations o
-     WHERE o.vehicle_id = cand.vid AND o.submitted_by_user_id = cfg.u) ol ON true
+     WHERE o.vehicle_id = ANY (cl.members) AND o.submitted_by_user_id = cfg.u) ol ON true
   -- Step 2 evidence: listings and the (duplicate-collapsed) organization their seller resolves to.
   LEFT JOIN LATERAL (
     SELECT (array_agg(x.org ORDER BY x.conf DESC, x.org::text))[1] AS org_id, max(x.conf) AS org_conf,
            count(DISTINCT x.org) AS n_orgs,
            jsonb_agg(jsonb_build_object('source', x.src, 'organization_id', x.org, 'as_listed', x.listed_org,
-                                        'confidence', x.conf, 'ref', x.ref) ORDER BY x.conf DESC, x.src, x.org::text) AS srcs
-      FROM lsc x WHERE x.vid = cand.vid) org ON true
+                                        'confidence', x.conf, 'ref', x.ref, 'member_vehicle_id', x.vid)
+                          ORDER BY x.conf DESC, x.src, x.org::text, x.vid::text) AS srcs
+      FROM lsc x WHERE x.vid = ANY (cl.members)) org ON true
   LEFT JOIN LATERAL (
-    SELECT jsonb_agg(jsonb_build_object('listing_id', ml.listing_id, 'score', ml.score, 'signals', to_jsonb(ml.sigs))
-                     ORDER BY ml.score DESC, ml.listing_id::text) AS matches
-      FROM ml WHERE ml.vid = cand.vid) mt ON true
+    SELECT jsonb_agg(jsonb_build_object('listing_id', ml.listing_id, 'score', ml.score, 'signals', to_jsonb(ml.sigs), 'member_vehicle_id', ml.vid)
+                     ORDER BY ml.score DESC, ml.listing_id::text, ml.vid::text) AS matches
+      FROM ml WHERE ml.vid = ANY (cl.members)) mt ON true
 ),
 g1 AS (
   SELECT f.*, f.structured_data->'correction'->'relationship' AS claim FROM f
@@ -1355,7 +1411,7 @@ h AS (
               * (CASE WHEN g6.amb THEN 0.5 ELSE 1 END) END AS s_conf
   FROM g6
 )
-SELECT h.vid AS vehicle_id,
+SELECT m.vid AS vehicle_id,
        cur.relationship AS old_role,
        h.d->>0 AS derived_role,
        (h.d->>1)::numeric AS confidence,
@@ -1367,6 +1423,14 @@ SELECT h.vid AS vehicle_id,
          'documented_from', h.first_t, 'documented_to', h.last_t,
          'organization_inventory', h.org_id,
          'sub_reason', h.d->>3,
+         -- duplicate cluster: the members are ONE subject here (never merged); every member row carries the same derived role and the
+         -- evidence of all members, each item saying which member it came from
+         'cluster', CASE WHEN cardinality(h.members) > 1 THEN jsonb_build_object(
+             'key', h.vid, 'members', to_jsonb(h.members), 'this_member', m.vid,
+             'evidence_from', jsonb_build_object(
+               'title_verification_vehicle_id', h.ver_vid, 'statement_vehicle_id', h.stmt_vid,
+               'listing_member_vehicle_ids', (SELECT coalesce(jsonb_agg(DISTINCT e->>'member_vehicle_id'), '[]'::jsonb) FROM jsonb_array_elements(coalesce(h.srcs, '[]'::jsonb)) e),
+               'photos_by_member', coalesce(h.by_member, '{}'::jsonb))) END,
          'flags', CASE WHEN h.amb THEN '["org_ambiguous"]'::jsonb ELSE '[]'::jsonb END,
          'title_denied', h.title_denied,
          'chain', jsonb_build_array(
@@ -1415,14 +1479,15 @@ SELECT h.vid AS vehicle_id,
              'eliminated', '[]'::jsonb),
            jsonb_build_object('step', 4, 'name', 'titles', 'confidence', CASE WHEN h.ver_id IS NOT NULL THEN 0.98 END,
              'evidence', jsonb_build_object('title_verification_id', h.ver_id,
-               'conflict_with_organization_listing', h.ver_id IS NOT NULL AND h.org_id IS NOT NULL),
+               'conflict_with_organization_listing', h.ver_id IS NOT NULL AND h.org_id IS NOT NULL,
+               'title_verification_vehicle_id', h.ver_vid),
              'eliminated', CASE WHEN h.ver_id IS NOT NULL
                THEN '["owner_reported","contributor","documenting","previously_documented","profile_record","imported_by_user"]'::jsonb
                ELSE '["owner_verified","co_owner_verified"]'::jsonb END),
            jsonb_build_object('step', 5, 'name', 'account_statements',
              'confidence', CASE WHEN h.obs_id IS NOT NULL AND h.ver_id IS NULL THEN (h.d->>1)::numeric END,
              'evidence', jsonb_build_object('observation_id', h.obs_id, 'statement_vehicle_id', h.stmt_vid,
-               'statement_from_duplicate', h.stmt_vid IS NOT NULL AND h.stmt_vid <> h.vid, 'roles', to_jsonb(h.roles), 'cited', h.cited,
+               'statement_from_duplicate', h.stmt_vid IS NOT NULL AND h.stmt_vid <> m.vid, 'roles', to_jsonb(h.roles), 'cited', h.cited,
                'first_person', h.first_person,
                'intake_actor', h.structured_data->>'intake_actor',
                'uncited_downgrade_ignored', h.uncited_ignored, 'long_tenure', h.tenure, 'title_denied', h.title_denied),
@@ -1437,7 +1502,9 @@ SELECT h.vid AS vehicle_id,
        CASE WHEN h.own_n > 0 THEN h.first_t END AS documented_from,
        CASE WHEN h.own_n > 0 THEN h.last_t END AS documented_to
 FROM h
-LEFT JOIN cur ON cur.vid = h.vid
+JOIN clm m ON m.ck = h.vid
+JOIN cand c0 ON c0.vid = m.vid
+LEFT JOIN cur ON cur.vid = m.vid
 CROSS JOIN LATERAL (SELECT concat_ws('; ',
     CASE WHEN h.self_granted THEN 'self-granted permission ignored' END,
     CASE WHEN h.uncited_ignored THEN 'uncited downgrade ignored' END,
@@ -1446,9 +1513,9 @@ CROSS JOIN LATERAL (SELECT concat_ws('; ',
     CASE WHEN h.org_id IS NOT NULL AND h.ver_id IS NOT NULL THEN 'CONFLICT: title verification vs organization listing' END,
     CASE WHEN h.org_id IS NOT NULL AND h.personal THEN 'long-term personal photo pattern conflicts with organization listing' END,
     CASE WHEN h.amb THEN 'more than one organization in range of the photos: ' || array_to_string(h.s_orgs, ', ') END,
-    CASE WHEN h.stmt_vid IS NOT NULL AND h.stmt_vid <> h.vid THEN 'statement taken from duplicate vehicle ' || h.stmt_vid END,
+    CASE WHEN h.stmt_vid IS NOT NULL AND h.stmt_vid <> m.vid THEN 'statement taken from duplicate vehicle ' || h.stmt_vid END,
     CASE WHEN coalesce(h.n_orgs, 0) > 1 THEN 'listings name more than one organization' END) AS t) notes
-ORDER BY h.vid
+ORDER BY m.vid
 -- END GENERATED
   LOOP
     IF NOT p_dry_run THEN

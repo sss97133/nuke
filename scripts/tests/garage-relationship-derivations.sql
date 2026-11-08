@@ -736,11 +736,11 @@ ALTER TABLE organizations ADD COLUMN IF NOT EXISTS business_type text;
 INSERT INTO organizations(id,name,latitude,longitude,business_type) VALUES
   (:'gz_shop','Gz Restoration Works',36.30000,-115.30000,'restoration_shop'),
   (:'gz_dealer','Gz Classic Dealer',36.40000,-115.40000,'dealer');
-CREATE FUNCTION gz(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ SELECT ('00000000-0000-4000-8000-0000000003'||lpad(n::text,2,'0'))::uuid $$;
+CREATE FUNCTION gz(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ SELECT ('00000000-0000-4000-8000-0000000009'||lpad(n::text,2,'0'))::uuid $$;
 CREATE FUNCTION gz_burst(n int, k int, start_ts timestamptz, lat numeric, lon numeric, gap interval DEFAULT interval '1 minute') RETURNS void LANGUAGE sql AS $$
  INSERT INTO vehicle_images(vehicle_id,user_id,image_url,taken_at,latitude,longitude,device_fingerprint)
  SELECT gz(n),'00000000-0000-4000-8000-000000000001','p',start_ts + g*gap,lat,lon,'dev-1' FROM generate_series(1,k) g $$;
-INSERT INTO vehicles(id,is_public,year,make,model) SELECT gz(g), true, 1990, 'Gzmake'||g, 'Gzmodel' FROM generate_series(1,40) g;
+INSERT INTO vehicles(id,is_public,year,make,model) SELECT gz(g), true, 1990, 'Gzmake'||g, 'Gzmodel' FROM generate_series(1,50) g;
 
 -- (a) scene context also applies to ONE organization in range
 SELECT gz_burst(1, 6, now() - interval '5 months', 36.30000, -115.30000);   -- no scene
@@ -803,6 +803,69 @@ SELECT fixture_assert(:'gz_b'::jsonb->(gz(16))::text->>'role'='owner_reported' A
 SELECT fixture_assert(:'gz_b'::jsonb->(gz(17))::text->>'role'='business_handling' AND (:'gz_b'::jsonb->(gz(17))::text->>'conf')::numeric=0.7
   AND :'gz_b'::jsonb->(gz(17))::text->'ev'->>'sub_reason' IS NULL,'a listing by the organization outranks pre-auction (0.7 inventory shoot, no sub-reason)');
 SELECT fixture_assert(:'gz_b'::jsonb->(gz(18))::text->>'role'='business_handling' AND :'gz_b'::jsonb->(gz(18))::text->'ev'->>'sub_reason'='pre_auction_inventory','ten days of photos elsewhere are inside the window');
+
+-- (c) duplicate clusters are ONE subject in the derivation (records are never merged)
+UPDATE vehicles SET make='Clusta', year=1985, model='Suburban K10' WHERE id IN (gz(30), gz(31));                     -- same year, identical model text: score 0.70
+UPDATE vehicles SET vin='GZVIN30000000001' WHERE id=gz(30);
+UPDATE vehicles SET make='Clustb', year=1986 WHERE id IN (gz(32), gz(33), gz(34), gz(35));
+UPDATE vehicles SET model='Suburban K10' WHERE id IN (gz(32), gz(34));
+UPDATE vehicles SET model='K15 Suburban' WHERE id = gz(33);                                                             -- same family, model text differs: score 0.65
+UPDATE vehicles SET model='Suburban 1500' WHERE id = gz(35);
+UPDATE vehicles SET vin='GZVIN32000000001' WHERE id = gz(32);
+UPDATE vehicles SET vin='GZVIN34000000001' WHERE id = gz(34);
+-- the vehicle rows that carry a listing were created for the account (vehicles.user_id), so they are among its vehicles
+UPDATE vehicles SET user_id=:'u' WHERE id IN (gz(30), gz(32), gz(34), gz(40));
+UPDATE vehicles SET make='Clustc', year=1987, model='Blazer', vin='GZVIN36000000001' WHERE id IN (gz(36), gz(37));  -- VIN equal: score 0.85
+UPDATE vehicles SET make='Clustd', year=1988, model='Blazer', vin='GZVIN38000000001' WHERE id IN (gz(38), gz(39));
+UPDATE vehicles SET make='Custe', year=1989, model='Blazer', vin='GZVIN40000000001' WHERE id IN (gz(40), gz(41));
+-- C1: one member carries the VIN-matched dealer listing, the other the account's own photos at the dealer (score edge)
+INSERT INTO bat_listings(vehicle_id,organization_id,seller_username,bat_listing_url) VALUES (gz(30),:'gz_dealer','gzdealer','https://bringatrailer.com/listing/gz30/');
+SELECT gz_burst(31, 6, now() - interval '5 months', 36.40000, -115.40000);
+-- C2: same shape, but the model text differs (0.65) and nothing else is shared: NOT grouped (reported, not loosened)
+INSERT INTO bat_listings(vehicle_id,organization_id,seller_username,bat_listing_url) VALUES (gz(32),:'gz_dealer','gzdealer','https://bringatrailer.com/listing/gz32/');
+SELECT gz_burst(33, 6, now() - interval '5 months', 36.40000, -115.40000);
+-- C2b: the same pair with a shared photo file (file_hash): grouped by shared strong evidence
+INSERT INTO bat_listings(vehicle_id,organization_id,seller_username,bat_listing_url) VALUES (gz(34),:'gz_dealer','gzdealer','https://bringatrailer.com/listing/gz34/');
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url,file_hash) VALUES (gz(34),:'u','p','gzfilehash0001'),(gz(35),:'u','p','gzfilehash0001');
+SELECT gz_burst(35, 6, now() - interval '5 months', 36.40000, -115.40000);
+-- C3: a first-person statement on one member, photos on the other
+SELECT gz_burst(37, 6, now() - interval '5 months', 36.40000, -115.40000);
+INSERT INTO vehicle_observations(vehicle_id,submitted_by_user_id,content_text,structured_data)
+ VALUES (gz(36),'00000000-0000-4000-8000-000000000001','I own it',
+  jsonb_build_object('claim_contract','garage_owner_correction_v1','correction',jsonb_build_object('relationship',fixture_claim('{owner_current}'))));
+-- C4: an approved title on one member
+INSERT INTO vehicle_images(vehicle_id,user_id,image_url) VALUES (gz(39),:'u','p');
+INSERT INTO ownership_verifications(vehicle_id,user_id,status,title_document_url) VALUES (gz(38),:'u','approved','https://example.test/gz38.pdf');
+-- C5: a dealer_lot scene on the member that carries the photos; the other member has nothing
+SELECT gz_burst(41, 6, now() - interval '5 months', 36.40000, -115.40000);
+\set gz_c_sql `sed -e "s/:'user_id'/'00000000-0000-4000-8000-000000000001'/" -e "s/:'vehicle_id'/''/" -e '$ s/;[[:space:]]*$//' -e "s/^   WHERE false -- (scene_labels)\$/   WHERE false UNION ALL SELECT gen_random_uuid(), gz(41), 'k41', (SELECT array_agg(id) FROM vehicle_images WHERE vehicle_id=gz(41)), 'dealer_lot', 'm', 0.9::numeric, 'cars in rows'/" supabase/sql/derive_vehicle_relationships_preview.sql`
+SELECT (SELECT jsonb_object_agg(d.vehicle_id, jsonb_build_object('role', d.derived_role, 'conf', d.confidence, 'ev', d.evidence, 'reason', d.reason))
+          FROM (:gz_c_sql) d WHERE d.vehicle_id BETWEEN gz(30) AND gz(41)) AS gz_c \gset
+SELECT fixture_assert(:'gz_c'::jsonb->(gz(30))::text->>'role'='business_handling' AND :'gz_c'::jsonb->(gz(31))::text->>'role'='business_handling'
+  AND (:'gz_c'::jsonb->(gz(30))::text->>'conf')::numeric=0.7 AND (:'gz_c'::jsonb->(gz(31))::text->>'conf')::numeric=0.7,
+  'listing on one member + own photos at the listing organization on the other: both rows are business_handling 0.7');
+SELECT fixture_assert(:'gz_c'::jsonb->(gz(30))::text->'ev'->'cluster'->'members'=jsonb_build_array(gz(30),gz(31))
+  AND :'gz_c'::jsonb->(gz(31))::text->'ev'->'cluster'->'members'=jsonb_build_array(gz(30),gz(31))
+  AND :'gz_c'::jsonb->(gz(30))::text->'ev'->'cluster'->>'this_member'=gz(30)::text AND :'gz_c'::jsonb->(gz(31))::text->'ev'->'cluster'->>'this_member'=gz(31)::text
+  AND :'gz_c'::jsonb->(gz(31))::text->'ev'->'cluster'->'evidence_from'->'listing_member_vehicle_ids'=jsonb_build_array(gz(30)::text)
+  AND (:'gz_c'::jsonb->(gz(31))::text->'ev'->'cluster'->'evidence_from'->'photos_by_member'->(gz(31)::text)->>'own_device')::int=6,
+  'each member row keeps its vehicle_id and cites the cluster members and the member each evidence came from');
+SELECT fixture_assert(jsonb_typeof(:'gz_c'::jsonb->(gz(32))::text->'ev'->'cluster')='null' AND jsonb_typeof(:'gz_c'::jsonb->(gz(33))::text->'ev'->'cluster')='null'
+  AND :'gz_c'::jsonb->(gz(32))::text->>'role' IS DISTINCT FROM :'gz_c'::jsonb->(gz(33))::text->>'role',
+  'same year + family but different model text (0.65) and no shared file: not grouped');
+SELECT fixture_assert(:'gz_c'::jsonb->(gz(34))::text->'ev'->'cluster'->'members'=jsonb_build_array(gz(34),gz(35))
+  AND :'gz_c'::jsonb->(gz(34))::text->>'role'=:'gz_c'::jsonb->(gz(35))::text->>'role','a shared file_hash groups a same-year, same-family pair; roles equal');
+SELECT fixture_assert(:'gz_c'::jsonb->(gz(36))::text->>'role'='owner_reported' AND :'gz_c'::jsonb->(gz(37))::text->>'role'='owner_reported'
+  AND NOT (:'gz_c'::jsonb->(gz(36))::text->'ev'->'chain'->4->'evidence'->>'statement_from_duplicate')::boolean
+  AND (:'gz_c'::jsonb->(gz(37))::text->'ev'->'chain'->4->'evidence'->>'statement_from_duplicate')::boolean
+  AND :'gz_c'::jsonb->(gz(37))::text->'ev'->'chain'->4->'evidence'->>'statement_vehicle_id'=gz(36)::text,'a statement on one member reaches the other, citing the member it was made on');
+SELECT fixture_assert(:'gz_c'::jsonb->(gz(38))::text->>'role'='owner_verified' AND :'gz_c'::jsonb->(gz(39))::text->>'role'='owner_verified'
+  AND :'gz_c'::jsonb->(gz(39))::text->'ev'->'chain'->3->'evidence'->>'title_verification_vehicle_id'=gz(38)::text,'a title on one member makes both owner_verified, citing the titled member');
+SELECT fixture_assert(:'gz_c'::jsonb->(gz(40))::text->>'role'='business_handling' AND :'gz_c'::jsonb->(gz(41))::text->>'role'='business_handling'
+  AND :'gz_c'::jsonb->(gz(40))::text->'ev'->>'sub_reason'='pre_auction_inventory'
+  AND (:'gz_c'::jsonb->(gz(40))::text->'ev'->'chain'->2->'evidence'->'pre_auction'->'scenes'->0->>'member_vehicle_id')=gz(41)::text,
+  'a scene on one member applies to the cluster (pre-auction on both rows), citing the member it was recorded on');
+SELECT fixture_assert((SELECT count(*) FROM vehicles WHERE merged_into_vehicle_id IS NOT NULL AND id BETWEEN gz(30) AND gz(41))=0,'clusters never merge records');
 
 SELECT 'PASS: evidence chain, listing matches, org aliases, shoot vs long-term, own-device, statement precedence, decay, preview parity, duplicate candidates, filing gate, merge/split plans';
 
