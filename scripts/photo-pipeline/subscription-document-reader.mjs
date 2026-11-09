@@ -11,7 +11,7 @@
 //
 // Work list: the owner's frames whose pipeline classification named a document type (ai_scan_metadata.classification.v2
 // .document_type) or whose route hit the missing function, minus frames that already have a capture_document_pages row.
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -56,6 +56,20 @@ function parseResult(text) {
   return j;
 }
 
+// claude -p with the prompt on stdin (execFile's `input` is ignored for async calls; the CLI then waits 3 s and runs empty).
+function claudePrint(text, env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('claude', ['-p', '--output-format', 'json', '--model', model, '--allowedTools', 'Read'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '', err = '';
+    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('reader timed out after 240 s')); }, 240_000);
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.on('error', (e) => { clearTimeout(timer); reject(e); });
+    child.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`claude exited ${code}: ${err.slice(0, 200)}`)); });
+    child.stdin.end(text);
+  });
+}
+
 async function readFrame(f, dir) {
   const ext = (f.file_name || f.image_url).toLowerCase().match(/\.(heic|heif|png|webp|jpe?g)/)?.[1] || 'jpg';
   const raw = join(dir, `${f.id}.${ext}`);
@@ -69,7 +83,7 @@ async function readFrame(f, dir) {
   }
   const env = { ...process.env };
   delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT; delete env.ANTHROPIC_API_KEY;
-  const { stdout } = await run('claude', ['-p', '--output-format', 'json', '--model', model, '--allowedTools', 'Read'], { env, input: prompt(img), maxBuffer: 4 * 1024 * 1024, timeout: 240_000 });
+  const stdout = await claudePrint(prompt(img), env);
   const outer = JSON.parse(stdout);
   if (outer.is_error) throw new Error(`reader error: ${String(outer.result ?? '').slice(0, 200)}`);
   const extraction = parseResult(outer.result);

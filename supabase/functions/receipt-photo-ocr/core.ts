@@ -390,7 +390,7 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
     doc_type: docType, class_conf: confidence, classifier: CLASSIFIER,
     doc_date: docDate, date_source: docDate ? "ocr" : "none", date_text: docDate ? String(data.date ?? data.receipt_date ?? data.invoice_date ?? data.transaction_date).slice(0, 40) : null,
     extraction: { ...data, storage_path: storagePath, sha256, byte_size: bytes.byteLength, landed_type: landType(docType, data) },
-    cost_usd: costUsd, run_id: runId,
+    cost_usd: costUsd ?? 0, run_id: runId, // the column is NOT NULL; a subscription read costs the platform nothing
   };
   const pg = await deps.upsertPage(row);
   if (pg.error) return { status: 502, image_id: imageId, page: false, landed: false, line_items_count: 0, parts_found: 0, error: `page row failed: ${pg.error}` };
