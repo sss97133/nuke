@@ -43,8 +43,10 @@ CREATE TABLE public.external_identities(id uuid PRIMARY KEY DEFAULT gen_random_u
 ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.asset_observations ENABLE ROW LEVEL SECURITY;
 
+CREATE TABLE public.profiles(id uuid PRIMARY KEY, username text, full_name text, is_public boolean DEFAULT true);
+INSERT INTO public.profiles (id, username, full_name) VALUES ('0b9f107a-0000-4000-8000-000000000001', 'holder', 'A Working Photographer');
 INSERT INTO public.observation_sources (id, slug, display_name, base_trust_score)
-VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
+VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90), ('ad7104a3-48aa-486e-afff-f9f8af614800', 'owner-input', 'Owner input', 0.95);
 
 \ir ../migrations/20261108170000_asset_lots.sql
 \ir ../migrations/20261108200000_asset_lot_walk.sql
@@ -53,6 +55,7 @@ VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
 \ir ../migrations/20261108234500_asset_creators_current_lot.sql
 \ir ../migrations/20261108235500_asset_creators_materialized.sql
 \ir ../migrations/20261109000000_asset_profile_read.sql
+\ir ../migrations/20261109013000_held_assets.sql
 
 -- 1. Anon cannot write.
 DO $$ BEGIN
@@ -281,6 +284,49 @@ DO $$ DECLARE p jsonb; sec jsonb; BEGIN
     RAISE EXCEPTION 'history must keep the superseded statement: %', p->'history'; END IF;
   IF public.asset_profile_read('00000000-0000-0000-0000-000000000000') IS NOT NULL THEN RAISE EXCEPTION 'unknown id must be null'; END IF;
 END $$;
+
+-- 6g. A holder declares a work: private, theirs, no market figure; the profile reads for them and not for anon.
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000001"}', false);
+DO $$ DECLARE r jsonb; r2 jsonb; p jsonb; mine jsonb; aid uuid; BEGIN
+  r := public.declare_held_asset('artwork', '  Danger   End of Road ', 'oil and enamel on canvas', 'c. 2024', '48 x 60 in', NULL, 'Painted at the shop.', 'private');
+  aid := (r->>'asset_id')::uuid;
+  IF aid IS NULL OR (r->>'duplicate')::boolean THEN RAISE EXCEPTION 'first declaration must create: %', r; END IF;
+  IF (SELECT title FROM public.assets WHERE id = aid) <> 'Danger End of Road' THEN RAISE EXCEPTION 'title must be space-normalised'; END IF;
+  IF (SELECT owner_id::text || creator_id::text FROM public.assets WHERE id = aid) <> repeat('0b9f107a-0000-4000-8000-000000000001', 2) THEN RAISE EXCEPTION 'the signer is creator and holder'; END IF;
+  IF (SELECT visibility FROM public.assets WHERE id = aid) <> 'private' THEN RAISE EXCEPTION 'private by default'; END IF;
+  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'holder_declaration') <> 1 THEN RAISE EXCEPTION 'one declaration observation'; END IF;
+  IF (SELECT structured_data->>'name_as_printed' FROM public.asset_observations WHERE asset_id = aid AND kind = 'creation_claim') <> 'A Working Photographer' THEN
+    RAISE EXCEPTION 'creation claim names the signer from profiles'; END IF;
+  r2 := public.declare_held_asset('artwork', 'Danger End of Road', 'Oil and Enamel on Canvas', 'c. 2024', '48 x 60 in', NULL, 'different notes', 'private');
+  IF NOT (r2->>'duplicate')::boolean OR (r2->>'asset_id')::uuid <> aid THEN RAISE EXCEPTION 'the same declaration twice is one row: %', r2; END IF;
+  p := public.asset_profile_read(aid);
+  IF p IS NULL THEN RAISE EXCEPTION 'the holder reads their private work'; END IF;
+  IF p->>'market' <> 'none_public' OR jsonb_array_length(p->'lots') <> 0 THEN RAISE EXCEPTION 'no market figure for a declared work: %', p->'market'; END IF;
+  IF NOT (p->'viewer'->>'is_holder')::boolean OR p->'declared'->>'year' <> 'c. 2024' OR p->'declared'->>'medium' <> 'oil and enamel on canvas' THEN RAISE EXCEPTION 'declared block wrong: %', p->'declared'; END IF;
+  IF p->'creation'->0->'party'->>'kind' <> 'user' OR p->'creation'->0->'party'->>'display_name' <> 'A Working Photographer' OR (p->'creation'->0->'party'->>'lots_direct')::int <> 1 THEN
+    RAISE EXCEPTION 'user party wrong: %', p->'creation'; END IF;
+  mine := public.held_assets_read(50);
+  IF (mine->>'total')::int <> 1 OR (mine->'by_type'->>'artwork')::int <> 1 OR (mine->'assets'->0->>'public_sale_recorded')::boolean THEN RAISE EXCEPTION 'held assets wrong: %', mine; END IF;
+  BEGIN
+    PERFORM public.declare_held_asset('artwork', 'Bad year', NULL, 'nineteen sixty', NULL, NULL, NULL, 'private');
+    RAISE EXCEPTION 'a year that is not a year must be refused';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  BEGIN
+    PERFORM public.declare_held_asset('vehicle', 'A car', NULL, NULL, NULL, NULL, NULL, 'private');
+    RAISE EXCEPTION 'a vehicle is not declared here';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+  IF public.asset_profile_read(aid) IS NOT NULL THEN RAISE EXCEPTION 'anon must not read a private work'; END IF;
+  IF public.held_assets_read(50) IS NOT NULL THEN RAISE EXCEPTION 'anon has no held assets'; END IF;
+  BEGIN
+    PERFORM public.declare_held_asset('artwork', 'x', NULL, NULL, NULL, NULL, NULL, 'private');
+    RAISE EXCEPTION 'anon must not declare';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  -- Another signed-in user is not the holder.
+  PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000002"}', true);
+  IF public.asset_profile_read(aid) IS NOT NULL THEN RAISE EXCEPTION 'another user must not read a private work'; END IF;
+END $$;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
 
 -- 7. The type list admits the three new types and still refuses an unknown one.
 DO $$ BEGIN

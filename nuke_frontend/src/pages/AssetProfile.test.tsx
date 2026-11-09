@@ -82,6 +82,25 @@ it('says so when nothing public is recorded, and never calls the reader for a ma
   expect(node.textContent).toContain('No such asset');
 });
 
+it('a declared work shows no public sale, the holder\'s words and a user party', async () => {
+  const declared: AssetProfile = { ...riley, asset: { ...riley.asset, id: '22222222-2222-4222-8222-222222222222', title: 'Danger End of Road', house_category: null, identity_basis: 'holder_declaration', visibility: 'private' },
+    viewer: { is_holder: true }, declared: { medium: 'oil and enamel on canvas', year: 'c. 2024', dimensions: '48 x 60 in', notes: 'Painted at the shop.' }, market: 'none_public',
+    image_url: null, lots: [], history: [],
+    creation: [{ claim_id: 'c9', attribution: 'direct', layout: 'holder_declaration', name_as_printed: 'A Working Photographer', qualifier_as_printed: null,
+      party: { id: 'u1', kind: 'user', display_name: 'A Working Photographer', claimed: true, lots_direct: 1, priced_lots: 0 }, executor: null, source: 'owner-input', observed_at: '2026-11-08T21:00:00Z', confidence: 0.95 }],
+    coverage: { presentations: 0, statements: 0, claims: 1, sources: [], as_of: '2026-11-08T22:00:00Z' } };
+  fixture.rpc.mockResolvedValue({ data: declared, error: null });
+  await act(async () => render('/assets/22222222-2222-4222-8222-222222222222'));
+  expect(node.textContent).toContain('No public sale recorded');
+  expect(node.textContent).toContain('As declared by the holder');
+  expect(node.textContent).toContain('oil and enamel on canvas');
+  expect(node.textContent).toContain('Painted at the shop.');
+  expect(node.textContent).toContain('A Nuke user, declaring their own work');
+  expect(node.textContent).toContain("the holder's own declaration");
+  expect(node.textContent).toContain('declared by its holder in their own words');
+  expect(node.querySelector('img')).toBeNull();
+});
+
 it('formats money by the house\'s currency and headlines the hammer, then the high bid, then the estimate', () => {
   expect(money(720000, 'GBP')).toBe('£720,000');
   expect(money(1416, 'USD')).toBe('$1,416');
