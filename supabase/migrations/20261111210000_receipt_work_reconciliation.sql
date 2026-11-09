@@ -124,7 +124,7 @@ $$;
 -- ─── the correlation ──────────────────────────────────────────────────────────────────────────────────────────
 -- One row per linked receipt line (a receipt without lines is one row with item_id null). Clock: photo EXIF taken_at in
 -- UTC; anchor = the line's own date, else the link's page date. Install window = anchor .. anchor + p_window_days.
-CREATE OR REPLACE FUNCTION public.receipt_work_lines(p_vehicle_id uuid, p_window_days int DEFAULT 90, p_max_images int DEFAULT 6)
+CREATE OR REPLACE FUNCTION public.receipt_work_lines(p_vehicle_id uuid, p_window_days int DEFAULT 90, p_max_images int DEFAULT 8)
 RETURNS TABLE(
   vehicle_id uuid, user_id uuid, receipt_id uuid, item_id uuid, link_id uuid, link_basis text, link_confidence numeric,
   vendor_name text, document_kind text, line_number int, description text, part_number text, total_price numeric,
@@ -165,7 +165,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
            count(m.id)::int AS total,
            count(m.id) FILTER (WHERE m.d <= ln.anchor + p_window_days)::int AS in_window,
            min(m.d) AS first_day,
-           (array_agg(m.id ORDER BY coalesce(m.img_end = ln.end_hint, false) DESC, cardinality(m.zones), m.taken_at))[1:p_max_images] AS ids
+           (array_agg(m.id ORDER BY coalesce(m.img_end = ln.end_hint, false) DESC, cardinality(m.zones),
+                             md5(m.id::text || coalesce(ln.item_id, ln.receipt_id)::text)))[1:p_max_images] AS ids  -- line-specific spread, not the day's first frames
       FROM lines ln
       LEFT JOIN imgs m ON ln.zone IS NOT NULL AND ln.anchor IS NOT NULL AND m.d >= ln.anchor AND ln.zone = ANY (m.zones)
                      -- a frame of the other end of the car cannot show this line's part

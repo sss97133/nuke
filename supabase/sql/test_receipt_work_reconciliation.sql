@@ -106,7 +106,7 @@ BEGIN
   ASSERT n = 6, format('5 lines of c1 + line-less c3, duplicate receipt excluded; got %s', n);
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d1';
   ASSERT r.conclusion = 'install_window_photographed' AND r.judgment_needed, r.conclusion;
-  ASSERT r.image_ids = ARRAY['00000000-0000-0000-0000-0000000000f1'::uuid, '00000000-0000-0000-0000-0000000000f7'::uuid], r.image_ids::text;
+  ASSERT r.image_ids[1] = '00000000-0000-0000-0000-0000000000f1'::uuid AND cardinality(r.image_ids) = 2, r.image_ids::text;
   ASSERT r.days_to_first_photo = 22 AND r.work_session_ids = ARRAY['00000000-0000-0000-0000-000000000011'::uuid];
   ASSERT r.timeline_event_ids = ARRAY['00000000-0000-0000-0000-000000000021'::uuid];
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d2';
