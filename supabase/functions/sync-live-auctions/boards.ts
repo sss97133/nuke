@@ -564,6 +564,9 @@ export interface ObservationPost {
   structured_data: Record<string, unknown>;
   vehicle_id: string;
   extraction_method: string;
+  raw_source_ref?: string;
+  extraction_metadata?: Record<string, unknown>;
+  defer_analysis?: boolean;
 }
 
 /** A Collecting Cars lot as the live board read it (Typesense production_listings, every five minutes). */

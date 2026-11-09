@@ -34,6 +34,8 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { postObservations } from "./postObservations.ts";
+import { retainCcBidCapture, type CcNativeCapture } from "./ccBidCapture.ts";
 import { pcarBidCapture, pcarBidObservation } from "./pcarBidCapture.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
@@ -85,6 +87,8 @@ interface LiveAuction {
   currency?: string | null;
   /** auction_live unless the house says otherwise: a catalog lot is 'upcoming', a lot whose bidding closed 'ended'. */
   sale_status?: "auction_live" | "upcoming" | "ended";
+  /** Internal native document; never copied into vehicle metadata or the public tape. */
+  cc_native_capture?: CcNativeCapture;
   raw_data: Record<string, unknown>;
 }
 
@@ -261,6 +265,7 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
     console.log("[sync-live-auctions] Fetching Collecting Cars live auctions from Typesense...");
 
     const documents: TypesenseDocument[] = [];
+    const captureOf = new Map<TypesenseDocument, CcNativeCapture>();
     let page = 1;
 
     while (page <= CC_MAX_PAGES) {
@@ -291,6 +296,8 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
       }
       const hits = data.results?.[0]?.hits ?? [];
       const pageDocs = hits.map((hit: { document: TypesenseDocument }) => hit.document);
+      const receivedAt = new Date().toISOString();
+      for (const document of pageDocs) captureOf.set(document, { document: document as unknown as Record<string, unknown>, receivedAt });
       documents.push(...pageDocs);
 
       if (pageDocs.length < CC_PAGE_SIZE) break;
@@ -321,6 +328,7 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
           model: doc.modelName || null,
           thumbnail_url: doc.mainImageUrl || null,
           external_id: String(doc.auctionId),
+          cc_native_capture: captureOf.get(doc),
           raw_data: {
             source: "typesense_production_listings",
             slug: doc.slug,
@@ -583,58 +591,6 @@ async function ingestPcarBids(
 }
 
 /**
- * Posts observations through ingest-observation, skipping those already held (same kind and source_identifier), a few
- * at a time, until the deadline; what is left is posted on a later run (it is still not held then).
- */
-async function postObservations(
-  supabase: ReturnType<typeof createClient>,
-  posts: ObservationPost[],
-  deadline: number,
-  maxPosts: number,
-): Promise<{ candidates: number; held: number; posted: number; deferred: number; errors: string[] }> {
-  const out = { candidates: posts.length, held: 0, posted: 0, deferred: 0, errors: [] as string[] };
-  const have = new Set<string>();
-  for (let i = 0; i < posts.length; i += 100) {
-    const chunk = posts.slice(i, i + 100);
-    for (const kind of new Set(chunk.map((p) => p.kind))) {
-      const { data, error } = await supabase.from("vehicle_observations").select("source_identifier").eq("kind", kind)
-        .in("source_identifier", chunk.filter((p) => p.kind === kind).map((p) => p.source_identifier));
-      if (error) { out.errors.push(`held check: ${error.message}`); return out; }
-      for (const r of (data ?? []) as { source_identifier: string }[]) have.add(`${kind}|${r.source_identifier}`);
-    }
-  }
-  const todo = posts.filter((p) => !have.has(`${p.kind}|${p.source_identifier}`));
-  out.held = posts.length - todo.length;
-  const base = Deno.env.get("SUPABASE_URL") ?? "";
-  const key = projectSecretKey() ?? "";
-  // Function-to-function calls share the platform's per-trace budget (2026-11-08: a 200-post first run was refused at
-  // about 60 and the refusal took the whole sync with it), so a run posts at most maxPosts, three at a time, and stops
-  // at the first refusal; the rest are still not held and post on a later run.
-  let stop = false;
-  for (let i = 0; i < todo.length; i += 3) {
-    if (stop || Date.now() > deadline || i >= maxPosts) { out.deferred = todo.length - i; break; }
-    await Promise.all(todo.slice(i, Math.min(i + 3, maxPosts)).map(async (p) => {
-      try {
-        const res = await fetch(`${base}/functions/v1/ingest-observation`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-          body: JSON.stringify(p),
-        });
-        if (res.ok) out.posted++;
-        else {
-          out.errors.push(`${p.source_identifier}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
-          if (res.status === 429 || res.status >= 500) stop = true;
-        }
-      } catch (e) {
-        out.errors.push(`${p.source_identifier}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200));
-        stop = true;
-      }
-    }));
-  }
-  return out;
-}
-
-/**
  * Collecting Cars' bid path and results, which the house keeps nowhere Nuke can read later: each lot's bid as this board
  * read saw it (once per distinct bid), and each closed lot's outcome (ccResultObservations). The finish estimator
  * (scripts/market/live-finish-houses.py) needs both before it can measure itself on this house.
@@ -659,10 +615,12 @@ async function ingestCcPath(
   const bidPosts = auctions.flatMap((a) => {
     const vid = vehicleOf.get(a.url);
     const p = vid ? ccBidObservation({ url: a.url, external_id: a.external_id, current_bid: a.current_bid, bid_count: a.bid_count,
-      currency: a.currency ?? null, ends: a.auction_end_date }, vid, readAt) : null;
+      currency: a.currency ?? null, ends: a.auction_end_date }, vid, a.cc_native_capture?.receivedAt ?? readAt) : null;
     return p ? [p] : [];
   });
-  const bids = await postObservations(supabase, bidPosts, deadline, 40);
+  const nativeOf = new Map(auctions.map(a => [a.url, a.cc_native_capture]));
+  const bids = await postObservations(supabase, bidPosts, deadline, 40,
+    p => retainCcBidCapture(supabase, p, nativeOf.get(p.source_url)));
 
   // results: the sold index since the window's start, and the lots Nuke followed that closed in it
   const now = Date.now();
