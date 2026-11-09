@@ -3,102 +3,93 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
 import { VEHICLE_CARD_COLUMNS } from '../vehicles/vehicleCardColumns';
+import { isCurrentGarageOwner, useVehiclesDashboard } from '../../hooks/useVehiclesDashboard';
 
 interface VehicleCollectionProps {
   userId: string;
   isOwnProfile: boolean;
 }
 
+/** Show qualified current ownership with private statements confined to the own-account view. */
 const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProfile }) => {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
+  const scope = `${userId}:${isOwnProfile}`;
+  const garage = useVehiclesDashboard(isOwnProfile ? userId : null, 'ownership');
   useEffect(() => {
-    loadVehicles();
-  }, [userId]);
+    let cancelled = false;
+    if (isOwnProfile && garage.isLoading) return () => { cancelled = true; };
+    const loadVehicles = async () => {
+      try {
+        setLoading(true);
 
-  const loadVehicles = async () => {
-    try {
-      setLoading(true);
-
-      // OWNED / BUILT only — the C0-correct ownership signal (founder teardown
-      // PROFILE_BUILD_ORDER 2026-06-13, item 8 "the ONE thing I wanna see").
-      //
-      // The old query (user_id ∪ uploaded_by ∪ owner_id) returned ~330 rows —
-      // mostly scraped Craigslist listings and a truck he SOLD (the 1983 K2500
-      // sits here as a `contributor` row). Showing those as "his" is the cardinal
-      // sin he named ("I'm not the verified owner of the K2500 … I sold that
-      // fucking truck"). owner_id is set by ingestion, not ownership.
-      //
-      // Truth comes from two gated rungs:
-      //   1. active owner/co_owner permissions  (vehicle_user_permissions)
-      //   2. approved title verifications        (ownership_verifications)
-      // The `contributor` role is deliberately EXCLUDED — it's the scraped/touched
-      // noise bucket (it even contains the sold K2500), so it fails the
-      // built/owned confidence test.
-      const [permRes, titleRes] = await Promise.all([
-        supabase
-          .from('vehicle_user_permissions')
-          .select('vehicle_id')
-          .eq('user_id', userId)
-          .is('revoked_at', null)
-          .in('role', ['owner', 'co_owner']),
-        supabase
-          .from('ownership_verifications')
-          .select('vehicle_id')
-          .eq('user_id', userId)
-          .eq('status', 'approved'),
-      ]);
-
-      const ownedIds = Array.from(new Set([
-        ...((permRes.data || []).map((r: any) => r.vehicle_id)),
-        ...((titleRes.data || []).map((r: any) => r.vehicle_id)),
-      ].filter(Boolean)));
-
-      if (ownedIds.length === 0) {
+        setLoadError(false);
         setVehicles([]);
-        return;
+        if (isOwnProfile && garage.error) throw new Error(garage.error);
+        let ownedIds: string[];
+        if (isOwnProfile) {
+          ownedIds = garage.vehicles.filter(isCurrentGarageOwner).map(vehicle => vehicle.id);
+        } else {
+          // The public reader qualifies title evidence without exposing private account statements.
+          const { data, error } = await supabase.rpc('get_user_garage', { p_user_id: userId })
+            .eq('relationship', 'owner').limit(50);
+          if (error) throw error;
+          ownedIds = (data ?? []).map((row: { vehicle_id: string }) => row.vehicle_id);
+        }
+        if (cancelled) return;
+        if (ownedIds.length === 0) {
+          setVehicles([]);
+          return;
+        }
+
+        let query = supabase
+          .from('vehicles')
+          .select(`
+            ${VEHICLE_CARD_COLUMNS},
+            vehicle_images(image_url, is_primary)
+          `)
+          .in('id', ownedIds);
+
+
+        // For public profiles, only show public vehicles
+        if (!isOwnProfile) {
+          query = query.eq('is_public', true);
+        }
+
+        const { data, error } = await query
+          .order('year', { ascending: false })
+          .limit(50);
+
+        if (error) throw error;
+
+        // Get primary images for each vehicle (vehicles without images are still included)
+        const vehiclesWithImages = (data || []).map(vehicle => {
+          const images = vehicle.vehicle_images || [];
+          const primaryImage = images.find((img: any) => img.is_primary) || images[0];
+          return {
+            ...vehicle,
+            image_url: primaryImage?.image_url,
+            image_count: images.length
+          };
+        });
+
+        if (!cancelled) setVehicles(vehiclesWithImages);
+      } catch (error) {
+        console.error('Error loading vehicle collection:', error);
+        if (!cancelled) setLoadError(true);
+      } finally {
+        if (!cancelled) { setLoading(false); setLoadedScope(scope); }
       }
+    };
+    void loadVehicles();
+    return () => { cancelled = true; };
+  }, [userId, isOwnProfile, scope, garage.isLoading, garage.error, garage.vehicles]);
 
-      let query = supabase
-        .from('vehicles')
-        .select(`
-          ${VEHICLE_CARD_COLUMNS},
-          vehicle_images(image_url, is_primary)
-        `)
-        .in('id', ownedIds);
+  if (loadedScope === scope && loadError) return <p role="alert">Vehicle ownership evidence unavailable. Please reload to retry.</p>;
 
-
-      // For public profiles, only show public vehicles
-      if (!isOwnProfile) {
-        query = query.eq('is_public', true);
-      }
-
-      const { data, error } = await query
-        .order('year', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-
-      // Get primary images for each vehicle (vehicles without images are still included)
-      const vehiclesWithImages = (data || []).map(vehicle => {
-        const images = vehicle.vehicle_images || [];
-        const primaryImage = images.find((img: any) => img.is_primary) || images[0];
-        return {
-          ...vehicle,
-          image_url: primaryImage?.image_url,
-          image_count: images.length
-        };
-      });
-
-      setVehicles(vehiclesWithImages);
-    } catch (error) {
-      console.error('Error loading vehicle collection:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (loading || loadedScope !== scope || (isOwnProfile && garage.isLoading)) {
     return (
       <div className="card">
         <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
@@ -108,7 +99,9 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
     );
   }
 
-  if (vehicles.length === 0) {
+  const visibleVehicles = isOwnProfile ? vehicles.filter(vehicle =>
+    garage.vehicles.some(row => row.id === vehicle.id && isCurrentGarageOwner(row))) : vehicles;
+  if (visibleVehicles.length === 0) {
     return (
       <div className="card">
         <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
@@ -142,7 +135,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
     <div>
       <div className="card">
         <div className="card-header">
-          <h3 className="heading-3">Vehicle Collection ({vehicles.length})</h3>
+          <h3 className="heading-3">Vehicle Collection ({visibleVehicles.length})</h3>
         </div>
         <div className="card-body">
           <div style={{
@@ -150,7 +143,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: 'var(--space-3)'
           }}>
-            {vehicles.map(vehicle => (
+            {visibleVehicles.map(vehicle => (
               <VehicleCardDense
                 key={vehicle.id}
                 vehicle={vehicle}
