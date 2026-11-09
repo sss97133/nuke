@@ -117,10 +117,14 @@ it('sets make lettering inside a line of text only for its evidenced years, and 
   const lettering = (make: string, year: number) => resolveVehicleArtwork({ year, make, model: 'Any' }).filter(a => a.textScale).map(a => a.file);
   for (const year of [2006, 2014, 2022]) expect(lettering('Porsche', year)).toEqual(['porsche-lettering-commons.svg']);
   for (const year of [1997, 2005, 2023, 2026]) expect(lettering('Porsche', year)).toEqual([]);
-  expect(lettering('Mercedes-Benz', 2015)).toEqual(['mercedes-benz-wordmark.svg']);
-  for (const year of [2009, 2021]) expect(lettering('Mercedes-Benz', year)).toEqual([]);
-  expect(lettering('Ford', 1977)).toEqual(['ford-oval-print-commons.svg']);
-  for (const year of [1967, 1993]) expect(lettering('Ford', year)).toEqual([]);
+  for (const year of [2010, 2021, 2026]) expect(lettering('Mercedes-Benz', year)).toEqual(['mercedes-benz-wordmark.svg']);
+  for (const year of [2009, 2027]) expect(lettering('Mercedes-Benz', year)).toEqual([]);
+  for (const year of [1977, 1993, 2003]) expect(lettering('Ford', year)).toEqual(['ford-oval-print-commons.svg']);
+  for (const year of [1967, 2004]) expect(lettering('Ford', year)).toEqual([]);
+  for (const year of [2015, 2020]) expect(lettering('Chevrolet', year)).toEqual(['chevrolet-wordmark.svg']);
+  // 1963 keeps its photographed brochure mark (headline art only); 2012 covers print a different, serif lettering.
+  for (const year of [1963, 2012, 2014, 2021]) expect(lettering('Chevrolet', year)).toEqual([]);
+  expect(lettering('Toyota', 1989)).toEqual([]);
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement('div'), root = createRoot(host);
   try {
