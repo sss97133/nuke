@@ -41,6 +41,12 @@ jobs:
           supabase/functions/ingest-observation/financialCandidates_test.ts
           supabase/functions/ingest-observation/financialCandidateContext_test.ts
           supabase/functions/ingest-observation/financialPngPixels.test.ts
+      - name: Install native source-processing build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential pkg-config libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev
       - name: Install locked source-processing dependencies
         run: npm ci
       - name: Verify actual BaT extractor canonical identity and stream fencing
