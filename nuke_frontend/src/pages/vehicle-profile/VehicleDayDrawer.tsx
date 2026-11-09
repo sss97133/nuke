@@ -59,7 +59,7 @@ interface DayDocumentInstall {
 interface DayDocumentLine { line_number: number | null; description: string | null; part_number: string | null; quantity: number | null; unit_price: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null; install?: DayDocumentInstall | null }
 interface DayDocumentPage { bucket: string; path: string; bytes?: number | null; page_no?: number | null }
 interface DayDocumentVendor { id?: string | null; name?: string | null; logo_url?: string | null; website?: string | null }
-interface DayDocument { receipt_id: string; vendor: string | null; vendor_org?: DayDocumentVendor | null; document_type: string | null; document_number: string | null; pages: number | null; page?: DayDocumentPage | null; page_paths?: string[] | null; payer_as_named: string | null; subtotal: number | null; tax: number | null; total: number | null; currency: string | null; date_basis: string | null; lines: DayDocumentLine[] }
+export interface DayDocument { receipt_id: string; vendor: string | null; vendor_org?: DayDocumentVendor | null; document_type: string | null; document_number: string | null; pages: number | null; page?: DayDocumentPage | null; page_paths?: string[] | null; payer_as_named: string | null; subtotal: number | null; tax: number | null; total: number | null; currency: string | null; date_basis: string | null; lines: DayDocumentLine[] }
 
 /** The install proofs a document's lines point at: the distinct days, oldest first. */
 export function installProofDays(doc: Pick<DayDocument, 'lines'>): string[] {
