@@ -66,13 +66,13 @@ beforeEach(() => {
       if (!['GET', 'HEAD'].includes(read.method) || !path.startsWith('/rest/v1/')) throw new Error('Synthetic transport denies non-read requests');
       const table = path.split('/').pop();
       if (table === 'vehicles') { expect(read.url.searchParams.get('id')).toBe(`eq.${vehicleId}`); return json([{ id: vehicleId }]); }
-      if (['auction_comments', 'auction_events', 'vehicle_events', 'vehicle_images'].includes(table!)) {
+      if (['auction_comments', 'auction_events_canonical', 'vehicle_events', 'vehicle_images'].includes(table!)) {
         expect(read.url.searchParams.get('vehicle_id')).toBe(`eq.${vehicleId}`);
         if (table === 'auction_comments') {
           expect(read.url.searchParams.get('order')).toBe('id.asc'); expect(read.url.searchParams.get('limit')).toBe('250');
           return json([]);
         }
-        if (table === 'auction_events') { expect(read.url.searchParams.get('limit')).toBe('5'); return json(auctionRows); }
+        if (table === 'auction_events_canonical') { expect(read.url.searchParams.get('limit')).toBe('5'); return json(auctionRows); }
         if (table === 'vehicle_events') { expect(read.url.searchParams.get('limit')).toBe('10'); return json(eventRows); }
         const fields = read.url.searchParams.get('select')!.split(',').map(v => v.trim());
         if (!read.url.searchParams.has('is_duplicate')) return json([]); // Separate Provider count/coverage reader.

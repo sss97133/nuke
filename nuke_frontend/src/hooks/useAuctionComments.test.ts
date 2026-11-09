@@ -33,6 +33,8 @@ it('bounds one exact listing with its slash alias and repeats public-parent elig
   expect(fixture.calls).toContainEqual(['auction_comments', 'eq', 'vehicles.is_public', true]);
   const selection = fixture.calls.find(c => c[0] === 'auction_comments' && c[1] === 'select')[2];
   expect(selection).not.toMatch(/author|email|raw|\*/);
+  expect(selection).toContain('canonical:auction_events_canonical(id)');
+  expect(fixture.calls).toContainEqual(['auction_comments','or','auction_event_id.is.null,canonical.not.is.null']);
 });
 it('does not borrow comments from other sources or malformed URLs', async () => {
   fixture.parent.listing_url = 'https://example.com/listing/public/';

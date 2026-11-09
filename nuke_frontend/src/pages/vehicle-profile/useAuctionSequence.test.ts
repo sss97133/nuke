@@ -12,7 +12,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
     const data = table === 'auction_comments' ? fixture.pages?.shift() ?? (fixture.rows[table] ?? []).filter(x => !after || x.id > after).sort((a,b) => a.id.localeCompare(b.id)).slice(0,fixture.serverCap) : fixture.rows[table] ?? [];
     return Promise.resolve({ data, error: table === 'auction_comments' && after && fixture.failAfter ? { message: 'private failure payload' } : null }).then(fn);
   } };
-  for (const method of ['select', 'eq', 'order', 'limit', 'not']) q[method] = () => q;
+  for (const method of ['select', 'eq', 'order', 'limit', 'not', 'or']) q[method] = () => q;
   q.gt = (_: string, value: string) => { after = value; return q; };
   q.abortSignal = (value: AbortSignal) => { signal = value; return q; };
   return q;
@@ -29,7 +29,7 @@ beforeEach(() => {
     vehicles: [{ id: 'vehicle' }],
     auction_comments: [{ id: id(1), vehicle_id: 'vehicle', posted_at: '2026-10-04T17:37:08Z', comment_type: 'bid', bid_amount: 122000,
       author_username: 'bidder', source_url: url, bat_comment_id: 1 }],
-    auction_events: [{ id: 'auction', source: 'bat', source_url: url, outcome: 'live', total_bids: 1 }],
+    auction_events_canonical: [{ id: 'auction', source: 'bat', source_url: url, outcome: 'live', total_bids: 1 }],
     vehicle_events: [{ id: 'event', source_platform: 'bat', source_url: url, started_at: '2026-09-27T17:36:00Z',
       ended_at: '2026-10-04T17:39:00Z', event_status: 'active' }],
     vehicle_images: [],
@@ -47,7 +47,7 @@ it('refreshes an already-read lot through shared query invalidation and shows th
 
   fixture.rows.auction_comments.push({ id: id(2), vehicle_id: 'vehicle', posted_at: '2026-10-04T17:37:28Z', comment_type: 'bid',
     bid_amount: 123000, author_username: 'winner', source_url: url, bat_comment_id: 2 });
-  fixture.rows.auction_events[0] = { ...fixture.rows.auction_events[0], outcome: 'sold', winning_bid: 123000, winning_bidder: 'winner', total_bids: 2 };
+  fixture.rows.auction_events_canonical[0] = { ...fixture.rows.auction_events_canonical[0], outcome: 'sold', winning_bid: 123000, winning_bidder: 'winner', total_bids: 2 };
   fixture.rows.vehicle_events[0] = { ...fixture.rows.vehicle_events[0], event_status: 'sold', final_price: 123000,
     sold_at: '2026-10-04T17:39:28Z', ended_at: '2026-10-04T17:39:28Z' };
   await client.invalidateQueries({ queryKey: ['auction-sequence', 'vehicle'] });
@@ -105,13 +105,13 @@ it('bounds a stalled request and respects an already cancelled route',async()=>{
 });
 
 it('withholds stale cached activity after a failed refresh',()=>{
-  fixture.result={isError:true,data:{comments:fixture.rows.auction_comments,auctionEvents:fixture.rows.auction_events,vehicleEvents:fixture.rows.vehicle_events,images:[]}};
+  fixture.result={isError:true,data:{comments:fixture.rows.auction_comments,auctionEvents:fixture.rows.auction_events_canonical,vehicleEvents:fixture.rows.vehicle_events,images:[]}};
   const result=useAuctionSequence('vehicle',{listing_url:url},[]);
   expect(result.activityUnavailable).toBe(true);expect(result.auctions).toEqual([]);expect(result.importStampedDays).toEqual([]);
 });
 
 it('retains unclocked source activity as unknown position rather than unextracted testimony',()=>{
-  fixture.result={data:{comments:[{...fixture.rows.auction_comments[0],posted_at:null}],auctionEvents:fixture.rows.auction_events,vehicleEvents:fixture.rows.vehicle_events,images:[]}};
+  fixture.result={data:{comments:[{...fixture.rows.auction_comments[0],posted_at:null}],auctionEvents:fixture.rows.auction_events_canonical,vehicleEvents:fixture.rows.vehicle_events,images:[]}};
   const result=useAuctionSequence('vehicle',{listing_url:url},[]);
   expect(result.hasUnpositionedActivity).toBe(true);expect(result.activityUnavailable).not.toBe(true);
 });

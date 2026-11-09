@@ -78,7 +78,7 @@ export function usePopoverData(
               return;
             }
             const { data: lots, error: lotsError } = await supabase
-              .from('auction_events')
+              .from('auction_events_canonical')
               .select('id, vehicle_id, source_url, outcome, auction_end_date, scraped_at, vehicle:vehicles!auction_events_vehicle_id_fkey!inner(make, model)')
               .eq('seller_external_identity_id', identity.id)
               .neq('vehicle_id', vehicle.id)

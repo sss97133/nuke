@@ -201,7 +201,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         const [auctionRes, eventRes, presentationRes] = await Promise.all([
           Promise.resolve(
         supabase
-          .from('auction_events')
+          .from('auction_events_canonical')
           .select('id, lot_number, source_url, broadcast_video_url, broadcast_video_id, broadcast_timestamp_start, broadcast_timestamp_end')
           .eq('vehicle_id', vehicleId)
           .order('auction_end_date', { ascending: false, nullsFirst: false })

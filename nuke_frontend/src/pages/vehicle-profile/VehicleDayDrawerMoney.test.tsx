@@ -65,7 +65,7 @@ beforeEach(() => {
         : json({ vehicle: vehicle(), images: [photo()], timeline_events: nativeEvents, work_sessions: [row, ...extraSessions], stats: { comment_count: 0, observation_count: 0 } });
       if (endpoint === 'vehicles') return json(url.searchParams.get('select') === 'id' ? [{ id: vehicleId }] : vehicle());
       if (endpoint === 'auction_comments') return json(includeAuction && !url.searchParams.has('id') ? [{ id: '00000000-0000-4000-8000-000000000001', vehicle_id: vehicleId, posted_at: `${day}T18:00:00Z`, comment_type: 'bid', bid_amount: 95, source_url: lotUrl, bat_comment_id: 321, author_username: 'Synthetic bidder' }] : []);
-      if (endpoint === 'auction_events') return json(includeAuction ? [{ id: 'synthetic-auction', source: 'bat', source_url: lotUrl, outcome: 'sold', winning_bid: 95 }] : []);
+      if (endpoint === 'auction_events_canonical') return json(includeAuction ? [{ id: 'synthetic-auction', source: 'bat', source_url: lotUrl, outcome: 'sold', winning_bid: 95 }] : []);
       if (endpoint === 'vehicle_events') return json(includeAuction ? [{ id: 'synthetic-event', source_platform: 'bat', source_url: lotUrl, started_at: `${day}T12:00:00Z`, ended_at: `${day}T20:00:00Z`, event_status: 'sold' }] : []);
       if (endpoint === 'vehicle_images') return json(url.searchParams.has('gte') || url.searchParams.get('taken_at')?.startsWith('gte.') ? [] : [photo()]);
       if (endpoint === 'timeline_events') return json(nativeEvents);

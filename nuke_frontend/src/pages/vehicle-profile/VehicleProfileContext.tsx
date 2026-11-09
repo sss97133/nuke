@@ -758,13 +758,13 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         try {
           const [cCount, lastBid, lastComment, lastSeller] = await Promise.all([
             commentCount === null
-              ? supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl).or('bid_amount.is.null,comment_type.neq.bid')
+              ? supabase.from('auction_comments').select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl).or('bid_amount.is.null,comment_type.neq.bid')
               : Promise.resolve({ count: commentCount } as any),
-            supabase.from('auction_comments').select('posted_at, author_username').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
+            supabase.from('auction_comments').select('posted_at, author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
               .not('bid_amount', 'is', null).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('posted_at').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
+            supabase.from('auction_comments').select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
               .or('bid_amount.is.null,comment_type.neq.bid').order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('author_username').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
+            supabase.from('auction_comments').select('author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
               .eq('is_seller', true).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
           ]);
 

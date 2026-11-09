@@ -30,7 +30,7 @@ export async function readAuctionEpisode(vehicleId: string, expectedSourceUrl?: 
   if (expectedSourceUrl && expectedSourceUrl.replace(/\/$/, '') !== url) return null;
   const [comments, specs] = await Promise.all([
     supabase.from('auction_comments')
-      .select('id,posted_at,comment_type,comment_text,bid_amount,is_seller,media_urls,bat_comment_id,source_url,vehicles!inner(id)')
+      .select('id,posted_at,comment_type,comment_text,bid_amount,is_seller,media_urls,bat_comment_id,source_url,vehicles!inner(id),canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
       .eq('vehicle_id', vehicleId).eq('vehicles.is_public', true).is('vehicles.deleted_at', null)
       .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item', { referencedTable: 'vehicles' })
       .in('source_url', [url, `${url}/`])
@@ -82,31 +82,31 @@ export function useAuctionCommentStats(
       const [bidCountRes, commentCountRes, lastBidRes, lastCommentRes, sellerRes] = await Promise.all([
         // bid count
         (() => {
-          let q = supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicleId!);
+          let q = supabase.from('auction_comments').select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicleId!);
           if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.not('bid_amount', 'is', null);
         })(),
         // comment count (non-bid)
         (() => {
-          let q = supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicleId!);
+          let q = supabase.from('auction_comments').select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicleId!);
           if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.or('bid_amount.is.null,comment_type.neq.bid');
         })(),
         // last bid
         (() => {
-          let q = supabase.from('auction_comments').select('posted_at, author_username').eq('vehicle_id', vehicleId!);
+          let q = supabase.from('auction_comments').select('posted_at, author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicleId!);
           if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.not('bid_amount', 'is', null).order('posted_at', { ascending: false }).limit(1).maybeSingle();
         })(),
         // last comment
         (() => {
-          let q = supabase.from('auction_comments').select('posted_at').eq('vehicle_id', vehicleId!);
+          let q = supabase.from('auction_comments').select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicleId!);
           if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.order('posted_at', { ascending: false }).limit(1).maybeSingle();
         })(),
         // seller
         (() => {
-          let q = supabase.from('auction_comments').select('author_username').eq('vehicle_id', vehicleId!);
+          let q = supabase.from('auction_comments').select('author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicleId!);
           if (listingUrl) { const url = listingUrl.replace(/\/$/, ''); q = q.in('source_url', [url, `${url}/`]); }
           return q.eq('is_seller', true).order('posted_at', { ascending: false }).limit(1).maybeSingle();
         })(),
@@ -139,7 +139,7 @@ export function useAuctionComments(
     queryFn: async () => {
       let q = supabase
         .from('auction_comments')
-        .select('*')
+        .select('*,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
         .eq('vehicle_id', vehicleId!)
         .order('posted_at', { ascending: false });
       if (listingUrl) q = q.eq('source_url', listingUrl);
