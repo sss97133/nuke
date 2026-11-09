@@ -127,7 +127,13 @@ $$;
 -- ─── the correlation ──────────────────────────────────────────────────────────────────────────────────────────
 -- One row per linked receipt line (a receipt without lines is one row with item_id null). Clock: photo EXIF taken_at in
 -- UTC; anchor = the line's own date, else the link's page date. Install window = anchor .. anchor + p_window_days.
-CREATE OR REPLACE FUNCTION public.receipt_work_lines(p_vehicle_id uuid, p_window_days int DEFAULT 90, p_max_images int DEFAULT 8)
+-- Semantics: every row is a PROPOSED contextual relationship (a receipt line and photos that share a time window), with
+-- its common source lineage (receipt, source document, line, link, cited image ids). It is never independent
+-- corroboration, installation proof, payment proof or an owner Sign. Printed line dates, billed hours and performers are
+-- claims attributed to the document, not account identity or labor duration: missing stays null, and a malformed value
+-- is refused (reported in refused_fields, never used), not coerced.
+DROP FUNCTION IF EXISTS public.receipt_work_lines(uuid, int, int);
+CREATE FUNCTION public.receipt_work_lines(p_vehicle_id uuid, p_window_days int DEFAULT 90, p_max_images int DEFAULT 8)
 RETURNS TABLE(
   vehicle_id uuid, user_id uuid, receipt_id uuid, item_id uuid, link_id uuid, link_basis text, link_confidence numeric,
   vendor_name text, document_kind text, line_number int, description text, part_number text, total_price numeric,
@@ -135,23 +141,43 @@ RETURNS TABLE(
   conclusion text, confidence numeric, days_to_first_photo int,
   zone_photos_total int, zone_photos_in_window int, first_photo_day date, image_ids uuid[],
   day_photos int, work_session_ids uuid[], timeline_event_ids uuid[],
-  judgment_needed boolean, logic_version text)
+  judgment_needed boolean, logic_version text,
+  relationship_status text, source_document_table text, source_document_id uuid, source_page int, refused_fields jsonb)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH v AS (SELECT id, coalesce(owner_id, user_id) AS uid FROM vehicles WHERE id = p_vehicle_id),
-  lines AS (
-    SELECT l.id AS link_id, l.basis, l.confidence AS link_conf, l.page_date, l.page_date_source, l.user_id AS link_user,
+  raw AS (
+    SELECT l.id AS link_id, l.basis, l.confidence AS link_conf, l.page_date AS page_date_raw, l.page_date_source, l.user_id AS link_user,
            r.id AS receipt_id, r.user_id AS receipt_user, r.vendor_name, r.document_kind::text AS document_kind,
-           i.id AS item_id, i.line_number, i.description, i.part_number, i.total_price, i.line_date,
-           CASE WHEN i.id IS NULL THEN 'receipt' ELSE receipt_line_kind(i.description, i.part_number, i.total_price, i.hours, i.line_date, i.performer) END AS kind,
-           receipt_line_photo_zone(i.description) AS zone, receipt_line_photo_end(i.description) AS end_hint,
-           coalesce(i.line_date, l.page_date, r.receipt_date) AS anchor,
-           CASE WHEN i.line_date IS NOT NULL THEN 'line_date' WHEN l.page_date IS NOT NULL THEN coalesce('page_date:' || l.page_date_source, 'page_date')
-                WHEN r.receipt_date IS NOT NULL THEN 'receipt_date' END AS anchor_source
+           r.receipt_date AS receipt_date_raw, r.source_document_table, r.source_document_id,
+           i.id AS item_id, i.line_number, i.description, i.part_number, i.total_price,
+           i.line_date AS line_date_raw, i.hours AS hours_raw, nullif(btrim(i.performer), '') AS performer
       FROM receipt_vehicle_links l
       JOIN receipts r ON r.id = l.receipt_id
       LEFT JOIN receipt_items i ON i.receipt_id = r.id
      WHERE l.vehicle_id = p_vehicle_id AND l.status = 'linked' AND l.retired_at IS NULL
        AND r.is_superseded IS NOT TRUE AND r.duplicate_of IS NULL
+  ),
+  checked AS (  -- printed values are refused when malformed (impossible date, non-positive or absurd hours), never coerced
+    SELECT w.*,
+           CASE WHEN w.line_date_raw BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.line_date_raw END AS line_date,
+           CASE WHEN w.page_date_raw BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.page_date_raw END AS page_date,
+           CASE WHEN w.receipt_date_raw BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.receipt_date_raw END AS receipt_date,
+           CASE WHEN w.hours_raw > 0 AND w.hours_raw <= 1000 THEN w.hours_raw END AS hours,
+           jsonb_strip_nulls(jsonb_build_object(
+             'line_date', CASE WHEN w.line_date_raw IS NOT NULL AND w.line_date_raw NOT BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.line_date_raw::text END,
+             'page_date', CASE WHEN w.page_date_raw IS NOT NULL AND w.page_date_raw NOT BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.page_date_raw::text END,
+             'receipt_date', CASE WHEN w.receipt_date_raw IS NOT NULL AND w.receipt_date_raw NOT BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.receipt_date_raw::text END,
+             'hours', CASE WHEN w.hours_raw IS NOT NULL AND NOT (w.hours_raw > 0 AND w.hours_raw <= 1000) THEN w.hours_raw::text END)) AS refused
+      FROM raw w
+  ),
+  lines AS (
+    SELECT c.*,
+           CASE WHEN c.item_id IS NULL THEN 'receipt' ELSE receipt_line_kind(c.description, c.part_number, c.total_price, c.hours, c.line_date, c.performer) END AS kind,
+           receipt_line_photo_zone(c.description) AS zone, receipt_line_photo_end(c.description) AS end_hint,
+           coalesce(c.line_date, c.page_date, c.receipt_date) AS anchor,
+           CASE WHEN c.line_date IS NOT NULL THEN 'line_date' WHEN c.page_date IS NOT NULL THEN coalesce('page_date:' || c.page_date_source, 'page_date')
+                WHEN c.receipt_date IS NOT NULL THEN 'receipt_date' END AS anchor_source
+      FROM checked c
   ),
   imgs AS MATERIALIZED (
     SELECT x.id, x.taken_at, (x.taken_at AT TIME ZONE 'UTC')::date AS d, x.work_session_id,
@@ -226,7 +252,10 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
                     AND t.event_date BETWEEN coalesce(CASE WHEN s.kind IN ('labor','receipt') THEN s.anchor - 1 ELSE s.first_day END, '-infinity'::date)
                                          AND coalesce(CASE WHEN s.kind IN ('labor','receipt') THEN s.anchor + 1 ELSE s.first_day END, '-infinity'::date)), '{}'),
          s.concl IN ('install_window_photographed', 'photographed_after_window'),
-         'receipt_work_lines/20261111210000'
+         'receipt_work_lines/20261111210000',
+         'proposed', s.source_document_table, s.source_document_id,
+         NULL::int,  -- page: receipts carry no page reference yet; stays null until a page table is the source
+         s.refused
     FROM shaped s
 $$;
 COMMENT ON FUNCTION public.receipt_work_lines(uuid, int, int) IS
@@ -304,3 +333,127 @@ END
 $fn$;
 REVOKE ALL ON FUNCTION public.rollback_evidence_judgment_run(uuid, text, boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.rollback_evidence_judgment_run(uuid, text, boolean) TO service_role;
+
+-- ─── answering a judgment ─────────────────────────────────────────────────────────────────────────────────────
+-- A worker claims pending requests (a claim older than p_stale_minutes is re-claimable), then answers one it holds. An
+-- answer is the answering agent/model's reading of a proposed context, never an owner Sign or proof; it must fit the
+-- request's question: for receipt_part_visible, visible/installed in yes|no|cannot_tell, confidence 0..1, image_id one of
+-- the request's candidate_image_ids (required when visible = yes), bbox [x1,y1,x2,y2] in 0..999 with x1<x2, y1<y2.
+-- A malformed answer is refused, not coerced.
+CREATE OR REPLACE FUNCTION public.claim_evidence_judgments(p_department text, p_question_kind text, p_limit int, p_claimed_by text,
+                                                           p_stale_minutes int DEFAULT 30)
+RETURNS SETOF public.evidence_judgment_requests
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $fn$
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION 'service role required' USING ERRCODE = '42501'; END IF;
+  IF nullif(btrim(coalesce(p_claimed_by, '')), '') IS NULL OR coalesce(p_limit, 0) < 1 THEN
+    RAISE EXCEPTION 'claimed_by and a positive limit required' USING ERRCODE = '22023';
+  END IF;
+  RETURN QUERY
+  UPDATE evidence_judgment_requests j SET status = 'claimed', claimed_at = now(), claimed_by = p_claimed_by
+   WHERE j.id IN (SELECT q.id FROM evidence_judgment_requests q
+                   WHERE q.department = p_department AND q.question_kind = p_question_kind
+                     AND (q.status = 'pending' OR (q.status = 'claimed' AND q.claimed_at < now() - make_interval(mins => p_stale_minutes)))
+                   ORDER BY q.priority DESC, q.created_at, q.id
+                   LIMIT least(p_limit, 500) FOR UPDATE SKIP LOCKED)
+  RETURNING j.*;
+END
+$fn$;
+REVOKE ALL ON FUNCTION public.claim_evidence_judgments(text, text, int, text, int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_evidence_judgments(text, text, int, text, int) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.evidence_judgment_answer_problems(p_question_kind text, p_params jsonb, p_answer jsonb)
+RETURNS text[]
+LANGUAGE plpgsql IMMUTABLE SET search_path = pg_catalog, public
+AS $fn$
+DECLARE probs text[] := '{}'; b jsonb; c numeric;
+BEGIN
+  IF p_question_kind <> 'receipt_part_visible' THEN RETURN ARRAY['unknown question_kind ' || coalesce(p_question_kind, 'null')]; END IF;
+  IF jsonb_typeof(p_answer) IS DISTINCT FROM 'object' THEN RETURN ARRAY['answer must be an object']; END IF;
+  IF NOT coalesce(p_answer ->> 'visible' IN ('yes', 'no', 'cannot_tell'), false) THEN probs := array_append(probs, 'visible must be yes|no|cannot_tell'); END IF;
+  IF NOT coalesce(p_answer ->> 'installed' IN ('yes', 'no', 'cannot_tell'), false) THEN probs := array_append(probs, 'installed must be yes|no|cannot_tell'); END IF;
+  IF jsonb_typeof(p_answer -> 'confidence') IS DISTINCT FROM 'number' THEN probs := array_append(probs, 'confidence must be a number');
+  ELSE c := (p_answer ->> 'confidence')::numeric; IF c < 0 OR c > 1 THEN probs := array_append(probs, 'confidence must be within 0..1'); END IF;
+  END IF;
+  IF coalesce(jsonb_typeof(p_answer -> 'image_id'), 'null') <> 'null' THEN
+    IF jsonb_typeof(p_answer -> 'image_id') <> 'string' OR NOT coalesce(p_params -> 'candidate_image_ids', '[]'::jsonb) ? (p_answer ->> 'image_id') THEN
+      probs := array_append(probs, 'image_id must be one of candidate_image_ids');
+    END IF;
+  ELSIF p_answer ->> 'visible' = 'yes' THEN probs := array_append(probs, 'visible = yes needs image_id');
+  END IF;
+  b := p_answer -> 'bbox';
+  IF coalesce(jsonb_typeof(b), 'null') <> 'null' THEN
+    IF jsonb_typeof(b) <> 'array' OR jsonb_array_length(b) <> 4
+       OR EXISTS (SELECT 1 FROM jsonb_array_elements(b) e WHERE jsonb_typeof(e) <> 'number' OR (e #>> '{}')::numeric NOT BETWEEN 0 AND 999)
+       OR (b ->> 0)::numeric >= (b ->> 2)::numeric OR (b ->> 1)::numeric >= (b ->> 3)::numeric THEN
+      probs := array_append(probs, 'bbox must be [x1,y1,x2,y2] within 0..999, x1<x2, y1<y2');
+    ELSIF coalesce(jsonb_typeof(p_answer -> 'image_id'), 'null') = 'null' THEN probs := array_append(probs, 'bbox needs image_id');
+    END IF;
+  END IF;
+  IF coalesce(jsonb_typeof(p_answer -> 'quote'), 'null') NOT IN ('null', 'string') THEN probs := array_append(probs, 'quote must be text'); END IF;
+  RETURN probs;
+END
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.answer_evidence_judgment(p_id uuid, p_claimed_by text, p_answer jsonb,
+                                                           p_answer_agent text, p_answer_model text, p_answer_version text)
+RETURNS public.evidence_judgment_requests
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $fn$
+DECLARE j evidence_judgment_requests; probs text[];
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION 'service role required' USING ERRCODE = '42501'; END IF;
+  IF nullif(btrim(coalesce(p_answer_agent, '')), '') IS NULL OR nullif(btrim(coalesce(p_answer_model, '')), '') IS NULL
+     OR nullif(btrim(coalesce(p_answer_version, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'answer_agent, answer_model and answer_version required' USING ERRCODE = '22023';
+  END IF;
+  SELECT * INTO j FROM evidence_judgment_requests WHERE id = p_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'no judgment request %', p_id USING ERRCODE = 'P0002'; END IF;
+  IF j.status <> 'claimed' OR j.claimed_by IS DISTINCT FROM p_claimed_by THEN
+    RAISE EXCEPTION 'request % is % (claimed by %), not claimed by %', p_id, j.status, j.claimed_by, p_claimed_by USING ERRCODE = '55000';
+  END IF;
+  probs := evidence_judgment_answer_problems(j.question_kind, j.params, p_answer);
+  IF cardinality(probs) > 0 THEN RAISE EXCEPTION 'answer refused: %', array_to_string(probs, '; ') USING ERRCODE = '22023'; END IF;
+  UPDATE evidence_judgment_requests SET status = 'answered', answered_at = now(), answer = p_answer,
+         answer_agent = p_answer_agent, answer_model = p_answer_model, answer_version = p_answer_version
+   WHERE id = p_id RETURNING * INTO j;
+  RETURN j;
+END
+$fn$;
+REVOKE ALL ON FUNCTION public.answer_evidence_judgment(uuid, text, jsonb, text, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.answer_evidence_judgment(uuid, text, jsonb, text, text, text) TO service_role;
+
+-- Undo answers from one answering version: they go back to pending and each reopened answer (with its agent, model,
+-- version, time and the reopen reason) is appended to answer_history, so nothing an answerer wrote is lost.
+ALTER TABLE public.evidence_judgment_requests ADD COLUMN IF NOT EXISTS answer_history jsonb NOT NULL DEFAULT '[]'::jsonb;
+CREATE OR REPLACE FUNCTION public.reopen_evidence_judgment_answers(p_answer_version text, p_reason text, p_dry_run boolean DEFAULT true)
+RETURNS TABLE(id uuid, question_kind text, subject_id uuid, answer jsonb)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $fn$
+#variable_conflict use_column
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION 'service role required' USING ERRCODE = '42501'; END IF;
+  IF nullif(btrim(coalesce(p_answer_version, '')), '') IS NULL OR nullif(btrim(coalesce(p_reason, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'answer version and reason required' USING ERRCODE = '22023';
+  END IF;
+  IF p_dry_run IS NOT TRUE THEN
+    RETURN QUERY
+    WITH prior AS (SELECT j.id, j.answer FROM evidence_judgment_requests j WHERE j.answer_version = p_answer_version AND j.status = 'answered' FOR UPDATE),
+    u AS (
+      UPDATE evidence_judgment_requests j SET status = 'pending', claimed_at = NULL, claimed_by = NULL, answered_at = NULL, answer = NULL,
+             answer_agent = NULL, answer_model = NULL, answer_version = NULL,
+             answer_history = j.answer_history || jsonb_build_array(jsonb_build_object('answer', j.answer, 'answer_agent', j.answer_agent,
+               'answer_model', j.answer_model, 'answer_version', j.answer_version, 'answered_at', j.answered_at, 'claimed_by', j.claimed_by,
+               'reopened_at', now(), 'reopen_reason', p_reason))
+        FROM prior p WHERE j.id = p.id
+      RETURNING j.id, j.question_kind, j.subject_id, p.answer)
+    SELECT u.id, u.question_kind, u.subject_id, u.answer FROM u;
+  ELSE
+    RETURN QUERY SELECT j.id, j.question_kind, j.subject_id, j.answer FROM evidence_judgment_requests j
+     WHERE j.answer_version = p_answer_version AND j.status = 'answered';
+  END IF;
+END
+$fn$;
+REVOKE ALL ON FUNCTION public.reopen_evidence_judgment_answers(text, text, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reopen_evidence_judgment_answers(text, text, boolean) TO service_role;

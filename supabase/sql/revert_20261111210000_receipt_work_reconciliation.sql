@@ -7,6 +7,10 @@ DO $$ BEGIN
     RAISE EXCEPTION 'active receipt_work_correlation rows: roll their runs back first';
   END IF;
 END $$;
+DROP FUNCTION IF EXISTS public.reopen_evidence_judgment_answers(text, text, boolean);
+DROP FUNCTION IF EXISTS public.answer_evidence_judgment(uuid, text, jsonb, text, text, text);
+DROP FUNCTION IF EXISTS public.evidence_judgment_answer_problems(text, jsonb, jsonb);
+DROP FUNCTION IF EXISTS public.claim_evidence_judgments(text, text, int, text, int);
 DROP FUNCTION IF EXISTS public.rollback_evidence_judgment_run(uuid, text, boolean);
 DROP TABLE IF EXISTS public.evidence_judgment_requests;
 DROP FUNCTION IF EXISTS public.receipt_work_lines(uuid, int, int);

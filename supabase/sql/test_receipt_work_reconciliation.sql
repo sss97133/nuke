@@ -17,7 +17,7 @@ CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid, taken_a
 CREATE TABLE public.work_sessions(id uuid PRIMARY KEY, vehicle_id uuid, session_date date);
 CREATE TABLE public.timeline_events(id uuid PRIMARY KEY, vehicle_id uuid, event_date date);
 CREATE TABLE public.receipts(id uuid PRIMARY KEY, user_id uuid, vendor_name text, document_kind text, receipt_date date,
-  is_superseded boolean, duplicate_of uuid);
+  is_superseded boolean, duplicate_of uuid, source_document_table text, source_document_id uuid);
 CREATE TABLE public.receipt_items(id uuid PRIMARY KEY, receipt_id uuid, line_number int, description text, part_number text,
   total_price numeric, line_date date, hours numeric, performer text);
 CREATE TABLE public.receipt_vehicle_links(id uuid PRIMARY KEY, receipt_id uuid, vehicle_id uuid, user_id uuid, status text, basis text,
@@ -141,6 +141,23 @@ BEGIN
     ('00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000c4', V, U, 'linked', 'chronology_session', 0.6, '2025-02-01', 'printed', NULL);
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.receipt_id = '00000000-0000-0000-0000-0000000000c4';
   ASSERT r.conclusion = 'receipt_day_photographed' AND r.confidence = 0.18, r.conclusion || ' ' || r.confidence;
+  -- every row is a proposed contextual relationship carrying its source lineage
+  SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d1';
+  ASSERT r.relationship_status = 'proposed' AND r.refused_fields = '{}'::jsonb AND r.source_page IS NULL, 'lineage/semantics';
+  -- malformed printed values are refused, not coerced; missing stays null
+  INSERT INTO receipts VALUES ('00000000-0000-0000-0000-0000000000c5', U, 'Shop', 'parts_service', '2025-04-01', false, NULL, 'vehicle_documents', '00000000-0000-0000-0000-0000000000aa');
+  INSERT INTO receipt_items VALUES
+    ('00000000-0000-0000-0000-0000000000d7', '00000000-0000-0000-0000-0000000000c5', 1, 'Labor: install', NULL, 120, '2999-01-01', -2, '  '),
+    ('00000000-0000-0000-0000-0000000000d8', '00000000-0000-0000-0000-0000000000c5', 2, 'Labor: align', NULL, 90, NULL, 1.5, 'Atomic Motors');
+  INSERT INTO receipt_vehicle_links VALUES
+    ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000c5', V, U, 'linked', 'cited_document', 0.9, NULL, NULL, NULL);
+  SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d7';
+  ASSERT r.refused_fields = '{"line_date": "2999-01-01", "hours": "-2"}'::jsonb, r.refused_fields::text;
+  ASSERT r.anchor_date = '2025-04-01' AND r.anchor_source = 'receipt_date', 'refused line date not used as anchor';
+  ASSERT r.line_kind = 'part', 'refused hours and a blank performer do not make a labor line: ' || r.line_kind;
+  ASSERT r.source_document_table = 'vehicle_documents' AND r.source_document_id = '00000000-0000-0000-0000-0000000000aa';
+  SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d8';
+  ASSERT r.line_kind = 'labor' AND r.refused_fields = '{}'::jsonb, 'valid billed hours and performer are kept';
   -- privacy: no excluded frame anywhere
   SELECT count(*) INTO n FROM receipt_work_lines(V) x, unnest(x.image_ids) i
    WHERE i IN ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000f5',
@@ -170,5 +187,38 @@ BEGIN
   ASSERT n = 1;
   ASSERT (SELECT status FROM evidence_judgment_requests WHERE dedupe_key = 'k2') = 'pending';
   ASSERT (SELECT cancelled_by_run_id FROM evidence_judgment_requests WHERE dedupe_key = 'k2') IS NULL;
+  -- claim, answer (validated), reopen
+  INSERT INTO evidence_judgment_requests(department, question_kind, subject_table, subject_id, vehicle_id, user_id, params, answer_schema,
+    producer_agent, producer_script, producer_version, run_id, dedupe_key, priority)
+  VALUES ('receipt_work_reconciliation', 'receipt_part_visible', 'receipt_items', '00000000-0000-0000-0000-0000000000d1', V, U,
+    '{"candidate_image_ids": ["00000000-0000-0000-0000-0000000000f1"]}', '{}',
+    'injestion', 'scripts/receipt-work/reconcile-receipt-work.mjs', 'test', '00000000-0000-0000-0000-000000000096', 'k3', 900);
+  SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-a');
+  ASSERT n = 2, 'claims both pending requests: ' || n;
+  SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-b');
+  ASSERT n = 0, 'a fresh claim is not re-claimed';
+  BEGIN
+    PERFORM answer_evidence_judgment((SELECT id FROM evidence_judgment_requests WHERE dedupe_key = 'k3'), 'worker-a',
+      '{"visible": "yes", "installed": "maybe", "confidence": 1.4, "image_id": "00000000-0000-0000-0000-0000000000f2", "bbox": [5, 5, 1, 1]}',
+      'agent', 'model', 'v1');
+    RAISE EXCEPTION 'malformed answer accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN
+    ASSERT SQLERRM LIKE '%installed must be%' AND SQLERRM LIKE '%confidence must be within%' AND SQLERRM LIKE '%candidate_image_ids%' AND SQLERRM LIKE '%bbox must be%', SQLERRM;
+  END;
+  BEGIN
+    PERFORM answer_evidence_judgment((SELECT id FROM evidence_judgment_requests WHERE dedupe_key = 'k3'), 'worker-b',
+      '{"visible": "no", "installed": "cannot_tell", "confidence": 0.5}', 'agent', 'model', 'v1');
+    RAISE EXCEPTION 'answer by a non-holder accepted';
+  EXCEPTION WHEN object_not_in_prerequisite_state THEN NULL;
+  END;
+  PERFORM answer_evidence_judgment((SELECT id FROM evidence_judgment_requests WHERE dedupe_key = 'k3'), 'worker-a',
+    '{"visible": "yes", "installed": "yes", "confidence": 0.8, "image_id": "00000000-0000-0000-0000-0000000000f1", "bbox": [100, 120, 400, 380], "quote": "hood scoop on the car"}',
+    'agent', 'model', 'v1');
+  ASSERT (SELECT status FROM evidence_judgment_requests WHERE dedupe_key = 'k3') = 'answered';
+  SELECT count(*) INTO n FROM reopen_evidence_judgment_answers('v1', 'contract', false);
+  ASSERT n = 1;
+  ASSERT (SELECT status = 'pending' AND answer IS NULL AND jsonb_array_length(answer_history) = 1
+                 AND answer_history -> 0 -> 'answer' ->> 'quote' = 'hood scoop on the car'
+            FROM evidence_judgment_requests WHERE dedupe_key = 'k3'), 'reopen keeps the prior answer in history';
   RAISE NOTICE 'receipt_work_reconciliation contract: ok';
 END $$;

@@ -16,7 +16,7 @@
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { fromReceiptWorkLine, canonical, sha256, producerVersion, PRODUCER_AGENT } from '../garage/derivation-evidence.mjs';
+import { fromReceiptWorkLine, canonical, sha256, producerVersion, PRODUCER_AGENT, RECEIPT_WORK_RELATIONSHIP } from '../garage/derivation-evidence.mjs';
 
 export const SCRIPT = 'scripts/receipt-work/reconcile-receipt-work.mjs';
 export const DEPARTMENT = 'receipt_work_reconciliation';
@@ -45,8 +45,11 @@ export function judgmentFor(row, evidence, { runId, version }) {
     description: row.description, part_number: row.part_number, total_price: row.total_price, purchase_date: row.anchor_date,
     zone: row.zone, end_hint: row.end_hint, candidate_image_ids, days_to_first_photo: row.days_to_first_photo,
     trigger_conclusion: row.conclusion, logic_version: row.logic_version,
+    // what an answer may and may not mean: a model's visual reading of a proposed context, not an owner Sign or proof of payment
+    relationship: RECEIPT_WORK_RELATIONSHIP(row.relationship_status),
+    lineage: evidence.evidence.lineage, refused_fields: row.refused_fields ?? {},
   };
-  const dedupe_key = sha256(canonical({ d: DEPARTMENT, q: QUESTION, s: row.item_id, imgs: [...candidate_image_ids].sort(), lv: row.logic_version }));
+  const dedupe_key = sha256(canonical({ d: DEPARTMENT, q: QUESTION, s: row.item_id, imgs: [...candidate_image_ids].sort(), lv: row.logic_version, sem: 'proposed_context/1' }));
   return {
     department: DEPARTMENT, question_kind: QUESTION, subject_table: 'receipt_items', subject_id: row.item_id,
     vehicle_id: row.vehicle_id, user_id: row.user_id, params, answer_schema: ANSWER_SCHEMA,

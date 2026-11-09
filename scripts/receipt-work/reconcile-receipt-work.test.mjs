@@ -39,3 +39,17 @@ test('a pending request this run did not raise again is stale', () => {
   assert.deepEqual(staleJudgments(open, new Set(['k-kept', 'k-new'])).map((j) => j.id), ['a']);
   assert.deepEqual(staleJudgments([], new Set()), []);
 });
+
+test('evidence and judgment carry proposed-context semantics and source lineage', () => {
+  const r2 = { ...row, relationship_status: 'proposed', source_document_table: 'vehicle_documents', source_document_id: '44444444-4444-4444-4444-444444444444',
+    source_page: null, refused_fields: { hours: '-2' } };
+  const ev = fromReceiptWorkLine(r2, { runId: '55555555-5555-5555-5555-555555555555' }, { version: 'test' });
+  assert.equal(ev.evidence.relationship.status, 'proposed');
+  assert.deepEqual(ev.evidence.relationship.not_asserted, ['independent_corroboration', 'installation_proof', 'payment_proof', 'owner_sign']);
+  assert.equal(ev.evidence.lineage.source_document_id, '44444444-4444-4444-4444-444444444444');
+  assert.equal(ev.evidence.lineage.page, null);
+  assert.deepEqual(ev.evidence.lineage.image_ids, r2.image_ids);
+  assert.deepEqual(ev.evidence.refused_fields, { hours: '-2' });
+  const jr = judgmentFor(r2, ev, { runId: 'x', version: 'test' });
+  if (jr) { assert.equal(jr.params.relationship.status, 'proposed'); assert.deepEqual(jr.params.lineage, ev.evidence.lineage); }
+});

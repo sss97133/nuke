@@ -116,14 +116,24 @@ export const fromReceiptWorkLine = (r, { runId, script = 'scripts/receipt-work/r
   script, run_id: runId, vehicle_id: r.vehicle_id, user_id: r.user_id, session_key: r.anchor_date ?? null,
   subject_key: r.item_id ? `receipt_item:${r.item_id}` : `receipt:${r.receipt_id}`, image_ids: r.image_ids ?? [],
   conclusion: r.conclusion, confidence: r.confidence, observed_at: observedAt,
-  rationale: `${r.line_kind} line, zone ${r.zone ?? 'none'}, anchor ${r.anchor_date ?? 'none'} (${r.anchor_source ?? 'no date'})`,
+  rationale: `proposed context: ${r.line_kind} line, zone ${r.zone ?? 'none'}, document-attributed anchor ${r.anchor_date ?? 'none'} (${r.anchor_source ?? 'no date'}); shared time window only, not proof of installation or payment`,
   conclusion_detail: { line_kind: r.line_kind, zone: r.zone, end_hint: r.end_hint, anchor_date: r.anchor_date, anchor_source: r.anchor_source,
     days_to_first_photo: r.days_to_first_photo, first_photo_day: r.first_photo_day, judgment_needed: r.judgment_needed },
   evidence: { receipt_id: r.receipt_id, item_id: r.item_id, link_id: r.link_id, link_basis: r.link_basis, link_confidence: r.link_confidence,
     vendor_name: r.vendor_name, document_kind: r.document_kind, line_number: r.line_number, description: r.description, part_number: r.part_number,
     total_price: r.total_price, zone_photos_total: r.zone_photos_total, zone_photos_in_window: r.zone_photos_in_window, day_photos: r.day_photos,
-    work_session_ids: r.work_session_ids ?? [], timeline_event_ids: r.timeline_event_ids ?? [], logic_version: r.logic_version },
+    work_session_ids: r.work_session_ids ?? [], timeline_event_ids: r.timeline_event_ids ?? [], logic_version: r.logic_version,
+    // A proposed contextual relationship (shared time window), never corroboration or proof; printed values are the document's claims.
+    relationship: RECEIPT_WORK_RELATIONSHIP(r.relationship_status),
+    lineage: { receipt_id: r.receipt_id, source_document_table: r.source_document_table ?? null, source_document_id: r.source_document_id ?? null,
+      page: r.source_page ?? null, line_number: r.line_number ?? null, item_id: r.item_id ?? null, link_id: r.link_id, image_ids: r.image_ids ?? [] },
+    refused_fields: r.refused_fields ?? {} },
 }, ctx);
+
+export const RECEIPT_WORK_NOT_ASSERTED = ['independent_corroboration', 'installation_proof', 'payment_proof', 'owner_sign'];
+export function RECEIPT_WORK_RELATIONSHIP(status) {
+  return { status: status ?? 'proposed', kind: 'receipt_time_context', claims_attributed_to: 'document', not_asserted: RECEIPT_WORK_NOT_ASSERTED };
+}
 
 // ---- sink ------------------------------------------------------------------------------------------------------------------
 
