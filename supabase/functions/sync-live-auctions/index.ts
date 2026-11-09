@@ -37,6 +37,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postObservations } from "./postObservations.ts";
 import { retainCcBidCapture, type CcNativeCapture } from "./ccBidCapture.ts";
 import { projectCcEpisodes } from "./ccEpisodeState.ts";
+import { planCcTransitions, refreshCcTransition } from "./ccSnapshotTransition.ts";
 import { pcarBidCapture, pcarBidObservation } from "./pcarBidCapture.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
@@ -620,8 +621,15 @@ async function ingestCcPath(
     return p ? [p] : [];
   });
   const nativeOf = new Map(auctions.map(a => [a.url, a.cc_native_capture]));
-  const bids = await postObservations(supabase, bidPosts, deadline, 40,
-    p => retainCcBidCapture(supabase, p, nativeOf.get(p.source_url)));
+  const transitions = await planCcTransitions(supabase, bidPosts, deadline);
+  const originalByUrl = new Map(bidPosts.map(p => [p.source_url, p]));
+  const bids = await postObservations(supabase, transitions.posts, deadline, 40, async p => {
+    if (!await refreshCcTransition(supabase, originalByUrl.get(p.source_url)!, p, deadline)) return null;
+    return retainCcBidCapture(supabase, p, nativeOf.get(p.source_url));
+  });
+  bids.deferred += transitions.deferred;
+  bids.errors.push(...transitions.errors);
+  bids.candidates = bidPosts.length;
 
   // results: the sold index since the window's start, and the lots Nuke followed that closed in it
   const now = Date.now();
@@ -658,7 +666,7 @@ async function ingestCcPath(
   await lookup(sold.filter((d) => !followed.has(String(d.auctionId))).map((d) => `https://collectingcars.com/for-sale/${d.slug}`));
   const results = await postObservations(supabase, ccResultObservations(sold, closed, vehicleOf, now, 12 * 3_600_000), deadline, 20);
   // Existing fresh bid/result captures run first. Held testimony retries this projection without another admission.
-  const episodes = await projectCcEpisodes(supabase, bidPosts, nativeOf, deadline);
+  const episodes = await projectCcEpisodes(supabase, transitions.posts, nativeOf, deadline);
   return { read_at: readAt, bids, episodes, results: { ...results, sold_index: sold.length, followed_closed: closed.length, days: resultsDays } };
 }
 

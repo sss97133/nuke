@@ -192,6 +192,10 @@ jobs:
         run: createdb dm_refinement_auction_receipts_ci
       - name: Verify source receipt identity, clocks, decimals and privacy
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_auction_receipts_ci -f supabase/sql/test_live_bid_tape_receipts.sql
+      - name: Create disposable CC snapshot compatibility database
+        run: createdb dm_refinement_cc_v2_ci
+      - name: Verify CC v2 public snapshot classification and legacy compatibility
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_cc_v2_ci -f supabase/sql/test_cc_v2_snapshot_tape.sql
       - name: Create disposable comment author key database
         run: createdb dm_refinement_comment_author_keys_ci
       - name: Verify comment author keys at insert and by bounded backfill; retired twin untouched
@@ -577,7 +581,7 @@ jobs:
       - name: Verify archiveFetch cache hits any successful snapshot and does not archive large lot pages as login walls
         run: deno test --no-check --node-modules-dir=none --allow-env --allow-net --allow-read supabase/functions/_shared/archiveFetch.cache.test.ts supabase/functions/_shared/archiveFetch.nul.test.ts supabase/functions/_shared/archiveFetch.retention.test.ts supabase/functions/_shared/firecrawlGate.test.ts
       - name: Verify the live board readers for PCarMarket and Bonhams
-        run: deno test --node-modules-dir=none --allow-read --allow-env supabase/functions/sync-live-auctions/boards.test.ts supabase/functions/sync-live-auctions/batEpisodeState.test.ts supabase/functions/sync-live-auctions/pcarBidCapture.test.ts supabase/functions/sync-live-auctions/ccBidCapture.test.ts supabase/functions/sync-live-auctions/ccEpisodeState.test.ts supabase/functions/_shared/vehicleEventWrite.test.ts
+        run: deno test --node-modules-dir=none --allow-read --allow-env supabase/functions/sync-live-auctions/boards.test.ts supabase/functions/sync-live-auctions/batEpisodeState.test.ts supabase/functions/sync-live-auctions/pcarBidCapture.test.ts supabase/functions/sync-live-auctions/ccBidCapture.test.ts supabase/functions/sync-live-auctions/ccEpisodeState.test.ts supabase/functions/sync-live-auctions/ccSnapshotTransition.test.ts supabase/functions/_shared/vehicleEventWrite.test.ts
 
   discovery-contract:
     runs-on: ubuntu-latest

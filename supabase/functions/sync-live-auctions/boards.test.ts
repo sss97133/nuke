@@ -366,17 +366,17 @@ Deno.test("Gooding link plan: write under the spelling a vehicle holds, claim a 
 // Typesense sold index (2015 Aston Martin Rapide S, read 2026-11-08).
 import { type CcClosedLot, type CcSoldDoc, ccBidObservation, ccResultObservations } from "./boards.ts";
 
-Deno.test("cc bid: one row per lot and distinct bid, at the board read, never without a bid", () => {
+Deno.test("cc snapshot: one row per lot and distinct aggregate state, at the board read, never without a bid", () => {
   const lot = { url: "https://collectingcars.com/for-sale/a", external_id: "91855", current_bid: 35000, bid_count: 71, currency: "gbp", ends: "2026-11-05T19:21:33Z" };
   const p = ccBidObservation(lot, "v1", "2026-11-05T19:20:12.410Z")!;
   assertEquals(p.kind, "bid");
   assertEquals(p.observed_at, "2026-11-05T19:20:12.410Z");
-  assertEquals(p.source_identifier, "collecting-cars-bid:91855:71:35000");
+  assertEquals(p.source_identifier, "collecting-cars-snapshot:v2:91855:35000:71:GBP:2026-11-05T19:21:33.000Z");
   assertEquals(p.structured_data.currency, "GBP");
   assertEquals(p.structured_data.clock, "board_read");
   assertEquals(ccBidObservation({ ...lot, current_bid: null }, "v1", "x"), null);
   assertEquals(ccBidObservation({ ...lot, external_id: null }, "v1", "x"), null);
-  assertEquals(ccBidObservation({ ...lot, current_bid: 36000, bid_count: 72 }, "v1", "y")!.source_identifier, "collecting-cars-bid:91855:72:36000");
+  assertEquals(ccBidObservation({ ...lot, current_bid: 36000, bid_count: 72 }, "v1", "y")!.source_identifier, "collecting-cars-snapshot:v2:91855:36000:72:GBP:2026-11-05T19:21:33.000Z");
 });
 
 Deno.test("cc results: sold from the index; not sold only when followed, absent and settled", () => {
@@ -404,4 +404,15 @@ Deno.test("cc results: sold from the index; not sold only when followed, absent 
   const known = ccResultObservations([other], [], new Map([["https://collectingcars.com/for-sale/e", "v5"]]), now, 0);
   assertEquals(known[0].structured_data.sale_price, null);
   assertEquals(known[0].vehicle_id, "v5");
+});
+
+Deno.test("CC v2 identity changes with end/currency, not read clock or equivalent normalized time", () => {
+  const lot = { external_id: "94494", url: "https://collectingcars.com/for-sale/fixture", current_bid: 15000,
+    bid_count: 31, currency: "aud", ends: "2026-11-12T06:05:00Z" };
+  const first = ccBidObservation(lot, "v", "2026-11-09T01:00:00Z")!;
+  assertEquals(ccBidObservation({ ...lot, currency: "AUD", ends: "2026-11-12T06:05:00.000Z" }, "v", "2026-11-09T01:15:00Z")!.source_identifier, first.source_identifier);
+  for (const change of [{ ends: "2026-11-12T06:08:00Z" }, { currency: "USD" }])
+    assertEquals(ccBidObservation({ ...lot, ...change }, "v", "now")!.source_identifier === first.source_identifier, false);
+  assertEquals(first.extraction_method, "cc_typesense_board_snapshot_v2");
+  assertEquals(first.structured_data.capture_kind, "auction_bid_snapshot");
 });

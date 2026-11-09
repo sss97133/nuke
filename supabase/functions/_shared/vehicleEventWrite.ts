@@ -40,6 +40,8 @@ export interface VehicleEventWritePolicy {
   /** Existing service-only digest retains full metadata CAS without placing galleries in request URLs. */
   compactMetadataCas?: boolean;
   sourceObservedAt?: string;
+  /** CC snapshot transitions must not arbitrate two different receipts at the same source clock. */
+  rejectEqualClockDifferentObservation?: boolean;
   /** Writer name stored as extraction_method on insert (e.g. 'extract-mecum'). Never overwrites a row-supplied value. */
   writer?: string;
   /** Run id stored as extraction_run_id on insert; defaults to one id per isolate. */
@@ -123,6 +125,10 @@ async function updateLive(supabase: Client, live: LiveRow, row: VehicleEventRow,
   }
   if (policy.activeAuction && live.ended_at != null && Date.parse(String(row.ended_at)) !== Date.parse(live.ended_at)
     && Number.isFinite(prior) && !(incoming > prior)) return { action: 'skipped', reason: 'scheduled end requires a newer source observation' };
+  if (policy.rejectEqualClockDifferentObservation && Number.isFinite(prior) && incoming === prior
+    && (typeof row.metadata?.auction_observation_id !== 'string' || !row.metadata.auction_observation_id
+      || live.metadata?.auction_observation_id !== row.metadata.auction_observation_id))
+    return { action: 'skipped', reason: 'different auction observations at the same source clock' };
   const { patch, locked } = patchForLiveRow(live, row);
   if (policy.preserveEventStatus) delete patch.event_status;
   if (policy.activeAuction && row.ended_at != null && Date.parse(String(row.ended_at)) > Date.parse(policy.activeAuction.now))
@@ -153,7 +159,7 @@ export async function writeVehicleEventByKey(supabase: Client, row: VehicleEvent
   if (!row.source_listing_id) return { action: 'skipped', reason: 'no source_listing_id' };
   if (policy.sourceObservedAt && !Number.isFinite(Date.parse(policy.sourceObservedAt))) return { action: 'skipped', reason: 'invalid source observation clock' };
 
-  if (policy.compactMetadataCas && !policy.sourceObservedAt) return { action: 'skipped', reason: 'compact CAS requires source observation clock' };
+  if ((policy.compactMetadataCas || policy.rejectEqualClockDifferentObservation) && !policy.sourceObservedAt) return { action: 'skipped', reason: 'compact CAS requires source observation clock' };
   if (policy.activeAuction && (!policy.sourceObservedAt || !Number.isFinite(Date.parse(policy.sourceObservedAt)) || row.event_type !== 'auction' || row.source_url !== policy.activeAuction.sourceUrl
     || !['active', 'live'].includes(String(row.event_status)) || !Number.isFinite(Date.parse(policy.activeAuction.now))
     || !Number.isFinite(Date.parse(String(row.ended_at))) || Date.parse(String(row.ended_at)) <= Date.parse(policy.activeAuction.now)))

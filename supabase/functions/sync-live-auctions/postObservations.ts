@@ -10,7 +10,7 @@ export async function postObservations(
   posts: ObservationPost[],
   deadline: number,
   maxPosts: number,
-  prepare?: (post: ObservationPost) => Promise<ObservationPost>,
+  prepare?: (post: ObservationPost) => Promise<ObservationPost | null>,
 ): Promise<{ candidates: number; held: number; posted: number; deferred: number; errors: string[] }> {
   const out = { candidates: posts.length, held: 0, posted: 0, deferred: 0, errors: [] as string[] };
   const have = new Set<string>();
@@ -38,6 +38,7 @@ export async function postObservations(
     await Promise.all(batch.map(async (p) => {
       try {
         const payload = prepare ? await prepare(p) : p;
+        if (payload === null) { out.held++; return; } // confirmed concurrent admission, no new archive/post
         if (Date.now() > deadline) { out.deferred++; return; }
         const res = await fetch(`${base}/functions/v1/ingest-observation`, {
           method: "POST",
