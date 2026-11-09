@@ -122,7 +122,7 @@ BEGIN
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d5';
   ASSERT r.conclusion = 'no_zone_photo_after_purchase', 'dash photo before purchase is not cited: ' || r.conclusion;
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.receipt_id = '00000000-0000-0000-0000-0000000000c3';
-  ASSERT r.item_id IS NULL AND r.line_kind = 'receipt' AND r.conclusion = 'work_day_unphotographed', r.conclusion;
+  ASSERT r.item_id IS NULL AND r.line_kind = 'receipt' AND r.conclusion = 'receipt_day_unphotographed', r.conclusion;
   -- privacy: no excluded frame anywhere
   SELECT count(*) INTO n FROM receipt_work_lines(V) x, unnest(x.image_ids) i
    WHERE i IN ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000f5');

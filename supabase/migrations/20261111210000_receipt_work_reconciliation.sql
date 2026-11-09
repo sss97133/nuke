@@ -185,8 +185,11 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
            CASE
              WHEN ln.kind IN ('charge', 'backordered', 'kit_component', 'note') THEN 'not_work_evidence'
              WHEN ln.anchor IS NULL THEN 'undated_line'
-             WHEN ln.kind IN ('labor', 'receipt') AND dl.n > 0 THEN 'work_day_photographed'
-             WHEN ln.kind IN ('labor', 'receipt') THEN 'work_day_unphotographed'
+             WHEN ln.kind = 'labor' AND dl.n > 0 THEN 'work_day_photographed'
+             WHEN ln.kind = 'labor' THEN 'work_day_unphotographed'
+             -- a line-less receipt is a purchase on a day, not work on it
+             WHEN ln.kind = 'receipt' AND dl.n > 0 THEN 'receipt_day_photographed'
+             WHEN ln.kind = 'receipt' THEN 'receipt_day_unphotographed'
              WHEN ln.zone IS NULL THEN 'part_zone_unknown'
              WHEN zl.in_window > 0 THEN 'install_window_photographed'
              WHEN zl.total > 0 THEN 'photographed_after_window'
@@ -203,6 +206,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
          round(least(1, greatest(0, coalesce(s.link_conf, 0.7) * CASE s.concl
            WHEN 'install_window_photographed' THEN 0.6 WHEN 'photographed_after_window' THEN 0.4
            WHEN 'work_day_photographed' THEN 0.7 WHEN 'work_day_unphotographed' THEN 0.6
+           WHEN 'receipt_day_photographed' THEN 0.6 WHEN 'receipt_day_unphotographed' THEN 0.6
            WHEN 'no_zone_photo_after_purchase' THEN 0.6 WHEN 'part_zone_unknown' THEN 0.5
            WHEN 'not_work_evidence' THEN 0.9 ELSE 0.5 END)), 3),
          CASE WHEN s.first_day IS NOT NULL THEN s.first_day - s.anchor END,
