@@ -47,3 +47,7 @@
   .ap-history__row { grid-template-columns: 1fr; }
   .ap-history__row > :nth-child(3) { grid-column: 1; }
 }
+
+.ap-verbs { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--border); }
+.ap-sign { min-height: 48px; padding: 0 22px; border-radius: 999px; background: var(--action); color: var(--on-action); display: inline-flex; align-items: center; text-decoration: none; }
+.ap-sign .k-label { color: inherit; }

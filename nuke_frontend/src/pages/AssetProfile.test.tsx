@@ -6,7 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('../hooks/usePageTitle', () => ({ usePageTitle: () => undefined }));
-import AssetProfilePage, { foldNotes, headline, money, type AssetProfile } from './AssetProfile';
+vi.mock('../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => <a href={to} className={className}>{children}</a> }));
+import AssetProfilePage, { foldNotes, headline, money, sittingsOf, type AssetProfile } from './AssetProfile';
 
 // The shape asset_profile_read returns for a sold print with a creation claim (synthetic values, the live shape of 2026-11-08).
 const riley: AssetProfile = {
@@ -99,6 +100,26 @@ it('a declared work shows no public sale, the holder\'s words and a user party',
   expect(node.textContent).toContain("the holder's own declaration");
   expect(node.textContent).toContain('declared by its holder in their own words');
   expect(node.querySelector('img')).toBeNull();
+});
+
+it('a work found in the photos shows what the analysis saw, the days photographed, and the holder\'s verbs', async () => {
+  const found: AssetProfile = { ...riley, asset: { ...riley.asset, id: '33333333-3333-4333-8333-333333333333', title: 'Proposed painting, Jul 2024', house_category: null, identity_basis: 'photo_proposal', visibility: 'private' },
+    viewer: { is_holder: true }, declared: null, market: 'none_public', image_url: null, lots: [], history: [], creation: [],
+    proposal: { kind: 'painting', labels: ['Painting', 'Modern Art'], labeller: 'apple_photos_on_device_v1', method: 'apple_vision_featureprint_cos0.90', photos: 2, sittings: 2,
+      span_from: '2024-07-03T18:00:00Z', span_to: '2026-09-13T20:00:00Z', places: [['Boulder City, United States', 2]], status: 'pending',
+      photo_sightings: [{ taken_at: '2024-07-03T18:00:00Z', filename: 'IMG_1.HEIC', place: 'Boulder City, United States', caption: 'a painting of a red car' },
+        { taken_at: '2026-09-13T20:00:00Z', filename: 'IMG_2.HEIC', place: 'Boulder City, United States', caption: 'a red painting on a black wall' }] },
+    coverage: { presentations: 0, statements: 0, claims: 0, sources: [], as_of: '2026-11-09T01:00:00Z' } };
+  fixture.rpc.mockResolvedValue({ data: found, error: null });
+  await act(async () => render('/assets/33333333-3333-4333-8333-333333333333'));
+  expect(node.textContent).toContain("Found in the holder's photographs");
+  expect(node.textContent).toContain('First photographed');
+  expect(node.textContent).toContain('Days photographed');
+  expect(node.textContent).toContain("the device's caption: a painting of a red car");
+  expect(node.textContent).toContain('nothing left the machine');
+  expect(node.querySelector('a[href="/assets/new?confirm=33333333-3333-4333-8333-333333333333"]')).not.toBeNull();
+  expect(node.textContent).toContain('No public sale recorded');
+  expect(sittingsOf(found.proposal!.photo_sightings!).length).toBe(2);
 });
 
 it('formats money by the house\'s currency and headlines the hammer, then the high bid, then the estimate', () => {

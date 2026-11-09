@@ -5,6 +5,7 @@
 // text: the house's lines, headings and figures arrive from the reader as it typed them.
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { PrefetchLink } from '../components/PrefetchLink';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { ClaimView, Row, Rows, Section, Text, day } from '../kit';
@@ -29,11 +30,15 @@ type Executor = { role: string; name_as_printed: string | null; qualifier_as_pri
 type Creation = { claim_id: string; attribution: string; layout: string | null; name_as_printed: string | null; qualifier_as_printed: string | null;
   party: Party | null; executor: Executor | null; source: string | null; observed_at: string; confidence: number | null };
 type Declared = { medium?: string; year?: string; dimensions?: string; edition?: string; notes?: string };
+type Sighting = { taken_at: string; filename?: string | null; labels?: string[] | null; library?: string | null; place?: string | null; camera?: string | null; caption?: string | null };
+type Proposal = { key?: string; kind?: string | null; labels?: string[] | null; labeller?: string | null; method?: string | null; photos?: number; sittings?: number;
+  span_from?: string | null; span_to?: string | null; filenames?: string[] | null; captions?: string[] | null; places?: Array<[string, number]> | null; status?: string; photo_sightings?: Sighting[] };
 export type AssetProfile = {
   asset: { id: string; asset_type: string; title: string | null; house_category: string | null; house_category_code: string | null;
     source: string | null; identity_basis: string | null; first_seen_at: string | null; created_at: string; visibility?: string };
   viewer?: { is_holder: boolean };
   declared?: Declared | null;
+  proposal?: Proposal | null;
   market?: 'recorded' | 'none_public';
   image_url: string | null;
   lots: Lot[];
@@ -53,7 +58,48 @@ const TYPE_WORDS: Record<string, string> = { artwork: 'Artwork', automobilia: 'A
 const IDENTITY_WORDS: Record<string, string> = {
   lot_presentation: 'one presentation at one house. The same object seen again at another sale is joined by supersession, never by overwriting.',
   holder_declaration: 'declared by its holder in their own words. Presentations, publications and sales attach to it as they are recorded.',
+  photo_proposal: "found in the holder's own photographs, grouped by visual identity across time; the holder confirms or dismisses, the machine never assumes.",
 };
+const KIND_WORDS: Record<string, string> = { painting: 'painting', drawing: 'drawing', sketch: 'sketch', billboard: 'billboard', mural: 'mural', sculpture: 'sculpture', street_art: 'street art', gallery: 'gallery sitting', artwork: 'work' };
+
+/** The photographs as the record's history: one row per day photographed, with place and the labeller's caption. */
+export function sittingsOf(photos: Sighting[]): Array<{ day: string; n: number; place: string | null; caption: string | null }> {
+  const by = new Map<string, { day: string; n: number; place: string | null; caption: string | null }>();
+  for (const p of photos) {
+    const k = p.taken_at.slice(0, 10);
+    const cur = by.get(k) ?? { day: p.taken_at, n: 0, place: null, caption: null };
+    cur.n += 1; cur.place = cur.place ?? p.place ?? null; cur.caption = cur.caption ?? p.caption ?? null;
+    by.set(k, cur);
+  }
+  return [...by.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+function FoundBlock({ proposal, isHolder, assetId }: { proposal: Proposal; isHolder: boolean; assetId: string }) {
+  const sightings = proposal.photo_sightings ?? [];
+  const sittings = sittingsOf(sightings);
+  const coverage: Coverage = { n: sightings.length, of: proposal.photos ?? sightings.length, grain: 'photograph', as_of: proposal.span_to ?? null };
+  return <Section title="Found in the holder's photographs" coverage={coverage}>
+    <Rows title="What the analysis saw">
+      <Row label="Kind">{KIND_WORDS[proposal.kind ?? ''] ?? proposal.kind ?? 'work'}</Row>
+      {proposal.labels && proposal.labels.length > 0 && <Row label="Labels, as the device printed them" role="caption">{proposal.labels.join(', ')}</Row>}
+      {proposal.span_from && <Row label="First photographed">{day(proposal.span_from)}</Row>}
+      {proposal.span_to && proposal.span_to.slice(0, 10) !== (proposal.span_from ?? '').slice(0, 10) && <Row label="Last photographed">{day(proposal.span_to)}</Row>}
+      <Row label="Days photographed" role="measure">{String(proposal.sittings ?? sittings.length)}</Row>
+      {proposal.places && proposal.places.length > 0 && <Row label="Where" role="caption">{proposal.places.map(([p, n]) => `${p} (${n})`).join(' · ')}</Row>}
+      <Row label="Method" role="caption">{`${proposal.labeller ?? 'on-device labels'}${proposal.method ? ` · ${proposal.method}` : ''} · nothing left the machine`}</Row>
+      {proposal.status === 'pending' && <Row label="Standing" role="caption">{isHolder ? 'Awaiting you: this is your work, or it is not' : 'Not yet confirmed by its holder'}</Row>}
+    </Rows>
+    {sittings.length > 0 && <ol className="ap-history">{sittings.map(s => <li key={s.day} className="ap-history__row">
+      <Text role="caption">{day(s.day)}</Text>
+      <Text role="body">{`${s.n} photograph${s.n === 1 ? '' : 's'}${s.place ? ` · ${s.place}` : ''}`}</Text>
+      {s.caption && <Text role="caption">{`the device's caption: ${s.caption}`}</Text>}
+    </li>)}</ol>}
+    {isHolder && proposal.status === 'pending' && <div className="ap-verbs">
+      <PrefetchLink to={`/assets/new?confirm=${assetId}`} className="ap-sign"><Text role="label">This is my work</Text></PrefetchLink>
+      <PrefetchLink to="/assets/mine" className="ap-link"><Text role="label">Back to your works</Text></PrefetchLink>
+    </div>}
+  </Section>;
+}
 const BASIS_WORDS: Record<string, string> = {
   hammer: 'hammer, premium not included', highest_bid_or_price: "the house's highest bid or price", hammer_time: 'the hammer clock',
   sale_end: "the sale's end", index_read: 'when Nuke read the index',
@@ -222,9 +268,10 @@ export default function AssetProfilePage() {
       {!current && <div className="ap-masthead__result">
         <Text role="label">Market</Text>
         <Text role="measure">No public sale recorded</Text>
-        <Text role="caption">a figure appears only when a house publishes one</Text>
+        <Text role="caption">{profile.proposal?.span_from ? `first photographed ${day(profile.proposal.span_from)}` : 'a figure appears only when a house publishes one'}</Text>
       </div>}
     </header>
+    {profile.proposal && <FoundBlock proposal={profile.proposal} isHolder={!!profile.viewer?.is_holder} assetId={profile.asset.id} />}
     {profile.declared && Object.keys(profile.declared).length > 0 && <Section title="As declared by the holder" coverage={{ n: 1, of: 1, grain: 'declaration', as_of: profile.asset.created_at }}>
       <Rows title="In the holder's words">
         {profile.declared.medium && <Row label="Medium">{profile.declared.medium}</Row>}
