@@ -363,7 +363,12 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['3V', 'Volkswagen Mexico', 'Volkswagen'],
     ['4T', 'Toyota', 'Toyota'],
     ['5T', 'Toyota', 'Toyota'],
-    ['JT', 'Toyota', 'Toyota'],
+    // NHTSA vPIC DecodeWMI: Toyota manufacture does not imply Toyota marque.
+    ['JTH', 'TOYOTA MOTOR CORPORATION', 'Lexus'],
+    ['JTJ', 'TOYOTA MOTOR CORPORATION', 'Lexus'],
+    ['JTD', 'TOYOTA MOTOR CORPORATION', 'Toyota'],
+    ['JTE', 'TOYOTA MOTOR CORPORATION', null],
+    ['JTM', 'TOYOTA MOTOR CORPORATION', null],
     ['JH', 'Honda', 'Honda'],
     ['JN', 'Nissan', 'Nissan'],
     ['JM', 'Mazda', 'Mazda'],
@@ -402,6 +407,10 @@ function decodeModernVin(vin: string): VINDecodeResult {
   // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/1C4?format=json
   if (wmi === '1C4') result.manufacturer_make_candidates =
     ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/JTE?format=json
+  if (wmi === 'JTE') result.manufacturer_make_candidates = ['Toyota', 'Lexus', 'Subaru'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/JTM?format=json
+  if (wmi === 'JTM') result.manufacturer_make_candidates = ['Toyota', 'Subaru'];
 
   // Model year (position 10)
   const yearChar = vin.charAt(9);
