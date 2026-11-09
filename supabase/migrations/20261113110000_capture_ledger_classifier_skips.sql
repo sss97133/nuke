@@ -15,7 +15,7 @@
 --   'skipped', and skip_reasons carries these reasons beside the phone's.
 -- Perf: capture_ledger_states stays index-only for every other frame; the judged frames come from a small partial index
 -- (built CONCURRENTLY, one 57 GB heap scan, about 15 min at the 76 MB/s measured 2026-11-08) and read the heap for those rows only.
--- Revert: supabase/sql/revert_20261112180000_capture_ledger_classifier_skips.sql. Contract: supabase/sql/test_capture_ledger_classifier_skips.sql.
+-- Revert: supabase/sql/revert_20261113110000_capture_ledger_classifier_skips.sql. Contract: supabase/sql/test_capture_ledger_classifier_skips.sql.
 -- Lane: photo/document/library (Codex reviews). Not applied live.
 SET statement_timeout = '3300s';
 SET lock_timeout = '60s';

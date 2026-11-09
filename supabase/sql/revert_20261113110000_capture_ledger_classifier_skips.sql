@@ -1,4 +1,4 @@
--- Revert 20261112180000_capture_ledger_classifier_skips: the 20261111190000 readers, and drop the partial index.
+-- Revert 20261113110000_capture_ledger_classifier_skips: the 20261111190000 readers, and drop the partial index.
 BEGIN;
 CREATE OR REPLACE FUNCTION public.capture_ledger_frames(p_uid uuid, p_tz text, p_from date, p_to date)
 RETURNS TABLE (image_id uuid, day date, taken_at timestamptz, state text, reason text, vehicle_id uuid, source text,

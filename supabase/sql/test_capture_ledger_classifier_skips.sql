@@ -1,4 +1,4 @@
--- Capture ledger classifier skips (20261112180000): frames the classifier or the phone already judged (duplicate, not a
+-- Capture ledger classifier skips (20261113110000): frames the classifier or the phone already judged (duplicate, not a
 -- vehicle, personal) stop reading 'unsorted'; personal never becomes 'skipped' and never carries a thumbnail; filed, pulled,
 -- private, failed, waiting and held frames keep their state; nothing is written; anon reaches nothing; the revert restores it.
 -- and vanish once the frame arrives; the re-scan request is made by the owner, claimed once by a phone and closed; anon
@@ -41,7 +41,7 @@ BEGIN IF NOT coalesce(ok, false) THEN RAISE EXCEPTION 'contract failed: %', msg;
 \i supabase/migrations/20261111180000_capture_ledger_fast.sql
 \i supabase/migrations/20261111190000_capture_ledger_index.sql
 
-\i supabase/migrations/20261112180000_capture_ledger_classifier_skips.sql
+\i supabase/migrations/20261113110000_capture_ledger_classifier_skips.sql
 
 -- ALLOW_RAW_TESTIMONY_WRITE
 INSERT INTO vehicles VALUES ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000aa', 1973, 'Pontiac', 'Firebird');
@@ -91,7 +91,7 @@ SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"00000000
 SELECT pg_temp.assert_true((public.get_capture_ledger('UTC', NULL)->'totals') @> '{"taken":1,"skipped":1}', 'another user sees only their own frame');
 SELECT pg_temp.assert_true(NOT EXISTS (SELECT * FROM vehicle_images EXCEPT SELECT * FROM before_rows) AND NOT EXISTS (SELECT * FROM before_rows EXCEPT SELECT * FROM vehicle_images), 'readers only: no frame written');
 
-\i supabase/sql/revert_20261112180000_capture_ledger_classifier_skips.sql
+\i supabase/sql/revert_20261113110000_capture_ledger_classifier_skips.sql
 SELECT pg_temp.assert_true(to_regclass('public.idx_vehicle_images_ledger_classified') IS NULL
   AND position('personal_on_device' IN pg_get_functiondef('public.capture_ledger_states(uuid, text, date, date)'::regprocedure)) = 0
   AND position('sk_all' IN pg_get_functiondef('public.get_capture_ledger(text, date, date, integer)'::regprocedure)) = 0, 'revert restores the 20261111190000 readers');
