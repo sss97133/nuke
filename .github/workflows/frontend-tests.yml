@@ -43,6 +43,8 @@ jobs:
           supabase/functions/ingest-observation/financialPngPixels.test.ts
       - name: Install locked source-processing dependencies
         run: npm ci
+      - name: Verify actual BaT extractor canonical identity and stream fencing
+        run: node --test scripts/test-bat-vehicle-identity.mjs
       - name: Verify deterministic source masking and metadata removal
         run: node --test scripts/receipts/redacted-source.test.mjs
 
@@ -745,7 +747,8 @@ jobs:
       - name: Verify the shared BaT comment builder and author identity links (anonymous never keyed)
         run: deno test supabase/functions/_shared/batAuctionRecord.test.ts
       - name: Verify extract-bat-core writes an end event only after the close, and its page read clock
-        run: deno test supabase/functions/extract-bat-core/auctionClose.test.ts supabase/functions/extract-bat-core/sourceReadClock.test.ts
+        run: |
+          deno test --node-modules-dir=none supabase/functions/extract-bat-core/auctionClose.test.ts supabase/functions/extract-bat-core/sourceReadClock.test.ts supabase/functions/extract-bat-core/vehicleIdentity.test.ts
       - name: Verify native BaT frames, per-lot admission isolation and coverage
         run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/batLiveEvents.test.ts supabase/functions/extract-bat-core/liveStream.test.ts supabase/functions/extract-bat-core/batHtmlRecovery.test.ts
       - name: Verify the Craigslist attribute block (parser, queue payload, funnel, VIN landing, ledger row)
