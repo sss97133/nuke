@@ -14,7 +14,8 @@ Deno.test("CC A→B→A source reads admit three canonical transitions and proje
       resolve({data,error:null});
     }:(...args:any[])=>{if(k==="eq"||k==="in")filters[args[0]]=args[1];return q;}});return q;
   }};
-  const original=globalThis.fetch;
+  const original=globalThis.fetch, originalNow=Date.now;
+  Date.now=()=>Date.parse("2026-11-09T01:10:00Z");
   globalThis.fetch=async(_u,init)=>{const p=JSON.parse(String(init?.body));const id=`00000000-0000-4000-8000-${String(++admits+10).padStart(12,"0")}`;
     obs.push({...p,id,source_id:"source",is_superseded:false});return Response.json({success:true,observation_id:id});};
   try {
@@ -33,7 +34,7 @@ Deno.test("CC A→B→A source reads admit three canonical transitions and proje
     assertEquals(admits,3);assertEquals(new Set(obs.map(o=>o.source_identifier)).size,3);
     assertEquals(obs[2].structured_data.previous_observation_id,obs[1].id);
     assertEquals(episodes[0].metadata.source_observed_at,"2026-11-09T01:02:00Z");
-  } finally {globalThis.fetch=original;}
+  } finally {globalThis.fetch=original;Date.now=originalNow;}
 });
 Deno.test("CC concurrent same transition dedupes; advanced different prior, tied clocks and stale source fail closed",async()=>{
  const a={...post(15000),id:"A"};const b=post(16000,"2026-11-09T01:01:00Z");
