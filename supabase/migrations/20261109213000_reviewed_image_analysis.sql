@@ -11,6 +11,10 @@ BEGIN
      OR (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.photo_land_trigger()'::regprocedure) <> '4e4570c88d1573124e75d17f4ee2b339' THEN
     RAISE EXCEPTION 'photo landing owner drifted; review current definitions';
   END IF;
+  IF (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.get_image_deep_analysis(uuid)'::regprocedure)
+      IS DISTINCT FROM 'acac1e37dfed2a8609ad8c2c1636b135' THEN
+    RAISE EXCEPTION 'deep image reader drifted; review current definition';
+  END IF;
 END $guard$;
 
 CREATE OR REPLACE FUNCTION public.photo_land_classification(p_image_id uuid, p_include_classifier boolean)
@@ -388,13 +392,21 @@ BEGIN
           'state','withdrawn','withdrawal_reason',reason,'withdrawn_at',clock_timestamp())),
       prior.layer_version,prior.observed_by,prior.agent_version,false) RETURNING id INTO withdrawn_id;
     UPDATE public.image_observations SET is_active=false,superseded_by=withdrawn_id WHERE id=prior.id;
+    -- The lightbox, gallery and cover scorer also read this cache directly.
+    -- Withdraw only this producer's matching projection in the source update,
+    -- avoiding a nested metadata UPDATE or replay of classifier side effects.
+    IF NEW.ai_scan_metadata#>>'{byok_deep_analysis,prompt_version}'='reviewed_image_analysis_v1'
+       AND NEW.ai_scan_metadata#>>'{byok_deep_analysis,observation_id}'=
+         prior.confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}' THEN
+      NEW.ai_scan_metadata := NEW.ai_scan_metadata - 'byok_deep_analysis';
+    END IF;
   END LOOP;
   RETURN NEW;
 END;
 $function$;
 REVOKE ALL ON FUNCTION public.withdraw_reviewed_image_analysis() FROM PUBLIC,anon,authenticated;
 CREATE TRIGGER trg_withdraw_reviewed_image_analysis
-AFTER UPDATE OF vehicle_id,image_url,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status
+BEFORE UPDATE OF vehicle_id,image_url,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status
 ON public.vehicle_images FOR EACH ROW EXECUTE FUNCTION public.withdraw_reviewed_image_analysis();
 
 -- Keep the existing deep-reader shape. A reviewed cache is only current while

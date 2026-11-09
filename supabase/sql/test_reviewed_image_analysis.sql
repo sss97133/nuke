@@ -325,6 +325,8 @@ DO $$ DECLARE oid uuid; r jsonb; placed uuid; independent uuid; flag text; k int
     AND withdrawn.confidence_basis#>>'{reviewed_image_analysis_v1,withdrawal_reason}'='source_changed'),
    'replacement appends explicit withdrawal preserving prior review';
  ASSERT (SELECT is_active FROM image_observations WHERE id=independent),'independent producer untouched';
+ ASSERT (SELECT NOT ai_scan_metadata ? 'byok_deep_analysis' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000004'),'direct cache consumers cannot read withdrawn review';
+ ASSERT EXISTS(SELECT FROM vehicle_observations WHERE id=oid AND structured_data->>'narrative_one_line'='Whole assembled car with clear surroundings'),'complete review testimony retained after cache withdrawal';
  ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000004')),'deep reader withholds cache after replacement';
  UPDATE vehicle_images SET image_url='https://example.invalid/current.jpg' WHERE id='10000000-0000-4000-8000-000000000004';
  BEGIN PERFORM project_reviewed_image_analysis(oid); RAISE EXCEPTION 'expected old review refusal';
@@ -335,6 +337,7 @@ DO $$ DECLARE oid uuid; r jsonb; placed uuid; independent uuid; flag text; k int
    r=project_reviewed_image_analysis(oid); placed=(r->>'image_observation_id')::uuid;
    EXECUTE format('UPDATE vehicle_images SET %I=true WHERE id=%L',flag,'10000000-0000-4000-8000-000000000004');
    ASSERT NOT (SELECT is_active FROM image_observations WHERE id=placed),flag||' withdraws search authority';
+   ASSERT (SELECT NOT ai_scan_metadata ? 'byok_deep_analysis' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000004'),flag||' removes only current review cache';
    ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000004')),flag||' withholds reader';
    EXECUTE format('UPDATE vehicle_images SET %I=false WHERE id=%L',flag,'10000000-0000-4000-8000-000000000004');
  END LOOP;
