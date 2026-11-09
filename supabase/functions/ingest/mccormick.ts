@@ -58,11 +58,14 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
   }
   const identity = documents.at(-1)!;
   const lot = identity.lot;
-  const mileageText = lot.raw_fields.Mileage?.replace(/,/g, "");
+  // The source labels a bare counter as Mileage, without a unit. Canonical mileage
+  // is displayed as miles; preserve unitless and kilometre claims in raw_fields only.
+  const miles = lot.raw_fields.Mileage?.match(/^((?:\d{1,3}(?:,\d{3})+|\d+))\s*(?:mi|miles)$/i);
+  const mileage = miles ? Number(miles[1].replace(/,/g, "")) : null;
   const known = (v?: string) => v && !/^(?:N\/?A|TBA|TMU)$/i.test(v) ? v : null;
   const candidate = {
     year: lot.year, make: lot.make ? normalizeMake(lot.make) : null, model: lot.model,
-    description: lot.description, mileage: /^\d+$/.test(mileageText ?? "") ? Number(mileageText) : null,
+    description: lot.description, mileage: mileage !== null && Number.isSafeInteger(mileage) ? mileage : null,
     // Short chassis numbers stay source claims; the existing resolver's modern-VIN path is not proof for them.
     vin: lot.vin?.length === 17 ? lot.vin : null,
     transmission: known(lot.raw_fields.Transmission), color: known(lot.raw_fields["Body Color"]),

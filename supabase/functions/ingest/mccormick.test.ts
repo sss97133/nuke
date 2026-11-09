@@ -47,10 +47,10 @@ Deno.test("McCormick follows advertised catalogs only and rejects external or du
   eq(p.lots,[url]);eq(p.catalogs,["https://www.classic-carauction.com/Auction-47","https://www.classic-carauction.com/auction-results?auctionnbr=47"]);
 });
 
-async function world(failure?: "archive" | "admission" | "readback" | "images" | "identity", unresolved = false) {
-  const body = unresolved ? html.replace("1967 FORD MUSTANG", "1967 FORD") : html;
+async function world(failure?: "archive" | "admission" | "readback" | "images" | "identity", unresolved = false, mileage = "TMU") {
+  const body = (unresolved ? html.replace("1967 FORD MUSTANG", "1967 FORD") : html).replace(">TMU</TD>", `>${mileage}</TD>`);
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map(b => b.toString(16).padStart(2, "0")).join("");
-  let payload: any, matches = 0, calls = 0;
+  let payload: any, matched: any, matches = 0, calls = 0;
   const source = { id: "source", species: "block_house", supported_observations: ["listing"] };
   const snapshot = { id: "snapshot", platform: "mccormicks", listing_url: url, html_sha256: hash, fetched_at: "2026-01-01T00:00:00Z", success: true };
   const db: any = {
@@ -77,9 +77,9 @@ async function world(failure?: "archive" | "admission" | "readback" | "images" |
       eq(options.directFetchOptions?.publicOnly, true); eq(options.firecrawlOnBlock, false);
       return { html: body, markdown: null, source: "cache", cached: true, snapshotId: failure === "archive" ? null : "snapshot", url, platform: "mccormicks", statusCode: 200, error: null, costCents: 0 };
     },
-    matchVehicle: async (data) => { matches++; eq(data.price, undefined); eq(data.vin, null); return { vehicleId: "vehicle", isNew: true }; },
+    matchVehicle: async (data) => { matched = data; matches++; eq(data.price, undefined); eq(data.vin, null); return { vehicleId: "vehicle", isNew: true }; },
   });
-  return { run, counts: () => ({ matches, calls }), payload: () => payload };
+  return { run, counts: () => ({ matches, calls }), payload: () => payload, matched: () => matched };
 }
 Deno.test("landing verifies capture, observation and images and disables paid analysis", async () => {
   const w = await world(); const result = await w.run();
@@ -173,3 +173,10 @@ Deno.test("ambiguous historical VIN stays two sourced blips without minting or a
   eq(w.payloads.every(p=>p.vehicle_id===undefined),true);
   eq(w.payloads[1].structured_data.vin,"1FAFP42X62F212138");
 });
+
+for (const [raw, expected] of [["90,880", null], ["90,880 km", null], ["90,880 mi", 90880]] as const) {
+  Deno.test(`mileage unit contract: ${raw} retains its literal source and promotes only explicit miles`, async () => {
+    const w = await world(undefined, false, raw); await w.run();
+    eq(w.matched().mileage, expected); eq(w.payload().structured_data.raw_fields.Mileage, raw);
+  });
+}
