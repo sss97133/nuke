@@ -169,18 +169,63 @@ Deno.test("under the floor nothing is called", async () => {
   assertEquals([client.searches.length, client.items.length, rep.stopped?.startsWith("quota")], [0, 0, true]);
 });
 
-Deno.test("max_calls caps landings; unheld lots land vintage first, then ending soonest, and the rest are counted", async () => {
+Deno.test("max_calls caps landings; first slot closes soonest and remaining slots prefer vintage", async () => {
   const page = [
     lot("300000000001", { title: "2019 Dodge Charger", ends: at(1) }),
     lot("300000000002", { title: "1972 Ford Bronco", ends: at(2) }),
     lot("300000000003", { title: "1965 Ford Mustang", ends: at(4) }),
-    lot("300000000004", { title: "1966 Ford Mustang", ends: at(0.2) }),   // ends inside 30 minutes: not worth a getItem
+    lot("300000000004", { title: "1966 Ford Mustang", ends: at(0.2) }),   // Still open inside 30 minutes: eligible.
   ];
   const client = fakeClient([page]);
   const rep = await auctions(fakeSb(world({})), client, { maxPages: 1, maxItems: 5, maxCalls: 3, now: () => NOW, ledger: open, snapshotWriter: admitted });
-  assertEquals(client.items, ["v1|300000000002|0", "v1|300000000003|0"]);   // 1 search + 2 getItem = the cap
+  assertEquals(client.items, ["v1|300000000004|0", "v1|300000000002|0"]);   // 1 search + 2 getItem = the cap
   assertEquals([rep.calls, rep.auctions.unheld.vintage, rep.auctions.unheld.other], [3, 3, 1]);
   assertEquals(rep.auctions.left, { vintage: 1, other: 1 });
+});
+
+Deno.test("a modern auction closing in20minutes receives one existing discovery slot", async () => {
+  const page = [lot("300000000011", { title: "1972 Ford Bronco", ends: at(2) }),
+    lot("300000000012", { title: "2022 Ford Bronco", ends: at(1 / 3) }),
+    lot("300000000013", { title: "1965 Ford Mustang", ends: at(4) }),
+    lot("300000000014", { title: "2023 Ford Bronco", ends: at(-1) })];
+  const client = fakeClient([page]);
+  await auctions(fakeSb(world({})), client, { maxPages: 1, now: () => NOW, ledger: open, snapshotWriter: admitted });
+  assertEquals(client.items, ["v1|300000000012|0", "v1|300000000011|0"]);
+  assertEquals(new Set(client.items).size, 2);
+});
+
+Deno.test("a lot that closes before getItem returns is not landed", async () => {
+  const s = lot("300000000031", { title: "2022 Ford Bronco", ends: at(0.01) });
+  const client = fakeClient([[s]], { items: { [s.itemId]: { ...s, itemEndDate: at(-1) } } });
+  const w = world({});
+  const result = await auctions(fakeSb(w), client, { now: () => NOW, ledger: open, snapshotWriter: admitted });
+  assertEquals([client.items.length, result.landed, result.blips, result.auctions.landed_live, result.errors.length], [1, 0, 0, 0, 0]);
+});
+
+Deno.test("an invalid getItem end cannot admit an apparently open summary", async () => {
+  const s = lot("300000000041", { title: "2022 Ford Bronco", ends: at(1) });
+  const client = fakeClient([[s]], { items: { [s.itemId]: { ...s, itemEndDate: "invalid" } } });
+  const result = await auctions(fakeSb(world({})), client, { now: () => NOW, ledger: open, snapshotWriter: admitted });
+  assertEquals([result.landed, result.blips, result.auctions.landed_live, result.errors.length], [0, 0, 0, 0]);
+});
+
+Deno.test("held evidence remains first and a lot expiring during it is never fetched", async () => {
+  let clock = NOW;
+  const w = world({ vehicles: [held("300000000051")] });
+  const client = fakeClient([[lot("300000000052", { title: "2022 Ford Bronco", ends: at(0.1) }),
+    lot("300000000051", { bids: 4, ends: at(3) })]]);
+  let captures = 0;
+  const result = await auctions(fakeSb(w), client, { now: () => clock, ledger: open,
+    snapshotWriter: async (_sb, input) => { captures++; clock += 30 * 60_000; return admitted(_sb, input); } });
+  assertEquals([captures, result.auctions.written_live, client.items.length, result.auctions.land_attempts], [1, 1, 0, 0]);
+});
+
+Deno.test("earliest vintage is selected once and second slot retains vintage priority", async () => {
+  const client = fakeClient([[lot("300000000021", { title: "1965 Ford Mustang", ends: at(0.1) }),
+    lot("300000000022", { title: "2022 Ford Bronco", ends: at(0.2) }),
+    lot("300000000023", { title: "1972 Ford Bronco", ends: at(4) })]]);
+  await auctions(fakeSb(world({})), client, { now: () => NOW, ledger: open, snapshotWriter: admitted });
+  assertEquals(client.items, ["v1|300000000021|0", "v1|300000000023|0"]);
 });
 
 Deno.test("a lot linked to another source's vehicle is never written or landed", async () => {

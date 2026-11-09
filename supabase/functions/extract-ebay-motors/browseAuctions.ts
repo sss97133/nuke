@@ -66,7 +66,7 @@ export interface AuctionOptions {
   floor?: number;          // calls left today (eBay's counter) this run never goes under
   blindCap?: number;       // calls allowed when eBay does not report what is left
   maxEnded?: number;       // listing episodes ended per complete pass
-  minMinutesLeft?: number; // an unheld lot ending sooner is not worth a getItem
+  minMinutesLeft?: number; // optional caller floor; default includes every still-open lot
   dryRun?: boolean;        // read and classify only: no getItem, no writes
   now?: () => number;
 }
@@ -316,19 +316,28 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
     if (o.dryRun) a.written_live = live.length;       // would be sent
     else if (live.length) a.written_live = await upsertLive(supabase, live, rep.errors);
 
-    // 3. land unheld lots: vintage first, then ending soonest (the search order, kept by the stable sort)
-    const minLeft = (o.minMinutesLeft ?? 30) * 60_000;
-    const todo = unheld.filter((s) => Date.parse(s.itemEndDate!) - now() >= minLeft)
-      .sort((x, y) => Number(isVintage(y)) - Number(isVintage(x)));
+    // 3. Reserve the first existing discovery slot for the next closing lot,
+    // regardless of year; remaining slots keep the vintage preference.
+    const minLeft = Math.max(0, o.minMinutesLeft ?? 0) * 60_000;
+    const openLots = unheld.filter((s) => Date.parse(s.itemEndDate!) > now()
+      && Date.parse(s.itemEndDate!) - now() >= minLeft)
+      .sort((x, y) => Date.parse(x.itemEndDate!) - Date.parse(y.itemEndDate!));
+    const todo = openLots.length ? [openLots[0], ...openLots.slice(1)
+      .sort((x, y) => Number(isVintage(y)) - Number(isVintage(x)))] : [];
     const take = o.dryRun ? [] : todo.slice(0, Math.max(0, Math.min(maxItems, budget - browse())));
     const landedKeys: string[] = [];
+    const tried = new Set<string>();
     for (const s of take) {                          // one at a time: each landing calls ingest, and the cap is exact
       if (browse() >= budget) break;
+      if (Date.parse(s.itemEndDate!) <= now()) continue; // it may close while earlier held updates run
       const why = await ledger.take();
       if (why) { rep.stopped = rep.stopped ? `${rep.stopped}; ${why}` : why; break; }
       a.land_attempts++;
+      tried.add(listingKey(s)!);
       try {
         const raw = await client.getItem(s.itemId!);
+        const freshEnd = Date.parse(raw.itemEndDate ?? s.itemEndDate!);
+        if (!Number.isFinite(freshEnd) || freshEnd <= now()) continue;
         const itemReadAt = new Date(now()).toISOString();
         const r = await landItem(supabase, raw, rep, itemReadAt);
         readAt.set(listingKey(s)!, itemReadAt);
@@ -359,8 +368,7 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
       }
       if (out.length) a.landed_live = await upsertLive(supabase, out, rep.errors);
     }
-    const tried = new Set(take.slice(0, a.land_attempts).map((s) => listingKey(s)));
-    for (const s of unheld) if (!tried.has(listingKey(s))) { if (isVintage(s)) a.left.vintage++; else a.left.other++; }
+    for (const s of unheld) if (!tried.has(listingKey(s)!)) { if (isVintage(s)) a.left.vintage++; else a.left.other++; }
     if (a.left.vintage + a.left.other > 0) {
       const wait = `${a.left.vintage + a.left.other} unheld open auctions in this read wait (vintage ${a.left.vintage}, other ${a.left.other})`;
       rep.stopped = rep.stopped ? `${rep.stopped}; ${wait}` : `budget: ${wait}`;
