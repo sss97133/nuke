@@ -56,6 +56,7 @@ import { readBatPartyLine, type BatSellerType } from "../_shared/batSellerType.t
 import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
+import { resolveBatVehicleIdentity } from "./vehicleIdentity.ts";
 import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type EndRow } from "./auctionClose.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
@@ -67,7 +68,7 @@ import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.11';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.12';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -1499,14 +1500,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    const identityResolution = await resolveBatVehicleIdentity(supabase, {
+      vehicleId, vin: essentials.vin, sourceUrl: listingUrlCanonical, comments: rawComments,
+    });
+    if (identityResolution.redirectedFrom) existing = null;
+    vehicleId = identityResolution.vehicleId;
     mark("resolve_vehicle");
     let streamOwnsAuction = false;
     if (vehicleId) {
-      const { data: liveMonitor } = await supabase.from("monitored_auctions")
-        .select("stream_state").eq("vehicle_id", vehicleId).in("external_auction_url", urlCandidates).limit(1).maybeSingle();
-      const state = liveMonitor?.stream_state;
-      streamOwnsAuction = Object.values(state?.sessions || {}).some((s: any) => s.connected && Date.parse(s.at) > Date.now() - 15000)
-        || (state?.last_frame_received_at && Date.parse(state.last_frame_received_at) > Date.parse(sourceFetchedAt || ""));
+      const monitorOwners = [...new Set([vehicleId, identityResolution.redirectedFrom].filter(Boolean))];
+      const { data: liveMonitors, error: liveMonitorError } = await supabase.from("monitored_auctions")
+        .select("stream_state").in("vehicle_id", monitorOwners).in("external_auction_url", urlCandidates).limit(3);
+      if (liveMonitorError) throw Error(`BaT native stream ownership unavailable: ${liveMonitorError.message}`);
+      if (!Array.isArray(liveMonitors) || liveMonitors.length > 2) throw Error('BaT native stream ownership ambiguous');
+      streamOwnsAuction = (liveMonitors ?? []).some((monitor: any) => {
+        const state = monitor.stream_state;
+        return Object.values(state?.sessions || {}).some((s: any) => s.connected && Date.parse(s.at) > Date.now() - 15000)
+          || (state?.last_frame_received_at && Date.parse(state.last_frame_received_at) > Date.parse(sourceFetchedAt || ""));
+      });
     }
     const createdIds: string[] = [];
     const updatedIds: string[] = [];
@@ -3075,6 +3086,11 @@ Deno.serve(async (req) => {
         vehicles_updated: updatedIds.length,
         created_vehicle_ids: createdIds,
         updated_vehicle_ids: updatedIds,
+        vehicle_resolution: identityResolution.redirectedFrom ? {
+          basis: 'exact_source_vin_over_native_inventory_locator',
+          inventory_locator_id: identityResolution.redirectedFrom,
+          canonical_vehicle_id: vehicleId,
+        } : null,
         issues: terminalCapture.status === "failed" || terminalCapture.status === "unavailable" ? ["terminal_evidence_" + terminalCapture.reason] : [],
         extraction_method: "direct_html_parsing_free_mode",
         timings: { ...timings, total_ms: Date.now() - phaseStart },
