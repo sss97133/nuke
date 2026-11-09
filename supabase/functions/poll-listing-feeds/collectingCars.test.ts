@@ -18,10 +18,10 @@ function fixture(count=221) {
 const read=(f:ReturnType<typeof fixture>)=>readCollectingCarsInventory(f.db,now,new AbortController().signal);
 async function rejects(fn:()=>Promise<unknown>,message:string){try{await fn();}catch(error){if(String(error).includes(message))return;throw error;}throw Error("Expected refusal");}
 Deno.test("retained CC discovery pages one exact complete batch and includes the real thin Porsche without a source request",async()=>{
-  const f=fixture();const r=await read(f);equal(r.urls.includes(porsche),true);equal(r.receipt,{scope:"retained_current_collecting_cars_inventory",inventory_recorded_at:at,inventory_lots:221,eligible_lots:221,pages:2,complete:true});
+  const f=fixture();const r=await read(f);equal(r.urls,f.rows.map(row=>row.external_auction_url));equal(r.urls[220],porsche);equal(r.receipt,{scope:"retained_current_collecting_cars_inventory",inventory_recorded_at:at,inventory_lots:221,eligible_lots:221,pages:2,complete:true});
   equal(f.calls.filter(c=>c[1]==="range").map(c=>c.slice(2)),[[0,199],[200,220]]);
   equal(f.calls.filter(c=>c[1]==="eq"&&c[2]==="last_synced_at").every(c=>c[3]===at),true);
-  equal(splitByYear([...r.urls,"https://collectingcars.com/for-sale/2023-porsche-test"],1964,1991).keep.includes(porsche),true);
+  equal(splitByYear([...r.urls,"https://collectingcars.com/for-sale/2023-porsche-test"],1964,1991).keep,r.urls);
   equal(splitByYear([...r.urls,"https://collectingcars.com/for-sale/2023-porsche-test"],1964,1991).rest.length,1);
 });
 Deno.test("complete retained inventory can honestly be empty; retired/elapsed lots are not current",async()=>{
@@ -84,7 +84,7 @@ Deno.test("CC remains subject to existing feed cadence and global zero allowance
 
 Deno.test("retained CC inventory preserves legitimate plus and uppercase native slugs",async()=>{
   const f=fixture(2);f.rows[0].external_auction_url="https://collectingcars.com/for-sale/1965-Porsche-911+SWB";
-  equal((await read(f)).urls.includes(f.rows[0].external_auction_url),true);
+  equal((await read(f)).urls,f.rows.map(row=>row.external_auction_url));
 });
 
 Deno.test("retained inventory respects the explicit2000-lot ceiling using bounded200-row pages",async()=>{
