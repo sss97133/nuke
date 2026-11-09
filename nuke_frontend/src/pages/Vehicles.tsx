@@ -271,7 +271,7 @@ const VehiclesInner: React.FC = () => {
   }, [isResizing, sidebarWidth]);
 
   useEffect(() => {
-    loadVehicleRelationships();
+    loadVehicleRelationships(false);
     if (session?.user?.id) {
       loadVehiclePreferences();
     }
@@ -287,7 +287,8 @@ const VehiclesInner: React.FC = () => {
     })();
   }, [session?.user?.id]);
 
-  const loadVehicleRelationships = async () => {
+  const loadVehicleRelationships = async (refreshOwnership = true) => {
+    if (refreshOwnership) qualifiedGarage.refresh();
     if (!session?.user?.id) {
       setLoading(false);
       return;

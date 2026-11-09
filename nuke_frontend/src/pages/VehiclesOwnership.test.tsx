@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ garage: { vehicles: [] as any[], isLoading: false, error: null as string | null } }));
+const fixture = vi.hoisted(() => ({ garage: { vehicles: [] as any[], isLoading: false, error: null as string | null, refresh: vi.fn() } }));
 vi.mock('../hooks/useVehiclesDashboard', async original => ({ ...await original<any>(), useVehiclesDashboard: () => fixture.garage }));
 vi.mock('../contexts/AuthContext', () => ({ useAuthContext: () => ({ session: { user: { id: 'user' } } }) }));
 vi.mock('../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
@@ -39,12 +39,15 @@ it('keeps photo-only co-owner permissions out of the actual legacy Owned tab and
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'vehicles.sidebarCollapsed' ? 'false' : null, setItem: () => {} });
   fixture.garage = { vehicles: [{ id: 'title', year: 1970, make: 'Fixture', model: 'title', relationship_type: 'VERIFIED OWNER', created_at: '2020-01-01' },
-    { id: 'photo', relationship_type: 'RELATIONSHIP REVIEW' }], isLoading: false, error: null };
+    { id: 'photo', relationship_type: 'RELATIONSHIP REVIEW' }], isLoading: false, error: null, refresh: vi.fn() };
   const host = document.createElement('div'), root = createRoot(host);
   try {
     await act(async () => root.render(<MemoryRouter><Vehicles /></MemoryRouter>));
     expect(host.querySelector('[data-vehicle="title"]')).not.toBeNull();
     expect(host.querySelector('[data-vehicle="photo"]')).toBeNull();
+    const refresh = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === 'REFRESH')!;
+    expect(refresh).not.toBeNull(); await act(async () => refresh.click());
+    expect(fixture.garage.refresh).toHaveBeenCalledOnce();
     const all = [...host.querySelectorAll('button')].find(button => button.textContent === 'All2')!;
     expect(all).toBeTruthy(); await act(async () => all.click());
     expect(host.querySelector('[data-vehicle="photo"]')).not.toBeNull();
