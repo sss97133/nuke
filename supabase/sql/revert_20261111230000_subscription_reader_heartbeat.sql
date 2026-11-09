@@ -1,4 +1,4 @@
--- Revert of 20261111210000_subscription_reader_heartbeat.sql: the cron watch, the assay and the heartbeat writer. The two
+-- Revert of 20261111230000_subscription_reader_heartbeat.sql: the cron watch, the assay and the heartbeat writer. The two
 -- job_assay_readings rows the readers wrote are left in place (they are readings, not testimony; refresh_job_health ignores
 -- jobnames it does not know).
 SET lock_timeout = '5s';

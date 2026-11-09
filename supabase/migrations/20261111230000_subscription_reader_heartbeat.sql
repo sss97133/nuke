@@ -8,7 +8,7 @@
 --     only, one upserted job_assay_readings row per reader (fresh 40 min, refresh 10 min: the plist fires every 10).
 --  2. assay_subscription_readers(): raises when either reader has no heartbeat within 40 minutes, so the cron job
 --     subscription-reader-watch (every 10 minutes) fails and v_job_health shows it failed; passes with both readings.
--- Nothing here reads an image or calls a model. Revert: supabase/sql/revert_20261111210000_subscription_reader_heartbeat.sql.
+-- Nothing here reads an image or calls a model. Revert: supabase/sql/revert_20261111230000_subscription_reader_heartbeat.sql.
 -- Contract: supabase/sql/test_subscription_reader_heartbeat.sql.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';

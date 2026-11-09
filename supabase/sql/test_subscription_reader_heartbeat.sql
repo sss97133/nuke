@@ -1,4 +1,4 @@
--- Subscription reader heartbeat (20261111210000): the service role records one reading per reader; anon and signed-in users
+-- Subscription reader heartbeat (20261111230000): the service role records one reading per reader; anon and signed-in users
 -- cannot; the assay passes with two fresh readings, raises when one is missing or stale; the watch is scheduled; the revert
 -- removes it all.
 \set ON_ERROR_STOP on
@@ -36,7 +36,7 @@ BEGIN IF NOT coalesce(ok, false) THEN RAISE EXCEPTION 'contract failed: %', msg;
 CREATE FUNCTION pg_temp.raises(sql text) RETURNS text LANGUAGE plpgsql AS $$
 BEGIN EXECUTE sql; RETURN NULL; EXCEPTION WHEN OTHERS THEN RETURN SQLERRM; END $$;
 
-\i supabase/migrations/20261111210000_subscription_reader_heartbeat.sql
+\i supabase/migrations/20261111230000_subscription_reader_heartbeat.sql
 
 -- grants
 SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.record_reader_heartbeat(text, jsonb, integer)', 'EXECUTE'), 'anon cannot record');
@@ -71,7 +71,7 @@ UPDATE public.job_assay_readings SET assayed_at = now() - interval '2 hours' WHE
 SELECT pg_temp.assert_true(pg_temp.raises($$SELECT public.assay_subscription_readers()$$) LIKE '%subscription-frame-classifier%', 'a reading older than 40 minutes is silent');
 
 -- revert
-\i supabase/sql/revert_20261111210000_subscription_reader_heartbeat.sql
+\i supabase/sql/revert_20261111230000_subscription_reader_heartbeat.sql
 SELECT pg_temp.assert_true(to_regprocedure('public.record_reader_heartbeat(text, jsonb, integer)') IS NULL AND to_regprocedure('public.assay_subscription_readers()') IS NULL
   AND (SELECT count(*) FROM cron.job WHERE jobname = 'subscription-reader-watch') = 0 AND (SELECT count(*) FROM public.job_assay_readings) = 2, 'revert removes the functions and the watch, keeps the readings');
 SELECT 'subscription reader heartbeat contract: ok' AS result;
