@@ -24,13 +24,17 @@ type Lot = {
 type Statement = { statement_id: string; source: string | null; observed_at: string; observed_at_basis: string | null; result: string | null;
   hammer_price: number | null; high_bid: number | null; estimate_low: number | null; estimate_high: number | null; currency: string | null;
   landed_at: string; superseded: boolean };
-type Party = { id: string; display_name: string | null; qualifier_as_printed: string | null; claimed: boolean; lots_direct: number; priced_lots: number };
+type Party = { id: string; kind?: 'catalogue' | 'user'; display_name: string | null; qualifier_as_printed?: string | null; claimed: boolean; lots_direct: number; priced_lots: number };
 type Executor = { role: string; name_as_printed: string | null; qualifier_as_printed: string | null; party_identity_id: string | null };
 type Creation = { claim_id: string; attribution: string; layout: string | null; name_as_printed: string | null; qualifier_as_printed: string | null;
   party: Party | null; executor: Executor | null; source: string | null; observed_at: string; confidence: number | null };
+type Declared = { medium?: string; year?: string; dimensions?: string; edition?: string; notes?: string };
 export type AssetProfile = {
   asset: { id: string; asset_type: string; title: string | null; house_category: string | null; house_category_code: string | null;
-    source: string | null; identity_basis: string | null; first_seen_at: string | null; created_at: string };
+    source: string | null; identity_basis: string | null; first_seen_at: string | null; created_at: string; visibility?: string };
+  viewer?: { is_holder: boolean };
+  declared?: Declared | null;
+  market?: 'recorded' | 'none_public';
   image_url: string | null;
   lots: Lot[];
   history: Statement[];
@@ -45,7 +49,11 @@ const ATTRIBUTION_WORDS: Record<string, string> = {
 const RESULT_WORDS: Record<string, string> = {
   sold: 'Sold', not_sold: 'Not sold', upcoming: 'Upcoming', 'bid-goes-on': 'Bid goes on', bid_goes_on: 'Bid goes on', unknown: 'Result unknown',
 };
-const TYPE_WORDS: Record<string, string> = { artwork: 'Artwork', automobilia: 'Automobilia', memorabilia: 'Memorabilia' };
+const TYPE_WORDS: Record<string, string> = { artwork: 'Artwork', automobilia: 'Automobilia', memorabilia: 'Memorabilia', publication: 'Publication' };
+const IDENTITY_WORDS: Record<string, string> = {
+  lot_presentation: 'one presentation at one house. The same object seen again at another sale is joined by supersession, never by overwriting.',
+  holder_declaration: 'declared by its holder in their own words. Presentations, publications and sales attach to it as they are recorded.',
+};
 const BASIS_WORDS: Record<string, string> = {
   hammer: 'hammer, premium not included', highest_bid_or_price: "the house's highest bid or price", hammer_time: 'the hammer clock',
   sale_end: "the sale's end", index_read: 'when Nuke read the index',
@@ -151,9 +159,9 @@ function CreationBlock({ claims, lots }: { claims: Creation[]; lots: number }) {
       <Rows title="This party across Nuke">
         <Row label="Lots attributed directly" role="measure">{(c.party?.lots_direct ?? 0).toLocaleString('en-US')}</Row>
         <Row label="With a published hammer" role="measure">{(c.party?.priced_lots ?? 0).toLocaleString('en-US')}</Row>
-        <Row label="Claimed by the artist or estate" role="caption">{c.party?.claimed ? 'Yes' : 'Not yet: the row is theirs to claim'}</Row>
+        <Row label={c.party?.kind === 'user' ? 'The party' : 'Claimed by the artist or estate'} role="caption">{c.party?.kind === 'user' ? 'A Nuke user, declaring their own work' : c.party?.claimed ? 'Yes' : 'Not yet: the row is theirs to claim'}</Row>
         {c.executor?.name_as_printed && <Row label={`Executed by (${c.executor.role})`}>{`${c.executor.name_as_printed}${c.executor.qualifier_as_printed ? ` (${c.executor.qualifier_as_printed})` : ''}`}</Row>}
-        <Row label="Claim source" role="caption">{`${c.source ?? 'the house'} · ${day(c.observed_at)} · ${c.layout === 'name_colon_description' ? 'the name before the colon' : 'the first catalogue line'}`}</Row>
+        <Row label="Claim source" role="caption">{`${c.source ?? 'the house'} · ${day(c.observed_at)} · ${c.layout === 'holder_declaration' ? "the holder's own declaration" : c.layout === 'name_colon_description' ? 'the name before the colon' : 'the first catalogue line'}`}</Row>
       </Rows>
     </div>)}
   </Section>;
@@ -211,7 +219,22 @@ export default function AssetProfilePage() {
         {current.hammer_price ? <ClaimView claim={lotClaim(current, current.hammer_price)} role="figure" format={v => money(Number(v), current.currency)} /> : <Text role="figure">{head.value}</Text>}
         <Text role="caption">{day(current.observed_at)}</Text>
       </div>}
+      {!current && <div className="ap-masthead__result">
+        <Text role="label">Market</Text>
+        <Text role="measure">No public sale recorded</Text>
+        <Text role="caption">a figure appears only when a house publishes one</Text>
+      </div>}
     </header>
+    {profile.declared && Object.keys(profile.declared).length > 0 && <Section title="As declared by the holder" coverage={{ n: 1, of: 1, grain: 'declaration', as_of: profile.asset.created_at }}>
+      <Rows title="In the holder's words">
+        {profile.declared.medium && <Row label="Medium">{profile.declared.medium}</Row>}
+        {profile.declared.year && <Row label="Year">{profile.declared.year}</Row>}
+        {profile.declared.dimensions && <Row label="Dimensions">{profile.declared.dimensions}</Row>}
+        {profile.declared.edition && <Row label="Edition">{profile.declared.edition}</Row>}
+        {profile.asset.visibility && <Row label="Visibility" role="caption">{profile.asset.visibility}</Row>}
+      </Rows>
+      {profile.declared.notes && <div className="ap-printed"><Text role="label" as="h3">Notes</Text><Text role="body" as="p" className="ap-prose">{profile.declared.notes}</Text></div>}
+    </Section>}
     {profile.image_url && <figure className="ap-figure">
       <img src={profile.image_url} alt={profile.asset.title ?? 'The lot as photographed by the house'} width={1200} height={900} loading="eager" decoding="async" />
       <figcaption><Text role="caption">{`The house's photograph${current?.source.name ? ` · ${current.source.name}` : ''}`}</Text></figcaption>
@@ -221,7 +244,7 @@ export default function AssetProfilePage() {
     <HistoryBlock statements={profile.history} />
     <footer className="ap-footer">
       <Text role="caption">{`Nuke holds ${profile.coverage.presentations.toLocaleString('en-US')} presentation${profile.coverage.presentations === 1 ? '' : 's'}, ${profile.coverage.statements.toLocaleString('en-US')} statement${profile.coverage.statements === 1 ? '' : 's'} and ${profile.coverage.claims.toLocaleString('en-US')} creation claim${profile.coverage.claims === 1 ? '' : 's'} for this asset${sources.length ? ` from ${sources.join(', ')}` : ''} · as of ${day(profile.coverage.as_of)}.`}</Text>
-      <Text role="caption">{`Identity: ${profile.asset.identity_basis === 'lot_presentation' ? 'one presentation at one house. The same object seen again at another sale is joined by supersession, never by overwriting.' : profile.asset.identity_basis ?? 'as recorded'}`}</Text>
+      <Text role="caption">{`Identity: ${IDENTITY_WORDS[profile.asset.identity_basis ?? ''] ?? profile.asset.identity_basis ?? 'as recorded'}`}</Text>
     </footer>
   </main>;
 }
