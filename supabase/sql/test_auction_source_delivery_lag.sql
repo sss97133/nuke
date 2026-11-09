@@ -37,6 +37,12 @@ DO $$ DECLARE bad jsonb; BEGIN
   UPDATE system_state SET value=bad;
   IF pg_temp.queue()->>'state'<>'invalid' OR pg_temp.queue() ? 'queued_receipts' THEN RAISE EXCEPTION 'Malformed queue became measured zero/count'; END IF;
  END LOOP;
+ UPDATE system_state SET value=jsonb_build_object('version',1,'entries',(
+   SELECT jsonb_agg(pg_temp.entry()||jsonb_build_object('key',(100000000000+g)::text,
+     'url','https://ebay.com/itm/'||(100000000000+g)::text)) FROM generate_series(1,1000) g));
+ IF pg_temp.queue()->>'queued_receipts'<>'1000' OR pg_temp.queue()->>'state'<>'recorded' THEN RAISE EXCEPTION 'Valid queue ceiling lost'; END IF;
+ UPDATE system_state SET value=jsonb_set(value,'{entries}',(value->'entries')||jsonb_build_array(pg_temp.entry()));
+ IF pg_temp.queue()->>'state'<>'invalid' OR pg_temp.queue() ? 'queued_receipts' THEN RAISE EXCEPTION 'Oversized queue became a partial count'; END IF;
  UPDATE system_state SET value=jsonb_build_object('version',1,'entries','[]'::jsonb),updated_at=now()+interval '1 minute';
  IF pg_temp.queue()->>'state'<>'invalid' THEN RAISE EXCEPTION 'Future queue clock admitted'; END IF;
  UPDATE system_state SET updated_at=now()-interval '1 minute';
