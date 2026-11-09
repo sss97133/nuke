@@ -33,7 +33,8 @@ globalThis.fetch = (async (input, init) => {
   if (url.pathname === "/rest/v1/rpc/project_reviewed_image_analysis") {
     assert(JSON.parse(String(init?.body)).p_observation_id === observationId);
     return rejectProjection ? Response.json({ message: "source withdrawn", code: "23514" }, { status: 400 }) :
-      Response.json({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId });
+      Response.json({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId,
+        image_observation_id: "50000000-0000-4000-8000-000000000001" });
   }
   throw new Error(`unexpected effect: ${url.pathname}`);
 }) as typeof fetch;
@@ -58,6 +59,7 @@ Deno.test("actual reviewed action sends service credentials only to read, deferr
   calls.length = 0; rejectProjection = false;
   const response = await handler(request()), result = await response.json();
   assert(response.status === 200 && result.success === true && result.model_calls === 0);
+  assert(result.image_observation_id === "50000000-0000-4000-8000-000000000001");
   assert(calls.join("|") === "GET /rest/v1/vehicle_images|POST /functions/v1/ingest-observation|POST /rest/v1/rpc/project_reviewed_image_analysis");
   assert(intakeBody.defer_analysis === true && intakeBody.agent_inferred === true);
   assert(intakeBody.extraction_metadata.reviewer_provenance.agent_model === "fixture-model");
