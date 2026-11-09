@@ -106,10 +106,14 @@ export function fixture(options = {}) {
   // stub it to success or let its default fetch escape to the real publisher.
   const purplewave = { exports: {} };
   vm.runInNewContext(compile(readFileSync(new URL('../supabase/functions/poll-listing-feeds/purplewave.ts', import.meta.url), 'utf8')), {
-    exports: purplewave.exports, module: purplewave, URLSearchParams, AbortSignal, Date: runtimeDate, fetch: transport,
+    exports: purplewave.exports, module: purplewave, URL, URLSearchParams, TextEncoder, crypto: webcrypto, AbortSignal, Date: runtimeDate, fetch: transport,
     require(name) {
       if (name.endsWith('/vehicleEventWrite.ts')) return { vehicleEventWriterFor };
       if (name === './purplewaveDescription.ts') return { purplewaveDescription };
+      // These generic feed cases never acquire Purple Wave pages. Keep the
+      // new custody dependency fail-closed; its real archive path is exercised
+      // by purplewave.test.ts in the CI poller contract job.
+      if (name.endsWith('/archiveFetch.ts')) return { retainFetchedCapture: () => { throw new Error('unexpected PurpleWave page retention'); } };
       throw new Error(`Unexpected PurpleWave import ${name}`);
     },
   });
