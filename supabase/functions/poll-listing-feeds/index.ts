@@ -947,7 +947,9 @@ async function pollFirecrawlHtmlFeed(
   const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
     feed.source_slug === "craigslist" ? { ...CRAIGSLIST_REVISIT, max: Math.min(CRAIGSLIST_REVISIT.max, budget.revisitAllowance()) } : null);
   budget.spendRevisits(plan.revisits ?? 0);
-  result.matched_existing = plan.settled + plan.backoff;
+  result.matched_existing = nativeCc
+    ? Number(result.retained_inventory?.current_full_listing_receipts ?? 0)
+    : plan.settled + plan.backoff;
   result.retries_due = plan.retries;
   result.backing_off = plan.backoff;
   const toIngest = plan.toIngest;

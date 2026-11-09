@@ -481,6 +481,7 @@ async function matchOrCreateVehicle(
       await enrichVehicle(owner, parsed, platform);
       return { vehicleId: owner, isNew: false, matchTier: 2, matchConfidence: 0.99 };
     }
+    if (!parsed.model) throw Error("cc_listing_owner_missing_for_unknown_model");
   }
 
   // ── Tier 1: VIN match (confidence 0.99) ───────────────────────
@@ -1453,7 +1454,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           parsed = {
             year: input.year || enriched.year,
             make: input.make || enriched.make,
-            model: input.model || enriched.model || parsed.model,
+            model: ccCapture?.fields.model === null ? null : input.model || enriched.model || parsed.model,
           };
         }
       } else {
@@ -1510,7 +1511,17 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         ...captureAnswer(),
       };
     }
-    if (!parsed.year || !parsed.make || !parsed.model) {
+    // Missing native model is unknown testimony, not permission to infer from
+    // the URL. A verified existing presentation can still receive its full
+    // capture; a new identity must satisfy the ordinary required-field gate.
+    let ccUnknownModelOwner = false;
+    if (ccCapture?.fields.model === null && parsed.year && parsed.make) {
+      const owners = await supabaseAdmin.from("vehicles").select("id,listing_url,vin,year,make,status,deleted_at,merged_into_vehicle_id,origin_metadata")
+        .eq("listing_url", ccCapture.fields.url).is("deleted_at", null).limit(2);
+      if (owners.error) throw Error("cc_listing_owner_unavailable");
+      ccUnknownModelOwner = collectingCarsOwner(owners.data ?? [], ccCapture.fields) !== null;
+    }
+    if (!parsed.year || !parsed.make || (!parsed.model && !ccUnknownModelOwner)) {
       return {
         status: "rejected",
         reason: `insufficient identity: year=${parsed.year ?? "?"} make=${parsed.make ?? "?"} model=${parsed.model ?? "?"} — need all three`,
@@ -1566,7 +1577,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     const candidateData: Record<string, any> = {
       year: parsed.year ?? input.year,
       make: parsed.make ?? input.make,
-      model: parsed.model ?? input.model,
+      model: ccCapture?.fields.model === null ? null : parsed.model ?? input.model,
       vin: input.vin ?? null,
       price: input.price ?? null,
       asking_price: input.price ?? null,

@@ -4,17 +4,20 @@ const base = 'https://fixture.supabase.test', key = 'sb_secret_cc_handler_fixtur
 Deno.env.set('SUPABASE_URL', base);
 Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', key);
 Deno.env.set('SUPABASE_SECRET_KEYS', JSON.stringify({ default: key }));
-const url = 'https://collectingcars.com/for-sale/1965-porsche-911-fixture';
+const defaultUrl = 'https://collectingcars.com/for-sale/1965-porsche-911-fixture';
+let url = defaultUrl;
 const id = '11111111-1111-4111-8111-111111111111';
 const snapshot = '22222222-2222-4222-8222-222222222222';
 const observationId = '33333333-3333-4333-8333-333333333333';
 const clock = '2026-01-01T00:00:00.000Z';
 const images = Array.from({ length: 266 }, (_, i) => `https://images.collectingcars.com/fixture/${i}.jpg`);
-const fields = { listing_id: '90001', url, listing_url: url, title: '1965 Porsche 911', year: 1965, make: 'Porsche', model: '911',
+const defaultFields = { listing_id: '90001', url, listing_url: url, title: '1965 Porsche 911', year: 1965, make: 'Porsche', model: '911',
   vin: '301999', lot_type: 'car', country: 'GB', description: 'Original full seller prose. '.repeat(60),
   price_amount: 17250, price_kind: 'current_bid', currency: 'GBP', bid_count: 8, image_urls: images };
+let fields: Omit<typeof defaultFields, 'model'> & { model: string | null } = { ...defaultFields };
 let vehicle: Record<string, any>, gallery: any[], observation: any, seen: any[], failure: string;
 function reset(mode = '') {
+  url = defaultUrl; fields = { ...defaultFields };
   vehicle = { id, listing_url: url, year: 1965, make: 'Porsche', model: '911', vin: null, country: 'USA',
     origin_metadata: { country: 'GB' }, deleted_at: null, merged_into_vehicle_id: null, status: 'active' };
   gallery = []; observation = null; seen = []; failure = mode;
@@ -42,6 +45,11 @@ globalThis.fetch = async (input, init) => {
   if (u.pathname === '/rest/v1/vehicles') {
     if (read) {
       assert(!u.searchParams.has('vin'), 'Exact current URL owner must win before six-character chassis lookup');
+      if (u.searchParams.has('listing_url')) {
+        const ownerReads = seen.filter(x => x.path === '/rest/v1/vehicles' && x.method === 'GET' && x.search.includes('listing_url=eq.')).length;
+        if (failure === 'no-owner' || (failure === 'owner-disappeared' && ownerReads > 1)) return Response.json([]);
+        if (failure === 'ambiguous-owner') return Response.json([vehicle, { ...vehicle, id: snapshot }]);
+      }
       return Response.json(object ? vehicle : [vehicle]);
     }
     assertEquals(req.method, 'PATCH', 'Existing current presentation must not fork');
@@ -87,3 +95,31 @@ for (const mode of ['capture', 'admission', 'gallery']) Deno.test(`actual CC han
   reset(mode); const r = await run(); assertEquals(r.status, 'error'); assertEquals(r.collecting_cars_receipt, undefined);
   if (mode === 'capture') assertEquals(seen.filter(x => x.method !== 'GET' && x.path.startsWith('/rest/')).length, 0);
 });
+
+function blueBird(mode = '') {
+  reset(mode);
+  url = 'https://collectingcars.com/for-sale/1986-bluebird-wanderlodge-pt38';
+  fields = { ...fields, url, listing_url: url, listing_id: '94590', title: '1986 Blue Bird Wanderlodge PT38',
+    year: 1986, make: 'Blue Bird', model: null, vin: 'GF0711857',
+    image_urls: Array.from({ length: 276 }, (_, i) => `https://images.collectingcars.com/bluebird/${i}.jpg`) };
+  vehicle = { ...vehicle, listing_url: url, year: 1986, make: 'Blue Bird', model: null, origin_metadata: { auction_id: '94590', country: 'GB' } };
+}
+Deno.test('actual CC handler retains known Blue Bird owner with native null model and all276 photos', async () => {
+  blueBird(); const r = await run();
+  assertEquals(r.status, 'matched'); assertEquals(r.vehicle_id, id);
+  assertEquals(r.collecting_cars_receipt.images, 276); assertEquals(gallery.length, 276);
+  assertEquals(vehicle.model, null); assertEquals(observation.structured_data.model, null);
+  assertEquals(observation.structured_data.title, fields.title); assertEquals(vehicle.vin, 'GF0711857');
+  assertEquals(observation.observed_at, clock); assertEquals(observation.raw_source_ref, `listing_page_snapshots:${snapshot}`);
+  assertEquals(seen.some(x => x.path === '/rest/v1/vehicles' && x.method === 'POST'), false);
+});
+for (const mode of ['no-owner', 'ambiguous-owner', 'owner-disappeared', 'foreign-owner']) {
+  Deno.test(`native null model cannot create or attach to ${mode}`, async () => {
+    blueBird(mode);
+    if (mode === 'foreign-owner') vehicle.origin_metadata.auction_id = 'different';
+    const r = await run();
+    assert(['error', 'rejected'].includes(r.status)); assertEquals(r.collecting_cars_receipt, undefined);
+    assertEquals(gallery.length, 0); assertEquals(observation, null);
+    assertEquals(seen.some(x => x.path.startsWith('/rest/') && !['GET', 'HEAD'].includes(x.method)), false);
+  });
+}
