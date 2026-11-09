@@ -732,7 +732,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       try {
         const result = await supabase
           .from('vehicle_events')
-          .select('source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('source_platform, source_url, event_type, event_status, ended_at, current_price, currency_code, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
           .eq('vehicle_id', vehicle!.id)
           .eq('source_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })
@@ -745,7 +745,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
         const platform = String((merged as any)?.platform || auctionPulse?.platform || '');
-        const listingUrl = String((merged as any)?.listing_url || auctionPulse?.listing_url || '');
+        const listingUrl = String((merged as any)?.listing_url || '');
+        if (!listingUrl) { setAuctionPulse(null); return; }
 
         let commentCount: number | null =
           typeof (merged as any)?.comment_count === 'number'
@@ -757,13 +758,13 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         try {
           const [cCount, lastBid, lastComment, lastSeller] = await Promise.all([
             commentCount === null
-              ? supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicle!.id)
+              ? supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl).or('bid_amount.is.null,comment_type.neq.bid')
               : Promise.resolve({ count: commentCount } as any),
-            supabase.from('auction_comments').select('posted_at, author_username').eq('vehicle_id', vehicle!.id)
+            supabase.from('auction_comments').select('posted_at, author_username').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
               .not('bid_amount', 'is', null).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('posted_at').eq('vehicle_id', vehicle!.id)
-              .order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('author_username').eq('vehicle_id', vehicle!.id)
+            supabase.from('auction_comments').select('posted_at').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
+              .or('bid_amount.is.null,comment_type.neq.bid').order('posted_at', { ascending: false }).limit(1).maybeSingle(),
+            supabase.from('auction_comments').select('author_username').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
               .eq('is_seller', true).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
           ]);
 
@@ -797,6 +798,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
             updated_at: (merged as any)?.updated_at ?? auctionPulse?.updated_at ?? null,
+            currency_code: (merged as any)?.currency_code ?? null,
+            source_observed_at: (merged as any)?.source_observed_at ?? null,
             metadata: (merged as any)?.metadata ?? (auctionPulse as any)?.metadata ?? null,
             winner_name: (auctionPulse as any)?.winner_name ?? null,
             seller_username: (auctionPulse as any)?.seller_username ?? null,

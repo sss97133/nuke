@@ -97,3 +97,18 @@ describe('canonical auction telemetry across a soft close', () => {
     source_observed_at: row.metadata.source_observed_at,
   });
 });
+
+
+it('qualifies only explicit PurpleWave auction item episodes', () => {
+  const row = { ...listing, source_platform: 'purplewave', event_type: 'auction',
+    source_url: 'https://www.purplewave.com/auction/261111A/item/FN3842' };
+  expect(isAuctionPresentation(row)).toBe(true);
+  for (const source_url of ['https://purplewave.com/', 'https://purplewave.com/auction/261111A',
+    'https://purplewave.example/auction/261111A/item/FN3842',
+    'https://user@purplewave.com/auction/261111A/item/FN3842',
+    'https://purplewave.com:444/auction/261111A/item/FN3842']) {
+    expect(isAuctionPresentation({ ...row, source_url })).toBe(false);
+  }
+  expect(isAuctionPresentation({ ...row, event_type: 'listing' })).toBe(false);
+  expect(isAuctionPresentation({ ...row, event_type: undefined })).toBe(false);
+});
