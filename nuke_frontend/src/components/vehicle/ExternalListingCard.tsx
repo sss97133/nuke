@@ -204,7 +204,11 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
             String(listing.metadata?.seller_username || listing.metadata?.seller || '').trim() || null;
           const buyer =
             String(listing.metadata?.buyer_username || listing.metadata?.buyer || '').trim() || null;
-          const endIso = (listing.sold_at || listing.ended_at || null) as string | null;
+          // Active source snapshots carry a scheduled deadline, not a terminal ended_at.
+          const snapshotEnd = listing.metadata?.auction_end_date;
+          const activeEnd = typeof snapshotEnd === 'string' && Number.isFinite(parseTs(snapshotEnd))
+            ? snapshotEnd : listing.ended_at;
+          const endIso = (isActive ? activeEnd : listing.sold_at || listing.ended_at) || null;
           const endLabel = isScheduled ? 'Scheduled' : isSold ? 'Sold' : (isActive ? 'Ends' : 'Ended');
           const endDate = endIso ? new Date(endIso) : null;
           const endText = isScheduled
@@ -347,7 +351,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
               {isActive && (
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
                   Source read: {sourceRead ? <time dateTime={sourceRead}>{sourceRead}</time> : 'Unrecorded'}
-                  {listing.metadata?.capture_kind === 'auction_bid_snapshot' && ' · Auction snapshot, not an individual bid time'}
+                  {['auction_bid_snapshot', 'auction_state_snapshot'].includes(listing.metadata?.capture_kind) && ' · Auction snapshot, not an individual bid time'}
                   {hasObservation && <> · <a href={`/vehicle/${vehicleId}/observation/${observationId}`}>Retained observation</a></>}
                 </div>
               )}

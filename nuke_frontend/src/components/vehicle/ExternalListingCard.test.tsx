@@ -48,6 +48,20 @@ it.each(['invalid', '2999-01-01T00:00:00Z', undefined])('never replaces unknown 
   expect(container.textContent).toContain('Source read: Unrecorded');
   expect(container.textContent).not.toContain('2026-11-09T02:00:00');
 });
+it('shows an active source snapshot deadline without claiming terminal time', async () => {
+  fixture.rows = [listing({ source_platform: 'purplewave', event_status: 'active', ended_at: null,
+    metadata: { auction_end_date: '2026-11-12T20:00:00Z', capture_kind: 'auction_state_snapshot' } })];
+  await render();
+  expect(container.textContent).toContain('Ends: Nov 12, 2026');
+  expect(container.textContent).toContain('Auction snapshot, not an individual bid time');
+  expect(container.textContent).not.toContain('Ended:');
+});
+it('never substitutes a scheduled source deadline for a terminal sale clock', async () => {
+  fixture.rows = [listing({ event_status: 'sold', ended_at: null, sold_at: null,
+    metadata: { auction_end_date: '2026-11-12T20:00:00Z', capture_kind: 'auction_state_snapshot' } })];
+  await render();
+  expect(container.textContent).not.toMatch(/Nov 12|Ended:|Sold:/);
+});
 
 it.each(['pending', 'upcoming', 'scheduled'])('shows a %s lot on its source run day, without a completed or invented time', async event_status => {
   fixture.rows = [listing({ event_status })];
