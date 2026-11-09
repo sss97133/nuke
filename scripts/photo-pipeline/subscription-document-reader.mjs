@@ -39,11 +39,11 @@ async function rest(q) {
   return r.json();
 }
 
-// Pages the route recorded while their frame had no vehicle, whose frame now holds one (capture_documents_land_by_vin, or the
-// capture landing loop): the route lands them from the stored page, no second read. The view drops a page once it carries
+// Pages the route recorded while their frame had no vehicle, now with one: from the frame (capture landing loop) or from the
+// page's own VIN (capture_documents_land_by_vin, landing_vehicle_id). The route lands them from the stored page, no second read. The view drops a page once it carries
 // extraction.landed.
 async function toLand() {
-  try { return await rest(`capture_document_pages_to_land?select=image_id,vehicle_id,doc_type&user_id=eq.${OWNER}&order=page_at&limit=200`); }
+  try { return await rest(`capture_document_pages_to_land?select=image_id,vehicle_id,basis,doc_type&user_id=eq.${OWNER}&order=page_at&limit=200`); }
   catch (e) { console.error(`to-land view unavailable: ${e.message}`); return []; }
 }
 async function worklist() {
@@ -142,13 +142,13 @@ if (!dry) {
   summary.to_land = pending.length; summary.relanded = 0; summary.reland_vehicle_document = 0; summary.reland_errors = 0;
   for (const p of pending) {
     try {
-      const r = await fetch(`${URL_}/functions/v1/receipt-photo-ocr`, { method: 'POST', headers: H, body: JSON.stringify({ image_id: p.image_id }) });
+      const r = await fetch(`${URL_}/functions/v1/receipt-photo-ocr`, { method: 'POST', headers: H, body: JSON.stringify({ image_id: p.image_id, vehicle_id: p.vehicle_id }) }); // the view's vehicle: the frame's, or the page's own VIN landing
       const res = await r.json().catch(() => ({}));
       out.push({ image_id: p.image_id, vehicle_id: p.vehicle_id, document_type: p.doc_type, reland: true, http: r.status, landed: !!res.landed, reason: res.reason, receipt_id: res.receipt_id, error: res.error });
       if (res.landed) summary.relanded++;
       else if (/vehicle document/.test(res.reason || '')) summary.reland_vehicle_document++;
       else summary.reland_errors++;
-      console.error(`${p.image_id} ${p.doc_type} reland ${r.status} ${res.landed ? 'landed ' + res.receipt_id : (res.reason || res.error || '')}`);
+      console.error(`${p.image_id} ${p.doc_type} reland(${p.basis}) ${r.status} ${res.landed ? 'landed ' + res.receipt_id : (res.reason || res.error || '')}`);
     } catch (e) {
       summary.reland_errors++; out.push({ image_id: p.image_id, reland: true, error: String(e.message || e).slice(0, 300) });
     }
