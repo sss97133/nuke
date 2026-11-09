@@ -2,7 +2,7 @@
 // provider answer: good JSON becomes a classification, bad JSON is classifier_response_invalid, never a thrown error.
 import { __setGuardDb, allowAllGuardDb } from '../_shared/geminiGuard.ts';
 __setGuardDb(allowAllGuardDb());
-import { classificationFromParsed, classificationFromReader, SCHEMA_MANIFEST } from './classifierProvider.ts';
+import { classificationFromParsed, classificationFromReader, renderPromptV2, SCHEMA_MANIFEST } from './classifierProvider.ts';
 import type { ClassifierReceipt } from './classifierTypes.ts';
 
 function assert(value: unknown, message = 'assertion failed'): asserts value { if (!value) throw new Error(message); }
@@ -45,4 +45,35 @@ Deno.test('a malformed VIN is dropped (the classification stands), a well-formed
   const okVin = await classificationFromReader({ ...structuredClone(good), vin_detected: '1HGCM82633A004352' }, 'r'); // checksum-valid, 17 characters
   assert(okVin.classifier_ok === true && okVin.vin_detected === '1HGCM82633A004352', 'the VIN is kept');
   assert(okVin.v2?.vin?.checksum_ok === true, 'the v98 extras carry the checksum verdict');
+});
+
+Deno.test('prompt separates body-tag, fender, scoop and casting inscriptions from specification claims', () => {
+  const prompt = renderPromptV2();
+  for (const [source, refusal] of [
+    ['Body tag "TR 297 A51"', 'omit trim and engine_type'],
+    ['Fender lettering "TRANS AM"', 'omit trim'],
+    ['Hood-scoop lettering "SD-455"', 'omit engine_type and displacement'],
+    ['Engine casting "9799140"', 'separate attributable decoder/reference'],
+  ]) {
+    const example = prompt.split('\n').find(line => line.startsWith(`- ${source}`));
+    assert(example?.includes('text_lines') && example.includes(refusal), `${source} must retain literal text without promoting it`);
+  }
+  assert(!prompt.includes('a legible badge, emblem text, VIN character, spec plate or document line'), 'removed the former blanket permission');
+});
+
+Deno.test('prompt preserves direct VIN, attributed document specifications and visible appearance paths', () => {
+  const prompt = renderPromptV2();
+  assert(prompt.includes('physical dash plate belongs in vin with evidence_role "vehicle_vin_plate"'));
+  assert(prompt.includes('invoice line explicitly stating "Engine: 455 V8" may supply engine_type "455 V8"'));
+  assert(prompt.includes('do not turn its date into an installation date'));
+  assert(prompt.includes('visibly red exterior may supply color "red"'));
+  assert(prompt.includes('Appearance alone supplies no factory paint name or code'));
+});
+
+Deno.test('literal-only component and appearance reads retain every inscription without creating spec fields', () => {
+  const text = ['TR 297 A51', 'TRANS AM', 'SD-455', '9799140'];
+  const c = classificationFromParsed({ ...good, image_type: 'vin_plate', is_document: false,
+    text_lines: text.map(text => ({ text, confidence: .95 })), vehicle_fields: [] }, SCHEMA_MANIFEST, true, receipt());
+  assert(JSON.stringify(c.v2?.text_lines.map(line => line.text)) === JSON.stringify(text));
+  assert(c.v2?.vehicle_fields.length === 0 && !c.v2?.vin, 'literal text never self-promotes into vehicle specs');
 });
