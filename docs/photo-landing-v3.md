@@ -67,6 +67,10 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    Claude Code login, `scripts/photo-pipeline/subscription-document-reader.mjs`, which posts `{image_id, extraction, reader}` to
    `receipt-photo-ocr`; the function lands a provided extraction without calling any provider. Measured: one sale sheet read in
    47 s on the default model; the reader uses sonnet by default.
+   Photos too: `photo-pipeline-orchestrator` hands out its checklist (`action: classifier_prompt`, the v98 prompt) and accepts
+   `classification_raw` + `reader`; `scripts/photo-pipeline/subscription-frame-classifier.mjs` runs it. Unattended:
+   `scripts/photo-pipeline/subscription-reader-batch.sh` (launchd `scripts/com.nuke.subscription-reader.plist`, every 10 min,
+   bounded batches, a checkout of origin/main at `~/.worktrees/nuke-main`) writes a `job_assay_readings` heartbeat per reader.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.
