@@ -120,7 +120,8 @@ export async function recordReviewedAnalysis(input: unknown, deps: ReviewedAnaly
   const landed = await deps.ingest(observation);
   assert(landed?.success === true && uuid(landed.observation_id), "review_observation_not_persisted", 502);
   const projection = await deps.project(landed.observation_id);
-  assert(projection?.success === true && projection.observation_id === landed.observation_id && projection.image_id === v.image_id && projection.vehicle_id === v.vehicle_id,
+  assert(projection?.success === true && projection.observation_id === landed.observation_id && projection.image_id === v.image_id && projection.vehicle_id === v.vehicle_id
+    && uuid(projection.image_observation_id),
     "review_projection_not_persisted", 409);
   return { ...projection, model_calls: 0, observation_duplicate: landed.duplicate === true };
 }

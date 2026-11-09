@@ -32,7 +32,8 @@ function fixture() {
     async authorize() { return true; },
     async readImage() { effects.push("read"); return row; },
     async ingest(body) { effects.push("ingest"); received = body; return { success: true, observation_id: observationId }; },
-    async project(id) { effects.push("project"); return { success: true, observation_id: id, image_id: imageId, vehicle_id: vehicleId, cover: { chosen_image_id: imageId } }; },
+    async project(id) { effects.push("project"); return { success: true, observation_id: id, image_id: imageId, vehicle_id: vehicleId,
+      image_observation_id: "50000000-0000-4000-8000-000000000001", cover: { chosen_image_id: imageId } }; },
     now: () => Date.parse("2026-11-09T20:00:00Z"),
   };
   return { row, deps, effects, get received() { return received; } };
@@ -85,6 +86,10 @@ Deno.test("projection failure after intake is surfaced, with no retry through th
 });
 Deno.test("wrong observation/subject response cannot claim success", async () => {
   const f = fixture(); f.deps.project = async () => ({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: "other" });
+  await refuses(() => recordReviewedAnalysis(packet(), f.deps), "review_projection_not_persisted");
+});
+Deno.test("a cache-only projector cannot report completed reviewed analysis", async () => {
+  const f = fixture(); f.deps.project = async () => ({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId });
   await refuses(() => recordReviewedAnalysis(packet(), f.deps), "review_projection_not_persisted");
 });
 Deno.test("stable material review identity survives own CAS token change only", async () => {

@@ -263,6 +263,7 @@ DECLARE
   i public.vehicle_images%ROWTYPE;
   after_i public.vehicle_images%ROWTYPE;
   s jsonb; p jsonb; a jsonb; cover jsonb; replay boolean;
+  placed_id uuid; placed_vehicle uuid; placed_role text; reference_scene boolean;
 BEGIN
   IF auth.role() IS DISTINCT FROM 'service_role' THEN RAISE EXCEPTION 'review_requires_service_role' USING ERRCODE='42501'; END IF;
   SELECT * INTO o FROM public.vehicle_observations WHERE id=p_observation_id FOR SHARE;
@@ -287,6 +288,12 @@ BEGIN
     RAISE EXCEPTION 'review_source_withdrawn' USING ERRCODE='23514';
   END IF;
   replay := i.ai_scan_metadata->'byok_deep_analysis'->>'observation_id'=o.id::text;
+  IF EXISTS(SELECT 1 FROM public.image_observations io WHERE io.image_id=i.id
+    AND io.observed_by='caller-byok' AND io.agent_version='reviewed_image_analysis_v1'
+    AND io.confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=o.id::text
+    AND io.confidence_basis#>>'{reviewed_image_analysis_v1,state}'='withdrawn') THEN
+    RAISE EXCEPTION 'review_source_previously_withdrawn' USING ERRCODE='23514';
+  END IF;
   IF replay IS NOT TRUE THEN
     IF i.updated_at IS DISTINCT FROM (s->>'expected_updated_at')::timestamptz
        OR i.ai_scan_metadata->'byok_deep_analysis' IS DISTINCT FROM o.extraction_metadata->'prior_analysis' THEN
@@ -298,7 +305,7 @@ BEGIN
     END IF;
     a := o.structured_data - ARRAY['image_id','vehicle_id','analysis_kind','witness_image_id','is_inferred'];
     a := a || jsonb_build_object('analyzed_at',s->>'reviewed_at','prompt_version','reviewed_image_analysis_v1',
-      'observation_id',o.id,'source_identifier',o.source_identifier,
+      'observation_id',o.id,'source_identifier',o.source_identifier,'vehicle_id',o.vehicle_id,
       'agent_model',o.agent_model,'agent_tier',o.agent_tier,'extraction_method',p->>'extraction_method',
       'run_id',p->>'run_id','agent_duration_ms',p->'agent_duration_ms',
       'agent_cost_cents',p->'agent_cost_cents','cost_basis',p->>'cost_basis');
@@ -312,15 +319,107 @@ BEGIN
       RAISE EXCEPTION 'review_source_changed_during_projection' USING ERRCODE='23514';
     END IF;
   END IF;
+  -- The canonical deep-analysis path includes the existing search/convergence
+  -- row, not just its BYOK cache and timeline observation. Keep this in the same
+  -- source-locked transaction: a failed placement rolls back the projection.
+  -- The role describes this frame. Reference/unknown scenes do not assert that
+  -- the photographed object is the vehicle; a body/detail reading is never a
+  -- high-confidence identity vote merely because a review was completed.
+  reference_scene := coalesce(o.structured_data->>'scene_type','unknown') NOT IN
+    ('body_exterior','body_interior','engine_bay','undercarriage','data_plate',
+     'wheel_assembly','fabrication_in_progress','paint_booth','road_test','off_property');
+  placed_vehicle := CASE WHEN reference_scene THEN NULL ELSE o.vehicle_id END;
+  placed_role := CASE WHEN reference_scene THEN 'incidental'
+    WHEN o.structured_data->>'scene_type' IN ('body_exterior','road_test','off_property') THEN 'subject'
+    ELSE 'part' END;
+  placed_id := public.ingest_image_observation(i.id, placed_vehicle, placed_role,
+    least(greatest(coalesce(o.confidence_score,0),0),0.6), 'caller-byok','reviewed_image_analysis_v1',
+    jsonb_build_object('reviewed_image_analysis_v1',jsonb_build_object(
+      'observation_id',o.id,'source_identifier',o.source_identifier,'vehicle_id',o.vehicle_id,
+      'image_url',s->>'image_url','reviewed_url',s->>'reviewed_url',
+      'reviewed_sha256',s->>'reviewed_sha256','reviewed_at',s->>'reviewed_at',
+      'scene_type',o.structured_data->>'scene_type',
+      'evidence_role',CASE WHEN reference_scene THEN 'reference' ELSE 'physical_observation' END)),
+    false, jsonb_build_object('method','reviewed_image_analysis_v1'));
+  IF placed_id IS NULL OR NOT EXISTS(SELECT 1 FROM public.image_observations io
+    WHERE io.id=placed_id AND io.image_id=i.id AND io.vehicle_id IS NOT DISTINCT FROM placed_vehicle
+      AND io.is_active AND io.observed_by='caller-byok' AND io.agent_version='reviewed_image_analysis_v1'
+      AND io.confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=o.id::text
+      AND io.confidence_basis#>>'{reviewed_image_analysis_v1,image_url}'=i.image_url) THEN
+    RAISE EXCEPTION 'review_search_projection_not_persisted' USING ERRCODE='23514';
+  END IF;
   cover := public.recompute_vehicle_primary_image(o.vehicle_id);
   RETURN jsonb_build_object('success',true,'observation_id',o.id,'image_id',i.id,'vehicle_id',o.vehicle_id,
-    'projection_duplicate',coalesce(replay,false),'cover',cover,'model_calls',0);
+    'projection_duplicate',coalesce(replay,false),'image_observation_id',placed_id,
+    'search_vehicle_id',placed_vehicle,'cover',cover,'model_calls',0);
 END;
 $function$;
 REVOKE ALL ON FUNCTION public.project_reviewed_image_analysis(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.project_reviewed_image_analysis(uuid) TO service_role;
 COMMENT ON FUNCTION public.project_reviewed_image_analysis(uuid) IS
-  'Owner photo-pipeline-orchestrator. Project one guarded deferred review observation into the existing BYOK image cache and recompute its vehicle cover. Preserves before-image in immutable observation; same-image/source CAS, witness, withdrawal and replay checks. No model, filing, field promotion or component confirmation.';
+  'Owner photo-pipeline-orchestrator. Project one guarded deferred review into the BYOK cache and existing image-observation search owner, then recompute its cover. Atomic source CAS, witness, withdrawal and replay checks; reference scenes have no vehicle placement and inferred physical readings do not vote for identity. No model, filing, field promotion or component confirmation.';
+
+-- Withdraw only this producer's derived search authority when its cited source
+-- changes. Preserve both the prior testimony and an explicit withdrawal revision;
+-- independent image observations remain under their own producers.
+CREATE OR REPLACE FUNCTION public.withdraw_reviewed_image_analysis()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $function$
+DECLARE prior public.image_observations%ROWTYPE; withdrawn_id uuid; reason text;
+BEGIN
+  FOR prior IN SELECT * FROM public.image_observations io WHERE io.image_id=NEW.id AND io.is_active
+    AND io.observed_by='caller-byok' AND io.agent_version='reviewed_image_analysis_v1'
+    AND io.confidence_basis ? 'reviewed_image_analysis_v1'
+    AND (NEW.is_sensitive IS TRUE OR NEW.is_superseded IS TRUE OR NEW.is_duplicate IS TRUE
+      OR NEW.is_document IS TRUE OR NEW.doc_flag IS TRUE
+      OR coalesce(NEW.vision_gate_status::text,'approved')<>'approved'
+      OR coalesce(NEW.image_vehicle_match_status,'pending') IN ('mismatch','unrelated')
+      OR io.confidence_basis#>>'{reviewed_image_analysis_v1,image_url}' IS DISTINCT FROM NEW.image_url
+      OR io.confidence_basis#>>'{reviewed_image_analysis_v1,vehicle_id}' IS DISTINCT FROM NEW.vehicle_id::text)
+    ORDER BY io.id FOR UPDATE
+  LOOP
+    reason := CASE WHEN prior.confidence_basis#>>'{reviewed_image_analysis_v1,image_url}' IS DISTINCT FROM NEW.image_url
+      OR prior.confidence_basis#>>'{reviewed_image_analysis_v1,vehicle_id}' IS DISTINCT FROM NEW.vehicle_id::text
+      THEN 'source_changed' ELSE 'source_withdrawn' END;
+    INSERT INTO public.image_observations(image_id,vehicle_id,cluster_id,role,confidence,confidence_basis,
+      layer_version,observed_by,agent_version,is_active)
+    VALUES(prior.image_id,prior.vehicle_id,prior.cluster_id,prior.role,prior.confidence,
+      jsonb_set(prior.confidence_basis,'{reviewed_image_analysis_v1}',
+        prior.confidence_basis->'reviewed_image_analysis_v1' || jsonb_build_object(
+          'state','withdrawn','withdrawal_reason',reason,'withdrawn_at',clock_timestamp())),
+      prior.layer_version,prior.observed_by,prior.agent_version,false) RETURNING id INTO withdrawn_id;
+    UPDATE public.image_observations SET is_active=false,superseded_by=withdrawn_id WHERE id=prior.id;
+  END LOOP;
+  RETURN NEW;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.withdraw_reviewed_image_analysis() FROM PUBLIC,anon,authenticated;
+CREATE TRIGGER trg_withdraw_reviewed_image_analysis
+AFTER UPDATE OF vehicle_id,image_url,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status
+ON public.vehicle_images FOR EACH ROW EXECUTE FUNCTION public.withdraw_reviewed_image_analysis();
+
+-- Keep the existing deep-reader shape. A reviewed cache is only current while
+-- its exact source-bound search revision is active; no new policy for legacy data.
+CREATE OR REPLACE FUNCTION public.get_image_deep_analysis(p_image_id uuid)
+RETURNS TABLE(image_id uuid,narrative text,intent text,intent_confidence numeric,scene_type text,build_phase text,
+ place_hint text,confidence numeric,agent_model text,agent_notes text,analyzed_at timestamptz,paint_state text,
+ rust_severity text,completeness text,damage_callouts jsonb,components jsonb,open_questions jsonb,needs_review boolean)
+LANGUAGE sql SECURITY DEFINER SET search_path='' AS $function$
+ SELECT vi.id,b->>'narrative_one_line',b->>'intent',nullif(b->>'intent_confidence','')::numeric,
+  b->>'scene_type',b->>'build_phase_guess',b->'presence'->>'place_hint',nullif(b->>'confidence','')::numeric,
+  b->>'agent_model',b->>'agent_notes',nullif(b->>'analyzed_at','')::timestamptz,
+  b->'state_observations'->>'paint_state',b->'state_observations'->>'rust_severity',
+  b->'state_observations'->>'completeness',b->'state_observations'->'damage_callouts',
+  b->'components_seen',b->'open_questions',nullif(b->>'needs_review','')::boolean
+ FROM public.vehicle_images vi
+ CROSS JOIN LATERAL(SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS b) j
+ WHERE vi.id=p_image_id AND vi.ai_scan_metadata ? 'byok_deep_analysis'
+   AND (coalesce(b->>'prompt_version','')<>'reviewed_image_analysis_v1' OR EXISTS(
+     SELECT 1 FROM public.image_observations io WHERE io.image_id=vi.id AND io.is_active
+       AND io.observed_by='caller-byok' AND io.agent_version='reviewed_image_analysis_v1'
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=b->>'observation_id'
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,image_url}'=vi.image_url
+       AND io.confidence_basis#>>'{reviewed_image_analysis_v1,vehicle_id}'=vi.vehicle_id::text));
+$function$;
 INSERT INTO public.pipeline_registry(table_name,column_name,owned_by,description,do_not_write_directly,write_via)
 VALUES ('vehicle_images','ai_scan_metadata.byok_deep_analysis','photo-pipeline-orchestrator',
   'Service-only supplied reviewed result; immutable deferred observation and source-bound image projection. No classifier/receipt/field handlers.',true,
