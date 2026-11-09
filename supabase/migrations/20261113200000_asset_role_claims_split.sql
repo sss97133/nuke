@@ -36,7 +36,7 @@
 --     counted in asset_creators (which reads party_identity_id only).
 --   * assets whose attributes carry declared_by_user_id but no holding_projection (old compound declare/confirm) are legacy compound:
 --     their owner_id is kept as written but no longer read as holding by asset_holder_is. The person keeps record access and sees
---     the work under held_assets_read.unresolved (reason legacy_compound). They resolve it by an explicit holder (and, separately,
+--     the work under held_assets_read.recorded (reason legacy_compound). They resolve it by an explicit holder (and, separately,
 --     creator) claim; the interim policy accepts a legacy owner's own holding claim like a record origin's.
 --   * Other assets with owner_id set by other writers (no declared_by_user_id) keep owner_id as holding, unchanged.
 --   * holder_declaration and photo_sighting rows are untouched testimony.
@@ -53,7 +53,9 @@
 -- Contracts: supabase/sql/test_asset_role_claims.sql (fresh database, PG17), supabase/sql/test_asset_role_claims_upgrade.sql
 -- (old compound flow first, then this migration), supabase/sql/test_asset_role_claims_concurrency.mjs (two sessions, real PG17).
 -- DRAFT: not applied.
--- Rollback: re-run the function bodies of 20261109020000_held_asset_proposals.sql and 20261109013000_held_assets.sql; DROP FUNCTION
+-- Rollback: DROP TRIGGER asset_observations_holding_follow_upd ON asset_observations; DROP TRIGGER asset_observations_holding_follow_del
+-- ON asset_observations; DROP FUNCTION asset_holding_follow_observation();
+-- re-run the function bodies of 20261109020000_held_asset_proposals.sql and 20261109013000_held_assets.sql; DROP FUNCTION
 -- the new functions below; DROP INDEX asset_observations_role_claim_party_idx, asset_observations_role_acceptance_key_idx. Rows
 -- written by the new writers stay as testimony.
 BEGIN;
@@ -129,7 +131,7 @@ BEGIN
   IF owner_source IS NULL THEN RAISE EXCEPTION 'owner-input source unavailable'; END IF;
   ikey := 'claim:' || p_asset_id::text || ':' || p_role || ':' || p_party::text;
   PERFORM pg_advisory_xact_lock(hashtextextended(ikey, 0));
-  SELECT o.id, coalesce((o.structured_data->>'version')::int, 1) AS version INTO prior FROM public.asset_observations o
+  SELECT o.id, coalesce((o.structured_data->>'version')::int, 1) AS version, o.structured_data->>'claim_state' AS state INTO prior FROM public.asset_observations o
     WHERE o.asset_id = p_asset_id AND o.kind = k AND o.superseded_by IS NULL AND o.extraction_method = 'asset_role_claim_v1' AND o.source_identifier = ikey
     ORDER BY o.created_at DESC LIMIT 1 FOR UPDATE;
   INSERT INTO public.asset_observations (id, asset_id, source_id, kind, observed_at, content_text, structured_data, content_hash, confidence,
@@ -137,7 +139,11 @@ BEGIN
   VALUES (nid, p_asset_id, owner_source, k, at_, format('%s claim (%s)%s', p_role, p_state, coalesce(': ' || p_statement, '')),
     jsonb_strip_nulls(jsonb_build_object('role', p_role, 'party_user_id', p_party, 'claim_state', p_state, 'basis', p_basis,
       'evidence', coalesce(p_evidence, '[]'::jsonb), 'statement', p_statement, 'recorded_by_user_id', p_by,
-      'version', coalesce(prior.version, 0) + 1, 'payload_hash', public.asset_role_claim_payload_hash(p_role, p_statement, p_evidence))),
+      'version', coalesce(prior.version, 0) + 1, 'payload_hash', public.asset_role_claim_payload_hash(p_role, p_statement, p_evidence),
+      -- A statement after the party's own withdrawal is new attributed testimony: a new version, marked as such, never a revival of
+      -- the withdrawn row (dependants that cited an older version stay lapsed; acceptance is decided afresh).
+      'restated_after_withdrawal', CASE WHEN prior.state = 'withdrawn' AND p_state = 'stated' THEN true END,
+      'restates_after_version', CASE WHEN prior.state = 'withdrawn' AND p_state = 'stated' THEN prior.version END)),
     md5(ikey || '|' || p_state || '|' || nid::text), 0.5, ikey, 'asset_role_claim_v1', prior.id);
   IF prior.id IS NOT NULL THEN UPDATE public.asset_observations SET superseded_by = nid WHERE id = prior.id; END IF;
   RETURN nid;
@@ -240,6 +246,36 @@ END $$;
 REVOKE ALL ON FUNCTION public.asset_holding_reproject(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.asset_holding_reproject(uuid) TO service_role;
 
+-- The owner_id cache follows every writer, not only the ones in this file. Writers on main that change asset_observations rows a
+-- role claim can cite: record_asset_lots (20261108170000_asset_lots.sql) and the lot walk (20261108200000_asset_lot_walk.sql)
+-- supersede auction_lot rows; any service-role UPDATE/DELETE (rereads, merges moving asset_id). Cited evidence must be on the same
+-- asset (asset_evidence_currentness), so a changed row can only lapse claims on its own asset (old and new asset_id). The trigger
+-- does one primary-key read of the asset and reprojects only assets already on holding_projection = role_claims; every other asset
+-- (all lot presentations, legacy compound records) is untouched. No writer is redefined. Inside this file's writers the trigger may
+-- reproject mid-function; each writer reprojects again at its end, under the same asset lock, so the final projection is theirs.
+CREATE OR REPLACE FUNCTION public.asset_holding_follow_observation()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE aid uuid;
+BEGIN
+  FOREACH aid IN ARRAY ARRAY[OLD.asset_id, CASE WHEN TG_OP = 'UPDATE' AND NEW.asset_id IS DISTINCT FROM OLD.asset_id THEN NEW.asset_id END] LOOP
+    IF aid IS NOT NULL AND EXISTS (SELECT 1 FROM public.assets a WHERE a.id = aid AND a.attributes ? 'holding_projection') THEN
+      PERFORM public.asset_holding_reproject(aid);
+    END IF;
+  END LOOP;
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION public.asset_holding_follow_observation() FROM PUBLIC, anon, authenticated, service_role;
+DROP TRIGGER IF EXISTS asset_observations_holding_follow_upd ON public.asset_observations;
+CREATE TRIGGER asset_observations_holding_follow_upd
+  AFTER UPDATE OF superseded_by, asset_id, structured_data ON public.asset_observations FOR EACH ROW
+  WHEN (OLD.superseded_by IS DISTINCT FROM NEW.superseded_by OR OLD.asset_id IS DISTINCT FROM NEW.asset_id
+        OR OLD.structured_data IS DISTINCT FROM NEW.structured_data)
+  EXECUTE FUNCTION public.asset_holding_follow_observation();
+DROP TRIGGER IF EXISTS asset_observations_holding_follow_del ON public.asset_observations;
+CREATE TRIGGER asset_observations_holding_follow_del
+  AFTER DELETE ON public.asset_observations FOR EACH ROW
+  EXECUTE FUNCTION public.asset_holding_follow_observation();
+
 -- TODO(decision): the interim acceptance policy for holding, isolated here so the mechanical split does not decide it. Today it
 -- keeps the pre-split behaviour only where nobody else could be displaced: the record origin (or the legacy compound owner) of an
 -- asset with no qualified holder and no other party's current holding claim. Returns the basis, or NULL (stays stated_unverified).
@@ -288,6 +324,10 @@ BEGIN
   IF cur.id IS NOT NULL AND cur.state = 'stated' AND cur.ph = ph THEN
     RETURN jsonb_build_object('claim_id', cur.id, 'duplicate', true) || jsonb_build_object('status', public.asset_role_claim_status(cur.id));
   END IF;
+  -- Stale retry: only while the head is stated. An older payload arriving then is a late retry and must not restore an old head.
+  -- After the party's own withdrawal (head withdrawn) any statement, old payload or new, is recorded as a new attributed version
+  -- (restated_after_withdrawal): withdrawal ends the lineage's current testimony, so a later statement is testimony again, with
+  -- its full history kept. It cites rows by id, so dependants of the withdrawn versions stay lapsed.
   IF cur.id IS NOT NULL AND cur.state = 'stated' AND EXISTS (SELECT 1 FROM public.asset_observations o WHERE o.asset_id = a.id AND o.kind = k
        AND o.source_identifier = ikey AND o.superseded_by IS NOT NULL AND o.structured_data->>'payload_hash' = ph) THEN
     RETURN jsonb_build_object('claim_id', cur.id, 'duplicate', true, 'stale_retry', true) || jsonb_build_object('status', public.asset_role_claim_status(cur.id));
@@ -309,14 +349,16 @@ BEGIN
     END IF;
     PERFORM public.asset_holding_reproject(a.id);
   END IF;
-  RETURN jsonb_build_object('claim_id', cid, 'kind', k, 'role', p_role, 'duplicate', false) || jsonb_build_object('status', public.asset_role_claim_status(cid));
+  RETURN jsonb_build_object('claim_id', cid, 'kind', k, 'role', p_role, 'duplicate', false, 'restated_after_withdrawal', coalesce(cur.state = 'withdrawn', false))
+    || jsonb_build_object('status', public.asset_role_claim_status(cid));
 END $$;
 REVOKE ALL ON FUNCTION public.record_asset_role_claim(uuid, text, jsonb, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.record_asset_role_claim(uuid, text, jsonb, text) TO authenticated, service_role;
 COMMENT ON FUNCTION public.record_asset_role_claim(uuid, text, jsonb, text) IS 'Sign-tier: the signer states one role (documenter, creator, '
   'fabricator, holder, performer, rights_holder) on one active asset for themself, citing current observation ids on that asset. Recorded '
   'as attributed testimony (stated); never promoted to verified. A changed payload is a new version; the same payload is a no-op; an older '
-  'payload is ignored. Only holding can be accepted, and only under asset_holding_policy_interim.';
+  'payload is ignored while the head is stated (stale_retry); after the signer withdrew, any statement is a new version marked '
+  'restated_after_withdrawal. Only holding can be accepted, and only under asset_holding_policy_interim.';
 
 -- Sign-tier: the current qualified holder hands holding to another party's current holding claim. Serialized per asset.
 CREATE OR REPLACE FUNCTION public.accept_asset_holding_claim(p_claim_id uuid, p_note text DEFAULT NULL)
