@@ -51,14 +51,14 @@ Deno.test('real CC extractor cache receipt retains original clock and normalizes
   const r = await run('cache', url + '/'); assertEquals(r.status, 200); assertEquals(r.body.success, true);
   assertEquals(r.body.source_capture, { snapshot_id: snapshot, sha256: hash, observed_at: clock, source_url: url });
   assertEquals(r.body.extracted.url, url);
-  assertEquals(calls.some(c => c.url.startsWith('https://collectingcars.com')), false);
+  assertEquals(calls.some(c => new URL(c.url).origin === 'https://collectingcars.com'), false);
 });
 for (const scenario of ['dedup', 'nul']) Deno.test(`real CC archive ${scenario} resolves23505 retained bytes with old clock`, async () => {
   const r = await run(scenario); assertEquals(r.status, 200); assertEquals(r.body.success, true);
   assertEquals(r.body.source_capture.observed_at, clock); assertEquals(r.body.source_capture.snapshot_id, snapshot);
   assertEquals(r.body.source_capture.sha256, hash); assertEquals(archivePayload.html, html);
   assertEquals(archivePayload.html_sha256, hash); assertEquals(archivePayload.listing_url, url);
-  assertEquals(calls.filter(c => c.url.startsWith('https://collectingcars.com')).length, 1);
+  assertEquals(calls.filter(c => new URL(c.url).origin === 'https://collectingcars.com').length, 1);
 });
 for (const scenario of ['failed', 'changed']) Deno.test(`real CC capture ${scenario} refuses success`, async () => {
   const r = await run(scenario); assertEquals(r.status, 500); assertEquals(r.body.success, undefined);
