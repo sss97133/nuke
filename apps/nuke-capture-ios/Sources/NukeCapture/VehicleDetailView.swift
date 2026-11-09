@@ -2449,6 +2449,7 @@ struct InvestmentProofView: View {
 
                     line("Parts", p.proven.parts.value, sub: "\(p.proven.parts.count ?? 0) receipts · proven",
                          onTap: drill("Parts", .receipts, p.audit?.receipts))
+                        .accessibilityIdentifier("investment-parts")
                     if (p.proven.confirmed_labor.value ?? 0) > 0 {
                         line("Labor (confirmed)", p.proven.confirmed_labor.value, sub: "proven",
                              onTap: drill("Labor", .labor, p.audit?.work_sessions))
@@ -2529,7 +2530,11 @@ struct InvestmentProofView: View {
                 // than the showAttest sheet below) so both present reliably;
                 // two .sheet modifiers on one view suppress the second.
                 .sheet(item: $ledgerDrill) { drill in
-                    LedgerEvidenceSheet(drill: drill) { Task { await load() } }
+                    LedgerEvidenceSheet(drill: LedgerDrill(title: drill.title, kind: drill.kind,
+                        rows: drill.kind == .receipts ? (proof?.audit?.receipts ?? []) : drill.rows),
+                        vehicleId: UUID(uuidString: vehicleId)) {
+                        Task { await load() }
+                    }
                 }
             } else if loadFailed {
                 // Don't vanish silently after the retries failed — say so + offer retry.
@@ -2540,6 +2545,11 @@ struct InvestmentProofView: View {
                     Button("Retry") { Task { await load() } }.font(.caption)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
+            } else {
+                // Keep a mounted child while the first read is pending. An empty
+                // Group gives its task no view on which to start the audit read.
+                ProgressView("Reading investment…")
+                    .padding(.horizontal, 16).padding(.vertical, 10)
             }
         }
         .task(id: vehicleId) { await load() }
@@ -3450,12 +3460,15 @@ struct FieldProvenanceSheet: View {
 private struct LedgerEvidenceSheet: View {
     typealias Row = InvestmentProof.Audit.Row
     let drill: LedgerDrill
+    let vehicleId: UUID?
     var onChanged: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var confirmed: Set<UUID> = []   // promoted (post-success)
     @State private var working: UUID?
     @State private var failed: Set<UUID> = []      // RPC failed — surface, don't swallow
+    @State private var unavailableReceipts: Set<UUID> = []
+    @State private var detent: PresentationDetent = .medium
 
     private func money(_ v: Double?) -> String {
         guard let v else { return "—" }
@@ -3477,7 +3490,17 @@ private struct LedgerEvidenceSheet: View {
                 }
                 ForEach(drill.rows) { row in
                     switch drill.kind {
-                    case .receipts: receiptRow(row)
+                    case .receipts:
+                        if let vehicleId {
+                            NavigationLink {
+                                ReceiptEvidenceView(receiptId: row.id, vehicleId: vehicleId) {
+                                    unavailableReceipts.insert(row.id)
+                                    onChanged()
+                                }
+                                .onAppear { detent = .large }
+                            } label: { receiptRow(row) }
+                            .accessibilityIdentifier("receipt-source-\(row.id.uuidString.lowercased())")
+                        } else { receiptRow(row) }
                     case .payments: paymentRow(row)
                     case .labor:    laborRow(row)
                     }
@@ -3488,7 +3511,7 @@ private struct LedgerEvidenceSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $detent)
     }
 
     @ViewBuilder private func receiptRow(_ r: Row) -> some View {
@@ -3498,7 +3521,11 @@ private struct LedgerEvidenceSheet: View {
                 if let d = r.date { Text(String(d.prefix(10))).font(.caption2).foregroundStyle(.secondary) }
             }
             Spacer()
-            Text(money(r.amount)).font(.system(.footnote, design: .monospaced))
+            if unavailableReceipts.contains(r.id) {
+                Text("Source detail unavailable").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text(money(r.amount)).font(.system(.footnote, design: .monospaced))
+            }
         }
     }
 

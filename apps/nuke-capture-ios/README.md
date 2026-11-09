@@ -273,6 +273,14 @@ Standing rules the code carries:
   receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
   not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as
   recorded; nothing masks plate-shaped text yet, so do not claim it.
+- **Receipt depth follows the current source.** Investment Parts audit rows open the exact receipt through
+  its currently visible `receipt_vehicle_links.page_date` and `get_vehicle_day_documents`. The phone requires
+  exact receipt/day membership and the reader's `tied` verdict, then rechecks the link and current account.
+  Unknown dates, withheld links, retired/duplicate records and failed reads stay explicit; no guessed date
+  or older extraction fallback. Detail adds returned lines and source/date qualifications without another
+  total panel, payment/allocation/work inference, original-page download, or local financial sum. A read
+  timestamp is a snapshot, not a promise that the record cannot change. Older investment-fold clock,
+  labor and overlap qualifications remain separate unresolved work.
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.
