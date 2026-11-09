@@ -43,7 +43,7 @@ export async function postObservations(
       const query = supabase.from("vehicle_observations").select("source_identifier").eq("kind", kind)
         .in("source_identifier", chunk.filter((p) => p.kind === kind).map((p) => p.source_identifier));
       const { data, error } = await (signal ? query.abortSignal(signal) : query);
-      if (error) { out.errors.push(`held check: ${error.message}`); return out; }
+      if (error) { out.errors.push(`held check: ${error.message}`); out.deferred = posts.length; return out; }
       for (const r of (data ?? []) as { source_identifier: string }[]) have.add(`${kind}|${r.source_identifier}`);
     }
   }
@@ -96,7 +96,8 @@ export async function postResultsBeforeBids(
   const resultDeadline = Math.min(Date.now() + 5_000, deadline - 10_000);
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const unavailable = (message: string) => ({ candidates: 0, held: 0, posted: 0, deferred: 0,
+  const unavailable = (message: string) => ({ candidates: null, held: null, posted: null, deferred: null,
+    sold_index: null, followed_closed: null,
     pending_unknown: true, errors: [message] });
   if (Date.now() >= resultDeadline) return unavailable("results deferred: reserved live capture time");
   try {

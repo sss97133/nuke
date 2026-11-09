@@ -54,7 +54,7 @@ Deno.test("failed, malformed and slow optional results never block current nativ
    // Ten seconds are reserved; this gives optional collection only twenty milliseconds.
    const deadline=Date.now()+10_020;
    const result=await postResultsBeforeBids(db,collect,deadline,budget);
-   assert.equal(result.posted,0);assert.equal(result.pending_unknown,true);assert.equal(result.errors.length,1);
+   assert.equal(result.posted,null);assert.equal(result.pending_unknown,true);assert.equal(result.errors.length,1);
    const bids=await postObservations(db,posts(25),deadline,budget.remaining("cc"),undefined,budget);
    assert.equal(bids.posted,20);assert.equal(bids.deferred,5);assert.equal(calls,20);
   }
@@ -72,7 +72,7 @@ Deno.test("results held reads and uncertain admission cannot consume reserved li
     return await new Promise<Response>((_resolve,reject)=>admissionSignal!.addEventListener("abort",()=>reject(Error("admission aborted"))));};
    const budget=auctionDispatchBudget(true),started=Date.now(),deadline=started+10_030;
    const result=await postResultsBeforeBids(boundedDb,async()=>({posts:posts(1),sold_index:1,followed_closed:0}),deadline,budget);
-   assert.equal(result.posted,0);assert.equal(result.pending_unknown,true);assert.ok(Date.now()-started<1000);
+   assert.equal(result.posted,null);assert.equal(result.pending_unknown,true);assert.ok(Date.now()-started<1000);
    assert.equal(heldSignal?.aborted,true);assert.equal(budget.receipt().attempted,stage==="admission"?1:0);
    if(stage==="admission")assert.equal(admissionSignal?.aborted,true);
    globalThis.fetch=async()=>Response.json({success:true,observation_id:"current-native"});
@@ -81,4 +81,18 @@ Deno.test("results held reads and uncertain admission cannot consume reserved li
    assert.equal(budget.receipt().attempted,20);
   }
  }finally{globalThis.fetch=original;}
+});
+
+Deno.test("held-state lookup failure defers every candidate without claiming a measured empty cohort",async()=>{
+ let reads=0,prepared=0;
+ const broken:any={from(){const q:any={select(){return q;},eq(){return q;},in:async()=>++reads===1
+  ? {data:[{source_identifier:"fixture:0"}],error:null} : {data:null,error:{message:"held read unavailable"}}};return q;}};
+ const budget=auctionDispatchBudget(true);
+ const result=await postObservations(broken,posts(101),Date.now()+5000,20,async p=>{prepared++;return p;},budget);
+ assert.equal(result.candidates,101);assert.equal(result.deferred,101);
+ assert.equal(result.held,0);assert.equal(result.posted,0);assert.equal(prepared,0);
+ assert.equal(result.errors.length,1);assert.equal(budget.receipt().attempted,0);
+ const unknown=await postResultsBeforeBids(db,async()=>{throw Error("unavailable");},Date.now()+20_000,budget);
+ for(const field of ["candidates","held","posted","deferred","sold_index","followed_closed"] as const) assert.equal(unknown[field],null);
+ assert.equal(unknown.pending_unknown,true);
 });
