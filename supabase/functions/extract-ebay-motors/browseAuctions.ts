@@ -437,11 +437,15 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
       const loaded = await replay.load(admissionDeadline);
       const pending = loaded.sort(closingFirst).slice(0, 200);
       a.replay.pending = loaded.length;
+      const pendingKeys = pending.map(e => e.key);
+      const [currentEpisodes, currentRows] = await Promise.all([
+        heldEpisodes(supabase, pendingKeys, admissionDeadline - 2000, true),
+        heldRows(supabase, pendingKeys, admissionDeadline - 2000),
+      ]);
       const acknowledgements: ReplayEntry[] = [];
       for (const entry of pending) {
         if (Date.now() >= admissionDeadline - 2000) break;
         try {
-          const currentEpisodes = await heldEpisodes(supabase, [entry.key], admissionDeadline - 2000, true);
           const matches = currentEpisodes.get(entry.key) ?? [];
           const episode = matches.length === 1 ? matches[0] : undefined;
           if (matches.length > 1 || episode && (episode.vehicle_id !== entry.vehicleId || episode.identity_check === "mismatch"
@@ -455,7 +459,6 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
           if (projectedAt > Date.parse(entry.readAt)) {
             a.replay.obsolete++; acknowledgements.push(entry); continue;
           }
-          const currentRows = await heldRows(supabase, [entry.key], admissionDeadline - 2000);
           const own = (currentRows.get(entry.key) ?? []).filter(v => v.platform_source === HOUSE);
           if (own.length > 1 || own.length === 1 && (own[0].id !== entry.vehicleId || TERMINAL.has(String(own[0].sale_status)))) {
             a.replay.identity_refused++; acknowledgements.push(entry); continue;

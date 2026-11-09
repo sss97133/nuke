@@ -20,6 +20,7 @@ const lot = (id: string, o: { title?: string; bids?: number; bid?: string; ends?
 type Op = { op: string; args: unknown[] };
 interface World {
   persist?: boolean;
+  reads?: { table: string; count: number }[];
   failScalar?: boolean;
   failEpisode?: boolean;
   snapshots: string[];                                    // item keys with a stored capture
@@ -32,6 +33,7 @@ function fakeSb(w: World) {
   const run = (table: string, ops: Op[]) => {
     const has = (op: string, col?: string) => ops.find((o) => o.op === op && (col === undefined || o.args[0] === col));
     const inList = (has("in", "listing_url")?.args[1] ?? []) as string[];
+    if (has("in")) w.reads?.push({ table, count: (has("in")!.args[1] as any[]).length });
     if (ops.some((o) => o.op === "update")) {
       const patch = ops.find((o) => o.op === "update")!.args[0] as any;
       w.updates.push({ table, patch });
@@ -169,6 +171,19 @@ Deno.test("admitted evidence stays queued until episode and scalar projections s
     // A projected episode is reused; scalar retry does not create another observation.
     if (failure === "failScalar") assertEquals(f.admissions.length, 1);
   }
+});
+
+Deno.test("replay ownership reads are batched for the bounded 200 candidate window", async () => {
+  const f = replayFixture(200);
+  await auctions(fakeSb(f.w), fakeClient([f.summaries]), { maxItems: 0, maxSnapshots: 0, now: () => NOW,
+    ledger: open, replayStore: f.store, snapshotWriter: f.writer });
+  f.w.reads = [];
+  await auctions(fakeSb(f.w), fakeClient([], { remaining: 0 }), { maxSnapshots: 0, now: () => NOW,
+    ledger: open, replayStore: f.store, snapshotWriter: f.writer });
+  assertEquals(f.w.reads.filter(r => r.table === "vehicle_events").length, 2);
+  assertEquals(f.w.reads.filter(r => r.table === "vehicles").length, 4);
+  assertEquals(f.w.reads.every(r => r.count <= 100), true);
+  assertEquals(f.queue().length, 200);
 });
 
 Deno.test("a newer scalar clock fences replay even with a stale episode", async () => {
