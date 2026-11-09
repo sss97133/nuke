@@ -20,6 +20,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from '../_shared/geminiGuard.ts';
+import { runWithChain } from "../_shared/claudeSubscriptionAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -486,6 +487,44 @@ async function classifyDocument(storagePath: string): Promise<{ document_type: s
 
 // ─── EXTRACTION (Claude Sonnet → GPT-4o → xAI) ────────────────────────────
 
+// The owner's own Claude first (2026-11-08): when the caller names the document's owner, extraction runs through the
+// subscription → user key → platform chain in _shared/claudeSubscriptionAuth.ts, the road derive-title-ownership and the
+// deep image analysis already take. No platform API key is needed for a connected owner. A 429 or a missing connection
+// falls through to the keyed providers below.
+const CHAIN_MODEL = "claude-opus-4-8";
+async function extractWithClaudeChain(base64Image: string, mediaType: string, docType: string, userId: string): Promise<any> {
+  const mType = mediaType.includes("png") ? "image/png" : mediaType.includes("webp") ? "image/webp" : "image/jpeg";
+  const payload = {
+    model: CHAIN_MODEL,
+    max_tokens: 4000,
+    messages: [{
+      role: "user",
+      content: [
+        { type: "image", source: { type: "base64", media_type: mType, data: base64Image } },
+        { type: "text", text: buildExtractionPrompt(docType) + "\n\nRespond with ONLY the JSON object, no markdown fences." },
+      ],
+    }],
+  };
+  const run = await runWithChain(supabase, userId, payload, { mode: "slow", maxWaitSeconds: 0 });
+  if (!run.ok) {
+    const detail = typeof run.body === "string" ? run.body.slice(0, 200) : JSON.stringify(run.body ?? {}).slice(0, 200);
+    throw new Error(`Claude chain ${run.status} via ${run.source}: ${detail}`);
+  }
+  const content = run.body?.content?.[0]?.text;
+  if (!content) throw new Error("Empty Claude chain response");
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
+  const usage = run.body?.usage || {};
+  return {
+    result: parsed,
+    provider: `anthropic_${run.source}`,
+    model: CHAIN_MODEL,
+    tokens_input: usage.input_tokens || 0,
+    tokens_output: usage.output_tokens || 0,
+    cost_usd: run.source === "subscription" ? 0 : ((run.chargedCents ?? 0) / 100),
+  };
+}
+
 // Gemini first (2026-11-08): the only provider whose key answers today. Measured on the capture document route:
 // Anthropic 401 invalid x-api-key, OpenAI 429, xAI 403, so every document failed "All providers failed". Classification
 // already runs on Gemini through the shared guard; extraction takes the same road, with the same per-day cap.
@@ -662,12 +701,22 @@ async function extractWithXAI(imageUrl: string, docType: string): Promise<any> {
   };
 }
 
-async function extractDocument(storagePath: string, docType: string): Promise<any> {
+async function extractDocument(storagePath: string, docType: string, userId: string | null = null): Promise<any> {
   const { base64, mediaType } = await getImageAsBase64(storagePath);
   const imageUrl = await getImageUrl(storagePath);
   const errors: string[] = [];
 
-  // Gemini first: the provider that answers (see extractWithGemini)
+  // The owner's own Claude first, when the caller named the owner (see extractWithClaudeChain)
+  if (userId) {
+    try {
+      return await extractWithClaudeChain(base64, mediaType, docType, userId);
+    } catch (e) {
+      errors.push(`Claude chain: ${(e as Error).message}`);
+      console.warn("Claude chain extraction failed:", (e as Error).message);
+    }
+  }
+
+  // Then Gemini (see extractWithGemini)
   try {
     return await extractWithGemini(base64, mediaType, docType);
   } catch (e) {
@@ -1009,6 +1058,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const { mode = "batch", queue_id, storage_path, document_type_hint, limit = 100 } = body;
+    const callerUser = typeof body.user_id === "string" && /^[0-9a-f-]{36}$/i.test(body.user_id) ? body.user_id : null;
 
     if (mode === "status") {
       const status = await getQueueStatus();
@@ -1022,7 +1072,7 @@ Deno.serve(async (req) => {
 
     if (mode === "extract" && storage_path) {
       const docType = document_type_hint || "other";
-      const extraction = await extractDocument(storage_path, docType);
+      const extraction = await extractDocument(storage_path, docType, callerUser);
       const { data, needsReview, reviewReasons } = postProcessResult(extraction.result);
       await trackCost(extraction);
       return json({

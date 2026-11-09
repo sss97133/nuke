@@ -30,20 +30,25 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 
 const deps: Deps = {
   frame: async (imageId) => {
-    const { data, error } = await supabase.from("vehicle_images").select("id, user_id, vehicle_id, image_url, thumbnail_url, file_name, taken_at").eq("id", imageId).maybeSingle();
+    const { data, error } = await supabase.from("vehicle_images").select("id, user_id, vehicle_id, image_url, thumbnail_url, file_name, taken_at, ai_scan_metadata").eq("id", imageId).maybeSingle();
     if (error) throw new Error(`vehicle_images read failed: ${error.message}`);
-    return data;
+    if (!data) return null;
+    const meta = (data as Record<string, unknown>).ai_scan_metadata as Record<string, unknown> | null;
+    const v2 = (meta?.classification as Record<string, unknown> | undefined)?.v2 as Record<string, unknown> | undefined;
+    const hint = typeof v2?.document_type === "string" ? (v2.document_type as string) : null;
+    return { id: data.id, user_id: data.user_id, vehicle_id: data.vehicle_id, image_url: data.image_url, thumbnail_url: data.thumbnail_url, file_name: data.file_name, taken_at: data.taken_at, doc_type_hint: hint };
   },
   existingPage: async (imageId) => {
     const { data, error } = await supabase.from("capture_document_pages").select("doc_type, extraction, class_conf, doc_date, run_id").eq("image_id", imageId).is("revoked_at", null).maybeSingle();
     if (error) throw new Error(`capture_document_pages read failed: ${error.message}`);
     return data;
   },
-  classify: async (url) => {
-    const r = await callFn("document-ocr-worker", { mode: "classify", storage_path: url });
+  classify: async (url, userId) => {
+    const r = await callFn("document-ocr-worker", { mode: "classify", storage_path: url, user_id: userId });
     return { document_type: String(r.document_type ?? "other"), confidence: Number(r.confidence ?? 0) };
   },
-  extract: (url, docType) => callFn("document-ocr-worker", { mode: "extract", storage_path: url, document_type_hint: docType }),
+  // user_id names the document's owner so the worker can read it through the owner's own Claude chain.
+  extract: (url, docType, userId) => callFn("document-ocr-worker", { mode: "extract", storage_path: url, document_type_hint: docType, user_id: userId }),
   fetchBytes: async (url) => {
     // The frame's own storage object on this project; a page on any other host is refused, never fetched.
     if (!url.startsWith(`${SUPABASE_URL}/storage/`)) throw new Error("frame url is not on this project's storage");

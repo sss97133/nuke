@@ -23,6 +23,8 @@ export interface FrameRow {
   thumbnail_url?: string | null;
   file_name?: string | null;
   taken_at?: string | null;
+  /** The pipeline classifier's own document type for this frame (ai_scan_metadata.classification.v2.document_type), when it has one. */
+  doc_type_hint?: string | null;
 }
 
 export interface Classification {
@@ -51,8 +53,8 @@ export interface LandDocumentResult {
 export interface Deps {
   frame: (imageId: string) => Promise<FrameRow | null>;
   existingPage: (imageId: string) => Promise<ExistingPage | null>;
-  classify: (url: string) => Promise<Classification>;
-  extract: (url: string, docType: string) => Promise<Extraction>;
+  classify: (url: string, userId: string) => Promise<Classification>;
+  extract: (url: string, docType: string, userId: string) => Promise<Extraction>;
   fetchBytes: (url: string) => Promise<{ bytes: Uint8Array; contentType: string }>;
   upload: (path: string, bytes: Uint8Array, contentType: string) => Promise<{ error: string | null }>;
   upsertPage: (row: CapturePageRow) => Promise<{ error: string | null }>;
@@ -344,11 +346,13 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
     confidence = existing.class_conf ?? 0;
     data = existing.extraction;
   } else {
-    const hinted = typeof body.document_type_hint === "string" && body.document_type_hint ? body.document_type_hint : null;
-    const cls = hinted ? { document_type: hinted, confidence: 1 } : await deps.classify(url);
+    // The type: the caller's hint, else the pipeline classifier's own reading of this frame, else the worker's classifier.
+    const hinted = typeof body.document_type_hint === "string" && body.document_type_hint ? body.document_type_hint
+      : typeof frame.doc_type_hint === "string" && frame.doc_type_hint && frame.doc_type_hint !== "other" ? frame.doc_type_hint : null;
+    const cls = hinted ? { document_type: hinted, confidence: 1 } : await deps.classify(url, userId);
     docType = (cls.document_type || "other").toLowerCase();
     confidence = normaliseConfidence(cls.confidence);
-    const raw = await deps.extract(url, docType);
+    const raw = await deps.extract(url, docType, userId);
     reviewReasons = Array.isArray(raw._review_reasons) ? (raw._review_reasons as unknown[]).map(String) : [];
     costUsd = typeof raw._cost_usd === "number" ? raw._cost_usd : null;
     data = sanitizeExtraction(raw) as Extraction;

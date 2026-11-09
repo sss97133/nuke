@@ -124,6 +124,25 @@ Deno.test("sanitizeExtraction removes e-mail addresses, card-length numbers and 
   assertEquals(((out.line_items as Array<Record<string, string>>)[0].description).length, 500);
 });
 
+Deno.test("the pipeline classifier's own document type is used as the hint, and the owner rides along to the reader", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const r = await handle({ image_id: IMG }, deps({
+    frame: () => Promise.resolve(frame({ vehicle_id: VEH, doc_type_hint: "receipt" })),
+  }, calls));
+  assertEquals(r.document_type, "receipt");
+  assertEquals(r.confidence, 1);
+  assert(!calls.some((c) => c[0] === "classify"), "no second classification when the pipeline already typed the frame");
+  const ex = calls.find((c) => c[0] === "extract")![1] as { url: string; t: string };
+  assertEquals(ex.t, "receipt");
+  assertEquals(r.landed, true);
+});
+
+Deno.test("a pipeline hint of 'other' does not pre-empt the worker's classifier", async () => {
+  const calls: Array<[string, unknown]> = [];
+  await handle({ image_id: IMG }, deps({ frame: () => Promise.resolve(frame({ doc_type_hint: "other" })) }, calls));
+  assert(calls.some((c) => c[0] === "classify"));
+});
+
 Deno.test("a page already recorded with no vehicle is not read again", async () => {
   const calls: Array<[string, unknown]> = [];
   const r = await handle({ image_id: IMG }, deps({
