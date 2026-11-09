@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { pcarBidCapture, pcarBidObservation } from "./pcarBidCapture.ts";
+import { pcarBidCapture, pcarBidObservation, ingestPcarBids } from "./pcarBidCapture.ts";
 import { parsePcarBids } from "./boards.ts";
 import { sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { observationHashInput } from "../_shared/observationIdentity.ts";
@@ -67,4 +67,28 @@ Deno.test("missing/ambiguous retention and archive failures stay visible",async(
 Deno.test("bid payload cannot attach another lot's proven capture",async()=>{
  const f=await fixture(),capture=await pcarBidCapture(f.db,f.fetched,receivedAt);
  assert.throws(()=>pcarBidObservation(parsePcarBids(html)[0],{url:"https://pcarmarket.com/auction/other",vehicle_id:vehicle},capture),/lot\/capture mismatch/);
+});
+
+Deno.test("PCar actual native capture admits only confirmed receipts and honors shared remaining slots",async()=>{
+ const {auctionDispatchBudget}=await import("./postObservations.ts");
+ const original=globalThis.fetch;
+ try {
+  for(const accepted of [true,false]) {
+   const f=await fixture(); const from=f.db.from;
+   f.db.from=(table:string)=>table!=="vehicle_observations"?from():{
+    select(){return this;},eq(){return this;},not(){return this;},in:async()=>({data:[],error:null})};
+   let calls=0,reads=0;
+   globalThis.fetch=async()=>{calls++;return Response.json(accepted?{success:true,observation_id:snapshot}:{success:false});};
+   const budget=auctionDispatchBudget(true);for(let i=0;i<20;i++)assert.equal(budget.take("cc"),true);
+   const lots=Array.from({length:12},()=>({url,vehicle_id:vehicle}));
+   const result=await ingestPcarBids(f.db,lots,12,Date.now()+5000,budget,async()=>{reads++;return f.fetched;});
+   assert.equal(result.posted,accepted?10:0);assert.equal(result.attempted,accepted?10:1);
+   assert.equal(result.deferred,true);assert.equal(calls,result.attempted);assert.equal(reads,result.attempted);
+   assert.equal(budget.receipt().attempted,20+calls);
+   if(!accepted)assert.match(result.errors[0],/admission not confirmed/);
+  }
+  const f=await fixture(),budget=auctionDispatchBudget(true);while(budget.take("pcar")){}
+  let reads=0;const r=await ingestPcarBids(f.db,[{url,vehicle_id:vehicle}],8,Date.now()+5000,budget,async()=>{reads++;return f.fetched;});
+  assert.equal(reads,0);assert.equal(r.deferred,true);assert.equal(r.attempted,0);
+ }finally{globalThis.fetch=original;}
 });

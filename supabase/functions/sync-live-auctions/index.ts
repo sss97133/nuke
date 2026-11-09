@@ -34,15 +34,15 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { postObservations } from "./postObservations.ts";
+import { postObservations, postResultsBeforeBids, auctionDispatchBudget, type AuctionDispatchBudget } from "./postObservations.ts";
 import { retainCcBidCapture, type CcNativeCapture } from "./ccBidCapture.ts";
 import { projectCcEpisodes } from "./ccEpisodeState.ts";
 import { planCcTransitions, refreshCcTransition } from "./ccSnapshotTransition.ts";
-import { pcarBidCapture, pcarBidObservation } from "./pcarBidCapture.ts";
+import { ingestPcarBids } from "./pcarBidCapture.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
   type BonhamsBidState, type BonhamsLotDoc, type BonhamsSaleDoc, bonhamsLot, bonhamsLotPhase, bonhamsSaleKind,
-  type PcarBoardItem, parseBonhamsBidStates, parsePcarBids, parsePcarBoard,
+  type PcarBoardItem, parseBonhamsBidStates, parsePcarBoard,
 } from "./boards.ts";
 import { type AmLotDoc, amOpenTimedSales, amSales, amTimedLot, BROAD_ARROW_BID } from "./boards.ts";
 import {
@@ -540,59 +540,6 @@ async function syncPCarMarket(): Promise<{ auctions: LiveAuction[]; error: strin
 }
 
 /**
- * Bids of PCarMarket lots whose retained history trails the board count, from the lot page's own bid history (Basta id, time, amount,
- * bidder), admitted through ingest-observation as kind 'bid' with observed_at = the bid's own time. A bid already
- * held for the vehicle is not posted again.
- */
-async function ingestPcarBids(
-  supabase: ReturnType<typeof createClient>,
-  moved: { url: string; vehicle_id: string | null }[],
-  maxLots: number,
-  deadline: number,
-): Promise<{ lots: number; posted: number; attempted: number; deferred: boolean; errors: string[] }> {
-  const out = { lots: 0, posted: 0, attempted: 0, deferred: false, errors: [] as string[] };
-  const base = Deno.env.get("SUPABASE_URL") ?? "";
-  const key = projectSecretKey() ?? "";
-  const linked = moved.flatMap((m) => (m.vehicle_id ? [{ url: m.url, vehicle_id: m.vehicle_id }] : []));
-  out.deferred = linked.length > maxLots;
-  for (const lot of linked.slice(0, maxLots)) {
-    if (Date.now() >= deadline || out.attempted >= 20) { out.deferred = true; break; }
-    const fetched = await archiveFetch(lot.url.replace("https://pcarmarket.com/", "https://www.pcarmarket.com/"), {
-      platform: "pcarmarket", skipCache: true, useFirecrawl: false, callerName: "sync-live-auctions",
-    });
-    const receivedAt = new Date().toISOString();
-    const { html, error } = fetched;
-    if (error || !html) { out.errors.push(`${lot.url}: ${error ?? "no HTML"}`); continue; }
-    out.lots++;
-    const bids = parsePcarBids(html);
-    if (!bids.length) { out.errors.push(`${lot.url}: no bid history parsed; capture remains pending`); continue; }
-    const ids = bids.map((b) => `pcarmarket-bid:${b.id}`);
-    const { data: held, error: heldError } = await supabase.from("vehicle_observations").select("source_identifier")
-      .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").not("is_superseded", "is", true).in("source_identifier", ids);
-    if (heldError) { out.errors.push(`held check: ${heldError.message}`); continue; }
-    const have = new Set((held ?? []).map((r: { source_identifier: string }) => r.source_identifier));
-    if (bids.every(b => have.has(`pcarmarket-bid:${b.id}`))) continue;
-    let capture;
-    try { capture = await pcarBidCapture(supabase, fetched, receivedAt); }
-    catch (error) { out.errors.push(`${lot.url}: ${error instanceof Error ? error.message : String(error)}`); continue; }
-    for (const b of bids) {
-      const sid = `pcarmarket-bid:${b.id}`;
-      if (have.has(sid)) continue;
-      if (Date.now() >= deadline || out.attempted >= 20) { out.deferred = true; break; }
-      out.attempted++;
-      const res = await fetch(`${base}/functions/v1/ingest-observation`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify(pcarBidObservation(b, lot, capture)),
-      });
-      if (res.ok) out.posted++;
-      else out.errors.push(`${sid}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
-    }
-  }
-  return out;
-}
-
-/**
  * Collecting Cars' bid path and results, which the house keeps nowhere Nuke can read later: each lot's bid as this board
  * read saw it (once per distinct bid), and each closed lot's outcome (ccResultObservations). The finish estimator
  * (scripts/market/live-finish-houses.py) needs both before it can measure itself on this house.
@@ -602,6 +549,7 @@ async function ingestCcPath(
   auctions: LiveAuction[],
   resultsDays: number,
   deadline: number,
+  budget: AuctionDispatchBudget,
 ): Promise<Record<string, unknown>> {
   const readAt = String(auctions[0]?.raw_data?.synced_at ?? new Date().toISOString());
   const vehicleOf = new Map<string, string>();
@@ -623,39 +571,41 @@ async function ingestCcPath(
   const nativeOf = new Map(auctions.map(a => [a.url, a.cc_native_capture]));
   const transitions = await planCcTransitions(supabase, bidPosts, deadline);
   const originalByUrl = new Map(bidPosts.map(p => [p.source_url, p]));
-  const bids = await postObservations(supabase, transitions.posts, deadline, 40, async p => {
-    if (!await refreshCcTransition(supabase, originalByUrl.get(p.source_url)!, p, deadline)) return null;
-    return retainCcBidCapture(supabase, p, nativeOf.get(p.source_url));
-  });
-  bids.deferred += transitions.deferred;
-  bids.errors.push(...transitions.errors);
-  bids.candidates = bidPosts.length;
 
   // results: the sold index since the window's start, and the lots Nuke followed that closed in it
+  const results = await postResultsBeforeBids(supabase, async signal => {
+  const resultVehicleOf = new Map(vehicleOf);
   const now = Date.now();
   const since = Math.floor((now - resultsDays * 86_400_000) / 1000);
   const sold: CcSoldDoc[] = [];
+
   for (let page = 1; page <= 10; page++) {
     const res = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, { // guardrail-allow: raw-fetch (house JSON API)
+      signal,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ searches: [{ collection: TYPESENSE_COLLECTION, q: "*", query_by: "title", per_page: 250, page,
         filter_by: `stage:=sold && lotType:=car && tsAuctionEndedUTC:>=${since}`,
         include_fields: "auctionId,slug,priceSold,currentBid,noBids,reserveMet,reserveLowered,noReserve,isSoldPriceHidden,currencyCode,dtAuctionEndedUTC,dtSoldUTC,priceNormalisedUSD" }] }),
     });
-    if (!res.ok) return { bids, results: { error: `sold index HTTP ${res.status}` } };
-    const hits = ((await res.json()).results?.[0]?.hits ?? []) as { document: CcSoldDoc }[];
+    if (!res.ok) throw Error(`sold index HTTP ${res.status}`);
+    const body = await res.json();
+    if (!Array.isArray(body?.results?.[0]?.hits) || body.results[0].hits.some((h: any) => !h?.document))
+      throw Error("sold index malformed response");
+    const hits = body.results[0].hits as { document: CcSoldDoc }[];
     sold.push(...hits.map((h) => h.document));
     if (hits.length < 250) break;
   }
-  const src = (await supabase.from("live_auction_sources").select("id").eq("slug", "collecting-cars").maybeSingle()).data as { id: string } | null;
+  const sourceResult = await supabase.from("live_auction_sources").select("id").eq("slug", "collecting-cars").abortSignal(signal).maybeSingle();
+  if (sourceResult.error) throw Error(`result source: ${sourceResult.error.message}`);
+  const src = sourceResult.data as { id: string } | null;
   const closed: CcClosedLot[] = [];
   if (src?.id) {
     const { data, error } = await supabase.from("monitored_auctions")
       .select("external_auction_id, external_auction_url, vehicle_id, auction_end_time, current_bid_cents, bid_count, stream_state")
       .eq("source_id", src.id).gte("auction_end_time", new Date(since * 1000).toISOString())
-      .lte("auction_end_time", new Date(now).toISOString()).limit(2000);
-    if (error) return { bids, results: { error: `monitored_auctions: ${error.message}` } };
+      .lte("auction_end_time", new Date(now).toISOString()).limit(2000).abortSignal(signal);
+    if (error) throw Error(`monitored_auctions: ${error.message}`);
     for (const m of (data ?? []) as Record<string, any>[]) {
       closed.push({ external_id: String(m.external_auction_id), url: m.external_auction_url, vehicle_id: m.vehicle_id,
         ends: m.auction_end_time, last_bid: m.current_bid_cents != null ? Number(m.current_bid_cents) / 100 : null,
@@ -663,11 +613,32 @@ async function ingestCcPath(
     }
   }
   const followed = new Set(closed.map((c) => c.external_id));
-  await lookup(sold.filter((d) => !followed.has(String(d.auctionId))).map((d) => `https://collectingcars.com/for-sale/${d.slug}`));
-  const results = await postObservations(supabase, ccResultObservations(sold, closed, vehicleOf, now, 12 * 3_600_000), deadline, 20);
+  const need = [...new Set(sold.filter(d => !followed.has(String(d.auctionId)))
+    .map(d => `https://collectingcars.com/for-sale/${d.slug}`))].filter(url => !resultVehicleOf.has(url));
+  for (let i = 0; i < need.length; i += 100) {
+    const { data, error } = await supabase.from("vehicles").select("id, listing_url")
+      .in("listing_url", need.slice(i, i + 100)).is("deleted_at", null).abortSignal(signal);
+    if (error) throw Error(`result owners: ${error.message}`);
+    for (const v of (data ?? []) as { id: string; listing_url: string }[]) resultVehicleOf.set(v.listing_url, v.id);
+  }
+  return { posts: ccResultObservations(sold, closed, resultVehicleOf, now, 12 * 3_600_000),
+    sold_index: sold.length, followed_closed: closed.length };
+  }, deadline, budget);
+  const closingFirst = [...transitions.posts].sort((a, b) => {
+    const end = (p: ObservationPost) => { const n = Date.parse(String(p.structured_data.ends ?? "")); return Number.isFinite(n) ? n : Infinity; };
+    return end(a) - end(b);
+  });
+  const bids = await postObservations(supabase, closingFirst, deadline, budget.remaining("cc"), async p => {
+    if (!await refreshCcTransition(supabase, originalByUrl.get(p.source_url)!, p, deadline)) return null;
+    return retainCcBidCapture(supabase, p, nativeOf.get(p.source_url));
+  }, budget);
+  bids.deferred += transitions.deferred;
+  bids.errors.push(...transitions.errors);
+  bids.candidates = bidPosts.length;
+
   // Existing fresh bid/result captures run first. Held testimony retries this projection without another admission.
   const episodes = await projectCcEpisodes(supabase, transitions.posts, nativeOf, deadline);
-  return { read_at: readAt, bids, episodes, results: { ...results, sold_index: sold.length, followed_closed: closed.length, days: resultsDays } };
+  return { read_at: readAt, bids, episodes, results: { ...results, days: resultsDays } };
 }
 
 // ============================================
@@ -1444,6 +1415,8 @@ Deno.serve(async (req) => {
         rm: "rm-sothebys",
       };
 
+      let commentDispatchDeferred = 0;
+      const dispatchBudget = auctionDispatchBudget(platforms.some(p => (platformAliases[p] || p) === "pcarmarket"));
       const functionStartTime = Date.now();
       const TIME_BUDGET_MS = 50_000; // 50s budget (edge function max ~60s)
 
@@ -1539,9 +1512,12 @@ Deno.serve(async (req) => {
               return hoursLeft > 0 && hoursLeft <= 6 && a.current_bid && a.current_bid > 0;
             });
             const toExtract = endingSoon.slice(0, 10);
+            const commentDeferred = Math.max(0, toExtract.length - dispatchBudget.remaining("bat"));
+            commentDispatchDeferred += commentDeferred;
             if (toExtract.length > 0) {
               console.log(`[sync-live-auctions] Triggering comment extraction for ${toExtract.length} auctions ending within 6h`);
               for (const auction of toExtract) {
+                if (!dispatchBudget.take("bat")) break;
                 fetch(`${supabaseUrl}/functions/v1/extract-auction-comments`, {
                   method: "POST",
                   headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
@@ -1588,7 +1564,7 @@ Deno.serve(async (req) => {
             const { data: pending, error: pendingError } = await supabase.rpc("pcarmarket_bid_capture_backlog", { p_limit: 9 });
             const bids = pendingError
               ? { lots: 0, posted: 0, attempted: 0, deferred: false, errors: [`capture backlog: ${pendingError.message}`] }
-              : await ingestPcarBids(supabase, pending ?? [], 8, functionStartTime + 45_000);
+              : await ingestPcarBids(supabase, pending ?? [], 8, functionStartTime + 45_000, dispatchBudget);
             board = { ...board, moved: moved.length, bid_reads: bids };
             if (bids.errors.length) console.warn(`[sync-live-auctions] PCarMarket bid reads: ${bids.errors.slice(0, 3).join("; ")}`);
           } else if (board) {
@@ -1598,7 +1574,7 @@ Deno.serve(async (req) => {
             const days = Math.min(30, Math.max(1, Number(body.cc_results_days) || 2));
             try {
               const cc = await ingestCcPath(supabase, syncResult.auctions, days,
-                functionStartTime + (platforms.length > 1 ? 25_000 : 45_000));
+                functionStartTime + (platforms.length > 1 ? 25_000 : 45_000), dispatchBudget);
               board = { ...board, cc_path: cc };
             } catch (e) {   // the bid path never costs the board its sync, nor the houses after it theirs
               board = { ...board, cc_path: { error: (e instanceof Error ? e.message : String(e)).slice(0, 300) } };
@@ -1663,6 +1639,7 @@ Deno.serve(async (req) => {
           ended_auctions: totalEnded,
         },
         results,
+        internal_dispatch: { ...dispatchBudget.receipt(), bat_deferred: commentDispatchDeferred },
         synced_at: new Date().toISOString(),
       }, writeFailed ? 500 : 200);
     }
