@@ -6,7 +6,9 @@ import { fromReceiptWorkLine, fromReceiptWorkWithdrawal } from '../garage/deriva
 const row = { vehicle_id: '20d21fb0-4651-4469-a0ba-e751309a1e54', user_id: '0b9f107a-d124-49de-9ded-94698f63c1c4', receipt_id: '11111111-1111-1111-1111-111111111111',
   item_id: '22222222-2222-2222-2222-222222222222', link_id: '33333333-3333-3333-3333-333333333333', description: '70-76 SHAKER HOOD', part_number: '15136',
   total_price: 652.99, line_kind: 'part', zone: 'exterior', end_hint: 'front', anchor_date: '2024-09-12', anchor_source: 'page_date',
-  conclusion: 'photographed_after_window', confidence: 0.36, image_ids: ['44444444-4444-4444-4444-444444444444'], judgment_needed: true, logic_version: 'receipt_work_lines/20261111210000' };
+  conclusion: 'photographed_after_window', confidence: 0.36, image_ids: ['44444444-4444-4444-4444-444444444444'], judgment_needed: true, logic_version: 'receipt_work_lines/20261111210000',
+  question_context: { receipt_id: '11111111-1111-1111-1111-111111111111', item_id: '22222222-2222-2222-2222-222222222222', link_id: '33333333-3333-3333-3333-333333333333',
+    link_basis: 'cited_document', receipt_date: '2024-09-12', anchor_date: '2024-09-12', source_document_id: null, candidate_image_ids: ['44444444-4444-4444-4444-444444444444'] } };
 const RUN = '55555555-5555-5555-5555-555555555555';
 
 test('evidence row is signed and subject-keyed by the line', () => {
@@ -182,4 +184,15 @@ test('--no-db reads but writes nothing', async () => {
   const { calls } = await runWith(state, ['--no-db']);
   assert.ok(calls.every((c) => c.method === 'GET' || c.path === 'rpc/receipt_work_lines' || c.path === 'rpc/receipt_work_withdrawals'),
     calls.map((c) => `${c.method} ${c.path}`).join(', '));
+});
+
+test('the stored question context is the reader context; any context change is a new question; no context is refused', () => {
+  const q = (r) => judgmentFor(r, fromReceiptWorkLine(r, { runId: RUN }, { version: 'v' }), { runId: RUN, version: 'v' });
+  const base = q(row);
+  assert.deepEqual(base.params.context, row.question_context);
+  for (const c of [{ receipt_date: '2999-01-01', anchor_date: null }, { source_document_id: '77777777-7777-7777-7777-777777777777' },
+    { link_id: '88888888-8888-8888-8888-888888888888', link_basis: 'vehicle_hint' }]) {
+    assert.notEqual(q({ ...row, question_context: { ...row.question_context, ...c } }).question_hash, base.question_hash, JSON.stringify(c));
+  }
+  assert.throws(() => q({ ...row, question_context: undefined }), /question_context/);
 });

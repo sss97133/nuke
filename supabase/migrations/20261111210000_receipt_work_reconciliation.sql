@@ -161,7 +161,8 @@ RETURNS TABLE(
   day_photos int, work_session_ids uuid[], timeline_event_ids uuid[],
   judgment_needed boolean, logic_version text,
   relationship_status text, source_document_table text, source_document_id uuid, source_page int,
-  custodian_user_id uuid, printed_line_date date, printed_hours numeric, printed_performer text, reader_ineligible jsonb)
+  custodian_user_id uuid, printed_line_date date, printed_hours numeric, printed_performer text, reader_ineligible jsonb,
+  question_context jsonb)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH v AS (SELECT id, coalesce(owner_id, user_id) AS uid FROM vehicles WHERE id = p_vehicle_id),
   raw AS (
@@ -269,7 +270,22 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
          'receipt_work_lines/20261111210000',
          'proposed', s.source_document_table, s.source_document_id,
          NULL::int,  -- page: the line-to-page mapping is unresolved (land_document_pages keeps page metadata per document, not per line)
-         s.receipt_user, s.printed_line_date, s.printed_hours, s.printed_performer, s.ineligible
+         s.receipt_user, s.printed_line_date, s.printed_hours, s.printed_performer, s.ineligible,
+         -- The canonical context a judgment question is asked in: everything about the source, its custody, the cited link,
+         -- the anchor and the candidate frames that the question depends on. A judgment request stores it as
+         -- params.context; claims and answers recompute it from current sources and refuse when it differs.
+         jsonb_build_object(
+           'receipt_id', s.receipt_id, 'item_id', s.item_id, 'line_number', s.line_number,
+           'link_id', s.link_id, 'link_basis', s.basis, 'link_confidence', s.link_conf,
+           'link_page_date', s.page_date_raw, 'link_page_date_source', s.page_date_source,
+           'receipt_date', s.receipt_date_raw, 'vendor_name', s.vendor_name, 'document_kind', s.document_kind,
+           'source_document_table', s.source_document_table, 'source_document_id', s.source_document_id, 'custodian_user_id', s.receipt_user,
+           'description', s.description, 'part_number', s.part_number, 'total_price', s.total_price,
+           'printed_line_date', s.printed_line_date, 'printed_hours', s.printed_hours, 'printed_performer', s.printed_performer,
+           'line_kind', s.kind, 'zone', s.zone, 'end_hint', s.end_hint, 'anchor_date', s.anchor, 'anchor_source', s.anchor_source,
+           'conclusion', s.concl, 'candidate_image_ids', to_jsonb(coalesce(s.cite_ids, '{}'::uuid[])),
+           'zone_photos_total', s.total, 'zone_photos_in_window', s.in_window, 'first_photo_day', s.first_day,
+           'window_days', p_window_days, 'max_images', p_max_images, 'logic_version', 'receipt_work_lines/20261111210000')
     FROM shaped s
 $$;
 COMMENT ON FUNCTION public.receipt_work_lines(uuid, int, int) IS
@@ -372,28 +388,36 @@ RETURNS jsonb LANGUAGE sql STABLE SET search_path = pg_catalog AS $$
                                                                 'actor', p_actor, 'kind', p_kind, 'reason', p_reason)))
 $$;
 
--- Why a request can no longer be claimed or answered (empty = eligible): its line, receipt or link is gone or retired,
--- the line's printed content changed since it was asked, or a candidate frame is no longer eligible (privacy and
--- gate withdrawals included).
+-- Why a request can no longer be claimed or answered (empty = eligible). Bound to the question's own context, not to
+-- whatever is current now: the cited link itself must still be active (another active link for the same receipt does
+-- not stand in for it); the receipt must still be current; the line must still exist with the same printed content; every
+-- candidate frame must still be eligible; and the canonical question context recomputed from current sources
+-- (receipt_work_lines(...).question_context: link identity, basis, confidence and page date; receipt date, anchor and
+-- anchor source; source document and custody; line content and printed claims; zone, end, conclusion and the exact
+-- candidate frame set and window counts) must equal the context stored with the question. Any difference refuses with
+-- context_changed:<keys>. A question without a stored context cannot be verified and is refused.
 CREATE OR REPLACE FUNCTION public.evidence_judgment_ineligibility(p_id uuid)
 RETURNS text[]
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public
 AS $fn$
 DECLARE j evidence_judgment_requests; probs text[] := '{}'; it receipt_items; rc receipts; x vehicle_images; cid text; rid uuid;
+  lid uuid; ctx jsonb; cur record; diff text[];
 BEGIN
   SELECT * INTO j FROM evidence_judgment_requests WHERE id = p_id;
   IF NOT FOUND THEN RETURN ARRAY['no_request']; END IF;
   IF j.question_kind <> 'receipt_part_visible' THEN RETURN ARRAY['unknown_question_kind']; END IF;
-  rid := (j.params ->> 'receipt_id')::uuid;
+  ctx := j.params -> 'context';
+  rid := coalesce(ctx ->> 'receipt_id', j.params ->> 'receipt_id')::uuid;
+  lid := coalesce(ctx ->> 'link_id', j.params #>> '{lineage,link_id}')::uuid;
   SELECT * INTO rc FROM receipts WHERE id = rid;
   IF NOT FOUND THEN probs := array_append(probs, 'receipt_removed');
   ELSE
     IF rc.is_superseded THEN probs := array_append(probs, 'receipt_superseded'); END IF;
     IF rc.duplicate_of IS NOT NULL THEN probs := array_append(probs, 'receipt_duplicate'); END IF;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM receipt_vehicle_links l WHERE l.receipt_id = rid AND l.vehicle_id = j.vehicle_id
-                   AND l.status = 'linked' AND l.retired_at IS NULL) THEN
-    probs := array_append(probs, 'link_retired');
+  IF lid IS NULL OR NOT EXISTS (SELECT 1 FROM receipt_vehicle_links l WHERE l.id = lid AND l.receipt_id = rid AND l.vehicle_id = j.vehicle_id
+                                  AND l.status = 'linked' AND l.retired_at IS NULL) THEN
+    probs := array_append(probs, 'link_retired');  -- the cited link, not any link
   END IF;
   SELECT * INTO it FROM receipt_items WHERE id = j.subject_id AND receipt_id = rid;
   IF NOT FOUND THEN probs := array_append(probs, 'line_removed');
@@ -411,6 +435,24 @@ BEGIN
       probs := array_append(probs, 'frame_ineligible:' || cid);
     END IF;
   END LOOP;
+  IF jsonb_typeof(ctx) IS DISTINCT FROM 'object' THEN
+    RETURN array_append(probs, 'context_unverifiable');
+  END IF;
+  IF ctx -> 'candidate_image_ids' IS DISTINCT FROM j.params -> 'candidate_image_ids' THEN
+    probs := array_append(probs, 'context_mismatch:candidate_image_ids');  -- the question's frames are the context's frames
+  END IF;
+  SELECT w.question_context, w.judgment_needed INTO cur
+    FROM receipt_work_lines(j.vehicle_id, coalesce((ctx ->> 'window_days')::int, 90), coalesce((ctx ->> 'max_images')::int, 8)) w
+   WHERE w.item_id = j.subject_id AND w.link_id = lid;
+  IF NOT FOUND THEN  -- the reader no longer returns this line through this link
+    RETURN CASE WHEN cardinality(probs) > 0 THEN probs ELSE ARRAY['context_missing'] END;
+  END IF;
+  IF cur.judgment_needed IS NOT TRUE THEN probs := array_append(probs, 'not_asked'); END IF;
+  SELECT array_agg(k ORDER BY k) INTO diff
+    FROM (SELECT k FROM jsonb_object_keys(cur.question_context) k
+          UNION SELECT k FROM jsonb_object_keys(ctx) k) keys
+   WHERE cur.question_context -> k IS DISTINCT FROM ctx -> k;
+  IF diff IS NOT NULL THEN probs := array_append(probs, 'context_changed:' || array_to_string(diff, ',')); END IF;
   RETURN probs;
 END
 $fn$;

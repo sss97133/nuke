@@ -59,7 +59,15 @@ vendor_name, document_kind, line_number, description, part_number, total_price, 
 anchor_source, conclusion, confidence, days_to_first_photo, zone_photos_total, zone_photos_in_window, first_photo_day,
 image_ids, day_photos, work_session_ids, timeline_event_ids, judgment_needed, logic_version, relationship_status,
 source_document_table, source_document_id, source_page, custodian_user_id, printed_line_date, printed_hours,
-printed_performer, reader_ineligible`.
+printed_performer, reader_ineligible, question_context`.
+
+`question_context` is the canonical current context of the question this row would ask, computed in SQL from current
+sources: `receipt_id, item_id, line_number, link_id, link_basis, link_confidence, link_page_date, link_page_date_source,
+receipt_date, vendor_name, document_kind, source_document_table, source_document_id, custodian_user_id, description,
+part_number, total_price, printed_line_date, printed_hours, printed_performer, line_kind, zone, end_hint, anchor_date,
+anchor_source, conclusion, candidate_image_ids, zone_photos_total, zone_photos_in_window, first_photo_day, window_days,
+max_images, logic_version`. The producer stores it verbatim in `params.context` (so it is part of `question_hash`), and
+claims and answers recompute it and compare.
 
 - `line_kind`: `charge | backordered | kit_component | labor | note | part | receipt`.
 - `zone`: `engine | dashboard | interior | exterior | wheel | undercarriage | null`; `end_hint`: `front | rear | null`.
@@ -118,12 +126,22 @@ cancelled_reason, cancelled_by_run_id, retire_kind, superseded_by, answer_histor
   - `cancelled` → `pending`, `withdrawn` → `answered`: identical content re-asked while eligible (revive)
   - `answered | withdrawn` → `pending | cancelled`, with the answer moved to `answer_history`
     (`reopen_evidence_judgment_answers`)
-- **Eligibility** (`evidence_judgment_ineligibility(id)`, empty = eligible): `receipt_removed`, `receipt_superseded`,
-  `receipt_duplicate`, `link_retired`, `line_removed`, `line_changed` (description, part number, price, printed date,
-  hours or performer differ from the question), `frame_ineligible:<image id>` (privacy or gate withdrawal included).
+- **Eligibility** (`evidence_judgment_ineligibility(id)`, empty = eligible), checked by `claim_evidence_judgments` and
+  again by `answer_evidence_judgment`: `receipt_removed`, `receipt_superseded`, `receipt_duplicate`, `link_retired` (the
+  question's **own cited link** `params.context.link_id` is no longer active for this receipt and vehicle; another active
+  link does not count), `line_removed`, `line_changed` (description, part number, price, printed date, hours or performer
+  differ from the question), `frame_ineligible:<image id>` (privacy or gate withdrawal included),
+  `context_mismatch:candidate_image_ids` (stored frames differ from the stored context). Then the reader is re-run for
+  the same item and link with the stored window and image cap, and its `question_context` is compared key by key with
+  `params.context`: `context_changed:<keys>` (e.g. `receipt_date,anchor_date` when the receipt date changes;
+  `source_document_id` or `source_document_table` when the lineage changes; `link_basis,link_confidence`;
+  `link_page_date,anchor_date,anchor_source`; `description`; `candidate_image_ids` when a frame enters or leaves the
+  computed set or window), `not_asked` (the reader would no longer ask), `context_missing` (the reader no longer returns
+  this line through this link). A question without a stored context is `context_unverifiable` and can be neither claimed
+  nor answered; re-running the producer re-asks it with a context.
 - `params`: `question, receipt_item_id, receipt_id, vehicle_id, vendor_name, description, part_number, total_price,
   purchase_date, anchor_source, zone, end_hint, candidate_image_ids, days_to_first_photo, trigger_conclusion,
-  logic_version, relationship, printed_claims, source_custody, lineage, reader_ineligible`.
+  logic_version, relationship, printed_claims, source_custody, lineage, reader_ineligible, context`.
 - `answer`: `visible, installed (yes | no | cannot_tell), confidence (0..1), image_id (one of candidate_image_ids;
   required when visible = yes), bbox ([x1,y1,x2,y2], 0..999), quote`. A malformed answer is refused with its problems.
 - Undo a producer run: `rollback_evidence_judgment_run(run_id, reason, dry_run)`. Questions it raised are retired;

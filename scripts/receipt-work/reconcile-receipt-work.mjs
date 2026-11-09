@@ -45,6 +45,7 @@ export const ANSWER_SCHEMA = {
 // The trigger: which conclusions need a judgment, and the parameterized question for one. Identity is the question's content.
 export function judgmentFor(row, evidence, { runId, version }) {
   if (!row.judgment_needed || !row.item_id || !(row.image_ids ?? []).length) return null;
+  if (!row.question_context) throw new Error(`receipt_work_lines row for item ${row.item_id} has no question_context (reader older than this producer)`);
   const candidate_image_ids = [...row.image_ids];
   const params = {
     question: 'Is the part on this receipt line visible, installed on this vehicle, in any of the candidate frames?',
@@ -56,6 +57,8 @@ export function judgmentFor(row, evidence, { runId, version }) {
     relationship: RECEIPT_WORK_RELATIONSHIP(row.relationship_status),
     printed_claims: evidence.evidence.printed_claims, source_custody: evidence.evidence.source_custody,
     lineage: evidence.evidence.lineage, reader_ineligible: row.reader_ineligible ?? {},
+    // the canonical context computed by receipt_work_lines; claims and answers recompute it and refuse on any change
+    context: row.question_context ?? null,
   };
   const question_hash = questionHash(params);
   const dedupe_key = sha256(canonical({ d: DEPARTMENT, q: QUESTION, s: row.item_id, qh: question_hash }));
@@ -75,7 +78,7 @@ export function staleJudgments(open, wanted) {
 }
 
 // Why a stale question is retired: a withdrawn source wins, then a withdrawn frame, then replaced content, else not asked.
-const SOURCE_PROBLEMS = ['receipt_removed', 'receipt_superseded', 'receipt_duplicate', 'link_retired', 'line_removed'];
+const SOURCE_PROBLEMS = ['receipt_removed', 'receipt_superseded', 'receipt_duplicate', 'link_retired', 'line_removed', 'context_missing'];
 export function retireKind(problems, replacement) {
   const p = problems ?? [];
   if (p.some((x) => SOURCE_PROBLEMS.includes(x))) return { kind: 'source_withdrawn', reason: p.filter((x) => SOURCE_PROBLEMS.includes(x)).join(', ') };

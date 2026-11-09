@@ -228,32 +228,60 @@ BEGIN
   RAISE NOTICE 'receipt_work_reconciliation contract (reader, withdrawals): ok';
 END $$;
 
--- the judgment lifecycle on real questions about line d1 (frames f1, f2)
+-- the judgment lifecycle, on questions built exactly as the producer builds them: from the reader's current row
+CREATE FUNCTION pg_temp.q_row(p_item uuid, p_key text, p_hash text) RETURNS jsonb LANGUAGE sql AS $q$
+  SELECT jsonb_build_object('department', 'receipt_work_reconciliation', 'question_kind', 'receipt_part_visible', 'subject_table', 'receipt_items',
+    'subject_id', w.item_id, 'vehicle_id', w.vehicle_id, 'user_id', w.user_id,
+    'params', jsonb_build_object('receipt_id', w.receipt_id, 'receipt_item_id', w.item_id, 'description', w.description,
+       'part_number', w.part_number, 'total_price', w.total_price,
+       'printed_claims', jsonb_build_object('line_date', w.printed_line_date, 'hours', w.printed_hours, 'performer', w.printed_performer),
+       'candidate_image_ids', to_jsonb(w.image_ids), 'lineage', jsonb_build_object('link_id', w.link_id), 'context', w.question_context),
+    'answer_schema', '{}'::jsonb, 'priority', 1, 'producer_agent', 'injestion', 'producer_script', 'scripts/receipt-work/reconcile-receipt-work.mjs',
+    'producer_version', 'test', 'dedupe_key', p_key, 'question_hash', p_hash)
+    FROM receipt_work_lines('00000000-0000-0000-0000-0000000000a1') w WHERE w.item_id = p_item AND w.judgment_needed
+$q$;
+-- answer q as holder h; true when accepted, false when refused as no longer eligible (anything else raises)
+CREATE FUNCTION pg_temp.try_answer(q uuid, h text, ans jsonb) RETURNS boolean LANGUAGE plpgsql AS $q$
+BEGIN
+  PERFORM answer_evidence_judgment(q, h, ans, 'agent', 'model', 'v1');
+  RETURN true;
+EXCEPTION WHEN object_not_in_prerequisite_state THEN
+  IF SQLERRM NOT LIKE '%no longer eligible%' THEN RAISE; END IF;
+  RETURN false;
+END $q$;
+
 DO $$
-DECLARE n int; st text; P jsonb; row1 jsonb; row2 jsonb; row3 jsonb; a record; q1 uuid; q2 uuid; q3 uuid;
+DECLARE n int; st text; a record; q1 uuid; q2 uuid; q3 uuid; qb uuid; row1 jsonb; row2 jsonb; row3 jsonb; ans jsonb; probs text[];
   V constant uuid := '00000000-0000-0000-0000-0000000000a1'; U constant uuid := '00000000-0000-0000-0000-0000000000b1';
-  D1 constant uuid := '00000000-0000-0000-0000-0000000000d1';
-  F1 constant text := '00000000-0000-0000-0000-0000000000f1'; F2 constant text := '00000000-0000-0000-0000-0000000000f2';
+  C9 constant uuid := '00000000-0000-0000-0000-0000000000c9'; D9 constant uuid := '00000000-0000-0000-0000-0000000000d9';
+  LA constant uuid := '00000000-0000-0000-0000-0000000000ea'; LB constant uuid := '00000000-0000-0000-0000-0000000000eb';
+  F1 constant uuid := '00000000-0000-0000-0000-0000000000f1'; FN constant uuid := '00000000-0000-0000-0000-0000000000fb';
   R1 constant uuid := '00000000-0000-0000-0000-0000000001a1'; R2 constant uuid := '00000000-0000-0000-0000-0000000001a2';
   R3 constant uuid := '00000000-0000-0000-0000-0000000001a3'; R4 constant uuid := '00000000-0000-0000-0000-0000000001a4';
   R5 constant uuid := '00000000-0000-0000-0000-0000000001a5'; R6 constant uuid := '00000000-0000-0000-0000-0000000001a6';
   R7 constant uuid := '00000000-0000-0000-0000-0000000001a7'; R8 constant uuid := '00000000-0000-0000-0000-0000000001a8';
-  GOOD constant jsonb := '{"visible": "yes", "installed": "yes", "confidence": 0.8, "image_id": "00000000-0000-0000-0000-0000000000f1", "bbox": [100, 120, 400, 380], "quote": "hood scoop on the car"}';
 BEGIN
   PERFORM set_config('test.role', 'service_role', true);
-  P := jsonb_build_object('receipt_item_id', D1, 'receipt_id', '00000000-0000-0000-0000-0000000000c1', 'description', '70-76 SHAKER HOOD',
-         'part_number', '15136', 'total_price', 652.99, 'printed_claims', jsonb_build_object('line_date', NULL, 'hours', NULL, 'performer', NULL),
-         'candidate_image_ids', jsonb_build_array(F1, F2));
-  row1 := jsonb_build_object('department', 'receipt_work_reconciliation', 'question_kind', 'receipt_part_visible', 'subject_table', 'receipt_items',
-         'subject_id', D1, 'vehicle_id', V, 'user_id', U, 'params', P, 'answer_schema', '{}'::jsonb, 'priority', 653, 'producer_agent', 'injestion',
-         'producer_script', 'scripts/receipt-work/reconcile-receipt-work.mjs', 'producer_version', 'test', 'dedupe_key', 'q-hood-1', 'question_hash', 'h1');
-  -- raise: new content inserted; identical content unchanged
+  -- fixture (Codex's case 1 shape): a part line whose anchor comes from receipts.receipt_date (no line date, no page date)
+  INSERT INTO receipts VALUES (C9, U, 'Classic Industries', 'parts_service', '2025-01-01', false, NULL, 'vehicle_documents', '00000000-0000-0000-0000-0000000000ab');
+  INSERT INTO receipt_items VALUES (D9, C9, 1, '70-76 SHAKER HOOD', '15136', 652.99, NULL, NULL, NULL);
+  INSERT INTO receipt_vehicle_links VALUES (LA, C9, V, U, 'linked', 'cited_document', 0.9, NULL, NULL, NULL);
+  row1 := pg_temp.q_row(D9, 'q-hood-1', 'h1');
+  ASSERT row1 IS NOT NULL, 'fixture line needs a judgment';
+  ASSERT row1 #>> '{params,context,anchor_source}' = 'receipt_date' AND row1 #>> '{params,context,anchor_date}' = '2025-01-01', row1::text;
+  ans := jsonb_build_object('visible', 'yes', 'installed', 'yes', 'confidence', 0.8, 'image_id', row1 #>> '{params,candidate_image_ids,0}',
+                            'bbox', jsonb_build_array(100, 120, 400, 380), 'quote', 'hood scoop on the car');
+
+  -- raise: new content inserted; identical content unchanged; eligible as raised
   SELECT * INTO a FROM raise_evidence_judgment(row1, R1);
   ASSERT a.action = 'inserted' AND a.status = 'pending', a.action; q1 := a.id;
   SELECT * INTO a FROM raise_evidence_judgment(row1, R2);
   ASSERT a.action = 'unchanged' AND a.id = q1;
-  ASSERT cardinality(evidence_judgment_ineligibility(q1)) = 0, evidence_judgment_ineligibility(q1)::text;
-  -- claim: the eligible question only (k2 has no source); a fresh claim is not re-claimed
+  ASSERT evidence_judgment_ineligibility(q1) = '{}'::text[], evidence_judgment_ineligibility(q1)::text;
+  -- a question without a stored context cannot be verified (k2 is legacy and has no source either)
+  ASSERT 'context_unverifiable' = ANY (evidence_judgment_ineligibility((SELECT id FROM evidence_judgment_requests WHERE dedupe_key = 'k2')));
+
+  -- claim: only the eligible question; a fresh claim is not re-claimed
   SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-a');
   ASSERT n = 1, 'only the eligible question is claimed: ' || n;
   SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-b');
@@ -261,7 +289,7 @@ BEGIN
   -- malformed answers and non-holders are refused
   BEGIN
     PERFORM answer_evidence_judgment(q1, 'worker-a',
-      '{"visible": "yes", "installed": "maybe", "confidence": 1.4, "image_id": "00000000-0000-0000-0000-0000000000f7", "bbox": [5, 5, 1, 1]}', 'agent', 'model', 'v1');
+      '{"visible": "yes", "installed": "maybe", "confidence": 1.4, "image_id": "00000000-0000-0000-0000-0000000000f6", "bbox": [5, 5, 1, 1]}', 'agent', 'model', 'v1');
     RAISE EXCEPTION 'malformed answer accepted';
   EXCEPTION WHEN invalid_parameter_value THEN
     ASSERT SQLERRM LIKE '%installed must be%' AND SQLERRM LIKE '%confidence must be within%' AND SQLERRM LIKE '%candidate_image_ids%' AND SQLERRM LIKE '%bbox must be%', SQLERRM;
@@ -271,41 +299,97 @@ BEGIN
     RAISE EXCEPTION 'answer by a non-holder accepted';
   EXCEPTION WHEN object_not_in_prerequisite_state THEN NULL;
   END;
-  -- withdrawals while claimed refuse the answer: a frame made private, the link retired, the receipt superseded
-  UPDATE vehicle_images SET is_sensitive = true WHERE id = F2::uuid;
-  BEGIN
-    PERFORM answer_evidence_judgment(q1, 'worker-a', GOOD, 'agent', 'model', 'v1');
-    RAISE EXCEPTION 'answer accepted after a privacy withdrawal';
-  EXCEPTION WHEN object_not_in_prerequisite_state THEN ASSERT SQLERRM LIKE '%frame_ineligible:' || F2 || '%', SQLERRM;
-  END;
-  UPDATE vehicle_images SET is_sensitive = false WHERE id = F2::uuid;
-  UPDATE receipt_vehicle_links SET retired_at = now() WHERE id = '00000000-0000-0000-0000-0000000000e1';
-  BEGIN
-    PERFORM answer_evidence_judgment(q1, 'worker-a', GOOD, 'agent', 'model', 'v1');
-    RAISE EXCEPTION 'answer accepted after the link was retired';
-  EXCEPTION WHEN object_not_in_prerequisite_state THEN ASSERT SQLERRM LIKE '%link_retired%', SQLERRM;
-  END;
-  UPDATE receipt_vehicle_links SET retired_at = NULL WHERE id = '00000000-0000-0000-0000-0000000000e1';
-  UPDATE receipts SET is_superseded = true WHERE id = '00000000-0000-0000-0000-0000000000c1';
-  BEGIN
-    PERFORM answer_evidence_judgment(q1, 'worker-a', GOOD, 'agent', 'model', 'v1');
-    RAISE EXCEPTION 'answer accepted after the receipt was superseded';
-  EXCEPTION WHEN object_not_in_prerequisite_state THEN ASSERT SQLERRM LIKE '%receipt_superseded%', SQLERRM;
-  END;
-  UPDATE receipts SET is_superseded = false WHERE id = '00000000-0000-0000-0000-0000000000c1';
-  PERFORM answer_evidence_judgment(q1, 'worker-a', GOOD, 'agent', 'model', 'v1');
+
+  -- claim -> context change -> answer is refused; each change undone -> eligible again
+  -- (1) Codex case 1: the receipt date moves to 2999-01-01; the current anchor becomes null
+  UPDATE receipts SET receipt_date = '2999-01-01' WHERE id = C9;
+  probs := evidence_judgment_ineligibility(q1);
+  ASSERT 'not_asked' = ANY (probs) AND EXISTS (SELECT 1 FROM unnest(probs) p WHERE p LIKE 'context_changed:%anchor_date%' AND p LIKE '%receipt_date%'), probs::text;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'case 1: answer accepted after the receipt date moved';
+  UPDATE receipts SET receipt_date = '2025-01-01' WHERE id = C9;
+  ASSERT evidence_judgment_ineligibility(q1) = '{}'::text[], evidence_judgment_ineligibility(q1)::text;
+  -- (2) Codex case 2: the source document changes, same receipt and item ids
+  UPDATE receipts SET source_document_id = '00000000-0000-0000-0000-0000000000ac' WHERE id = C9;
+  probs := evidence_judgment_ineligibility(q1);
+  ASSERT probs = ARRAY['context_changed:source_document_id'], probs::text;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'case 2: answer accepted with the old source lineage';
+  UPDATE receipts SET source_document_table = 'receipts_import' WHERE id = C9;
+  UPDATE receipts SET source_document_id = '00000000-0000-0000-0000-0000000000ab' WHERE id = C9;
+  ASSERT evidence_judgment_ineligibility(q1) = ARRAY['context_changed:source_document_table'], 'source table is lineage too';
+  UPDATE receipts SET source_document_table = 'vehicle_documents' WHERE id = C9;
+  -- (3) Codex case 3: the cited link A is retired and a different active link B is added for the same receipt and vehicle
+  UPDATE receipt_vehicle_links SET retired_at = now() WHERE id = LA;
+  INSERT INTO receipt_vehicle_links VALUES (LB, C9, V, U, 'linked', 'vehicle_hint', 0.6, NULL, NULL, NULL);
+  probs := evidence_judgment_ineligibility(q1);
+  ASSERT 'link_retired' = ANY (probs), probs::text;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'case 3: answer accepted citing a retired link';
+  DELETE FROM receipt_vehicle_links WHERE id = LB;
+  UPDATE receipt_vehicle_links SET retired_at = NULL WHERE id = LA;
+  -- the cited link itself changes basis / confidence
+  UPDATE receipt_vehicle_links SET basis = 'vehicle_hint', confidence = 0.6 WHERE id = LA;
+  ASSERT evidence_judgment_ineligibility(q1) = ARRAY['context_changed:link_basis,link_confidence'], evidence_judgment_ineligibility(q1)::text;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans);
+  UPDATE receipt_vehicle_links SET basis = 'cited_document', confidence = 0.9 WHERE id = LA;
+  -- (4) the anchor changes: a page date appears on the cited link
+  UPDATE receipt_vehicle_links SET page_date = '2025-01-20', page_date_source = 'printed' WHERE id = LA;
+  probs := evidence_judgment_ineligibility(q1);
+  ASSERT EXISTS (SELECT 1 FROM unnest(probs) p WHERE p LIKE 'context_changed:%anchor_date%' AND p LIKE '%anchor_source%' AND p LIKE '%link_page_date%'), probs::text;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'anchor change';
+  UPDATE receipt_vehicle_links SET page_date = NULL, page_date_source = NULL WHERE id = LA;
+  -- (5) line content: description, part number, printed hours (same ids)
+  UPDATE receipt_items SET description = '70-76 SHAKER HOOD (RAM AIR)' WHERE id = D9;
+  probs := evidence_judgment_ineligibility(q1);
+  ASSERT 'line_changed' = ANY (probs) AND EXISTS (SELECT 1 FROM unnest(probs) p WHERE p LIKE 'context_changed:%description%'), probs::text;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'description change';
+  UPDATE receipt_items SET description = '70-76 SHAKER HOOD', part_number = '15137' WHERE id = D9;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'part number change';
+  UPDATE receipt_items SET part_number = '15136', hours = 1.5 WHERE id = D9;
+  ASSERT 'line_changed' = ANY (evidence_judgment_ineligibility(q1)) AND NOT pg_temp.try_answer(q1, 'worker-a', ans), 'printed hours change';
+  UPDATE receipt_items SET hours = NULL WHERE id = D9;
+  -- (6) frame set: a new eligible frame joins the computed candidate set; a cited frame becomes private
+  INSERT INTO vehicle_images(id, vehicle_id, taken_at, is_duplicate, is_superseded, is_sensitive, vision_gate_status, ai_scan_metadata, is_document) VALUES
+    (FN, V, '2025-01-15 15:00Z', false, false, false, 'approved', '{"classification":{"v2":{"angle":{"value":"exterior_front"}}}}', false);
+  probs := evidence_judgment_ineligibility(q1);
+  ASSERT EXISTS (SELECT 1 FROM unnest(probs) p WHERE p LIKE 'context_changed:%candidate_image_ids%'), probs::text;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'frame set change';
+  DELETE FROM vehicle_images WHERE id = FN;
+  UPDATE vehicle_images SET is_sensitive = true WHERE id = F1;
+  probs := evidence_judgment_ineligibility(q1);
+  ASSERT ('frame_ineligible:' || F1) = ANY (probs), probs::text;
+  ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'privacy withdrawal during the claim';
+  UPDATE vehicle_images SET is_sensitive = false WHERE id = F1;
+  -- the receipt superseded during the claim
+  UPDATE receipts SET is_superseded = true WHERE id = C9;
+  ASSERT 'receipt_superseded' = ANY (evidence_judgment_ineligibility(q1)) AND NOT pg_temp.try_answer(q1, 'worker-a', ans);
+  UPDATE receipts SET is_superseded = false WHERE id = C9;
+
+  -- a pending question whose context changed is not claimable; unchanged again, it is
+  row2 := row1 || jsonb_build_object('dedupe_key', 'q-hood-b', 'question_hash', 'hb');
+  SELECT * INTO a FROM raise_evidence_judgment(row2, R1); qb := a.id;
+  UPDATE receipts SET source_document_id = '00000000-0000-0000-0000-0000000000ac' WHERE id = C9;
+  SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-z');
+  ASSERT n = 0, 'claimed a question whose context changed';
+  UPDATE receipts SET source_document_id = '00000000-0000-0000-0000-0000000000ab' WHERE id = C9;
+  SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-z');
+  ASSERT n = 1, 'unchanged context is claimable';
+  ASSERT retire_evidence_judgment(qb, R1, 'not_asked', 'fixture cleanup') = 'cancelled';
+
+  -- unchanged context: the answer is accepted
+  ASSERT evidence_judgment_ineligibility(q1) = '{}'::text[], evidence_judgment_ineligibility(q1)::text;
+  ASSERT pg_temp.try_answer(q1, 'worker-a', ans), 'answer refused with unchanged context';
   ASSERT (SELECT status FROM evidence_judgment_requests WHERE id = q1) = 'answered';
+
   -- privacy withdrawal after the answer: retired as withdrawn, the answer kept, not claimable
-  UPDATE vehicle_images SET is_sensitive = true WHERE id = F2::uuid;
-  ASSERT evidence_judgment_ineligibility(q1) = ARRAY['frame_ineligible:' || F2];
-  ASSERT retire_evidence_judgment(q1, R3, 'frame_withdrawn', 'f2 made private') = 'withdrawn';
+  UPDATE vehicle_images SET is_sensitive = true WHERE id = F1;
+  ASSERT ('frame_ineligible:' || F1) = ANY (evidence_judgment_ineligibility(q1));
+  ASSERT retire_evidence_judgment(q1, R3, 'frame_withdrawn', 'f1 made private') = 'withdrawn';
   ASSERT (SELECT status = 'withdrawn' AND answer ->> 'quote' = 'hood scoop on the car' AND retire_kind = 'frame_withdrawn'
             AND lifecycle -> -1 ->> 'from' = 'answered' FROM evidence_judgment_requests WHERE id = q1), 'withdrawn keeps the answer';
   ASSERT retire_evidence_judgment(q1, R3, 'frame_withdrawn', 'again') = 'unchanged';
   SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-c');
   ASSERT n = 0, 'a withdrawn question is not claimable';
   -- eligible again and re-asked with identical content: the answer revives; rolling that run back withdraws it again
-  UPDATE vehicle_images SET is_sensitive = false WHERE id = F2::uuid;
+  UPDATE vehicle_images SET is_sensitive = false WHERE id = F1;
   SELECT * INTO a FROM raise_evidence_judgment(row1, R4);
   ASSERT a.action = 'revived' AND a.status = 'answered', a.action || a.status;
   SELECT count(*) INTO n FROM rollback_evidence_judgment_run(R4, 'contract', false) x WHERE x.action = 'reverted' AND x.to_status = 'withdrawn';
@@ -313,8 +397,8 @@ BEGIN
   SELECT x.action INTO st FROM rollback_evidence_judgment_run(R3, 'contract', true) x WHERE x.id = q1;
   ASSERT st = 'skipped_later_activity', st;
 
-  -- changed content (other frames) is a different question; claimed then no longer asked -> cancelled; re-asked -> revived
-  row2 := row1 || jsonb_build_object('params', P || jsonb_build_object('candidate_image_ids', jsonb_build_array(F1)), 'dedupe_key', 'q-hood-2', 'question_hash', 'h2');
+  -- changed content is a different question; claimed then no longer asked -> cancelled; re-asked -> revived
+  row2 := row1 || jsonb_build_object('dedupe_key', 'q-hood-2', 'question_hash', 'h2');
   SELECT * INTO a FROM raise_evidence_judgment(row2, R5);
   ASSERT a.action = 'inserted'; q2 := a.id;
   SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-d');
@@ -324,26 +408,24 @@ BEGIN
   ASSERT a.action = 'revived' AND a.status = 'pending' AND (SELECT claimed_by IS NULL AND cancelled_at IS NULL FROM evidence_judgment_requests WHERE id = q2);
 
   -- correction with the same ids: the old question becomes ineligible and is superseded by a new one that inherits no answer
-  UPDATE receipt_items SET description = '70-76 SHAKER HOOD (RAM AIR)', part_number = '15137' WHERE id = D1;
+  UPDATE receipt_items SET description = '70-76 SHAKER HOOD (RAM AIR)', part_number = '15137' WHERE id = D9;
   ASSERT 'line_changed' = ANY (evidence_judgment_ineligibility(q2)), evidence_judgment_ineligibility(q2)::text;
   SELECT count(*) INTO n FROM claim_evidence_judgments('receipt_work_reconciliation', 'receipt_part_visible', 10, 'worker-e');
   ASSERT n = 0, 'a question about the old content is not claimable';
-  row3 := row1 || jsonb_build_object('params', P || jsonb_build_object('description', '70-76 SHAKER HOOD (RAM AIR)', 'part_number', '15137'),
-                                     'dedupe_key', 'q-hood-3', 'question_hash', 'h3');
+  row3 := pg_temp.q_row(D9, 'q-hood-3', 'h3');
   SELECT * INTO a FROM raise_evidence_judgment(row3, R8);
   ASSERT a.action = 'inserted' AND a.status = 'pending'; q3 := a.id;
   ASSERT retire_evidence_judgment(q2, R8, 'content_changed', 'line corrected', q3) = 'cancelled';
   ASSERT (SELECT superseded_by = q3 AND retire_kind = 'content_changed' FROM evidence_judgment_requests WHERE id = q2);
   ASSERT (SELECT answer IS NULL AND answer_history = '[]'::jsonb FROM evidence_judgment_requests WHERE id = q3), 'no inherited answer';
-  ASSERT cardinality(evidence_judgment_ineligibility(q3)) = 0, evidence_judgment_ineligibility(q3)::text;
-  -- a printed-date correction with the same ids also retires the question's eligibility
-  UPDATE receipt_items SET line_date = '2025-01-11' WHERE id = D1;
+  ASSERT evidence_judgment_ineligibility(q3) = '{}'::text[], evidence_judgment_ineligibility(q3)::text;
+  -- a printed-date correction, and a removed line
+  UPDATE receipt_items SET line_date = '2025-01-02' WHERE id = D9;
   ASSERT 'line_changed' = ANY (evidence_judgment_ineligibility(q3));
-  UPDATE receipt_items SET line_date = NULL WHERE id = D1;
-  -- a removed line
-  UPDATE receipt_items SET id = '00000000-0000-0000-0000-00000000d1d1' WHERE id = D1;
+  UPDATE receipt_items SET line_date = NULL WHERE id = D9;
+  UPDATE receipt_items SET id = '00000000-0000-0000-0000-00000000d9d9' WHERE id = D9;
   ASSERT 'line_removed' = ANY (evidence_judgment_ineligibility(q3));
-  UPDATE receipt_items SET id = D1 WHERE id = '00000000-0000-0000-0000-00000000d1d1';
+  UPDATE receipt_items SET id = D9 WHERE id = '00000000-0000-0000-0000-00000000d9d9';
   -- rolling back R8: its new question is retired and the question it superseded goes back to pending
   SELECT count(*) INTO n FROM rollback_evidence_judgment_run(R8, 'contract', false);
   ASSERT n = 2, 'R8 touched two questions: ' || n;
