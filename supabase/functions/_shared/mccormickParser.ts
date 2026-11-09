@@ -30,7 +30,7 @@ export interface McCormickLot {
   source_id: string; source_url: string; auction_number: string | null; auction_dates_text: string | null;
   title: string; lot_number: string; year: number | null; make: string | null; model: string | null;
   vin: string | null; description: string; raw_fields: Record<string, string>; condition_ratings: Record<string, string>;
-  image_urls: string[]; presentation: "archive" | "upcoming";
+  image_urls: string[]; presentation: "archive" | "unknown";
   result_claim: { status: "sold" | "no_sale"; amount: number; currency_symbol: "$"; currency: null; fee_basis: "unknown"; literal: string } | null;
 }
 
@@ -87,11 +87,11 @@ export function parseMcCormickLot(html: string, url: string): McCormickLot {
   const high = resultText.match(/(?:High Bid|No Sale)\s*:?\s*\$\s*([\d,]+(?:\.\d{2})?)/i);
   const match = sold ?? high;
   const vin = known(raw["Vin No."]);
-  return { source_id: target.id, source_url: target.url, auction_number: target.auction ?? number,
-    auction_dates_text: auction?.match(/\(([^)]+)\)/)?.[1] ?? null,
+  return { source_id: target.id, source_url: target.url, auction_number: target.auction,
+    auction_dates_text: target.archive ? auction?.match(/\(([^)]+)\)/)?.[1] ?? null : null,
     title, lot_number: lot, year, make, model, vin: vin && /^[A-HJ-NPR-Z0-9]{5,17}$/i.test(vin) ? vin.toUpperCase() : null,
     description: owner ? text(owner[1]) : "", raw_fields: raw, condition_ratings: ratings,
-    image_urls: [...images], presentation: target.archive ? "archive" : "upcoming",
+    image_urls: [...images], presentation: target.archive ? "archive" : "unknown",
     result_claim: match ? { status: sold ? "sold" : "no_sale", amount: Number(match[1].replace(/,/g, "")),
       currency_symbol: "$", currency: null, fee_basis: "unknown", literal: match[0] } : null };
 }

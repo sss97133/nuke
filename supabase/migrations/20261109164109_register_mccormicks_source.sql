@@ -20,7 +20,7 @@ VALUES
        'https://www.classic-carauction.com/auction-results?auctionnbr=47&auctionid=3632',
        'https://www.classic-carauction.com/auction-results?auctionnbr=80&auctionid=15164',
        'https://www.classic-carauction.com/Showroom-Inventory'),
-     'seen', 'Named auction events and lot numbers; upcoming catalog and archived sold/high-bid results. Current detail pages may name VINs; archives omit them. Specifications and component condition ratings occupy separate sections. Descriptions and photos are consignor claims. Showroom inventory separately labels owners asking prices and says vehicles may or may not enter an auction.',
+     'seen', 'Named auction events and lot numbers; upcoming catalog and archived sold/high-bid results. The archive template omits VINs and extra photos; the public detail alias for the same native ID may expose them. Its current-auction header is decorative, not evidence that an archived lot is upcoming. Specifications and component condition ratings occupy separate sections. Descriptions and photos are consignor claims. Showroom inventory separately labels owners asking prices and says vehicles may or may not enter an auction.',
      'doc', 'docs/ledger/theory/data-machine-cases.md section 6: block houses',
      'extractor', 'ingest:mccormick_html_v1',
      'listing_rule', 'auction-cars or featured-cars URL with one numeric auctionid; auction-results also requires auctionnbr. One auctionid is one appearance; a sold result is a source claim, not current availability or ownership. Showroom-Inventory is dealer species and excluded from this block-house intake adapter.'))

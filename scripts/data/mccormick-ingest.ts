@@ -90,11 +90,11 @@ if (has("--retain-local")) {
     for (const line of (await Deno.readTextFile(receiptsPath)).trim().split("\n")) {
       if (!line.trim()) continue;
       const r = JSON.parse(line);
-      if (r.action === "ingest" && r.verified === true) done.add(r.url);
+      if (r.action === "ingest" && r.verified === true && r.capture_complete !== false) done.add(r.url);
     }
   } catch (e) { if (!(e instanceof Deno.errors.NotFound)) throw e; }
   const pending = manifest.lots.filter(url => !done.has(url)).slice(0, limit);
-  let index = 0, completed = 0, stopped = false;
+  let index = 0, completed = 0, admitted = 0, captureGaps = 0, stopped = false;
   await Promise.all(Array.from({ length: concurrency }, async () => {
     while (!stopped && index < pending.length) {
       const url = pending[index++];
@@ -103,16 +103,18 @@ if (has("--retain-local")) {
       const receipt = result.data?.mccormick_receipt;
       const verified = !result.error && ["created", "matched", "unresolved"].includes(result.data?.status)
         && typeof receipt?.observation_id === "string" && typeof receipt?.snapshot_id === "string";
-      await append({ action: "ingest", url, recorded_at: new Date().toISOString(), verified, result: result.data,
+      const captureComplete = verified && receipt?.source_capture_gaps?.length === 0;
+      await append({ action: "ingest", url, recorded_at: new Date().toISOString(), verified, capture_complete: captureComplete, result: result.data,
         error: result.error ? String(result.error.message) : null });
       if (!verified) { stopped = true; break; }
-      completed++;
-      console.log(JSON.stringify({ completed, attempted_limit: pending.length, source_id: receipt.source_id,
+      admitted++;
+      if (captureComplete) completed++; else captureGaps++;
+      console.log(JSON.stringify({ admitted, completed, capture_gaps: captureGaps, attempted_limit: pending.length, source_id: receipt.source_id,
         vehicle_id: result.data.vehicle_id, images: receipt.images, unresolved: receipt.unresolved }));
       await pause(250);
     }
   }));
-  console.log(JSON.stringify({ action: "ingest", completed, already_verified: done.size, enumerated_lots: manifest.lots.length,
+  console.log(JSON.stringify({ action: "ingest", admitted, completed, capture_gaps: captureGaps, already_verified: done.size, enumerated_lots: manifest.lots.length,
     remaining: manifest.lots.length - done.size - completed, discovery_complete: manifest.discovery_complete, stopped }));
   if (stopped) Deno.exit(1);
 }

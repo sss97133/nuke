@@ -95,3 +95,80 @@ for (const failure of ["archive", "identity", "admission", "readback", "images"]
     if (failure === "archive" || failure === "identity") eq(w.counts().matches, 0);
   });
 }
+
+async function archiveWorld(mode: "complete" | "missing" | "disagreement" | "ambiguous" = "complete") {
+  const archiveUrl="https://www.classic-carauction.com/auction-results?auctionnbr=80&auctionid=123";
+  const modern=(s:string)=>s.replaceAll("1967","2002");
+  const archiveBody=modern(fixture(true)).replace('second</a>', 'second</a><a href="./upload/Auction/archive-only.jpg">original</a>');
+  const detailBody=modern(fixture(false)).replace('>TBA</TD>', '>1FAFP42X62F212138</TD>')
+    .replace('second</a>', 'second</a><a href="./upload/Auction/extra.jpg">third</a>')
+    .replace('Lot Nbr. 42', mode === "disagreement" ? 'Lot Nbr. 43' : 'Lot Nbr. 42');
+  const docs:Record<string,any>={};
+  for(const [name,body,sourceUrl] of [["archive",archiveBody,archiveUrl],["detail",detailBody,url]]) {
+    const hash=[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(body)))].map(b=>b.toString(16).padStart(2,"0")).join("");
+    docs[name]={id:name,body,platform:"mccormicks",listing_url:sourceUrl,html_sha256:hash,fetched_at:"2026-01-01T00:00:00Z",success:true};
+  }
+  const payloads:any[]=[];const held=new Map<string,any>();let candidate:any;
+  const db:any={
+    from(table:string){
+      const filters:Record<string,any>={};let inserted:any[]|null=null;
+      const query:any={};
+      for(const k of ["select","order","range","limit","in"])query[k]=()=>query;
+      query.eq=(k:string,v:any)=>{filters[k]=v;return query;};
+      query.insert=(rows:any[])=>{inserted=rows;return query;};
+      const result=()=>{
+        if(table==="observation_sources")return {data:{id:"source",species:"block_house",supported_observations:["listing"]}};
+        if(table==="listing_page_snapshots")return {data:docs[filters.id]};
+        if(table==="vehicles")return {data:mode === "ambiguous" && filters.vin ? [{id:"a"},{id:"b"}] : []};
+        if(table==="vehicle_images"){
+          for(const row of inserted??[])held.set(row.image_url,row);
+          return {data:[...held.values()]};
+        }
+        const p=payloads[Number(String(filters.id).split("-")[1])];
+        return {data:{...p,id:filters.id,source_id:"source",vehicle_id:p.vehicle_id??null}};
+      };
+      query.maybeSingle=async()=>result();
+      query.then=(resolve:any,reject:any)=>Promise.resolve(result()).then(resolve,reject);
+      return query;
+    },
+    functions:{invoke(_name:string,{body}:any){const n=payloads.push(body)-1;return Promise.resolve({data:{success:true,observation_id:`obs-${n}`}});}},
+  };
+  const result=await ingestMcCormick(archiveUrl,{
+    supabase:db,
+    archiveFetch:async(fetchUrl)=>{
+      const doc=fetchUrl===archiveUrl?docs.archive:docs.detail;
+      return {html:doc.body,markdown:null,source:"cache",cached:true,snapshotId:mode==="missing"&&doc.id==="detail"?null:doc.id,url:fetchUrl,platform:"mccormicks",statusCode:200,error:null,costCents:0};
+    },
+    matchVehicle:async(data)=>{
+      candidate=data;
+      for(const image_url of data.imageUrls)held.set(image_url,{image_url,source_url:data.url});
+      return {vehicleId:"vehicle",isNew:true};
+    },
+  });
+  return {result,payloads,candidate,images:[...held.values()],archiveUrl};
+}
+Deno.test("historical VIN and gallery come from a separately retained matching public detail witness",async()=>{
+  const w=await archiveWorld();
+  eq(w.candidate.vin,"1FAFP42X62F212138");eq(w.candidate.price,undefined);
+  eq(w.payloads.length,2);eq(w.payloads.map(p=>p.raw_source_ref),["listing_page_snapshots:archive","listing_page_snapshots:detail"]);
+  eq(w.payloads[0].structured_data.result_claim.status,"sold");
+  eq(w.payloads[1].structured_data.result_claim,null);
+  eq(w.payloads[1].structured_data.auction_number,null);eq(w.payloads[1].structured_data.presentation,"unknown");
+  eq(w.result.mccormick_receipt.source_capture_gaps,[]);eq(w.result.mccormick_receipt.images,4);
+  eq(w.images.find(i=>i.image_url.endsWith("archive-only.jpg"))?.source_url,w.archiveUrl);
+  eq(w.images.find(i=>i.image_url.endsWith("extra.jpg"))?.source_url,url);
+});
+for(const mode of ["missing","disagreement"] as const) {
+  Deno.test(`alternate detail ${mode} preserves the result and explicit missing coverage without importing its VIN`,async()=>{
+    const w=await archiveWorld(mode);
+    eq(w.candidate.vin,null);eq(w.payloads.length,1);eq(w.result.mccormick_receipt.source_capture_gaps.length,1);
+    eq(w.payloads[0].source_url,w.archiveUrl);eq(w.payloads[0].structured_data.result_claim.status,"sold");
+  });
+}
+
+Deno.test("ambiguous historical VIN stays two sourced blips without minting or attaching a vehicle",async()=>{
+  const w=await archiveWorld("ambiguous");eq(w.candidate,undefined);eq(w.payloads.length,2);
+  eq(w.result.mccormick_receipt.unresolved,true);eq(w.result.mccormick_receipt.images,0);
+  eq(w.payloads.every(p=>p.vehicle_id===undefined),true);
+  eq(w.payloads[1].structured_data.vin,"1FAFP42X62F212138");
+});
