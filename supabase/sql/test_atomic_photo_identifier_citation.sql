@@ -119,6 +119,11 @@ DROP TRIGGER fixture_reject_identifier ON vehicle_identifiers;
 DO $$ DECLARE result jsonb; BEGIN
  result:=fixture_land('{"identifiers":[{"kind":"vin","value":"1HGCM82633A004352","quote":"modern plate","confidence":0.79}]}');
  ASSERT result->>'status'='ok' AND result->>'identifiers'='1' AND result->>'field_evidence'='0','legacy modern envelope preserved';
+ result:=land_identifier_claims('11111111-1111-1111-1111-111111111111',
+  '{"identifiers":[{"kind":"engine","value":"WS","quote":"engine stamp","confidence":0.7}]}',
+  NULL,'photo_land_classification','photo','22222222-2222-2222-2222-222222222222',NULL);
+ ASSERT result->>'status'='ok' AND result->>'identifiers'='1','existing SQL caller may omit source URL';
+ ASSERT (SELECT source_url='https://example.invalid/plate.jpg' FROM vehicle_identifiers WHERE kind='engine'),'new legacy call binds the locked photo URL';
  ASSERT NOT has_function_privilege('anon','land_identifier_claims(uuid,jsonb,text,text,text,uuid,uuid)','EXECUTE');
  RAISE NOTICE 'PASS: no public write access or modern input change';
 END $$;
@@ -134,7 +139,7 @@ DO $$ DECLARE result jsonb; BEGIN
  UPDATE vehicle_images SET vehicle_id=NULL;
  result:=identifier_consensus('11111111-1111-1111-1111-111111111111','vin');
  ASSERT jsonb_array_length(result->'values')=1 AND result->'values'->0->>'images'='0','withdrawn photo loses authority, independent text remains';
- ASSERT (SELECT count(*) FROM vehicle_identifiers WHERE source_kind='photo')=2,'source testimony remains intact';
+ ASSERT (SELECT count(*) FROM vehicle_identifiers WHERE source_kind='photo' AND kind='vin')=2,'source testimony remains intact';
  UPDATE vehicle_images SET vehicle_id='11111111-1111-1111-1111-111111111111',image_url='https://example.invalid/replacement.jpg';
  result:=identifier_consensus('11111111-1111-1111-1111-111111111111','vin');
  ASSERT result->'values'->0->>'images'='0','replacement image is not authority for the former image reading';
@@ -146,6 +151,13 @@ DO $$ DECLARE result jsonb; BEGIN
  result:=identifier_consensus('11111111-1111-1111-1111-111111111111','vin');
  ASSERT result->'values'->0->>'images'='0','superseded photo is withdrawn';
  UPDATE vehicle_images SET is_superseded=false;
+ UPDATE vehicle_identifiers SET source_url=NULL WHERE source_kind='photo' AND kind='vin';
+ result:=identifier_consensus('11111111-1111-1111-1111-111111111111','vin');
+ ASSERT EXISTS(SELECT FROM jsonb_array_elements(result->'values') e WHERE (e->>'images')::int>0),'pre-existing URL-less photo claims retain their ID-based source relation';
+ UPDATE vehicle_images SET vehicle_id=NULL;
+ result:=identifier_consensus('11111111-1111-1111-1111-111111111111','vin');
+ ASSERT result->'values'->0->>'images'='0','legacy URL-less photo also withdraws when unfiled';
+ UPDATE vehicle_images SET vehicle_id='11111111-1111-1111-1111-111111111111';
  UPDATE vehicles SET is_public=false,user_id='33333333-3333-3333-3333-333333333333';
  ASSERT identifier_consensus('11111111-1111-1111-1111-111111111111','vin') IS NULL,'unrelated viewer cannot read private vehicle';
  PERFORM set_config('test.auth_uid','33333333-3333-3333-3333-333333333333',true);

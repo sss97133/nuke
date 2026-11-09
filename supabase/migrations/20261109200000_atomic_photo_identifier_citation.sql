@@ -62,9 +62,14 @@ BEGIN
     SELECT id, vehicle_id, image_url, is_superseded INTO image_row
       FROM vehicle_images WHERE id=p_source_image_id FOR UPDATE;
     IF image_row.id IS NULL OR image_row.vehicle_id IS DISTINCT FROM p_vehicle_id
-       OR image_row.is_superseded IS TRUE OR image_row.image_url IS DISTINCT FROM p_source_url THEN
+       OR image_row.is_superseded IS TRUE
+       OR ((p_source_url IS NOT NULL OR cited IS NOT NULL) AND image_row.image_url IS DISTINCT FROM p_source_url) THEN
       RETURN jsonb_build_object('status','source_image_changed');
     END IF;
+    -- photo_land_classification historically omits its URL. Bind that existing
+    -- caller to the locked source for future reads; cited_vin still requires its
+    -- original URL above so stale classifier text cannot cite a replacement.
+    p_source_url := image_row.image_url;
   END IF;
   SELECT id, make, model, year, vin FROM vehicles WHERE id = p_vehicle_id FOR UPDATE INTO v;
   IF v.id IS NULL THEN RETURN jsonb_build_object('status','no_vehicle'); END IF;
@@ -178,7 +183,9 @@ with gate as (
     and (i.source_kind <> 'photo' or exists (
       select 1 from public.vehicle_images source_image
       where source_image.id=i.source_image_id and source_image.vehicle_id=i.vehicle_id
-        and source_image.image_url=i.source_url
+        -- Older SQL photo callers supplied only the image ID. Retain that
+        -- legacy attachment check; new photo claims bind the locked URL.
+        and (i.source_url is null or source_image.image_url=i.source_url)
         and nullif(btrim(source_image.image_url),'') is not null
         and source_image.is_superseded is not true and source_image.is_sensitive is not true
         and source_image.is_duplicate is not true
