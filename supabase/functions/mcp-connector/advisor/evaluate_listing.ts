@@ -27,6 +27,7 @@ import {
 } from "./variants.ts";
 import { allInCost, cohortTrend, type FeeRow, pricePosition } from "./market_position.ts";
 import { batLotUrl, type InstantIngestResult, instantIngestBat, type InvokeFunction } from "./instant_ingest.ts";
+import { checkStoredBid, type StoredBidCheck } from "./live_bid_refresh.ts";
 
 /** Page-observed subject facts passed to value_asset (mirrors handlers.ts SubjectOverride). */
 export interface ValueAssetOverride {
@@ -1672,6 +1673,41 @@ export async function handleEvaluateListing(
     redFlags.push(`Disclosed mods: ${detectModFlags(subjectBlob(listing)).join(", ")}`);
   }
 
+  // T7: a live BaT lot's stored bid vs the page. When the page is ahead, the lot is re-read through the
+  // existing writer (extract-bat-core) in the background; the answer itself always uses the page.
+  let storedBid: StoredBidCheck | null = null;
+  if (matchedId && lotUrl && listing.listing_kind === "auction_live" && (listing.current_bid ?? 0) > 0) {
+    const bare = lotUrl.replace(/\/$/, "");
+    const { data: aeRows, error: aeErr } = await sb
+      .from("auction_events")
+      .select("id, high_bid, updated_at, outcome")
+      .eq("vehicle_id", matchedId)
+      .in("source_url", [bare, `${bare}/`])
+      .is("duplicate_of", null)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    if (!aeErr) {
+      const row = (aeRows?.[0] ?? null) as
+        | { id: string; high_bid: number | null; updated_at: string | null; outcome: string | null }
+        | null;
+      storedBid = checkStoredBid(row, Number(listing.current_bid), lotUrl, deps.invokeFunction, {
+        justIngested: ingest?.status === "ingested",
+      });
+      if (storedBid.behind) {
+        const stored = storedBid.stored_high_bid != null ? money(storedBid.stored_high_bid) : "(none)";
+        const age = storedBid.stored_age_hours != null ? `, ${storedBid.stored_age_hours} h old,` : "";
+        const action = storedBid.refresh === "dispatched"
+          ? "refresh dispatched"
+          : storedBid.refresh === "throttled"
+          ? "refresh already dispatched"
+          : "not refreshed here";
+        redFlags.push(
+          `Nuke's stored bid ${stored}${age} is behind the page's ${money(storedBid.page_bid)} — ${action}; this answer uses the page`,
+        );
+      }
+    }
+  }
+
   // Prior sales / relists of the matched asset.
   let priorSales: Array<Record<string, unknown>> = [];
   if (matchedId) {
@@ -1867,6 +1903,7 @@ export async function handleEvaluateListing(
     position,
     trend,
     ingest,
+    stored_bid: storedBid,
     latency_ms,
     markdown_summary: markdown,
   });

@@ -106,7 +106,8 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
       "Evaluate a public listing URL: verdict, value range, prior sales/relists of the same car, top comps, and red flags. Prefer this for any 'is this a good buy?' question. " +
       "listing.price_kind says what the page price is (sold | high_bid_reserve_not_met | current_bid | ask) with price_basis (hammer = before buyer fee); " +
       "all_in (price + cited buyer fee + transport + paperwork), position (percentile among the comps shown) and trend (12-month cohort median vs prior 12 months, with n) are cited. " +
-      "A Bring a Trailer lot not yet in Nuke is landed on the spot (ingest.status = ingested, ~10 s budget) and evaluated in full; on timeout it is queued (ingest.status = timeout).",
+      "A Bring a Trailer lot not yet in Nuke is landed on the spot (ingest.status = ingested, ~10 s budget) and evaluated in full; on timeout it is queued (ingest.status = timeout). " +
+      "For a live BaT lot, stored_bid compares Nuke's stored bid with the page's; when Nuke is behind, a re-read is dispatched and a red flag says so (the answer always uses the page).",
     inputSchema: {
       type: "object",
       properties: {
