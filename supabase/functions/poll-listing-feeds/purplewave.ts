@@ -140,6 +140,9 @@ export async function landPurplewaveLot(client: any, lot: ReturnType<typeof purp
       auction_end_date: lot.end, latest_bid_at: lot.bidAt, currency: "USD", currency_source: CURRENCY_SOURCE,
       capture_kind: "auction_state_snapshot", sale_outcome: "unknown" },
   }, { sourceObservedAt: lot.readAt });
+  if (episode.action === "skipped" && episode.reason === "older source observation")
+    return { vehicle_id: vehicleId, observation_id: observationId, episode_id: null,
+      created: identity.data.status === "created", newer_state_preserved: true };
   if (!("id" in episode) || !episode.id) throw Error("PurpleWave episode projection failed");
   // Mutable discovery projection, only after the attributed observation and episode were acknowledged.
   const vehicle = await db.from("vehicles").select("id,platform_source,listing_url,sale_status,origin_metadata,deleted_at,description").eq("id", vehicleId).maybeSingle();
@@ -160,7 +163,7 @@ export async function landPurplewaveLot(client: any, lot: ReturnType<typeof purp
 /** Rotating bounded snapshots under the existing feed allocation; not a full-stream coverage claim. */
 export async function pollPurplewave(db: any, feed: any, budget: IntakeBudget, allocation: number, fetcher = fetch) {
   const result = { feed: feed.display_name, source: "purplewave", items_found: 0, new_ingested: 0,
-    snapshots_admitted: 0, unresolved: 0, native_limit: MAX_NATIVE_LOTS, error: null as string | null, coverage: "paged snapshots; individual bids and full inventory unverified" };
+    snapshots_admitted: 0, unresolved: 0, newer_state_preserved: 0, native_limit: MAX_NATIVE_LOTS, error: null as string | null, coverage: "paged snapshots; individual bids and full inventory unverified" };
   let config = feed.search_criteria ?? {};
   let page = Number(config.native_page ?? 1), offset = Number(config.native_offset ?? 0);
   let capture: PageCapture | null = config.native_capture ?? null;
@@ -235,6 +238,7 @@ export async function pollPurplewave(db: any, feed: any, budget: IntakeBudget, a
         throw error;
       }
       if (!landed.vehicle_id) result.unresolved++;
+      if ("newer_state_preserved" in landed && landed.newer_state_preserved) result.newer_state_preserved++;
       if (landed.created) result.new_ingested++;
       result.snapshots_admitted++;
       offset++;

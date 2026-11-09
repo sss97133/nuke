@@ -44,7 +44,7 @@ Deno.test("PurpleWave rejects wrong taxonomy, malformed identity and invalid bid
 function fixture(failAdmission = false) {
   const calls: { name: string; body: any }[] = [], writes: { table: string; body: any }[] = [];
   const snapshots = new Map<string, any>();
-  const controls = { progressConflict: false };
+  const controls = { progressConflict: false, newerEpisode: false };
   let saved: any;
   const db = { functions: { invoke: async (name: string, { body }: any) => {
     calls.push({ name, body });
@@ -58,7 +58,7 @@ function fixture(failAdmission = false) {
       : table === "listing_feeds" ? (controls.progressConflict ? [] : [{ id: "feed" }])
       : table === "observation_sources" ? { species: "timed_auction", supported_observations: ["listing"] }
       : table === "vehicle_observations" ? { id: "observation", ...saved }
-      : table === "vehicle_events" ? (action === "insert" ? [{ id: "episode" }] : [])
+      : table === "vehicle_events" ? (action === "insert" ? [{ id: "episode" }] : controls.newerEpisode ? [{ id: "episode", metadata: { source_observed_at: "2026-11-09T00:00:00Z" } }] : [])
       : table === "vehicles" ? (action === "update" ? [{ id: "vehicle" }] : { id: "vehicle", platform_source: "purplewave", listing_url: `https://www.purplewave.com/auction/${raw.auction}/item/${raw.item}`, origin_metadata: null, deleted_at: null })
       : null, error: null });
     const q: any = { select: () => q, eq: (key: string, value: string) => { if (key === "id") selectedId = value; return q; }, is: () => q, limit: () => q,
@@ -189,4 +189,11 @@ Deno.test("conflicting checkpoint cannot admit lots from an unclaimed page", asy
     { refusal: () => null, reserve: () => ({ timeout_ms: 5000 }), record: () => {} } as any, 8,
     async () => new Response(JSON.stringify([raw])));
   equal(result.error, "PurpleWave progress changed concurrently or could not be saved"); equal(f.calls, []);
+});
+
+Deno.test("a resumed older snapshot is retained without regressing a newer episode or blocking the cursor", async () => {
+  const f = fixture(); f.controls.newerEpisode = true;
+  const result = await landPurplewaveLot(f.db, purplewaveLot(raw, clock));
+  equal(result.observation_id, "observation"); equal("newer_state_preserved" in result && result.newer_state_preserved, true);
+  equal(f.writes, []); equal(f.calls.map(c => c.name), ["ingest", "ingest-observation"]);
 });
