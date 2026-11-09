@@ -922,7 +922,7 @@ it.each(['https://bringatrailer.com/listing/old-lot/', 'https://carsandbids.com/
         source_url: sourceUrl, event_status: 'active', current_price: 15000, bid_count: 2,
         final_price: null, sold_at: null, ended_at: new Date(Date.now() + 86400000).toISOString() }]);
       if (!endpoint(request, 'auction_comments', a)) return undefined;
-      const exact = request.url.searchParams.get('source_url') === `eq.${url}`;
+      const exact = request.url.searchParams.get('source_url') === `in.(${url.replace(/\/$/, '')},${url.replace(/\/$/, '')}/)`;
       return json({ posted_at: exact ? currentClock : '2026-11-08T23:00:00Z',
         author_username: exact ? 'current-source' : 'wrong-source', source_url: exact ? url : otherUrl });
     };
@@ -931,7 +931,7 @@ it.each(['https://bringatrailer.com/listing/old-lot/', 'https://carsandbids.com/
     expect(current.auctionPulse).toMatchObject({ listing_url: url, last_bid_at: currentClock, last_comment_at: currentClock });
     const reads = requests.filter(request => endpoint(request, 'auction_comments', a));
     expect(reads.length).toBeGreaterThan(4);
-    expect(reads.every(request => request.url.searchParams.get('source_url') === `eq.${url}`)).toBe(true);
+    expect(reads.every(request => request.url.searchParams.get('source_url') === `in.(${url.replace(/\/$/, '')},${url.replace(/\/$/, '')}/)`)).toBe(true);
     expect(reads.every(request => request.url.searchParams.get('select')?.includes('canonical:auction_events_canonical(id)'))).toBe(true);
     expect(reads.every(request => request.url.searchParams.getAll('or').includes('(auction_event_id.is.null,canonical.not.is.null)'))).toBe(true);
     const before = reads.length;
@@ -941,3 +941,38 @@ it.each(['https://bringatrailer.com/listing/old-lot/', 'https://carsandbids.com/
     expect(requests.filter(request => endpoint(request, 'auction_comments', a))).toHaveLength(before);
   },
 );
+
+it('shows the current RX7 episode over its historical sold scalar and reads both exact comment URL spellings on load and refresh', async () => {
+  const currentUrl = 'https://bringatrailer.com/listing/1994-mazda-rx-7-r2-2';
+  const oldUrl = 'https://bringatrailer.com/listing/1994-mazda-rx-7-us-can-22';
+  const sourceAt = '2026-11-09T02:57:39.489Z';
+  const expectedFilter = `in.(${currentUrl},${currentUrl}/)`;
+  reply = request => {
+    if (endpoint(request, 'rpc/get_vehicle_profile_data', a)) return json(profile(a, { sale_status: 'sold', sale_price: 40750, listing_url: oldUrl }));
+    if (endpoint(request, 'vehicle_events', a)) return json([
+      { id: 'current', source_platform: 'bat', source_url: currentUrl, event_type: 'auction', event_status: 'active',
+        current_price: 57500, currency_code: 'USD', bid_count: 12, ended_at: new Date(Date.now() + 86400000).toISOString(),
+        metadata: { source_observed_at: sourceAt }, updated_at: sourceAt },
+      ...(request.url.searchParams.has('source_url') ? [] : [{ id: 'historical', source_platform: 'bat', source_url: oldUrl,
+        event_type: 'auction', event_status: 'sold', current_price: 40750, final_price: 40750, sold_at: '2024-05-20T00:00:00Z' }]),
+    ]);
+    if (!endpoint(request, 'auction_comments', a)) return undefined;
+    const exact = request.url.searchParams.get('source_url') === expectedFilter;
+    if (request.method === 'HEAD') return new Response(null, { status: 200, headers: { 'Content-Range': `0-0/${exact ? 48 : 0}` } });
+    return json({ posted_at: exact ? sourceAt : null, author_username: exact ? 'current-lot-bidder' : 'historical-bidder' });
+  };
+  await render();
+  expect(current.vehicle).toMatchObject({ sale_price: 40750, sale_status: 'sold', listing_url: oldUrl });
+  expect(current.auctionPulse).toMatchObject({ listing_url: currentUrl, listing_status: 'active', current_bid: 57500,
+    currency_code: 'USD', bid_count: 12, comment_count: 48, last_bid_at: sourceAt, source_observed_at: sourceAt });
+  await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+  expect(current.auctionPulse).toMatchObject({ listing_url: currentUrl, current_bid: 57500, bid_count: 12, comment_count: 48, last_bid_at: sourceAt });
+  const episodeReads = requests.filter(request => endpoint(request, 'vehicle_events', a));
+  expect(episodeReads.length).toBeGreaterThan(1);
+  expect(episodeReads.every(request => request.url.searchParams.get('duplicate_of_event_id') === 'is.null')).toBe(true);
+  const telemetry = requests.filter(request => endpoint(request, 'auction_comments', a));
+  expect(telemetry.length).toBeGreaterThanOrEqual(8);
+  expect(telemetry.every(request => request.url.searchParams.get('source_url') === expectedFilter)).toBe(true);
+  expect(telemetry.every(request => request.url.searchParams.getAll('or').includes('(auction_event_id.is.null,canonical.not.is.null)'))).toBe(true);
+  expect(functions).not.toHaveBeenCalled();
+});

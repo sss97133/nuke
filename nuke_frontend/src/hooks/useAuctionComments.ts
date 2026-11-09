@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { auctionSourceUrlVariants, buildAuctionPulseFromExternalListings } from '../pages/vehicle-profile/buildAuctionPulse';
 
 export interface EpisodeInteraction {
   id: string;
@@ -19,15 +20,33 @@ export const EPISODE_READ_LIMIT = 100;
 export async function readAuctionEpisode(vehicleId: string, expectedSourceUrl?: string | null) {
   const parent = await supabase.from('vehicles')
     .select('id,title,year,make,model,listing_url,auction_end_date')
-    .eq('id', vehicleId).eq('is_public', true).is('deleted_at', null)
-    .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item').maybeSingle();
+    .eq('id', vehicleId).eq('is_public', true).is('deleted_at', null).is('merged_into_vehicle_id', null)
+    .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item')
+    .or('status.is.null,status.neq.merged').maybeSingle();
   if (parent.error) throw parent.error;
   // Comments have a legacy broad public policy. Never read them without an eligible public parent.
   if (!parent.data) return null;
   const vehicle = parent.data;
-  if (!/^https:\/\/bringatrailer\.com\/listing\/[^/?#]+\/?$/.test(vehicle.listing_url ?? '')) return null;
-  const url = vehicle.listing_url!.replace(/\/$/, '');
-  if (expectedSourceUrl && expectedSourceUrl.replace(/\/$/, '') !== url) return null;
+  const isBatLot = (value: string) => /^https:\/\/bringatrailer\.com\/listing\/[^/?#]+\/?$/.test(value);
+  let url = String(vehicle.listing_url ?? '').replace(/\/$/, '');
+  if (expectedSourceUrl && expectedSourceUrl.replace(/\/$/, '') !== url) {
+    if (!isBatLot(expectedSourceUrl)) return null;
+    const variants = auctionSourceUrlVariants(expectedSourceUrl);
+    const episode = await supabase.from('vehicle_events')
+      .select('id,source_platform,source_url,event_type,event_status,ended_at,sold_at,duplicate_of_event_id')
+      .eq('vehicle_id', vehicleId).is('duplicate_of_event_id', null)
+      .in('source_url', variants).eq('event_type', 'auction').in('source_platform', ['bat', 'bringatrailer'])
+      .in('event_status', ['active', 'live']).is('sold_at', null).gt('ended_at', new Date().toISOString()).limit(2);
+    if (episode.error) throw episode.error;
+    if (!Array.isArray(episode.data) || episode.data.length !== 1) return null;
+    const row = episode.data[0];
+    const current = buildAuctionPulseFromExternalListings([row], vehicleId);
+    if (row.duplicate_of_event_id || row.sold_at || row.event_type !== 'auction'
+      || !['bat', 'bringatrailer'].includes(row.source_platform) || !variants.includes(row.source_url)
+      || !['active', 'live'].includes(current?.listing_status) || !(Date.parse(current?.end_date || '') > Date.now())) return null;
+    url = expectedSourceUrl.replace(/\/$/, '');
+  }
+  if (!isBatLot(url)) return null;
   const [comments, specs] = await Promise.all([
     supabase.from('auction_comments')
       .select('id,posted_at,comment_type,comment_text,bid_amount,is_seller,media_urls,bat_comment_id,source_url,vehicles!inner(id),canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
@@ -142,7 +161,7 @@ export function useAuctionComments(
         .select('*,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
         .eq('vehicle_id', vehicleId!)
         .order('posted_at', { ascending: false });
-      if (listingUrl) q = q.eq('source_url', listingUrl);
+      if (listingUrl) q = q.in('source_url', auctionSourceUrlVariants(listingUrl));
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
