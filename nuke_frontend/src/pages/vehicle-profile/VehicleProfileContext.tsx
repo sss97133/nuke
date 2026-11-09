@@ -652,11 +652,21 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 
-  // ── Auction pulse realtime: published current cache ──
+  // ── Auction pulse while live: a 30 s read of this vehicle's episodes ──
+  // vehicle_events left the supabase_realtime publication on 2026-11-09: decoding every ingest write for Realtime was
+  // the database's costliest statement (realtime.list_changes, ~460 s/h). An open profile with a live lot re-reads its
+  // episodes every 30 s while visible and applies them as the subscription did.
+
+  const auctionLiveRef = useRef(false);
+  useEffect(() => {
+    const end = Date.parse(String(auctionPulse?.end_date ?? ''));
+    auctionLiveRef.current = Number.isFinite(end) ? end > Date.now() : ['active', 'live'].includes(String(auctionPulse?.listing_status ?? ''));
+  }, [auctionPulse?.end_date, auctionPulse?.listing_status]);
 
   useEffect(() => {
     if (!vehicle?.id) return;
     const vehicleIdForFilter = vehicle.id;
+    let cancelled = false;
 
     let lastRevision: string | null = null;
     let readerRefresh: ReturnType<typeof setTimeout> | null = null;
@@ -676,35 +686,38 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       }, 1000);
     };
 
-    const channel = supabase
-      .channel(`auction-pulse:${vehicleIdForFilter}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'vehicle_events', filter: `vehicle_id=eq.${vehicleIdForFilter}` },
-        (payload) => {
-          const row = (payload as any)?.new as any;
-          if (!row) return;
-          const currentUrl = currentAuctionUrlRef.current;
-          if (currentUrl && row.source_url && row.source_url.replace(/\/$/, '') !== currentUrl.replace(/\/$/, '')) return;
+    const applyRow = (row: any) => {
+      const currentUrl = currentAuctionUrlRef.current;
+      if (currentUrl && row.source_url && row.source_url.replace(/\/$/, '') !== currentUrl.replace(/\/$/, '')) return;
 
-          const merged = buildAuctionPulseFromExternalListings([row], vehicleIdForFilter);
-          if (merged) setAuctionPulse((prev: any) => {
-            if (prev?.updated_at && merged.updated_at && Date.parse(merged.updated_at) < Date.parse(prev.updated_at)) return prev;
-            return { ...(prev || {}), ...merged };
-          });
-          if (merged) refreshReaders(row);
-        },
-      )
-      .subscribe();
+      const merged = buildAuctionPulseFromExternalListings([row], vehicleIdForFilter);
+      if (merged) setAuctionPulse((prev: any) => {
+        if (prev?.updated_at && merged.updated_at && Date.parse(merged.updated_at) < Date.parse(prev.updated_at)) return prev;
+        return { ...(prev || {}), ...merged };
+      });
+      if (merged) refreshReaders(row);
+    };
+
+    const poll = async () => {
+      if (!auctionLiveRef.current || document.visibilityState !== 'visible') return;
+      const { data } = await supabase
+        .from('vehicle_events')
+        .select('source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+        .eq('vehicle_id', vehicleIdForFilter)
+        .order('updated_at', { ascending: false })
+        .limit(20);
+      if (cancelled || !data?.length) return;
+      const currentUrl = currentAuctionUrlRef.current?.replace(/\/$/, '');
+      const row = (currentUrl && data.find((r: any) => String(r.source_url ?? '').replace(/\/$/, '') === currentUrl)) || data[0];
+      applyRow(row);
+    };
+    const id = window.setInterval(() => { void poll(); }, 30_000);
 
     return () => {
+      cancelled = true;
+      window.clearInterval(id);
       if (readerRefresh) clearTimeout(readerRefresh);
-      try { supabase.removeChannel(channel); } catch {
-        try { channel.unsubscribe(); } catch { /* ignore */ }
-      }
     };
-  // Keep this channel stable while initial pulse data arrives. Removing and
-  // immediately reusing its topic can leave a joined channel without delivery.
   }, [vehicle?.id, queryClient]);
 
   // ── Auction pulse polling (60s) ──
