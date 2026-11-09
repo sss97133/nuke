@@ -26,6 +26,7 @@ let openaiCalls = 0, selfCalls: any[] = [], inflight = 0, maxInflight = 0;
 let selfCall: (body: any) => Promise<Response> = async () => Response.json({ success: true, classification: "other", classifier_ok: true });
 let queueRows: any[] = [];
 let fieldEvidenceStatus = 201;
+let filedVehicle: Record<string, unknown> = {};
 let handler!: (req: Request) => Promise<Response>;
 const originalServe = Deno.serve;
 
@@ -38,6 +39,7 @@ function reset() {
   calls = []; patchBodies = []; openaiCalls = 0; selfCalls = []; inflight = 0; maxInflight = 0; queueRows = []; fieldEvidenceStatus = 201; skew += 11 * 60_000 + 1; // expire the isolate-local OpenAI breaker between tests
   row = { id: "image", image_url: "https://example.invalid/image.jpg", vehicle_id: "vehicle", updated_at: "2026-01-01T00:00:00.000Z",
     ai_scan_metadata: {}, ai_processing_status: "pending", apple_ml_labels: [], vehicle_score: null, is_external: true, taken_at: null };
+  filedVehicle = { id: "vehicle", year: 1973, make: "Pontiac", model: "Firebird", vin: "2S87D3N000001" };
   rpc = {
     claim_photo_pipeline_batch: () => Response.json(queueRows),
     report_capture_step: () => Response.json(null),
@@ -45,6 +47,7 @@ function reset() {
     photo_pipeline_note_failure: () => Response.json({ status: "failed", transient: false, attempts: 12, next_attempt_at: null }),
     land_identifier_claims: () => Response.json({ ok: true }),
     classifier_schema_manifest: () => Response.json({ message: "absent" }, { status: 404 }),
+    identifier_rule_for: () => Response.json([{ rule_id: 23, rule_status: "in_range", series: "GM 13-char 1972-80", model_year_from: 1972, model_year_to: 1980 }]),
   };
   openai = () => oaOk(base);
   selfCall = async () => Response.json({ success: true, classification: "other", classifier_ok: true });
@@ -75,6 +78,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return h(body);
   }
   if (u.pathname === "/rest/v1/platform_config") return Response.json({});
+  if (u.pathname === "/rest/v1/vehicles" && method === "GET") return Response.json(u.searchParams.get("id") === "eq.vehicle" ? filedVehicle : []);
   if (u.pathname === "/rest/v1/llm_cost_tracking") return new Response(null, { status: 201 });
   if (u.pathname === "/rest/v1/field_evidence") return fieldEvidenceStatus >= 300 ? Response.json({ message: "synthetic" }, { status: fieldEvidenceStatus }) : new Response(null, { status: 201 });
   if (u.pathname === "/rest/v1/vehicle_observations") return Response.json([]);
@@ -237,6 +241,57 @@ const citedAnswer = { ...base, vin: { value: GOOD_VIN, confidence: 0.95, evidenc
     { field_name: "year", value: "1990", confidence: 0.9, evidence: null },                       // no evidence => dropped by applyV2
     { field_name: "not_a_column", value: "x", confidence: 0.9, evidence: "y" },                   // not in manifest => dropped
   ] };
+
+const classicAnswer = { ...base, image_type: "vin_plate", is_document: false,
+  vin: { value: "2S87D3N000001", confidence: .97, evidence: "Dash VIN plate reads 2S87D3N000001", evidence_role: "vehicle_vin_plate" } };
+
+Deno.test({ name: "physical pre1981VIN: source→registered rule→existing identifier and direct photo evidence, with no auto-filing", ...T, fn: async () => {
+  reset(); openai = () => oaOk(classicAnswer);
+  const response = await handler(one()); const result = await response.json();
+  assert(response.status === 200 && result.success === true, JSON.stringify(result));
+  const fields = calls.find(c => c.path === "/rest/v1/field_evidence")?.body;
+  const vin = fields?.find((r: any) => r.field_name === "vin");
+  assert(vin && vin.proposed_value === "2S87D3N000001" && vin.proposed_value.length === 13);
+  assert(vin.raw_extraction_data.photo_id === "image" && vin.raw_extraction_data.image_id === "image" &&
+    vin.raw_extraction_data.image_url === row.image_url && vin.raw_extraction_data.quote === classicAnswer.vin.evidence,
+    "existing get_field_provenance field_evidence join receives its exact photo_id and literal quote");
+  assert(vin.raw_extraction_data.checksum_ok === null && vin.raw_extraction_data.checksum_status === "not_applicable_pre1981");
+  assert(vin.raw_extraction_data.identifier_rule_id === 23 && vin.raw_extraction_data.model_year_context === 1973);
+  const rule = rpcCalls("identifier_rule_for")[0]?.body;
+  assert(rule?.p_make === "Pontiac" && rule.p_kind === "vin" && rule.p_value === classicAnswer.vin.value);
+  const claim = rpcCalls("land_identifier_claims")[0]?.body;
+  assert(claim?.p_read.identifiers[0].kind === "vin" && claim.p_read.identifiers[0].value === classicAnswer.vin.value &&
+    claim.p_source_kind === "photo" && claim.p_source_image_id === "image");
+  assert(rpcCalls("attribute_testimony").length === 0 && rpcCalls("auto_match_image_to_vehicles").length === 0);
+  assert(patchBodies.every(p => !("vehicle_id" in p)));
+  assert(patchBodies.some(p => p.vehicle_vin === classicAnswer.vin.value && p.vehicle_vin_confidence === .79));
+  assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === "pre1981_physical_plate"));
+}});
+
+Deno.test({ name: "physical pre1981VIN: conflicting/unsupported sources retain their reading with explicit refusal and no field/identifier admission", ...T, fn: async () => {
+  for (const [answer, vehicle, reason] of [
+    [classicAnswer, { vin: "2S87D3N000002" }, "stored_identifier_conflict"],
+    [classicAnswer, { year: null }, "vehicle_year_unknown"],
+    [classicAnswer, { year: 1981 }, "vehicle_year_not_pre1981"],
+    [{ ...classicAnswer, vin: { ...classicAnswer.vin, evidence_role: "body_tag" } }, {}, "physical_vin_source_required"],
+    [{ ...classicAnswer, vin: { ...classicAnswer.vin, evidence_role: "engine_stamp" } }, {}, "physical_vin_source_required"],
+    [{ ...classicAnswer, vin: { ...classicAnswer.vin, evidence_role: "sticker" } }, {}, "physical_vin_source_required"],
+  ] as const) {
+    reset(); Object.assign(filedVehicle, vehicle); openai = () => oaOk(answer);
+    const result = await (await handler(one())).json();
+    assert(result.success === true && rpcCalls("land_identifier_claims").length === 0, reason);
+    assert(!calls.some(c => c.path === "/rest/v1/field_evidence"), reason);
+    assert(!patchBodies.some(p => "vehicle_vin" in p), reason);
+    assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === reason), reason);
+    assert(JSON.stringify(row.ai_scan_metadata).includes(classicAnswer.vin.value), "original reading preserved");
+  }
+}});
+
+Deno.test({ name: "generic vehicle_fields cannot bypass dedicatedVIN admission", ...T, fn: async () => {
+  reset(); openai = () => oaOk({ ...base, vehicle_fields: [{ field_name: "vin", value: "1HGCM82633A004353", confidence: .99, evidence: "bad-checksum number" }] });
+  const result = await (await handler(one())).json();
+  assert(result.success === true && !calls.some(c => c.path === "/rest/v1/field_evidence") && rpcCalls("land_identifier_claims").length === 0);
+}});
 
 Deno.test({ name: "cited evidence: pending field_evidence rows with quote/photo id; VIN capped at 0.79; identifier claim; clear_retry; no testimony overwrite", ...T, fn: async () => {
   reset(); openai = () => oaOk(citedAnswer);
