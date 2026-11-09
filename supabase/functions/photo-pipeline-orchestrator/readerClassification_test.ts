@@ -43,5 +43,5 @@ Deno.test('a VIN that fails the pattern is refused, a well-formed one is kept', 
   assert(badVin.classifier_ok === false);
   const okVin = await classificationFromReader({ ...structuredClone(good), vin_detected: '1HGCM82633A004352' }, 'r'); // a checksum-valid 17-character VIN
   assert(okVin.classifier_ok === true, 'a well-formed VIN keeps the classification');
-  assert(okVin.vin_detected === '1HGCM82633A004352' || okVin.v2?.vin === '1HGCM82633A004352', 'the VIN is kept on the result');
+  assert(okVin.vin_detected === '1HGCM82633A004352' || okVin.v2?.vin?.value === '1HGCM82633A004352', 'the VIN is kept on the result');
 });
