@@ -62,6 +62,11 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    money record lands it through `land_document_pages` (the binder's writer) and bridges it with `ingest-receipts-as-observations`.
    A frame with no vehicle keeps its page and waits. Backfill: `scripts/photo-pipeline/reroute-document-frames.mjs`.
    Tests: `receipt-photo-ocr/core.test.ts` (mocked deps).
+   Owner decision 2026-11-08 ("ai read should be fueled by my subscription"; no platform vision key answers: Gemini 402 depleted
+   since 10-15, Anthropic 401, OpenAI insufficient_quota, xAI 403): the read runs on the owner's Mac as `claude -p` under his
+   Claude Code login, `scripts/photo-pipeline/subscription-document-reader.mjs`, which posts `{image_id, extraction, reader}` to
+   `receipt-photo-ocr`; the function lands a provided extraction without calling any provider. Measured: one sale sheet read in
+   47 s on the default model; the reader uses sonnet by default.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.

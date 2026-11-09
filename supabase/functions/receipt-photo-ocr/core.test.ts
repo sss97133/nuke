@@ -124,6 +124,34 @@ Deno.test("sanitizeExtraction removes e-mail addresses, card-length numbers and 
   assertEquals(((out.line_items as Array<Record<string, string>>)[0].description).length, 500);
 });
 
+Deno.test("a provided extraction lands without any provider call; the pipeline hint types it", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const r = await handle({ image_id: IMG, extraction: { ...receiptData, ocr_text: "dump" }, reader: "claude-cli subscription" },
+    deps({ frame: () => Promise.resolve(frame({ vehicle_id: VEH, doc_type_hint: "receipt" })) }, calls));
+  assertEquals(r.status, 200);
+  assertEquals(r.landed, true);
+  assertEquals(r.document_type, "receipt");
+  assert(!calls.some((c) => c[0] === "classify"));
+  assert(!calls.some((c) => c[0] === "extract"));
+  const page = calls.find((c) => c[0] === "page")![1] as Record<string, unknown>;
+  const ex = page.extraction as Record<string, unknown>;
+  assertEquals(ex.ocr_text, undefined);
+  assertEquals(ex.reader, "claude-cli subscription");
+  assertEquals(ex._provider, undefined);
+});
+
+Deno.test("a provided extraction updates a page that was recorded before, even with no vehicle", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const r = await handle({ image_id: IMG, extraction: { ...receiptData }, document_type: "receipt" }, deps({
+    existingPage: () => Promise.resolve({ doc_type: "other", extraction: {}, class_conf: 0, doc_date: null, run_id: "run-0" }),
+  }, calls));
+  assertEquals(r.page, true);
+  assertEquals(r.landed, false);
+  const page = calls.find((c) => c[0] === "page")![1] as Record<string, unknown>;
+  assertEquals(page.doc_type, "receipt");
+  assertEquals(page.run_id, "run-0");
+});
+
 Deno.test("a page already recorded with no vehicle is not read again", async () => {
   const calls: Array<[string, unknown]> = [];
   const r = await handle({ image_id: IMG }, deps({

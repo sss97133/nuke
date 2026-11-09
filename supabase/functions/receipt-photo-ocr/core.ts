@@ -23,6 +23,8 @@ export interface FrameRow {
   thumbnail_url?: string | null;
   file_name?: string | null;
   taken_at?: string | null;
+  /** The pipeline classifier's own document type for this frame (ai_scan_metadata.classification.v2.document_type), when it has one. */
+  doc_type_hint?: string | null;
 }
 
 export interface Classification {
@@ -116,6 +118,11 @@ export interface RouteBody {
   vehicle_id?: string | null;
   user_id?: string | null;
   document_type_hint?: string | null;
+  /** A reader that already read the page (the owner's subscription worker) hands its result here; no provider is called. */
+  extraction?: Extraction | null;
+  document_type?: string | null;
+  confidence?: number | null;
+  reader?: string | null;
 }
 
 export interface RouteResult {
@@ -325,7 +332,8 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
 
   // Already recorded and nothing new to do: a page with no vehicle waits for one.
   const existing = await deps.existingPage(imageId);
-  if (existing && !vehicleId) {
+  const hasProvided = !!(body.extraction && typeof body.extraction === "object" && !Array.isArray(body.extraction));
+  if (existing && !vehicleId && !hasProvided) {
     return {
       status: 200, image_id: imageId, document_type: existing.doc_type ?? undefined, confidence: existing.class_conf ?? undefined,
       page: true, landed: false, reason: "page already recorded; no vehicle to land on", line_items_count: lineCount(existing.extraction), parts_found: 0,
@@ -339,12 +347,24 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
   let data: Extraction;
   let reviewReasons: string[] = [];
   let costUsd: number | null = null;
-  if (existing?.extraction && existing.doc_type) {
+  const provided = body.extraction && typeof body.extraction === "object" && !Array.isArray(body.extraction) ? body.extraction : null;
+  if (provided) {
+    // A reader already read the page: the pipeline hint or the reader's type, the reader's confidence, its JSON sanitized.
+    const t = typeof body.document_type === "string" && body.document_type ? body.document_type
+      : typeof provided.document_type === "string" && provided.document_type ? String(provided.document_type)
+      : typeof frame.doc_type_hint === "string" && frame.doc_type_hint ? frame.doc_type_hint : "other";
+    docType = t.toLowerCase();
+    confidence = normaliseConfidence(body.confidence ?? provided.confidence ?? 1);
+    reviewReasons = Array.isArray(provided._review_reasons) ? (provided._review_reasons as unknown[]).map(String) : [];
+    data = sanitizeExtraction(provided) as Extraction;
+    if (typeof body.reader === "string" && body.reader) (data as Record<string, unknown>).reader = body.reader.slice(0, 80);
+  } else if (existing?.extraction && existing.doc_type) {
     docType = existing.doc_type;
     confidence = existing.class_conf ?? 0;
     data = existing.extraction;
   } else {
-    const hinted = typeof body.document_type_hint === "string" && body.document_type_hint ? body.document_type_hint : null;
+    const hinted = typeof body.document_type_hint === "string" && body.document_type_hint ? body.document_type_hint
+      : typeof frame.doc_type_hint === "string" && frame.doc_type_hint && frame.doc_type_hint !== "other" ? frame.doc_type_hint : null;
     const cls = hinted ? { document_type: hinted, confidence: 1 } : await deps.classify(url);
     docType = (cls.document_type || "other").toLowerCase();
     confidence = normaliseConfidence(cls.confidence);
