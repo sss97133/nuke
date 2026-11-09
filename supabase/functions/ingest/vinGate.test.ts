@@ -47,3 +47,13 @@ Deno.test("the actual McCormick Maserati passes the make gate while an incompati
   assertEquals(vinMakeConflict(vin, "Maserati", decoded), null);
   assertEquals(vinMakeConflict(vin, "Alfa Romeo", decoded)?.expected, "Maserati");
 });
+Deno.test("actual retained McCormick Bentley, DMC and Jeep claims are not contradicted by broad manufacturer guesses", () => {
+  for (const [vin, make] of [['SCBCR63W84C022079', 'Bentley'], ['SCEDT26T6BD005114', 'DMC'], ['1C4BJWDG8EL322097', 'Jeep']]) {
+    assertEquals(vinMakeCheckApplies(vin), true);
+    assertEquals(vinMakeConflict(vin, make, decodeVin(vin)), null);
+  }
+  assertEquals(vinMakeConflict('SCBCR63W84C022079', 'Ford', decodeVin('SCBCR63W84C022079'))?.expected, 'Bentley');
+  assertEquals(vinMakeConflict('1C4BJWDG8EL322097', 'Ford', decodeVin('1C4BJWDG8EL322097'))?.claimed, 'Ford');
+  // NHTSA exact VIN is a Chrysler Prowler; preserve this source's Plymouth disagreement.
+  assertEquals(vinMakeConflict('1C3EW65G92V101514', 'Plymouth', decodeVin('1C3EW65G92V101514'))?.expected, 'Chrysler');
+});
