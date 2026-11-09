@@ -37,6 +37,13 @@ Deno.test("capture retries reuse first read clock and canonical identifier; mism
     assertEquals(posts[1], posts[0]);
     assertEquals(posts[0].raw_source_ref, "listing_page_snapshots:snapshot-fixture");
     assertEquals(posts[0].kind, "listing");
+    const parent = { snapshot_id: "native-page-fixture", html_sha256: "a".repeat(64),
+      fetched_at: input.observedAt, source_url: "https://api.ebay.com/buy/browse/v1/item_summary/search" };
+    await admitAuctionSnapshot(sb, { ...input, sourceCapture: parent });
+    assertEquals(posts.at(-1).extraction_metadata.source_capture, parent);
+    assertEquals(JSON.parse(snapshots.at(-1).html).source_capture, parent);
+    assertEquals(posts.at(-1).observed_at, parent.fetched_at);
+    await assertRejects(() => admitAuctionSnapshot(sb, { ...input, sourceCapture: { ...parent, fetched_at: "2026-11-08T13:00:00Z" } }), Error, "source page clock mismatch");
     mismatch = true;
     await assertRejects(() => admitAuctionSnapshot(sb, input), Error, "readback mismatch");
   } finally {
