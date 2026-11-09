@@ -11,6 +11,9 @@
  * of the result, prices and estimate, so a re-read lands nothing new and a changed result appends and supersedes.
  * Cursor: source_walk_cursors (source christies, walk results_by_month), last_page = month_offset * 1000 + sale_index.
  *
+ *   POST { ..., "lot_pages": true }            -> also read up to LOT_PAGE_MAX closed lots' pages for their printed symbols
+ *                                                 (symbols_list), only when CHRISTIES_LOT_PAGES=true; off by default.
+ *
  * DISABLED: writes require CHRISTIES_ART_ENABLED=true; no cron is part of this change. Price and outcome semantics are
  * unproven (see christiesLot.ts). Deploy is not part of this draft.
  */
@@ -20,7 +23,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { CHRISTIES_LOT_METHOD, decodePosition, EARLIEST, encodePosition, monthAt, type ChristiesLotRecord } from "./christiesLot.ts";
-import { artSales, Reader, saleLots } from "./christiesRead.ts";
+import { artSales, LOT_PAGE_GAP_MS, LOT_PAGE_MAX, Reader, saleLots, withLotPages } from "./christiesRead.ts";
 
 const SOURCE = "christies";
 const WALK = "results_by_month";
@@ -36,7 +39,7 @@ Deno.serve(async (req) => {
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
 
-  const body = await req.json().catch(() => ({})) as { mode?: string; dry_run?: boolean };
+  const body = await req.json().catch(() => ({})) as { mode?: string; dry_run?: boolean; lot_pages?: boolean };
   const mode = body.mode ?? "art_land";
   const dryRun = body.dry_run === true;
   // Disabled by default: nothing lands until CHRISTIES_ART_ENABLED=true is set deliberately (no cron ships with this draft).
@@ -45,11 +48,21 @@ Deno.serve(async (req) => {
   }
   const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "");
   const reader = new Reader();
+  // Lot pages: gated twice (the run asks, the deployment allows), own small budget, slower gap.
+  const lotPagesOn = body.lot_pages === true && Deno.env.get("CHRISTIES_LOT_PAGES") === "true";
+  const pageReader = new Reader(lotPagesOn ? LOT_PAGE_MAX : 0, LOT_PAGE_GAP_MS);
+  let lotPagesRead = 0;
   const landed: Record<string, unknown>[] = [];
   const mappedRows: ChristiesLotRecord[] = [];
 
-  const land = async (records: ChristiesLotRecord[]) => {
-    if (!records.length) return null;
+  const land = async (input: ChristiesLotRecord[]) => {
+    if (!input.length) return null;
+    let records = input;
+    if (lotPagesOn && !pageReader.exhausted) {
+      const r = await withLotPages(pageReader, records);
+      records = r.records; lotPagesRead += r.read;
+      if (r.status === 403 || r.status === 429 || r.status === 408) pageReader.stop(); // no more page reads this run
+    }
     if (dryRun) { mappedRows.push(...records); return null; }
     const { data, error } = await supabase.rpc("record_asset_lots", { p_source_slug: SOURCE, p_lots: records });
     if (error) throw new Error(`record_asset_lots failed: ${error.message}`);
@@ -111,7 +124,7 @@ Deno.serve(async (req) => {
       creation = error ? { error: error.message } : data;
     }
     return okJson({
-      success: true, mode, dry_run: dryRun, method: CHRISTIES_LOT_METHOD, requests: reader.requests,
+      success: true, mode, dry_run: dryRun, method: CHRISTIES_LOT_METHOD, requests: reader.requests, lot_pages: lotPagesOn, lot_pages_read: lotPagesRead,
       landed, creation, mapped: dryRun ? mappedRows : undefined,
     });
   } catch (e) {

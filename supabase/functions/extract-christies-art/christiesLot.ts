@@ -12,12 +12,24 @@
  *
  * Every field is the house's claim, kept as printed.
  *
- * NEEDS SOURCE PROOF (open, not settled): Christie's labels the figure "price realised". Whether it includes the buyer's
- * premium (and from which year), and whether an unpriced closed lot means unsold or price withheld, are not yet proven
- * from a Christie's source page. Until then the figure is carried under the house's own label (price_basis
- * price_realised) in the writer's hammer_premium slot, never in hammer_price, and no premium is added or backed out.
- * Readers must not compare it with Bonhams hammer prices.
+ * Price realised: hammer price plus buyer's premium. Christie's 2025 year-end release (17 December 2025), Notes to Editors:
+ * "Estimates do not include buyer's premium. Sales totals are hammer price plus buyer's premium."
+ *   https://press.christies.com/62b-projected-global-sales-in-2025/
+ *   https://press.christies.com/wp-content/uploads/2025/12/e711cb9b6180e212a569ebb6e3f3045f.pdf
+ * The release states it for totals; the per-lot "Price realised" on the saved lot pages (lot-6609192.html GBP 588,800,
+ * lot-6609196.html GBP 3,262,000) is exactly a whole hammer under the printed 1 September 2026 London schedule (460,000 and
+ * 2,600,000), which the tests check. So the figure is carried in the writer's hammer_premium slot (hammer plus premium) with
+ * price_semantics citing the release, never in hammer_price; no hammer is backed out or stored. Whether a guarantor's financing
+ * fee is netted from it is not stated by the release (not claimed).
+ * The premium schedule in force is attached as printed (premium_schedule) when the sale site and date fall under a schedule
+ * saved from the house's own page (financial-information.html, effective 1 September 2026); older sales carry none.
+ *
+ * NEEDS SOURCE PROOF (still open): whether a closed lot with a printed price realised is "sold" (result stays
+ * unresolved:PRICE_REALISED) and whether an unpriced closed lot is unsold or price-withheld (result unknown). The lot header
+ * JSON carries an is_unsold flag; it is not yet proven against a house statement and is not used.
  */
+
+import { type LotHeader, type PrintedSymbol, symbolLabels } from "./christiesPage.ts";
 
 /** Christie's calendar categories that hold artworks, in the order a sale with several takes its department. */
 export const ART_CATEGORIES: Record<string, string> = {
@@ -27,6 +39,56 @@ export const ART_CATEGORIES: Record<string, string> = {
 };
 
 export const CHRISTIES_LOT_METHOD = "christies_results_json_v1";
+
+export const PRICE_SEMANTICS = {
+  label_as_printed: "Price realised",
+  reading: "hammer_plus_buyers_premium",
+  source_url: "https://press.christies.com/62b-projected-global-sales-in-2025/",
+  source_pdf: "https://press.christies.com/wp-content/uploads/2025/12/e711cb9b6180e212a569ebb6e3f3045f.pdf",
+  source_date: "2025-12-17",
+  source_quote: "Sales totals are hammer price plus buyer's premium.",
+} as const;
+
+/**
+ * Buyer's premium schedules as printed by the house, newest first. Each is the parse of a saved public page
+ * (christiesPage.premiumScheduleRows; the test re-parses the saved page and requires equality). Rates apply to the hammer
+ * price in bands, excluding local sales taxes. Wine and Gooding have their own schedules and are not art slices here.
+ */
+export const PREMIUM_SCHEDULES = [{
+  schedule: "all_collecting_categories_except_wine_and_gooding",
+  effective_from: "2026-09-01",
+  effective_txt: "1 September 2026",
+  source_url: "https://www.christies.com/en/help/buying-guide-important-information/financial-information",
+  read_at: "2026-11-09",
+  rows: [
+    { site: "London", rates: ["28.0%", "22.0%", "15.0%"], thresholds: ["Up to £1,500,000", "£1,500,001 to £6,000,000", "£6,000,001 and Above"] },
+    { site: "New York", rates: ["28.0%", "22.0%", "15.0%"], thresholds: ["Up to $2,000,000", "$2,000,001 to $8,000,000", "$8,000,001 and Above"] },
+    { site: "Hong Kong", rates: ["28.0%", "22.0%", "15.0%"], thresholds: ["Up to HK$15,000,000", "HK$15,000,001 to HK$60,000,000", "HK$60,000,001 and Above"] },
+    { site: "Paris", rates: ["28.0%", "22.0%", "15.0%"], thresholds: ["Up to €1,750,000", "€1,750,001 to €7,000,000", "€7,000,001 and Above"] },
+    { site: "Geneva", rates: ["28.0%", "22.0%", "15.0%"], thresholds: ["Up to CHF 1,600,000", "CHF 1,600,001 to CHF 7,000,000", "CHF 7,000,001 and Above"] },
+    { site: "Shanghai", rates: ["28.0%", "22.0%", "15.0%"], thresholds: ["Up to CNY 10,000,000", "CNY 10,000,001 to CNY 50,000,000", "CNY 50,000,001 and Above"] },
+    { site: "Dubai", rates: ["28.0%", "22.0%", "15.0%"], thresholds: ["Up to $2,000,000", "$2,000,001 to $8,000,000", "$8,000,001 and Above"] },
+    { site: "Abu Dhabi", rates: ["28.0%", "22.0%", "15.0%"], thresholds: ["Up to $2,000,000", "$2,000,001 to $8,000,000", "$8,000,001 and Above"] },
+  ],
+}] as const;
+
+export interface PremiumScheduleApplied {
+  schedule: string; effective_from: string; effective_txt: string; site: string; rates: string[]; thresholds: string[];
+  basis: "on_hammer_price_in_bands_excluding_local_taxes"; source_url: string; read_at: string;
+}
+
+/** The printed schedule in force for a sale site on a sale date, or null (site not printed, or before every saved schedule). */
+export function premiumScheduleFor(site: string | undefined, saleDate: string | null): PremiumScheduleApplied | null {
+  if (!site || !saleDate) return null;
+  for (const s of PREMIUM_SCHEDULES) {
+    if (saleDate.slice(0, 10) < s.effective_from) continue;
+    const row = s.rows.find((r) => r.site === site.trim());
+    if (!row) return null;
+    return { schedule: s.schedule, effective_from: s.effective_from, effective_txt: s.effective_txt, site: row.site, rates: [...row.rates],
+      thresholds: [...row.thresholds], basis: "on_hammer_price_in_bands_excluding_local_taxes", source_url: s.source_url, read_at: s.read_at };
+  }
+  return null;
+}
 
 export interface ChristiesEvent {
   event_id: string;
@@ -79,6 +141,10 @@ export interface ChristiesLotRecord {
   sale_ends_at: string | null;
   result: "withdrawn" | "upcoming" | "unknown" | "unresolved:PRICE_REALISED";
   price_basis: "price_realised" | null;
+  /** What the printed price is, with the house statement it rests on; null when no price is printed. */
+  price_semantics: typeof PRICE_SEMANTICS | null;
+  /** The buyer's premium schedule in force for this sale, as printed; null when not saved for the sale's site and date. */
+  premium_schedule: PremiumScheduleApplied | null;
   hammer_price: null;
   hammer_premium: number | null;
   high_bid: number | null;
@@ -86,6 +152,10 @@ export interface ChristiesLotRecord {
   estimate_high: number | null;
   currency: string | null;
   lines: string[];
+  /** From the lot page only (gated read, see withLotPage): display labels, the printed objects, and where they came from. */
+  symbols?: string[];
+  symbols_printed?: PrintedSymbol[];
+  symbols_basis?: "lot_page_symbols_list";
   catalog_text: string | null;
   image_url: string | null;
   country: string | null;
@@ -214,6 +284,8 @@ export function christiesLotRecord(
     sale_ends_at: saleEnds,
     result,
     price_basis: price ? "price_realised" : null,
+    price_semantics: price ? PRICE_SEMANTICS : null,
+    premium_schedule: premiumScheduleFor(ev.location_txt, lot.start_date ?? saleEnds),
     hammer_price: null,
     hammer_premium: price,
     high_bid: !over && lot.is_in_progress ? num(lot.current_bid) : null,
@@ -229,6 +301,15 @@ export function christiesLotRecord(
     ts_page: ctx.page,
     ts_pass: ctx.pass,
   };
+}
+
+/**
+ * Attach the symbols a lot page printed (lotHeader). Only when the page is this lot's (object_id matches) and carried a
+ * symbols_list; [] is kept as "printed none". Otherwise the record is returned unchanged.
+ */
+export function withLotPage(rec: ChristiesLotRecord, header: LotHeader | null): ChristiesLotRecord {
+  if (!header || header.object_id !== rec.source_identifier || header.symbols_printed === null) return rec;
+  return { ...rec, symbols: symbolLabels(header.symbols_printed), symbols_printed: header.symbols_printed, symbols_basis: "lot_page_symbols_list" };
 }
 
 /**
