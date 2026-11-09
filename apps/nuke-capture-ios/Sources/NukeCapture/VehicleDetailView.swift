@@ -2364,9 +2364,24 @@ struct InvestmentProofView: View {
     @State private var showAttest = false
     @State private var ledgerDrill: LedgerDrill?
 
-    // The legacy reader mixes receipt totals, payment testimony and session values.
-    // Keep its backing records; don't present that sum as cash, investment or price.
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let vehicle = UUID(uuidString: vehicleId) {
+                NavigationLink("Book allocation records") { VehicleAllocationRecordsView(vehicleId: vehicle) }
+                    .accessibilityIdentifier("vehicle-book-allocations")
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+            }
+            legacyEvidence
+        }
+        .task(id: vehicleId) { await load() }
+        .sheet(isPresented: $showAttest) {
+            AttestContributionView(vehicleId: vehicleId) { Task { await load() } }
+        }
+    }
+
+    // Independent of the legacy fold's success or owner flag: the canonical reader
+    // decides allocation visibility using its existing book AND vehicle permissions.
+    private var legacyEvidence: some View {
         Group {
             if let p = proof {
                 VStack(alignment: .leading, spacing: 8) {
@@ -2415,10 +2430,6 @@ struct InvestmentProofView: View {
                 ProgressView("Reading financial records…")
                     .padding(.horizontal, 16).padding(.vertical, 10)
             }
-        }
-        .task(id: vehicleId) { await load() }
-        .sheet(isPresented: $showAttest) {
-            AttestContributionView(vehicleId: vehicleId) { Task { await load() } }
         }
     }
 

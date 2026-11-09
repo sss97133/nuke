@@ -52,6 +52,7 @@ enum FixtureBackend {
 
     /// Readers the app may call: these, plus any *_read, get_* or my_* RPC. Any other RPC is a writer and recorded.
     static let readers: Set<String> = [
+        "accounting_vehicle_financials", "accounting_record_evidence",
         "work_order_job_path_read", "work_order_resources_read", "work_order_quotes_read", "work_order_offers_read",
         "work_order_inspection_read", "work_order_invoices_read", "job_evidence_candidates_read",
         "work_order_facility_reservations_read", "work_order_operations_read", "vehicle_work_orders_read",
@@ -132,6 +133,12 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "accounting_vehicle_financials" where scenario == "financial-qualification" || scenario == "financial-evidence-withheld":
+            return ok("[\(AllocationEvidenceFixtures.row)]")
+        case "accounting_record_evidence" where scenario == "financial-qualification" || scenario == "financial-evidence-withheld":
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_ALLOCATION_SOURCE_WITHHELD"] == "1" { return ok("null") }
+            let requestedDocument = (args["p_document_id"] as? String).flatMap(UUID.init(uuidString:))
+            return ok(AllocationEvidenceFixtures.source(bank: requestedDocument == UUID(uuidString: AllocationEvidenceFixtures.bank)))
         case "get_vehicle_investment_timeline" where scenario.hasPrefix("financial-"):
             return ok(InvestmentEvidenceFixtures.timeline)
         case "get_vehicle_valuation" where scenario == "financial-qualification":
