@@ -1,6 +1,7 @@
--- Capture documents land by VIN (20261112130000 + 20261112160000 indexed lookup): a waiting document page whose VIN resolves to a vehicle the user holds is
--- filed through the text-read and capture-set writers; bad check digits, low confidence, ambiguous or foreign VINs are
--- skipped with a reason; dry runs write nothing; landed pages leave the to-land view; the tick, grants, schedule and revert.
+-- Capture documents land by VIN (20261112130000, 20261112160000, 20261112170000): a waiting document page whose VIN resolves
+-- to a vehicle the user holds is recorded as a text read and lands on that vehicle as a page (landing_vehicle_id); the frame,
+-- held or not, is never touched; bad check digits, low confidence, ambiguous or foreign VINs are skipped with a reason; dry
+-- runs write nothing; landed pages leave the to-land view; the tick, grants, schedule and revert.
 -- ALLOW_RAW_TESTIMONY_WRITE: every table here is a stand-in created in a disposable test database, never production.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -56,16 +57,7 @@ BEGIN
   RETURN jsonb_build_object('recorded', jsonb_array_length(p_items), 'skipped', 0, 'run_id', p_run_id);
 END $$;
 CREATE FUNCTION public.capture_sets_apply(p_run_id uuid, p_user uuid, p_items jsonb, p_min_conf numeric) RETURNS jsonb LANGUAGE plpgsql AS $$
-DECLARE it jsonb; n int := 0;
-BEGIN
-  FOR it IN SELECT * FROM jsonb_array_elements(p_items) LOOP
-    UPDATE vehicle_images SET vehicle_id = (it->>'vehicle_id')::uuid WHERE id = (it->'image_ids'->>0)::uuid AND user_id = p_user AND vehicle_id IS NULL;
-    IF FOUND THEN n := n + 1; END IF;
-    INSERT INTO capture_set_links(run_id, set_key, image_id, vehicle_id, confidence, basis, min_conf)
-    VALUES (p_run_id, it->>'set_key', (it->'image_ids'->>0)::uuid, (it->>'vehicle_id')::uuid, (it->>'confidence')::numeric, it->>'basis', p_min_conf);
-  END LOOP;
-  RETURN jsonb_build_object('run_id', p_run_id, 'sets', n, 'photos_filed', n, 'sets_refused', '[]'::jsonb);
-END $$;
+BEGIN RAISE EXCEPTION 'capture_sets_apply must not be called: frames stay where they are, the page lands'; END $$;
 
 CREATE FUNCTION pg_temp.assert_true(ok boolean, msg text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF NOT coalesce(ok, false) THEN RAISE EXCEPTION 'contract failed: %', msg; END IF; END $$;
@@ -99,39 +91,45 @@ INSERT INTO capture_document_pages(image_id, user_id, doc_type, class_conf, extr
 
 \i supabase/migrations/20261112130000_capture_documents_land_by_vin.sql
 \i supabase/migrations/20261112160000_capture_documents_land_by_vin_indexed.sql
+\i supabase/migrations/20261112170000_capture_documents_land_pages_by_vin.sql
 
 SELECT pg_temp.assert_true((SELECT count(*) FROM contributors WHERE agent_key='agent:subscription-document-reader' AND contributor_type='agent') = 1, 'the reader is a contributor');
 
--- dry run: two candidates, four skipped with reasons, the held frame never considered, nothing written
+-- dry run: three candidates (the title, the sale sheet and the held title: a held frame still carries paper), four skipped
+-- with reasons, nothing written
 SELECT public.capture_documents_land_by_vin('aaaaaaaa-0000-4000-8000-00000000000a', 'dddddddd-0000-4000-8000-0000000000d1', true, 50) AS dry \gset
-SELECT pg_temp.assert_true((:'dry')::jsonb->>'candidates' = '2' AND ((:'dry')::jsonb->>'dry')::boolean, 'dry run: the title and the sale sheet are candidates');
+SELECT pg_temp.assert_true((:'dry')::jsonb->>'candidates' = '3' AND ((:'dry')::jsonb->>'dry')::boolean, 'dry run: the title, the sale sheet and the held title are candidates');
 SELECT pg_temp.assert_true((SELECT jsonb_agg(s->>'reason' ORDER BY s->>'image_id') FROM jsonb_array_elements((:'dry')::jsonb->'skipped') s)
   = '["check_digit_failed","vehicle_not_held_by_user","low_confidence","no_unique_vehicle"]'::jsonb, 'skipped pages carry their reason');
-SELECT pg_temp.assert_true((SELECT count(*) FROM vehicle_images WHERE vehicle_id IS NOT NULL) = 0 AND (SELECT count(*) FROM image_text_reads) = 0, 'a dry run writes nothing');
-SELECT pg_temp.assert_true(NOT EXISTS (SELECT 1 FROM jsonb_array_elements((:'dry')::jsonb->'items' || (:'dry')::jsonb->'skipped') i WHERE i->>'image_id' = 'cccccccc-0000-4000-8000-0000000000c7'), 'a held frame is not considered');
+SELECT pg_temp.assert_true((SELECT count(*) FROM capture_document_pages WHERE landing_vehicle_id IS NOT NULL) = 0 AND (SELECT count(*) FROM image_text_reads) = 0, 'a dry run writes nothing');
 
--- live run: both filed through the writers, with the reader as contributor and the vin_read basis at min confidence 0.6
+-- live run: three pages land on their vehicles, three reads recorded with the reader as contributor; no frame moves
 SELECT public.capture_documents_land_by_vin('aaaaaaaa-0000-4000-8000-00000000000a', 'dddddddd-0000-4000-8000-0000000000d2', false, 50) AS live \gset
-SELECT pg_temp.assert_true((:'live')::jsonb#>>'{apply,photos_filed}' = '2' AND (:'live')::jsonb#>>'{text_reads,recorded}' = '2', 'live run files two frames and records two reads');
-SELECT pg_temp.assert_true((SELECT vehicle_id FROM vehicle_images WHERE id='cccccccc-0000-4000-8000-0000000000c1') = 'aaaaaaaa-0000-4000-8000-0000000000a1'
-  AND (SELECT vehicle_id FROM vehicle_images WHERE id='cccccccc-0000-4000-8000-0000000000c2') = 'aaaaaaaa-0000-4000-8000-0000000000a2', 'each frame lands on the vehicle its VIN names');
+SELECT pg_temp.assert_true((:'live')::jsonb->>'pages_resolved' = '3' AND (:'live')::jsonb#>>'{text_reads,recorded}' = '3', 'live run resolves three pages and records three reads');
+SELECT pg_temp.assert_true((SELECT landing_vehicle_id FROM capture_document_pages WHERE image_id='cccccccc-0000-4000-8000-0000000000c1') = 'aaaaaaaa-0000-4000-8000-0000000000a1'
+  AND (SELECT landing_vehicle_id FROM capture_document_pages WHERE image_id='cccccccc-0000-4000-8000-0000000000c2') = 'aaaaaaaa-0000-4000-8000-0000000000a2'
+  AND (SELECT landing_vehicle_id FROM capture_document_pages WHERE image_id='cccccccc-0000-4000-8000-0000000000c7') = 'aaaaaaaa-0000-4000-8000-0000000000a1', 'each page lands on the vehicle its VIN names');
+SELECT pg_temp.assert_true((SELECT count(*) FROM capture_document_pages WHERE landing_basis='vin:document_page' AND landing_run_id='dddddddd-0000-4000-8000-0000000000d2') = 3, 'the landing carries its basis and run');
+SELECT pg_temp.assert_true((SELECT count(*) FROM vehicle_images WHERE vehicle_id IS NOT NULL) = 0, 'no frame is moved');
 SELECT pg_temp.assert_true((SELECT count(*) FROM image_text_reads WHERE contributor_key='agent:subscription-document-reader' AND method='capture_document_pages_vin_v1'
-  AND is_document AND vin_candidates->0->>'vin' IN ('1HGCM82633A004352','CE141J600001')) = 2, 'the reads carry the reader, the method and the VIN');
-SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_links WHERE run_id='dddddddd-0000-4000-8000-0000000000d2' AND basis='vin_read' AND min_conf=0.6 AND set_key LIKE 'document:%') = 2, 'apply is asked with the vin_read basis at 0.6');
+  AND is_document AND vin_candidates->0->>'vin' IN ('1HGCM82633A004352','CE141J600001')) = 3, 'the reads carry the reader, the method and the VIN');
 
--- the filed pages wait for the document route; a landed page leaves the view
-SELECT pg_temp.assert_true((SELECT count(*) FROM capture_document_pages_to_land) = 2, 'two pages are ready to land');
-UPDATE capture_document_pages SET extraction = extraction || '{"landed":{"as":"receipt","receipt_id":"eeeeeeee-0000-4000-8000-0000000000e1","at":"2026-11-08T18:00:00Z"}}' WHERE image_id='cccccccc-0000-4000-8000-0000000000c1';
-SELECT pg_temp.assert_true((SELECT count(*) FROM capture_document_pages_to_land) = 1, 'a landed page leaves the view');
+-- the resolved pages wait for the document route with their vehicle; a landed page leaves the view
+SELECT pg_temp.assert_true((SELECT count(*) FROM capture_document_pages_to_land WHERE basis='vin:document_page' AND vehicle_id IS NOT NULL) = 3, 'three pages are ready to land, each with its vehicle');
+UPDATE capture_document_pages SET extraction = extraction || '{"landed":{"as":"vehicle_document","at":"2026-11-08T18:00:00Z"}}' WHERE image_id='cccccccc-0000-4000-8000-0000000000c1'; -- stand-in table
+SELECT pg_temp.assert_true((SELECT count(*) FROM capture_document_pages_to_land) = 2, 'a landed page leaves the view');
+-- a frame that holds a vehicle lists its page too, with the frame as basis
+UPDATE vehicle_images SET vehicle_id = 'aaaaaaaa-0000-4000-8000-0000000000a1' WHERE id='cccccccc-0000-4000-8000-0000000000c8'; -- stand-in table
+SELECT pg_temp.assert_true((SELECT basis FROM capture_document_pages_to_land WHERE image_id='cccccccc-0000-4000-8000-0000000000c8') = 'frame', 'a page on a filed frame lands by the frame');
 
--- a second run finds nothing left to file
+-- a second run finds nothing left
 SELECT public.capture_documents_land_by_vin('aaaaaaaa-0000-4000-8000-00000000000a', 'dddddddd-0000-4000-8000-0000000000d3', false, 50) AS again \gset
-SELECT pg_temp.assert_true((:'again')::jsonb->>'candidates' = '0' AND (:'again')::jsonb->'apply' = 'null'::jsonb, 'nothing is filed twice');
+SELECT pg_temp.assert_true((:'again')::jsonb->>'candidates' = '0' AND (:'again')::jsonb->>'pages_resolved' = '0', 'nothing lands twice');
 
--- the tick covers users with waiting VIN pages
-UPDATE vehicle_images SET vehicle_id = NULL WHERE id='cccccccc-0000-4000-8000-0000000000c2';
+-- the tick covers users with unresolved VIN pages
+UPDATE capture_document_pages SET landing_vehicle_id = NULL, landing_basis = NULL, landing_run_id = NULL WHERE image_id='cccccccc-0000-4000-8000-0000000000c2'; -- stand-in table
 SELECT public.capture_documents_land_by_vin_tick(50) AS tick \gset
-SELECT pg_temp.assert_true((:'tick')::jsonb->>'users' = '1' AND (:'tick')::jsonb->'runs'->0->>'filed' = '1', 'the tick runs the step per user');
+SELECT pg_temp.assert_true((:'tick')::jsonb->>'users' = '1' AND (:'tick')::jsonb->'runs'->0->>'pages_resolved' = '1', 'the tick runs the step per user');
 
 -- grants and schedule
 SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.capture_documents_land_by_vin(uuid, uuid, boolean, integer)', 'EXECUTE')
@@ -140,9 +138,11 @@ SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.capture_do
 SELECT pg_temp.assert_true(NOT has_table_privilege('anon', 'public.capture_document_pages_to_land', 'SELECT') AND has_table_privilege('service_role', 'public.capture_document_pages_to_land', 'SELECT'), 'the view is service side');
 SELECT pg_temp.assert_true((SELECT count(*) FROM cron.job WHERE jobname='capture-documents-land-by-vin' AND schedule='4-59/10 * * * *') = 1, 'scheduled every 10 minutes');
 
--- revert (the indexed body first, then the step itself)
+-- revert (page landing, then the indexed body, then the step itself)
+\i supabase/sql/revert_20261112170000_capture_documents_land_pages_by_vin.sql
+SELECT pg_temp.assert_true(to_regclass('public.capture_document_pages_to_land') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='capture_document_pages' AND column_name='landing_vehicle_id'), 'the page-landing revert restores the frame step and drops its columns');
 \i supabase/sql/revert_20261112160000_capture_documents_land_by_vin_indexed.sql
 \i supabase/sql/revert_20261112130000_capture_documents_land_by_vin.sql
 SELECT pg_temp.assert_true(to_regprocedure('public.capture_documents_land_by_vin(uuid, uuid, boolean, integer)') IS NULL AND to_regclass('public.capture_document_pages_to_land') IS NULL
-  AND (SELECT count(*) FROM cron.job WHERE jobname='capture-documents-land-by-vin') = 0 AND (SELECT count(*) FROM capture_set_links) = 3, 'revert removes the step, view and schedule, keeps the links');
+  AND (SELECT count(*) FROM cron.job WHERE jobname='capture-documents-land-by-vin') = 0 AND (SELECT count(*) FROM image_text_reads) = 4, 'revert removes the step, view and schedule, keeps the reads');
 SELECT 'capture documents land by vin contract: ok' AS result;
