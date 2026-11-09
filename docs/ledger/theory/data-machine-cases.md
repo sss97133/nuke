@@ -3868,3 +3868,28 @@ What Nuke is in that conversation, and what it is not:
 Shape to build when the first real mandate arrives, in this order: the presentation observation for a fair (exhibitor,
 venue, dates, works shown), the holding fold with evidence frames, a private mandate record under the advisor's organization,
 and a reader that lists an exhibitor's works beside their public figures. Nothing is minted for it today.
+
+### 21.3 Art is an analysis, not a declaration (owner, 2026-11-08, night)
+
+Owner, verbatim, after `/assets/new` shipped as a form: "why cant vision api or an agent declare wtf" … "art is an analysis not a
+declaration done manually. humans arent for manual data input" … "you bypassed all theory" … "we prioritizing the aggregation of
+data and defining what the data points towards more tahn being an excel sheet for users to arbitrarily fill out".
+
+He is right, and the theory already said it (shoot-layer discourse: a profile "derived from file proof"; O09; correction as model
+development). The correction, built the same night:
+
+- **The atom store is the Photos library** (97,191 assets on 2026-11-08). Apple's on-device labels already name the art in it:
+  Art 7,914, Drawing 920, Painting 888, Modern Art 385, Sketch 298, Billboards 83, Mural 42. Nothing leaves the machine.
+- **Pipeline** (`scripts/extractors/art_photos/`): `osxphotos query --json` for the art labels (1,579 photos, 506 days, 2004 to
+  2026) → `score_candidates.py` (the holder's own work vs art photographed or saved: camera EXIF, his places, albums, size,
+  labels; 964 in scope) → `osxphotos export --preview-if-missing` → `featureprint.swift` (Apple Vision feature prints, 768
+  dimensions, 950 previews in 10 s) → `cluster_works.py` (cosine, union-find; at 0.90: 707 works from 947 photos, 5 seen on more
+  than one day, the red-car painting photographed in 2024 and again in 2026 among them) → `propose_art_from_photos.py` →
+  `propose_held_assets` (migration `20261109020000`): one pending, private `assets` row per work (creator = the holder, owner
+  unset) with one `photo_sighting` per photograph carrying the device's caption, place and camera.
+- **The holder's verbs are corrections**: *This is my work* (`confirm_held_asset`, optional words), *Not mine*
+  (`dismiss_held_asset`, archived, testimony kept). The form of §21.1 remains only for a work no photograph shows.
+- **What the profile shows for a found work**: what the analysis saw (kind, labels as printed, first and last photographed, days
+  photographed, places, method), the photographs as the record's history, and *No public sale recorded*.
+- **Declared assumptions, to be tuned by corrections**: the place and album regexes, the 0.90 threshold, the sitting grain.
+  Feature prints merge scenes below 0.85; a gallery sitting of many works by others is skipped (`gallery` kind with > 3 photos).
