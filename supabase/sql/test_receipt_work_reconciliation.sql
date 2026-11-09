@@ -147,5 +147,15 @@ BEGIN
   SELECT count(*) INTO n FROM rollback_evidence_judgment_run('00000000-0000-0000-0000-000000000099', 'contract', false);
   ASSERT n = 1;
   ASSERT (SELECT status FROM evidence_judgment_requests WHERE dedupe_key = 'k1') = 'cancelled';
+  -- a stale request cancelled by a later run re-opens when that later run is rolled back
+  INSERT INTO evidence_judgment_requests(department, question_kind, subject_table, subject_id, vehicle_id, user_id, params, answer_schema,
+    producer_agent, producer_script, producer_version, run_id, dedupe_key, status, cancelled_at, cancelled_reason, cancelled_by_run_id)
+  VALUES ('receipt_work_reconciliation', 'receipt_part_visible', 'receipt_items', '00000000-0000-0000-0000-0000000000d1', V, U, '{}', '{}',
+    'injestion', 'scripts/receipt-work/reconcile-receipt-work.mjs', 'test', '00000000-0000-0000-0000-000000000098', 'k2',
+    'cancelled', now(), 'stale', '00000000-0000-0000-0000-000000000097');
+  SELECT count(*) INTO n FROM rollback_evidence_judgment_run('00000000-0000-0000-0000-000000000097', 'contract', false);
+  ASSERT n = 1;
+  ASSERT (SELECT status FROM evidence_judgment_requests WHERE dedupe_key = 'k2') = 'pending';
+  ASSERT (SELECT cancelled_by_run_id FROM evidence_judgment_requests WHERE dedupe_key = 'k2') IS NULL;
   RAISE NOTICE 'receipt_work_reconciliation contract: ok';
 END $$;

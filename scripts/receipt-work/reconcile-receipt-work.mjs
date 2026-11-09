@@ -56,6 +56,11 @@ export function judgmentFor(row, evidence, { runId, version }) {
   };
 }
 
+// Pending requests for a vehicle that this run did not raise again.
+export function staleJudgments(open, wanted) {
+  return (open ?? []).filter((j) => !wanted.has(j.dedupe_key));
+}
+
 function client({ url, key }) {
   const h = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
   const req = async (path, init = {}) => {
@@ -98,12 +103,13 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     catch (e) { summary.errors.push(`${vid}: ${e.message}`); continue; }
     const active = noDb ? [] : await db.req(`garage_derivation_evidence?select=id,subject_key,content_hash&kind=eq.receipt_work_correlation&vehicle_id=eq.${vid}&superseded_at=is.null&limit=100000`);
     const bySubject = new Map(active.map((a) => [a.subject_key, a]));
+    const wanted = new Set();
     for (const row of rows) {
       vs.lines++; vs.conclusions[row.conclusion] = (vs.conclusions[row.conclusion] ?? 0) + 1;
       const ev = fromReceiptWorkLine(row, { runId }, ctx);
       const jr = judgmentFor(row, ev, { runId, version });
       scratch.push({ evidence: ev, judgment: jr });
-      if (jr) vs.judgments++;
+      if (jr) { vs.judgments++; wanted.add(jr.dedupe_key); }
       if (noDb) continue;
       const prior = bySubject.get(ev.subject_key);
       if (prior && prior.content_hash === ev.content_hash) { summary.unchanged++; }
@@ -123,6 +129,17 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         summary.judgments++;
       }
     }
+    if (noDb) continue;
+    // A request this run no longer raises (its line's evidence or candidate frames changed) is stale: cancel it, signed
+    // with this run so rollback_evidence_judgment_run(<this run>) re-opens it.
+    const open = await db.req(`evidence_judgment_requests?select=id,dedupe_key&department=eq.${DEPARTMENT}&question_kind=eq.${QUESTION}&vehicle_id=eq.${vid}&status=eq.pending&limit=100000`);
+    const stale = staleJudgments(open, wanted);
+    for (const s of stale) {
+      await db.req(`evidence_judgment_requests?id=eq.${s.id}&status=eq.pending`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_reason: `stale: not raised by run ${runId}`, cancelled_by_run_id: runId }) });
+    }
+    vs.judgments_cancelled_stale = stale.length;
+    summary.judgments_cancelled_stale = (summary.judgments_cancelled_stale ?? 0) + stale.length;
   }
   if (out) writeFileSync(out, scratch.map((s) => JSON.stringify(s)).join('\n') + '\n');
   summary.rollback = [`select * from rollback_garage_derivation_run('${runId}', '<reason>', false);`,

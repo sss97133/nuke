@@ -253,6 +253,10 @@ CREATE TABLE IF NOT EXISTS public.evidence_judgment_requests (
   answered_at timestamptz, answer jsonb, answer_agent text, answer_model text, answer_version text,
   cancelled_at timestamptz, cancelled_reason text
 );
+-- A producer re-run that no longer asks a question (the subject's evidence changed) cancels the stale pending request and
+-- signs the cancellation with its run, so rolling that run back re-opens the request.
+ALTER TABLE public.evidence_judgment_requests ADD COLUMN IF NOT EXISTS cancelled_by_run_id uuid;
+CREATE INDEX IF NOT EXISTS evidence_judgment_requests_cancelled_by_run ON public.evidence_judgment_requests (cancelled_by_run_id) WHERE cancelled_by_run_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS evidence_judgment_requests_pending ON public.evidence_judgment_requests (department, question_kind, priority DESC) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS evidence_judgment_requests_run ON public.evidence_judgment_requests (run_id);
 CREATE INDEX IF NOT EXISTS evidence_judgment_requests_vehicle ON public.evidence_judgment_requests (vehicle_id) WHERE status <> 'cancelled';
@@ -279,11 +283,17 @@ BEGIN
     WITH u AS (
       UPDATE evidence_judgment_requests j SET status = 'cancelled', cancelled_at = now(), cancelled_reason = 'rollback run ' || p_run_id || ': ' || p_reason
        WHERE j.run_id = p_run_id AND j.status IN ('pending', 'claimed')
+      RETURNING j.id, j.question_kind, j.subject_id, j.status),
+    r AS (
+      UPDATE evidence_judgment_requests j SET status = 'pending', cancelled_at = NULL, cancelled_reason = NULL, cancelled_by_run_id = NULL
+       WHERE j.cancelled_by_run_id = p_run_id AND j.status = 'cancelled'
       RETURNING j.id, j.question_kind, j.subject_id, j.status)
-    SELECT u.id, u.question_kind, u.subject_id, u.status FROM u;
+    SELECT u.id, u.question_kind, u.subject_id, u.status FROM u
+    UNION ALL SELECT r.id, r.question_kind, r.subject_id, r.status FROM r;
   ELSE
     RETURN QUERY SELECT j.id, j.question_kind, j.subject_id, j.status FROM evidence_judgment_requests j
-     WHERE j.run_id = p_run_id AND j.status IN ('pending', 'claimed');
+     WHERE (j.run_id = p_run_id AND j.status IN ('pending', 'claimed'))
+        OR (j.cancelled_by_run_id = p_run_id AND j.status = 'cancelled');
   END IF;
 END
 $fn$;

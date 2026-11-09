@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { judgmentFor, DEPARTMENT, QUESTION } from './reconcile-receipt-work.mjs';
+import { judgmentFor, staleJudgments, DEPARTMENT, QUESTION } from './reconcile-receipt-work.mjs';
 import { fromReceiptWorkLine } from '../garage/derivation-evidence.mjs';
 
 const row = { vehicle_id: '20d21fb0-4651-4469-a0ba-e751309a1e54', user_id: '0b9f107a-d124-49de-9ded-94698f63c1c4', receipt_id: '11111111-1111-1111-1111-111111111111',
@@ -32,4 +32,10 @@ test('no judgment without a need, a line, or a frame', () => {
   assert.equal(judgmentFor({ ...row, judgment_needed: false }, ev, { runId: RUN, version: 'v' }), null);
   assert.equal(judgmentFor({ ...row, item_id: null }, ev, { runId: RUN, version: 'v' }), null);
   assert.equal(judgmentFor({ ...row, image_ids: [] }, ev, { runId: RUN, version: 'v' }), null);
+});
+
+test('a pending request this run did not raise again is stale', () => {
+  const open = [{ id: 'a', dedupe_key: 'k-old' }, { id: 'b', dedupe_key: 'k-kept' }];
+  assert.deepEqual(staleJudgments(open, new Set(['k-kept', 'k-new'])).map((j) => j.id), ['a']);
+  assert.deepEqual(staleJudgments([], new Set()), []);
 });
