@@ -68,3 +68,17 @@ Deno.test("CC concurrent different reads may both retain testimony, but older so
   {sourceObservedAt:b.observed_at,compactMetadataCas:true,preserveEventStatus:true,activeAuction:{sourceUrl:url,now:"2026-11-09T01:03:00Z"}});
  assertEquals(result.action,"skipped");assertEquals(writes,0);
 });
+
+Deno.test("CC equal-clock writers refuse a different observation, allow same receipt retry, and leave default callers unchanged",async()=>{
+ const clock="2026-11-09T01:01:00Z";
+ const live={id:"episode",metadata:{source_observed_at:clock,auction_observation_id:"first"},sold_at:null,ended_at:null,vehicle_event_metadata_digest:"a".repeat(64)};
+ let writes=0;const filters:string[]=[];
+ const db:any={from:()=>{let writing=false;const q:any=new Proxy({}, {get:(_t,k)=>k==="then"?(resolve:any)=>resolve({data:writing?[{id:"episode"}]:[live],error:null}):(...args:any[])=>{if(k==="update"){writes++;writing=true;}if(k==="eq")filters.push(args[0]);return q;}});return q;}};
+ const row=(id:string)=>({vehicle_id:vehicle,source_platform:"collecting_cars",source_listing_id:"lot",metadata:{source_observed_at:clock,auction_observation_id:id},current_price:16000});
+ const policy={sourceObservedAt:clock,compactMetadataCas:true,rejectEqualClockDifferentObservation:true};
+ assertEquals((await writeVehicleEventByKey(db,row("second"),policy)).action,"skipped");assertEquals(writes,0);
+ assertEquals((await writeVehicleEventByKey(db,row("first"),policy)).action,"updated");assertEquals(writes,1);
+ assertEquals(filters.includes("vehicle_event_metadata_digest"),true);
+ assertEquals((await writeVehicleEventByKey(db,row("second"),{sourceObservedAt:clock,compactMetadataCas:true})).action,"updated");
+ assertEquals(writes,2);
+});

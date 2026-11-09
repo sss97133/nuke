@@ -100,7 +100,7 @@ export async function projectCcEpisodes(db: any, posts: ObservationPost[], nativ
           update: (value: any) => db.from(table).update(value).abortSignal(signal()),
         }) };
         const result = await writer(bounded, row, { writer: "sync-live-auctions:cc-canonical-snapshot", preserveEventStatus: true,
-          sourceObservedAt: o.observed_at, compactMetadataCas: true, activeAuction: { sourceUrl: p.source_url, now: new Date().toISOString() } });
+          sourceObservedAt: o.observed_at, compactMetadataCas: true, rejectEqualClockDifferentObservation: true, activeAuction: { sourceUrl: p.source_url, now: new Date().toISOString() } });
         if (result.action === "error") throw Error(result.error);
         if (result.action === "skipped") out.deferred++; else out.projected++;
       } catch (err) { out.refused++; out.errors.push(String((err as Error).message).slice(0, 200)); }
