@@ -13,7 +13,7 @@
 --      check digit; a pre-1981 serial needs an exact unique match of 11+ characters; the page's confidence must be >= 0.6;
 --   3. capture_sets_apply files the frame (attribute_testimony + a capture_set_links row, revertible by capture_sets_revert).
 -- Pages whose frames now hold a vehicle are listed by capture_document_pages_to_land for the document route to land from
--- the stored page; a landed page carries extraction.landed_receipt_id. The tick runs every 10 minutes for every user with
+-- the stored page; a page the route has landed, or recorded as a vehicle document, carries extraction.landed. The tick runs every 10 minutes for every user with
 -- waiting VIN pages. Dry runs report what would land and write nothing.
 -- Revert: supabase/sql/revert_20261112130000_capture_documents_land_by_vin.sql. Test: supabase/sql/test_capture_documents_land_by_vin.sql.
 
@@ -98,11 +98,12 @@ BEGIN
   RETURN jsonb_build_object('users', jsonb_array_length(v_out), 'runs', v_out);
 END $$;
 
--- 4. Pages ready for the document route: the frame holds a vehicle, the page is not yet landed.
+-- 4. Pages ready for the document route: the frame holds a vehicle; the route has not yet landed the page (as a receipt)
+--    or recorded it as a vehicle document (extraction.landed = {as, receipt_id?, at}).
 CREATE OR REPLACE VIEW public.capture_document_pages_to_land WITH (security_invoker = true) AS
 SELECT cdp.image_id, cdp.user_id, vi.vehicle_id, cdp.doc_type, cdp.created_at AS page_at
 FROM public.capture_document_pages cdp JOIN public.vehicle_images vi ON vi.id = cdp.image_id
-WHERE cdp.revoked_at IS NULL AND vi.vehicle_id IS NOT NULL AND cdp.extraction->>'landed_receipt_id' IS NULL;
+WHERE cdp.revoked_at IS NULL AND vi.vehicle_id IS NOT NULL AND cdp.extraction->'landed' IS NULL;
 
 -- 5. Grants: service side only.
 REVOKE ALL ON FUNCTION public.capture_documents_land_by_vin(uuid, uuid, boolean, integer) FROM PUBLIC, anon, authenticated;

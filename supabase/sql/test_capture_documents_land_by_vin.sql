@@ -122,7 +122,7 @@ SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_links WHERE run_id=
 
 -- the filed pages wait for the document route; a landed page leaves the view
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_document_pages_to_land) = 2, 'two pages are ready to land');
-UPDATE capture_document_pages SET extraction = extraction || '{"landed_receipt_id":"eeeeeeee-0000-4000-8000-0000000000e1"}' WHERE image_id='cccccccc-0000-4000-8000-0000000000c1';
+UPDATE capture_document_pages SET extraction = extraction || '{"landed":{"as":"receipt","receipt_id":"eeeeeeee-0000-4000-8000-0000000000e1","at":"2026-11-08T18:00:00Z"}}' WHERE image_id='cccccccc-0000-4000-8000-0000000000c1';
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_document_pages_to_land) = 1, 'a landed page leaves the view');
 
 -- a second run finds nothing left to file
