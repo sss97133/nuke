@@ -535,6 +535,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const pulseMeta = (auctionPulse as any)?.metadata;
     return resolveCurrencyCode(
+      (auctionPulse as any)?.currency_code,
       pulseMeta?.currency, pulseMeta?.currency_code, pulseMeta?.currencyCode,
       pulseMeta?.price_currency, pulseMeta?.priceCurrency,
       externalListing?.currency, externalListing?.currency_code, externalListing?.price_currency,
