@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
 import { VEHICLE_CARD_COLUMNS } from '../vehicles/vehicleCardColumns';
 import { isCurrentGarageOwner, useVehiclesDashboard } from '../../hooks/useVehiclesDashboard';
+import { useAuth } from '../../hooks/useAuth';
 
 interface VehicleCollectionProps {
   userId: string;
@@ -12,14 +13,23 @@ interface VehicleCollectionProps {
 
 /** Show qualified current ownership with private statements confined to the own-account view. */
 const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProfile }) => {
+  const { user, loading: authLoading } = useAuth();
+  const viewerId = user?.id ?? null;
+  const authPending = authLoading || (isOwnProfile && !!viewerId && viewerId !== userId);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [loadedScope, setLoadedScope] = useState<string | null>(null);
-  const scope = `${userId}:${isOwnProfile}`;
-  const garage = useVehiclesDashboard(isOwnProfile ? userId : null, 'ownership');
+  const scope = `${userId}:${isOwnProfile}:${viewerId}:${authLoading}`;
+  const garage = useVehiclesDashboard(isOwnProfile && viewerId && !authPending ? userId : null, 'ownership');
   useEffect(() => {
     let cancelled = false;
+    if (authPending || !viewerId) {
+      setVehicles([]);
+      setLoadError(false);
+      setLoadedScope(null);
+      return () => { cancelled = true; };
+    }
     if (isOwnProfile && garage.isLoading) return () => { cancelled = true; };
     const loadVehicles = async () => {
       try {
@@ -32,7 +42,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
         if (isOwnProfile) {
           ownedIds = garage.vehicles.filter(isCurrentGarageOwner).map(vehicle => vehicle.id);
         } else {
-          // The public reader qualifies title evidence without exposing private account statements.
+          // This authenticated reader qualifies public title evidence for another signed-in viewer.
           const { data, error } = await supabase.rpc('get_user_garage', { p_user_id: userId })
             .eq('relationship', 'owner').limit(50);
           if (error) throw error;
@@ -85,11 +95,15 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
     };
     void loadVehicles();
     return () => { cancelled = true; };
-  }, [userId, isOwnProfile, scope, garage.isLoading, garage.error, garage.vehicles]);
+  }, [userId, isOwnProfile, viewerId, authPending, scope, garage.isLoading, garage.error, garage.vehicles]);
+
+  if (!authLoading && !viewerId) {
+    return <p className="text text-muted">Sign in to view this collection.</p>;
+  }
 
   if (loadedScope === scope && loadError) return <p role="alert">Vehicle ownership evidence unavailable. Please reload to retry.</p>;
 
-  if (loading || loadedScope !== scope || (isOwnProfile && garage.isLoading)) {
+  if (authPending || loading || loadedScope !== scope || (isOwnProfile && garage.isLoading)) {
     return (
       <div className="card">
         <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
