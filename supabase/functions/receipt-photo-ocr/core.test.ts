@@ -138,6 +138,7 @@ Deno.test("a provided extraction lands without any provider call; the pipeline h
   assertEquals(ex.ocr_text, undefined);
   assertEquals(ex.reader, "claude-cli subscription");
   assertEquals(ex._provider, undefined);
+  assertEquals(page.cost_usd, 0, "the page row's cost is a number even when the reader charged nothing");
 });
 
 Deno.test("a provided extraction updates a page that was recorded before, even with no vehicle", async () => {
