@@ -9,6 +9,29 @@ Deno.test("public auction bidding and registration prompts are not a login gate"
   if (isLoginPage(html)) throw new Error("public lot falsely rejected");
 });
 
+Deno.test("block classification handles malformed script endings without joining tokens or rewriting source", async () => {
+  const original = globalThis.fetch;
+  const padding = "Auction listing ".repeat(100);
+  try {
+    for (const fragment of [
+      `<script>payment blocked</script\t\n bar>`,
+      `<script>payment blocked</script/>`,
+      `blo<script>translation</script>cked`,
+      `<scr<script>payment blocked</script>ipt>`,
+    ]) {
+      const body = `<title>Porsche auction</title>${fragment}${padding}`;
+      globalThis.fetch = async () => new Response(body);
+      const result = await fetchPage("https://collectingcars.com/for-sale/porsche", { publicOnly: true });
+      if (result.html !== body) throw new Error("classification joined tokens or altered original source");
+    }
+    const refusedBody = `<script>dictionary</script\t\n bar><h1>You have been blocked</h1>${padding}`;
+    globalThis.fetch = async () => new Response(refusedBody);
+    if ((await fetchPage("https://collectingcars.com/for-sale/porsche", { publicOnly: true })).html !== null) {
+      throw new Error("visible block page after malformed script ending accepted");
+    }
+  } finally { globalThis.fetch = original; }
+});
+
 Deno.test("actual credential forms and explicit login gates remain rejected", () => {
   for (const html of [
     `<form id="login-form"></form>`,

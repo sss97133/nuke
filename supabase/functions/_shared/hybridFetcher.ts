@@ -31,7 +31,10 @@ function hasBlockedPageContent(html: string): boolean {
   // Keep explicit challenge machinery rejected even when it lives in a script.
   if (/\/cdn-cgi\/challenge-platform\/[^"'\s<>]*\/orchestrate\//i.test(html) ||
       /<title[^>]*>\s*(?:Just a moment|Attention Required)[^<]*<\/title>/i.test(html)) return true;
-  const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
+  // This is classification text only, never sanitized/rendered output. A space
+  // prevents removal from joining separate tokens. Browsers also terminate a
+  // script at a closing tag with whitespace/attributes before its final `>`.
+  const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, " ");
   return markup.includes('Access Denied') || markup.includes('blocked');
 }
 
