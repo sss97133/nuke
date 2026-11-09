@@ -101,4 +101,16 @@ INSERT INTO ownership_verifications(id,vehicle_id,user_id,status,title_document_
 SELECT assert((SELECT relationship='owner' FROM get_user_garage(auth.uid()) WHERE vehicle_id='20000000-0000-4000-8000-000000000008'),'photographer row cannot cancel current title');
 SELECT set_config('fixture.uid','10000000-0000-4000-8000-000000000002',false);
 SELECT assert((SELECT relationship='owner' FROM get_user_garage('10000000-0000-4000-8000-000000000001') WHERE vehicle_id='20000000-0000-4000-8000-000000000008'),'qualified public title survives activity row');
+SELECT set_config('fixture.uid','10000000-0000-4000-8000-000000000001',false);
+UPDATE vehicle_user_permissions SET is_active=false WHERE vehicle_id='20000000-0000-4000-8000-000000000008';
+UPDATE vehicle_ownerships SET is_current=false,end_date=current_date-5 WHERE vehicle_id='20000000-0000-4000-8000-000000000008';
+SELECT assert(NOT EXISTS (SELECT 1 FROM vehicle_user_permissions WHERE vehicle_id='20000000-0000-4000-8000-000000000008' AND coalesce(is_active,true)),'title case has no active permission to mask reader classification');
+SELECT assert((SELECT relationship='owner' FROM get_user_garage(auth.uid()) WHERE vehicle_id='20000000-0000-4000-8000-000000000008'),'ended photography is not disposal without a permission');
+INSERT INTO vehicle_ownerships(vehicle_id,owner_profile_id,role,is_current,start_date,end_date) VALUES
+ ('20000000-0000-4000-8000-000000000005',auth.uid(),'photographer',true,current_date-1,null),
+ ('20000000-0000-4000-8000-000000000009',auth.uid(),'photographer',false,current_date-10,current_date-5);
+SELECT assert((SELECT relationship='previously_owned' FROM get_user_garage(auth.uid()) WHERE vehicle_id='20000000-0000-4000-8000-000000000005'),'current photography cannot mask real disposal');
+SELECT assert((SELECT relationship='relationship_review' FROM get_user_garage(auth.uid()) WHERE vehicle_id='20000000-0000-4000-8000-000000000009'),'ended photography cannot invent prior ownership before a future period');
+SELECT set_config('fixture.uid','10000000-0000-4000-8000-000000000002',false);
+SELECT assert((SELECT relationship='owner' FROM get_user_garage('10000000-0000-4000-8000-000000000001') WHERE vehicle_id='20000000-0000-4000-8000-000000000008'),'public title survives ended photography without a permission');
 \echo 'garage ownership admission -> reader contract PASS'

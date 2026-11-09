@@ -58,6 +58,10 @@ it('keeps photo-only co-owner permissions out of the actual legacy Owned tab and
     expect(document.activeElement).toBe(search);
     expect(host.textContent).toContain('Reading ownership evidence');
     expect(host.textContent).not.toContain('No vehicles yet');
+    expect(host.textContent).toContain('Owned (…');
+    expect(host.textContent).toContain('Vehicles (…');
+    expect(host.textContent).not.toContain('Owned (0)');
+    expect(host.textContent).not.toContain('Vehicles (0)');
     fixture.garage = accepted;
     await act(async () => root.render(<MemoryRouter><Vehicles /></MemoryRouter>));
     const all = [...host.querySelectorAll('button')].find(button => button.textContent === 'All2')!;
@@ -71,5 +75,9 @@ it('keeps photo-only co-owner permissions out of the actual legacy Owned tab and
     expect(host.querySelector('[data-vehicle="title"]')).toBeNull();
     expect(host.querySelector('[data-vehicle="photo"]')).toBeNull();
     expect(host.textContent).not.toContain('No vehicles yet');
+    expect(host.textContent).toContain('Owned (?');
+    expect(host.textContent).toContain('Vehicles (?');
+    expect(host.textContent).not.toContain('Owned (0)');
+    expect(host.textContent).not.toContain('Vehicles (0)');
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

@@ -125,19 +125,33 @@ AS $function$
   -- prec = precedence when one vehicle is reached by several routes (lower wins).
   --   1 owner | 2 previously_owned | 3 consigned (significant non-owner role) | 4 documenting (own photos / work in last 60d)
   --   5 contributor | 6 profile_record | 7 relationship_review
+  account_periods AS (
+    SELECT vehicle_id, lower(role) AS role, is_current, start_date, end_date
+    FROM public.vehicle_ownerships WHERE owner_profile_id=p_user_id
+  ),
+  ownership_periods AS (
+    SELECT vehicle_id, role, is_current, start_date, end_date FROM account_periods
+    WHERE role IN ('owner','verified_owner','current_owner','co_owner','co-owner','previous_owner')
+  ),
+  current_periods AS (
+    SELECT vehicle_id FROM ownership_periods
+    WHERE role <> 'previous_owner' AND is_current AND end_date IS NULL
+      AND (start_date IS NULL OR start_date <= current_date)
+  ),
+  past_periods AS (
+    SELECT o.vehicle_id FROM ownership_periods o
+    WHERE (o.start_date IS NULL OR o.start_date <= current_date)
+      AND (o.role='previous_owner' OR o.end_date <= current_date)
+      AND NOT EXISTS (SELECT 1 FROM current_periods c WHERE c.vehicle_id=o.vehicle_id)
+  ),
   valid_titles AS (
     SELECT id, vehicle_id FROM public.ownership_verifications
     WHERE user_id=p_user_id AND status='approved'
       AND verification_category='title_document' AND title_document_url ~ '^https://'
       AND (expires_at IS NULL OR expires_at > (now() AT TIME ZONE 'UTC'))
       -- A title approval does not erase the account's recorded disposal/future period.
-      AND (NOT EXISTS (SELECT 1 FROM public.vehicle_ownerships o
-          WHERE o.owner_profile_id=p_user_id AND o.vehicle_id=ownership_verifications.vehicle_id
-            AND o.role IN ('owner','verified_owner','current_owner','co_owner','co-owner','previous_owner'))
-        OR EXISTS (SELECT 1 FROM public.vehicle_ownerships o
-          WHERE o.owner_profile_id=p_user_id AND o.vehicle_id=ownership_verifications.vehicle_id
-            AND o.role IN ('owner','verified_owner','current_owner','co_owner','co-owner')
-            AND o.is_current AND o.end_date IS NULL AND (o.start_date IS NULL OR o.start_date <= current_date)))
+      AND (NOT EXISTS (SELECT 1 FROM ownership_periods o WHERE o.vehicle_id=ownership_verifications.vehicle_id)
+        OR EXISTS (SELECT 1 FROM current_periods c WHERE c.vehicle_id=ownership_verifications.vehicle_id))
   ),
   src AS (
     -- A permission is membership, not proof of title. Preserve unsupported rows for own-account review.
@@ -148,23 +162,16 @@ AS $function$
         AND p.role IN ('owner','co_owner')
         AND ((SELECT is_own FROM viewer) OR EXISTS (SELECT 1 FROM valid_titles t WHERE t.vehicle_id=p.vehicle_id))
     UNION ALL SELECT ov.vehicle_id, CASE
-        WHEN EXISTS (SELECT 1 FROM public.vehicle_ownerships o WHERE o.owner_profile_id=p_user_id
-          AND o.vehicle_id=ov.vehicle_id AND (o.role='previous_owner' OR o.end_date <= current_date))
-          AND NOT EXISTS (SELECT 1 FROM public.vehicle_ownerships o WHERE o.owner_profile_id=p_user_id
-            AND o.vehicle_id=ov.vehicle_id AND o.is_current AND o.end_date IS NULL
-            AND (o.start_date IS NULL OR o.start_date <= current_date)) THEN 2
+        WHEN EXISTS (SELECT 1 FROM past_periods p WHERE p.vehicle_id=ov.vehicle_id) THEN 2
         WHEN EXISTS (SELECT 1 FROM valid_titles t WHERE t.id=ov.id) THEN 1 ELSE 7 END, NULL
       FROM public.ownership_verifications ov WHERE ov.user_id=p_user_id AND ov.status='approved'
         AND ((SELECT is_own FROM viewer) OR EXISTS (SELECT 1 FROM valid_titles t WHERE t.id=ov.id))
     UNION ALL SELECT o.vehicle_id, CASE
-        WHEN o.role IN ('owner','verified_owner','current_owner','co_owner','co-owner','previous_owner')
-          AND (o.start_date IS NULL OR o.start_date <= current_date)
-          AND (o.role='previous_owner' OR o.end_date <= current_date) THEN 2
-        WHEN o.role IN ('owner','verified_owner','current_owner','co_owner','co-owner')
-          AND o.is_current AND o.end_date IS NULL AND (o.start_date IS NULL OR o.start_date <= current_date)
-          AND EXISTS (SELECT 1 FROM valid_titles t WHERE t.id=o.verification_id AND t.vehicle_id=o.vehicle_id) THEN 1
+        WHEN EXISTS (SELECT 1 FROM past_periods p WHERE p.vehicle_id=o.vehicle_id) THEN 2
+        WHEN EXISTS (SELECT 1 FROM current_periods c WHERE c.vehicle_id=o.vehicle_id)
+          AND EXISTS (SELECT 1 FROM valid_titles t WHERE t.vehicle_id=o.vehicle_id) THEN 1
         ELSE 7 END, NULL
-      FROM public.vehicle_ownerships o WHERE o.owner_profile_id=p_user_id AND (SELECT is_own FROM viewer)
+      FROM (SELECT DISTINCT vehicle_id FROM account_periods) o WHERE (SELECT is_own FROM viewer)
     -- significant non-owner roles carried as their own role
     UNION ALL SELECT vehicle_id, 2, NULL FROM vehicle_user_permissions
       WHERE user_id=p_user_id AND revoked_at IS NULL AND coalesce(is_active,true) AND role='previously_owned' AND (SELECT is_own FROM viewer)

@@ -1303,6 +1303,9 @@ const VehiclesInner: React.FC = () => {
     });
 
   const groupedRelationships = activeTab === 'associated' ? groupByRelationship(filteredRelationships) : [];
+  const ownershipCountState = qualifiedGarage.isLoading ? '…' : qualifiedGarage.error ? '?' : null;
+  const displayedVehicleCount = activeTab === 'owned' && ownershipCountState !== null
+    ? ownershipCountState : filteredRelationships.length;
 
   const collectionCounts = React.useMemo(() => {
     const counts = new Map<string, number>();
@@ -1859,8 +1862,7 @@ const VehiclesInner: React.FC = () => {
                           if (t.key !== 'discovered') setDiscoverySourceFilter(null);
                         }}
                         label={t.label}
-                        right={<span className="vehicle-sidebar-mini">{t.key === 'owned' && qualifiedGarage.isLoading ? '…'
-                          : t.key === 'owned' && qualifiedGarage.error ? '?' : t.count}</span>}
+                        right={<span className="vehicle-sidebar-mini">{t.key === 'owned' ? ownershipCountState ?? t.count : t.count}</span>}
                       />
                     ))}
                   </div>
@@ -1892,7 +1894,7 @@ const VehiclesInner: React.FC = () => {
                   </div>
                 </SidebarSection>
 
-                <SidebarSection title={`Vehicles (${activeTab === 'owned' && qualifiedGarage.isLoading ? 'reading' : filteredRelationships.length})`} sectionKey="vehicles">
+                <SidebarSection title={`Vehicles (${displayedVehicleCount})`} sectionKey="vehicles">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {filteredRelationships.slice(0, 60).map((rel, index) => (
                       <Link
@@ -1945,7 +1947,7 @@ const VehiclesInner: React.FC = () => {
             <div className="vehicle-library-toolbar">
               <div className="vehicle-library-toolbar-left">
                 <div style={{ fontSize: '11px', fontWeight: 700 }}>
-                  {currentTabLabel} ({filteredRelationships.length})
+                  {currentTabLabel} ({displayedVehicleCount})
                 </div>
                 <input
                   type="text"
