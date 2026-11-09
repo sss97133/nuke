@@ -24,10 +24,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { url } = await req.json();
-    if (typeof url !== 'string' || !/^https:\/\/collectingcars\.com\/for-sale\/[a-z0-9-]+/.test(url)) {
+    const { url: requestedUrl } = await req.json();
+    if (typeof requestedUrl !== 'string' || !/^https:\/\/collectingcars\.com\/for-sale\/[a-zA-Z0-9+-]+\/?$/.test(requestedUrl)) {
       return json({ error: 'Invalid Collecting Cars lot URL' }, 400);
     }
+    const url = requestedUrl.replace(/\/$/, '');
     // Ask first, record after: a paid scrape needs a credit in today's allowance and is written to the spend log.
     const gate = firecrawlGate(createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!), 'collecting-cars');
     const fetched = await archiveFetch(url, {
@@ -56,7 +57,20 @@ Deno.serve(async (req) => {
     if (extracted.lot_type && extracted.lot_type !== 'car') {
       return json({ success: false, skipped: true, skip_reason: `Collecting Cars lot type ${extracted.lot_type}`, url });
     }
-    return json({ success: true, extracted: { ...extracted, listing_url: extracted.url } });
+    // A parsed page is usable only with its durable source bytes and original clock.
+    if (fetched.archiveError) throw Error("Collecting Cars capture was not retained");
+    const db = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!);
+    const storedHtml = fetched.html.replace(/\u0000/g, '');
+    const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(storedHtml)))].map(x => x.toString(16).padStart(2, '0')).join('');
+    let query = db.from('listing_page_snapshots').select('id,listing_url,platform,fetched_at,html_sha256,success');
+    query = fetched.snapshotId ? query.eq('id', fetched.snapshotId)
+      : query.eq('platform', 'collectingcars').eq('listing_url', url).eq('html_sha256', hash);
+    const saved = await query.limit(2);
+    const row = saved.data?.length === 1 ? saved.data[0] : null;
+    if (saved.error || !row?.success || row.listing_url !== url || row.platform !== 'collectingcars'
+      || row.html_sha256 !== hash || !Number.isFinite(Date.parse(row.fetched_at)) || Date.parse(row.fetched_at) > Date.now()) throw Error('Collecting Cars capture mismatch');
+    return json({ success: true, extracted: { ...extracted, listing_url: extracted.url },
+      source_capture: { snapshot_id: row.id, sha256: hash, observed_at: row.fetched_at, source_url: url } });
   } catch (error: any) {
     console.error('extract-collecting-cars error:', error);
     return json({ error: error.message }, 500);
