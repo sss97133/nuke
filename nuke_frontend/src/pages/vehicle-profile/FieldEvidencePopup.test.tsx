@@ -26,6 +26,19 @@ beforeEach(() => {
     { id: 'local-observation', value: 'SOURCE-VIN', confidence: 0.6, source_url: 'https://example.com/listing', source_slug: 'listing-source', observed_at: '2026-10-03T12:00:00Z' },
   ] } };
 });
+it('opens a cited object and quotation immediately without claim drawers or scores', () => {
+  fixture.inventory.data.images = [{ id: 'cited-image', image_url: 'https://example.test/physical.jpg' }];
+  const row = { id: 'reading', source_image_id: 'cited-image', field_value: 'Stamped text', source_type: 'ai_visual',
+    extraction_context: 'photo-pipeline landing v1: text on the physical plate' };
+  fixture.claims.evidence.vin = { sources: [row, { ...row, id: 'copy', source_type: 'system_update' }] };
+  const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="vin" label="VIN" value="Stored value" presentation="citations" />);
+  expect(html).toContain('https://example.test/physical.jpg');
+  expect(html).toContain('text on the physical plate');
+  expect(html).not.toContain('<details');
+  expect(html).not.toContain('CLAIM RECORDS');
+  expect(html).not.toContain('Stored score');
+  expect(html).not.toContain('system update');
+});
 describe('canonical value -> attributed observation', () => {
   it('makes a retained claim and its correction history reachable even without a parent-supplied group', () => {
     const row = { id: 'local-claim', vehicle_id: 'local-vehicle', field_name: 'vin', field_value: 'SOURCE-VIN',
