@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { admitBatHtmlRecovery } from "./batHtmlRecovery.ts";
+import { admitBatHtmlRecovery, findBatHtmlRecoveryMonitor } from "./batHtmlRecovery.ts";
 import { ingestBatLive } from "../ingest-observation/batLive.ts";
 
 const monitor = "00000000-0000-0000-0000-000000000001";
@@ -7,6 +7,35 @@ const vehicle = "00000000-0000-0000-0000-000000000002";
 const source = "00000000-0000-0000-0000-000000000003";
 const url = "https://bringatrailer.com/listing/fixture-k5/";
 const receivedAt = "2026-11-08T19:30:09.602Z";
+Deno.test("normal monitor lookup stays on the vehicle index without fallback reads",async()=>{
+  const row={id:monitor,vehicle_id:vehicle,external_auction_url:url};
+  let reads=0;
+  const q:any={select(){return q;},eq(key:string,value:string){assert.equal(key,"vehicle_id");assert.equal(value,vehicle);return q;},
+    in(){return q;},limit(){return Promise.resolve({data:[row],error:null});}};
+  assert.deepEqual(await findBatHtmlRecoveryMonitor({from(table:string){reads++;assert.equal(table,"monitored_auctions");return q;}},[url],vehicle),row);
+  assert.equal(reads,1);
+});
+Deno.test("exact unique monitor locator survives canonical vehicle resolution without a rebind",async()=>{
+  const row={id:monitor,vehicle_id:vehicle,external_auction_url:url,is_live:true};
+  let limited=0;const filters:any[]=[];
+  const db={from(table:string){const eqs:any[]=[];return {
+    select(){return this;},eq(key:string,value:string){eqs.push([key,value]);filters.push([table,key,value]);return this;},
+    in(column:string,urls:string[]){assert.equal(column,"external_auction_url");assert.deepEqual(urls,[url]);return this;},
+    single(){return Promise.resolve({data:{id:source},error:null});},
+    limit(n:number){limited=n;return Promise.resolve({data:eqs.some(([k])=>k==="vehicle_id")?[]:[row],error:null});}};}};
+  assert.deepEqual(await findBatHtmlRecoveryMonitor(db,[url],"canonical-vehicle"),row);assert.equal(limited,2);
+  assert.ok(filters.some(([t,k,v])=>t==="monitored_auctions"&&k==="external_auction_id"&&v==="fixture-k5"));
+  assert.ok(filters.some(([t,k,v])=>t==="monitored_auctions"&&k==="source_id"&&v===source));
+});
+Deno.test("recovery refuses ambiguous, foreign and failed locator reads",async()=>{
+  for(const data of [[{id:monitor,external_auction_url:url},{id:vehicle,external_auction_url:url}],
+    [{id:monitor,external_auction_url:"https://bringatrailer.com/listing/foreign/"}],null]) {
+    const q:any={select(){return q;},eq(){return q;},in(){return q;},limit(){return Promise.resolve({data,error:null});}};
+    await assert.rejects(()=>findBatHtmlRecoveryMonitor({from(){return q;}},[url],vehicle));
+  }
+  const q:any={select(){return q;},eq(){return q;},in(){return q;},limit(){return Promise.resolve({data:null,error:{message:"unavailable"}});}};
+  await assert.rejects(()=>findBatHtmlRecoveryMonitor({from(){return q;}},[url],vehicle),/unavailable/);
+});
 // Eight historical bid values/source clocks from the measured K5 shape; aliases
 // and member identifiers are synthetic. All native fields remain attributable.
 const bids = [100,222,50000,51000,60000,70000,72000,75000].map((bidAmount,i)=>({
