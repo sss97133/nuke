@@ -76,7 +76,8 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    and `capture_landing_apply_chunk`. Before any live write it must pass a self-agreement gate against hand-viewed verdicts
    (>= 85% agreement, <= 2% of hand-wrong samples accepted; tests `test_subscription_gate_reader.py`). Kept alive by
    `subscription-gate-supervise.sh STATE_DIR`; state and cursor in STATE_DIR. `landing_drain_loop.py` drives `capture_sets_drain`
-   for queued days (proposals only).
+   for queued days (proposals only); network errors and timeouts back off and retry (`test_landing_drain_loop.py`), an
+   empty queue idles and re-polls, and the same supervisor restarts it if it exits.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.
