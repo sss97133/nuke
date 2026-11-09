@@ -153,6 +153,7 @@ Deno.test("historical VIN and gallery come from a separately retained matching p
   eq(w.payloads.length,2);eq(w.payloads.map(p=>p.raw_source_ref),["listing_page_snapshots:archive","listing_page_snapshots:detail"]);
   eq(w.payloads[0].structured_data.result_claim.status,"sold");
   eq(w.payloads[1].structured_data.result_claim,null);
+  eq(w.payloads.every(p=>p.structured_data.observation_time_basis==="source_capture" && p.structured_data.source_captured_at===p.observed_at),true);
   eq(w.payloads[1].structured_data.auction_number,null);eq(w.payloads[1].structured_data.presentation,"unknown");
   eq(w.result.mccormick_receipt.source_capture_gaps,[]);eq(w.result.mccormick_receipt.images,4);
   eq(w.images.find(i=>i.image_url.endsWith("archive-only.jpg"))?.source_url,w.archiveUrl);
