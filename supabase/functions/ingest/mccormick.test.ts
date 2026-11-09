@@ -1,4 +1,4 @@
-import { parseMcCormickLot, mccormickLinks, mccormickTarget } from "../_shared/mccormickParser.ts";
+import { parseMcCormickLot, parseMcCormickCatalogLot, parseMcCormickFeaturedLot, mccormickLinks, mccormickTarget } from "../_shared/mccormickParser.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { ingestMcCormick } from "./mccormick.ts";
 const url = "https://www.classic-carauction.com/auction-cars?auctionid=123";
@@ -18,6 +18,91 @@ function fixture(archive=false, sold=true) {
   <b>Component Ratings:</b>${row("Transmission","good")}${row("Paint","fair")}
   <!end car details><img src="./upload/sponsor.jpg">`;
 }
+
+const unavailable = '<div>Sorry, but details about this car are not available.</div>';
+const catalogUrl = 'https://www.classic-carauction.com/auction-cars';
+const featuredUrl = 'https://www.classic-carauction.com/featured-cars';
+const catalogFixture = `<tr><td>42</td><td><img src="./upload/Auction/own.jpg"></td><td>2026</td>
+  <td><a href="?auctionid=123">PORSCHE</a></td><td>911 TARGA 4S</td><td>TARGA</td></tr>
+  <tr><td>43</td><td><img src="./upload/Auction/neighbor.jpg"></td><td>1972</td>
+  <td><a href="?auctionid=999">CHEVROLET</a></td><td>CAMARO</td><td>COUPE</td></tr>`;
+const featuredCard = (id: string, title: string, lot: string, photo: string) => `<div class="bcopy12"><a href="?auctionid=${id}"><b>${title}</b></a>
+  <font>Lot Number ${lot}</font><div class="bcopy10">Original preview ends...<br><div class="bcopy8">
+  <a rel="example_group" href="./upload/Auction/${photo}">photo</a>`;
+const featuredFixture = featuredCard('123', '2026 PORSCHE 911 TARGA 4S', '42', 'own.jpg') +
+  '<a rel="example_group" href="./upload/Auction/extra.jpg">second</a><img src="./upload/sponsor.jpg">' +
+  featuredCard('999', '1972 CHEVROLET CAMARO', '43', 'neighbor.jpg');
+
+Deno.test('an explicit unavailable detail is a captured source state, not a guessed identity', () => {
+  const p = parseMcCormickLot(unavailable, url);
+  eq(p.evidence_scope, 'detail_unavailable'); eq(p.year, null); eq(p.vin, null); eq(p.image_urls, []);
+  let failed = false; try { parseMcCormickLot('<script>' + unavailable + '</script>', url); } catch { failed = true; }
+  eq(failed, true);
+});
+Deno.test('catalog fallback scopes the exact native row and its independently matching featured excerpt/gallery', () => {
+  const c = parseMcCormickCatalogLot(catalogFixture, catalogUrl, '123');
+  const f = parseMcCormickFeaturedLot(featuredFixture, featuredUrl, c)!;
+  eq([c.title, c.lot_number, c.vin], ['2026 PORSCHE 911 TARGA 4S', '42', null]);
+  eq(c.raw_fields['Body Style'], 'TARGA'); eq(c.image_urls, ['https://www.classic-carauction.com/upload/Auction/own.jpg']);
+  eq(f.description, 'Original preview ends...'); eq(f.description_is_excerpt, true);
+  eq(f.image_urls, ['https://www.classic-carauction.com/upload/Auction/own.jpg', 'https://www.classic-carauction.com/upload/Auction/extra.jpg']);
+  eq(f.raw_fields, {}); // Do not attribute the catalog table's body-style cell to the featured card.
+  eq(f.result_claim, null); eq(f.auction_number, null);
+  let failed = false; try { parseMcCormickCatalogLot(catalogFixture + catalogFixture, catalogUrl, '123'); } catch { failed = true; }
+  eq(failed, true);
+  failed = false; try { parseMcCormickCatalogLot(catalogFixture.replace('PORSCHE</a>', 'PORSCHE</a><a href="?auctionid=124">other</a>'), catalogUrl, '123'); } catch { failed = true; }
+  eq(failed, true);
+});
+
+async function catalogWorld(mode: 'complete' | 'absent' | 'disagree' | 'index_missing' = 'complete') {
+  const pages: Record<string, any> = {};
+  for (const [name, sourceUrl, html] of [['primary', url, unavailable], ['catalog', catalogUrl, mode === 'index_missing' ? '' : catalogFixture],
+    ['featured', featuredUrl, mode === 'absent' ? featuredCard('999', '1972 CHEVROLET CAMARO', '43', 'neighbor.jpg') : mode === 'disagree' ? featuredFixture.replace('Lot Number 42', 'Lot Number 99') : featuredFixture]]) {
+    const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(html)))].map(b => b.toString(16).padStart(2, '0')).join('');
+    pages[sourceUrl] = { id: name, body: html, listing_url: sourceUrl, platform: 'mccormicks', html_sha256: hash, fetched_at: '2026-01-01T00:00:00Z', success: true };
+  }
+  const payloads: any[] = [], held = new Map<string, any>(); let candidate: any;
+  const db: any = { from(table: string) {
+    const filters: Record<string, any> = {}; let inserted: any[] | null = null;
+    const q: any = {};
+    for (const k of ['select', 'limit', 'in', 'range', 'order']) q[k] = () => q;
+    q.eq = (k: string, value: any) => { filters[k] = value; return q; };
+    q.insert = (rows: any[]) => { inserted = rows; return q; };
+    const result = () => {
+      if (table === 'observation_sources') return { data: { id: 'source', species: 'block_house', supported_observations: ['listing'] } };
+      if (table === 'listing_page_snapshots') return { data: Object.values(pages).find((p: any) => p.id === filters.id) };
+      if (table === 'vehicles') return { data: [] };
+      if (table === 'vehicle_images') { for (const row of inserted ?? []) held.set(row.image_url, row); return { data: [...held.values()] }; }
+      const p = payloads[Number(String(filters.id).split('-')[1])];
+      return { data: { ...p, id: filters.id, source_id: 'source', vehicle_id: p.vehicle_id ?? null } };
+    };
+    q.maybeSingle = async () => result(); q.then = (resolve: any, reject: any) => Promise.resolve(result()).then(resolve, reject); return q;
+  }, functions: { invoke(_name: string, { body }: any) { const n = payloads.push(body) - 1; return Promise.resolve({ data: { success: true, observation_id: `obs-${n}` } }); } } };
+  const result = await ingestMcCormick(url, { supabase: db,
+    archiveFetch: async sourceUrl => { const p = pages[sourceUrl]; return { html: p.body, markdown: null, source: 'cache', cached: true, snapshotId: p.id, url: sourceUrl, platform: 'mccormicks', statusCode: 200, error: null, costCents: 0 }; },
+    matchVehicle: async data => { candidate = data; return { vehicleId: 'vehicle', isNew: true }; } });
+  return { result, payloads, candidate, images: [...held.values()] };
+}
+Deno.test('unavailable detail retains three independent witnesses and canonical native identity, with correctly sourced photos', async () => {
+  const w = await catalogWorld();
+  eq(w.candidate.url, url); eq(w.candidate.vin, null); eq(w.candidate.imageUrls, []);
+  eq(w.payloads.map(p => p.source_url), [url, catalogUrl, featuredUrl]);
+  eq(w.payloads.map(p => p.raw_source_ref), ['listing_page_snapshots:primary', 'listing_page_snapshots:catalog', 'listing_page_snapshots:featured']);
+  eq(w.payloads[0].structured_data.year, null); eq(w.payloads[2].structured_data.description_is_excerpt, true);
+  eq(w.result.mccormick_receipt.evidence_scope, 'catalog_only'); eq(w.result.mccormick_receipt.source_capture_gaps, []);
+  eq(w.result.mccormick_receipt.images, 2);
+  eq(w.images.find(i => i.image_url.endsWith('/extra.jpg'))?.source_url, featuredUrl);
+});
+Deno.test('a card absent from a captured featured catalog is distinguished from a failed or disagreeing capture', async () => {
+  const absent = await catalogWorld('absent');
+  eq(absent.payloads.length, 2); eq(absent.result.mccormick_receipt.source_capture_gaps, []);
+  eq(absent.result.mccormick_receipt.catalog_checks?.[0]?.native_id_found, false);
+  const disagree = await catalogWorld('disagree');
+  eq(disagree.payloads.length, 2); eq(disagree.result.mccormick_receipt.source_capture_gaps.length, 1);
+  const missing = await catalogWorld('index_missing');
+  eq(missing.candidate, undefined); eq(missing.payloads.length, 1); eq(missing.result.mccormick_receipt.unresolved, true);
+  eq(missing.result.mccormick_receipt.source_capture_gaps.length, 1);
+});
 const html=fixture();
 Deno.test("McCormick identity keeps query IDs and coalesces current/featured/archive locators", () => {
   eq(normalizeListingUrl(url)?.canonicalListingId,"mccormicks:123");
@@ -47,7 +132,7 @@ Deno.test("McCormick follows advertised catalogs only and rejects external or du
   eq(p.lots,[url]);eq(p.catalogs,["https://www.classic-carauction.com/Auction-47","https://www.classic-carauction.com/auction-results?auctionnbr=47"]);
 });
 
-async function world(failure?: "archive" | "admission" | "readback" | "images" | "identity", unresolved = false, mileage = "TMU", vin = "TBA") {
+async function world(failure?: "source" | "archive" | "admission" | "readback" | "images" | "identity", unresolved = false, mileage = "TMU", vin = "TBA") {
   const body = (unresolved ? html.replace("1967 FORD MUSTANG", "1967 FORD") : html).replace(">TMU</TD>", `>${mileage}</TD>`).replace('>TBA</TD>', `>${vin}</TD>`);
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map(b => b.toString(16).padStart(2, "0")).join("");
   let payload: any, matched: any, matches = 0, calls = 0;
@@ -58,7 +143,7 @@ async function world(failure?: "archive" | "admission" | "readback" | "images" |
       const query: any = {};
       for (const k of ["select", "eq", "in", "limit"]) query[k] = () => query;
       const result = () => {
-        if (table === "observation_sources") return { data: source };
+        if (table === "observation_sources") return failure === "source" ? { error: { message: "Read timed out" } } : { data: source };
         if (table === "listing_page_snapshots") return { data: snapshot };
         if (table === "vehicles") return failure === "identity" ? { error: "unavailable" } : { data: [] };
         if (table === "vehicle_images") return { data: failure === "images" ? [] : parseMcCormickLot(body, url).image_urls.map(image_url => ({image_url})) };
@@ -96,12 +181,12 @@ Deno.test("a real VIN make conflict is retained as an unbound source claim befor
   eq(w.payload().structured_data.vin, "1HGCM82633A004352");
   eq(w.payload().extraction_metadata.quality_issues.some((s: string) => s.startsWith('vin_make_mismatch:')), true);
 });
-for (const failure of ["archive", "identity", "admission", "readback", "images"] as const) {
+for (const failure of ["source", "archive", "identity", "admission", "readback", "images"] as const) {
   Deno.test(`landing refuses false success when ${failure} fails`, async () => {
     const w = await world(failure); let failed = false;
-    try { await w.run(); } catch { failed = true; }
+    try { await w.run(); } catch (e) { failed = true; if (failure === "source") eq((e as Error).message, "mccormicks_source_read_unavailable"); }
     eq(failed, true);
-    if (failure === "archive" || failure === "identity") eq(w.counts().matches, 0);
+    if (failure === "source" || failure === "archive" || failure === "identity") eq(w.counts().matches, 0);
   });
 }
 
