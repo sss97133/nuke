@@ -1,6 +1,8 @@
-import { stripNul, type ArchiveFetchResult } from "../_shared/archiveFetch.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { admissionConfirmed, type AuctionDispatchBudget } from "./postObservations.ts";
+import { archiveFetch, stripNul, type ArchiveFetchResult } from "../_shared/archiveFetch.ts";
 import { sha256Hex } from "../_shared/batAuctionRecord.ts";
-import type { PcarBid } from "./boards.ts";
+import { parsePcarBids, type PcarBid } from "./boards.ts";
 
 export type PcarBidCapture = { snapshot_id: string; html_sha256: string; fetched_at: string; received_at: string; url: string };
 
@@ -63,4 +65,69 @@ export function pcarBidObservation(b: PcarBid, lot: { url: string; vehicle_id: s
       received_at: capture.received_at, received_at_basis: "producer_received_archived_response", source_capture_sha256: capture.html_sha256,
       source_capture: { snapshot_id: capture.snapshot_id, html_sha256: capture.html_sha256,
         fetched_at: capture.fetched_at, source_url: capture.url, representation: "utf8_text_nul_removed_if_present" } }, defer_analysis: true };
+}
+
+/**
+ * Bids of PCarMarket lots whose retained history trails the board count, from the lot page's own bid history (Basta id, time, amount,
+ * bidder), admitted through ingest-observation as kind 'bid' with observed_at = the bid's own time. A bid already
+ * held for the vehicle is not posted again.
+ */
+export async function ingestPcarBids(
+  supabase: any,
+  moved: { url: string; vehicle_id: string | null }[],
+  maxLots: number,
+  deadline: number,
+  budget: AuctionDispatchBudget,
+  fetchPage: typeof archiveFetch = archiveFetch,
+): Promise<{ lots: number; posted: number; attempted: number; deferred: boolean; errors: string[] }> {
+  const out = { lots: 0, posted: 0, attempted: 0, deferred: false, errors: [] as string[] };
+  const base = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = projectSecretKey() ?? "";
+  const linked = moved.flatMap((m) => (m.vehicle_id ? [{ url: m.url, vehicle_id: m.vehicle_id }] : []));
+  out.deferred = linked.length > maxLots;
+  for (const lot of linked.slice(0, maxLots)) {
+    if (Date.now() >= deadline || !budget.remaining("pcar")) { out.deferred = true; break; }
+    const fetched = await fetchPage(lot.url.replace("https://pcarmarket.com/", "https://www.pcarmarket.com/"), {
+      platform: "pcarmarket", skipCache: true, useFirecrawl: false, callerName: "sync-live-auctions",
+    });
+    const receivedAt = new Date().toISOString();
+    const { html, error } = fetched;
+    if (error || !html) { out.errors.push(`${lot.url}: ${error ?? "no HTML"}`); continue; }
+    out.lots++;
+    const bids = parsePcarBids(html);
+    if (!bids.length) { out.errors.push(`${lot.url}: no bid history parsed; capture remains pending`); continue; }
+    const ids = bids.map((b) => `pcarmarket-bid:${b.id}`);
+    const { data: held, error: heldError } = await supabase.from("vehicle_observations").select("source_identifier")
+      .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").not("is_superseded", "is", true).in("source_identifier", ids);
+    if (heldError) { out.errors.push(`held check: ${heldError.message}`); continue; }
+    const have = new Set((held ?? []).map((r: { source_identifier: string }) => r.source_identifier));
+    if (bids.every(b => have.has(`pcarmarket-bid:${b.id}`))) continue;
+    let capture;
+    try { capture = await pcarBidCapture(supabase, fetched, receivedAt); }
+    catch (error) { out.errors.push(`${lot.url}: ${error instanceof Error ? error.message : String(error)}`); continue; }
+    for (const b of bids) {
+      const sid = `pcarmarket-bid:${b.id}`;
+      if (have.has(sid)) continue;
+      if (Date.now() >= deadline || !budget.remaining("pcar")) { out.deferred = true; break; }
+      if (!budget.take("pcar")) { out.deferred = true; break; }
+      out.attempted++;
+      try {
+        const res = await fetch(`${base}/functions/v1/ingest-observation`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify(pcarBidObservation(b, lot, capture)),
+        });
+        const admitted = await res.json().catch(() => null);
+        if (admissionConfirmed(res.ok, admitted)) out.posted++;
+        else {
+          out.errors.push(`${sid}: admission not confirmed (HTTP ${res.status})`);
+          if (res.ok || res.status === 429 || res.status >= 500) { out.deferred = true; return out; }
+        }
+      } catch (error) {
+        out.errors.push(`${sid}: ${error instanceof Error ? error.message : String(error)}`.slice(0, 200));
+        out.deferred = true; return out;
+      }
+    }
+  }
+  return out;
 }
