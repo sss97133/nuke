@@ -3315,10 +3315,10 @@ const ImageGallery = ({
       {viewMode === 'zones' && showImages && (
         <div>
           {(() => {
-            const zoneSections = groupImagesByZone(displayedImages);
+            const zoneSections = groupImagesByZone(lightboxImages);
             // Build global index map for lightbox navigation
             const globalIndexMap = new Map<string, number>();
-            displayedImages.forEach((img: any, idx: number) => {
+            lightboxImages.forEach((img: any, idx: number) => {
               globalIndexMap.set(String(img?.id || ''), idx);
             });
 
@@ -3361,9 +3361,7 @@ const ImageGallery = ({
                     defaultOpen={autoExpandKeys.has(zs.section.key)}
                     imagesPerRow={imagesPerRow}
                     vehicleId={vehicleId}
-                    onImageClick={(_image, globalIndex) => {
-                      if (globalIndex >= 0) openLightbox(globalIndex);
-                    }}
+                    onImageClick={(image) => openLightboxById(String(image.id))}
                     globalIndexMap={globalIndexMap}
                     selectMode={selectMode}
                     selectedImages={selectedImages}
@@ -4382,7 +4380,7 @@ const ImageGallery = ({
       )}
 
       {/* One sentinel after every gallery view, including FULL and INFO. */}
-      {showImages && displayedImages.length < galleryFilteredImages.length && (
+      {showImages && viewMode !== 'zones' && displayedImages.length < galleryFilteredImages.length && (
         <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
           {loadingMore && (
             <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '11px' }}>

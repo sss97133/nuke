@@ -30,7 +30,7 @@ vi.mock('../image/ImageLightbox', () => ({ default: ({ imageId, title, onNext, o
   <div data-testid="lightbox">{imageId}</div><span data-testid="lightbox-title">{title}</span>
   <button data-testid="lightbox-next" onClick={onNext}>Next</button><button data-testid="lightbox-prev" onClick={onPrev}>Previous</button>
 </> }));
-vi.mock('./SensitiveImageOverlay', () => ({ SensitiveImageOverlay: () => null }));
+vi.mock('./SensitiveImageOverlay', () => ({ SensitiveImageOverlay: ({ imageUrl }: any) => <img src={imageUrl} alt="Vehicle image" /> }));
 vi.mock('../onboarding/OnboardingSlideshow', () => ({ OnboardingSlideshow: () => null }));
 
 import ImageGallery from './ImageGallery';
@@ -82,6 +82,28 @@ async function mount(props: Record<string, any> = {}) {
 
 // Each case renders 399 rows through 20 timer steps (about 0.6 s locally, near 5 s on loaded CI runners; one timed out on 2026-10-13).
 describe('ImageGallery canonical database rows', { timeout: 20_000 }, () => {
+  it.each([false, true])('groups the complete classified collection and opens a source beyond the thumbnail page (filtered=%s)', async (filtered) => {
+    vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} unobserve() {} });
+    fixture.rows = photos(120).map((photo, index) => ({ ...photo,
+      category: index % 2 ? 'detail' : 'general',
+      ai_classification: { image_type: index === 119 ? 'engine_bay' : 'vehicle_exterior' },
+    }));
+    const galleryFilter = filtered ? { category: 'detail' } : undefined;
+    const eligible = fixture.rows.filter(row => !filtered || row.category === 'detail');
+    await mount({ galleryView: 'ZONES', galleryFilter });
+    const exterior = container.querySelector('[data-zone-section="exterior"]');
+    const engine = container.querySelector('[data-zone-section="engine_bay"]');
+    expect(exterior?.querySelectorAll('img')).toHaveLength(eligible.length - 1);
+    expect(engine?.querySelectorAll('img')).toHaveLength(1);
+    expect(container.querySelector('[data-zone-section="uncategorized"]')).toBeNull();
+    expect(container.querySelector('[data-gallery-load-more]')).toBeNull();
+    await act(async () => engine!.querySelector('[role="button"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(container.querySelector('[data-testid="lightbox"]')?.textContent).toBe(fixture.rows[119].id);
+    expect(container.querySelector('[data-testid="lightbox-title"]')?.textContent).toBe(`${eligible.length} of ${eligible.length}`);
+    await act(async () => container.querySelector('[data-testid="lightbox-next"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.querySelector('[data-testid="lightbox"]')?.textContent).toBe(eligible[0].id);
+  });
+
   it('retains the selected part topic and its count across full-size and session views', async () => {
     fixture.rows = photos(4);
     fixture.rows[0].vehicle_zone = 'mech_drivetrain';
