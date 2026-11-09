@@ -359,3 +359,19 @@ DO $$ DECLARE oid uuid; r jsonb; placed uuid; independent uuid; flag text; k int
  ASSERT NOT EXISTS(SELECT FROM vehicle_image_attribution_queue),'withdrawal/review never promotes identity';
  RAISE NOTICE 'PASS: retained-source withdrawal, historical revision, reader refusal and fresh-review recovery';
 END $$;
+
+-- UPDATE OF observes SET targets, not earlier BEFORE-trigger assignments.
+-- A later metadata-only classifier update can unfile this image.
+INSERT INTO vehicle_images(id,vehicle_id,source,image_url,vision_gate_status,ai_scan_metadata) VALUES
+('10000000-0000-4000-8000-000000000005','20000000-0000-4000-8000-000000000001','capture_relay_ios','https://example.invalid/hint-guard.jpg','approved',
+ '{"classification":{"image_type":"vehicle_exterior","vehicle_hints":{},"description":"Fixture body"}}');
+DO $$ DECLARE oid uuid; placed uuid; BEGIN
+ oid=fixture_review('10000000-0000-4000-8000-000000000005',md5('hint')||md5('hint'));
+ placed=(project_reviewed_image_analysis(oid)->>'image_observation_id')::uuid;
+ ASSERT (SELECT vehicle_id IS NOT NULL AND ai_scan_metadata ? 'byok_deep_analysis' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000005'),'review initially current';
+ UPDATE vehicle_images SET ai_scan_metadata=jsonb_set(ai_scan_metadata,'{classification,vehicle_hints}','{"make":"Other"}') WHERE id='10000000-0000-4000-8000-000000000005';
+ ASSERT (SELECT vehicle_id IS NULL AND NOT ai_scan_metadata ? 'byok_deep_analysis' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000005'),'existing metadata hint guard unfiles and atomically withdraws cache';
+ ASSERT NOT (SELECT is_active FROM image_observations WHERE id=placed),'metadata-only unfile withdraws current search';
+ ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000005')),'reader also withholds unfiled review';
+ RAISE NOTICE 'PASS: actual hint-guard metadata-only unfile withdraws current review';
+END $$;

@@ -406,7 +406,7 @@ END;
 $function$;
 REVOKE ALL ON FUNCTION public.withdraw_reviewed_image_analysis() FROM PUBLIC,anon,authenticated;
 CREATE TRIGGER trg_withdraw_reviewed_image_analysis
-BEFORE UPDATE OF vehicle_id,image_url,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status
+BEFORE UPDATE OF vehicle_id,image_url,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status,ai_scan_metadata
 ON public.vehicle_images FOR EACH ROW EXECUTE FUNCTION public.withdraw_reviewed_image_analysis();
 
 -- Keep the existing deep-reader shape. A reviewed cache is only current while
