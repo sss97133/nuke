@@ -38,10 +38,11 @@ Deno.test('classificationFromReader never throws: bad JSON is classifier_respons
   assert(ok.classifier_receipt?.prompt_version === 'v98');
 });
 
-Deno.test('a VIN that fails the pattern is refused, a well-formed one is kept', async () => {
+Deno.test('a malformed VIN is dropped (the classification stands), a well-formed one is kept with its checksum read', async () => {
   const badVin = await classificationFromReader({ ...structuredClone(good), vin_detected: 'NOT-A-VIN' }, 'r');
-  assert(badVin.classifier_ok === false);
-  const okVin = await classificationFromReader({ ...structuredClone(good), vin_detected: '1HGCM82633A004352' }, 'r'); // a checksum-valid 17-character VIN
-  assert(okVin.classifier_ok === true, 'a well-formed VIN keeps the classification');
-  assert(okVin.vin_detected === '1HGCM82633A004352' || okVin.v2?.vin?.value === '1HGCM82633A004352', 'the VIN is kept on the result');
+  assert(badVin.classifier_ok === true, 'a bad VIN does not fail the classification');
+  assert(badVin.vin_detected === undefined, 'the malformed VIN is dropped');
+  const okVin = await classificationFromReader({ ...structuredClone(good), vin_detected: '1HGCM82633A004352' }, 'r'); // checksum-valid, 17 characters
+  assert(okVin.classifier_ok === true && okVin.vin_detected === '1HGCM82633A004352', 'the VIN is kept');
+  assert(okVin.v2?.vin?.checksum_ok === true, 'the v98 extras carry the checksum verdict');
 });
