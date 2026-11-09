@@ -347,7 +347,7 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['1J8', 'Jeep', 'Jeep'],
     ['1J', 'Jeep', 'Jeep'],
     ['1C3', 'Chrysler', 'Chrysler'],
-    ['1C4', 'Chrysler', 'Chrysler'],
+    ['1C4', 'FCA US LLC', null], // multi-marque manufacturer, not Chrysler marque
     ['1C6', 'Dodge', 'Dodge'],
     ['1C', 'Chrysler', 'Chrysler'],
     ['2C', 'Chrysler Canada', 'Chrysler'],
@@ -379,7 +379,10 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['ZAR', 'ALFA ROMEO S.P.A.', 'Alfa Romeo'],
     ['SA', 'Jaguar', 'Jaguar'],
     ['SJ', 'Jaguar', 'Jaguar'],
-    ['SC', 'Lotus', 'Lotus'],
+    // NHTSA vPIC: SCB is Bentley and SCC is Lotus. SC alone also spans
+    // other manufacturers (e.g. SCE); leave unrecognized identifiers unknown.
+    ['SCB', 'BENTLEY MOTORS LIMITED', 'Bentley'],
+    ['SCC', 'LOTUS CARS LIMITED', 'Lotus'],
     ['YV', 'Volvo', 'Volvo'],
   ];
 
@@ -395,6 +398,9 @@ function decodeModernVin(vin: string): VINDecodeResult {
   // exact make of each VIN. Exact 3C6LD5AT0CG145618 decodes DODGE, not CHRYSLER.
   // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/3C6?format=json
   if (wmi === '3C6') result.manufacturer_make_candidates =
+    ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/1C4?format=json
+  if (wmi === '1C4') result.manufacturer_make_candidates =
     ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia'];
 
   // Model year (position 10)
