@@ -994,6 +994,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Create disposable listing-state contract database
         run: createdb dm_fold_listing
+      - name: Create disposable preserved native lot contract database
+        run: createdb dm_refinement_preserved_lot
+      - name: Verify preserved native lot correction and atomic rollback
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_preserved_lot -f supabase/sql/test_preserved_native_lot_correction.sql
       - name: Verify event queue fold and public evidence reader
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_listing -f supabase/sql/test_listing_observation_consensus.sql
       - name: Create disposable listed-engine contract database
