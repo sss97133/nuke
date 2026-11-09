@@ -220,3 +220,58 @@ Deno.test("words: land types, brands, dates", () => {
   assertEquals(d.vendor.name, "X");
   assertEquals(d.payment, undefined);
 });
+
+Deno.test("printed line claims retain date, billed-hour precision and name without resolving an account", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const r = await handle({ image_id: IMG, extraction: {
+    document_type: "work_order", customer_name: "Different Customer", date: "2026-10-31",
+    line_items: [{ description: "Recorded labor", line_date: "2026-10-29", hours: 1.2345, performer: "Named on paper" }],
+  } }, deps({ frame: () => Promise.resolve(frame({ vehicle_id: VEH })) }, calls));
+  assertEquals(r.landed, true);
+  const land = calls.find(([kind]) => kind === "land")![1] as { docs: { documents: Array<Record<string, unknown>> } };
+  const doc = land.docs.documents[0];
+  assertEquals(doc.source_key, `capture:${IMG}`);
+  assertEquals(doc.doc_date, "2026-10-31");
+  assertEquals(doc.bill_to_name, "Different Customer");
+  assertEquals(doc.lines, [{ description: "Recorded labor", line_date: "2026-10-29", hours: 1.2345, performer: "Named on paper" }]);
+  assertEquals((doc.pages as Array<Record<string, string>>)[0].sha256, "a".repeat(64));
+});
+
+Deno.test("missing line claims stay absent despite customer, photo clock, quantity, price and top-level hours", () => {
+  const doc = toLandingDocument(frame(), "invoice", {
+    customer_name: "A Customer", date: "2026-10-31", hours: 8, performer: "A User",
+    line_items: [{ description: "Item", quantity: 8, unit_price: 10, amount: 80 }],
+  }, 0.9, { sha256: "a".repeat(64), storage_path: `${USER}/capture/${IMG}.heic`, byte_size: 3 });
+  assertEquals(doc.lines[0], { description: "Item", quantity: 8, unit_price: 10, amount: 80 });
+  for (const absent of [null, ""]) {
+    const blank = toLandingDocument(frame(), "invoice", { line_items: [{ description: "Item", hours: absent, performer: absent, line_date: absent }] },
+      0.9, { sha256: "a".repeat(64), storage_path: `${USER}/capture/${IMG}.heic`, byte_size: 3 });
+    assertEquals(blank.lines[0], { description: "Item" });
+  }
+});
+
+Deno.test("printed zero, credit billed hours and historical line dates are retained without monetary rounding", () => {
+  for (const hours of [0, -1.2345]) {
+    const doc = toLandingDocument(frame(), "invoice", { line_items: [{ description: "Adjustment", hours, line_date: "1890-01-01" }] },
+      0.9, { sha256: "a".repeat(64), storage_path: `${USER}/capture/${IMG}.heic`, byte_size: 3 });
+    assertEquals(doc.lines[0], { description: "Adjustment", hours, line_date: "1890-01-01" });
+  }
+});
+
+Deno.test("malformed printed line claims explicitly refuse before upload, page upsert or admission", async () => {
+  for (const claim of [
+    { line_date: "2026-02-30" }, { line_date: "10/31/2026" }, { line_date: "2026-10-31T12:00:00Z" },
+    { hours: "2 hours" }, { hours: "2" }, { hours: 1.23456 }, { hours: 1_000_000_000 },
+    { performer: { user_id: USER } }, { performer: " " }, { performer: "x".repeat(81) },
+  ]) {
+    const calls: Array<[string, unknown]> = [];
+    const r = await handle({ image_id: IMG, extraction: { document_type: "invoice", line_items: [{ description: "Item", ...claim }] } }, deps({
+      frame: () => Promise.resolve(frame({ vehicle_id: VEH })),
+      fetchBytes: () => { throw new Error("must not copy bytes for invalid claims"); },
+    }, calls));
+    assertEquals(r.status, 422);
+    assertEquals(r.landed, false);
+    assertStringIncludes(r.error ?? "", "line 1: invalid printed");
+    assertEquals(calls.length, 0);
+  }
+});

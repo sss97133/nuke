@@ -93,7 +93,7 @@ export interface LandingDocument {
   bill_to_name?: string;
   vehicle_noted?: string;
   pages: Array<{ sha256: string; storage_path: string; byte_size: string; page_no: string; role: string; source_filename: string }>;
-  lines: Array<{ description: string; part_number?: string; quantity?: number; unit_price?: number; amount?: number }>;
+  lines: Array<{ description: string; part_number?: string; quantity?: number; unit_price?: number; amount?: number; line_date?: string; hours?: number; performer?: string }>;
   subtotal?: number;
   discount?: number;
   shipping?: number;
@@ -257,6 +257,29 @@ function str(v: unknown, max: number): string | undefined {
   return s ? s.slice(0, max) : undefined;
 }
 
+/** Printed line claims only. Never substitute photo times, prices, customer names or account identities. */
+function printedLineFields(line: Record<string, unknown>, index: number): { line_date?: string; hours?: number; performer?: string } {
+  const out: { line_date?: string; hours?: number; performer?: string } = {};
+  const fail = (field: string): never => { throw new Error(`line ${index + 1}: invalid printed ${field}`); };
+  if (line.line_date != null && line.line_date !== "") {
+    const v = line.line_date;
+    if (typeof v !== "string" || !ISO_DATE.test(v) || v.startsWith("0000")) fail("line_date");
+    const date = new Date(String(v) + "T00:00:00Z");
+    if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== v) fail("line_date");
+    out.line_date = v as string;
+  }
+  if (line.hours != null && line.hours !== "") {
+    // Match the existing writer's numeric precision/range; billed hours can include a printed credit.
+    if (typeof line.hours !== "number" || !Number.isFinite(line.hours) || !/^-?[0-9]{1,9}(\.[0-9]{1,4})?$/.test(String(line.hours))) fail("hours");
+    out.hours = line.hours as number;
+  }
+  if (line.performer != null && line.performer !== "") {
+    if (typeof line.performer !== "string" || !line.performer.trim() || line.performer.length > 80) fail("performer");
+    out.performer = line.performer as string;
+  }
+  return out;
+}
+
 /** One landing document from a sanitized extraction and the page already copied to user-documents. */
 export function toLandingDocument(
   frame: FrameRow,
@@ -268,7 +291,7 @@ export function toLandingDocument(
 ): LandingDocument {
   const lt = landType(docType, data);
   const items = Array.isArray(data.line_items) ? (data.line_items as unknown[]) : [];
-  const lines = items.slice(0, 200).map((raw) => {
+  const lines = items.slice(0, 200).map((raw, index) => {
     const l = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     const o: LandingDocument["lines"][number] = { description: str(l.description, 500) || "line" };
     const pn = str(l.part_number ?? l.sku ?? l.part, 100);
@@ -279,6 +302,7 @@ export function toLandingDocument(
     if (u !== undefined) o.unit_price = u;
     const a = money(l.amount ?? l.total ?? l.ext_price);
     if (a !== undefined) o.amount = a;
+    Object.assign(o, printedLineFields(l, index));
     return o;
   });
   const date = parseIsoDate(data.date ?? data.receipt_date ?? data.invoice_date ?? data.transaction_date);
@@ -372,6 +396,15 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
     reviewReasons = Array.isArray(raw._review_reasons) ? (raw._review_reasons as unknown[]).map(String) : [];
     costUsd = typeof raw._cost_usd === "number" ? raw._cost_usd : null;
     data = sanitizeExtraction(raw) as Extraction;
+  }
+
+  // Invalid optional source claims are an explicit refusal, before copying bytes or changing the retained reading.
+  try {
+    if (Array.isArray(data.line_items)) data.line_items.slice(0, 200).forEach((line, index) => {
+      if (line && typeof line === "object" && !Array.isArray(line)) printedLineFields(line as Record<string, unknown>, index);
+    });
+  } catch (e) {
+    return { status: 422, image_id: imageId, page: !!existing, landed: false, line_items_count: lineCount(data), parts_found: 0, error: (e as Error).message };
   }
 
   // 2. The page's bytes, into the private bucket under the owner.
