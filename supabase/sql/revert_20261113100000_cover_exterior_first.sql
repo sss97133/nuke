@@ -108,5 +108,6 @@ BEGIN
   RETURN jsonb_build_object('vehicle_id',p_vehicle_id,'changed',(v_old IS DISTINCT FROM v_url),
     'tier',v_tier,'chosen_image_id',v_id,'taken_at',v_taken,'zone',v_zone,'was',left(v_old,40),'now',left(v_url,40));
 END $function$;
+DROP FUNCTION IF EXISTS public.image_cover_rank(uuid, jsonb, boolean);
 DROP FUNCTION IF EXISTS public.image_cover_rank(jsonb, boolean);
 COMMIT;

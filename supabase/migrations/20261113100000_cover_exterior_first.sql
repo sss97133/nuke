@@ -10,7 +10,7 @@
 -- tiers. Eligibility (gate, privacy, match status, tiers) is unchanged, so no new frame becomes a cover candidate; only
 -- the order among eligible frames changes. Within a rank the old order (hero score, then recency) holds.
 --   0 classifier image_type vehicle_exterior, or byok scene_type body_exterior
---   1 not classified yet
+--   1 not classified yet (unless the local analysis pass labelled it; see image_cover_rank(uuid, jsonb, boolean))
 --   2 any other vehicle view (interior, engine_bay, undercarriage, detail_closeup, progress_shot, part_closeup, ...)
 --   3 is_document, or image_type document / receipt_document / vin_plate / screenshot / other
 -- Covers change only when recompute_vehicle_primary_image runs for a vehicle (its existing callers); nothing is backfilled here.
@@ -42,6 +42,32 @@ COMMENT ON FUNCTION public.image_cover_rank(jsonb, boolean) IS
   'Cover preference among eligible frames: 0 exterior, 1 unclassified, 2 other vehicle views, 3 paperwork/VIN plate/screenshot/other. Lower is better.';
 REVOKE ALL ON FUNCTION public.image_cover_rank(jsonb, boolean) FROM PUBLIC, anon;
 
+-- Unlabelled frames: when the classifier has not read a frame (rank 1), use the free local analysis pass's view label
+-- (image_observations, observed_by local_image_analysis_v1, scripts/photo-pipeline/local_image_analysis.py on branch
+-- photo-pipeline/local-image-analysis, first run 192ec5d8). Only an active row counts, so reverting that run
+-- (is_active=false) returns its frames to rank 1. The classifier always wins where it has a label.
+--   exterior_front / exterior_rear / exterior_side with view_confidence >= 0.4 and p_vehicle >= 0.5 -> 0
+--   document / screenshot / person / other -> 3     interior / engine / undercarriage / detail -> 2
+--   no active local reading, or a low-confidence exterior -> 1 (unchanged)
+CREATE OR REPLACE FUNCTION public.image_cover_rank(p_image_id uuid, meta jsonb, is_doc boolean)
+RETURNS integer LANGUAGE sql STABLE PARALLEL SAFE SET search_path TO 'public' AS $f$
+  SELECT CASE WHEN r.base <> 1 THEN r.base ELSE coalesce((
+    SELECT CASE
+      WHEN rd->>'view' IN ('exterior_front','exterior_rear','exterior_side')
+       AND coalesce((rd->>'view_confidence')::numeric, 0) >= 0.4 AND coalesce((rd->>'p_vehicle')::numeric, 0) >= 0.5 THEN 0
+      WHEN rd->>'view' IN ('document','screenshot','person','other') THEN 3
+      WHEN rd->>'view' IN ('interior','engine','undercarriage','detail') THEN 2
+      ELSE 1 END
+    FROM (SELECT o.confidence_basis->'local_image_analysis_v1'->'reading' AS rd, o.observed_at
+            FROM public.image_observations o
+           WHERE o.image_id = p_image_id AND o.observed_by = 'local_image_analysis_v1' AND o.is_active
+           ORDER BY o.observed_at DESC LIMIT 1) l), 1) END
+  FROM (SELECT public.image_cover_rank(meta, is_doc) AS base) r
+$f$;
+COMMENT ON FUNCTION public.image_cover_rank(uuid, jsonb, boolean) IS
+  'Cover preference: the classifier rank (image_cover_rank(jsonb, boolean)); for a frame the classifier has not read, the active local_image_analysis_v1 view label decides (exterior 0, other vehicle view 2, paperwork/screenshot/person/other 3). Lower is better.';
+REVOKE ALL ON FUNCTION public.image_cover_rank(uuid, jsonb, boolean) FROM PUBLIC, anon;
+
 CREATE OR REPLACE FUNCTION public.recompute_vehicle_primary_image(p_vehicle_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -69,7 +95,7 @@ BEGIN
     AND image_vehicle_match_status = 'confirmed'
     AND ai_scan_metadata->'byok_deep_analysis' IS NOT NULL
     AND image_url IS NOT NULL AND image_url <> ''
-  ORDER BY public.image_cover_rank(ai_scan_metadata, is_document), public.image_hero_score(ai_scan_metadata, file_size) DESC, COALESCE(taken_at,created_at) DESC
+  ORDER BY public.image_cover_rank(id, ai_scan_metadata, is_document), public.image_hero_score(ai_scan_metadata, file_size) DESC, COALESCE(taken_at,created_at) DESC
   LIMIT 1;
   IF v_id IS NOT NULL THEN v_tier := 'hero_score'; END IF;
 
@@ -83,7 +109,7 @@ BEGIN
       AND COALESCE(vision_gate_status::text,'approved') NOT IN ('rejected_personal','rejected_misattributed','review_needed')
       AND image_vehicle_match_status = 'confirmed'
       AND image_url IS NOT NULL AND image_url <> ''
-    ORDER BY public.image_cover_rank(ai_scan_metadata, is_document), COALESCE(taken_at,created_at) DESC LIMIT 1;
+    ORDER BY public.image_cover_rank(id, ai_scan_metadata, is_document), COALESCE(taken_at,created_at) DESC LIMIT 1;
     IF v_id IS NOT NULL THEN v_tier := 'confirmed_any'; END IF;
   END IF;
 
@@ -101,7 +127,7 @@ BEGIN
       AND COALESCE(image_vehicle_match_status,'pending') NOT IN ('mismatch','unrelated')
       AND ai_scan_metadata->'byok_deep_analysis' IS NOT NULL
       AND image_url IS NOT NULL AND image_url <> ''
-    ORDER BY public.image_cover_rank(ai_scan_metadata, is_document), public.image_hero_score(ai_scan_metadata, file_size) DESC, COALESCE(taken_at,created_at) DESC
+    ORDER BY public.image_cover_rank(id, ai_scan_metadata, is_document), public.image_hero_score(ai_scan_metadata, file_size) DESC, COALESCE(taken_at,created_at) DESC
     LIMIT 1;
     IF v_id IS NOT NULL THEN v_tier := 'owner_hero'; END IF;
   END IF;
@@ -116,7 +142,7 @@ BEGIN
       AND COALESCE(vision_gate_status::text,'approved') NOT IN ('rejected_personal','rejected_misattributed','review_needed')
       AND COALESCE(image_vehicle_match_status,'pending') NOT IN ('mismatch','unrelated')
       AND image_url IS NOT NULL AND image_url <> ''
-    ORDER BY public.image_cover_rank(ai_scan_metadata, is_document), COALESCE(taken_at,created_at) DESC LIMIT 1;
+    ORDER BY public.image_cover_rank(id, ai_scan_metadata, is_document), COALESCE(taken_at,created_at) DESC LIMIT 1;
     IF v_id IS NOT NULL THEN v_tier := 'owner_latest'; END IF;
   END IF;
 
@@ -130,7 +156,7 @@ BEGIN
       AND COALESCE(vision_gate_status::text,'approved') NOT IN ('rejected_personal','rejected_misattributed','review_needed')
       AND COALESCE(image_vehicle_match_status,'pending') NOT IN ('mismatch','unrelated')
       AND image_url IS NOT NULL AND image_url <> ''
-    ORDER BY public.image_cover_rank(ai_scan_metadata, is_document), COALESCE(is_primary,false) DESC, COALESCE(taken_at,created_at) DESC LIMIT 1;
+    ORDER BY public.image_cover_rank(id, ai_scan_metadata, is_document), COALESCE(is_primary,false) DESC, COALESCE(taken_at,created_at) DESC LIMIT 1;
     IF v_id IS NOT NULL THEN v_tier := 'any_approved'; END IF;
   END IF;
 

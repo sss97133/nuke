@@ -16,6 +16,8 @@ CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid, image_
   created_at timestamptz DEFAULT now(), vehicle_zone text, file_size bigint, is_primary boolean DEFAULT false,
   is_superseded boolean, is_duplicate boolean, is_sensitive boolean, is_document boolean, vision_gate_status text,
   image_vehicle_match_status text, ai_scan_metadata jsonb DEFAULT '{}');
+CREATE TABLE public.image_observations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), image_id uuid, vehicle_id uuid,
+  observed_by text, is_active boolean DEFAULT true, confidence_basis jsonb, observed_at timestamptz DEFAULT now());
 CREATE FUNCTION public.image_hero_score(meta jsonb, fsize bigint) RETURNS numeric LANGUAGE sql IMMUTABLE AS $$ SELECT 0::numeric $$;
 
 -- the 20261016151000 cover chooser, verbatim
@@ -160,9 +162,46 @@ SELECT public.recompute_vehicle_primary_image('00000000-0000-4000-8000-000000000
 SELECT pg_temp.assert_true((SELECT primary_image_url FROM vehicles) = 'u-closeup', 'a held exterior is never the cover; a vehicle view beats the receipt');
 UPDATE vehicle_images SET vision_gate_status = 'approved' WHERE image_url = 'u-exterior';
 
+-- Unlabelled frames: the local analysis pass's active view label ranks them; the classifier still wins where it has a label.
+CREATE FUNCTION pg_temp.obs(img text, view text, vc numeric, pv numeric, run text) RETURNS void LANGUAGE sql AS $$
+  INSERT INTO public.image_observations(image_id, observed_by, confidence_basis) VALUES (img::uuid, 'local_image_analysis_v1',
+    jsonb_build_object('local_image_analysis_v1', jsonb_build_object('run_id', run, 'reading', jsonb_build_object('view', view, 'view_confidence', vc, 'p_vehicle', pv)))) $$;
+INSERT INTO vehicles VALUES ('00000000-0000-4000-8000-0000000000b1', 'old-cover-b');
+INSERT INTO vehicle_images(id, vehicle_id, image_url, source, taken_at, vision_gate_status, ai_scan_metadata) VALUES
+ ('00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-0000000000b1', 'b-local-exterior', 'iphoto', '2024-01-01', 'approved', '{}'),
+ ('00000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-0000000000b1', 'b-no-reading', 'iphoto', '2024-06-01', 'approved', '{}'),
+ ('00000000-0000-4000-8000-000000000013', '00000000-0000-4000-8000-0000000000b1', 'b-local-detail', 'iphoto', '2025-01-01', 'approved', '{}'),
+ ('00000000-0000-4000-8000-000000000014', '00000000-0000-4000-8000-0000000000b1', 'b-local-person', 'iphoto', '2025-06-01', 'approved', '{}'),
+ ('00000000-0000-4000-8000-000000000015', '00000000-0000-4000-8000-0000000000b1', 'b-weak-exterior', 'iphoto', '2026-01-01', 'approved', '{}'),
+ ('00000000-0000-4000-8000-000000000016', '00000000-0000-4000-8000-0000000000b1', 'b-classified-engine', 'iphoto', '2026-02-01', 'approved', '{"classification":{"image_type":"engine_bay"}}');
+SELECT pg_temp.obs('00000000-0000-4000-8000-000000000011', 'exterior_side', 0.71, 0.93, '192ec5d8');
+SELECT pg_temp.obs('00000000-0000-4000-8000-000000000013', 'detail', 0.6, 0.9, '192ec5d8');
+SELECT pg_temp.obs('00000000-0000-4000-8000-000000000014', 'person', 0.8, 0.1, '192ec5d8');
+SELECT pg_temp.obs('00000000-0000-4000-8000-000000000015', 'exterior_front', 0.22, 0.9, '192ec5d8');
+SELECT pg_temp.obs('00000000-0000-4000-8000-000000000016', 'exterior_front', 0.9, 0.95, '192ec5d8');
+SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.image_cover_rank(uuid, jsonb, boolean)', 'EXECUTE'), 'anon cannot call the labelled rank');
+SELECT pg_temp.assert_true(
+      public.image_cover_rank('00000000-0000-4000-8000-000000000011'::uuid, '{}', false) = 0
+  AND public.image_cover_rank('00000000-0000-4000-8000-000000000012'::uuid, '{}', false) = 1
+  AND public.image_cover_rank('00000000-0000-4000-8000-000000000013'::uuid, '{}', false) = 2
+  AND public.image_cover_rank('00000000-0000-4000-8000-000000000014'::uuid, '{}', false) = 3
+  AND public.image_cover_rank('00000000-0000-4000-8000-000000000015'::uuid, '{}', false) = 1
+  AND public.image_cover_rank('00000000-0000-4000-8000-000000000016'::uuid, '{"classification":{"image_type":"engine_bay"}}', false) = 2
+  AND public.image_cover_rank('00000000-0000-4000-8000-000000000011'::uuid, '{}', true) = 3,
+  'local labels: confident exterior 0, none 1, detail 2, person 3, weak exterior 1; the classifier and is_document win');
+SELECT public.recompute_vehicle_primary_image('00000000-0000-4000-8000-0000000000b1');
+SELECT pg_temp.assert_true((SELECT primary_image_url FROM vehicles WHERE id = '00000000-0000-4000-8000-0000000000b1') = 'b-local-exterior',
+  'an unlabelled vehicle gets the oldest frame the local pass reads as a confident exterior, not the newest frame');
+UPDATE public.image_observations SET is_active = false WHERE confidence_basis->'local_image_analysis_v1'->>'run_id' = '192ec5d8';
+SELECT public.recompute_vehicle_primary_image('00000000-0000-4000-8000-0000000000b1');
+SELECT pg_temp.assert_true((SELECT primary_image_url FROM vehicles WHERE id = '00000000-0000-4000-8000-0000000000b1') = 'b-weak-exterior',
+  'reverting the analysis run returns to the classifier-only order (newest unclassified)');
+UPDATE public.image_observations SET is_active = true;
+
 \i supabase/sql/revert_20261113100000_cover_exterior_first.sql
 SELECT pg_temp.assert_true(md5(pg_get_functiondef('public.recompute_vehicle_primary_image(uuid)'::regprocedure)) = '0abc418f16fa239c346397f060bba3e9'
-  AND to_regprocedure('public.image_cover_rank(jsonb, boolean)') IS NULL, 'revert restores the 20261016151000 body and drops the rank');
+  AND to_regprocedure('public.image_cover_rank(jsonb, boolean)') IS NULL
+  AND to_regprocedure('public.image_cover_rank(uuid, jsonb, boolean)') IS NULL, 'revert restores the 20261016151000 body and drops the rank');
 SELECT public.recompute_vehicle_primary_image('00000000-0000-4000-8000-0000000000a1');
-SELECT pg_temp.assert_true((SELECT primary_image_url FROM vehicles) = 'u-receipt', 'after revert the old choice returns');
+SELECT pg_temp.assert_true((SELECT primary_image_url FROM vehicles WHERE id = '00000000-0000-4000-8000-0000000000a1') = 'u-receipt', 'after revert the old choice returns');
 SELECT 'cover exterior-first contract: ok' AS result;
