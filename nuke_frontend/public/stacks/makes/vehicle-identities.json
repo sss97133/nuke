@@ -81,31 +81,6 @@
     "retrievedAt": "2026-10-10",
     "attribution": "Porsche trademarks belong to Dr. Ing. h.c. F. Porsche AG. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
     "years": [
-      1997,
-      1997
-    ],
-    "role": "make",
-    "file": "porsche-wordmark.svg",
-    "viewport": "0 0 394.352201 28.576001",
-    "width": 124,
-    "height": 9,
-    "sourceWidth": 394.352201,
-    "sourceHeight": 28.576001,
-    "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Porsche%20Wordmark.svg",
-    "sourceAsset": "https://raw.githubusercontent.com/cardog-ai/icons/05c4001e83a0/core/optimized/Porsche%20Wordmark.svg",
-    "evidence": "https://porschecarshistory.com/wp-content/old/brochures3/48/1996%20993.pdf",
-    "notes": "Reuse the attributed local wordmark, visually matched to the 911 factory brochure cover, literature WK 191 720 97 E/WW, status 4/96. Applicability conservatively limited to model year 1997; source provenance retained in wordmarks.json.",
-    "sourceSha256Base64": "5a6uVnAx+oKzxKEWH42TJ2I+xHAZWyu6Sk4Tny5N5OA=",
-    "localSha256Base64": "6pfK/bRMUvFf850slRASva3JGWosljHc1hicCqW0Qdc="
-  },
-  {
-    "make": "Porsche",
-    "models": [
-      "911"
-    ],
-    "retrievedAt": "2026-10-10",
-    "attribution": "Porsche trademarks belong to Dr. Ing. h.c. F. Porsche AG. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
-    "years": [
       1994,
       2005
     ],
@@ -174,5 +149,286 @@
     "sourceSha256Base64": "X0rL8nWy6ig9lTRR94TmFQ25hFPTr34McGdKXyNwcfs=",
     "sourceDocumentSha256Base64": "cKDFALZsC4RVkd5kFFUbAcIU73AafWUpJkP2gKznFvo=",
     "extraction": "pdfimages -f 5 -l 5 -j; source image object 93, unchanged JPEG stream"
+  },
+  {
+    "make": "Porsche",
+    "models": [],
+    "years": [
+      2006,
+      2022
+    ],
+    "role": "make",
+    "file": "porsche-lettering-commons.svg",
+    "viewport": "17.67 17.67 885.93 61",
+    "width": 146,
+    "height": 10,
+    "sourceWidth": 921.25983,
+    "sourceHeight": 96.377953,
+    "source": "https://commons.wikimedia.org/wiki/File:Porsche_Schriftzug.svg",
+    "sourceAsset": "https://upload.wikimedia.org/wikipedia/commons/0/05/Porsche_Schriftzug.svg",
+    "license": "Public domain (PD-textlogo), Wikimedia Commons; trademark",
+    "evidence": "https://porschecarshistory.com/wp-content/old/brochures4/03/2006%20997FullBrochure%20EN.pdf",
+    "evidenceDocuments": [
+      {
+        "year": 2006,
+        "url": "https://porschecarshistory.com/wp-content/old/brochures4/03/2006%20997FullBrochure%20EN.pdf",
+        "page": 1,
+        "iou": 0.972
+      },
+      {
+        "year": 2010,
+        "url": "https://porschecarshistory.com/wp-content/old/brochures4/04/997FullBrochure2010.pdf",
+        "page": 1,
+        "iou": 0.971
+      },
+      {
+        "year": 2013,
+        "url": "https://porschecarshistory.com/wp-content/old/brochures4/66/2013%20Porsche%20991%20US.pdf",
+        "page": 1,
+        "iou": 0.906
+      },
+      {
+        "year": 2016,
+        "url": "https://porschecarshistory.com/wp-content/old/brochures3/80/2016%20991.pdf",
+        "page": 1,
+        "iou": 0.891
+      },
+      {
+        "year": 2019,
+        "url": "https://porschecarshistory.com/wp-content/old/brochures5/35/2019%20992%20US.pdf",
+        "page": 1,
+        "iou": 0.982
+      },
+      {
+        "year": 2022,
+        "url": "https://porschecarshistory.com/wp-content/old/brochures5/49/2022MY%20992%20DE.pdf",
+        "page": 1,
+        "iou": 0.991
+      }
+    ],
+    "notes": "Make lettering as printed on dated Porsche brochure covers 2006-2022 (ink IoU 0.89-0.99 after scaling to the same box; word width 14.57 cap heights vs 14.48-14.63 in print). The 2023 identity refresh widened the letter spacing (14.91-14.98 cap heights from 2024), so the range stops at 2022. Earlier lettering (1969, 1977-1991) is a wider drawing with no matching source vector. The source fill colour is the uploader's; the lettering renders one-colour, as printed. Viewport is the ink box.",
+    "retrievedAt": "2026-11-08",
+    "attribution": "Porsche trademarks belong to Dr. Ing. h.c. F. Porsche AG. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
+    "sourceSha256Base64": "smfwhfdGR7iZDAN/m6Rwe7cflXXb6UbvM9avvUYK0Ko=",
+    "tone": "monochrome",
+    "textScale": {
+      "capHeight": 1,
+      "baseline": 0
+    }
+  },
+  {
+    "make": "Mercedes-Benz",
+    "models": [],
+    "years": [
+      2010,
+      2020
+    ],
+    "role": "make",
+    "file": "mercedes-benz-wordmark.svg",
+    "viewport": "1.38 1.38 455.98 52.37",
+    "width": 110,
+    "height": 13,
+    "sourceWidth": 458.736,
+    "sourceHeight": 55.126,
+    "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/MB%20Wordmark.svg",
+    "sourceAsset": "https://raw.githubusercontent.com/cardog-ai/icons/05c4001e83a0/core/optimized/MB%20Wordmark.svg",
+    "license": "MIT (CARDOG-LICENSE.txt)",
+    "evidence": "https://archive.org/details/mercedes-benz-c-class-car-brochure-2009",
+    "evidenceDocuments": [
+      {
+        "year": 2010,
+        "url": "https://archive.org/details/mercedes-benz-c-class-car-brochure-2009",
+        "page": 1,
+        "iou": 0.951
+      },
+      {
+        "year": 2012,
+        "url": "https://archive.org/details/mercedes-benz-s-class-car-brochure-2012",
+        "page": 1,
+        "iou": 0.963
+      },
+      {
+        "year": 2015,
+        "url": "https://archive.org/details/mercedes-benz-c-class-car-brochure-2014",
+        "page": 1,
+        "iou": 0.961
+      },
+      {
+        "year": 2016,
+        "url": "https://archive.org/details/mercedes-benz-glc-car-brochure-2015",
+        "page": 1,
+        "iou": 0.95
+      },
+      {
+        "year": 2020,
+        "url": "https://archive.org/details/mercedes-benz-amg-gt-coupe-and-roadster-car-brochure-2019",
+        "page": 1,
+        "iou": 0.946
+      },
+      {
+        "year": 2020,
+        "url": "https://archive.org/details/gls-brochure",
+        "page": 1,
+        "iou": 0.946
+      }
+    ],
+    "notes": "Reuse the attributed local wordmark: the same Corporate A cut is printed on every dated brochure cover from the 09/2009 C-Class (MY2010) to the 2020 GLS (ink IoU 0.95-0.96). US MY2008 brochures still print an older condensed cut, so the range starts at 2010; no dated 2021-2025 document was checked, so it stops at 2020. Upstream provenance and hashes stay in wordmarks.json.",
+    "retrievedAt": "2026-11-08",
+    "attribution": "Mercedes-Benz trademarks belong to Mercedes-Benz Group AG. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
+    "sourceSha256Base64": "qvhb5pKYsyxlgJJ82BClBbS7ZIJlyUipXj/5mb2VC80=",
+    "localSha256Base64": "qPU7O1xBI9ZnmLX4sCrVjhcstTeTI4kAgAFQdaXo/t8=",
+    "tone": "monochrome",
+    "textScale": {
+      "capHeight": 0.977,
+      "baseline": 0.012
+    }
+  },
+  {
+    "make": "Ford",
+    "models": [],
+    "years": [
+      1977,
+      1992
+    ],
+    "role": "make",
+    "file": "ford-oval-print-commons.svg",
+    "viewport": "0 0 1000 344.619",
+    "width": 58,
+    "height": 20,
+    "sourceWidth": 1000,
+    "sourceHeight": 344.619,
+    "source": "https://commons.wikimedia.org/wiki/File:Ford_Logo_1976_Print_Ver.svg",
+    "sourceAsset": "https://upload.wikimedia.org/wikipedia/commons/b/ba/Ford_Logo_1976_Print_Ver.svg",
+    "license": "Public domain (PD-textlogo; PD US no notice), Wikimedia Commons; trademark",
+    "evidence": "https://archive.org/details/101_20261103_20261103_1644",
+    "evidenceDocuments": [
+      {
+        "year": 1977,
+        "url": "https://archive.org/details/101_20261103_20261103_1644",
+        "page": "back cover",
+        "document": "1977 Ford Bronco brochure, USA 8-1976, FDT-7713",
+        "iou": 0.813
+      },
+      {
+        "year": 1982,
+        "url": "https://archive.org/details/101_20261105_20261105_1715",
+        "page": "back cover",
+        "document": "1982 Ford Bronco brochure, USA 8-1981, FDT-8213",
+        "iou": 0.777
+      },
+      {
+        "year": 1987,
+        "url": "https://archive.org/details/101_20261106_20261106",
+        "page": "back cover",
+        "document": "1987 Ford Bronco brochure, USA 8-1986, FDT-8712",
+        "iou": 0.821
+      },
+      {
+        "year": 1992,
+        "url": "https://archive.org/details/1992-ford-bronco-brochure.-usa-7-1991.-fdt-004-1",
+        "page": "back page",
+        "document": "1992 Ford Bronco brochure, USA 7-1991, FDT-004",
+        "iou": 0.77
+      }
+    ],
+    "notes": "One-colour print form of the script oval adopted in 1976. Script IoU 0.77-0.82 against the brochure ovals (printed on chrome or textured stock); the same script measures 0.976 against Ford's own flat oval (local ford.svg, from the Ford 2017 annual report), which corroborates the drawing. The 1935/1939 brochures print block FORD and 1960s brochures block FORD, so earlier years keep text. A 2003 Excursion cover also matches (0.806) but 1993-2002 was not checked. Unmodified source; the oval is a lettered lockup, sized so its script matches the title text.",
+    "retrievedAt": "2026-11-08",
+    "attribution": "Ford trademarks belong to Ford Motor Company. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
+    "sourceSha256Base64": "0b+YoY1/FPDZ7F9gqW3ONRpBAL6gwGXgacRMpPBQpes=",
+    "tone": "monochrome",
+    "textScale": {
+      "capHeight": 0.62,
+      "baseline": 0.18
+    }
+  },
+  {
+    "make": "Toyota",
+    "models": [],
+    "years": [
+      1985,
+      1992
+    ],
+    "role": "make",
+    "file": "toyota-wordmark.svg",
+    "viewport": "1.26 1.26 411.83 72.94",
+    "width": 84,
+    "height": 15,
+    "sourceWidth": 414.472,
+    "sourceHeight": 75.472,
+    "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Toyota%20Wordmark.svg",
+    "sourceAsset": "https://raw.githubusercontent.com/cardog-ai/icons/05c4001e83a0/core/optimized/Toyota%20Wordmark.svg",
+    "license": "MIT (CARDOG-LICENSE.txt)",
+    "evidence": "https://archive.org/details/0_20261015_202610",
+    "evidenceDocuments": [
+      {
+        "year": 1985,
+        "url": "https://archive.org/details/0_20261015_202610",
+        "page": 8,
+        "document": "1985 Toyota Supra brochure, USA, P/5-008 (8/84)",
+        "iou": 0.842
+      },
+      {
+        "year": 1989,
+        "url": "https://archive.org/details/101_20260429_20260429_1545",
+        "page": 1,
+        "document": "1989 Toyota Land Cruiser brochure, USA, PT8-512 (9-88)",
+        "iou": 0.852
+      },
+      {
+        "year": 1992,
+        "url": "https://archive.org/details/101_20260822_20260822_2004",
+        "page": 1,
+        "document": "1992 Toyota Land Cruiser brochure, USA, PT2-533 (7/92)",
+        "iou": 0.872
+      }
+    ],
+    "notes": "Reuse the attributed local wordmark: dated US brochures print the same TOYOTA lettering (straight-armed Y, flat-topped A) in black (1985) and red (1989, 1992). The scans are about 167 ppi, so the overlay also checked system fonts as controls (0.74-0.83); the match rests on the overlay plus a visual comparison of each letter. No later US printed lettering was found, so the range stops at 1992.",
+    "retrievedAt": "2026-11-08",
+    "attribution": "Toyota trademarks belong to Toyota Motor Corporation. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
+    "sourceSha256Base64": "qy3WQBe5UjWuke4f0B/ANjkWC4s0Ui86VjlD90qzkTo=",
+    "localSha256Base64": "AMxhl7CkWQBr9kJHl+dXidDE6D5iVM2339zhEkv7yQ0=",
+    "tone": "monochrome",
+    "textScale": {
+      "capHeight": 0.943,
+      "baseline": 0.022
+    }
+  },
+  {
+    "make": "Ferrari",
+    "models": [],
+    "years": [
+      1994,
+      1994
+    ],
+    "role": "make",
+    "file": "ferrari-wordmark.svg",
+    "viewport": "1.07 1.07 354.19 78.06",
+    "width": 68,
+    "height": 15,
+    "sourceWidth": 356.46024,
+    "sourceHeight": 80.209212,
+    "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Ferrari%20Wordmark.svg",
+    "sourceAsset": "https://raw.githubusercontent.com/cardog-ai/icons/05c4001e83a0/core/optimized/Ferrari%20Wordmark.svg",
+    "license": "MIT (CARDOG-LICENSE.txt)",
+    "evidence": "https://archive.org/details/1_20260418_20260418_1043",
+    "evidenceDocuments": [
+      {
+        "year": 1994,
+        "url": "https://archive.org/details/1_20260418_20260418_1043",
+        "page": 1,
+        "document": "1994 Ferrari 348 GT brochure, 788/93-5M/11/93",
+        "iou": 0.781
+      }
+    ],
+    "notes": "Reuse the attributed local wordmark: the 1994 348 GT brochure cover prints this logotype (long F bar ending at the i dot; serif fonts score 0.42-0.50 as controls). The 1988 328, 1991/92 512 TR and 2002 Enzo brochures print the shield only, so the range is the one evidenced year.",
+    "retrievedAt": "2026-11-08",
+    "attribution": "Ferrari trademarks belong to Ferrari S.p.A. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
+    "sourceSha256Base64": "/sv52gLSsFBIGtkZhHrmZetvNJVp5E3y1SGZSBvKoLU=",
+    "localSha256Base64": "mFjBJElUHNF+9W4nCyONP/5CshoxzQBkjeGh3D3oRv0=",
+    "tone": "monochrome",
+    "textScale": {
+      "capHeight": 1,
+      "baseline": 0
+    }
   }
 ]

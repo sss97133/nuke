@@ -52,8 +52,13 @@
 .vehicle-identity--compact[data-variant-artwork="true"] { flex-wrap:wrap; }
 /* A neutral nameplate surface retains the source chrome/enamel in both themes.
    Multiply removes the white photographic surround without recoloring the badge. */
-.vehicle-identity[data-period-artwork="true"] { background:#f1f1ee; color:#202020; padding:6px 8px; }
-.vehicle-identity[data-period-artwork="true"] .vehicle-identity__art { mix-blend-mode:multiply; }
+.vehicle-identity:not(.vehicle-identity--text)[data-period-artwork="true"] { background:#f1f1ee; color:#202020; padding:6px 8px; }
+.vehicle-identity:not(.vehicle-identity--text)[data-period-artwork="true"] .vehicle-identity__art { mix-blend-mode:multiply; }
+/* Lettering inside a line of text: its capitals take the text's cap height (0.71em in the system and Arial faces) and
+   its baseline sits on the text's; one colour, the text's, in either theme (the catalogue's monochrome tone). */
+.vehicle-identity--text .vehicle-identity__art--text { --art-h:calc(0.71em / var(--art-cap)); display:inline-block; width:auto; vertical-align:calc(var(--art-h) * var(--art-base) * -1); line-height:0; }
+.vehicle-identity--text .vehicle-identity__art--text svg { display:block; height:var(--art-h); width:calc(var(--art-h) * var(--art-ratio)); max-width:none; filter:brightness(0); }
+:root[data-theme="dark"] .vehicle-identity--text .vehicle-identity__art--text svg { filter:brightness(0) invert(1); }
 @media (max-width:600px) {
   .vehicle-identity__art--model { width:120px; }
   .vehicle-identity__art--emblem { width:24px; }
