@@ -1,6 +1,11 @@
 node_modules
 .git
-/supabase
+/supabase/*
+!/supabase/functions
+/supabase/functions/*
+!/supabase/functions/_shared
+/supabase/functions/_shared/*
+!/supabase/functions/_shared/htmlToText.ts
 /nuke_api
 /scripts
 /database

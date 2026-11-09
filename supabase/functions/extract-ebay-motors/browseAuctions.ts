@@ -25,11 +25,12 @@
  */
 import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
 const writeVehicleEventByKey = vehicleEventWriterFor("extract-ebay-motors:browse-auctions");
-import { BrowseClient, ItemGone, QuotaExceeded, type SearchSummary } from "./browseApi.ts";
+import { BrowseClient, ItemGone, QuotaExceeded, CATEGORY_CARS_TRUCKS, type SearchSummary } from "./browseApi.ts";
 import { listingKey, yearOf, type EbayItem } from "./browseMap.ts";
 import { emptyReport, heldKeys, landItem, PLATFORM, pool, type Report } from "./browseSweep.ts";
 import { admitAuctionSnapshot, snapshotFields, type SnapshotWriter, type SnapshotReceipt } from "./auctionSnapshot.ts";
 import { quotaDay } from "./partsFinder.ts";
+import { auctionReplayStore, closingFirst, type AuctionRead, type ReplayCandidate, type ReplayEntry, type ReplayStore } from "./auctionReplay.ts";
 
 /** Counts one Browse call before it is made; returns why not when the day's cap is used or the ledger cannot be written. */
 export interface CallLedger { take(): Promise<string | null> }
@@ -56,6 +57,7 @@ const TERMINAL = new Set(["sold", "not_sold", "unsold", "bid_to", "reserve_not_m
 const VINTAGE = { from: 1930, to: 2005 };           // the sweep's tiers
 
 export interface AuctionOptions {
+  replayStore?: ReplayStore; // dependency seam; production uses retained pages and owned system_state
   snapshotWriter?: SnapshotWriter; // dependency seam; production uses canonical admission
   maxSnapshots?: number;    // bounded internal admissions, default 20; no additional eBay calls
   maxPages?: number;       // search pages this run; a full pass needs ceil(total / 200)
@@ -76,6 +78,7 @@ export interface AuctionCounts {
   held_rows: number; held_elsewhere: number; held_terminal: number; written_live: number; unchanged: number;
   unheld: { vintage: number; other: number }; land_attempts: number; landed_live: number; left: { vintage: number; other: number };
   snapshots_admitted: number; snapshots_deferred: number; written_episodes: number;
+  replay: { queued: number; pending: number; admitted: number; acknowledged: number; overflow: number; retention_failed: number; obsolete: number; terminal_or_expired: number; identity_refused: number };
   ended_vehicles: number; ended_episodes: number; episodes_past_end: number; browse_calls: number;
 }
 export interface AuctionReport extends Report { auctions: AuctionCounts }
@@ -134,13 +137,16 @@ export function liveRow(v: VehicleRow, s: EbayItem, nowIso: string): Record<stri
 
 const isVintage = (s: EbayItem) => { const y = yearOf(s); return y != null && y >= VINTAGE.from && y <= VINTAGE.to; };
 
-async function heldRows(supabase: any, keys: string[]): Promise<Map<string, VehicleRow[]>> {
+async function heldRows(supabase: any, keys: string[], deadline?: number): Promise<Map<string, VehicleRow[]>> {
   const urls = keys.flatMap(itemUrls);
   const m = new Map<string, VehicleRow[]>();
   for (let i = 0; i < urls.length; i += 100) {
-    const r = await supabase.from("vehicles")
+    if (deadline != null && Date.now() >= deadline) throw Error("replay ownership deadline");
+    let query = supabase.from("vehicles")
       .select("id,listing_url,platform_source,sale_status,auction_status,high_bid,auction_end_date,origin_metadata,title,year,make,model")
       .in("listing_url", urls.slice(i, i + 100)).is("deleted_at", null).limit(1000);
+    if (deadline != null) query = query.abortSignal(AbortSignal.timeout(Math.max(1, Math.min(10000, deadline - Date.now()))));
+    const r = await query;
     if (r.error) throw new Error(`held vehicles read failed: ${r.error.message}`);
     for (const v of (r.data ?? []) as VehicleRow[]) { const k = keyOfUrl(v.listing_url); if (k) m.set(k, [...(m.get(k) ?? []), v]); }
   }
@@ -148,15 +154,18 @@ async function heldRows(supabase: any, keys: string[]): Promise<Map<string, Vehi
 }
 
 interface EpisodeRow { vehicle_id: string; source_listing_id: string; source_url: string; event_status: string; metadata: Record<string, unknown> | null; ended_at: string | null; sold_at: string | null; identity_check?: string | null; source_suspect?: string[] | null }
-async function heldEpisodes(sb: any, keys: string[]): Promise<Map<string, EpisodeRow[]>> {
+async function heldEpisodes(sb: any, keys: string[], deadline?: number, includeUntrusted = false): Promise<Map<string, EpisodeRow[]>> {
   const out = new Map<string, EpisodeRow[]>();
   for (let i = 0; i < keys.length; i += 100) {
-    const r = await sb.from("vehicle_events").select("vehicle_id,source_listing_id,source_url,event_status,metadata,ended_at,sold_at,identity_check,source_suspect")
+    if (deadline != null && Date.now() >= deadline) throw Error("replay episode deadline");
+    let query = sb.from("vehicle_events").select("vehicle_id,source_listing_id,source_url,event_status,metadata,ended_at,sold_at,identity_check,source_suspect")
       .eq("source_platform", PLATFORM).in("source_listing_id", keys.slice(i, i + 100)).limit(1000);
+    if (deadline != null) query = query.abortSignal(AbortSignal.timeout(Math.max(1, Math.min(10000, deadline - Date.now()))));
+    const r = await query;
     if (r.error) throw new Error(`held episodes read failed: ${r.error.message}`);
     for (const e of (r.data ?? []) as EpisodeRow[]) {
-      if (e.identity_check === "mismatch" || e.source_suspect?.includes("vehicle_id")) continue;
-      if (!e.vehicle_id || !itemUrls(e.source_listing_id).includes(e.source_url)) continue;
+      if (!includeUntrusted && (e.identity_check === "mismatch" || e.source_suspect?.includes("vehicle_id"))) continue;
+      if (!includeUntrusted && (!e.vehicle_id || !itemUrls(e.source_listing_id).includes(e.source_url))) continue;
       out.set(e.source_listing_id, [...(out.get(e.source_listing_id) ?? []), e]);
     }
   }
@@ -189,6 +198,7 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
     held_rows: 0, held_elsewhere: 0, held_terminal: 0, written_live: 0, unchanged: 0,
     unheld: { vintage: 0, other: 0 }, land_attempts: 0, landed_live: 0, left: { vintage: 0, other: 0 },
     snapshots_admitted: 0, snapshots_deferred: 0, written_episodes: 0,
+    replay: { queued: 0, pending: 0, admitted: 0, acknowledged: 0, overflow: 0, retention_failed: 0, obsolete: 0, terminal_or_expired: 0, identity_refused: 0 },
     ended_vehicles: 0, ended_episodes: 0, episodes_past_end: 0, browse_calls: 0,
   };
   const rep: AuctionReport = { ...emptyReport(o.dryRun ? "auctions_dry_run" : "auctions"), auctions: a };
@@ -200,15 +210,16 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
     rep.remaining_before = q?.remaining ?? null;
     const cap = o.maxCalls ?? maxPages + maxItems;
     const budget = Math.min(cap, q ? q.remaining - floor : (o.blindCap ?? cap));
-    if (budget < 1) { rep.stopped = `quota: ${q?.remaining ?? "?"} calls left today, ${floor} kept as the floor`; return rep; }
+    if (budget < 1) rep.stopped = `quota: ${q?.remaining ?? "?"} calls left today, ${floor} kept as the floor`;
 
     // 1. the open list, ending soonest first. `present` is every lot listed (it is open); `seen` the ones we can write.
     const seen = new Map<string, SearchSummary>();
     const present = new Set<string>();
     const readAt = new Map<string, string>();
     const itemReads = new Set<string>();
+    const pageOf = new Map<string, AuctionRead>();
     for (let page = 0; page < maxPages; page++) {
-      if (browse() >= budget) { rep.stopped = `budget: ${browse()} of ${budget} calls spent after ${page} pages`; break; }
+      if (browse() >= budget) { rep.stopped ??= `budget: ${browse()} of ${budget} calls spent after ${page} pages`; break; }
       const why = await ledger.take();
       if (why) { rep.stopped = `${why}; after ${page} pages`; break; }
       const offset = page * PAGE;
@@ -216,6 +227,9 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
       const pageReadAt = new Date(now()).toISOString();
       a.pages_read++;
       a.open_total = res.total;
+      const query = new URLSearchParams({ category_ids: CATEGORY_CARS_TRUCKS, filter: AUCTION_FILTER, sort: "endingSoonest", offset: String(offset), limit: String(PAGE) });
+      const nativePage: AuctionRead = { url: `https://api.ebay.com/buy/browse/v1/item_summary/search?${query}`, readAt: pageReadAt,
+        method: "search", response: res.raw ?? { total: res.total, next: res.next, itemSummaries: res.itemSummaries }, items: res.itemSummaries };
       for (const s of res.itemSummaries) {
         const k = listingKey(s);
         if (!k) continue;
@@ -225,6 +239,7 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
         if (!Number.isFinite(t) || t > now() + HORIZON_MS) { a.bad_end++; continue; }
         seen.set(k, s);
         readAt.set(k, pageReadAt);
+        pageOf.set(k, nativePage);
       }
       if (!res.next || offset + PAGE >= res.total || res.itemSummaries.length === 0) { a.complete = true; break; }
       if (offset + 2 * PAGE > MAX_OFFSET) { rep.stopped = `offset: the open list (${res.total}) is longer than Browse pages reach`; break; }
@@ -248,13 +263,58 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
     let snapshotAttempts = 0, admissionStopped = false;
     const admissionDeadline = Date.now() + 45_000;
     const maxSnapshots = Math.max(0, Math.min(20, o.maxSnapshots ?? 20));
-    const capture = async (vehicleId: string, url: string, s: EbayItem, previous: unknown): Promise<SnapshotReceipt | null> => {
+    const replay = o.replayStore ?? auctionReplayStore(supabase);
+    const queued: ReplayEntry[] = [];
+    if (!o.dryRun) {
+      // Retain complete native pages before the bounded admission loop can run out
+      // of time. Only already-owned, changed lots enter the delivery queue.
+      const groups = new Map<AuctionRead, ReplayCandidate[]>();
+      for (const [k, summary] of seen) {
+        const own = (rows.get(k) ?? []).filter(v => v.platform_source === HOUSE);
+        const linked = episodes.get(k) ?? [];
+        const episode = linked.length === 1 ? linked[0] : undefined;
+        let vehicleId: string | undefined, url: string | undefined;
+        if (own.length === 1 && !TERMINAL.has(String(own[0].sale_status)) && linked.length <= 1
+          && (!episode || !episodeClosed(episode) && episode.vehicle_id === own[0].id)
+          && (liveRow(own[0], summary, nowIso) || episode && episodeChanged(episode, summary))) {
+          vehicleId = own[0].id; url = episode?.source_url ?? own[0].listing_url;
+        } else if (own.length === 0 && episode && !episodeClosed(episode) && episodeChanged(episode, summary)) {
+          vehicleId = episode.vehicle_id; url = episode.source_url;
+        }
+        const page = pageOf.get(k);
+        if (vehicleId && url && page) groups.set(page, [...(groups.get(page) ?? []),
+          { key: k, vehicleId, url, endAt: summary.itemEndDate! }]);
+      }
+      // Reserve at least 35s of the 45s stage for current evidence/projection.
+      const retentionDeadline = Math.min(Date.now() + 8000, admissionDeadline - 35_000);
+      for (const [page, candidates] of [...groups].slice(0, 20)) {
+        if (Date.now() >= retentionDeadline) break;
+        try { queued.push(...await replay.retain(page, candidates, retentionDeadline)); }
+        catch (e) { a.replay.retention_failed += candidates.length; rep.errors.push(`replay retention: ${(e as Error).message}`.slice(0, 300)); }
+        if (Date.now() >= retentionDeadline) break;
+      }
+      const expectedRetention = [...groups.values()].reduce((n, list) => n + list.length, 0);
+      a.replay.retention_failed = Math.max(a.replay.retention_failed, expectedRetention - queued.length);
+      a.replay.queued = queued.length;
+      if (queued.length) {
+        try {
+          const saved = await replay.merge(queued, [], Math.min(Date.now() + 2000, admissionDeadline - 33_000));
+          a.replay.pending = saved.pending; a.replay.overflow += saved.overflow;
+        } catch (e) {
+          rep.errors.push(`replay queue save: ${(e as Error).message}`.slice(0, 300));
+        }
+      }
+    }
+    const capture = async (vehicleId: string, url: string, s: EbayItem, previous: unknown, capturedAt?: string, method?: "search" | "getItem", sourceEntry?: ReplayEntry): Promise<SnapshotReceipt | null> => {
       if (admissionStopped || Date.now() >= admissionDeadline || snapshotAttempts >= maxSnapshots) { a.snapshots_deferred++; return null; }
       snapshotAttempts++;
+      const observedAt = capturedAt ?? readAt.get(listingKey(s)!) ?? nowIso;
+      const source = sourceEntry ?? queued.find(e => e.key === listingKey(s) && Date.parse(e.readAt) === Date.parse(observedAt));
       try {
         const receipt = await (o.snapshotWriter ?? admitAuctionSnapshot)(supabase, {
-          vehicleId, url, summary: s, observedAt: readAt.get(listingKey(s)!) ?? nowIso,
-          previousObservationId: typeof previous === "string" ? previous : null, readMethod: itemReads.has(listingKey(s)!) ? "getItem" : "search",
+          vehicleId, url, summary: s, observedAt,
+          ...(source ? { sourceCapture: { snapshot_id: source.snapshotId, html_sha256: source.sha256, fetched_at: source.readAt, source_url: source.pageUrl } } : {}),
+          previousObservationId: typeof previous === "string" ? previous : null, readMethod: method ?? (itemReads.has(listingKey(s)!) ? "getItem" : "search"),
         });
         a.snapshots_admitted++;
         const fields = snapshotFields(s, receipt.observedAt);
@@ -272,8 +332,8 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
         return receipt;
       } catch (e) { admissionStopped = true; rep.errors.push(`auction evidence ${listingKey(s)}: ${(e as Error).message}`.slice(0, 300)); return null; }
     };
-    const project = async (v: VehicleRow, s: EbayItem, episode?: EpisodeRow): Promise<Record<string, unknown> | null> => {
-      const row = liveRow(v, s, readAt.get(listingKey(s)!) ?? nowIso);
+    const project = async (v: VehicleRow, s: EbayItem, episode?: EpisodeRow, capturedAt?: string, method?: "search" | "getItem", sourceEntry?: ReplayEntry): Promise<Record<string, unknown> | null> => {
+      const row = liveRow(v, s, capturedAt ?? readAt.get(listingKey(s)!) ?? nowIso);
       if (o.dryRun) return row;
       const m = episode?.metadata;
       // A prior run may have admitted/projected the episode before its scalar upsert failed. Reuse that receipt.
@@ -281,7 +341,7 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
         && typeof m?.auction_snapshot_id === "string" && typeof m?.source_observed_at === "string"
         ? { observationId: m.auction_observation_id, snapshotId: m.auction_snapshot_id, observedAt: m.source_observed_at } : null;
       const receipt = retained ?? await capture(v.id, episode?.source_url ?? v.listing_url, s,
-        episode?.metadata?.auction_observation_id ?? v.origin_metadata?.auction_observation_id);
+        episode?.metadata?.auction_observation_id ?? v.origin_metadata?.auction_observation_id, capturedAt, method, sourceEntry);
       if (!receipt || !row) return null;
       row.origin_metadata = { ...(row.origin_metadata as Record<string, unknown>), auction_observation_id: receipt.observationId,
         auction_snapshot_id: receipt.snapshotId, source_observed_at: receipt.observedAt, last_sync: receipt.observedAt };
@@ -378,6 +438,72 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
 
     // 4. ended: only on a complete pass, only past the end time, never an outcome
     if (a.complete && !o.dryRun) await endAbsent(supabase, present, rep, now, o.maxEnded ?? 200);
+
+    // Drain old held-state debt using only slots left after current source reads.
+    // Re-query current ownership/clocks: a newer projection or terminal lot wins.
+    if (!o.dryRun && Date.now() < admissionDeadline - 2000) {
+      const loaded = await replay.load(admissionDeadline);
+      const pending = loaded.sort(closingFirst).slice(0, 200);
+      a.replay.pending = loaded.length;
+      const pendingKeys = pending.map(e => e.key);
+      const [currentEpisodes, currentRows] = await Promise.all([
+        heldEpisodes(supabase, pendingKeys, admissionDeadline - 2000, true),
+        heldRows(supabase, pendingKeys, admissionDeadline - 2000),
+      ]);
+      const acknowledgements: ReplayEntry[] = [];
+      for (const entry of pending) {
+        if (Date.now() >= admissionDeadline - 2000) break;
+        try {
+          const matches = currentEpisodes.get(entry.key) ?? [];
+          const episode = matches.length === 1 ? matches[0] : undefined;
+          if (matches.length > 1 || episode && (episode.vehicle_id !== entry.vehicleId || episode.identity_check === "mismatch"
+            || episode.source_suspect?.includes("vehicle_id") || !itemUrls(entry.key).includes(episode.source_url))) {
+            a.replay.identity_refused++; acknowledgements.push(entry); continue; // no reassignment from a stale queue
+          }
+          if (episode && episodeClosed(episode) || Date.parse(entry.endAt) <= now()) {
+            a.replay.terminal_or_expired++; acknowledgements.push(entry); continue;
+          }
+          const projectedAt = Date.parse(String(episode?.metadata?.source_observed_at));
+          if (projectedAt > Date.parse(entry.readAt)) {
+            a.replay.obsolete++; acknowledgements.push(entry); continue;
+          }
+          const own = (currentRows.get(entry.key) ?? []).filter(v => v.platform_source === HOUSE);
+          if (own.length > 1 || own.length === 1 && (own[0].id !== entry.vehicleId || TERMINAL.has(String(own[0].sale_status)))) {
+            a.replay.identity_refused++; acknowledgements.push(entry); continue;
+          }
+          const ownClock = own.length === 1 ? Date.parse(String(own[0].origin_metadata?.source_observed_at
+            ?? own[0].origin_metadata?.last_sync)) : NaN;
+          if (ownClock > Date.parse(entry.readAt)) {
+            a.replay.obsolete++; acknowledgements.push(entry); continue;
+          }
+          if (!episode && own.length !== 1) { a.replay.identity_refused++; acknowledgements.push(entry); continue; }
+          const summary = await replay.summary(entry, admissionDeadline - 2000);
+          if (episode && !episodeChanged(episode, summary) && (own.length === 0 || !liveRow(own[0], summary, entry.readAt))) {
+            a.replay.obsolete++; acknowledgements.push(entry); continue;
+          }
+          if (admissionStopped || snapshotAttempts >= maxSnapshots) continue;
+          const before = a.snapshots_admitted;
+          let delivered = false;
+          if (own.length === 1) {
+            const row = await project(own[0], summary, episode, entry.readAt, entry.method, entry);
+            if (row) {
+              const written = await upsertLive(supabase, [row], rep.errors);
+              a.written_live += written; delivered = written === 1;
+            }
+          } else if (episode) delivered = Boolean(await capture(entry.vehicleId, entry.url, summary,
+            episode.metadata?.auction_observation_id, entry.readAt, entry.method, entry));
+          a.replay.admitted += a.snapshots_admitted - before;
+          if (delivered) acknowledgements.push(entry);
+        } catch (e) { rep.errors.push(`auction replay ${entry.key}: ${(e as Error).message}`.slice(0, 300)); break; }
+      }
+      if (acknowledgements.length) {
+        const saved = await replay.merge([], acknowledgements, admissionDeadline);
+        a.replay.pending = saved.pending; a.replay.overflow += saved.overflow;
+        a.replay.acknowledged = acknowledgements.length;
+      }
+    }
+    if (a.replay.pending || a.replay.overflow || a.replay.retention_failed)
+      rep.stopped = `${rep.stopped ? rep.stopped + "; " : ""}held snapshot replay: ${a.replay.pending} pending, ${a.replay.overflow} outside queue cap, ${a.replay.retention_failed} retention failures`;
   } catch (e) {
     if (e instanceof QuotaExceeded) rep.stopped = `quota: ${e.message}`;
     else { rep.ok = false; rep.errors.push((e as Error).message.slice(0, 400)); }

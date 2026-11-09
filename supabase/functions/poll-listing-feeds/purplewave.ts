@@ -24,6 +24,24 @@ export function purplewavePageUrl(page: number): string {
     filters: "industry_category_id:277", page: String(page), perPage: String(PAGE_SIZE), showHalted: "false" })}`;
 }
 
+/** Resolve publisher-supplied filenames against its supplied photo directory. */
+export function purplewaveImages(r: Row, item: string): string[] {
+  const base = text(r.image_url) ?? text(r.securebaseurl);
+  if (!base) return [];
+  let directory: URL;
+  try { directory = new URL(base); } catch { return []; }
+  if (directory.protocol !== "https:" || directory.hostname !== "d323w7klwy72q3.cloudfront.net"
+    || directory.port || directory.username || directory.password || directory.search || directory.hash
+    || !/^\/i\/a\/\d{4}\/[A-Za-z0-9_-]+\/?$/.test(directory.pathname)) return [];
+  const files = Array.isArray(r.image_files) ? r.image_files
+    : typeof r.images === "string" ? r.images.trim().split(/\s+/) : [];
+  const primary = text(r.image);
+  const names = primary ? [primary, ...files] : files;
+  const ownPhoto = new RegExp(`^${item}[A-Z]*\\.(?:JPG|JPEG|PNG)$`, "i");
+  return [...new Set(names.filter((name): name is string =>
+    typeof name === "string" && ownPhoto.test(name)))].map(name => `${base.replace(/\/$/, "")}/${name}`);
+}
+
 export function purplewaveLot(raw: unknown, readAt: string) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw Error("invalid PurpleWave lot");
   const r = raw as Row, auction = text(r.auction), item = text(r.item);
@@ -35,9 +53,10 @@ export function purplewaveLot(raw: unknown, readAt: string) {
     || ![0, 1].includes(r.closed as number) || ![0, 1].includes(r.auction_closed as number) || r.halted !== 0
     || r.industry_category_id !== 277) throw Error("PurpleWave lot identity/state incomplete");
   const url = `https://www.purplewave.com/auction/${auction}/item/${item}`;
+  const images = purplewaveImages(r, item);
   return { raw: r, auction, item, key: `${auction}:${item}`, url, year, make, model, end, bid, count,
     title: [year || null, make, model].filter(Boolean).join(" ") || `PurpleWave ${item}`, readAt, bidAt: time(r.winning_bid_time),
-    ...purplewaveDescription(r.new_description, r.vin), image: null,
+    ...purplewaveDescription(r.new_description, r.vin), image: images[0] ?? null, images,
     // Soft-close extension clocks can move. Only the publisher's terminal flags end a lot.
     closed: r.closed === 1 || r.auction_closed === 1 };
 }
@@ -95,7 +114,7 @@ export async function landPurplewaveLot(client: any, lot: ReturnType<typeof purp
   const identity = await db.functions.invoke("ingest", { body: { url: lot.url, enrich: false,
     year: lot.year, make: lot.make, model: lot.model, description: lot.description || lot.title,
     ...(lot.vin ? { vin: lot.vin } : {}),
-    ...(lot.image ? { image_url: lot.image } : {}) } });
+    ...(lot.image ? { image_url: lot.image, image_urls: lot.images } : {}) } });
   const vehicleId = identity.data?.vehicle_id;
   if (identity.error || !vehicleId || !["created", "matched", "updated", "duplicate"].includes(identity.data?.status))
     throw Error(`PurpleWave identity unresolved: ${identity.data?.reason ?? identity.error?.message ?? identity.data?.status}`);
