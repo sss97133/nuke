@@ -10,7 +10,7 @@ export async function retainCcBidCapture(db: any, post: ObservationPost, native?
   const received = Date.parse(native?.receivedAt ?? "");
   const end = typeof d?.dtStageEndsUTC === "string" ? Date.parse(d.dtStageEndsUTC.replace(" ", "T") + "Z") : NaN;
   if (!d || post.source_slug !== "collecting-cars" || post.kind !== "bid"
-    || post.extraction_method !== "cc_typesense_board_bid_v1" || fields.clock !== "board_read"
+    || !["cc_typesense_board_bid_v1", "cc_typesense_board_snapshot_v2"].includes(post.extraction_method) || fields.clock !== "board_read"
     || d.lotType !== "car" || d.stage !== "live"
     || typeof d.slug !== "string" || !/^[a-zA-Z0-9-]+$/.test(d.slug)
     || post.source_url !== `https://collectingcars.com/for-sale/${d.slug}`
@@ -29,12 +29,12 @@ export async function retainCcBidCapture(db: any, post: ObservationPost, native?
   });
   if ("reason" in retained)
     throw new Error(`CC native capture ${retained.status}: ${retained.reason}`);
-  return { ...post, observed_at: retained.fetched_at,
+  return { ...post, observed_at: post.extraction_method === "cc_typesense_board_snapshot_v2" ? native!.receivedAt : retained.fetched_at,
     raw_source_ref: `listing_page_snapshots:${retained.snapshot_id}`, defer_analysis: true,
     extraction_metadata: { producer: "sync-live-auctions", capture_kind: "auction_bid_snapshot",
       source_event_time: null, received_at: native!.receivedAt,
       source_capture: { snapshot_id: retained.snapshot_id, html_sha256: retained.html_sha256,
-        fetched_at: retained.fetched_at, source_url: post.source_url,
+        fetched_at: retained.fetched_at, source_url: post.source_url, source_read_at: native!.receivedAt, archive_status: retained.status,
         representation: "complete_selected_document_json_not_wire_response" } },
   };
 }

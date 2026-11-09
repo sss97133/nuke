@@ -4,7 +4,7 @@ import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 import type { ObservationPost } from "./boards.ts";
 import type { CcNativeCapture } from "./ccBidCapture.ts";
 
-const METHOD = "cc_typesense_board_bid_v1";
+const METHODS = ["cc_typesense_board_bid_v1", "cc_typesense_board_snapshot_v2"];
 const PLATFORM = "collecting_cars";
 const hash = async (body: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map(b => b.toString(16).padStart(2, "0")).join("");
 const endOf = (d: any) => typeof d?.dtStageEndsUTC === "string" ? Date.parse(d.dtStageEndsUTC.replace(" ", "T") + "Z") : NaN;
@@ -18,9 +18,9 @@ function nativeMatches(d: any, p: ObservationPost) {
 export async function ccEpisodeRow(p: ObservationPost, native: CcNativeCapture | undefined, o: any, s: any, now: number) {
   const fail = () => { throw Error("CC episode testimony/identity/capture parity refused"); };
   const f = p.structured_data, capture = o?.extraction_metadata?.source_capture;
-  if (p.source_slug !== "collecting-cars" || p.kind !== "bid" || p.extraction_method !== METHOD
+  if (p.source_slug !== "collecting-cars" || p.kind !== "bid" || !METHODS.includes(p.extraction_method)
     || !nativeMatches(native?.document, p) || Date.parse(native?.receivedAt ?? "") !== Date.parse(p.observed_at)
-    || !o || o.kind !== "bid" || o.is_superseded !== false || o.extraction_method !== METHOD
+    || !o || o.kind !== "bid" || o.is_superseded !== false || o.extraction_method !== p.extraction_method
     || o.vehicle_id !== p.vehicle_id || o.source_url !== p.source_url || o.source_identifier !== p.source_identifier
     || ["amount", "currency", "bid_count", "auction_id", "ends", "clock"].some(k => o.structured_data?.[k] !== f[k])
     || !Number.isFinite(Date.parse(o.observed_at)) || Date.parse(o.observed_at) > Date.parse(p.observed_at)
@@ -30,7 +30,12 @@ export async function ccEpisodeRow(p: ObservationPost, native: CcNativeCapture |
     || s.metadata?.capture_kind !== "typesense_native_document"
     || s.metadata?.representation !== "complete_selected_document_json_not_wire_response"
     || capture?.snapshot_id !== s.id || capture?.html_sha256 !== s.html_sha256 || capture?.source_url !== p.source_url
-    || Date.parse(capture?.fetched_at) !== Date.parse(o.observed_at) || Date.parse(s.fetched_at) !== Date.parse(o.observed_at)
+    || Date.parse(capture?.fetched_at) !== Date.parse(s.fetched_at)
+    || (p.extraction_method === "cc_typesense_board_snapshot_v2"
+      ? (Date.parse(capture?.source_read_at) !== Date.parse(o.observed_at)
+        || Date.parse(o.extraction_metadata?.received_at) !== Date.parse(o.observed_at)
+        || Date.parse(s.fetched_at) > Date.parse(o.observed_at))
+      : Date.parse(s.fetched_at) !== Date.parse(o.observed_at))
     || typeof s.html !== "string" || new TextEncoder().encode(s.html).length > 2_097_152
     || await hash(s.html) !== s.html_sha256 || !nativeMatches(JSON.parse(s.html), p)) fail();
   return { vehicle_id: p.vehicle_id, source_platform: PLATFORM, source_listing_id: normalizeListingUrlKey(p.source_url),

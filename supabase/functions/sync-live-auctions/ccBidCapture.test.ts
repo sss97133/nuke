@@ -51,7 +51,10 @@ Deno.test("CC retains every native document field and binds exact amount, curren
 Deno.test("CC exact duplicate archive keeps original capture clock and current response clock separate", async () => {
   const oldClock = "2026-01-02T03:00:00Z", f = fixture({ duplicate: true, oldClock });
   const result = await retainCcBidCapture(f.db, post, { document, receivedAt });
-  assert.equal(result.observed_at, oldClock);
+  assert.equal(result.observed_at, receivedAt);
+  assert.equal((result.extraction_metadata?.source_capture as any)?.fetched_at, oldClock);
+  assert.equal((result.extraction_metadata?.source_capture as any)?.archive_status, "existing");
+  assert.equal((result.extraction_metadata?.source_capture as any)?.source_read_at, receivedAt);
   assert.equal(result.extraction_metadata?.received_at, receivedAt);
 });
 Deno.test("CC refuses cross-lot, amount, count, currency, end, kind and future-clock substitutions before archive", async () => {
@@ -106,4 +109,32 @@ Deno.test("post cap and archive-deadline deferrals account for every unposted ca
     const expired = await postObservations(fixture().db, posts, 200, 40, async p => { now = 201; return p; });
     assert.equal(expired.posted, 0); assert.equal(expired.deferred, 50);
   } finally { globalThis.fetch = original; Date.now = clock; }
+});
+
+Deno.test("CC v2 current captures converge within40 slots without replacing or being suppressed by legacy testimony", async () => {
+  const legacyId = "collecting-cars-bid:123:13:5500";
+  const held = new Set([legacyId]);
+  const posts = Array.from({ length: 45 }, (_, i) => ({ ...post, source_identifier: `${post.source_identifier}:fixture${i}` }));
+  const db: any = { from: () => {
+    let requested: string[] = [];
+    const q: any = new Proxy({}, { get: (_t, k) => k === "then" ? (resolve: any) => resolve({ error: null,
+      data: requested.filter(id => held.has(id)).map(source_identifier => ({ source_identifier })) })
+      : (...args: any[]) => { if (k === "in") requested = args[1]; return q; } }); return q;
+  } };
+  const original = globalThis.fetch; let preparations = 0;
+  globalThis.fetch = async (_url, init) => {
+    const p = JSON.parse(String(init?.body)); held.add(p.source_identifier);
+    assert.equal(p.observed_at, receivedAt);
+    return Response.json({ success: true, observation_id: snapshot });
+  };
+  try {
+    const prepare = async (p: typeof post) => { preparations++; return p; };
+    const first = await postObservations(db, posts, Date.now() + 5000, 40, prepare);
+    assert.deepEqual([first.posted, first.deferred, first.held], [40, 5, 0]);
+    const second = await postObservations(db, posts, Date.now() + 5000, 40, prepare);
+    assert.deepEqual([second.posted, second.deferred, second.held], [5, 0, 40]);
+    const third = await postObservations(db, posts, Date.now() + 5000, 40, prepare);
+    assert.deepEqual([third.posted, third.held, preparations], [0, 45, 45]);
+    assert.equal(held.has(legacyId), true);
+  } finally { globalThis.fetch = original; }
 });

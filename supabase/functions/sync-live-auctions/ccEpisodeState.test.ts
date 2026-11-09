@@ -13,7 +13,7 @@ async function fixture(n = 0) {
   const s = { id: `00000000-0000-4000-8000-${String(n + 1).padStart(12, "0")}`, platform: "collecting-cars", listing_url: fixtureUrl, html, html_sha256: sha,
     fetched_at: readAt, success: true, http_status: 200, metadata: { capture_kind: "typesense_native_document", representation: "complete_selected_document_json_not_wire_response" } };
   const o = { ...p, id: `observation-fixture-${n}`, is_superseded: false, raw_source_ref: `listing_page_snapshots:${s.id}`,
-    extraction_metadata: { source_capture: { snapshot_id: s.id, html_sha256: sha, source_url: fixtureUrl, fetched_at: readAt } } };
+    extraction_metadata: { received_at: readAt, source_capture: { snapshot_id: s.id, html_sha256: sha, source_url: fixtureUrl, source_read_at: readAt, fetched_at: readAt } } };
   return { p, o, s, native: { document, receivedAt: readAt } };
 }
 Deno.test("CC native aggregate projects recorded AUD, count, end and original capture without individual bid fiction", async () => {
@@ -77,4 +77,33 @@ Deno.test("CC projection cap converges held eligible episodes and leaves legacy 
   assertEquals([second.projected, second.unchanged, second.deferred], [5, 20, 1]);
   const expired = await projectCcEpisodes({ from: () => { throw Error("deadline must stop reads"); } }, posts, natives, Date.now(), writer);
   assertEquals(expired.deferred, 26);
+});
+
+Deno.test("CC v2 preserves a genuine new read clock over an identical older raw artifact; v1 remains compatible", async () => {
+  const f = await fixture(), older = "2026-11-08T01:06:03.523Z";
+  const oldRaw = { ...f.s, fetched_at: older };
+  const witnessed = { ...f.o, extraction_metadata: { ...f.o.extraction_metadata,
+    source_capture: { ...f.o.extraction_metadata.source_capture, fetched_at: older, archive_status: "existing" } } };
+  assertEquals((await ccEpisodeRow(f.p, f.native, witnessed, oldRaw, now)).metadata.source_observed_at, readAt);
+  await assertRejects(() => ccEpisodeRow(f.p, { ...f.native, receivedAt: older }, witnessed, oldRaw, now));
+  await assertRejects(() => ccEpisodeRow(f.p, f.native, { ...witnessed, extraction_metadata: {
+    ...witnessed.extraction_metadata, received_at: older } }, oldRaw, now));
+  const legacy = { ...f.p, extraction_method: "cc_typesense_board_bid_v1", source_identifier: "collecting-cars-bid:94494:31:15000" };
+  assertEquals((await ccEpisodeRow(legacy, f.native, { ...f.o, ...legacy }, f.s, now)).current_price, 15000);
+});
+
+Deno.test("CC old A receipt cannot roll back newer B; a returned state needs its new transition receipt", async () => {
+  const f = await fixture(); let writes = 0;
+  const p = { ...f.p, observed_at: "2026-11-09T01:09:00Z" };
+  const episode = { vehicle_id: p.vehicle_id, source_listing_id: "collectingcars.com/for-sale/1980-porsche-928-2",
+    source_url: url, event_type: "auction", event_status: "active", current_price: 16000,
+    metadata: { source_observed_at: "2026-11-09T01:08:00Z", auction_observation_id: "newer-B" } };
+  const db: any = { from: (table: string) => {
+    const q: any = new Proxy({}, { get: (_t, k) => k === "then" ? (resolve: any) => resolve({ error: null,
+      data: table === "observation_sources" ? { id: "source" } : table === "vehicle_observations" ? [f.o] : [episode] }) : () => q }); return q;
+  } };
+  const result = await projectCcEpisodes(db, [p], new Map([[url, { ...f.native, receivedAt: p.observed_at }]]),
+    Date.now() + 5000, (() => { writes++; return { action: "updated" }; }) as any);
+  assertEquals([result.refused, result.projected, writes], [1, 0, 0]);
+  assertEquals(f.o.observed_at, readAt);
 });
