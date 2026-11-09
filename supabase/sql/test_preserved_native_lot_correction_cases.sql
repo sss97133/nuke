@@ -164,6 +164,23 @@ SELECT pg_temp.ok('canonical projection uses retained read clock and episode kee
  AND (SELECT vehicle_id='90000000-0000-4000-8000-000000000002' AND current_price=57500 AND currency_code='USD'
  FROM vehicle_events WHERE id='93000000-0000-4000-8000-000000000001'));
 CREATE TEMP TABLE audit_size AS SELECT count(*) AS n FROM superseded_rows;
+-- Actual native intake owner fallback from 20261014060000; no new source frame is minted.
+DO $$ DECLARE fold_vehicle uuid:='90000000-0000-4000-8000-000000000001'; lot_vehicles integer; lot_url text;
+BEGIN
+ SELECT source_url INTO lot_url FROM auction_events WHERE id='91000000-0000-4000-8000-000000000002';
+ IF NOT EXISTS(SELECT 1 FROM vehicle_events e WHERE e.vehicle_id=fold_vehicle AND e.source_platform='bat'
+  AND rtrim(e.source_url,'/')=rtrim(lot_url,'/')) THEN
+  SELECT (array_agg(DISTINCT e.vehicle_id))[1],count(DISTINCT e.vehicle_id) INTO fold_vehicle,lot_vehicles
+   FROM vehicle_events e JOIN vehicles cv ON cv.id=e.vehicle_id AND cv.deleted_at IS NULL
+   WHERE e.source_platform='bat'
+    AND lower(substring(e.source_url FROM 'bringatrailer\.com/listing/([^/?#]+)'))
+      =lower(substring(lot_url FROM 'bringatrailer\.com/listing/([^/?#]+)'));
+  IF lot_vehicles IS DISTINCT FROM 1 THEN fold_vehicle:='90000000-0000-4000-8000-000000000001'; END IF;
+ END IF;
+ PERFORM pg_temp.ok('subsequent native frame resolves one canonical vehicle and event',
+  fold_vehicle='90000000-0000-4000-8000-000000000002'
+  AND (SELECT count(*)=1 FROM auction_events WHERE vehicle_id=fold_vehicle AND rtrim(source_url,'/')=rtrim(lot_url,'/')));
+END $$;
 INSERT INTO bat_listings(id,bat_listing_url) SELECT '97000000-0000-4000-8000-000000000001',source_url FROM auction_events WHERE id='91000000-0000-4000-8000-000000000002';
 INSERT INTO bat_bids(id,bat_listing_id,vehicle_id,bat_username,bid_amount,bid_timestamp,auction_event_id)
  VALUES('98000000-0000-4000-8000-000000000001','97000000-0000-4000-8000-000000000001',
