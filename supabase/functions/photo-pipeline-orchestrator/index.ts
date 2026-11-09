@@ -23,6 +23,7 @@ import { classifyImageRouted, classificationFromReader, loadManifest, renderProm
 import { qualifyVinRead, vinCitation, type VinAdmission } from "./vinAdmission.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
+import { admitPhotoFields, type FieldSourceAdmission } from "./fieldSourceAdmission.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -134,13 +135,15 @@ async function persistV98Columns(imageId: string, c: ClassificationResult, vinAd
  *    only EMPTY vehicle columns, marks disagreements 'conflicted' and records provenance. Nothing here overwrites a vehicle column.
  *  - vehicle_identifiers via land_identifier_claims (source_kind 'photo', quote + source_image_id + confidence): feeds identifier_consensus.
  *  Only when the photo is already filed to a vehicle (no new filing behaviour). Best effort: never fails classification. */
-async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: string, c: ClassificationResult, vinAdmission: VinAdmission): Promise<{ field_evidence: number; identifiers: number; vin_refusal?: string }> {
-  const out: { field_evidence: number; identifiers: number; vin_refusal?: string } = { field_evidence: 0, identifiers: 0 };
+async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: string, c: ClassificationResult, vinAdmission: VinAdmission): Promise<{ field_evidence: number; identifiers: number; vin_refusal?: string; field_refusals: FieldSourceAdmission['refusals'] }> {
+  const out: { field_evidence: number; identifiers: number; vin_refusal?: string; field_refusals: FieldSourceAdmission['refusals'] } = { field_evidence: 0, identifiers: 0, field_refusals: [] };
   try {
     const x = c.v2;
     if (!x || !vehicleId) return out;
+    const admission = await admitPhotoFields(x.vehicle_fields ?? [], c.description, (name, args) => supabase.rpc(name, args));
+    out.field_refusals = admission.refusals;
     const rows: Record<string, unknown>[] = [];
-    for (const f of x.vehicle_fields ?? []) {
+    for (const f of admission.fields) {
       // VINs must use the dedicated source/format admission, never a generic field that bypasses it.
       if (f.field_name === "vin" || (f.confidence ?? 0) < 0.6 || !f.evidence || !f.value) continue;
       rows.push({
@@ -631,10 +634,11 @@ Deno.serve(async (req) => {
     // v98: persist the new columns (separate best-effort write) and close the capture-step trail.
     const vinAdmission = await resolveVinAdmission(resolvedVehicleId, image_id, classification);
     const v98Written = await persistV98Columns(image_id, classification, vinAdmission);
-    const cited = resolvedVehicleId ? await landCitedEvidence(resolvedVehicleId, image_id, image_url, classification, vinAdmission) : { field_evidence: 0, identifiers: 0 };
+    const cited = resolvedVehicleId ? await landCitedEvidence(resolvedVehicleId, image_id, image_url, classification, vinAdmission) : { field_evidence: 0, identifiers: 0, field_refusals: [] };
     await reportStep(image_id, "done", { image_type: classification.image_type, confidence: classification.confidence,
       model: classification.classifier_receipt?.model ?? null, prompt_version: classification.classifier_receipt?.prompt_version ?? "legacy",
       v98_columns: Object.keys(v98Written), cited_field_evidence: cited.field_evidence, cited_identifiers: cited.identifiers,
+      cited_field_refusals: cited.field_refusals,
       vin_admission: cited.vin_refusal ?? (vinAdmission.admitted ? vinAdmission.basis : vinAdmission.reason) });
 
     // Late-resolution dedup pass: Step 1.5 could only see this row in the
