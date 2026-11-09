@@ -58,7 +58,7 @@ test('evidenceRow rejects unknown kind and non-uuid run; bad confidence becomes 
   assert.throws(() => evidenceRow('nope', { run_id: U(1), script: 's', conclusion: 'c' }), /unknown kind/);
   assert.throws(() => evidenceRow('scene_label', { run_id: 'x', script: 's', conclusion: 'c' }), /run_id/);
   assert.equal(evidenceRow('scene_label', { run_id: U(1), script: 's', conclusion: 'c', confidence: 'abc' }).confidence, null);
-  assert.equal(KINDS.length, 7);
+  assert.equal(KINDS.length, 8);
 });
 
 test('imported_from is stored but not hashed', () => {
@@ -114,7 +114,8 @@ test('importer: classification, deterministic run ids, per-file mapping and idem
 
 test('migration: append-only, service-role only, rollback by run supersedes and never deletes', () => {
   const sql = readFileSync(new URL('../../supabase/migrations/20261111195000_garage_derivation_evidence.sql', import.meta.url), 'utf8');
-  for (const k of KINDS) assert.ok(sql.includes(`'${k}'`), k);
+  const later = readFileSync(new URL('../../supabase/migrations/20261111210000_receipt_work_reconciliation.sql', import.meta.url), 'utf8');
+  for (const k of KINDS) assert.ok(sql.includes(`'${k}'`) || later.includes(`'${k}'`), k);
   assert.match(sql, /UNIQUE \(dedupe_key\)/); assert.match(sql, /derived_rows_append_only/); assert.match(sql, /REVOKE ALL ON public\.garage_derivation_evidence FROM anon, authenticated/);
   assert.match(sql, /rollback_garage_derivation_run/); assert.match(sql, /SET superseded_at = now\(\)/); assert.ok(!/DELETE FROM/i.test(sql)); assert.match(sql, /producer_agent text NOT NULL DEFAULT 'injestion'/);
   // the column list the mappers send must all exist in the table

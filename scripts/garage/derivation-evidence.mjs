@@ -11,7 +11,8 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 export const PRODUCER_AGENT = 'injestion';
-export const KINDS = ['scene_label', 'place_match', 'place_exemplar', 'sign_read', 'duplicate_judgment', 'seller_history_match', 'relationship_role'];
+export const KINDS = ['scene_label', 'place_match', 'place_exemplar', 'sign_read', 'duplicate_judgment', 'seller_history_match', 'relationship_role',
+  'receipt_work_correlation'];
 const PROJECT_URL = 'https://qkgaybvrernstplzjaam.supabase.co';
 const BATCH = 200;
 
@@ -107,6 +108,21 @@ export const fromRelationshipRole = (r, { runId, userId = null, script = 'script
   script, run_id: runId, vehicle_id: r.vehicle_id, user_id: userId, conclusion: r.derived_role, confidence: r.confidence, rationale: r.reason, observed_at: observedAt,
   evidence: { old_role: r.old_role ?? null, evidence_ids: r.evidence_ids ?? [], title_verification_id: r.title_verification_id ?? null,
     documented_from: r.documented_from ?? null, documented_to: r.documented_to ?? null, mode, derivation: r.evidence ?? {} },
+}, ctx);
+
+// A receipt-to-work correlation (one row of public.receipt_work_lines): the line, its anchor date and zone, the photos,
+// sessions and timeline events it cites, and the deterministic conclusion. Subject: the receipt line (or the receipt).
+export const fromReceiptWorkLine = (r, { runId, script = 'scripts/receipt-work/reconcile-receipt-work.mjs', observedAt = null } = {}, ctx) => evidenceRow('receipt_work_correlation', {
+  script, run_id: runId, vehicle_id: r.vehicle_id, user_id: r.user_id, session_key: r.anchor_date ?? null,
+  subject_key: r.item_id ? `receipt_item:${r.item_id}` : `receipt:${r.receipt_id}`, image_ids: r.image_ids ?? [],
+  conclusion: r.conclusion, confidence: r.confidence, observed_at: observedAt,
+  rationale: `${r.line_kind} line, zone ${r.zone ?? 'none'}, anchor ${r.anchor_date ?? 'none'} (${r.anchor_source ?? 'no date'})`,
+  conclusion_detail: { line_kind: r.line_kind, zone: r.zone, end_hint: r.end_hint, anchor_date: r.anchor_date, anchor_source: r.anchor_source,
+    days_to_first_photo: r.days_to_first_photo, first_photo_day: r.first_photo_day, judgment_needed: r.judgment_needed },
+  evidence: { receipt_id: r.receipt_id, item_id: r.item_id, link_id: r.link_id, link_basis: r.link_basis, link_confidence: r.link_confidence,
+    vendor_name: r.vendor_name, document_kind: r.document_kind, line_number: r.line_number, description: r.description, part_number: r.part_number,
+    total_price: r.total_price, zone_photos_total: r.zone_photos_total, zone_photos_in_window: r.zone_photos_in_window, day_photos: r.day_photos,
+    work_session_ids: r.work_session_ids ?? [], timeline_event_ids: r.timeline_event_ids ?? [], logic_version: r.logic_version },
 }, ctx);
 
 // ---- sink ------------------------------------------------------------------------------------------------------------------
