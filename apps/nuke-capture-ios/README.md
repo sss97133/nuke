@@ -285,7 +285,8 @@ Standing rules the code carries:
   `total_job_cost`, which can include parts and tools; confirmation records testimony, not payment.
   Its widget keeps receipt, payment/contribution and session record doors, without presenting mixed
   totals, projected photo labor, party totals or ROI as reconciled investment/cash. Session and receipt
-  readings omit an invented currency; payment reports retain their declared USD unit and attributed
+  readings omit an invented currency; audit values are explicitly rounded and session dates carry
+  no invented timezone. Payment reports retain their declared USD unit and attributed
   status. A missing confirmation is unknown, not an action grant. Existing confirmation/contribution
   writers keep their effects. Session confirmation is displayed only after an explicit successful
   acknowledgement for that session; an HTTP200 refusal, absent/malformed receipt or transport error
