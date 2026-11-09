@@ -61,6 +61,7 @@ struct PostJobView: View {
         }
         Section {
             TextField("Describe the work in your own words", text: $description, axis: .vertical)
+                .accessibilityIdentifier("postjob.description")
                 .lineLimit(5...12)
             if PostJobDrafting.hasContactDetails(description) {
                 Label("This looks like a phone number or email. Take it out.", systemImage: "exclamationmark.triangle")

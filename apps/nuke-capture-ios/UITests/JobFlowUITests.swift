@@ -59,16 +59,41 @@ final class JobFlowUITests: XCTestCase {
     /// Scrolls until the element is on screen (lists render lazily).
     @discardableResult
     private func reveal(_ el: XCUIElement, in app: XCUIApplication, up: Bool = true, tries: Int = 14) -> XCUIElement {
+        func swipe(_ upward: Bool) {
+            // App-wide swipes start in the keyboard on a short visible form.
+            // Drag the form's inset gutter above the keyboard instead.
+            let keyboard = app.keyboards.firstMatch
+            let form = app.collectionViews.firstMatch
+            if keyboard.exists && form.exists {
+                let frame = form.frame
+                let navigation = app.navigationBars.firstMatch
+                let visibleTop = max(frame.minY, navigation.exists ? navigation.frame.maxY : frame.minY)
+                let visibleBottom = min(frame.maxY, keyboard.frame.minY)
+                guard visibleBottom > visibleTop else { XCTFail("no visible form area above keyboard"); return }
+                let height = visibleBottom - visibleTop
+                let gutterX = frame.minX + frame.width * 0.05
+                let origin = app.coordinate(withNormalizedOffset: .zero)
+                let top = origin.withOffset(CGVector(dx: gutterX, dy: visibleTop + height * 0.1))
+                let bottom = origin.withOffset(CGVector(dx: gutterX, dy: visibleTop + height * 0.8))
+                (upward ? bottom : top).press(forDuration: 0.05, thenDragTo: upward ? top : bottom)
+            } else if upward { app.swipeUp() } else { app.swipeDown() }
+        }
         var n = 0
         while !(el.exists && el.isHittable) && n < tries {
-            if up { app.swipeUp() } else { app.swipeDown() }
+            swipe(up)
             n += 1
         }
         // Past it (a slow runner can overshoot)? Search back the other way once.
         n = 0
         while !(el.exists && el.isHittable) && n < tries {
-            if up { app.swipeDown() } else { app.swipeUp() }
+            swipe(!up)
             n += 1
+        }
+        if !el.exists {
+            print(app.debugDescription)
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
         }
         XCTAssertTrue(el.exists, "not found: \(el)")
         return el
@@ -90,18 +115,21 @@ final class JobFlowUITests: XCTestCase {
     }
 
     /// Types into the field with this placeholder (a text field, or a multi-line text view); "" means the first text view.
-    private func type(_ app: XCUIApplication, into placeholder: String, _ value: String) {
+    private func type(_ app: XCUIApplication, into placeholder: String, _ value: String, identifier: String? = nil) {
         let byPlaceholder = NSPredicate(format: "placeholderValue == %@", placeholder)
         let field = app.textFields.matching(byPlaceholder).firstMatch
         let view = placeholder.isEmpty ? app.textViews.firstMatch : app.textViews.matching(byPlaceholder).firstMatch
         let deadline = Date().addingTimeInterval(8)
-        while !field.exists && !view.exists && Date() < deadline { usleep(250_000) }
-        let target = field.exists ? field : view
+        while identifier == nil && !field.exists && !view.exists && Date() < deadline { usleep(250_000) }
+        // Multiline SwiftUI fields do not always expose placeholderValue.
+        // Its stable identifier still names the actual editable control.
+        let target = identifier.map { app.descendants(matching: .any)[$0].firstMatch }
+            ?? (field.exists ? field : view)
         reveal(target, in: app).tap()
         // Slow runners may not have focused the field yet: wait for the keyboard, tap again if it isn't up.
         if !app.keyboards.firstMatch.waitForExistence(timeout: 4) { target.tap() }
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 6), "the field never took focus")
-        target.typeText(value)
+        if identifier != nil { app.typeText(value) } else { target.typeText(value) }
     }
 
     /// Every label on the screen, scrolled top to bottom.
@@ -139,7 +167,7 @@ final class JobFlowUITests: XCTestCase {
         let post = app.buttons["Post a job"].firstMatch
         XCTAssertTrue(post.waitForExistence(timeout: 10))
         post.tap()
-        type(app, into: "Describe the work in your own words", "Replace the front brake pads. Bleed the lines.")
+        type(app, into: "Describe the work in your own words", "Replace the front brake pads. Bleed the lines.", identifier: "postjob.description")
         reveal(app.buttons["postjob.post"], in: app).tap()
         let confirm = app.alerts["Post this job?"].buttons["Post the job"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "no explicit confirm before posting")
