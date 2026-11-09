@@ -1,4 +1,4 @@
--- Capture documents land by VIN (20261112130000): a waiting document page whose VIN resolves to a vehicle the user holds is
+-- Capture documents land by VIN (20261112130000 + 20261112150000 indexed lookup): a waiting document page whose VIN resolves to a vehicle the user holds is
 -- filed through the text-read and capture-set writers; bad check digits, low confidence, ambiguous or foreign VINs are
 -- skipped with a reason; dry runs write nothing; landed pages leave the to-land view; the tick, grants, schedule and revert.
 -- ALLOW_RAW_TESTIMONY_WRITE: every table here is a stand-in created in a disposable test database, never production.
@@ -42,11 +42,9 @@ CREATE FUNCTION public.vin_check_digit_ok(p text) RETURNS boolean LANGUAGE sql I
           FROM (SELECT substr(upper(p), i, 1) ch, i FROM generate_series(1, 17) i) c) c2
     CROSS JOIN LATERAL (SELECT CASE WHEN c2.ch ~ '[0-9]' THEN c2.idx
       ELSE ('{1,2,3,4,5,6,7,8,1,2,3,4,5,7,9,2,3,4,5,6,7,8,9}'::int[])[c2.idx + 1] END val) v) END $$;
--- the live resolver's rule: exactly one current vehicle with that VIN
-CREATE FUNCTION public.find_vehicle_by_vin(p_vin text, p_require_unique boolean) RETURNS uuid LANGUAGE sql STABLE AS $$
-  SELECT CASE WHEN count(*) = 1 THEN (array_agg(id))[1] END FROM (SELECT id FROM vehicles
-    WHERE upper(regexp_replace(vin, '[^A-Za-z0-9]', '', 'g')) = upper(regexp_replace(trim(p_vin), '[^A-Za-z0-9]', '', 'g'))
-      AND status IS DISTINCT FROM 'merged' AND deleted_at IS NULL LIMIT 2) v $$;
+-- the live resolver, which 20261112150000 stops calling (it scans every vehicle; the step reads upper(vin) on its index)
+CREATE FUNCTION public.find_vehicle_by_vin(p_vin text, p_require_unique boolean) RETURNS uuid LANGUAGE plpgsql STABLE AS $$
+BEGIN RAISE EXCEPTION 'find_vehicle_by_vin must not be called: it scans every vehicle'; END $$;
 CREATE FUNCTION public.receipt_user_vehicle_tie(p_user uuid, p_vehicle uuid) RETURNS text LANGUAGE sql STABLE AS $$
   SELECT CASE WHEN owner_id = p_user THEN 'vehicles.owner_id' WHEN user_id = p_user THEN 'vehicles.user_id' END FROM vehicles WHERE id = p_vehicle $$;
 -- writers, stubbed to record what they were asked
@@ -100,6 +98,7 @@ INSERT INTO capture_document_pages(image_id, user_id, doc_type, class_conf, extr
   ('cccccccc-0000-4000-8000-0000000000c8', 'aaaaaaaa-0000-4000-8000-00000000000a', 'receipt', 0.9, '{"vendor_name":"Example Parts Co","total":12.5}');
 
 \i supabase/migrations/20261112130000_capture_documents_land_by_vin.sql
+\i supabase/migrations/20261112150000_capture_documents_land_by_vin_indexed.sql
 
 SELECT pg_temp.assert_true((SELECT count(*) FROM contributors WHERE agent_key='agent:subscription-document-reader' AND contributor_type='agent') = 1, 'the reader is a contributor');
 
@@ -141,7 +140,8 @@ SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.capture_do
 SELECT pg_temp.assert_true(NOT has_table_privilege('anon', 'public.capture_document_pages_to_land', 'SELECT') AND has_table_privilege('service_role', 'public.capture_document_pages_to_land', 'SELECT'), 'the view is service side');
 SELECT pg_temp.assert_true((SELECT count(*) FROM cron.job WHERE jobname='capture-documents-land-by-vin' AND schedule='4-59/10 * * * *') = 1, 'scheduled every 10 minutes');
 
--- revert
+-- revert (the indexed body first, then the step itself)
+\i supabase/sql/revert_20261112150000_capture_documents_land_by_vin_indexed.sql
 \i supabase/sql/revert_20261112130000_capture_documents_land_by_vin.sql
 SELECT pg_temp.assert_true(to_regprocedure('public.capture_documents_land_by_vin(uuid, uuid, boolean, integer)') IS NULL AND to_regclass('public.capture_document_pages_to_land') IS NULL
   AND (SELECT count(*) FROM cron.job WHERE jobname='capture-documents-land-by-vin') = 0 AND (SELECT count(*) FROM capture_set_links) = 3, 'revert removes the step, view and schedule, keeps the links');
