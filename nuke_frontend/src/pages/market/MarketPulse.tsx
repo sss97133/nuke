@@ -400,8 +400,8 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, group,
   // hour (and a board in another order) ticks.
   const ticking = group == null || group === 'hour';
   // The title's year, make and model each re-scope the board in place (the shared VehicleIdentity); the rest of the row
-  // opens the lot. The title stays text: the catalogue's period lettering is headline-scale, and at row size (2026-11-08)
-  // the 1963 Chevrolet badge read as an illegible bowtie in a boxed panel that wrapped a phone title one word a line.
+  // opens the lot. The title is set as text scale: a make or model with vector period lettering for its year shows that
+  // lettering at the title's cap height, inline; photographed badges (headline art) and unknown matches stay text.
   const drillable = a.make !== NO_MAKE && !!a.model?.trim();
   const openFromRow = (e: React.MouseEvent) => {
     if ((e.target as Element).closest('button, a') || window.getSelection()?.toString()) return;
@@ -415,7 +415,7 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, showHouse, group,
       </button>
       <div className="market-lot-identity">
         <div className="market-lot-name"><Text role="entity">{drillable
-          ? <VehicleIdentity compact artwork={false} year={a.year} make={displayMake(a.make)} model={a.model!.trim()}
+          ? <VehicleIdentity compact scale="text" year={a.year} make={displayMake(a.make)} model={a.model!.trim()}
             onExplore={field => onDrill(a, field as RowDrill)} exploreLabel={field => drillLabel(a, field, scope)} />
           : title(a)}</Text></div>
         <div className="market-lot-facts">

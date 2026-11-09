@@ -43,15 +43,16 @@ it('keeps the recorded name readable when source artwork fails and when identity
     expect(host.querySelector('.vehicle-identity__maker')?.textContent).toContain('Chevrolet');
     expect(host.querySelector('.vehicle-identity__model')?.textContent).toBe('Corvette');
     await act(async () => root.render(<VehicleIdentity year={1997} make="Porsche" model="911" variants={[{ kind: 'series', value: 'Turbo' }]} />));
-    expect(host.querySelectorAll('image')).toHaveLength(3);
+    // The 993 crest and Turbo script; the Cardog wordmark measured against the 1996-98 covers did not match (2026-11-08).
+    expect(host.querySelectorAll('image')).toHaveLength(2);
     expect(host.querySelector('.sr-only')?.textContent).toBe('1997 Porsche 911 Turbo');
     await act(async () => host.querySelectorAll('image').forEach(image => image.dispatchEvent(new Event('error'))));
     expect(host.querySelector('.vehicle-identity__variant')?.textContent).toBe('Turbo');
     expect(host.querySelector('.vehicle-identity__maker')?.textContent).toContain('Porsche');
-    await act(async () => root.render(<VehicleIdentity year={2006} make="Porsche" model="911" variants={[{ kind: 'series', value: 'Turbo' }]} />));
+    await act(async () => root.render(<VehicleIdentity year={2023} make="Porsche" model="911" variants={[{ kind: 'series', value: 'Turbo' }]} />));
     expect(host.querySelector('image')).toBeNull();
     expect(host.textContent).toContain('911Turbo');
-    expect(host.querySelector('.sr-only')?.textContent).toBe('2006 Porsche 911 Turbo');
+    expect(host.querySelector('.sr-only')?.textContent).toBe('2023 Porsche 911 Turbo');
   } finally { await act(async () => root.unmount()); }
 });
 
@@ -109,5 +110,31 @@ it('uses the photographed K5 emblem only for the supplier documented full-size m
     expect(host.querySelector('svg text')).toBeNull();
     await act(async () => host.querySelector('image')!.dispatchEvent(new Event('error')));
     expect(host.querySelector('.vehicle-identity__model')?.textContent).toBe('K5 Blazer');
+  } finally { await act(async () => root.unmount()); }
+});
+
+it('sets make lettering inside a line of text only for its evidenced years, and keeps photographed badges out of it', async () => {
+  const lettering = (make: string, year: number) => resolveVehicleArtwork({ year, make, model: 'Any' }).filter(a => a.textScale).map(a => a.file);
+  for (const year of [2006, 2014, 2022]) expect(lettering('Porsche', year)).toEqual(['porsche-lettering-commons.svg']);
+  for (const year of [1997, 2005, 2023, 2026]) expect(lettering('Porsche', year)).toEqual([]);
+  expect(lettering('Mercedes-Benz', 2015)).toEqual(['mercedes-benz-wordmark.svg']);
+  for (const year of [2009, 2021]) expect(lettering('Mercedes-Benz', year)).toEqual([]);
+  expect(lettering('Ford', 1977)).toEqual(['ford-oval-print-commons.svg']);
+  for (const year of [1967, 1993]) expect(lettering('Ford', year)).toEqual([]);
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'), root = createRoot(host);
+  try {
+    // A free-text board model still gets the make's lettering; the full title stays the accessible name.
+    await act(async () => root.render(<VehicleIdentity compact scale="text" year={2016} make="Porsche" model="911 Carrera 4S Coupe 7-Speed" />));
+    expect([...host.querySelectorAll('image')].map(node => node.getAttribute('href'))).toEqual(['/stacks/makes/porsche-lettering-commons.svg']);
+    expect(host.querySelector('.vehicle-identity__art--text')).not.toBeNull();
+    expect(host.querySelector('.sr-only')?.textContent).toBe('2016 Porsche 911 Carrera 4S Coupe 7-Speed');
+    expect(host.querySelector('.vehicle-identity__model')?.textContent).toBe('911 Carrera 4S Coupe 7-Speed');
+    await act(async () => host.querySelector('image')!.dispatchEvent(new Event('error')));
+    expect(host.querySelector('.vehicle-identity__maker')?.textContent).toBe('Porsche');
+    // The 1963 brochure scan, nose emblem and Corvette script are headline art: a row keeps text.
+    await act(async () => root.render(<VehicleIdentity compact scale="text" year={1963} make="Chevrolet" model="Corvette" />));
+    expect(host.querySelector('image')).toBeNull();
+    expect(host.querySelector('.vehicle-identity')?.getAttribute('data-period-artwork')).toBe('false');
   } finally { await act(async () => root.unmount()); }
 });
