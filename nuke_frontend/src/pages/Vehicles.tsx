@@ -18,13 +18,14 @@ import FleetHealthOverview from '../components/vehicles/FleetHealthOverview';
 import QuickFixModal from '../components/vehicles/QuickFixModal';
 import { MyOrganizationsService, type MyOrganization } from '../services/myOrganizationsService';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { isCurrentGarageOwner, useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
 import '../styles/unified-design-system.css';
 
 interface Vehicle {
   id: string;
-  year: number;
-  make: string;
-  model: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
   vin: string | null;
   color: string | null;
   mileage: number | null;
@@ -82,7 +83,7 @@ const VehiclesInner: React.FC = () => {
   // Read from global AuthContext — no network call needed, initialised at app boot
   const { session: authSession } = useAuthContext();
 
-  const [vehicleRelationships, setVehicleRelationships] = useState<{
+  const [retainedRelationships, setVehicleRelationships] = useState<{
     owned: VehicleRelationship[];
     contributing: VehicleRelationship[];
     interested: VehicleRelationship[];
@@ -95,11 +96,17 @@ const VehiclesInner: React.FC = () => {
   // Initialise from AuthContext synchronously, keep a local copy so that the
   // onAuthStateChange subscription below can still update it.
   const [session, setSession] = useState<any>(() => authSession ?? readCachedSession());
+  const qualifiedGarage = useVehiclesDashboard(session?.user?.id ?? null, 'ownership');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   // Default to "Owned" so users land on "their stuff" first.
   // If they have no owned vehicles, we'll fall back to "All" after loading.
   const [activeTab, setActiveTab] = useState<VehiclesTab>('owned');
+  useEffect(() => {
+    if (!qualifiedGarage.isLoading && !qualifiedGarage.error && !qualifiedGarage.vehicles.some(isCurrentGarageOwner)) {
+      setActiveTab(tab => tab === 'owned' ? 'associated' : tab);
+    }
+  }, [qualifiedGarage.isLoading, qualifiedGarage.error, qualifiedGarage.vehicles]);
   const [relationshipModal, setRelationshipModal] = useState<{
     vehicleId: string;
     currentRelationship: string | null;
@@ -1091,6 +1098,45 @@ const VehiclesInner: React.FC = () => {
     return Math.min(Math.max(hype, 5), 100);
   };
 
+  // Both legacy loading paths retain account membership. Only the garage's
+  // evidence/statement fold may place a vehicle in Owned.
+  const retainedRows = Object.values(retainedRelationships).flat();
+  const retainedById = new Map(retainedRows.map(row => [row.vehicle.id, row]));
+  const qualifiedById = new Map(qualifiedGarage.vehicles.map(row => [row.id, row]));
+  const qualifiedOwned: VehicleRelationship[] = (qualifiedGarage.error ? [] : qualifiedGarage.vehicles)
+    .filter(isCurrentGarageOwner)
+    .filter(row => !selectedOrganizationId || retainedById.has(row.id))
+    .map(row => ({
+      vehicle: retainedById.get(row.id)?.vehicle ?? {
+        id: row.id, year: row.year, make: row.make, model: row.model, vin: row.vin,
+        color: null, mileage: null, primaryImageUrl: row.resolved_image_url,
+        isAnonymous: false, created_at: row.created_at,
+      },
+      relationshipType: 'owned', role: row.relationship_type, context: row.relationship_detail,
+      lastActivity: row.last_event_at ?? row.updated_at,
+    }));
+  const ownedIds = new Set(qualifiedOwned.map(row => row.vehicle.id));
+  const reviewRows: VehicleRelationship[] = retainedRelationships.owned
+    .filter((row, index, rows) => !ownedIds.has(row.vehicle.id) &&
+      rows.findIndex(other => other.vehicle.id === row.vehicle.id) === index)
+    .map(row => {
+      const qualified = qualifiedById.get(row.vehicle.id);
+      const relationshipType = qualified?.relationship_type === 'PREVIOUSLY OWNED' ? 'previously_owned'
+        : qualified?.relationship_type === 'CONSIGNED' ? 'consigned' : 'contributing';
+      return { ...row, relationshipType,
+        role: qualified?.relationship_type ?? 'RELATIONSHIP REVIEW', context: qualified?.relationship_detail };
+    });
+  const withoutOwned = (rows: VehicleRelationship[]) => rows.filter((row, index) =>
+    !ownedIds.has(row.vehicle.id) && rows.findIndex(other => other.vehicle.id === row.vehicle.id) === index);
+  const vehicleRelationships = { ...retainedRelationships, owned: qualifiedOwned,
+    contributing: withoutOwned([...retainedRelationships.contributing, ...reviewRows.filter(row => row.relationshipType === 'contributing')]),
+    previously_owned: withoutOwned([...retainedRelationships.previously_owned, ...reviewRows.filter(row => row.relationshipType === 'previously_owned')]),
+    consigned: withoutOwned([...retainedRelationships.consigned, ...reviewRows.filter(row => row.relationshipType === 'consigned')]),
+    interested: withoutOwned(retainedRelationships.interested),
+    discovered: withoutOwned(retainedRelationships.discovered),
+    curated: withoutOwned(retainedRelationships.curated),
+  };
+
   // Get current tab's relationships
   const allRelationships: VehicleRelationship[] = [
     ...vehicleRelationships.owned,
@@ -1246,9 +1292,9 @@ const VehiclesInner: React.FC = () => {
         case 'year':
           return (Number(bVehicle.year) || 0) - (Number(aVehicle.year) || 0);
         case 'make':
-          return aVehicle.make.localeCompare(bVehicle.make);
+          return (aVehicle.make ?? '').localeCompare(bVehicle.make ?? '');
         case 'model':
-          return aVehicle.model.localeCompare(bVehicle.model);
+          return (aVehicle.model ?? '').localeCompare(bVehicle.model ?? '');
         case 'created_at':
         default:
           return new Date(bVehicle.created_at).getTime() - new Date(aVehicle.created_at).getTime();
@@ -1432,7 +1478,8 @@ const VehiclesInner: React.FC = () => {
 
   return (
     <>
-      {loading ? (
+      {qualifiedGarage.error && <p role="alert">Ownership evidence unavailable. Refresh the garage to retry.</p>}
+      {loading || qualifiedGarage.isLoading ? (
         <div style={{ height: '100vh', background: 'var(--bg)' }} />
       ) : (
         <div className="fade-in vehicle-library-layout">
@@ -2264,4 +2311,4 @@ const Vehicles: React.FC = () => (
   </ErrorBoundary>
 );
 
-export default Vehicles; 
+export default Vehicles;

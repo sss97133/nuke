@@ -4,7 +4,7 @@
  * and provides view/sort/filter state for the garage UI.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { readGarageActivity, type CustodyOrg, type GarageActivityContext } from './garageCustody';
 import { applyGarageOwnerCorrections, unresolvedGarageSources, type GarageOwnerCorrection, type UnresolvedGarageSource } from './garageOwnerCorrections';
@@ -188,6 +188,8 @@ interface Verification {
   vehicle_id: string;
   status: string;
   expires_at: string | null;
+  verification_category: string | null;
+  title_document_url: string | null;
 }
 
 interface GarageRelationship {
@@ -246,8 +248,12 @@ async function readGarageRecords(userId: string, cancelled: () => boolean): Prom
 }
 
 function verificationIsCurrent(row: Verification | undefined, now: Date): boolean {
+  // The database column is timestamp without time zone, recorded in UTC.
+  const expiry = row?.expires_at;
+  const expiryTime = expiry ? Date.parse(/(?:z|[+-]\d{2}:?\d{2})$/i.test(expiry) ? expiry : `${expiry}Z`) : null;
   return !!row && row.status === 'approved' &&
-    (!row.expires_at || new Date(row.expires_at).getTime() > now.getTime());
+    row.verification_category === 'title_document' && /^https:\/\//.test(row.title_document_url ?? '') &&
+    (expiryTime === null || expiryTime > now.getTime());
 }
 
 // The period establishes the relationship; verification corroborates it.
@@ -289,9 +295,12 @@ export function resolveGarageRelationships(
     if ((!p.start_date || p.start_date <= today) && role && ownerRoles.includes(role)) {
       if (role === 'previous_owner' || (p.end_date && p.end_date <= today)) type = 'PREVIOUSLY OWNED';
       else if (current(p)) {
-        const proof = proofs.get(p.verification_id ?? '');
-        type = role === 'co_owner' || role === 'co-owner' ? 'CO-OWNER'
-          : proof?.vehicle_id === p.vehicle_id && verificationIsCurrent(proof, now) ? 'VERIFIED OWNER' : 'OWNER';
+        const linkedProof = proofs.get(p.verification_id ?? '');
+        const proof = linkedProof?.vehicle_id === p.vehicle_id && verificationIsCurrent(linkedProof, now) ? linkedProof
+          : verifications.find(row => row.vehicle_id === p.vehicle_id && verificationIsCurrent(row, now));
+        if (proof?.vehicle_id === p.vehicle_id && verificationIsCurrent(proof, now)) {
+          type = role === 'co_owner' || role === 'co-owner' ? 'CO-OWNER' : 'VERIFIED OWNER';
+        }
       }
     } else if (role === 'consigned' && current(p)) type = 'CONSIGNED';
     result.set(p.vehicle_id, { type, source: 'ownership', id: p.id, role: p.role ?? undefined,
@@ -310,6 +319,10 @@ function matchesFilter(v: GarageVehicle, filter: FilterMode): boolean {
   if (filter === 'OWNED') return ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED'].includes(v.relationship_type);
   if (filter === 'CONTRIBUTED') return v.relationship_type === 'CONTRIBUTOR';
   return true;
+}
+
+export function isCurrentGarageOwner(vehicle: Pick<GarageVehicle, 'relationship_type'>): boolean {
+  return ['VERIFIED OWNER', 'OWNER', 'CO-OWNER'].includes(vehicle.relationship_type);
 }
 
 function sortVehicles(a: GarageVehicle, b: GarageVehicle, sort: SortMode): number {
@@ -475,7 +488,7 @@ function rowToGarageVehicle(
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useVehiclesDashboard(userId: string | undefined | null): VehiclesDashboardState {
+export function useVehiclesDashboard(userId: string | undefined | null, scope: 'all' | 'ownership' = 'all'): VehiclesDashboardState {
   const [readerViewer, setReaderViewer] = useState(userId ?? null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [rawVehicles, setRawVehicles] = useState<GarageVehicle[]>([]);
@@ -514,7 +527,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         // The existing period and verification fold still owns ownership.
         const [verifiedRes, prevOwnedRes, ownershipRes, correctionRes, accountRecords] = await Promise.all([
           supabase.from('ownership_verifications')
-            .select('id, vehicle_id, status, expires_at')
+            .select('id, vehicle_id, status, expires_at, verification_category, title_document_url')
             .eq('user_id', userId)
             .eq('status', 'approved'),
           supabase.from('discovered_vehicles')
@@ -526,7 +539,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             .select('id, vehicle_id, role, is_current, start_date, end_date, verification_id, created_at')
             .eq('owner_profile_id', userId),
           supabase.rpc('get_my_garage_owner_corrections', { p_user_id: userId, p_include_unresolved: true }),
-          readGarageRecords(userId!, () => cancelled),
+          scope === 'ownership' ? Promise.resolve([]) : readGarageRecords(userId!, () => cancelled),
         ]);
         if (cancelled) return;
         for (const res of [verifiedRes, prevOwnedRes, ownershipRes, correctionRes]) {
@@ -633,6 +646,10 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           setIsLoading(false);
         };
 
+        // Collection/Owned consumers need the same evidence fold without
+        // loading unrelated account membership, valuations and activity.
+        if (scope === 'ownership') { publish(); return; }
+
         if (vehicleIdArray.length > 0) {
           // Image counts come from vehicles.image_count (trigger-maintained by
           // update_vehicle_image_count, verified exact in prod). The live
@@ -736,21 +753,22 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
     fetchAll();
     return () => { cancelled = true; };
-  }, [userId, refreshKey]);
+  }, [userId, refreshKey, scope]);
 
   // Derived state
   const sameViewer = readerViewer === (userId ?? null);
   const visibleLoading = !!userId && (!sameViewer || isLoading);
-  const vehicles = (sameViewer && userId ? rawVehicles : [])
+  const vehicles = useMemo(() => (sameViewer && userId ? rawVehicles : [])
     .map((v) => activity ? { ...v, custody_org: activity.custody.get(v.id) ?? null, recent_work_at: activity.recentWork.get(v.id) ?? null } : v)
     .filter((v) => matchesFilter(v, filterMode))
-    .sort((a, b) => sortVehicles(a, b, sortMode));
+    .sort((a, b) => sortVehicles(a, b, sortMode)),
+  [sameViewer, userId, rawVehicles, activity, filterMode, sortMode]);
 
   const sections = buildSections(vehicles);
 
   // Current ownership only; ended periods, claims and consignments are not assets.
   const totalEstimatedValue = vehicles
-    .filter((v) => ['VERIFIED OWNER', 'OWNER', 'CO-OWNER'].includes(v.relationship_type))
+    .filter(isCurrentGarageOwner)
     .reduce((sum, v) => sum + (v.estimated_value ?? 0), 0);
 
   const data = sameViewer && userId ? buildDashboardData(sections, vehicles) : null;

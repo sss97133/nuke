@@ -1,0 +1,58 @@
+// @vitest-environment jsdom
+import React, { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+const fixture = vi.hoisted(() => ({ garage: { vehicles: [] as any[], isLoading: false, error: null as string | null },
+  rows: [{ id: 'title' }, { id: 'photo' }], publicRows: [{ vehicle_id: 'title', relationship: 'owner' }],
+  fail: false, calls: [] as string[] }));
+vi.mock('../../hooks/useVehiclesDashboard', async original => ({ ...await original<any>(), useVehiclesDashboard: () => fixture.garage }));
+vi.mock('../vehicles/VehicleCardDense', () => ({ default: ({ vehicle }: any) => <a href={`/vehicle/${vehicle.id}`}>{vehicle.id}</a> }));
+vi.mock('../../lib/supabase', () => ({ supabase: {
+  from: (table: string) => {
+    fixture.calls.push(table); let rows = fixture.rows;
+    const q: any = { select: () => q, in: (_key: string, ids: string[]) => { rows = rows.filter(row => ids.includes(row.id)); return q; },
+      eq: () => q, order: () => q, limit: () => q,
+      then: (fn: any) => Promise.resolve({ data: rows, error: fixture.fail ? { message: 'read failed' } : null }).then(fn) };
+    return q;
+  },
+  rpc: (name: string) => {
+    fixture.calls.push(name); let rows = fixture.publicRows;
+    const q: any = { eq: (key: string, value: string) => { rows = rows.filter(row => (row as any)[key] === value); return q; },
+      limit: () => q, then: (fn: any) => Promise.resolve({ data: rows, error: fixture.fail ? { message: 'read failed' } : null }).then(fn) };
+    return q;
+  },
+} }));
+import VehicleCollection from './VehicleCollection';
+let host: HTMLDivElement, root: Root;
+beforeEach(() => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  fixture.calls = []; fixture.fail = false;
+  fixture.garage = { vehicles: [{ id: 'title', relationship_type: 'OWNER' }, { id: 'photo', relationship_type: 'RELATIONSHIP REVIEW' }], isLoading: false, error: null };
+  host = document.createElement('div'); root = createRoot(host);
+});
+afterEach(async () => { await act(async () => root.unmount()); });
+const render = (own = true, user = 'user') => act(async () => root.render(<MemoryRouter><VehicleCollection userId={user} isOwnProfile={own} /></MemoryRouter>));
+it('uses the qualified own-account projection and never the photo-backed permission union', async () => {
+  await render();
+  expect(host.querySelector('a[href="/vehicle/title"]')).not.toBeNull();
+  expect(host.querySelector('a[href="/vehicle/photo"]')).toBeNull();
+  expect(fixture.calls).toEqual(['vehicles']);
+});
+it('uses only qualified public reader rows for a visitor', async () => {
+  await render(false);
+  expect(fixture.calls).toEqual(['get_user_garage', 'vehicles']);
+  expect(host.querySelector('a[href="/vehicle/photo"]')).toBeNull();
+});
+it('withdraws previously rendered ownership when its evidence read fails', async () => {
+  await render(); fixture.garage = { ...fixture.garage, error: 'proof unavailable' };
+  await render();
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  expect(host.querySelector('a[href="/vehicle/title"]')).toBeNull();
+  expect(host.textContent).not.toContain('No vehicles yet');
+});
+it('withdraws an old owner result as soon as the new projection no longer supports it', async () => {
+  await render(); fixture.garage = { ...fixture.garage, vehicles: [{ id: 'photo', relationship_type: 'RELATIONSHIP REVIEW' }] };
+  await render();
+  expect(host.querySelector('a[href="/vehicle/title"]')).toBeNull();
+});
