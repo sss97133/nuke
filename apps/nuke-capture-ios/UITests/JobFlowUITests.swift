@@ -58,13 +58,20 @@ final class JobFlowUITests: XCTestCase {
 
     /// Scrolls until the element is on screen (lists render lazily).
     @discardableResult
-    private func reveal(_ el: XCUIElement, in app: XCUIApplication, up: Bool = true, tries: Int = 14) -> XCUIElement {
+    private func reveal(_ el: XCUIElement, in app: XCUIApplication, up: Bool = true, tries: Int = 14, keyboardAware: Bool = false) -> XCUIElement {
+        func reachable() -> Bool {
+            guard el.exists && el.isHittable else { return false }
+            let keyboard = app.keyboards.firstMatch
+            return !keyboardAware || !keyboard.exists || el.frame.maxY < keyboard.frame.minY
+        }
         func swipe(_ upward: Bool) {
             // App-wide swipes start in the keyboard on a short visible form.
             // Drag the form's inset gutter above the keyboard instead.
             let keyboard = app.keyboards.firstMatch
-            let form = app.collectionViews.firstMatch
-            if keyboard.exists && form.exists {
+            if keyboardAware, keyboard.exists {
+                guard let form = app.collectionViews.allElementsBoundByIndex.last(where: { $0.isHittable }) else {
+                    XCTFail("no foreground form above keyboard"); return
+                }
                 let frame = form.frame
                 let navigation = app.navigationBars.firstMatch
                 let visibleTop = max(frame.minY, navigation.exists ? navigation.frame.maxY : frame.minY)
@@ -79,29 +86,29 @@ final class JobFlowUITests: XCTestCase {
             } else if upward { app.swipeUp() } else { app.swipeDown() }
         }
         var n = 0
-        while !(el.exists && el.isHittable) && n < tries {
+        while !reachable() && n < tries {
             swipe(up)
             n += 1
         }
         // Past it (a slow runner can overshoot)? Search back the other way once.
         n = 0
-        while !(el.exists && el.isHittable) && n < tries {
+        while !reachable() && n < tries {
             swipe(!up)
             n += 1
         }
-        if !el.exists {
+        if !(keyboardAware ? reachable() : el.exists) {
             print(app.debugDescription)
             let screenshot = XCTAttachment(screenshot: app.screenshot())
             screenshot.lifetime = .keepAlways
             add(screenshot)
         }
-        XCTAssertTrue(el.exists, "not found: \(el)")
+        XCTAssertTrue(keyboardAware ? reachable() : el.exists, "not reachable: \(el)")
         return el
     }
 
-    private func tapConfirm(_ app: XCUIApplication, _ id: String = "sign.confirm") {
+    private func tapConfirm(_ app: XCUIApplication, _ id: String = "sign.confirm", keyboardAware: Bool = false) {
         let b = app.buttons[id].firstMatch
-        reveal(b, in: app).tap()
+        reveal(b, in: app, keyboardAware: keyboardAware).tap()
     }
 
     private func dismissSheet(_ app: XCUIApplication) {
@@ -168,7 +175,7 @@ final class JobFlowUITests: XCTestCase {
         XCTAssertTrue(post.waitForExistence(timeout: 10))
         post.tap()
         type(app, into: "Describe the work in your own words", "Replace the front brake pads. Bleed the lines.", identifier: "postjob.description")
-        reveal(app.buttons["postjob.post"], in: app).tap()
+        reveal(app.buttons["postjob.post"], in: app, keyboardAware: true).tap()
         let confirm = app.alerts["Post this job?"].buttons["Post the job"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "no explicit confirm before posting")
         XCTAssertTrue(writes(app).isEmpty, "nothing may be written before the explicit confirm")
@@ -209,8 +216,11 @@ final class JobFlowUITests: XCTestCase {
         reveal(app.buttons["Make an offer"].firstMatch, in: app).tap()
         XCTAssertTrue(app.navigationBars["Make an offer"].waitForExistence(timeout: 6), "the offer sheet didn't open")
         type(app, into: "Amount", "450")
-        tapConfirm(app)
-        XCTAssertTrue(app.staticTexts["Offer sent"].waitForExistence(timeout: 8))
+        tapConfirm(app, keyboardAware: true)
+        waitForWrite(app, "offer_on_requirement")
+        let sent = app.staticTexts["Offer sent"].waitForExistence(timeout: 8)
+        if !sent { print(app.debugDescription) }
+        XCTAssertTrue(sent)
         dismissSheet(app)
         let offer = call(app, "offer_on_requirement")
         XCTAssertEqual(offer?["p_requirement_id"] as? String, toolRequirementId)
