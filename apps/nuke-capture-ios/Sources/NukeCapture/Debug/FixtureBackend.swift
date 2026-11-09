@@ -144,6 +144,8 @@ enum FixtureBackend {
             return ok(ReceiptDepthFixtures.proof)
         case "get_vehicle_day_documents" where scenario.hasPrefix("receipt-") || scenario == "financial-qualification":
             return ok(scenario == "receipt-withdrawn" ? ReceiptDepthFixtures.withdrawn : ReceiptDepthFixtures.day)
+        case "get_vehicle_receipt_work_context" where scenario.hasPrefix("receipt-"):
+            return ok(ReceiptDepthFixtures.work)
         case "get_orphan_sessions" where scenario == "source-inspection":
             return ok("""
             [{"session_day":"2026-10-31","gps_cell":"fixture","photo_count":1,"image_ids":["00000000-0000-4000-8000-00000000e001"],"sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
