@@ -44,6 +44,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { ART_DEPARTMENTS, ART_LOT_METHOD, artDepartmentFilter, artLotFromDoc, assetTypeForDepartment } from "./artLot.ts";
+import { advance, landedAnything, startFrom, type WalkCursor } from "./landCursor.ts";
 
 // ─── Typesense API config ─────────────────────────────────────────────────────
 
@@ -51,6 +52,8 @@ const TYPESENSE_HOST = "https://api01.bonhams.com";
 const TYPESENSE_COLLECTION = "lots";
 const TYPESENSE_API_KEY = "7YZqOyG0twgst4ACc2VuCyZxpGAYzM0weFTLCC20FQY";
 const DEPARTMENT_FILTER = "department.code:MOT-CAR";
+/** The car walk's row in source_walk_cursors (source_slug bonhams). */
+const LAND_WALK = "typesense_land";
 
 const EXTRACTOR_VERSION = "bonhams-typesense-v1";
 const MAX_PER_PAGE = 250; // Typesense max
@@ -583,7 +586,18 @@ Deno.serve(async (req) => {
 
       let pageNo = Number(page) > 1 ? Number(page) : 0;
       let pass = 0;
+      // The walk's place is its row in source_walk_cursors (primary-key read). Only a run that starts from the cursor moves it.
+      const fromCursor = !pageNo;
+      let stored: WalkCursor | null = null;
+      let haveRow = false;
+      if (fromCursor) {
+        const { data: row, error: rowErr } = await supabase.from("source_walk_cursors").select("pass, last_page")
+          .eq("source_slug", "bonhams").eq("walk", LAND_WALK).maybeSingle();
+        if (!rowErr && row) { stored = row as WalkCursor; haveRow = true; ({ pass, page: pageNo } = startFrom(stored)); }
+      }
       if (!pageNo) {
+        // No cursor row yet (or it could not be read): derive it once from the landed lots' stamps, as before 2026-11-09.
+        // That read scans every Bonhams typesense episode (13.5 s, ~32k blocks a run on 2026-11-09), so it is only a fallback.
         // The cursor is the furthest page of the newest pass (metadata.ts_pass, absent = pass 0), not the latest row written:
         // a stray page-1 landing, or a failed read read as "nothing landed", used to send the walk back to page 1 (10:42Z
         // 2026-10-15: 150 lots per 20 minutes became re-landing pages 1-4). A failed read now stops the run.
@@ -602,6 +616,7 @@ Deno.serve(async (req) => {
         const lastPage = Number(m.ts_page);
         pass = Number.isFinite(Number(m.ts_pass)) ? Number(m.ts_pass) : 0;
         pageNo = Number.isFinite(lastPage) && lastPage > 0 ? lastPage + 1 : 1;
+        if (Number.isFinite(lastPage) && lastPage > 0) stored = { pass, last_page: lastPage };
       }
 
       const fetchPage = (n: number) => {
@@ -670,10 +685,22 @@ Deno.serve(async (req) => {
         landed.push(await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })));
       }
 
-      // The cursor is metadata.ts_page on each landed vehicle_events row (set by the lander).
+      // Each landed lot keeps its page stamp (metadata.ts_page/ts_pass, set by the lander); the walk's row moves forward
+      // once a page has landed something. A failed cursor write is reported and the next run derives or retries.
+      let cursorWrite: string | null = null;
+      if (fromCursor) {
+        const moved = advance(stored, pass, pageNo, pagesRead, landedAnything(landed));
+        if (moved) {
+          const { error: wErr } = await supabase.from("source_walk_cursors").upsert({
+            source_slug: "bonhams", walk: LAND_WALK, pass: moved.pass, last_page: moved.last_page, total_pages: totalPages,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "source_slug,walk" });
+          cursorWrite = wErr ? `failed: ${wErr.message}` : (haveRow ? "advanced" : "seeded");
+        } else cursorWrite = "unchanged";
+      }
       return okJson({
-        success: landOk, mode: "land", page: pageNo, pages_read: pagesRead, total_pages: totalPages, found: data.found,
-        next_page: pageNo + pagesRead > totalPages ? 1 : pageNo + pagesRead, lander: landed,
+        success: landOk, mode: "land", page: pageNo, pass, pages_read: pagesRead, total_pages: totalPages, found: data.found,
+        next_page: pageNo + pagesRead > totalPages ? 1 : pageNo + pagesRead, cursor: cursorWrite, lander: landed,
       });
     }
 
