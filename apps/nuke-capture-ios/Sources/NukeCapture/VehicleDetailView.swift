@@ -3342,9 +3342,9 @@ private struct LedgerEvidenceSheet: View {
                     case .receipts:
                         Text("Reported totals are rounded; currency is not returned in this record list. Open a source for its current lines and currency. A receipt alone does not establish payment or allocation.")
                     case .payments:
-                        Text("Payment reports and contribution statements use the records' USD field. A method or reference alone does not verify who paid or received funds.")
+                        Text("Payment reports and contribution statements use the records' USD field; amounts in this list are rounded. A method or reference alone does not verify who paid or received funds.")
                     case .labor:
-                        Text("Session values may include labor, parts and tool depreciation. Currency is not returned. Confirmation records the session owner's statement; it does not verify hours, who performed work, or payment.")
+                        Text("Rounded session values may include labor, parts and tool depreciation. Currency is not returned. Confirmation records a statement about the session; it does not verify hours, who performed work, or payment.")
                         if unconfirmedCount > 0 {
                             Text("\(unconfirmedCount) session\(unconfirmedCount == 1 ? "" : "s") awaiting confirmation.")
                         }
@@ -3416,9 +3416,9 @@ private struct LedgerEvidenceSheet: View {
     @ViewBuilder private func laborRow(_ row: Row) -> some View {
         let isConfirmed = row.confirmed == true || confirmed.contains(row.id)
         VStack(alignment: .leading, spacing: 6) {
-            Text(row.date.map { "Recorded UTC day " + String($0.prefix(10)) } ?? "Session day not returned")
+            Text(row.date.map { "Recorded day " + String($0.prefix(10)) } ?? "Session day not returned")
                 .font(.footnote)
-            RootedValueView(label: "Stored session value", value: recordedNumber(row.cost), status: .recorded)
+            RootedValueView(label: "Rounded session value", value: recordedNumber(row.cost), status: .recorded)
                 .accessibilityIdentifier("session-value-\(row.id.uuidString.lowercased())")
             if isConfirmed {
                 RootedValueView(label: "Confirmation", value: "Session confirmation recorded", status: .attributed)
