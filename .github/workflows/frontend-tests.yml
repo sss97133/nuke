@@ -196,6 +196,10 @@ jobs:
         run: createdb dm_refinement_cc_v2_ci
       - name: Verify CC v2 public snapshot classification and legacy compatibility
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_cc_v2_ci -f supabase/sql/test_cc_v2_snapshot_tape.sql
+      - name: Create disposable CC native slug compatibility database
+        run: createdb dm_refinement_cc_plus_ci
+      - name: Verify literal-plus CC native ownership without widening source boundaries
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_cc_plus_ci -f supabase/sql/test_cc_literal_plus_native_slug.sql
       - name: Create disposable comment author key database
         run: createdb dm_refinement_comment_author_keys_ci
       - name: Verify comment author keys at insert and by bounded backfill; retired twin untouched

@@ -12,7 +12,7 @@ export async function retainCcBidCapture(db: any, post: ObservationPost, native?
   if (!d || post.source_slug !== "collecting-cars" || post.kind !== "bid"
     || !["cc_typesense_board_bid_v1", "cc_typesense_board_snapshot_v2"].includes(post.extraction_method) || fields.clock !== "board_read"
     || d.lotType !== "car" || d.stage !== "live"
-    || typeof d.slug !== "string" || !/^[a-zA-Z0-9-]+$/.test(d.slug)
+    || typeof d.slug !== "string" || !/^[a-zA-Z0-9+-]+$/.test(d.slug)
     || post.source_url !== `https://collectingcars.com/for-sale/${d.slug}`
     || String(d.auctionId) !== fields.auction_id || d.currentBid !== fields.amount
     || (d.noBids ?? null) !== fields.bid_count

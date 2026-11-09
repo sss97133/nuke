@@ -138,3 +138,11 @@ Deno.test("CC v2 current captures converge within40 slots without replacing or b
     assert.equal(held.has(legacyId), true);
   } finally { globalThis.fetch = original; }
 });
+
+Deno.test("CC retains native literal-plus slug exactly without URL rewriting or owner relaxation",async()=>{
+ const slug="2021-mercedes-amg-gt-43-4matic+",p={...post,source_url:`https://collectingcars.com/for-sale/${slug}`};
+ const f=fixture();const captured=await retainCcBidCapture(f.db,p,{document:{...document,slug},receivedAt});
+ assert.equal(captured.source_url,p.source_url);assert.equal(JSON.parse(f.stored().html).slug,slug);
+ for(const unsafe of ["wrong?query", "wrong#fragment", "../wrong", "wrong/path"])
+  await assert.rejects(()=>retainCcBidCapture(fixture().db,{...p,source_url:`https://collectingcars.com/for-sale/${unsafe}`},{document:{...document,slug:unsafe},receivedAt}));
+});
