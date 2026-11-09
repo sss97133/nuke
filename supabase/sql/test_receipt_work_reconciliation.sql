@@ -30,6 +30,7 @@ CREATE TABLE public.garage_derivation_evidence(id uuid PRIMARY KEY DEFAULT gen_r
   vehicle_id uuid, user_id uuid, subject_key text, conclusion text, evidence jsonb, superseded_at timestamptz,
   CONSTRAINT garage_derivation_evidence_kind_check CHECK (kind IN ('scene_label')));
 -- (after this point the migration is applied: \i supabase/migrations/20261111210000_receipt_work_reconciliation.sql)
+\ir ../migrations/20261111210000_receipt_work_reconciliation.sql
 DO $$
 DECLARE r record; n int;
   V constant uuid := '00000000-0000-0000-0000-0000000000a1'; U constant uuid := '00000000-0000-0000-0000-0000000000b1';
