@@ -49,6 +49,8 @@ BEGIN
   ASSERT receipt_line_photo_zone('70-76 SHAKER HOOD') = 'exterior';
   ASSERT receipt_line_photo_zone('70-73 FIREBIRD REAR BUMPER') = 'exterior';
   ASSERT receipt_line_photo_zone('SHIPPING') IS NULL;
+  ASSERT receipt_line_photo_zone('Inner Rocker Panel, Extended-RH') = 'exterior';
+  ASSERT receipt_line_photo_zone('ROLLER ROCKER ARM SET') = 'engine';
   ASSERT receipt_line_photo_zone('71-76 TA SHKR AIR CLNR VENT TB') = 'engine';
   ASSERT receipt_line_photo_zone('70-81 F-BODY DOOR SILL PLTE-RH') = 'interior';
   ASSERT receipt_line_photo_zone('70-81 FIREBIRD AM/FM KNOBS (SET)') = 'dashboard';

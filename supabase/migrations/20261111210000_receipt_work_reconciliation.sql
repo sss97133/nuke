@@ -58,7 +58,7 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
     WHEN d ~* '\m(dash|cluster|gauge|tach|clock|speedo|instrument|glove ?box|glv box|console|radio|steering|horn|shifter|bezel|heater control|htr ctrl|ash ?tray|lighter|radio knobs?|am/fm)' THEN 'dashboard'
     WHEN d ~* '\m(seat|upholst|foam|headrest|carpet|headliner|door panel|door pnl|sill plate|kick panel|visor|dome light|arm ?rest|spe?a?ke?r shelf|spkr shlf|package tray|sill plte|cpt|uph|shi?ft boot|shft boot|grshft|shift tunnel|window crank|wndow crnk|door lock knob)' THEN 'interior'
     -- "CAM/FB" is a Camaro/Firebird fitment, not a camshaft
-    WHEN d ~* '\m(engine|carb|intake|valve cover|header|manifold|distributor|alternator|water pump|radiator|rad support|rad core|starter|spark|plug wire|pulley|air cleaner|fuel pump|oil pan|timing|thermostat|piston|cylinder|crank|lifter|rocker|gasket|bore|hone|firewall|frwall|dipstick|cooling system|emission|water neck|pcv|sending uni|clnr|fan clutch|oil filter|battery|surface heads|cylinder heads?|valve job|block)'
+    WHEN d ~* '\m(engine|carb|intake|valve cover|header|manifold|distributor|alternator|water pump|radiator|rad support|rad core|starter|spark|plug wire|pulley|air cleaner|fuel pump|oil pan|timing|thermostat|piston|cylinder|crank|lifter|rocker arm|rockers|gasket|bore|hone|firewall|frwall|dipstick|cooling system|emission|water neck|pcv|sending uni|clnr|fan clutch|oil filter|battery|surface heads|cylinder heads?|valve job|block)'
          OR d ~* '\mcam(shaft)?\M(?!/)' THEN 'engine'
     WHEN d ~* '\m(wheel|tire|rim|hub ?cap|lug|center cap)' THEN 'wheel'
     WHEN d ~* '\m(exhaust|muffler|tail ?pipe|driveshaft|drive shaft|axle|leaf spring|shock|control arm|sway bar|frame rail|floor pan|fuel tank|brake line)' THEN 'undercarriage'
@@ -165,7 +165,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
            count(m.id)::int AS total,
            count(m.id) FILTER (WHERE m.d <= ln.anchor + p_window_days)::int AS in_window,
            min(m.d) AS first_day,
-           (array_agg(m.id ORDER BY coalesce(m.img_end = ln.end_hint, false) DESC, cardinality(m.zones),
+           (array_agg(m.id ORDER BY (m.d <= ln.anchor + p_window_days) DESC, coalesce(m.img_end = ln.end_hint, false) DESC, cardinality(m.zones),
                              md5(m.id::text || coalesce(ln.item_id, ln.receipt_id)::text)))[1:p_max_images] AS ids  -- line-specific spread, not the day's first frames
       FROM lines ln
       LEFT JOIN imgs m ON ln.zone IS NOT NULL AND ln.anchor IS NOT NULL AND m.d >= ln.anchor AND ln.zone = ANY (m.zones)
