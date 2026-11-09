@@ -1,12 +1,16 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
 
-const mocks = vi.hoisted(() => ({ from: vi.fn(), source: vi.fn() }));
+const mocks = vi.hoisted(() => ({ from: vi.fn(), source: vi.fn(), context: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: mocks.from } }));
 vi.mock('../../lib/vehicleImageColumns', () => ({ vehicleImageGallerySource: mocks.source }));
-vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: vi.fn() }));
-import { withCurrentImageSources } from './ObservationTimeline';
+vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: mocks.context }));
+import ObservationTimeline, { withCurrentImageSources } from './ObservationTimeline';
 
-const attached = '00000000-0000-4000-8000-000000000001';
+const attached = 'a0000000-0000-4000-8000-000000000001';
 const unfiled = '00000000-0000-4000-8000-000000000002';
 const moved = '00000000-0000-4000-8000-000000000003';
 const hidden = '00000000-0000-4000-8000-000000000004';
@@ -43,7 +47,7 @@ describe('observation image source withdrawal', () => {
   it('retains attached evidence and non-image records, withholding unfiled, moved and ineligible sources', async () => {
     const query = reader();
     const result = await withCurrentImageSources('vehicle', rows);
-    expect(result.map(row => row.id)).toEqual(['retained-photo-description', 'receipt-work', 'listing']);
+    expect(result.rows.map(row => row.id)).toEqual(['retained-photo-description', 'receipt-work', 'listing']);
     expect(mocks.from).toHaveBeenCalledWith('vehicle_images_public');
     expect(query.select).toHaveBeenCalledWith('id');
     expect(query.in).toHaveBeenCalledWith('id', [attached, unfiled, moved, hidden]);
@@ -53,32 +57,71 @@ describe('observation image source withdrawal', () => {
   it('uses the same eligibility check for a signed-in viewer', async () => {
     mocks.source.mockResolvedValue('vehicle_images');
     reader();
-    expect((await withCurrentImageSources('vehicle', rows)).map(row => row.id))
+    expect((await withCurrentImageSources('vehicle', rows)).rows.map(row => row.id))
       .toEqual(['retained-photo-description', 'receipt-work', 'listing']);
     expect(mocks.from).toHaveBeenCalledWith('vehicle_images');
+  });
+
+  it('normalizes uppercase UUID citations without rewriting their testimony', async () => {
+    reader();
+    const uppercase = [{ structured_data: { image_id: attached.toUpperCase() } }];
+    expect(await withCurrentImageSources('vehicle', uppercase)).toEqual({ rows: uppercase, unavailable: false });
   });
 
   it('does not equate inaccessible sources with an attribution to another vehicle', async () => {
     const query = reader();
     query.then = (resolve: any) => resolve({ data: [], error: null });
-    expect(await withCurrentImageSources('vehicle', rows)).toEqual(rows.slice(4));
+    expect(await withCurrentImageSources('vehicle', rows)).toEqual({ rows: rows.slice(4), unavailable: false });
   });
 
   it('keeps receipt and listing records when image qualification fails', async () => {
     reader({ message: 'source read unavailable' });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(await withCurrentImageSources('vehicle', rows)).toEqual(rows.slice(4));
+    expect(await withCurrentImageSources('vehicle', rows)).toEqual({ rows: rows.slice(4), unavailable: true });
     warn.mockRestore();
   });
 
   it('does not query images for records without image citations', async () => {
-    expect(await withCurrentImageSources('vehicle', rows.slice(4))).toEqual(rows.slice(4));
+    expect(await withCurrentImageSources('vehicle', rows.slice(4))).toEqual({ rows: rows.slice(4), unavailable: false });
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
   it('does not send malformed references to the image query', async () => {
     const malformed = [{ id: 'bad', structured_data: { image_id: '../../elsewhere' } }];
-    expect(await withCurrentImageSources('vehicle', malformed)).toEqual([]);
+    expect(await withCurrentImageSources('vehicle', malformed)).toEqual({ rows: [], unavailable: false });
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it('shows a partial-read state when source lookup fails and restores observations on retry', async () => {
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.context.mockReturnValue({ vehicle: { id: 'vehicle' }, isRowOwner: true });
+    let failed = true;
+    const imageQuery = reader();
+    imageQuery.then = (resolve: any) => resolve(failed
+      ? { data: null, error: { message: 'source read unavailable' } }
+      : { data: [{ id: attached }], error: null });
+    const observations: any = {
+      select: () => observations, eq: () => observations, order: () => observations,
+      limit: async () => ({ data: [{ id: 'photo', kind: 'media', content_text: 'Attached photo description',
+        structured_data: { image_id: attached }, observed_at: '2026-11-01T12:00:00Z' }], error: null }),
+    };
+    mocks.from.mockImplementation(name => name === 'vehicle_observations' ? observations : imageQuery);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    try {
+      await act(async () => { root.render(React.createElement(MemoryRouter, null, React.createElement(ObservationTimeline))); });
+      expect(container.querySelector('[role="status"]')?.textContent).toContain('could not be loaded');
+      expect(container.textContent).toContain('0 SHOWN');
+      expect(container.textContent).not.toContain('Attached photo description');
+      failed = false;
+      await act(async () => { container.querySelector('button')!.click(); });
+      expect(container.querySelector('[role="status"]')).toBeNull();
+      expect(container.textContent).toContain('Attached photo description');
+      expect(container.textContent).toContain('1 TOTAL');
+    } finally {
+      await act(async () => { root.unmount(); });
+      warn.mockRestore();
+    }
   });
 });
