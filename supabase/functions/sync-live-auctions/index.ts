@@ -28,7 +28,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { batBoardReceipt, updateVehicleEvents } from "./batEpisodeState.ts";
+import { batBoardReceipt, episodeFailureMessage, updateVehicleEvents } from "./batEpisodeState.ts";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
@@ -1555,7 +1555,7 @@ Deno.serve(async (req) => {
               episodeErrors.push(`BaT episode projection deferred: ${episodeSync.deferred} changed rows; read_limit=${episodeSync.read_limit_reached}`);
             console.log(`[sync-live-auctions] Episode state: ${JSON.stringify(episodeSync)}`);
           } catch (e) {
-            episodeErrors.push(`BaT episode projection failed: ${e instanceof Error ? e.message : String(e)}`);
+            episodeErrors.push(`BaT episode projection failed: ${episodeFailureMessage(e)}`);
           }
         }
 

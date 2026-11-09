@@ -1,6 +1,13 @@
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { clocksLocked } from "../_shared/vehicleEventWrite.ts";
 
+/** Keep provider failures useful without echoing huge filters or source payloads. */
+export function episodeFailureMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message
+    : error && typeof error === "object" && "message" in error ? String(error.message) : String(error);
+  return message.replace(/https?:\/\/\S+/gi, "[request URL omitted]").slice(0, 300);
+}
+
 export type BatBoardLot = { url: string; current_bid: number | null; bid_count: number | null;
   auction_end_date: string | null; raw_data: Record<string, unknown> };
 
@@ -29,7 +36,7 @@ export function batEpisodePatch(event: any, lot: BatBoardLot) {
   const clock = String(lot.raw_data.source_read_at ?? ""), observed = Date.parse(clock);
   if (!lot.raw_data.source_snapshot_id || !Number.isFinite(observed)) throw Error("BaT board receipt unavailable");
   const prior = Date.parse(event.metadata?.source_observed_at ?? "");
-  if (Number.isFinite(prior) && prior >= observed) return null;
+  if (observed > Date.now() || (Number.isFinite(prior) && prior >= observed)) return null;
   const patch: Record<string, unknown> = {};
   // Never roll back an admitted higher bid or a soft-close extension from a stale CDN response.
   if (typeof lot.current_bid === "number" && Number.isFinite(lot.current_bid) && lot.current_bid > 0
@@ -58,11 +65,11 @@ export async function updateVehicleEvents(db: any, auctions: BatBoardLot[], maxU
   for (let offset = 0; offset < 3000; offset += 500) {
     if (Date.now() >= deadline) { result.read_limit_reached = true; break; }
     const read = await db.from("vehicle_events")
-      .select("id,source_platform,event_status,event_type,source_url,current_price,bid_count,ended_at,sold_at,metadata,updated_at")
+      .select("id,source_platform,event_status,event_type,source_url,current_price,bid_count,ended_at,sold_at,metadata,updated_at,vehicle_event_metadata_digest")
       .eq("source_platform", "bat").eq("event_status", "active").eq("event_type", "auction")
       .order("updated_at", { ascending: true, nullsFirst: true }).order("id", { ascending: true })
       .range(offset, offset + 499);
-    if (read.error) throw Error(`BaT episode read failed: ${read.error.message}`);
+    if (read.error) throw Error(`BaT episode read failed: ${episodeFailureMessage(read.error)}`);
     events.push(...(read.data ?? []));
     if ((read.data ?? []).length < 500) break;
     if (offset === 2500) result.read_limit_reached = true;
@@ -76,13 +83,19 @@ export async function updateVehicleEvents(db: any, auctions: BatBoardLot[], maxU
     const patch = batEpisodePatch(event, lot);
     if (!patch) continue;
     if (Date.now() >= deadline || result.updated + result.errors.length >= maxUpdates) { result.deferred++; continue; }
+    // The live table has no universal updated_at trigger. A server-computed
+    // full metadata digest protects even a gallery edit that leaves that clock alone.
+    if (!/^[0-9a-f]{64}$/.test(event.vehicle_event_metadata_digest ?? "")) {
+      result.errors.push("episode metadata digest unavailable; retry after schema refresh");
+      continue;
+    }
     // Compare source/state clocks so a native event or terminal transition wins a race.
     let write = db.from("vehicle_events").update({ ...patch, updated_at: new Date().toISOString() })
       .eq("id", event.id).eq("source_platform", "bat").eq("event_status", "active").eq("event_type", "auction").is("sold_at", null);
     write = event.updated_at == null ? write.is("updated_at", null) : write.eq("updated_at", event.updated_at);
-    write = event.metadata == null ? write.is("metadata", null) : write.eq("metadata", JSON.stringify(event.metadata));
+    write = write.eq("vehicle_event_metadata_digest", event.vehicle_event_metadata_digest);
     const saved = await write.select("id");
-    if (saved.error || saved.data?.length !== 1) result.errors.push(saved.error?.message ?? "episode changed concurrently; retry");
+    if (saved.error || saved.data?.length !== 1) result.errors.push(saved.error ? episodeFailureMessage(saved.error) : "episode changed concurrently; retry");
     else result.updated++;
   }
   return result;
