@@ -2,6 +2,8 @@ import { parseMcCormickLot, mccormickTarget, MCCORMICK_PARSER } from "../_shared
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { normalizeMake } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
+import { decodeVin } from "../_shared/vin-decoder.ts";
+import { vinMakeConflict } from "./vinGate.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import type { ArchiveFetchOptions, ArchiveFetchResult } from "../_shared/archiveFetch.ts";
 
@@ -72,8 +74,12 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
     body_style: known(lot.raw_fields["Body Style"]),
   };
   const gate = qualityGate(candidate, { source: "mccormicks", sourceType: "auction" });
+  // Apply the existing make-conflict rule before the native writer, not only
+  // later in the outer ingest gate. Conflicts remain attributed unbound blips.
+  const vinConflict = candidate.vin ? vinMakeConflict(candidate.vin, candidate.make, decodeVin(candidate.vin)) : null;
+  if (vinConflict) gate.issues.push(`vin_make_mismatch: ${vinConflict.basis} indicates ${vinConflict.expected}, claimed ${vinConflict.claimed}`);
   let vehicleId: string | null = null;
-  if (gate.pass && gate.cleaned.year && gate.cleaned.make && gate.cleaned.model) {
+  if (gate.pass && !vinConflict && gate.cleaned.year && gate.cleaned.make && gate.cleaned.model) {
     const prior = await deps.supabase.from("vehicles").select("id").eq("listing_url", normalizeListingUrl(canonical)!.normalized).limit(2);
     if (prior.error) throw new Error("mccormicks_identity_lookup_unavailable");
     let resolutionIssue = prior.data?.length > 1 ? "mccormicks_ambiguous_listing_identity" : null;
