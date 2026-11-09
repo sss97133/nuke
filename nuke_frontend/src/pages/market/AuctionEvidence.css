@@ -258,7 +258,7 @@
 .market-figure__context { display: grid; gap: 6px; min-width: 0; }
 .market-figure__lots { all: unset; cursor: pointer; text-decoration: underline; color: var(--text); }
 .market-figure__lots:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-.market-no-reserve { display: inline-block; padding: 1px 6px; border-radius: 4px; background: var(--yellow-200); color: #1a1a1a; }
+.market-no-reserve { display: inline-block; padding: 1px 6px; border-radius: 4px; background: var(--yellow-200); color: var(--text); box-shadow: inset 0 0 0 1px rgba(234, 179, 8, .45); }
 .market-lot-house { display: inline-flex; align-items: center; }
 .market-figure__note { grid-column: 1 / -1; margin: 0; }
 .market-board__scope { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
