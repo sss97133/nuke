@@ -40,3 +40,10 @@ Deno.test("specific WMI mismatch checks and checksum eligibility remain enforced
   assertEquals(vinMakeConflict(vin, "Ford", decodeVin(vin))?.expected, "Honda");
   assertEquals(vinMakeConflict("3C6LD5AT1CG145618", "Ford", decodeVin("3C6LD5AT1CG145618")), null);
 });
+
+Deno.test("the actual McCormick Maserati passes the make gate while an incompatible claim still fails", () => {
+  const vin = "ZAMBC38A320008428", decoded = decodeVin(vin);
+  assertEquals(vinMakeCheckApplies(vin), true);
+  assertEquals(vinMakeConflict(vin, "Maserati", decoded), null);
+  assertEquals(vinMakeConflict(vin, "Alfa Romeo", decoded)?.expected, "Maserati");
+});
