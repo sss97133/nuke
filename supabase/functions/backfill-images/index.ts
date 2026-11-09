@@ -561,14 +561,24 @@ Deno.serve(async (req: Request) => {
         // Comparing publicUrl across vehicles is ineffective because our storage paths include vehicle_id.
         // Use content identity (file_hash) to detect cross-vehicle contamination.
         if (fileHash) {
-          const { data: existingByHash } = await supabase
+          // limit(1), not maybeSingle(): maybeSingle() returns an error and null data when the
+          // hash is already on 2+ other vehicles, and the old code read null as "not used
+          // elsewhere". That let a Bring a Trailer related-listings thumbnail spread onto
+          // 19-31 vehicles on 2025-12-21. Any lookup error now fails closed.
+          const { data: hashRows, error: hashErr } = await supabase
             .from('vehicle_images')
             .select('vehicle_id, vehicles!inner(id, year, make, model)')
             .eq('file_hash', fileHash)
             .neq('vehicle_id', vehicle_id)
             .not('is_duplicate', 'is', true)
-            .maybeSingle();
+            .limit(1);
 
+          if (hashErr) {
+            results.errors.push(`cross_vehicle_hash_check_failed: ${rawUrl} :: ${hashErr.message}`);
+            results.failed++;
+            continue;
+          }
+          const existingByHash = hashRows?.[0];
           if (existingByHash) {
             const otherVehicle = (existingByHash as any).vehicles;
             console.warn(
@@ -593,9 +603,13 @@ Deno.serve(async (req: Request) => {
               return normalizedCanonical.includes(normalizedRaw) || normalizedRaw.includes(normalizedCanonical);
             });
             
-            if (!isCanonical && batUrl && batUrl.includes('bringatrailer.com/listing/')) {
-              console.warn(`⚠️  WARNING: BAT image ${rawUrl.substring(0, 80)}... not in canonical list for vehicle ${vehicle_id}. Proceeding but may be contamination.`);
-              // Don't block, but log warning
+            if (!isCanonical) {
+              // Not in this vehicle's own listing gallery: a related-listings / sidebar image
+              // from another auction. Skip it instead of filing it to this vehicle.
+              console.warn(`⚠️  SKIPPING: BAT image ${rawUrl.substring(0, 80)}... not in canonical list for vehicle ${vehicle_id} (${batUrl || 'no listing url'}).`);
+              results.errors.push(`bat_image_not_in_listing_gallery: ${rawUrl}`);
+              results.failed++;
+              continue;
             }
           }
         }
