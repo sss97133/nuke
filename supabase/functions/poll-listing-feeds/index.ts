@@ -1063,7 +1063,12 @@ async function pollFirecrawlHtmlFeed(
         (!ingest.vehicle_id || !ingest.dealer_receipt?.observation_id || !ingest.dealer_receipt.snapshot_id || !ingest.dealer_receipt.listing_event_id || !ingest.dealer_receipt.observed_at)) {
         ingest.status = "error"; ingest.error = "dealer canonical admission unacknowledged";
       }
-      if (nativeCc && !resp.ok) { ingest.status = "error"; ingest.error = `Collecting Cars ingest HTTP ${resp.status}`; delete ingest.collecting_cars_receipt; }
+      if (nativeCc && !resp.ok) {
+        ingest.status = "error";
+        const detail = typeof ingest.error === "string" ? ingest.error.slice(0, 300) : "";
+        ingest.error = `Collecting Cars ingest HTTP ${resp.status}${detail ? `: ${detail}` : ""}`;
+        delete ingest.collecting_cars_receipt;
+      }
       if (nativeCc && ["created", "matched", "duplicate"].includes(ingest.status ?? "")) {
         const receipt = collectingCarsReceipt(ingest.collecting_cars_receipt);
         const admission = receipt && ingest.vehicle_id ? await supabase.from("vehicle_observations")

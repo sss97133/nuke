@@ -680,6 +680,17 @@ test('actual CC handler refuses old sink capability before acquiring inventory o
   assert.equal(f.calls.some(c => c.path === '/functions/v1/ingest' && c.method === 'POST'), false);
 });
 
+test('actual CC handler preserves bounded native extractor errors after HTTP failure', async () => {
+  const detail = 'no Collecting Cars lot payload on page';
+  const f = ccFixture({ ingestResult: () => Response.json({ status: 'error', error: detail + 'x'.repeat(500) }, { status: 500 }) });
+  const result = await f.poll();
+  assert.equal(result.ingest_outcomes[0].status, 'error');
+  assert.equal(result.ingest_outcomes[0].ledger, 'failed');
+  assert.match(result.ingest_outcomes[0].error, /Collecting Cars ingest HTTP 500: no Collecting Cars lot payload on page/);
+  assert.ok(result.ingest_outcomes[0].error.length <= 200);
+  assert.equal(f.queued.get(f.url).attempts, 1);
+});
+
 test('actual CC main handler preserves global/source holds before retained discovery and ingestion', async () => {
   for (const controls of [{ max_ingests: 0 }, { sources: { 'collecting-cars': { enabled: false } } }]) {
     const f = ccFixture({ controls }); const result = await f.request({ source: 'collecting-cars', force: true });
