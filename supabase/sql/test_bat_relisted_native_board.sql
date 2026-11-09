@@ -62,6 +62,10 @@ CREATE TEMP TABLE previous_acl AS SELECT oid,proacl FROM pg_proc WHERE oid IN('m
 SET statement_timeout='3s'; SET lock_timeout='1s';
 \ir ../migrations/20261109021917_bat_relisted_native_board.sql
 \ir ../migrations/20261109021917_bat_relisted_native_board.sql
+\if :{?test_bat_locator_correlation}
+\ir ../migrations/20261109024115_bat_board_locator_correlation.sql
+\ir ../migrations/20261109024115_bat_board_locator_correlation.sql
+\endif
 SELECT assert_contract(current_setting('statement_timeout')='3s' AND current_setting('lock_timeout')='1s','stricter budgets restored');
 SELECT assert_contract(NOT EXISTS(SELECT FROM previous_acl a JOIN pg_proc p ON p.oid=a.oid WHERE p.proacl IS DISTINCT FROM a.proacl),'existing grants unchanged');
 SET ROLE anon;
