@@ -984,6 +984,10 @@ jobs:
         run: createdb dm_fold_listed_engine
       - name: Verify source-bound listed engine phrases and existing listing contracts
         run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_listed_engine -f supabase/sql/test_listed_engine_reported_state.sql
+      - name: Create disposable full-payload index contract database
+        run: createdb dm_fold_observation_index
+      - name: Verify full native payload admission and unchanged specs reader
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_fold_observation_index -f supabase/sql/test_observation_covering_index_removal.sql
       - name: Create disposable intake reconciliation database
         run: createdb dm_fold_reconcile_ci
       - name: Verify retained evidence, typed relations, current fold and reader reconciliation
