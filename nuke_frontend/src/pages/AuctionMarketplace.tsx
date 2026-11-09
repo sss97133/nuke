@@ -148,9 +148,10 @@ export default function AuctionMarketplace() {
       }, 2000);
     };
 
+    // vehicle_events left the supabase_realtime publication on 2026-11-09 (decoding every episode write cost ~460 s/h of
+    // database time); the 60 s poll above carries episode changes.
     const channel = supabase
       .channel('live-auctions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_events' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_listings', filter: 'status=eq.active' }, scheduleReload)
       .subscribe();
 
