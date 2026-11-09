@@ -84,9 +84,23 @@ it('does not promote expired, mismatched, unverified or unknown roles to verifie
   expect(resolveGarageRelationships([period()], [proof({ expires_at: '2025-01-01' })], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
   expect(resolveGarageRelationships([period()], [proof({ vehicle_id: 'other' })], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
   for (const role of ['unverified_claim', 'photographer', null]) {
-    expect(resolveGarageRelationships([period({ role })], [proof()], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
+    expect(resolveGarageRelationships([period({ role })], [], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
   }
   expect(resolveGarageRelationships([], [proof({ expires_at: '2025-01-01' })], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
+});
+
+it('retains a current title when another period row only records photography', () => {
+  expect(resolveGarageRelationships([period({ role: 'photographer' })], [proof()], [], now).get('car'))
+    .toMatchObject({ type: 'VERIFIED OWNER', source: 'verification', id: 'proof' });
+});
+
+it('keeps a recorded disposal authoritative when a later row only records photography', () => {
+  const rows = [period({ id: 'ended', is_current: false, end_date: '2023-01-01' }),
+    period({ id: 'photo', role: 'photographer', start_date: '2025-01-01' })];
+  for (const input of [rows, [...rows].reverse()]) {
+    expect(resolveGarageRelationships(input, [proof()], [], now).get('car'))
+      .toMatchObject({ type: 'PREVIOUSLY OWNED', id: 'ended' });
+  }
 });
 
 it('retains a declared prior relationship without inventing its dates or an acquisition', () => {
@@ -142,7 +156,7 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 function seedGarage() {
-  fixture.rows.ownership_verifications = [proof({ user_id: 'user' })];
+  fixture.rows.ownership_verifications = [proof({ user_id: 'user', expires_at: null })];
   fixture.rows.vehicle_ownerships = [period({ owner_profile_id: 'user', role: 'owner' }),
     period({ id: 'ended', vehicle_id: 'old', owner_profile_id: 'user', is_current: false, end_date: '2023-01-01' })];
   fixture.rows.vehicles = ['car', 'old'].map(id => ({ id, year: 1970, make: 'Example', model: 'Car', status: 'active',

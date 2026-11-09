@@ -40,7 +40,8 @@ it('keeps photo-only co-owner permissions out of the actual legacy Owned tab and
   vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'vehicles.sidebarCollapsed' ? 'false' : null, setItem: () => {} });
   fixture.garage = { vehicles: [{ id: 'title', year: 1970, make: 'Fixture', model: 'title', relationship_type: 'VERIFIED OWNER', created_at: '2020-01-01' },
     { id: 'photo', relationship_type: 'RELATIONSHIP REVIEW' }], isLoading: false, error: null, refresh: vi.fn() };
-  const host = document.createElement('div'), root = createRoot(host);
+  const host = document.createElement('div'); document.body.appendChild(host);
+  const root = createRoot(host);
   try {
     await act(async () => root.render(<MemoryRouter><Vehicles /></MemoryRouter>));
     expect(host.querySelector('[data-vehicle="title"]')).not.toBeNull();
@@ -48,6 +49,17 @@ it('keeps photo-only co-owner permissions out of the actual legacy Owned tab and
     const refresh = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === 'REFRESH')!;
     expect(refresh).not.toBeNull(); await act(async () => refresh.click());
     expect(fixture.garage.refresh).toHaveBeenCalledOnce();
+    const search = host.querySelector('input[placeholder="Search vehicles..."]') as HTMLInputElement;
+    search.focus();
+    const accepted = fixture.garage;
+    fixture.garage = { ...accepted, isLoading: true, vehicles: [] };
+    await act(async () => root.render(<MemoryRouter><Vehicles /></MemoryRouter>));
+    expect(host.querySelector('input[placeholder="Search vehicles..."]')).toBe(search);
+    expect(document.activeElement).toBe(search);
+    expect(host.textContent).toContain('Reading ownership evidence');
+    expect(host.textContent).not.toContain('No vehicles yet');
+    fixture.garage = accepted;
+    await act(async () => root.render(<MemoryRouter><Vehicles /></MemoryRouter>));
     const all = [...host.querySelectorAll('button')].find(button => button.textContent === 'All2')!;
     expect(all).toBeTruthy(); await act(async () => all.click());
     expect(host.querySelector('[data-vehicle="photo"]')).not.toBeNull();
@@ -58,5 +70,6 @@ it('keeps photo-only co-owner permissions out of the actual legacy Owned tab and
     await act(async () => owned.click());
     expect(host.querySelector('[data-vehicle="title"]')).toBeNull();
     expect(host.querySelector('[data-vehicle="photo"]')).toBeNull();
-  } finally { await act(async () => root.unmount()); vi.unstubAllGlobals(); }
+    expect(host.textContent).not.toContain('No vehicles yet');
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });

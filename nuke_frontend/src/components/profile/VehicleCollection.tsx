@@ -10,6 +10,7 @@ interface VehicleCollectionProps {
   isOwnProfile: boolean;
 }
 
+/** Show qualified current ownership with private statements confined to the own-account view. */
 const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProfile }) => {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,13 +20,13 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
   const garage = useVehiclesDashboard(isOwnProfile ? userId : null, 'ownership');
   useEffect(() => {
     let cancelled = false;
+    if (isOwnProfile && garage.isLoading) return () => { cancelled = true; };
     const loadVehicles = async () => {
       try {
         setLoading(true);
 
         setLoadError(false);
         setVehicles([]);
-        if (isOwnProfile && garage.isLoading) return;
         if (isOwnProfile && garage.error) throw new Error(garage.error);
         let ownedIds: string[];
         if (isOwnProfile) {

@@ -43,6 +43,8 @@ INSERT INTO vehicle_images(vehicle_id,user_id,created_at,image_url)
  SELECT id,auth.uid(),now(),'fixture-image' FROM vehicles WHERE right(id::text,1)='1';
 INSERT INTO vehicle_user_permissions(vehicle_id,user_id,role,is_active,context) VALUES
  ('20000000-0000-4000-8000-000000000001',auth.uid(),'co_owner',true,'Photo evidence only');
+INSERT INTO vehicle_user_permissions(id,vehicle_id,user_id,role,is_active,context) VALUES
+ ('40000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001',auth.uid(),'co_owner',null,'Legacy NULL-active photo claim');
 SELECT assert((SELECT relationship='owner' FROM get_user_garage(auth.uid()) WHERE vehicle_id='20000000-0000-4000-8000-000000000001'), 'reproduce old photo -> owner bug');
 INSERT INTO ownership_verifications(id,vehicle_id,user_id,status,title_document_url,verification_category,expires_at) SELECT
  ('30000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,
@@ -74,7 +76,9 @@ INSERT INTO vehicle_user_permissions(vehicle_id,user_id,role,is_active) VALUES
  ('20000000-0000-4000-8000-000000000002',auth.uid(),'co_owner',true),
  ('20000000-0000-4000-8000-000000000001',auth.uid(),'contributor',true);
 SELECT refuses($q$UPDATE vehicle_user_permissions SET is_active=false,vehicle_id='20000000-0000-4000-8000-000000000003' WHERE role='co_owner' AND vehicle_id='20000000-0000-4000-8000-000000000001'$q$);
+SELECT refuses($q$UPDATE vehicle_user_permissions SET is_active=null WHERE role='co_owner' AND is_active IS TRUE AND vehicle_id='20000000-0000-4000-8000-000000000001'$q$);
 UPDATE vehicle_user_permissions SET is_active=false WHERE role='co_owner' AND vehicle_id='20000000-0000-4000-8000-000000000001';
+SELECT assert((SELECT is_active IS FALSE FROM vehicle_user_permissions WHERE id='40000000-0000-4000-8000-000000000001'),'NULL-active unsupported permission can be retracted');
 SELECT refuses($q$UPDATE vehicle_user_permissions SET is_active=true WHERE role='co_owner' AND vehicle_id='20000000-0000-4000-8000-000000000001'$q$);
 SELECT set_config('fixture.uid','10000000-0000-4000-8000-000000000002',false);
 SELECT assert((SELECT count(*)=1 FROM get_user_garage('10000000-0000-4000-8000-000000000001')),'stranger sees only qualified public owner');
@@ -90,4 +94,11 @@ UPDATE ownership_verifications SET status='pending' WHERE vehicle_id IN (
 UPDATE ownership_verifications SET status='approved',human_reviewer_id='10000000-0000-4000-8000-000000000002';
 SELECT assert((SELECT count(*)=1 FROM vehicle_user_permissions WHERE role='owner'),'only current title approval grants owner');
 SELECT assert((SELECT status='approved' FROM ownership_verifications WHERE vehicle_id='20000000-0000-4000-8000-000000000004'),'custody approval succeeds without ownership grant');
+-- An activity row cannot withdraw independently approved title evidence.
+INSERT INTO ownership_verifications(id,vehicle_id,user_id,status,title_document_url,verification_category,expires_at,human_reviewer_id) VALUES
+ ('30000000-0000-4000-8000-000000000008','20000000-0000-4000-8000-000000000008',auth.uid(),'approved',
+ 'https://example.test/title','title_document',now()+interval '1 day','10000000-0000-4000-8000-000000000002');
+SELECT assert((SELECT relationship='owner' FROM get_user_garage(auth.uid()) WHERE vehicle_id='20000000-0000-4000-8000-000000000008'),'photographer row cannot cancel current title');
+SELECT set_config('fixture.uid','10000000-0000-4000-8000-000000000002',false);
+SELECT assert((SELECT relationship='owner' FROM get_user_garage('10000000-0000-4000-8000-000000000001') WHERE vehicle_id='20000000-0000-4000-8000-000000000008'),'qualified public title survives activity row');
 \echo 'garage ownership admission -> reader contract PASS'

@@ -28,8 +28,8 @@ BEGIN
   -- Revocations always allowed: an active row going inactive
   -- doesn't claim anything new, it retracts a prior claim.
   IF TG_OP = 'UPDATE'
-     AND COALESCE(OLD.is_active, false) = true
-     AND COALESCE(NEW.is_active, false) = false
+     AND COALESCE(OLD.is_active, true) = true
+     AND NEW.is_active = false
      AND (NEW.vehicle_id, NEW.user_id, NEW.role) IS NOT DISTINCT FROM
          (OLD.vehicle_id, OLD.user_id, OLD.role) THEN
     RETURN NEW;
@@ -132,7 +132,8 @@ AS $function$
       AND (expires_at IS NULL OR expires_at > (now() AT TIME ZONE 'UTC'))
       -- A title approval does not erase the account's recorded disposal/future period.
       AND (NOT EXISTS (SELECT 1 FROM public.vehicle_ownerships o
-          WHERE o.owner_profile_id=p_user_id AND o.vehicle_id=ownership_verifications.vehicle_id)
+          WHERE o.owner_profile_id=p_user_id AND o.vehicle_id=ownership_verifications.vehicle_id
+            AND o.role IN ('owner','verified_owner','current_owner','co_owner','co-owner','previous_owner'))
         OR EXISTS (SELECT 1 FROM public.vehicle_ownerships o
           WHERE o.owner_profile_id=p_user_id AND o.vehicle_id=ownership_verifications.vehicle_id
             AND o.role IN ('owner','verified_owner','current_owner','co_owner','co-owner')

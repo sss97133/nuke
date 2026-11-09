@@ -1480,7 +1480,7 @@ const VehiclesInner: React.FC = () => {
   return (
     <>
       {qualifiedGarage.error && <p role="alert">Ownership evidence unavailable. Refresh the garage to retry.</p>}
-      {loading || qualifiedGarage.isLoading ? (
+      {loading ? (
         <div style={{ height: '100vh', background: 'var(--bg)' }} />
       ) : (
         <div className="fade-in vehicle-library-layout">
@@ -1859,7 +1859,8 @@ const VehiclesInner: React.FC = () => {
                           if (t.key !== 'discovered') setDiscoverySourceFilter(null);
                         }}
                         label={t.label}
-                        right={<span className="vehicle-sidebar-mini">{t.count}</span>}
+                        right={<span className="vehicle-sidebar-mini">{t.key === 'owned' && qualifiedGarage.isLoading ? '…'
+                          : t.key === 'owned' && qualifiedGarage.error ? '?' : t.count}</span>}
                       />
                     ))}
                   </div>
@@ -1891,7 +1892,7 @@ const VehiclesInner: React.FC = () => {
                   </div>
                 </SidebarSection>
 
-                <SidebarSection title={`Vehicles (${filteredRelationships.length})`} sectionKey="vehicles">
+                <SidebarSection title={`Vehicles (${activeTab === 'owned' && qualifiedGarage.isLoading ? 'reading' : filteredRelationships.length})`} sectionKey="vehicles">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {filteredRelationships.slice(0, 60).map((rel, index) => (
                       <Link
@@ -2045,7 +2046,8 @@ const VehiclesInner: React.FC = () => {
                 />
               )}
 
-              {currentRelationships.length === 0 && (
+              {qualifiedGarage.isLoading && <p role="status">Reading ownership evidence…</p>}
+              {currentRelationships.length === 0 && !(activeTab === 'owned' && (qualifiedGarage.isLoading || qualifiedGarage.error)) && (
                 <div className="card">
                   <div className="card-body text-center" style={{ padding: '48px 24px' }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>

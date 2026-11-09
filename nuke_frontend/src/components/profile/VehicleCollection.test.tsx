@@ -56,3 +56,21 @@ it('withdraws an old owner result as soon as the new projection no longer suppor
   await render();
   expect(host.querySelector('a[href="/vehicle/title"]')).toBeNull();
 });
+
+it('never renders a false empty collection between evidence loading and its detail read', async () => {
+  const changes: string[] = [];
+  const observer = new MutationObserver(records => {
+    for (const record of records) {
+      changes.push(record.oldValue ?? '', ...[...record.addedNodes, ...record.removedNodes].map(node => node.textContent ?? ''));
+    }
+  });
+  observer.observe(host, { childList: true, subtree: true, characterData: true, characterDataOldValue: true });
+  try {
+    fixture.garage = { ...fixture.garage, isLoading: true };
+    await render();
+    fixture.garage = { ...fixture.garage, isLoading: false };
+    await render();
+    expect(changes.some(text => text.includes('No vehicles yet'))).toBe(false);
+    expect(host.querySelector('a[href="/vehicle/title"]')).not.toBeNull();
+  } finally { observer.disconnect(); }
+});

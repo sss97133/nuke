@@ -258,6 +258,7 @@ function verificationIsCurrent(row: Verification | undefined, now: Date): boolea
 
 // The period establishes the relationship; verification corroborates it.
 // A past approval cannot override a disposal or turn an unknown role into title.
+/** Fold periods and title approvals; explicit account corrections are applied separately. */
 export function resolveGarageRelationships(
   periods: OwnershipPeriod[],
   verifications: Verification[],
@@ -280,17 +281,21 @@ export function resolveGarageRelationships(
         source: 'verification', id: v.id, start_date: null, end_date: null });
     }
   }
-  // Reacquisition wins over an earlier ended period; otherwise use the latest
-  // recorded period deterministically. Row creation is never acquisition time.
+  // Ownership periods outrank activity rows. Reacquisition wins over an earlier
+  // ended period; row creation is never acquisition time.
+  const ownerRoles = ['verified_owner', 'owner', 'current_owner', 'co_owner', 'co-owner', 'previous_owner'];
+  const ownershipPeriod = (p: OwnershipPeriod) => ownerRoles.includes(p.role?.toLowerCase() ?? '');
   const selected = new Map<string, OwnershipPeriod>();
-  for (const p of [...periods].sort((a, b) => Number(current(b)) - Number(current(a)) ||
+  for (const p of [...periods].sort((a, b) => Number(ownershipPeriod(b)) - Number(ownershipPeriod(a)) ||
+    Number(current(b)) - Number(current(a)) ||
     (b.start_date ?? '').localeCompare(a.start_date ?? '') ||
     b.created_at.localeCompare(a.created_at) || a.id.localeCompare(b.id))) {
     if (!selected.has(p.vehicle_id)) selected.set(p.vehicle_id, p);
   }
   for (const p of selected.values()) {
     const role = p.role?.toLowerCase();
-    const ownerRoles = ['verified_owner', 'owner', 'current_owner', 'co_owner', 'co-owner', 'previous_owner'];
+    // Activity or an unverified claim cannot withdraw an independent current title approval.
+    if ((!role || !ownerRoles.includes(role)) && result.get(p.vehicle_id)?.type === 'VERIFIED OWNER') continue;
     let type: RelationshipType = 'OWNERSHIP CLAIM';
     if ((!p.start_date || p.start_date <= today) && role && ownerRoles.includes(role)) {
       if (role === 'previous_owner' || (p.end_date && p.end_date <= today)) type = 'PREVIOUSLY OWNED';
@@ -321,6 +326,7 @@ function matchesFilter(v: GarageVehicle, filter: FilterMode): boolean {
   return true;
 }
 
+/** Current ownership from the shared evidence and explicit account-statement fold. */
 export function isCurrentGarageOwner(vehicle: Pick<GarageVehicle, 'relationship_type'>): boolean {
   return ['VERIFIED OWNER', 'OWNER', 'CO-OWNER'].includes(vehicle.relationship_type);
 }
@@ -488,6 +494,7 @@ function rowToGarageVehicle(
 // Hook
 // ---------------------------------------------------------------------------
 
+/** Read qualified relationships; ownership scope omits unrelated membership and secondary details. */
 export function useVehiclesDashboard(userId: string | undefined | null, scope: 'all' | 'ownership' = 'all'): VehiclesDashboardState {
   const [readerViewer, setReaderViewer] = useState(userId ?? null);
   const [warnings, setWarnings] = useState<string[]>([]);
