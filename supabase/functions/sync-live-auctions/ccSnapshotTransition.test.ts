@@ -82,3 +82,14 @@ Deno.test("CC equal-clock writers refuse a different observation, allow same rec
  assertEquals((await writeVehicleEventByKey(db,row("second"),{sourceObservedAt:clock,compactMetadataCas:true})).action,"updated");
  assertEquals(writes,2);
 });
+
+Deno.test("CC actual 4matic+ slug is eligible; one malformed owner defers alone before the188-lot RPC", async()=>{
+ const p=post(15000),mercedes={...p,source_url:"https://collectingcars.com/for-sale/2021-mercedes-amg-gt-43-4matic+"};
+ const posts=Array.from({length:187},(_,i)=>({...p,source_url:`${url}-${i}`}));posts.push(mercedes);
+ const batches:any[]=[];const db:any={rpc:(_name:string,args:any)=>{batches.push(args.p_lots);return{abortSignal:async()=>({data:[],error:null})};}};
+ const first=await planCcTransitions(db,posts,Date.now()+5000);
+ assertEquals([first.posts.length,first.deferred,batches[0].length],[188,0,188]);
+ const second=await planCcTransitions(db,[...posts.slice(0,187),{...p,source_url:"https://collectingcars.com/for-sale/wrong?token=private"}],Date.now()+5000);
+ assertEquals([second.posts.length,second.deferred,batches[1].length],[187,1,187]);
+ assertEquals(second.errors.length,1);
+});
