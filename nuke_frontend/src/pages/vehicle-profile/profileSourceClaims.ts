@@ -1,4 +1,50 @@
+import type { FieldProvenance } from './hooks/useFieldProvenance';
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+/** A reviewed physical reading remains attributed testimony. It does not change
+ * the vehicle column or promote an unregistered property into canonical state. */
+export const PHYSICAL_READING_ROLES = {
+  engine_size: 'nominal_engine_displacement',
+  transmission: 'identified_transmission_housing',
+  drivetrain: 'visible_drivetrain_layout',
+  mileage: 'odometer_display',
+  factory_color: 'factory_paint_code',
+} as const;
+export type PhysicalReadingField = keyof typeof PHYSICAL_READING_ROLES;
+const PHYSICAL_READING_RELATIONS: Record<PhysicalReadingField, readonly string[]> = {
+  engine_size: ['direct_code'], transmission: ['direct_code', 'component_inference'],
+  drivetrain: ['direct_visual'], mileage: ['direct_visual'], factory_color: ['direct_code'],
+};
+export const PHYSICAL_READING_METHOD = 'interactive_physical_source_review_v1';
+export function physicalRecordedValue(vehicleId: string, field: PhysicalReadingField, provenance?: FieldProvenance | null):
+  { status: 'absent' | 'unavailable' | 'conflict'; value?: never; note?: never }
+  | { status: 'resolved'; value: string; note: string } {
+  if (!provenance) return { status: 'absent' };
+  if (provenance.vehicle_id !== vehicleId || provenance.field !== field
+    || (provenance.coverage && provenance.coverage.status !== 'complete_current_reader')) return { status: 'unavailable' };
+  const rows = (provenance.image_observations || []).filter(o => {
+    const citation = o as typeof o & { witness_id?: string; witness_role?: string; source_url?: string };
+    return o.extraction_method === PHYSICAL_READING_METHOD && o.claim_role === PHYSICAL_READING_ROLES[field]
+      && o.is_inferred === true && typeof o.agent_model === 'string' && !!o.agent_model.trim()
+      && UUID.test(o.image_id) && UUID.test(o.observation_id) && UUID.test(citation.witness_id || '')
+      && citation.witness_role === 'derived' && citation.source_url === o.image_url
+      && /^https?:\/\//.test(o.image_url) && o.source_family === `image:${o.image_id}`
+      && PHYSICAL_READING_RELATIONS[field].includes(o.visual_relation || '')
+      && typeof o.value === 'string' && !!o.value.trim() && o.value.length <= 160
+      && typeof o.limitation === 'string' && !!o.limitation.trim();
+  });
+  if (!rows.length) return { status: 'absent' };
+  // Different active readings are a disagreement, never a "latest wins" guess.
+  const values = [...new Set(rows.map(o => o.value!.trim()))];
+  if (values.length !== 1) return { status: 'conflict' };
+  const value = values[0];
+  if (field === 'mileage') {
+    // Units belong to the source reading. A bare number cannot imply miles.
+    const reading = /^(\d+(?:\.\d+)?) (?:miles|km) shown$/.exec(value);
+    if (!reading || !Number.isFinite(Number(reading[1])) || Number(reading[1]) >= 10000000) return { status: 'unavailable' };
+  }
+  return { status: 'resolved', value, note: [...new Set(rows.map(o => o.limitation!))].join(' ') };
+}
 export type SourceValue = string | number | string[];
 export type StructuredClaim = {
   property_key: string; property_id: string; observation_id: string; label?: string;

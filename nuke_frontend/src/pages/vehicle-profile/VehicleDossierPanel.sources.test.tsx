@@ -3,9 +3,14 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ rpc: vi.fn() }));
+const state = vi.hoisted(() => ({ rpc: vi.fn(), provenance: new Map<string, unknown>() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: state.rpc }, SUPABASE_ANON_KEY: 'fixture', getSupabaseFunctionsUrl: () => 'https://fixture.test' }));
+vi.mock('./hooks/useFieldProvenance', async importOriginal => ({
+  ...await importOriginal<typeof import('./hooks/useFieldProvenance')>(),
+  useFieldProvenance: (_id: string, field: string) => ({ data: state.provenance.get(field), isError: false }),
+}));
 import { StructuredProfileData } from './VehicleDossierPanel';
+import { PHYSICAL_READING_METHOD, PHYSICAL_READING_ROLES } from './profileSourceClaims';
 
 const VEHICLE = '10000000-0000-4000-8000-000000000001';
 const OTHER = '10000000-0000-4000-8000-000000000002';
@@ -29,7 +34,7 @@ let host: HTMLDivElement, root: Root;
 const render = (id = VEHICLE) => act(async () => { root.render(<MemoryRouter><StructuredProfileData vehicleId={id} /></MemoryRouter>); });
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  state.rpc.mockReset(); host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
+  state.rpc.mockReset(); state.provenance.clear(); host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 
@@ -96,3 +101,46 @@ it('opens the selected recorded value directly and lets an empty field inspect e
   await act(async () => (host.querySelector('[data-record-field="mileage"] button') as HTMLButtonElement).click());
   expect(inspect).toHaveBeenLastCalledWith('mileage', 'Odometer', '');
 });
+
+it('puts the exact physical odometer reading in the existing row and opens its source directly', async () => {
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page([]) : record())) }));
+  state.provenance.set('mileage', physical('mileage', '12.3 miles shown', 'Total mileage unknown.'));
+  const inspect = vi.fn();
+  await act(async () => root.render(<MemoryRouter><StructuredProfileData vehicleId={VEHICLE} onInspect={inspect} /></MemoryRouter>));
+  const row = host.querySelector('[data-record-field="mileage"]')!;
+  expect(row.textContent).toContain('12.3 miles shown'); expect(row.textContent).toContain('Total mileage unknown.');
+  expect(row.querySelectorAll('button')).toHaveLength(1);
+  await act(async () => (row.querySelector('button') as HTMLButtonElement).click());
+  expect(inspect).toHaveBeenLastCalledWith('mileage', 'Odometer', '12.3 miles shown');
+  state.provenance.set('mileage', { ...physical('mileage', '12.3 miles shown', 'Total mileage unknown.'), image_observations: [] });
+  await render();
+  expect(host.querySelector('[data-record-field="mileage"]')!.textContent).not.toContain('12.3');
+});
+it('keeps decoded factory paint separate from current exterior color and omits an empty factory row', async () => {
+  const stored = record(); stored.retained_record.attributes.color = { origin_column: 'color', unit: null, data_type: 'string', value_status: 'retained_record_value', value: 'Green' };
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page([]) : stored)) }));
+  await render(); expect(host.querySelector('[data-record-field="factory_color"]')).toBeNull();
+  state.provenance.set('factory_color', physical('factory_color', 'Factory blue (42)', 'Decoded tag; present paint formula not established.'));
+  await render();
+  expect(host.querySelector('[data-record-field="color"]')!.textContent).toContain('Green');
+  expect(host.querySelector('[data-record-field="factory_color"]')!.textContent).toContain('Factory blue (42)');
+});
+it('preserves missing units on the legacy mileage fallback', async () => {
+  const stored = record();
+  Object.assign(stored.retained_record.attributes.mileage, { value: 123, data_type: 'integer', value_status: 'retained_record_value' });
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page([]) : stored)) }));
+  await render();
+  const row = host.querySelector('[data-record-field="mileage"]')!;
+  expect(row.textContent).toContain('123'); expect(row.textContent).toContain('Unit not established');
+  expect(row.textContent).not.toContain('miles shown');
+});
+
+function physical(field: keyof typeof PHYSICAL_READING_ROLES, value: string, limitation: string) {
+  const image = '40000000-0000-4000-8000-000000000001';
+  return { vehicle_id: VEHICLE, field, value: null, evidence: [], observations: [], image_observations: [{
+    observation_id: FIRST, image_id: image, image_url: 'https://example.test/physical.jpg', source_url: 'https://example.test/physical.jpg',
+    witness_id: SECOND, witness_role: 'derived', source_family: `image:${image}`, value, limitation,
+    extraction_method: PHYSICAL_READING_METHOD, agent_model: 'fixture', claim_role: PHYSICAL_READING_ROLES[field],
+    is_inferred: true, visual_relation: field === 'factory_color' ? 'direct_code' : 'direct_visual',
+  }] };
+}
