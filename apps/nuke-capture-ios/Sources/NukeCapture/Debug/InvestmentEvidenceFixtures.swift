@@ -36,7 +36,11 @@ enum InvestmentEvidenceFixtures {
        "work_sessions":[
          {"id":"00000000-0000-4000-8000-00000000f001","date":"2026-03-11","cost":600,"confirmed":true,"source":"work_sessions"},
          {"id":"00000000-0000-4000-8000-00000000f002","date":"2026-03-12","cost":400,"confirmed":false,"source":"work_sessions"},
-         {"id":"00000000-0000-4000-8000-00000000f003","date":"2026-03-13","source":"work_sessions"}]}}
+         {"id":"00000000-0000-4000-8000-00000000f003","date":"2026-03-13","source":"work_sessions"},
+         {"id":"00000000-0000-4000-8000-00000000f004","date":"2026-03-14","cost":100,"confirmed":false,"source":"work_sessions"},
+         {"id":"00000000-0000-4000-8000-00000000f005","date":"2026-03-15","cost":100,"confirmed":false,"source":"work_sessions"},
+         {"id":"00000000-0000-4000-8000-00000000f006","date":"2026-03-16","cost":100,"confirmed":false,"source":"work_sessions"},
+         {"id":"00000000-0000-4000-8000-00000000f007","date":"2026-03-17","cost":100,"confirmed":false,"source":"work_sessions"}]}}
     """
     static let withheld = """
     {"is_owner_view":false,"proven":{"parts":{"value":987654,"count":42},"confirmed_labor":{"value":600},"money_in":{},"money_out":{}},

@@ -2,6 +2,21 @@ import XCTest
 @testable import NukeCapture
 
 final class InvestmentEvidenceTests: XCTestCase {
+    func testConfirmationRequiresTheExactAffirmativeWriterReceipt() throws {
+        let id = UUID(uuidString:"00000000-0000-4000-8000-00000000f002")!
+        let decoder = JSONDecoder()
+        func reply(_ text: String) throws -> SessionConfirmationReceipt {
+            try decoder.decode(SessionConfirmationReceipt.self,from:Data(text.utf8))
+        }
+        XCTAssertTrue(try reply(#"{"ok":true,"session_id":"00000000-0000-4000-8000-00000000f002","confirmed":true}"#).acknowledges(id))
+        for text in [#"{"ok":false,"error":"not_authorized"}"#, #"{"ok":true}"#,
+                     #"{"ok":true,"session_id":"00000000-0000-4000-8000-00000000f001","confirmed":true}"#,
+                     #"{"ok":true,"session_id":"00000000-0000-4000-8000-00000000f002","confirmed":false}"#] {
+            XCTAssertFalse(try reply(text).acknowledges(id))
+        }
+        XCTAssertThrowsError(try reply("{}"))
+        XCTAssertThrowsError(try reply(#"{"ok":"#))
+    }
     func testCompoundSessionPayloadCannotSupplyPureLaborCurrencyOrPaymentProof() throws {
         let proof = try JSONDecoder().decode(InvestmentProof.self, from: Data(InvestmentEvidenceFixtures.proof.utf8))
         XCTAssertEqual(proof.proven.confirmed_labor.value, 600)
