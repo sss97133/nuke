@@ -41,6 +41,16 @@ Two rules outrank taste:
    Swift twin; `RootedValueView` (`RootedValue.swift`) is the one primitive that renders a value, with its
    trust rung, its clock and its drill (or its honest refusal to drill). A bare value is a bug.
 
+**Book allocations use the existing accounting readers.** `AllocationEvidence.swift` opens
+`accounting_vehicle_financials` independently of the legacy investment fold. Its pages preserve
+book, vehicle, currency, phase and qualification; loaded records are not a complete financial
+picture. Each allocation opens its exact current book or bank record through
+`accounting_record_evidence`, with an allocation recheck before and after the source read.
+An account change, withdrawal, ambiguous identity or changed source reference clears the result.
+Amounts remain decimal text; a bank source supplies its own currency and date. Witness references
+do not become costs, payment proof, work completion or filing actions. This path adds no financial
+totals, original-file access, SQL, grants or writes.
+
 **The header is on the read.** `vehicle_profile_read(uuid)` (migration `20261013143000`, SECURITY
 INVOKER, callable by anon and authenticated) returns the vehicle page's header as one ProfileDocument: a
 `masthead` (identity columns, the one headline price as a Claim with its kind, platform and clock), a
