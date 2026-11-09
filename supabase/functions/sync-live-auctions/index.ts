@@ -206,6 +206,7 @@ async function syncBaT(supabase: Parameters<typeof batBoardReceipt>[0]): Promise
             source: "bat_auctions_page",
             source_snapshot_id: boardReceipt.id,
             source_read_at: boardReceipt.fetched_at,
+            source_current_bid: typeof item.current_bid === "number" && Number.isFinite(item.current_bid) ? item.current_bid : null,
             timestamp_end: item.timestamp_end,
             country: item.country,
             currency: item.currency,
