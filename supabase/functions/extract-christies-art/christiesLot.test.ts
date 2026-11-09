@@ -133,11 +133,11 @@ Deno.test("withLotPage attaches symbols only from this lot's own page", () => {
 class FakeReader extends Reader {
   paths: string[] = [];
   constructor(max: number, private readonly pages: Record<string, string | number>) { super(max, 0); }
-  override async text(path: string): Promise<{ status: number; body: string | null }> {
-    if (this.exhausted) return { status: 0, body: null };
+  override text(path: string): Promise<{ status: number; body: string | null }> {
+    if (this.exhausted) return Promise.resolve({ status: 0, body: null });
     this.requests += 1; this.paths.push(path);
     const p = this.pages[path];
-    return typeof p === "number" ? { status: p, body: null } : { status: 200, body: p ?? null };
+    return Promise.resolve(typeof p === "number" ? { status: p, body: null } : { status: 200, body: p ?? null });
   }
 }
 Deno.test("lot page reads are bounded, skip upcoming lots, and stop on a 429", async () => {
