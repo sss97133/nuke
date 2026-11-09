@@ -45,7 +45,10 @@ function reset() {
     report_capture_step: () => Response.json(null),
     photo_pipeline_clear_retry: () => Response.json(null),
     photo_pipeline_note_failure: () => Response.json({ status: "failed", transient: false, attempts: 12, next_attempt_at: null }),
-    land_identifier_claims: () => Response.json({ ok: true }),
+    land_identifier_claims: body => Response.json(body.p_read?.cited_vin
+      ? row.vehicle_id !== body.p_vehicle_id ? { status: "source_image_changed" }
+        : { status: "ok", field_evidence: 1, identifiers: 1 }
+      : { status: "ok", identifiers: 1 }),
     classifier_schema_manifest: () => Response.json({ message: "absent" }, { status: 404 }),
     identifier_rule_for: () => Response.json([{ rule_id: 23, rule_status: "in_range", series: "GM 13-char 1972-80", model_year_from: 1972, model_year_to: 1980 }]),
   };
@@ -249,14 +252,10 @@ Deno.test({ name: "physical pre1981VIN: source→registered rule→existing iden
   reset(); openai = () => oaOk(classicAnswer);
   const response = await handler(one()); const result = await response.json();
   assert(response.status === 200 && result.success === true, JSON.stringify(result));
-  const fields = calls.find(c => c.path === "/rest/v1/field_evidence")?.body;
-  const vin = fields?.find((r: any) => r.field_name === "vin");
-  assert(vin && vin.proposed_value === "2S87D3N000001" && vin.proposed_value.length === 13);
-  assert(vin.raw_extraction_data.photo_id === "image" && vin.raw_extraction_data.image_id === "image" &&
-    vin.raw_extraction_data.image_url === row.image_url && vin.raw_extraction_data.quote === classicAnswer.vin.evidence,
-    "existing get_field_provenance field_evidence join receives its exact photo_id and literal quote");
-  assert(vin.raw_extraction_data.checksum_ok === null && vin.raw_extraction_data.checksum_status === "not_applicable_pre1981");
-  assert(vin.raw_extraction_data.identifier_rule_id === 23 && vin.raw_extraction_data.model_year_context === 1973);
+  assert(!calls.some(c => c.path === "/rest/v1/field_evidence"), "short VIN evidence must use the atomic writer, never a separate raw upsert");
+  const vin = rpcCalls("land_identifier_claims")[0]?.body.p_read.cited_vin;
+  assert(vin.checksum_ok === null && vin.checksum_status === "not_applicable_pre1981");
+  assert(vin.identifier_rule_id === 23 && vin.model_year_context === 1973 && vin.identifier_rule_series === "GM 13-char 1972-80");
   const rule = rpcCalls("identifier_rule_for")[0]?.body;
   assert(rule?.p_make === "Pontiac" && rule.p_kind === "vin" && rule.p_value === classicAnswer.vin.value);
   const claim = rpcCalls("land_identifier_claims")[0]?.body;
@@ -264,7 +263,7 @@ Deno.test({ name: "physical pre1981VIN: source→registered rule→existing iden
     claim.p_source_kind === "photo" && claim.p_source_image_id === "image");
   assert(rpcCalls("attribute_testimony").length === 0 && rpcCalls("auto_match_image_to_vehicles").length === 0);
   assert(patchBodies.every(p => !("vehicle_id" in p)));
-  assert(patchBodies.some(p => p.vehicle_vin === classicAnswer.vin.value && p.vehicle_vin_confidence === .79));
+  assert(!patchBodies.some(p => "vehicle_vin" in p), "short VIN cannot be written outside the source-locked transaction");
   assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === "pre1981_physical_plate"));
 }});
 
@@ -284,6 +283,32 @@ Deno.test({ name: "physical pre1981VIN: conflicting/unsupported sources retain t
     assert(!patchBodies.some(p => "vehicle_vin" in p), reason);
     assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === reason), reason);
     assert(JSON.stringify(row.ai_scan_metadata).includes(classicAnswer.vin.value), "original reading preserved");
+  }
+}});
+
+Deno.test({ name: "physical VIN is not admitted after its photo is unfiled during the rule read", ...T, fn: async () => {
+  reset(); openai = () => oaOk(classicAnswer);
+  const rule = rpc.identifier_rule_for;
+  rpc.identifier_rule_for = body => {
+    row = { ...row, vehicle_id: null, updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
+    return rule(body);
+  };
+  await handler(one());
+  assert(rpcCalls("land_identifier_claims").length === 1, "the source-locked writer owns final attachment validation");
+  assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === "source_image_changed"), "refusal must be recorded instead of claiming admission");
+  assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.cited_identifiers === 0 && c.body.p_detail?.cited_field_evidence === 0));
+  assert(!calls.some(c => c.path === "/rest/v1/field_evidence"), "stale source must not land field evidence");
+  assert(!patchBodies.some(p => "vehicle_vin" in p), "stale source must not get an admitted VIN column");
+}});
+
+Deno.test({ name: "physical VIN writer refusals and unavailable contracts are reported without claiming admission", ...T, fn: async () => {
+  for (const [body, status, expected] of [[{ status: "vin_context_changed" }, 200, "vin_context_changed"],
+    [{ status: "ok" }, 200, "vin_writer_unavailable"], [{ message: "failed" }, 500, "vin_writer_unavailable"]] as const) {
+    reset(); openai = () => oaOk(classicAnswer);
+    rpc.land_identifier_claims = () => Response.json(body, { status });
+    await handler(one());
+    assert(!calls.some(c => c.path === "/rest/v1/field_evidence") && !patchBodies.some(p => "vehicle_vin" in p));
+    assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === expected && c.body.p_detail.cited_identifiers === 0));
   }
 }});
 

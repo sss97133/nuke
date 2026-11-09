@@ -113,7 +113,7 @@ async function persistV98Columns(imageId: string, c: ClassificationResult, vinAd
       if (row.is_document !== true) patch.is_document = true;
       if (row.document_category == null) patch.document_category = x.document_category;
     }
-    if (vinAdmission.admitted && !row.vehicle_vin) {
+    if (vinAdmission.admitted && vinAdmission.basis === "modern_checksum" && !row.vehicle_vin) {
       patch.vehicle_vin = vinAdmission.read.value;
       patch.vehicle_vin_confidence = Math.min(vinAdmission.read.confidence ?? 0.8, 0.79);
     }
@@ -134,8 +134,8 @@ async function persistV98Columns(imageId: string, c: ClassificationResult, vinAd
  *    only EMPTY vehicle columns, marks disagreements 'conflicted' and records provenance. Nothing here overwrites a vehicle column.
  *  - vehicle_identifiers via land_identifier_claims (source_kind 'photo', quote + source_image_id + confidence): feeds identifier_consensus.
  *  Only when the photo is already filed to a vehicle (no new filing behaviour). Best effort: never fails classification. */
-async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: string, c: ClassificationResult, vinAdmission: VinAdmission): Promise<Record<string, number>> {
-  const out = { field_evidence: 0, identifiers: 0 };
+async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: string, c: ClassificationResult, vinAdmission: VinAdmission): Promise<{ field_evidence: number; identifiers: number; vin_refusal?: string }> {
+  const out: { field_evidence: number; identifiers: number; vin_refusal?: string } = { field_evidence: 0, identifiers: 0 };
   try {
     const x = c.v2;
     if (!x || !vehicleId) return out;
@@ -150,7 +150,7 @@ async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: s
         raw_extraction_data: { photo_id: imageId, image_id: imageId, quote: f.evidence, confidence: f.confidence, extractor: "photo-pipeline-orchestrator", prompt_version: x.prompt_version, image_url: imageUrl },
       });
     }
-    if (vinAdmission.admitted) {
+    if (vinAdmission.admitted && vinAdmission.basis === "modern_checksum") {
       const vin = vinAdmission.read;
       rows.push({
         vehicle_id: vehicleId, field_name: "vin", proposed_value: vin.value, source_type: "ai_visual",
@@ -171,13 +171,26 @@ async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: s
       ids.push({ kind: vinAdmission.kind, value: vin.value, quote: vin.evidence ?? "VIN read from photo", confidence: Math.min(vin.confidence ?? 0.8, 0.79) });
     }
     if (ids.length) {
-      const { error } = await supabase.rpc("land_identifier_claims", {
-        p_vehicle_id: vehicleId, p_read: { identifiers: ids }, p_source_url: imageUrl, p_extractor: "photo-pipeline-orchestrator-v99",
+      const atomic = vinAdmission.admitted && vinAdmission.basis === "pre1981_physical_plate";
+      const { data, error } = await supabase.rpc("land_identifier_claims", {
+        p_vehicle_id: vehicleId, p_read: { identifiers: ids,
+          ...(atomic ? { cited_vin: { ...vinCitation(vinAdmission), confidence: vinAdmission.read.confidence, prompt_version: x.prompt_version } } : {}) },
+        p_source_url: imageUrl, p_extractor: "photo-pipeline-orchestrator-v99",
         p_source_kind: "photo", p_source_image_id: imageId, p_run_id: null });
-      if (error) console.warn("[photo-pipeline] identifier landing failed (classification unaffected)");
-      else out.identifiers = ids.length;
+      if (error) {
+        console.warn("[photo-pipeline] identifier landing failed (classification unaffected)");
+        if (atomic) out.vin_refusal = "vin_writer_unavailable";
+      } else if (atomic && (data?.status !== "ok" || typeof data?.field_evidence !== "number" || typeof data?.identifiers !== "number"))
+        out.vin_refusal = data?.status && data.status !== "ok" ? data.status : "vin_writer_unavailable";
+      else {
+        out.identifiers = typeof data?.identifiers === "number" ? data.identifiers : ids.length;
+        if (atomic) out.field_evidence += data?.field_evidence ?? 0;
+      }
     }
-  } catch { console.warn("[photo-pipeline] cited evidence landing threw (classification unaffected)"); }
+  } catch {
+    console.warn("[photo-pipeline] cited evidence landing threw (classification unaffected)");
+    if (vinAdmission.admitted && vinAdmission.basis === "pre1981_physical_plate") out.vin_refusal = "vin_writer_unavailable";
+  }
   return out;
 }
 
@@ -622,7 +635,7 @@ Deno.serve(async (req) => {
     await reportStep(image_id, "done", { image_type: classification.image_type, confidence: classification.confidence,
       model: classification.classifier_receipt?.model ?? null, prompt_version: classification.classifier_receipt?.prompt_version ?? "legacy",
       v98_columns: Object.keys(v98Written), cited_field_evidence: cited.field_evidence, cited_identifiers: cited.identifiers,
-      vin_admission: vinAdmission.admitted ? vinAdmission.basis : vinAdmission.reason });
+      vin_admission: cited.vin_refusal ?? (vinAdmission.admitted ? vinAdmission.basis : vinAdmission.reason) });
 
     // Late-resolution dedup pass: Step 1.5 could only see this row in the
     // detector's corpus if it was INSERTed with a vehicle_id. When the vehicle
