@@ -489,7 +489,7 @@ export function parseTape(data: unknown): TapeBid[] {
   });
 }
 
-export interface SourceReceiptStatus { house: string; readAt: number | null; lots: number | null; state: string | null; hasError: boolean }
+export interface SourceReceiptStatus { house: string; readAt: number | null; lots: number | null; state: string | null; hasError: boolean; discoveryState?: string; discoveryAttemptAt?: number | null; collectionState?: string }
 async function fetchTape(): Promise<{ bids: TapeBid[]; sources: string[]; status: SourceReceiptStatus[] }> {
   const { data, error } = await supabase.rpc('live_bid_tape', { p_minutes: 5 });
   if (error) throw error;
@@ -498,7 +498,11 @@ async function fetchTape(): Promise<{ bids: TapeBid[]; sources: string[]; status
     if (typeof s.house !== 'string') return [];
     if (typeof s.label === 'string') SENT_LABELS.set(s.house, s.label);
     const readAt = Date.parse(s.read_at);
-    return [{ house:s.house, readAt:Number.isFinite(readAt) ? readAt : null, lots:typeof s.lots === 'number' ? s.lots : null, state:typeof s.state === 'string' ? s.state : null, hasError:s.has_error === true }];
+    const discoveryAttemptAt = Date.parse(s.discovery_attempt_at);
+    return [{ house:s.house, readAt:Number.isFinite(readAt) ? readAt : null, lots:typeof s.lots === 'number' ? s.lots : null, state:typeof s.state === 'string' ? s.state : null, hasError:s.has_error === true,
+      discoveryState: ['unrecorded','disabled','no_listings_parsed','blocked','error','unverified'].includes(s.discovery_state) ? s.discovery_state : undefined,
+      discoveryAttemptAt: Number.isFinite(discoveryAttemptAt) ? discoveryAttemptAt : null,
+      collectionState: s.collection_state === 'paused' ? 'paused' : undefined }];
   });
   return { status, bids: parseTape(data), sources: Array.isArray(data?.sources) ? data.sources.filter((s: unknown): s is string => typeof s === 'string') : [] };
 }

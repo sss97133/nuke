@@ -27,3 +27,23 @@ it('separates snapshots and recovery, retains quiet-source uncertainty, and puls
   expect(host.querySelector('.auction-flow__source--arrival')).toBeNull();
  } finally {await act(async()=>root.unmount());}
 });
+it('keeps discovery failures and paused collectors visible without inventing inventory', async () => {
+ vi.useFakeTimers(); vi.setSystemTime(now); (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div'); const root=createRoot(host);
+ try {
+  await act(async()=>root.render(<AuctionFlow bids={[]} houses={[]} auctions={[]} configuredSources={[]} now={now} error={false} updatedAt={now} onInspect={()=>{}}
+   sourceStatus={[
+    {house:'govdeals',readAt:null,lots:null,state:null,hasError:false,discoveryState:'no_listings_parsed',discoveryAttemptAt:now-60000},
+    {house:'cars-and-bids',readAt:null,lots:null,state:null,hasError:false,collectionState:'paused',discoveryState:'unverified'},
+    {house:'autohunter',readAt:null,lots:null,state:null,hasError:false,discoveryState:'disabled'},
+   ]}/>));
+  expect(host.querySelectorAll('.auction-flow__source')).toHaveLength(4);
+  expect(host.textContent).toContain('Discovery failed to parse listings');
+  expect(host.textContent).toContain('Native auction collector paused');
+  expect(host.textContent).toContain('Discovery feeds disabled');
+  expect(host.textContent).toContain('Discovery enabled · landing unverified');
+  expect(host.textContent).toContain('Inventory check not recorded');
+  expect(host.textContent).not.toContain('Reader found 0 lots');
+  expect(host.querySelector('.auction-flow__source--arrival')).toBeNull();
+ } finally { await act(async()=>root.unmount()); }
+});
