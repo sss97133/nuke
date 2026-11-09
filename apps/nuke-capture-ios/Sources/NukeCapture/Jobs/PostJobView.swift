@@ -48,6 +48,7 @@ struct PostJobView: View {
                 form
             }
         }
+        .accessibilityIdentifier("postjob.form")
         .navigationTitle(result == nil ? "Post a job" : "Job posted")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: vehicleId) {
