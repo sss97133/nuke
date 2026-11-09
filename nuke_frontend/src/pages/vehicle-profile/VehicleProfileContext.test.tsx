@@ -932,6 +932,8 @@ it.each(['https://bringatrailer.com/listing/old-lot/', 'https://carsandbids.com/
     const reads = requests.filter(request => endpoint(request, 'auction_comments', a));
     expect(reads.length).toBeGreaterThan(4);
     expect(reads.every(request => request.url.searchParams.get('source_url') === `eq.${url}`)).toBe(true);
+    expect(reads.every(request => request.url.searchParams.get('select')?.includes('canonical:auction_events_canonical(id)'))).toBe(true);
+    expect(reads.every(request => request.url.searchParams.getAll('or').includes('(auction_event_id.is.null,canonical.not.is.null)'))).toBe(true);
     const before = reads.length;
     sourceUrl = null;
     await act(async () => { await vi.advanceTimersByTimeAsync(60000); });

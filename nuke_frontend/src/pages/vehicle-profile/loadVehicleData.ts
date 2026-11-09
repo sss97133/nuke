@@ -746,7 +746,7 @@ export async function loadVehicleImpl({
             (shouldLoadComments && bidCount === null)
               ? supabase
                   .from('auction_comments')
-                  .select('id', { count: 'exact', head: true })
+                  .select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
                   .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                   .not('bid_amount', 'is', null)
@@ -755,7 +755,7 @@ export async function loadVehicleImpl({
             shouldLoadComments
               ? supabase
                   .from('auction_comments')
-                  .select('id', { count: 'exact', head: true })
+                  .select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
                   .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                   .or('bid_amount.is.null,comment_type.neq.bid')
@@ -763,7 +763,7 @@ export async function loadVehicleImpl({
             shouldLoadComments
               ? supabase
                   .from('auction_comments')
-                  .select('posted_at, author_username')
+                  .select('posted_at, author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
                   .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                   .not('bid_amount', 'is', null)
@@ -774,7 +774,7 @@ export async function loadVehicleImpl({
             shouldLoadComments
               ? supabase
                   .from('auction_comments')
-                  .select('posted_at')
+                  .select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
                   .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                   .or('bid_amount.is.null,comment_type.neq.bid')
@@ -785,7 +785,7 @@ export async function loadVehicleImpl({
             shouldLoadComments
               ? supabase
                   .from('auction_comments')
-                  .select('author_username')
+                  .select('author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
                   .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                   .eq('is_seller', true)

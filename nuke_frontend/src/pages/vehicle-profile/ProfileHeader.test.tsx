@@ -65,7 +65,7 @@ beforeEach(() => {
   fixture.gallery.mockReset();
   fixture.read = mustangRead();
   fixture.auctionRows = []; fixture.eventRows = [];
-  fixture.request.mockReset().mockImplementation((table: string) => Promise.resolve({ data: table === 'auction_events' ? fixture.auctionRows : fixture.eventRows, error: null }));
+  fixture.request.mockReset().mockImplementation((table: string) => Promise.resolve({ data: table === 'auction_events_canonical' ? fixture.auctionRows : fixture.eventRows, error: null }));
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 const render = () => act(async () => root.render(<ProfileHeader priceLotId="lot-1" />));
@@ -178,7 +178,7 @@ it('keeps an errored response stale payload out and names the unavailable enrich
 });
 
 it('preserves an exact positive result when the other additive reader fails', async () => {
-  fixture.request.mockImplementation((table: string) => table === 'auction_events'
+  fixture.request.mockImplementation((table: string) => table === 'auction_events_canonical'
     ? Promise.resolve({ data: [auction()], error: null }) : Promise.reject(new Error('PRIVATE REJECTED READ')));
   await renderLoaded(); openPrice();
   expect(document.body.textContent).toContain('Lot EXACT-LOT');
