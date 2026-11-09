@@ -1,100 +1,16 @@
--- Disposable PG17 only. Synthetic fixtures; exercises the actual migrations through 20261113200000_asset_role_claims_split.sql (acceptance paths a, b, c).
-\set ON_ERROR_STOP on
-DO $$ BEGIN
-  IF current_database() NOT LIKE 'dm_%' OR to_regclass('public.assets') IS NOT NULL THEN
-    RAISE EXCEPTION 'Empty disposable database required';
-  END IF;
-END $$;
-DO $$ BEGIN
-  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
-  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
-  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN BYPASSRLS; END IF;
-END $$;
-CREATE SCHEMA auth;
-CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
-$$ SELECT nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', '')::uuid $$;
-CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS
-$$ SELECT nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role' $$;
-GRANT USAGE ON SCHEMA auth TO PUBLIC;
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-
--- Live shapes (subset of columns), as of 2026-11-08.
-CREATE TABLE public.observation_sources(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text UNIQUE NOT NULL, display_name text,
-  base_trust_score numeric);
-CREATE TABLE public.assets(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), asset_type text NOT NULL, title text, description text,
-  creator_id uuid, owner_id uuid, organization_id uuid, status text DEFAULT 'active', visibility text DEFAULT 'private', vehicle_id uuid,
-  attributes jsonb DEFAULT '{}'::jsonb, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
-  CONSTRAINT assets_asset_type_check CHECK (asset_type = ANY (ARRAY['image','vehicle','garment','publication','issue','article','shoot',
-    'equipment','tool','part','material','goods'])));
-CREATE TABLE public.asset_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), asset_id uuid REFERENCES public.assets(id) ON DELETE CASCADE,
-  source_id uuid, kind text NOT NULL, observed_at timestamptz NOT NULL, content_text text, structured_data jsonb DEFAULT '{}'::jsonb, content_hash text NOT NULL,
-  confidence numeric DEFAULT 0.5, source_url text, source_identifier text, extraction_method text, agent_model text, superseded_by uuid,
-  supersedes uuid, created_at timestamptz DEFAULT now());
-CREATE UNIQUE INDEX asset_observations_photo_sighting_uidx ON public.asset_observations (asset_id, source_identifier, extraction_method)
-  WHERE kind = 'photo_sighting';
-CREATE TABLE public.source_census(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), source_id uuid REFERENCES public.observation_sources(id),
-  universe_total integer, universe_active integer, census_method text NOT NULL, census_confidence numeric, census_url text, census_notes text,
-  census_at timestamptz NOT NULL DEFAULT now(), by_year jsonb DEFAULT '{}', by_make jsonb DEFAULT '{}', by_category jsonb DEFAULT '{}',
-  raw_response jsonb, created_at timestamptz DEFAULT now());
-CREATE TABLE public.external_identities(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), platform text NOT NULL, handle text NOT NULL, profile_url text,
-  display_name text, claimed_by_user_id uuid, claimed_at timestamptz, claim_confidence integer DEFAULT 0, first_seen_at timestamptz DEFAULT now(),
-  last_seen_at timestamptz DEFAULT now(), metadata jsonb DEFAULT '{}'::jsonb, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(), user_id uuid,
-  CONSTRAINT external_identities_platform_handle_key UNIQUE (platform, handle));
-ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.asset_observations ENABLE ROW LEVEL SECURITY;
-
-CREATE TABLE public.profiles(id uuid PRIMARY KEY, username text, full_name text, is_public boolean DEFAULT true);
-INSERT INTO public.profiles (id, username, full_name) VALUES ('0b9f107a-0000-4000-8000-000000000001', 'holder', 'A Museum Visitor');
-INSERT INTO public.observation_sources (id, slug, display_name, base_trust_score)
-VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90), ('ad7104a3-48aa-486e-afff-f9f8af614800', 'owner-input', 'Owner input', 0.95);
--- Identity-link owners (subset of live columns and the live CHECK on targets). viewer_identity_bridge is the live body
--- (20261019093000_job_readers_authenticated.sql), copied verbatim.
-CREATE TABLE public.actors(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), display_name text);
-CREATE TABLE public.account_link_claims(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL, platform text NOT NULL, handle text NOT NULL,
-  external_identity_id uuid REFERENCES public.external_identities(id), status text NOT NULL DEFAULT 'pending', verification_method text,
-  reviewed_by_user_id uuid, reviewed_at timestamptz, actor_id uuid REFERENCES public.actors(id), rung_evidence jsonb NOT NULL DEFAULT '[]'::jsonb,
-  CONSTRAINT account_link_claims_one_target CHECK (
-    (actor_id IS NULL AND platform <> 'nuke_actor') OR
-    (actor_id IS NOT NULL AND external_identity_id IS NULL AND platform = 'nuke_actor' AND handle = actor_id::text)),
-  CONSTRAINT account_link_claims_actor_rung CHECK (
-    actor_id IS NULL OR (
-      verification_method IN ('unknown','self_claim','work_evidence','co_sign','authenticated_sign')
-      AND status IN ('pending','approved','rejected','expired')
-      AND (status <> 'approved' OR verification_method IN ('work_evidence','co_sign','authenticated_sign'))
-      AND (verification_method IN ('unknown','self_claim') OR (reviewed_by_user_id IS NOT NULL AND reviewed_at IS NOT NULL)))));
-CREATE FUNCTION public.viewer_identity_bridge(p_user uuid)
-RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path = pg_catalog, public AS $$
-  SELECT jsonb_build_object(
-    'state', CASE WHEN bool_or(c.status = 'approved' AND c.verification_method IN ('work_evidence','co_sign','authenticated_sign')) THEN 'evidenced'
-      WHEN bool_or(c.status = 'pending') THEN 'claimed' ELSE 'none' END,
-    'evidenced_actor_ids', COALESCE(to_jsonb(array_agg(DISTINCT c.actor_id) FILTER (WHERE c.status = 'approved'
-      AND c.verification_method IN ('work_evidence','co_sign','authenticated_sign'))), '[]'::jsonb))
-  FROM public.account_link_claims c
-  WHERE c.user_id = p_user AND c.actor_id IS NOT NULL
-$$;
-
--- Synthetic people. ...01 museum visitor; ...02 does vehicle and art work; ...03 artist; ...04 fabricator; ...05 later holder;
--- ...06 a different user whose display name equals a catalogue name.
-INSERT INTO public.profiles (id, username, full_name) VALUES
-  ('0b9f107a-0000-4000-8000-000000000002', 'tech', 'Two Trades'), ('0b9f107a-0000-4000-8000-000000000003', 'artist', 'An Artist'),
-  ('0b9f107a-0000-4000-8000-000000000004', 'fab', 'A Fabricator'), ('0b9f107a-0000-4000-8000-000000000005', 'later', 'A Later Holder'),
-  ('0b9f107a-0000-4000-8000-000000000006', 'namesake', 'Jane Doe');
-
-\ir ../migrations/20261108170000_asset_lots.sql
-\ir ../migrations/20261108200000_asset_lot_walk.sql
-\ir ../migrations/20261108230000_asset_creation_claims.sql
-\ir ../migrations/20261108233000_asset_creation_fold_layouts.sql
-\ir ../migrations/20261108234500_asset_creators_current_lot.sql
-\ir ../migrations/20261108235500_asset_creators_materialized.sql
-\ir ../migrations/20261109000000_asset_profile_read.sql
-\ir ../migrations/20261109013000_held_assets.sql
-\ir ../migrations/20261109020000_held_asset_proposals.sql
+-- Disposable PG17 only. Synthetic fixtures. Fresh-database contract for 20261113200000_asset_role_claims_split.sql: acceptance paths
+-- (a) museum visitor, (b) same person doing vehicle and art work, (c) artist / fabricator / later holder, plus cited-evidence
+-- currentness (supersede, withdraw) and claim revision history. Old-flow upgrade: test_asset_role_claims_upgrade.sql. Two-session
+-- handover race: test_asset_role_claims_concurrency.mjs.
+\ir asset_role_claims_fixture.sql
 \ir ../migrations/20261113200000_asset_role_claims_split.sql
+INSERT INTO public.profiles (id, username, full_name) VALUES ('0b9f107a-0000-4000-8000-000000000007', 'archive', 'An Own Archive');
 
--- (a) A museum visitor photographs someone else's work. Proposal -> confirm = one documentation claim. creator_id stays the visitor
---     as record origin; no maker, no holder, no holder_declaration. Dismiss leaves no current claim; pending proposals take no claims.
+-- (a) A museum visitor photographs someone else's work. Keeping it writes one documentation_record and no role claim at all:
+--     creator_id stays the visitor as record origin; no maker, holder, photographer or holder declaration. It stays listed and
+--     readable. A documenter statement is optional, recorded as testimony, and never promoted.
 SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
-DO $$ DECLARE r jsonb; c jsonb; p jsonb; mine jsonb; aid uuid; bid uuid; BEGIN
+DO $$ DECLARE r jsonb; c jsonb; p jsonb; mine jsonb; aid uuid; bid uuid; dc jsonb; BEGIN
   r := public.propose_held_assets('0b9f107a-0000-4000-8000-000000000001', $j$[
     {"proposal_key":"museum:visit:0001","kind":"painting","labels":["Painting"],"labeller":"apple_photos_on_device_v1",
      "photos":[{"uuid":"MUSE-1","taken_at":"2026-10-01T15:00:00Z","filename":"IMG_10.HEIC","place":"A museum"},
@@ -111,33 +27,36 @@ DO $$ DECLARE r jsonb; c jsonb; p jsonb; mine jsonb; aid uuid; bid uuid; BEGIN
     RAISE EXCEPTION 'a: a pending proposal must refuse claims';
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
   c := public.confirm_held_asset(aid, 'A painting seen at a museum', NULL, NULL, NULL, NULL, 'Photographed on a visit.', 'private');
-  IF (c->>'duplicate')::boolean OR c->>'holding' <> 'not_claimed' OR c->>'authorship' <> 'not_claimed' THEN RAISE EXCEPTION 'a: confirm receipt wrong: %', c; END IF;
+  IF (c->>'duplicate')::boolean OR c->>'holding' <> 'not_claimed' OR c->>'authorship' <> 'not_claimed' OR c->>'documentation_record_id' IS NULL THEN RAISE EXCEPTION 'a: keep receipt wrong: %', c; END IF;
   IF (SELECT creator_id::text FROM public.assets WHERE id = aid) <> '0b9f107a-0000-4000-8000-000000000001' THEN RAISE EXCEPTION 'a: creator_id must stay record origin'; END IF;
   IF (SELECT owner_id FROM public.assets WHERE id = aid) IS NOT NULL THEN RAISE EXCEPTION 'a: documenting must not set a holder'; END IF;
-  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind IN ('creation_claim', 'holding_claim', 'holder_declaration')) <> 0 THEN
-    RAISE EXCEPTION 'a: documenting must write no maker, holder or holder declaration'; END IF;
-  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'documentation_claim' AND superseded_by IS NULL
-        AND structured_data->>'party_user_id' = '0b9f107a-0000-4000-8000-000000000001' AND structured_data->>'claim_state' = 'evidenced'
-        AND jsonb_array_length(structured_data->'evidence') = 2) <> 1 THEN RAISE EXCEPTION 'a: one evidenced documentation claim citing both photos'; END IF;
+  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind IN ('documentation_claim', 'creation_claim', 'holding_claim',
+        'performance_claim', 'rights_claim', 'role_claim_acceptance', 'holder_declaration')) <> 0 THEN RAISE EXCEPTION 'a: keeping documentation writes no role claim'; END IF;
+  IF (SELECT jsonb_array_length(structured_data->'evidence') FROM public.asset_observations WHERE id = (c->>'documentation_record_id')::uuid) <> 2 THEN
+    RAISE EXCEPTION 'a: the documentation record cites both current photos'; END IF;
   c := public.confirm_held_asset(aid, 'A painting seen at a museum', NULL, NULL, NULL, NULL, NULL, 'private');
-  IF NOT (c->>'duplicate')::boolean OR (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'documentation_claim') <> 1 THEN
-    RAISE EXCEPTION 'a: confirming twice is a no-op'; END IF;
+  IF NOT (c->>'duplicate')::boolean OR (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'documentation_record') <> 1 THEN
+    RAISE EXCEPTION 'a: keeping twice is a no-op'; END IF;
   mine := public.held_assets_read(50);
-  IF (mine->>'total')::int <> 0 OR (mine->>'documented_total')::int <> 1 OR mine->'documented'->0->'my_roles' <> '["documenter"]'::jsonb THEN
-    RAISE EXCEPTION 'a: the visitor documents, does not hold: %', mine; END IF;
+  IF (mine->>'total')::int <> 0 OR (mine->>'documented_total')::int <> 1 OR mine->'documented'->0->>'id' <> aid::text
+     OR mine->'documented'->0 ? 'my_roles' OR (mine->'documented'->0->>'documentation_records')::int <> 1 THEN
+    RAISE EXCEPTION 'a: the visitor''s documentation stays listed with no role claim: %', mine; END IF;
   p := public.asset_profile_read(aid);
   IF p IS NULL OR (p->'viewer'->>'is_holder')::boolean OR NOT (p->'viewer'->>'is_record_origin')::boolean OR jsonb_array_length(p->'creation') <> 0
-     OR p->'role_claims'->0->>'role' <> 'documenter' OR p->'role_claims'->0 ? 'party_user_id' THEN RAISE EXCEPTION 'a: profile wrong: %', p; END IF;
-  -- Another signed-in user cannot read the private record.
+     OR jsonb_array_length(p->'role_claims') <> 0 OR (p->'documentation'->>'records')::int <> 1 THEN RAISE EXCEPTION 'a: profile wrong: %', p; END IF;
+  -- Optional documenter statement: stated, basis own library, unverified; the record stays documented either way.
+  dc := public.record_asset_role_claim(aid, 'documenter', (SELECT jsonb_agg(id::text) FROM public.asset_observations WHERE asset_id = aid AND kind = 'photo_sighting'), 'I took these.');
+  IF dc->'status'->>'qualification' <> 'stated_unverified' OR dc->'status'->>'basis' <> 'own_library_photo_sightings' THEN RAISE EXCEPTION 'a: documenter is testimony only: %', dc; END IF;
+  IF ((public.held_assets_read(50))->>'documented_total')::int <> 1 THEN RAISE EXCEPTION 'a: still documented'; END IF;
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000005"}', true);
   IF public.asset_profile_read(aid) IS NOT NULL THEN RAISE EXCEPTION 'a: a private record is not readable by another user'; END IF;
-  -- Dismiss the second proposal: archived, no current claim of any kind, testimony kept.
+  -- Discard the second proposal: archived, no current claim, testimony kept.
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000001"}', true);
   c := public.dismiss_held_asset(bid, 'not a work, a plinth');
   IF (SELECT status FROM public.assets WHERE id = bid) <> 'archived' THEN RAISE EXCEPTION 'a: dismiss archives'; END IF;
   IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = bid AND superseded_by IS NULL
         AND kind IN ('documentation_claim', 'creation_claim', 'holding_claim', 'performance_claim', 'rights_claim')
-        AND coalesce(structured_data->>'claim_state', 'source_statement') NOT IN ('withdrawn', 'ended')) <> 0 THEN RAISE EXCEPTION 'a: dismiss leaves no current claim'; END IF;
+        AND coalesce(structured_data->>'claim_state', 'stated') <> 'withdrawn') <> 0 THEN RAISE EXCEPTION 'a: dismiss leaves no current claim'; END IF;
   IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = bid AND kind = 'photo_sighting') <> 1 THEN RAISE EXCEPTION 'a: dismiss keeps testimony'; END IF;
   BEGIN
     PERFORM public.record_asset_role_claim(bid, 'holder');
@@ -145,9 +64,9 @@ DO $$ DECLARE r jsonb; c jsonb; p jsonb; mine jsonb; aid uuid; bid uuid; BEGIN
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
 END $$;
 
--- (b) One person does vehicle work and art work. Their art contributions resolve to work actors only through an approved
---     account_link_claims actor link (viewer_identity_bridge). A catalogue identity is not a technician actor, even when that
---     person has claimed it. A same-name user resolves to nothing.
+-- (b) One person does vehicle work and art work. Art claims resolve to work actors only through an approved account_link_claims
+--     actor link (viewer_identity_bridge). A catalogue identity is not a technician actor, even when claimed by that person. A
+--     same-name user resolves to nothing. Resolution is identity only, never skill evidence.
 SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
 INSERT INTO public.actors (id, display_name) VALUES ('ac700000-0000-4000-8000-000000000001', 'Two Trades shop actor'),
   ('ac700000-0000-4000-8000-000000000002', 'Unproven actor');
@@ -165,14 +84,13 @@ INSERT INTO public.asset_observations (asset_id, source_id, kind, observed_at, c
 VALUES ('a5500000-0000-4000-8000-000000000001', 'ad7104a3-48aa-486e-afff-f9f8af614883', 'creation_claim', '2025-05-01T12:00:00Z', 'Untitled',
         '{"role":"creator","attribution":"direct","layout":"lines","party_identity_id":"e7000000-0000-4000-8000-000000000001","name_as_printed":"Jane Doe"}',
         'test-house-claim-1', 'test-lot-1', 'house_catalogue_lines_v1');
-DO $$ DECLARE c jsonb; r jsonb; hc jsonb; tc jsonb; nc jsonb; BEGIN
+DO $$ DECLARE r jsonb; hc jsonb; tc jsonb; nc jsonb; BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000002"}', true);
   tc := public.record_asset_role_claim('a5500000-0000-4000-8000-000000000001', 'performer', '[]'::jsonb, 'Installed the work.');
-  IF tc->>'claim_state' <> 'self_reported' THEN RAISE EXCEPTION 'b: a performance claim is self-reported: %', tc; END IF;
+  IF tc->'status'->>'qualification' <> 'stated_unverified' THEN RAISE EXCEPTION 'b: a performance claim is testimony: %', tc; END IF;
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000006"}', true);
   nc := public.record_asset_role_claim('a5500000-0000-4000-8000-000000000001', 'creator', '[]'::jsonb, 'I am Jane Doe.');
-  IF nc->>'claim_state' <> 'self_reported' THEN RAISE EXCEPTION 'b: a name match is not evidence: %', nc; END IF;
-  -- Citing their own claim as evidence is refused.
+  IF nc->'status'->>'qualification' <> 'stated_unverified' THEN RAISE EXCEPTION 'b: a name match is not evidence: %', nc; END IF;
   BEGIN
     PERFORM public.record_asset_role_claim('a5500000-0000-4000-8000-000000000001', 'rights_holder', jsonb_build_array(nc->>'claim_id'), NULL);
     RAISE EXCEPTION 'b: own claim as evidence must be refused';
@@ -185,54 +103,67 @@ DO $$ DECLARE c jsonb; r jsonb; hc jsonb; tc jsonb; nc jsonb; BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
   r := public.asset_claim_actors('a5500000-0000-4000-8000-000000000001');
   SELECT x INTO hc FROM jsonb_array_elements(r->'claims') x WHERE x->>'party_kind' = 'catalogue';
-  IF hc IS NULL OR hc->'actor_ids' <> '[]'::jsonb OR hc->>'actor_basis' <> 'catalogue_identity_not_actor' THEN
+  IF hc IS NULL OR hc->'actor_ids' <> '[]'::jsonb OR hc->>'actor_basis' <> 'catalogue_identity_not_actor' OR hc->>'qualification' <> 'source_statement' THEN
     RAISE EXCEPTION 'b: a catalogue identity is not an actor, even when claimed: %', hc; END IF;
   SELECT x INTO tc FROM jsonb_array_elements(r->'claims') x WHERE x->>'claim_id' = tc->>'claim_id';
-  IF tc->'actor_ids' <> '["ac700000-0000-4000-8000-000000000001"]'::jsonb OR tc->>'bridge_state' <> 'evidenced' THEN
-    RAISE EXCEPTION 'b: the person resolves through the approved actor link only: %', tc; END IF;
+  IF tc->'actor_ids' <> '["ac700000-0000-4000-8000-000000000001"]'::jsonb OR tc->>'bridge_state' <> 'evidenced' OR tc->>'skill_evidence' <> 'none_identity_only' THEN
+    RAISE EXCEPTION 'b: the person resolves through the approved actor link only, as identity: %', tc; END IF;
   SELECT x INTO nc FROM jsonb_array_elements(r->'claims') x WHERE x->>'claim_id' = nc->>'claim_id';
   IF nc->'actor_ids' <> '[]'::jsonb OR nc->>'bridge_state' <> 'claimed' THEN RAISE EXCEPTION 'b: a pending self-claimed actor link resolves nothing: %', nc; END IF;
   IF jsonb_array_length(r->'claims') <> 3 THEN RAISE EXCEPTION 'b: three current claims expected: %', r; END IF;
-  -- The live CHECK forbids one row pairing an actor and a catalogue identity.
   BEGIN
     INSERT INTO public.account_link_claims (user_id, platform, handle, actor_id, external_identity_id, status, verification_method)
     VALUES ('0b9f107a-0000-4000-8000-000000000002', 'nuke_actor', 'ac700000-0000-4000-8000-000000000001', 'ac700000-0000-4000-8000-000000000001',
             'e7000000-0000-4000-8000-000000000001', 'pending', 'self_claim');
     RAISE EXCEPTION 'b: actor + catalogue identity in one row must fail';
   EXCEPTION WHEN check_violation THEN NULL; END;
-  -- House statements are untouched and user claims stay out of the market-by-party table.
   IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = 'a5500000-0000-4000-8000-000000000001' AND kind = 'creation_claim'
         AND structured_data ? 'party_identity_id' AND superseded_by IS NULL) <> 1 THEN RAISE EXCEPTION 'b: the house claim stays current'; END IF;
 END $$;
 
--- (c) Artist, fabricator and later holder: distinct claims. The artist's declaration holds but does not author; authorship is a
---     separate act. The later holder's holding (and their own declaration) writes no authorship claim. creator_id stays record origin.
-DO $$ DECLARE d jsonb; aid uuid; cr jsonb; fb jsonb; lh jsonb; h jsonb; mine jsonb; p jsonb; d2 jsonb; BEGIN
+-- (c) Artist, fabricator and later holder: distinct claims. Declaring holds (accepted under the interim policy) but does not author.
+--     Authorship is separate testimony, never promoted. The later holder writes no authorship. creator_id stays record origin.
+--     Revisions keep history (finding 5); a withdrawn cited claim lapses dependent evidence without touching the citing testimony.
+DO $$ DECLARE d jsonb; aid uuid; cr jsonb; cr2 jsonb; cr3 jsonb; fb jsonb; rt jsonb; lh jsonb; h jsonb; mine jsonb; p jsonb; d2 jsonb; BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000003"}', true);
   d := public.declare_held_asset('artwork', 'Edition of a fabricated sculpture', 'powder-coated steel', '2025', NULL, '1/3', NULL, 'public');
   aid := (d->>'asset_id')::uuid;
   IF d->>'authorship' <> 'not_claimed' OR (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'creation_claim') <> 0 THEN
     RAISE EXCEPTION 'c: declaring a held work writes no authorship: %', d; END IF;
-  IF (SELECT structured_data->>'claim_state' FROM public.asset_observations WHERE id = (d->>'holding_claim_id')::uuid) <> 'accepted'
-     OR (SELECT owner_id::text FROM public.assets WHERE id = aid) <> '0b9f107a-0000-4000-8000-000000000003' THEN RAISE EXCEPTION 'c: the declarer holds'; END IF;
-  -- Holding is not evidence of making: the artist's own holding claim cannot be cited for authorship.
+  IF public.asset_role_claim_status((d->>'holding_claim_id')::uuid)->>'qualification' <> 'accepted_interim'
+     OR (SELECT owner_id::text FROM public.assets WHERE id = aid) <> '0b9f107a-0000-4000-8000-000000000003' THEN RAISE EXCEPTION 'c: the declarer holds (interim)'; END IF;
   BEGIN
     PERFORM public.record_asset_role_claim(aid, 'creator', jsonb_build_array(d->>'holding_claim_id'), NULL);
     RAISE EXCEPTION 'c: own holding claim cited for authorship must be refused';
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
   cr := public.record_asset_role_claim(aid, 'creator', '[]'::jsonb, 'I conceived and designed it.');
-  IF cr->>'kind' <> 'creation_claim' OR cr->>'claim_state' <> 'self_reported' THEN RAISE EXCEPTION 'c: artist creator claim: %', cr; END IF;
+  IF cr->>'kind' <> 'creation_claim' OR cr->'status'->>'qualification' <> 'stated_unverified' THEN RAISE EXCEPTION 'c: artist creator claim: %', cr; END IF;
+  -- Finding 5: same payload is a no-op; a corrected statement is version 2 superseding version 1; a retry of version 1 is ignored.
+  IF NOT (public.record_asset_role_claim(aid, 'creator', '[]'::jsonb, 'I conceived and designed it.')->>'duplicate')::boolean THEN RAISE EXCEPTION 'c: same payload is a no-op'; END IF;
+  cr2 := public.record_asset_role_claim(aid, 'creator', '[]'::jsonb, 'I conceived, designed and supervised it.');
+  IF (cr2->>'duplicate')::boolean OR (cr2->'status'->>'version')::int <> 2 OR (SELECT superseded_by FROM public.asset_observations WHERE id = (cr->>'claim_id')::uuid) <> (cr2->>'claim_id')::uuid THEN
+    RAISE EXCEPTION 'c: a revised statement is a new version: %', cr2; END IF;
+  cr3 := public.record_asset_role_claim(aid, 'creator', '[]'::jsonb, 'I conceived and designed it.');
+  IF NOT (cr3->>'stale_retry')::boolean OR cr3->>'claim_id' <> cr2->>'claim_id' THEN RAISE EXCEPTION 'c: an old retry must not restore the old head: %', cr3; END IF;
+  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'creation_claim') <> 2 THEN RAISE EXCEPTION 'c: both versions kept'; END IF;
+
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000004"}', true);
   fb := public.record_asset_role_claim(aid, 'fabricator', '[]'::jsonb, 'Cut and welded the edition.');
   IF fb->>'kind' <> 'creation_claim' OR fb->>'role' <> 'fabricator' THEN RAISE EXCEPTION 'c: fabricator claim: %', fb; END IF;
+  -- Finding 3: the fabricator cites the artist's current creator claim for a rights statement; the artist later withdraws it.
+  rt := public.record_asset_role_claim(aid, 'rights_holder', jsonb_build_array(cr2->>'claim_id'), 'Licensed to reproduce the edition.');
+  BEGIN
+    PERFORM public.record_asset_role_claim(aid, 'performer', jsonb_build_array(cr->>'claim_id'), NULL);
+    RAISE EXCEPTION 'c: a superseded row cannot be cited';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
   BEGIN
     PERFORM public.accept_asset_holding_claim((d->>'holding_claim_id')::uuid);
     RAISE EXCEPTION 'c: only the current holder hands over';
   EXCEPTION WHEN invalid_parameter_value OR insufficient_privilege THEN NULL; END;
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000005"}', true);
   lh := public.record_asset_role_claim(aid, 'holder', '[]'::jsonb, 'Bought it from the artist.');
-  IF lh->>'claim_state' <> 'self_reported' OR (SELECT owner_id::text FROM public.assets WHERE id = aid) <> '0b9f107a-0000-4000-8000-000000000003' THEN
-    RAISE EXCEPTION 'c: a later holder is self-reported until handover: %', lh; END IF;
+  IF lh->'status'->>'qualification' <> 'stated_unverified' OR (SELECT owner_id::text FROM public.assets WHERE id = aid) <> '0b9f107a-0000-4000-8000-000000000003' THEN
+    RAISE EXCEPTION 'c: a later holder is testimony until handover: %', lh; END IF;
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000004"}', true);
   BEGIN
     PERFORM public.accept_asset_holding_claim((lh->>'claim_id')::uuid);
@@ -240,37 +171,74 @@ DO $$ DECLARE d jsonb; aid uuid; cr jsonb; fb jsonb; lh jsonb; h jsonb; mine jso
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000003"}', true);
   h := public.accept_asset_holding_claim((lh->>'claim_id')::uuid, 'sold 2026');
-  IF (SELECT owner_id::text FROM public.assets WHERE id = aid) <> '0b9f107a-0000-4000-8000-000000000005'
+  IF h->'status'->>'qualification' <> 'accepted_interim' OR (SELECT owner_id::text FROM public.assets WHERE id = aid) <> '0b9f107a-0000-4000-8000-000000000005'
      OR (SELECT creator_id::text FROM public.assets WHERE id = aid) <> '0b9f107a-0000-4000-8000-000000000003' THEN
-    RAISE EXCEPTION 'c: holding moves, record origin stays'; END IF;
-  -- Distinct current claims: artist creator, fabricator, later holder accepted, artist holding ended.
-  IF (SELECT string_agg(structured_data->>'role' || ':' || right(structured_data->>'party_user_id', 1) || ':' || (structured_data->>'claim_state'), ',' ORDER BY structured_data->>'role', structured_data->>'party_user_id')
-        FROM public.asset_observations WHERE asset_id = aid AND superseded_by IS NULL AND extraction_method = 'asset_role_claim_v1')
-     <> 'creator:3:self_reported,fabricator:4:self_reported,holder:3:ended,holder:5:accepted' THEN
-    RAISE EXCEPTION 'c: current claims wrong: %', (SELECT jsonb_agg(structured_data) FROM public.asset_observations WHERE asset_id = aid AND superseded_by IS NULL AND extraction_method = 'asset_role_claim_v1'); END IF;
+    RAISE EXCEPTION 'c: holding moves, record origin stays: %', h; END IF;
+  IF public.asset_holder_is(aid, '0b9f107a-0000-4000-8000-000000000003') THEN RAISE EXCEPTION 'c: the artist no longer holds'; END IF;
+  -- The artist withdraws the cited creator claim: the fabricator's rights claim keeps its testimony and its evidence lapses.
+  PERFORM public.withdraw_asset_role_claim((cr2->>'claim_id')::uuid, 'restating later');
+  IF public.asset_role_claim_status((rt->>'claim_id')::uuid)->>'qualification' <> 'stated_evidence_lapsed'
+     OR (SELECT structured_data->>'statement' FROM public.asset_observations WHERE id = (rt->>'claim_id')::uuid) <> 'Licensed to reproduce the edition.'
+     OR (SELECT superseded_by FROM public.asset_observations WHERE id = (rt->>'claim_id')::uuid) IS NOT NULL THEN
+    RAISE EXCEPTION 'c: withdrawing a cited claim lapses dependent evidence, testimony kept: %', public.asset_role_claim_status((rt->>'claim_id')::uuid); END IF;
   IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'creation_claim' AND structured_data->>'party_user_id' = '0b9f107a-0000-4000-8000-000000000005') <> 0 THEN
     RAISE EXCEPTION 'c: the later holder has no authorship claim'; END IF;
-  -- The artist is still record origin but no longer a holder: the reader never treats creator_id as holding.
   mine := public.held_assets_read(50);
-  IF (mine->>'total')::int <> 0 THEN RAISE EXCEPTION 'c: the artist no longer holds: %', mine; END IF;
+  IF (mine->>'total')::int <> 0 OR (mine->>'recorded_total')::int <> 1 OR NOT (mine->'recorded'->0->'reasons') ? 'record_origin' THEN
+    RAISE EXCEPTION 'c: the artist no longer holds but keeps the record in view: %', mine; END IF;
   p := public.asset_profile_read(aid);
   IF (p->'viewer'->>'is_holder')::boolean OR NOT (p->'viewer'->>'is_record_origin')::boolean THEN RAISE EXCEPTION 'c: artist viewer wrong: %', p->'viewer'; END IF;
-  IF (SELECT count(*) FROM jsonb_array_elements(p->'creation') x WHERE x->>'claim_state' = 'self_reported') <> 2 THEN RAISE EXCEPTION 'c: creation shows two self-reported claims: %', p->'creation'; END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(p->'creation') x WHERE x->>'qualification' = 'stated_unverified') <> 1 THEN RAISE EXCEPTION 'c: creation shows the fabricator''s stated claim only: %', p->'creation'; END IF;
   PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000005"}', true);
   mine := public.held_assets_read(50);
-  IF (mine->>'total')::int <> 1 OR mine->'assets'->0->'my_roles' <> '["holder"]'::jsonb THEN RAISE EXCEPTION 'c: the later holder holds: %', mine; END IF;
-  IF NOT ((public.asset_profile_read(aid))->'viewer'->>'is_holder')::boolean THEN RAISE EXCEPTION 'c: later holder is_holder'; END IF;
-  -- The later holder's own declaration of a work also writes no authorship.
+  IF (mine->>'total')::int <> 1 OR mine->'assets'->0->'my_roles'->0->>'qualification' <> 'accepted_interim' THEN RAISE EXCEPTION 'c: the later holder holds: %', mine; END IF;
   d2 := public.declare_held_asset('artwork', 'A print bought at a fair', NULL, NULL, NULL, NULL, NULL, 'private');
   IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = (d2->>'asset_id')::uuid AND kind = 'creation_claim') <> 0 THEN RAISE EXCEPTION 'c: declaration is not authorship'; END IF;
-  -- Withdrawing holding clears owner_id; the claim history stays.
-  PERFORM public.withdraw_asset_role_claim((h->>'claim_id')::uuid, 'consigned away');
-  IF (SELECT owner_id FROM public.assets WHERE id = aid) IS NOT NULL OR ((public.asset_profile_read(aid)) IS NOT NULL AND ((public.asset_profile_read(aid))->'viewer'->>'is_holder')::boolean) THEN
+  PERFORM public.withdraw_asset_role_claim((lh->>'claim_id')::uuid, 'consigned away');
+  IF (SELECT owner_id FROM public.assets WHERE id = aid) IS NOT NULL OR public.asset_holder_is(aid, '0b9f107a-0000-4000-8000-000000000005') THEN
     RAISE EXCEPTION 'c: withdrawal ends holding'; END IF;
-  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'holding_claim') <> 5 THEN RAISE EXCEPTION 'c: holding history kept (declared, self-reported, accepted, ended, withdrawn)'; END IF;
+  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'holding_claim') <> 3
+     OR (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'role_claim_acceptance') <> 4 THEN
+    RAISE EXCEPTION 'c: holding testimony (3) and acceptance history (4) kept'; END IF;
 END $$;
 
--- Anon cannot call the sign-tier writers.
+-- Finding 3, projection: an own-archive holder accepted under the interim policy cites a photo. A reread supersedes that photo:
+-- holding is disqualified at once (reader-time), owner_id is re-projected to NULL, and the holding testimony is unchanged.
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+DO $$ DECLARE r jsonb; aid uuid; ph uuid; ph2 uuid; hc jsonb; BEGIN
+  r := public.propose_held_assets('0b9f107a-0000-4000-8000-000000000007', $j$[{"proposal_key":"archive:own:0001","kind":"painting","labeller":"apple_photos_on_device_v1",
+    "photos":[{"uuid":"ARCH-1","taken_at":"2024-01-01T10:00:00Z"}]}]$j$::jsonb);
+  SELECT id INTO aid FROM public.assets WHERE attributes->>'identity_key' = 'proposal:0b9f107a-0000-4000-8000-000000000007:archive:own:0001';
+  SELECT id INTO ph FROM public.asset_observations WHERE asset_id = aid AND kind = 'photo_sighting';
+  PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000007"}', true);
+  PERFORM public.confirm_held_asset(aid, 'A painting in my studio', NULL, NULL, NULL, NULL, NULL, 'private');
+  hc := public.record_asset_role_claim(aid, 'holder', jsonb_build_array(ph::text), 'It hangs in my studio.');
+  IF hc->'status'->>'qualification' <> 'accepted_interim' OR hc->'status'->'acceptance'->>'basis' <> 'sign_tier_record_origin_declaration'
+     OR NOT public.asset_holder_is(aid, '0b9f107a-0000-4000-8000-000000000007') THEN RAISE EXCEPTION 'e: interim acceptance: %', hc; END IF;
+  -- A reread lands a new sighting and supersedes the cited one (as a re-reading writer would).
+  PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  INSERT INTO public.asset_observations (asset_id, source_id, kind, observed_at, structured_data, content_hash, source_identifier, extraction_method)
+  VALUES (aid, 'ad7104a3-48aa-486e-afff-f9f8af614800', 'photo_sighting', '2024-01-01T10:00:00Z', '{"reread":true}', 'reread-1', 'ARCH-1', 'reread_v2') RETURNING id INTO ph2;
+  UPDATE public.asset_observations SET superseded_by = ph2 WHERE id = ph;
+  IF public.asset_holder_is(aid, '0b9f107a-0000-4000-8000-000000000007') THEN RAISE EXCEPTION 'e: a superseded cited photo disqualifies holding'; END IF;
+  IF public.asset_role_claim_status((hc->>'claim_id')::uuid)->>'qualification' <> 'acceptance_lapsed' THEN RAISE EXCEPTION 'e: acceptance lapsed'; END IF;
+  IF (SELECT owner_id FROM public.assets WHERE id = aid) IS NULL THEN RAISE EXCEPTION 'e: owner_id is a cache, stale until re-projected'; END IF;
+  IF public.asset_holding_reproject(aid) IS NOT NULL THEN RAISE EXCEPTION 'e: re-projection finds no qualified holder'; END IF;
+  IF (SELECT owner_id FROM public.assets WHERE id = aid) IS NOT NULL THEN RAISE EXCEPTION 'e: projection cleared'; END IF;
+  IF (SELECT structured_data->>'claim_state' FROM public.asset_observations WHERE id = (hc->>'claim_id')::uuid) <> 'stated' THEN RAISE EXCEPTION 'e: testimony kept'; END IF;
+  -- The person sees it, now under documented (still their own photos), with the lapsed holding as a reason.
+  PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000007"}', true);
+  r := public.held_assets_read(50);
+  IF (r->>'total')::int <> 0 OR (r->>'documented_total')::int <> 1 OR NOT (r->'documented'->0->'reasons') ? 'holder:acceptance_lapsed' THEN RAISE EXCEPTION 'e: listed with its lapsed holding: %', r; END IF;
+  -- The lapsed photo cannot be cited again; the current reread can.
+  BEGIN
+    PERFORM public.record_asset_role_claim(aid, 'holder', jsonb_build_array(ph::text), 'It hangs in my studio.');
+    RAISE EXCEPTION 'e: a superseded photo cannot be cited';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  hc := public.record_asset_role_claim(aid, 'holder', jsonb_build_array(ph2::text), 'It hangs in my studio.');
+  IF hc->'status'->>'qualification' <> 'accepted_interim' OR (hc->'status'->>'version')::int <> 2 THEN RAISE EXCEPTION 'e: restated on current evidence: %', hc; END IF;
+END $$;
+
 DO $$ BEGIN
   PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
   BEGIN
