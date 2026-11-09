@@ -7,6 +7,7 @@ export const AUCTION_SNAPSHOT_METHOD = "ebay_browse_auction_snapshot_v1";
 export interface SnapshotReceipt { observationId: string; snapshotId: string; observedAt: string }
 export interface SnapshotInput {
   vehicleId: string; url: string; summary: EbayItem; observedAt: string; previousObservationId: string | null; readMethod?: "search" | "getItem";
+  sourceCapture?: { snapshot_id: string; html_sha256: string; fetched_at: string; source_url: string };
 }
 export type SnapshotWriter = (sb: any, input: SnapshotInput) => Promise<SnapshotReceipt>;
 const hash = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, "0")).join("");
@@ -30,7 +31,10 @@ export const admitAuctionSnapshot: SnapshotWriter = async (sb, input) => {
   if (!key || !base) throw new Error("auction observation credentials unavailable");
   const raw = (await tombstoneItem(deletedLookup(sb), input.summary)).raw;
   // Previous admission distinguishes A -> B -> A. A failed projection retries the same capture and clock.
-  const body = JSON.stringify({ previous_observation_id: input.previousObservationId, read_method: input.readMethod ?? "search", summary: raw });
+  if (input.sourceCapture && Date.parse(input.sourceCapture.fetched_at) !== Date.parse(input.observedAt))
+    throw new Error("auction source page clock mismatch");
+  const body = JSON.stringify({ previous_observation_id: input.previousObservationId, read_method: input.readMethod ?? "search", summary: raw,
+    ...(input.sourceCapture ? { source_capture: input.sourceCapture } : {}) });
   const digest = await hash(body);
   const identifier = `auction-snapshot:${listingKey(input.summary)}:${input.vehicleId}:${digest}`;
   const find = () => sb.from("listing_page_snapshots").select("id,fetched_at")
@@ -56,7 +60,8 @@ export const admitAuctionSnapshot: SnapshotWriter = async (sb, input) => {
     body: JSON.stringify({ source_slug: "ebay_motors", kind: "listing", observed_at: observedAt, source_url: input.url,
       source_identifier: identifier, vehicle_id: input.vehicleId, structured_data: fields,
       extraction_method: AUCTION_SNAPSHOT_METHOD, raw_source_ref: ref, defer_analysis: true,
-      extraction_metadata: { capture_kind: "auction_bid_snapshot", snapshot_id: snapshotId, clock: "source_read" },
+      extraction_metadata: { capture_kind: "auction_bid_snapshot", snapshot_id: snapshotId, clock: "source_read",
+        ...(input.sourceCapture ? { source_capture: input.sourceCapture } : {}) },
     }),
   });
   const result = await response.json().catch(() => null);
