@@ -20,14 +20,17 @@ Deno.test("exact unique monitor locator survives canonical vehicle resolution wi
   let limited=0;const filters:any[]=[];
   const db={from(table:string){const eqs:any[]=[];return {
     select(){return this;},eq(key:string,value:string){eqs.push([key,value]);filters.push([table,key,value]);return this;},
-    in(column:string,urls:string[]){assert.equal(column,"external_auction_url");assert.deepEqual(urls,[url]);return this;},
+    in(column:string,urls:string[]){assert.equal(column,"external_auction_url");assert.deepEqual(urls,[url.slice(0,-1),url]);return this;},
     single(){return Promise.resolve({data:{id:source},error:null});},
     limit(n:number){limited=n;return Promise.resolve({data:eqs.some(([k])=>k==="vehicle_id")?[]:[row],error:null});}};}};
-  assert.deepEqual(await findBatHtmlRecoveryMonitor(db,[url],"canonical-vehicle"),row);assert.equal(limited,2);
+  assert.deepEqual(await findBatHtmlRecoveryMonitor(db,["http://www.bringatrailer.com/listing/fixture-k5/?utm_source=test",url.slice(0,-1),url],"canonical-vehicle"),row);assert.equal(limited,2);
   assert.ok(filters.some(([t,k,v])=>t==="monitored_auctions"&&k==="external_auction_id"&&v==="fixture-k5"));
   assert.ok(filters.some(([t,k,v])=>t==="monitored_auctions"&&k==="source_id"&&v===source));
 });
 Deno.test("recovery refuses ambiguous, foreign and failed locator reads",async()=>{
+  for (const urls of [[url,"https://bringatrailer.com/listing/another-lot/"],[url,"https://foreign.example/listing/fixture-k5/"]]) {
+    await assert.rejects(()=>findBatHtmlRecoveryMonitor({from(){throw Error("must reject before lookup");}},urls,vehicle),/locator/);
+  }
   for(const data of [[{id:monitor,external_auction_url:url},{id:vehicle,external_auction_url:url}],
     [{id:monitor,external_auction_url:"https://bringatrailer.com/listing/foreign/"}],null]) {
     const q:any={select(){return q;},eq(){return q;},in(){return q;},limit(){return Promise.resolve({data,error:null});}};

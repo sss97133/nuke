@@ -4,6 +4,18 @@ import { BAT_LIVE_MODE, type BatLiveFrame } from "../_shared/batLiveEvents.ts";
  * episode belongs to the original vehicle. The native intake owns that binding;
  * select only an unambiguous exact lot locator, never reassign either vehicle. */
 export async function findBatHtmlRecoveryMonitor(db: any, urls: string[], resolvedVehicleId: string) {
+  const slugs=[...new Set(urls.map(url=>{
+    const u=new URL(url);
+    if(!["https:","http:"].includes(u.protocol) || !["bringatrailer.com","www.bringatrailer.com"].includes(u.hostname)
+      || u.username || u.password || u.port || !/^\/listing\/[^/]+\/?$/.test(u.pathname))
+      throw new Error("BaT recovery lot locator invalid");
+    return u.pathname.replace(/\/$/,"").split("/").pop()!;
+  }))];
+  if(slugs.length!==1) throw new Error("BaT recovery lot locator ambiguous");
+  // The extractor includes its raw input alongside canonical variants. Tracking
+  // parameters, www and HTTP inputs must not break an otherwise valid BaT lot.
+  const canonical=`https://bringatrailer.com/listing/${slugs[0]}`;
+  urls=[canonical,`${canonical}/`];
   const columns="id,vehicle_id,external_auction_url,auction_end_time,stream_state,is_live";
   const checked=(result:any)=>{
     if (result.error) throw new Error(`BaT native recovery monitor lookup failed: ${result.error.message}`);
@@ -19,13 +31,6 @@ export async function findBatHtmlRecoveryMonitor(db: any, urls: string[], resolv
   if(own) return own;
   const source=await db.from("live_auction_sources").select("id").eq("slug","bat").single();
   if(source.error || typeof source.data?.id!=="string") throw new Error("BaT recovery source unavailable");
-  const slugs=[...new Set(urls.map(url=>{
-    const u=new URL(url);
-    if(u.protocol!=="https:" || u.hostname!=="bringatrailer.com" || u.search || u.hash
-      || !/^\/listing\/[^/]+\/?$/.test(u.pathname)) throw new Error("BaT recovery lot locator invalid");
-    return u.pathname.replace(/\/$/,"").split("/").pop()!;
-  }))];
-  if(slugs.length!==1) throw new Error("BaT recovery lot locator ambiguous");
   // Reuse the existing unique (source_id, external_auction_id) index. A URL-only
   // fallback would scan all historical monitors on every normal page extraction.
   return checked(await db.from("monitored_auctions").select(columns)

@@ -27,7 +27,9 @@ DECLARE
         JOIN public.observation_sources provenance ON provenance.id=native.source_id AND provenance.slug='bat'
         JOIN public.vehicles locator ON locator.id=m.vehicle_id
         JOIN public.vehicles canonical ON canonical.id=native.vehicle_id AND canonical.deleted_at IS NULL
-        WHERE native.id=nullif(m.stream_state->>'last_observation_id','')::uuid
+        WHERE native.id=CASE WHEN m.stream_state->>'last_observation_id'
+          ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          THEN (m.stream_state->>'last_observation_id')::uuid END
           AND native.extraction_method='bat_public_live_v1' AND native.is_superseded IS NOT TRUE
           AND native.vehicle_id IS DISTINCT FROM m.vehicle_id
           AND native.vehicle_match_signals->>'monitor_vehicle_id'=m.vehicle_id::text

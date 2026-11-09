@@ -58,6 +58,9 @@ INSERT INTO vehicle_events(vehicle_id,source_platform,source_url) VALUES(md5('ot
 SELECT public.bat_live_pull_run(0,false);
 SELECT pg_temp.ok('ambiguous episode owner cannot account the capture',(SELECT last_comment_synced_at IS NULL FROM monitored_auctions WHERE id=md5('monitor')::uuid));
 DELETE FROM vehicle_events WHERE vehicle_id=md5('other')::uuid;
+UPDATE monitored_auctions SET stream_state='{"last_observation_id":"invalid"}' WHERE id=md5('monitor')::uuid;
+SELECT public.bat_live_pull_run(0,false);
+SELECT pg_temp.ok('malformed witness fails closed without aborting scheduler',(SELECT last_comment_synced_at IS NULL FROM monitored_auctions WHERE id=md5('monitor')::uuid));
 UPDATE monitored_auctions SET stream_state='{}' WHERE id=md5('monitor')::uuid;
 SELECT public.bat_live_pull_run(0,false);
 SELECT pg_temp.ok('canonical event alone without native witness is insufficient',(SELECT last_comment_synced_at IS NULL FROM monitored_auctions WHERE id=md5('monitor')::uuid));
