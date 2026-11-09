@@ -66,6 +66,8 @@ BEGIN
   ASSERT image_photo_zones('exterior_side', NULL, NULL, ARRAY['tire','wheel']) = ARRAY['exterior'];
   ASSERT 'wheel' = ANY (image_photo_zones(NULL, 'wheel_fl', NULL, NULL));
   ASSERT image_photo_end('exterior_rear', NULL) = 'rear';
+  ASSERT image_photo_zones('undercarriage', NULL, NULL, ARRAY['engine_vehicle','wheel']) = ARRAY['undercarriage'], 'labels do not override a placed frame';
+  ASSERT image_photo_zones(NULL, NULL, NULL, ARRAY['Dashboard']) = ARRAY['dashboard'], 'labels read case-insensitively for an unplaced frame';
 
   -- correlation fixture: receipt 2025-01-10 (shaker hood, tail lamp, shipping, labor line); photos
   INSERT INTO vehicles VALUES (V, U, U);
@@ -93,6 +95,8 @@ BEGIN
     -- sensitive and duplicate frames: never cited
     ('00000000-0000-0000-0000-0000000000f4', V, '2025-01-12 15:00Z', false, false, true, 'approved', NULL, NULL, '{"classification":{"v2":{"angle":{"value":"exterior_front"}}}}', NULL),
     ('00000000-0000-0000-0000-0000000000f5', V, '2025-01-12 15:00Z', true, false, false, 'approved', NULL, NULL, '{"classification":{"v2":{"angle":{"value":"exterior_front"}}}}', NULL),
+    -- an end-less exterior frame shot before the rear frame: a rear line still cites the rear frame first
+    ('00000000-0000-0000-0000-0000000000f7', V, '2025-08-01 15:00Z', false, false, false, 'approved', NULL, NULL, '{"classification":{"v2":{"angle":{"value":"exterior_three_quarter"}}}}', NULL),
     -- a photo before the purchase is not after it
     ('00000000-0000-0000-0000-0000000000f6', V, '2024-12-01 15:00Z', false, false, false, 'approved', NULL, NULL, '{"classification":{"v2":{"angle":{"value":"interior_dashboard"}}}}', NULL);
   INSERT INTO work_sessions VALUES ('00000000-0000-0000-0000-000000000011', V, '2025-02-01');
@@ -102,12 +106,13 @@ BEGIN
   ASSERT n = 6, format('5 lines of c1 + line-less c3, duplicate receipt excluded; got %s', n);
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d1';
   ASSERT r.conclusion = 'install_window_photographed' AND r.judgment_needed, r.conclusion;
-  ASSERT r.image_ids = ARRAY['00000000-0000-0000-0000-0000000000f1'::uuid], r.image_ids::text;
+  ASSERT r.image_ids = ARRAY['00000000-0000-0000-0000-0000000000f1'::uuid, '00000000-0000-0000-0000-0000000000f7'::uuid], r.image_ids::text;
   ASSERT r.days_to_first_photo = 22 AND r.work_session_ids = ARRAY['00000000-0000-0000-0000-000000000011'::uuid];
   ASSERT r.timeline_event_ids = ARRAY['00000000-0000-0000-0000-000000000021'::uuid];
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d2';
-  ASSERT r.conclusion = 'photographed_after_window' AND r.image_ids = ARRAY['00000000-0000-0000-0000-0000000000f2'::uuid], 'front frame cannot show a tail lamp: ' || r.conclusion || r.image_ids::text;
-  ASSERT r.days_to_first_photo = 234;
+  ASSERT r.conclusion = 'photographed_after_window' AND r.image_ids = ARRAY['00000000-0000-0000-0000-0000000000f2'::uuid, '00000000-0000-0000-0000-0000000000f7'::uuid],
+    'rear frame first, end-less frame next, front frame never: ' || r.conclusion || r.image_ids::text;
+  ASSERT r.days_to_first_photo = 203;
   SELECT * INTO r FROM receipt_work_lines(V, 300) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d2';
   ASSERT r.conclusion = 'install_window_photographed', r.conclusion;
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.item_id = '00000000-0000-0000-0000-0000000000d3';

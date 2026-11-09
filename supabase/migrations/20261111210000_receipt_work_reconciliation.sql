@@ -95,18 +95,19 @@ COMMENT ON FUNCTION public.receipt_zone_labels(text) IS
 -- ─── what zones a frame shows ─────────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.image_photo_zones(p_angle text, p_vehicle_zone text, p_scene text, p_labels text[]) RETURNS text[]
 LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
-  SELECT coalesce(array_agg(z ORDER BY z), '{}') FROM (
-    SELECT 'dashboard' AS z WHERE p_angle = 'interior_dashboard' OR p_vehicle_zone = 'int_dashboard'
-                              OR coalesce(p_labels, '{}') && ARRAY['dashboard', 'tachometer', 'dial']
-    UNION SELECT 'interior' WHERE p_angle = 'interior_dashboard' OR p_vehicle_zone LIKE 'int\_%' OR p_scene = 'body_interior'
-                              OR coalesce(p_labels, '{}') && ARRAY['seat', 'car_seat']
-    UNION SELECT 'engine' WHERE p_angle = 'engine_bay' OR p_vehicle_zone = 'mech_engine_bay' OR p_scene = 'engine_bay'
-                              OR coalesce(p_labels, '{}') && ARRAY['engine_vehicle']
-    UNION SELECT 'wheel' WHERE p_vehicle_zone LIKE 'wheel\_%' OR p_vehicle_zone = 'mech_brakes' OR p_scene LIKE 'wheel\_assembly%'
-    UNION SELECT 'undercarriage' WHERE p_angle = 'undercarriage' OR p_vehicle_zone IN ('ext_undercarriage', 'mech_drivetrain', 'mech_exhaust', 'mech_suspension')
-                              OR p_scene = 'undercarriage'
-    UNION SELECT 'exterior' WHERE p_angle LIKE 'exterior%' OR (p_vehicle_zone LIKE 'ext\_%' AND p_vehicle_zone <> 'ext_undercarriage')
-                              OR p_vehicle_zone LIKE 'panel\_%' OR p_vehicle_zone = 'detail_badge' OR p_scene LIKE 'body\_exterior%'
+  -- a frame a reader has placed (classifier angle, promoted zone, deep scene) is read from that placement only;
+  -- the on-device labels speak only for a frame no reader has placed (an "engine_vehicle" label on an underside shot is not an engine photo)
+  WITH f AS (SELECT p_angle AS a, p_vehicle_zone AS vz, p_scene AS sc,
+                    CASE WHEN coalesce(p_angle, p_vehicle_zone, p_scene) IS NULL
+                         THEN (SELECT array_agg(lower(l)) FROM unnest(coalesce(p_labels, '{}')) l) ELSE '{}' END AS lb)
+  SELECT coalesce(array_agg(z ORDER BY z), '{}') FROM f, LATERAL (
+    SELECT 'dashboard' AS z WHERE a = 'interior_dashboard' OR vz = 'int_dashboard' OR coalesce(lb, '{}') && ARRAY['dashboard', 'tachometer', 'dial']
+    UNION SELECT 'interior' WHERE a = 'interior_dashboard' OR vz LIKE 'int\_%' OR sc = 'body_interior' OR coalesce(lb, '{}') && ARRAY['seat', 'car_seat']
+    UNION SELECT 'engine' WHERE a = 'engine_bay' OR vz = 'mech_engine_bay' OR sc = 'engine_bay' OR coalesce(lb, '{}') && ARRAY['engine_vehicle']
+    UNION SELECT 'wheel' WHERE vz LIKE 'wheel\_%' OR vz = 'mech_brakes' OR sc LIKE 'wheel\_assembly%'
+    UNION SELECT 'undercarriage' WHERE a = 'undercarriage' OR vz IN ('ext_undercarriage', 'mech_drivetrain', 'mech_exhaust', 'mech_suspension') OR sc = 'undercarriage'
+    UNION SELECT 'exterior' WHERE a LIKE 'exterior%' OR (vz LIKE 'ext\_%' AND vz <> 'ext_undercarriage') OR vz LIKE 'panel\_%' OR vz = 'detail_badge'
+                              OR sc LIKE 'body\_exterior%' OR coalesce(lb, '{}') && ARRAY['bumper', 'license_plate']
   ) s
 $$;
 COMMENT ON FUNCTION public.image_photo_zones(text, text, text, text[]) IS
@@ -164,7 +165,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
            count(m.id)::int AS total,
            count(m.id) FILTER (WHERE m.d <= ln.anchor + p_window_days)::int AS in_window,
            min(m.d) AS first_day,
-           (array_agg(m.id ORDER BY (ln.end_hint IS NOT NULL AND m.img_end = ln.end_hint) DESC, m.taken_at))[1:p_max_images] AS ids
+           (array_agg(m.id ORDER BY coalesce(m.img_end = ln.end_hint, false) DESC, cardinality(m.zones), m.taken_at))[1:p_max_images] AS ids
       FROM lines ln
       LEFT JOIN imgs m ON ln.zone IS NOT NULL AND ln.anchor IS NOT NULL AND m.d >= ln.anchor AND ln.zone = ANY (m.zones)
                      -- a frame of the other end of the car cannot show this line's part
