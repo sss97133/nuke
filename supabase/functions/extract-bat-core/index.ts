@@ -60,14 +60,14 @@ import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type E
 import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
 import { handoffBatLiveCollection } from "./liveStream.ts";
-import { admitBatHtmlRecovery } from "./batHtmlRecovery.ts";
+import { admitBatHtmlRecovery, findBatHtmlRecoveryMonitor } from "./batHtmlRecovery.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/archiveFetch.ts";
 import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.10';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.11';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -2871,14 +2871,13 @@ Deno.serve(async (req) => {
     // uses (sha256 of 'bat'|url|sequence|posted_at|author|text; rows built by the shared builder), so the two writers dedupe on
     // (vehicle_id, content_hash); bids also into bat_bids when the lot has a bat_listings row. Skylar's rule:
     // a BaT auction's comments, bids, open and close belong on the vehicle's timeline at their precise moments.
-    const closingCommentMonitor = vehicleId && auction.parsed ? await supabase.from("monitored_auctions")
-      .select("id,auction_end_time,stream_state,is_live").eq("vehicle_id",vehicleId).in("external_auction_url",urlCandidates).limit(1).maybeSingle() : null;
-    if (closingCommentMonitor?.error) throw new Error(`BaT native recovery monitor lookup failed: ${closingCommentMonitor.error.message}`);
-    const closingCommentId = closingCommentMonitor?.data?.id;
+    const closingCommentMonitor = vehicleId && auction.parsed
+      ? await findBatHtmlRecoveryMonitor(supabase, urlCandidates, vehicleId) : null;
+    const closingCommentId = closingCommentMonitor?.id;
     const nativeClosingIntake = closingCommentId && (streamOwnsAuction ||
-      (Date.parse(closingCommentMonitor!.data!.auction_end_time) <= Date.now()+15*60000
-        && Date.parse(closingCommentMonitor!.data!.auction_end_time) > Date.now()-24*60*60000));
-    const scheduledBidRecovery = closingCommentId && closingCommentMonitor?.data?.is_live === true;
+      (Date.parse(closingCommentMonitor!.auction_end_time) <= Date.now()+15*60000
+        && Date.parse(closingCommentMonitor!.auction_end_time) > Date.now()-24*60*60000));
+    const scheduledBidRecovery = closingCommentId && closingCommentMonitor?.is_live === true;
     if (nativeClosingIntake || scheduledBidRecovery) {
       // Shared front door and monitor lock with the WebSocket reader. An HTML
       // fallback cannot race its native comment/profile INSERT or create a fork.
