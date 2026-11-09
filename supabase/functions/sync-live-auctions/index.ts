@@ -36,6 +36,7 @@ import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/b
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postObservations } from "./postObservations.ts";
 import { retainCcBidCapture, type CcNativeCapture } from "./ccBidCapture.ts";
+import { projectCcEpisodes } from "./ccEpisodeState.ts";
 import { pcarBidCapture, pcarBidObservation } from "./pcarBidCapture.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import {
@@ -656,7 +657,9 @@ async function ingestCcPath(
   const followed = new Set(closed.map((c) => c.external_id));
   await lookup(sold.filter((d) => !followed.has(String(d.auctionId))).map((d) => `https://collectingcars.com/for-sale/${d.slug}`));
   const results = await postObservations(supabase, ccResultObservations(sold, closed, vehicleOf, now, 12 * 3_600_000), deadline, 20);
-  return { read_at: readAt, bids, results: { ...results, sold_index: sold.length, followed_closed: closed.length, days: resultsDays } };
+  // Existing fresh bid/result captures run first. Held testimony retries this projection without another admission.
+  const episodes = await projectCcEpisodes(supabase, bidPosts, nativeOf, deadline);
+  return { read_at: readAt, bids, episodes, results: { ...results, sold_index: sold.length, followed_closed: closed.length, days: resultsDays } };
 }
 
 // ============================================

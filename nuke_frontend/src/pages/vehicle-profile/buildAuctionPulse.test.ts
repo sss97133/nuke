@@ -85,3 +85,15 @@ describe('canonical auction telemetry across a soft close', () => {
       last_bid_at: '2026-10-04T17:38:00Z', last_comment_at: '2026-10-04T17:38:00Z' });
   });
 });
+
+ it('preserves the CC episode currency, native clock and current quote despite stale high_bid', () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-09T01:10:00Z'));
+  const row = { ...listing, source_platform: 'collecting_cars', event_type: 'auction',
+    source_url: 'https://collectingcars.com/for-sale/1980-porsche-928-2',
+    current_price: 15000, high_bid: 999999, currency_code: 'AUD', bid_count: 31,
+    ended_at: '2026-11-12T06:05:00Z', metadata: { currency: 'USD', source_observed_at: '2026-11-09T01:06:03.523Z' } };
+  expect(buildAuctionPulseFromExternalListings([row], 'cc-vehicle')).toMatchObject({
+    current_bid: 15000, currency_code: 'AUD', bid_count: 31, end_date: row.ended_at,
+    source_observed_at: row.metadata.source_observed_at,
+  });
+});
