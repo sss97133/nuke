@@ -170,33 +170,7 @@ export async function classifyWithOpenAI(imageUrl: string, apiKey: string | unde
     const text = choice?.message?.content;
     if (typeof text !== "string" || !text) return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase, error_class: "classifier_response_empty" });
     const parsed = JSON.parse(text);
-    const imageTypes = ["vehicle_exterior", "vehicle_interior", "engine_bay", "undercarriage", "detail_closeup", "vin_plate", "part_closeup", "receipt_document", "progress_shot", "other"];
-    const extras = useV2 ? applyV2(parsed, manifest) : null; // normalises legacy-shaped fields in place; never throws
-    const hints = parsed?.vehicle_hints;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      // OpenAI emits "" / "null" / "N/A" for unknown optional fields more often than Gemini; normalise to absent before validating.
-      if (parsed.vin_detected === "" || parsed.vin_detected === "null") parsed.vin_detected = null;
-      if (Array.isArray(parsed.detected_text)) parsed.detected_text = parsed.detected_text.filter((v: unknown) => typeof v === "string" && v.trim()).slice(0, 32).map((v: string) => v.slice(0, 200));
-      if (typeof parsed.description === "string") parsed.description = parsed.description.slice(0, 1000);
-      if (typeof parsed.medium_context === "string") parsed.medium_context = parsed.medium_context.slice(0, 300);
-    }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !imageTypes.includes(parsed.image_type) ||
-        !["photograph", "render", "drawing", "screenshot"].includes(parsed.image_medium) ||
-        typeof parsed.is_automotive !== "boolean" || !oa_boundedText(parsed.description, 1000) || !parsed.description.trim() ||
-        !Number.isFinite(parsed.confidence) || parsed.confidence < 0 || parsed.confidence > 1 ||
-        (parsed.detected_text != null && (!Array.isArray(parsed.detected_text) || parsed.detected_text.length > 32 || !parsed.detected_text.every((v: unknown) => oa_boundedText(v, 200)))) ||
-        (parsed.vin_detected != null && (typeof parsed.vin_detected !== "string" || !/^[A-HJ-NPR-Z0-9]{17}$/.test(parsed.vin_detected))) ||
-        (parsed.medium_context != null && !oa_boundedText(parsed.medium_context, 300)) ||
-        (hints != null && (typeof hints !== "object" || Array.isArray(hints) || Object.entries(hints).some(([k, v]) =>
-          !["make", "model", "year_range", "color"].includes(k) || (v != null && !oa_boundedText(v, 120)))))) {
-      throw new SyntaxError("invalid classifier fields");
-    }
-    return { image_type: parsed.image_type, confidence: parsed.confidence, is_automotive: parsed.is_automotive,
-      description: parsed.description, detected_text: parsed.detected_text ?? undefined,
-      vin_detected: parsed.vin_detected ?? undefined, image_medium: parsed.image_medium,
-      medium_context: parsed.medium_context ?? undefined,
-      vehicle_hints: hints == null ? undefined : Object.fromEntries(Object.entries(hints).filter(([, v]) => v != null && v !== "")),
-      v2: extras ?? undefined, classifier_ok: true, classifier_receipt: receipt };
+    return classificationFromParsed(parsed, manifest, useV2, receipt);
   } catch (error) {
     if (error instanceof ClassifierError) return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase, error_class: error.code, ...(error.status != null ? { http_status: error.status } : {}) });
     const code = error instanceof SyntaxError ? "classifier_response_invalid"
@@ -480,4 +454,51 @@ export function applyV2(parsed: any, m: SchemaManifest = SCHEMA_MANIFEST): V2Ext
       vin, text_lines: lines, vehicle_fields: fields, document,
     };
   } catch { return null; }
+}
+
+/** The classifier's answer, validated exactly as classifyWithOpenAI validates it (legacy fields + the v98 extras). Throws
+ *  SyntaxError on an unusable answer. Shared by the OpenAI path and by a reader that ran the same prompt elsewhere. */
+export function classificationFromParsed(parsed: any, manifest: SchemaManifest, useV2: boolean, receipt: ClassifierReceipt): ClassificationResult {
+  const imageTypes = ["vehicle_exterior", "vehicle_interior", "engine_bay", "undercarriage", "detail_closeup", "vin_plate", "part_closeup", "receipt_document", "progress_shot", "other"];
+  const extras = useV2 ? applyV2(parsed, manifest) : null; // normalises legacy-shaped fields in place; never throws
+  const hints = parsed?.vehicle_hints;
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    // OpenAI emits "" / "null" / "N/A" for unknown optional fields more often than Gemini; normalise to absent before validating.
+    if (parsed.vin_detected === "" || parsed.vin_detected === "null") parsed.vin_detected = null;
+    if (Array.isArray(parsed.detected_text)) parsed.detected_text = parsed.detected_text.filter((v: unknown) => typeof v === "string" && v.trim()).slice(0, 32).map((v: string) => v.slice(0, 200));
+    if (typeof parsed.description === "string") parsed.description = parsed.description.slice(0, 1000);
+    if (typeof parsed.medium_context === "string") parsed.medium_context = parsed.medium_context.slice(0, 300);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !imageTypes.includes(parsed.image_type) ||
+      !["photograph", "render", "drawing", "screenshot"].includes(parsed.image_medium) ||
+      typeof parsed.is_automotive !== "boolean" || !oa_boundedText(parsed.description, 1000) || !parsed.description.trim() ||
+      !Number.isFinite(parsed.confidence) || parsed.confidence < 0 || parsed.confidence > 1 ||
+      (parsed.detected_text != null && (!Array.isArray(parsed.detected_text) || parsed.detected_text.length > 32 || !parsed.detected_text.every((v: unknown) => oa_boundedText(v, 200)))) ||
+      (parsed.vin_detected != null && (typeof parsed.vin_detected !== "string" || !/^[A-HJ-NPR-Z0-9]{17}$/.test(parsed.vin_detected))) ||
+      (parsed.medium_context != null && !oa_boundedText(parsed.medium_context, 300)) ||
+      (hints != null && (typeof hints !== "object" || Array.isArray(hints) || Object.entries(hints).some(([k, v]) =>
+        !["make", "model", "year_range", "color"].includes(k) || (v != null && !oa_boundedText(v, 120)))))) {
+    throw new SyntaxError("invalid classifier fields");
+  }
+  return { image_type: parsed.image_type, confidence: parsed.confidence, is_automotive: parsed.is_automotive,
+    description: parsed.description, detected_text: parsed.detected_text ?? undefined,
+    vin_detected: parsed.vin_detected ?? undefined, image_medium: parsed.image_medium,
+    medium_context: parsed.medium_context ?? undefined,
+    vehicle_hints: hints == null ? undefined : Object.fromEntries(Object.entries(hints).filter(([, v]) => v != null && v !== "")),
+    v2: extras ?? undefined, classifier_ok: true, classifier_receipt: receipt };
+}
+
+/** A classification produced by the owner's own reader (the subscription worker ran renderPromptV2 and hands back the
+ *  JSON). Same validation as a provider answer; an unusable answer is the usual classifier_response_invalid, so the
+ *  orchestrator's retry and failure accounting are unchanged. */
+export async function classificationFromReader(parsed: unknown, reader: string): Promise<ClassificationResult> {
+  const receipt: ClassifierReceipt = { model: `reader:${reader.slice(0, 80)}`, attempts: 1, token_count_attempts: 0, prompt_version: "v98",
+    timing_ms: { image_download: 0, token_count: 0, generation: 0, total: 0 } };
+  let manifest: SchemaManifest = SCHEMA_MANIFEST;
+  try { manifest = await loadManifest(); } catch { /* static manifest */ }
+  try {
+    return classificationFromParsed(parsed, manifest, true, receipt);
+  } catch (_e) {
+    return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: "classification", error_class: "classifier_response_invalid" });
+  }
 }
