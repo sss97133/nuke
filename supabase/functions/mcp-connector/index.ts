@@ -14,6 +14,7 @@ import {
   type WriteTier,
 } from "../_shared/scopeGrammar.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { serviceInvoker } from "./advisor/instant_ingest.ts";
 import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import {
   checkAdvisorRateLimit,
@@ -6165,6 +6166,8 @@ async function handleJsonRpc(body: JsonRpcRequest, chatgptSurface = false): Prom
 initAdvisorHandlers({
   sb: () => getSupabase(),
   callEdgeApi,
+  // T6: evaluate_listing lands a missing BaT lot through extract-bat-core (service role, ~10 s budget).
+  invokeFunction: serviceInvoker(SUPABASE_URL, SERVICE_ROLE_KEY),
 });
 
 Deno.serve(async (req: Request) => {

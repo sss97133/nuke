@@ -2,6 +2,7 @@
 import { assetIdProblem, effectiveListingStatus } from "./asset_status.ts";
 import { rankFindResults } from "./find_rank.ts";
 import { adjustedEstimate, type AdjResult, type IndexSeries } from "./adjust.ts";
+import type { InvokeFunction } from "./instant_ingest.ts";
 import {
   AGENT_CITATION_RULES,
   citationFromObservation,
@@ -49,6 +50,8 @@ export interface AdvisorDeps {
     method?: "GET" | "POST",
     body?: Record<string, unknown>,
   ) => Promise<unknown>;
+  /** T6: service-role edge invoker (evaluate_listing's instant BaT ingest). Optional; absent = queue only. */
+  invokeFunction?: InvokeFunction;
 }
 
 export interface AdvisorToolResult {

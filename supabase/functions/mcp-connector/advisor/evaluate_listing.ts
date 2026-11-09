@@ -26,6 +26,7 @@ import {
   recentSaleSanityGuard,
 } from "./variants.ts";
 import { allInCost, cohortTrend, type FeeRow, pricePosition } from "./market_position.ts";
+import { batLotUrl, type InstantIngestResult, instantIngestBat, type InvokeFunction } from "./instant_ingest.ts";
 
 /** Page-observed subject facts passed to value_asset (mirrors handlers.ts SubjectOverride). */
 export interface ValueAssetOverride {
@@ -78,6 +79,13 @@ export interface EvaluateDeps {
     assetId: string,
     override?: ValueAssetOverride,
   ) => Promise<{ structuredContent: AdvisorEnvelope; isError?: boolean }>;
+  /**
+   * T6: service-role edge invoker. When present, a BaT lot that is not in Nuke is landed through
+   * extract-bat-core inside a ~10 s budget before evaluating; absent (tests, harness) = old queue-only path.
+   */
+  invokeFunction?: InvokeFunction;
+  /** Override the instant-ingest budget (tests). */
+  instantIngestBudgetMs?: number;
 }
 
 export interface AdvisorToolResult {
@@ -89,6 +97,29 @@ export interface AdvisorToolResult {
 const VISION_PHOTO_CAP = 8;
 const VISION_CONCURRENCY = 2;
 const VISION_BUDGET_MS = 75_000;
+
+function hostOf(u: string): string {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return "";
+  }
+}
+
+/** One markdown line describing what T6 did for a miss (null when the lot was already in Nuke). */
+function ingestLine(ingest: (InstantIngestResult & { queued?: boolean }) | null): string | null {
+  if (!ingest) return null;
+  if (ingest.status === "ingested") {
+    return `- Not in Nuke before this paste: landed now from the BaT page (${ingest.created ? "new record" : "existing record refreshed"}, ${ingest.ms} ms)`;
+  }
+  if (ingest.status === "timeout") {
+    return `- Not in Nuke yet: instant ingest passed its ${Math.round(ingest.budget_ms / 1000)} s budget; ${ingest.queued ? "queued" : "queue attempted"} for ingest — page facts only`;
+  }
+  if (ingest.status === "failed") {
+    return `- Not in Nuke yet: instant ingest failed (${ingest.error}); ${ingest.queued ? "queued" : "queue attempted"} for ingest — page facts only`;
+  }
+  return `- Not in Nuke yet: ${ingest.reason}`;
+}
 
 function ok(envelope: AdvisorEnvelope, markdown: string): AdvisorToolResult {
   const withMd = { ...envelope, markdown_summary: markdown };
@@ -893,8 +924,11 @@ function buildVerdict(input: {
   } else if (kind === "current_bid") {
     // A live bid is not an ask: never say "ask below fair band" days before the close.
     const ends = listing.auction_end_at ? `, ends ${listing.auction_end_at.slice(0, 10)}` : "";
-    if (price != null) {
+    if (price != null && price > 0) {
       parts.push(`auction live, ${said} — ${bandRelation(price, fairLow, fairHigh)} what similar cars sold for so far${ends}`);
+    } else if (price === 0) {
+      // A just-listed lot shows "Bidding Open" and a $0 price: no bid yet, nothing to compare.
+      parts.push(`auction live, no bids yet${ends}`);
     } else {
       parts.push(`auction live${ends}`);
     }
@@ -956,6 +990,7 @@ function buildMarkdown(input: {
   value: Record<string, unknown>;
   verdict: string;
   latency_ms: number;
+  ingest?: string | null;
 }): string {
   const { listing, photos, claims, missing, comps, priorSales, redFlags, value, verdict, latency_ms } =
     input;
@@ -964,6 +999,7 @@ function buildMarkdown(input: {
   lines.push("");
   lines.push(`**${listing.title || "Untitled"}**`);
   lines.push(`- URL: ${listing.url}`);
+  if (input.ingest) lines.push(input.ingest);
   if (listing.listing_kind === "auction_live") {
     lines.push(
       `- Auction live · current bid ${money(listing.current_bid ?? null)}${
@@ -1076,6 +1112,14 @@ export async function handleEvaluateListing(
   }
   if (listing.http_status >= 400 && !listing.title && !listing.description) {
     return err(`Listing fetch returned HTTP ${listing.http_status}`);
+  }
+  // T6: a BaT lot page that answers 404/410 does not exist publicly (unpublished, removed, or a dead `?p=`
+  // shortlink — the Nov 5 coverage-miss row). Nothing to evaluate and nothing to queue.
+  if ((listing.http_status === 404 || listing.http_status === 410) && /(^|\.)bringatrailer\.com$/i.test(hostOf(listing.url || url))) {
+    return err(
+      `Bring a Trailer answered HTTP ${listing.http_status} for this URL: the lot is not public (unpublished or removed), ` +
+        "so there is nothing to evaluate and it was not queued for ingest.",
+    );
   }
 
   const listingCit = citeListing(listing);
@@ -1206,15 +1250,36 @@ export async function handleEvaluateListing(
       matchedRow = fuzzy[0] as Record<string, unknown>;
     }
   }
+  // T6: a BaT lot that is not in Nuke yet is landed now through the canonical writer (extract-bat-core,
+  // service role) inside a ~10 s budget, then evaluated like any matched lot. Only a timeout or a failed
+  // write falls through to the queue below. The `?p=<post id>` shortlink resolves to its lot through the
+  // page fetch's final URL, so the canonical lot URL is what gets landed or queued.
+  let ingest: (InstantIngestResult & { lot_url?: string; queued?: boolean }) | null = null;
+  const lotUrl = batLotUrl(listing.url, url);
+  if (!matchedId && lotUrl && listing.http_status < 400 && deps.invokeFunction) {
+    ingest = { ...(await instantIngestBat(deps.invokeFunction, lotUrl, { budgetMs: deps.instantIngestBudgetMs })), lot_url: lotUrl };
+    if (ingest.status === "ingested") {
+      const { data: landed } = await sb.from("vehicles").select(matchSelect).eq("id", ingest.vehicle_id).limit(1);
+      if (landed?.[0]?.id) {
+        matchMethod = "instant_ingest";
+        matchedId = String(landed[0].id);
+        matchedRow = landed[0] as Record<string, unknown>;
+      } else {
+        ingest = { status: "failed", ms: ingest.ms, error: "landed vehicle not readable after ingest", lot_url: lotUrl };
+      }
+    }
+  }
   // Coverage: every listing handed to the advisor should already be in Nuke. Log hit/miss; misses are queued
-  // for ingest. Best effort, never blocks the evaluation.
+  // for ingest (an instant ingest logs as a hit with match_method 'instant_ingest', so misses stay countable).
+  // Best effort, never blocks the evaluation.
   try {
-    await sb.rpc("log_listing_coverage", {
+    const cov = await sb.rpc("log_listing_coverage", {
       p_tool: "evaluate_listing",
-      p_url: url,
+      p_url: !matchedId && lotUrl ? lotUrl : url,
       p_vehicle_id: matchedId,
       p_match_method: matchMethod,
     });
+    if (ingest && ingest.status !== "ingested") ingest.queued = Boolean(cov?.data?.queued);
   } catch (_e) { /* coverage logging must not fail the evaluation */ }
   let matchedSale: { amount: number; on: string | null; source_url: string | null } | null = null;
   const subjectCanon = canonicalListingUrl(url);
@@ -1395,6 +1460,7 @@ export async function handleEvaluateListing(
       value: { fair_low: null, fair_high: null, confidence: 0.15, basis: value.basis },
       verdict,
       latency_ms,
+      ingest: ingestLine(ingest),
     });
     return ok(
       makeEnvelope("evaluate_listing", "vehicle", matchedId, claimsOut, {
@@ -1406,6 +1472,7 @@ export async function handleEvaluateListing(
         matched_asset_id: matchedId,
         listing: listingOut(listing),
         field_conflicts: fieldConflicts,
+        ingest,
         latency_ms,
         markdown_summary: markdown,
       }),
@@ -1779,6 +1846,7 @@ export async function handleEvaluateListing(
     },
     verdict,
     latency_ms,
+    ingest: ingestLine(ingest),
   });
 
   // Hero shape only — omit empty boilerplate fields.
@@ -1798,6 +1866,7 @@ export async function handleEvaluateListing(
     all_in: allIn,
     position,
     trend,
+    ingest,
     latency_ms,
     markdown_summary: markdown,
   });
