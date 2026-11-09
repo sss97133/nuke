@@ -93,3 +93,29 @@ it('preserves an explicitly denominated completed sale', async () => {
   expect(container.textContent).toContain('Sold: Oct 1, 2026');
   expect(container.textContent).not.toContain('currency unrecorded');
 });
+
+
+it('reads a source-cited canonical currency without replacing an older unknown-currency episode', async () => {
+  fixture.rows = [listing({ source_platform: 'bat', event_status: 'active', current_price: 75000,
+    currency_code: 'USD', currency_source: 'Native BaT inventory item.currency=USD', metadata: {} }),
+    listing({ id: 'prior', source_platform: 'barrettjackson', source_url: 'https://www.barrett-jackson.com/fixture',
+      event_status: 'sold', final_price: 121000, sold_at: '2026-01-15T00:00:00Z', metadata: {} })];
+  await render();
+  expect(container.textContent).toContain('$75,000');
+  expect(container.textContent).toContain('Current Bid');
+  expect(container.textContent).toContain('121,000 (currency unrecorded)');
+  expect(container.querySelectorAll('a')).toHaveLength(2);
+});
+
+it('prefers the canonical price currency and preserves the explicit legacy currency-code fallback', async () => {
+  fixture.rows = [listing({ event_status: 'active', current_price: 75000, currency_code: 'CHF',
+    metadata: { currency: 'USD' } })];
+  await render();
+  expect(container.textContent).toContain('CHF');
+  expect(container.textContent).not.toContain('$');
+  fixture.rows = [listing({ event_status: 'active', current_price: 75000, currency_code: null,
+    metadata: { currency_code: ' eur ' } })];
+  await act(async () => root.render(<ExternalListingCard vehicleId="other" />));
+  expect(container.textContent).toContain('€75,000');
+  expect(container.textContent).not.toContain('currency unrecorded');
+});

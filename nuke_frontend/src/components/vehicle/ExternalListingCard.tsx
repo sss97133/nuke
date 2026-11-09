@@ -7,6 +7,8 @@ interface VehicleEvent {
   source_platform: string;
   source_url: string;
   event_status: string;
+  currency_code?: string | null;
+  currency_source?: string | null;
   current_price?: number | string | null;
   final_price?: number | string | null;
   bid_count?: number;
@@ -185,8 +187,10 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
           const isActive = statusStr === 'active' || statusStr === 'live';
           const isScheduled = ['pending', 'upcoming', 'scheduled'].includes(statusStr);
           const isSold = statusStr === 'sold';
-          const currencyCode = typeof listing.metadata?.currency === 'string' ? listing.metadata.currency.trim().toUpperCase() : '';
-          const currency = supportedCurrencies.has(currencyCode) ? currencyCode : null;
+          // The canonical price currency is nullable (unknown), never a platform-based USD default.
+          const currency = [listing.currency_code, listing.metadata?.currency_code, listing.metadata?.currency]
+            .map(value => typeof value === 'string' ? value.trim().toUpperCase() : '')
+            .find(value => supportedCurrencies.has(value)) ?? null;
           const reserveStatus = String(listing.metadata?.reserve_status || '').toLowerCase();
           const reserveNotMet =
             statusStr === 'reserve_not_met' ||
