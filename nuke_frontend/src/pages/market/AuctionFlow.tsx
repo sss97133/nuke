@@ -37,13 +37,13 @@ export function AuctionFlow({ bids, houses, auctions, configuredSources, sourceS
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   const recent = sourceActivity(bids, now);
   const current = recent.filter(b => !b.recovered && b.bidAt > now - 300_000);
-  const sources = [...new Set(['bringatrailer', ...configuredSources, ...houses.map(h => h.house), ...auctions.map(a => a.house), ...recent.flatMap(b => b.house ? [b.house] : [])])];
+  const sources = [...new Set(['bringatrailer', ...configuredSources, ...sourceStatus.map(s => s.house), ...houses.map(h => h.house), ...auctions.map(a => a.house), ...recent.flatMap(b => b.house ? [b.house] : [])])];
   const scale = Math.max(1, ...sources.flatMap(h => Array.from({ length: 5 }, (_, i) => current.filter(b => b.house === h && b.ingestedAt! > now - (5 - i) * 60_000 && b.ingestedAt! <= now - (4 - i) * 60_000).length)));
   const stale = error || !updatedAt || now - updatedAt > 45_000;
   const rows = recent.filter(b => !selected || b.house === selected).sort((a, b) => (b.ingestedAt ?? 0) - (a.ingestedAt ?? 0));
   return <section className="auction-flow" aria-label="Auction data arriving">
     <div className="auction-flow__heading"><h2>Arriving now</h2><span>{stale ? 'Receipt refresh unavailable' : `Receipts read ${clock(updatedAt)}`}</span></div>
-    <p>Priced auction evidence admitted in the last five minutes. A snapshot records a high bid when polled; it is not an individual bid. Price quotes with zero or unknown bids are counted separately. Recovered history is listed separately and does not light up current activity. No arrivals does not prove a quiet source.</p>
+    <p>Priced auction evidence admitted in the last five minutes. A snapshot records a high bid when polled; it is not an individual bid. Price quotes with zero or unknown bids are counted separately. Recovered history is listed separately and does not light up current activity. No arrivals does not prove a quiet source. Discovery attempts do not establish inventory or bid coverage.</p>
     <div className="auction-flow__sources">
       {sources.map(house => {
         const status = sourceStatus.find(s => s.house === house);
@@ -62,6 +62,8 @@ export function AuctionFlow({ bids, houses, auctions, configuredSources, sourceS
             {bins.map((n, i) => <span key={i} title={`${n} admitted updates`} style={{ height: `${Math.max(2, n / scale * 24)}px`, opacity: n ? 1 : 0.2 }} />)}
           </span>
           {status && <small>{status.hasError ? 'Inventory reader reports an error' : status.readAt == null ? 'Inventory check not recorded' : now - status.readAt > 900_000 ? 'Inventory check is stale' : `Reader found ${status.lots ?? 'unknown'} lots`}{status.readAt != null ? ` · ${new Date(status.readAt).toLocaleString()}` : ''}{status.state ? ` · ${status.state.replaceAll('_', ' ')}` : ''}</small>}
+          {status?.collectionState === 'paused' && <small>Native auction collector paused</small>}
+          {status?.discoveryState && <small>{({ unrecorded: 'Discovery feed not recorded', disabled: 'Discovery feeds disabled', no_listings_parsed: 'Discovery failed to parse listings', blocked: 'Discovery is blocked or deferred', error: 'Discovery reports an error', unverified: 'Discovery enabled · landing unverified' } as Record<string, string>)[status.discoveryState]}{status.discoveryAttemptAt != null ? ` · last attempt ${new Date(status.discoveryAttemptAt).toLocaleString()}` : ''}</small>}
           <small>{stale ? 'Last received evidence' : held && !held.onBoard ? 'Board freshness gate holds this source' : group.length ? 'Arrivals observed · completeness unverified' : 'No receipts in window · coverage unverified'}</small>
         </button>;
       })}
