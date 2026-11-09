@@ -33,15 +33,18 @@ git -C "$MAIN" fetch -q origin main && git -C "$MAIN" checkout -q --detach origi
 run_reader() { # name script args...
   local name="$1"; shift
   local out="$LOGDIR/$name-$STAMP.json"
+  local started_s; started_s=$(date +%s)
   local summary
   summary="$(cd "$HOME/nuke" && dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" 2>>"$LOGDIR/subscription-reader.log" | tail -1)"
   [ -n "$summary" ] || summary='{"error":"no summary"}'
   echo "$STAMP $name $summary"
-  # 4. heartbeat: one job_assay_readings row the job-health view can read (fresh for 30 min; the plist fires every 10)
-  dotenvx run -q -f "$ENV_FILE" -- bash -c 'curl -sS --max-time 20 -o /dev/null -w "%{http_code}" -X POST "$SUPABASE_URL/rest/v1/job_assay_readings" \
-    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -H "Prefer: return=minimal" \
-    -d "{\"jobname\":\"'"$name"'\",\"reading\":'"$summary"',\"assayed_at\":\"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'\",\"fresh_for\":\"30 minutes\",\"refresh_every\":\"10 minutes\"}"' \
-    | { read -r code; [ "$code" = "201" ] || echo "$STAMP heartbeat for $name returned HTTP $code"; }
+  # 4. heartbeat: record_reader_heartbeat (service role only) upserts one job_assay_readings row per reader; the cron job
+  #    subscription-reader-watch fails when either row is older than 40 minutes, so v_job_health shows a silent reader.
+  local elapsed_ms=$(( ( $(date +%s) - started_s ) * 1000 ))
+  dotenvx run -q -f "$ENV_FILE" -- bash -c 'curl -sS --max-time 20 -o /dev/null -w "%{http_code}" -X POST "$SUPABASE_URL/rest/v1/rpc/record_reader_heartbeat" \
+    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" \
+    -d "{\"p_jobname\":\"'"$name"'\",\"p_reading\":'"$summary"',\"p_elapsed_ms\":'"$elapsed_ms"'}"' \
+    | { read -r code; [ "$code" = "200" ] || echo "$STAMP heartbeat for $name returned HTTP $code"; }
 }
 
 # 2. documents, then 3. frames (failed first, then pending)
