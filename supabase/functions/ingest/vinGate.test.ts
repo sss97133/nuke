@@ -12,6 +12,22 @@ Deno.test("a 17-character VIN with a valid check digit is decoded", () => {
   assertEquals(vinMakeCheckApplies("1HGCM82633A004352"), true);
 });
 
+Deno.test("actual retained Lexus VINs pass without allowing a Toyota marque claim", () => {
+  for (const vin of ["JTHFN48Y320004994", "JTHFN48Y640051813", "JT8CH32Y0X1002070"]) {
+    const decoded = decodeVin(vin);
+    assertEquals(vinMakeCheckApplies(vin), true);
+    assertEquals(vinMakeConflict(vin, "Lexus", decoded), null);
+    assertEquals(vinMakeConflict(vin, "Toyota", decoded)?.expected, "Lexus");
+  }
+});
+Deno.test("retained International truck passes manufacturer compatibility without assigning a marque", () => {
+  const vin = "1HTSCAAM8SH264534", decoded = decodeVin(vin);
+  assertEquals(vinMakeCheckApplies(vin), true);
+  assertEquals(decoded.make, null);
+  assertEquals(vinMakeConflict(vin, "International", decoded), null);
+  assertEquals(vinMakeConflict(vin, "Honda", decoded)?.claimed, "Honda");
+});
+
 Deno.test("a 17-character VIN with a failing check digit is not decoded", () => {
   assertEquals(vinMakeCheckApplies("1HGCM82643A004352"), false);
   assertEquals(vinMakeCheckApplies("WP0ZZZ99ZHS116152"), false); // European VIN, no NA check digit

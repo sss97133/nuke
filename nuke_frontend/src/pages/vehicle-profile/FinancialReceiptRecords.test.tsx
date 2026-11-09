@@ -2,17 +2,21 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ from: vi.fn(), eq: vi.fn(), sign: vi.fn(), privatePath: vi.fn() }));
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+const fixture = vi.hoisted(() => ({ from: vi.fn(), eq: vi.fn(), sign: vi.fn(), privatePath: vi.fn(), rpc: vi.fn(), viewer: null as string | null, authLoading: false }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.viewer ? { id: fixture.viewer } : null, loading: fixture.authLoading }) }));
 vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '/synthetic-pdf-worker.mjs' }));
-vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from } }));
+vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from, rpc: fixture.rpc } }));
 vi.mock('../../lib/privateStorage', () => ({ signPrivateStorageUrl: fixture.sign, privateStoragePath: fixture.privatePath }));
-import { ReceiptRecords } from './FinancialReceiptRecords';
+import { ReceiptRecords, CorrectionReceipt } from './FinancialReceiptRecords';
 import { parseVehicleReceiptRecord } from './hooks/useBuildLedger';
 
 let host: HTMLDivElement, root: Root;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.eq.mockReset(); fixture.sign.mockReset().mockImplementation(url => Promise.resolve(url)); fixture.privatePath.mockReset().mockReturnValue(null);
+  fixture.rpc.mockReset();
+  fixture.viewer = null; fixture.authLoading = false;
   fixture.from.mockReset().mockImplementation(() => {
     const query = { select: () => query, eq: fixture.eq.mockImplementation(() => query),
       maybeSingle: () => Promise.resolve({ data: { file_url: 'https://example.test/receipt.png' }, error: null }) };
@@ -21,6 +25,69 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, blob: async () => new Blob(['synthetic'], { type: 'image/png' }) })));
   vi.stubGlobal('URL', class extends URL { static createObjectURL = vi.fn(() => 'blob:receipt'); static revokeObjectURL = vi.fn(); });
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
+});
+
+const citation = { correction_id: 'correction-a', receipt_id: 'receipt-a', document_id: 'source-a', source_table: 'vehicle_documents' as const,
+  page_date: '2026-01-01', recorded_at: '2026-02-01', value: 'Fixture V8' };
+const correctionDocument = { receipt_id: 'receipt-a', vendor: 'Fixture Machine Shop', document_type: 'work_order', document_number: '42', total: null,
+  currency: 'USD', lines: [{ line_number: 1, description: 'Machine cylinder heads', part_number: null, quantity: 2, amount: null }] };
+const renderCorrection = async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await act(async () => root.render(<QueryClientProvider client={client}><CorrectionReceipt vehicleId="vehicle-a" citation={citation} /></QueryClientProvider>));
+  for (let i = 0; i < 30 && !host.textContent?.includes('Fixture Machine Shop') && !host.textContent?.includes('unavailable'); i++) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  }
+  return client;
+};
+it('keys receipt money and original preview to the resolved viewer and withholds a failed refresh', async () => {
+  fixture.viewer = 'owner-a';
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [{ ...correctionDocument, total: 125 }] }, error: null }) });
+  const client = await renderCorrection();
+  expect(host.textContent).toContain('$125.00');
+  await click('Read original source', () => !!host.querySelector('img'));
+  expect(host.querySelector('img')).not.toBeNull();
+  fixture.viewer = null; fixture.authLoading = true;
+  await act(async () => root.render(<QueryClientProvider client={client}><CorrectionReceipt vehicleId="vehicle-a" citation={citation} /></QueryClientProvider>));
+  expect(host.textContent).not.toContain('$125.00');
+  expect(host.querySelector('img')).toBeNull();
+  const ownerCalls = fixture.rpc.mock.calls.length;
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [correctionDocument] }, error: null }) });
+  fixture.authLoading = false;
+  await act(async () => root.render(<QueryClientProvider client={client}><CorrectionReceipt vehicleId="vehicle-a" citation={citation} /></QueryClientProvider>));
+  for (let i = 0; i < 30 && !host.textContent?.includes('Fixture Machine Shop'); i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(fixture.rpc.mock.calls.length).toBe(ownerCalls + 1);
+  expect(host.textContent).toContain('Machine cylinder heads');
+  expect(host.textContent).not.toContain('$125.00');
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: null, error: { message: 'source unavailable' } }) });
+  await act(async () => { await client.refetchQueries({ queryKey: ['field-correction-receipt', 'anonymous'] }); });
+  for (let i = 0; i < 30 && !host.textContent?.includes('unavailable'); i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(host.textContent).toContain('The cited receipt is unavailable');
+  expect(host.textContent).not.toContain('Machine cylinder heads');
+  expect(host.querySelector('img')).toBeNull();
+});
+it('shows the exact correction receipt immediately and opens its existing original source in place', async () => {
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [correctionDocument, { ...correctionDocument, receipt_id: 'other', vendor: 'Unrelated vendor' }] }, error: null }) });
+  await renderCorrection();
+  expect(fixture.rpc).toHaveBeenCalledWith('get_vehicle_day_documents', { p_vehicle_id: 'vehicle-a', p_date: '2026-01-01' });
+  expect(host.textContent).toContain('Fixture V8');
+  expect(host.textContent).toContain('Fixture Machine Shop #42');
+  expect(host.textContent).toContain('Machine cylinder heads');
+  expect(host.textContent).not.toContain('Unrelated vendor');
+  expect(host.textContent).not.toContain('Document total');
+  expect(host.querySelector('details')).toBeNull();
+  await click('Read original source', () => !!host.querySelector('img'));
+  expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+  expect(host.querySelector('img')?.src).toBe('blob:receipt');
+});
+it('does not substitute another receipt on the same day and offers a retry', async () => {
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [{ ...correctionDocument, receipt_id: 'other' }] }, error: null }) });
+  await renderCorrection();
+  expect(host.textContent).toContain('The cited receipt is unavailable');
+  expect(host.textContent).not.toContain('Machine cylinder heads');
+  expect(host.textContent).not.toContain('Read original source');
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [correctionDocument] }, error: null }) });
+  await click('Retry receipt', () => !!host.textContent?.includes('Machine cylinder heads'));
+  expect(host.textContent).toContain('Machine cylinder heads');
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 const render = async () => act(async () => {

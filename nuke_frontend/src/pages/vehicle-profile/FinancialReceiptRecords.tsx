@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuthContext } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { signPrivateStorageUrl, privateStoragePath } from '../../lib/privateStorage';
 import { bounded } from '../../services/accountingCloseout';
 import { useVehicleWorkOrderFinancials, type VehicleReceiptRecord, type useVehicleReceiptRecords } from './hooks/useBuildLedger';
+import type { FieldProvenance } from './hooks/useFieldProvenance';
+import type { DayDocument } from './VehicleDayDrawer';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
 function amountText(amount: number | null, currency: string | null): string {
@@ -11,7 +15,7 @@ function amountText(amount: number | null, currency: string | null): string {
     : `${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} · currency unrecorded`;
 }
 
-function ReceiptSource({ receipt, vehicleId }: { receipt: VehicleReceiptRecord; vehicleId: string }) {
+function ReceiptSource({ receipt, vehicleId }: { receipt: Pick<VehicleReceiptRecord, 'sourceId' | 'sourceTable'>; vehicleId: string }) {
   const [state, setState] = useState('');
   const [original, setOriginal] = useState<{ blob: Blob; filename: string } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -46,6 +50,52 @@ function ReceiptSource({ receipt, vehicleId }: { receipt: VehicleReceiptRecord; 
     </React.Suspense>}
     {state && state !== 'Reading source…' && <p role="status">{state}</p>}
   </div>;
+}
+
+/** The retained correction points to an existing receipt, whose existing reader
+ * supplies its public lines and masks money/payer/page access for this viewer. */
+export function CorrectionReceipt({ vehicleId, citation }: {
+  vehicleId: string; citation: NonNullable<FieldProvenance['current_correction']>;
+}) {
+  const { user, loading: authLoading } = useAuthContext();
+  const viewer = user?.id ?? 'anonymous';
+  const read = useQuery({
+    queryKey: ['field-correction-receipt', viewer, vehicleId, citation.correction_id, citation.receipt_id, citation.page_date],
+    enabled: !authLoading,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) => {
+      const { data, error } = await bounded(sourceSignal => supabase.rpc('get_vehicle_day_documents', {
+        p_vehicle_id: vehicleId, p_date: citation.page_date,
+      }).abortSignal(sourceSignal), signal);
+      if (error || !Array.isArray(data?.documents)) throw new Error('Receipt could not be read');
+      return (data.documents as DayDocument[]).find(doc => doc.receipt_id === citation.receipt_id) ?? null;
+    },
+  });
+  const doc = !authLoading && !read.isError ? read.data : null;
+  const showAmounts = doc?.lines.some(line => line.amount != null);
+  return <article className="field-correction-receipt" aria-label="Receipt cited by the recorded value">
+    <strong>{citation.value}</strong>
+    <p className="field-citations__note">The recorded correction cites this document.</p>
+    {(authLoading || read.isLoading) && <p role="status">Reading cited receipt…</p>}
+    {!authLoading && (read.isError || (!read.isLoading && !doc)) && <p role="status">The cited receipt is unavailable in this read.{' '}
+      <button type="button" disabled={read.isFetching} onClick={() => void read.refetch()}>Retry receipt</button>
+    </p>}
+    {doc && <>
+      <header><h3>{doc.vendor || doc.vendor_org?.name || 'Receipt'}{doc.document_number ? ` #${doc.document_number}` : ''}</h3>
+        <p>{doc.document_type?.replace(/_/g, ' ') || 'Document'} · {citation.page_date}</p>
+      </header>
+      {doc.lines.length > 0 && <table><thead><tr><th scope="col">Recorded item or work</th><th scope="col">Qty</th>{showAmounts && <th scope="col">Amount</th>}</tr></thead>
+        <tbody>{doc.lines.map((line, i) => <tr key={`${line.line_number ?? i}:${i}`}>
+          <td>{line.description || line.part_number || 'Line item'}{line.part_number && line.description && <small>{line.part_number}</small>}</td>
+          <td>{line.quantity ?? '—'}</td>
+          {showAmounts && <td>{line.amount == null ? '—' : amountText(line.amount, doc.currency)}</td>}
+        </tr>)}</tbody>
+      </table>}
+      {doc.total != null && <p className="field-correction-receipt__total">Document total <strong>{amountText(doc.total, doc.currency)}</strong></p>}
+      <ReceiptSource key={`${viewer}:${vehicleId}:${citation.source_table}:${citation.document_id}`} vehicleId={vehicleId}
+        receipt={{ sourceId: citation.document_id, sourceTable: citation.source_table }} />
+    </>}
+  </article>;
 }
 
 export function ReceiptRecords({ vehicleId, read }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords> }) {

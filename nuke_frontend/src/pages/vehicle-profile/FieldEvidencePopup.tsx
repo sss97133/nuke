@@ -13,9 +13,10 @@ import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, referenceFieldImages, isReferenceImage, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
-import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
+import { useFieldProvenance, citedFieldImages, currentImageObservations, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
 import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import FieldProvenanceDrawer from './FieldProvenanceDrawer';
+import { CorrectionReceipt } from './FinancialReceiptRecords';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import type { FieldProvenance } from './hooks/useFieldProvenance';
@@ -171,7 +172,9 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const imagesLoading = inventory.isLoading || provenance.isLoading;
   const awaiting = rows.filter(image => !hasImageAnalysis(image)).length;
   const imageReadFailed = !!inventory.error || !!provenance.error || (!provenance.isLoading && provenance.data === null);
-  const imageObservations = provenance.data?.image_observations || [];
+  const imageObservations = currentImageObservations(provenance.data, rows);
+  const unavailableImageObservations = (provenance.data?.image_observations || [])
+    .filter(source => !imageObservations.includes(source));
   const isEngineProperty = !!ENGINE_PROPERTY_IDS[field];
   const resolvedValue = isEngineProperty
     ? (provenance.data?.canonical?.status === 'resolved' ? provenance.data.canonical.value : null)
@@ -196,6 +199,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   // The value's first click shows the cited object and original quotation.
   // System copies and unrelated area photographs are not additional support.
   if (presentation === 'citations') {
+    const correction = provenance.data?.current_correction;
     const readings = claimGroup?.sources.filter(source => source.source_type !== 'system_update') || [];
     const imageIds = new Set([
       ...readings.map(source => source.source_image_id),
@@ -205,6 +209,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     const witnesses = rows.filter(image => imageIds.has(image.id));
     const reports = groupRepeatedReports(provenanceCoverageUnavailable(provenance.data) ? [] : provenance.data?.observations || []);
     return <div className="field-citations" aria-label={`${label} sources`}>
+      {correction && <CorrectionReceipt key={`${vehicleId}:${correction.correction_id}`} vehicleId={vehicleId} citation={correction} />}
       {(imagesLoading || claims.loading) && <p role="status">Reading sources…</p>}
       {(imageReadFailed || claims.error) && <p role="status">Some source evidence could not be read.
         <button type="button" onClick={() => {
@@ -229,6 +234,11 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           </div>)}
         </figcaption>
       </figure>)}
+      {!imagesLoading && unavailableImageObservations.map(source => <p key={source.observation_id}>
+        Current image citation unavailable. <PrefetchLink to={`/vehicle/${vehicleId}/observation/${source.observation_id}`} onClick={closeTop}>
+          Inspect retained source record
+        </PrefetchLink>
+      </p>)}
       {readings.filter(source => source.source_image_id && !witnesses.some(image => image.id === source.source_image_id)).map(source =>
         <p key={source.id}><PrefetchLink to={`/vehicle/${vehicleId}/image/${source.source_image_id}`} onClick={closeTop}>
           {source.field_value} · inspect cited image
@@ -239,7 +249,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
         {webSourceUrl(report.source_url) && <a href={webSourceUrl(report.source_url)!} target="_blank" rel="noopener noreferrer">Open original source</a>}
         <PrefetchLink to={`/vehicle/${vehicleId}/observation/${report.id}`} onClick={closeTop}>Inspect source record</PrefetchLink>
       </article>)}
-      {!imagesLoading && !claims.loading && !imageReadFailed && !claims.error && witnesses.length === 0 && imageIds.size === 0 && reports.length === 0 &&
+      {!correction && !imagesLoading && !claims.loading && !imageReadFailed && !claims.error && witnesses.length === 0 && imageIds.size === 0 && reports.length === 0 &&
         <p>{value ? `“${value}” has no supporting citation in this field’s reader.` : 'This field’s reader has no supporting citation.'}</p>}
       {(field === 'trim' || field === 'engine_type' || field === 'engine_size') && witnesses.length > 0 &&
         <p className="field-citations__note">Lettering identifies what is written on the part. Factory trim and engine specification need their own evidence.</p>}
@@ -252,6 +262,8 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
         <div className="ev-label">{label}</div>
         {!isEngineProperty && <div className={`field-evidence-value${field === 'vin' ? ' field-evidence-value--identifier' : ''}`}>{value}</div>}
       </header>
+
+      {provenance.data?.current_correction && <CorrectionReceipt key={`${vehicleId}:${provenance.data.current_correction.correction_id}`} vehicleId={vehicleId} citation={provenance.data.current_correction} />}
 
       {provenance.data && <div style={{ marginBottom: 8 }}>
         <span className="ev-label">{isEngineProperty ? 'RESOLVED SOURCE CLAIM' : 'RECORDED VEHICLE VALUE'}</span>{' '}
