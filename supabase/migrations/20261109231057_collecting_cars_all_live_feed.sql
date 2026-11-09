@@ -2,6 +2,7 @@
 -- Discovery cadence is independent of the daily full-page refresh interval.
 -- Source holds, per-invocation caps, failed-attempt backoff and paid allowances
 -- remain enforced by the existing writers. No new cron or capacity is added.
+BEGIN;
 SET LOCAL statement_timeout = '3s';
 SET LOCAL lock_timeout = '2s';
 
@@ -29,3 +30,4 @@ BEGIN
     RAISE EXCEPTION 'Collecting Cars feed changed; inspect configuration before widening scope';
   END IF;
 END $$;
+COMMIT;
