@@ -287,7 +287,10 @@ Standing rules the code carries:
   totals, projected photo labor, party totals or ROI as reconciled investment/cash. Session and receipt
   readings omit an invented currency; payment reports retain their declared USD unit and attributed
   status. A missing confirmation is unknown, not an action grant. Existing confirmation/contribution
-  writers keep their effects. The legacy receipt curve is withheld pending a qualified money/clock
+  writers keep their effects. Session confirmation is displayed only after an explicit successful
+  acknowledgement for that session; an HTTP200 refusal, absent/malformed receipt or transport error
+  remains unconfirmed with retry. This establishes no vehicle holding or work/payment role.
+  The legacy receipt curve is withheld pending a qualified money/clock
   contract; its first receipt is not an acquisition. The canonical valuation/price section is unchanged. This does
   not repair the server folds or replace the canonical book/vehicle accounting service.
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a

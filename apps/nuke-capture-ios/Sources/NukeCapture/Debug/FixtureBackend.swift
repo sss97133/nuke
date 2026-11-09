@@ -256,6 +256,13 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case "confirm_work_session" where scenario == "financial-qualification":
+            let id = (args["p_session_id"] as? String ?? "").lowercased()
+            if id.hasSuffix("f004") { return ok(#"{"ok":false,"error":"not_authorized"}"#) }
+            if id.hasSuffix("f005") { return ok("{}") }
+            if id.hasSuffix("f006") { return ok(#"{"ok":"#) }
+            if id.hasSuffix("f007") { return (-1, Data()) } // finite transport failure below
+            return ok(#"{"ok":true,"session_id":"\#(id)","confirmed":true}"#)
         case "post_work_request": return ok(PostJobFixtures.posted)
         case "accept_work_order_quote": return ok(JobFixtures.acceptReceipt)
         case "offer_on_requirement": return ok(OfferFixtures.offerReceipt)
@@ -322,6 +329,10 @@ final class FixtureURLProtocol: URLProtocol {
 
     override func startLoading() {
         let (status, data) = FixtureBackend.respond(request)
+        if status == -1 {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
         let response = HTTPURLResponse(url: request.url ?? FixtureBackend.baseURL, statusCode: status, httpVersion: "HTTP/1.1",
                                        headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

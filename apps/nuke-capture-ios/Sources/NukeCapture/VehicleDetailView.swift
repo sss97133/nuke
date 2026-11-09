@@ -2347,6 +2347,14 @@ struct LedgerDrill: Identifiable {
     var id: String { title }
 }
 
+/// The existing writer can refuse within an HTTP 200 response.
+struct SessionConfirmationReceipt: Decodable {
+    let ok: Bool
+    let session_id: UUID?
+    let confirmed: Bool?
+    func acknowledges(_ id: UUID) -> Bool { ok && session_id == id && confirmed == true }
+}
+
 struct InvestmentProofView: View {
     let vehicleId: String
     @State private var proof: InvestmentProof?
@@ -3336,7 +3344,7 @@ private struct LedgerEvidenceSheet: View {
                     case .payments:
                         Text("Payment reports and contribution statements use the records' USD field. A method or reference alone does not verify who paid or received funds.")
                     case .labor:
-                        Text("Session values may include labor, parts and tool depreciation. Currency is not returned. Confirmation records testimony about a session; it does not verify hours, who performed work, or payment.")
+                        Text("Session values may include labor, parts and tool depreciation. Currency is not returned. Confirmation records the session owner's statement; it does not verify hours, who performed work, or payment.")
                         if unconfirmedCount > 0 {
                             Text("\(unconfirmedCount) session\(unconfirmedCount == 1 ? "" : "s") awaiting confirmation.")
                         }
@@ -3413,11 +3421,12 @@ private struct LedgerEvidenceSheet: View {
             RootedValueView(label: "Stored session value", value: recordedNumber(row.cost), status: .recorded)
                 .accessibilityIdentifier("session-value-\(row.id.uuidString.lowercased())")
             if isConfirmed {
-                RootedValueView(label: "Confirmation", value: "Owner statement recorded", status: .attributed)
+                RootedValueView(label: "Confirmation", value: "Session confirmation recorded", status: .attributed)
                     .accessibilityIdentifier("session-confirmation-\(row.id.uuidString.lowercased())")
             } else if working == row.id {
                 ProgressView()
             } else if failed.contains(row.id) {
+                Text("Confirmation could not be verified.").font(.caption).foregroundStyle(.secondary)
                 Button { Task { await confirm(row.id) } } label: {
                     Label("Retry confirmation", systemImage: "exclamationmark.arrow.circlepath")
                 }.buttonStyle(.bordered).controlSize(.small).tint(.red)
@@ -3437,9 +3446,15 @@ private struct LedgerEvidenceSheet: View {
         defer { working = nil }
         struct P: Encodable { let p_session_id: String; let p_confirm: Bool }
         do {
-            _ = try await SupabaseService.client
+            let reply: SessionConfirmationReceipt = try await SupabaseService.client
                 .rpc("confirm_work_session", params: P(p_session_id: id.uuidString, p_confirm: true))
-                .execute()
+                .execute().value
+            // A refusal is HTTP 200 with ok:false. Only the exact successful
+            // acknowledgement records a statement; transport success is not it.
+            guard reply.acknowledges(id) else {
+                failed.insert(id)
+                return
+            }
             failed.remove(id)
             confirmed.insert(id)   // testimony accepted; not a cash/proven promotion
             onChanged()            // refresh the existing record read

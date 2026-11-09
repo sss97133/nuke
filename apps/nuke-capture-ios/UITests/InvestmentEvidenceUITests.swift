@@ -42,7 +42,7 @@ final class InvestmentEvidenceUITests: XCTestCase {
         sessions.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@","tool depreciation")).firstMatch.waitForExistence(timeout:5))
         XCTAssertTrue(reading(app,"session-value-00000000-0000-4000-8000-00000000f001").contains("600"))
-        XCTAssertTrue(reading(app,"session-confirmation-00000000-0000-4000-8000-00000000f001").contains("Owner statement recorded"))
+        XCTAssertTrue(reading(app,"session-confirmation-00000000-0000-4000-8000-00000000f001").contains("Session confirmation recorded"))
         XCTAssertFalse(app.staticTexts["Proven"].exists)
         XCTAssertFalse(app.staticTexts["$600"].exists)
         XCTAssertFalse(app.buttons["session-confirm-00000000-0000-4000-8000-00000000f003"].exists,"Missing confirmation is not false or an action grant")
@@ -58,6 +58,24 @@ final class InvestmentEvidenceUITests: XCTestCase {
         XCTAssertEqual((args?["p_session_id"] as? String)?.lowercased(),"00000000-0000-4000-8000-00000000f002")
         XCTAssertEqual(args?["p_confirm"] as? Bool,true)
         let shot = XCTAttachment(screenshot:app.screenshot());shot.name="session-testimony-qualified";shot.lifetime = .keepAlways;add(shot)
+    }
+    func testRefusedMissingMalformedAndTransportFailureNeverRecordConfirmation() {
+        let app = launch()
+        let sessions = app.buttons["investment-sessions"];reveal(sessions,app:app);sessions.tap()
+        for (index, suffix) in ["f004","f005","f006","f007"].enumerated() {
+            let id = "00000000-0000-4000-8000-00000000" + suffix
+            let confirm = app.buttons["session-confirm-" + id]
+            reveal(confirm,app:app);confirm.tap()
+            let retry = app.buttons.matching(identifier:"session-confirm-" + id)
+                .matching(NSPredicate(format:"label == %@","Retry confirmation")).firstMatch
+            XCTAssertTrue(retry.waitForExistence(timeout:5),"No acknowledgement for " + suffix)
+            XCTAssertFalse(app.descendants(matching:.any)["session-confirmation-" + id].exists)
+            let calls = writes(app)
+            XCTAssertEqual(calls.count,index + 1)
+            XCTAssertEqual((calls.last?["args"] as? [String:Any])?["p_session_id"] as? String,id.uppercased())
+        }
+        XCTAssertTrue(app.staticTexts["Confirmation could not be verified."].firstMatch.exists)
+        let shot = XCTAttachment(screenshot:app.screenshot());shot.name="session-confirmation-refused";shot.lifetime = .keepAlways;add(shot)
     }
     func testPaymentReportsPreserveStatedValuesAndKnownZeroWithoutProvenCash() {
         let app = launch()
