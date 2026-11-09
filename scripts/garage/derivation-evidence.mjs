@@ -124,11 +124,31 @@ export const fromReceiptWorkLine = (r, { runId, script = 'scripts/receipt-work/r
     total_price: r.total_price, zone_photos_total: r.zone_photos_total, zone_photos_in_window: r.zone_photos_in_window, day_photos: r.day_photos,
     work_session_ids: r.work_session_ids ?? [], timeline_event_ids: r.timeline_event_ids ?? [], logic_version: r.logic_version,
     // A proposed contextual relationship (shared time window), never corroboration or proof; printed values are the document's claims.
+    // Three separate things: the proposed context (relationship), the document's printed testimony (printed_claims, kept as
+    // printed whether or not the reader could use it), and source custody (who holds which document). Ownership testimony
+    // (payer / bill-to) is not read here.
     relationship: RECEIPT_WORK_RELATIONSHIP(r.relationship_status),
+    printed_claims: { attributed_to: 'document', source_table: r.item_id ? 'receipt_items' : 'receipts', source_id: r.item_id ?? r.receipt_id,
+      line_date: r.printed_line_date ?? null, hours: r.printed_hours ?? null, performer: r.printed_performer ?? null },
+    source_custody: { custodian_user_id: r.custodian_user_id ?? null, source_document_table: r.source_document_table ?? null,
+      source_document_id: r.source_document_id ?? null, page: r.source_page ?? null },
     lineage: { receipt_id: r.receipt_id, source_document_table: r.source_document_table ?? null, source_document_id: r.source_document_id ?? null,
       page: r.source_page ?? null, line_number: r.line_number ?? null, item_id: r.item_id ?? null, link_id: r.link_id, image_ids: r.image_ids ?? [] },
-    refused_fields: r.refused_fields ?? {} },
+    reader_ineligible: r.reader_ineligible ?? {} },
 }, ctx);
+
+// A subject whose source was withdrawn (line removed, receipt removed / superseded / duplicate, link retired): a signed
+// retraction that supersedes its last conclusion. It cites nothing and proposes nothing.
+export const fromReceiptWorkWithdrawal = (w, { runId, vehicleId, userId, script = 'scripts/receipt-work/reconcile-receipt-work.mjs', observedAt = null } = {}, ctx) =>
+  evidenceRow('receipt_work_correlation', {
+    script, run_id: runId, vehicle_id: vehicleId, user_id: userId, session_key: null, subject_key: w.subject_key, image_ids: [],
+    conclusion: 'source_withdrawn', confidence: 1, observed_at: observedAt,
+    rationale: `source withdrawn (${w.reason}): the earlier proposed context for this ${w.item_id ? 'line' : 'receipt'} no longer stands`,
+    conclusion_detail: { reason: w.reason, prior_evidence_id: w.evidence_id },
+    evidence: { receipt_id: w.receipt_id, item_id: w.item_id ?? null, link_id: w.link_id ?? null, withdrawn: { reason: w.reason, prior_evidence_id: w.evidence_id },
+      relationship: { ...RECEIPT_WORK_RELATIONSHIP('withdrawn') } },
+  }, ctx);
+export const retractionFromReceiptWork = fromReceiptWorkWithdrawal;
 
 export const RECEIPT_WORK_NOT_ASSERTED = ['independent_corroboration', 'installation_proof', 'payment_proof', 'owner_sign'];
 export function RECEIPT_WORK_RELATIONSHIP(status) {

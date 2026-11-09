@@ -129,9 +129,27 @@ $$;
 -- UTC; anchor = the line's own date, else the link's page date. Install window = anchor .. anchor + p_window_days.
 -- Semantics: every row is a PROPOSED contextual relationship (a receipt line and photos that share a time window), with
 -- its common source lineage (receipt, source document, line, link, cited image ids). It is never independent
--- corroboration, installation proof, payment proof or an owner Sign. Printed line dates, billed hours and performers are
--- claims attributed to the document, not account identity or labor duration: missing stays null, and a malformed value
--- is refused (reported in refused_fields, never used), not coerced.
+-- corroboration, installation proof, payment proof or an owner Sign. Three things stay separate: the document's printed
+-- testimony (line date, billed hours, performer: returned as printed, including zero or credit hours and historical
+-- dates; claims attributed to the document, not account identity or labor duration), source custody (who holds the
+-- receipt and which document it came from), and the proposed context this function computes. Ownership testimony
+-- (payer / bill-to) is not read. Reader eligibility is narrower than testimony: a printed date after tomorrow cannot
+-- anchor photos taken after it, so it is reported in reader_ineligible and not used as the anchor, but it is still
+-- returned as printed.
+
+-- One frame-eligibility rule for the reader, for claims and for answers: approved by the vision gate (personal and
+-- misattributed frames never), not sensitive, not redacted, not a duplicate or superseded, not paperwork, a screenshot
+-- or a reference picture, and EXIF-dated.
+CREATE OR REPLACE FUNCTION public.receipt_work_frame_eligible(x public.vehicle_images) RETURNS boolean
+LANGUAGE sql STABLE SET search_path = pg_catalog, public AS $$
+  SELECT x.taken_at IS NOT NULL
+     AND x.vision_gate_status IS NOT DISTINCT FROM 'approved'
+     AND x.is_sensitive IS NOT TRUE AND x.is_duplicate IS NOT TRUE AND x.is_superseded IS NOT TRUE
+     AND x.is_document IS NOT TRUE
+     AND coalesce(x.redaction_level::text, 'none') = 'none'
+     AND coalesce(x.ai_scan_metadata #>> '{byok_deep_analysis,scene_type}', '') NOT IN ('product_screenshot', 'cross_reference', 'receipt_document', 'hand_drawn_diagram')
+$$;
+
 DROP FUNCTION IF EXISTS public.receipt_work_lines(uuid, int, int);
 CREATE FUNCTION public.receipt_work_lines(p_vehicle_id uuid, p_window_days int DEFAULT 90, p_max_images int DEFAULT 8)
 RETURNS TABLE(
@@ -142,7 +160,8 @@ RETURNS TABLE(
   zone_photos_total int, zone_photos_in_window int, first_photo_day date, image_ids uuid[],
   day_photos int, work_session_ids uuid[], timeline_event_ids uuid[],
   judgment_needed boolean, logic_version text,
-  relationship_status text, source_document_table text, source_document_id uuid, source_page int, refused_fields jsonb)
+  relationship_status text, source_document_table text, source_document_id uuid, source_page int,
+  custodian_user_id uuid, printed_line_date date, printed_hours numeric, printed_performer text, reader_ineligible jsonb)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH v AS (SELECT id, coalesce(owner_id, user_id) AS uid FROM vehicles WHERE id = p_vehicle_id),
   raw AS (
@@ -150,29 +169,29 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
            r.id AS receipt_id, r.user_id AS receipt_user, r.vendor_name, r.document_kind::text AS document_kind,
            r.receipt_date AS receipt_date_raw, r.source_document_table, r.source_document_id,
            i.id AS item_id, i.line_number, i.description, i.part_number, i.total_price,
-           i.line_date AS line_date_raw, i.hours AS hours_raw, nullif(btrim(i.performer), '') AS performer
+           i.line_date AS printed_line_date, i.hours AS printed_hours, i.performer AS printed_performer
       FROM receipt_vehicle_links l
       JOIN receipts r ON r.id = l.receipt_id
       LEFT JOIN receipt_items i ON i.receipt_id = r.id
      WHERE l.vehicle_id = p_vehicle_id AND l.status = 'linked' AND l.retired_at IS NULL
        AND r.is_superseded IS NOT TRUE AND r.duplicate_of IS NULL
   ),
-  checked AS (  -- printed values are refused when malformed (impossible date, non-positive or absurd hours), never coerced
+  checked AS (  -- reader eligibility only: a date after tomorrow cannot anchor later photos (testimony is kept as printed)
     SELECT w.*,
-           CASE WHEN w.line_date_raw BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.line_date_raw END AS line_date,
-           CASE WHEN w.page_date_raw BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.page_date_raw END AS page_date,
-           CASE WHEN w.receipt_date_raw BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.receipt_date_raw END AS receipt_date,
-           CASE WHEN w.hours_raw > 0 AND w.hours_raw <= 1000 THEN w.hours_raw END AS hours,
+           CASE WHEN w.printed_line_date <= current_date + 1 THEN w.printed_line_date END AS line_date,
+           CASE WHEN w.page_date_raw <= current_date + 1 THEN w.page_date_raw END AS page_date,
+           CASE WHEN w.receipt_date_raw <= current_date + 1 THEN w.receipt_date_raw END AS receipt_date,
            jsonb_strip_nulls(jsonb_build_object(
-             'line_date', CASE WHEN w.line_date_raw IS NOT NULL AND w.line_date_raw NOT BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.line_date_raw::text END,
-             'page_date', CASE WHEN w.page_date_raw IS NOT NULL AND w.page_date_raw NOT BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.page_date_raw::text END,
-             'receipt_date', CASE WHEN w.receipt_date_raw IS NOT NULL AND w.receipt_date_raw NOT BETWEEN DATE '1900-01-01' AND current_date + 1 THEN w.receipt_date_raw::text END,
-             'hours', CASE WHEN w.hours_raw IS NOT NULL AND NOT (w.hours_raw > 0 AND w.hours_raw <= 1000) THEN w.hours_raw::text END)) AS refused
+             'line_date', CASE WHEN w.printed_line_date > current_date + 1 THEN 'after_today' END,
+             'page_date', CASE WHEN w.page_date_raw > current_date + 1 THEN 'after_today' END,
+             'receipt_date', CASE WHEN w.receipt_date_raw > current_date + 1 THEN 'after_today' END)) AS ineligible
       FROM raw w
   ),
   lines AS (
     SELECT c.*,
-           CASE WHEN c.item_id IS NULL THEN 'receipt' ELSE receipt_line_kind(c.description, c.part_number, c.total_price, c.hours, c.line_date, c.performer) END AS kind,
+           CASE WHEN c.item_id IS NULL THEN 'receipt'
+                ELSE receipt_line_kind(c.description, c.part_number, c.total_price, c.printed_hours, c.printed_line_date,
+                                       nullif(btrim(c.printed_performer), '')) END AS kind,
            receipt_line_photo_zone(c.description) AS zone, receipt_line_photo_end(c.description) AS end_hint,
            coalesce(c.line_date, c.page_date, c.receipt_date) AS anchor,
            CASE WHEN c.line_date IS NOT NULL THEN 'line_date' WHEN c.page_date IS NOT NULL THEN coalesce('page_date:' || c.page_date_source, 'page_date')
@@ -185,12 +204,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
                              x.ai_scan_metadata #>> '{byok_deep_analysis,scene_type}', x.apple_ml_labels) AS zones,
            image_photo_end(x.ai_scan_metadata #>> '{classification,v2,angle,value}', x.vehicle_zone) AS img_end
       FROM vehicle_images x
-     WHERE x.vehicle_id = p_vehicle_id AND x.taken_at IS NOT NULL
-       AND x.vision_gate_status = 'approved'                       -- personal / misattributed frames never cited
-       AND x.is_sensitive IS NOT TRUE AND x.is_duplicate IS NOT TRUE AND x.is_superseded IS NOT TRUE
-       -- screenshots, reference pictures and paperwork are not photos of the work on this vehicle
-       AND x.is_document IS NOT TRUE
-       AND coalesce(x.ai_scan_metadata #>> '{byok_deep_analysis,scene_type}', '') NOT IN ('product_screenshot', 'cross_reference', 'receipt_document', 'hand_drawn_diagram')
+     WHERE x.vehicle_id = p_vehicle_id AND receipt_work_frame_eligible(x)
   ),
   zl AS (
     SELECT ln.link_id, ln.item_id,
@@ -254,8 +268,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
          s.concl IN ('install_window_photographed', 'photographed_after_window'),
          'receipt_work_lines/20261111210000',
          'proposed', s.source_document_table, s.source_document_id,
-         NULL::int,  -- page: receipts carry no page reference yet; stays null until a page table is the source
-         s.refused
+         NULL::int,  -- page: the line-to-page mapping is unresolved (land_document_pages keeps page metadata per document, not per line)
+         s.receipt_user, s.printed_line_date, s.printed_hours, s.printed_performer, s.ineligible
     FROM shaped s
 $$;
 COMMENT ON FUNCTION public.receipt_work_lines(uuid, int, int) IS
@@ -263,7 +277,47 @@ COMMENT ON FUNCTION public.receipt_work_lines(uuid, int, int) IS
 REVOKE ALL ON FUNCTION public.receipt_work_lines(uuid, int, int) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.receipt_work_lines(uuid, int, int) TO service_role;
 
+-- ─── withdrawn sources ────────────────────────────────────────────────────────────────────────────────────────
+-- The active receipt_work_correlation subjects of a vehicle that the reader no longer returns, with why: the line was
+-- removed, the receipt was removed / superseded / marked a duplicate, its link to this vehicle was retired, or it is
+-- simply no longer returned (e.g. a line-less receipt that now has lines). A subject already concluded
+-- 'source_withdrawn' is not listed again. The producer writes a signed retraction for each and supersedes the old row.
+CREATE OR REPLACE FUNCTION public.receipt_work_withdrawals(p_vehicle_id uuid)
+RETURNS TABLE(evidence_id uuid, subject_key text, receipt_id uuid, item_id uuid, link_id uuid, user_id uuid, reason text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  WITH cur AS (SELECT CASE WHEN w.item_id IS NOT NULL THEN 'receipt_item:' || w.item_id ELSE 'receipt:' || w.receipt_id END AS k
+                 FROM receipt_work_lines(p_vehicle_id) w),
+  act AS (
+    SELECT e.id, e.subject_key, e.user_id, (e.evidence ->> 'receipt_id')::uuid AS receipt_id, (e.evidence ->> 'item_id')::uuid AS item_id,
+           (e.evidence ->> 'link_id')::uuid AS link_id
+      FROM garage_derivation_evidence e
+     WHERE e.kind = 'receipt_work_correlation' AND e.vehicle_id = p_vehicle_id AND e.superseded_at IS NULL
+       AND e.conclusion <> 'source_withdrawn'
+       AND e.subject_key NOT IN (SELECT k FROM cur))
+  SELECT a.id, a.subject_key, a.receipt_id, a.item_id, a.link_id, a.user_id,
+         CASE
+           WHEN a.item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM receipt_items i WHERE i.id = a.item_id AND i.receipt_id = a.receipt_id) THEN 'line_removed'
+           WHEN NOT EXISTS (SELECT 1 FROM receipts r WHERE r.id = a.receipt_id) THEN 'receipt_removed'
+           WHEN EXISTS (SELECT 1 FROM receipts r WHERE r.id = a.receipt_id AND r.is_superseded) THEN 'receipt_superseded'
+           WHEN EXISTS (SELECT 1 FROM receipts r WHERE r.id = a.receipt_id AND r.duplicate_of IS NOT NULL) THEN 'receipt_duplicate'
+           WHEN NOT EXISTS (SELECT 1 FROM receipt_vehicle_links l WHERE l.receipt_id = a.receipt_id AND l.vehicle_id = p_vehicle_id
+                              AND l.status = 'linked' AND l.retired_at IS NULL) THEN 'link_retired'
+           ELSE 'not_returned'
+         END
+    FROM act a
+$$;
+REVOKE ALL ON FUNCTION public.receipt_work_withdrawals(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.receipt_work_withdrawals(uuid) TO service_role;
+
 -- ─── the judgment queue ───────────────────────────────────────────────────────────────────────────────────────
+-- Lifecycle (every transition is appended to lifecycle with its run or actor; nothing is deleted):
+--   (raised) -> pending -> claimed -> answered            claim_evidence_judgments / answer_evidence_judgment
+--   pending | claimed -> cancelled                          the producer no longer asks it (content changed: a new
+--   answered -> withdrawn (answer kept)                     question supersedes it; source or frame withdrawn; not asked)
+--   cancelled -> pending, withdrawn -> answered             re-asked with identical content while eligible (revive)
+--   answered -> pending (answer moved to answer_history)    reopen_evidence_judgment_answers
+-- Identity: dedupe_key = department + question + subject + question_hash, question_hash = sha256 of the canonical params
+-- (description, part number, printed claims, dates, lineage, candidate frames, ...): changed content is a new question.
 CREATE TABLE IF NOT EXISTS public.evidence_judgment_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   department text NOT NULL,
@@ -275,7 +329,7 @@ CREATE TABLE IF NOT EXISTS public.evidence_judgment_requests (
   params jsonb NOT NULL,
   answer_schema jsonb NOT NULL,
   priority int NOT NULL DEFAULT 0,
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'claimed', 'answered', 'cancelled')),
+  status text NOT NULL DEFAULT 'pending',
   trigger_evidence_dedupe_key text,
   producer_agent text NOT NULL,
   producer_script text NOT NULL,
@@ -287,77 +341,232 @@ CREATE TABLE IF NOT EXISTS public.evidence_judgment_requests (
   answered_at timestamptz, answer jsonb, answer_agent text, answer_model text, answer_version text,
   cancelled_at timestamptz, cancelled_reason text
 );
--- A producer re-run that no longer asks a question (the subject's evidence changed) cancels the stale pending request and
--- signs the cancellation with its run, so rolling that run back re-opens the request.
-ALTER TABLE public.evidence_judgment_requests ADD COLUMN IF NOT EXISTS cancelled_by_run_id uuid;
+ALTER TABLE public.evidence_judgment_requests
+  ADD COLUMN IF NOT EXISTS cancelled_by_run_id uuid,
+  ADD COLUMN IF NOT EXISTS answer_history jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS lifecycle jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS question_hash text,
+  ADD COLUMN IF NOT EXISTS retire_kind text,
+  ADD COLUMN IF NOT EXISTS superseded_by uuid;
+ALTER TABLE public.evidence_judgment_requests DROP CONSTRAINT IF EXISTS evidence_judgment_requests_status_check;
+ALTER TABLE public.evidence_judgment_requests ADD CONSTRAINT evidence_judgment_requests_status_check
+  CHECK (status IN ('pending', 'claimed', 'answered', 'cancelled', 'withdrawn'));
+ALTER TABLE public.evidence_judgment_requests DROP CONSTRAINT IF EXISTS evidence_judgment_requests_retire_kind_check;
+ALTER TABLE public.evidence_judgment_requests ADD CONSTRAINT evidence_judgment_requests_retire_kind_check
+  CHECK (retire_kind IS NULL OR retire_kind IN ('content_changed', 'source_withdrawn', 'frame_withdrawn', 'not_asked', 'rollback'));
 CREATE INDEX IF NOT EXISTS evidence_judgment_requests_cancelled_by_run ON public.evidence_judgment_requests (cancelled_by_run_id) WHERE cancelled_by_run_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS evidence_judgment_requests_pending ON public.evidence_judgment_requests (department, question_kind, priority DESC) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS evidence_judgment_requests_run ON public.evidence_judgment_requests (run_id);
 CREATE INDEX IF NOT EXISTS evidence_judgment_requests_vehicle ON public.evidence_judgment_requests (vehicle_id) WHERE status <> 'cancelled';
 COMMENT ON TABLE public.evidence_judgment_requests IS
-  'Parameterized judgments a department''s code trigger needs from an agent or model: department, question_kind, subject (table + id), params (the cited ids and facts), answer_schema (the only shape an answer may take). Raised by producers (e.g. scripts/receipt-work/reconcile-receipt-work.mjs), signed with producer_agent/script/version and run_id; idempotent on dedupe_key. Answers land in answer/answer_agent/answer_model/answer_version. Undo a run with rollback_evidence_judgment_run.';
+  'Parameterized judgments a department''s code trigger needs from an agent or model: department, question_kind, subject (table + id), params (the cited ids and facts), answer_schema (the only shape an answer may take). Raised by producers (e.g. scripts/receipt-work/reconcile-receipt-work.mjs) through raise_evidence_judgment, signed with producer_agent/script/version and run_id; identity is the question content (question_hash). Status pending | claimed | answered | cancelled | withdrawn; every transition is in lifecycle. Only status = answered is a usable answer, and it is a model''s reading of a proposed context, never an owner Sign or proof. Undo a run with rollback_evidence_judgment_run.';
 ALTER TABLE public.evidence_judgment_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS evidence_judgment_requests_service ON public.evidence_judgment_requests;
 CREATE POLICY evidence_judgment_requests_service ON public.evidence_judgment_requests FOR ALL TO service_role USING (true) WITH CHECK (true);
 REVOKE ALL ON public.evidence_judgment_requests FROM anon, authenticated;
 GRANT ALL ON public.evidence_judgment_requests TO service_role;
 
-CREATE OR REPLACE FUNCTION public.rollback_evidence_judgment_run(p_run_id uuid, p_reason text, p_dry_run boolean DEFAULT true)
-RETURNS TABLE(id uuid, question_kind text, subject_id uuid, status text)
+CREATE OR REPLACE FUNCTION public.evidence_judgment_transition(p_from text, p_to text, p_run_id uuid, p_actor text, p_kind text, p_reason text)
+RETURNS jsonb LANGUAGE sql STABLE SET search_path = pg_catalog AS $$
+  SELECT jsonb_build_array(jsonb_strip_nulls(jsonb_build_object('at', now(), 'from', p_from, 'to', p_to, 'run_id', p_run_id,
+                                                                'actor', p_actor, 'kind', p_kind, 'reason', p_reason)))
+$$;
+
+-- Why a request can no longer be claimed or answered (empty = eligible): its line, receipt or link is gone or retired,
+-- the line's printed content changed since it was asked, or a candidate frame is no longer eligible (privacy and
+-- gate withdrawals included).
+CREATE OR REPLACE FUNCTION public.evidence_judgment_ineligibility(p_id uuid)
+RETURNS text[]
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public
+AS $fn$
+DECLARE j evidence_judgment_requests; probs text[] := '{}'; it receipt_items; rc receipts; x vehicle_images; cid text; rid uuid;
+BEGIN
+  SELECT * INTO j FROM evidence_judgment_requests WHERE id = p_id;
+  IF NOT FOUND THEN RETURN ARRAY['no_request']; END IF;
+  IF j.question_kind <> 'receipt_part_visible' THEN RETURN ARRAY['unknown_question_kind']; END IF;
+  rid := (j.params ->> 'receipt_id')::uuid;
+  SELECT * INTO rc FROM receipts WHERE id = rid;
+  IF NOT FOUND THEN probs := array_append(probs, 'receipt_removed');
+  ELSE
+    IF rc.is_superseded THEN probs := array_append(probs, 'receipt_superseded'); END IF;
+    IF rc.duplicate_of IS NOT NULL THEN probs := array_append(probs, 'receipt_duplicate'); END IF;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM receipt_vehicle_links l WHERE l.receipt_id = rid AND l.vehicle_id = j.vehicle_id
+                   AND l.status = 'linked' AND l.retired_at IS NULL) THEN
+    probs := array_append(probs, 'link_retired');
+  END IF;
+  SELECT * INTO it FROM receipt_items WHERE id = j.subject_id AND receipt_id = rid;
+  IF NOT FOUND THEN probs := array_append(probs, 'line_removed');
+  ELSIF it.description IS DISTINCT FROM j.params ->> 'description'
+     OR it.part_number IS DISTINCT FROM j.params ->> 'part_number'
+     OR it.total_price IS DISTINCT FROM (j.params ->> 'total_price')::numeric
+     OR it.line_date IS DISTINCT FROM (j.params #>> '{printed_claims,line_date}')::date
+     OR it.hours IS DISTINCT FROM (j.params #>> '{printed_claims,hours}')::numeric
+     OR it.performer IS DISTINCT FROM j.params #>> '{printed_claims,performer}' THEN
+    probs := array_append(probs, 'line_changed');
+  END IF;
+  FOR cid IN SELECT jsonb_array_elements_text(coalesce(j.params -> 'candidate_image_ids', '[]'::jsonb)) LOOP
+    SELECT * INTO x FROM vehicle_images WHERE id = cid::uuid;
+    IF NOT FOUND OR x.vehicle_id IS DISTINCT FROM j.vehicle_id OR NOT receipt_work_frame_eligible(x) THEN
+      probs := array_append(probs, 'frame_ineligible:' || cid);
+    END IF;
+  END LOOP;
+  RETURN probs;
+END
+$fn$;
+REVOKE ALL ON FUNCTION public.evidence_judgment_ineligibility(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.evidence_judgment_ineligibility(uuid) TO service_role;
+
+-- Raise (or re-ask) one question. New content -> inserted pending. Identical content already open or answered ->
+-- unchanged. Identical content that was cancelled -> pending again; withdrawn -> answered again (its answer was about
+-- exactly this content and these frames, which are eligible again). Each revive is a logged transition of this run.
+CREATE OR REPLACE FUNCTION public.raise_evidence_judgment(p_row jsonb, p_run_id uuid)
+RETURNS TABLE(id uuid, action text, status text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $fn$
 #variable_conflict use_column
+DECLARE j evidence_judgment_requests; v_to text;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION 'service role required' USING ERRCODE = '42501'; END IF;
+  IF p_run_id IS NULL OR nullif(p_row ->> 'dedupe_key', '') IS NULL OR nullif(p_row ->> 'question_hash', '') IS NULL
+     OR nullif(p_row ->> 'producer_version', '') IS NULL OR (p_row ->> 'user_id') IS NULL THEN
+    RAISE EXCEPTION 'run id, dedupe_key, question_hash, producer_version and user_id required' USING ERRCODE = '22023';
+  END IF;
+  SELECT * INTO j FROM evidence_judgment_requests r WHERE r.dedupe_key = p_row ->> 'dedupe_key' FOR UPDATE;
+  IF NOT FOUND THEN
+    INSERT INTO evidence_judgment_requests AS r (department, question_kind, subject_table, subject_id, vehicle_id, user_id, params,
+           answer_schema, priority, status, trigger_evidence_dedupe_key, producer_agent, producer_script, producer_version, run_id,
+           dedupe_key, question_hash, lifecycle)
+    VALUES (p_row ->> 'department', p_row ->> 'question_kind', p_row ->> 'subject_table', (p_row ->> 'subject_id')::uuid,
+            (p_row ->> 'vehicle_id')::uuid, (p_row ->> 'user_id')::uuid, p_row -> 'params', p_row -> 'answer_schema',
+            coalesce((p_row ->> 'priority')::int, 0), 'pending', p_row ->> 'trigger_evidence_dedupe_key', p_row ->> 'producer_agent',
+            p_row ->> 'producer_script', p_row ->> 'producer_version', p_run_id, p_row ->> 'dedupe_key', p_row ->> 'question_hash',
+            evidence_judgment_transition(NULL, 'pending', p_run_id, p_row ->> 'producer_agent', 'raised', NULL))
+    RETURNING r.* INTO j;
+    RETURN QUERY SELECT j.id, 'inserted'::text, j.status;
+  ELSIF j.status IN ('cancelled', 'withdrawn') THEN
+    v_to := CASE WHEN j.status = 'withdrawn' AND j.answer IS NOT NULL THEN 'answered' ELSE 'pending' END;
+    UPDATE evidence_judgment_requests r SET status = v_to, cancelled_at = NULL, cancelled_reason = NULL, cancelled_by_run_id = NULL,
+           retire_kind = NULL, superseded_by = NULL, claimed_at = CASE WHEN v_to = 'pending' THEN NULL ELSE r.claimed_at END,
+           claimed_by = CASE WHEN v_to = 'pending' THEN NULL ELSE r.claimed_by END,
+           lifecycle = r.lifecycle || evidence_judgment_transition(j.status, v_to, p_run_id, p_row ->> 'producer_agent', 'revived', 're-asked with identical content')
+     WHERE r.id = j.id RETURNING r.* INTO j;
+    RETURN QUERY SELECT j.id, 'revived'::text, j.status;
+  ELSE
+    RETURN QUERY SELECT j.id, 'unchanged'::text, j.status;
+  END IF;
+END
+$fn$;
+REVOKE ALL ON FUNCTION public.raise_evidence_judgment(jsonb, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.raise_evidence_judgment(jsonb, uuid) TO service_role;
+
+-- Retire one question this run no longer asks: pending | claimed -> cancelled, answered -> withdrawn (answer kept).
+CREATE OR REPLACE FUNCTION public.retire_evidence_judgment(p_id uuid, p_run_id uuid, p_kind text, p_reason text, p_superseded_by uuid DEFAULT NULL)
+RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $fn$
+DECLARE j evidence_judgment_requests; v_to text;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION 'service role required' USING ERRCODE = '42501'; END IF;
+  IF p_run_id IS NULL OR p_kind NOT IN ('content_changed', 'source_withdrawn', 'frame_withdrawn', 'not_asked')
+     OR nullif(btrim(coalesce(p_reason, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'run id, a retire kind and a reason required' USING ERRCODE = '22023';
+  END IF;
+  SELECT * INTO j FROM evidence_judgment_requests WHERE id = p_id FOR UPDATE;
+  IF NOT FOUND OR j.status IN ('cancelled', 'withdrawn') THEN RETURN 'unchanged'; END IF;
+  v_to := CASE WHEN j.status = 'answered' THEN 'withdrawn' ELSE 'cancelled' END;
+  UPDATE evidence_judgment_requests r SET status = v_to, cancelled_at = now(), cancelled_reason = p_reason, cancelled_by_run_id = p_run_id,
+         retire_kind = p_kind, superseded_by = p_superseded_by,
+         lifecycle = r.lifecycle || evidence_judgment_transition(j.status, v_to, p_run_id, 'producer', p_kind, p_reason)
+   WHERE r.id = p_id;
+  RETURN v_to;
+END
+$fn$;
+REVOKE ALL ON FUNCTION public.retire_evidence_judgment(uuid, uuid, text, text, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.retire_evidence_judgment(uuid, uuid, text, text, uuid) TO service_role;
+
+-- Undo one producer run. Questions it raised are retired (cancelled, or withdrawn when already answered). Questions it
+-- retired or revived go back to the state before its transition, when that transition is still their latest; a question
+-- that saw later activity is reported as skipped_later_activity and left alone. Every change is logged.
+DROP FUNCTION IF EXISTS public.rollback_evidence_judgment_run(uuid, text, boolean);
+CREATE FUNCTION public.rollback_evidence_judgment_run(p_run_id uuid, p_reason text, p_dry_run boolean DEFAULT true)
+RETURNS TABLE(id uuid, question_kind text, subject_id uuid, from_status text, to_status text, action text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $fn$
+#variable_conflict use_column
+DECLARE j evidence_judgment_requests; last jsonb; v_to text; v_action text; v_why text;
 BEGIN
   IF coalesce(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION 'service role required' USING ERRCODE = '42501'; END IF;
   IF p_run_id IS NULL OR nullif(btrim(coalesce(p_reason, '')), '') IS NULL THEN
     RAISE EXCEPTION 'run id and reason required' USING ERRCODE = '22023';
   END IF;
-  IF p_dry_run IS NOT TRUE THEN
-    RETURN QUERY
-    WITH u AS (
-      UPDATE evidence_judgment_requests j SET status = 'cancelled', cancelled_at = now(), cancelled_reason = 'rollback run ' || p_run_id || ': ' || p_reason
-       WHERE j.run_id = p_run_id AND j.status IN ('pending', 'claimed')
-      RETURNING j.id, j.question_kind, j.subject_id, j.status),
-    r AS (
-      UPDATE evidence_judgment_requests j SET status = 'pending', cancelled_at = NULL, cancelled_reason = NULL, cancelled_by_run_id = NULL
-       WHERE j.cancelled_by_run_id = p_run_id AND j.status = 'cancelled'
-      RETURNING j.id, j.question_kind, j.subject_id, j.status)
-    SELECT u.id, u.question_kind, u.subject_id, u.status FROM u
-    UNION ALL SELECT r.id, r.question_kind, r.subject_id, r.status FROM r;
-  ELSE
-    RETURN QUERY SELECT j.id, j.question_kind, j.subject_id, j.status FROM evidence_judgment_requests j
-     WHERE (j.run_id = p_run_id AND j.status IN ('pending', 'claimed'))
-        OR (j.cancelled_by_run_id = p_run_id AND j.status = 'cancelled');
-  END IF;
+  v_why := 'rollback run ' || p_run_id || ': ' || p_reason;
+  FOR j IN SELECT * FROM evidence_judgment_requests r
+            WHERE r.run_id = p_run_id OR r.cancelled_by_run_id = p_run_id
+               OR r.lifecycle @> jsonb_build_array(jsonb_build_object('run_id', p_run_id))
+            ORDER BY r.created_at, r.id FOR UPDATE LOOP
+    last := j.lifecycle -> -1;
+    v_to := NULL;
+    IF j.run_id = p_run_id THEN
+      IF j.status IN ('pending', 'claimed') THEN v_to := 'cancelled'; v_action := 'retired';
+      ELSIF j.status = 'answered' THEN v_to := 'withdrawn'; v_action := 'retired';
+      ELSE v_action := 'already_retired'; END IF;
+    ELSIF last IS NOT NULL AND (last ->> 'run_id')::uuid IS NOT DISTINCT FROM p_run_id AND last ->> 'kind' <> 'rollback' THEN
+      v_to := last ->> 'from'; v_action := 'reverted';
+    ELSIF jsonb_array_length(j.lifecycle) = 0 AND j.cancelled_by_run_id = p_run_id AND j.status = 'cancelled' THEN
+      v_to := 'pending'; v_action := 'reverted';  -- cancelled before lifecycle was recorded
+    ELSE v_action := 'skipped_later_activity'; END IF;
+    IF v_to IS NOT NULL AND p_dry_run IS NOT TRUE THEN
+      UPDATE evidence_judgment_requests r SET status = v_to,
+             cancelled_at = CASE WHEN v_to IN ('cancelled', 'withdrawn') THEN now() END,
+             cancelled_reason = CASE WHEN v_to IN ('cancelled', 'withdrawn') THEN v_why END,
+             cancelled_by_run_id = NULL,
+             retire_kind = CASE WHEN v_to IN ('cancelled', 'withdrawn') THEN 'rollback' END,
+             superseded_by = NULL,
+             claimed_at = CASE WHEN v_to = 'pending' THEN NULL ELSE r.claimed_at END,
+             claimed_by = CASE WHEN v_to = 'pending' THEN NULL ELSE r.claimed_by END,
+             lifecycle = r.lifecycle || evidence_judgment_transition(j.status, v_to, p_run_id, 'rollback', 'rollback', v_why)
+       WHERE r.id = j.id;
+    END IF;
+    RETURN QUERY SELECT j.id, j.question_kind, j.subject_id, j.status, coalesce(v_to, j.status), v_action;
+  END LOOP;
 END
 $fn$;
 REVOKE ALL ON FUNCTION public.rollback_evidence_judgment_run(uuid, text, boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.rollback_evidence_judgment_run(uuid, text, boolean) TO service_role;
 
 -- ─── answering a judgment ─────────────────────────────────────────────────────────────────────────────────────
--- A worker claims pending requests (a claim older than p_stale_minutes is re-claimable), then answers one it holds. An
--- answer is the answering agent/model's reading of a proposed context, never an owner Sign or proof; it must fit the
--- request's question: for receipt_part_visible, visible/installed in yes|no|cannot_tell, confidence 0..1, image_id one of
--- the request's candidate_image_ids (required when visible = yes), bbox [x1,y1,x2,y2] in 0..999 with x1<x2, y1<y2.
--- A malformed answer is refused, not coerced.
+-- A worker claims pending requests (a claim older than p_stale_minutes is re-claimable); a request whose source or
+-- frames are no longer eligible is skipped. It answers one it holds; the answer RPC re-checks eligibility at answer time
+-- and refuses when the line, receipt, link or any candidate frame was withdrawn or changed since the claim. An answer is
+-- the answering agent/model's reading of a proposed context, never an owner Sign or proof; it must fit the question:
+-- for receipt_part_visible, visible/installed in yes|no|cannot_tell, confidence 0..1, image_id one of the request's
+-- candidate_image_ids (required when visible = yes), bbox [x1,y1,x2,y2] in 0..999 with x1<x2, y1<y2. A malformed
+-- answer is refused, not coerced.
 CREATE OR REPLACE FUNCTION public.claim_evidence_judgments(p_department text, p_question_kind text, p_limit int, p_claimed_by text,
                                                            p_stale_minutes int DEFAULT 30)
 RETURNS SETOF public.evidence_judgment_requests
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $fn$
+DECLARE q record; j evidence_judgment_requests; n int := 0;
 BEGIN
   IF coalesce(auth.role(), '') <> 'service_role' THEN RAISE EXCEPTION 'service role required' USING ERRCODE = '42501'; END IF;
   IF nullif(btrim(coalesce(p_claimed_by, '')), '') IS NULL OR coalesce(p_limit, 0) < 1 THEN
     RAISE EXCEPTION 'claimed_by and a positive limit required' USING ERRCODE = '22023';
   END IF;
-  RETURN QUERY
-  UPDATE evidence_judgment_requests j SET status = 'claimed', claimed_at = now(), claimed_by = p_claimed_by
-   WHERE j.id IN (SELECT q.id FROM evidence_judgment_requests q
-                   WHERE q.department = p_department AND q.question_kind = p_question_kind
-                     AND (q.status = 'pending' OR (q.status = 'claimed' AND q.claimed_at < now() - make_interval(mins => p_stale_minutes)))
-                   ORDER BY q.priority DESC, q.created_at, q.id
-                   LIMIT least(p_limit, 500) FOR UPDATE SKIP LOCKED)
-  RETURNING j.*;
+  FOR q IN SELECT r.id, r.status FROM evidence_judgment_requests r
+            WHERE r.department = p_department AND r.question_kind = p_question_kind
+              AND (r.status = 'pending' OR (r.status = 'claimed' AND r.claimed_at < now() - make_interval(mins => p_stale_minutes)))
+            ORDER BY r.priority DESC, r.created_at, r.id
+            LIMIT 2000 FOR UPDATE SKIP LOCKED LOOP
+    EXIT WHEN n >= least(p_limit, 500);
+    CONTINUE WHEN cardinality(evidence_judgment_ineligibility(q.id)) > 0;
+    UPDATE evidence_judgment_requests r SET status = 'claimed', claimed_at = now(), claimed_by = p_claimed_by,
+           lifecycle = r.lifecycle || evidence_judgment_transition(q.status, 'claimed', NULL, p_claimed_by, 'claim', NULL)
+     WHERE r.id = q.id RETURNING r.* INTO j;
+    n := n + 1;
+    RETURN NEXT j;
+  END LOOP;
 END
 $fn$;
 REVOKE ALL ON FUNCTION public.claim_evidence_judgments(text, text, int, text, int) FROM PUBLIC, anon, authenticated;
@@ -413,11 +622,16 @@ BEGIN
   IF j.status <> 'claimed' OR j.claimed_by IS DISTINCT FROM p_claimed_by THEN
     RAISE EXCEPTION 'request % is % (claimed by %), not claimed by %', p_id, j.status, j.claimed_by, p_claimed_by USING ERRCODE = '55000';
   END IF;
+  probs := evidence_judgment_ineligibility(p_id);
+  IF cardinality(probs) > 0 THEN
+    RAISE EXCEPTION 'answer refused: request no longer eligible: %', array_to_string(probs, '; ') USING ERRCODE = '55000';
+  END IF;
   probs := evidence_judgment_answer_problems(j.question_kind, j.params, p_answer);
   IF cardinality(probs) > 0 THEN RAISE EXCEPTION 'answer refused: %', array_to_string(probs, '; ') USING ERRCODE = '22023'; END IF;
-  UPDATE evidence_judgment_requests SET status = 'answered', answered_at = now(), answer = p_answer,
-         answer_agent = p_answer_agent, answer_model = p_answer_model, answer_version = p_answer_version
-   WHERE id = p_id RETURNING * INTO j;
+  UPDATE evidence_judgment_requests r SET status = 'answered', answered_at = now(), answer = p_answer,
+         answer_agent = p_answer_agent, answer_model = p_answer_model, answer_version = p_answer_version,
+         lifecycle = r.lifecycle || evidence_judgment_transition('claimed', 'answered', NULL, p_claimed_by, 'answer', p_answer_version)
+   WHERE r.id = p_id RETURNING r.* INTO j;
   RETURN j;
 END
 $fn$;
@@ -426,7 +640,6 @@ GRANT EXECUTE ON FUNCTION public.answer_evidence_judgment(uuid, text, jsonb, tex
 
 -- Undo answers from one answering version: they go back to pending and each reopened answer (with its agent, model,
 -- version, time and the reopen reason) is appended to answer_history, so nothing an answerer wrote is lost.
-ALTER TABLE public.evidence_judgment_requests ADD COLUMN IF NOT EXISTS answer_history jsonb NOT NULL DEFAULT '[]'::jsonb;
 CREATE OR REPLACE FUNCTION public.reopen_evidence_judgment_answers(p_answer_version text, p_reason text, p_dry_run boolean DEFAULT true)
 RETURNS TABLE(id uuid, question_kind text, subject_id uuid, answer jsonb)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
@@ -439,19 +652,24 @@ BEGIN
   END IF;
   IF p_dry_run IS NOT TRUE THEN
     RETURN QUERY
-    WITH prior AS (SELECT j.id, j.answer FROM evidence_judgment_requests j WHERE j.answer_version = p_answer_version AND j.status = 'answered' FOR UPDATE),
+    WITH prior AS (SELECT j.id, j.answer FROM evidence_judgment_requests j
+                    WHERE j.answer_version = p_answer_version AND j.status IN ('answered', 'withdrawn') FOR UPDATE),
     u AS (
-      UPDATE evidence_judgment_requests j SET status = 'pending', claimed_at = NULL, claimed_by = NULL, answered_at = NULL, answer = NULL,
+      UPDATE evidence_judgment_requests j SET
+             status = CASE WHEN j.status = 'withdrawn' THEN 'cancelled' ELSE 'pending' END,
+             claimed_at = NULL, claimed_by = NULL, answered_at = NULL, answer = NULL,
              answer_agent = NULL, answer_model = NULL, answer_version = NULL,
              answer_history = j.answer_history || jsonb_build_array(jsonb_build_object('answer', j.answer, 'answer_agent', j.answer_agent,
                'answer_model', j.answer_model, 'answer_version', j.answer_version, 'answered_at', j.answered_at, 'claimed_by', j.claimed_by,
-               'reopened_at', now(), 'reopen_reason', p_reason))
+               'reopened_at', now(), 'reopen_reason', p_reason)),
+             lifecycle = j.lifecycle || evidence_judgment_transition(j.status, CASE WHEN j.status = 'withdrawn' THEN 'cancelled' ELSE 'pending' END,
+               NULL, 'reopen', 'reopen', p_reason)
         FROM prior p WHERE j.id = p.id
       RETURNING j.id, j.question_kind, j.subject_id, p.answer)
     SELECT u.id, u.question_kind, u.subject_id, u.answer FROM u;
   ELSE
     RETURN QUERY SELECT j.id, j.question_kind, j.subject_id, j.answer FROM evidence_judgment_requests j
-     WHERE j.answer_version = p_answer_version AND j.status = 'answered';
+     WHERE j.answer_version = p_answer_version AND j.status IN ('answered', 'withdrawn');
   END IF;
 END
 $fn$;
