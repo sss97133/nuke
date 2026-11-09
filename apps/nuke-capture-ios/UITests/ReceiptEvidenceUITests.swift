@@ -43,7 +43,7 @@ final class ReceiptEvidenceUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Corrected gasket reading"].exists)
         XCTAssertTrue(app.buttons["Retry"].exists)
         noWrites(app)
-        let back = app.navigationBars.buttons["Parts"].firstMatch
+        let back = app.navigationBars.buttons["Receipt sources"].firstMatch
         XCTAssertTrue(back.exists); back.tap()
         XCTAssertTrue(app.staticTexts["Source detail unavailable"].waitForExistence(timeout: 5))
     }

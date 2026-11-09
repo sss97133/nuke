@@ -281,6 +281,19 @@ Standing rules the code carries:
   total panel, payment/allocation/work inference, original-page download, or local financial sum. A read
   timestamp is a snapshot, not a promise that the record cannot change. Older investment-fold clock,
   labor and overlap qualifications remain separate unresolved work.
+- **Legacy financial inputs stay evidence.** The legacy proof's `confirmed_labor` is a sum of session
+  `total_job_cost`, which can include parts and tools; confirmation records testimony, not payment.
+  Its widget keeps receipt, payment/contribution and session record doors, without presenting mixed
+  totals, projected photo labor, party totals or ROI as reconciled investment/cash. Session and receipt
+  readings omit an invented currency; audit values are explicitly rounded and session dates carry
+  no invented timezone. Payment reports retain their declared USD unit and attributed
+  status. A missing confirmation is unknown, not an action grant. Existing confirmation/contribution
+  writers keep their effects. Session confirmation is displayed only after an explicit successful
+  acknowledgement for that session; an HTTP200 refusal, absent/malformed receipt or transport error
+  remains unconfirmed with retry. This establishes no vehicle holding or work/payment role.
+  The legacy receipt curve is withheld pending a qualified money/clock
+  contract; its first receipt is not an acquisition. The canonical valuation/price section is unchanged. This does
+  not repair the server folds or replace the canonical book/vehicle accounting service.
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.

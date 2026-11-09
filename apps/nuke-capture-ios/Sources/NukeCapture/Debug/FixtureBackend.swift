@@ -56,7 +56,7 @@ enum FixtureBackend {
         "work_order_inspection_read", "work_order_invoices_read", "job_evidence_candidates_read",
         "work_order_facility_reservations_read", "work_order_operations_read", "vehicle_work_orders_read",
         "listing_work_plan_read", "open_requirements_read", "provider_profile_read", "provider_job_record_read",
-        "compute_vehicle_investment_proof", "vehicle_testimony_summary",
+        "compute_vehicle_investment_proof", "vehicle_testimony_summary", "resolve_vehicle_identity_marks",
         "my_contact_requests", "contact_thread_read", "my_signature_queue", "my_work_orders", "my_identity_read",
         "work_order_statement_read", "facility_read", "my_vouches_read", "user_org_relations",
     ]
@@ -132,29 +132,37 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "get_vehicle_investment_timeline" where scenario.hasPrefix("financial-"):
+            return ok(InvestmentEvidenceFixtures.timeline)
+        case "get_vehicle_valuation" where scenario == "financial-qualification":
+            return ok(InvestmentEvidenceFixtures.valuation)
+        case "compute_vehicle_investment_proof" where scenario == "financial-qualification":
+            return ok(InvestmentEvidenceFixtures.proof)
+        case "compute_vehicle_investment_proof" where scenario == "financial-evidence-withheld":
+            return ok(InvestmentEvidenceFixtures.withheld)
         case "compute_vehicle_investment_proof" where scenario.hasPrefix("receipt-"):
             return ok(ReceiptDepthFixtures.proof)
-        case "get_vehicle_day_documents" where scenario.hasPrefix("receipt-"):
+        case "get_vehicle_day_documents" where scenario.hasPrefix("receipt-") || scenario == "financial-qualification":
             return ok(scenario == "receipt-withdrawn" ? ReceiptDepthFixtures.withdrawn : ReceiptDepthFixtures.day)
         case "get_orphan_sessions" where scenario == "source-inspection":
             return ok("""
             [{"session_day":"2026-10-31","gps_cell":"fixture","photo_count":1,"image_ids":["00000000-0000-4000-8000-00000000e001"],"sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
             """)
-        case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn"].contains(scenario):
+        case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
-            {"vehicle_id":"\(navigationVehicleId)","viewer":"\(scenario.hasPrefix("receipt-") ? "owner" : "anon")","read_at":"2026-10-31T12:00:00Z",
-             "sections":[{"kind":"strip","coverage":{"n":1,"of":1,"grain":"source claims","as_of":"2026-10-31T12:00:00Z"},
+            {"vehicle_id":"\(navigationVehicleId)","viewer":"\((scenario.hasPrefix("receipt-") || scenario.hasPrefix("financial-")) ? "owner" : "anon")","read_at":"2026-10-31T12:00:00Z",
+             "sections":[\(scenario == "financial-qualification" ? InvestmentEvidenceFixtures.mastheadSection : ""){"kind":"strip","coverage":{"n":1,"of":1,"grain":"source claims","as_of":"2026-10-31T12:00:00Z"},
                "facets":[{"dimension":"engine","label":"350 V8 Crate","member":{"value":"350 V8 Crate",
                  "source":{"kind":"listing","label":"Dealer seller listing","method":"dealer_microdata_v2","url":"https://example.com/vehicle"},
                  "trust":0.6,"qualification":{"role":"seller_claim","factory_configuration_status":"unknown","current_configuration_status":"unknown"}}}]}]}
             """)
-        case "get_user_garage" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn"].contains(scenario):
+        case "get_user_garage" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             [{"vehicle_id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe",
               "trim_name":null,"image_url":null,"current_value":null,"image_count":0,"relationship":"profile_record"}]
             """)
-        case "get_my_garage_owner_corrections" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn"].contains(scenario): return ok("[]")
-        case "my_unorganized_photo_count" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn"].contains(scenario): return ok("0")
+        case "get_my_garage_owner_corrections" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("[]")
+        case "my_unorganized_photo_count" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("0")
         case "listing_work_plan_read": return ok(PlanFixtures.plan)
         case "my_suggested_provider_links": return ok(ParityFixtures.suggestions)
         case "work_order_publication_read":
@@ -248,6 +256,13 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case "confirm_work_session" where scenario == "financial-qualification":
+            let id = (args["p_session_id"] as? String ?? "").lowercased()
+            if id.hasSuffix("f004") { return ok(#"{"ok":false,"error":"not_authorized"}"#) }
+            if id.hasSuffix("f005") { return ok("{}") }
+            if id.hasSuffix("f006") { return ok(#"{"ok":"#) }
+            if id.hasSuffix("f007") { return (-1, Data()) } // finite transport failure below
+            return ok(#"{"ok":true,"session_id":"\#(id)","confirmed":true}"#)
         case "post_work_request": return ok(PostJobFixtures.posted)
         case "accept_work_order_quote": return ok(JobFixtures.acceptReceipt)
         case "offer_on_requirement": return ok(OfferFixtures.offerReceipt)
@@ -271,9 +286,11 @@ enum FixtureBackend {
 
     private static func table(_ name: String) -> (Int, Data) {
         switch name {
-        case "receipt_vehicle_links" where scenario.hasPrefix("receipt-"):
+        case "vehicle_timeline_events" where scenario == "financial-qualification":
+            return ok(InvestmentEvidenceFixtures.saleEvents)
+        case "receipt_vehicle_links" where scenario.hasPrefix("receipt-") || scenario == "financial-qualification":
             return ok(ReceiptDepthFixtures.links)
-        case "vehicles" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn"].contains(scenario):
+        case "vehicles" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             [{"id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe","vin":"TEST1234567",
               "trim":null,"primary_image_url":null,"image_count":0}]
@@ -281,7 +298,7 @@ enum FixtureBackend {
         case "vehicle_images" where scenario == "source-inspection":
             return ok(#"[{"id":"00000000-0000-4000-8000-00000000e001","image_url":"https://fixture.nuke.invalid/photo.png","auto_suggested_vehicle_id":null,"auto_suggestion_reasons":null}]"#)
         case "vehicle_images" where scenario == "navigation-garage": return ok("[]")
-        case "vehicle_images_public" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn"].contains(scenario): return ok("[]")
+        case "vehicle_images_public" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("[]")
         case "vehicle_images": return ok(persona == .client ? PostJobFixtures.photos : "[]")
         case "profiles": return ok(ParityFixtures.ownRow)
         case "tool_requirement_key_map": return ok(ParityFixtures.toolKeys)
@@ -312,6 +329,10 @@ final class FixtureURLProtocol: URLProtocol {
 
     override func startLoading() {
         let (status, data) = FixtureBackend.respond(request)
+        if status == -1 {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
         let response = HTTPURLResponse(url: request.url ?? FixtureBackend.baseURL, statusCode: status, httpVersion: "HTTP/1.1",
                                        headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
