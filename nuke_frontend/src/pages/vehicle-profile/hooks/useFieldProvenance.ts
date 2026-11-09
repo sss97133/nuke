@@ -17,6 +17,8 @@ export interface ImageObservation {
   observation_id: string;
   image_id: string;
   image_url: string;
+  /** Original observation URL, when supplied by the current witness reader. */
+  source_url?: string | null;
   value: string | null;
   source_slug: string | null;
   observed_at: string | null;
@@ -96,6 +98,17 @@ export function provenanceCoverageUnavailable(provenance: FieldProvenance | null
   return !!provenance?.coverage && provenance.coverage.status !== 'complete_current_reader';
 }
 
+/** A retained image ID cannot transfer an old reading onto replacement bytes. */
+export function currentImageObservations(provenance: FieldProvenance | null | undefined, images: EvidenceImage[]) {
+  if (!provenance || provenanceCoverageUnavailable(provenance)) return [];
+  const current = new Map(images.map(image => [image.id, image.image_url]));
+  return (provenance.image_observations || []).filter(observation => {
+    const url = current.get(observation.image_id);
+    return !!url && observation.image_url === url
+      && (observation.source_url == null || observation.source_url === url);
+  });
+}
+
 export function citedFieldImages(provenance: FieldProvenance | null | undefined, images: EvidenceImage[]) {
   if (!provenance || provenanceCoverageUnavailable(provenance)) return [];
   // Recheck returned citations against this vehicle's independently filtered
@@ -103,9 +116,10 @@ export function citedFieldImages(provenance: FieldProvenance | null | undefined,
   const ids = new Set(provenance.evidence
     .filter(e => e.source !== 'field_evidence' || e.verified === true)
     .map(e => e.image_id).filter(Boolean));
-  for (const observation of provenance.image_observations || []) ids.add(observation.image_id);
+  const currentObservations = currentImageObservations(provenance, images);
+  for (const observation of currentObservations) ids.add(observation.image_id);
   return images.filter(image => ids.has(image.id)).sort((a, b) => {
-    const priority = (id: string) => Math.min(3, ...(provenance.image_observations || []).filter(o => o.image_id === id).map(o => evidenceOrder(o.visual_relation)));
+    const priority = (id: string) => Math.min(3, ...currentObservations.filter(o => o.image_id === id).map(o => evidenceOrder(o.visual_relation)));
     return priority(a.id) - priority(b.id);
   });
 }

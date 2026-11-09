@@ -13,7 +13,7 @@ import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, referenceFieldImages, isReferenceImage, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
-import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
+import { useFieldProvenance, citedFieldImages, currentImageObservations, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
 import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import FieldProvenanceDrawer from './FieldProvenanceDrawer';
 import { CorrectionReceipt } from './FinancialReceiptRecords';
@@ -172,7 +172,9 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const imagesLoading = inventory.isLoading || provenance.isLoading;
   const awaiting = rows.filter(image => !hasImageAnalysis(image)).length;
   const imageReadFailed = !!inventory.error || !!provenance.error || (!provenance.isLoading && provenance.data === null);
-  const imageObservations = provenance.data?.image_observations || [];
+  const imageObservations = currentImageObservations(provenance.data, rows);
+  const unavailableImageObservations = (provenance.data?.image_observations || [])
+    .filter(source => !imageObservations.includes(source));
   const isEngineProperty = !!ENGINE_PROPERTY_IDS[field];
   const resolvedValue = isEngineProperty
     ? (provenance.data?.canonical?.status === 'resolved' ? provenance.data.canonical.value : null)
@@ -232,6 +234,11 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           </div>)}
         </figcaption>
       </figure>)}
+      {!imagesLoading && unavailableImageObservations.map(source => <p key={source.observation_id}>
+        Current image citation unavailable. <PrefetchLink to={`/vehicle/${vehicleId}/observation/${source.observation_id}`} onClick={closeTop}>
+          Inspect retained source record
+        </PrefetchLink>
+      </p>)}
       {readings.filter(source => source.source_image_id && !witnesses.some(image => image.id === source.source_image_id)).map(source =>
         <p key={source.id}><PrefetchLink to={`/vehicle/${vehicleId}/image/${source.source_image_id}`} onClick={closeTop}>
           {source.field_value} · inspect cited image
