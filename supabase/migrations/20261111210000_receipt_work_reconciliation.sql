@@ -33,7 +33,7 @@ CREATE OR REPLACE FUNCTION public.receipt_line_kind(p_description text, p_part_n
                                                     p_line_date date, p_performer text) RETURNS text
 LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
   SELECT CASE
-    WHEN d ~* '\m(shipping|freight|handling|delivery|sales tax|tax|discount|coupon|core charge|deposit|payment|surcharge|fee|subtotal|total)\M'
+    WHEN d ~* '\m(shipping|freight|handling|delivery|sales tax|tax|discount|coupon|core charge|core exchange|core return|return|deposit|payment|surcharge|fee|subtotal|total)\M'
          OR coalesce(p_part_number, '') ~* '^\{?(shipping|freight|tax|handling)\}?$' THEN 'charge'
     WHEN d ~* 'back[- ]?order' OR d ~* 'qty shipped 0' THEN 'backordered'
     WHEN d ~* 'kit component' THEN 'kit_component'
@@ -55,14 +55,14 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
     WHEN d ~* '\m(fstnrs|fasteners?|weatherstrip|switch)\M' OR d ~* '\m(screws?|bolts?|nuts|clips?)\M\s*(set|kit|\(|$)' THEN NULL
     -- lamps, lenses and their bezels are on the body ends, not the dash
     WHEN d ~* '\m(tail ?lamp|tail ?light|t/?l ?la?mp|head ?lamp|headlight|marker lamp|park(ing)? lamp|back ?up lamp)' THEN 'exterior'
-    WHEN d ~* '\m(dash|cluster|gauge|tach|clock|speedo|instrument|glove ?box|glv box|console|radio|steering|horn|shifter|bezel|heater control|htr ctrl|ash ?tray|lighter)' THEN 'dashboard'
-    WHEN d ~* '\m(seat|upholst|foam|headrest|carpet|headliner|door panel|door pnl|sill plate|kick panel|visor|dome light|arm ?rest|spe?a?ke?r shelf|spkr shlf|package tray)' THEN 'interior'
+    WHEN d ~* '\m(dash|cluster|gauge|tach|clock|speedo|instrument|glove ?box|glv box|console|radio|steering|horn|shifter|bezel|heater control|htr ctrl|ash ?tray|lighter|radio knobs?|am/fm)' THEN 'dashboard'
+    WHEN d ~* '\m(seat|upholst|foam|headrest|carpet|headliner|door panel|door pnl|sill plate|kick panel|visor|dome light|arm ?rest|spe?a?ke?r shelf|spkr shlf|package tray|sill plte|cpt|uph|shi?ft boot|shft boot|grshft|shift tunnel|window crank|wndow crnk|door lock knob)' THEN 'interior'
     -- "CAM/FB" is a Camaro/Firebird fitment, not a camshaft
-    WHEN d ~* '\m(engine|carb|intake|valve cover|header|manifold|distributor|alternator|water pump|radiator|rad support|rad core|starter|spark|plug wire|pulley|air cleaner|fuel pump|oil pan|timing|thermostat|piston|cylinder|crank|lifter|rocker|gasket|bore|hone|firewall|frwall|dipstick|cooling system|emission)'
+    WHEN d ~* '\m(engine|carb|intake|valve cover|header|manifold|distributor|alternator|water pump|radiator|rad support|rad core|starter|spark|plug wire|pulley|air cleaner|fuel pump|oil pan|timing|thermostat|piston|cylinder|crank|lifter|rocker|gasket|bore|hone|firewall|frwall|dipstick|cooling system|emission|water neck|pcv|sending uni|clnr|fan clutch|oil filter|battery|surface heads|cylinder heads?|valve job|block)'
          OR d ~* '\mcam(shaft)?\M(?!/)' THEN 'engine'
     WHEN d ~* '\m(wheel|tire|rim|hub ?cap|lug|center cap)' THEN 'wheel'
     WHEN d ~* '\m(exhaust|muffler|tail ?pipe|driveshaft|drive shaft|axle|leaf spring|shock|control arm|sway bar|frame rail|floor pan|fuel tank|brake line)' THEN 'undercarriage'
-    WHEN d ~* '\m(bumper|spoiler|hood|tail panel|tail pnl|fender|quarter panel|qtr panel|grille|grill|mirror|emblem|letters|decal|stripe|header panel|rocker panel|deck lid|decklid|trunk|body panel|bdy pnl|deck|door shell|door skin|door hinge|dr hng|cowl|windshield|moulding|molding)' THEN 'exterior'
+    WHEN d ~* '\m(bumper|spoiler|hood|tail panel|tail pnl|fender|quarter panel|qtr panel|grille|grill|mirror|emblem|letters|decal|stripe|header panel|rocker panel|deck lid|decklid|trunk|body panel|bdy pnl|deck|door shell|door skin|door hinge|dr hng|cowl|windshield|moulding|molding|sealed beam|wiper)' THEN 'exterior'
   END
   FROM (SELECT coalesce(p_description, '') AS d) s
 $$;

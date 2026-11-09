@@ -49,6 +49,12 @@ BEGIN
   ASSERT receipt_line_photo_zone('70-76 SHAKER HOOD') = 'exterior';
   ASSERT receipt_line_photo_zone('70-73 FIREBIRD REAR BUMPER') = 'exterior';
   ASSERT receipt_line_photo_zone('SHIPPING') IS NULL;
+  ASSERT receipt_line_photo_zone('71-76 TA SHKR AIR CLNR VENT TB') = 'engine';
+  ASSERT receipt_line_photo_zone('70-81 F-BODY DOOR SILL PLTE-RH') = 'interior';
+  ASSERT receipt_line_photo_zone('70-81 FIREBIRD AM/FM KNOBS (SET)') = 'dashboard';
+  ASSERT receipt_line_photo_zone('SEALED BEAM (SYL) 1Y; list 37.27') = 'exterior';
+  ASSERT receipt_line_photo_zone('MINI BULB (SYL) 1Y BP; list 11.00') IS NULL;
+  ASSERT receipt_line_kind('Core Return (ULT); Core Return. Original Invoice: 3565-277034', NULL, -20, NULL, NULL, NULL) = 'charge';
   ASSERT receipt_line_photo_zone('70-73 UNDER HOOD&TRNK FSTNRS (SET)') IS NULL;
   ASSERT receipt_line_photo_zone('69-81 BACK UP LAMP SWITCH MT') IS NULL;
   ASSERT receipt_line_photo_zone('73 455 MT EMISSION DECAL (PH)') = 'engine';
