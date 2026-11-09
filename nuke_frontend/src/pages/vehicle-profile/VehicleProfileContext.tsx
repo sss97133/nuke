@@ -719,7 +719,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       try {
         const result = await supabase
           .from('vehicle_events')
-          .select('source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('source_platform, source_url, event_type, event_status, ended_at, current_price, currency_code, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
           .eq('vehicle_id', vehicle!.id)
           .eq('source_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })
@@ -784,6 +784,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
             updated_at: (merged as any)?.updated_at ?? auctionPulse?.updated_at ?? null,
+            currency_code: (merged as any)?.currency_code ?? null,
+            source_observed_at: (merged as any)?.source_observed_at ?? null,
             metadata: (merged as any)?.metadata ?? (auctionPulse as any)?.metadata ?? null,
             winner_name: (auctionPulse as any)?.winner_name ?? null,
             seller_username: (auctionPulse as any)?.seller_username ?? null,

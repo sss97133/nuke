@@ -644,7 +644,7 @@ export async function loadVehicleImpl({
       try {
         const { data } = await supabase
           .from('vehicle_events')
-          .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, currency_code, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
           .eq('vehicle_id', vehicleData.id)
           .order('updated_at', { ascending: false })
           .limit(10);
@@ -829,6 +829,8 @@ export async function loadVehicleImpl({
           last_bid_at: lastBidAt,
           last_comment_at: lastCommentAt,
           updated_at: (effective as any).updated_at || null,
+          currency_code: (effective as any)?.currency_code ?? null,
+          source_observed_at: (effective as any)?.source_observed_at ?? null,
           metadata: (effective as any).metadata ?? null,
           winner_name: (effective as any).winner_name ?? null,
           seller_username: (effective as any).seller_username ?? null,
@@ -852,7 +854,7 @@ export async function loadVehicleImpl({
                 // Refresh latest listing rows and re-derive pulse.
                 const result = await supabase
                   .from('vehicle_events')
-                  .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+                  .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, currency_code, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
                   .eq('vehicle_id', vehicleData.id)
                   .order('updated_at', { ascending: false })
                   .limit(10);

@@ -41,6 +41,8 @@ export function isAuctionPresentation(row: any): boolean {
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port) return false;
     const host = url.hostname.replace(/^www\./, '');
     return (platform === 'hagerty' && host === 'hagerty.com' && /^\/marketplace\/auction\//.test(url.pathname))
+      || (platform === 'purplewave' && type === 'auction' && host === 'purplewave.com'
+        && /^\/auction\/[A-Za-z0-9]+\/item\/[A-Za-z0-9]+\/?$/.test(url.pathname))
       || (platform === 'hemmings' && host === 'hemmings.com' && /^\/auctions?\//.test(url.pathname));
   } catch { return false; }
 }
