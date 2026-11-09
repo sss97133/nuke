@@ -106,6 +106,13 @@ Deno.test("a title or registration is a vehicle document, not a receipt: page on
   assertEquals(page.doc_type, "registration");
   assertEquals(page.date_source, "none");
   assertEquals(page.doc_date, null);
+  // the frame holds a vehicle, so the page is placed: the marker drains capture_document_pages_to_land
+  const pages = calls.filter((c) => c[0] === "page").map((c) => c[1] as Record<string, unknown>);
+  assertEquals(pages.length, 2);
+  const landed = (pages[1].extraction as Record<string, unknown>).landed as Record<string, unknown>;
+  assertEquals(landed.as, "vehicle_document");
+  assertEquals(landed.vehicle_id, VEH);
+  assert(typeof landed.at === "string");
 });
 
 Deno.test("sanitizeExtraction removes e-mail addresses, card-length numbers and raw OCR text", () => {
@@ -176,8 +183,12 @@ Deno.test("a page already recorded, now with a vehicle, lands from the stored ex
   assert(!calls.some((c) => c[0] === "classify"));
   assert(!calls.some((c) => c[0] === "extract"));
   assert(calls.some((c) => c[0] === "land"));
-  const page = calls.find((c) => c[0] === "page")![1] as Record<string, unknown>;
-  assertEquals(page.run_id, "run-0");
+  const pages = calls.filter((c) => c[0] === "page").map((c) => c[1] as Record<string, unknown>);
+  assertEquals(pages[0].run_id, "run-0");
+  const landed = (pages[pages.length - 1].extraction as Record<string, unknown>).landed as Record<string, unknown>;
+  assertEquals(landed.as, "receipt");
+  assertEquals(landed.receipt_id, "r-1");
+  assertEquals(landed.vehicle_id, VEH);
 });
 
 Deno.test("unknown frame, bad id and a refused landing are reported, never thrown", async () => {

@@ -403,7 +403,13 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
   if (!vehicleId) {
     return { status: 200, image_id: imageId, document_type: docType, confidence, page: true, landed: false, reason: "no vehicle on the frame; page recorded, waiting", storage_path: storagePath, line_items_count: n, parts_found: 0, extracted_fields: fields, run_id: runId };
   }
+  // A page the route has placed (as a receipt, or recorded as a vehicle document on a frame that holds a vehicle) carries
+  // extraction.landed, so capture_document_pages_to_land stops listing it.
+  const markLanded = async (landed: Record<string, unknown>): Promise<void> => {
+    await deps.upsertPage({ ...row, extraction: { ...row.extraction, landed: { ...landed, at: deps.now().toISOString() } } });
+  };
   if (!MONEY_TYPES.has(lt) && lt !== "packing_slip" && lt !== "order_confirmation" && lt !== "alignment_report") {
+    await markLanded({ as: "vehicle_document", vehicle_id: vehicleId });
     return { status: 200, image_id: imageId, document_type: docType, confidence, page: true, landed: false, reason: `a ${docType} is a vehicle document, not a receipt; page recorded`, storage_path: storagePath, line_items_count: n, parts_found: 0, extracted_fields: fields, run_id: runId };
   }
   const doc = toLandingDocument(frame, docType, data, confidence, { sha256, storage_path: storagePath, byte_size: bytes.byteLength }, reviewReasons);
@@ -418,6 +424,7 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
   if (d0.receipt_id && !d0.duplicate) {
     try { await deps.bridge(d0.receipt_id); } catch (_e) { /* the bridge runs again on its own; the receipt exists */ }
   }
+  await markLanded({ as: "receipt", vehicle_id: vehicleId, receipt_id: d0.receipt_id ?? null, document_id: d0.document_id ?? null, duplicate: !!d0.duplicate });
   return {
     status: 200, image_id: imageId, document_type: docType, confidence, page: true, landed: true, reason: d0.duplicate ? "already landed" : undefined,
     receipt_id: d0.receipt_id ?? null, document_id: d0.document_id ?? null, storage_path: storagePath, line_items_count: n, parts_found: 0, extracted_fields: fields, run_id: runId,
