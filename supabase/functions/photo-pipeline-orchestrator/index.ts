@@ -19,7 +19,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
-import { classifyImageRouted } from "./classifierProvider.ts";
+import { classifyImageRouted, classificationFromReader, loadManifest, renderPromptV2 } from "./classifierProvider.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -188,6 +188,14 @@ Deno.serve(async (req) => {
     const input = await req.json();
 
     if (input?.action === "classifier_assay") return await runClassifierAssay(req, input, supabase);
+    // The checklist for a reader that runs the classification elsewhere (the owner's subscription worker): the same
+    // v98 prompt the OpenAI path sends, from the same manifest. No image, no model call.
+    if (input?.action === "classifier_prompt") {
+      const manifest = await loadManifest();
+      return new Response(JSON.stringify({ prompt: renderPromptV2(manifest), prompt_version: "v98",
+        image_types: ["vehicle_exterior", "vehicle_interior", "engine_bay", "undercarriage", "detail_closeup", "vin_plate", "part_closeup", "receipt_document", "progress_shot", "other"] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
@@ -431,10 +439,20 @@ Deno.serve(async (req) => {
     }
 
     // Step 2: Classify image type (OpenAI primary, Gemini fallback; see classifierProvider.ts)
-    await reportStep(image_id, "classifying", { provider_route: "openai_primary" });
-    const classification = await classifyImageRouted(image_url,
-      Deno.env.get("GOOGLE_AI_API_KEY") ?? Deno.env.get("GEMINI_API_KEY") ??
-      Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("free_api_key"));
+    // A reader that already ran the checklist (action classifier_prompt) hands its JSON in classification_raw; it is
+    // validated exactly like a provider answer and the rest of the pipeline is unchanged. Otherwise the provider route.
+    const providedRaw = input.classification_raw && typeof input.classification_raw === "object" && !Array.isArray(input.classification_raw) ? input.classification_raw : null;
+    const readerName = typeof input.reader === "string" && input.reader.trim() ? input.reader.trim().slice(0, 80) : null;
+    let classification: ClassificationResult;
+    if (providedRaw && readerName) {
+      await reportStep(image_id, "classifying", { provider_route: "reader", reader: readerName });
+      classification = await classificationFromReader(providedRaw, readerName);
+    } else {
+      await reportStep(image_id, "classifying", { provider_route: "openai_primary" });
+      classification = await classifyImageRouted(image_url,
+        Deno.env.get("GOOGLE_AI_API_KEY") ?? Deno.env.get("GEMINI_API_KEY") ??
+        Deno.env.get("GOOGLE_API_KEY") ?? Deno.env.get("free_api_key"));
+    }
     // A missing classifier is operational failure, not visual testimony. No
     // second paid model or deep queue is automatically invoked to rescue it.
     if (classification.classifier_ok === false) {
