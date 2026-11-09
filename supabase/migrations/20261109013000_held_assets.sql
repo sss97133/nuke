@@ -13,16 +13,14 @@
 --     else gets null as before. The creation block names a user party from profiles (full_name, else username). A 'declared'
 --     block carries the holder's own words (medium, year, dimensions, edition, notes) and 'viewer' says whether the reader is the
 --     holder. 'market' says 'none_public' when no lot exists for the asset.
+-- Version 20261109013000: 20261109010000 was taken on main by grade_closed_hammer_predictions.
 -- Contract: supabase/sql/test_asset_lots.sql (PG17).
 BEGIN;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '2s';
 
-ALTER TABLE public.assets DROP CONSTRAINT assets_asset_type_check;
-ALTER TABLE public.assets ADD CONSTRAINT assets_asset_type_check CHECK (asset_type = ANY (ARRAY['image'::text, 'vehicle'::text,
-  'garment'::text, 'publication'::text, 'issue'::text, 'article'::text, 'shoot'::text, 'equipment'::text, 'tool'::text, 'part'::text,
-  'material'::text, 'goods'::text, 'artwork'::text, 'automobilia'::text, 'memorabilia'::text]));
-
+-- assets.asset_type already admits publication (2026-07) and artwork, automobilia, memorabilia (20261108170000); no CHECK change.
+-- assets holds ~82k rows (2026-11-08): a plain build is sub-second under the 2 s lock_timeout; the deploy role cannot run CONCURRENTLY.
 CREATE INDEX IF NOT EXISTS assets_holder_idx ON public.assets (owner_id, created_at DESC) WHERE owner_id IS NOT NULL;
 
 CREATE OR REPLACE FUNCTION public.declare_held_asset(p_asset_type text, p_title text, p_medium text DEFAULT NULL, p_year text DEFAULT NULL,

@@ -55,7 +55,7 @@ VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90), ('a
 \ir ../migrations/20261108234500_asset_creators_current_lot.sql
 \ir ../migrations/20261108235500_asset_creators_materialized.sql
 \ir ../migrations/20261109000000_asset_profile_read.sql
-\ir ../migrations/20261109010000_held_assets.sql
+\ir ../migrations/20261109013000_held_assets.sql
 
 -- 1. Anon cannot write.
 DO $$ BEGIN
