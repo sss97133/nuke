@@ -19,6 +19,7 @@ import { useFieldProvenance, formatProvenanceValue, provenanceCoverageUnavailabl
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { readProfileSourcePage, sourceValueText, type StructuredClaim } from './profileSourceClaims';
+import { currentBidEvidenceAmount } from './auctionEvidenceDisplay';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
 
@@ -546,7 +547,7 @@ const FieldRow: React.FC<{
 /* ------------------------------------------------------------------ */
 
 const VehicleDossierPanel: React.FC = () => {
-  const { vehicle, vehicleId, canEdit, isVerifiedOwner, isMobile, setGalleryFilter } = useVehicleProfile();
+  const { vehicle, vehicleId, canEdit, isVerifiedOwner, isMobile, setGalleryFilter, auctionPulse } = useVehicleProfile();
   const navigate = useNavigate();
   const { openPopup } = usePopup();
   const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
@@ -795,7 +796,9 @@ const VehicleDossierPanel: React.FC = () => {
                   const on = priceFacts?.price_as_of
                     ? new Date(priceFacts.price_as_of).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
                     : null;
-                  displayValue = priceKind ? fmtVal(field, priceFacts?.price_amount) + (on ? ` · ${on}` : '') : '';
+                  displayValue = priceKind && priceFacts ? (priceFacts.price_kind === 'bid'
+                    ? currentBidEvidenceAmount(priceFacts, auctionPulse)
+                    : fmtVal(field, priceFacts.price_amount)) + (on ? ` · ${on}` : '') : '';
                   fieldLabel = priceKind === 'Sold' ? 'SALE PRICE' : (priceKind || '').toUpperCase();
                 }
                 // the listing's own qualifier on the reading, e.g. BaT "10k Miles Shown, TMU" -> "10,000 mi · shown, TMU"
