@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const root = new URL('../../', import.meta.url).pathname;
 const previewPath = `${root}supabase/sql/derive_vehicle_relationships_preview.sql`;
-const migrationPath = `${root}supabase/migrations/20261111200000_garage_listing_org_evidence.sql`;
+const migrationPath = `${root}supabase/migrations/20261111200500_garage_listing_org_evidence.sql`;
 const BEGIN = '-- BEGIN GENERATED FROM supabase/sql/derive_vehicle_relationships_preview.sql (scripts/garage/build-chain-function.mjs)\n';
 const END = '\n-- END GENERATED';
 

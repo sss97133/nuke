@@ -1,4 +1,4 @@
--- Revert 20261111210000_receipt_work_reconciliation. Normal undo of a producer run is by run id
+-- Revert 20261111210500_receipt_work_reconciliation. Normal undo of a producer run is by run id
 -- (rollback_garage_derivation_run / rollback_evidence_judgment_run); this removes the department's schema itself.
 -- Refuses while active receipt_work_correlation rows exist (supersede them by run first).
 SET lock_timeout = '5s';

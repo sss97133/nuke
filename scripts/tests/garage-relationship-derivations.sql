@@ -52,12 +52,12 @@ CREATE FUNCTION public.get_user_garage(p_user_id uuid)
 GRANT USAGE ON SCHEMA public,auth TO authenticated,anon,service_role;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated,service_role;
 GRANT INSERT,UPDATE ON ALL TABLES IN SCHEMA public TO service_role;
-\! sed '/DO \$guard\$/,/END \$guard\$;/d' supabase/migrations/20261111170000_vehicle_relationship_derivations.sql > /tmp/vrd_fixture_migration.sql
+\! sed '/DO \$guard\$/,/END \$guard\$;/d' supabase/migrations/20261111170500_vehicle_relationship_derivations.sql > /tmp/vrd_fixture_migration.sql
 \i /tmp/vrd_fixture_migration.sql
-\! cp supabase/migrations/20261111180000_garage_evidence_chain.sql /tmp/vrd_fixture_chain.sql
+\! cp supabase/migrations/20261111180500_garage_evidence_chain.sql /tmp/vrd_fixture_chain.sql
 \i /tmp/vrd_fixture_chain.sql
-\i supabase/migrations/20261111190000_vehicle_duplicate_gates.sql
-\! sed '/DO \$guard\$/,/END \$guard\$;/d' supabase/migrations/20261111200000_garage_listing_org_evidence.sql > /tmp/vrd_fixture_listing_org.sql
+\i supabase/migrations/20261111190500_vehicle_duplicate_gates.sql
+\! sed '/DO \$guard\$/,/END \$guard\$;/d' supabase/migrations/20261111200500_garage_listing_org_evidence.sql > /tmp/vrd_fixture_listing_org.sql
 \i /tmp/vrd_fixture_listing_org.sql
 CREATE TRIGGER fixture_evidence BEFORE INSERT OR UPDATE ON vehicle_user_permissions
  FOR EACH ROW EXECUTE FUNCTION enforce_user_vehicle_evidence();

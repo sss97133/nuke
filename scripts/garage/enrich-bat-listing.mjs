@@ -13,7 +13,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 const UA = 'NukeResearchBot/1.0 (+https://nuke.ag; listing detail enrichment; contact via site)';
-const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+// &amp; is decoded last so an escaped entity (&amp;quot;) is not unescaped twice.
+const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
 export function parseBatListing(html) {
   const title = (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1];

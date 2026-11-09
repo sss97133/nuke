@@ -11,7 +11,7 @@ BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
 
--- Same body as in 20261111200000_garage_listing_org_evidence.sql (CREATE OR REPLACE there too), so either order works.
+-- Same body as in 20261111200500_garage_listing_org_evidence.sql (CREATE OR REPLACE there too), so either order works.
 CREATE OR REPLACE FUNCTION public.derived_rows_append_only() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
   IF TG_OP = 'DELETE' THEN

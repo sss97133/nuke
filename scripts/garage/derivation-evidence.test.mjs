@@ -114,7 +114,7 @@ test('importer: classification, deterministic run ids, per-file mapping and idem
 
 test('migration: append-only, service-role only, rollback by run supersedes and never deletes', () => {
   const sql = readFileSync(new URL('../../supabase/migrations/20261111195000_garage_derivation_evidence.sql', import.meta.url), 'utf8');
-  const later = readFileSync(new URL('../../supabase/migrations/20261111210000_receipt_work_reconciliation.sql', import.meta.url), 'utf8');
+  const later = readFileSync(new URL('../../supabase/migrations/20261111210500_receipt_work_reconciliation.sql', import.meta.url), 'utf8');
   for (const k of KINDS) assert.ok(sql.includes(`'${k}'`) || later.includes(`'${k}'`), k);
   assert.match(sql, /UNIQUE \(dedupe_key\)/); assert.match(sql, /derived_rows_append_only/); assert.match(sql, /REVOKE ALL ON public\.garage_derivation_evidence FROM anon, authenticated/);
   assert.match(sql, /rollback_garage_derivation_run/); assert.match(sql, /SET superseded_at = now\(\)/); assert.ok(!/DELETE FROM/i.test(sql)); assert.match(sql, /producer_agent text NOT NULL DEFAULT 'injestion'/);

@@ -1,6 +1,6 @@
 # Receipt-to-work reconciliation: column contract
 
-Migration `supabase/migrations/20261111210000_receipt_work_reconciliation.sql` (full revert:
+Migration `supabase/migrations/20261111210500_receipt_work_reconciliation.sql` (full revert:
 `supabase/sql/revert_20261111210000_receipt_work_reconciliation.sql`; schema rollback of the lifecycle amendment to
 74916ea18: `supabase/sql/rollback_20261111210000_lifecycle_to_74916ea18.sql`; contract test:
 `supabase/sql/test_receipt_work_reconciliation.sql`). Producer `scripts/receipt-work/reconcile-receipt-work.mjs`; sink

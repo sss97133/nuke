@@ -1,8 +1,8 @@
--- Schema rollback of the lifecycle amendment of 20261111210000_receipt_work_reconciliation (PR #3168 review repair) back to
+-- Schema rollback of the lifecycle amendment of 20261111210500_receipt_work_reconciliation (PR #3168 review repair) back to
 -- its reading at 74916ea18. Use only after undoing the amendment's producer runs WHILE the amendment is still live:
 --   select * from rollback_evidence_judgment_run('<run>', '<reason>', false);
 --   select * from rollback_garage_derivation_run('<run>', '<reason>', false);
--- then run this file, then re-apply supabase/migrations/20261111210000_receipt_work_reconciliation.sql as of 74916ea18
+-- then run this file, then re-apply supabase/migrations/20261111210500_receipt_work_reconciliation.sql as of 74916ea18
 -- (git show 74916ea18:supabase/migrations/20261111210000_receipt_work_reconciliation.sql). Added columns stay (additive,
 -- ignored by the older code); rows in status 'withdrawn' keep it (the older check is re-added NOT VALID).
 SET lock_timeout = '5s';

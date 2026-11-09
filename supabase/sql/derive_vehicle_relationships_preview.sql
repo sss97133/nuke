@@ -1,7 +1,7 @@
 -- READ-ONLY preview of derive_vehicle_relationships: one SELECT, no DDL, no writes, no temp tables.
 -- It reproduces the ordered evidence chain over base tables only (it never reads listing_vehicle_matches,
 -- listing_seller_derivations or organization_aliases), so it can run against production BEFORE the migrations that create
--- those tables are deployed. The function body in supabase/migrations/20261111200000_garage_listing_org_evidence.sql is
+-- those tables are deployed. The function body in supabase/migrations/20261111200500_garage_listing_org_evidence.sql is
 -- generated from this file by scripts/garage/build-chain-function.mjs (:'user_id' -> p_user,
 -- nullif(:'vehicle_id','')::uuid -> p_vehicle); scripts/tests asserts the two are identical and return the same rows.
 -- Needs org_seller_aliases (20261111180000), normalize_vehicle_model_family (20261111190000) and, from

@@ -416,7 +416,7 @@ test('match-places: row maps the letter to the organization; shuffle is determin
 test('match-places: the empty CTE is byte-identical to the preview placeholder; a filled CTE has the placeholder columns', async () => {
   const { readFileSync } = await import('node:fs');
   const pre = readFileSync(new URL('../../supabase/sql/derive_vehicle_relationships_preview.sql', import.meta.url), 'utf8');
-  assert.ok(pre.includes(placeCte([]).replace(/^/, '')), 'empty CTE matches the placeholder');
+  assert.ok(pre.includes(placeCte([])), 'empty CTE matches the placeholder');
   const c = placeCte([{ run_id: V1, vehicle_id: V1, session_key: "k'1", image_ids: [O1], photo_count: 4, org_id: O1, confidence: 0.9, model: 'm', viewer: 2, rationale: 'r', cues: ['a'] }]);
   assert.match(c, /WHERE true -- \(place_matches\)/); assert.match(c, /'k''1'/); assert.match(c, /, 2::int, 'r Cues: a'\)/);
 });

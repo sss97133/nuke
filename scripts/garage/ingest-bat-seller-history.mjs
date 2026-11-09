@@ -23,8 +23,9 @@ const BASE = 'https://bringatrailer.com';
 const PROJECT_URL = 'https://qkgaybvrernstplzjaam.supabase.co';
 export const PRODUCER = 'ingest-bat-seller-history/1';
 
-const decode = (s) => s.replace(/&#0?38;|&#038;|&amp;/g, '&').replace(/&#0?39;|&#8217;|&apos;/g, "'").replace(/&quot;|&#8220;|&#8221;/g, '"')
-  .replace(/&#215;/g, '×').replace(/&nbsp;/g, ' ');
+// The ampersand is decoded last so an escaped entity (&amp;quot;) is not unescaped twice.
+const decode = (s) => s.replace(/&#0?39;|&#8217;|&apos;/g, "'").replace(/&quot;|&#8220;|&#8221;/g, '"')
+  .replace(/&#215;/g, '×').replace(/&nbsp;/g, ' ').replace(/&#0?38;|&#038;|&amp;/g, '&');
 const strip = (h) => decode(h.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
 const isoDate = (unixSeconds) => (Number.isFinite(+unixSeconds) && +unixSeconds > 0 ? new Date(+unixSeconds * 1000).toISOString().slice(0, 10) : null);
 export const listingSlug = (u) => (String(u).match(/\/listing\/([a-z0-9-]+)\/?/i) || [])[1] ?? null;
