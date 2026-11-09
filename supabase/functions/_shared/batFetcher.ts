@@ -67,14 +67,18 @@ export function isLoginPage(html: string): boolean {
   if (lower.includes('id="auth0-lock-container"')) return true;
   if (lower.includes('accounts.google.com/signin')) return true;
 
-  // Common login page body patterns (multiple signals needed to avoid false positives)
+  // Public listings also contain sign-in/register prompts (for bidding, comments,
+  // and navigation). Those phrases alone do not establish an authentication gate.
+  // Require a real credential input for this weak body-text fallback; explicit
+  // login forms, page titles and SSO gates are handled above.
+  const hasPasswordInput = /<input\b[^>]*\btype\s*=\s*(?:"password"|'password'|password(?=\s|\/?\s*>))/i.test(html);
   const loginSignals = [
-    lower.includes('type="password"'),
+    hasPasswordInput,
     lower.includes('forgot password') || lower.includes('forgot your password'),
     lower.includes('sign in to') || lower.includes('log in to'),
     lower.includes('create an account') || lower.includes('register'),
   ].filter(Boolean).length;
-  if (loginSignals >= 2) return true;
+  if (hasPasswordInput && loginSignals >= 2) return true;
 
   return false;
 }

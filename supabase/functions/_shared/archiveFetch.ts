@@ -308,7 +308,7 @@ export async function archiveFetch(
       // Fetches up to 5 rows, then picks preferred fetch_method client-side
       const variants = cacheKeyVariants(normalized);
       const preferredMethod = useFirecrawl ? "firecrawl" : "direct";
-      const { data: rows } = await supabase
+      let cacheQuery = supabase
         .from("listing_page_snapshots")
         .select("id, html, markdown, fetched_at, html_storage_path, markdown_storage_path, fetch_method")
         .in("listing_url", variants)
@@ -316,6 +316,11 @@ export async function archiveFetch(
         .gte("fetched_at", cutoff)
         .order("fetched_at", { ascending: false })
         .limit(5);
+      // CC board JSON shares listing URLs with full HTML, but has its own
+      // collecting-cars namespace. Filter before LIMIT so recent board captures
+      // cannot crowd an older reusable full listing out of the cache window.
+      if (platform === "collectingcars") cacheQuery = cacheQuery.eq("platform", platform);
+      const { data: rows } = await cacheQuery;
 
       const cached = pickCachedSnapshot(rows, preferredMethod);
 

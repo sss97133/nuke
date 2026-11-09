@@ -208,7 +208,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
 
           {/* Vehicle Dossier — provenance-rich field panel */}
-          <CollapsibleWidget variant="profile" title="Source claims & specifications" defaultCollapsed={false}>
+          <CollapsibleWidget variant="profile" title="Specifications" defaultCollapsed={false}>
             <React.Suspense fallback={null}><VehicleDossierPanel /></React.Suspense>
           </CollapsibleWidget>
 

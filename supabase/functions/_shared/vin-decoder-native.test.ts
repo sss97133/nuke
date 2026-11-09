@@ -26,3 +26,16 @@ Deno.test("specific Italian WMIs distinguish Maserati from Alfa Romeo without gu
   assertEquals(decodeVin(vin("ZAR")).make, "Alfa Romeo");
   assertEquals(decodeVin(vin("ZAP")).make, null);
 });
+
+Deno.test("SC is not a Lotus identifier: actual Bentley is specific, other SC identifiers stay unknown", () => {
+  assertEquals(decodeVin("SCBCR63W84C022079").make, "Bentley");
+  assertEquals(decodeVin(vin("SCC")).make, "Lotus");
+  assertEquals(decodeVin("SCEDT26T6BD005114").make, null);
+  assertEquals(decodeVin(vin("SCZ")).make, null);
+});
+Deno.test("1C4 preserves manufacturer compatibility without assigning Jeep or Chrysler as the marque", () => {
+  const decoded = decodeVin("1C4BJWDG8EL322097");
+  assertEquals(decoded.make, null);
+  assertEquals(decoded.manufacturer, "FCA US LLC");
+  assertEquals(decoded.manufacturer_make_candidates, ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia']);
+});

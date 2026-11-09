@@ -41,6 +41,7 @@ interface FieldEvidencePopupProps {
   /** Optional VIN decode data (passed for VIN field) */
   vinDecode?: Record<string, any> | null;
   context?: ProfileFieldContext;
+  presentation?: 'citations';
 }
 
 /** The selected attribute remains framed by this vehicle; peer matches never replace its evidence. */
@@ -154,7 +155,7 @@ function sourceLabel(sourceType: string): string {
 }
 
 const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
-  field, label, value, vehicleId, evidence, vinDecode, context,
+  field, label, value, vehicleId, evidence, vinDecode, context, presentation,
 }) => {
   const { closeTop } = usePopup();
   const inventory = useVehicleImageEvidence(vehicleId, context ? field : undefined);
@@ -189,6 +190,59 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   if (!context && provenanceCoverageUnavailable(provenance.data)) {
     return <div className="field-evidence-popup"><p role="status">Source evidence could not be loaded completely for this field. Coverage is unknown.</p>
       <Button type="button" variant="secondary" disabled={provenance.isFetching} onClick={() => void provenance.refetch()}>Retry source evidence</Button>
+    </div>;
+  }
+
+  // The value's first click shows the cited object and original quotation.
+  // System copies and unrelated area photographs are not additional support.
+  if (presentation === 'citations') {
+    const readings = claimGroup?.sources.filter(source => source.source_type !== 'system_update') || [];
+    const imageIds = new Set([
+      ...readings.map(source => source.source_image_id),
+      ...(provenance.data?.evidence || []).filter(source => source.source !== 'field_evidence').map(source => source.image_id),
+      ...imageObservations.map(source => source.image_id),
+    ].filter(Boolean));
+    const witnesses = rows.filter(image => imageIds.has(image.id));
+    const reports = groupRepeatedReports(provenanceCoverageUnavailable(provenance.data) ? [] : provenance.data?.observations || []);
+    return <div className="field-citations" aria-label={`${label} sources`}>
+      {(imagesLoading || claims.loading) && <p role="status">Reading sources…</p>}
+      {(imageReadFailed || claims.error) && <p role="status">Some source evidence could not be read.
+        <button type="button" onClick={() => {
+          if (inventory.error) void inventory.refetch();
+          if (provenance.error) void provenance.refetch();
+          if (claims.error) void claims.refetch();
+        }}>Retry sources</button>
+      </p>}
+      {witnesses.map(image => <figure key={image.id}>
+        <button type="button" aria-label={`Inspect cited photograph for ${label}`} onClick={() => { closeTop(); openVehiclePhoto(image.id); }}>
+          <img src={optimizeImageUrl(image.image_url, 'large') || image.image_url} alt={`Cited photograph for ${label}`} width={900} height={675} />
+        </button>
+        <figcaption>
+          {readings.filter(source => source.source_image_id === image.id).map(source => <div key={source.id}>
+            <strong>{source.field_value}</strong>
+            {source.extraction_context && <p>{source.extraction_context.replace(/^photo-pipeline landing v\d+:\s*/i, '')}</p>}
+            <small>{source.source_type.replace(/_/g, ' ')} reading</small>
+          </div>)}
+          {imageObservations.filter(source => source.image_id === image.id).map(source => <div key={source.observation_id}>
+            {source.image_region?.label && <p>{source.image_region.label}</p>}
+            {source.limitation && <p>{source.limitation}</p>}
+          </div>)}
+        </figcaption>
+      </figure>)}
+      {readings.filter(source => source.source_image_id && !witnesses.some(image => image.id === source.source_image_id)).map(source =>
+        <p key={source.id}><PrefetchLink to={`/vehicle/${vehicleId}/image/${source.source_image_id}`} onClick={closeTop}>
+          {source.field_value} · inspect cited image
+        </PrefetchLink></p>)}
+      {reports.map(({ report }) => <article key={report.id}>
+        <blockquote>{report.source_value || report.content || report.value}</blockquote>
+        <small>{(report.source_slug || 'Source report').replace(/_/g, ' ')}</small>
+        {webSourceUrl(report.source_url) && <a href={webSourceUrl(report.source_url)!} target="_blank" rel="noopener noreferrer">Open original source</a>}
+        <PrefetchLink to={`/vehicle/${vehicleId}/observation/${report.id}`} onClick={closeTop}>Inspect source record</PrefetchLink>
+      </article>)}
+      {!imagesLoading && !claims.loading && !imageReadFailed && !claims.error && witnesses.length === 0 && imageIds.size === 0 && reports.length === 0 &&
+        <p>{value ? `“${value}” has no supporting citation in this field’s reader.` : 'This field’s reader has no supporting citation.'}</p>}
+      {(field === 'trim' || field === 'engine_type' || field === 'engine_size') && witnesses.length > 0 &&
+        <p className="field-citations__note">Lettering identifies what is written on the part. Factory trim and engine specification need their own evidence.</p>}
     </div>;
   }
 

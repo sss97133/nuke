@@ -25,6 +25,7 @@ export interface CollectingCarsExtracted {
   mileage_unit: "mi" | "km" | null;
   mileage_raw: string | null;
   location: string | null;
+  country: string | null;
   description: string | null;
   transmission: string | null;
   engine: string | null;
@@ -148,6 +149,7 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
     mileage_unit: unit,
     mileage_raw: mileageRaw,
     location: place,
+    country: /^[A-Za-z]{2}$/.test(String(L.countryCode ?? "")) ? String(L.countryCode).toUpperCase() : null,
     description: descRaw ? clean(plain(descRaw)) : null,
     transmission: clean(L.transmission),
     engine: clean(L.engineSize),

@@ -185,7 +185,7 @@ it('a tied viewer opens the page through a signed render URL from the private bu
   await act(async () => { await vi.advanceTimersByTimeAsync(5); });
   expect(signRequests()).toHaveLength(1);
   expect(signRequests()[0].url.pathname).toBe(`/storage/v1/object/sign/user-documents/${pagePath}`);
-  expect(signRequests()[0].body).toEqual({ expiresIn: 600, transform: { width: 1800, quality: 80 } });
+  expect(signRequests()[0].body).toEqual({ expiresIn: 600, transform: { width: 1800, height: 1800, resize: 'contain', quality: 80 } });
   expect(opened).toHaveLength(1);
   expect(String(opened[0].imageUrl)).toContain(`/render/image/sign/user-documents/${pagePath}?token=synthetic`);
 });

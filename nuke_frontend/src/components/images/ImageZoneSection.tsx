@@ -20,6 +20,30 @@ export interface ZoneSectionDef {
   virtual?: boolean;
 }
 
+/** Use the retained coarse classification when a precise vehicle zone is absent.
+ * This groups views; it does not assert a component's specification or installation. */
+export function imageZoneSectionKey(img: any): string {
+  const classification = img?.ai_scan_metadata?.classification;
+  const type = classification?.image_type;
+  const scene = img?.ai_scan_metadata?.byok_deep_analysis?.scene_type;
+  if (img?.is_document === true || String(img?.document_category || '').trim() || type === 'receipt_document' || scene === 'receipt_document') return 'documents';
+  const zone = String(img?.vehicle_zone || '').trim().toLowerCase();
+  if (['ext_undercarriage', 'mech_suspension', 'mech_transmission', 'mech_drivetrain'].includes(zone)) return 'undercarriage';
+  if (zone.startsWith('ext_')) return 'exterior';
+  if (zone === 'mech_engine_bay' || zone === 'mech_engine') return 'engine_bay';
+  if (zone.startsWith('int_')) return 'interior';
+  if (zone.startsWith('wheel_')) return 'wheels';
+  if (zone.startsWith('detail_')) return 'detail';
+  const angle = img?.ai_detected_angle || classification?.v2?.angle?.value || img?.angle;
+  if (type === 'engine_bay' || angle === 'engine_bay' || scene === 'engine_bay') return 'engine_bay';
+  if (type === 'undercarriage' || angle === 'undercarriage' || scene === 'undercarriage') return 'undercarriage';
+  if (['detail_closeup', 'part_closeup', 'vin_plate'].includes(type) || scene === 'data_plate') return 'detail';
+  if (type === 'vehicle_interior' || String(angle || '').startsWith('interior_') || scene === 'body_interior') return 'interior';
+  if (type === 'vehicle_exterior' || String(angle || '').startsWith('exterior') || scene === 'body_exterior') return 'exterior';
+  if (angle === 'detail_shot') return 'detail';
+  return 'uncategorized';
+}
+
 /**
  * Canonical zone section definitions.
  * Order matters: images are assigned to the FIRST matching section.
@@ -30,72 +54,42 @@ export const ZONE_SECTIONS: ZoneSectionDef[] = [
   {
     key: 'exterior',
     label: 'EXTERIOR',
-    match: (img) => {
-      const zone = String(img?.vehicle_zone || '').toLowerCase();
-      return zone.startsWith('ext_') && zone !== 'ext_undercarriage';
-    },
+    match: (img) => imageZoneSectionKey(img) === 'exterior',
   },
   {
     key: 'engine_bay',
     label: 'ENGINE BAY',
-    match: (img) => {
-      const zone = String(img?.vehicle_zone || '').toLowerCase();
-      return zone === 'mech_engine_bay';
-    },
+    match: (img) => imageZoneSectionKey(img) === 'engine_bay',
   },
   {
     key: 'interior',
     label: 'INTERIOR',
-    match: (img) => {
-      const zone = String(img?.vehicle_zone || '').toLowerCase();
-      return zone.startsWith('int_');
-    },
+    match: (img) => imageZoneSectionKey(img) === 'interior',
   },
   {
     key: 'undercarriage',
     label: 'UNDERCARRIAGE',
-    match: (img) => {
-      const zone = String(img?.vehicle_zone || '').toLowerCase();
-      return (
-        zone === 'ext_undercarriage' ||
-        zone === 'mech_suspension' ||
-        zone === 'mech_transmission'
-      );
-    },
+    match: (img) => imageZoneSectionKey(img) === 'undercarriage',
   },
   {
     key: 'wheels',
     label: 'WHEELS',
-    match: (img) => {
-      const zone = String(img?.vehicle_zone || '').toLowerCase();
-      return zone.startsWith('wheel_');
-    },
+    match: (img) => imageZoneSectionKey(img) === 'wheels',
   },
   {
     key: 'detail',
     label: 'DETAIL',
-    match: (img) => {
-      const zone = String(img?.vehicle_zone || '').toLowerCase();
-      return zone.startsWith('detail_');
-    },
+    match: (img) => imageZoneSectionKey(img) === 'detail',
   },
   {
     key: 'documents',
     label: 'DOCUMENTS',
-    match: (img) => {
-      return (
-        img?.is_document === true ||
-        (img?.document_category != null && String(img.document_category).trim() !== '')
-      );
-    },
+    match: (img) => imageZoneSectionKey(img) === 'documents',
   },
   {
     key: 'uncategorized',
     label: 'UNCATEGORIZED',
-    match: (img) => {
-      const zone = String(img?.vehicle_zone || '').trim().toLowerCase();
-      return !zone || zone === 'other' || zone === 'null' || zone === 'undefined';
-    },
+    match: (img) => imageZoneSectionKey(img) === 'uncategorized',
   },
 ];
 
@@ -227,7 +221,9 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
   return (
     <div data-zone-section={section.key} style={{ borderBottom: '1px solid var(--border)' }}>
       {/* Section Header */}
-      <div
+      <button
+        type="button"
+        aria-expanded={!collapsed}
         onClick={() => setCollapsed(!collapsed)}
         style={{
           display: 'flex',
@@ -236,8 +232,12 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
           padding: '8px 12px',
           cursor: 'pointer',
           backgroundColor: 'var(--grey-50, #fafafa)',
+          border: 0,
           borderBottom: collapsed ? 'none' : '1px solid var(--border)',
           userSelect: 'none',
+          width: '100%',
+          color: 'inherit',
+          textAlign: 'left',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -276,7 +276,7 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
         >
           {collapsed ? '\u25B6' : '\u25BC'}
         </span>
-      </div>
+      </button>
 
       {/* Image Grid (expanded) */}
       {!collapsed && (
@@ -287,7 +287,7 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
             gap: 0,
           }}
         >
-          {images.map((image) => {
+          {images.map((image, index) => {
             const globalIndex = globalIndexMap.get(String(image.id || '')) ?? -1;
             const isSelected = selectMode && selectedImages?.has(image.id);
             const deepScore = image.ai_scan_metadata?.deep_analysis?.condition_detail?.overall_score;
@@ -310,6 +310,16 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
             return (
               <div
                 key={image.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Inspect ${displayLabel.toLowerCase()} image ${index + 1}`}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.currentTarget.click();
+                  }
+                }}
                 style={{
                   cursor: 'pointer',
                   position: 'relative',
@@ -319,6 +329,7 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
                   border: 'none',
                 }}
                 onClick={(e) => {
+                  if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea')) return;
                   if (selectMode && onImageSelect) {
                     onImageSelect(image.id, e);
                   } else {
@@ -373,6 +384,7 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
                     isSensitive={image.is_sensitive || false}
                     sensitiveType={image.sensitive_type}
                     objectFit="cover"
+                    loading="lazy"
                   />
                 </div>
 

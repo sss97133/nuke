@@ -1324,3 +1324,5 @@
 .vp-structured-record th { width: 35%; font-weight: 500; }
 .vp-structured-record__unknown, .vp-structured-record__note { color: var(--text-secondary); }
 .vp-structured-record__note { margin-top: 4px; font-size: var(--text-caption); }
+.vp-structured-record__value { border: 0; background: transparent; color: var(--link); padding: 0; min-height: 44px; font: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.vp-structured-record__value:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }

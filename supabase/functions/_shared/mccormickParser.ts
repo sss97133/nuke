@@ -1,6 +1,7 @@
 import { htmlToText } from "./htmlToText.ts";
 
 export const MCCORMICK_PARSER = "mccormick_html_v1";
+export const MCCORMICK_CATALOG_PARSER = "mccormick_catalog_v1";
 const origin = "https://www.classic-carauction.com";
 const text = (s: string) => htmlToText(s).replace(/[ \t]+/g, " ").trim();
 const known = (s?: string) => s && !/^(?:TBA|TMU|N\/?A|unknown|none|-+)$/i.test(s.trim()) ? s.trim() : null;
@@ -32,6 +33,66 @@ export interface McCormickLot {
   vin: string | null; description: string; raw_fields: Record<string, string>; condition_ratings: Record<string, string>;
   image_urls: string[]; presentation: "archive" | "unknown";
   result_claim: { status: "sold" | "no_sale"; amount: number; currency_symbol: "$"; currency: null; fee_basis: "unknown"; literal: string } | null;
+  evidence_scope?: "detail_unavailable" | "catalog_row" | "featured_card";
+  description_is_excerpt?: boolean;
+}
+
+function emptyLot(id: string, source_url: string): McCormickLot {
+  return { source_id: id, source_url, auction_number: null, auction_dates_text: null,
+    title: "", lot_number: "", year: null, make: null, model: null, vin: null, description: "",
+    raw_fields: {}, condition_ratings: {}, image_urls: [], presentation: "unknown", result_claim: null };
+}
+function ownImages(section: string): string[] {
+  const urls = new Set<string>();
+  for (const tag of section.matchAll(/<(?:a|img)\b[^>]*\b(?:href|src)=["']([^"']+)["']/gi)) {
+    try {
+      const u = new URL(tag[1].replace(/&amp;/g, "&"), origin);
+      if (u.origin === origin && !u.username && !u.password && /^\/upload\/(?:Auction\/)?[^?#]+\.(?:jpe?g|png|gif|webp)$/i.test(u.pathname)) urls.add(u.href);
+    } catch { /* Invalid photo locators are not evidence. */ }
+  }
+  return [...urls];
+}
+
+/** Current catalog's explicit cells, not a URL slug or a guessed vehicle ID. */
+export function parseMcCormickCatalogLot(html: string, source_url: string, id: string): McCormickLot {
+  if (source_url !== `${origin}/auction-cars`) throw new Error("mccormick_catalog_route_unsupported");
+  const matches = [...visible(html).matchAll(/<TR\b[^>]*>([\s\S]*?)<\/TR>/gi)].filter(row =>
+    [...row[1].matchAll(/<a\b[^>]*href=["']([^"']+)["']/gi)].some(a => {
+      try { return mccormickTarget(new URL(a[1].replace(/&amp;/g, "&"), source_url).href)?.id === id; } catch { return false; }
+    }));
+  if (matches.length !== 1) throw new Error("mccormick_catalog_identity_missing_or_ambiguous");
+  const linkedIds = new Set([...matches[0][1].matchAll(/<a\b[^>]*href=["']([^"']+)["']/gi)].map(a => {
+    try { return mccormickTarget(new URL(a[1].replace(/&amp;/g, "&"), source_url).href)?.id; } catch { return undefined; }
+  }).filter(Boolean));
+  if (linkedIds.size !== 1) throw new Error("mccormick_catalog_row_identity_conflict");
+  const cells = [...matches[0][1].matchAll(/<TD\b[^>]*>([\s\S]*?)<\/TD>/gi)].map(c => text(c[1]));
+  if (cells.length !== 6 || !/^\d{4}$/.test(cells[2]) || !known(cells[3]) || !known(cells[4]) || !cells[0]) throw new Error("mccormick_catalog_cells_invalid");
+  return { ...emptyLot(id, source_url), evidence_scope: "catalog_row", lot_number: cells[0],
+    title: `${cells[2]} ${cells[3]} ${cells[4]}`, year: Number(cells[2]), make: cells[3], model: cells[4],
+    raw_fields: { "Model Year": cells[2], Make: cells[3], "Body Style": cells[5] }, image_urls: ownImages(matches[0][1]) };
+}
+
+/** A featured card can retain its excerpt/gallery even when its detail route is unavailable. */
+export function parseMcCormickFeaturedLot(html: string, source_url: string, identity: McCormickLot): McCormickLot | null {
+  if (source_url !== `${origin}/featured-cars`) throw new Error("mccormick_featured_route_unsupported");
+  const body = visible(html);
+  const headings = [...body.matchAll(/<div\b[^>]*class=["']bcopy12["'][^>]*>\s*<a\b[^>]*href=["']([^"']+)["'][^>]*>\s*<b>([^<>]+)<\/b>\s*<\/a>/gi)];
+  if (!headings.length) throw new Error("mccormick_featured_catalog_format_unknown");
+  const matches = headings.filter(h => {
+    try { return mccormickTarget(new URL(h[1].replace(/&amp;/g, "&"), source_url).href)?.id === identity.source_id; } catch { return false; }
+  });
+  if (!matches.length) return null; // Only absence within this successfully captured catalog.
+  if (matches.length !== 1) throw new Error("mccormick_featured_identity_ambiguous");
+  const heading = matches[0], next = headings[headings.indexOf(heading) + 1];
+  const section = body.slice(heading.index!, next?.index);
+  const lot = text(section.match(/Lot Number\s+([^<]+)/i)?.[1] ?? "");
+  const title = text(heading[2]);
+  if (title !== identity.title || lot !== identity.lot_number) throw new Error("mccormick_featured_identity_disagreement");
+  const description = section.match(/<div\b[^>]*class=["']bcopy10["'][^>]*>([\s\S]*?)<br\s*\/?>/i)?.[1];
+  return { ...emptyLot(identity.source_id, source_url), evidence_scope: "featured_card", title, lot_number: lot,
+    year: identity.year, make: identity.make, model: identity.model,
+    description: description ? text(description) : "", description_is_excerpt: true,
+    image_urls: ownImages([...section.matchAll(/<a\b[^>]*\brel=["']example_group["'][^>]*>/gi)].map(a => a[0]).join("")) };
 }
 
 /** Native labeled claims, keeping specifications and component ratings in separate sections. */
@@ -40,6 +101,10 @@ export function parseMcCormickLot(html: string, url: string): McCormickLot {
   if (!target) throw new Error("invalid_mccormick_listing_url");
   const body = visible(html);
   const heading = body.match(/<div\b[^>]*class=["']bcopy12["'][^>]*>\s*<b>([^<>]+)<\/b>\s*<br\s*\/?>\s*Lot Nbr\.\s*([^<]+)/i);
+  if (!heading && text(body).includes("Sorry, but details about this car are not available.")) {
+    return { ...emptyLot(target.id, target.url), evidence_scope: "detail_unavailable",
+      description: "Sorry, but details about this car are not available." };
+  }
   if (!heading) throw new Error("mccormick_lot_heading_missing");
   const start = heading.index!;
   const end = body.indexOf("<!end car details>", start);
