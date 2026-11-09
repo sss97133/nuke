@@ -4,7 +4,7 @@
 -- across every vehicle: no index serves that expression, so each page scanned 1.4M rows and the first tick timed out.
 -- The lookup is now inline on upper(vin), which idx_vehicles_vin_upper serves; same rule (exactly one current, unmerged
 -- vehicle) and the page's VIN is already stripped to upper-case alphanumerics. Nothing else changes.
--- Revert: supabase/sql/revert_20261112150000_capture_documents_land_by_vin_indexed.sql (restores the 20261112130000 body).
+-- Revert: supabase/sql/revert_20261112160000_capture_documents_land_by_vin_indexed.sql (restores the 20261112130000 body).
 -- Test: supabase/sql/test_capture_documents_land_by_vin.sql (the resolver stub must not be called).
 
 CREATE OR REPLACE FUNCTION public.capture_documents_land_by_vin(p_user uuid, p_run uuid DEFAULT gen_random_uuid(),

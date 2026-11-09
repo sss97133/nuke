@@ -1,4 +1,4 @@
--- Revert 20261112150000: restore the step as 20261112130000 defined it (find_vehicle_by_vin lookup).
+-- Revert 20261112160000: restore the step as 20261112130000 defined it (find_vehicle_by_vin lookup).
 CREATE OR REPLACE FUNCTION public.capture_documents_land_by_vin(p_user uuid, p_run uuid DEFAULT gen_random_uuid(),
                                                                 p_dry boolean DEFAULT true, p_limit integer DEFAULT 50)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
