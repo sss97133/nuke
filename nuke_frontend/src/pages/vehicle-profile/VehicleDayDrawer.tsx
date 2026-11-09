@@ -79,7 +79,7 @@ export function describeInstall(install: DayDocumentInstall | null | undefined):
 /** The page's signed render URL for this viewer (the bucket is private; signing needs the viewer's own storage policy). */
 async function signDocumentPage(page: DayDocumentPage): Promise<string | null> {
   try {
-    const { data, error } = await supabase.storage.from(page.bucket).createSignedUrl(page.path, 600, { transform: { width: 1800, quality: 80 } });
+    const { data, error } = await supabase.storage.from(page.bucket).createSignedUrl(page.path, 600, { transform: { width: 1800, height: 1800, resize: 'contain', quality: 80 } });
     return !error && data?.signedUrl ? data.signedUrl : null;
   } catch {
     return null;

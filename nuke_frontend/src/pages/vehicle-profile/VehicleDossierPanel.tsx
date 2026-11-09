@@ -2,11 +2,8 @@
  * VehicleDossierPanel.tsx
  *
  * Provenance-rich vehicle profile panel. Replaces VehicleBasicInfo.
- * Each field row shows the primary value with source badges and an
- * expandable provenance drawer showing all evidence sources.
- *
- * Design system: Nuke utilitarian — Arial, 2px solid borders,
- * ALL CAPS labels, 9-10px body, zero radius/shadows/gradients.
+ * Core recorded values have one source action. The first click opens cited
+ * photographs and quotations; additional computations retain their own rows.
  */
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -40,7 +37,7 @@ const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 /** Read every stored field first, then admitted claims from the same owner.
  * A slow or failed source read must not hide the structured stored record. */
-export const StructuredProfileData: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+export const StructuredProfileData: React.FC<{ vehicleId: string; onInspect?: (field: string, label: string, value: string) => void }> = ({ vehicleId, onInspect }) => {
   const [read, setRead] = useState<StructuredRead>(
     { id: vehicleId, status: 'loading', claims: [] });
   const generation = React.useRef(0);
@@ -118,19 +115,20 @@ export const StructuredProfileData: React.FC<{ vehicleId: string }> = ({ vehicle
   const current: StructuredRead = read.id === vehicleId ? read : { id: vehicleId, status: 'loading', claims: [] };
   return <>
     <section aria-label="Structured vehicle data" className="vp-structured-claims">
-      <h3>Structured vehicle data</h3>
       {current.status === 'loading' ? <p role="status">Reading vehicle data…</p>
         : current.status === 'failed' ? <p role="status">Vehicle data could not be read. Missing information has not been established.</p>
         : <table className="vp-structured-record">
-          <caption>Stored values; source attribution has not been established. Original and current configuration remain unknown. Source-backed claims appear below.</caption>
+          <caption>Select a value to inspect its source.</caption>
           <thead><tr><th scope="col">Field</th><th scope="col">Recorded value</th></tr></thead>
           <tbody>{RECORD_FIELDS.map(key => {
             const a = current.attributes![key];
             const derived = current.bindings?.filter(b => b.origin_column === key && (b.value !== a.value || b.unit !== a.unit || b.record_columns_disagree));
             return <tr key={key} data-record-field={key}>
               <th scope="row">{STRUCTURED_RECORD_LABELS[key]}</th>
-              <td>{a.value_status === 'unrecorded' ? <span className="vp-structured-record__unknown">Not recorded</span> : typeof a.value === 'string' && !a.value.trim() ? 'Empty recorded value' : String(a.value)}
-                {a.value !== null && a.unit && ` ${a.unit}`}
+              <td><button type="button" className="vp-structured-record__value" disabled={!onInspect}
+                onClick={() => onInspect?.(key, STRUCTURED_RECORD_LABELS[key], a.value === null ? '' : `${String(a.value)}${a.unit ? ` ${a.unit}` : ''}`)}>
+                {a.value_status === 'unrecorded' ? 'Inspect evidence' : typeof a.value === 'string' && !a.value.trim() ? 'Inspect evidence' : `${String(a.value)}${a.unit ? ` ${a.unit}` : ''}`}
+              </button>
                 {key === 'mileage' && a.value !== null && !a.unit && <div className="vp-structured-record__note">Unit not established</div>}
                 {derived?.map(b => <div key={b.property_key} className="vp-structured-record__note">
                   {b.property_key.replaceAll('_', ' ')}: {String(b.value)}{b.unit ? ` ${b.unit}` : ''}
@@ -141,7 +139,8 @@ export const StructuredProfileData: React.FC<{ vehicleId: string }> = ({ vehicle
           })}</tbody>
         </table>}
     </section>
-    <section aria-label="Structured source claims" className="vp-structured-claims">
+    <section aria-label="Structured source claims" className="vp-structured-claims"
+      hidden={current.claimStatus === 'ready' && current.claims.length === 0 && !current.unresolved?.length}>
     <h3>Structured source claims</h3>
     {(current.claimStatus ?? current.status) === 'loading' ? <p role="status">Reading structured evidence…</p>
       : (current.claimStatus ?? current.status) === 'failed' ? <p role="status">Structured evidence could not be read. Missing information has not been established.</p>
@@ -567,28 +566,8 @@ const VehicleDossierPanel: React.FC = () => {
   const { priceFacts, priceSettled, priceFailed } = useVehiclePriceFacts(vehicle?.id);
   const priceKind = priceSettled && !priceFailed ? priceKindLabel(priceFacts) : null;
 
-  // Auto-expand fields with multi-source evidence
-  const autoExpandFields = useMemo(() => {
-    const candidates = ['drivetrain', 'engine_type', 'fuel_system_type'];
-    const set = new Set<string>();
-    for (const f of candidates) {
-      const g = evidence[f];
-      if (g && g.sources.length > 1) set.add(f);
-    }
-    return set;
-  }, [evidence]);
-
   const [openDrawers, setOpenDrawers] = useState<Set<string>>(new Set());
-  const [initialized, setInitialized] = useState(false);
   const [powerplantExpanded, setPowerplantExpanded] = useState(false);
-
-  // Initialize auto-expanded drawers once evidence loads
-  React.useEffect(() => {
-    if (!initialized && autoExpandFields.size > 0) {
-      setOpenDrawers(new Set(autoExpandFields));
-      setInitialized(true);
-    }
-  }, [autoExpandFields, initialized]);
 
   const toggleDrawer = (field: string) => {
     setOpenDrawers(prev => {
@@ -732,13 +711,17 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Info Panel */}
       <div className="vp-dossier-panel">
-        <div className="vp-dossier-panel__title">Vehicle information</div>
-
-        <StructuredProfileData vehicleId={vehicle?.id || ''} />
+        <StructuredProfileData vehicleId={vehicle.id} onInspect={(field, label, value) => openPopup(
+          <React.Suspense fallback={<p role="status">Reading source…</p>}>
+            <FieldEvidencePopup vehicleId={vehicle.id} field={field} label={label} value={value} presentation="citations" />
+          </React.Suspense>, label, Math.min(720, window.innerWidth - 24), false,
+        )} />
 
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
           const visibleFields = fg.fields.filter(field => {
+            // The structured table owns these values and their source action.
+            if (RECORD_FIELDS.includes(field as RecordField)) return false;
             if (engineReads[field]) return !!engineValue(field);
             if (field === 'vin') return true; // Unknown canonical identity still has a useful source drill.
             if (field === 'sale_price') return !!priceKind;

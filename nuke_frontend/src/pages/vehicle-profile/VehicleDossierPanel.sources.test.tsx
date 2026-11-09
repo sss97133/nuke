@@ -57,11 +57,11 @@ it('a failed continuation preserves source claims and retries the same cursor', 
     : continuation++ === 0 ? { data: null, error: { message: 'unavailable' } }
     : response(page([claim({ observation_id: SECOND, property_key: 'image_spid_rpo_codes', value: ['Z49'] })]))) }));
   await render();
-  await act(async () => { (host.querySelector('button') as HTMLButtonElement).click(); });
+  await act(async () => { (host.querySelector('[aria-label="Structured source claims"] button') as HTMLButtonElement).click(); });
   expect(host.textContent).toContain('surface'); expect(host.textContent).toContain('could not be read');
-  await act(async () => { (host.querySelector('button') as HTMLButtonElement).click(); });
+  await act(async () => { (host.querySelector('[aria-label="Structured source claims"] button') as HTMLButtonElement).click(); });
   expect(state.rpc).toHaveBeenLastCalledWith('get_vehicle_specs', { p_vehicle_ids: [VEHICLE], p_include_typed_claims: true, p_claim_cursor: { after: FIRST } });
-  expect(host.textContent).toContain('surface'); expect(host.textContent).toContain('Z49'); expect(host.querySelector('button')).toBeNull();
+  expect(host.textContent).toContain('surface'); expect(host.textContent).toContain('Z49'); expect(host.querySelector('[aria-label="Structured source claims"] button')).toBeNull();
 });
 it('an unqualified reply cannot assert engine specifications and retains the stored record', async () => {
   const bad = page([claim({ property_key: 'engine_configuration', value: 'Unsupported engine assertion', measurement_scope: 'attributed_source_claim', mechanical_verification: 'verified' })]);
@@ -86,4 +86,13 @@ it('an input-limit refusal remains visible without pretending that the evidence 
   const limited = { ...page([]), unresolved_properties: [{ property_key: 'image_visible_rust_severity', reason: 'source_reader_refused_input_limit' }] };
   state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? limited : record())) }));
   await render(); expect(host.textContent).toContain('exceeds the current reader limit and remains unresolved');
+});
+it('opens the selected recorded value directly and lets an empty field inspect evidence', async () => {
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page([]) : record())) }));
+  const inspect = vi.fn();
+  await act(async () => root.render(<MemoryRouter><StructuredProfileData vehicleId={VEHICLE} onInspect={inspect} /></MemoryRouter>));
+  await act(async () => (host.querySelector('[data-record-field="make"] button') as HTMLButtonElement).click());
+  expect(inspect).toHaveBeenLastCalledWith('make', 'Make', 'Fixture make');
+  await act(async () => (host.querySelector('[data-record-field="mileage"] button') as HTMLButtonElement).click());
+  expect(inspect).toHaveBeenLastCalledWith('mileage', 'Odometer', '');
 });
