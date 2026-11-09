@@ -175,7 +175,7 @@ function tokenizeQuery(query: string): string[] {
     .toLowerCase()
     .replace(/[^\w\s-]/g, ' ')
     .split(/\s+/)
-    .filter(t => t.length > 1)
+    .filter(t => t.length > 1 || /^[a-z0-9]$/.test(t))
     .filter(t => !['the', 'a', 'an', 'and', 'or', 'for', 'with', 'in', 'on'].includes(t));
 }
 
