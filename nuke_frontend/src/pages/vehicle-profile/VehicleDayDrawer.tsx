@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { highlightVehicleDays, openVehicleDay, openVehiclePhoto, openVehiclePhotoByUrl } from './VehiclePhotoLightbox';
 import WorkSessionContext from './WorkSessionContext';
+import { ReceiptLineContext, receiptLineKey, useReceiptWorkContext } from './ReceiptWorkContext';
 import { auctionMomentDayTitle, auctionOpenDayTitle, fmtClock, fmtMoment, fmtUsd, isBatHosted, listingForPhoto, localDate, momentDay, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
@@ -245,6 +246,9 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     return () => { cancelled = true; };
   }, [vehicleId, date, documentCount, documentKey]);
 
+  // ── The receipt-to-work context of the day's lines: one read, only once the day's paper has lines ──
+  const receiptWork = useReceiptWorkContext(vehicleId, date, (documents ?? []).some(d => d.lines.length > 0));
+
   // ── Day events from the already-loaded timeline ──
   const dayEvents = useMemo(
     () => ((timelineEvents || []) as DayEvent[]).filter((ev) => String(ev.event_date || '').slice(0, 10) === date),
@@ -385,7 +389,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
           {doc.lines.length > 0 && (
             <div style={{ fontSize: 9, color: 'var(--vp-pencil, #888)', marginTop: 2, lineHeight: 1.5 }}>
               {doc.lines.map((line, i) => (
-                <div key={`${doc.receipt_id}:${line.line_number ?? i}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <div key={`${doc.receipt_id}:${line.line_number ?? i}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span>
                     {[line.line_date && line.line_date !== date ? line.line_date : null, line.performer, line.part_number, line.description].filter(Boolean).join(' · ')}
                     {describeInstall(line.install) && (
@@ -403,6 +408,11 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                     )}
                   </span>
                   <span style={mono}>{[line.hours != null ? `${line.hours} h` : null, line.quantity != null && line.quantity !== 1 ? `×${line.quantity}` : null, line.amount != null ? fmtMoney(line.amount, doc.currency) : null].filter(Boolean).join(' · ')}</span>
+                </div>
+                <ReceiptLineContext
+                  line={receiptWork.byLine.get(receiptLineKey(doc.receipt_id, line.line_number))}
+                  withdrawn={receiptWork.withdrawnByLine.get(receiptLineKey(doc.receipt_id, line.line_number))}
+                />
                 </div>
               ))}
             </div>
