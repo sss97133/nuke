@@ -148,6 +148,32 @@ cancelled_reason, cancelled_by_run_id, retire_kind, superseded_by, answer_histor
   questions it retired or revived return to their prior state when that is still their latest transition; others are
   reported `skipped_later_activity`.
 
+## Consumer (read-only)
+
+`get_vehicle_receipt_work_context(p_vehicle_id, p_page_date = null)` (migration
+`20261113090000_receipt_work_context_reader.sql`, revert `supabase/sql/revert_20261113090000_receipt_work_context_reader.sql`,
+contract `supabase/sql/test_receipt_work_context_reader.sql`). Executable by `authenticated` and `service_role` only; returns
+data only for a vehicle the caller may view (public, or owner / uploader / granted access). No table is written.
+
+Returns `{vehicle_id, page_date, visible, tied, relationship, lines, withdrawn}`:
+
+- `lines`: active `receipt_work_correlation` rows except retractions: `evidence_id, receipt_id, item_id, line_number,
+  description, part_number, amount (tied only), vendor_name, conclusion, confidence, status ('proposed'), kind,
+  not_asserted, rationale, anchor_date, anchor_source, zone, days_to_first_photo, zone_photos_in_window, frames,
+  frames_hidden, lineage {receipt_id, source_document_table, source_document_id, line_number, item_id, link_id, link_basis,
+  link_confidence, page: null, page_reason: 'line-to-page mapping unresolved'}, printed {attributed_to: 'document',
+  line_date, hours, performer}, printed_performer {label, value}, custodian {label, user_id (tied only), masked}, judgment`.
+- `frames`: only cited frames on this vehicle that pass `receipt_work_frame_eligible` now (vision gate approved, so
+  privacy-hold and personal frames never; not sensitive, redacted, duplicate or superseded), each with `photographer
+  {label, attribution, documented_by_user_id (tied only)}`; `frames_hidden` counts the rest.
+- `judgment`: the line's `pending | claimed | answered` question; `holder {label, claimed_by, claimed_at}` only while
+  claimed; `answer` only when answered, its `image_id` only if that frame is visible to the caller.
+- `withdrawn`: active `source_withdrawn` retractions with `reason`, the prior conclusion and line number; never in `lines`.
+
+Photographer, printed performer, custodian and holder are distinct labelled fields; none states ownership, payment,
+installation or who did the work. Surfaces: the web day drawer (`ReceiptWorkContext.tsx`, behind a CONTEXT tap under each
+paper line) and the iOS receipt evidence screen (a "Proposed work context" disclosure under each line).
+
 ## Not touched
 
 Photo pipeline, classifier, photo landing, document OCR and `land_document_pages`, library filing, vehicle
