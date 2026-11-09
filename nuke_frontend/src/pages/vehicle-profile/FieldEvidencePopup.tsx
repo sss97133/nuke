@@ -184,6 +184,15 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     .map((source, index) => ({ id: `${source.source}-${index}`, source_type: source.source_type || source.source, field_value: source.value, created_at: source.at }));
   const sortedSources = [...sources].sort((a, b) => trustRank(a.source_type) - trustRank(b.source_type));
 
+  if (!context && !provenance.isLoading && provenance.data === null && !provenance.error) {
+    return <div className="field-evidence-popup"><p role="status">Field evidence is unavailable or this record is private.</p></div>;
+  }
+  if (!context && provenanceCoverageUnavailable(provenance.data)) {
+    return <div className="field-evidence-popup"><p role="status">Source evidence could not be loaded completely for this field. Coverage is unknown.</p>
+      <Button type="button" variant="secondary" disabled={provenance.isFetching} onClick={() => void provenance.refetch()}>Retry source evidence</Button>
+    </div>;
+  }
+
   // The value's first click shows the cited object and original quotation.
   // System copies and unrelated area photographs are not additional support.
   if (presentation === 'citations') {
@@ -198,7 +207,11 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     return <div className="field-citations" aria-label={`${label} sources`}>
       {(imagesLoading || claims.loading) && <p role="status">Reading sources…</p>}
       {(imageReadFailed || claims.error) && <p role="status">Some source evidence could not be read.
-        <button type="button" onClick={() => { void inventory.refetch(); void provenance.refetch(); }}>Retry sources</button>
+        <button type="button" onClick={() => {
+          if (inventory.error) void inventory.refetch();
+          if (provenance.error) void provenance.refetch();
+          if (claims.error) void claims.refetch();
+        }}>Retry sources</button>
       </p>}
       {witnesses.map(image => <figure key={image.id}>
         <button type="button" aria-label={`Inspect cited photograph for ${label}`} onClick={() => { closeTop(); openVehiclePhoto(image.id); }}>
@@ -230,15 +243,6 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
         <p>{value ? `“${value}” has no supporting citation in this field’s reader.` : 'This field’s reader has no supporting citation.'}</p>}
       {(field === 'trim' || field === 'engine_type' || field === 'engine_size') && witnesses.length > 0 &&
         <p className="field-citations__note">Lettering identifies what is written on the part. Factory trim and engine specification need their own evidence.</p>}
-    </div>;
-  }
-
-  if (!context && !provenance.isLoading && provenance.data === null && !provenance.error) {
-    return <div className="field-evidence-popup"><p role="status">Field evidence is unavailable or this record is private.</p></div>;
-  }
-  if (!context && provenanceCoverageUnavailable(provenance.data)) {
-    return <div className="field-evidence-popup"><p role="status">Source evidence could not be loaded completely for this field. Coverage is unknown.</p>
-      <Button type="button" variant="secondary" disabled={provenance.isFetching} onClick={() => void provenance.refetch()}>Retry source evidence</Button>
     </div>;
   }
 
