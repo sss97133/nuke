@@ -337,7 +337,7 @@ export async function auctions(supabase: any, client: BrowseClient, o: AuctionOp
       try {
         const raw = await client.getItem(s.itemId!);
         const freshEnd = Date.parse(raw.itemEndDate ?? s.itemEndDate!);
-        if (!Number.isFinite(freshEnd) || freshEnd <= now()) continue;
+        if (!Number.isFinite(freshEnd) || freshEnd <= now() || !raw.buyingOptions?.includes("AUCTION")) continue;
         const itemReadAt = new Date(now()).toISOString();
         const r = await landItem(supabase, raw, rep, itemReadAt);
         readAt.set(listingKey(s)!, itemReadAt);

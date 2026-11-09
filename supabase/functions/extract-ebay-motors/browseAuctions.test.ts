@@ -220,6 +220,13 @@ Deno.test("held evidence remains first and a lot expiring during it is never fet
   assertEquals([captures, result.auctions.written_live, client.items.length, result.auctions.land_attempts], [1, 1, 0, 0]);
 });
 
+Deno.test("a getItem changed to fixed-price only cannot land as an auction", async () => {
+  const s = lot("300000000061", { title: "2022 Ford Bronco", ends: at(1) });
+  const client = fakeClient([[s]], { items: { [s.itemId]: { ...s, buyingOptions: ["FIXED_PRICE"] } } });
+  const result = await auctions(fakeSb(world({})), client, { now: () => NOW, ledger: open, snapshotWriter: admitted });
+  assertEquals([result.landed, result.blips, result.auctions.landed_live], [0, 0, 0]);
+});
+
 Deno.test("earliest vintage is selected once and second slot retains vintage priority", async () => {
   const client = fakeClient([[lot("300000000021", { title: "1965 Ford Mustang", ends: at(0.1) }),
     lot("300000000022", { title: "2022 Ford Bronco", ends: at(0.2) }),
