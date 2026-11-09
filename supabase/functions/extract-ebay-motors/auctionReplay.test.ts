@@ -79,10 +79,20 @@ Deno.test("full native page retains source clock/hash and exact member, using ex
     assert.equal(retained.page_read_at, at); assert.equal(retained.response.nativePageField, "preserved");
     assert.deepEqual(native.extraNativeField, { retained: true });
     assert.deepEqual(native.seller, deleted ? {} : item.seller);
+    if (!deleted) assert.deepEqual(retained.response, page.response);
+    assert.equal(f.mutations.filter(m => m.includes("ebay_deleted_member_hashes")).length, 1);
     assert.ok(Array.isArray(f.stored().metadata.member_handles_sha256));
     await assert.rejects(() => store.summary({ ...entries[0], sha256: "b".repeat(64) }, deadline), /cached receipt differs/);
   }
 });
+Deno.test("batch fast path preserves explicit seller deletion outside handle regex grammar", async () => {
+  const f = database({ deleted: true }), store = auctionReplayStore(f.db), deadline = Date.now() + 5000;
+  const special = { ...item, seller: { username: "x", feedbackScore: 2 } };
+  const native = { ...page, items: [special], response: { ...page.response, itemSummaries: [special] } };
+  const retained = await store.retain(native, [candidate], deadline);
+  assert.deepEqual((await store.summary(retained[0], deadline)).seller, {});
+});
+
 Deno.test("archive failure, changed bytes, source-clock and byte limits refuse replay", async () => {
   for (const options of [{ rejectInsert: true }, { corrupt: true }]) {
     const store = auctionReplayStore(database(options).db);

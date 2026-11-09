@@ -1,7 +1,7 @@
 /** Bounded delivery receipts for already-read, already-owned auction states.
  * Native pages remain in the archive after delivery; this is not an identity queue. */
 import { retainFetchedCapture } from "../_shared/archiveFetch.ts";
-import { deletedLookup, handleHashes, tombstoneItem } from "./deletedMembers.ts";
+import { deletedLookup, handleHash, handleHashes, tombstoneItem } from "./deletedMembers.ts";
 import { listingKey, type EbayItem } from "./browseMap.ts";
 
 export const REPLAY_KEY = "ebay_auction_snapshot_replay_v1";
@@ -84,9 +84,21 @@ export function auctionReplayStore(sb: any): ReplayStore {
         storage: { from: () => ({ download: async () => ({ data: null, error: "replay requires inline retained page" }) }) },
       };
       const handles = await handleHashes(JSON.stringify(page.items));
-      const gone = await deletedLookup(bounded)(handles.member);
+      // tombstoneItem also checks explicit usernames outside its text-pattern
+      // grammar (for example one-character handles); preserve that coverage.
+      const known = new Set(handles.byHash.values());
+      const memberHashes = new Set(handles.member);
+      for (const item of page.items) if (item.seller?.username && !known.has(String(item.seller.username).toLowerCase())) {
+        memberHashes.add(await handleHash(String(item.seller.username)));
+        known.add(String(item.seller.username).toLowerCase());
+      }
+      const gone = await deletedLookup(bounded)([...memberHashes]);
       const lookup = async (keys: string[]) => new Set(keys.filter(k => gone.has(k)));
-      const items = await Promise.all(page.items.map(async item => (await tombstoneItem(lookup, item)).raw));
+      // The complete item set was checked above. With no deleted handles, each
+      // item's identical lookup would return empty; avoid thousands of duplicate
+      // regex scans/hashes across a full pass. Redaction stays unchanged otherwise.
+      const items = gone.size === 0 ? page.items
+        : await Promise.all(page.items.map(async item => (await tombstoneItem(lookup, item)).raw));
       const response = page.method === "search" ? { ...page.response, itemSummaries: items } : items[0];
       const body = JSON.stringify({ page_read_at: page.readAt, read_method: page.method, response });
       if (new TextEncoder().encode(body).length > MAX_BYTES) throw Error("auction replay page exceeds retention byte cap");
