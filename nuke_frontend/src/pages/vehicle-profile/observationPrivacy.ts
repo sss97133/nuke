@@ -28,6 +28,21 @@ export function publicObservationData(data: Record<string, unknown> | null): Rec
       visible[key] = value;
     }
   }
+  // Auction amounts are source claims, not verified transaction values. Project
+  // only numbers and closed enums; never pass through the claim's literal text.
+  const result = data?.result_claim;
+  if (data?.kind_detail === 'auction_listing' && result && typeof result === 'object' && !Array.isArray(result)) {
+    const claim = result as Record<string, unknown>;
+    if ((claim.status === 'sold' || claim.status === 'no_sale') &&
+        typeof claim.amount === 'number' && Number.isFinite(claim.amount) && claim.amount >= 0) {
+      visible.source_reported_outcome = claim.status;
+      visible.source_reported_amount_type = claim.status === 'sold' ? 'sale_price' : 'high_bid';
+      visible.source_reported_amount = claim.amount;
+      visible.source_reported_currency = typeof claim.currency === 'string' && categories.currency.includes(claim.currency)
+        ? claim.currency : 'not_stated';
+      visible.source_reported_fee_basis = 'unknown';
+    }
+  }
   return visible;
 }
 
