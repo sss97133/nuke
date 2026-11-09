@@ -4,9 +4,16 @@
 TRUNCATE monitored_auctions,auction_events,vehicle_events,vehicles,vehicle_observations,auction_comments,net.calls;
 ALTER TABLE vehicles ADD COLUMN merged_into_vehicle_id uuid,ADD COLUMN status text;
 ALTER TABLE auction_events ADD COLUMN id uuid DEFAULT gen_random_uuid(),ADD COLUMN source text DEFAULT 'bat',
- ADD COLUMN high_bid numeric,ADD COLUMN raw_data jsonb,ADD COLUMN duplicate_of uuid,ADD COLUMN total_bids integer,ADD COLUMN scraped_at timestamptz;
+ ADD COLUMN high_bid numeric,ADD COLUMN raw_data jsonb,ADD COLUMN duplicate_of uuid,ADD COLUMN total_bids integer,ADD COLUMN scraped_at timestamptz,ADD COLUMN source_listing_id text;
 CREATE VIEW auction_events_canonical AS SELECT * FROM auction_events WHERE duplicate_of IS NULL;
 ALTER TABLE vehicle_events ADD COLUMN id uuid DEFAULT gen_random_uuid(),ADD COLUMN sold_at timestamptz,ADD COLUMN duplicate_of_event_id uuid;
+ALTER TABLE vehicle_events ADD COLUMN merged_from_vehicle_id uuid;
+ALTER TABLE vehicle_observations ADD COLUMN merged_from_vehicle_id uuid,ADD COLUMN raw_source_ref text,
+ ADD COLUMN subject_id uuid,ADD COLUMN auction_event_id uuid;
+CREATE TABLE auction_event_duplicate_mark(event_id uuid,duplicate_of uuid,vehicle_id uuid,source text,canonical_listing_url text,run_id text,retired_at timestamptz);
+CREATE INDEX fixture_duplicate_run ON auction_event_duplicate_mark(run_id);
+CREATE TABLE superseded_rows(source_table text,row_id uuid,row_data jsonb,source jsonb,restored_at timestamptz);
+CREATE INDEX fixture_beforeimage_row ON superseded_rows(source_table,row_id);
 ALTER TABLE observation_sources ADD COLUMN species text DEFAULT 'timed_auction',ADD COLUMN supported_observations text[] DEFAULT ARRAY['bid'];
 CREATE TABLE listing_page_snapshots(id uuid PRIMARY KEY,platform text,success boolean,http_status integer,listing_url text,fetched_at timestamptz);
 UPDATE live_auction_sources SET scraping_config='{"live_pull":{"lots_per_run":8,"closing_slots":1,"reserve_first_read":1,"cadence_minutes":{"under_12h":60,"h12_to_48":360,"over_48h":1440}}}';
@@ -111,3 +118,69 @@ UPDATE live_auction_sources SET scraping_config=jsonb_set(scraping_config,'{live
  '[[1,20000],[2,20000],[3,20000]]');
 SELECT bat_live_pull_run(NULL,true);
 SELECT pg_temp.ok('existing scheduler pause blocks all HTML price-change dispatch',NOT EXISTS(SELECT FROM net.calls WHERE body ? 'url'));
+TRUNCATE monitored_auctions,auction_events,vehicle_events,vehicles,vehicle_observations,listing_page_snapshots,net.calls;
+UPDATE live_auction_sources SET scraping_config=jsonb_set(scraping_config,'{live_pull,run_samples}','[]');
+CREATE FUNCTION pg_temp.seed_corrected_price(label text) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE canonical_event uuid;duplicate_event uuid:=gen_random_uuid();evidence jsonb;
+BEGIN
+ PERFORM pg_temp.seed_price(label);
+ SELECT id INTO STRICT canonical_event FROM auction_events WHERE vehicle_id=md5(label||'-owner')::uuid;
+ evidence:=jsonb_build_object('run_id',label,'canonical_event_id',canonical_event,'native_post_id','123456','ref','retained:correction');
+ UPDATE auction_events SET source_listing_id=label,raw_data=raw_data||jsonb_build_object('link_correction',evidence) WHERE id=canonical_event;
+ INSERT INTO auction_events(id,vehicle_id,source_url,source_listing_id,duplicate_of,outcome)
+ VALUES(duplicate_event,md5(label)::uuid,'https://bringatrailer.com/listing/'||label,label,canonical_event,'live');
+ INSERT INTO auction_event_duplicate_mark VALUES(duplicate_event,canonical_event,md5(label)::uuid,'bat','https://bringatrailer.com/listing/'||label,label,NULL);
+ UPDATE vehicle_observations SET vehicle_id=md5(label)::uuid,subject_id=md5(label)::uuid,
+ raw_source_ref='bat:public-live:post:123456',vehicle_match_signals='{"binding":"bat_auctions_page","native_post_id":"123456","source_url_match":true}'
+ WHERE id=md5(label)::uuid;
+ INSERT INTO superseded_rows(source_table,row_id,row_data,source) SELECT 'vehicle_observations',id,to_jsonb(o),evidence FROM vehicle_observations o WHERE id=md5(label)::uuid;
+ UPDATE vehicle_observations SET vehicle_id=md5(label||'-owner')::uuid,subject_id=md5(label||'-owner')::uuid,merged_from_vehicle_id=md5(label)::uuid WHERE id=md5(label)::uuid;
+ UPDATE vehicle_events SET merged_from_vehicle_id=md5(label)::uuid WHERE vehicle_id=md5(label||'-owner')::uuid;
+END $$;
+SELECT pg_temp.seed_corrected_price('corrected-price');
+SELECT bat_live_pull_run(NULL,true);
+SELECT pg_temp.ok('preserved original binding gains eligibility only through sanctioned correction lineage',
+ (SELECT count(*)=1 FROM net.calls WHERE body->>'url' LIKE '%/corrected-price')
+ AND (SELECT NOT(vehicle_match_signals ? 'monitor_vehicle_id') AND vehicle_match_signals->>'binding'='bat_auctions_page'
+ FROM vehicle_observations WHERE id=md5('corrected-price')::uuid));
+-- A later native capture legitimately supplies ordinary lot_slug binding. The
+-- preserved duplicate must not block accounting, but an unmarked owner still does.
+INSERT INTO vehicle_observations SELECT (jsonb_populate_record(NULL::vehicle_observations,to_jsonb(o)||jsonb_build_object(
+ 'id',md5('corrected-price-next')::uuid,'structured_data',o.structured_data||jsonb_build_object('received_at',now()),
+ 'vehicle_match_signals',jsonb_build_object('monitor_vehicle_id',md5('corrected-price')::uuid,
+ 'binding_resolved_by','lot_slug','source_url_match',true)))).* FROM vehicle_observations o WHERE id=md5('corrected-price')::uuid;
+UPDATE monitored_auctions SET stream_state=jsonb_set(stream_state,'{last_observation_id}',to_jsonb(md5('corrected-price-next')::uuid)) WHERE external_auction_id='corrected-price';
+UPDATE auction_events SET updated_at=now(),high_bid=57500,total_bids=12,
+ raw_data=jsonb_set(raw_data,'{source_read,at}',to_jsonb(now())) WHERE vehicle_id=md5('corrected-price-owner')::uuid;
+INSERT INTO auction_comments SELECT md5('corrected-price-owner')::uuid,'https://bringatrailer.com/listing/corrected-price' FROM generate_series(1,12);
+SELECT bat_live_pull_run(0,false);
+SELECT pg_temp.ok('postdispatch native capture reconciles despite preserved marked duplicate',
+ (SELECT last_comment_synced_at>=last_synced_at AND sync_latency_ms IS NOT NULL AND poll_interval_ms=86400000 AND last_comment_count=12
+ FROM monitored_auctions WHERE external_auction_id='corrected-price'));
+INSERT INTO auction_events(vehicle_id,source_url,outcome) VALUES(md5('foreign-owner')::uuid,'https://bringatrailer.com/listing/corrected-price','live');
+UPDATE monitored_auctions SET last_comment_synced_at=NULL,last_synced_at=now()-interval '1 minute' WHERE external_auction_id='corrected-price';
+SELECT bat_live_pull_run(0,false);
+SELECT pg_temp.ok('unmarked competing auction still prevents canonical reconciliation',
+ (SELECT last_comment_synced_at IS NULL FROM monitored_auctions WHERE external_auction_id='corrected-price'));
+TRUNCATE monitored_auctions,auction_events,vehicle_events,vehicles,vehicle_observations,listing_page_snapshots,net.calls,auction_event_duplicate_mark,superseded_rows;
+SELECT pg_temp.seed_corrected_price(x) FROM unnest(ARRAY['audit-missing','audit-owner','audit-payload','audit-clock','audit-source',
+ 'retired-marker','wrong-run','marker-owner','episode-lineage','duplicate-link','wrong-native-post',
+ 'current-foreign-ref','current-structured-ref','before-foreign-ref','before-structured-ref','restored-audit'])x;
+DELETE FROM superseded_rows WHERE row_id=md5('audit-missing')::uuid;
+UPDATE superseded_rows SET row_data=jsonb_set(row_data,'{vehicle_id}',to_jsonb(md5('foreign')::uuid)) WHERE row_id=md5('audit-owner')::uuid;
+UPDATE superseded_rows SET row_data=jsonb_set(row_data,'{structured_data,unknown_payload}','"changed"') WHERE row_id=md5('audit-payload')::uuid;
+UPDATE superseded_rows SET row_data=jsonb_set(row_data,'{structured_data,received_at}',to_jsonb(now())) WHERE row_id=md5('audit-clock')::uuid;
+UPDATE superseded_rows SET row_data=jsonb_set(row_data,'{source_id}',to_jsonb(md5('foreign')::uuid)) WHERE row_id=md5('audit-source')::uuid;
+UPDATE auction_event_duplicate_mark SET retired_at=now() WHERE run_id='retired-marker';
+UPDATE auction_event_duplicate_mark SET run_id='foreign-run' WHERE run_id='wrong-run';
+UPDATE auction_event_duplicate_mark SET vehicle_id=md5('foreign')::uuid WHERE run_id='marker-owner';
+UPDATE vehicle_events SET merged_from_vehicle_id=NULL WHERE source_url LIKE '%/episode-lineage';
+UPDATE auction_events SET duplicate_of=md5('foreign')::uuid WHERE vehicle_id=md5('duplicate-link')::uuid;
+UPDATE auction_events SET raw_data=jsonb_set(raw_data,'{link_correction,native_post_id}','"999999"') WHERE vehicle_id=md5('wrong-native-post-owner')::uuid;
+UPDATE vehicle_observations SET auction_event_id=md5('foreign')::uuid WHERE id=md5('current-foreign-ref')::uuid;
+UPDATE vehicle_observations SET structured_data=structured_data||jsonb_build_object('source_auction_event_id',md5('foreign')::uuid) WHERE id=md5('current-structured-ref')::uuid;
+UPDATE superseded_rows SET row_data=jsonb_set(row_data,'{auction_event_id}',to_jsonb(md5('foreign')::uuid)) WHERE row_id=md5('before-foreign-ref')::uuid;
+UPDATE superseded_rows SET row_data=jsonb_set(row_data,'{structured_data,auction_event_id}',to_jsonb(md5('foreign')::uuid)) WHERE row_id=md5('before-structured-ref')::uuid;
+UPDATE superseded_rows SET restored_at=now() WHERE row_id=md5('restored-audit')::uuid;
+SELECT bat_live_pull_run(NULL,true);
+SELECT pg_temp.ok('missing or conflicting correction lineage never relaxes ordinary native binding',(SELECT count(*)=0 FROM net.calls));

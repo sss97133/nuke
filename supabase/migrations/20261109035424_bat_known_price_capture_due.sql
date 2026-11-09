@@ -13,6 +13,9 @@ DO $repair$
 DECLARE
  body text:=pg_get_functiondef('public.bat_live_pull_run(integer,boolean)'::regprocedure);
  source_uuid uuid;
+ reconcile_old text:=$old$AND other_lot.vehicle_id IS DISTINCT FROM native.vehicle_id)$old$;
+ reconcile_new text:=$new$AND other_lot.duplicate_of IS NULL
+              AND other_lot.vehicle_id IS DISTINCT FROM native.vehicle_id)$new$;
  anchor text:=$old$AND (m.next_poll_at IS NULL OR m.next_poll_at <= v_now$old$;
  replacement text:=$new$AND (m.next_poll_at IS NULL OR m.next_poll_at <= v_now
                -- Known inventory price change; one existing-slot attempt per retained source clock.
@@ -54,7 +57,47 @@ DECLARE
                        AND (receipt.vehicle_id=m.vehicle_id OR (
                          receipt.vehicle_match_signals->>'monitor_vehicle_id'=m.vehicle_id::text
                          AND receipt.vehicle_match_signals->>'binding_resolved_by'='lot_slug'
-                         AND receipt.vehicle_match_signals->>'source_url_match'='true'))
+                         AND receipt.vehicle_match_signals->>'source_url_match'='true') OR (
+                         -- A sanctioned correction preserves original capture signals.
+                         -- Prove that lineage separately; never reinterpret them as lot_slug.
+                         receipt.merged_from_vehicle_id=m.vehicle_id
+                         AND receipt.vehicle_match_signals->>'binding'='bat_auctions_page'
+                         AND receipt.vehicle_match_signals->>'source_url_match'='true'
+                         AND receipt.raw_source_ref='bat:public-live:post:'||(locator.origin_metadata->>'external_id')
+                         AND captured.raw_data#>>'{link_correction,canonical_event_id}'=captured.id::text
+                         AND captured.raw_data#>>'{link_correction,native_post_id}'=locator.origin_metadata->>'external_id'
+                         AND nullif(captured.raw_data#>>'{link_correction,run_id}','') IS NOT NULL
+                         AND (receipt.auction_event_id IS NULL OR receipt.auction_event_id=captured.id)
+                         AND (receipt.structured_data->>'auction_event_id' IS NULL OR receipt.structured_data->>'auction_event_id'=captured.id::text)
+                         AND (receipt.structured_data->>'source_auction_event_id' IS NULL OR receipt.structured_data->>'source_auction_event_id'=captured.id::text)
+                         AND EXISTS(SELECT 1 FROM public.auction_event_duplicate_mark correction
+                           JOIN public.auction_events duplicate ON duplicate.id=correction.event_id
+                           WHERE correction.run_id=captured.raw_data#>>'{link_correction,run_id}'
+                             AND correction.retired_at IS NULL AND correction.duplicate_of=captured.id
+                             AND correction.vehicle_id=m.vehicle_id AND correction.source='bat'
+                             AND correction.canonical_listing_url=rtrim(m.external_auction_url,'/')
+                             AND duplicate.duplicate_of=captured.id AND duplicate.vehicle_id=m.vehicle_id
+                             AND duplicate.source='bat' AND duplicate.source_listing_id=captured.source_listing_id
+                             AND duplicate.source_url IN(rtrim(m.external_auction_url,'/'),rtrim(m.external_auction_url,'/')||'/')
+                             AND EXISTS(SELECT 1 FROM public.superseded_rows before_image
+                               WHERE before_image.source_table='vehicle_observations' AND before_image.row_id=receipt.id
+                                 AND before_image.restored_at IS NULL
+                                 AND before_image.source=captured.raw_data->'link_correction'
+                                 AND before_image.row_data->>'id'=receipt.id::text
+                                 AND before_image.row_data->>'vehicle_id'=m.vehicle_id::text
+                                 AND (before_image.row_data->>'auction_event_id' IS NULL OR before_image.row_data->>'auction_event_id' IN(duplicate.id::text,captured.id::text))
+                                 AND (before_image.row_data#>>'{structured_data,auction_event_id}' IS NULL OR before_image.row_data#>>'{structured_data,auction_event_id}' IN(duplicate.id::text,captured.id::text))
+                                 AND (before_image.row_data#>>'{structured_data,source_auction_event_id}' IS NULL OR before_image.row_data#>>'{structured_data,source_auction_event_id}' IN(duplicate.id::text,captured.id::text))
+                                 AND before_image.row_data-ARRAY['vehicle_id','subject_id','merged_from_vehicle_id','auction_event_id','structured_data']
+                                   =to_jsonb(receipt)-ARRAY['vehicle_id','subject_id','merged_from_vehicle_id','auction_event_id','structured_data']
+                                 AND (before_image.row_data->'structured_data')-ARRAY['auction_event_id','source_auction_event_id']
+                                   =receipt.structured_data-ARRAY['auction_event_id','source_auction_event_id']))
+                         AND EXISTS(SELECT 1 FROM public.vehicle_events corrected_episode
+                           WHERE corrected_episode.vehicle_id=canonical.id AND corrected_episode.source_platform='bat'
+                             AND corrected_episode.event_type='auction' AND corrected_episode.merged_from_vehicle_id=m.vehicle_id
+                             AND corrected_episode.source_url IN(rtrim(m.external_auction_url,'/'),rtrim(m.external_auction_url,'/')||'/')
+                             AND corrected_episode.event_status IN('active','live') AND corrected_episode.sold_at IS NULL
+                             AND corrected_episode.duplicate_of_event_id IS NULL AND corrected_episode.ended_at>v_now)))
                        AND inventory.fetched_at>CASE WHEN pg_input_is_valid(receipt.structured_data->>'received_at','timestamp with time zone')
                          THEN (receipt.structured_data->>'received_at')::timestamptz END
                        AND (captured.raw_data#>>'{source_read,at}' IS NULL
@@ -89,12 +132,20 @@ BEGIN
  SELECT id INTO STRICT source_uuid FROM public.observation_sources
  WHERE slug='bat' AND species='timed_auction' AND 'bid'=ANY(supported_observations);
  replacement:=replace(replacement,'__BAT_SOURCE_UUID__',quote_literal(source_uuid::text));
- IF strpos(body,replacement)>0 THEN RETURN; END IF;
- IF (length(body)-length(replace(body,anchor,'')))/length(anchor)<>1
-   OR strpos(body,'Known inventory price change;')>0 THEN
-  RAISE EXCEPTION 'BaT due predicate drifted; inspect before applying';
+ IF strpos(body,replacement)=0 THEN
+  IF (length(body)-length(replace(body,anchor,'')))/length(anchor)<>1
+    OR strpos(body,'Known inventory price change;')>0 THEN
+   RAISE EXCEPTION 'BaT due predicate drifted; inspect before applying';
+  END IF;
+  body:=replace(body,anchor,replacement);
  END IF;
- EXECUTE replace(body,anchor,replacement);
+ IF strpos(body,reconcile_new)=0 THEN
+  IF (length(body)-length(replace(body,reconcile_old,'')))/length(reconcile_old)<>1 THEN
+   RAISE EXCEPTION 'BaT canonical reconciliation ambiguity guard drifted; inspect before applying';
+  END IF;
+  body:=replace(body,reconcile_old,reconcile_new);
+ END IF;
+ EXECUTE body;
 END $repair$;
 SET statement_timeout = :'bat_price_prior_statement_timeout';
 SET lock_timeout = :'bat_price_prior_lock_timeout';
