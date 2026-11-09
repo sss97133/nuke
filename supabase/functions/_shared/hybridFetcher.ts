@@ -25,6 +25,16 @@ export interface FetchOptions {
 const DEFAULT_TIMEOUT = 15000;
 const DEFAULT_RETRIES = 2;
 
+function hasBlockedPageContent(html: string): boolean {
+  // Application dictionaries include unrelated phrases such as "payment has
+  // been blocked". Inspect rendered markup, not embedded script translations.
+  // Keep explicit challenge machinery rejected even when it lives in a script.
+  if (/\/cdn-cgi\/challenge-platform\/[^"'\s<>]*\/orchestrate\//i.test(html) ||
+      /<title[^>]*>\s*(?:Just a moment|Attention Required)[^<]*<\/title>/i.test(html)) return true;
+  const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
+  return markup.includes('Access Denied') || markup.includes('blocked');
+}
+
 const USER_AGENTS = [
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -119,7 +129,7 @@ export async function fetchPage(
                 authRequired: true,
               };
             }
-            if (html.length > 1000 && !html.includes('Access Denied') && !html.includes('blocked')) {
+            if (html.length > 1000 && !hasBlockedPageContent(html)) {
               return { html, source: 'direct', statusCode: redirectResp.status };
             }
             lastError = 'Blocked by site (after redirect)';
@@ -144,7 +154,7 @@ export async function fetchPage(
           };
         }
 
-        if (html.length > 1000 && !html.includes('Access Denied') && !html.includes('blocked')) {
+        if (html.length > 1000 && !hasBlockedPageContent(html)) {
           return { html, source: 'direct', statusCode: response.status };
         }
         lastError = 'Blocked by site';
