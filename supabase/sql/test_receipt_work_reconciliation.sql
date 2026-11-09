@@ -49,6 +49,10 @@ BEGIN
   ASSERT receipt_line_photo_zone('70-76 SHAKER HOOD') = 'exterior';
   ASSERT receipt_line_photo_zone('70-73 FIREBIRD REAR BUMPER') = 'exterior';
   ASSERT receipt_line_photo_zone('SHIPPING') IS NULL;
+  ASSERT receipt_line_photo_zone('Power steering pump (Endurance 7023)') = 'engine';
+  ASSERT receipt_line_photo_zone('Pitman arm — bolts onto sector shaft of steering box') = 'undercarriage';
+  ASSERT receipt_line_photo_zone('QFS H882 build + P367 — custom in-tank pump') = 'undercarriage';
+  ASSERT receipt_line_photo_zone('70-81 FBRD STEERING WHEEL') = 'dashboard';
   ASSERT receipt_line_photo_zone('Inner Rocker Panel, Extended-RH') = 'exterior';
   ASSERT receipt_line_photo_zone('ROLLER ROCKER ARM SET') = 'engine';
   ASSERT receipt_line_photo_zone('71-76 TA SHKR AIR CLNR VENT TB') = 'engine';

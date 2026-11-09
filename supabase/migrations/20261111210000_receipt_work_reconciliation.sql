@@ -53,6 +53,9 @@ LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
   SELECT CASE
     -- loose hardware and switches: a photo would not show them
     WHEN d ~* '\m(fstnrs|fasteners?|weatherstrip|switch)\M' OR d ~* '\m(screws?|bolts?|nuts|clips?)\M\s*(set|kit|\(|$)' THEN NULL
+    -- steering and fuel hardware that lives under the car or in the engine bay, not on the dash
+    WHEN d ~* '\m(steering (box|gear)|pitman|steering arm|tie rod|drag link|steering knuckle|in-tank|fuel tank|tank sending)' THEN 'undercarriage'
+    WHEN d ~* '\m(power steering|steering pump|p/s pump)' THEN 'engine'
     -- lamps, lenses and their bezels are on the body ends, not the dash
     WHEN d ~* '\m(tail ?lamp|tail ?light|t/?l ?la?mp|head ?lamp|headlight|marker lamp|park(ing)? lamp|back ?up lamp)' THEN 'exterior'
     WHEN d ~* '\m(dash|cluster|gauge|tach|clock|speedo|instrument|glove ?box|glv box|console|radio|steering|horn|shifter|bezel|heater control|htr ctrl|ash ?tray|lighter|radio knobs?|am/fm)' THEN 'dashboard'
