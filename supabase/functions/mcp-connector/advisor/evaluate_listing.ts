@@ -16,12 +16,49 @@ import {
   canonicalListingUrl,
   cleanListingUrl,
   detectVariant,
+  hardVariantMismatch,
   identityFromListingUrl,
   isLikelyPartsSale,
   isGenerationMismatch,
   isVariantMismatch,
+  junkCompReason,
+  lowOutlierCut,
   recentSaleSanityGuard,
 } from "./variants.ts";
+import { allInCost, cohortTrend, type FeeRow, pricePosition } from "./market_position.ts";
+
+/** Page-observed subject facts passed to value_asset (mirrors handlers.ts SubjectOverride). */
+export interface ValueAssetOverride {
+  subjectText?: string | null;
+  subjectMileage?: number | null;
+  excludeUrls?: string[];
+  ownSaleIsSubject?: boolean;
+  ignoreDbSubjectAttrs?: boolean;
+}
+
+/** Fee-schedule platform key for a listing source. */
+function feePlatform(source: string): string | null {
+  if (source === "bat") return "bat";
+  if (source === "cars_and_bids") return "cars_and_bids";
+  if (source === "mecum") return "mecum";
+  return null;
+}
+
+/** "sold $64,000" / "bid to $67,118, reserve not met" / "current bid $39,993" / "ask $X". */
+export function priceLabel(kind: string | null | undefined, price: number | null | undefined, on?: string | null): string | null {
+  if (price == null || !Number.isFinite(price)) return null;
+  const d = on ? ` on ${on.slice(0, 10)}` : "";
+  if (kind === "sold") return `sold ${money(price)}${d}`;
+  if (kind === "high_bid_reserve_not_met") return `bid to ${money(price)}${d}, reserve not met (no sale)`;
+  if (kind === "current_bid") return `current bid ${money(price)}`;
+  if (kind === "ask") return `ask ${money(price)}`;
+  return null;
+}
+
+/** below / inside / above what similar cars sold for. */
+export function bandRelation(price: number, low: number, high: number): "below" | "inside" | "above" {
+  return price < low ? "below" : price > high ? "above" : "inside";
+}
 
 /** Minimal deps (kept local to avoid circular import with handlers.ts). */
 export interface EvaluateDeps {
@@ -37,7 +74,10 @@ export interface EvaluateDeps {
    * value_asset for a matched Nuke asset. Injected by handlers.ts (no circular import) so
    * evaluate_listing and value_asset return one valuation and one comp set for the same car.
    */
-  valueAsset?: (assetId: string) => Promise<{ structuredContent: AdvisorEnvelope; isError?: boolean }>;
+  valueAsset?: (
+    assetId: string,
+    override?: ValueAssetOverride,
+  ) => Promise<{ structuredContent: AdvisorEnvelope; isError?: boolean }>;
 }
 
 export interface AdvisorToolResult {
@@ -456,6 +496,7 @@ async function loadCompsForListing(
   const yearMin = year - 3;
   const yearMax = year + 2;
   const subjectVariant = detectVariant(subjectBlob(listing));
+  const subjectIdText = `${listing.title || ""} ${listing.model || ""} ${listing.url || ""}`;
 
   let rpcRows: unknown = null;
   let rpcErr: { message?: string } | null = null;
@@ -474,9 +515,28 @@ async function loadCompsForListing(
     rpcRows = res.data;
     rpcErr = res.error;
   }
+  // A full title model ("Mustang Shelby GT350 Track Package") can match nothing: retry on the model
+  // family; the variant and junk filters below keep the cohort honest.
+  const family = modelCore.split(/\s+/)[0] || "";
+  if ((rpcErr || !Array.isArray(rpcRows) || !(rpcRows as unknown[]).length) && family && family !== modelCore) {
+    const res = await sb.rpc("get_comps_combined", {
+      p_basis: "hammer",
+      p_make: make,
+      p_model: family,
+      p_year_min: yearMin,
+      p_year_max: yearMax,
+      p_min_price: null,
+      p_max_price: null,
+      p_exclude_vehicle_id: null,
+      p_limit: 80,
+    });
+    rpcRows = res.data;
+    rpcErr = res.error;
+  }
   if (rpcErr || !Array.isArray(rpcRows) || !(rpcRows as unknown[]).length) {
     // Fallback: broader model null + edge comps API
     const res2 = await sb.rpc("get_comps_combined", {
+      p_basis: "hammer",
       p_make: make,
       p_model: null,
       p_year_min: yearMin,
@@ -544,6 +604,10 @@ async function loadCompsForListing(
     variant: 0,
     generation: 0,
     parts: 0,
+    hard_variant_mismatch: 0,
+    junk_title: 0,
+    url_year_mismatch: 0,
+    low_price_outlier: 0,
   };
   const seenUrl = new Set<string>();
   const seenPriceDate = new Set<string>();
@@ -565,6 +629,23 @@ async function loadCompsForListing(
     if (isVariantMismatch(subjectVariant, candVariant)) {
       if (candVariant === "turbo" || candVariant === "turbo_s") excluded.turbo++;
       else excluded.variant++;
+      continue;
+    }
+    // T3: RS / GT2 / Turbo S / Weissach / Clubsport / Speedster / Cup must match exactly.
+    if (hardVariantMismatch(subjectIdText, candBlob).length) {
+      excluded.hard_variant_mismatch++;
+      continue;
+    }
+    const junk = junkCompReason({
+      title,
+      url: rawUrl,
+      model,
+      rowYear: (v?.year as number) ?? (r.yr as number) ?? null,
+      subjectText: subjectIdText,
+    });
+    if (junk) {
+      if (junk === "url_year_mismatch") excluded.url_year_mismatch++;
+      else excluded.junk_title++;
       continue;
     }
     // Same variant, different generation (e.g. 964 Turbo 3.6 comps for a 993 Turbo).
@@ -682,7 +763,11 @@ async function loadCompsForListing(
     });
   }
 
-  return { comps, excluded };
+  // T3: a "sale" under 25% of the cohort median is a parts lot or a no-sale mislabeled as sold.
+  const cut = lowOutlierCut(comps.filter((c) => c.result_type === "sold"), (c) => c.sale_price);
+  const drop = new Set(cut.dropped);
+  excluded.low_price_outlier = drop.size;
+  return { comps: comps.filter((c) => !drop.has(c)), excluded };
 }
 
 function filterSubjectComps(
@@ -794,42 +879,70 @@ function buildVerdict(input: {
   const { listing, fairLow, fairHigh, confidence, flags, redFlags, matchedSale } = input;
   const label = [listing.year, listing.make, listing.model].filter(Boolean).join(" ") ||
     "Listing";
+  const kind = listing.price_kind ?? (listing.listing_kind === "auction_live" ? "current_bid" : listing.asking_price != null ? "ask" : null);
+  const price = listing.price ?? (kind === "current_bid" ? listing.current_bid : listing.asking_price) ?? null;
+  const said = priceLabel(kind, price, kind === "sold" || kind === "high_bid_reserve_not_met" ? listing.end_at : null);
   if (fairLow == null || fairHigh == null) {
-    return `${label}: value not recorded — identity or comps insufficient.`;
+    return `${label}${said ? `: ${said}` : ""}: value not recorded — identity or comps insufficient.`;
   }
-  const parts: string[] = [
-    `${label}: fair ${money(fairLow)}–${money(fairHigh)} (confidence ${confidence.toFixed(2)})`,
-  ];
-  if (matchedSale) {
-    parts.push(
-      `same car sold ${money(matchedSale.amount)}${
-        matchedSale.on ? ` on ${matchedSale.on.slice(0, 10)}` : ""
-      }`,
-    );
-  }
-  if (listing.listing_kind === "auction_live") {
+  const parts: string[] = [`${label}: similar cars sold ${money(fairLow)}–${money(fairHigh)} (confidence ${confidence.toFixed(2)})`];
+  if (kind === "sold" && price != null) {
+    parts.push(`${said} — ${bandRelation(price, fairLow, fairHigh)} what similar cars sold for`);
+  } else if (kind === "high_bid_reserve_not_met" && price != null) {
+    parts.push(`${said} — high bid ${bandRelation(price, fairLow, fairHigh)} what similar cars sold for`);
+  } else if (kind === "current_bid") {
     // A live bid is not an ask: never say "ask below fair band" days before the close.
     const ends = listing.auction_end_at ? `, ends ${listing.auction_end_at.slice(0, 10)}` : "";
-    if (listing.current_bid != null) {
-      const rel = listing.current_bid < fairLow
-        ? "below fair band so far"
-        : listing.current_bid > fairHigh
-        ? "above fair band"
-        : "inside fair band";
-      parts.push(`auction live, current bid ${money(listing.current_bid)} vs fair band (${rel}${ends})`);
+    if (price != null) {
+      parts.push(`auction live, ${said} — ${bandRelation(price, fairLow, fairHigh)} what similar cars sold for so far${ends}`);
     } else {
       parts.push(`auction live${ends}`);
     }
-  } else if (listing.asking_price != null && fairHigh != null) {
-    if (listing.asking_price > fairHigh * 1.15) parts.push("ask above fair band");
-    else if (listing.asking_price < fairLow * 0.9) parts.push("ask below fair band");
-    else parts.push("ask inside fair band");
+  } else if (kind === "ask" && price != null) {
+    if (price > fairHigh * 1.15) parts.push(`${said} — above what similar cars sold for`);
+    else if (price < fairLow * 0.9) parts.push(`${said} — below what similar cars sold for`);
+    else parts.push(`${said} — inside what similar cars sold for`);
+  }
+  if (matchedSale) {
+    parts.push(`same car previously sold ${money(matchedSale.amount)}${matchedSale.on ? ` on ${matchedSale.on.slice(0, 10)}` : ""}`);
   }
   if (flags.includes("recent_same_asset_sale_dominates")) {
     parts.push("anchored on recent same-asset sale");
   }
   if (redFlags.length) parts.push(`${redFlags.length} red flag(s)`);
   return parts.join(" · ");
+}
+
+/** Listing block of the envelope. Existing keys keep their names; T1/T2 fields are added. */
+function listingOut(listing: FetchedListing): Record<string, unknown> {
+  return {
+    url: listing.url,
+    title: listing.title,
+    // `ask` is an asking price only; a sale or bid is never reported here (see price_kind / price).
+    ask: listing.asking_price,
+    listing_kind: listing.listing_kind ?? null,
+    current_bid: listing.current_bid ?? null,
+    auction_end_at: listing.auction_end_at ?? null,
+    year: listing.year,
+    make: listing.make,
+    model: listing.model,
+    mileage: listing.mileage,
+    transmission: listing.transmission,
+    photo_count: listing.photo_urls.length,
+    price_kind: listing.price_kind ?? null,
+    price: listing.price ?? null,
+    price_label: priceLabel(listing.price_kind, listing.price ?? null, listing.end_at ?? null),
+    price_basis: listing.price_basis ?? null,
+    price_basis_note: listing.price_basis_note ?? null,
+    currency: listing.currency,
+    sold_price: listing.sold_price ?? null,
+    high_bid: listing.high_bid ?? null,
+    end_at: listing.end_at ?? null,
+    mileage_tmu: listing.mileage_tmu ?? false,
+    mileage_km: listing.mileage_km ?? null,
+    mileage_text: listing.mileage_text ?? null,
+    mileage_source: listing.mileage_source ?? null,
+  };
 }
 
 function buildMarkdown(input: {
@@ -857,6 +970,11 @@ function buildMarkdown(input: {
         listing.auction_end_at ? ` · ends ${listing.auction_end_at}` : ""
       } (a bid, not an asking price)`,
     );
+  } else if (listing.price_kind === "sold" || listing.price_kind === "high_bid_reserve_not_met") {
+    lines.push(
+      `- Result: ${priceLabel(listing.price_kind, listing.price ?? null, listing.end_at ?? null)}` +
+        `${listing.price_basis === "hammer" ? " (hammer; buyer fee not included)" : ""}`,
+    );
   } else if (listing.asking_price != null) {
     lines.push(`- Ask: ${money(listing.asking_price)}${listing.location ? ` · ${listing.location}` : ""}`);
   }
@@ -864,7 +982,7 @@ function buildMarkdown(input: {
   if (ident) {
     lines.push(
       `- Identity: ${ident}${
-        listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""
+        listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi${listing.mileage_tmu ? " (TMU)" : ""}` : ""
       }${listing.transmission ? ` · ${listing.transmission}` : ""}`,
     );
   }
@@ -875,6 +993,16 @@ function buildMarkdown(input: {
     `- Range: ${money(value.fair_low as number)} – ${money(value.fair_high as number)} · confidence ${value.confidence}`,
   );
   if (value.basis) lines.push(`- Basis: ${value.basis}`);
+  const allIn = value.all_in as Record<string, unknown> | undefined;
+  if (allIn?.status === "recorded") lines.push(`- All-in: ${money(allIn.total as number)} — ${allIn.label}`);
+  const pos = value.position as Record<string, unknown> | undefined;
+  if (pos?.status === "recorded") lines.push(`- Position: ${pos.percentile}th percentile — ${pos.note}`);
+  const tr = value.trend as Record<string, unknown> | undefined;
+  if (tr?.status === "recorded") {
+    const r = tr.window_recent as Record<string, unknown>;
+    const p = tr.window_prior as Record<string, unknown>;
+    lines.push(`- Trend: ${tr.direction} ${tr.change_pct}% (median ${money(r.median as number)}, n=${r.n} vs ${money(p.median as number)}, n=${p.n})`);
+  }
   if (priorSales.length) {
     lines.push("");
     lines.push(`## Prior sales / relists (same car)`);
@@ -951,15 +1079,39 @@ export async function handleEvaluateListing(
   }
 
   const listingCit = citeListing(listing);
+  const resultCit = citeListing(listing, listing.end_at ?? null);
   const claimsOut: Claim[] = [];
   claimsOut.push(
     recordedClaim("asking_price", listing.asking_price, {
       confidence: listing.asking_price != null ? 0.9 : null,
       confidence_basis: "source_trust",
       citations: [listingCit],
-      note: "Seller ask from listing page (not a sale)",
+      note: listing.price_kind && listing.price_kind !== "ask"
+        ? `No asking price: the page price is a ${listing.price_kind.replace(/_/g, " ")}, not an ask`
+        : "Seller ask from listing page (not a sale)",
     }),
   );
+  // T1: a closed auction's price is a sale (or a no-sale high bid), labeled by basis — never an ask.
+  if (listing.price_kind === "sold") {
+    claimsOut.push(
+      recordedClaim("sold_price", listing.sold_price ?? listing.price ?? null, {
+        confidence: 0.95,
+        confidence_basis: "source_trust",
+        citations: [resultCit],
+        note: `${listing.price_basis === "hammer" ? "Winning bid (hammer); the buyer fee is on top" : "Published sale price"}` +
+          `${listing.currency ? ` · ${listing.currency}` : ""}${listing.price_basis_note && listing.price_basis !== "hammer" ? ` · ${listing.price_basis_note}` : ""}`,
+      }),
+    );
+  } else if (listing.price_kind === "high_bid_reserve_not_met") {
+    claimsOut.push(
+      recordedClaim("high_bid", listing.high_bid ?? listing.price ?? null, {
+        confidence: 0.95,
+        confidence_basis: "source_trust",
+        citations: [resultCit],
+        note: "High bid; reserve not met, so the car did not sell — not a sale price",
+      }),
+    );
+  }
   if (listing.listing_kind === "auction_live") {
     claimsOut.push(
       recordedClaim("current_bid", listing.current_bid ?? null, {
@@ -991,6 +1143,17 @@ export async function handleEvaluateListing(
       confidence: 0.8,
       confidence_basis: "source_trust",
       citations: [listingCit],
+    }),
+  );
+  // T2: the odometer as the page shows it, with TMU (true mileage unknown) when the seller says so.
+  claimsOut.push(
+    recordedClaim("mileage", listing.mileage, {
+      confidence: listing.mileage != null ? (listing.mileage_tmu ? 0.3 : 0.8) : null,
+      confidence_basis: "source_trust",
+      citations: [listingCit],
+      note: listing.mileage_text
+        ? `Page: "${listing.mileage_text}"${listing.mileage_tmu ? " — TMU: true mileage unknown, the odometer reading is not the car's real mileage" : ""}`
+        : undefined,
     }),
   );
 
@@ -1054,11 +1217,44 @@ export async function handleEvaluateListing(
     });
   } catch (_e) { /* coverage logging must not fail the evaluation */ }
   let matchedSale: { amount: number; on: string | null; source_url: string | null } | null = null;
+  const subjectCanon = canonicalListingUrl(url);
+  const sameListing = (u: unknown) => !!u && canonicalListingUrl(String(u)) === subjectCanon;
+  // T2: page-observed fields beat stored ones for this answer; disagreements are flagged, never overwritten.
+  const fieldConflicts: Array<Record<string, unknown>> = [];
+  const normModel = (m: unknown) => String(m ?? "").toLowerCase().replace(/\s+\d-speed.*$/, "").replace(/[^a-z0-9]+/g, " ").trim();
+  if (matchedRow) {
+    const dbMiles = matchedRow.mileage != null ? Number(matchedRow.mileage) : null;
+    if (listing.mileage != null && dbMiles != null &&
+      Math.abs(dbMiles - listing.mileage) > Math.max(1000, 0.1 * listing.mileage)) {
+      fieldConflicts.push({
+        field: "mileage",
+        page_value: listing.mileage,
+        page_text: listing.mileage_text ?? null,
+        page_tmu: listing.mileage_tmu ?? false,
+        stored_value: dbMiles,
+        stored_source: `vehicles.mileage (${matchedId})`,
+        used: "page_value",
+        note: "Page reading used for this answer; the stored value is not overwritten",
+      });
+    }
+    if (listing.model_from_title && matchedRow.model && normModel(matchedRow.model) !== normModel(listing.model_from_title)) {
+      fieldConflicts.push({
+        field: "model",
+        page_value: listing.model_from_title,
+        stored_value: matchedRow.model,
+        stored_source: `vehicles.model (${matchedId})`,
+        used: "page_value",
+        note: "Full model from the listing title used for this answer; the stored value is not overwritten",
+      });
+    }
+  }
   if (matchedRow) {
     listing.year = listing.year ?? (matchedRow.year as number | null);
     listing.make = listing.make ?? (matchedRow.make as string | null);
     // Prefer richer specialty model from URL/slug over a thin retained model when both exist.
-    if (!listing.model) {
+    if (listing.model_from_title) {
+      /* the page title's full model wins (T2) */
+    } else if (!listing.model) {
       listing.model = (matchedRow.model as string) ||
         (matchedRow.trim as string) ||
         null;
@@ -1079,7 +1275,18 @@ export async function handleEvaluateListing(
       listing.title = [listing.year, listing.make, listing.model].filter(Boolean).join(" ") ||
         listing.title;
     }
-    listing.mileage = listing.mileage ?? (matchedRow.mileage as number | null);
+    if (listing.mileage == null && matchedRow.mileage != null) {
+      listing.mileage = matchedRow.mileage as number;
+      listing.mileage_source = null;
+      claimsOut.push(
+        recordedClaim("mileage_stored", matchedRow.mileage, {
+          confidence: 0.5,
+          confidence_basis: "source_trust",
+          citations: [emptyCitation({ source_name: "nuke vehicles.mileage", source_url: null })],
+          note: "Page shows no odometer; stored Nuke value used",
+        }),
+      );
+    }
     listing.transmission = listing.transmission ?? (matchedRow.transmission as string | null);
     // A live auction's stored price is the running bid, not a sale: never anchor on it.
     if (matchedRow.sale_price != null && listing.listing_kind !== "auction_live") {
@@ -1089,7 +1296,15 @@ export async function handleEvaluateListing(
         on: null,
         source_url: (matchedRow.listing_url || matchedRow.bat_auction_url || url) as string,
       };
-      if (listing.asking_price == null) listing.asking_price = amount;
+      // T1: a stored sale price is never relabeled as an ask. When the page showed no price, the
+      // stored sale for this same listing is reported as a sale, cited to Nuke.
+      if (listing.price_kind == null && sameListing(matchedSale.source_url)) {
+        listing.price_kind = "sold";
+        listing.price = amount;
+        listing.sold_price = amount;
+        listing.price_basis = "unknown";
+        listing.price_basis_note = "price read from the stored Nuke record (vehicles.sale_price), not the page";
+      }
     }
   }
   if (matchedId) {
@@ -1103,6 +1318,17 @@ export async function handleEvaluateListing(
         on: fact.sold_on ? String(fact.sold_on) : null,
         source_url: (fact.source_url as string) || matchedSale?.source_url || url,
       };
+    }
+  }
+  // T1: the listing being judged is not its own prior sale. A stored sale that is this listing (same
+  // URL, or a closed/live auction whose stored amount is the page's own price) is the subject.
+  let subjectSale: { amount: number; on: string | null; source_url: string | null } | null = null;
+  if (matchedSale) {
+    const isAuction = listing.listing_kind === "auction_live" || listing.listing_kind === "auction_ended";
+    const samePrice = listing.price != null && Math.abs(matchedSale.amount - listing.price) < 1;
+    if (sameListing(matchedSale.source_url) || (isAuction && samePrice)) {
+      subjectSale = matchedSale;
+      matchedSale = null;
     }
   }
 
@@ -1178,17 +1404,8 @@ export async function handleEvaluateListing(
         comps: [],
         red_flags: redFlags,
         matched_asset_id: matchedId,
-        listing: {
-          url: listing.url,
-          title: listing.title,
-          ask: listing.asking_price,
-          listing_kind: listing.listing_kind ?? null,
-          current_bid: listing.current_bid ?? null,
-          auction_end_at: listing.auction_end_at ?? null,
-          year: listing.year,
-          make: listing.make,
-          model: listing.model,
-        },
+        listing: listingOut(listing),
+        field_conflicts: fieldConflicts,
         latency_ms,
         markdown_summary: markdown,
       }),
@@ -1293,9 +1510,16 @@ export async function handleEvaluateListing(
   // vs $210k-$332k).
   let sharedComps: CompRow[] | null = null;
   let sharedExcluded: Record<string, number> | null = null;
+  let sharedTrend: Record<string, unknown> | null = null;
   if (matchedId && deps.valueAsset) {
     try {
-      const va = await deps.valueAsset(matchedId);
+      const va = await deps.valueAsset(matchedId, {
+        subjectText: `${listing.title || ""} ${listing.model || ""} ${listing.url}`,
+        subjectMileage: listing.mileage ?? null,
+        excludeUrls: [listing.url, url],
+        ownSaleIsSubject: subjectSale != null,
+        ignoreDbSubjectAttrs: fieldConflicts.some((c) => c.field === "mileage"),
+      });
       const sc = va.isError ? null : (va.structuredContent as unknown as Record<string, unknown>);
       if (sc && !sc.error) {
         const vLow = typeof sc.value_low === "number" ? sc.value_low : null;
@@ -1312,6 +1536,7 @@ export async function handleEvaluateListing(
           for (const f of sc.flags as string[]) if (!flags.includes(f)) flags.push(f);
         }
         sharedExcluded = (summary.excluded || null) as Record<string, number> | null;
+        sharedTrend = (sc.trend as Record<string, unknown> | undefined) ?? null;
         sharedComps = used.map((c) => ({
           asset_id: c.asset_id != null ? String(c.asset_id) : null,
           year: (c.year as number) ?? null,
@@ -1319,7 +1544,7 @@ export async function handleEvaluateListing(
           model: (c.model as string) ?? null,
           body: null,
           transmission: null,
-          mileage: null,
+          mileage: typeof c.mileage === "number" ? c.mileage : null,
           sale_price: typeof c.sale_price === "number" ? c.sale_price : null,
           sold_date: (c.sold_date as string) ?? null,
           listing_url: (c.listing_url as string) ?? null,
@@ -1361,6 +1586,15 @@ export async function handleEvaluateListing(
       /* informational, not a red flag */
     } else redFlags.push(f);
   }
+  for (const c of fieldConflicts) {
+    redFlags.push(
+      c.field === "mileage"
+        ? `Stored mileage ${Number(c.stored_value).toLocaleString("en-US")} disagrees with the page (${c.page_text ?? Number(c.page_value).toLocaleString("en-US")}); page value used`
+        : `Stored model "${c.stored_value}" disagrees with the page title ("${c.page_value}"); page value used`,
+    );
+  }
+  if (listing.mileage_tmu) redFlags.push("TMU: seller states true mileage is unknown");
+  if (listing.price_basis_note?.startsWith("conflict")) redFlags.push(`Price basis ${listing.price_basis_note}`);
   if (listing.photo_urls.length === 0) redFlags.push("No photos parsed from listing page");
   if (!listing.description) redFlags.push("Listing description empty (often JS-rendered shell)");
   for (const c of textClaims.filter((x) => x.tag === "contradicted").slice(0, 5)) {
@@ -1382,7 +1616,7 @@ export async function handleEvaluateListing(
       .eq("vehicle_id", matchedId)
       .order("sold_at", { ascending: false, nullsFirst: false })
       .limit(20);
-    priorSales = (events || []).map((e: Record<string, unknown>) => ({
+    priorSales = (events || []).filter((e: Record<string, unknown>) => !sameListing(e.source_url)).map((e: Record<string, unknown>) => ({
       event_type: e.event_type ?? null,
       event_date: e.sold_at || e.ended_at || e.started_at || null,
       sale_price: e.final_price ?? null,
@@ -1392,7 +1626,7 @@ export async function handleEvaluateListing(
       source_url: e.source_url ?? null,
       venue: e.source_platform ?? null,
     }));
-    if (matchedSale && !priorSales.some((p) => Number(p.sale_price) === matchedSale.amount)) {
+    if (matchedSale && !sameListing(matchedSale.source_url) && !priorSales.some((p) => Number(p.sale_price) === matchedSale.amount)) {
       priorSales.unshift({
         event_type: "sale",
         event_date: matchedSale.on,
@@ -1419,7 +1653,48 @@ export async function handleEvaluateListing(
       listing_url: c.listing_url,
       platform: c.platform,
       result_type: c.result_type,
+      price_basis: "hammer",
+      variant: detectVariant(`${c.model || ""} ${c.listing_url || ""}`),
     }));
+
+  // T4: money, position and trend — each cited.
+  let feeRows: FeeRow[] = [];
+  const platform = feePlatform(listing.source);
+  if (platform) {
+    try {
+      const { data } = await sb
+        .from("platform_fee_schedule")
+        .select("id, platform, role, fee_kind, rate, min_amount, cap_amount, flat_amount, currency, published_price_basis, valid_from, valid_to, source_url, lot_class, sale_type")
+        .eq("platform", platform)
+        .eq("role", "buyer");
+      feeRows = (data || []) as FeeRow[];
+    } catch { /* all-in is additive */ }
+  }
+  const subjectPriceKind = listing.price_kind ?? null;
+  const subjectPrice = listing.price ?? (listing.listing_kind === "auction_live" ? listing.current_bid ?? null : listing.asking_price) ?? null;
+  const allIn = platform
+    ? allInCost({
+      price: subjectPrice,
+      price_kind: subjectPriceKind,
+      price_basis: listing.price_basis ?? null,
+      currency: listing.currency,
+      platform,
+      at: (subjectPriceKind === "sold" || subjectPriceKind === "high_bid_reserve_not_met") && listing.end_at
+        ? listing.end_at
+        : new Date().toISOString(),
+      feeRows,
+      listingUrl: listing.url,
+    })
+    : { status: "not_recorded", reason: `no fee schedule for source ${listing.source}`, total: null };
+  const position = pricePosition(
+    listing.price_basis === "hammer" || listing.price_kind === "current_bid" ? subjectPrice : null,
+    subjectPriceKind,
+    topComps,
+  );
+  if (position.status !== "recorded" && listing.price_basis && listing.price_basis !== "hammer" && subjectPrice != null) {
+    position.reason = `subject price basis is ${listing.price_basis}; comps are hammer — not compared`;
+  }
+  const trend = sharedTrend ?? cohortTrend(usedComps.map((c) => ({ sale_price: c.sale_price, sold_date: c.sold_date, listing_url: c.listing_url })));
 
   const value = {
     low: fair_low,
@@ -1429,6 +1704,7 @@ export async function handleEvaluateListing(
     n,
     subject_variant: detectVariant(subjectBlob(listing)),
     flags,
+    price_basis: "hammer",
   };
 
   claimsOut.push(
@@ -1497,6 +1773,9 @@ export async function handleEvaluateListing(
       fair_high,
       confidence: value.confidence,
       basis,
+      all_in: allIn,
+      position,
+      trend,
     },
     verdict,
     latency_ms,
@@ -1511,20 +1790,14 @@ export async function handleEvaluateListing(
     red_flags: redFlags,
     matched_asset_id: matchedId,
     excluded_comps: sharedExcluded ?? excluded,
-    listing: {
-      url: listing.url,
-      title: listing.title,
-      ask: listing.asking_price,
-      listing_kind: listing.listing_kind ?? null,
-      current_bid: listing.current_bid ?? null,
-      auction_end_at: listing.auction_end_at ?? null,
-      year: listing.year,
-      make: listing.make,
-      model: listing.model,
-      mileage: listing.mileage,
-      transmission: listing.transmission,
-      photo_count: listing.photo_urls.length,
-    },
+    listing: listingOut(listing),
+    subject_sale: subjectSale
+      ? { ...subjectSale, note: "This listing's own result; not used as evidence for its own value" }
+      : null,
+    field_conflicts: fieldConflicts,
+    all_in: allIn,
+    position,
+    trend,
     latency_ms,
     markdown_summary: markdown,
   });

@@ -103,7 +103,9 @@ export const ADVISOR_TOOLS: AdvisorToolDef[] = [
   {
     name: "evaluate_listing",
     description:
-      "Evaluate a public listing URL: verdict, value range, prior sales/relists of the same car, top comps, and red flags. Prefer this for any 'is this a good buy?' question.",
+      "Evaluate a public listing URL: verdict, value range, prior sales/relists of the same car, top comps, and red flags. Prefer this for any 'is this a good buy?' question. " +
+      "listing.price_kind says what the page price is (sold | high_bid_reserve_not_met | current_bid | ask) with price_basis (hammer = before buyer fee); " +
+      "all_in (price + cited buyer fee + transport + paperwork), position (percentile among the comps shown) and trend (12-month cohort median vs prior 12 months, with n) are cited.",
     inputSchema: {
       type: "object",
       properties: {

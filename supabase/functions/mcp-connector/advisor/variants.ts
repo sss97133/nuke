@@ -6,6 +6,8 @@
 export type VariantKey =
   | "turbo_s"
   | "turbo"
+  | "gt2_rs"
+  | "gt3_rs"
   | "gt2"
   | "gt3"
   | "rs"
@@ -16,6 +18,9 @@ export type VariantKey =
 
 const VARIANT_RULES: Array<{ key: Exclude<VariantKey, "base">; re: RegExp }> = [
   { key: "gunther_werks", re: /gunther\s*werks|g[uü]nther\s*werks/i },
+  // Compound variants before their parents: "GT3 RS" must never read as "GT3".
+  { key: "gt2_rs", re: /\bgt[\s\-]?2[\s\-_]*rs\b/i },
+  { key: "gt3_rs", re: /\bgt[\s\-]?3[\s\-_]*rs\b/i },
   { key: "turbo_s", re: /turbo\s*[\-_]?s\b/i },
   { key: "gt2", re: /\bgt[\s\-]?2\b/i },
   { key: "gt3", re: /\bgt[\s\-]?3\b/i },
@@ -78,7 +83,10 @@ export function detectGeneration(input: {
     !/\b911\b/.test(blob);
   if (!isPorsche || !is911 || otherModel) return null;
   // Explicit generation codes win (e.g. "964 Turbo 3.6", "993 Carrera 4S"). Skip "911" itself.
-  const code = blob.match(/(?:^|[^0-9.])(930|964|993|996|997|991|992)(?![0-9])(?!\s*(?:k\b|mi\b|miles|km))/);
+  // "993-Mile 2019 GT2 RS" and "964 miles" are odometer readings, not generation codes.
+  const code = blob.match(
+    /(?:^|[^0-9.,])(930|964|993|996|997|991|992)(?![0-9,])(?![\s-]*(?:k\b|mi\b|mile|miles|km|kilomet))/,
+  );
   if (code) return code[1] as Porsche911Generation;
   const y = input.year ?? null;
   if (y == null || !Number.isFinite(y)) return null;
@@ -335,4 +343,105 @@ export function identityFromListingUrl(url: string): {
     /* ignore */
   }
   return { year, make, model, title, auction_id };
+}
+
+/**
+ * Specialty markers that must match exactly between subject and comp (T3): RS, GT2, Turbo S,
+ * Weissach, Clubsport, Speedster, Cup. Read only from identity text (title / model / trim / URL),
+ * never from equipment lists ("Cup II wheels" is a wheel, not a Cup car).
+ */
+export type HardVariantTag = "rs" | "gt2" | "turbo_s" | "weissach" | "clubsport" | "speedster" | "cup";
+
+const HARD_TAG_RULES: Array<{ tag: HardVariantTag; re: RegExp }> = [
+  { tag: "rs", re: /(?:^|[^a-z0-9])rs(?![a-z0-9])/i },
+  { tag: "gt2", re: /\bgt[\s\-_]?2\b/i },
+  { tag: "turbo_s", re: /\bturbo[\s\-_]?s\b/i },
+  { tag: "weissach", re: /weissach/i },
+  { tag: "clubsport", re: /club[\s\-_]?sport/i },
+  { tag: "speedster", re: /speedster/i },
+  { tag: "cup", re: /\bcup\b(?![\s\-_]*(?:i{1,3}\b|[123]\b|wheels?|holders?|style|design))/i },
+];
+
+export function hardVariantTags(text: string | null | undefined): Set<HardVariantTag> {
+  const t = String(text || "").replace(/_/g, " ");
+  const out = new Set<HardVariantTag>();
+  for (const r of HARD_TAG_RULES) if (r.re.test(t)) out.add(r.tag);
+  return out;
+}
+
+/** True when subject and candidate differ on any must-match specialty marker. Returns the differing tags. */
+export function hardVariantMismatch(
+  subjectText: string | null | undefined,
+  candidateText: string | null | undefined,
+): HardVariantTag[] {
+  const a = hardVariantTags(subjectText);
+  const b = hardVariantTags(candidateText);
+  const diff: HardVariantTag[] = [];
+  for (const t of a) if (!b.has(t)) diff.push(t);
+  for (const t of b) if (!a.has(t)) diff.push(t);
+  return diff;
+}
+
+/** Model year from a listing URL slug (".../listing/1994-porsche-911-..."), or null. */
+export function yearFromListingUrl(url: string | null | undefined): number | null {
+  if (!url) return null;
+  try {
+    const u = new URL(String(url).startsWith("http") ? String(url) : `https://${url}`);
+    const parts = u.pathname.split("/").filter(Boolean);
+    const slug = parts.find((p) => /^(?:19|20)\d{2}-[a-z]/i.test(p));
+    if (!slug) return null;
+    const y = Number(slug.slice(0, 4));
+    return y >= 1885 && y <= 2100 ? y : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Title words that mark a comp as something other than a complete, comparable car (T3). */
+const JUNK_TITLE_RULES: Array<{ reason: string; re: RegExp }> = [
+  { reason: "bodied", re: /-?\bbodied\b/i },
+  { reason: "replica", re: /\breplica\b|\btribute\b|\brecreation\b/i },
+  { reason: "track_car", re: /\btrack[\s\-_]?car\b/i },
+  { reason: "project", re: /\bproject\b/i },
+  { reason: "parts", re: /\bparts?\b|\bparting[\s\-_]?out\b|\brolling[\s\-_]?chassis\b|\bshell[\s\-_]?only\b|\bbody[\s\-_]?shell\b/i },
+  { reason: "non_vehicle", re: /\bsign\b|\bposter\b|\bbrochure\b|\bmodel[\s\-_]?car\b|\bdiecast\b|\bpedal[\s\-_]?car\b|\bwheels? only\b|\bengine only\b|\bmemorabilia\b|\bautomobilia\b/i },
+];
+
+/**
+ * Why a comp is junk for this subject, or null. A word the subject itself carries is never a reason
+ * (a replica subject may use replica comps). URL year must equal the row year when both exist.
+ */
+export function junkCompReason(input: {
+  title?: string | null;
+  url?: string | null;
+  model?: string | null;
+  rowYear?: number | null;
+  subjectText?: string | null;
+}): string | null {
+  const blob = `${input.title || ""} ${input.model || ""} ${(input.url || "").replace(/[-_]/g, " ")}`;
+  const subj = input.subjectText || "";
+  for (const r of JUNK_TITLE_RULES) {
+    if (r.re.test(blob) && !r.re.test(subj)) return r.reason;
+  }
+  const uy = yearFromListingUrl(input.url);
+  if (uy != null && input.rowYear != null && Number.isFinite(input.rowYear) && uy !== Number(input.rowYear)) {
+    return "url_year_mismatch";
+  }
+  return null;
+}
+
+/** Drop comps priced under `floor` x the cohort median (default 25%): parts or no-sale rows mislabeled as sales. */
+export function lowOutlierCut<T>(rows: T[], price: (r: T) => number | null, floor = 0.25): { kept: T[]; dropped: T[]; median: number | null } {
+  const ps = rows.map(price).filter((n): n is number => typeof n === "number" && n > 0).sort((a, b) => a - b);
+  if (ps.length < 3) return { kept: rows, dropped: [], median: null };
+  const mid = Math.floor(ps.length / 2);
+  const med = ps.length % 2 ? ps[mid]! : (ps[mid - 1]! + ps[mid]!) / 2;
+  const kept: T[] = [];
+  const dropped: T[] = [];
+  for (const r of rows) {
+    const p = price(r);
+    if (p != null && p < floor * med) dropped.push(r);
+    else kept.push(r);
+  }
+  return { kept, dropped, median: med };
 }
