@@ -61,6 +61,8 @@ UPDATE vehicles SET user_id=auth.uid() WHERE id='20000000-0000-4000-8000-0000000
 CREATE TEMP TABLE original_permissions AS SELECT row_to_json(p)::text value FROM vehicle_user_permissions p;
 CREATE TEMP TABLE original_verifications AS SELECT row_to_json(p)::text value FROM ownership_verifications p;
 \ir ../migrations/20261109055301_garage_ownership_requires_evidence.sql
+-- re-applying where it is already live (as Supabase deploy does on merge) must be a no-op, not a guard refusal
+\ir ../migrations/20261109055301_garage_ownership_requires_evidence.sql
 SELECT assert(NOT EXISTS (SELECT value FROM original_permissions EXCEPT SELECT row_to_json(p)::text FROM vehicle_user_permissions p),'permission testimony unchanged');
 SELECT assert(NOT EXISTS (SELECT value FROM original_verifications EXCEPT SELECT row_to_json(p)::text FROM ownership_verifications p),'verification testimony unchanged');
 SELECT assert((SELECT relationship='documenting' FROM get_user_garage(auth.uid()) WHERE vehicle_id='20000000-0000-4000-8000-000000000001'),'photo membership retained as documenting');

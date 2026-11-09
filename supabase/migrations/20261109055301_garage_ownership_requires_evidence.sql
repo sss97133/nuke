@@ -5,16 +5,21 @@ BEGIN;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '5s';
 DO $guard$
-DECLARE actual text; target text; expected text;
+DECLARE actual text; target text; expected text; installed text;
 BEGIN
-  FOR target, expected IN SELECT * FROM (VALUES
-    ('get_user_garage(uuid)', '48224a341e1b1480c78a0aa3bf0321f02eade15cec594f9b9ac0eef3e65d9caa'),
-    ('enforce_user_vehicle_evidence()', 'f5753f64a5242154c20b133f49d7abe316e9309e2feeb88cfe5b7aebeeabca2d'),
-    ('auto_grant_owner_on_verification()', '4035ffb29fcb5443bb1276980e2a0d46ef5abe9ddb430340f92f153c080f134e')
-  ) AS reviewed(target, expected) LOOP
+  -- Each target accepts the reviewed pre-repair body or the body this migration itself installs, so re-applying
+  -- it where it is already live (production, applied 2026-11-09 before this file merged) is a no-op instead of a refusal.
+  FOR target, expected, installed IN SELECT * FROM (VALUES
+    ('get_user_garage(uuid)', '48224a341e1b1480c78a0aa3bf0321f02eade15cec594f9b9ac0eef3e65d9caa',
+       '301cc092178df8297b274a4304ae5ee9cef52117cbc01cba07003979464ae97f'),
+    ('enforce_user_vehicle_evidence()', 'f5753f64a5242154c20b133f49d7abe316e9309e2feeb88cfe5b7aebeeabca2d',
+       'f4acccdb8d20488b32a211e682595d5126f80a99bdadce8312b9289b8f2dc800'),
+    ('auto_grant_owner_on_verification()', '4035ffb29fcb5443bb1276980e2a0d46ef5abe9ddb430340f92f153c080f134e',
+       '0e83b572e4b3a380538ade5444e9bb8fd69215ddb5533cbb8c5c0e0159dedd89')
+  ) AS reviewed(target, expected, installed) LOOP
     SELECT encode(sha256(convert_to(prosrc,'UTF8')),'hex') INTO actual
     FROM pg_proc WHERE oid=to_regprocedure('public.' || target);
-    IF actual IS DISTINCT FROM expected THEN
+    IF actual IS DISTINCT FROM expected AND actual IS DISTINCT FROM installed THEN
       RAISE EXCEPTION 'ownership repair refuses unreviewed definition: % (%)', target, actual;
     END IF;
   END LOOP;

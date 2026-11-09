@@ -126,6 +126,9 @@ SELECT assert(rel('5')='owner','reproduce: uncited legal_title period shown as o
 
 \ir ../migrations/20261109055301_garage_ownership_requires_evidence.sql
 \ir ../migrations/20261109070000_rederive_ownership_roles.sql
+-- both are re-applied on merge against a database where they are already live; the second pass must be a no-op
+\ir ../migrations/20261109055301_garage_ownership_requires_evidence.sql
+\ir ../migrations/20261109070000_rederive_ownership_roles.sql
 
 -- the negative case is not owner through the API reader, and cannot be made owner through the write path
 SELECT assert(rel('3') IS DISTINCT FROM 'owner','custody + consignment + receipts + photos + expired title is not owner');
