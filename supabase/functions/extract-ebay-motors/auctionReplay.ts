@@ -86,12 +86,14 @@ export function auctionReplayStore(sb: any): ReplayStore {
       const handles = await handleHashes(JSON.stringify(page.items));
       // tombstoneItem also checks explicit usernames outside its text-pattern
       // grammar (for example one-character handles); preserve that coverage.
-      const known = new Set(handles.byHash.values());
+      const known = new Map([...handles.byHash].map(([hash, name]) => [name, hash]));
       const memberHashes = new Set(handles.member);
       for (const item of page.items) if (item.seller?.username && !known.has(String(item.seller.username).toLowerCase())) {
-        memberHashes.add(await handleHash(String(item.seller.username)));
-        known.add(String(item.seller.username).toLowerCase());
+        const name = String(item.seller.username).toLowerCase();
+        const hash = await handleHash(name);
+        memberHashes.add(hash); known.set(name, hash);
       }
+      if (memberHashes.size > 1000) throw Error("auction page exceeds deleted-member lookup bound");
       const gone = await deletedLookup(bounded)([...memberHashes]);
       const lookup = async (keys: string[]) => new Set(keys.filter(k => gone.has(k)));
       // The complete item set was checked above. With no deleted handles, each
@@ -103,12 +105,18 @@ export function auctionReplayStore(sb: any): ReplayStore {
       const body = JSON.stringify({ page_read_at: page.readAt, read_method: page.method, response });
       if (new TextEncoder().encode(body).length > MAX_BYTES) throw Error("auction replay page exceeds retention byte cap");
       const remainingHandles = await handleHashes(body);
+      const remainingMembers = new Set(remainingHandles.member), remainingSellers = new Set(remainingHandles.seller);
+      for (const item of items) if (item.seller?.username) {
+        const name = String(item.seller.username).toLowerCase();
+        const hash = known.get(name) ?? await handleHash(name);
+        remainingMembers.add(hash); remainingSellers.add(hash);
+      }
       const pageUrl = new URL(page.url);
       pageUrl.searchParams.sort();
       const receipt = await retainFetchedCapture(bounded, { platform: "ebay_motors", url: pageUrl.href,
         html: body, httpStatus: 200, fetchedAt: page.readAt,
         metadata: { capture_kind: "auction_replay_page", representation: "native_json_with_capture_clock",
-          member_handles_sha256: remainingHandles.member, seller_handles_sha256: remainingHandles.seller } });
+          member_handles_sha256: [...remainingMembers].sort(), seller_handles_sha256: [...remainingSellers].sort() } });
       if ("reason" in receipt) throw Error(`auction page retention ${receipt.status}: ${receipt.reason}`);
       if (Date.parse(receipt.fetched_at) !== Date.parse(page.readAt)) throw Error("auction page capture clock mismatch");
       return candidates.map(c => {

@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { handleHash } from "./deletedMembers.ts";
 import { auctionReplayStore, decodeReplay, mergeReplay, MAX_REPLAY, type ReplayEntry, type AuctionRead } from "./auctionReplay.ts";
 
 const id = "00000000-0000-4000-8000-000000000001";
@@ -91,6 +92,19 @@ Deno.test("batch fast path preserves explicit seller deletion outside handle reg
   const native = { ...page, items: [special], response: { ...page.response, itemSummaries: [special] } };
   const retained = await store.retain(native, [candidate], deadline);
   assert.deepEqual((await store.summary(retained[0], deadline)).seller, {});
+});
+
+Deno.test("unrecognized nondeleted seller retains future deletion hashes; lookup overflow fails closed", async () => {
+  const f = database(), store = auctionReplayStore(f.db), deadline = Date.now() + 5000;
+  const special = { ...item, seller: { username: "x" } };
+  await store.retain({ ...page, items: [special], response: { ...page.response, itemSummaries: [special] } }, [candidate], deadline);
+  const hash = await handleHash("x");
+  assert.ok(f.stored().metadata.member_handles_sha256.includes(hash));
+  assert.ok(f.stored().metadata.seller_handles_sha256.includes(hash));
+  const crowded = { ...item, description: Array.from({ length: 1001 }, (_, n) => `https://ebay.com/usr/member${n}`).join(" ") };
+  const before = f.mutations.length;
+  await assert.rejects(() => store.retain({ ...page, items: [crowded], response: { itemSummaries: [crowded] } }, [candidate], deadline), /lookup bound/);
+  assert.equal(f.mutations.length, before);
 });
 
 Deno.test("archive failure, changed bytes, source-clock and byte limits refuse replay", async () => {
