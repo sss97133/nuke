@@ -614,6 +614,7 @@ export interface LiveSession {
 }
 
 export interface AuctionPulse {
+  currency_code?: string | null;
   /** Source-feed receipt clock; never the generic database updated_at. */
   source_observed_at?: string | null;
   platform: string;

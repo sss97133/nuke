@@ -29,6 +29,26 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 async function render() { await act(async () => root.render(<ExternalListingCard vehicleId={vehicleId} />)); }
 
+it('shows the retained source-read clock and observation without claiming an individual bid time', async () => {
+  fixture.rows = [listing({ event_status: 'active', current_price: 15000, currency_code: 'AUD', bid_count: 31,
+    watcher_count: 0, view_count: 0, metadata: { capture_kind: 'auction_bid_snapshot',
+      source_observed_at: '2026-11-09T01:06:03.523Z', auction_observation_id: '1d32679c-e1e5-46a0-a397-b10c3cf42340' } })];
+  await render();
+  expect(container.textContent).toContain('A$15,000');
+  expect(container.textContent).toContain('Source read: 2026-11-09T01:06:03.523Z');
+  expect(container.textContent).toContain('Auction snapshot, not an individual bid time');
+  expect(container.textContent).toContain('WatchersUnrecorded');
+  expect(container.textContent).toContain('ViewsUnrecorded');
+  expect(container.querySelector('a[href$="/observation/1d32679c-e1e5-46a0-a397-b10c3cf42340"]')).not.toBeNull();
+});
+
+it.each(['invalid', '2999-01-01T00:00:00Z', undefined])('never replaces unknown source time with row or end clocks (%s)', async source_observed_at => {
+  fixture.rows = [listing({ event_status: 'active', updated_at: '2026-11-09T02:00:00Z', metadata: { source_observed_at } })];
+  await render();
+  expect(container.textContent).toContain('Source read: Unrecorded');
+  expect(container.textContent).not.toContain('2026-11-09T02:00:00');
+});
+
 it.each(['pending', 'upcoming', 'scheduled'])('shows a %s lot on its source run day, without a completed or invented time', async event_status => {
   fixture.rows = [listing({ event_status })];
   await render();
