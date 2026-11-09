@@ -14,7 +14,7 @@ import { readCachedSession } from '../../utils/cachedSession';
 import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useViewHistory } from '../../hooks/useViewHistory';
-import { auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
+import { auctionSourceUrlVariants, auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult, type TimelineReadState } from './loadVehicleData';
 import { resolveVehicleImages } from './resolveVehicleImages';
 import { isVerifiedOwnerOf } from './ownerStatus';
@@ -703,6 +703,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       const { data } = await supabase
         .from('vehicle_events')
         .select('source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+        .is('duplicate_of_event_id', null)
         .eq('vehicle_id', vehicleIdForFilter)
         .order('updated_at', { ascending: false })
         .limit(20);
@@ -733,6 +734,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         const result = await supabase
           .from('vehicle_events')
           .select('source_platform, source_url, event_type, event_status, ended_at, current_price, currency_code, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .is('duplicate_of_event_id', null)
           .eq('vehicle_id', vehicle!.id)
           .eq('source_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })
@@ -758,13 +760,13 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         try {
           const [cCount, lastBid, lastComment, lastSeller] = await Promise.all([
             commentCount === null
-              ? supabase.from('auction_comments').select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl).or('bid_amount.is.null,comment_type.neq.bid')
+              ? supabase.from('auction_comments').select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).in('source_url', auctionSourceUrlVariants(listingUrl)).or('bid_amount.is.null,comment_type.neq.bid')
               : Promise.resolve({ count: commentCount } as any),
-            supabase.from('auction_comments').select('posted_at, author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
+            supabase.from('auction_comments').select('posted_at, author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).in('source_url', auctionSourceUrlVariants(listingUrl))
               .not('bid_amount', 'is', null).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
+            supabase.from('auction_comments').select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).in('source_url', auctionSourceUrlVariants(listingUrl))
               .or('bid_amount.is.null,comment_type.neq.bid').order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
+            supabase.from('auction_comments').select('author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).in('source_url', auctionSourceUrlVariants(listingUrl))
               .eq('is_seller', true).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
           ]);
 
@@ -900,6 +902,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             const { data: listings } = await supabase
               .from('vehicle_events')
               .select('metadata')
+              .is('duplicate_of_event_id', null)
               .eq('vehicle_id', vehicle.id)
               .eq('source_url', listingUrl)
               .order('updated_at', { ascending: false })
