@@ -4,7 +4,7 @@ import { decodeVin } from "./vin-decoder.ts";
 const vin = (wmi: string) => wmi + "ZZZZZ0X0000000";
 Deno.test("Toyota manufacture preserves Lexus marque and multi-marque WMI uncertainty", () => {
   // Both actual retained McCormick VINs decode cleanly to Lexus in NHTSA vPIC.
-  for (const value of ["JTHFN48Y320004994", "JTHFN48Y640051813", vin("JTJ")]) {
+  for (const value of ["JTHFN48Y320004994", "JTHFN48Y640051813", "JT8CH32Y0X1002070", vin("JTJ")]) {
     assertEquals(decodeVin(value).make, "Lexus");
     assertEquals(decodeVin(value).manufacturer, "TOYOTA MOTOR CORPORATION");
   }
@@ -14,6 +14,14 @@ Deno.test("Toyota manufacture preserves Lexus marque and multi-marque WMI uncert
   assertEquals(decodeVin(vin("JTM")).make, null);
   assertEquals(decodeVin(vin("JTM")).manufacturer_make_candidates, ["Toyota", "Subaru"]);
   assertEquals(decodeVin(vin("JTZ")).make, null);
+});
+Deno.test("1H alone does not establish Honda while specific truck manufacturer stays multi-marque", () => {
+  assertEquals(decodeVin("1HGCM82633A004352").make, "Honda");
+  const decoded = decodeVin("1HTSCAAM8SH264534");
+  assertEquals(decoded.make, null);
+  assertEquals(decoded.manufacturer, "INTERNATIONAL MOTORS, LLC");
+  assertEquals(decoded.manufacturer_make_candidates, ["Chevrolet", "Navistar", "Caterpillar", "IC Bus", "Workhorse", "International", "GM"]);
+  assertEquals(decodeVin(vin("1HZ")).make, null);
 });
 Deno.test("NHTSA-supported Canadian Pontiac WMI is distinct from Chevrolet", () => {
   assertEquals(decodeVin(vin("2G2")).make, "Pontiac");
