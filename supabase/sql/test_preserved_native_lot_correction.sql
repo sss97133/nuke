@@ -261,6 +261,6 @@ $function$;
 
 \ir ../migrations/20261109031652_preserved_native_lot_correction.sql
 \ir ../migrations/20261109031652_preserved_native_lot_correction.sql
-\ir test_preserved_native_lot_correction_cases.sql
+\ir preserved_native_lot_correction_cases.sql
 
 
