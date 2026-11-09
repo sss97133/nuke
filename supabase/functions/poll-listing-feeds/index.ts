@@ -60,7 +60,7 @@ import { splitByYear } from "./yearFilter.ts";
 import { nextYield } from "./schedule.ts";
 import { pollPurplewave } from "./purplewave.ts";
 import { CC_LISTING_METHOD, CC_OBSERVATION_COLUMNS, collectingCarsReceipt, collectingCarsAdmissionMatches,
-  prepareCollectingCarsLedger, readCollectingCarsInventory, type CollectingCarsReceipt } from "./collectingCars.ts";
+  prepareCollectingCarsLedger, planCollectingCarsIngests, collectingCarsCaptureInterval, readCollectingCarsInventory, type CollectingCarsReceipt } from "./collectingCars.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -928,6 +928,7 @@ async function pollFirecrawlHtmlFeed(
     // backoff and terminal native rejections remain with the ordinary planner.
     urls.sort((a, b) => Number(proved.has(a)) - Number(proved.has(b)) || (proved.get(a) ?? 0) - (proved.get(b) ?? 0));
   }
+  const ccRefreshes = new Map<string, number>();
   if (nativeCc) {
     // Board-created shells do not prove full native listing capture. Validate the
     // retained admission receipt before skipping a URL; leave failed backoff intact.
@@ -940,11 +941,13 @@ async function pollFirecrawlHtmlFeed(
       if (read.error || !Array.isArray(read.data)) return await failFeed("retained_listing_admission_lookup_failed");
       for (const row of read.data) admitted.set(row.id, row);
     }
-    const proved = prepareCollectingCarsLedger(urls, ledgerRows, nativeLedger, admitted, nativeSourceId!, feed.poll_interval_minutes);
+    const proved = prepareCollectingCarsLedger(urls, ledgerRows, nativeLedger, admitted, nativeSourceId!, collectingCarsCaptureInterval(feed.search_criteria), Date.now(), ccRefreshes);
     result.retained_inventory = { ...result.retained_inventory, eligible_after_year_filter: urls.length, current_full_listing_receipts: proved.size };
   }
-  // New URLs first, then failed ones whose retry is due; the cap applies to both.
-  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
+  // CC reserves the first slot for a due retry and keeps uncaptured lots ahead of refreshes.
+  const plan = nativeCc
+    ? planCollectingCarsIngests(urls, ledgerRows, ccRefreshes, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation))
+    : planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
     feed.source_slug === "craigslist" ? { ...CRAIGSLIST_REVISIT, max: Math.min(CRAIGSLIST_REVISIT.max, budget.revisitAllowance()) } : null);
   budget.spendRevisits(plan.revisits ?? 0);
   result.matched_existing = nativeCc
