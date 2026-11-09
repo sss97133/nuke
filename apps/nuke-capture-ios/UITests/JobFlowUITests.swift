@@ -29,6 +29,14 @@ final class JobFlowUITests: XCTestCase {
 
     // MARK: Helpers
 
+    private func diagnose(_ app: XCUIApplication) {
+        // The CI log filter retains error lines. Keep the failing UI tree visible there.
+        for line in app.debugDescription.split(separator: "\n") { print("error: UI diagnostic: \(line)") }
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     private func launch(_ persona: String, scenario: String, _ env: [String: String]) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-NukeFixtureBackend", "1", "-NukeFixturePersona", persona]
@@ -58,7 +66,8 @@ final class JobFlowUITests: XCTestCase {
 
     /// Scrolls until the element is on screen (lists render lazily).
     @discardableResult
-    private func reveal(_ el: XCUIElement, in app: XCUIApplication, up: Bool = true, tries: Int = 14, keyboardAware: Bool = false) -> XCUIElement {
+    private func reveal(_ el: XCUIElement, in app: XCUIApplication, up: Bool = true, tries: Int = 14, formIdentifier: String? = nil) -> XCUIElement {
+        let keyboardAware = formIdentifier != nil
         func reachable() -> Bool {
             guard el.exists && el.isHittable else { return false }
             let keyboard = app.keyboards.firstMatch
@@ -68,15 +77,22 @@ final class JobFlowUITests: XCTestCase {
             // App-wide swipes start in the keyboard on a short visible form.
             // Drag the form's inset gutter above the keyboard instead.
             let keyboard = app.keyboards.firstMatch
-            if keyboardAware, keyboard.exists {
-                guard let form = app.collectionViews.allElementsBoundByIndex.last(where: { $0.isHittable }) else {
-                    XCTFail("no foreground form above keyboard"); return
+            if let formIdentifier, keyboard.exists {
+                // The collection container is not itself hittable on newer iOS,
+                // even with visible, editable children. Identify the intended form.
+                let form = app.descendants(matching: .any)[formIdentifier].firstMatch
+                guard form.waitForExistence(timeout: 5) else {
+                    diagnose(app)
+                    XCTFail("foreground form missing: \(formIdentifier)"); return
                 }
                 let frame = form.frame
                 let navigation = app.navigationBars.firstMatch
                 let visibleTop = max(frame.minY, navigation.exists ? navigation.frame.maxY : frame.minY)
                 let visibleBottom = min(frame.maxY, keyboard.frame.minY)
-                guard visibleBottom > visibleTop else { XCTFail("no visible form area above keyboard"); return }
+                guard visibleBottom > visibleTop else {
+                    diagnose(app)
+                    XCTFail("no visible form area above keyboard"); return
+                }
                 let height = visibleBottom - visibleTop
                 let gutterX = frame.minX + frame.width * 0.05
                 let origin = app.coordinate(withNormalizedOffset: .zero)
@@ -97,18 +113,15 @@ final class JobFlowUITests: XCTestCase {
             n += 1
         }
         if !(keyboardAware ? reachable() : el.exists) {
-            print(app.debugDescription)
-            let screenshot = XCTAttachment(screenshot: app.screenshot())
-            screenshot.lifetime = .keepAlways
-            add(screenshot)
+            diagnose(app)
         }
         XCTAssertTrue(keyboardAware ? reachable() : el.exists, "not reachable: \(el)")
         return el
     }
 
-    private func tapConfirm(_ app: XCUIApplication, _ id: String = "sign.confirm", keyboardAware: Bool = false) {
+    private func tapConfirm(_ app: XCUIApplication, _ id: String = "sign.confirm", formIdentifier: String? = nil) {
         let b = app.buttons[id].firstMatch
-        reveal(b, in: app, keyboardAware: keyboardAware).tap()
+        reveal(b, in: app, formIdentifier: formIdentifier).tap()
     }
 
     private func dismissSheet(_ app: XCUIApplication) {
@@ -175,7 +188,7 @@ final class JobFlowUITests: XCTestCase {
         XCTAssertTrue(post.waitForExistence(timeout: 10))
         post.tap()
         type(app, into: "Describe the work in your own words", "Replace the front brake pads. Bleed the lines.", identifier: "postjob.description")
-        reveal(app.buttons["postjob.post"], in: app, keyboardAware: true).tap()
+        reveal(app.buttons["postjob.post"], in: app, formIdentifier: "postjob.form").tap()
         let confirm = app.alerts["Post this job?"].buttons["Post the job"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "no explicit confirm before posting")
         XCTAssertTrue(writes(app).isEmpty, "nothing may be written before the explicit confirm")
@@ -216,7 +229,7 @@ final class JobFlowUITests: XCTestCase {
         reveal(app.buttons["Make an offer"].firstMatch, in: app).tap()
         XCTAssertTrue(app.navigationBars["Make an offer"].waitForExistence(timeout: 6), "the offer sheet didn't open")
         type(app, into: "Amount", "450")
-        tapConfirm(app, keyboardAware: true)
+        tapConfirm(app, formIdentifier: "offer.form")
         waitForWrite(app, "offer_on_requirement")
         let sent = app.staticTexts["Offer sent"].waitForExistence(timeout: 8)
         if !sent { print(app.debugDescription) }
@@ -276,15 +289,8 @@ final class JobFlowUITests: XCTestCase {
         // Keyboard expansion changes the sheet detent. Scroll the form's margin,
         // rather than the nested TextEditor or the provider page behind it.
         let send = app.buttons["contact.send"].firstMatch
-        XCTAssertTrue(send.waitForExistence(timeout: 10), "contact composer did not finish keyboard layout")
-        XCTAssertGreaterThan(app.collectionViews.count, 0)
-        let form = app.collectionViews.element(boundBy: app.collectionViews.count - 1)
-        for _ in 0..<3 where !send.isHittable {
-            form.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.5))
-                .press(forDuration: 0.1, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.2)))
-        }
-        XCTAssertTrue(send.isHittable, "contact Send row stayed behind the keyboard")
-        send.tap()
+        reveal(send, in: app, formIdentifier: "contact.form").tap()
+        waitForWrite(app, "request_contact")
         XCTAssertTrue(app.staticTexts["Sent"].waitForExistence(timeout: 8))
         dismissSheet(app)
         let args = call(app, "request_contact")
