@@ -48,7 +48,9 @@ def main():
     summary = {"works": len(works), "proposals": len(proposals), "photos": sum(len(p["photos"]) for p in proposals), "by_kind": by_kind,
                "multi_day": sum(1 for p in proposals if (p.get("sittings") or 1) > 1)}
     if a.dry_run:
-        print(json.dumps({**summary, "sample": proposals[:1]}, indent=1, default=str)); return
+        # The receipt names counts and the first work's key and kind; photo coordinates and places stay in the file, not in a log.
+        first = proposals[0] if proposals else None
+        print(json.dumps({**summary, "first": {"proposal_key": first["proposal_key"], "kind": first["kind"], "photos": len(first["photos"]), "sittings": first.get("sittings")} if first else None}, indent=1, default=str)); return
     base = os.environ.get("SUPABASE_URL", "").rstrip("/"); key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
     if not base or not key:
         sys.exit("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required (run under dotenvx)")
