@@ -13,7 +13,7 @@ CREATE SCHEMA IF NOT EXISTS auth;
 CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.role', true), '') $$;
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY, user_id uuid, owner_id uuid);
 CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY, vehicle_id uuid, taken_at timestamptz, is_duplicate boolean, is_superseded boolean,
-  is_sensitive boolean, vision_gate_status text, vehicle_zone text, apple_ml_labels text[], ai_scan_metadata jsonb, work_session_id uuid);
+  is_sensitive boolean, vision_gate_status text, vehicle_zone text, apple_ml_labels text[], ai_scan_metadata jsonb, work_session_id uuid, is_document boolean);
 CREATE TABLE public.work_sessions(id uuid PRIMARY KEY, vehicle_id uuid, session_date date);
 CREATE TABLE public.timeline_events(id uuid PRIMARY KEY, vehicle_id uuid, event_date date);
 CREATE TABLE public.receipts(id uuid PRIMARY KEY, user_id uuid, vendor_name text, document_kind text, receipt_date date,
@@ -129,10 +129,23 @@ BEGIN
   ASSERT r.conclusion = 'no_zone_photo_after_purchase', 'dash photo before purchase is not cited: ' || r.conclusion;
   SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.receipt_id = '00000000-0000-0000-0000-0000000000c3';
   ASSERT r.item_id IS NULL AND r.line_kind = 'receipt' AND r.conclusion = 'receipt_day_unphotographed', r.conclusion;
+  -- a product screenshot and a document frame on the receipt day are not work photos
+  INSERT INTO vehicle_images(id, vehicle_id, taken_at, is_duplicate, is_superseded, is_sensitive, vision_gate_status, ai_scan_metadata, is_document) VALUES
+    ('00000000-0000-0000-0000-0000000000f8', V, '2025-03-01 15:00Z', false, false, false, 'approved', '{"byok_deep_analysis":{"scene_type":"product_screenshot"}}', false),
+    ('00000000-0000-0000-0000-0000000000f9', V, '2025-03-01 15:00Z', false, false, false, 'approved', '{"classification":{"v2":{"angle":{"value":"exterior_front"}}}}', true);
+  SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.receipt_id = '00000000-0000-0000-0000-0000000000c3';
+  ASSERT r.conclusion = 'receipt_day_unphotographed', 'screenshot/document counted as a work photo: ' || r.conclusion;
+  -- a receipt linked by photo chronology gets no confidence credit for those same photos
+  INSERT INTO receipts VALUES ('00000000-0000-0000-0000-0000000000c4', U, 'Parts store', 'parts_service', '2025-02-01', false, NULL);
+  INSERT INTO receipt_vehicle_links VALUES
+    ('00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000c4', V, U, 'linked', 'chronology_session', 0.6, '2025-02-01', 'printed', NULL);
+  SELECT * INTO r FROM receipt_work_lines(V) x WHERE x.receipt_id = '00000000-0000-0000-0000-0000000000c4';
+  ASSERT r.conclusion = 'receipt_day_photographed' AND r.confidence = 0.18, r.conclusion || ' ' || r.confidence;
   -- privacy: no excluded frame anywhere
   SELECT count(*) INTO n FROM receipt_work_lines(V) x, unnest(x.image_ids) i
-   WHERE i IN ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000f5');
-  ASSERT n = 0, 'personal/sensitive/duplicate frame cited';
+   WHERE i IN ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000f5',
+               '00000000-0000-0000-0000-0000000000f8', '00000000-0000-0000-0000-0000000000f9');
+  ASSERT n = 0, 'personal/sensitive/duplicate/screenshot/document frame cited';
 
   -- evidence kind accepted
   INSERT INTO garage_derivation_evidence(kind) VALUES ('receipt_work_correlation');

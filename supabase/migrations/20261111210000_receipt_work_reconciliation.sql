@@ -162,6 +162,9 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
      WHERE x.vehicle_id = p_vehicle_id AND x.taken_at IS NOT NULL
        AND x.vision_gate_status = 'approved'                       -- personal / misattributed frames never cited
        AND x.is_sensitive IS NOT TRUE AND x.is_duplicate IS NOT TRUE AND x.is_superseded IS NOT TRUE
+       -- screenshots, reference pictures and paperwork are not photos of the work on this vehicle
+       AND x.is_document IS NOT TRUE
+       AND coalesce(x.ai_scan_metadata #>> '{byok_deep_analysis,scene_type}', '') NOT IN ('product_screenshot', 'cross_reference', 'receipt_document', 'hand_drawn_diagram')
   ),
   zl AS (
     SELECT ln.link_id, ln.item_id,
@@ -211,7 +214,9 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
            WHEN 'work_day_photographed' THEN 0.7 WHEN 'work_day_unphotographed' THEN 0.6
            WHEN 'receipt_day_photographed' THEN 0.6 WHEN 'receipt_day_unphotographed' THEN 0.6
            WHEN 'no_zone_photo_after_purchase' THEN 0.6 WHEN 'part_zone_unknown' THEN 0.5
-           WHEN 'not_work_evidence' THEN 0.9 ELSE 0.5 END)), 3),
+           WHEN 'not_work_evidence' THEN 0.9 ELSE 0.5 END
+           -- a link made from same-day photos (chronology_session) is not independent of a same-day-photo conclusion
+           * CASE WHEN s.basis = 'chronology_session' AND s.concl IN ('receipt_day_photographed', 'work_day_photographed') THEN 0.5 ELSE 1 END)), 3),
          CASE WHEN s.first_day IS NOT NULL THEN s.first_day - s.anchor END,
          s.total, s.in_window, s.first_day, coalesce(s.cite_ids, '{}'), s.day_n,
          coalesce((SELECT array_agg(w.id ORDER BY w.session_date) FROM work_sessions w WHERE w.vehicle_id = p_vehicle_id
