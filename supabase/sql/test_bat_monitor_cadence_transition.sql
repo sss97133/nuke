@@ -21,8 +21,11 @@ SELECT pg_temp.seed_cadence('daily-to-six',interval '40 hours',interval '10 hour
 SELECT pg_temp.seed_cadence('six-to-hour',interval '8 hours',interval '2 hours',360);
 SELECT public.bat_live_pull_run(NULL,true);
 SELECT pg_temp.ok('old scheduler leaves both transitioned lots unread',(SELECT count(*)=0 FROM net.calls));
+SET statement_timeout='3s';
+SET lock_timeout='1s';
 \ir ../migrations/20261109003500_bat_current_cadence_eligibility.sql
 \ir ../migrations/20261109003500_bat_current_cadence_eligibility.sql
+SELECT pg_temp.ok('migration restores stricter caller budgets',current_setting('statement_timeout')='3s' AND current_setting('lock_timeout')='1s');
 SELECT public.bat_live_pull_run(NULL,true);
 SELECT pg_temp.ok('actual scheduler dispatches both current-cadence transitions',(SELECT count(*)=2 FROM net.calls));
 SELECT pg_temp.ok('new schedules use existing current cadence',(SELECT bool_and(poll_interval_ms=CASE external_auction_id WHEN 'daily-to-six' THEN 21600000 ELSE 3600000 END) FROM monitored_auctions));

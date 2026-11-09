@@ -1,6 +1,16 @@
 -- A successful daily read must become eligible when its lot enters the existing
 -- six-hour/hourly cadence. Keep slots, pause, sessions, in-flight and retry rules.
 -- Change only the due predicate in the deployed body, preserving later repairs.
+SELECT current_setting('statement_timeout') AS statement_timeout,
+       current_setting('lock_timeout') AS lock_timeout \gset bat_cadence_prior_
+SELECT set_config('statement_timeout',
+  CASE WHEN current_setting('statement_timeout')::interval = interval '0'
+    OR current_setting('statement_timeout')::interval > interval '10 seconds'
+    THEN '10s' ELSE current_setting('statement_timeout') END, false);
+SELECT set_config('lock_timeout',
+  CASE WHEN current_setting('lock_timeout')::interval = interval '0'
+    OR current_setting('lock_timeout')::interval > interval '2 seconds'
+    THEN '2s' ELSE current_setting('lock_timeout') END, false);
 DO $repair$
 DECLARE
   body text := pg_get_functiondef('public.bat_live_pull_run(integer,boolean)'::regprocedure);
@@ -28,3 +38,5 @@ BEGIN
   EXECUTE replace(body,anchor,replacement);
 END;
 $repair$;
+SET statement_timeout = :'bat_cadence_prior_statement_timeout';
+SET lock_timeout = :'bat_cadence_prior_lock_timeout';
