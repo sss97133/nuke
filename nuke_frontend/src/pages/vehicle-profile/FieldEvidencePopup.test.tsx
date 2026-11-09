@@ -39,6 +39,27 @@ it('opens a cited object and quotation immediately without claim drawers or scor
   expect(html).not.toContain('Stored score');
   expect(html).not.toContain('system update');
 });
+it('opens an appearance witness directly but never attaches its reading to replacement bytes', () => {
+  fixture.provenance.data.observations = [];
+  fixture.provenance.data.image_observations = [{ observation_id: 'appearance-reading', image_id: 'appearance-image',
+    image_url: 'https://example.test/reviewed.jpg', source_url: 'https://example.test/reviewed.jpg',
+    value: 'Sport-style', image_region: { label: 'Visible exterior treatment' },
+    limitation: 'Factory trim is not established by this photograph.' }];
+  fixture.inventory.data.images = [{ id: 'appearance-image', image_url: 'https://example.test/reviewed.jpg' }];
+  const view = () => renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="appearance" label="Appearance" value="Sport-style" presentation="citations" />);
+  const current = view();
+  expect(current).toContain('reviewed.jpg'); expect(current).toContain('Visible exterior treatment');
+  expect(current).not.toContain('<details'); expect(current).not.toContain('CLAIM RECORDS');
+  fixture.inventory.data.images[0].image_url = 'https://example.test/replacement.jpg';
+  fixture.provenance.data.image_observations[0].image_url = 'https://example.test/replacement.jpg';
+  const replaced = view();
+  expect(replaced).not.toContain('<img'); expect(replaced).not.toContain('Visible exterior treatment');
+  expect(replaced).toContain('Current image citation unavailable');
+  expect(replaced).toContain('/vehicle/local-vehicle/observation/appearance-reading');
+  fixture.inventory.isLoading = true;
+  expect(view()).toContain('Reading sources');
+  expect(view()).not.toContain('Current image citation unavailable');
+});
 it('preserves denied and refused source responses in the citation presentation', () => {
   fixture.claims.evidence.vin = { sources: [{ id: 'retained-claim', field_value: 'WITHHELD-CLAIM', source_type: 'manual_review', source_image_id: 'retained-image' }] };
   fixture.inventory.data.images = [{ id: 'retained-image', image_url: 'https://example.test/withheld.jpg' }];

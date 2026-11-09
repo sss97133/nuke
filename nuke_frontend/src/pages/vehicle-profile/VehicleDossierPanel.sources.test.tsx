@@ -135,6 +135,33 @@ it('preserves missing units on the legacy mileage fallback', async () => {
   expect(row.textContent).not.toContain('miles shown');
 });
 
+it('shows a replica appearance source without reasserting retained trim or its derived binding', async () => {
+  const stored = record();
+  Object.assign(stored.retained_record.attributes.trim, { value: 'SPORT', value_status: 'retained_record_value' });
+  (stored.retained_record.property_bindings as unknown[]).push({ property_key: 'trim_name', origin_column: 'trim',
+    value: 'SPORT deluxe', unit: null, record_columns_disagree: false });
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page([]) : stored)) }));
+  state.provenance.set('appearance', physical('appearance', 'Sport-style', 'Visible exterior treatment; factory trim is not established.'));
+  const inspect = vi.fn();
+  const renderReplica = () => act(async () => root.render(<MemoryRouter><StructuredProfileData vehicleId={VEHICLE}
+    isReplica onInspect={inspect} /></MemoryRouter>));
+  await renderReplica();
+  expect(host.querySelector('[data-record-field="trim"]')).toBeNull();
+  expect(host.textContent).not.toContain('SPORT');
+  const row = host.querySelector('[data-record-field="appearance"]')!;
+  expect(row.textContent).toContain('Sport-style');
+  expect(row.textContent).toContain('factory trim is not established');
+  await act(async () => (row.querySelector('button') as HTMLButtonElement).click());
+  expect(inspect).toHaveBeenLastCalledWith('appearance', 'Appearance', 'Sport-style');
+  // Withdrawing the image must not resurrect the known replica trim.
+  state.provenance.set('appearance', { ...physical('appearance', 'Sport-style', 'Exterior only.'), image_observations: [] });
+  await renderReplica();
+  expect(host.querySelector('[data-record-field="appearance"]')).toBeNull();
+  expect(host.textContent).not.toContain('SPORT');
+  await render();
+  expect(host.querySelector('[data-record-field="trim"]')!.textContent).toContain('SPORT');
+});
+
 function physical(field: keyof typeof PHYSICAL_READING_ROLES, value: string, limitation: string) {
   const image = '40000000-0000-4000-8000-000000000001';
   return { vehicle_id: VEHICLE, field, value: null, evidence: [], observations: [], image_observations: [{

@@ -60,7 +60,8 @@ function PhysicalRecordedValue({ vehicleId, field, label, fallback, fallbackNote
 
 /** Read every stored field first, then admitted claims from the same owner.
  * A slow or failed source read must not hide the structured stored record. */
-export const StructuredProfileData: React.FC<{ vehicleId: string; onInspect?: (field: string, label: string, value: string) => void }> = ({ vehicleId, onInspect }) => {
+export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: boolean | null;
+  onInspect?: (field: string, label: string, value: string) => void }> = ({ vehicleId, isReplica, onInspect }) => {
   const [read, setRead] = useState<StructuredRead>(
     { id: vehicleId, status: 'loading', claims: [] });
   const generation = React.useRef(0);
@@ -145,6 +146,9 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; onInspect?: (f
           <thead><tr><th scope="col">Field</th><th scope="col">Recorded value</th></tr></thead>
           <tbody>{RECORD_FIELDS.map(key => {
             const a = current.attributes![key];
+            // A replica's retained trim can name the car it resembles. It cannot
+            // establish factory identity, even after the old claim is retired.
+            if (key === 'trim' && isReplica === true) return null;
             const derived = current.bindings?.filter(b => b.origin_column === key && (b.value !== a.value || b.unit !== a.unit || b.record_columns_disagree));
             return <tr key={key} data-record-field={key}>
               <th scope="row">{STRUCTURED_RECORD_LABELS[key]}</th>
@@ -163,7 +167,9 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; onInspect?: (f
               </td>
             </tr>;
           })}<PhysicalRecordedValue vehicleId={vehicleId} field="factory_color" label="Factory paint code"
-            fallback="" onInspect={onInspect} optional /></tbody>
+            fallback="" onInspect={onInspect} optional />
+            <PhysicalRecordedValue vehicleId={vehicleId} field="appearance" label="Appearance"
+              fallback="" onInspect={onInspect} optional /></tbody>
         </table>}
     </section>
     <section aria-label="Structured source claims" className="vp-structured-claims"
@@ -738,7 +744,7 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Info Panel */}
       <div className="vp-dossier-panel">
-        <StructuredProfileData vehicleId={vehicle.id} onInspect={(field, label, value) => openPopup(
+        <StructuredProfileData vehicleId={vehicle.id} isReplica={vehicle.is_replica} onInspect={(field, label, value) => openPopup(
           <React.Suspense fallback={<p role="status">Reading source…</p>}>
             <FieldEvidencePopup vehicleId={vehicle.id} field={field} label={label} value={value} presentation="citations" />
           </React.Suspense>, label, Math.min(720, window.innerWidth - 24), false,

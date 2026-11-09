@@ -9,11 +9,13 @@ export const PHYSICAL_READING_ROLES = {
   drivetrain: 'visible_drivetrain_layout',
   mileage: 'odometer_display',
   factory_color: 'factory_paint_code',
+  appearance: 'visible_exterior_appearance',
 } as const;
 export type PhysicalReadingField = keyof typeof PHYSICAL_READING_ROLES;
 const PHYSICAL_READING_RELATIONS: Record<PhysicalReadingField, readonly string[]> = {
   engine_size: ['direct_code'], transmission: ['direct_code', 'component_inference'],
   drivetrain: ['direct_visual'], mileage: ['direct_visual'], factory_color: ['direct_code'],
+  appearance: ['direct_visual'],
 };
 export const PHYSICAL_READING_METHOD = 'interactive_physical_source_review_v1';
 export function physicalRecordedValue(vehicleId: string, field: PhysicalReadingField, provenance?: FieldProvenance | null):

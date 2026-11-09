@@ -26,6 +26,17 @@ describe('physical recorded value', () => {
     const p = source(); p.image_observations![0].visual_relation = 'component_inference';
     expect(physicalRecordedValue(vehicle, 'mileage', p).status).toBe('absent');
   });
+  it('keeps exterior appearance separate from badge-derived trim identity', () => {
+    const p = source(); p.field = 'appearance';
+    Object.assign(p.image_observations![0], { value: 'Sport-style', claim_role: 'visible_exterior_appearance',
+      limitation: 'Appearance only; factory trim is not established.' });
+    expect(physicalRecordedValue(vehicle, 'appearance', p)).toMatchObject({ status: 'resolved', value: 'Sport-style' });
+    p.image_observations![0].visual_relation = 'direct_code';
+    expect(physicalRecordedValue(vehicle, 'appearance', p).status).toBe('absent');
+    p.image_observations![0].visual_relation = 'direct_visual';
+    p.image_observations![0].claim_role = 'trim';
+    expect(physicalRecordedValue(vehicle, 'appearance', p).status).toBe('absent');
+  });
   it.each(['image_id', 'witness_id', 'witness_role', 'source_url', 'source_family', 'claim_role', 'agent_model', 'extraction_method', 'limitation'])(
     'withholds a reading with invalid %s', key => {
       const p = source(); (p.image_observations![0] as unknown as Record<string, unknown>)[key] = '';
