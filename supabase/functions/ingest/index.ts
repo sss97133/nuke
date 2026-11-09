@@ -43,6 +43,8 @@ import { prepareGatewayCapture, landGatewayCapture, type GatewayCapture } from "
 import { gatewayListing } from "../_shared/gatewayParser.ts";
 import { dealerListing, dealerHost } from "../_shared/dealerParser.ts";
 import { prepareDealerCapture, landDealerCapture, dealerIdentityConflict, type DealerCapture } from "./dealer.ts";
+import { mccormickTarget } from "../_shared/mccormickParser.ts";
+import { ingestMcCormick } from "./mccormick.ts";
 import { ingestVicari } from "./vicari.ts";
 
 const supabaseAdmin = createClient(
@@ -257,6 +259,8 @@ function detectSource(url: string): SourceMatch {
   if (dealer) return { platform: dealer.platform, externalId: dealer.stock_id };
   const gateway = gatewayListing(url);
   if (gateway) return { platform: "gateway_classics", externalId: gateway.id };
+  const mccormick = mccormickTarget(url);
+  if (mccormick) return { platform: "mccormicks", externalId: mccormick.id };
   const vicariId = vicariListingId(url);
   if (vicariId) return { platform: "vicari", externalId: vicariId };
   for (const { platform, pattern, extractId } of SOURCE_PATTERNS) {
@@ -650,8 +654,8 @@ async function matchOrCreateVehicle(
     source: platform && platform !== "unknown" ? platform : null,
     platform_source: platformSourceFor(platform), // C7: the platform key
   };
-  // An archived Vicari appearance has no established current sale state. Do not inherit the DB's "available" default.
-  if (platform === "vicari") vehicleData.sale_status = null;
+  // A block-house appearance does not establish current availability. Do not inherit the DB's "available" default.
+  if (["vicari", "mccormicks"].includes(platform ?? "")) vehicleData.sale_status = null;
   // A Craigslist post is a live classified when we read it. The column defaulted to false for every one of them
   // (1,053 of 1,053 created in two days, 2026-10-15) while sale_status said "available".
   if (platform === "craigslist") vehicleData.is_for_sale = true;
@@ -850,6 +854,7 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
 interface EnrichedData {
   dealer_capture?: DealerCapture;
   gateway_capture?: GatewayCapture;
+  mccormick_receipt?: Record<string, unknown>;
   vicari_receipt?: Record<string, unknown>;
   vehicle_id?: string;
   year?: number | null;
@@ -898,6 +903,14 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     try {
       const capture = await prepareGatewayCapture(supabaseAdmin, url);
       return { ok: true, data: { ...capture.fields, listing_url: capture.fields.url, gateway_capture: capture } };
+    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+  }
+
+  if (platform === "mccormicks") {
+    try {
+      const data = await ingestMcCormick(url, { supabase: supabaseAdmin, archiveFetch,
+        matchVehicle: (fields) => matchOrCreateVehicle(fields, "mccormicks") });
+      return { ok: true, data: { ...data, vehicle_id: data.vehicle_id ?? undefined } };
     } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
   }
 
@@ -1155,6 +1168,7 @@ interface IngestInput {
 interface IngestResult {
   dealer_receipt?: Record<string, unknown>;
   gateway_receipt?: Record<string, unknown>;
+  mccormick_receipt?: Record<string, unknown>;
   vicari_receipt?: Record<string, unknown>;
   status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview" | "unresolved";
   vehicle_id?: string | null;
@@ -1338,18 +1352,20 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let extractorVehicleId: string | undefined;
     let enrichedPostedAt: string | null = null;
     let enrichedSellerType: string | null = null;
+    let mccormickReceipt: Record<string, unknown> | undefined;
     let vicariReceipt: Record<string, unknown> | undefined;
     let dealerCapture: DealerCapture | undefined;
     let dealerReceipt: Record<string, unknown> | undefined;
     let gatewayCapture: GatewayCapture | undefined;
     let gatewayReceipt: Record<string, unknown> | undefined;
 
-    if (listingUrl && (platform === "vicari" || (platform === "gr_auto_gallery" || platform === "streetside_classics") || platform === "gateway_classics" || (input.enrich !== false && !input.description))) {
+    if (listingUrl && (["vicari", "mccormicks"].includes(platform) || (platform === "gr_auto_gallery" || platform === "streetside_classics") || platform === "gateway_classics" || (input.enrich !== false && !input.description))) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
       if (["gr_auto_gallery", "streetside_classics", "gateway_classics"].includes(platform) && !enrichResult.ok) return { status: "rejected", reason: `enrichment_failed: ${enrichResult.error}`, source: platform };
       if (enrichResult.ok) {
         enrichmentSucceeded = true;
         const enriched = enrichResult.data;
+        mccormickReceipt = enriched.mccormick_receipt;
         vicariReceipt = enriched.vicari_receipt;
         gatewayCapture = enriched.gateway_capture;
         dealerCapture = enriched.dealer_capture;
@@ -1362,6 +1378,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           // disagreements stay unresolved rather than attaching the wrong asset.
           parsed = { year: dealerCapture.fields.year, make: dealerCapture.fields.make, model: dealerCapture.fields.model };
           identityIsSlugGuess = false;
+        }
+        if (platform === "mccormicks" && mccormickReceipt?.unresolved === true) {
+          return { status: "unresolved", vehicle_id: null, source: platform, external_id: externalId, mccormick_receipt: mccormickReceipt };
         }
         if (platform === "vicari" && vicariReceipt?.unresolved === true) {
           return { status: "unresolved", vehicle_id: null, source: platform, external_id: externalId, vicari_receipt: vicariReceipt };
@@ -1424,7 +1443,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       }
     }
 
-    if (platform === "vicari" && enrichmentError) {
+    if (["vicari", "mccormicks"].includes(platform) && enrichmentError) {
       return { status: "error", error: enrichmentError, source: platform, external_id: externalId };
     }
 
@@ -1920,6 +1939,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       quality_score: qualityScore,
       issues: gateResult.issues.length > 0 ? gateResult.issues : undefined,
       needs_review: needsReview || undefined,
+      ...(mccormickReceipt ? { mccormick_receipt: mccormickReceipt } : {}),
       ...(vicariReceipt ? { vicari_receipt: vicariReceipt } : {}),
       ...(gatewayReceipt ? { gateway_receipt: gatewayReceipt } : {}),
       ...(dealerReceipt ? { dealer_receipt: dealerReceipt } : {}),
