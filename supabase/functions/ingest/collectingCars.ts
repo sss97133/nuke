@@ -15,7 +15,7 @@ export function collectingCarsCapture(result: any, url: string): CollectingCarsC
     || !/^[0-9a-f-]{36}$/.test(c.snapshot_id ?? '') || !/^[0-9a-f]{64}$/.test(c.sha256 ?? '')
     || !Number.isFinite(Date.parse(c.observed_at)) || Date.parse(c.observed_at) > Date.now()
     || !/^\d+$/.test(f.listing_id ?? '') || f.lot_type !== 'car'
-    || !f.year || !f.make || !f.model || !Array.isArray(f.image_urls)) throw Error('cc_listing_capture_invalid');
+    || !f.year || !f.make || (f.model !== null && !f.model) || !Array.isArray(f.image_urls)) throw Error('cc_listing_capture_invalid');
   return { ...c, fields: f };
 }
 
