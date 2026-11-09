@@ -1,7 +1,7 @@
 /** Bounded delivery receipts for already-read, already-owned auction states.
  * Native pages remain in the archive after delivery; this is not an identity queue. */
 import { retainFetchedCapture } from "../_shared/archiveFetch.ts";
-import { deletedLookup, handleHashes, tombstoneItem } from "./deletedMembers.ts";
+import { deletedLookup, handleHash, handleHashes, tombstoneItem } from "./deletedMembers.ts";
 import { listingKey, type EbayItem } from "./browseMap.ts";
 
 export const REPLAY_KEY = "ebay_auction_snapshot_replay_v1";
@@ -84,19 +84,39 @@ export function auctionReplayStore(sb: any): ReplayStore {
         storage: { from: () => ({ download: async () => ({ data: null, error: "replay requires inline retained page" }) }) },
       };
       const handles = await handleHashes(JSON.stringify(page.items));
-      const gone = await deletedLookup(bounded)(handles.member);
+      // tombstoneItem also checks explicit usernames outside its text-pattern
+      // grammar (for example one-character handles); preserve that coverage.
+      const known = new Map([...handles.byHash].map(([hash, name]) => [name, hash]));
+      const memberHashes = new Set(handles.member);
+      for (const item of page.items) if (item.seller?.username && !known.has(String(item.seller.username).toLowerCase())) {
+        const name = String(item.seller.username).toLowerCase();
+        const hash = await handleHash(name);
+        memberHashes.add(hash); known.set(name, hash);
+      }
+      if (memberHashes.size > 1000) throw Error("auction page exceeds deleted-member lookup bound");
+      const gone = await deletedLookup(bounded)([...memberHashes]);
       const lookup = async (keys: string[]) => new Set(keys.filter(k => gone.has(k)));
-      const items = await Promise.all(page.items.map(async item => (await tombstoneItem(lookup, item)).raw));
+      // The complete item set was checked above. With no deleted handles, each
+      // item's identical lookup would return empty; avoid thousands of duplicate
+      // regex scans/hashes across a full pass. Redaction stays unchanged otherwise.
+      const items = gone.size === 0 ? page.items
+        : await Promise.all(page.items.map(async item => (await tombstoneItem(lookup, item)).raw));
       const response = page.method === "search" ? { ...page.response, itemSummaries: items } : items[0];
       const body = JSON.stringify({ page_read_at: page.readAt, read_method: page.method, response });
       if (new TextEncoder().encode(body).length > MAX_BYTES) throw Error("auction replay page exceeds retention byte cap");
       const remainingHandles = await handleHashes(body);
+      const remainingMembers = new Set(remainingHandles.member), remainingSellers = new Set(remainingHandles.seller);
+      for (const item of items) if (item.seller?.username) {
+        const name = String(item.seller.username).toLowerCase();
+        const hash = known.get(name) ?? await handleHash(name);
+        remainingMembers.add(hash); remainingSellers.add(hash);
+      }
       const pageUrl = new URL(page.url);
       pageUrl.searchParams.sort();
       const receipt = await retainFetchedCapture(bounded, { platform: "ebay_motors", url: pageUrl.href,
         html: body, httpStatus: 200, fetchedAt: page.readAt,
         metadata: { capture_kind: "auction_replay_page", representation: "native_json_with_capture_clock",
-          member_handles_sha256: remainingHandles.member, seller_handles_sha256: remainingHandles.seller } });
+          member_handles_sha256: [...remainingMembers].sort(), seller_handles_sha256: [...remainingSellers].sort() } });
       if ("reason" in receipt) throw Error(`auction page retention ${receipt.status}: ${receipt.reason}`);
       if (Date.parse(receipt.fetched_at) !== Date.parse(page.readAt)) throw Error("auction page capture clock mismatch");
       return candidates.map(c => {

@@ -659,6 +659,8 @@ jobs:
         run: deno test supabase/functions/extract-barrett-jackson/
       - name: Verify Bonhams lot pages and titles extract deterministic series, trim, and body_style facets
         run: deno test --no-check --allow-read supabase/functions/extract-bonhams/
+      - name: Verify the Bonhams land walk reads and moves its cursor row forward only, and only after a page landed
+        run: deno test --node-modules-dir=none supabase/functions/extract-bonhams-typesense/landCursor.test.ts
       - name: Verify Broad Arrow roster cards and lot pages keep every digit of comma and Swiss apostrophe amounts
         run: |
           deno check --node-modules-dir=none supabase/functions/extract-broad-arrow/roster.ts supabase/functions/extract-broad-arrow/lotPage.ts

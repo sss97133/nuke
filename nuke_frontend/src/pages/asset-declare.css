@@ -30,3 +30,9 @@
 .ad-item .k-caption { color: var(--text-secondary); }
 .ad-page :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
 @media (max-width: 480px) { .ad-row { grid-template-columns: 1fr; } }
+
+.ad-item__row { display: flex; align-items: flex-start; gap: 12px; }
+.ad-item__row .ad-item__link { flex: 1 1 auto; min-width: 0; }
+.ad-item__verbs { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding-top: 10px; }
+.ad-verb { min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); cursor: pointer; }
+.ad-verb:disabled { opacity: 0.55; cursor: default; }

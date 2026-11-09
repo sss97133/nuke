@@ -221,7 +221,7 @@
     "models": [],
     "years": [
       2010,
-      2020
+      2026
     ],
     "role": "make",
     "file": "mercedes-benz-wordmark.svg",
@@ -239,40 +239,62 @@
         "year": 2010,
         "url": "https://archive.org/details/mercedes-benz-c-class-car-brochure-2009",
         "page": 1,
-        "iou": 0.951
+        "iou": 0.951,
+        "control": "best serif font (Palatino) 0.48"
       },
       {
         "year": 2012,
         "url": "https://archive.org/details/mercedes-benz-s-class-car-brochure-2012",
         "page": 1,
-        "iou": 0.963
+        "iou": 0.963,
+        "control": "best serif font (Palatino) 0.474"
       },
       {
         "year": 2015,
         "url": "https://archive.org/details/mercedes-benz-c-class-car-brochure-2014",
         "page": 1,
-        "iou": 0.961
+        "iou": 0.961,
+        "control": "best serif font (Palatino) 0.479"
       },
       {
         "year": 2016,
         "url": "https://archive.org/details/mercedes-benz-glc-car-brochure-2015",
         "page": 1,
-        "iou": 0.95
+        "iou": 0.95,
+        "control": "best serif font (Palatino) 0.48"
       },
       {
         "year": 2020,
         "url": "https://archive.org/details/mercedes-benz-amg-gt-coupe-and-roadster-car-brochure-2019",
         "page": 1,
-        "iou": 0.946
+        "iou": 0.946,
+        "control": "best serif font (Palatino) 0.48"
       },
       {
         "year": 2020,
         "url": "https://archive.org/details/gls-brochure",
         "page": 1,
-        "iou": 0.946
+        "iou": 0.946,
+        "control": "best serif font (Palatino) 0.48"
+      },
+      {
+        "year": 2024,
+        "url": "https://archive.org/details/manuals-plus-2024-mercedes-benz-eqe-operators-manual-173816c4",
+        "page": 1,
+        "document": "Mercedes-Benz EQE operator's manual, edition F295 0087 13, PDF by Mercedes-Benz AG created 2024-07-16 (MY2024 per the archive title; the cover prints no year, it may be an early MY2025 edition)",
+        "iou": 0.949,
+        "control": "best serif font (Palatino) 0.474"
+      },
+      {
+        "year": 2026,
+        "url": "https://archive.org/details/2026-mercedes-benz-w-223-v-223-s-class-sedan-web-catalog.-japan-october-10th-2025",
+        "page": "cover (1.png, MP202601)",
+        "document": "2026 S-Class web catalogue, Japan, 2025-10-10",
+        "iou": 0.845,
+        "control": "best serif font (Palatino) 0.475"
       }
     ],
-    "notes": "Reuse the attributed local wordmark: the same Corporate A cut is printed on every dated brochure cover from the 09/2009 C-Class (MY2010) to the 2020 GLS (ink IoU 0.95-0.96). US MY2008 brochures still print an older condensed cut, so the range starts at 2010; no dated 2021-2025 document was checked, so it stops at 2020. Upstream provenance and hashes stay in wordmarks.json.",
+    "notes": "Reuse the attributed local wordmark: the same Corporate A cut is printed on dated Mercedes-Benz documents from the 09/2009 C-Class brochure (MY2010) to the 2026 S-Class catalogue (ink IoU 0.85-0.96 on eight documents, no more than four model years apart; the 2026 crop is 35 px tall). Serif system fonts set on the same crops (Times New Roman, Times, Georgia, Baskerville, Palatino) score 0.38-0.48. US MY2008 brochures still print an older condensed cut, so the range starts at 2010. Upstream provenance and hashes stay in wordmarks.json.",
     "retrievedAt": "2026-11-08",
     "attribution": "Mercedes-Benz trademarks belong to Mercedes-Benz Group AG. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
     "sourceSha256Base64": "qvhb5pKYsyxlgJJ82BClBbS7ZIJlyUipXj/5mb2VC80=",
@@ -288,7 +310,7 @@
     "models": [],
     "years": [
       1977,
-      1992
+      2003
     ],
     "role": "make",
     "file": "ford-oval-print-commons.svg",
@@ -329,9 +351,31 @@
         "page": "back page",
         "document": "1992 Ford Bronco brochure, USA 7-1991, FDT-004",
         "iou": 0.77
+      },
+      {
+        "year": 1996,
+        "url": "https://archive.org/details/1996-ford-mustang-brochure.-usa-8-1995",
+        "page": "cover (file 101.png)",
+        "document": "1996 Ford Mustang brochure, USA 8-1995",
+        "iou": 0.768
+      },
+      {
+        "year": 1999,
+        "url": "https://archive.org/details/1999-ford-super-duty-f-series-brochure.-usa-3-1998-01",
+        "page": "cover",
+        "document": "1999 Ford Super Duty F-Series brochure, USA 3-1998",
+        "iou": 0.725,
+        "threshold": "white L>125 (embossed low-resolution render; 0.559 at the default L>150, where the F crossbar drops out)"
+      },
+      {
+        "year": 2003,
+        "url": "https://archive.org/details/2003-ford-excursion-brochure.-usa-01",
+        "page": "cover",
+        "document": "2003 Ford Excursion brochure, USA",
+        "iou": 0.806
       }
     ],
-    "notes": "One-colour print form of the script oval adopted in 1976. Script IoU 0.77-0.82 against the brochure ovals (printed on chrome or textured stock); the same script measures 0.976 against Ford's own flat oval (local ford.svg, from the Ford 2017 annual report), which corroborates the drawing. The 1935/1939 brochures print block FORD and 1960s brochures block FORD, so earlier years keep text. A 2003 Excursion cover also matches (0.806) but 1993-2002 was not checked. Unmodified source; the oval is a lettered lockup, sized so its script matches the title text.",
+    "notes": "One-colour print form of the script oval adopted in 1976. Dated brochures print it flat blue (1977-1987) or as a chrome-bezel render (1992-2003) with the same script: IoU 0.73-0.82 on seven documents no more than five model years apart. The same script measures 0.976 against Ford's own flat oval (local ford.svg, from the Ford 2017 annual report), which corroborates the drawing. The 1935/1939 and 1960s brochures print block FORD, so earlier years keep text; nothing after 2003 was checked. Unmodified source; the oval is a lettered lockup, sized so its script matches the title text.",
     "retrievedAt": "2026-11-08",
     "attribution": "Ford trademarks belong to Ford Motor Company. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
     "sourceSha256Base64": "0b+YoY1/FPDZ7F9gqW3ONRpBAL6gwGXgacRMpPBQpes=",
@@ -373,6 +417,61 @@
     "attribution": "Ferrari trademarks belong to Ferrari S.p.A. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
     "sourceSha256Base64": "/sv52gLSsFBIGtkZhHrmZetvNJVp5E3y1SGZSBvKoLU=",
     "localSha256Base64": "mFjBJElUHNF+9W4nCyONP/5CshoxzQBkjeGh3D3oRv0=",
+    "tone": "monochrome",
+    "textScale": {
+      "capHeight": 1,
+      "baseline": 0
+    }
+  },
+  {
+    "make": "Chevrolet",
+    "models": [],
+    "years": [
+      2015,
+      2020
+    ],
+    "role": "make",
+    "file": "chevrolet-wordmark.svg",
+    "viewport": "1.23 1.23 411.87 36.29",
+    "width": 124,
+    "height": 11,
+    "sourceWidth": 414.342226,
+    "sourceHeight": 38.739226,
+    "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Chevrolet%20Wordmark.svg",
+    "sourceAsset": "https://raw.githubusercontent.com/cardog-ai/icons/05c4001e83a0/core/optimized/Chevrolet%20Wordmark.svg",
+    "license": "MIT (CARDOG-LICENSE.txt)",
+    "evidence": "https://archive.org/details/chevrolet-silverado-truck-brochure-2015",
+    "evidenceDocuments": [
+      {
+        "year": 2015,
+        "url": "https://archive.org/details/chevrolet-silverado-truck-brochure-2015",
+        "page": "39.pdf p.30 (back cover)",
+        "document": "2015 Silverado LD catalog, PDF created 2014-08-21",
+        "iou": 0.981,
+        "control": "Tahoma Bold 0.707"
+      },
+      {
+        "year": 2017,
+        "url": "https://archive.org/details/2017-chevrolet-suburban-brochure",
+        "page": 1,
+        "document": "2017 Chevrolet Suburban brochure, PDF created 2016-08-18",
+        "iou": 0.972,
+        "control": "Tahoma Bold 0.711"
+      },
+      {
+        "year": 2020,
+        "url": "https://archive.org/details/2020-chevrolet-corvette-page-0001",
+        "page": "page-0040 (back page)",
+        "document": "2020 Chevrolet Corvette brochure",
+        "iou": 0.87,
+        "control": "Arial Bold 0.694"
+      }
+    ],
+    "notes": "Reuse the attributed local wordmark: block CHEVROLET as printed beside the bowtie on dated brochures 2015-2020. Font controls (Arial Black/Bold, Helvetica Bold, DIN Alternate Bold, Verdana Bold, Tahoma Bold, Avenir Next Heavy, Krungthep) set on the same crops score at most 0.69-0.71, so the drawing, not the block style, carries the match (margin 0.17-0.27). 2012 covers print a serif italic 'Chevrolet'; 2013-2014 pages checked show the bowtie only; nothing after 2020 was checked.",
+    "retrievedAt": "2026-11-08",
+    "attribution": "Chevrolet trademarks belong to General Motors. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
+    "sourceSha256Base64": "XiGlLIj3cRxe/EQoBGEDBrr6MOF/jZ298XfzN8ffIUg=",
+    "localSha256Base64": "0oiog1vw8yetYBitfsTV1yL5x+23enAhV2HTLhTfEYM=",
     "tone": "monochrome",
     "textScale": {
       "capHeight": 1,

@@ -9,7 +9,7 @@ vi.mock('../hooks/usePageTitle', () => ({ usePageTitle: () => undefined }));
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: fixture.user.current, session: null, loading: false }) }));
 vi.mock('../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => <a href={to} className={className}>{children}</a> }));
 import AssetDeclarePage, { problems, YEAR_RULE } from './AssetDeclare';
-import HeldAssetsPage, { ledgerLine } from './HeldAssets';
+import HeldAssetsPage, { ledgerLine, proposalLine } from './HeldAssets';
 
 let node: HTMLDivElement, root: Root;
 beforeEach(() => {
@@ -67,9 +67,39 @@ it('lists the holder\'s works with the ledger line and no public sale', async ()
   ] }, error: null });
   await act(async () => render('/assets/mine'));
   expect(fixture.rpc).toHaveBeenCalledWith('held_assets_read', { p_limit: 500 });
-  expect(node.textContent).toContain('2 works declared: 1 artworks, 1 publications · 0 with a public sale recorded');
+  expect(node.textContent).toContain('2 works confirmed: 1 artworks, 1 publications · 0 with a public sale recorded');
   expect(node.querySelectorAll('.ad-item').length).toBe(2);
   expect(node.querySelector('a[href="/assets/a1"]')).not.toBeNull();
   expect(node.textContent).toContain('no public sale recorded');
-  expect(ledgerLine({ total: 0, by_type: {}, as_of: '', assets: [] })).toBe('0 works declared · 0 with a public sale recorded');
+  expect(ledgerLine({ total: 0, by_type: {}, as_of: '', assets: [] })).toBe('0 works confirmed · 0 with a public sale recorded');
+});
+
+it('shows works found in the photos with Open, Name it and Not mine, and dismisses through the writer', async () => {
+  fixture.user.current = { id: 'u1' };
+  const found = { total: 0, by_type: {}, as_of: '2026-11-09T01:00:00Z', assets: [], proposed_total: 2, proposed: [
+    { id: '33333333-3333-4333-8333-333333333333', title: 'Proposed painting, Jul 2024', kind: 'painting', labels: ['Painting', 'Modern Art'], photos: 2, span_from: '2024-07-03T18:00:00Z', span_to: '2026-09-13T20:00:00Z', filenames: ['IMG_1.HEIC'], labeller: 'apple_photos_on_device_v1', proposed_at: '2026-11-09T00:50:00Z' },
+    { id: '44444444-4444-4444-8444-444444444444', title: 'Proposed drawing, Mar 2020', kind: 'drawing', labels: ['Drawing'], photos: 21, span_from: '2020-03-09T14:52:00Z', span_to: '2021-06-17T10:39:00Z', filenames: null, labeller: 'apple_photos_on_device_v1', proposed_at: '2026-11-09T00:50:00Z' },
+  ] };
+  fixture.rpc.mockImplementation(async (fn: string) => fn === 'held_assets_read' ? { data: found, error: null } : { data: { asset_id: '44444444-4444-4444-8444-444444444444', duplicate: false }, error: null });
+  await act(async () => render('/assets/mine'));
+  expect(node.textContent).toContain('2 found in your photos, awaiting you');
+  expect(node.textContent).toContain('Found in your photos');
+  expect(node.querySelector('a[href="/assets/new?confirm=33333333-3333-4333-8333-333333333333"]')).not.toBeNull();
+  expect(proposalLine(found.proposed[0])).toContain('painting · 2 photos · ');
+  const notMine = Array.from(node.querySelectorAll('button.ad-verb'))[1] as HTMLButtonElement;
+  await act(async () => notMine.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(fixture.rpc).toHaveBeenCalledWith('dismiss_held_asset', { p_asset_id: '44444444-4444-4444-8444-444444444444', p_reason: 'not my work' });
+});
+
+it('names a found work through confirm_held_asset when the form opens with ?confirm', async () => {
+  fixture.user.current = { id: 'u1' };
+  fixture.rpc.mockResolvedValue({ data: { asset_id: '33333333-3333-4333-8333-333333333333', duplicate: false, visibility: 'private' }, error: null });
+  await act(async () => render('/assets/new?confirm=33333333-3333-4333-8333-333333333333'));
+  expect(node.querySelector('h1')?.textContent).toBe('Name a work found in your photos');
+  expect(node.querySelector('select')).toBeNull();
+  const inputs = node.querySelectorAll('input.jb-input');
+  await act(async () => { type(inputs[0], 'Red Car'); });
+  await act(async () => node.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(fixture.rpc).toHaveBeenCalledWith('confirm_held_asset', expect.objectContaining({ p_asset_id: '33333333-3333-4333-8333-333333333333', p_title: 'Red Car' }));
+  expect(node.querySelector('h1')?.textContent).toBe('Profile');
 });

@@ -2,7 +2,7 @@
 // holder; private by default. No price field exists on purpose: a declared work carries no market figure until a public sale is
 // recorded (case ledger §21.1). Phone first: one column, 44px controls, the kit's roles.
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PrefetchLink } from '../components/PrefetchLink';
 import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -43,11 +43,14 @@ export function problems(d: Draft): string[] {
 export default function AssetDeclarePage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const confirmId = params.get('confirm');
+  const confirming = !!confirmId && /^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(confirmId);
   const [d, setD] = useState<Draft>(empty);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
-  usePageTitle('Declare a work');
+  usePageTitle(confirming ? 'Name a work found in your photos' : 'Declare a work');
   const issues = problems(d);
   const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setD(prev => ({ ...prev, [k]: e.target.value }));
 
@@ -56,10 +59,15 @@ export default function AssetDeclarePage() {
     setTouched(true);
     if (issues.length || sending) return;
     setSending(true); setError(null);
-    const { data, error: err } = await supabase.rpc('declare_held_asset', {
-      p_asset_type: d.asset_type, p_title: d.title, p_medium: d.medium || null, p_year: d.year || null, p_dimensions: d.dimensions || null,
-      p_edition: d.edition || null, p_notes: d.notes || null, p_visibility: d.visibility,
-    });
+    const { data, error: err } = confirming
+      ? await supabase.rpc('confirm_held_asset', {
+        p_asset_id: confirmId, p_title: d.title, p_medium: d.medium || null, p_year: d.year || null, p_dimensions: d.dimensions || null,
+        p_edition: d.edition || null, p_notes: d.notes || null, p_visibility: d.visibility,
+      })
+      : await supabase.rpc('declare_held_asset', {
+        p_asset_type: d.asset_type, p_title: d.title, p_medium: d.medium || null, p_year: d.year || null, p_dimensions: d.dimensions || null,
+        p_edition: d.edition || null, p_notes: d.notes || null, p_visibility: d.visibility,
+      });
     setSending(false);
     if (err) { setError(err.message); return; }
     const id = (data as { asset_id?: string } | null)?.asset_id;
@@ -74,12 +82,14 @@ export default function AssetDeclarePage() {
 
   return <main className="ad-page">
     <header className="ad-head">
-      <Text role="entity" as="h1">Declare a work</Text>
-      <Text role="body" as="p" className="ad-lede">In your own words. You become its creator and holder; it stays private unless you say otherwise. There is no price here: a work carries no market figure until a public sale is recorded.</Text>
+      <Text role="entity" as="h1">{confirming ? 'Name a work found in your photos' : 'Declare a work'}</Text>
+      <Text role="body" as="p" className="ad-lede">{confirming
+        ? 'The analysis found this work in your photographs. Give it its name and anything the photos cannot say; it becomes yours and stays private unless you say otherwise.'
+        : 'For a work no photograph shows. In your own words; you become its creator and holder. There is no price here: a work carries no market figure until a public sale is recorded.'}</Text>
     </header>
     <form className="ad-form" onSubmit={submit} noValidate>
-      <label className="jb-field"><Text role="label">What is it</Text>
-        <select className="jb-input k-body" value={d.asset_type} onChange={set('asset_type')}>{TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}</select></label>
+      {!confirming && <label className="jb-field"><Text role="label">What is it</Text>
+        <select className="jb-input k-body" value={d.asset_type} onChange={set('asset_type')}>{TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}</select></label>}
       <label className="jb-field"><Text role="label">Title</Text>
         <input className="jb-input k-body" value={d.title} onChange={set('title')} maxLength={200} placeholder="Untitled is a title too" autoComplete="off" /></label>
       <label className="jb-field"><Text role="label">Medium</Text>
@@ -104,10 +114,12 @@ export default function AssetDeclarePage() {
       {touched && issues.length > 0 && <ul className="ad-issues" role="alert">{issues.map(i => <li key={i}><Text role="caption">{i}</Text></li>)}</ul>}
       {error && <p className="ad-issues" role="alert"><Text role="caption">{`The record was not written: ${error}`}</Text></p>}
       <div className="ad-actions">
-        <button type="submit" className="ad-sign" disabled={sending}><Text role="label">{sending ? 'Recording…' : 'Declare it'}</Text></button>
+        <button type="submit" className="ad-sign" disabled={sending}><Text role="label">{sending ? 'Recording…' : confirming ? 'This is my work' : 'Declare it'}</Text></button>
         <PrefetchLink to="/assets/mine" className="ad-link">Your works</PrefetchLink>
       </div>
-      <Text role="caption" as="p" className="ad-foot">Signing records one declaration under your account with today's clock. The same declaration twice opens the same record. Photographs of the work come through the capture path, not here.</Text>
+      <Text role="caption" as="p" className="ad-foot">{confirming
+        ? 'Confirming records your words under your account with today\'s clock; the photographs and their dates stay on the record as the evidence that found it.'
+        : 'Signing records one declaration under your account with today\'s clock. The same declaration twice opens the same record.'}</Text>
     </form>
   </main>;
 }

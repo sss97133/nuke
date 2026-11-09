@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { handleHash } from "./deletedMembers.ts";
 import { auctionReplayStore, decodeReplay, mergeReplay, MAX_REPLAY, type ReplayEntry, type AuctionRead } from "./auctionReplay.ts";
 
 const id = "00000000-0000-4000-8000-000000000001";
@@ -79,10 +80,33 @@ Deno.test("full native page retains source clock/hash and exact member, using ex
     assert.equal(retained.page_read_at, at); assert.equal(retained.response.nativePageField, "preserved");
     assert.deepEqual(native.extraNativeField, { retained: true });
     assert.deepEqual(native.seller, deleted ? {} : item.seller);
+    if (!deleted) assert.deepEqual(retained.response, page.response);
+    assert.equal(f.mutations.filter(m => m.includes("ebay_deleted_member_hashes")).length, 1);
     assert.ok(Array.isArray(f.stored().metadata.member_handles_sha256));
     await assert.rejects(() => store.summary({ ...entries[0], sha256: "b".repeat(64) }, deadline), /cached receipt differs/);
   }
 });
+Deno.test("batch fast path preserves explicit seller deletion outside handle regex grammar", async () => {
+  const f = database({ deleted: true }), store = auctionReplayStore(f.db), deadline = Date.now() + 5000;
+  const special = { ...item, seller: { username: "x", feedbackScore: 2 } };
+  const native = { ...page, items: [special], response: { ...page.response, itemSummaries: [special] } };
+  const retained = await store.retain(native, [candidate], deadline);
+  assert.deepEqual((await store.summary(retained[0], deadline)).seller, {});
+});
+
+Deno.test("unrecognized nondeleted seller retains future deletion hashes; lookup overflow fails closed", async () => {
+  const f = database(), store = auctionReplayStore(f.db), deadline = Date.now() + 5000;
+  const special = { ...item, seller: { username: "x" } };
+  await store.retain({ ...page, items: [special], response: { ...page.response, itemSummaries: [special] } }, [candidate], deadline);
+  const hash = await handleHash("x");
+  assert.ok(f.stored().metadata.member_handles_sha256.includes(hash));
+  assert.ok(f.stored().metadata.seller_handles_sha256.includes(hash));
+  const crowded = { ...item, description: Array.from({ length: 1001 }, (_, n) => `https://ebay.com/usr/member${n}`).join(" ") };
+  const before = f.mutations.length;
+  await assert.rejects(() => store.retain({ ...page, items: [crowded], response: { itemSummaries: [crowded] } }, [candidate], deadline), /lookup bound/);
+  assert.equal(f.mutations.length, before);
+});
+
 Deno.test("archive failure, changed bytes, source-clock and byte limits refuse replay", async () => {
   for (const options of [{ rejectInsert: true }, { corrupt: true }]) {
     const store = auctionReplayStore(database(options).db);
