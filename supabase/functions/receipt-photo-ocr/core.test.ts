@@ -24,6 +24,7 @@ function deps(over: Partial<Deps> = {}, calls: Array<[string, unknown]> = []): D
     classify: (url) => { calls.push(["classify", url]); return Promise.resolve({ document_type: "receipt", confidence: 92 }); },
     extract: (url, t) => { calls.push(["extract", { url, t }]); return Promise.resolve({ ...receiptData }); },
     fetchBytes: () => Promise.resolve({ bytes: new Uint8Array([1, 2, 3]), contentType: "image/heic" }),
+    fetchStoredBytes: (path) => { calls.push(["retained", path]); return Promise.resolve(new Uint8Array([1, 2, 3])); },
     upload: (path, bytes, ct) => { calls.push(["upload", { path, n: bytes.byteLength, ct }]); return Promise.resolve({ error: null }); },
     upsertPage: (row) => { calls.push(["page", row]); return Promise.resolve({ error: null }); },
     land: (owner, vehicle, run, docs) => { calls.push(["land", { owner, vehicle, run, docs }]); return Promise.resolve({ landed: 1, duplicates: 0, errors: 0, documents: [{ source_key: `capture:${IMG}`, receipt_id: "r-1", document_id: "d-1", duplicate: false, lines: 2 }] }); },
@@ -148,10 +149,10 @@ Deno.test("a provided extraction lands without any provider call; the pipeline h
   assertEquals(page.cost_usd, 0, "the page row's cost is a number even when the reader charged nothing");
 });
 
-Deno.test("a provided extraction updates a page that was recorded before, even with no vehicle", async () => {
+Deno.test("a provided extraction updates a retained page without another copy, even with no vehicle", async () => {
   const calls: Array<[string, unknown]> = [];
   const r = await handle({ image_id: IMG, extraction: { ...receiptData }, document_type: "receipt" }, deps({
-    existingPage: () => Promise.resolve({ doc_type: "other", extraction: {}, class_conf: 0, doc_date: null, run_id: "run-0" }),
+    existingPage: () => Promise.resolve({ doc_type: "other", extraction: retainedExtraction(), class_conf: 0, doc_date: null, run_id: "run-0" }),
   }, calls));
   assertEquals(r.page, true);
   assertEquals(r.landed, false);
@@ -177,7 +178,7 @@ Deno.test("a page already recorded, now with a vehicle, lands from the stored ex
   const calls: Array<[string, unknown]> = [];
   const r = await handle({ image_id: IMG }, deps({
     frame: () => Promise.resolve(frame({ vehicle_id: VEH })),
-    existingPage: () => Promise.resolve({ doc_type: "receipt", extraction: { ...receiptData }, class_conf: 0.9, doc_date: "2026-10-31", run_id: "run-0" }),
+    existingPage: () => Promise.resolve({ doc_type: "receipt", extraction: retainedExtraction(), class_conf: 0.9, doc_date: "2026-10-31", run_id: "run-0" }),
   }, calls));
   assertEquals(r.landed, true);
   assert(!calls.some((c) => c[0] === "classify"));
@@ -202,6 +203,93 @@ Deno.test("unknown frame, bad id and a refused landing are reported, never throw
   assertEquals(r.page, true);
   assertEquals(r.landed, false);
   assertStringIncludes(r.reason ?? "", "not tied");
+});
+
+const retainedExtraction = (): Extraction => ({
+  ...receiptData, storage_path: `${USER}/capture/${IMG}.heic`, sha256: "a".repeat(64), byte_size: 3,
+});
+
+Deno.test("replay verifies retained private bytes without the missing original, a provider or an upload", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const r = await handle({ image_id: IMG, vehicle_id: VEH }, deps({
+    frame: () => Promise.resolve(frame({ image_url: null })),
+    existingPage: () => Promise.resolve({ doc_type: "receipt", extraction: retainedExtraction(), class_conf: 0.9, doc_date: "2026-10-31", run_id: "run-0" }),
+    fetchBytes: () => { throw new Error("original must not be fetched"); },
+    upload: () => { throw new Error("retained copy must not be overwritten"); },
+  }, calls));
+  assertEquals(r.status, 200);
+  assertEquals(r.landed, true);
+  assertEquals(calls.filter(([kind]) => kind === "retained").length, 1);
+  assert(!calls.some(([kind]) => kind === "classify" || kind === "extract" || kind === "upload"));
+  const land = calls.find(([kind]) => kind === "land")![1] as { docs: { documents: Array<{ pages: unknown[] }> } };
+  const page = land.docs.documents[0].pages[0] as Record<string, string>;
+  assertEquals(page.storage_path, `${USER}/capture/${IMG}.heic`);
+  assertEquals(page.sha256, "a".repeat(64));
+  assertEquals(page.byte_size, "3");
+});
+
+Deno.test("foreign owner/image paths and malformed retained metadata refuse replay before any writes", async () => {
+  for (const over of [
+    { storage_path: undefined, sha256: undefined, byte_size: undefined },
+    { storage_path: `other-user/capture/${IMG}.heic` },
+    { storage_path: `${USER}/capture/other-image.heic` },
+    { storage_path: `${USER}/capture/../${IMG}.heic` },
+    { sha256: undefined }, { sha256: "invalid" }, { byte_size: "3" }, { byte_size: 0 }, { byte_size: 52_428_801 },
+  ]) {
+    const calls: Array<[string, unknown]> = [];
+    const r = await handle({ image_id: IMG, vehicle_id: VEH }, deps({
+      existingPage: () => Promise.resolve({ doc_type: "receipt", extraction: { ...retainedExtraction(), ...over }, class_conf: 0.9, doc_date: null, run_id: "run-0" }),
+      fetchBytes: () => { throw new Error("must not fall back to original"); },
+    }, calls));
+    assertEquals(r.status, 409);
+    assertEquals(r.landed, false);
+    assertEquals(calls.length, 0);
+  }
+});
+
+Deno.test("an incomplete legacy reading refuses replay without automatically calling a provider", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const r = await handle({ image_id: IMG, vehicle_id: VEH }, deps({
+    existingPage: () => Promise.resolve({ doc_type: null, extraction: retainedExtraction(), class_conf: null, doc_date: null, run_id: "run-0" }),
+  }, calls));
+  assertEquals(r.status, 409);
+  assertEquals(r.landed, false);
+  assertStringIncludes(r.error ?? "", "reader result is required");
+  assertEquals(calls.length, 0);
+});
+
+Deno.test("missing retained bytes, size or hash disagreement preserve the page and never replace evidence", async () => {
+  for (const mode of ["missing", "size", "hash"]) {
+    const calls: Array<[string, unknown]> = [];
+    const r = await handle({ image_id: IMG, vehicle_id: VEH }, deps({
+      existingPage: () => Promise.resolve({ doc_type: "receipt", extraction: retainedExtraction(), class_conf: 0.9, doc_date: null, run_id: "run-0" }),
+      fetchStoredBytes: () => { if (mode === "missing") throw new Error("404"); return Promise.resolve(new Uint8Array(mode === "size" ? [1] : [1, 2, 3])); },
+      sha256: () => Promise.resolve(mode === "hash" ? "b".repeat(64) : "a".repeat(64)),
+      fetchBytes: () => { throw new Error("must not fall back to original"); },
+    }, calls));
+    assertEquals(r.status, mode === "missing" ? 502 : 409);
+    assertEquals(r.page, true);
+    assertEquals(r.landed, false);
+    assertEquals(calls.length, 0, "no page upsert, upload, writer or bridge after a failed integrity check");
+  }
+});
+
+Deno.test("retained replay still uses the sanctioned writer's refusal and duplicate admission", async () => {
+  for (const refused of [true, false]) {
+    const calls: Array<[string, unknown]> = [];
+    const r = await handle({ image_id: IMG, vehicle_id: VEH }, deps({
+      existingPage: () => Promise.resolve({ doc_type: "receipt", extraction: retainedExtraction(), class_conf: 0.9, doc_date: null, run_id: "run-0" }),
+      land: () => Promise.resolve(refused
+        ? { landed: 0, duplicates: 0, errors: 1, documents: [{ error: "custodian is not tied to vehicle" }] }
+        : { landed: 0, duplicates: 1, errors: 0, documents: [{ document_id: "d-1", receipt_id: "r-1", duplicate: true }] }),
+    }, calls));
+    assertEquals(r.landed, !refused);
+    assertStringIncludes(r.reason ?? "", refused ? "not tied" : "already landed");
+    assert(!calls.some(([kind]) => kind === "upload" || kind === "bridge"));
+    const pages = calls.filter(([kind]) => kind === "page");
+    const lastExtraction = (pages[pages.length - 1][1] as { extraction: Extraction }).extraction;
+    assertEquals(!!lastExtraction.landed, !refused);
+  }
 });
 
 Deno.test("words: land types, brands, dates", () => {
