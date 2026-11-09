@@ -46,14 +46,42 @@ def sign(bucket, paths, expires):
     return {r["path"]: (f"{URL}/storage/v1{r['signedURL']}" if r.get("signedURL") else None) for r in res}
 
 
+def privacy_hold_ids(owner):
+    """The privacy hold: the owner's iOS capture rows with no uploaded bytes (empty image_url). Never read or sent."""
+    rows = page(f"/rest/v1/vehicle_images?user_id=eq.{owner}&source=eq.capture_relay_ios&image_url=eq.&select=id&order=id.asc")
+    return {r["id"] for r in rows}
+
+
+def verify(out_dir, local_path, owner, expect=276):
+    """Hard check: no privacy-hold id appears in the Codex manifest or the local shard; records the count."""
+    hold = privacy_hold_ids(owner)
+    codex = {json.loads(l)["image_id"] for l in open(os.path.join(out_dir, "manifest_codex.jsonl"))}
+    local = {l.strip() for l in open(local_path) if l.strip()}
+    leak_c, leak_l, overlap = hold & codex, hold & local, codex & local
+    if leak_c or leak_l or overlap:
+        raise SystemExit(f"SHARD CHECK FAILED: hold in codex={len(leak_c)} hold in local={len(leak_l)} codex/local overlap={len(overlap)}")
+    if len(hold) != expect:
+        print(f"warning: privacy hold has {len(hold)} ids, expected {expect}", file=sys.stderr)
+    sp = os.path.join(out_dir, "shards_summary.json")
+    summ = json.load(open(sp))
+    summ.update({"privacy_hold_excluded": len(hold), "privacy_hold_in_codex": 0, "privacy_hold_in_local": 0,
+                 "codex_local_overlap": 0, "verified_at": datetime.datetime.now(AST).isoformat()})
+    json.dump(summ, open(sp, "w"), indent=1)
+    return len(hold)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--owner", default="0b9f107a-d124-49de-9ded-94698f63c1c4")
     ap.add_argument("--out", default="/workspace/codex_handoff")
     ap.add_argument("--local-out", default="/workspace/sortrun/analysis/local_shard.txt")
     ap.add_argument("--expires", type=int, default=86400)
+    ap.add_argument("--verify-only", action="store_true", help="check existing shard files against the privacy hold")
     a = ap.parse_args()
     o = a.owner
+    if a.verify_only:
+        print(json.dumps({"privacy_hold_excluded": verify(a.out, a.local_out, o)}))
+        return
     allrows = page(f"/rest/v1/vehicle_images?user_id=eq.{o}&order=id.asc&select={ELIGIBLE_SELECT}")
     garage = page(f"/rest/v1/vehicles?or=(user_id.eq.{o},owner_id.eq.{o},uploaded_by.eq.{o})&deleted_at=is.null"
                   f"&merged_into_vehicle_id=is.null&select=id,year,make,model&order=id.asc")
@@ -111,6 +139,7 @@ def main():
             "vehicle_order": [{"vehicle_id": v, "ymm": " ".join(str(x) for x in (gids[v]["year"], gids[v]["make"], gids[v]["model"]) if x),
                                "held_or_misattributed": score[v][0], "photos": score[v][1]} for v in vorder]}
     json.dump(summ, open(os.path.join(a.out, "shards_summary.json"), "w"), indent=1)
+    verify(a.out, a.local_out, o)
     print(json.dumps({k: v for k, v in summ.items() if k != "vehicle_order"}))
 
 

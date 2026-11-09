@@ -101,7 +101,7 @@ def git_commit():
     try:
         d = os.path.dirname(os.path.abspath(__file__))
         c = subprocess.check_output(["git", "-C", d, "rev-parse", "HEAD"], text=True).strip()
-        dirty = subprocess.call(["git", "-C", d, "diff", "--quiet", "HEAD", "--", "scripts/photo-pipeline"], cwd=d) != 0
+        dirty = subprocess.call(["git", "-C", d, "diff", "--quiet", "HEAD", "--", "."], cwd=d) != 0
         return c + ("-dirty" if dirty else "")
     except Exception:  # noqa: BLE001
         return "unknown"
