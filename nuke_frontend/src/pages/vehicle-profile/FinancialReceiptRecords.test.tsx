@@ -5,10 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ from: vi.fn(), eq: vi.fn(), sign: vi.fn(), privatePath: vi.fn(), rpc: vi.fn(), user: null as { id: string } | null, loading: false }));
 vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '/synthetic-pdf-worker.mjs' }));
-vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from, rpc: (...args: unknown[]) => { const result = fixture.rpc(...args); return Object.assign(result, { abortSignal: () => result }); } } }));
+vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from, rpc: (...args: unknown[]) => { const result = fixture.rpc(...args); return typeof result?.abortSignal === 'function' ? result : Object.assign(result, { abortSignal: () => result }); } } }));
 vi.mock('../../lib/privateStorage', () => ({ signPrivateStorageUrl: fixture.sign, privateStoragePath: fixture.privatePath }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.user, loading: fixture.loading }) }));
-import { ReceiptRecords } from './FinancialReceiptRecords';
+import { ReceiptRecords, CorrectionReceipt } from './FinancialReceiptRecords';
 import { parseVehicleReceiptRecord } from './hooks/useBuildLedger';
 
 let host: HTMLDivElement, root: Root, client: QueryClient;
@@ -161,4 +161,66 @@ it('bounds a stalled receipt read and exposes Retry', async () => {
     expect(host.textContent).toContain('Line items could not load.');
     expect([...host.querySelectorAll('button')].some(button => button.textContent === 'Retry')).toBe(true);
   } finally { vi.useRealTimers(); }
+});
+
+const citation = { correction_id: 'correction-a', receipt_id: 'receipt-a', document_id: 'source-a', source_table: 'vehicle_documents' as const,
+  page_date: '2026-01-01', recorded_at: '2026-02-01', value: 'Fixture V8' };
+const correctionDocument = { receipt_id: 'receipt-a', vendor: 'Fixture Machine Shop', document_type: 'work_order', document_number: '42', total: null,
+  currency: 'USD', lines: [{ line_number: 1, description: 'Machine cylinder heads', part_number: null, quantity: 2, amount: null }] };
+const renderCorrection = async () => {
+  await act(async () => root.render(<QueryClientProvider client={client}><CorrectionReceipt vehicleId="vehicle-a" citation={citation} /></QueryClientProvider>));
+  for (let i = 0; i < 30 && !host.textContent?.includes('Fixture Machine Shop') && !host.textContent?.includes('unavailable'); i++) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  }
+  return client;
+};
+it('keys receipt money and original preview to the resolved viewer and withholds a failed refresh', async () => {
+  fixture.user = { id: 'owner-a' };
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [{ ...correctionDocument, total: 125 }] }, error: null }) });
+  const client = await renderCorrection();
+  expect(host.textContent).toContain('$125.00');
+  await click('Read original source', () => !!host.querySelector('img'));
+  expect(host.querySelector('img')).not.toBeNull();
+  fixture.user = null; fixture.loading = true;
+  await act(async () => root.render(<QueryClientProvider client={client}><CorrectionReceipt vehicleId="vehicle-a" citation={citation} /></QueryClientProvider>));
+  expect(host.textContent).not.toContain('$125.00');
+  expect(host.querySelector('img')).toBeNull();
+  const ownerCalls = fixture.rpc.mock.calls.length;
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [correctionDocument] }, error: null }) });
+  fixture.loading = false;
+  await act(async () => root.render(<QueryClientProvider client={client}><CorrectionReceipt vehicleId="vehicle-a" citation={citation} /></QueryClientProvider>));
+  for (let i = 0; i < 30 && !host.textContent?.includes('Fixture Machine Shop'); i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(fixture.rpc.mock.calls.length).toBe(ownerCalls + 1);
+  expect(host.textContent).toContain('Machine cylinder heads');
+  expect(host.textContent).not.toContain('$125.00');
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: null, error: { message: 'source unavailable' } }) });
+  await act(async () => { await client.refetchQueries({ queryKey: ['field-correction-receipt', 'anonymous'] }); });
+  for (let i = 0; i < 30 && !host.textContent?.includes('unavailable'); i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(host.textContent).toContain('The cited receipt is unavailable');
+  expect(host.textContent).not.toContain('Machine cylinder heads');
+  expect(host.querySelector('img')).toBeNull();
+});
+it('shows the exact correction receipt immediately and opens its existing original source in place', async () => {
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [correctionDocument, { ...correctionDocument, receipt_id: 'other', vendor: 'Unrelated vendor' }] }, error: null }) });
+  await renderCorrection();
+  expect(fixture.rpc).toHaveBeenCalledWith('get_vehicle_day_documents', { p_vehicle_id: 'vehicle-a', p_date: '2026-01-01' });
+  expect(host.textContent).toContain('Fixture V8');
+  expect(host.textContent).toContain('Fixture Machine Shop #42');
+  expect(host.textContent).toContain('Machine cylinder heads');
+  expect(host.textContent).not.toContain('Unrelated vendor');
+  expect(host.textContent).not.toContain('Document total');
+  expect(host.querySelector('details')).toBeNull();
+  await click('Read original source', () => !!host.querySelector('img'));
+  expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+  expect(host.querySelector('img')?.src).toBe('blob:receipt');
+});
+it('does not substitute another receipt on the same day and offers a retry', async () => {
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [{ ...correctionDocument, receipt_id: 'other' }] }, error: null }) });
+  await renderCorrection();
+  expect(host.textContent).toContain('The cited receipt is unavailable');
+  expect(host.textContent).not.toContain('Machine cylinder heads');
+  expect(host.textContent).not.toContain('Read original source');
+  fixture.rpc.mockReturnValue({ abortSignal: () => Promise.resolve({ data: { documents: [correctionDocument] }, error: null }) });
+  await click('Retry receipt', () => !!host.textContent?.includes('Machine cylinder heads'));
+  expect(host.textContent).toContain('Machine cylinder heads');
 });

@@ -113,6 +113,25 @@ export function getDetailImageUrl(url: string | null | undefined): string | null
   return optimizeImageUrl(url, 'large');
 }
 
+/** Keep the source intact, but display stored HEIC/HEIF captures as browser images. */
+export function getLightboxImageUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.supabase.co') ||
+        !parsed.pathname.startsWith('/storage/v1/object/public/') ||
+        !/\.(heic|heif)$/i.test(parsed.pathname)) return url;
+    parsed.pathname = parsed.pathname.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
+    parsed.searchParams.set('width', '1800');
+    parsed.searchParams.set('height', '1800');
+    parsed.searchParams.set('quality', '90');
+    parsed.searchParams.set('resize', 'contain');
+    parsed.searchParams.set('format', 'origin');
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 /**
  * Check if a URL is from a supported CDN that can be optimized
  */

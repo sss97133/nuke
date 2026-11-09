@@ -1,6 +1,7 @@
 /** Reuse the existing, access-gated spec drill RPC; never render its image URLs unchecked. */
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
+import { useAuthContext } from '../../../contexts/AuthContext';
 import type { EvidenceImage } from './useVehicleImageEvidence';
 
 export interface ProvenanceCitation {
@@ -34,6 +35,10 @@ export interface FieldProvenance {
   field: string;
   vehicle_id?: string;
   value: string | null;
+  current_correction?: {
+    correction_id: string; value: string; receipt_id: string; document_id: string;
+    source_table: 'vehicle_documents' | 'vehicle_images'; page_date: string; recorded_at: string;
+  } | null;
   /** Existing canonical owner, qualified against the access-gated report collection. */
   canonical?: { status: 'resolved' | 'unknown' | 'unavailable'; value?: string; observation_id?: string };
   inline_source: string | null;
@@ -138,9 +143,10 @@ export function formatProvenanceValue(field: string, value: string): string {
 }
 
 export function useFieldProvenance(vehicleId: string, field: string) {
-  return useQuery({
-    queryKey: ['field-provenance', vehicleId, field],
-    enabled: !!vehicleId && !!field,
+  const { user, loading: authLoading } = useAuthContext();
+  const read = useQuery({
+    queryKey: ['field-provenance', vehicleId, field, user?.id ?? 'anonymous'],
+    enabled: !!vehicleId && !!field && !authLoading,
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
       const controller = new AbortController();
@@ -167,4 +173,5 @@ export function useFieldProvenance(vehicleId: string, field: string) {
       }
     },
   });
+  return { ...read, data: authLoading || read.isError ? undefined : read.data, isLoading: authLoading || read.isLoading };
 }
