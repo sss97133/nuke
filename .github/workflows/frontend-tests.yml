@@ -602,6 +602,7 @@ jobs:
         run: |
           deno test supabase/functions/poll-listing-feeds/feedFetch.test.ts
           deno test --no-check --allow-env supabase/functions/poll-listing-feeds/craigslistExtractor.test.ts
+          deno test --no-check --node-modules-dir=none --allow-env supabase/functions/poll-listing-feeds/purplewave.test.ts supabase/functions/poll-listing-feeds/purplewaveDescription.test.ts
       - name: Verify a sold lot seeds a recorded sale (one hammer milestone, recorded_unconfirmed), a relisted lot seeds nothing, and a party engaging gets the pipeline
         run: deno test --no-check --allow-read supabase/functions/_shared/transferSeed.test.ts
       - name: Verify the contributor link answers unknown, expired and revoked tokens with one 404, hashes the ip, and validates before storage
