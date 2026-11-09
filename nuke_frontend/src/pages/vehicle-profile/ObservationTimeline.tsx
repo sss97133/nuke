@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { vehicleImageGallerySource } from '../../lib/vehicleImageColumns';
 import { useVehicleProfile } from './VehicleProfileContext';
 
 /* ------------------------------------------------------------------ */
@@ -265,6 +266,28 @@ function extractHost(url: string | null): string | null {
 
 const ALL_KINDS = ['listing', 'sale_result', 'comment', 'bid', 'work_record', 'ownership', 'specification', 'provenance', 'valuation', 'condition', 'media'] as const;
 
+/** A retained description cannot outlive the image's current attribution or visibility.
+ * Absence means unavailable to this viewer, not proof of another vehicle. */
+export async function withCurrentImageSources<T extends { structured_data: Record<string, unknown> | null }>(vehicleId: string, rows: T[]): Promise<T[]> {
+  const imageId = (row: T) => row.structured_data?.image_id;
+  const cited = rows.filter(row => imageId(row) != null);
+  if (!cited.length) return rows;
+  const ids = [...new Set(cited.map(imageId).filter((id): id is string => typeof id === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))];
+  if (!ids.length) return rows.filter(row => imageId(row) == null);
+  try {
+    const { data, error } = await supabase.from(await vehicleImageGallerySource())
+      .select('id').eq('vehicle_id', vehicleId).in('id', ids)
+      .eq('vehicle_image_gallery_eligible', true);
+    if (error) throw error;
+    const available = new Set((data || []).map(image => image.id));
+    return rows.filter(row => imageId(row) == null || available.has(imageId(row) as string));
+  } catch (error) {
+    console.warn('[ObservationTimeline] image sources unavailable:', error);
+    return rows.filter(row => imageId(row) == null);
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -309,7 +332,7 @@ const ObservationTimeline: React.FC = () => {
           source_slug: null,
         }));
         if (!isRowOwner) rows = rows.concat(await fetchPublicBuildLog(vehicle.id, new Set(rows.map(r => r.id))));
-        setObservations(rows);
+        setObservations(await withCurrentImageSources(vehicle.id, rows));
         return;
       }
 
@@ -328,7 +351,7 @@ const ObservationTimeline: React.FC = () => {
           source_slug: r.observation_sources?.slug ?? null,
         }));
         if (!isRowOwner) rows = rows.concat(await fetchPublicBuildLog(vehicle.id, new Set(rows.map(r => r.id))));
-        setObservations(rows);
+        setObservations(await withCurrentImageSources(vehicle.id, rows));
       }
     } catch (err) {
       console.error('[ObservationTimeline] error:', err);
