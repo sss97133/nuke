@@ -87,12 +87,12 @@ lettering one-colour in the text colour, as the period print forms show it; phot
 | porsche-lettering-commons.svg | [Porsche Schriftzug.svg](https://commons.wikimedia.org/wiki/File:Porsche_Schriftzug.svg) | PD-textlogo | 2006-2022 |
 | mercedes-benz-wordmark.svg (existing) | Cardog MB Wordmark (above) | MIT | 2010-2020 |
 | ford-oval-print-commons.svg | [Ford Logo 1976 Print Ver.svg](https://commons.wikimedia.org/wiki/File:Ford_Logo_1976_Print_Ver.svg) | PD-textlogo | 1977-1992 |
-| toyota-wordmark.svg (existing) | Cardog Toyota Wordmark (above) | MIT | 1985-1992 |
 | ferrari-wordmark.svg (existing) | Cardog Ferrari Wordmark (above) | MIT | 1994 |
 
 The two Commons files are byte-identical downloads (hashes in the catalogue). The Cardog Porsche wordmark is the
 2024+ lettering (wider spacing after the 2023 identity refresh, and lighter strokes); it did not match the 1996-98
 covers, so its former 1997 registration was removed. Not used: Porsche Design System model signatures and their Commons
-re-uploads (their asset license limits use to Porsche applications); Commons lettering redrawn from logo aggregators
+re-uploads (their asset license limits use to Porsche applications); the Cardog Toyota wordmark for 1985-1992 (0.84-0.87 against
+low-resolution brochures, with system-font controls at 0.81-0.83, is not proof); Commons lettering redrawn from logo aggregators
 without a corroborating manufacturer source; OpenClipart drawings. No model lettering (911, Corvette, Mustang, Camaro,
 Bronco, Defender, Land Cruiser) met this bar.

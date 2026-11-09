@@ -342,58 +342,6 @@
     }
   },
   {
-    "make": "Toyota",
-    "models": [],
-    "years": [
-      1985,
-      1992
-    ],
-    "role": "make",
-    "file": "toyota-wordmark.svg",
-    "viewport": "1.26 1.26 411.83 72.94",
-    "width": 84,
-    "height": 15,
-    "sourceWidth": 414.472,
-    "sourceHeight": 75.472,
-    "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Toyota%20Wordmark.svg",
-    "sourceAsset": "https://raw.githubusercontent.com/cardog-ai/icons/05c4001e83a0/core/optimized/Toyota%20Wordmark.svg",
-    "license": "MIT (CARDOG-LICENSE.txt)",
-    "evidence": "https://archive.org/details/0_20261015_202610",
-    "evidenceDocuments": [
-      {
-        "year": 1985,
-        "url": "https://archive.org/details/0_20261015_202610",
-        "page": 8,
-        "document": "1985 Toyota Supra brochure, USA, P/5-008 (8/84)",
-        "iou": 0.842
-      },
-      {
-        "year": 1989,
-        "url": "https://archive.org/details/101_20260429_20260429_1545",
-        "page": 1,
-        "document": "1989 Toyota Land Cruiser brochure, USA, PT8-512 (9-88)",
-        "iou": 0.852
-      },
-      {
-        "year": 1992,
-        "url": "https://archive.org/details/101_20260822_20260822_2004",
-        "page": 1,
-        "document": "1992 Toyota Land Cruiser brochure, USA, PT2-533 (7/92)",
-        "iou": 0.872
-      }
-    ],
-    "notes": "Reuse the attributed local wordmark: dated US brochures print the same TOYOTA lettering (straight-armed Y, flat-topped A) in black (1985) and red (1989, 1992). The scans are about 167 ppi, so the overlay also checked system fonts as controls (0.74-0.83); the match rests on the overlay plus a visual comparison of each letter. No later US printed lettering was found, so the range stops at 1992.",
-    "retrievedAt": "2026-11-08",
-    "attribution": "Toyota trademarks belong to Toyota Motor Corporation. Reference artwork identifies the recorded vehicle; it does not establish which physical badge is installed.",
-    "sourceSha256Base64": "qy3WQBe5UjWuke4f0B/ANjkWC4s0Ui86VjlD90qzkTo=",
-    "localSha256Base64": "AMxhl7CkWQBr9kJHl+dXidDE6D5iVM2339zhEkv7yQ0=",
-    "tone": "monochrome",
-    "textScale": {
-      "capHeight": 0.943,
-      "baseline": 0.022
-    }
-  },
-  {
     "make": "Ferrari",
     "models": [],
     "years": [
