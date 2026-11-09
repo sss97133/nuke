@@ -160,6 +160,22 @@ BEGIN
     IF v_id IS NOT NULL THEN v_tier := 'any_approved'; END IF;
   END IF;
 
+  -- Tier 6: every public frame is marked a duplicate (e.g. the album copies of an import
+  -- whose originals are still held for review). A public duplicate is still a public frame
+  -- of this vehicle, so it beats an empty cover. Same ranking: exterior before paperwork.
+  IF v_id IS NULL THEN
+    SELECT id,image_url,COALESCE(taken_at,created_at),vehicle_zone INTO v_id,v_url,v_taken,v_zone
+    FROM vehicle_images
+    WHERE vehicle_id = p_vehicle_id
+      AND COALESCE(is_superseded,false)=false AND COALESCE(is_duplicate,false)=true
+      AND COALESCE(is_sensitive,false)=false
+      AND COALESCE(vision_gate_status::text,'approved') NOT IN ('rejected_personal','rejected_misattributed','review_needed')
+      AND COALESCE(image_vehicle_match_status,'pending') NOT IN ('mismatch','unrelated')
+      AND image_url IS NOT NULL AND image_url <> ''
+    ORDER BY public.image_cover_rank(id, ai_scan_metadata, is_document), (source = ANY(c_owner)) DESC, COALESCE(taken_at,created_at) DESC LIMIT 1;
+    IF v_id IS NOT NULL THEN v_tier := 'public_duplicate'; END IF;
+  END IF;
+
   IF v_id IS NULL THEN
     -- No frame the public may read: a held frame must not stay the cover, so clear it rather than keep it.
     UPDATE vehicle_images SET is_primary = false

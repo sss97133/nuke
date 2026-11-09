@@ -198,6 +198,17 @@ SELECT pg_temp.assert_true((SELECT primary_image_url FROM vehicles WHERE id = '0
   'reverting the analysis run returns to the classifier-only order (newest unclassified)');
 UPDATE public.image_observations SET is_active = true;
 
+-- Tier 6: every public frame is a duplicate copy (originals held for review). The cover must be
+-- the public exterior copy, never empty and never the paperwork copy or the held original.
+INSERT INTO vehicles VALUES ('00000000-0000-4000-8000-0000000000c1', 'c-old-receipt');
+INSERT INTO vehicle_images(id, vehicle_id, image_url, source, taken_at, vision_gate_status, is_duplicate, ai_scan_metadata) VALUES
+ ('00000000-0000-4000-8000-000000000021', '00000000-0000-4000-8000-0000000000c1', 'c-held-original', 'ssd_blast', '2021-11-09', 'review_needed', false, '{"classification":{"image_type":"exterior"}}'),
+ ('00000000-0000-4000-8000-000000000022', '00000000-0000-4000-8000-0000000000c1', 'c-dup-exterior', 'iphoto', '2021-11-09', 'approved', true, '{"classification":{"image_type":"exterior"}}'),
+ ('00000000-0000-4000-8000-000000000023', '00000000-0000-4000-8000-0000000000c1', 'c-dup-receipt', 'iphoto', '2021-11-10', 'approved', true, '{"classification":{"image_type":"receipt_document"}}');
+SELECT public.recompute_vehicle_primary_image('00000000-0000-4000-8000-0000000000c1');
+SELECT pg_temp.assert_true((SELECT primary_image_url FROM vehicles WHERE id = '00000000-0000-4000-8000-0000000000c1') = 'c-dup-exterior',
+  'all-duplicate gallery: the public exterior copy, not an empty cover, the receipt, or the held original');
+
 \i supabase/sql/revert_20261113100000_cover_exterior_first.sql
 SELECT pg_temp.assert_true(md5(pg_get_functiondef('public.recompute_vehicle_primary_image(uuid)'::regprocedure)) = '0abc418f16fa239c346397f060bba3e9'
   AND to_regprocedure('public.image_cover_rank(jsonb, boolean)') IS NULL
