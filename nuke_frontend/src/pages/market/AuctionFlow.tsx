@@ -63,7 +63,14 @@ export function AuctionFlow({ bids, houses, auctions, configuredSources, sourceS
           </span>
           {status && <small>{status.hasError ? 'Inventory reader reports an error' : status.readAt == null ? 'Inventory check not recorded' : now - status.readAt > 900_000 ? 'Inventory check is stale' : `Reader found ${status.lots ?? 'unknown'} lots`}{status.readAt != null ? ` · ${new Date(status.readAt).toLocaleString()}` : ''}{status.state ? ` · ${status.state.replaceAll('_', ' ')}` : ''}</small>}
           {status?.collectionState === 'paused' && <small>Native auction collector paused</small>}
-          {status?.discoveryState && <small>{({ unrecorded: 'Discovery feed not recorded', disabled: 'Discovery feeds disabled', no_listings_parsed: 'Discovery failed to parse listings', blocked: 'Discovery is blocked or deferred', error: 'Discovery reports an error', unverified: 'Discovery enabled · landing unverified' } as Record<string, string>)[status.discoveryState]}{status.discoveryAttemptAt != null ? ` · last attempt ${new Date(status.discoveryAttemptAt).toLocaleString()}` : ''}</small>}
+          {house === 'ebay-motors' && status?.collectionState === 'scheduled' && <small>Native API collector scheduled</small>}
+          {status?.nativePollMinutes != null && <small>Native polling configured every {status.nativePollMinutes} minutes · not continuous bid coverage</small>}
+          {status?.deliveryQueue && <small>{status.deliveryQueue.state === 'recorded'
+            ? <>{status.deliveryQueue.count} retained receipts queued for delivery{status.deliveryQueue.oldestReadAt != null ? ` · oldest source read ${Math.max(0, Math.floor((now - status.deliveryQueue.oldestReadAt) / 60_000))}m ago` : ''}. May include landed receipts awaiting acknowledgement.</>
+            : status.deliveryQueue.state === 'invalid' ? 'Delivery queue could not be measured' : 'Delivery queue not recorded'}
+            {status.deliveryQueue.measuredAt != null ? ` · measured ${clock(status.deliveryQueue.measuredAt)}` : ''}
+            {status.deliveryQueue.updatedAt != null ? ` · queue changed ${new Date(status.deliveryQueue.updatedAt).toLocaleString()}` : ''}</small>}
+          {status?.discoveryState && <small>{house === 'ebay-motors' ? 'Generic discovery: ' : ''}{({ unrecorded: 'Discovery feed not recorded', disabled: 'Discovery feeds disabled', no_listings_parsed: 'Discovery failed to parse listings', blocked: 'Discovery is blocked or deferred', error: 'Discovery reports an error', unverified: 'Discovery enabled · landing unverified' } as Record<string, string>)[status.discoveryState]}{status.discoveryAttemptAt != null ? ` · last attempt ${new Date(status.discoveryAttemptAt).toLocaleString()}` : ''}</small>}
           <small>{stale ? 'Last received evidence' : held && !held.onBoard ? 'Board freshness gate holds this source' : group.length ? 'Arrivals observed · completeness unverified' : 'No receipts in window · coverage unverified'}</small>
         </button>;
       })}
