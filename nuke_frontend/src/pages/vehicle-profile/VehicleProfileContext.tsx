@@ -732,7 +732,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
         const platform = String((merged as any)?.platform || auctionPulse?.platform || '');
-        const listingUrl = String((merged as any)?.listing_url || auctionPulse?.listing_url || '');
+        const listingUrl = String((merged as any)?.listing_url || '');
+        if (!listingUrl) { setAuctionPulse(null); return; }
 
         let commentCount: number | null =
           typeof (merged as any)?.comment_count === 'number'
@@ -744,13 +745,13 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         try {
           const [cCount, lastBid, lastComment, lastSeller] = await Promise.all([
             commentCount === null
-              ? supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicle!.id)
+              ? supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl).or('bid_amount.is.null,comment_type.neq.bid')
               : Promise.resolve({ count: commentCount } as any),
-            supabase.from('auction_comments').select('posted_at, author_username').eq('vehicle_id', vehicle!.id)
+            supabase.from('auction_comments').select('posted_at, author_username').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
               .not('bid_amount', 'is', null).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('posted_at').eq('vehicle_id', vehicle!.id)
-              .order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('author_username').eq('vehicle_id', vehicle!.id)
+            supabase.from('auction_comments').select('posted_at').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
+              .or('bid_amount.is.null,comment_type.neq.bid').order('posted_at', { ascending: false }).limit(1).maybeSingle(),
+            supabase.from('auction_comments').select('author_username').eq('vehicle_id', vehicle!.id).eq('source_url', listingUrl)
               .eq('is_seller', true).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
           ]);
 

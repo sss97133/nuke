@@ -910,3 +910,32 @@ it.each([['collecting_cars', 'AUD', 'A$15,000'], ['purplewave', 'USD', '$15,000'
     expect(currentBidEvidenceAmount({ price_amount: 15000, source_url: url }, current.auctionPulse)).toBe('15,000 (currency unrecorded)');
   },
 );
+
+
+it.each(['https://bringatrailer.com/listing/old-lot/', 'https://carsandbids.com/auctions/other-lot/'])(
+  'does not inherit current-lot telemetry from %s during polling', async otherUrl => {
+    const url = 'https://bringatrailer.com/listing/current-lot/';
+    let sourceUrl: string | null = url;
+    const currentClock = '2026-11-08T01:00:00Z';
+    reply = request => {
+      if (endpoint(request, 'vehicle_events', a)) return json([{ ...listing(a), source_platform: 'bat',
+        source_url: sourceUrl, event_status: 'active', current_price: 15000, bid_count: 2,
+        final_price: null, sold_at: null, ended_at: new Date(Date.now() + 86400000).toISOString() }]);
+      if (!endpoint(request, 'auction_comments', a)) return undefined;
+      const exact = request.url.searchParams.get('source_url') === `eq.${url}`;
+      return json({ posted_at: exact ? currentClock : '2026-11-08T23:00:00Z',
+        author_username: exact ? 'current-source' : 'wrong-source', source_url: exact ? url : otherUrl });
+    };
+    await render();
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(current.auctionPulse).toMatchObject({ listing_url: url, last_bid_at: currentClock, last_comment_at: currentClock });
+    const reads = requests.filter(request => endpoint(request, 'auction_comments', a));
+    expect(reads.length).toBeGreaterThan(4);
+    expect(reads.every(request => request.url.searchParams.get('source_url') === `eq.${url}`)).toBe(true);
+    const before = reads.length;
+    sourceUrl = null;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(current.auctionPulse).toBeNull();
+    expect(requests.filter(request => endpoint(request, 'auction_comments', a))).toHaveLength(before);
+  },
+);
