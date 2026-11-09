@@ -381,6 +381,11 @@ observation → original source**. The prior job can point back into the repair 
 nodes, not duplicated ownership of every descendant. A missing outcome is unobserved, not successful work. A
 rating has a reviewer, criterion and work context; it is not automatically a measurement of technical skill.
 
+Artistic practice uses this same contribution foundation: a person's evidenced activity can develop their skill record across
+vehicles and artworks. Keep the originating artist, executor, holder and documenting photographer as contextual roles; a
+library association is not a creation claim. The shared automotive/art repair and its open acceptance cases are in
+`data-machine-cases.md` §21.4. Extend existing contribution and capability owners before introducing a separate artist system.
+
 Above that evidence, follow the card's five layers:
 
 1. **Log:** source-keyed claims/events and corrections, with their event and recording clocks.

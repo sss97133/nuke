@@ -3871,6 +3871,9 @@ and a reader that lists an exhibitor's works beside their public figures. Nothin
 
 ### 21.3 Art is an analysis, not a declaration (owner, 2026-11-08, night)
 
+The later owner correction in §21.4 rejects the creator/holder shortcut in the implementation below. Analysis-first remains
+the direction; the proposal pipeline here is a dated receipt, not evidence of model acceptance.
+
 Owner, verbatim, after `/assets/new` shipped as a form: "why cant vision api or an agent declare wtf" … "art is an analysis not a
 declaration done manually. humans arent for manual data input" … "you bypassed all theory" … "we prioritizing the aggregation of
 data and defining what the data points towards more tahn being an excel sheet for users to arbitrarily fill out".
@@ -3893,3 +3896,49 @@ development). The correction, built the same night:
   photographed, places, method), the photographs as the record's history, and *No public sale recorded*.
 - **Declared assumptions, to be tuned by corrections**: the place and album regexes, the 0.90 threshold, the sitting grain.
   Feature prints merge scenes below 0.85; a gallery sitting of many works by others is skipped (`gallery` kind with > 3 photos).
+
+### 21.4 Artistic practice belongs to the shared contribution model (owner correction, 2026-11-09)
+
+The photo proposal path in §21.3 is a dated implementation receipt, not an accepted model of authorship or holding.
+The owner's correction is that artistic practice should become legible through the same evidenced contributions that
+develop a technician's skill record. Artwork development must extend that foundation, including its missing relationships.
+Analysis-first remains the direction; library membership, camera metadata, place and visual similarity do not establish
+creation or ownership. A photograph of another artist's work is useful documentation of that work.
+
+**Shared grain.** Keep the source image, depicted object, activity, participant and participant's role distinct. An activity
+can involve an originating artist, fabricator, printer, conservator, curator or documenting photographer. The same person can
+contribute in different roles across vehicles and artworks. The asset's history and the person's practice are readings of those
+shared contributions, not independent assertions copied into separate verticals. Authorship of the photograph and authorship
+of the depicted work are separate claims. A skill record does not by itself establish authorship of a particular work.
+
+**Existing owners and measured boundaries (live definitions checked 2026-11-09).** `capability_fold_actor` already derives
+`actor_capabilities` and retains source IDs in `actor_capability_basis`; `provider_capability_items` supplies the provider
+profile's evidence breakdown. Its basis reader consumes component events, reported-performed specifications, accepted
+completion and inspection findings. It does not consume `work_sessions`, `technician_work_evidence` or `asset_observations`.
+Those paths also use different identity references: session technician links target `technician_phone_links`, photo technician
+evidence targets `technicians`, and capabilities target `actors`. Their names do not establish identity equivalence.
+`work_sessions` requires a vehicle; the current process/operation mapping is automotive, with bare `paint` mapped to
+`paint_refinish`. Extending a list of skills alone cannot repair the missing participant and subject relationships.
+
+`photo_work_proof_read` already distinguishes documented activity from performance, but its `own_hands` camera-viewpoint
+classification does not independently establish performer identity. First-to-last photo spans describe capture coverage;
+they do not establish active labor duration or a lower bound on that duration. These are limitations to repair in their
+existing owners, not evidence to attribute work or hours to the library user.
+
+**First shared acceptance.** Trace retained evidence through existing sanctioned intake, contextual contribution, participant
+identity and the intended asset/person readers for each of these cases:
+
+- Vehicle paint or fabrication work and artwork production can develop the same person's evidenced practice, while retaining
+  each activity's subject, method, dates, role and unresolved attribution.
+- A museum photograph contributes documentation to the depicted work and the contributor's history without assigning the
+  depicted work's authorship, ownership, rights or production labor to the contributor.
+- Correcting a false artwork classification, a same-object match or a participant role revises that proposition and its
+  dependent readers without discarding the source photograph or unrelated contributions.
+- Naming an object or accepting a match does not also assert creation or holding. A supported creation claim can coexist
+  with a different holder; an artist, executor and photographer retain their separate credit.
+- Shared source evidence remains one witness when reused across folds. Supersession and withdrawal propagate to the
+  contribution and skill readings, with earlier testimony retained and uncertainty visible.
+
+The foundation repair is open. This section introduces no schema, writer, identity merge, data correction or release.
+Reconcile the active art design and ingestion lanes before changing their owners. Technical checks alone do not close these
+cases: verify the source-to-consumer activity with the actual records and the intended visibility.
