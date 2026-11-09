@@ -8,6 +8,7 @@ vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => fixture.con
 vi.mock('../../components/vehicle/VehicleCommentsCard', () => ({
   VehicleCommentsCard: (props: any) => { fixture.comments(props); return <div data-testid="comment-reader">Comments &amp; Bids</div>; },
 }));
+vi.mock('./FinancialReceiptRecords', () => ({ ProfileReceiptRecords: () => <section data-testid="receipt-pages">Work &amp; parts</section> }));
 vi.mock('./WorkMemorySection', () => ({ default: () => null }));
 vi.mock('./VehicleDossierPanel', () => ({ default: () => <div data-testid="specifications">Retained specifications</div> }));
 vi.mock('../../components/vehicle/VehicleLedgerDocumentsCard', () => ({ VehicleLedgerDocumentsCard: () => null }));

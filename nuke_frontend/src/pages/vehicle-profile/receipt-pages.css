@@ -1,0 +1,33 @@
+.vp-receipt-section { margin: 20px 12px 28px; color: var(--text); scroll-margin-top: var(--vp-sticky-top, 100px); }
+.vp-receipt-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.vp-receipt-heading h3 { margin: 0; font-size: 22px; }
+.vp-receipt-heading > span, .vp-receipt-intro { color: var(--text-secondary); font-size: 14px; }
+.vp-receipt-intro { margin: 6px 0 16px; }
+.vp-receipt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); align-items: start; gap: 20px; }
+.vp-receipt-page { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; min-width: 0; font-size: 14px; line-height: 1.45; }
+.vp-receipt-page > header { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.vp-receipt-page h4 { font-size: 18px; line-height: 1.25; margin: 0; }
+.vp-receipt-page header p { margin: 5px 0 0; font-size: 12px; color: var(--text-secondary); }
+.vp-receipt-lines { width: 100%; border-collapse: collapse; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.vp-receipt-lines th { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.vp-receipt-lines th, .vp-receipt-lines td { text-align: right; padding: 10px 0 10px 10px; vertical-align: top; }
+.vp-receipt-lines th:first-child, .vp-receipt-lines td:first-child { text-align: left; padding-left: 0; }
+.vp-receipt-lines tbody tr + tr { border-top: 1px solid var(--border); }
+.vp-receipt-lines td:first-child { overflow-wrap: anywhere; }
+.vp-receipt-lines small, .vp-receipt-lines time { display: block; margin-top: 3px; color: var(--text-secondary); font-size: 12px; }
+.vp-receipt-lines time { color: var(--text); font-weight: 600; margin: 0 0 4px; }
+.vp-receipt-page footer { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.vp-receipt-page footer dl { display: grid; grid-template-columns: 1fr auto; gap: 5px 16px; color: var(--text-secondary); margin: 0 0 10px; }
+.vp-receipt-page footer dd { text-align: right; margin: 0; font-variant-numeric: tabular-nums; }
+.vp-receipt-total { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
+.vp-receipt-total strong { text-align: right; font-variant-numeric: tabular-nums; }
+.vp-receipt-note { font-size: 12px; color: var(--text-secondary); }
+.vp-receipt-page button, .vp-receipt-section > button { min-height: 44px; border-radius: var(--radius); padding: 7px 12px; border: 1px solid var(--border); background: var(--surface); color: var(--accent); cursor: pointer; }
+.vp-receipt-page button:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+.vp-receipt-page .vp-financial-original { margin-top: 14px; }
+.vp-receipt-expand { width: 100%; }
+.vp-receipt-page .vp-receipt-note button { margin-left: 8px; }
+
+.vp-receipt-filter { display: flex; align-items: center; gap: 12px; font-size: 14px; margin: 0 0 16px; }
+.vp-receipt-filter select { min-height: 44px; min-width: 220px; max-width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 12px; }
+.vp-receipt-browse { margin-top: 16px; }
