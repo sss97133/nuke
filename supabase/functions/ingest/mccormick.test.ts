@@ -47,8 +47,8 @@ Deno.test("McCormick follows advertised catalogs only and rejects external or du
   eq(p.lots,[url]);eq(p.catalogs,["https://www.classic-carauction.com/Auction-47","https://www.classic-carauction.com/auction-results?auctionnbr=47"]);
 });
 
-async function world(failure?: "archive" | "admission" | "readback" | "images" | "identity", unresolved = false, mileage = "TMU") {
-  const body = (unresolved ? html.replace("1967 FORD MUSTANG", "1967 FORD") : html).replace(">TMU</TD>", `>${mileage}</TD>`);
+async function world(failure?: "archive" | "admission" | "readback" | "images" | "identity", unresolved = false, mileage = "TMU", vin = "TBA") {
+  const body = (unresolved ? html.replace("1967 FORD MUSTANG", "1967 FORD") : html).replace(">TMU</TD>", `>${mileage}</TD>`).replace('>TBA</TD>', `>${vin}</TD>`);
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map(b => b.toString(16).padStart(2, "0")).join("");
   let payload: any, matched: any, matches = 0, calls = 0;
   const source = { id: "source", species: "block_house", supported_observations: ["listing"] };
@@ -86,6 +86,15 @@ Deno.test("landing verifies capture, observation and images and disables paid an
   eq(result.mccormick_receipt.images, 2); eq(result.vehicle_id, "vehicle");
   eq(w.payload().defer_analysis, true); eq(w.payload().observed_at, "2026-01-01T00:00:00Z");
   eq(w.payload().raw_source_ref, "listing_page_snapshots:snapshot");
+});
+Deno.test("a real VIN make conflict is retained as an unbound source claim before vehicle admission", async () => {
+  const w = await world(undefined, false, "TMU", "1HGCM82633A004352");
+  const result = await w.run();
+  eq(w.counts().matches, 0);
+  eq(result.mccormick_receipt.unresolved, true);
+  eq(w.payload().vehicle_id, undefined);
+  eq(w.payload().structured_data.vin, "1HGCM82633A004352");
+  eq(w.payload().extraction_metadata.quality_issues.some((s: string) => s.startsWith('vin_make_mismatch:')), true);
 });
 for (const failure of ["archive", "identity", "admission", "readback", "images"] as const) {
   Deno.test(`landing refuses false success when ${failure} fails`, async () => {

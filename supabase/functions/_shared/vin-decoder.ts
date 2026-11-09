@@ -374,7 +374,9 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['WP', 'Porsche', 'Porsche'],
     ['WV', 'Volkswagen', 'Volkswagen'],
     ['ZF', 'Ferrari', 'Ferrari'],
-    ['ZA', 'Alfa Romeo', 'Alfa Romeo'],
+    // NHTSA vPIC DecodeWMI/ZAM and /ZAR: ZA alone spans distinct marques.
+    ['ZAM', 'MASERATI S.P.A.', 'Maserati'],
+    ['ZAR', 'ALFA ROMEO S.P.A.', 'Alfa Romeo'],
     ['SA', 'Jaguar', 'Jaguar'],
     ['SJ', 'Jaguar', 'Jaguar'],
     ['SC', 'Lotus', 'Lotus'],

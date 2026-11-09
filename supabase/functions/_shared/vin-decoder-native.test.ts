@@ -17,3 +17,12 @@ Deno.test("3C6 retains manufacturer without falsely projecting Chrysler as the m
   assertEquals(decoded.manufacturer, "CHRYSLER DE MEXICO TOLUCA");
   assertEquals(decoded.manufacturer_make_candidates, ["Dodge", "Chrysler", "Volkswagen", "Jeep", "Fiat", "RAM", "Lancia"]);
 });
+
+Deno.test("specific Italian WMIs distinguish Maserati from Alfa Romeo without guessing other ZA marques", () => {
+  // NHTSA vPIC decodes the actual McCormick15440 VIN as a 2002 Maserati Coupe.
+  const decoded = decodeVin("ZAMBC38A320008428");
+  assertEquals(decoded.make, "Maserati");
+  assertEquals(decoded.manufacturer, "MASERATI S.P.A.");
+  assertEquals(decodeVin(vin("ZAR")).make, "Alfa Romeo");
+  assertEquals(decodeVin(vin("ZAP")).make, null);
+});
