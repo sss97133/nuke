@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import * as ledger from '../supabase/functions/poll-listing-feeds/ledger.ts';
 import { captureLedgerFields } from '../supabase/functions/poll-listing-feeds/captureLedger.ts';
 import * as collectingCars from '../supabase/functions/poll-listing-feeds/collectingCars.ts';
+import { selectCollectingCarsReplay } from '../supabase/functions/poll-listing-feeds/collectingCarsReplay.ts';
 import { splitByYear } from '../supabase/functions/poll-listing-feeds/yearFilter.ts';
 import { fetchCraigslistFeed } from '../supabase/functions/poll-listing-feeds/feedFetch.ts';
 import { emptySearchHtml } from '../supabase/functions/poll-listing-feeds/fixtures/empty-search.ts';
@@ -38,11 +39,38 @@ export function fixture(options = {}) {
     static now() { return nowMs; }
   } : Date;
   const advance = ms => { if (options.timing) nowMs += ms; };
-  const calls = [], stored = new Map(), queued = new Map(); let serve, patchCount = 0, feedReadCount = 0;
+  const calls = [], stored = new Map(), queued = new Map(), snapshots = new Map((options.replaySnapshots ?? []).map(row=>[row.id,row])), targets = new Map(); let serve, patchCount = 0, feedReadCount = 0;
   const transport = async (input, init = {}) => {
     const url = new URL(input), method = init.method ?? 'GET';
     const body = init.body ? JSON.parse(init.body) : undefined;
-    calls.push({ path: url.pathname, query: url.search, method, body, at: runtimeDate.now() });
+    calls.push({ path: url.pathname, query: url.search, method, body, at: runtimeDate.now(), signal: init.signal });
+    if(url.pathname.startsWith("/storage/v1/object/")) {
+      assert.ok(init.signal, "protected preflight storage transport must receive the deadline signal");
+      if(options.replayStorageUnavailable)throw new DOMException("fixture abort", "AbortError");
+      return new Response(options.replayStorageBody ?? "");
+    }
+    if (url.hostname === 'dora.production.collecting.com') {
+      assert.ok(url.searchParams.get('x-typesense-api-key'));
+      if (!options.historyDocuments) throw new Error('unexpected CC search');
+      if (options.historyHttp) return new Response('source refusal', { status: options.historyHttp });
+      if(options.historyResponse)return Response.json(options.historyResponse);
+      const search=body.searches[0], m=search.filter_by.match(/^owningSite:=cars && auctionId:>(\d+) && auctionId:<=(\d+)$/);
+      assert.ok(m); assert.equal(search.sort_by,'auctionId:asc'); assert.equal(search.page,1);
+      const found=options.historyDocuments.filter(d=>d.owningSite==='cars' && d.auctionId>Number(m[1]) && d.auctionId<=Number(m[2])).sort((a,b)=>a.auctionId-b.auctionId);
+      return Response.json({results:[{found:found.length,hits:found.slice(0,search.per_page).map(document=>({document}))}]});
+    }
+    if (url.pathname === '/rest/v1/listing_page_snapshots') {
+      if(method==='POST') {
+        if(options.historyRetentionFailure) return Response.json({message:'retention unavailable'},{status:500});
+        const id=`00000000-0000-4000-8000-${String(9000+snapshots.size).padStart(12,'0')}`;
+        snapshots.set(id,{...body,id});return Response.json({id});
+      }
+      let rows=[...snapshots.values()].filter(row=>['id','platform','listing_url','success','http_status'].every(field=>
+        !url.searchParams.has(field)||String(row[field])===url.searchParams.get(field).slice(3)));
+      rows.sort((a,b)=>Date.parse(b.fetched_at)-Date.parse(a.fetched_at)||b.id.localeCompare(a.id));
+      if(url.searchParams.has('limit'))rows=rows.slice(0,Number(url.searchParams.get('limit')));
+      return Response.json(url.searchParams.has('limit')?rows:rows[0]??null);
+    }
     if (url.hostname === 'source.invalid') {
       advance(options.timing?.sourceMs ?? 0);
       if (options.sourceFailures?.[url.pathname]) return new Response('', { status: options.sourceFailures[url.pathname] });
@@ -51,9 +79,9 @@ export function fixture(options = {}) {
         `<item><title>1980 Ford fixture</title><link>https://bringatrailer.com/listing/${url.pathname.slice(1)}-${i}/</link></item>`).join('') + '</channel></rss>');
     }
     if (url.pathname === '/functions/v1/ingest') {
-      if (method === "GET") return Response.json({ capabilities: { dealer_microdata_native: options.nativeNotDeployed !== true, collecting_cars_native_listing: options.nativeNotDeployed !== true } });
+      if (method === "GET") return Response.json({ capabilities: { dealer_microdata_native: options.nativeNotDeployed !== true, collecting_cars_native_listing: options.nativeNotDeployed !== true, collecting_cars_pinned_closed_replay: options.pinnedCapability !== false } });
       advance(options.timing?.ingestMs ?? 0);
-      const outcome = options.ingestResult?.(body.url) ?? { status: 'created', vehicle_id: vehicleId };
+      const outcome = options.ingestResult?.(body.url,body) ?? { status: 'created', vehicle_id: vehicleId };
       return outcome instanceof Response ? outcome : Response.json(outcome);
     }
     if (url.pathname === '/rest/v1/observation_sources') return Response.json(options.observationSource ?? { id: 'dealer-source', species: 'dealer', supported_observations: ['listing'] });
@@ -65,7 +93,11 @@ export function fixture(options = {}) {
     }
     if (url.pathname === '/rest/v1/vehicle_observations') return Response.json(url.searchParams.get('id')?.startsWith('eq.')
       ? (options.nativeObservations ?? []).find(o => o.id === url.searchParams.get('id').slice(3)) ?? null : options.nativeObservations ?? []);
-    if (url.pathname === '/rest/v1/source_targets' && method === 'POST') return Response.json(body);
+    if (url.pathname === '/rest/v1/source_targets') {
+      if(method==='POST') {for(const row of body)if(!targets.has(row.listing_url))targets.set(row.listing_url,row);return Response.json(body);}
+      const listed=url.searchParams.get('listing_url')?.slice(4,-1).split(',').map(v=>v.replace(/^\"|\"$/g,''));
+      return Response.json([...targets.values()].filter(row=>(!url.searchParams.has('source_slug')||row.source_slug===url.searchParams.get('source_slug').slice(3))&&(!listed||listed.some(value=>value===row.listing_url))));
+    }
     if (url.pathname === '/rest/v1/platform_config') return Response.json(options.controls ? { config_value: options.controls } : null);
     if (url.pathname === '/rest/v1/listing_feeds') {
       if (method === 'GET') {
@@ -85,9 +117,15 @@ export function fixture(options = {}) {
         const limit = Math.min(Number(url.searchParams.get('limit') || 1000), options.feedApiCap ?? 1000);
         return Response.json(selected.slice(offset, offset + limit));
       }
+      if(body.search_criteria && url.searchParams.has('search_criteria')) {
+        const target=feeds.find(row=>row.id===url.searchParams.get('id')?.slice(3));
+        if(options.historyCheckpointFailure || JSON.stringify(target?.search_criteria)!==url.searchParams.get('search_criteria').slice(3))return Response.json([]);
+        Object.assign(target,body);return Response.json([{id:target.id}]);
+      }
       if (options.retainLedger) Object.assign(feeds.find(row => row.id === url.searchParams.get('id')?.slice(3)) ?? {}, body);
       return new Response(null, { status: 204 });
     }
+    if (url.pathname === '/rest/v1/vehicles' && url.searchParams.get('listing_url')?.startsWith('eq.') && url.searchParams.get('select')?.includes('origin_metadata'))return Response.json(options.replayOwners ?? []);
     if (url.pathname === '/rest/v1/vehicles') return Response.json(url.searchParams.has('id')
       ? [{ id: vehicleId, description: 'Retained fixture description' }] : (options.knownUrls ?? []).map(listing_url => ({ listing_url })));
     if (url.pathname === '/rest/v1/import_queue') {
@@ -127,6 +165,26 @@ export function fixture(options = {}) {
       throw new Error(`Unexpected PurpleWave import ${name}`);
     },
   });
+  // Run the real capture writer and history reader against the installed SDK transport.
+  const archive={exports:{}};
+  vm.runInNewContext(compile(readFileSync(new URL('../supabase/functions/_shared/archiveFetch.ts',import.meta.url),'utf8')), {
+    exports:archive.exports,module:archive,URL,URLSearchParams,TextEncoder,crypto:webcrypto,Date:runtimeDate,console,
+    require(name) {
+      if(name.includes('supabase-js'))return {createClient:()=>db};
+      if(name.endsWith('/batFetcher.ts'))return {isLoginPage:()=>false}; // Native search JSON, not a rendered login page.
+      if(name.endsWith('/supabaseKeys.ts'))return {projectSecretKey:()=> 'synthetic-service-key'};
+      return {};
+    },
+  });
+  const ccHistory={exports:{}};
+  vm.runInNewContext(compile(readFileSync(new URL('../supabase/functions/poll-listing-feeds/collectingCarsHistory.ts',import.meta.url),'utf8')), {
+    exports:ccHistory.exports,module:ccHistory,URL,URLSearchParams,TextEncoder,crypto:webcrypto,AbortSignal,Date:runtimeDate,fetch:transport,
+    require(name) {
+      if(name.endsWith('/archiveFetch.ts'))return archive.exports;
+      if(name.endsWith('/ledger.ts'))return ledger;
+      throw new Error(`Unexpected CC history import ${name}`);
+    },
+  });
   const source = options.source ?? readFileSync(new URL('../supabase/functions/poll-listing-feeds/index.ts', import.meta.url), 'utf8');
   vm.runInNewContext(compile(source + '\nexport { pollFirecrawlHtmlFeed };'), {
     exports: module.exports, module, Request, Response, URL, AbortSignal, AbortController, Date: runtimeDate, crypto: webcrypto,
@@ -136,7 +194,7 @@ export function fixture(options = {}) {
     Deno: { env: { get: key => key === 'SUPABASE_URL' ? 'https://database.invalid' : 'synthetic-service-key' }, serve: fn => { serve = fn; } },
     require(name) {
       if (name === 'https://esm.sh/parse5@7.3.0') return { parse };
-      if (name.includes('supabase-js')) return { createClient: () => db };
+      if (name.includes('supabase-js')) return { createClient: (url,key,options) => options?.global?.fetch ? createClient(url,key,options) : db };
       if (name.endsWith('/ledger.ts')) return { ...ledger,
         createIntakeBudget: (throttle, start) => ledger.createIntakeBudget(throttle, start, runtimeDate.now) };
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
@@ -149,6 +207,8 @@ export function fixture(options = {}) {
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
       if (name.endsWith('/kslCards.ts')) return { parseKslSearchCards: () => [] };
       if (name === './collectingCars.ts') return collectingCars;
+      if (name === './collectingCarsHistory.ts') return ccHistory.exports;
+      if (name === './collectingCarsReplay.ts') return { selectCollectingCarsReplay };
       if (name.endsWith('/yearFilter.ts')) return { splitByYear };
       if (name.endsWith('/firecrawlGate.ts')) return { firecrawlGate: () => ({ allow: async () => true, record: async () => {} }), ALLOWANCE_EXHAUSTED: 'allowance_deferred: test' };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
@@ -162,7 +222,7 @@ export function fixture(options = {}) {
       throw new Error(`Unexpected feed import ${name}`);
     },
   });
-  return { calls, stored, queued, db, feed, advance,
+  return { calls, stored, queued, snapshots, targets, db, feed, advance,
     async poll() { return module.exports.pollFirecrawlHtmlFeed(db, feed, ledger.createIntakeBudget(ledger.intakeThrottle({}), Date.now())); },
     async request(body = {}) { const response = await serve(new Request('https://fixture.invalid/poll-listing-feeds', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
@@ -783,4 +843,188 @@ test('actual CC all-year feed admits pre1964 and post1991 full receipts while ex
     assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,before);
     if(restricted)assert.deepEqual(f.calls.find(c=>c.path==='/rest/v1/source_targets').body.map(row=>row.listing_url),[urls[0],urls[2]]);
   }
+});
+
+function ccHistoryFixture(overrides={}) {
+  const uuid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+  const documents=overrides.historyDocuments??Array.from({length:25},(_,i)=>({auctionId:i+1,owningSite:'cars',
+    slug:`1960-history-${i+1}`,lotType:i===0?'plate':'car',listingStage:'sold',productYear:'1960',currencyCode:'GBP',priceSold:100+i}));
+  const clock=new Date(Date.now()-7*86400000).toISOString();
+  const receipts=new Map(documents.filter(d=>d.lotType==='car').map(d=>[`https://collectingcars.com/for-sale/${d.slug}`,
+    {observation_id:uuid(1000+d.auctionId),snapshot_id:uuid(2000+d.auctionId),source_read_at:clock,images:3}]));
+  const nativeObservations=[...receipts].map(([url,r])=>({id:r.observation_id,vehicle_id:uuid(2),source_id:uuid(71),source_url:url,
+    kind:'listing',extraction_method:'cc_native_listing_v1',is_superseded:false,raw_source_ref:`listing_page_snapshots:${r.snapshot_id}`,observed_at:r.source_read_at}));
+  const f=fixture({feed:{source_slug:'collecting-cars',feed_url:'https://collectingcars.com/search/',poll_interval_minutes:15,
+    search_criteria:{fetch_strategy:'collecting_cars_history',history_version:1,history_ceiling_id:25,history_after_id:0,history_capture:null,history_pass:1,history_discovery_complete:false}},
+    controls:{max_ingests:2},knownUrls:[],retainLedger:true,historyDocuments:documents,
+    observationSource:{id:uuid(71),supported_observations:['listing']},nativeObservations,
+    ingestResult:url=>({status:'created',vehicle_id:uuid(2),collecting_cars_receipt:receipts.get(url)}),...overrides});
+  return {...f,documents,receipts,nativeObservations};
+}
+
+test('actual historical handler resumes retained membership after capped batches and reaches the exact cohort boundary',async()=>{
+  const f=ccHistoryFixture();
+  const first=await f.request({force:true});
+  assert.ok(f.feed.search_criteria.history_capture, JSON.stringify(first.body));
+  assert.equal(f.feed.search_criteria.history_after_id,0);
+  const captured=f.feed.search_criteria.history_capture.id;
+  assert.equal(f.snapshots.size,1);assert.equal(f.targets.size,20);
+  assert.equal(new URL(f.snapshots.get(captured).listing_url).searchParams.has('x-typesense-api-key'),false);
+  assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,2);
+  await f.request({force:true});
+  assert.equal(f.feed.search_criteria.history_capture.id,captured);
+  assert.equal(f.calls.filter(c=>c.path==='/multi_search').length,1);
+  for(let i=0;i<8;i++)await f.request({force:true});
+  assert.equal(f.feed.search_criteria.history_after_id,20);assert.equal(f.feed.search_criteria.history_capture,null);
+  // A new lot outside the census boundary cannot enter the old cohort.
+  f.documents.push({auctionId:100,owningSite:'cars',slug:'2020-new-later',lotType:'car'});
+  for(let i=0;i<3;i++)await f.request({force:true});
+  assert.equal(f.feed.search_criteria.history_after_id,0);assert.equal(f.feed.search_criteria.history_pass,2);
+  assert.equal(f.feed.search_criteria.history_discovery_complete,true);
+  assert.equal(f.targets.size,25);assert.equal(f.queued.size,24);assert.equal(f.snapshots.size,2);
+  assert.equal([...f.queued.values()].every(row=>row.status==='complete'),true);
+  const invoked=f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').map(c=>c.body.url);
+  assert.equal(new Set(invoked).size,24);assert.equal(invoked.length,24);
+  assert.deepEqual(invoked,f.documents.filter(doc=>doc.lotType==='car'&&doc.auctionId<=25).map(doc=>`https://collectingcars.com/for-sale/${doc.slug}`));
+  // Current-index retry reconciliation may read again; seven-day-old full receipts stay settled.
+  await f.request({force:true});
+  assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,24);
+});
+
+test('actual historical handler never advances or ingests when page retention or checkpoint fails',async()=>{
+  for(const failure of [{historyRetentionFailure:true},{historyCheckpointFailure:true}]){
+    const f=ccHistoryFixture(failure);await f.request({force:true});
+    assert.equal(f.feed.search_criteria.history_after_id,0);assert.equal(f.feed.search_criteria.history_capture,null);
+    assert.equal(f.targets.size,0);assert.equal(f.calls.some(c=>c.path==='/functions/v1/ingest'&&c.method==='POST'),false);
+  }
+});
+
+test('actual historical handler rejects legacy complete testimony as capture evidence and does not advance an unacknowledged lot',async()=>{
+  const doc={auctionId:25,owningSite:'cars',slug:'1960-unseen-owner',lotType:'car',listingStage:'sold'};
+  const f=ccHistoryFixture({historyDocuments:[doc],ledgerError:true});
+  const url=`https://collectingcars.com/for-sale/${doc.slug}`;
+  f.queued.set(url,{status:'complete',vehicle_id:'00000000-0000-4000-8000-000000000002',listing_url:url});
+  await f.request({force:true});
+  assert.deepEqual(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').map(c=>c.body),[{url}]);
+  assert.equal(f.feed.search_criteria.history_after_id,0);assert.equal(f.feed.search_criteria.history_pass,1);
+  assert.ok(f.feed.search_criteria.history_capture);
+});
+
+test('actual historical handler retains noncars and durable failed debt without claiming canonical completion',async()=>{
+  const docs=[{auctionId:24,owningSite:'cars',slug:'1960-failed-car',lotType:'car',listingStage:'sold'},
+    {auctionId:25,owningSite:'cars',slug:'historical-number-plate',lotType:'plate'}];
+  const f=ccHistoryFixture({historyDocuments:docs,ingestResult:()=>({status:'error',error:'native parser missing source fields'})});
+  await f.request({force:true});
+  assert.equal(f.targets.size,2);assert.equal(f.queued.size,1);assert.equal([...f.queued.values()][0].status,'failed');
+  assert.equal(f.feed.search_criteria.history_pass,2);
+  const attempted=f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length;
+  await f.request({force:true});
+  assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,attempted);
+});
+
+
+test('historical held sources, malformed source pages and access refusals make no paid or canonical attempt',async()=>{
+  for(const options of [{controls:{max_ingests:0}},{controls:{sources:{'collecting-cars':{enabled:false}}}},
+    {historyHttp:403},{historyResponse:{results:[{found:1,hits:[]}]}},
+    {historyResponse:{results:[{found:1,hits:[{document:{auctionId:1,owningSite:'watches',slug:'1960-wrong-site',lotType:'car'}}]}]}}]){
+    const f=ccHistoryFixture(options);await f.request({force:true});
+    assert.equal(f.calls.some(c=>c.path==='/functions/v1/ingest'&&c.method==='POST'),false);
+    assert.equal(f.feed.search_criteria.history_after_id,0);assert.equal(f.snapshots.size,0);
+  }
+});
+
+test('historical retained-page hash and source attribution are required before resume',async()=>{
+  for(const patch of [{platform:'another-source'},{html:'tampered body'}]){
+    const f=ccHistoryFixture();await f.request({force:true});
+    const capture=f.feed.search_criteria.history_capture;
+    Object.assign(f.snapshots.get(capture.id),patch);
+    const before=f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length;
+    await f.request({force:true});
+    assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,before);
+    assert.equal(f.calls.filter(c=>c.path==='/multi_search').length,1);
+    assert.equal(f.feed.search_criteria.history_after_id,0);
+  }
+});
+
+async function ccPinnedFixture(options={}) {
+  const url='https://collectingcars.com/for-sale/2017-porsche-911-991-2-carrera-s-2';
+  const html=readFileSync(new URL('../supabase/functions/extract-collecting-cars/fixtures/lot-911.html',import.meta.url),'utf8');
+  const uuid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+  const hash=async text=>Buffer.from(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(text))).toString('hex');
+  const originalClock='2020-01-01T00:00:00.000Z';
+  const closed={id:uuid(501),listing_url:url,platform:'collectingcars',success:true,http_status:200,html,
+    html_sha256:await hash(html),fetched_at:originalClock,created_at:originalClock,metadata:{},content_length:html.length};
+  const openHtml=html.replaceAll('\\"stage\\":\\"unsold\\"','\\"stage\\":\\"live\\"');
+  assert.notEqual(openHtml,html);
+  const open={...closed,id:uuid(502),html:openHtml,html_sha256:await hash(openHtml),fetched_at:'2021-01-01T00:00:00.000Z',created_at:'2021-01-01T00:00:00.000Z'};
+  const receipt={observation_id:uuid(601),snapshot_id:closed.id,source_read_at:originalClock,images:3};
+  const owner={id:uuid(2),listing_url:url,year:2017,make:'Porsche',vin:'WP0ZZZ99ZHS000000',origin_metadata:{auction_id:'93268'}};
+  const nativeObservations=[{id:receipt.observation_id,vehicle_id:owner.id,source_id:uuid(71),source_url:url,kind:'listing',
+    extraction_method:'cc_native_listing_v1',is_superseded:false,raw_source_ref:`listing_page_snapshots:${closed.id}`,observed_at:originalClock}];
+  const f=ccHistoryFixture({feed:{source_slug:'collecting-cars',feed_url:'https://collectingcars.com/search/',poll_interval_minutes:15,
+      search_criteria:{fetch_strategy:'collecting_cars_history',history_version:1,history_ceiling_id:93268,history_after_id:0,history_capture:null,history_pass:1}},
+    historyDocuments:[{auctionId:93268,slug:url.split('/').pop(),owningSite:'cars',listingStage:'sold',lotType:'car'}],
+    knownUrls:[url],replayOwners:[owner],replaySnapshots:[open,closed],nativeObservations,
+    ingestResult:()=>({status:'matched',vehicle_id:owner.id,collecting_cars_receipt:receipt}),...options});
+  return {...f,url,html,closed,open,owner,receipt,hash};
+}
+
+test('history replay skips a newer open candidate then admits the older closed pin with its original source clock',async()=>{
+  const f=await ccPinnedFixture();const result=await f.request({force:true});
+  const posts=f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST');
+  assert.deepEqual(posts.map(c=>c.body),[{url:f.url,cc_snapshot:{snapshot_id:f.closed.id,expected_sha256:f.closed.html_sha256}}]);
+  assert.equal(result.body.throttle.attempted,1);
+  assert.equal(f.queued.get(f.url).status,'complete');
+  assert.equal(f.queued.get(f.url).raw_data.collecting_cars_receipt.source_read_at,'2020-01-01T00:00:00.000Z');
+  assert.equal(f.calls.filter(c=>c.path==='/multi_search').length,1);
+  assert.equal(f.feed.search_criteria.history_pass,2);
+});
+
+test('history replay refusal retains a durable failed preflight without a paid or ingest attempt',async()=>{
+  for(const kind of ['ambiguous','deleted','native-id','owner-year','hash','withdrawn']){
+    const base=await ccPinnedFixture();let options={};
+    if(kind==='ambiguous')options.replayOwners=[base.owner,{...base.owner,id:'00000000-0000-4000-8000-000000000003'}];
+    if(kind==='deleted')options.replayOwners=[{...base.owner,deleted_at:'2022-01-01'}];
+    if(kind==='native-id')options.replayOwners=[{...base.owner,origin_metadata:{}}], options.historyDocuments=[{auctionId:93267,slug:base.url.split('/').pop(),owningSite:'cars',listingStage:'sold',lotType:'car'}];
+    if(kind==='owner-year')options.replayOwners=[{...base.owner,year:2016}];
+    if(kind==='hash')options.replaySnapshots=[{...base.closed,html_sha256:'a'.repeat(64)}];
+    if(kind==='withdrawn'){
+      const html=base.html.replaceAll('\\"stage\\":\\"unsold\\"','\\"stage\\":\\"withdrawn\\"');
+      options.replaySnapshots=[{...base.closed,html,html_sha256:await base.hash(html)}];
+    }
+    const f=await ccPinnedFixture(options);const result=await f.request({force:true});
+    assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,0,kind);
+    assert.equal(result.body.throttle.attempted,0,kind);
+    assert.equal(f.queued.get(f.url).status,'failed',kind);
+    assert.equal(f.feed.search_criteria.history_pass,2,kind);
+    const outcome=result.body.results[0].ingest_outcomes[0];assert.equal(outcome.ingest_attempted,false,kind);
+    assert.equal(result.body.results[0].retained_inventory.failed_or_backing_off,1,kind);
+    await f.request({force:true});assert.equal(f.queued.get(f.url).attempts,1,kind);
+  }
+});
+
+test('unknown replay write outcome never falls back to a fresh ingest or another pin',async()=>{
+  const f=await ccPinnedFixture({ingestResult:()=>{throw Error('upstream timeout after potential write');}});
+  await f.request({force:true});
+  const posts=f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST');
+  assert.equal(posts.length,1);assert.ok(posts[0].body.cc_snapshot);assert.equal(f.queued.get(f.url).status,'failed');
+});
+
+test('protected Storage preflight carries the real request signal and unavailable reads defer without an attempt',async()=>{
+  const base=await ccPinnedFixture();
+  for(const unavailable of [false,true]){
+    const f=await ccPinnedFixture({replaySnapshots:[{...base.closed,html:null,html_storage_path:'collectingcars/closed.html'}],
+      replayStorageBody:base.html,replayStorageUnavailable:unavailable});
+    const result=await f.request({force:true});
+    assert.ok(f.calls.find(c=>c.path.startsWith('/storage/v1/object/'))?.signal);
+    if(unavailable){assert.equal(result.body.throttle.attempted,0);assert.equal(f.queued.size,0);assert.equal(f.feed.search_criteria.history_pass,1);}
+    else {assert.equal(result.body.throttle.attempted,1);assert.equal(f.queued.get(f.url).status,'complete');}
+  }
+});
+
+test('missing replay capability defers retained candidates; absent owners use the existing fresh intake',async()=>{
+  const held=await ccPinnedFixture({pinnedCapability:false});const response=await held.request({force:true});
+  assert.equal(response.body.throttle.attempted,0);assert.equal(held.queued.size,0);assert.equal(held.feed.search_criteria.history_pass,1);
+  const fresh=await ccPinnedFixture({replayOwners:[]});await fresh.request({force:true});
+  assert.deepEqual(fresh.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').map(c=>c.body),[{url:fresh.url}]);
 });

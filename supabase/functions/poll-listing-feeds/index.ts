@@ -57,6 +57,8 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { noticeFrom, sweepCraigslistRemovals } from "./removal.ts";
 import { parseKslSearchCards } from "./kslCards.ts";
 import { splitByYear } from "./yearFilter.ts";
+import { selectCollectingCarsReplay } from "./collectingCarsReplay.ts";
+import { prepareCollectingCarsHistory } from "./collectingCarsHistory.ts";
 import { nextYield } from "./schedule.ts";
 import { pollPurplewave } from "./purplewave.ts";
 import { CC_LISTING_METHOD, CC_OBSERVATION_COLUMNS, collectingCarsReceipt, collectingCarsAdmissionMatches,
@@ -618,7 +620,10 @@ async function pollFirecrawlHtmlFeed(
   let confirmedEmptySearch = false;
   const nativeDealer = ["gr_auto_gallery", "streetside_classics"].includes(feed.source_slug);
   const nativeCc = feed.source_slug === "collecting-cars";
+  const ccHistory = nativeCc && feed.search_criteria?.fetch_strategy === "collecting_cars_history";
+  let historyPage: Awaited<ReturnType<typeof prepareCollectingCarsHistory>> | null = null;
   let nativeSourceId: string | null = null;
+  let ccReplayAvailable = false;
 
   if (nativeCc) {
     const [source, capability] = await Promise.all([
@@ -628,12 +633,21 @@ async function pollFirecrawlHtmlFeed(
     if (source.error || !source.data?.id || !source.data.supported_observations?.includes("listing")) return await failFeed("blocked: Collecting Cars listing source unavailable");
     if (capability.error || capability.data?.capabilities?.collecting_cars_native_listing !== true) return await failFeed("blocked: Collecting Cars native listing intake not deployed");
     nativeSourceId = source.data.id;
+    ccReplayAvailable = capability.data?.capabilities?.collecting_cars_pinned_closed_replay === true;
     try {
-      const retained = await readCollectingCarsInventory(supabase, Date.now(),
-        AbortSignal.timeout(Math.max(1, Math.min(10_000, budget.remainingMs() - 10_000))));
-      urls = retained.urls;
-      result.retained_inventory = retained.receipt;
-      confirmedEmptySearch = retained.receipt.complete;
+      if (ccHistory) {
+        historyPage = await prepareCollectingCarsHistory(supabase, feed,
+          AbortSignal.timeout(Math.max(1, Math.min(15_000, budget.remainingMs() - 10_000))));
+        urls = historyPage.urls;
+        result.retained_inventory = historyPage.receipt;
+        confirmedEmptySearch = true;
+      } else {
+        const retained = await readCollectingCarsInventory(supabase, Date.now(),
+          AbortSignal.timeout(Math.max(1, Math.min(10_000, budget.remainingMs() - 10_000))));
+        urls = retained.urls;
+        result.retained_inventory = retained.receipt;
+        confirmedEmptySearch = retained.receipt.complete;
+      }
     } catch (error) { return await failFeed(error instanceof Error ? error.message : String(error)); }
   } else if (feed.source_slug === "gr_auto_gallery" || feed.source_slug === "streetside_classics") {
     const [source, capability] = await Promise.all([
@@ -941,7 +955,7 @@ async function pollFirecrawlHtmlFeed(
       if (read.error || !Array.isArray(read.data)) return await failFeed("retained_listing_admission_lookup_failed");
       for (const row of read.data) admitted.set(row.id, row);
     }
-    const proved = prepareCollectingCarsLedger(urls, ledgerRows, nativeLedger, admitted, nativeSourceId!, collectingCarsCaptureInterval(feed.search_criteria), Date.now(), ccRefreshes);
+    const proved = prepareCollectingCarsLedger(urls, ledgerRows, nativeLedger, admitted, nativeSourceId!, ccHistory ? Infinity : collectingCarsCaptureInterval(feed.search_criteria), Date.now(), ccRefreshes);
     result.retained_inventory = { ...result.retained_inventory, eligible_after_year_filter: urls.length, current_full_listing_receipts: proved.size };
   }
   // CC reserves the first slot for a due retry and keeps uncaptured lots ahead of refreshes.
@@ -1034,7 +1048,32 @@ async function pollFirecrawlHtmlFeed(
     lastFlushAt = Date.now();
   };
 
+  let replayPreflightMs = 0, replayPreflightFailures = 0;
   for (const url of toIngest) {
+    let ccPin: { snapshot_id: string; expected_sha256: string } | undefined;
+    if (historyPage) {
+      const availableMs = Math.floor(Math.min(10_000, 20_000 - replayPreflightMs, budget.remainingMs() - 10_000));
+      if (availableMs <= 0 || budget.refusal(feed.source_slug)) { result.deferred_reason = "cc_replay_preflight_budget"; break; }
+      const preflightSignal = AbortSignal.timeout(availableMs), preflightStarted = Date.now();
+      // supabase-js 2.45.4 Storage.download ignores per-call fetch parameters.
+      // Bind its actual authenticated transport, as well as metadata reads, to the same deadline.
+      const replayDb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false },
+        global: { fetch: (input, init) => fetch(input, { ...init,
+          signal: init?.signal ? AbortSignal.any([preflightSignal, init.signal]) : preflightSignal }) } }); // guardrail-allow: raw-fetch (deadline-bound Supabase SDK transport)
+      const selection = await selectCollectingCarsReplay(replayDb, url, historyPage.identities.get(url), ccReplayAvailable, preflightSignal);
+      replayPreflightMs += Date.now() - preflightStarted;
+      if (selection.mode === "deferred") { result.deferred_reason = selection.reason; break; }
+      if (selection.mode === "failed") {
+        replayPreflightFailures++;
+        const ingest: IngestOutcome = { status: "error", error: `cc_replay_preflight: ${selection.reason}` };
+        const entry = { url, status: "error", ingest_attempted: false, error: String(ingest.error) };
+        result.ingest_outcomes!.push(entry);
+        waiting.push({ url, ingest, entry });
+        await flushLedger();
+        continue;
+      }
+      if (selection.mode === "pinned") ccPin = selection.pin;
+    }
     const grant = budget.reserve(feed.source_slug);
     if (!grant) { result.deferred_reason = budget.refusal(feed.source_slug); break; }
     const attemptStarted = Date.now();
@@ -1054,7 +1093,7 @@ async function pollFirecrawlHtmlFeed(
           Authorization: `Bearer ${serviceKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, ...(nativeDealer ? { enrich: false } : {}) }),
+        body: JSON.stringify({ url, ...(nativeDealer ? { enrich: false } : {}), ...(ccPin ? { cc_snapshot: ccPin } : {}) }),
         signal: controller.signal,
       });
 
@@ -1132,12 +1171,17 @@ async function pollFirecrawlHtmlFeed(
     await new Promise((r) => setTimeout(r, spacing));
   }
   await flushLedger();
+  if (historyPage) {
+    try {
+      await historyPage.finish(ledgerRows, result.ingest_outcomes ?? []);
+      result.retained_inventory = { ...result.retained_inventory, ...historyPage.receipt, replay_preflight_failures: replayPreflightFailures, replay_preflight_ms: replayPreflightMs };
+    } catch (error) { return await failFeed(error instanceof Error ? error.message : String(error)); }
+  }
 
   // If every attempted ingest errored, that's a failure too -- say so.
-  const ingestErrors = result.ingest_outcomes!.filter(
-    (o) => o.status === "error"
-  ).length;
-  const attempted = result.ingest_outcomes!.length;
+  const actualAttempts = result.ingest_outcomes!.filter(o => o.ingest_attempted !== false);
+  const ingestErrors = actualAttempts.filter(o => o.status === "error").length;
+  const attempted = actualAttempts.length;
   const hold = budget.refusal(feed.source_slug);
   if (["billing", "rate_limited", "blocked", "timeout"].includes(hold || "")) return await failFeed(`intake_backoff: ${hold}`);
   if (attempted > 0 && ingestErrors === attempted) {
@@ -1145,6 +1189,8 @@ async function pollFirecrawlHtmlFeed(
       `ingest_failed: ${ingestErrors}/${attempted} ingest calls errored`
     );
   }
+
+  if (replayPreflightFailures > 0 && attempted === 0) return await failFeed(`replay_preflight_failed: ${replayPreflightFailures} unresolved retained listings; no ingest calls`);
 
   if (nativeDealer && attempted > 0 && !result.ingest_outcomes!.some(o => o.dealer_receipt?.observation_id)) {
     return await failFeed("canonical_admission_failed: no dealer observation acknowledged");
@@ -1396,7 +1442,7 @@ Deno.serve(async (req) => {
       if (
         ["firecrawl_html", "rss_direct_ingest", "mecum_public_index"].includes(
           feed.search_criteria?.fetch_strategy
-        )
+        ) || (feed.source_slug === "collecting-cars" && feed.search_criteria?.fetch_strategy === "collecting_cars_history")
       ) {
         const fcResult = await pollFirecrawlHtmlFeed(supabase, feed, budget, allocation);
         results.push(fcResult);

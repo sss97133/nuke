@@ -778,7 +778,7 @@ jobs:
       - name: Verify photo-pipeline-orchestrator files a photo only through attribute_testimony and writes no upload-clock suggestion
         run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/orchestrator_test.ts supabase/functions/photo-pipeline-orchestrator/persistence_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedAnalysisHandler_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedIntakeChain_test.ts
       - name: Verify a reader's classification is validated like a provider answer and never throws
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/readerClassification_test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/readerClassification_test.ts supabase/functions/photo-pipeline-orchestrator/suppliedClassificationHandler_test.ts supabase/functions/photo-pipeline-orchestrator/suppliedClassificationIntakeChain_test.ts
       - name: Verify physical VIN admission keeps source, era, checksum and photo-filing boundaries
         run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/vinAdmission_test.ts supabase/functions/photo-pipeline-orchestrator/v101_orchestrator_contract_test.ts supabase/functions/photo-pipeline-orchestrator/v101_router_contract_test.ts
       - name: Verify image comparisons retain per-photo evidence without forced identity or eligibility changes
