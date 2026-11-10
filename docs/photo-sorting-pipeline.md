@@ -749,6 +749,59 @@ Subtle product note, not treated as a bug this pass: the sweep keys only on `set
 
 No CLIP-to-typ producer was built. typ is not new evidence under `capture_day_replan_state`, so a typ write would not re-arm `refused_no_new_evidence` days. empty_url / the 276 class stays untouched. Do not start another leftover cap-50 unless new unlogged, unrefused, clocked leftovers appear. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`.
 
+
+## 18.9 Review-sweep coverage (#3318) and restore of the :17 drops (16:36–17:11 AST)
+
+### The sweep bug and the fix
+
+`superseded_by_newer_run` used to resolve an older open review whenever any newer row existed for the same `(user_id, set_key)`, even when the newer review was smaller. Unique still-unfiled photos then left `held`. That is what closed 21 unique photos at 15:17 and 16:17 AST today.
+
+PR [#3318](https://github.com/sss97133/nuke/pull/3318) (`fix/capture-review-sweep-coverage`, feature commit `7b1e5bd0`, follow-up `be256ddf`, title "fix(capture-sets): keep unique photos when a newer review supersedes"). Parent sweep is the live 20261113120600 body (prosrc md5 `f021b75c81be85388884d9c16d42ca49`), which is applied but still unmerged as #3236. The 20600 re-arm logic and cron `capture-review-sweep` (jobid 720, `17 * * * *`) are unchanged.
+
+Migration `20261115230000` only resolves an older review as `superseded_by_newer_run` when every still-unfiled photo (no `vehicle_id`, no active `capture_set_links` row, no active document page; `is_duplicate` / `is_superseded` do not exempt it) is already in the newer open review or another open review. Otherwise the older review stays open and the uncovered ids are recorded on `evidence.uncovered_after_newer_run` (updated only when the set changes).
+
+The same migration adds `capture_set_review_reopen_uncovered_v1`: signed, dry-default, cap 50, `granted_by`, revert-by-run (`capture_set_review_reopen_uncovered_revert_v1`). No reopen or revert function existed before; re-arming days via `capture_sets_enqueue` would not have restored typ=`other` frames the current scorer still omits from the newer, smaller review. Reopening the exact older reviews is the sanctioned restore path. No hand edits.
+
+Contract: `supabase/sql/test_capture_review_sweep_coverage.sql` (local `TEST_EXIT:0`). Validate passed (run 42898137827) and db-contracts passed (job on run 42898137874). Applied live at about 16:56 AST. Live sweep md5 is now `2e3bb92f11c82feea8b91687d58e4748` (was `f021b75c`). Ledger md5s unchanged (`ba4646ae` / `52d8f857`).
+
+The first reopen body timed out on the live library (a per-row `ARRAY` subquery over every resolved superseded review). Follow-up migration `20261115230100` replaces it with a set-based eligibility query. Same contract, local `TEST_EXIT:0`. Validate passed (run 42900425816) and db-contracts passed (job on run 42900425829, completed 17:09 AST). Applied live at about 17:10 AST. Live reopen md5 is now `7f473938ae09adc45ec97d0ab03ed42f` (was `ac989c8c`). Revert helper md5 `fd646992`.
+
+### Restore of the already-dropped photos
+
+No existing reopen function. Dry-run of `capture_set_review_reopen_uncovered_v1` (run `a3318000-…0001`, cap 50): eligible 52 reviews, would_reopen 50, log 0. A broader scan of the same bug found 84 distinct still-unfiled uncovered photos in those 52 reviews (the 21 from 15:17/16:17 plus 63 mostly `is_duplicate` copies from earlier sweeps). Signed apply run `a3318000-0000-4000-8000-000000000002` at about 17:10 AST reopened 50 reviews (granted_by `0b9f107a-…`). A second dry-run then took 0: the remaining two reviews' uncovered photos were already covered by the reopened rows. Revert-by-run is unused.
+
+Official in-database `GROUP BY` immediately before the reopen (after the function applies, which wrote no photo rows) versus immediately after:
+
+| State | Before | After | Δ |
+|---| ---:| ---:| ---:|
+| on_vehicle | 13,974 | 13,974 | 0 |
+| held | 8,942 | **8,963** | **+21** |
+| pulled | 2,126 | 2,126 | 0 |
+| unverified | 1,989 | 1,989 | 0 |
+| private | 1,251 | 1,251 | 0 |
+| duplicate | 826 | **833** | **+7** |
+| **unsorted** | **513** | **485** | **−28** |
+| non_vehicle | 127 | 127 | 0 |
+| waiting | 0 | 0 | 0 |
+| **n** | **29,748** | **29,748** | **0** |
+
+The 21 unique typ=`other` photos dropped at 15:17 (19) and 16:17 (2) are back in `held`. The extra 7 official `duplicate` are copies of originals that just became held (`#3316` chain walk). Nothing else moved. The 17:17 sweep will not re-close those reviews: their uncovered photos are not in the newer smaller review.
+
+### Official unsorted 485 after the restore — exclusive buckets
+
+| Why | Count | Producer gap / why it is correctly unsorted |
+|---| ---:|---|
+| empty_url | 275 | Leave the 276 class untouched |
+| plan_refused | 94 | Still `refused_no_new_evidence` until new evidence arrives. typ is not new evidence. Do not re-arm as a class |
+| planned_but_left_out | 36 | Was 57, including the 21 just restored. Remainder: typ=`other` (mostly `photo_auto_sync`) that typ-aware scoring correctly keeps out of clear sets, plus 18 typ-empty session-admitted `user_upload` left out of clear sets. typ=`other` belongs in review or `non_vehicle`, not filed; ones that had been in a review are now protected by #3318. typ-empty uploads stay unsorted until typ or a sanctioned split exists. No CLIP-to-typ producer |
+| superseded | 28 | All `capture_relay_ios`, clocked, not dups: typ other 12, vehicle_exterior 11, vehicle_interior 3, progress_shot 2. typ-aware supersede left them unfiled. [#3289](https://github.com/sss97133/nuke/pull/3289) (open, typ-omitted frames still cover a superseded plan) is the in-flight fix for the stale-chunk side. No second producer this pass |
+| duplicate_of_unfiled | 19 | Was 26 after #3316, then −7 when their originals became held. Remainder: missing originals (correctly not counted) and copies whose original is still unresolved. The copies follow once the original is held / filed / private / `non_vehicle`. No producer that files a copy without resolving the original |
+| judgment_personal | 18 | Still logged under `00aa930c`. Official classifier did not set `is_sensitive` |
+| source_not_admitted | 12 | `image_intake` / `direct_pull` without a file DTO. #3303 admits `user_upload` only. Never invent a clock. Correctly unsorted |
+| no_date | 3 | No `taken_at`. Never invent a clock |
+
+empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`.
+
 ## 19. Known gaps and next work
 
 
@@ -799,6 +852,7 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3311](https://github.com/sss97133/nuke/pull/3311) | skip logged leftovers and refused days | Draft, **applied live** ~15:37 AST; remaining 81 leftovers signed once | Leftovers idempotency |
 | [#3314](https://github.com/sss97133/nuke/pull/3314) | skip no-clock leftovers the scorer cannot use | Draft, **applied live** ~16:20 AST | Leftovers / scorer match |
 | [#3316](https://github.com/sss97133/nuke/pull/3316) | walk dup chains and count non_vehicle copies | Draft, **applied live** ~16:35 AST | Ledger definition only |
+| [#3318](https://github.com/sss97133/nuke/pull/3318) | keep unique photos when a newer review supersedes | Draft, **applied live** ~16:56 AST (sweep) and ~17:10 AST (fast reopen) | Sweep fix + signed reopen |
 
 ## 21. Unverified or out of scope in this writing
 
@@ -816,4 +870,4 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Operator log: `/workspace/sortrun/progress.md` (9–10 Nov 2026)
 - Scripts and artifacts under `/workspace/sortrun`: `gate_reader.py`, `drain_loop.py`, `ledger_now.py`, `emptyplan/*`, `fingerprint/*`, `lookalike_pilot/*`, `garage/gallery_pollution_audit.md`, `garage/visual_identity_recheck_v1.md`, `garage/gross_mismatch_v1/*`, `held/same_scene_dryrun.py`, `ingest_audit/`, `unsorted/breakdown.json`, `unsorted/fresh_20261110/*`, `stamp_dto_pr/BRIEF.md`, `receipt_order_fix/`, `ledger_live_def.txt`
 - Repository: `github.com/sss97133/nuke` — especially `docs/receipt-work-contract.md`, `supabase/migrations/20261020001000_vehicle_image_review_holds.sql`, `supabase/migrations/20261109070000_rederive_ownership_roles.sql`, `scripts/ownership/rederive-ownership-roles.mjs`, `scripts/receipt-work/reconcile-receipt-work.mjs`, `scripts/photo-pipeline/local_image_analysis.py`, `scripts/iphoto-intake.mjs`, and the PRs in §20
-- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~16:35 AST)
+- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~17:11 AST)
