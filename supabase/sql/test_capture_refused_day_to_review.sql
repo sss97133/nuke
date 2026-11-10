@@ -144,7 +144,7 @@ SELECT pg_temp.assert_true((:'dry_pack'::jsonb->>'dry_run')::boolean, 'dry flag'
 SELECT pg_temp.assert_true((:'dry_pack'::jsonb->>'eligible')::int = 6, '6 eligible originals');
 SELECT pg_temp.assert_true((:'dry_pack'::jsonb->>'would_route')::int = 2, 'cap 3 packs only day A');
 SELECT pg_temp.assert_true((:'dry_pack'::jsonb->>'days')::int = 1, 'one whole day under cap 3');
-SELECT pg_temp.assert_true((:'dry_pack'::jsonb->'items'->0->>'refusal_reason') = 'refused_no_new_evidence', 'replan reason on dry items');
+SELECT pg_temp.assert_true((:'dry_pack'::jsonb->'items'->0->>'refusal_reason') = 'gate_failed', 'refusal_reason is last plan state');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_refused_day_to_review_log) = 0, 'dry wrote no log');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_review WHERE reason = 'refused_day') = 0, 'dry wrote no review');
 
@@ -163,7 +163,7 @@ SELECT pg_temp.assert_true((:'apply1'::jsonb->>'routed')::int = 2, 'applied 2');
 SELECT pg_temp.assert_true((:'apply1'::jsonb->>'reviews')::int = 1, 'one review for day A');
 SELECT pg_temp.assert_true((
   SELECT count(*) = 1 AND bool_and(status = 'open' AND confidence = 0 AND basis = 'refused_day_to_review'
-    AND evidence->>'refusal_reason' = 'refused_no_new_evidence'
+    AND evidence->>'refusal_reason' = 'gate_failed'
     AND (evidence->>'chunk_id')::uuid = '00000000-0000-4000-8000-0000000000c1'
     AND evidence->>'chunk_state' = 'gate_failed')
   FROM capture_set_review WHERE reason = 'refused_day'

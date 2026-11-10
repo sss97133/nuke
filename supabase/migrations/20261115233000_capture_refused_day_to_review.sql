@@ -4,7 +4,7 @@
 -- capture_set_review (held) for a human. Never files to a vehicle,
 -- never re-arms the day, never touches the gate or the forward cursor,
 -- never invents clocks. Group by America/Los_Angeles day. Confidence 0.
--- Evidence records the refusal reason and the failed gate chunk.
+-- Evidence records the refusal reason (last plan state, gate_failed) and the failed gate chunk. Does not call capture_day_replan_state (it times out on the live library).
 --
 -- Eligibility: last non-dry chunk for the photo's LA day is gate_failed;
 -- unfiled; taken_at present; not empty_url; not is_sensitive; not an
@@ -161,17 +161,9 @@ BEGIN
 
   SELECT count(DISTINCT day) INTO n_days FROM tmp_refused_day_to_review;
 
-  IF to_regprocedure('public.capture_day_replan_state(uuid, date)') IS NOT NULL THEN
-    UPDATE tmp_refused_day_to_review t
-       SET refusal_reason = coalesce(s.reason, t.last_plan)
-      FROM (
-        SELECT DISTINCT ON (x.day) x.day,
-               public.capture_day_replan_state(p_user, x.day)->>'reason' AS reason
-        FROM tmp_refused_day_to_review x
-        ORDER BY x.day
-      ) s
-     WHERE t.day = s.day;
-  END IF;
+  -- Do not call capture_day_replan_state here: it times out on the live
+  -- library. refusal_reason is the last plan state (gate_failed). The failed
+  -- chunk id is recorded alongside it.
 
   SELECT coalesce(jsonb_agg(jsonb_build_object(
            'image_id', t.image_id, 'day', t.day, 'chunk_id', t.chunk_id,
