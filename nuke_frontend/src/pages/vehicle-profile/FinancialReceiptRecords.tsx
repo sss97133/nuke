@@ -11,6 +11,7 @@ import type { DayDocument } from './VehicleDayDrawer';
 import { useVehicleWorkOrderFinancials, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
 import { useVisualWork } from './hooks/useVisualWork';
 import { VisualWorkCards } from './VisualWorkCards';
+import { receiptSupplierLabel } from './receiptSupplierLabel';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
 function amountText(amount: number | null, currency: string | null): string {
@@ -110,7 +111,7 @@ export function CorrectionReceipt({ vehicleId, citation }: {
       <button type="button" disabled={read.isFetching} onClick={() => void read.refetch()}>Retry receipt</button>
     </p>}
     {doc && <>
-      <header><h3>{doc.vendor || doc.vendor_org?.name || 'Receipt'}{doc.document_number ? ` #${doc.document_number}` : ''}</h3>
+      <header><h3>{receiptSupplierLabel(doc.vendor || doc.vendor_org?.name) || 'Receipt'}{doc.document_number ? ` #${doc.document_number}` : ''}</h3>
         <p>{doc.document_type?.replace(/_/g, ' ') || 'Document'} · {citation.page_date}</p>
       </header>
       {doc.lines.length > 0 && <table><thead><tr><th scope="col">Recorded item or work</th><th scope="col">Qty</th>{showAmounts && <th scope="col">Amount</th>}</tr></thead>
@@ -195,7 +196,9 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   const { user, loading } = useAuthContext();
   const [vendor, setVendor] = useState('');
   const [showAll, setShowAll] = useState(false);
-  const rows = [...(loading || read.isError ? [] : read.rows)].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.id.localeCompare(b.id));
+  const rows = (loading || read.isError ? [] : read.rows)
+    .map(receipt => ({ ...receipt, vendor: receiptSupplierLabel(receipt.vendor) }))
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.id.localeCompare(b.id));
   const vendors = [...new Set(rows.map(receipt => receipt.vendor).filter((name): name is string => !!name))].sort();
   const selectedVendor = vendors.includes(vendor) ? vendor : '';
   const matching = selectedVendor ? rows.filter(receipt => receipt.vendor === selectedVendor) : rows;
