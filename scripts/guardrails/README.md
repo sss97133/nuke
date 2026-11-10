@@ -21,6 +21,7 @@ specified; current operational claims still require live verification.
 | `no-schema-baked-labels.mjs` | New migrations baking world-labels as CHECK enums / CREATE TYPE (doctrine: labels are projections of measurement). Advisory — always exits 0. Default scopes to staged migrations; `--all` = full audit. | **282** across 143 historical migrations (`--all`); staged mode currently clean |
 | `check-write-guard.mjs` | An edge function that writes (table/storage/auth.admin/write RPC/raw SQL, or fan-out to a writer) without `requireWriteAuth` from `_shared/writeGuard.ts` and not on the script's allowlist. Runs in `supabase-deploy.yml` before deploy — a hit blocks the deploy. `--list` prints every function's classification. | **0** (2026-09-27: 155 guarded, 13 allowlisted) |
 | `no-pii-exposure.mjs` | A migration (version ≥ its `FLOOR`) that opens a personal column (e-mail, phone, address, legal name, precise location, device identity; `PII_COLUMN`) to anon/authenticated/PUBLIC by a select grant, a permissive `USING (true)` policy, disabled RLS or an owner-run view, unless `pii-exposure-allowlist.json` names it with a reason. Tables' columns from `pii-columns.json` (`--refresh` from live). `--live` checks production the same way; `--live --content` samples free-form columns open to anon for e-mail addresses and phone numbers (counts only) and fails on any column `pii-freeform-columns.json` does not list. Static mode also treats the listed free-form columns as personal. Runs in `scripts/ci/verify.sh` (hard fail). | 2026-10-19: static **0**; live **5** before 20261020163000, all closed by it; 17 allowlisted. Content (SEC4): 17 free-form columns listed (1 closed, 2 redacted in readers, 14 public by nature) |
+| `no-new-photo-reader.mjs` | A change that adds a table keyed by a photo (`image_id`, `vehicle_image_id`, `photo_id`) in a new migration, or a new edge function or script whose name says it reads photos, and is not listed in `photo-stores.allow.json` with the owner's approval. Owner direction 2026-11-10: readings are keyed through the registry and `ingest-observation`; no reader gets its own table. Reads names and CREATE TABLE text only. Tried on the 40 newest commits on main (2026-11-10): fired on 3 (two new stage tables, two scripts of a new reading lane, and one heartbeat script that is now exempt). |
 | `no-dead-asset-references.mjs` | Live code referencing dropped tables (`.from('vehicle_image_tags')` → silent 404) or DEAD edge functions. ERROR = DB-confirmed ghost on a live path; WARNING = ledger-DEAD. `--no-db`, `--json`, `--strict`. | **6** ERRORs (2026-07-12: 50 ghost ERRORs found → 44 fixed [repointed/guarded/webhooks removed] → 6 remain, all guarded `vehicle_transactions`; ~184 ledger-DEAD WARNINGs) |
 
 Exit convention: 0 = clean, 1 = violation, 2 = setup/usage error.
@@ -35,13 +36,20 @@ owner restriction.
 | Execution path | What runs | Boundary |
 |---|---|---|
 | `scripts/ci/verify.sh` | Frontend typecheck, raw-fetch regression tests, ghost/raw-fetch/testimony ratchets, secret scan, advisory schema-label scan; optional build | `CI_ENFORCE=1` blocks a failing local gate; default WARN mode reports and returns success |
-| `.github/workflows/pre-deploy-check.yml` | Raw-fetch regression tests, frontend typecheck and build; lint reports without blocking | Pull requests and pushes to main; inspect actual check results |
+| `.github/workflows/pre-deploy-check.yml` | Raw-fetch regression tests, `no-new-photo-reader.mjs` and its tests, frontend typecheck and build; lint reports without blocking | Pull requests and pushes to main; inspect actual check results |
 | `.github/workflows/supabase-deploy.yml` | `check-write-guard.mjs` | Blocks edge-function deployment when a writing function lacks the required guard or explicit script allowlist |
 | Local Git and agent-tool hooks | Whatever the active installation configures | Client/checkout-specific; inspect the installed configuration before claiming coverage |
 
 The local ratchets permit existing findings up to the configured baseline. They do not prove
 that all code satisfies the design requirements. The write-guard scanner checks source wiring;
 runtime caller rejection is implemented by the guarded function and must be verified separately.
+
+## The owner-voice test
+
+`owner-voice-test.md` in this folder is the owner's test of the image analysis record (the direction at the top
+of `docs/ledger/theory/data-machine.md`): a new agent with no memory gets the kind of message he would send, and
+is graded on where it goes. It holds the messages, the grading, the results of each round and the script. It is
+the answer key, so nothing in the record links to it and an agent under test must not open it.
 
 ## Use the existing checks
 

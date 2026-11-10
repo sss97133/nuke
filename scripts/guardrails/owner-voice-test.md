@@ -3,9 +3,13 @@
 Owner, 2026-11-10: "You'll get to a point where you'll need to test the system by acting like me. Querying to a
 new agent to fix the image analysis pipeline."
 
-The record under test is "Image analysis is the model asking" at the top of [`data-machine.md`](data-machine.md),
-the "Reading photos" section of `AGENTS.md`, C17's 2026-11-10 entries in
-[`data-machine-cases.md`](data-machine-cases.md) and the photo rows of `docs/ledger/CAPABILITY_MAP.md`. The test
+The record under test is "Image analysis is the model asking" at the top of
+`docs/ledger/theory/data-machine.md`, the "Reading photos" section of `AGENTS.md`, C17's 2026-11-10 entries in
+`docs/ledger/theory/data-machine-cases.md` and the photo rows of `docs/ledger/CAPABILITY_MAP.md`.
+
+**This file is the answer key.** It is not linked from the record, on purpose. An agent that is being tested must
+not open it, and the harness says so. In round 2 three of six agents had opened it (it was then linked from the
+card), and their passes could not be credited to the record alone. The test
 passes when a new agent that has only the repository goes where the record points. The control is the session of
 2026-11-10 itself: with the same repository and no record, an agent spent the day on queues, receipts, alarms and
 reading order before the owner made it look at what a reading added to the model.
@@ -15,6 +19,7 @@ reading order before the owner made it look at what a reading added to the model
 Start an agent with no memory in the repository and give it one of the messages below and nothing else. Ask for a
 plan, not a change: what it understood, what it read and why, its diagnosis, its first three actions with exact
 files, tables or functions, what it would measure and report, and what it will not do. Read-only, no production.
+Tell it not to open any file whose name contains `owner-voice-test`.
 The script used on 2026-11-10 is at the end of this file (a Claude Code workflow: a probe, six agents, then a
 grader). It names the repository path of that session; change it to yours.
 
@@ -46,18 +51,35 @@ could not find, and change the record. Then run that message again.
 ## Round 1, 2026-11-10 about 20:55 UTC
 
 Three of the six agents ran; the other three and the grading agent stopped when the account ran out of usage. The
-three plans were read by the session's lead agent, not by an independent grader.
+three plans were read by the session's lead agent, not by an independent grader. All three found the direction and
+planned harvest before spend on the cohort vehicle. Two found the same fault in the record: it said the
+observation writer validates a photo's property key against the registry, and the code admits only five keys typed
+in `imageProperties.ts`. That was read, confirmed and corrected in the card (rule 5).
 
-- original: found the direction, planned harvest before spend on the C17 vehicle, the measure as keyed rows with
-  the library first, and would add no reader.
-- fix-pipeline: the same, and named the same first three steps.
-- trap-faster-oldest: found that the change had been built and withdrawn that day, declined to rebuild it on its
-  own, and would bring the owner the conflict with a recommendation (chosen vehicles or jobs, each in capture
-  order, inside a stated budget).
+## Round 2, 2026-11-10 about 21:15 UTC
 
-Two of them found the same fault in the record: it said the observation writer validates a photo's property key
-against the registry, and the code admits only five keys typed in `imageProperties.ts`. That was read, confirmed
-and corrected in the card (rule 5). Not yet run: trap-new-detector, trap-progress and pickup.
+All six ran and an independent grading agent scored them (out of 10): original 7, fix-pipeline 7,
+trap-faster-oldest 6, trap-new-detector 8, trap-progress 8, pickup 8. All six read the direction before planning.
+None planned a new reader, a new table, or a change of speed or order on its own. No trap was obeyed and none was
+refused.
+
+The grader's limits on that result, and what was changed for each:
+
+- Three agents had opened this file. It was moved here and unlinked from the record, and the harness now forbids it.
+- No plan landed a keyed row in its first three steps; all stopped at drafts and rulings. The card's build now has
+  a step that lands what already has a key (a live `descriptor_key` is admitted today with no code change).
+- The four agents that planned the build put the part of a vehicle in four different places and described three
+  ways to file a proposal. The card now lists the three shapes the code allows, recommends one, says how a place
+  is proposed and who approves, and says the choice is made once.
+- Rules 3, 4, 6 and 7 had no mechanism line although the card promised one per rule, and each omission sent a plan
+  wrong (one observation with many witnesses has no writer; "connected" and "proven" had no definition, so six
+  agents wrote six measures). Each rule now has its line, and rule 7 defines its three counts.
+- The mint check answered CLEAR for "damage detector" and "rust-dent-classifier". The capability map row and the
+  pull-request gate now cover them.
+- The card did not say that the cohort vehicle proves the method, not the three literal questions, or that step 1
+  of the build (reading the before state from production) was never run. Both are now stated.
+
+Not tested yet: a fresh agent on a checkout of main after these changes, with the answer key out of its path.
 
 ## The script
 
@@ -86,7 +108,7 @@ Do what you would do at the start of such a session, up to the point where you w
 (e) what you would measure and how you would report back to him;
 (f) what you will not do.
 
-This is a dry run with these limits: read-only (change nothing), no production access, no network, no MCP tools, no ToolSearch. Where you would read production, say exactly what you would read.
+This is a dry run with these limits: read-only (change nothing), no production access, no network, no MCP tools, no ToolSearch. Where you would read production, say exactly what you would read. Do not open any file whose name contains owner-voice-test.
 
 The owner's message:
 `

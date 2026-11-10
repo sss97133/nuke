@@ -495,6 +495,34 @@ theory card ("Image analysis is the model asking"), and the acceptance is his th
 made capture-date order the rule for the whole backfill and let the reader run to the subscription's limit, was
 withdrawn unmerged on his word within the hour: "Earliest photos first is a dangerous mode."
 
+**C17, same day, 21:31–21:33 UTC: the proof vehicle.** Read-only. The owner named it: "A better example to work on
+is the firebird ... it has to be for the data we actually care about." Readers: `vehicle_images` by owner and
+vehicle (the capture ledger index), `observation_witnesses` joined to `vehicle_observations`, one count per table
+with an index led by `image_id`, and counts by `vehicle_id` on the work tables named. Population first: of the
+owner's 29,749 photos, 16,345 are on one of 135 vehicles. This vehicle (`20d21fb0-4651-4469-a0ba-e751309a1e54`)
+holds 453 of them over 7 capture days, 414 dated 2026-10 and 420 inside the last 60 days; the next most recent
+vehicle has 65. One vehicle: validation scope.
+
+- Read: 452 photos carry a classifier reading (435 under v98) and 444 a deep reading, 443 of those under
+  `reviewed_image_analysis_v1`. None has a stage receipt: the first pass queues only photos with no reading.
+- What the deep readings hold: 1,157 callouts; 3,560 part labels in 2,678 spellings; a non-empty
+  `damage_localized` (label, box, severity) on 284 photos; 443 open questions, most marked with why they could not
+  be answered (a closer photo is needed, or a document the graph does not hold). The callouts say what a photo
+  does not establish as carefully as what it shows.
+- Around it: 66 `receipt_vehicle_links`; 1,090 `garage_derivation_evidence` rows; 595 `evidence_judgment_requests`,
+  which is most of the 774 that exist; 4 work sessions; 6 timeline events; 27 `field_evidence` rows.
+- Keyed: of 488 witnessed observations on these photos (457 condition, 20 media, 7 work record, 4 specification),
+  none has a `descriptor_id` or a `property_id`. The vehicle has 0 `component_identifications`, 0
+  `component_events` and 0 `vehicle_change_claims`.
+- For the three questions: the owner has photos on three Mustangs (1,922, 65 and 27 photos) and on one Porsche
+  (21), so they can be asked of owner photos. Some of this vehicle's November photos are photographs of printed
+  pictures of earlier work (panels off, surface preparation, the engine out), which is the shape of "during a
+  restoration, with photographic proof".
+
+So the vehicle the owner cares about most is the most thoroughly read vehicle measured and has no keyed fact. The
+first build on it needs no photo read again. The reader, meanwhile, spent the day on 2025-09 uploads of other
+vehicles; nothing chooses what it reads.
+
 **C17 pickup, 2026-11-10 21:10 UTC: where everything stands.** Written for whoever continues. Stages are named
 separately; nothing below is a claim of fleet coverage.
 
@@ -507,30 +535,42 @@ separately; nothing below is a claim of fleet coverage.
 - Withdrawn or parked, none merged. Each is a closed pull request by this session; fetch its commit by hash.
   - #3313, `089053353`: capture-date order for the backfill and a reader that claims one photo at a time.
     Withdrawn on the owner's word. Tested; never deployed.
-  - `56ead0d34`, "feat(db): photo landing supersedes an earlier reading" (migration `20261113150000`): the
+  - #3324, `56ead0d34`, "feat(db): photo landing supersedes an earlier reading" (migration `20261113150000`): the
     landing fold stops being first-write-wins. Its contract passes 101 checks on a local PostgreSQL 16; the
     adversarial verification pass did not run; nothing was read from production for it. It adds three tables to
     the classifier's own landing. Under the owner direction of this date the first question is whether to invest
     in that landing at all, or to let keyed observations replace it.
-  - `1330a8e5c`, "feat(capture): photo reading status reader, web block and app bar" (migration
+  - #3325, `1330a8e5c`, "feat(capture): photo reading status reader, web block and app bar" (migration
     `20261113170000`): tells the owner whether reading is moving or stalled and why. The SQL reader's contract
     passes locally with 22 of 22 mutations caught; its production plan was never read. The web block was
     reviewed and one must-fix is open (a waiting state shows no reason). The Swift was never compiled or
     reviewed. Its headline counts photos read, which the owner has since said is not the measure.
-- Not started: the build ("Where the build starts" in the theory card); a provider key box (owner: "Use
+- Not started: the build ("Where the build starts" in the theory card), on the proof vehicle the owner named
+  (the 21:31 entry above). Of its step 1, that vehicle and the acceptance population were read; the library
+  baseline was not. Also not started: a provider key box (owner: "Use
   whatever key has tokens. Don't just block"); the phone's own reading as the first stage; choosing what to read
   by worth inside a budget; database capacity.
+- The build's design and its two judgments, repo only, to be verified: `docs/ledger/2026-11-10_image-keys-build-design.md`
+  and `2026-11-10_image-keys-build-design-judgment.md` (read the judgment first; it corrects the design and names a
+  first pull request of scripts only).
 - Audits of this date, repo only, each to be verified before use: `docs/ledger/2026-11-10_image-reading-map-*.md`
   (the model against the three questions; what a reading emits and where it lands; what the owner had already
   written; free signals for choosing what to read; what a reading costs; and a critic's check of all five, which
   found two of their claims wrong and two stale).
-- The owner's test of this record, and its first round: `docs/ledger/theory/owner-voice-test.md`.
+- The owner's test of this record exists and has run twice; it is kept out of this reading path (the guardrails
+  README says where). In round 2 all six fresh agents read the direction first, none planned a new reader, table
+  or speed change, and no trap was obeyed or refused. The grader's limits on that result: three agents had opened
+  the test's own file; no plan landed a keyed row in its first three steps; four agents put the part of a vehicle
+  in four different places. The card was changed for each (2026-11-10 21:40 UTC).
 - Decisions that are the owner's, each with the default taken so far: which registry is the map for photos (the
   database one); whether the classifier's landing gets supersession or is left as retained input (left); the
   reader's budget on the subscription and what "matters this week" selects (unset; the reader runs at 20 per
   fire); the 2026-06-18 "deprecated, drop" comment on `image_question_answers` (kept, not dropped; the table
   holds 1,021 rows); whether the phone's shop gate stays, given "the users photo album ... the same for
-  everyone" (unchanged).
+  everyone" (unchanged); where the part of a vehicle lives on an observation (recommended in the card, not
+  ruled); whether the first-pass reader keeps reading at its present pace and upload-date order while paid
+  readings wait to be keyed (it does; rule 6 says harvest first); whether listing photos enter a reading lane if
+  no Mustang or Porsche has owner photos (not read yet).
 
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
