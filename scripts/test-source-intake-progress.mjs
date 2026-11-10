@@ -1372,7 +1372,7 @@ test('equivalent clock spelling never permits changed source time, query, malfor
 
 test('native non-car classification is retained as skipped and does not refetch next poll', async () => {
  const capture={snapshot_id:'00000000-0000-4000-8000-000000000073',sha256:'a'.repeat(64),observed_at:new Date().toISOString(),source_url:'https://collectingcars.com/for-sale/1965-porsche-911-2-0-swb-4',listing_id:'42',lot_type:'plate'};
- const f=ccFixture({ingestResult:()=>({status:'rejected',source:'collecting_cars',reason:'not_a_vehicle: Collecting Cars lot type plate',collecting_cars_noncar:capture})});
+ const f=ccFixture({ingestResult:()=>({status:'rejected',source:'collecting_cars',reason:'quality_gate_reject: Collecting Cars car intake excludes native lot type plate',collecting_cars_noncar:capture})});
  f.queued.set(f.url,{listing_url:f.url,status:'failed',attempts:1,max_attempts:3,next_attempt_at:new Date(Date.now()-60000).toISOString(),error_message:'old failure',failure_category:'extraction_failed',raw_data:{collecting_cars_native_version:'cc_native_listing_v1'}});
  const first=await f.poll(); assert.equal(first.ingest_outcomes[0].ledger,'skipped');
  const row=f.queued.get(f.url); assert.deepEqual(row.raw_data.collecting_cars_noncar,capture);

@@ -192,7 +192,7 @@ for (const mode of ['no-owner', 'ambiguous-owner', 'owner-disappeared', 'foreign
 for (const lotType of ['plate', 'part', 'bike', 'boat']) Deno.test(`retained native ${lotType} is a structural rejection without vehicle writes`, async () => {
  reset('noncar'); fields.lot_type = lotType;
  const r = await run(); assertEquals(r.status, 'rejected');
- assertEquals(r.reason, `not_a_vehicle: Collecting Cars lot type ${lotType}`);
+ assertEquals(r.reason, `quality_gate_reject: Collecting Cars car intake excludes native lot type ${lotType}`);
  assertEquals(r.collecting_cars_noncar, { snapshot_id: snapshot, sha256: 'a'.repeat(64), observed_at: clock, source_url: url, listing_id: fields.listing_id, lot_type: lotType });
  const { ledgerWriteFor } = await import('../poll-listing-feeds/ledger.ts');
  const write = ledgerWriteFor({url,feedId:id,ingest:r,batch:{rows:new Map(),error:null},now:new Date()});

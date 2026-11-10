@@ -1102,7 +1102,7 @@ async function tryAutoEnrich(url: string, platform: string, ccPin?: CcSnapshotPi
           || !/^[0-9a-f-]{36}$/.test(c?.snapshot_id ?? "") || !/^[0-9a-f]{64}$/.test(c?.sha256 ?? "")
           || !Number.isFinite(Date.parse(c?.observed_at)) || Date.parse(c.observed_at) > Date.now())
           return { ok: false, error: "cc_noncar_capture_invalid" };
-        return { ok: false, skipped: true, error: `not_a_vehicle: Collecting Cars lot type ${f.lot_type}`,
+        return { ok: false, skipped: true, error: `quality_gate_reject: Collecting Cars car intake excludes native lot type ${f.lot_type}`,
           cc_noncar: { ...c, listing_id: f.listing_id, lot_type: f.lot_type } };
       }
       return { ok: false, skipped: true, error: result.skip_reason || result.reason || `${extractorName} skipped this page` };
@@ -1497,7 +1497,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     }
 
     if (platform === "collecting_cars" && ccNonCar) {
-      return { status: "rejected", reason: `not_a_vehicle: Collecting Cars lot type ${ccNonCar.lot_type}`, source: platform,
+      return { status: "rejected", reason: `quality_gate_reject: Collecting Cars car intake excludes native lot type ${ccNonCar.lot_type}`, source: platform,
         external_id: externalId, collecting_cars_noncar: ccNonCar };
     }
 
