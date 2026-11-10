@@ -428,6 +428,30 @@ level of which image is read under which contract, so levels cannot chain, a bet
 every lane keeps its own worklist, store and normalizer. Draft #3027 (per-image stage receipts and a reconciler) is
 that object; its SQL contract was executed for the first time on 2026-11-10 (PostgreSQL 16, passing).
 
+**C17, same day, 17:23–17:35 UTC: the reader reports in and reads nothing.** Readers: `job_assay_readings`,
+`cron.job_run_details`, and the frame reader's own worklist query run as SQL (the owner's `failed`/`pending`
+`vehicle_images` rows with a URL, newest `taken_at` first).
+
+- With the heartbeat repaired, both subscription readers posted from 16:36. Frame reader: `frames 20, read 0,
+  errors 20, accepted 0` in 5 s; document reader: `frames 3, read 0, errors 3`. `subscription-reader-watch` went
+  green at 16:36, because a row arrived.
+- The worklist is 325 rows. 301 are held (sensitive, `rejected_personal` or superseded); the newest 20 are all held,
+  and the public storage URL of two of them answered HTTP 400. The script takes the newest 20, records nothing about
+  a failure, and so takes the same 20 on every fire. The 24 readable rows behind them were never reached.
+- So a worklist read from a status column has no memory and no holds, and a watch that only checks arrival passes a
+  reader that does no work. This is the stage ledger's case in one lane.
+
+Repair: the stage ledger (migration `20261113110000`: `image_stage_receipts`, `image_stage_work`,
+`reconcile_image_stages`, `claim_image_stage_work`, shipped switched off) gives each photo a typed receipt per
+attempt, so a photo whose bytes are gone is not offered again until its URL changes; the frame reader's status
+worklist carries the same holds; both readers post their failures by type (`error_classes`). The assay's second
+version (migration `20261113120000`) raises when a reader has taken photos and read none for over 2 h
+(`zero_read_since`, carried forward by `reader-heartbeat.mjs`), counts only accepted readings as a reading landed
+(a provider HTTP 200 is logged before the answer is validated), judges queue eligibility before capping its
+sample, and, once the ledger is switched on, raises on work due for over 6 h with no receipt and on a reconciler
+that stopped. Still open: the landing fold is first-write-wins, so a re-read cannot yet replace what the first
+reading landed in the normalized tables; deep, text and document levels have no stage worker.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026

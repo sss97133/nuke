@@ -13,6 +13,11 @@
 //   READER_NAME=subscription-frame-classifier READER_SUMMARY='{"frames":20,...}' READER_EXIT=0 READER_ELAPSED_MS=41000 \
 //     dotenvx run -- node scripts/photo-pipeline/reader-heartbeat.mjs
 //
+// A reader can report in and read nothing (2026-11-10: frames 20, read 0 on every fire, for days, while the watch was
+// green because a row arrived). So when a reader took photos and read none, the heartbeat carries zero_read_since and
+// zero_read_fires forward from its previous row; a fire that read something ends the run, an idle fire (no frames)
+// leaves it as it was. assay_photo_reading_flow raises on a long run.
+//
 // Exit 0 when the heartbeat landed (HTTP 200), 1 when it did not, 2 on a bad call, 3 when the reader gave nothing to
 // post. Prints one line built from fixed words, the reader name and a status code: never a secret, never reader text.
 import process from 'node:process';
@@ -53,6 +58,40 @@ export function buildHeartbeatBody({ name, summary, elapsedMs, readerExit }) {
   return { p_jobname: name, p_reading: reading, p_elapsed_ms: Number.isFinite(elapsed) && elapsed > 0 ? elapsed : 0 };
 }
 
+const count = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/**
+ * The reading with the zero-read run carried forward. `previous` is the reader's last stored reading (or null when it
+ * could not be read: the run then starts now, which delays an alarm but never invents a longer run).
+ *   took photos, read none   zero_read_since = previous run's start or now; zero_read_fires = previous + 1
+ *   read at least one        both removed
+ *   idle (no frames)         both kept as they were
+ */
+export function withZeroReadRun(reading, previous, nowIso) {
+  const frames = count(reading.frames), read = count(reading.read);
+  const prevSince = typeof previous?.zero_read_since === 'string' && !Number.isNaN(Date.parse(previous.zero_read_since)) ? previous.zero_read_since : null;
+  const prevFires = prevSince ? Math.max(0, Math.trunc(count(previous.zero_read_fires) ?? 0)) : 0;
+  const { zero_read_since: _s, zero_read_fires: _f, ...rest } = reading;  // the reader does not set these itself
+  if (frames !== null && frames > 0 && read === 0) return { ...rest, zero_read_since: prevSince ?? nowIso, zero_read_fires: prevFires + 1 };
+  if (frames === 0 && prevSince) return { ...rest, zero_read_since: prevSince, zero_read_fires: prevFires };
+  return rest;
+}
+
+/** The reader's last stored reading, or null (no row yet, or the read failed). */
+export async function previousReading({ url, key, name, fetchImpl = fetch, timeoutMs = 10000 }) {
+  try {
+    const res = await fetchImpl(`${url.replace(/\/+$/, '')}/rest/v1/job_assay_readings?jobname=eq.${encodeURIComponent(name)}&select=reading`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (res.status !== 200) return null;
+    const rows = await res.json();
+    const r = Array.isArray(rows) ? rows[0]?.reading : null;
+    return r && typeof r === 'object' && !Array.isArray(r) ? r : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function postHeartbeat({ url, key, body, fetchImpl = fetch, timeoutMs = 20000 }) {
   const res = await fetchImpl(`${url.replace(/\/+$/, '')}/rest/v1/rpc/record_reader_heartbeat`, {
     method: 'POST',
@@ -76,6 +115,7 @@ async function main() {
     console.log(`heartbeat: ${e.message}`);
     return 2;
   }
+  body.p_reading = withZeroReadRun(body.p_reading, await previousReading({ url, key, name }), new Date().toISOString());
   try {
     const status = await postHeartbeat({ url, key, body });
     console.log(`heartbeat ${name} HTTP ${status}`);
