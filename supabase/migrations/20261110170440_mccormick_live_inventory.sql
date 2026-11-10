@@ -165,7 +165,7 @@ BEGIN
   SELECT pg_get_functiondef('public.supersede_vehicle_event_episode(uuid,jsonb,jsonb,text)'::regprocedure) INTO definition;
   IF position('mccormick_scheduled_clock_v1' IN definition)>0 THEN RETURN; END IF;
   before:='IF NOT isfinite(v_new) OR v_new > now() THEN';
-  after:=$fragment$IF NOT isfinite(v_new) OR (v_new > now() AND NOT (
+  after:=$fragment$IF NOT isfinite(v_new) OR (v_new > now() AND NOT COALESCE((
         -- mccormick_scheduled_clock_v1: future scheduled testimony, never a result.
         v_field='ended_at' AND v_spec->>'precision'='day'
         AND p_source->>'type'='mccormick_scheduled_catalog_day'
@@ -191,7 +191,7 @@ BEGIN
             AND e.vehicle_id::text=r->>'vehicle_id' AND e.metadata->>'native_id'=r->>'native_id'
             AND e.source_url=r->>'source_url' AND p_source->>'ref'=e.source_url
             AND r->>'run_on'=to_char(v_new AT TIME ZONE 'UTC','YYYY-MM-DD')
-        ))) THEN$fragment$;
+        )), false)) THEN$fragment$;
   IF (length(definition)-length(replace(definition,before,'')))/length(before)<>1 THEN
     RAISE EXCEPTION 'supersession future-clock guard changed; inspect before extending';
   END IF;

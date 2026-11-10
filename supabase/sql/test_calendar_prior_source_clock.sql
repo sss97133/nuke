@@ -478,6 +478,14 @@ DO $$ DECLARE payload jsonb; cid uuid; result jsonb; proof jsonb; old_clock time
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM NOT LIKE '%must be a finite instant, not in the future%' THEN RAISE; END IF;
   END;
+  BEGIN
+    PERFORM public.supersede_vehicle_event_episode(md5('mcc-reschedule')::uuid,
+      jsonb_build_object('ended_at',jsonb_build_object('expected',old_clock,'value',new_clock)),
+      proof,'A scheduled correction without day precision must not be accepted.');
+    RAISE EXCEPTION 'missing day precision accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%must be a finite instant, not in the future%' THEN RAISE; END IF;
+  END;
   result:=public.supersede_vehicle_event_episode(md5('mcc-reschedule')::uuid,
     jsonb_build_object('ended_at',jsonb_build_object('expected',old_clock,'value',new_clock,'precision','day')),
     proof,'The complete publisher catalog and schedule agree on the changed run day.');
