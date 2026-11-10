@@ -7,6 +7,8 @@ export interface VINDecodeResult {
   make: string | null;
   /** Manufacturer compatibility only; never a VIN-exact make assertion. */
   manufacturer_make_candidates?: string[];
+  /** Actual lookup prefix; a partial heuristic is not a complete manufacturer identifier. */
+  manufacturer_match_prefix?: string;
   model: string | null;
   trim: string | null;
   engine_size: string | null;
@@ -372,7 +374,9 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['JTE', 'TOYOTA MOTOR CORPORATION', null],
     ['JTM', 'TOYOTA MOTOR CORPORATION', null],
     ['JH', 'Honda', 'Honda'],
-    ['JN', 'Nissan', 'Nissan'],
+    ['JNK', 'NISSAN MOTOR COMPANY, LTD', 'Infiniti'],
+    ['JN1', 'NISSAN MOTOR COMPANY, LTD', null],
+    ['JN8', 'NISSAN MOTOR COMPANY, LTD', null],
     ['JM', 'Mazda', 'Mazda'],
     ['WA', 'Audi', 'Audi'],
     ['WB', 'BMW', 'BMW'],
@@ -396,6 +400,7 @@ function decodeModernVin(vin: string): VINDecodeResult {
   for (const [prefix, manufacturer, make] of manufacturerMap) {
     if (wmi.startsWith(prefix)) {
       result.manufacturer = manufacturer;
+      result.manufacturer_match_prefix = prefix;
       if (make) result.make = make;
       break;
     }
@@ -416,6 +421,11 @@ function decodeModernVin(vin: string): VINDecodeResult {
   // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/1HT?format=json
   if (wmi === '1HT') result.manufacturer_make_candidates =
     ['Chevrolet', 'Navistar', 'Caterpillar', 'IC Bus', 'Workhorse', 'International', 'GM'];
+  // NHTSA vPIC DecodeWMI: manufacture does not establish a single marque.
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/JN1?format=json
+  if (wmi === 'JN1') result.manufacturer_make_candidates = ['Nissan', 'Infiniti', 'Datsun'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/JN8?format=json
+  if (wmi === 'JN8') result.manufacturer_make_candidates = ['Nissan', 'Infiniti'];
 
   // Model year (position 10)
   const yearChar = vin.charAt(9);

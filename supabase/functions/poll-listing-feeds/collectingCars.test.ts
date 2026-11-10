@@ -1,4 +1,4 @@
-import { CC_LISTING_METHOD, collectingCarsReceipt, collectingCarsAdmissionMatches, prepareCollectingCarsLedger, readCollectingCarsInventory } from "./collectingCars.ts";
+import { CC_LISTING_METHOD, collectingCarsCaptureInterval, planCollectingCarsIngests, collectingCarsReceipt, collectingCarsAdmissionMatches, prepareCollectingCarsLedger, readCollectingCarsInventory } from "./collectingCars.ts";
 import { planIngests, createIntakeBudget, intakeThrottle, selectIntakeFeeds } from "./ledger.ts";
 import { splitByYear } from "./yearFilter.ts";
 const equal = (a: unknown,b: unknown) => { if(JSON.stringify(a)!==JSON.stringify(b)) throw Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
@@ -90,4 +90,54 @@ Deno.test("retained CC inventory preserves legitimate plus and uppercase native 
 Deno.test("retained inventory respects the explicit2000-lot ceiling using bounded200-row pages",async()=>{
   const f=fixture(2000);const result=await read(f);equal(result.urls.length,2000);equal(result.receipt.pages,10);
   equal(f.calls.filter(c=>c[1]==="range").every(c=>c[3]-c[2]<200),true);
+});
+
+Deno.test("CC capped passes drain uncaptured inventory before repeatedly refreshing earlier lots",()=>{
+  const urls=fixture(61).rows.map(row=>row.external_auction_url);
+  const ledger=new Map<string,any>(), raw=new Map<string,any>(), observations=new Map<string,any>();
+  const land=(url:string,clock:number)=>{
+    const n=urls.indexOf(url), rec={...receipt,observation_id:id(8000+n),source_read_at:new Date(clock).toISOString()};
+    ledger.set(url,{status:"complete",vehicle_id:id(6000)});
+    raw.set(url,{collecting_cars_receipt:rec});
+    observations.set(rec.observation_id,{...obs,id:rec.observation_id,source_url:url,observed_at:rec.source_read_at});
+  };
+  urls.slice(0,20).forEach(url=>land(url,now-2*86400000));
+  const captured:string[]=[];
+  for(let round=0;round<3;round++){
+    // Reconstruct the persisted ledger: preparation mutates only this invocation's map.
+    const local=new Map(ledger), stale=new Map<string,number>();
+    prepareCollectingCarsLedger(urls,local,raw,observations,id(7000),1440,now+round*15*60000,stale);
+    const plan=planCollectingCarsIngests(urls,local,stale,new Date(now+round*15*60000),20);
+    const expected=round<2?urls.slice(20+round*20,40+round*20):[urls[60],...urls.slice(0,19)];
+    equal(plan.toIngest,expected);
+    for(const url of plan.toIngest){captured.push(url);land(url,now+round*15*60000);}
+  }
+  equal(captured.slice(0,41),urls.slice(20));
+});
+Deno.test("CC oldest due retry gets the first executable slot without consuming backoff or final rows",()=>{
+  const ledger=new Map<string,any>([
+    ["later",{status:"failed",attempts:1,next_attempt_at:new Date(now-60000).toISOString()}],
+    ["oldest",{status:"failed",attempts:1,next_attempt_at:new Date(now-3600000).toISOString()}],
+    ["backoff",{status:"failed",attempts:1,next_attempt_at:new Date(now+60000).toISOString()}],
+    ["final",{status:"failed",attempts:3,max_attempts:3}],
+    ["native-skip",{status:"skipped"}],
+  ]);
+  const urls=["refresh-newer","fresh1","later","backoff","final","native-skip","oldest","fresh2","refresh-older"];
+  const stale=new Map([["refresh-newer",now-86400000],["refresh-older",now-2*86400000]]);
+  const plan=(cap:number)=>planCollectingCarsIngests(urls,ledger,stale,new Date(now),cap);
+  equal(plan(0).toIngest,[]);equal(plan(1).toIngest,["oldest"]);
+  equal(plan(2).toIngest,["oldest","fresh1"]);
+  equal(plan(20).toIngest,["oldest","fresh1","fresh2","later","refresh-older","refresh-newer"]);
+  equal([plan(20).backoff,plan(20).settled,plan(20).fresh,plan(20).retries],[1,2,2,2]);
+  equal(ledger.get("backoff").attempts,1);
+});
+Deno.test("CC full-capture freshness stays daily across shorter polls and honors explicit valid configuration",()=>{
+  for(const criteria of [{},null,{full_capture_interval_minutes:0},{full_capture_interval_minutes:"15"},{full_capture_interval_minutes:NaN}])equal(collectingCarsCaptureInterval(criteria),1440);
+  equal(collectingCarsCaptureInterval({full_capture_interval_minutes:120}),120);
+  for(const minutes of [0,15,30,60,120]){
+    const ledger=new Map<string,any>([[porsche,{status:"complete",vehicle_id:id(6000)}]]),stale=new Map<string,number>();
+    const proved=prepareCollectingCarsLedger([porsche],ledger,new Map([[porsche,{collecting_cars_receipt:receipt}]]),
+      new Map([[receipt.observation_id,obs]]),id(7000),collectingCarsCaptureInterval({}),now+minutes*60000,stale);
+    equal([...proved],[porsche]);equal(planCollectingCarsIngests([porsche],ledger,stale,new Date(now+minutes*60000),20).toIngest,[]);
+  }
 });

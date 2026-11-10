@@ -1,6 +1,27 @@
 import { isLoginPage } from "./batFetcher.ts";
 import { fetchPage } from "./hybridFetcher.ts";
 
+Deno.test("ordinary vehicle bodywork text is retained while actual denial signals stay rejected", async () => {
+  const original = globalThis.fetch;
+  const padding = "Vehicle description ".repeat(100);
+  const body = `<title>Classic car auction</title><p>The body panels were primed, blocked, and finished in metallic blue.</p>${padding}`;
+  try {
+    globalThis.fetch = async () => new Response(body);
+    if ((await fetchPage("https://example.com/auction", { publicOnly: true })).html !== body)
+      throw new Error("ordinary bodywork testimony discarded");
+    for (const denial of ["<h1>Blocked</h1>", "<p>Your request has been blocked</p>", "<p>Access denied</p>"]) {
+      globalThis.fetch = async () => new Response(denial + padding);
+      if ((await fetchPage("https://example.com/auction", { publicOnly: true })).html !== null)
+        throw new Error("actual denial accepted: " + denial);
+    }
+    for (const status of [401, 403, 429]) {
+      globalThis.fetch = async () => new Response(body, { status });
+      if ((await fetchPage("https://example.com/auction", { publicOnly: true })).html !== null)
+        throw new Error("HTTP refusal accepted: " + status);
+    }
+  } finally { globalThis.fetch = original; }
+});
+
 Deno.test("public auction bidding and registration prompts are not a login gate", () => {
   const html = `<html><title>1965 Porsche 911 2.0 SWB - LHD For Sale by Auction | Collecting Cars</title>
     <a href="/login">Sign in to bid</a><a href="/register">Create an account</a>
