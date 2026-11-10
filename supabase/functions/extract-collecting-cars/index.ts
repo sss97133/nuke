@@ -6,11 +6,12 @@
 // Returns { success, extracted }; `ingest` reads that shape and does the vehicle write.
 
 import { archiveFetch } from '../_shared/archiveFetch.ts';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireWriteAuth, authenticateWriter } from '../_shared/writeGuard.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { projectSecretKey } from '../_shared/supabaseKeys.ts';
 import { ALLOWANCE_EXHAUSTED, firecrawlGate } from '../_shared/firecrawlGate.ts';
 import { extractFromHtml } from './extract.ts';
+import { replayClosedCollectingCars } from './historicalReplay.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,11 +26,16 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { url: requestedUrl } = await req.json();
+    const { url: requestedUrl, cc_snapshot } = await req.json();
     if (typeof requestedUrl !== 'string' || !/^https:\/\/collectingcars\.com\/for-sale\/[a-zA-Z0-9+-]+\/?$/.test(requestedUrl)) {
       return json({ error: 'Invalid Collecting Cars lot URL' }, 400);
     }
     const url = requestedUrl.replace(/\/$/, '');
+    if (cc_snapshot !== undefined) {
+      const auth = await authenticateWriter(req);
+      if (!auth.ok || auth.caller.kind !== 'service_role') return json({ error: 'Historical replay requires a service writer' }, 403);
+      return json(await replayClosedCollectingCars(createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!), url, cc_snapshot));
+    }
     // Ask first, record after: a paid scrape needs a credit in today's allowance and is written to the spend log.
     const gate = firecrawlGate(createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!), 'collecting-cars');
     const fetched = await archiveFetch(url, {
