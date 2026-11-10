@@ -38,6 +38,14 @@ Deno.test("odometer in km is converted to miles and the raw text is kept", () =>
   assertEquals([x.mileage, x.mileage_unit, x.mileage_raw], [15329, "km", "24,669 Km (Indicated)"]);
 });
 
+Deno.test("a source-declared sale with no disclosed price stays sold without promoting its last bid", () => {
+  const soldPage = swap(html, '\\"stage\\":\\"unsold\\"', '\\"stage\\":\\"sold\\"');
+  for (const replacement of ['null', '0']) {
+    const x = extractFromHtml(swap(soldPage, '\\"priceSold\\":null', `\\"priceSold\\":${replacement}`), url);
+    assertEquals([x.sale_outcome, x.price_amount, x.price_kind, x.price], ["sold", null, null, null]);
+  }
+});
+
 Deno.test("description resolves through its flight reference and the gallery is the full image list", () => {
   const x = extractFromHtml(html, url);
   assert(x.description?.startsWith("KEY FACTS"), x.description ?? "null");

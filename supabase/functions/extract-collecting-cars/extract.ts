@@ -114,9 +114,10 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   // mid-auction kept as the price, an unsold or sealed-bid lot called sold, and a native-currency amount stored as dollars.
   // A sale is the page's stage "sold" with priceSold; an ended lot without it is a high bid, never a price.
   const stage = clean(L.stage)?.toLowerCase() ?? null;
-  const sold = (stage === null || stage === "sold") && L.priceSold != null && Number(L.priceSold) > 0;
+  const soldAmount = L.priceSold != null && Number.isFinite(Number(L.priceSold)) && Number(L.priceSold) > 0 ? Number(L.priceSold) : null;
+  const sold = stage === "sold" || (stage === null && soldAmount !== null);
   const ended = stage !== null && stage !== "live" && stage !== "comingsoon" && !sold;
-  const amount = sold ? Number(L.priceSold) : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
+  const amount = sold ? soldAmount : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
   const sealed = clean(L.saleFormat)?.toLowerCase() === "sealed";
   const outcome: CollectingCarsExtracted["sale_outcome"] = sold ? "sold" : ended ? (sealed ? "sealed_unsold" : "unsold") : stage === "live" ? "live" : null;
   const kind: CollectingCarsExtracted["price_kind"] = amount === null ? null : sold ? "sold" : ended ? "high_bid" : "current_bid";
