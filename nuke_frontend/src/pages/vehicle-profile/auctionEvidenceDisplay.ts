@@ -38,7 +38,8 @@ export function recordedAudienceCount(value: unknown, explicit: unknown): number
 export interface NativeListingHistory {
   observation_id: string; source_url: string; source_listing_id: string;
   source: 'collecting-cars'; qualification: 'publisher_reported_unverified';
-  reported_outcome: 'sold' | 'unsold'; reported_amount: number | null; currency: string | null;
+  reported_outcome: 'sold' | 'unsold' | 'unknown'; reported_amount: number | null; currency: string | null;
+  reported_listing_stage?: 'sold' | 'unsold' | 'ended'; sale_format?: 'auction' | 'sealed' | 'classified' | null;
   reported_amount_kind: 'sale_price' | 'high_bid' | null;
   reported_event_at: string | null; source_captured_at: string; ingested_at: string;
   mileage: number | null; mileage_unit: 'mi' | 'km' | null; bid_count: number | null;
@@ -53,13 +54,20 @@ export function readNativeListingHistory(input: unknown, vehicleId: string): { e
     || rows[0]?.schema_version !== 'vehicle_data_model_v1') throw Error('Source history unavailable');
   const history = rows[0].native_listing_history;
   if (history === undefined) return { entries: [], hasMore: false }; // older deployed reader
-  if (history?.reader !== 'cc_native_profile_history_v1' || history.capture_limit !== 50
+  if (!['cc_native_profile_history_v1', 'cc_native_profile_history_v2'].includes(history?.reader) || history.capture_limit !== 50
     || typeof history.has_more_captures !== 'boolean' || !Array.isArray(history.entries) || history.entries.length > 50
     || !history.entries.every((r: NativeListingHistory) => r && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(r.observation_id)
       && r.source === 'collecting-cars' && r.qualification === 'publisher_reported_unverified'
       && /^https:\/\/collectingcars\.com\/for-sale\/[a-zA-Z0-9+-]+$/.test(r.source_url) && /^\d+$/.test(r.source_listing_id)
-      && ['sold', 'unsold'].includes(r.reported_outcome)
-      && (r.reported_amount_kind === null || (r.reported_outcome === 'sold' ? r.reported_amount_kind === 'sale_price' : r.reported_amount_kind === 'high_bid'))
+      && ['sold', 'unsold', 'unknown'].includes(r.reported_outcome)
+      && (r.reported_listing_stage === undefined || ['sold', 'unsold', 'ended'].includes(r.reported_listing_stage))
+      && (r.sale_format === undefined || [null, 'auction', 'sealed', 'classified'].includes(r.sale_format))
+      && (r.reported_listing_stage !== 'ended' || (r.reported_event_at !== null
+        && (r.sale_format === 'classified' ? r.reported_outcome === 'unknown'
+          : ['auction', 'sealed'].includes(r.sale_format ?? '') && r.reported_outcome === 'unsold')))
+      && (r.reported_outcome !== 'unknown' || (r.reported_listing_stage === 'ended' && r.sale_format === 'classified'
+        && r.reported_amount === null && r.reported_amount_kind === null))
+      && (r.reported_amount_kind === null || (r.reported_outcome === 'sold' ? r.reported_amount_kind === 'sale_price' : r.reported_outcome === 'unsold' && r.reported_amount_kind === 'high_bid'))
       && (r.reported_amount === null || (r.reported_amount_kind !== null && typeof r.reported_amount === 'number' && Number.isFinite(r.reported_amount) && r.reported_amount > 0))
       && (r.currency === null || (typeof r.currency === 'string' && recordedCurrency(r.currency) === r.currency))
       && validInstant(r.source_captured_at) && validInstant(r.ingested_at) && Date.parse(r.ingested_at) >= Date.parse(r.source_captured_at)
@@ -75,6 +83,7 @@ export function readNativeListingHistory(input: unknown, vehicleId: string): { e
 
 export function nativeListingObservationData(row: NativeListingHistory): Record<string, unknown> {
   return { source_reported_outcome: row.reported_outcome, source_reported_amount: row.reported_amount,
+    source_reported_listing_stage: row.reported_listing_stage, source_reported_sale_format: row.sale_format,
     source_reported_amount_type: row.reported_amount_kind,
     source_reported_amount_status: row.reported_amount === null ? 'not_stated' : 'reported',
     source_reported_currency: row.currency ?? 'not_stated', source_reported_event_at: row.reported_event_at,

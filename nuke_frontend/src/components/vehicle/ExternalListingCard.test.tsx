@@ -67,6 +67,17 @@ it('exposes an unsold high bid without calling it a sale price', async () => {
  expect(container.textContent).toContain('Reported high bid: £67,500');
  expect(container.textContent).toContain('no sale reported'); expect(container.textContent).not.toContain('reports sold');
 });
+it('shows classified termination with unknown outcome, original actual end and no asking-price promotion', async () => {
+ fixture.rows = []; fixture.history = [native({ reported_outcome: 'unknown', reported_listing_stage: 'ended', sale_format: 'classified',
+  reported_amount: null, reported_amount_kind: null, reported_event_at: '2023-12-07T00:00:04Z', bid_count: null })]; await render();
+ expect(container.textContent).toContain('Collecting Cars reports listing ended');
+ expect(container.textContent).toContain('Sale outcome unknown');
+ expect(container.textContent).toContain('2023-12-07T00:00:04.000Z');
+ expect(container.textContent).toContain('2026-01-01T00:00:00.000Z');
+ expect(container.textContent).not.toContain('reports unsold');
+ expect(container.textContent).not.toContain('Reported high bid');
+ expect(container.textContent).not.toContain('£10,995');
+});
 it('shows failure rather than treating unreadable source history as an empty auction history', async () => {
  fixture.rows = []; fixture.historyError = true; await render();
  expect(container.querySelector('[role=status]')?.textContent).toContain('could not be read');
