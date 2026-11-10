@@ -3,7 +3,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ context: {} as any, comments: vi.fn(), gallery: vi.fn() }));
+const fixture = vi.hoisted(() => ({ context: {} as any, auth: { user: null, loading: false } as any, comments: vi.fn(), gallery: vi.fn(), findings: vi.fn() }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => fixture.auth }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => fixture.context }));
 vi.mock('../../components/vehicle/VehicleCommentsCard', () => ({
   VehicleCommentsCard: (props: any) => { fixture.comments(props); return <div data-testid="comment-reader">Comments &amp; Bids</div>; },
@@ -18,7 +19,7 @@ vi.mock('./BuildLedger', () => ({ default: () => null }));
 vi.mock('../../components/agent/AgentChat', () => ({ default: () => null }));
 vi.mock('./WorthEngineCard', () => ({ default: () => null }));
 vi.mock('./PhotoAuthenticationCard', () => ({ default: () => null }));
-vi.mock('./VehicleFindingsCard', () => ({ default: () => null }));
+vi.mock('./VehicleFindingsCard', () => ({ default: (props: any) => { fixture.findings(props); return null; } }));
 vi.mock('../../components/vehicle/BuyerQuestionPreview', () => ({ default: () => null }));
 vi.mock('../../components/vehicle/ExternalListingCard', () => ({ default: () => null }));
 vi.mock('../../components/vehicle/VehicleReferenceLibrary', () => ({ default: () => null }));
@@ -49,6 +50,7 @@ beforeEach(() => {
   fixture.context = { vehicle: { id: 'offline-subject' }, session: null, totalCommentCount: 0,
     vehicleImages: [], fallbackListingImageUrls: [], observationCount: 0 };
   fixture.comments.mockClear(); fixture.gallery.mockClear();
+  fixture.findings.mockClear(); fixture.auth = { user: null, loading: false };
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
@@ -112,4 +114,27 @@ it('labels image columns and updates the existing grid variable', async () => {
   });
   expect(host.querySelector('.gallery-slider-val')?.textContent).toBe('2');
   expect(host.querySelector<HTMLElement>('.vehicle-profile-right-column')?.style.getPropertyValue('--vp-gallery-cols')).toBe('2');
+});
+
+it('routes a counted analysis population to the existing gallery and preserves viewer scope', async () => {
+  fixture.context.setGalleryFilter = vi.fn();
+  const scroll = vi.fn(); HTMLElement.prototype.scrollIntoView = scroll;
+  await mount();
+  const read = { vehicleId: 'offline-subject', viewerKey: 'anonymous', status: 'ready', images: [{ id: 'source' }], partial: false, readAt: '2026-11-09' };
+  await act(async () => fixture.gallery.mock.calls.at(-1)![0].onAnalysisRead(read));
+  expect(fixture.findings.mock.calls.at(-1)?.[0].read).toEqual(read);
+  await act(async () => fixture.findings.mock.calls.at(-1)![0].onSelectImages(['source'], 'Detailed observations'));
+  expect(fixture.context.setGalleryFilter).toHaveBeenCalledWith({ imageIds: ['source'], label: 'Detailed observations' });
+  expect(fixture.gallery.mock.calls.at(-1)?.[0].galleryView).toBe('GRID');
+  expect(scroll).toHaveBeenCalled();
+  fixture.auth = { user: { id: 'another-viewer' }, loading: false }; await mount();
+  expect(fixture.gallery.mock.calls.at(-1)?.[0].viewerKey).toBe('another-viewer');
+  // The findings consumer receives the new subject independently of the old read receipt.
+  expect(fixture.findings.mock.calls.at(-1)?.[0].viewerKey).toBe('another-viewer');
+});
+
+it('waits for authentication resolution before mounting the gallery source reader', async () => {
+  fixture.auth.loading = true; await mount();
+  expect(fixture.gallery).not.toHaveBeenCalled();
+  expect(fixture.findings.mock.calls.at(-1)?.[0].read).toBeNull();
 });
