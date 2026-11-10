@@ -146,6 +146,13 @@ SELECT pg_temp.assert_true(pg_temp.st('2017-12-03') = 'refused_no_new_evidence',
 -- B re-planned after the admission and refused again, leaving the upload out: no loop
 SELECT pg_temp.refused('2017-11-19', interval '10 minutes', ARRAY['00000000-0000-4000-8000-00000000b001']::uuid[]);
 SELECT pg_temp.assert_true(pg_temp.st('2017-11-19') = 'refused_no_new_evidence', 'B: a re-plan that leaves the upload out is not re-opened by it again');
+-- day F: refused 30 min ago (after the admission epoch); an old upload whose camera clock was recovered from its file 5 min ago
+SELECT pg_temp.photo('00000000-0000-4000-8000-00000000f001', '2017-12-09', 'user_upload', now() - interval '300 days', false);
+SELECT pg_temp.refused('2017-12-09', interval '30 minutes', NULL);
+SELECT pg_temp.assert_true(pg_temp.st('2017-12-09') = 'refused_no_new_evidence', 'F: no clock yet: not admitted, stays blocked');
+UPDATE vehicle_images SET exif_data = jsonb_build_object('DateTimeOriginal', '2017:12:09 10:00:00',
+  'capture_clock', jsonb_build_object('source', 'file_exif', 'at', now() - interval '5 minutes')) WHERE id = '00000000-0000-4000-8000-00000000f001';
+SELECT pg_temp.assert_true(pg_temp.st('2017-12-09') = 'new_evidence_since_refusal', 'F: a clock recovered after the refusal re-opens the day');
 -- a brand-new photo still re-opens (existing rule kept)
 SELECT pg_temp.photo('00000000-0000-4000-8000-00000000c009', '2017-12-01', 'capture_relay_ios', now());
 SELECT pg_temp.assert_true(pg_temp.st('2017-12-01') = 'new_evidence_since_refusal', 'a photo that arrived after the refusal still re-opens');

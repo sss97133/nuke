@@ -74,7 +74,8 @@ BEGIN
     INTO v_anchor;
   -- 20261113120900: a photo the refused plan never saw and could not have seen: planner-eligible and unfiled now, absent
   -- from the refused run's candidates and review rows, and eligible only since the refusal (it arrived later, or the planner
-  -- admitted its kind later: capture_set_admission_epochs, e.g. unfiled uploads from 20261113120700). Photos the planner
+  -- admitted its kind later: capture_set_admission_epochs, e.g. unfiled uploads from 20261113120700, or its camera clock was
+  -- recovered later from the stored file: exif_data.capture_clock.at). Photos the planner
   -- saw and chose not to propose never count, so a re-plan that leaves one out is not re-armed by it again.
   SELECT EXISTS (
            SELECT 1 FROM vehicle_images v
@@ -87,7 +88,9 @@ BEGIN
              AND greatest(v.created_at,
                           CASE WHEN v.source = ANY (public.capture_set_photo_sources()) THEN '-infinity'::timestamptz
                                ELSE coalesce((SELECT max(e.admitted_from) FROM capture_set_admission_epochs e
-                                              WHERE e.rule = 'unfiled_uploads'), '-infinity'::timestamptz) END) > c.at
+                                              WHERE e.rule = 'unfiled_uploads'), '-infinity'::timestamptz) END,
+                          -- a camera clock recovered later from the stored file (capture_clock_from_file.py) admits it then
+                          coalesce((v.exif_data -> 'capture_clock' ->> 'at')::timestamptz, '-infinity'::timestamptz)) > c.at
              AND NOT EXISTS (SELECT 1 FROM capture_set_candidates k WHERE k.run_id = c.run_id AND v.id = ANY (k.image_ids))
              AND NOT EXISTS (SELECT 1 FROM capture_set_review r WHERE r.run_id = c.run_id AND v.id = ANY (r.image_ids)))
     INTO v_unseen;
