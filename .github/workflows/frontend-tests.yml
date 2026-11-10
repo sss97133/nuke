@@ -771,7 +771,7 @@ jobs:
       - name: Verify batch-extract-snapshots never calls the model under no_ai, ends queue rows with no vehicle, and does not fail a row on a price or VIN the database refuses
         run: deno test --allow-read=supabase/functions/batch-extract-snapshots supabase/functions/batch-extract-snapshots/aiGate.test.ts supabase/functions/batch-extract-snapshots/writeRules.test.ts
       - name: Verify photo-pipeline-orchestrator files a photo only through attribute_testimony and writes no upload-clock suggestion
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/orchestrator_test.ts supabase/functions/photo-pipeline-orchestrator/persistence_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedAnalysisHandler_test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/orchestrator_test.ts supabase/functions/photo-pipeline-orchestrator/persistence_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedAnalysisHandler_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedIntakeChain_test.ts
       - name: Verify a reader's classification is validated like a provider answer and never throws
         run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/readerClassification_test.ts
       - name: Verify physical VIN admission keeps source, era, checksum and photo-filing boundaries
