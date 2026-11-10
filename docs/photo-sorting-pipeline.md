@@ -921,7 +921,62 @@ Exclusive why, with `empty_url` first, then last-plan `gate_failed` as `plan_ref
 | no_date | 3 | `photo_auto_sync`, typ empty, no `taken_at`. Never invent a clock |
 | judgment_personal | 2 | `direct_pull_2026_05_23` typ=`other`, logged under the #3302 log, not on a planned leftover or refused day. Official classifier did not set `is_sensitive`. 18 `judgment_personal` remain unofficially unsorted in total (13 inside leftover, 3 inside plan_refused, 2 here) |
 
-empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks. Never re-arm refused days. Next sanctioned work is to fix `nothing_left_unfiled` so `is_duplicate` / `is_superseded` do not exempt still-unfiled photos, then restore the 26 typ=`other` #3322 frames (revert that log and re-apply, or a reopen path for `nothing_left_unfiled`) and apply the remaining 22 refused-day photos.
+empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks. Never re-arm refused days. That work is in §18.12: `nothing_left_unfiled` is fixed, the 26 typ=`other` frames are restored, and the remaining refused-day photos are in open review.
+
+## 18.12 nothing_left_unfiled fix, typ-other restore, and the last refused-day batch (18:30–18:44 AST)
+
+PR [#3329](https://github.com/sss97133/nuke/pull/3329) (`fix/capture-review-sweep-nothing-left-unfiled`, `6fb92bda`) patches `capture_set_review_sweep` so `nothing_left_unfiled` uses the same still-unfiled definition as the #3318 coverage clause: a photo is still unfiled when it has no `vehicle_id`, no active `capture_set_link`, and no active document page. `is_duplicate` / `is_superseded` do not exempt it. Function-only; coverage, re-arm, cron, and grants are unchanged. Parent is the live #3318 body (md5 `2e3bb92f`). Revert SQL restores that body. Contract `supabase/sql/test_capture_review_sweep_nothing_left_unfiled.sql` (local `TEST_EXIT:0`): the parent body still closes an all-superseded or all-duplicate unfiled review; after the patch those stay open; truly filed / linked / paged reviews still resolve; a revoked page or reverted link does not count as filing. Validate 42915169605 and Frontend Tests 42915169608 (db-contracts job 130175648855) were green. Applied live at about 18:42 AST. Live sweep md5 `e569895db14709dd55e98b3061dc538e`. The old flag exemption is gone from the live body.
+
+`capture_set_review_reopen_uncovered_v1` does not apply here: it only reopens `superseded_by_newer_run`, and the three #3322 reviews were resolved `nothing_left_unfiled`. All 26 photos were still unfiled and in no open review. The sanctioned path was therefore to revert the #3322 log and re-apply. Revert of run `a3322000-…0004` at about 18:42 AST marked 26 log rows reverted and deleted 0 open reviews (the three rows were already resolved and stay as history). Dry `a3322000-…0006`: eligible 26, would_route 26, same 3 days. Signed apply `a3322000-0000-4000-8000-000000000007` at about 18:43 AST (granted_by `0b9f107a-…`) routed 26 photos into 3 new open reviews (`nv_vehicle_review:2019-09-27` 1, `2026-06-12` 20, `2026-06-13` 5), confidence 0. 7 unfiled copies followed via the #3316 dupmap. Official in-database `GROUP BY` immediately before versus after that apply:
+
+| State | Before restore | After #3322 re-apply | Δ |
+|---| ---:| ---:| ---:|
+| on_vehicle | 13,977 | 13,977 | 0 |
+| held | 9,036 | **9,062** | **+26** |
+| pulled | 2,126 | 2,126 | 0 |
+| unverified | 1,986 | 1,986 | 0 |
+| private | 1,251 | 1,251 | 0 |
+| duplicate | 832 | **839** | **+7** |
+| **unsorted** | **414** | **381** | **−33** |
+| non_vehicle | 127 | 127 | 0 |
+| waiting | 0 | 0 | 0 |
+| **n** | **29,749** | **29,749** | **0** |
+
+(The before-restore snapshot already differs from the 18:23 batch-2 ledger by on_vehicle +3 / unverified −3: three photos filed under the normal path between 18:23 and 18:42. held / unsorted / duplicate / n were unchanged by that filing.)
+
+The five typ=`other` photos on gate_failed 2026-06-13 are again in the typ-other review, so they are skipped by the refused-day producer. Dry `a3327000-…0008` of the remainder: eligible 17, would_route 17, 3 days (2026-06-13 13 all-superseded leftovers, 2026-07-22 1, 2026-09-02 3). Those 17 had 0 already filed and 8 unfiled direct copies (11 official `duplicate` after the chain walk). Signed apply `a3327000-0000-4000-8000-000000000009` at **18:43:41 AST** (America/St_Barthelemy) routed 17 photos into 3 open reviews, confidence 0, 0 filed, chunks still `gate_failed`, cursor unchanged. A further dry (`…000a`) took 0. 21 open `refused_day` reviews / 107 photos and the 3 restored typ-other reviews remain open. Because the sweep fix is live, the all-superseded 2026-06-13 typ-other and refused-day reviews will not be closed as `nothing_left_unfiled` at 19:17 AST.
+
+Official `GROUP BY` immediately after batch 3:
+
+| State | After #3322 restore | After refused-day batch 3 | Δ |
+|---| ---:| ---:| ---:|
+| on_vehicle | 13,977 | 13,977 | 0 |
+| held | 9,062 | **9,079** | **+17** |
+| pulled | 2,126 | 2,126 | 0 |
+| unverified | 1,986 | 1,986 | 0 |
+| private | 1,251 | 1,251 | 0 |
+| duplicate | 839 | **850** | **+11** |
+| **unsorted** | **381** | **353** | **−28** |
+| non_vehicle | 127 | 127 | 0 |
+| waiting | 0 | 0 | 0 |
+| **n** | **29,749** | **29,749** | **0** |
+
+Landing stayed `enabled=true`, `halted=false`, `halt_reason=null`, `forward_cursor=2026-11-03 10:00:00+00`. Backup of the 17: `/workspace/sortrun/refused_day_review/batch3_17.txt`.
+
+### Official unsorted 353 after the restore and batch 3 — exclusive buckets
+
+Same exclusive why as §18.11 (`empty_url` first, then last-plan `gate_failed` as `plan_refused`, then any other planned day as `planned_but_left_out`, then remaining `judgment_personal`, `source_not_admitted`, and `no_date`). Sum 275+58+3+12+3+2=353.
+
+| Why | Count | Producer gap / why it is correctly unsorted |
+|---| ---:|---|
+| empty_url | 275 | Leave the 276 class untouched |
+| planned_but_left_out | 58 | typ=`other` 34 (27 `photo_auto_sync`, 4 `capture_relay_ios`, 3 placeholder-URL `image_intake`, one of them with no clock), typ-empty 20 (18 session-admitted `user_upload`, 2 `iphoto` unfiled copies), `progress_shot` 2 superseded, `vehicle_exterior` 2 (1 superseded `capture_relay_ios`, 1 `iphoto` with no clock), 13 `judgment_personal` on leftover days. The 21 typ=`other` vehicle-judged frames that had been in leftover after the 17:52 drop are back in held. typ-empty uploads stay until typ or a sanctioned split; `judgment_personal` stays unsorted and logged; never invent a clock |
+| plan_refused | 3 | All `judgment_personal` typ=`other` (2 `iphoto`, 1 `photo_auto_sync`) on gate_failed days. The refused-day producer correctly skips them. A further dry took 0. Do not re-arm as a class |
+| source_not_admitted | 12 | `image_intake` typ `vehicle_exterior` 10 + `direct_pull_2026_05_23` typ `engine_bay` 2. #3303 admits `user_upload` only. Never invent a clock. Correctly unsorted |
+| no_date | 3 | `photo_auto_sync`, typ empty, no `taken_at`. Never invent a clock |
+| judgment_personal | 2 | `direct_pull_2026_05_23` typ=`other`, logged under the #3302 log, not on a planned leftover or refused day. Official classifier did not set `is_sensitive`. 18 `judgment_personal` remain unofficially unsorted in total (13 inside leftover, 3 inside plan_refused, 2 here) |
+
+empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks. Never re-arm refused days.
 
 ## 19. Known gaps and next work
 
@@ -974,9 +1029,10 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3314](https://github.com/sss97133/nuke/pull/3314) | skip no-clock leftovers the scorer cannot use | Draft, **applied live** ~16:20 AST | Leftovers / scorer match |
 | [#3316](https://github.com/sss97133/nuke/pull/3316) | walk dup chains and count non_vehicle copies | Draft, **applied live** ~16:35 AST | Ledger definition only |
 | [#3318](https://github.com/sss97133/nuke/pull/3318) | keep unique photos when a newer review supersedes | Draft, **applied live** ~16:56 AST (sweep) and ~17:10 AST (fast reopen) | Sweep fix + signed reopen |
-| [#3322](https://github.com/sss97133/nuke/pull/3322) | route typ-other vehicle looks to held review | Open, **applied live** ~17:42 AST (26 photos / 3 reviews) | typ other into held |
+| [#3322](https://github.com/sss97133/nuke/pull/3322) | route typ-other vehicle looks to held review | Open, **applied live** ~17:42 AST; reviews dropped 17:52 and restored 18:43 AST (26 photos / 3 new open reviews) | typ other into held |
 | [#3323](https://github.com/sss97133/nuke/pull/3323) | write typ from high-confidence local CLIP views | Open, **applied live** (DDL only); typ writes refused (agreement 63.2% < 90%) | typ from CLIP |
-| [#3327](https://github.com/sss97133/nuke/pull/3327) | route refused days' unfiled photos to held review | Open, **applied live** ~18:20 AST (function) and 18:22 AST (90 photos / 18 reviews; 22 held back) | refused-day review |
+| [#3327](https://github.com/sss97133/nuke/pull/3327) | route refused days' unfiled photos to held review | Open, **applied live** ~18:20 AST (function) and 18:22–18:43 AST (107 photos / 21 reviews) | refused-day review |
+| [#3329](https://github.com/sss97133/nuke/pull/3329) | keep flagged unfiled photos in open reviews | Open, **applied live** ~18:42 AST | Sweep nothing_left_unfiled |
 
 ## 21. Unverified or out of scope in this writing
 
@@ -994,4 +1050,4 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Operator log: `/workspace/sortrun/progress.md` (9–10 Nov 2026)
 - Scripts and artifacts under `/workspace/sortrun`: `gate_reader.py`, `drain_loop.py`, `ledger_now.py`, `emptyplan/*`, `fingerprint/*`, `lookalike_pilot/*`, `garage/gallery_pollution_audit.md`, `garage/visual_identity_recheck_v1.md`, `garage/gross_mismatch_v1/*`, `held/same_scene_dryrun.py`, `ingest_audit/`, `unsorted/breakdown.json`, `unsorted/fresh_20261110/*`, `stamp_dto_pr/BRIEF.md`, `receipt_order_fix/`, `ledger_live_def.txt`
 - Repository: `github.com/sss97133/nuke` — especially `docs/receipt-work-contract.md`, `supabase/migrations/20261020001000_vehicle_image_review_holds.sql`, `supabase/migrations/20261109070000_rederive_ownership_roles.sql`, `scripts/ownership/rederive-ownership-roles.mjs`, `scripts/receipt-work/reconcile-receipt-work.mjs`, `scripts/photo-pipeline/local_image_analysis.py`, `scripts/iphoto-intake.mjs`, and the PRs in §20
-- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~18:23 AST, after refused-day batch 2)
+- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~18:44 AST, after the typ-other restore and refused-day batch 3)
