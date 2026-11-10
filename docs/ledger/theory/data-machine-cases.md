@@ -495,6 +495,43 @@ theory card ("Image analysis is the model asking"), and the acceptance is his th
 made capture-date order the rule for the whole backfill and let the reader run to the subscription's limit, was
 withdrawn unmerged on his word within the hour: "Earliest photos first is a dangerous mode."
 
+**C17 pickup, 2026-11-10 21:10 UTC: where everything stands.** Written for whoever continues. Stages are named
+separately; nothing below is a claim of fleet coverage.
+
+- Runtime-verified that day (read 20:10 UTC): the stage ledger is on for one account
+  (`platform_config.image_stage_reconciler`: enabled, one user id, `refill_below` 100, no `order` key); the
+  reconciler runs and skips while the line is full; the Mac reader posts 20 accepted readings per 10-minute
+  fire (98 succeeded receipts in the last hour, none rate-limited); the assay passed at 19:49 UTC. Merged and
+  deployed:
+  #3293, #3295, #3306, #3307, #3308, #3310.
+- Withdrawn or parked, none merged. Each is a closed pull request by this session; fetch its commit by hash.
+  - #3313, `089053353`: capture-date order for the backfill and a reader that claims one photo at a time.
+    Withdrawn on the owner's word. Tested; never deployed.
+  - `56ead0d34`, "feat(db): photo landing supersedes an earlier reading" (migration `20261113150000`): the
+    landing fold stops being first-write-wins. Its contract passes 101 checks on a local PostgreSQL 16; the
+    adversarial verification pass did not run; nothing was read from production for it. It adds three tables to
+    the classifier's own landing. Under the owner direction of this date the first question is whether to invest
+    in that landing at all, or to let keyed observations replace it.
+  - `1330a8e5c`, "feat(capture): photo reading status reader, web block and app bar" (migration
+    `20261113170000`): tells the owner whether reading is moving or stalled and why. The SQL reader's contract
+    passes locally with 22 of 22 mutations caught; its production plan was never read. The web block was
+    reviewed and one must-fix is open (a waiting state shows no reason). The Swift was never compiled or
+    reviewed. Its headline counts photos read, which the owner has since said is not the measure.
+- Not started: the build ("Where the build starts" in the theory card); a provider key box (owner: "Use
+  whatever key has tokens. Don't just block"); the phone's own reading as the first stage; choosing what to read
+  by worth inside a budget; database capacity.
+- Audits of this date, repo only, each to be verified before use: `docs/ledger/2026-11-10_image-reading-map-*.md`
+  (the model against the three questions; what a reading emits and where it lands; what the owner had already
+  written; free signals for choosing what to read; what a reading costs; and a critic's check of all five, which
+  found two of their claims wrong and two stale).
+- The owner's test of this record, and its first round: `docs/ledger/theory/owner-voice-test.md`.
+- Decisions that are the owner's, each with the default taken so far: which registry is the map for photos (the
+  database one); whether the classifier's landing gets supersession or is left as retained input (left); the
+  reader's budget on the subscription and what "matters this week" selects (unset; the reader runs at 20 per
+  fire); the 2026-06-18 "deprecated, drop" comment on `image_question_answers` (kept, not dropped; the table
+  holds 1,021 rows); whether the phone's shop gate stays, given "the users photo album ... the same for
+  everyone" (unchanged).
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026

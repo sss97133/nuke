@@ -100,6 +100,32 @@ vehicle, the C17 cohort of that date:
    `evidence_judgment_requests`.
 5. Readers for the three questions, then C17's comparison on the same photos.
 
+Four things were read in the code that day and have to be settled before step 3. They are also the
+first test of rule 5.
+
+- **A part has no place.** `vehicle_observations` has no column for the part of the vehicle a row is
+  about (`subject_type` admits vehicle, organization, user, asset and external identity), a registry
+  row carries no list of allowed values and no part, and no property uses a part as its discriminator.
+  This is the first thing to file through `schema_proposals`.
+- **There are two registries.** `observation_properties` in the database, and the code registry
+  `supabase/functions/_shared/cockpit/attribute-registry.ts`, whose own comment records an earlier
+  owner call ("registry code is source of truth, not a DB table") and which already asks for a
+  condition cue as kind, severity, box and panel. Nothing joins them. This card takes the database
+  registry for photo readings, because the writer checks against it and `schema_proposals` grows it;
+  the owner has not ruled between them.
+- **A keyed fact is its own observation.** The reviewed deep-reading row cannot carry a property key
+  or a confidence above 0.6 (the guard in 20261109213000), so each keyed fact is a separate
+  observation through `ingest-observation`, citing one photo.
+- **Nothing in the repo answers a question.** The claim and answer functions of
+  `evidence_judgment_requests` exist and no script, function or app calls them; the answers in
+  production were written from outside the repo.
+
+**Testing this card by acting as the owner.** The owner's test: send a new agent, with no memory, the
+kind of message he would send, and see whether it goes where this card points or where the 2026-11-10
+session went. The messages, the grading and the first results are in
+[`owner-voice-test.md`](owner-voice-test.md). Run it again after any change to this section and after
+each piece of the build.
+
 **What a person brings, and where it lives.** The owner describes how a person critiques the data:
 "based on their understanding and their patterns and their training along with their experience and
 the context of the situation but we have to build that as a system". Each has a home. On 2026-11-10
