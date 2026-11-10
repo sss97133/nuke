@@ -18,6 +18,7 @@ import './vehicle-evidence-detail.css';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { publicObservationData, publicObservationArtifact, OBSERVATION_PRIVACY_NOTICE } from './observationPrivacy';
+import { readNativeListingHistory, nativeListingObservationData } from './auctionEvidenceDisplay';
 
 interface ObservationRow {
   id: string;
@@ -36,6 +37,7 @@ interface ObservationRow {
   superseded_by: string | null;
   source_slug: string | null;
   source_name: string | null;
+  public_source_url?: string;
 }
 
 interface RelatedObservation {
@@ -144,11 +146,22 @@ const ObservationPageContent: React.FC = () => {
         if (cancelled) return;
 
         if (obsRes.error) throw new Error('Unable to load this observation. Try again.');
-        if (!obsRes.data || obsRes.data.id !== obsId || obsRes.data.vehicle_id !== vehicleId) {
-          throw new Error('Observation unavailable for this vehicle.');
+        let rawObs = obsRes.data as any;
+        if (!rawObs) {
+          // Raw CC listings may contain a seller name. Preserve that policy and
+          // use only the existing server-side sanitized source-history fields.
+          const history = await supabase.rpc('get_vehicle_specs', {
+            p_vehicle_ids: [vehicleId], p_include_typed_claims: true, p_claim_cursor: {},
+          }).abortSignal(controller.signal);
+          if (cancelled) return;
+          if (history.error) throw new Error('Source history unavailable.');
+          const claim = readNativeListingHistory(history.data, vehicleId).entries.find(r => r.observation_id === obsId);
+          if (claim) rawObs = { id: claim.observation_id, vehicle_id: vehicleId, kind: 'listing',
+            observed_at: claim.source_captured_at, ingested_at: claim.ingested_at,
+            structured_data: nativeListingObservationData(claim), public_source_url: claim.source_url, property_id: null, is_superseded: false,
+            superseded_by: null, observation_sources: { slug: 'collecting-cars', display_name: 'Collecting Cars publisher report (unverified)' } };
         }
-
-        const rawObs = obsRes.data as any;
+        if (!rawObs || rawObs.id !== obsId || rawObs.vehicle_id !== vehicleId) throw new Error('Observation unavailable for this vehicle.');
         const observation: ObservationRow = {
           ...rawObs,
           source_slug: rawObs.observation_sources?.slug ?? null,
@@ -371,6 +384,9 @@ const ObservationPageContent: React.FC = () => {
           </h1>
 
           <p style={{ color: 'var(--text-secondary)' }}>{OBSERVATION_PRIVACY_NOTICE}</p>
+          {obs.public_source_url && <p>Publisher report (unverified). Aggregate bid counts do not establish individual bid history.{' '}
+            <a href={obs.public_source_url} target="_blank" rel="noopener noreferrer">View on Collecting Cars</a>
+          </p>}
 
           <div className="evidence-metadata"
             style={{
