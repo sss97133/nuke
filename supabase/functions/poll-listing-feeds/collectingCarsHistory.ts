@@ -1,5 +1,6 @@
 import { retainFetchedCapture } from "../_shared/archiveFetch.ts";
 import { ledgerDecision, type LedgerKnown } from "./ledger.ts";
+import { discoverCollectingCarsSitemap, prepareCollectingCarsTargets, readCollectingCarsRetry } from "./collectingCarsSupplement.ts";
 
 const ENDPOINT = "https://dora.production.collecting.com/multi_search";
 // Publisher's existing public, search-only client key (same discovery owner).
@@ -33,7 +34,7 @@ function readPage(body: any, after: number, ceiling: number) {
 }
 
 /** One immutable page is drained through the existing full-listing ledger before the keyset advances. */
-export async function prepareCollectingCarsHistory(db: any, feed: any, signal: AbortSignal, fetcher = fetch) {
+export async function prepareCollectingCarsHistory(db: any, feed: any, signal: AbortSignal, fetcher = fetch, checkpointDb = db) {
   let config = feed.search_criteria ?? {};
   if (feed.source_slug !== "collecting-cars" || feed.enabled !== true || config.fetch_strategy !== "collecting_cars_history"
     || config.history_version !== 1 || "slug_year_min" in config || "slug_year_max" in config || !integer(config.history_pass ?? 1, 1)) throw Error("cc_history_config_invalid");
@@ -41,13 +42,28 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
   const search = collectingCarsHistorySearch(after, ceiling);
   // Attribution URL contains the exact bounded query, never the client key.
   const sourceUrl = `${ENDPOINT}?${new URLSearchParams({ search: JSON.stringify(search) })}`;
+  let preparing = true;
   const checkpoint = async (next: Row) => {
-    const saved = await db.from("listing_feeds").update({ search_criteria: next, updated_at: new Date().toISOString() })
+    const checkpointSignal = preparing ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000);
+    const saved = await checkpointDb.from("listing_feeds").update({ search_criteria: next, updated_at: new Date().toISOString() })
       .eq("id", feed.id).eq("source_slug", "collecting-cars").eq("enabled", true)
-      .eq("search_criteria", JSON.stringify(config)).select("id").abortSignal(AbortSignal.timeout(5000));
+      .eq("search_criteria", JSON.stringify(config)).select("id").abortSignal(checkpointSignal);
     if (saved.error || saved.data?.length !== 1 || saved.data[0].id !== feed.id) throw Error("cc_history_checkpoint_conflict");
     config = next;
+    feed.search_criteria = next;
   };
+  const supplement = config.history_supplement_version === 1;
+  if (config.history_supplement_version != null && !supplement) throw Error("cc_history_supplement_version_invalid");
+  const control = { get: () => config, checkpoint };
+  const sitemap = supplement ? await discoverCollectingCarsSitemap(db, control, signal, fetcher) : null;
+  const retry = supplement ? await readCollectingCarsRetry(db, control, signal) : null;
+  if (supplement && ![undefined, "index", "targets"].includes(config.history_phase)) throw Error("cc_history_phase_invalid");
+  if (supplement && config.history_phase === "targets") {
+    const targets = await prepareCollectingCarsTargets(db, control, signal);
+    attachRetry(targets, retry);
+    targets.receipt.sitemap_discovery = sitemap;
+    return { ...targets, async finish(...args: Parameters<typeof targets.finish>) { preparing = false; return await targets.finish(...args); } };
+  }
   let capture: Capture | null = config.history_capture ?? null, response: any;
   if (capture) {
     if (capture.after_id !== after || capture.ceiling_id !== ceiling || typeof capture.id !== "string"
@@ -61,7 +77,10 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
       || typeof row.html !== "string" || new TextEncoder().encode(row.html).length > MAX_BYTES || await digest(row.html) !== capture.sha256)
       throw Error("cc_history_capture_unavailable");
     const envelope = JSON.parse(row.html);
-    if (JSON.stringify(envelope.search) !== JSON.stringify(search) || envelope.read_at !== capture.read_at) throw Error("cc_history_capture_attribution_mismatch");
+    const envelopeClock = typeof envelope.read_at === "string" ? Date.parse(envelope.read_at) : NaN;
+    // PostgreSQL returns equivalent UTC timestamps with +00:00 instead of Z; compare the instant, never re-clock it.
+    if (JSON.stringify(envelope.search) !== JSON.stringify(search) || !Number.isFinite(envelopeClock)
+      || envelopeClock !== Date.parse(capture.read_at)) throw Error("cc_history_capture_attribution_mismatch");
     response = envelope.response;
   } else {
     signal.throwIfAborted();
@@ -110,7 +129,8 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
     capture_id: capture.id, pass: config.history_pass ?? 1, discovery_complete: config.history_discovery_complete === true,
     coverage: "Current publisher index only; delisted or absent historical lots unknown. Non-car discovery is not canonical ingestion." };
   const identities = new Map<string, { auctionId: number; stage: string | null }>(page.lots.map((lot: any) => [lot.url, { auctionId: lot.id, stage: typeof lot.document.listingStage === "string" ? lot.document.listingStage : null }]));
-  return { urls, identities, receipt, async finish(ledger: Map<string, LedgerKnown>, outcomes: Row[]) {
+  const result = { urls, identities, freshClassificationUrls: new Set<string>(), receipt, async finish(ledger: Map<string, LedgerKnown>, outcomes: Row[]) {
+    preparing = false;
     const ack = new Set(outcomes.filter(row => row.ledger_write_status === "acknowledged" && ["complete", "skipped", "failed"].includes(row.ledger)).map(row => row.url));
     const pending = urls.filter(url => !ack.has(url) && !["settled", "backoff"].includes(ledgerDecision(ledger.get(url), new Date())));
     receipt.page_unattempted_or_unacknowledged = pending.length;
@@ -119,10 +139,25 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
     const end = page.found === page.lots.length || page.lastId === ceiling;
     await checkpoint({ ...config, history_after_id: end ? 0 : page.lastId, history_capture: null,
       history_discovery_complete: config.history_discovery_complete === true || end,
-      history_pass: (config.history_pass ?? 1) + (end ? 1 : 0) });
+      history_pass: (config.history_pass ?? 1) + (end ? 1 : 0),
+      ...(supplement ? { history_phase: "targets" } : {}) });
     receipt.page_advanced = true; receipt.discovery_complete = config.history_discovery_complete;
     receipt.next_after_id = config.history_after_id;
     // Subsequent passes reconcile current-index retry debt. Known full captures do not expire here.
     // A correction/version upgrade and withdrawal policy are separate from first-capture completion.
   } };
+  attachRetry(result, retry);
+  if (sitemap) receipt.sitemap_discovery = sitemap;
+  return result;
+}
+
+function attachRetry(page: { urls: string[]; identities: Map<string, { auctionId: number; stage: string | null }>; freshClassificationUrls: Set<string>; receipt: Row },
+  retry: Awaited<ReturnType<typeof readCollectingCarsRetry>>) {
+  if (!retry) return;
+  if (!page.urls.includes(retry.url)) page.urls.unshift(retry.url);
+  if (!page.identities.has(retry.url)) {
+    if (retry.identity) page.identities.set(retry.url, retry.identity);
+    else page.freshClassificationUrls.add(retry.url);
+  }
+  page.receipt.independent_due_retry = true;
 }
