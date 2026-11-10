@@ -1,4 +1,5 @@
 import React from 'react';
+import { CatalogProductReference } from './CatalogProductReference';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import type { VisualWork } from './hooks/useVisualWork';
@@ -43,6 +44,7 @@ export function VisualWorkCards({ rows, renderSource }: {
         <strong>{line.description || line.part_number || 'Receipt line'}</strong>
         <small>{[receiptSupplierLabel(line.vendor), line.part_number, line.quantity != null ? `Qty ${line.quantity}` : null, line.page_date ? date(line.page_date) : null].filter(Boolean).join(' · ')}</small>
         {line.amounts_visible ? line.amount != null && <b>{amount(line.amount, line.currency)} · line charge</b> : <small>Amount visible to owner & contributors</small>}
+        <CatalogProductReference product={line.product} />
         {renderSource(line)}
       </div>)}</div>}
       {work.receipt_links_unavailable > 0 && <p className="vp-work-note">Some cited receipt lines are no longer available in this read.</p>}
