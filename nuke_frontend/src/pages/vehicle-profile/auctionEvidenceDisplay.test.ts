@@ -14,6 +14,24 @@ it('accepts only the exact sanitized native history contract', () => {
  expect(readNativeListingHistory(history(), 'v').entries[0]).toEqual(report);
  expect(() => readNativeListingHistory(history(), 'another')).toThrow();
 });
+it.each(['cc_native_profile_history_v1', 'cc_native_profile_history_v2'])('preserves sold history during reader rollout: %s', reader => {
+ const response = history();
+ response[0].native_listing_history.reader = reader;
+ expect(readNativeListingHistory(response, 'v').entries[0]).toEqual(report);
+});
+it('refuses unknown reader versions', () => {
+ const response = history();
+ response[0].native_listing_history.reader = 'cc_native_profile_history_v3';
+ expect(() => readNativeListingHistory(response, 'v')).toThrow();
+});
+it('accepts ended classified history only with an unknown outcome and no price role', () => {
+ const ended = { ...report, reported_outcome: 'unknown', reported_listing_stage: 'ended', sale_format: 'classified', reported_amount: null, reported_amount_kind: null };
+ expect(readNativeListingHistory(history(ended as any), 'v').entries[0]).toEqual(ended);
+ for (const patch of [{ reported_outcome: 'unsold' }, { reported_amount: 10995 }, { reported_amount_kind: 'high_bid' },
+  { reported_event_at: null }, { sale_format: 'unknown' }, { reported_listing_stage: undefined }]) {
+  expect(() => readNativeListingHistory(history({ ...ended, ...patch } as any), 'v')).toThrow();
+ }
+});
 it.each([
  { source_url: 'https://private.invalid/secret' }, { source: 'other' }, { qualification: 'verified_sale' },
  { reported_amount: '67500' }, { reported_outcome: 'unsold', reported_amount: 67500 },
