@@ -85,6 +85,7 @@ SELECT pg_temp.assert_true((SELECT evidence#>>'{resolved,how}' FROM capture_set_
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_rescore_queue) = 0, 'pre: re-arm limit 0 writes no queue rows');
 
 \i supabase/migrations/20261115230000_capture_review_sweep_coverage.sql
+\i supabase/migrations/20261115230100_capture_review_reopen_uncovered_fast.sql
 
 SELECT pg_temp.assert_true(md5(p.prosrc) <> 'f021b75c81be85388884d9c16d42ca49', 'new sweep body is not the parent')
 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
@@ -93,6 +94,11 @@ SELECT pg_temp.assert_true(position('uncovered_after_newer_run' in p.prosrc) > 0
   AND position('20261113120600' in p.prosrc) > 0, 'coverage fix and 20600 re-arm comments are both present')
 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
 WHERE n.nspname='public' AND p.proname='capture_set_review_sweep';
+
+SELECT pg_temp.assert_true(md5(p.prosrc) <> 'ac989c8c6bb6d8b8d8f0f1332ddfd8bf'
+  AND position('AS MATERIALIZED' in p.prosrc) > 0, 'reopen eligibility is the set-based 230100 body')
+FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE n.nspname='public' AND p.proname='capture_set_review_reopen_uncovered_v1';
 
 -- Post-patch fixtures: F2 is the same shape as F1; G is covered by another open review;
 -- I's leftover photo is already filed; J's leftover is an unfiled duplicate.
