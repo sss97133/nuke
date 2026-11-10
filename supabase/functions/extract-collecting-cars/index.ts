@@ -62,9 +62,6 @@ Deno.serve(async (req) => {
       throw e;
     }
     if (fetched.source === 'firecrawl') await gate.record(1, 1, 'extract-collecting-cars', url);
-    if (extracted.lot_type && extracted.lot_type !== 'car') {
-      return json({ success: false, skipped: true, skip_reason: `Collecting Cars lot type ${extracted.lot_type}`, url });
-    }
     // A parsed page is usable only with its durable source bytes and original clock.
     if (fetched.archiveError) throw Error("Collecting Cars capture was not retained");
     const db = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!);
@@ -77,6 +74,11 @@ Deno.serve(async (req) => {
     const row = saved.data?.length === 1 ? saved.data[0] : null;
     if (saved.error || !row?.success || row.listing_url !== url || row.platform !== 'collectingcars'
       || row.html_sha256 !== hash || !Number.isFinite(Date.parse(row.fetched_at)) || Date.parse(row.fetched_at) > Date.now()) throw Error('Collecting Cars capture mismatch');
+    if (extracted.lot_type && extracted.lot_type !== 'car') {
+      return json({ success: false, skipped: true, skip_reason: `Collecting Cars lot type ${extracted.lot_type}`, url,
+        extracted: { listing_id: extracted.listing_id, lot_type: extracted.lot_type, url },
+        source_capture: { snapshot_id: row.id, sha256: hash, observed_at: row.fetched_at, source_url: url } });
+    }
     return json({ success: true, extracted: { ...extracted, listing_url: extracted.url },
       source_capture: { snapshot_id: row.id, sha256: hash, observed_at: row.fetched_at, source_url: url } });
   } catch (error: any) {

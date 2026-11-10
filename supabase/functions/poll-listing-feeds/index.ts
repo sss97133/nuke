@@ -1025,8 +1025,12 @@ async function pollFirecrawlHtmlFeed(
           dealer_native_version: "dealer_microdata_v2", ...(w.ingest.dealer_receipt ? { dealer_receipt: w.ingest.dealer_receipt } : {}) };
       }
       if (nativeCc) {
+        if (write.status === "skipped" && w.ingest.collecting_cars_noncar) {
+          Object.assign(write.row, { error_message: null, failure_category: null, next_attempt_at: null });
+        }
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}),
           collecting_cars_native_version: CC_LISTING_METHOD,
+          ...(w.ingest.collecting_cars_noncar ? { collecting_cars_noncar: w.ingest.collecting_cars_noncar } : {}),
           ...(historyPage?.identities.get(w.url) ? { collecting_cars_history_identity: historyPage.identities.get(w.url) } : {}),
           ...(w.ingest.collecting_cars_receipt ? { collecting_cars_receipt: w.ingest.collecting_cars_receipt } : {}) };
       }
