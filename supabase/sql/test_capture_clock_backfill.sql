@@ -37,7 +37,7 @@ SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.capture_cl
 SELECT pg_temp.assert_true(NOT has_table_privilege('authenticated', 'public.capture_clock_backfill_log', 'SELECT'), 'log private');
 
 CREATE FUNCTION pg_temp.k(src text, run text, dto text) RETURNS jsonb LANGUAGE sql AS
-$$ SELECT jsonb_build_object('DateTimeOriginal', dto, 'capture_clock', jsonb_build_object('source', src, 'run_id', run, 'producer', 't', 'prior_taken_at', null)) $$;
+$$ SELECT jsonb_build_object('DateTimeOriginal', dto, 'Make', 'Apple', 'capture_clock', jsonb_build_object('source', src, 'run_id', run, 'producer', 't', 'prior_taken_at', null)) $$;
 SELECT pg_temp.assert_true(capture_clock_backfill_apply('a0000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001',
   '2021-05-07 21:30Z', pg_temp.k('file_exif', 'a0000000-0000-4000-8000-000000000001', '2021:05:07 14:30:00'), true) ->> 'status' = 'written', 'upload written');
 SELECT pg_temp.assert_true(capture_clock_backfill_apply('a0000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002',
@@ -50,6 +50,16 @@ DO $$ BEGIN
     pg_temp.k('guess', 'a0000000-0000-4000-8000-000000000001', 'x'), true);
   RAISE EXCEPTION 'unsigned source accepted';
 EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '%unsigned%' THEN RAISE; END IF; END $$;
+DO $$ BEGIN
+  PERFORM capture_clock_backfill_apply('a0000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', now(),
+    pg_temp.k('file_exif', 'a0000000-0000-4000-8000-000000000001', 'x') - 'Make', true);
+  RAISE EXCEPTION 'no-camera clock accepted';
+EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '%no-camera%' THEN RAISE; END IF; END $$;
+DO $$ BEGIN
+  PERFORM capture_clock_backfill_apply('a0000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', now(),
+    pg_temp.k('file_xmp', 'a0000000-0000-4000-8000-000000000001', 'x'), true);
+  RAISE EXCEPTION 'xmp clock accepted';
+EXCEPTION WHEN raise_exception THEN IF SQLERRM LIKE '%xmp clock%' THEN RAISE; END IF; END $$;
 SELECT pg_temp.assert_true((SELECT taken_at = '2021-05-07 21:30Z' AND exif_data ->> 'DateTimeOriginal' = '2021:05:07 14:30:00' AND exif_data ->> 'w' = '1'
   AND exif_data -> 'capture_clock' ? 'at' FROM vehicle_images WHERE id = '00000000-0000-4000-8000-000000000001'), 'clock and taken_at written, other keys kept');
 SELECT pg_temp.assert_true((SELECT taken_at = '2019-06-01 17:00Z' FROM vehicle_images WHERE id = '00000000-0000-4000-8000-000000000002'), 'taken_at kept when not asked');

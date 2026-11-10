@@ -31,8 +31,9 @@ CREATE OR REPLACE FUNCTION public.capture_clock_backfill_apply(
 RETURNS jsonb LANGUAGE plpgsql SET search_path = public AS $function$
 DECLARE r record; v_src text := p_keys -> 'capture_clock' ->> 'source';
 BEGIN
-  IF p_run IS NULL OR p_clock IS NULL OR v_src NOT IN ('file_exif', 'file_xmp')
-     OR NOT (p_keys ? 'DateTimeOriginal') OR (p_keys -> 'capture_clock' ->> 'run_id') IS DISTINCT FROM p_run::text THEN
+  -- camera originals only: a clock from the file's EXIF and the camera's Make (screenshots and XMP dates are not written)
+  IF p_run IS NULL OR p_clock IS NULL OR v_src IS DISTINCT FROM 'file_exif'
+     OR NOT (p_keys ? 'DateTimeOriginal') OR NOT (p_keys ? 'Make') OR (p_keys -> 'capture_clock' ->> 'run_id') IS DISTINCT FROM p_run::text THEN
     RAISE EXCEPTION 'capture_clock_backfill_apply: bad arguments';
   END IF;
   SELECT id, exif_data, taken_at, vehicle_id, coalesce(is_sensitive, false) AS sens, source

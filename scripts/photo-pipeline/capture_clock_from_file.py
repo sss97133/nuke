@@ -7,7 +7,7 @@ rows taken_at is the upload time. The file in storage often still carries DateTi
 
 Read order (first hit wins), all from the stored bytes, never from the filename or upload time:
   1. EXIF DateTimeOriginal (+ OffsetTimeOriginal when present)       -> capture_clock_source 'file_exif'
-  2. XMP photoshop:DateCreated / exif:DateTimeOriginal (with or without offset) -> 'file_xmp'
+  2. (replay only, never written) XMP photoshop:DateCreated / exif:DateTimeOriginal (with or without offset) -> 'file_xmp'
 Local times without an offset are read as America/Los_Angeles, the convention the existing ingest used (checked: rows whose
 taken_at already came from EXIF match this conversion).
 
@@ -60,7 +60,8 @@ def read_clock(raw):
         im=Image.open(BytesIO(raw)); ex=im.getexif(); ifd=ex.get_ifd(0x8769)
         dto=ifd.get(36867); off=ifd.get(36881)
         t=parse_exif_clock(dto, off)
-        if t: return t,'file_exif',{'DateTimeOriginal':dto, **({'OffsetTimeOriginal':off} if off else {})}
+        cam={k:str(v).strip('\x00 ') for k,v in (('Make',ex.get(271)),('Model',ex.get(272))) if v}
+        if t: return t,'file_exif',{'DateTimeOriginal':dto, **({'OffsetTimeOriginal':off} if off else {}), **cam}
     except Exception: pass
     t=parse_xmp_clock(raw[:400000])
     if t: return t,'file_xmp',{'DateTimeOriginal':t.astimezone(LA).strftime('%Y:%m:%d %H:%M:%S')}
@@ -89,7 +90,7 @@ def main():
     rows=[r for r in rows if not (r.get('exif_data') or {}).get('DateTimeOriginal') and not r.get('is_sensitive')
           and (r.get('vision_gate_status') or '')!='rejected_personal' and (r.get('image_url') or '')]
     if a.ids_file: keep=set(json.load(open(a.ids_file))); rows=[r for r in rows if r['id'] in keep]
-    out=open(a.out,'w'); n_live=0; summary={'pool':len(rows),'file_exif':0,'file_xmp':0,'none':0,'fetch_error':0,'taken_at_changes':0,'written':0}
+    out=open(a.out,'w'); n_live=0; summary={'pool':len(rows),'file_exif':0,'file_xmp':0,'none':0,'fetch_error':0,'taken_at_changes':0,'writable':0,'writable_changes':0,'written':0}
     for r in rows:
         if a.live and n_live>=a.limit: break
         try: raw=urllib.request.urlopen(r['image_url'],timeout=60).read()
@@ -102,9 +103,13 @@ def main():
         summary[src]+=1
         p=datetime.datetime.fromisoformat(prior.replace('Z','+00:00')) if prior else None
         change=p is None or abs((t-p).total_seconds())>120
-        rec['taken_at_change']=change; summary['taken_at_changes']+=change
+        # only a camera original is written: file EXIF clock + camera Make. XMP dates (screenshots, edited graphics) are
+        # reported in the replay but never written.
+        rec['writable']=src=='file_exif' and bool(keys.get('Make'))
+        rec['taken_at_change']=change; summary['taken_at_changes']+=change; summary['writable']+=rec['writable']
+        summary['writable_changes']+=rec['writable'] and change
         out.write(json.dumps(rec)+'\n')
-        if not a.live: continue
+        if not a.live or not rec['writable']: continue
         res=req('POST','/rest/v1/rpc/capture_clock_backfill_apply',{'p_run':a.run_id,'p_image':r['id'],'p_clock':t.isoformat(),
                  'p_keys':{**keys,'capture_clock':{'source':src,'run_id':a.run_id,'producer':PRODUCER,'prior_taken_at':prior}},'p_set_taken_at':change})
         summary['written']+= 1 if res else 0; n_live+=1
