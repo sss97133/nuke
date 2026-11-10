@@ -1,0 +1,75 @@
+-- Exact existing owner functions; synthetic local fixture only.
+CREATE OR REPLACE FUNCTION public.receipt_work_frame_eligible(x vehicle_images)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$;
+  SELECT x.taken_at IS NOT NULL
+     AND x.vision_gate_status IS NOT DISTINCT FROM 'approved'
+     AND x.is_sensitive IS NOT TRUE AND x.is_duplicate IS NOT TRUE AND x.is_superseded IS NOT TRUE
+     AND x.is_document IS NOT TRUE
+     AND coalesce(x.redaction_level::text, 'none') = 'none'
+     AND coalesce(x.ai_scan_metadata #>> '{byok_deep_analysis,scene_type}', '') NOT IN ('product_screenshot', 'cross_reference', 'receipt_document', 'hand_drawn_diagram')
+$function$;
+
+CREATE OR REPLACE FUNCTION public.project_observation_image_witness()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = '' SET lock_timeout = '5s'
+AS $projection$
+DECLARE
+  image_reference text;
+  image_key uuid;
+  image_vehicle uuid;
+BEGIN
+  -- Exact legacy share-verdict path is not authenticated testimony promotion.
+  IF NEW.kind::text = 'comment'
+     AND NEW.structured_data->>'kind_detail' = 'professional_review'
+     AND EXISTS (SELECT 1 FROM public.observation_sources s
+                 WHERE s.id = NEW.source_id AND s.slug = 'shop') THEN
+    RETURN NEW;
+  END IF;
+  image_reference := NEW.structured_data->>'image_id';
+  IF image_reference IS NULL OR lower(btrim(image_reference)) = 'unknown' THEN
+    RETURN NEW;
+  END IF;
+  IF image_reference !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'observation_image_reference_invalid';
+  END IF;
+  image_key := image_reference::uuid;
+  -- FOR SHARE prevents a concurrent non-key vehicle reassignment while this
+  -- same-vehicle relation is checked and appended. One image row, fixed cost.
+  SELECT i.vehicle_id INTO image_vehicle FROM public.vehicle_images i
+    WHERE i.id = image_key FOR SHARE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = '23503', MESSAGE = 'observation_image_reference_missing';
+  END IF;
+  IF NEW.vehicle_id IS NULL OR image_vehicle IS NULL OR NEW.vehicle_id <> image_vehicle THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'observation_image_vehicle_mismatch';
+  END IF;
+  INSERT INTO public.observation_witnesses (
+    observation_id, image_id, witness_role, capture_method, image_timestamp,
+    attestation_notes, added_by_user_id, added_by_agent_key
+  ) VALUES (
+    NEW.id, image_key, 'derived', 'unknown', NULL,
+    'Derived from structured_data.image_id by the observation log insert projection; no assertion of visual correctness, independent source, capture method or capture time.',
+    NEW.submitted_by_user_id,
+    CASE WHEN NEW.submitted_by_user_id IS NULL THEN 'db:project_observation_image_witness:v1' END
+  ) ON CONFLICT (observation_id, image_id, witness_role) DO NOTHING;
+  RETURN NEW;
+END
+$projection$;
+CREATE TRIGGER image_witness AFTER INSERT ON vehicle_observations FOR EACH ROW WHEN (NEW.structured_data ? 'image_id') EXECUTE FUNCTION project_observation_image_witness();
+CREATE OR REPLACE FUNCTION public.public_text(p text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$;
+  SELECT CASE
+    WHEN p IS NULL OR btrim(p) = '' THEN NULL
+    WHEN p ~* '(\$\s?[0-9]|invoice|billed|\mpaid\M|payment|\mcard\M|client|customer|@|\m\d{3}[-.\s]\d{3}[-.\s]\d{4}\M)' THEN NULL
+    ELSE left(btrim(p), 300)
+  END;
+$function$;
+;
