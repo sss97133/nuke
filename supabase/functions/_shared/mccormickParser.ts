@@ -232,3 +232,6 @@ export function mccormickLinks(html: string, base: string): { lots: string[]; ca
   }
   return { lots: [...lots], catalogs: [...catalogs] };
 }
+
+/** Shared fixed-point removal of non-visible publisher blocks before text parsing. */
+export { visible as mccormickVisibleHtml };

@@ -356,6 +356,16 @@ CREATE TABLE public.listing_feeds(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   last_polled_at timestamptz,last_error text);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid,source_id uuid,source_url text,
   kind text,is_superseded boolean DEFAULT false,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now());
+ALTER TABLE public.vehicle_observations ADD COLUMN source_vehicle_event_id uuid;
+CREATE INDEX idx_vehicle_observations_source_vehicle_event ON public.vehicle_observations(source_vehicle_event_id);
+ALTER TABLE public.vehicle_events ADD COLUMN source_listing_id text;
+CREATE TABLE public.superseded_rows(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),source_table text,row_id uuid,
+  row_data jsonb,asserted_by text,source jsonb,reason text,superseded_at timestamptz DEFAULT now(),restored_at timestamptz);
+CREATE TABLE public.bat_bids(id uuid PRIMARY KEY,bat_listing_id uuid);
+CREATE TABLE public.hammer_predictions(id uuid PRIMARY KEY,external_listing_id uuid);
+CREATE TABLE public.auction_events(id uuid PRIMARY KEY,vehicle_id uuid,source_url text);
+CREATE TABLE public.listing_page_snapshots(id uuid PRIMARY KEY,listing_url text,http_status integer);
+\ir ../migrations/20261025141000_supersede_repoint.sql
 INSERT INTO public.organizations VALUES ('07fbc081-986c-43bc-ab9d-df24c24e513b','McCormick''s Auto Auctions',true,true);
 INSERT INTO public.observation_sources VALUES ('006f01c3-e5fb-44f5-ab40-e55b0654de1c','mccormicks','block_house');
 \ir ../migrations/20261110170440_mccormick_live_inventory.sql
@@ -434,5 +444,47 @@ DO $$ BEGIN
     AND by_category='{"mccormicks-91":1,"mccormicks-92":null}'::jsonb
     AND next_census_at=census_at+interval '15 minutes') THEN
     RAISE EXCEPTION 'Native census writer dropped coverage, unknown count or revisit clock';
+  END IF;
+END $$;
+
+-- A changed future run day uses the actual supersession owner and keeps its
+-- before-image. Missing census/capture/binding proof still refuses future dates.
+UPDATE public.organizations SET is_public=true;
+UPDATE public.vehicle_observations SET is_superseded=true WHERE id=md5('mcc-unbound')::uuid;
+INSERT INTO public.listing_page_snapshots VALUES
+  (md5('mcc-catalog')::uuid,'https://www.classic-carauction.com/auction-cars',200);
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_listing_id,source_url,event_status,ended_at,metadata)
+VALUES(md5('mcc-reschedule')::uuid,md5('dated')::uuid,'mccormicks','mccormicks-91:1',
+  'https://www.classic-carauction.com/auction-cars?auctionid=1','upcoming',
+  (current_date+10)::timestamp AT TIME ZONE 'UTC'+interval '12 hours',
+  '{"native_id":"1","sale_key":"mccormicks-91","projection_method":"mccormick_live_v1"}');
+SET statement_timeout='8s';
+DO $$ DECLARE payload jsonb; cid uuid; result jsonb; proof jsonb; old_clock timestamptz; new_clock timestamptz; BEGIN
+  SELECT raw_response INTO payload FROM public.source_census WHERE jsonb_array_length(raw_response->'inventory')=4 LIMIT 1;
+  payload:=jsonb_set(payload,'{inventory,0,run_on}',to_jsonb((current_date+11)::text));
+  payload:=payload||jsonb_build_object('captures',jsonb_build_array(jsonb_build_object(
+    'snapshot_id',md5('mcc-catalog')::uuid,'url','https://www.classic-carauction.com/auction-cars')));
+  cid:=public.record_census('mccormicks',4,4,'house_roster_facet',1,'https://www.classic-carauction.com/Home',
+    '{}','{}',payload,'{"mccormicks-91":4,"mccormicks-92":null}',now());
+  old_clock:=(current_date+10)::timestamp AT TIME ZONE 'UTC'+interval '12 hours';
+  new_clock:=(current_date+11)::timestamp AT TIME ZONE 'UTC'+interval '12 hours';
+  proof:=jsonb_build_object('type','mccormick_scheduled_catalog_day','ref','https://www.classic-carauction.com/auction-cars?auctionid=1',
+    'snapshot_id',md5('mcc-catalog')::uuid,'census_id',cid,'basis','scheduled_run_day');
+  BEGIN
+    PERFORM public.supersede_vehicle_event_episode(md5('mcc-reschedule')::uuid,
+      jsonb_build_object('ended_at',jsonb_build_object('expected',old_clock,'value',new_clock,'precision','day')),
+      proof-'census_id','A publisher moved the scheduled lot to a different day.');
+    RAISE EXCEPTION 'missing census proof accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%must be a finite instant, not in the future%' THEN RAISE; END IF;
+  END;
+  result:=public.supersede_vehicle_event_episode(md5('mcc-reschedule')::uuid,
+    jsonb_build_object('ended_at',jsonb_build_object('expected',old_clock,'value',new_clock,'precision','day')),
+    proof,'The complete publisher catalog and schedule agree on the changed run day.');
+  IF result->>'status'<>'superseded' OR NOT EXISTS (SELECT 1 FROM public.vehicle_events
+      WHERE id=(result->>'replacement_event_id')::uuid AND ended_at=new_clock)
+    OR NOT EXISTS (SELECT 1 FROM public.superseded_rows WHERE row_id=md5('mcc-reschedule')::uuid
+      AND (row_data->>'ended_at')::timestamptz=old_clock) THEN
+    RAISE EXCEPTION 'Changed run day not corrected with retained before-image: %',result;
   END IF;
 END $$;

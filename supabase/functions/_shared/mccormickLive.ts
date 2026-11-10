@@ -1,9 +1,9 @@
 import { htmlToText } from "./htmlToText.ts";
-import { mccormickTarget } from "./mccormickParser.ts";
+import { mccormickTarget, mccormickVisibleHtml } from "./mccormickParser.ts";
 
 export const MCCORMICK_LIVE_METHOD = "mccormick_live_v1";
 export const MCCORMICK_ORIGIN = "https://www.classic-carauction.com";
-const plain = (html: string) => htmlToText(html.replace(/<!--[\s\S]*?-->|<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")).replace(/\s+/g, " ").trim();
+const plain = (html: string) => htmlToText(mccormickVisibleHtml(html)).replace(/\s+/g, " ").trim();
 const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 const day = (month: string, d: number, year: number) => {
   const m = months.indexOf(month.toLowerCase());

@@ -32,7 +32,7 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
       db.functions.invoke("ingest", { method: "GET" }),
     ]);
     if (source.error || source.data?.species !== "block_house") throw Error("mccormick_source_unavailable");
-    if (capability.error || capability.data?.capabilities?.mccormicks_native_listing !== true) throw Error("mccormick_native_intake_not_deployed");
+    if (capability.error || capability.data?.capabilities?.mccormicks_native_fresh_capture !== true) throw Error("mccormick_native_intake_not_deployed");
     const pages: Capture[] = [];
     const page = async (url: string): Promise<Capture> => {
       if (budget.remainingMs() < 15000) throw Error("mccormick_catalog_deadline");
@@ -106,6 +106,7 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
       const started = clock(), landed = await db.functions.invoke("ingest", { body: { url: row.source_url }, signal: AbortSignal.timeout(slot.timeout_ms) });
       const receipt = landed.data?.mccormick_receipt;
       const valid = !landed.error && receipt?.source_id === row.native_id && receipt.observation_id && receipt.snapshot_id
+        && Date.parse(receipt.source_checked_at ?? "") >= started - 60000 && Date.parse(receipt.source_checked_at ?? "") <= clock() + 60000
         && receipt.source_capture_gaps?.length === 0 && ["created", "matched", "unresolved"].includes(landed.data?.status);
       const outcome = valid ? landed.data : { status: "error", error: landed.error?.message ?? "mccormick_detail_admission_unverified" };
       budget.record("mccormicks", clock() - started, outcome);
@@ -131,15 +132,41 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
     const current = await db.rpc("organization_source_inventory_read", { p_organization_id: organizationId });
     if (current.error || Date.parse(current.data?.checked_at ?? "") !== Date.parse(checkedAt) || !Array.isArray(current.data?.inventory)) throw Error("mccormick_binding_readback_failed");
     const byNative = new Map<string, any>(current.data.inventory.map((r: any) => [r.native_id, r]));
-    const events = await db.from("vehicle_events").select("id,vehicle_id,source_listing_id,metadata,ended_at")
+    const events = await db.from("vehicle_events").select("id,vehicle_id,source_listing_id,metadata,ended_at,event_status")
       .eq("source_platform", "mccormicks").eq("metadata->>sale_key", sale.sale_key).limit(1500);
     if (events.error || (events.data?.length ?? 0) >= 1500) throw Error("mccormick_episode_lookup_unavailable");
-    const eventMap = new Map<string, any>((events.data ?? []).map((e: any) => [e.source_listing_id, e]));
-    const eligible = lots.filter(l => l.run_on && byNative.get(l.native_id)?.vehicle_id)
-      .sort((a, b) => (Date.parse(eventMap.get(`${sale.sale_key}:${a.native_id}`)?.metadata?.source_observed_at ?? "") || 0)
-        - (Date.parse(eventMap.get(`${sale.sale_key}:${b.native_id}`)?.metadata?.source_observed_at ?? "") || 0));
+    const eventMap = new Map<string, any>();
+    for (const e of events.data ?? []) {
+      const expected = byNative.get(e.metadata?.native_id)?.vehicle_id;
+      if (!eventMap.has(e.source_listing_id) || e.vehicle_id === expected) eventMap.set(e.source_listing_id, e);
+    }
+    const eligible = lots.filter(l => l.run_on && byNative.get(l.native_id)?.vehicle_id
+      && !(eventMap.get(`${sale.sale_key}:${l.native_id}`)?.vehicle_id === byNative.get(l.native_id)?.vehicle_id
+        && ["sold", "unsold", "ended", "cancelled"].includes(eventMap.get(`${sale.sale_key}:${l.native_id}`)?.event_status)))
+      .sort((a, b) => {
+        const priority = (lot: McCormickInventoryRow) => {
+          const e = eventMap.get(`${sale.sale_key}:${lot.native_id}`);
+          return e?.ended_at && Date.parse(e.ended_at) !== Date.parse(`${lot.run_on}T12:00:00Z`) ? 0 : 1;
+        };
+        return priority(a) - priority(b) || (Date.parse(eventMap.get(`${sale.sale_key}:${a.native_id}`)?.metadata?.source_observed_at ?? "") || 0)
+          - (Date.parse(eventMap.get(`${sale.sale_key}:${b.native_id}`)?.metadata?.source_observed_at ?? "") || 0);
+      });
     let projected = 0;
     const write = async (lot: McCormickInventoryRow, binding: any) => {
+      const previous = eventMap.get(`${sale.sale_key}:${lot.native_id}`);
+      if (previous?.vehicle_id === binding.vehicle_id && previous.metadata?.projection_method !== MCCORMICK_LIVE_METHOD)
+        throw Error("mccormick_episode_not_owned");
+      const targetEnd = lot.run_on ? `${lot.run_on}T12:00:00Z` : null;
+      if (previous?.vehicle_id === binding.vehicle_id && previous.ended_at && targetEnd
+        && Date.parse(previous.ended_at) !== Date.parse(targetEnd)) {
+        if (previous.metadata?.projection_method !== MCCORMICK_LIVE_METHOD) throw Error("mccormick_scheduled_clock_not_owned");
+        const corrected = await db.rpc("supersede_vehicle_event_episode", { p_event_id: previous.id,
+          p_corrections: { ended_at: { expected: previous.ended_at, value: targetEnd, precision: "day" } },
+          p_source: { type: "mccormick_scheduled_catalog_day", ref: lot.source_url, snapshot_id: catalog.snapshot_id,
+            census_id: census.data, basis: "scheduled_run_day", asserted_by: "poll-listing-feeds:mccormicks", repoint_references: true },
+          p_reason: "The complete current publisher catalog and schedule agree on a changed lot run day." });
+        if (corrected.error || !["superseded", "noop"].includes(corrected.data?.status)) throw Error("mccormick_scheduled_clock_supersession_failed");
+      }
       const projected = await writeEpisode(db, { vehicle_id: binding.vehicle_id, source_platform: "mccormicks",
         source_listing_id: `${sale.sale_key}:${lot.native_id}`, source_url: lot.source_url, event_type: "auction", event_status: "upcoming",
         ended_at: lot.run_on ? `${lot.run_on}T12:00:00Z` : null, source_organization_id: organizationId,
@@ -151,11 +178,15 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
           ended_at_precision: "day", ended_at_method: "scheduled_run_day", sale_outcome: "unknown" } }, { sourceObservedAt: checkedAt });
       if (projected.action === "error" || projected.action === "skipped") throw Error("mccormick_episode_projection_unavailable");
     };
-    const currentIds = new Set(lots.map(l => l.native_id));
+    const lotMap = new Map(lots.map(l => [l.native_id, l]));
     for (const old of events.data ?? []) {
-      if (old.metadata?.projection_method !== MCCORMICK_LIVE_METHOD || currentIds.has(old.metadata?.native_id) || old.metadata?.withdrawn_at || budget.remainingMs() < 12000) continue;
+      if (old.metadata?.projection_method !== MCCORMICK_LIVE_METHOD || old.metadata?.withdrawn_at) continue;
+      const lot = lotMap.get(old.metadata?.native_id), binding = byNative.get(old.metadata?.native_id);
+      const reason = projectionWithdrawal(old, lot, binding);
+      if (!reason) continue;
+      if (budget.remainingMs() < 12000) throw Error("mccormick_projection_reconciliation_deadline");
       const withdrawn = await writeEpisode(db, { vehicle_id: old.vehicle_id, source_platform: "mccormicks",
-        source_listing_id: old.source_listing_id, metadata: { withdrawn_at: checkedAt, withdrawal_basis: "not_in_complete_current_catalog",
+        source_listing_id: old.source_listing_id, metadata: { withdrawn_at: checkedAt, withdrawal_basis: reason,
           source_observed_at: checkedAt, source_catalog_snapshot_id: catalog.snapshot_id } }, { sourceObservedAt: checkedAt });
       if (withdrawn.action === "error" || withdrawn.action === "skipped") throw Error("mccormick_withdrawal_projection_failed");
     }
@@ -172,4 +203,14 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
     await stamp(result.error.slice(0, 500));
     return result;
   }
+}
+
+/** A still-listed native ID does not preserve an obsolete parent or unverified run day. */
+export function projectionWithdrawal(old: any, lot: McCormickInventoryRow | undefined, binding: any): string | null {
+  if (!lot) return "not_in_complete_current_catalog";
+  if (!lot.run_on) return "current_run_day_unverified";
+  if (!binding?.vehicle_id) return "current_public_binding_unavailable";
+  if (binding.vehicle_id !== old.vehicle_id) return "current_public_binding_changed";
+  if (old.ended_at && Date.parse(old.ended_at) !== Date.parse(`${lot.run_on}T12:00:00Z`)) return "scheduled_run_day_changed";
+  return null;
 }

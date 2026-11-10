@@ -154,4 +154,47 @@ BEGIN
   definition:=replace(definition,before,after);
   EXECUTE definition;
 END $patch$;
+
+-- The existing correction owner only accepts past terminal clocks. A publisher's
+-- scheduled run day is a different claim: permit this one native future clock
+-- only when the latest admitted complete census, captured catalog and closed
+-- public binding reader all agree. Keep the original rejection for other clocks.
+DO $scheduled$
+DECLARE definition text; before text; after text;
+BEGIN
+  SELECT pg_get_functiondef('public.supersede_vehicle_event_episode(uuid,jsonb,jsonb,text)'::regprocedure) INTO definition;
+  IF position('mccormick_scheduled_clock_v1' IN definition)>0 THEN RETURN; END IF;
+  before:='IF NOT isfinite(v_new) OR v_new > now() THEN';
+  after:=$fragment$IF NOT isfinite(v_new) OR (v_new > now() AND NOT (
+        -- mccormick_scheduled_clock_v1: future scheduled testimony, never a result.
+        v_field='ended_at' AND v_spec->>'precision'='day'
+        AND p_source->>'type'='mccormick_scheduled_catalog_day'
+        AND p_source->>'basis'='scheduled_run_day'
+        AND v_new <= now()+interval '400 days'
+        AND (v_new AT TIME ZONE 'UTC')::time = time '12:00:00'
+        AND EXISTS (
+          SELECT 1 FROM public.source_census c
+          JOIN public.vehicle_events e ON e.id=p_event_id
+          CROSS JOIN LATERAL jsonb_array_elements(public.organization_source_inventory_read(
+            '07fbc081-986c-43bc-ab9d-df24c24e513b'::uuid)->'inventory') r
+          WHERE c.id::text=p_source->>'census_id'
+            AND c.source_id='006f01c3-e5fb-44f5-ab40-e55b0654de1c'
+            AND c.census_method='house_roster_facet' AND c.raw_response->>'method'='mccormick_live_v1'
+            AND c.census_at BETWEEN now()-interval '5 minutes' AND now()+interval '1 minute'
+            AND NOT EXISTS (SELECT 1 FROM public.source_census newer WHERE newer.source_id=c.source_id
+              AND newer.census_method=c.census_method AND newer.census_at>c.census_at)
+            AND c.raw_response->'captures' @> jsonb_build_array(jsonb_build_object(
+              'snapshot_id',p_source->>'snapshot_id','url','https://www.classic-carauction.com/auction-cars'))
+            AND e.source_platform='mccormicks' AND e.event_status IN ('upcoming','pending')
+            AND e.metadata->>'projection_method'='mccormick_live_v1'
+            AND e.source_listing_id=(r->>'sale_key')||':'||(r->>'native_id')
+            AND e.vehicle_id::text=r->>'vehicle_id' AND e.metadata->>'native_id'=r->>'native_id'
+            AND e.source_url=r->>'source_url' AND p_source->>'ref'=e.source_url
+            AND r->>'run_on'=to_char(v_new AT TIME ZONE 'UTC','YYYY-MM-DD')
+        ))) THEN$fragment$;
+  IF (length(definition)-length(replace(definition,before,'')))/length(before)<>1 THEN
+    RAISE EXCEPTION 'supersession future-clock guard changed; inspect before extending';
+  END IF;
+  EXECUTE replace(definition,before,after);
+END $scheduled$;
 COMMIT;

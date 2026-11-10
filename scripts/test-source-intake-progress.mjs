@@ -257,6 +257,7 @@ export function fixture(options = {}) {
       if (name.endsWith('/schedule.ts')) return { nextYield: () => ({ rate: 0, interval_minutes: 60 }) };
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
       if (name.endsWith('/kslCards.ts')) return { parseKslSearchCards: () => [] };
+      if (name === './mccormick.ts') return { pollMcCormick: async () => { throw new Error('unexpected McCormick source'); } };
       if (name === './collectingCars.ts') return collectingCars;
       if (name === './collectingCarsHistory.ts') return ccHistory.exports;
       if (name === './collectingCarsReplay.ts') return { selectCollectingCarsReplay };

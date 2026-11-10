@@ -25,11 +25,13 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
   if (!source.data || source.data.species !== "block_house"
     || !source.data.supported_observations?.includes("listing")) throw new Error("mccormicks_source_not_registered");
   const capture = async (sourceUrl: string) => {
+    const refresh = !mccormickTarget(sourceUrl)?.archive;
     const page = await deps.archiveFetch(sourceUrl, {
+      forceRefresh: refresh,
       platform: "mccormicks", callerName: "ingest:mccormicks", useFirecrawl: false, firecrawlOnBlock: false,
       directFetchOptions: { publicOnly: true, timeout: 20_000 },
     });
-    if (page.error || page.archiveError || !page.html || !page.snapshotId) throw new Error("mccormicks_capture_not_retained");
+    if (page.error || page.archiveError || !page.html || !page.snapshotId || (refresh && page.cached)) throw new Error("mccormicks_capture_not_retained");
     const read = await deps.supabase.from("listing_page_snapshots")
       .select("id,platform,listing_url,fetched_at,html_sha256,success").eq("id", page.snapshotId).maybeSingle();
     const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(page.html)))]
@@ -42,7 +44,7 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
       || !Number.isFinite(Date.parse(snapshot.fetched_at)) || Date.parse(snapshot.fetched_at) > Date.now()) {
       throw new Error("mccormicks_capture_readback_failed");
     }
-    return { html: page.html, snapshot, hash, url: sourceUrl };
+    return { html: page.html, snapshot, hash, url: sourceUrl, checked_at: refresh ? new Date().toISOString() : null };
   };
   const captureLot = async (sourceUrl: string, parse: (html: string, url: string) => McCormickLot = parseMcCormickLot) => {
     const page = await capture(sourceUrl);
@@ -176,7 +178,7 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
   return {
     ...gate.cleaned, vehicle_id: vehicleId, listing_url: canonical,
     image_url: lot.image_urls[0] ?? null, image_urls: imageUrls,
-    mccormick_receipt: { ...observations[0], observations, source_id: id, images: imageCount,
+    mccormick_receipt: { ...observations[0], observations, source_checked_at: primary.checked_at, source_id: id, images: imageCount,
       unresolved: !vehicleId, presentation: primary.lot.presentation, source_capture_gaps: gaps,
       ...(catalogOnly ? { evidence_scope: "catalog_only", detail_route_status: "publisher_reports_unavailable", catalog_checks: catalogChecks } : {}) },
   };

@@ -79,7 +79,7 @@ async function catalogWorld(mode: 'complete' | 'absent' | 'disagree' | 'index_mi
     q.maybeSingle = async () => result(); q.then = (resolve: any, reject: any) => Promise.resolve(result()).then(resolve, reject); return q;
   }, functions: { invoke(_name: string, { body }: any) { const n = payloads.push(body) - 1; return Promise.resolve({ data: { success: true, observation_id: `obs-${n}` } }); } } };
   const result = await ingestMcCormick(url, { supabase: db,
-    archiveFetch: async sourceUrl => { const p = pages[sourceUrl]; return { html: p.body, markdown: null, source: 'cache', cached: true, snapshotId: p.id, url: sourceUrl, platform: 'mccormicks', statusCode: 200, error: null, costCents: 0 }; },
+    archiveFetch: async sourceUrl => { const p = pages[sourceUrl]; return { html: p.body, markdown: null, source: 'cache', cached: false, snapshotId: p.id, url: sourceUrl, platform: 'mccormicks', statusCode: 200, error: null, costCents: 0 }; },
     matchVehicle: async data => { candidate = data; return { vehicleId: 'vehicle', isNew: true }; } });
   return { result, payloads, candidate, images: [...held.values()] };
 }
@@ -132,7 +132,7 @@ Deno.test("McCormick follows advertised catalogs only and rejects external or du
   eq(p.lots,[url]);eq(p.catalogs,["https://www.classic-carauction.com/Auction-47","https://www.classic-carauction.com/auction-results?auctionnbr=47"]);
 });
 
-async function world(failure?: "source" | "archive" | "admission" | "readback" | "images" | "identity", unresolved = false, mileage = "TMU", vin = "TBA") {
+async function world(failure?: "source" | "archive" | "admission" | "readback" | "images" | "identity" | "cached", unresolved = false, mileage = "TMU", vin = "TBA") {
   const body = (unresolved ? html.replace("1967 FORD MUSTANG", "1967 FORD") : html).replace(">TMU</TD>", `>${mileage}</TD>`).replace('>TBA</TD>', `>${vin}</TD>`);
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map(b => b.toString(16).padStart(2, "0")).join("");
   let payload: any, matched: any, matches = 0, calls = 0;
@@ -159,8 +159,9 @@ async function world(failure?: "source" | "archive" | "admission" | "readback" |
     supabase: db,
     archiveFetch: async (fetchUrl, options) => {
       eq(fetchUrl, url);
+      eq(options.forceRefresh,true);
       eq(options.directFetchOptions?.publicOnly, true); eq(options.firecrawlOnBlock, false);
-      return { html: body, markdown: null, source: "cache", cached: true, snapshotId: failure === "archive" ? null : "snapshot", url, platform: "mccormicks", statusCode: 200, error: null, costCents: 0 };
+      return { html: body, markdown: null, source: "cache", cached: failure === "cached", snapshotId: failure === "archive" ? null : "snapshot", url, platform: "mccormicks", statusCode: 200, error: null, costCents: 0 };
     },
     matchVehicle: async (data) => { matched = data; matches++; eq(data.price, undefined); eq(data.vin, null); return { vehicleId: "vehicle", isNew: true }; },
   });
@@ -181,7 +182,7 @@ Deno.test("a real VIN make conflict is retained as an unbound source claim befor
   eq(w.payload().structured_data.vin, "1HGCM82633A004352");
   eq(w.payload().extraction_metadata.quality_issues.some((s: string) => s.startsWith('vin_make_mismatch:')), true);
 });
-for (const failure of ["source", "archive", "identity", "admission", "readback", "images"] as const) {
+for (const failure of ["source", "archive", "identity", "admission", "readback", "images", "cached"] as const) {
   Deno.test(`landing refuses false success when ${failure} fails`, async () => {
     const w = await world(failure); let failed = false;
     try { await w.run(); } catch (e) { failed = true; if (failure === "source") eq((e as Error).message, "mccormicks_source_read_unavailable"); }
@@ -252,7 +253,7 @@ async function archiveWorld(mode: "complete" | "missing" | "disagreement" | "amb
     supabase:db,
     archiveFetch:async(fetchUrl)=>{
       const doc=fetchUrl===archiveUrl?docs.archive:docs.detail;
-      return {html:doc.body,markdown:null,source:"cache",cached:true,snapshotId:mode==="missing"&&doc.id==="detail"?null:doc.id,url:fetchUrl,platform:"mccormicks",statusCode:200,error:null,costCents:0};
+      return {html:doc.body,markdown:null,source:"cache",cached:false,snapshotId:mode==="missing"&&doc.id==="detail"?null:doc.id,url:fetchUrl,platform:"mccormicks",statusCode:200,error:null,costCents:0};
     },
     matchVehicle:async(data)=>{
       candidate=data;
