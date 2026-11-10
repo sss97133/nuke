@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertRejects, assertThrows } from "jsr:@std/assert";
 import { cliArgs, eligibleWorklist, exactRows, packReviews, parseStage, requireSubscription,
   subscriptionEnvironment, validateEnvelopeBatch, runBatch } from "./reviewed-image-batch.ts";
-import { admitReviewedBatch } from "../deep-image-analysis-byok.mjs";
+import { admitReviewedBatch, persistReviewedBatchReceipt } from "../deep-image-analysis-byok.mjs";
 
 const vehicle = "20000000-0000-4000-8000-000000000001", image = "10000000-0000-4000-8000-000000000001";
 const other = "10000000-0000-4000-8000-000000000002", now = new Date().toISOString();
@@ -102,6 +102,34 @@ Deno.test("source CAS refusal retains partial receipts and stops remaining admis
       { error: { context: Response.json({ error: "review_source_changed" }, { status: 409 }) } } });
   assertEquals(calls, 2); assertEquals([result.wrote, result.failed, result.remaining], [1, 1, 1]);
   assertEquals(result.receipts[1].error, "review_source_changed");
+});
+Deno.test("confirmed receipt is durable while the next admission is still pending", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "review-progress-test-" }), path = `${dir}/receipts.json`;
+  const batch = [envelopes()[0], structuredClone(envelopes()[0])]; batch[1].verdict.image_id = other;
+  let release!: () => void, reached!: () => void;
+  const pending = new Promise<void>(r => release = r), entered = new Promise<void>(r => reached = r);
+  let calls = 0;
+  const run = admitReviewedBatch(batch, vehicle, { validate: validateEnvelopeBatch,
+    persist: (receipt: unknown) => persistReviewedBatchReceipt(path, receipt),
+    invoke: async (p: any) => {
+      if (++calls === 1) return { data: { success: true, image_id: p.verdict.image_id, vehicle_id: vehicle,
+        observation_id: "30000000-0000-4000-8000-000000000001", image_observation_id: "40000000-0000-4000-8000-000000000001", model_calls: 0 } };
+      reached(); await pending; throw new Error("response lost");
+    } });
+  try {
+    await entered;
+    // This is the file a killed/timed-out child leaves; no completed function
+    // return or final ingest write is needed to preserve the first admission.
+    const durable = JSON.parse(await Deno.readTextFile(path));
+    assertEquals([durable.wrote, durable.failed, durable.unknown, durable.remaining], [1, 0, 1, 0]);
+    assertEquals(durable.in_flight, other); assertEquals(durable.complete, false);
+    assertEquals(durable.receipts[0].image_id, image); assertEquals(durable.receipts[0].success, true);
+    assertEquals(durable.receipts[0].image_observation_id, "40000000-0000-4000-8000-000000000001");
+  } finally { release(); await run; }
+  const final = JSON.parse(await Deno.readTextFile(path));
+  assertEquals([final.wrote, final.failed, final.unknown], [1, 1, 1]);
+  assertEquals(final.receipts[1].outcome, "unverified");
+  await Deno.remove(dir, { recursive: true });
 });
 
 // Execute the real foreground harness with only process/network boundaries

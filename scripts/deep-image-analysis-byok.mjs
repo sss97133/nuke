@@ -45,7 +45,7 @@
  * observation_witness linking the image.
  */
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, openSync, closeSync, fsyncSync, renameSync } from 'fs';
 import { dirname } from 'path';
 import { createHash } from 'crypto';
 import { fileURLToPath } from 'node:url';
@@ -785,7 +785,15 @@ async function prepare() {
 
 // The existing deep intake delegates to the guarded photo owner. No raw cache,
 // observation, identity, entity, labor or financial writes remain in this mode.
-export async function admitReviewedBatch(envelopes, vehicleId, { validate, invoke }) {
+export function persistReviewedBatchReceipt(path, receipt) {
+  // Replace the existing private receipt only after its next complete version is
+  // flushed. A timeout/termination must not truncate already confirmed results.
+  const pending = `${path}.next`, fd = openSync(pending, 'w', 0o600);
+  try { writeFileSync(fd, JSON.stringify(receipt, null, 2)); fsyncSync(fd); }
+  finally { closeSync(fd); }
+  renameSync(pending, path);
+}
+export async function admitReviewedBatch(envelopes, vehicleId, { validate, invoke, persist = receipt => { void receipt; } }) {
   await validate(envelopes, vehicleId); // Whole batch validated before the first effect.
   const uuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
   if (!uuid(vehicleId) || envelopes.length < 1 || envelopes.length > 8 ||
@@ -794,7 +802,16 @@ export async function admitReviewedBatch(envelopes, vehicleId, { validate, invok
     throw new Error('review_batch_scope_mismatch');
   }
   const receipts = [];
+  const progress = (extra = {}) => ({ vehicle_id: vehicleId,
+    wrote: receipts.filter(r => r.success).length, failed: receipts.filter(r => !r.success).length,
+    remaining: envelopes.length - receipts.length, unknown: 0, in_flight: null,
+    complete: false, receipts, ...extra });
+  persist(progress());
   for (const envelope of envelopes) {
+    // Persist before invoking: a lost response may still have committed remotely.
+    // It is an unknown result, never evidence of zero writes or permission to retry.
+    persist(progress({ in_flight: envelope.verdict.image_id, unknown: 1,
+      remaining: envelopes.length - receipts.length - 1 }));
     let data, error;
     try { ({ data, error } = await invoke(envelope)); }
     catch { error = true; }
@@ -805,14 +822,20 @@ export async function admitReviewedBatch(envelopes, vehicleId, { validate, invok
         const refusal = error?.context instanceof Response ? await error.context.clone().json() : data;
         if (typeof refusal?.error === 'string' && /^[a-z][a-z0-9_]{1,100}$/.test(refusal.error)) code = refusal.error;
       } catch { /* Transport failures retain the fixed unknown-admission code. */ }
-      receipts.push({ image_id: envelope.verdict.image_id, success: false, error: code });
-      return { wrote: receipts.length - 1, failed: 1, remaining: envelopes.length - receipts.length, receipts };
+      receipts.push({ image_id: envelope.verdict.image_id, success: false, error: code,
+        outcome: 'unverified' });
+      const result = progress({ unknown: 1 });
+      persist(result);
+      return result;
     }
     receipts.push({ image_id: data.image_id, success: true, observation_id: data.observation_id,
       image_observation_id: data.image_observation_id, observation_duplicate: data.observation_duplicate === true,
       projection_duplicate: data.projection_duplicate === true, cover: data.cover });
+    persist(progress());
   }
-  return { wrote: receipts.length, failed: 0, remaining: 0, receipts };
+  const result = progress({ complete: true });
+  persist(result);
+  return result;
 }
 async function ingest() {
   const sink = arg('--sink'), vehicleId = arg('--vehicle-id');
@@ -828,8 +851,8 @@ async function ingest() {
       if (validation.status !== 0) throw new Error('reviewed envelope validation failed before admission');
     },
     invoke: body => sb.functions.invoke('photo-pipeline-orchestrator', { body }),
+    persist: receipt => persistReviewedBatchReceipt(`${sink}.receipts.json`, receipt),
   });
-  writeFileSync(`${sink}.receipts.json`, JSON.stringify(result, null, 2), { mode: 0o600 });
   console.log(`ingest: wrote ${result.wrote}, failed ${result.failed}, remaining ${result.remaining} from ${sink}`);
   if (result.failed || result.remaining) process.exitCode = 1;
 }
