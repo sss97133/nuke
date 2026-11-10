@@ -5,6 +5,10 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 
 ---
 
+## Prepared Work ingest (inactive)
+
+`gmail-books-poller` stages private money/books signals and pending job links; it never records payments or completion. Offline entry: `scripts/work-money-dry-run.ts`. Setup, reader contracts and explicit release holds: `docs/work-money-ingest.md`. This is a prepared sibling, not an additional active function; do not retire or enable the listing poller or SMS stub as part of this change.
+
 ## How to Use This Document
 
 1. Find your intent in the table below → use the listed function

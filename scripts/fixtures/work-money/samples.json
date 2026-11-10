@@ -1,0 +1,11 @@
+{
+  "accountantSenders": ["accountant@example.com"],
+  "jobs": [{"id":"10000000-0000-0000-0000-000000000001","vehicle_id":null,"title":"Service","customer_name":"Example Customer","customer_email":"customer@example.com","estimated_total":125,"currency":"USD","created_at":"2026-10-01T00:00:00.000Z","status":"in_progress","vehicle_label":"1980 Ford F100"}],
+  "emails": [
+    {"id":"synthetic-payment","sender":"customer@example.com","receivedAt":"2026-11-01T00:00:00.000Z","subject":"Payment received","text":"Payment received from Example Customer: $125.00 for the 1980 Ford F100."},
+    {"id":"synthetic-deposit","sender":"alerts@example.com","receivedAt":"2026-11-01T00:00:00.000Z","subject":"Deposit posted","text":"Deposit of $125.00 posted to your account."},
+    {"id":"synthetic-invoice","sender":"vendor@example.com","receivedAt":"2026-11-01T00:00:00.000Z","subject":"Invoice ready","text":"Invoice total USD 37.00","attachments":[{"filename":"invoice.pdf"}]},
+    {"id":"synthetic-payout","sender":"payments@bringatrailer.com","receivedAt":"2026-11-01T00:00:00.000Z","subject":"Payout sent","text":"Your proceeds of USD 250.00 were sent."},
+    {"id":"synthetic-books","sender":"accountant@example.com","receivedAt":"2026-11-01T00:00:00.000Z","subject":"Books questions","text":"Who sent the $125 deposit? Is the $250 balance still open?"}
+  ]
+}
