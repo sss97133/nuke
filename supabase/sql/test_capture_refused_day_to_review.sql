@@ -161,6 +161,8 @@ SELECT public.capture_refused_day_to_review_v1(
   '00000000-0000-4000-8000-0000000000cc', false, 3) AS apply1 \gset
 SELECT pg_temp.assert_true((:'apply1'::jsonb->>'routed')::int = 2, 'applied 2');
 SELECT pg_temp.assert_true((:'apply1'::jsonb->>'reviews')::int = 1, 'one review for day A');
+SELECT pg_temp.assert_true((SELECT count(*) FROM capture_refused_day_to_review_log WHERE reverted_at IS NULL) = 1, 'one log row per review');
+SELECT pg_temp.assert_true((SELECT cardinality(image_ids) FROM capture_refused_day_to_review_log WHERE run_id = '00000000-0000-4000-8000-0000000000f1') = 2, 'log image_ids has both day A photos');
 SELECT pg_temp.assert_true((
   SELECT count(*) = 1 AND bool_and(status = 'open' AND confidence = 0 AND basis = 'refused_day_to_review'
     AND evidence->>'refusal_reason' = 'gate_failed'
@@ -189,7 +191,7 @@ SELECT pg_temp.assert_true((:'again'::jsonb->>'routed')::int = 0, 'third apply r
 -- revert f1 deletes only the still-open f1 review
 SELECT public.capture_refused_day_to_review_revert_v1(
   '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000f1') AS rev1 \gset
-SELECT pg_temp.assert_true((:'rev1'::jsonb->>'reverted_log')::int = 2, 'reverted f1 log');
+SELECT pg_temp.assert_true((:'rev1'::jsonb->>'reverted_log')::int = 1, 'reverted f1 log (one review)');
 SELECT pg_temp.assert_true((:'rev1'::jsonb->>'deleted_open_reviews')::int = 1, 'deleted f1 review');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_review WHERE reason = 'refused_day') = 2, 'f2 reviews remain');
 

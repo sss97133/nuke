@@ -1,12 +1,54 @@
 -- 20261115233100 capture_refused_day_to_review_no_replan_call
--- Function-only. The 233000 body called capture_day_replan_state per day
--- and timed out on the live library. Record refusal_reason from the last
--- plan state (gate_failed) plus the failed chunk id. Behaviour otherwise
--- unchanged. Grants and revert-by-run are unchanged.
+-- Function-only plus log reshape. The 233000 body applied live called
+-- capture_day_replan_state and timed out; it also created a per-photo
+-- image_id log. Refusal_reason is the last plan state (gate_failed).
+-- The audit log is one row per review with image_ids[] (empty on live
+-- so far; refuse if any rows exist). Grants and revert-by-run unchanged.
 -- Revert: supabase/sql/revert_20261115233100_capture_refused_day_to_review_no_replan_call.sql
 
 SET statement_timeout = '30s';
 SET lock_timeout = '5s';
+
+DO $$
+BEGIN
+  IF to_regclass('public.capture_refused_day_to_review_log') IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='capture_refused_day_to_review_log'
+         AND column_name='image_id')
+  THEN
+    IF EXISTS (SELECT 1 FROM public.capture_refused_day_to_review_log) THEN
+      RAISE EXCEPTION 'capture_refused_day_to_review_log has rows; revert those runs before reshaping';
+    END IF;
+    DROP TABLE public.capture_refused_day_to_review_log;
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.capture_refused_day_to_review_log (
+  id bigserial PRIMARY KEY,
+  run_id uuid NOT NULL,
+  review_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  granted_by uuid NOT NULL,
+  day date NOT NULL,
+  chunk_id uuid,
+  refusal_reason text,
+  set_key text NOT NULL,
+  image_ids uuid[] NOT NULL,
+  signature text NOT NULL,
+  applied_at timestamptz NOT NULL DEFAULT now(),
+  reverted_at timestamptz,
+  UNIQUE (run_id, review_id)
+);
+CREATE INDEX IF NOT EXISTS capture_refused_day_to_review_log_live_idx
+  ON public.capture_refused_day_to_review_log (user_id, run_id)
+  WHERE reverted_at IS NULL;
+CREATE INDEX IF NOT EXISTS capture_refused_day_to_review_log_run_idx
+  ON public.capture_refused_day_to_review_log (run_id);
+
+REVOKE ALL ON public.capture_refused_day_to_review_log FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.capture_refused_day_to_review_log TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.capture_refused_day_to_review_log_id_seq TO service_role;
 
 CREATE OR REPLACE FUNCTION public.capture_refused_day_to_review_v1(
   p_user uuid, p_run uuid, p_granted_by uuid, p_dry boolean DEFAULT true, p_cap integer DEFAULT 50)
@@ -74,7 +116,7 @@ BEGIN
         SELECT 1 FROM public.capture_privacy_promote_exclude e WHERE e.image_id = v.id)
       AND NOT EXISTS (
         SELECT 1 FROM public.capture_refused_day_to_review_log g
-        WHERE g.image_id = v.id AND g.reverted_at IS NULL)
+        WHERE g.reverted_at IS NULL AND v.id = ANY (g.image_ids))
       AND NOT EXISTS (
         SELECT 1 FROM public.capture_non_vehicle_log nv
         WHERE nv.image_id = v.id AND nv.reverted_at IS NULL AND nv.verdict = 'non_vehicle')
@@ -164,12 +206,13 @@ BEGIN
     RETURNING id, set_key, image_ids
   )
   INSERT INTO public.capture_refused_day_to_review_log(
-      run_id, image_id, user_id, granted_by, day, chunk_id, refusal_reason,
-      review_id, set_key, signature)
-  SELECT p_run, t.image_id, p_user, p_granted_by, t.day, t.chunk_id, t.refusal_reason,
-         r.id, r.set_key, v_sig
-  FROM tmp_refused_day_to_review t
-  JOIN ins_rev r ON t.image_id = ANY (r.image_ids);
+      run_id, review_id, user_id, granted_by, day, chunk_id, refusal_reason,
+      set_key, image_ids, signature)
+  SELECT p_run, r.id, p_user, p_granted_by, d.day, d.chunk_id, d.refusal_reason,
+         r.set_key, r.image_ids, v_sig
+  FROM days d
+  JOIN ins_rev r ON r.image_ids = d.image_ids;
+
 
   RETURN jsonb_build_object(
     'run', p_run, 'dry_run', false, 'granted_by', p_granted_by, 'signature', v_sig,
