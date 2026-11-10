@@ -2,6 +2,20 @@ import { decodeVin } from "../_shared/vin-decoder.ts";
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { vinMakeCheckApplies, vinMakeConflict } from "./vinGate.ts";
 
+Deno.test("partial manufacturer heuristics cannot contradict actual retained makes", () => {
+  // NHTSA exact VINs: DODGE Challenger and DAYTEC CENTER custom motorcycle.
+  // The legacy decoder's two-character heuristics are not their complete WMIs.
+  for (const [vin, claimed, legacyGuess] of [
+    ["2C3CDZC90GH119094", "Dodge", "Chrysler"],
+    ["1D9SS64D85H251096", "Custom", "Dodge"],
+  ]) {
+    const decoded = decodeVin(vin);
+    assertEquals(vinMakeCheckApplies(vin), true);
+    assertEquals(decoded.make, legacyGuess);
+    assertEquals(vinMakeConflict(vin, claimed, decoded), null);
+  }
+});
+
 Deno.test("actual retained Infiniti and Datsun claims pass without projecting manufacturer to marque", () => {
   for (const [vin, make] of [["JNKCV66E09M722027", "Infiniti"], ["JNKCV64E49M604114", "Infiniti"],
     ["JN1HT02S8BT202355", "Datsun"], ["JN8AS5MT9FW153681", "Nissan"]]) {

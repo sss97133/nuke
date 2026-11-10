@@ -7,6 +7,8 @@ export interface VINDecodeResult {
   make: string | null;
   /** Manufacturer compatibility only; never a VIN-exact make assertion. */
   manufacturer_make_candidates?: string[];
+  /** Actual lookup prefix; a partial heuristic is not a complete manufacturer identifier. */
+  manufacturer_match_prefix?: string;
   model: string | null;
   trim: string | null;
   engine_size: string | null;
@@ -398,6 +400,7 @@ function decodeModernVin(vin: string): VINDecodeResult {
   for (const [prefix, manufacturer, make] of manufacturerMap) {
     if (wmi.startsWith(prefix)) {
       result.manufacturer = manufacturer;
+      result.manufacturer_match_prefix = prefix;
       if (make) result.make = make;
       break;
     }
