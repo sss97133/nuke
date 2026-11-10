@@ -65,8 +65,8 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
     response = envelope.response;
   } else {
     signal.throwIfAborted();
-    const remote = await fetcher(ENDPOINT, { method: "POST", signal,
-      headers: { "Content-Type": "application/json", "x-typesense-api-key": PUBLIC_SEARCH_KEY }, body: JSON.stringify({ searches: [search] }) }); // guardrail-allow: raw-fetch (existing public search API)
+    const remote = await fetcher(`${ENDPOINT}?x-typesense-api-key=${PUBLIC_SEARCH_KEY}`, { method: "POST", signal,
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ searches: [search] }) }); // guardrail-allow: raw-fetch (existing public search API)
     if (!remote.ok) throw Error(`cc_history_source_http_${remote.status}`);
     const raw = await remote.text();
     if (new TextEncoder().encode(raw).length > MAX_BYTES) throw Error("cc_history_page_oversized");

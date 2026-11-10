@@ -44,6 +44,7 @@ export function fixture(options = {}) {
     const body = init.body ? JSON.parse(init.body) : undefined;
     calls.push({ path: url.pathname, query: url.search, method, body, at: runtimeDate.now() });
     if (url.hostname === 'dora.production.collecting.com') {
+      assert.ok(url.searchParams.get('x-typesense-api-key'));
       if (!options.historyDocuments) throw new Error('unexpected CC search');
       if (options.historyHttp) return new Response('source refusal', { status: options.historyHttp });
       if(options.historyResponse)return Response.json(options.historyResponse);
@@ -857,6 +858,7 @@ test('actual historical handler resumes retained membership after capped batches
   assert.equal(f.feed.search_criteria.history_after_id,0);
   const captured=f.feed.search_criteria.history_capture.id;
   assert.equal(f.snapshots.size,1);assert.equal(f.targets.size,20);
+  assert.equal(new URL(f.snapshots.get(captured).listing_url).searchParams.has('x-typesense-api-key'),false);
   assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,2);
   await f.request({force:true});
   assert.equal(f.feed.search_criteria.history_capture.id,captured);
