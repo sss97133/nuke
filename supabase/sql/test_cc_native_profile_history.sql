@@ -2,6 +2,8 @@
 \set ON_ERROR_STOP on
 \i supabase/sql/test_registered_profile_source_claims.sql
 RESET ROLE;
+-- The imported image fixture predates the deployed personal-name privacy guard.
+\i supabase/migrations/20261004175418_observation_private_fields_guard.sql
 ALTER TABLE public.vehicles ADD COLUMN status text,ADD COLUMN merged_into_vehicle_id uuid;
 ALTER TABLE public.observation_sources ADD COLUMN species text,ADD COLUMN requires_auth boolean;
 ALTER TABLE public.vehicle_observations ADD COLUMN IF NOT EXISTS superseded_by uuid;
@@ -33,6 +35,9 @@ INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,kind,source_url,
  '{"source_claims_only":true,"capture_kind":"listing_page","lot_type":"car","listing_id":"1","url":"https://collectingcars.com/for-sale/fixture-car","listing_url":"https://collectingcars.com/for-sale/fixture-car","stage":"sold","sale_outcome":"sold","price_kind":"sold","price_amount":67500,"currency":"GBP","sold_at":"2019-06-06T15:02:00Z","mileage":283785,"mileage_unit":"mi","mileage_raw":"283,785 miles","bid_count":38,"seller_name":"Private Seller","description":"Private prose","image_urls":["https://private.invalid/image"]}');
 CREATE FUNCTION pg_temp.history() RETURNS jsonb LANGUAGE sql AS $$SELECT pg_temp.profile()->'native_listing_history'$$;
 GRANT SELECT ON public.vehicle_observations TO anon;
+-- The imported observation RLS evaluates these vehicle columns as the caller.
+-- Its prior tests only call SECURITY DEFINER readers, so supply this fixture dependency.
+GRANT SELECT(id,user_id,owner_id,uploaded_by,is_public) ON public.vehicles TO anon;
 -- Raw listing remains unavailable to anon under the original fixture's RLS.
 SET ROLE anon;
 SELECT pg_temp.ok('raw seller testimony remains private',NOT EXISTS(SELECT FROM public.vehicle_observations WHERE id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'));
