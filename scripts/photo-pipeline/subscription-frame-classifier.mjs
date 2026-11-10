@@ -75,7 +75,11 @@ const fromQueue = source === 'stage-queue' || (source === 'auto' && await stageQ
 let frames;
 if (fromQueue) {
   // The ledger hands out the work: eligibility (privacy holds, duplicates, superseded rows) was judged by the reconciler.
-  const work = dry ? [] : await claimStageWork(rpc, { limit, leaseSeconds: 900, userId: OWNER });
+  // The lease covers the whole batch: every photo is claimed up front, and one read can take up to 240 s plus the
+  // download and the orchestrator. A lease shorter than the batch hands this fire's unread photos back to the queue
+  // while it is still working through them.
+  const leaseSeconds = Math.max(900, Math.ceil(Math.min(limit, 25) / Math.max(1, conc)) * 300);
+  const work = dry ? [] : await claimStageWork(rpc, { limit, leaseSeconds, userId: OWNER });
   frames = work.map((w) => ({ id: w.image_id, vehicle_id: w.vehicle_id, user_id: w.user_id, image_url: w.image_url, target_version: w.target_version, lane: w.lane, reason: w.reason }));
 } else {
   const statusFilter = statuses.length === 1 ? `ai_processing_status=eq.${statuses[0]}` : `ai_processing_status=in.(${statuses.join(',')})`;
