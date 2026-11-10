@@ -1,3 +1,4 @@
+-- PR title is conventional and at most 72 characters.
 -- capture_privacy_promote_v1: dry-default, cap 50, backup, revert-by-run, granted_by required.
 -- Promotes is_sensitive unfiled rows to rejected_personal. Skips empty_url, the exclude
 -- table, already-rejected, filed, held, waiting, and failed rows. Never touches image_url.
