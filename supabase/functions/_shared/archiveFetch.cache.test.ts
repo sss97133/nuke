@@ -37,7 +37,7 @@ Deno.test("archive failures preserve safe HTTP diagnostics and never retry or ac
       assertEquals([sourceCalls, writes], [1, scenario === "hash_throw" ? 0 : 1]);
       assertEquals(result.html, html);
       assertEquals(result.snapshotId, scenario === "success" ? "acknowledged-capture" : null);
-      if (scenario === "success" || scenario === "duplicate") assertEquals(result.archiveError, undefined);
+      if (scenario === "success") assertEquals(result.archiveError, undefined);
       else {
         assert(result.archiveError);
         assert(!result.archiveError.includes("undefined") && !result.archiveError.includes("private"));
