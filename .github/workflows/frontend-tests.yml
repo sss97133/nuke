@@ -515,6 +515,11 @@ jobs:
           node-version: '22'
       - name: Verify cached image projection receipts (offline)
         run: node --test scripts/deep-image-analysis-byok.test.mjs scripts/lib/image-property-projection.test.mjs scripts/lib/cached-image-worker.test.mjs scripts/daily-receipt/byok-drain.test.mjs
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify bounded subscription review and guarded admission (offline)
+        run: deno test --node-modules-dir=none --allow-read --allow-write --allow-env --allow-run scripts/daily-receipt/reviewed-image-batch_test.ts
       - name: Create disposable cached-image ancestry database
         run: createdb dm_refinement_image_ancestry
       - name: Verify actual cached-image migration, intake and public reader ancestry
