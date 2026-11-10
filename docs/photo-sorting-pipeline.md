@@ -641,6 +641,61 @@ Official in-database ledger at 15:49 AST:
 | waiting | 0 |
 | **n** | **29,749** |
 
+## 18.7 Typ gap, leftover no-clock fix, dupmap chains, and the 15:08→15:28 shift (15:57–16:10 AST)
+
+### The typ writer
+
+`typ` used by leftovers, typ-aware supersede, and "other/receipt stay out of clear sets" is `ai_scan_metadata#>>'{classification,image_type}'`. The existing writer of that field is `photo-pipeline-orchestrator` (`classifyImageRouted`), and the only providers are OpenAI and Gemini. That path was not run (no paid API keys). The Mac was offline, so Claude via the Mac was not available.
+
+`VisionDecision.decide` is the sanctioned sensitivity classifier (already used on the 41 `judgment_personal` frames). It does not write `image_type`.
+
+The sanctioned local typ-adjacent producer is `local_image_analysis_v1` (draft PR #3224, `scripts/photo-pipeline/local_image_analysis.py`): OpenCLIP embeddings plus ViT-L/14 zero-shot view labels, signed `image_observations` rows (`observed_by = local_image_analysis_v1`), revert by run. It does **not** write `classification.image_type`, and its vocabulary is different (`exterior_side` / `engine` / `document`, not `vehicle_exterior` / `engine_bay` / `receipt_document`). There is no existing signed producer that copies those observations into typ. None was invented, and typ was not hand-written.
+
+CLIP has already been run on almost every typ-empty photo that would have been in scope (excluding empty_url / 276, the 452 privacy union, and sensitive):
+
+- All **242** live session-admitted photos lack typ and already have an active `local_image_analysis_v1` observation. 237 of them are in open review, including all 234 of the 2025-12-07 set. 0 are sensitive. CLIP views on the 242: exterior_side 125, interior 31, engine 29, detail 20, exterior_rear 14, exterior_front 12, document 4, screenshot 4, undercarriage 3.
+- Of the 139 typ-empty official-unsorted photos after excluding empty_url 275: 135 already have `local_image_analysis_v1`; 4 have only `clip_embed_carrier_v1`. Breakdown of the 139: plan_refused user_upload typ empty 53, planned_but_left_out user_upload typ empty 18, typ-empty `duplicate_of_unfiled` 65, no_date typ empty 3.
+
+A typ write from those CLIP views would still need a new, versioned, signed producer (mapping, CAS, revert). That was not built this pass.
+
+`capture_day_replan_state` does **not** treat a typ write as new evidence. New evidence is only: a new unfiled photo of that day with `created_at` after the refusal, a gate-passed filing after the refusal onto a proposed vehicle / set / day, or an unseen admitted photo the refused plan never saw (later arrival, later admission epoch, or a later recovered file clock). Writing typ would not re-arm `refused_no_new_evidence` days. On `last_plan_applied` days, leftovers_v1 could pick up newly typ'd vehicle photos if the other predicates hold (unlogged, has URL, has `taken_at` once #3314 is live, not in open review). No typ was written, so nothing was re-armed.
+
+### Visual-cluster or typ split of large review sets — report only
+
+No sanctioned option exists today to split a review set by typ or by visual cluster. typ is used to keep `other` / `receipt_document` out of clear sets and for typ-aware supersede coverage (`capture_landing_supersede_v1`); it does not split sessions. Visual similarity scores a set against vehicle anchors (at most 12 evenly spaced embedded photos) and does not split the set. `p_only_imgs` forces `sid=0` (one set). Session split remains a gap >1200 s or distance >300 m. Not built.
+
+### `duplicate_of_unfiled` 85 — chains
+
+Traced all 85 exclusive unsorted copies (53 iphoto typ empty, 32 capture_relay). 0 are sensitive. Immediate `duplicate_of`:
+
+- 49 point at an original that is itself a duplicate
+- 16 point at a missing original (all `capture_relay_ios`, typ other) — dupmap correctly does not count a missing original
+- 20 point at an existing unfiled, unresolved original (not filed / held / private / pulled / non_vehicle)
+- **0** point at a `non_vehicle` original (and 0 unfiled copies of any of the 127 `non_vehicle` photos exist today)
+
+Walking each chain to the root (cap depth 8, cycle-safe):
+
+- 24 reach a **filed** root (mostly chain length 2; two of length 3; two hit the depth cap at 8 and should be treated as possible cycles / long chains)
+- 20 reach a **held** (open review) root, chain length 2
+- 16 missing immediate originals (chain length 0)
+- 25 still unfiled and unresolved (20 at length 1, 5 at length 2)
+
+Live dupmap looks only at the immediate `duplicate_of`. So 44 copies of already-resolved roots (24 filed + 20 held) stay official unsorted. If the immediate original later becomes held / private / filed / `non_vehicle`, the 20 length-1 copies would follow today; the 44 would not, until dupmap walks the chain (or `duplicate_of` is flattened to the root).
+
+Should `non_vehicle` originals count? Yes — a copy of a reviewed non-vehicle is a duplicate, same as a copy of a held / private / pulled / filed original. A tiny ledger-definition PR (no row writes) on the #3302 body should add `copy_of_non_vehicle` and, to make the stated invariant actually hold, walk `duplicate_of` chains to the first resolved root with cycle protection. That PR was not opened or applied this pass. It would move 0 rows for `non_vehicle` today and about 44 of these 85 if chain-walking is included. Official `duplicate` / unsorted would shift only after that body is applied.
+
+### leftovers_v1 no-clock fix — #3314, not yet applied
+
+PR [#3314](https://github.com/sss97133/nuke/pull/3314) (`fix/capture-replan-leftovers-require-clock`, feature commit `8052169c`). Migration `20261115210000` requires `taken_at IS NOT NULL` and uses `taken_at` for the LA day and the prior-plan window, matching the live scorer. #3311 idempotent filters are unchanged. No clocks invented. Revert restores the 200000 body and refuses while unreverted log rows remain. Contract test adds a no-clock leftover on an already-planned day and asserts dry / apply / post-evidence runs skip it. Local `TEST_EXIT:0`. CI (validate + db-contracts) was retriggered against main; **do not apply until both are green**. After apply, do not start a leftover cap-50 unless new unlogged, unrefused, **clocked** leftovers appear.
+
+### The 15:08→15:28 official ledger shift
+
+Between 15:08 and 15:28 AST the official counts were reported as held 8,964 → 8,945 (−19), unsorted 554 → 577 (+23), duplicate 787 → 783 (−4); n stayed 29,749; private / pulled / on_vehicle / unverified / non_vehicle unchanged. 19+4=23, which is the same shape as a REST pagination scramble of `capture_ledger_states` without a stable `ORDER BY`.
+
+A write-scan of the producer logs in 19:00–19:35 UTC found no expire, extend, supersede, link create/revert, review create, privacy_promote, non_vehicle, leftover, or session-admit writes in the 15:08–15:28 window. The only chunk update was 2019-10-03 applied 0-set at 15:00:45 AST, already in the 15:08 drain table. 62 `vehicle_images.updated_at` values fall in 15:08–15:28, but 61 of them are already filed photos (a background touch, ~5–8 rows per minute from 15:00–15:34); filed rows cannot move held / unsorted / duplicate of unfiled photos. Open-review membership is what makes `held`; no review rows were created in the window, and there is no `updated_at` on `capture_set_review` to prove a silent close — but unique open-review math and every later official in-database `GROUP BY` have held at 8,945 (then unsorted/private moved only by the 23-promote at 15:41).
+
+Conclusion: nothing is regressing. Treat the 15:28 official in-database `GROUP BY` (held 8,945 / unsorted 577 / duplicate 783) as the start of the consistent series. The 15:08 figure is not reproducible from later official reads or from any logged write. Live ledger md5s are still `379d2ec7` / `5d801d4f`; leftovers_v1 is still `a90186df`; `capture_day_replan_state` `def_md5` is still `eff69f49`.
+
 ## 19. Known gaps and next work
 
 
@@ -648,8 +703,9 @@ Filing work (the path that can move unsorted):
 
 1. **The 4 newly admitted stamp-DTO rows** — days re-armed at 13:16 AST and drained at 13:26 AST. Both plans were review-only (0 clear), so no visual gate fired. The two typ `vehicle_exterior` frames are now held in open review; the two typ `other` frames are still unsorted / left out of the set. Do not call `capture_landing_gate_check` as a dry-run.
 2. **238 (plus 14 XMP and 4 `direct_pull`) with no file camera clock** — #3303 (`capture_import_session_admit_v1`) is **applied live**. All 242 eligible `user_upload` rows were admitted in cap-50 runs (no DTO / `taken_at` written). 2025-11-07 and 2025-12-07 drained to review-only (3 + 234 photos held, 0 filed). The 12 `image_intake` + 4 `direct_pull` + 14 XMP stay unadmitted. Never invent a clock.
-3. **plan_refused / planned_but_left_out vehicle-typed frames** — typ coverage and identity_conflict are already live in `capture_landing_plan_step`; typ-aware `capture_landing_supersede_v1` is already live. #3304 (`capture_replan_vehicle_leftovers_v1`) is **applied live**, and the #3311 idempotent body is **applied live** (~15:37 AST, md5 `a90186df`). Canonical first run `9a9407c8` (50 / 19 days) plus this pass `90848ff6` + `c5a7280c` (81 photos / 4 days, signed once; third run `76cc8213` took 0). The four days drained at 15:48 AST: two review-only (0 clear, 0 filed; already-held frames), two 0-set applies. 79 of the 81 leftovers were already official ledger `duplicate`; 2 stayed unsorted (no `taken_at` / superseded). Five gate_failed days (23 photos) remain skipped `refused_no_new_evidence` until new evidence arrives. Do not start another leftover cap-50 unless new unlogged, unrefused leftovers appear. Do not back-door file. typ `other` / `receipt_document` belong to #3302, not this producer.
+3. **plan_refused / planned_but_left_out vehicle-typed frames** — typ coverage and identity_conflict are already live in `capture_landing_plan_step`; typ-aware `capture_landing_supersede_v1` is already live. #3304 (`capture_replan_vehicle_leftovers_v1`) is **applied live**, and the #3311 idempotent body is **applied live** (~15:37 AST, md5 `a90186df`). Canonical first run `9a9407c8` (50 / 19 days) plus this pass `90848ff6` + `c5a7280c` (81 photos / 4 days, signed once; third run `76cc8213` took 0). The four days drained at 15:48 AST: two review-only (0 clear, 0 filed; already-held frames), two 0-set applies. 79 of the 81 leftovers were already official ledger `duplicate`; 2 stayed unsorted (no `taken_at` / superseded). Five gate_failed days (23 photos) remain skipped `refused_no_new_evidence` until new evidence arrives. Do not start another leftover cap-50 unless new unlogged, unrefused leftovers appear. #3314 (no-clock leftover skip) is open, contract green locally, not applied until CI is green. Do not back-door file. typ `other` / `receipt_document` belong to #3302, not this producer.
 4. **`capture_documents_land_by_vin`** — dry-run 10 Nov (`d0c00000-...000000000001`) returned 0 candidates. Every VIN page was skipped (`no_unique_vehicle`, `vehicle_not_held_by_user`, or `check_digit_failed`). Do not apply a signed run until a unique vehicle the user holds is actually found. The 10-minute tick is already scheduled and will no-op on the same skips.
+
 5. **typ `other` / `receipt_document` (180 + 17 non-sensitive)** — #3302 (`capture_non_vehicle_review_v1`) is **applied live**. Second looks (operator-viewed; Mac was offline) then signed cap-50 runs: 127 `non_vehicle`, 26 vehicle photos enqueued, 41 `judgment_personal` logged, 3 unreadable skipped. typ alone is not a terminal. The 41 were then run through the sanctioned `VisionDecision.decide` path (the on-device rule that sets `is_sensitive`; not `vision-gate-classify.mjs`). 23 were flagged (21 document, 2 personal_face) and promoted by `privacy_promote_v1` run `fe1622c6` (private +23, unsorted −23). The remaining 18 work / no_junk_signal frames stay unsorted and logged under `00aa930c`. A personal judgment that is only the reviewer's is still not promoted.
 6. **empty_url (275 unsorted / 276 live)** — leave alone. iOS `SyncEngine` retries failed uploads locally (`failed(retry:)` stays queued on the device; `BackgroundUploader`). The server has almost no retry signal: 3 of 276 have `capture_upload_status.stage=uploaded`, 0 failed. 42 carry `on_device_vision.is_personal` (intentional metadata-only alibi rows). **0 are newer than 4 Nov 2026**; created 19 Jun-29 Oct 2026, latest `taken_at` 28 Oct. This class does not explain a post-Nov-4 upload stall.
 7. **`capture_ledger_states` timeout (13:31 AST)** — EXPLAIN: the held CTE is 19 ms; the timeout is a generic plan plus I/O (wrong index on the date window, 4.0 s; dupmap scan of unorganized rows, 4.8 s). The held join from #3299 is not the expensive part. #3301 is **applied live** (INCLUDE-less index `idx_capture_set_review_open_user`; `plan_cache_mode=force_custom_plan`; materialized held/waiting/failed). Official `capture_ledger_states` completed in 59.9 s at 14:20 AST, then ~50–73 s on later reads. No row writes. Live ledger bodies were then replaced by #3302 (same timeout fix plus the `non_vehicle` state).
@@ -688,6 +744,7 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3303](https://github.com/sss97133/nuke/pull/3303) | admit user uploads by import session | Draft, **applied live** 14:34 AST; 242 admitted | Admission, no clock invent |
 | [#3304](https://github.com/sss97133/nuke/pull/3304) | replan leftover vehicle-typed frames | Draft, **applied live** 14:42 AST; 50 photos / 19 days; included in #3311 | Enqueue via sanctioned path |
 | [#3311](https://github.com/sss97133/nuke/pull/3311) | skip logged leftovers and refused days | Draft, **applied live** ~15:37 AST; remaining 81 leftovers signed once | Leftovers idempotency |
+| [#3314](https://github.com/sss97133/nuke/pull/3314) | skip no-clock leftovers the scorer cannot use | Draft, contract green locally; **not applied** pending CI | Leftovers / scorer match |
 
 ## 21. Unverified or out of scope in this writing
 
@@ -705,4 +762,4 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Operator log: `/workspace/sortrun/progress.md` (9–10 Nov 2026)
 - Scripts and artifacts under `/workspace/sortrun`: `gate_reader.py`, `drain_loop.py`, `ledger_now.py`, `emptyplan/*`, `fingerprint/*`, `lookalike_pilot/*`, `garage/gallery_pollution_audit.md`, `garage/visual_identity_recheck_v1.md`, `garage/gross_mismatch_v1/*`, `held/same_scene_dryrun.py`, `ingest_audit/`, `unsorted/breakdown.json`, `unsorted/fresh_20261110/*`, `stamp_dto_pr/BRIEF.md`, `receipt_order_fix/`, `ledger_live_def.txt`
 - Repository: `github.com/sss97133/nuke` — especially `docs/receipt-work-contract.md`, `supabase/migrations/20261020001000_vehicle_image_review_holds.sql`, `supabase/migrations/20261109070000_rederive_ownership_roles.sql`, `scripts/ownership/rederive-ownership-roles.mjs`, `scripts/receipt-work/reconcile-receipt-work.mjs`, `scripts/photo-pipeline/local_image_analysis.py`, `scripts/iphoto-intake.mjs`, and the PRs in §20
-- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~15:49 AST)
+- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~16:08 AST)
