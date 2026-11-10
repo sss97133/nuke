@@ -69,6 +69,7 @@ jobs:
         run: |
           node --test scripts/guardrails/no-new-photo-reader.test.mjs
           node --test scripts/guardrails/owner-voice-other-model.test.mjs
+          python3 scripts/photo-pipeline/keys-dry-run/test_check_units.py
           node scripts/guardrails/no-new-photo-reader.mjs
 
       - name: Intake status reader contracts

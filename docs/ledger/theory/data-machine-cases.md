@@ -578,6 +578,41 @@ separately; nothing below is a claim of fleet coverage.
   readings wait to be keyed (it does; rule 6 says harvest first); whether listing photos enter a reading lane if
   no Mustang or Porsche has owner photos (not read yet).
 
+**C17, 2026-11-10 22:15 to 23:50 UTC: "can u prove it works".** The owner asked for proof. What was proven, what was
+found broken and what is still unproven:
+
+- The checks, tried by hand on main: a new reader script and a new photo-keyed table each fail the pull-request gate;
+  removing the "Reading photos" section or renaming the owner's-words heading fails the build; a harmless change passes.
+- The smallest model of the family, asked as the owner would ask (a rust finder, a parts-per-photo table, a faster
+  reader): the three that answered built none of it as worded, refused none of it, and proposed keying the stored
+  readings. Told to skip the guidance, three more each built a reader and a table; the gate caught two and missed one
+  (a `find_rust` script with a `rust_findings` table keyed by the photo's hash). Fixed in #3331, with the three builds
+  kept as a test. The gate still reads names; a reader under a neutral name passes it.
+- The owner's own test, 23:05 UTC: "a real test would be that I can like talk with Grok Bot and like it actually would
+  be on the same page as where we're at right now". Not run. No key for another provider was in the cloud session (the
+  keys are in his local env files). The tool that runs it is `scripts/guardrails/owner-voice-other-model.mjs` (#3332):
+  one command from a checkout that has the key. Its first result belongs in the guardrails answer key.
+- The owner, 23:20 UTC: "the best type of batch is one at a time ... then figuring out how to speed things up beyond
+  one at a time". It is now in the card (the lane: the unit is one photo, checked by code; what needs the whole set is
+  a different harness). The reader half of the withdrawn #3313 claimed one photo at a time; that half matches this
+  and the capture-date half is what was withdrawn. Reviving it is still the owner's call.
+- The keys role, as a dry run over the proof vehicle's stored readings: every photo passed the code check, 958 claims
+  from 1,157 statements, 304 of them holdable by the registry as it is, 360 folded claims, and a receipt line and a
+  photo claim meeting on the same part key for 26 parts. Method, counts, the skeptics' refutations and the limits are
+  in `docs/ledger/theory/image-keys-test.md` (the 22:48 round); the harness that produced them is
+  `scripts/photo-pipeline/keys-dry-run/`, with the first run's decisions kept there as pending.
+- `evidence_judgment_requests` held 595 rows for the proof vehicle at 22:48 UTC: 115 answered, 68 withdrawn, 412
+  cancelled, every one the receipt-part question. The model has been asking on this vehicle; nothing in the repo reads
+  the answers into a claim.
+- Still unproven, and the definition of done has not moved: no keyed row has landed (0 of 488 on the proof vehicle,
+  read again 22:48 UTC); the writer, scoreboard and database gates are not built; the decisions memory has no store
+  but a file; no model from another provider has been put through the owner's test.
+- For whoever builds next, from the dry run: (1) the writer's check can start from `check_units.py`; (2) the first
+  proposals to put to the owner are the places most claims waited on (paint or coating loss, "no break visible", "no
+  leak visible", the hood and the front valance as parts); (3) the conventions that the skeptics found weak (a located
+  mark whose cause is hedged; a body-panel key on upholstery; a severity the reader did not give) are named in the
+  test file; (4) a print of an old photo inside a receipt frame needs its own rule for the day it shows.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026
