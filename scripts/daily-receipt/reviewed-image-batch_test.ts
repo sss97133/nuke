@@ -111,12 +111,13 @@ Deno.test("only the known pre-turn experimental configuration warning is retaine
   assertThrows(() => parseStage(stream() + "\n" + warning, ["image"], "gpt-6-astra"), Error, "unexpected_model_tool");
   assertThrows(() => parseStage(warning.replace("Under-development", "Unknown") + "\n" + stream(), ["image"], "gpt-6-astra"), Error, "unexpected_model_tool");
 });
-Deno.test("recovered routing discovery warning retains successful answer but not terminal or incomplete reads", () => {
-  const warning = JSON.stringify({ type: "error", message: "Reconnecting... 2/5 (workspace routing discovery timed out)" });
+for (const reason of ["workspace routing discovery timed out", "stream disconnected before completion: Connection reset by peer (os error 54)"])
+Deno.test(`recovered ${reason} warning retains successful answer but not terminal or incomplete reads`, () => {
+  const warning = JSON.stringify({ type: "error", message: `Reconnecting... 2/5 (${reason})` });
   const add = (s: string) => s.split("\n").flatMap(line => JSON.parse(line).type === "turn.started" ? [line, warning] : [line]).join("\n");
   assertEquals(parseStage(add(stream()), ["image"], "gpt-6-astra").warnings, [JSON.parse(warning).message]);
   for (const bad of [add(stream({ noComplete: true })), add(stream({ failed: true })), warning + "\n" + stream(), stream() + "\n" + warning,
-    add(stream()).replace("workspace routing discovery timed out", "authentication refused")])
+    add(stream()).replace(reason, "authentication refused")])
     assertThrows(() => parseStage(bad, ["image"], "gpt-6-astra"), Error, "reader_stage_failed");
 });
 Deno.test("wrong or repeated IDs refuse; order never rewrites identity", () => {

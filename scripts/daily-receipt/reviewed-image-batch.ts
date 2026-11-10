@@ -66,7 +66,7 @@ export function parseStage(stream: string, sourcePaths: string[], requestedModel
   let turnStarted = false, turnEnded = false;
   ensure(sourcePaths.length > 0 && new Set(sourcePaths).size === sourcePaths.length, "source_images_missing");
   for (const e of events) {
-    if (turnStarted && !turnEnded && e.type === "error" && /^Reconnecting\.\.\. [1-5]\/5 \(workspace routing discovery timed out\)$/.test(e.message ?? "")) {
+    if (turnStarted && !turnEnded && e.type === "error" && /^Reconnecting\.\.\. [1-5]\/5 \((?:workspace routing discovery timed out|stream disconnected before completion: Connection reset by peer \(os error 54\))\)$/.test(e.message ?? "")) {
       // The CLI may reconnect successfully and then finish this same turn.
       // Keep the warning; the completed-turn/final-answer checks below still
       // refuse an exhausted/failed or incomplete read. Never repeat a paid turn
