@@ -31,7 +31,7 @@ globalThis.fetch = async (input, init) => {
       if (mode === 'failed') return Response.json({ code: '57014', message: 'synthetic retention unavailable' }, { status: 500 });
       return Response.json({ code: '23505', message: 'synthetic identical retained body' }, { status: 409 });
     }
-    if (u.searchParams.get('select')?.includes('html_storage_path')) {
+    if (u.searchParams.get('select')?.includes('html_storage_path') && u.searchParams.get('fetched_at')?.startsWith('gte.')) {
       assert(Date.parse(clock) >= Date.parse(u.searchParams.get('fetched_at')!.slice(4)), 'Synthetic retained hit satisfies actual cache cutoff');
       return Response.json(['cache', 'changed'].includes(mode) ? [{ id: snapshot, html, fetched_at: clock, fetch_method: 'direct' }] : []);
     }
@@ -40,7 +40,7 @@ globalThis.fetch = async (input, init) => {
       assertEquals(u.searchParams.get('html_sha256'), `eq.${hash}`);
     }
     return Response.json([{ id: snapshot, listing_url: url, platform: 'collectingcars', fetched_at: clock,
-      html_sha256: mode === 'changed' ? 'b'.repeat(64) : hash, success: true }]);
+      html_sha256: mode === 'changed' ? 'b'.repeat(64) : hash, success: true, http_status: 200, html, html_storage_path: null }]);
   }
   throw Error(`Unexpected capture request ${req.method} ${u.pathname}`);
 };

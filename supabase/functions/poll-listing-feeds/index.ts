@@ -62,6 +62,7 @@ import { prepareCollectingCarsHistory } from "./collectingCarsHistory.ts";
 // Native history preparation also admits bounded, explicitly configured retained discovery manifests.
 import { nextYield } from "./schedule.ts";
 import { pollPurplewave } from "./purplewave.ts";
+import { pollMcCormick } from "./mccormick.ts";
 import { CC_LISTING_METHOD, CC_OBSERVATION_COLUMNS, collectingCarsReceipt, collectingCarsAdmissionMatches,
   prepareCollectingCarsLedger, planCollectingCarsIngests, collectingCarsCaptureInterval, readCollectingCarsInventory, type CollectingCarsReceipt } from "./collectingCars.ts";
 
@@ -1443,6 +1444,13 @@ Deno.serve(async (req) => {
       // Curated direct-ingest strategies (Craigslist HTML via Firecrawl, BaT
       // RSS). Both bypass the legacy import_queue path entirely and route
       // through `ingest` with the share-URL ledger.
+      if (feed.source_slug === "mccormicks" && feed.search_criteria?.fetch_strategy === "mccormick_live") {
+        const nativeResult = await pollMcCormick(supabase, feed, budget, allocation);
+        results.push(nativeResult);
+        totalFound += nativeResult.items_found;
+        totalIngested += nativeResult.new_ingested;
+        continue;
+      }
       if (feed.source_slug === "purplewave" && feed.search_criteria?.fetch_strategy === "purplewave_public_json") {
         const nativeResult = await pollPurplewave(supabase, feed, budget, allocation);
         results.push(nativeResult);

@@ -1,3 +1,4 @@
+import OrganizationSourceInventory from '../components/organization/OrganizationSourceInventory';
 import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactDOM from 'react-dom';
@@ -2363,6 +2364,7 @@ export default function OrganizationProfile() {
       }}>
         {activeTab === 'overview' && (
           <>
+            {organizationId && <OrganizationSourceInventory key={`inventory:${organizationId}`} organizationId={organizationId} />}
             {organizationId && <OrganizationSourceTargets key={organizationId} organizationId={organizationId} />}
             {/* Opened to invite this business to a job's need: the on-Nuke section leads. Otherwise it sits below the fold. */}
             {organizationId && new URLSearchParams(location.search).has('requirement') && <OrganizationOnNuke organizationId={organizationId} />}
@@ -3803,10 +3805,9 @@ export default function OrganizationProfile() {
               </div>
             )}
 
-            <OrganizationInventory
-              organizationId={organization.id}
-              isOwner={isOwner}
-            />
+            <OrganizationSourceInventory organizationId={organization.id} fallback={
+              <OrganizationInventory organizationId={organization.id} isOwner={isOwner} />
+            } />
           </div>
         )}
 
