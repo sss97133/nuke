@@ -27,13 +27,14 @@ export async function collectingCarsReplayCandidates(db: any, sourceUrl: string)
 }
 
 /** No publisher fetch, insert, re-clock or unpinned fallback. Protected bytes remain server-side. */
-export async function replayClosedCollectingCars(db: any, sourceUrl: string, value: unknown) {
+export async function replayClosedCollectingCars(db: any, sourceUrl: string, value: unknown, expectedListingId?: string) {
   const pin = ccSnapshotPin(value), url = lotUrl(sourceUrl);
   const read = await db.from('listing_page_snapshots')
     .select('id,listing_url,platform,success,http_status,html,html_storage_path,html_sha256,fetched_at,created_at,metadata,content_length')
     .eq('id', pin.snapshot_id).abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+  if (read.error) throw Error('cc_snapshot_read_unavailable');
   const s = read.data, at = Date.parse(s?.fetched_at ?? ''), archived = Date.parse(s?.created_at ?? '');
-  if (read.error || !s || s.id !== pin.snapshot_id || s.platform !== 'collectingcars' || s.listing_url !== url
+  if (!s || s.id !== pin.snapshot_id || s.platform !== 'collectingcars' || s.listing_url !== url
     || s.success !== true || s.http_status !== 200 || s.html_sha256 !== pin.expected_sha256
     || s.metadata?.rows_only === true || s.metadata?.withdrawn === true
     || (s.content_length != null && (!Number.isFinite(s.content_length) || s.content_length > 2_097_152))
@@ -53,7 +54,10 @@ export async function replayClosedCollectingCars(db: any, sourceUrl: string, val
   const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(html)))].map(x => x.toString(16).padStart(2, '0')).join('');
   if (hash !== pin.expected_sha256) throw Error('cc_snapshot_hash_refused');
   const extracted = extractFromHtml(html, url);
-  // Unknown/withdrawn/live stages are not terminal-auction evidence. Never infer closure from age.
+  if (expectedListingId !== undefined && extracted.listing_id !== expectedListingId) throw Error('cc_snapshot_listing_mismatch');
+  // Only an explicit open car is safe ineligibility for a read-only caller.
+  if (extracted.lot_type === 'car' && ['live', 'comingsoon'].includes(extracted.stage ?? '')) throw Error('cc_snapshot_open_car');
+  // Unknown/withdrawn/non-car stages are refusals, never permission to fetch another page.
   if (!['sold', 'unsold'].includes(extracted.stage ?? '') || extracted.lot_type !== 'car') throw Error('cc_snapshot_not_closed_car');
   return { success: true, extracted: { ...extracted, listing_url: extracted.url },
     source_capture: { snapshot_id: s.id, sha256: hash, observed_at: s.fetched_at, source_url: url },
