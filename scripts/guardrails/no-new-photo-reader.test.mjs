@@ -2,6 +2,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { saysItReadsPhotos, tablesWithPhotoKey, violations } from './no-new-photo-reader.mjs';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const text = (p) => readFileSync(join(ROOT, p), 'utf8');
 
 test('a new table keyed by a photo is found, whatever its other columns look like', () => {
   const sql = `
@@ -47,4 +53,31 @@ test('only additions that are not allowed are violations', () => {
   });
   assert.deepEqual(found.map((v) => `${v.kind}:${v.what}`), [
     'table:part_sightings', 'function:photo-damage-detector', 'script:scripts/photo-pipeline/part-state-reader.mjs']);
+});
+
+// The owner, 2026-11-10: "This is the only conversation that matters and that we never backtrack from here", and
+// "the talk on keys and folds is essential to not lose". An earlier form of the same idea was labelled deprecated by
+// a cleanup and forgotten. So the record is held by a test: removing or renaming any of these has to be done on
+// purpose, by changing this file in a pull request someone can see.
+test('the owner direction on photo reading is still where every agent starts', () => {
+  const agents = text('AGENTS.md');
+  assert.match(agents, /^## Reading photos$/m, 'AGENTS.md keeps its "Reading photos" section');
+  assert.ok(agents.includes('docs/ledger/theory/data-machine.md'), 'and it points at the theory card');
+  assert.ok(agents.includes('skills/image-keys/SKILL.md'), 'and at the keys brief');
+
+  const card = text('docs/ledger/theory/data-machine.md');
+  for (const part of [
+    '## Image analysis is the model asking, owner direction 2026-11-10',
+    '**Keys and folds, for photos.**',
+    '**The gates.**',
+    '**The proof vehicle.**',
+    '**Acceptance.**',
+    "## The owner's words, 2026-11-10",
+  ]) assert.ok(card.includes(part), `the theory card keeps: ${part}`);
+  // the direction stays the first section of the card, not an appendix
+  assert.ok(card.indexOf('## Image analysis is the model asking') < card.indexOf('## Construction direction'), 'the direction is the first section of the card');
+
+  assert.ok(text('docs/ledger/CAPABILITY_MAP.md').includes('| Photo reading: what a photo shows'), 'the capability map keeps the photo reading row');
+  assert.match(text('skills/image-keys/SKILL.md'), /^name: image-keys$/m, 'the keys brief exists');
+  assert.ok(text('.github/workflows/pre-deploy-check.yml').includes('scripts/guardrails/no-new-photo-reader.mjs'), 'the gate is still run on pull requests');
 });
