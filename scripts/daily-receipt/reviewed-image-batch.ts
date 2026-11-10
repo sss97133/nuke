@@ -28,7 +28,8 @@ export function eligibleWorklist(rows: Row[], vehicleId: string, limit: number) 
 export function subscriptionEnvironment(env: Record<string, string>) {
   // Normal settings/hooks and subscription login remain. No provider/database
   // keys or alternate provider endpoints are inherited by the image reader.
-  return Object.fromEntries(Object.entries(env).filter(([k]) => ["HOME", "PATH", "TMPDIR", "LANG", "LC_ALL", "TERM",
+  // macOS subscription keychain lookup also needs its ordinary OS identity.
+  return Object.fromEntries(Object.entries(env).filter(([k]) => ["HOME", "USER", "LOGNAME", "PATH", "TMPDIR", "LANG", "LC_ALL", "TERM",
     "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CONFIG_DIR"].includes(k)));
 }
 export function requireSubscription(auth: Row) {

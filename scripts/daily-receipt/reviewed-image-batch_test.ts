@@ -39,9 +39,9 @@ Deno.test("current eligible source snapshot retained, including unknown source c
   assertThrows(() => eligibleWorklist([...work(), ...work()], vehicle, 2), Error, "identity_mismatch");
 });
 Deno.test("subscription-only auth and reader tools preserve permissions without API fallback", () => {
-  assertEquals(subscriptionEnvironment({ HOME: "/home/fixture", PATH: "/bin", CLAUDE_CODE_OAUTH_TOKEN: "oauth",
+  assertEquals(subscriptionEnvironment({ HOME: "/home/fixture", USER: "fixture", LOGNAME: "fixture", PATH: "/bin", CLAUDE_CODE_OAUTH_TOKEN: "oauth",
     ANTHROPIC_API_KEY: "secret", SUPABASE_SERVICE_ROLE_KEY: "secret", ANTHROPIC_BASE_URL: "other",
-    CLAUDE_CODE_USE_BEDROCK: "1" }), { HOME: "/home/fixture", PATH: "/bin", CLAUDE_CODE_OAUTH_TOKEN: "oauth" });
+    CLAUDE_CODE_USE_BEDROCK: "1" }), { HOME: "/home/fixture", USER: "fixture", LOGNAME: "fixture", PATH: "/bin", CLAUDE_CODE_OAUTH_TOKEN: "oauth" });
   requireSubscription({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty" });
   for (const auth of [{ loggedIn: false }, { loggedIn: true, authMethod: "api_key", apiProvider: "firstParty" }])
     assertThrows(() => requireSubscription(auth), Error, "subscription_auth_required");
