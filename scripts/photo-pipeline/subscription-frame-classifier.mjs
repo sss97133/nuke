@@ -71,7 +71,7 @@ function claudePrint(text, env) {
 
 const checklist = await orchestrator({ action: 'classifier_prompt' });
 if (checklist.http !== 200 || typeof checklist.prompt !== 'string') { console.error(`could not get the checklist: ${checklist.http} ${checklist.error ?? ''}`); process.exit(1); }
-const fromQueue = source === 'stage-queue' || (source === 'auto' && await stageQueueEnabled(rest));
+const fromQueue = source === 'stage-queue' || (source === 'auto' && await stageQueueEnabled(rest, OWNER));
 let frames;
 if (fromQueue) {
   // The ledger hands out the work: eligibility (privacy holds, duplicates, superseded rows) was judged by the reconciler.
@@ -79,7 +79,9 @@ if (fromQueue) {
   frames = work.map((w) => ({ id: w.image_id, vehicle_id: w.vehicle_id, user_id: w.user_id, image_url: w.image_url, target_version: w.target_version, lane: w.lane, reason: w.reason }));
 } else {
   const statusFilter = statuses.length === 1 ? `ai_processing_status=eq.${statuses[0]}` : `ai_processing_status=in.(${statuses.join(',')})`;
-  frames = await rest(`vehicle_images?select=id,vehicle_id,user_id,image_url,file_name,taken_at,ai_processing_status&user_id=eq.${OWNER}&${statusFilter}&image_url=not.is.null&order=taken_at.desc.nullslast&limit=${limit}`);
+  // the same holds the ledger applies: nothing sensitive, personal, duplicate, superseded or external goes to a reader
+  const holds = 'is_sensitive=not.is.true&is_duplicate=not.is.true&is_superseded=not.is.true&is_external=not.is.true&or=(vision_gate_status.is.null,vision_gate_status.neq.rejected_personal)';
+  frames = await rest(`vehicle_images?select=id,vehicle_id,user_id,image_url,file_name,taken_at,ai_processing_status&user_id=eq.${OWNER}&${statusFilter}&image_url=like.http*&${holds}&order=taken_at.desc.nullslast&limit=${limit}`);
 }
 console.error(`${frames.length} frames (${fromQueue ? 'stage queue' : statuses.join('/')}) to classify for ${OWNER} with the orchestrator's ${checklist.prompt_version} checklist (model ${model}, concurrency ${conc})${dry ? ' [dry run]' : ''}`);
 
@@ -106,6 +108,7 @@ if (!dry) {
       const t0 = Date.now();
       let stage = 'download';
       try {
+        if (!/^https?:\/\//.test(f.image_url ?? '')) { await settle(f, { input: {} }); throw new Error('no http(s) image URL'); }
         const ext = (f.file_name || f.image_url).toLowerCase().match(/\.(heic|heif|png|webp|jpe?g)/)?.[1] || 'jpg';
         const raw = join(dir, `${f.id}.${ext}`);
         const res = await fetch(f.image_url).catch(() => ({ ok: false, status: 0 }));
@@ -145,7 +148,7 @@ if (!dry) {
         // fault are settled here. Without one, the item would return to the queue on lease expiry with no attempt counted.
         if (stage === 'download') await settle(f, { download: { status: 0 } });
         else if (stage === 'convert') await settle(f, { convert: { missingTool: e?.code === 'ENOENT' } });
-        else if (stage === 'reader') await settle(f, { reader: { error: String(e.message || e), apiStatus: e.apiStatus ?? null, invalidOutput: e.invalidOutput === true } });
+        else if (stage === 'reader') await settle(f, { reader: { error: String(e.message || e), apiStatus: e.apiStatus ?? null, invalidOutput: e.invalidOutput === true, missingTool: e?.code === 'ENOENT' } });
         else if (stage === 'orchestrator') await settle(f, { orchestrator: { http: 0, error_class: 'orchestrator_request_error' } });
         summary.errors++; out.push({ image_id: f.id, error: String(e.message || e).slice(0, 300) });
         console.error(`${f.id} ERROR ${String(e.message || e).slice(0, 160)}`);

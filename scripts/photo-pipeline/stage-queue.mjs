@@ -18,14 +18,17 @@
 
 export const STAGE = 'classifier';
 
-/** True when the stage ledger is deployed and the reconciler is switched on (platform_config image_stage_reconciler.enabled). */
-export async function stageQueueEnabled(rest) {
-  try {
-    const rows = await rest(`platform_config?select=config_value&config_key=eq.image_stage_reconciler`);
-    return rows?.[0]?.config_value?.enabled === true;
-  } catch {
-    return false;
-  }
+/**
+ * True when this owner's photos are handed out by the stage ledger: the reconciler is switched on (platform_config
+ * image_stage_reconciler.enabled, read the way the SQL reads it) and the owner is in its user_ids (no user_ids key =
+ * every user). False when the config row is absent (ledger not deployed). An error reading the config is thrown, not
+ * answered with false: falling back to the status worklist on a blip would read photos the queue also holds.
+ */
+export async function stageQueueEnabled(rest, owner) {
+  const rows = await rest(`platform_config?select=config_value&config_key=eq.image_stage_reconciler`);
+  const cfg = Array.isArray(rows) ? rows[0]?.config_value : null;
+  if (!cfg || !(cfg.enabled === true || cfg.enabled === 'true')) return false;
+  return Array.isArray(cfg.user_ids) ? cfg.user_ids.includes(owner) : true;
 }
 
 /** Claim up to `limit` photos for a stage (at most 25 a call). Returns [] when nothing is due. */
@@ -38,8 +41,10 @@ export async function claimStageWork(rpc, { stage = STAGE, limit = 20, leaseSeco
 // "You're out of extra usage", earlier "Claude usage limit reached"), plus an API rate-limit or overload error. A bare
 // number is not a signal: "JSON at position 429" and "(req 4291)" are not rate limits, and "Context limit reached" is
 // about one photo's prompt, not the account.
-const USAGE_LIMIT = /usage limit|hit your [\w' -]{0,24}limit|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b/i;
+const USAGE_LIMIT = /usage limit|(?:hit|reached) your [\w' -]{0,24}limit|(?:5-hour|session|weekly|opus|sonnet) limit reached|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b/i;
 const OUTPUT_INVALID = /no JSON|not valid JSON|in JSON at position|Unexpected (?:token|end)|is not valid JSON/i;
+// the API cannot be reached from this machine: the next photo would fail the same way
+const API_DOWN = /API Error: (?:5\d\d|Connection|connect|fetch failed|network|socket)|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT/i;
 
 /** md5 of the image URL: the same value as md5(coalesce(image_url, '')) in image_stage_gaps, which re-offers a blocked photo only when it differs. */
 export function inputFingerprint(imageUrl, md5) {
@@ -49,8 +54,9 @@ export function inputFingerprint(imageUrl, md5) {
 /**
  * The receipt for one frame.
  *   { download: {status} }                       the image fetch failed with that HTTP status (0 = network or body read)
+ *   { input: {} }                                the row has no http(s) URL to fetch
  *   { convert: {missingTool} }                   the bytes could not be turned into a JPEG (missingTool: the converter is not installed)
- *   { reader: {error, apiStatus, invalidOutput} } `claude -p` failed, timed out, hit a limit, or printed no usable JSON
+ *   { reader: {error, apiStatus, invalidOutput, missingTool} } `claude -p` failed, timed out, hit a limit, printed no usable JSON, or is not installed
  *   { orchestrator: {http, success, skipped, classification, classifier_ok, error_class}, image_type }   the orchestrator answered
  * `stop: true` means the fault is the batch's, not the photo's: the caller ends the batch.
  */
@@ -68,7 +74,10 @@ export function receiptForResult(result, { reader, promptVersion } = {}) {
     if (result.convert.missingTool) return { outcome: 'unavailable', error_class: 'reader_tool_missing', retry_after_seconds: 3600, stop: true, detail };
     return { outcome: 'blocked_input', error_class: 'image_unreadable', detail };
   }
+  // nothing to fetch (the iOS app writes '' when the pixels stay on the phone)
+  if (result.input) return { outcome: 'blocked_input', error_class: 'image_url_missing', detail };
   if (result.reader) {
+    if (result.reader.missingTool) return { outcome: 'unavailable', error_class: 'reader_tool_missing', retry_after_seconds: 3600, stop: true, detail };
     const msg = String(result.reader.error ?? '');
     const api = Number(result.reader.apiStatus) || 0;
     if (/timed out/i.test(msg)) return { outcome: 'unavailable', error_class: 'reader_timeout', retry_after_seconds: 1800, detail };
@@ -76,6 +85,7 @@ export function receiptForResult(result, { reader, promptVersion } = {}) {
     if (api === 429 || api === 529 || USAGE_LIMIT.test(msg)) return { outcome: 'rate_limited', error_class: 'reader_usage_limit', http_status: api || null, retry_after_seconds: 3600, stop: true, detail };
     // a login that stopped working fails every photo the same way
     if (api === 401 || api === 403) return { outcome: 'unavailable', error_class: 'reader_unauthorized', http_status: api, retry_after_seconds: 3600, stop: true, detail };
+    if (api >= 500 || API_DOWN.test(msg)) return { outcome: 'unavailable', error_class: 'reader_api_unreachable', http_status: api || null, retry_after_seconds: 1800, stop: true, detail };
     return { outcome: 'unavailable', error_class: 'reader_exited', http_status: api || null, retry_after_seconds: 1800, detail };
   }
   const o = result.orchestrator ?? {};
@@ -96,16 +106,24 @@ export function receiptForResult(result, { reader, promptVersion } = {}) {
   return { outcome: 'unavailable', error_class: String(o.error_class || 'orchestrator_http_error'), http_status: o.http ?? null, retry_after_seconds: 900, detail: d };
 }
 
-/** Write the receipt (closes the open work item). Never throws: a reader must not lose a batch to its bookkeeping. */
-export async function recordStageReceipt(rpc, { imageId, stage = STAGE, version, receipt, fingerprint = null }) {
-  try {
-    const id = await rpc('record_image_stage_receipt', {
-      p_image_id: imageId, p_stage: stage, p_producer_version: version, p_outcome: receipt.outcome,
-      p_error_class: receipt.error_class ?? null, p_http_status: receipt.http_status ?? null,
-      p_retry_after_seconds: receipt.retry_after_seconds ?? null, p_input_fingerprint: fingerprint, p_detail: receipt.detail ?? {},
-    });
-    return { ok: true, id };
-  } catch (e) {
-    return { ok: false, error: String(e?.message || e).slice(0, 200) };
+/**
+ * Write the receipt (closes the open work item). Never throws: a reader must not lose a batch to its bookkeeping. A
+ * failed write is tried again (three tries in all): without the receipt the item returns to the queue and is read twice.
+ */
+export async function recordStageReceipt(rpc, { imageId, stage = STAGE, version, receipt, fingerprint = null, tries = 3, pauseMs = 400 }) {
+  let error = '';
+  for (let n = 1; n <= Math.max(1, tries); n++) {
+    try {
+      const id = await rpc('record_image_stage_receipt', {
+        p_image_id: imageId, p_stage: stage, p_producer_version: version, p_outcome: receipt.outcome,
+        p_error_class: receipt.error_class ?? null, p_http_status: receipt.http_status ?? null,
+        p_retry_after_seconds: receipt.retry_after_seconds ?? null, p_input_fingerprint: fingerprint, p_detail: receipt.detail ?? {},
+      });
+      return { ok: true, id, tries: n };
+    } catch (e) {
+      error = String(e?.message || e).slice(0, 200);
+      if (n < tries && pauseMs > 0) await new Promise((r) => setTimeout(r, pauseMs * n));
+    }
   }
+  return { ok: false, error };
 }

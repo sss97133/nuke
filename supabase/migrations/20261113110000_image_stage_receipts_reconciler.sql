@@ -53,6 +53,9 @@
 --  * blocked_input is offered again when the image URL changes (input_fingerprint = md5(image_url)).
 --  * The backfill lane walks everything older than the grace period, so a bulk upload larger than the live scan waits
 --    minutes, not days.
+--  * user_ids is seeded empty (nobody): the only reader claims one user's photos, so work queued for anyone else would
+--    sit unclaimed until it filled max_open. Photos without an http(s) URL are not eligible (nothing to fetch).
+--  * A claim does not hand out an item whose gap closed while it waited.
 begin;
 set local statement_timeout = '60s';
 set local lock_timeout = '2s';
@@ -128,7 +131,7 @@ create table if not exists public.image_stage_work (
   finished_at timestamptz
 );
 comment on table public.image_stage_work is
-  'Stage-level requeue written by reconcile_image_stages(); claimed by claim_image_stage_work(). One open item per (image, stage). dropped = the photo stopped being eligible while queued.';
+  'Stage-level requeue written by reconcile_image_stages(); claimed by claim_image_stage_work(). One open item per (image, stage). done = a receipt closed it. dropped = closed at a claim without a read: the photo stopped being eligible, or its gap was closed by another path, while it was queued.';
 -- idempotency: the reconciler can run any number of times and never double-queues
 create unique index if not exists image_stage_work_one_open on public.image_stage_work (image_id, stage) where status in ('queued', 'claimed');
 create index if not exists image_stage_work_claim_idx on public.image_stage_work (stage, lane, not_before, id) where status = 'queued';
@@ -157,8 +160,8 @@ grant select on public.image_pipeline_stages, public.image_stage_receipts, publi
 
 insert into public.platform_config (config_key, config_value, description) values
   ('image_stage_reconciler',
-   '{"enabled": false, "live_days": 2, "scan_per_lane": 1000, "max_open": 300, "backfill_share": 0.5, "min_age_minutes": 15}'::jsonb,
-   'reconcile_image_stages(): enabled gate; user_ids (array of user uuids that have a reader; absent = every user); live window in days; rows scanned per lane per run; cap on open work items; backfill share of each run budget; grace before an upload is considered a gap.')
+   '{"enabled": false, "user_ids": [], "live_days": 2, "scan_per_lane": 1000, "max_open": 300, "backfill_share": 0.5, "min_age_minutes": 15}'::jsonb,
+   'reconcile_image_stages(): enabled gate; user_ids (array of user uuids that have a reader: seeded empty = nobody, so switching on means naming them; key absent = every user); live window in days; rows scanned per lane per run; cap on open work items; backfill share of each run budget; grace before an upload is considered a gap.')
 on conflict (config_key) do nothing;
 
 -- ---------------------------------------------------------------- latest-receipt view
@@ -294,7 +297,8 @@ $$;
 
 -- ---------------------------------------------------------------- reconciler
 -- Eligibility, stated once and repeated verbatim in claim_image_stage_work (a contract test compares the two): a photo
--- with an owner and a URL that is not a duplicate, not sensitive, not external, not superseded and not rejected as
+-- with an owner and an http(s) URL (the iOS app writes '' for photos whose pixels stay on the phone, and for video and
+-- screen-capture previews) that is not a duplicate, not sensitive, not external, not superseded and not rejected as
 -- personal. A row is skipped only while a pipeline run is in flight on it (status 'processing', started under 30 minutes
 -- ago). The paid drain's 'pending' status, its retry rows and its provider breaker are not consulted: they describe one
 -- producer, and that producer being down is exactly when this queue is needed.
@@ -350,7 +354,7 @@ begin
     select coalesce(array_agg(v.id), '{}') into v_ids
       from public.vehicle_images v
      where v.id = any (v_cand)
-       and v.is_duplicate is not true and v.image_url is not null and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'
+       and v.is_duplicate is not true and v.image_url ~ '^https?://' and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'
        and not (coalesce(v.ai_processing_status, '') = 'processing' and coalesce(v.ai_processing_started_at, '-infinity'::timestamptz) > now() - interval '30 minutes');
 
     with gaps as (
@@ -388,7 +392,8 @@ comment on function public.reconcile_image_stages(integer) is
 -- ---------------------------------------------------------------- claim (for stage workers)
 -- p_user_id scopes a claim to one user's photos (a reader running on that user's own subscription reads only theirs).
 -- Eligibility is judged again here: an item can wait for hours, and a photo marked sensitive or personal meanwhile must
--- not reach a reader. Items for photos that stopped being eligible are dropped (bounded per call).
+-- not reach a reader. Items for photos that stopped being eligible are dropped (bounded per call), and so is a picked
+-- item whose gap has closed since it was queued.
 create or replace function public.claim_image_stage_work(p_stage text, p_limit integer default 8, p_lease_seconds integer default 300, p_user_id uuid default null)
 returns table(work_id bigint, image_id uuid, image_url text, user_id uuid, vehicle_id uuid, lane text, reason text, target_version integer)
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -400,7 +405,7 @@ begin
      left join public.vehicle_images v on v.id = w.image_id
      where w.stage = p_stage and w.status = 'queued' and w.not_before <= now()
        and (p_user_id is null or v.user_id = p_user_id or v.id is null)
-       and not coalesce(v.is_duplicate is not true and v.image_url is not null and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal', false)
+       and not coalesce(v.is_duplicate is not true and v.image_url ~ '^https?://' and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal', false)
      order by w.id limit 200 for update of w skip locked);
   return query
   with due as (
@@ -410,18 +415,26 @@ begin
     join public.vehicle_images v on v.id = w.image_id
     where w.stage = p_stage and w.status = 'queued' and w.not_before <= now()
       and (p_user_id is null or v.user_id = p_user_id)
-      and v.is_duplicate is not true and v.image_url is not null and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'
+      and v.is_duplicate is not true and v.image_url ~ '^https?://' and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'
     ), pick as (
       -- interleave: live #1, backfill #1, live #2, ... ; a lane with nothing due simply yields to the other
       select d.id from due d order by d.rn, case when d.lane = 'live' then 0 else 1 end limit v_n
     ), locked as (
-      select w.id from public.image_stage_work w where w.id in (select id from pick) and w.status = 'queued' for update skip locked
+      select w.id, w.image_id from public.image_stage_work w where w.id in (select id from pick) and w.status = 'queued' for update skip locked
+    ), still as (
+      -- another path may have read the photo while the item waited (the paid drain, a hand run, a receipt that was
+      -- written after its lease ran out): judge the gap again on the few picked rows, so a read is never spent twice
+      select g.image_id from public.image_stage_gaps(array(select l.image_id from locked l)) g where g.stage = p_stage
     ), upd as (
-      update public.image_stage_work w set status = 'claimed', lease_until = now() + make_interval(secs => greatest(p_lease_seconds, 30))
-      from locked where w.id = locked.id returning w.*
+      update public.image_stage_work w
+         set status = case when l.image_id in (select s.image_id from still s) then 'claimed' else 'dropped' end,
+             lease_until = case when l.image_id in (select s.image_id from still s) then now() + make_interval(secs => greatest(p_lease_seconds, 30)) end,
+             finished_at = case when l.image_id in (select s.image_id from still s) then null else now() end
+      from locked l where w.id = l.id returning w.*
     )
   select u.id, u.image_id, i.image_url, i.user_id, i.vehicle_id, u.lane, u.reason, u.target_version
-  from upd u join public.vehicle_images i on i.id = u.image_id;
+  from upd u join public.vehicle_images i on i.id = u.image_id
+  where u.status = 'claimed';
 end $$;
 
 -- expired leases go back to the queue (a crashed worker never strands an item)

@@ -32,7 +32,7 @@ test("reconciler never mutates vehicle_images or calls a provider", () => {
 });
 
 test("disabled by default, bounded, rate-limited, fair", () => {
-  assert.match(code, /"enabled": false/);
+  assert.match(code, /"enabled": false, "user_ids": \[\]/);   // off, and nobody named: switching on means naming the reader's user
   assert.match(code, /least\(greatest\(p_limit, 0\)[^;]*, 500\)/);
   assert.match(code, /backfill_share/);
   assert.match(code, /order by c\.created_at asc, c\.id asc limit v_scan/);   // oldest-first backfill, keyset tie-break
@@ -63,7 +63,7 @@ test("one transaction, short lock wait, foreign keys to vehicle_images added las
 });
 
 test("privacy is judged at enqueue and again at claim; scope by user", () => {
-  const eligible = "v.is_duplicate is not true and v.image_url is not null and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'";
+  const eligible = "v.is_duplicate is not true and v.image_url ~ '^https?://' and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'";
   assert.ok(code.split(eligible).length - 1 >= 3, "the same predicate in the reconciler, the claim and the claim's drop");
   assert.match(code, /set status = 'dropped'/);
   assert.match(code, /v_cfg -> 'user_ids'/);

@@ -154,6 +154,10 @@ SELECT pg_temp.ok((SELECT count(*) FROM image_stage_work) = 0, 'disabled run enq
 
 -- ===== 7. reconciler enabled: only the real gaps, only eligible images
 UPDATE platform_config SET config_value = config_value || '{"enabled": true}' WHERE config_key = 'image_stage_reconciler';
+-- the seed names no user: switching on without naming one queues nothing (the only reader claims one user's photos)
+SELECT pg_temp.ok((SELECT config_value -> 'user_ids' FROM platform_config WHERE config_key = 'image_stage_reconciler') = '[]'::jsonb, 'user_ids is seeded empty');
+SELECT pg_temp.ok((reconcile_image_stages(100) ->> 'enqueued')::int = 0 AND (SELECT count(*) FROM image_stage_work) = 0, 'enabled with no user named: nothing is queued');
+UPDATE platform_config SET config_value = config_value - 'user_ids' WHERE config_key = 'image_stage_reconciler';  -- sections 7-12: key absent = every user
 CREATE TEMP TABLE run1 AS SELECT reconcile_image_stages(100) AS r;
 SELECT pg_temp.ok((SELECT (r ->> 'enqueued')::int FROM run1) = 3, 'enqueued exactly the 3 gaps (missing live, retryable live, missing backfill)');
 SELECT pg_temp.ok((SELECT array_agg(image_id ORDER BY image_id) FROM image_stage_work) = ARRAY[pg_temp.img(1), pg_temp.img(5), pg_temp.img(14)], 'work rows are images 1, 5, 14');
@@ -325,6 +329,17 @@ UPDATE vehicle_images SET vision_gate_status = 'rejected_personal' WHERE id = pg
 SELECT pg_temp.ok((SELECT count(*) FROM claim_image_stage_work('classifier', 25, 900, '00000000-0000-4000-8000-0000000000aa')) = 0, 'photos that became sensitive or personal while queued are not handed out');
 SELECT pg_temp.ok((SELECT array_agg(status ORDER BY image_id) FROM image_stage_work WHERE image_id IN (pg_temp.img(501), pg_temp.img(502))) = ARRAY['dropped', 'dropped'], 'and their items are dropped');
 SELECT pg_temp.ok((image_stage_coverage() #>> '{stages,classifier,closed,dropped}')::int = 2, 'coverage counts dropped items');
+-- a photo with no fetchable URL is not work: the iOS app writes '' when the pixels stay on the phone
+SELECT pg_temp.mk(507, interval '1 hour'); SELECT pg_temp.mk(508, interval '1 hour');
+UPDATE vehicle_images SET image_url = '', user_id = '00000000-0000-4000-8000-0000000000aa' WHERE id = pg_temp.img(507);
+UPDATE vehicle_images SET user_id = '00000000-0000-4000-8000-0000000000aa' WHERE id = pg_temp.img(508);
+SELECT reconcile_image_stages(100);
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_work WHERE image_id = pg_temp.img(507))
+  AND (SELECT status FROM image_stage_work WHERE image_id = pg_temp.img(508)) = 'queued', 'an empty URL is never queued; its neighbour is');
+-- a photo another path read while its item waited is not handed out: the gap is judged again at the claim
+UPDATE vehicle_images SET ai_scan_metadata = '{"pipeline_version":"v2","classification":{"image_type":"engine_bay","confidence":0.9,"classifier_ok":true,"v2":{"prompt_version":"v98"}}}' WHERE id = pg_temp.img(508);
+SELECT pg_temp.ok((SELECT count(*) FROM claim_image_stage_work('classifier', 25, 900, '00000000-0000-4000-8000-0000000000aa')) = 0, 'a photo read meanwhile is not handed out');
+SELECT pg_temp.ok((SELECT status = 'dropped' AND finished_at IS NOT NULL AND lease_until IS NULL FROM image_stage_work WHERE image_id = pg_temp.img(508)), 'its item is closed as dropped, with no lease');
 -- a reader-wide outage must not retire a photo: out of attempts, it is offered again after a day
 SELECT record_image_stage_receipt(pg_temp.img(503), 'classifier', 1, 'unavailable', 'reader_exited', NULL, 0);
 UPDATE image_pipeline_stages SET max_attempts = 1 WHERE stage = 'classifier';

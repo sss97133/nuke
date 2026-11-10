@@ -19,7 +19,7 @@ const OWNER = '00000000-0000-4000-8000-0000000000aa';
 const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
 
 // `claude -p --output-format json`: the prompt arrives on stdin and names the image file; the file name picks the answer.
-const FAKE_CLAUDE = `#!/usr/bin/env node
+const FAKE_CLAUDE = `#!${process.execPath}
 let input = '';
 process.stdin.on('data', (d) => { input += d; });
 process.stdin.on('end', () => {
@@ -33,15 +33,15 @@ process.stdin.on('end', () => {
   process.stdout.write(JSON.stringify({ type: 'result', is_error: false, duration_ms: 1000, result: 'Here it is: {"image_type":"engine_bay","confidence":0.9}' }));
 });
 `;
-const FAKE_SIPS = `#!/usr/bin/env node
+const FAKE_SIPS = `#!${process.execPath}
 const args = process.argv.slice(2);
 const raw = args[args.indexOf('--out') - 1], out = args[args.indexOf('--out') + 1];
 if (raw.includes('corrupt')) { console.error('Error: Cannot extract image from file.'); process.exit(13); }
 require('node:fs').copyFileSync(raw, out);
 `;
 
-async function withStandIns(frameNames, fn, { sips = true } = {}) {
-  const calls = { receipts: [], claims: [], readings: [] };
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false } = {}) {
+  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0 };
   let port;
   const server = createServer((req, res) => {
     let data = '';
@@ -52,12 +52,16 @@ async function withStandIns(frameNames, fn, { sips = true } = {}) {
         if (req.url.includes('gone')) return res.writeHead(404).end();
         return res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
       }
-      if (req.url.startsWith('/rest/v1/platform_config')) return json(200, [{ config_value: { enabled: true } }]);
+      if (req.url.startsWith('/rest/v1/platform_config')) return config === 'error' ? json(503, { code: 'PGRST002' }) : json(200, config ? [{ config_value: config }] : []);
+      if (req.url.startsWith('/rest/v1/vehicle_images')) { calls.status.push(decodeURIComponent(req.url)); return json(200, []); }
       if (req.url === '/rest/v1/rpc/claim_image_stage_work') {
         calls.claims.push(JSON.parse(data));
-        return json(200, frameNames.map((n, i) => ({ work_id: i + 1, image_id: n, image_url: `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: null, lane: 'live', reason: 'missing', target_version: 1 })));
+        return json(200, frameNames.map((n, i) => ({ work_id: i + 1, image_id: n, image_url: n.includes('no-url') ? '' : `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: null, lane: 'live', reason: 'missing', target_version: 1 })));
       }
-      if (req.url === '/rest/v1/rpc/record_image_stage_receipt') { calls.receipts.push(JSON.parse(data)); return json(200, calls.receipts.length); }
+      if (req.url === '/rest/v1/rpc/record_image_stage_receipt') {
+        if (failFirstReceipt && ++calls.receiptAttempts === 1) return json(503, { message: 'upstream connect error' });
+        calls.receipts.push(JSON.parse(data)); return json(200, calls.receipts.length);
+      }
       if (req.url === '/functions/v1/photo-pipeline-orchestrator') {
         const body = JSON.parse(data);
         if (body.action === 'classifier_prompt') return json(200, { prompt: 'Classify the photo.', prompt_version: 'v98' });
@@ -71,14 +75,16 @@ async function withStandIns(frameNames, fn, { sips = true } = {}) {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   port = server.address().port;
   const bin = mkdtempSync(join(tmpdir(), 'frame-reader-bin-'));
-  writeFileSync(join(bin, 'claude'), FAKE_CLAUDE); chmodSync(join(bin, 'claude'), 0o755);
+  if (claude) { writeFileSync(join(bin, 'claude'), FAKE_CLAUDE); chmodSync(join(bin, 'claude'), 0o755); }
   if (sips) { writeFileSync(join(bin, 'sips'), FAKE_SIPS); chmodSync(join(bin, 'sips'), 0o755); }
   try {
     const result = await run(process.execPath, [join(here, 'subscription-frame-classifier.mjs'), '--owner', OWNER, '--concurrency', '1', '--limit', '20'], {
-      // only the stand-ins and node itself are on PATH: a real `claude` or `sips` on the machine is never reached
-      env: { PATH: `${bin}:${dirname(process.execPath)}`, HOME: bin, SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key' },
+      // PATH holds only the stand-ins (they run under this node by absolute path): a real `claude` or `sips` on the
+      // machine, which can sit in node's own directory, is never reached
+      env: { PATH: bin, HOME: bin, SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key' },
     }).then((r) => ({ code: 0, ...r }), (e) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));
-    await fn({ calls, summary: JSON.parse(result.stdout.trim().split('\n').pop()), port, result });
+    let summary = null; try { summary = JSON.parse(result.stdout.trim().split('\n').pop()); } catch { /* the run failed before its summary */ }
+    await fn({ calls, summary, port, result });
   } finally {
     server.close();
     rmSync(bin, { recursive: true, force: true });
@@ -108,6 +114,40 @@ test('every started photo gets one typed receipt with the URL fingerprint; a spe
     assert.deepEqual([summary.source, summary.frames, summary.receipts, summary.receipt_errors, summary.accepted, summary.stopped],
       ['stage-queue', 7, 6, 0, 1, 'reader_usage_limit'], 'the summary counts receipts and names why the batch stopped');
   });
+});
+
+test('a row with no URL is settled without a fetch; a receipt write that fails once is tried again', async () => {
+  await withStandIns(['a-no-url', 'b-ok.jpg'], ({ calls, summary }) => {
+    assert.deepEqual(calls.receipts.map((r) => [r.p_image_id, r.p_outcome, r.p_error_class]), [['a-no-url', 'blocked_input', 'image_url_missing'], ['b-ok.jpg', 'succeeded', null]]);
+    assert.equal(calls.receipts[0].p_input_fingerprint, 'd41d8cd98f00b204e9800998ecf8427e', 'md5 of the empty URL, as the ledger computes it');
+    assert.deepEqual([summary.receipts, summary.receipt_errors], [2, 0], 'the first write failed with 503 and was repeated');
+  }, { failFirstReceipt: true });
+});
+
+test('the queue is used only for an owner the reconciler names; a failed config read fails the run', async () => {
+  // switched on for someone else: this owner keeps the status worklist, with the ledger's holds in the query
+  await withStandIns(['a-ok.jpg'], ({ calls, summary }) => {
+    assert.equal(calls.claims.length, 0);
+    assert.equal(summary.source, 'status');
+    assert.equal(calls.status.length, 1);
+    for (const hold of ['is_sensitive=not.is.true', 'is_duplicate=not.is.true', 'is_superseded=not.is.true', 'is_external=not.is.true',
+      'or=(vision_gate_status.is.null,vision_gate_status.neq.rejected_personal)', 'image_url=like.http*', `user_id=eq.${OWNER}`]) {
+      assert.ok(calls.status[0].includes(hold), `status worklist carries ${hold}`);
+    }
+  }, { config: { enabled: true, user_ids: ['00000000-0000-4000-8000-0000000000bb'] } });
+  // the config could not be read: no fallback to the unqueued worklist, no summary line, non-zero exit (so no heartbeat)
+  await withStandIns(['a-ok.jpg'], ({ calls, summary, result }) => {
+    assert.notEqual(result.code, 0);
+    assert.equal(summary, null);
+    assert.deepEqual([calls.claims.length, calls.status.length, calls.receipts.length], [0, 0, 0]);
+  }, { config: 'error' });
+});
+
+test('no CLI on the machine stops the batch at the first photo', async () => {
+  await withStandIns(['a-first.jpg', 'b-second.jpg'], ({ calls, summary }) => {
+    assert.deepEqual(calls.receipts.map((r) => [r.p_image_id, r.p_outcome, r.p_error_class]), [['a-first.jpg', 'unavailable', 'reader_tool_missing']]);
+    assert.equal(summary.stopped, 'reader_tool_missing');
+  }, { claude: false });
 });
 
 test('no converter on the machine stops the batch instead of blocking every non-JPEG photo', async () => {
