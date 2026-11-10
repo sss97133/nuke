@@ -2,6 +2,17 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { decodeVin } from "./vin-decoder.ts";
 // Synthetic VIN-shaped strings exercise WMI interpretation only, not a real car.
 const vin = (wmi: string) => wmi + "ZZZZZ0X0000000";
+Deno.test("Nissan manufacture preserves Infiniti and historical Datsun marque uncertainty", () => {
+  for (const value of ["JNKCV66E09M722027", "JNKCV64E49M604114"]) assertEquals(decodeVin(value).make, "Infiniti");
+  const datsun = decodeVin("JN1HT02S8BT202355");
+  assertEquals(datsun.make, null);
+  assertEquals(datsun.manufacturer, "NISSAN MOTOR COMPANY, LTD");
+  assertEquals(datsun.manufacturer_make_candidates, ["Nissan", "Infiniti", "Datsun"]);
+  const nissan = decodeVin("JN8AS5MT9FW153681");
+  assertEquals(nissan.make, null);
+  assertEquals(nissan.manufacturer_make_candidates, ["Nissan", "Infiniti"]);
+  assertEquals(decodeVin(vin("JNZ")).make, null);
+});
 Deno.test("Toyota manufacture preserves Lexus marque and multi-marque WMI uncertainty", () => {
   // Both actual retained McCormick VINs decode cleanly to Lexus in NHTSA vPIC.
   for (const value of ["JTHFN48Y320004994", "JTHFN48Y640051813", "JT8CH32Y0X1002070", vin("JTJ")]) {
