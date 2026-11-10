@@ -97,6 +97,21 @@ Carry the next observed gap into code and the methodology together, preserving d
 Roles such as artist, buyer and researcher describe evidenced behavior in context; do not turn them
 into permanent identity types or mandatory arrival choices without a separate model decision.
 
+## Reading photos
+
+Owner direction, 2026-11-10. A photo reading is finished when it is keyed in the model's own vocabulary
+with its photo as witness, not when it is stored. The data model asks: the questions for a photo come
+from registry rows (`observation_properties`), chosen by the vehicle, the job in hand and the view.
+Answers are closed (a listed value, not visible, cannot tell). An answer becomes a fact only by
+agreement across photos and readers, by a receipt, or by the owner's word. Where the model has no place
+for what a reading found, look for an existing key and its aliases first, then propose the place
+through `schema_proposals`. Do not add a reader, a prompt vocabulary or a per-reader table for photos.
+Report what the model gained (keyed, connected, proven rows), not photos analysed. Before any photo
+work read "Image analysis is the model asking" at the top of
+[`data-machine.md`](docs/ledger/theory/data-machine.md) and C17's 2026-11-10 entries in
+[`data-machine-cases.md`](docs/ledger/theory/data-machine-cases.md). The acceptance is the owner's three
+questions there. These are direction; the card says which have a mechanism and which do not yet.
+
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.

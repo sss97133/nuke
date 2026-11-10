@@ -452,6 +452,48 @@ sample, and, once the ledger is switched on, raises on work due for over 6 h wit
 that stopped. Still open: the landing fold is first-write-wins, so a re-read cannot yet replace what the first
 reading landed in the normalized tables; deep, text and document levels have no stage worker.
 
+**C17, same day, 20:10–20:41 UTC: what a reading adds to the model.** Read-only. Readers: `image_stage_current`,
+`photo_land_progress`, `photo_extracted_fields`, `observation_witnesses` joined to `vehicle_observations`, the
+registries named below, and one count per table that has an index led by `image_id`. Population first: the owner
+holds 29,749 `vehicle_images` rows (20:10 UTC). 129 of them had a succeeded classifier receipt under the stage
+ledger at 20:20 UTC, all from one upload batch, 121 already on one of 8 vehicles. How many of the 29,749 hold any
+earlier reading was not measured. Everything below is those 129, or one vehicle's 47 of them: a validation cohort,
+not fleet coverage.
+
+- What 129 readings landed (`photo_land_progress.result`, summed): 129 descriptions; 703 field rows, of which 516
+  are four bookkeeping fields per photo and 160 of the other 187 are colour or body style, repeated per photo
+  across 8 vehicles; 232 text lines; 46 `field_evidence` rows on 34 photos; 53 angle rows, with 61 more angles read
+  and not landed because three-quarter, side and plain exterior views have no arm in the fold's CASE. No row names
+  a part, a state, a flaw or a piece of work, and no row links one photo to another.
+- One vehicle, 47 photos of one capture day (`7176a5fc-24ae-4b42-9e65-0b96c4f9e50c`). Five readers had run:
+  `image_work_extractions` (42 rows from an early vision pass, 25 of them work type "other");
+  `image_condition_observations` (54 rows, source `yono_v1`, nearly all a baseline score with a coarse zone); the
+  deep read landed in 2026-07 (47 `vehicle_observations` of kind condition with witnesses, 167
+  `component_identifications`, 65 `image_analysis_records`); 47 embedding carriers in `image_observations`; and that
+  day's classifier. The deep read holds 30 damage callouts, 186 part labels in 126 spellings, a build phase per
+  photo and 15 questions it could not answer from the photos; its `damage_localized` array is empty on all 47. Of
+  the 94 witnessed observations on these photos none has a `descriptor_id`, a `property_id`, an anchor or a
+  cluster; none of the 167 part rows has a `component_definition_id`; `component_events` holds 0 rows for the
+  vehicle and 3 in all.
+- The places exist. `observation_properties`: 47 rows, among them `image_visible_paint_stage`,
+  `image_visible_rust_severity` and `image_visible_assembly_state` (one value per photo, none per part), validated
+  by `ingest-observation`. `schema_proposals`: 14 `add_property`, 4 `add_table` and 3 `add_column` approved.
+  `evidence_judgment_requests`: 774 rows of one kind, `receipt_part_visible` (158 answered, 548 cancelled, 68
+  withdrawn). `subject_taxonomy`: 106 keys, with no hood, bed, tailgate, seam, molding or weatherstrip.
+  `condition_taxonomy`: 202 keys; about 90 read as fragments of a service manual (an agent's reading of the names,
+  not a count made by a rule), and there is no state for paint in process. `component_assembly_map`: 3 assemblies,
+  each with its states and what each state looks like. `image_question_answers`: 1,021 rows. 113 tables carry a
+  `condition_grade` column; `body_panels` and `body_weatherstripping` hold 0 rows.
+- Tried by hand: the 30 callouts fold to about 13 claims about the vehicle (one state of one panel accounts for 13
+  of the photos). The two vocabularies can express 3 of the 13 without a new key. This fold is an agent's
+  judgment, not a stored result.
+
+So C17's open object is more than "which level of which image is read under which contract". It is the step
+between a reading and the model: no reading is keyed. The owner's direction of the same day is at the top of the
+theory card ("Image analysis is the model asking"), and the acceptance is his three questions there. #3313, which
+made capture-date order the rule for the whole backfill and let the reader run to the subscription's limit, was
+withdrawn unmerged on his word within the hour: "Earliest photos first is a dangerous mode."
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026

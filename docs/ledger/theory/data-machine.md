@@ -1,5 +1,97 @@
 # DATA MACHINE — theory card
 
+## Image analysis is the model asking, owner direction 2026-11-10
+
+Read this before any work that looks at a photo. It records one working session with the owner and what
+was measured that day. His words are quoted in "The owner's words, 2026-11-10" below; the measurements
+are in the case ledger under C17 for the same date. He closed the session with: "This is the only
+conversation that matters and that we never backtrack from here and that any agents never has to do
+what you did today."
+
+**The finding.** Reading photos was never the missing part. On one owner vehicle (47 photos of one
+capture day) five readers had run over eleven months, each writing its own words into its own table.
+The most careful one recorded 30 damage callouts and 126 spellings of the vehicle's parts, and none of
+its 47 observations carried a part, a condition key or a position. The model has the places: a
+property registry the observation writer validates against, a proposal path that grows it, and a
+closed-question store with a fixed answer shape. No reading is brought to them. A photo counted as
+analysed had added a sentence, the colour again and sometimes an angle.
+
+**The model is the map, and it asks.** In the owner's words the data model is "the blue print the
+hypothesis the mirror of how the data needs to be interpreted", and it is "shaped even to help find
+what it's shaped to look for". A reader does not describe a photo. The registry says what can be
+observed on a vehicle, the values each observation may take and what each looks like. The vehicle, the
+job in hand, what earlier readings said and the view the photo shows choose which of those to ask. The
+photo answers.
+
+Rules for every agent and every reader. Each names its mechanism or says that none exists yet.
+
+1. **A reading is finished when it is keyed, not when it is stored.** Keyed means an observation written
+   through `ingest-observation` that carries a registered key (`property_key` from
+   `observation_properties`, or `descriptor_key` from `condition_taxonomy`), names the part of the
+   vehicle it is about, and has its photo as an `observation_witnesses` row. A description, a JSON value
+   or a row in a reader's own table is retained input, not a finished reading. Mechanism: none yet;
+   rule 7's measure is what makes it visible.
+2. **Questions are derived, never typed.** The question list for a photo is built by code from registry
+   rows. No reader carries its own vocabulary of types, parts, states or flaws. A repo read on
+   2026-11-10 counted six hand-written photo contracts side by side. Mechanism: none yet.
+3. **Answers are closed.** A value from the registry's list, not visible, or cannot tell; where in the
+   photo; who answered, with which reader, from what. `evidence_judgment_requests` already has this
+   shape for one question kind. Unknown is an answer and is stored.
+4. **An answer is testimony.** "The yes/no is answers. And they become factual if handled right
+   creating truth from a hallucination machine." One reader's answer is never a fact. It becomes one by
+   agreement across photos and across independent readers, by a receipt, or by the owner's word at
+   Sign. The same state seen in thirteen photos is one claim with thirteen witnesses. A later photo
+   that shows the opposite records a change and leaves the earlier testimony in place.
+5. **Where there is no place, the place is written, the same way every time.** "If there's no place to
+   put the data it has to be written. That takes a certain degree of intelligence and most importantly
+   consistency." Look first, in the registry and in every alias already recorded. If the thing is
+   there, use its key. If it is not, file it through `schema_proposals` with the reading that forced
+   it. Whether something is the same as an existing key is decided once, stored as an alias, and not
+   decided again by the next reader. The owner's caution stands beside this rule: "The obvious problem
+   of being able to write the data model side is if it writes too much and wrong and new every time
+   ... if it's running we can fix it. If it never gets off the ground we can't." So it starts on one
+   vehicle, and new keys per hundred readings is a number to watch fall. Mechanism: `ingest-observation`
+   refuses an unknown key; an alias memory for parts does not exist yet.
+6. **Harvest before spend, and choose with prejudice.** Readings already paid for are keyed before any
+   photo is read again. What is read next is chosen by what it is worth, inside a stated budget: "it's
+   great if we have infinite compute. But if we don't we will not win." Date order belongs inside one
+   subject once that subject is chosen. As the rule for a whole library the owner called it "a
+   dangerous mode", and the change that made it the rule (#3313) was withdrawn unmerged.
+7. **The measure is what the model gained.** "The next bar that's more important the images being
+   'analysed' is the enrichment of the data model which is the real measure ... That the observations
+   connect." Report keyed, connected, proven rows gained, with repeats folded: the whole library and
+   its clock first, any one vehicle after (the fleet-relative contract below applies). Photos read is
+   a processing count.
+8. **No new reader, prompt vocabulary or per-reader table for photos.** Extend the registry, the
+   question store or the landing. Earlier attempts at this same idea are in the database and are not
+   dead: `component_assembly_map` (a part, its states, what each state looks like),
+   `image_question_answers` (1,021 answers with agreement and validation columns; a 2026-06-18 comment
+   calls it empty and proposes dropping it, and it is not empty), the digital-twin component tables,
+   and `docs/features/image-processing/CONTEXT_DRIVEN_PROCESSING.md`. Mechanism:
+   `scripts/guardrails/check-capability-before-mint.mjs` reads the photo-reading rows of
+   `docs/ledger/CAPABILITY_MAP.md`.
+
+**Acceptance.** Three questions, the owner's, must be queries that return vehicles with the photos that
+prove the answer: (1) Mustangs whose window felts were replaced during a restoration; (2) a Porsche
+that has a specific imperfection; (3) that imperfection was repaired and it is now this restored
+Porsche. Proof on one vehicle is validation scope, not fleet coverage. Under C17's rule the comparison
+is the same retained photos, the prior state against the new method, with changed claims traced into
+an existing consumer and an unchanged control.
+
+**What a person brings, and where it lives.** The owner describes how a person critiques the data:
+"based on their understanding and their patterns and their training along with their experience and
+the context of the situation but we have to build that as a system". Each has a home. On 2026-11-10
+none was present when a photo was read.
+
+| What the person brings | Where it lives | State read 2026-11-10 |
+|---|---|---|
+| Understanding: what a vehicle is, its parts and their states | `observation_properties`, `subject_taxonomy`, `component_assembly_map` | 47 properties, 5 about a whole photo and none about a part of the body; 106 places; 3 assemblies |
+| Patterns: what each state or flaw looks like | `component_assembly_map.state_indicators`, `condition_component_definitions` | read by no reader |
+| Training: reference knowledge | `condition_knowledge`, `component_definitions` | mixed; some of it is manual text parsed into fragments |
+| Experience: what has been seen, and what people ask | listing photos and comments, `question_taxonomy` | not consulted when a photo is read |
+| Context: this vehicle, this job, this day, this view | the vehicle, its jobs and receipts, capture sets, the first read's view | not handed to the reader |
+| The critique: ask, answer, agree, fact | `evidence_judgment_requests`, `ingest-observation` with witnesses | one question kind; no photo reading goes through it |
+
 ## Construction direction, owner priority 2026-10-04
 
 The worked examples below are a construction brief, not a ceiling or evidence that Nuke is complete.
@@ -457,6 +549,67 @@ of every table you touch.
 
 (The elisions `[...]` drop the owner's market-strategy remarks about a named company, kept out of this public repo; the
 lead holds them.)
+
+## The owner's words, 2026-11-10 (typed from his phone during the image-analysis session)
+
+> Here's how I see it, when a user signs up, they grant access by clicking allow allow allow on the requests we ask
+> for. Then the connection takes place and it's really not batches. It's one at a time til done. The ideal is that we
+> start from the earliest available data because provenance works in order not in random. But in reality we also have
+> priorities like users want to have their thing in mind getting handled, I'm not sure what that would be per say but
+> like a specific job of vehicle they have some need for urgently. So part of the reason we are such a mess now is due
+> to the multiple swings of the jagged ax over the last two years causing a mess of ideas. Anyways User signs up grants
+> access Flow begins data enriches. User data stack and the profile takes it shape. This idea is in opposition to the
+> traditional approach of software provinding a bunch of forms to fill. Instead, the data acquires labels, keys, folds
+> etc as connections are made. The connections span from the images, text messages, emails, connected financial
+> records, and whatever else, PDFs etc. The users photo album is one of the most easy repeatable systems to automate.
+> Because it's the same for everyone. Just a bunch of images. Then we label and tag all the stuff in the images. We
+> build up "everything" specifically visible and underlying concepts visible in the pattern of images. It tells so much
+> about users. The data is signal the lack of data is signal. If they don't give signal we direct them on what they
+> need in order to provide us with what we need. So yeah image analysis is the mega department of everything and I hate
+> it. I think for now you're kind of focusing on the single idea of how to look at images and make sure whatever packet
+> of data that you've arbitrarily decided is important lands in someway in a data base that's under powered for the
+> capacity you're in need of. [...] It should be divided and given to shapes that will persist
+
+> The other thing is that the data model is supposed to be the blue print the hypothesis the mirror of how the data
+> needs to be interpreted. The agent walks up to the mirror with the data and sees it's normalized form its data model
+> shaped form it's tesseract it's real structure that will enable it to be cross examined in a full on mind hive of
+> data. So when you wanna search specifically mustangs whose felts were replaced during restoration with photographic
+> proof you can. Or like find a Porsche that has this specific imperfection on it. You can. Or find that that specific
+> imperfection was repaired and that it's now this restored Porsche. Stuff like that. Earliest photos first is a
+> dangerous mode. That's why you need to handle it like really carefully with prejudice Because it's great if we have
+> infinite compute. But if we don't we will not win. And in the state of the db and how images are handled I wouldn't
+> know if it's good or not. I like the body of what I said earlier and wouldn't want to dismiss the heavy concepts [in]
+> it because of a focus on one aspect like this
+
+> So the next bar that's more important the images being "analysed" is the enrichment of the data model which is the
+> real measure. I don't know where to start with that but like tables, keys, folds, all those fancy things. That's
+> image analysis. That the observations connect
+
+> The map is supposed to be the data model it's supposed to be the mcguffins of the scenario. It's supposed to be
+> shaped even to help find what it's shaped to look for. We get to control the map and look for what we are trying to
+> find. The yes/no is answers. And they become factual if handled right creating truth from a hallucination machine.
+> The contextual data shapes the map too. The point of view shapes it
+
+> There's so much going on. This is how I explain how a human approaches critiquing the data They do it based on their
+> understanding and their patterns and their training along with their experience and the context of the situation but
+> we have to build that as a system which is what I've thought we've been doing for a couple years now
+
+> That's my point is that the data and the data model reinforce either and the agent has to wire it in real time. If
+> there's no place to put the data it has to be written. That takes a certain degree of intelligence and most
+> importantly consistency
+
+> This is the only conversation that matters and that we never backtrack from here and that any agents never has to do
+> what you did today The obvious problem of being able to write the data model side is if it writes too much and wrong
+> and new every time. So I'm not sure how to remedy that but again if it's running we can fix it. If it never gets off
+> the ground we can't
+
+Earlier the same day, on where the first reading happens, on provider keys and on the app: "First read can take place
+the moment the image is taken like a live stream basically. And it can be routed vision api on device and all in near
+livestream speed"; "That gate is more like a key box. Use whatever key has tokens. Don't just block"; "there's no
+successful integration on the iOS that helps me know it's moving forward or stalling."
+
+(The elision `[...]` and the omitted messages are remarks about the session itself. `[in]` restores a word the phone
+dropped.)
 
 ## Additions, 2026-10-01 (from the owner's phone session of 2026-09-30)
 
