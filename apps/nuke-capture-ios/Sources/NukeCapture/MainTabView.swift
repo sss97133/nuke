@@ -115,6 +115,12 @@ struct MainTabView: View {
         }
     }
 
+    /// The Garage tab exists only for a signed-in account; elsewhere the profile pushes the Garage screen.
+    private var openGarageTab: (() -> Void)? {
+        guard session.isSignedIn else { return nil }
+        return { tab = .garage }
+    }
+
     private var profileTab: some View {
         // Explore mode passes nil → sample profile + a Sign In door in the
         // ProfileTab toolbar (not-signing-in is never a dead end).
@@ -122,6 +128,8 @@ struct MainTabView: View {
             ownUserId: session.isSignedIn ? SupabaseService.currentUserId : nil,
             onSignIn: session.isSignedIn ? nil : { exploreMode = false }
         )
+        // The profile's garage counts open the Garage tab, where the vehicles are listed.
+        .environment(\.openGarageTab, openGarageTab)
     }
 
     /// Everyone lands on Explore: the populated world is the front door for a visitor, and for a

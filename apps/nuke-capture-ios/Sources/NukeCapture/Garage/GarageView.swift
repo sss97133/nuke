@@ -248,31 +248,3 @@ struct UnorganizedPhotosRow: View {
         }
     }
 }
-
-/// The own profile's door to the garage: the photo count and the way into each vehicle's jobs.
-struct GarageDoorSection: View {
-    let userId: String
-
-    @State private var photos: JobLoad<UnorganizedPhotos> = .loading
-
-    var body: some View {
-        if SupabaseService.currentUserId == userId.lowercased() {
-            Section {
-                NavigationLink { GarageView(userId: userId) } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label("Open garage", systemImage: "car.2")
-                        Text("Each vehicle's jobs, and post a job for one you own")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                UnorganizedPhotosRow(load: photos)
-                NavigationLink { SessionConfirmView() } label: {
-                    Label("Organize photos", systemImage: "checklist")
-                }
-            } header: {
-                Text("Garage")
-            }
-            .task(id: userId) { photos = await GarageReaders.unorganizedPhotos() }
-        }
-    }
-}
