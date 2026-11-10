@@ -474,7 +474,7 @@ export async function archiveFetch(
       },
     };
 
-    const { data: inserted, error: insertErr } = await supabase
+    const { data: inserted, error: insertErr, status: insertStatus } = await supabase
       .from("listing_page_snapshots")
       .insert(payload)
       .select("id")
@@ -487,15 +487,25 @@ export async function archiveFetch(
       } else {
         // A retention that fails must be visible: the fetch itself is still returned, the failure is logged by softWrite and
         // carried on the result (archiveError) so callers and counters see it instead of it vanishing.
-        result.archiveError = `listing_page_snapshots insert failed: ${insertErr.message}${(insertErr as { code?: string }).code ? ` (${(insertErr as { code?: string }).code})` : ""}`;
+        // Gateways can return problem+json without PostgREST's message field.
+        // Keep safe protocol diagnostics, never a response body or request data.
+        const status = Number.isInteger(insertStatus) && insertStatus >= 100 && insertStatus <= 599
+          ? `HTTP ${insertStatus}` : "HTTP status unavailable";
+        const code = typeof insertErr.code === "string" && /^(?:[0-9A-Z]{5}|PGRST[0-9]{3})$/.test(insertErr.code)
+          ? `; code ${insertErr.code}` : "";
+        result.archiveError = `listing_page_snapshots insert failed: ${status}${code}`;
         console.error(`[archiveFetch] ${result.archiveError}`);
       }
-    } else if (inserted) {
+    } else if (typeof inserted?.id === "string" && inserted.id.length > 0) {
       result.snapshotId = inserted.id;
       console.log(`[archiveFetch] Archived ${platform} snapshot ${inserted.id} (${html?.length ?? 0} bytes)`);
+    } else {
+      result.archiveError = "listing_page_snapshots insert returned no acknowledgment";
+      console.error(`[archiveFetch] ${result.archiveError}`);
     }
-  } catch (e: any) {
-    console.warn(`[archiveFetch] Archive failed (non-fatal): ${e?.message}`);
+  } catch (_e: unknown) {
+    result.archiveError = "listing_page_snapshots retention failed before acknowledgment";
+    console.warn(`[archiveFetch] ${result.archiveError}`);
   }
 
   return result;
