@@ -30,6 +30,8 @@ export interface MetadataStore {
   compareAndSwap(snapshot: MetadataSnapshot, patch: Record<string, unknown>): Promise<boolean>;
 }
 
+export interface PipelineSource { image_url: string; vehicle_id: string | null; expected_updated_at?: string }
+
 /**
  * Compare-and-swap uses the row's trigger-maintained updated_at token. On a
  * conflict, re-read and merge again; never claim that a stale spread is atomic.
@@ -40,18 +42,23 @@ export async function persistPipelineState(
   receipt: PipelineReceipt,
   state: Record<string, unknown>,
   compatibilityMetadata: Record<string, unknown> = {},
-  source?: { image_url: string; vehicle_id: string | null },
+  source?: PipelineSource,
 ): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const snapshot = await store.read();
-    if (source && (snapshot.image_url !== source.image_url || snapshot.vehicle_id !== source.vehicle_id)) {
+    if (source && (snapshot.image_url !== source.image_url || snapshot.vehicle_id !== source.vehicle_id ||
+      source.expected_updated_at !== undefined && snapshot.updated_at !== source.expected_updated_at)) {
       throw new Error("photo_pipeline_source_changed");
     }
     const namespace = snapshot.metadata.photo_pipeline as Record<string, unknown> | undefined;
     const previous = namespace?.receipt as PipelineReceipt | undefined;
     if (previous?.receipt_id === receipt.receipt_id) return;
+    // A supplied correction validates and lands in one completed write. Its
+    // explicit source version replaces the normal initial processing claim;
+    // it never authorizes an equal/older attempt or a refreshed source token.
+    const sourceBoundCompletion = receipt.outcome === "completed" && source?.expected_updated_at !== undefined;
     if (previous && previous.attempt_id !== receipt.attempt_id &&
-      (previous.processing_started_at >= receipt.processing_started_at || receipt.outcome !== "processing")) {
+      (previous.processing_started_at >= receipt.processing_started_at || receipt.outcome !== "processing" && !sourceBoundCompletion)) {
       throw new Error("photo_pipeline_stale_attempt");
     }
     const patch = {
