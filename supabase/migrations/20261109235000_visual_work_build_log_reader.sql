@@ -5,6 +5,16 @@ BEGIN;
 SET LOCAL lock_timeout='1s';
 SET LOCAL statement_timeout='10s';
 
+DO $guard$ BEGIN
+ IF to_regprocedure('public.visual_work_build_log(uuid)') IS NOT NULL
+  OR md5(pg_get_functiondef('public.vehicle_build_log_public(uuid)'::regprocedure))
+       IS DISTINCT FROM 'b64b5eb8b2f38ecb83f0eca9c89f7517'
+  OR md5(pg_get_functiondef('public.vehicle_build_log_public(uuid,boolean)'::regprocedure))
+       IS DISTINCT FROM '3a541c335e88446faaad8a41e94027f8' THEN
+   RAISE EXCEPTION 'visual work reader owner drifted; inspect current definitions';
+ END IF;
+END $guard$;
+
 CREATE OR REPLACE FUNCTION public.visual_work_build_log(p_vehicle_id uuid)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=''
 AS $fn$

@@ -73,3 +73,71 @@ AS $function$;
   END;
 $function$;
 ;
+
+-- Exact deployed build-log owners captured for the guarded reader extension.
+CREATE OR REPLACE FUNCTION public.vehicle_build_log_public(p_vehicle_id uuid)
+ RETURNS TABLE(observation_id uuid, done_on date, item text, category text, supplier text, labor_minutes numeric, build_stage text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT o.id,
+         COALESCE(CASE WHEN o.structured_data->>'transaction_date' ~ '^\d{4}-\d{2}-\d{2}'
+                       THEN left(o.structured_data->>'transaction_date', 10)::date END,
+                  o.observed_at::date),
+         public.public_text(COALESCE(o.structured_data->>'item', o.structured_data->>'task',
+                                     o.structured_data->>'title', o.structured_data->>'work_performed')),
+         public.public_text(o.structured_data->>'category'),
+         public.public_text(o.structured_data->>'supplier'),
+         CASE WHEN o.structured_data->>'labor_minutes' ~ '^\d+(\.\d+)?$'
+              THEN (o.structured_data->>'labor_minutes')::numeric END,
+         public.public_text(COALESCE(o.structured_data->>'build_stage', o.structured_data->>'phase'))
+  FROM public.vehicle_observations o
+  JOIN public.vehicles v ON v.id = o.vehicle_id
+  WHERE o.vehicle_id = p_vehicle_id
+    AND o.kind = 'work_record'
+    AND o.is_superseded IS NOT TRUE
+    AND jsonb_typeof(o.structured_data) = 'object'
+    AND NOT (o.structured_data ?| ARRAY['receipt_id', 'invoice_number', 'file_url'])
+    AND COALESCE(o.structured_data->>'subject', '') <> 'client_invoice'
+    AND COALESCE(o.structured_data->>'item', o.structured_data->>'task', o.structured_data->>'title',
+                 o.structured_data->>'work_performed', o.structured_data->>'category') IS NOT NULL
+    AND v.deleted_at IS NULL
+    AND (v.is_public = true
+         OR v.user_id = (SELECT auth.uid())
+         OR v.owner_id = (SELECT auth.uid())
+         OR v.uploaded_by = (SELECT auth.uid()))
+  ORDER BY 2 DESC NULLS LAST, 1;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.vehicle_build_log_public(p_vehicle_id uuid, p_include_reported boolean)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+ SELECT jsonb_build_object(
+  'work_records',(SELECT coalesce(jsonb_agg(to_jsonb(w)),'[]'::jsonb) FROM public.vehicle_build_log_public(p_vehicle_id) w),
+  'reported_work',CASE WHEN p_include_reported IS TRUE THEN (
+   SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'observation_id',c.id,'kind',c.kind,'report_status',c.structured_data->>'report_status',
+    'occurrence_status',c.structured_data->>'occurrence_status','performer_id',c.structured_data->'performer_id','performer_status',c.structured_data->>'performer_status',
+    'independent_source',c.structured_data->'independent_source','intent_status',c.structured_data->>'intent_status',
+    'observed_at_basis',c.structured_data->>'observed_at_basis',
+    'reported_date',c.structured_data->>'reported_date','reported_date_label',c.structured_data->>'reported_date_label','date_precision',c.structured_data->>'date_precision',
+    'performed_clause',c.structured_data->>'performed_clause','source_value',c.structured_data->>'source_value',
+    'source_observation_id',c.source_observation_id,'source_id',c.source_id,'source_url',c.source_url,
+    'source_captured_at',c.structured_data->>'source_captured_at','source_recorded_at',c.parent_ingested_at,
+    'source_capture_sha256',c.structured_data->>'source_capture_sha256','source_capture_basis',c.structured_data->>'source_capture_basis',
+    'source_witness_version',c.structured_data->>'source_witness_version','observed_at',c.observed_at,'ingested_at',c.ingested_at,
+    'confidence_score',c.confidence_score) ORDER BY c.structured_data->>'reported_date' DESC,c.id),'[]'::jsonb)
+   FROM (SELECT DISTINCT ON (c.source_id,c.source_url,c.structured_data->>'source_value') c.*,p.ingested_at AS parent_ingested_at
+    FROM public.vehicle_observations c JOIN public.vehicle_observations p ON p.id=c.source_observation_id
+    WHERE c.vehicle_id=p_vehicle_id AND c.kind='activity' AND c.extraction_method='retained_listing_reported_work_v1'
+     AND c.is_superseded IS FALSE AND public.retained_reported_work_matches(p,c)
+     AND public.public_text(c.structured_data->>'source_value')=c.structured_data->>'source_value'
+     AND public.public_text(c.structured_data->>'performed_clause')=c.structured_data->>'performed_clause'
+    -- Repeated captures of one listing sentence are one report: the earliest admitted.
+    ORDER BY c.source_id,c.source_url,c.structured_data->>'source_value',c.ingested_at,c.id) c
+  ) ELSE '[]'::jsonb END);
+$function$;
