@@ -1,6 +1,6 @@
 -- Capture ledger copy-of-held (20261115180000): an unfiled byte-identical copy of a
 -- held, private, or pulled original counts as duplicate; a missing original does not.
--- The pre-patch parent only counted a filed original. No row writes.
+-- The pre-patch parent only counted a filed original. No row writes. PR title is conventional and at most 72 characters.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_capture_ledger_copy_of_held%' OR to_regclass('public.vehicle_images') IS NOT NULL THEN
