@@ -978,17 +978,89 @@ Same exclusive why as §18.11 (`empty_url` first, then last-plan `gate_failed` a
 
 empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks. Never re-arm refused days.
 
+## 18.13 leftover typ=other looks and left-out-to-review (18:49–19:09 AST)
+
+Of the exclusive planned_but_left_out 58 after §18.12, the typ=`other` 34 that were not already vehicle-judged were triaged, and the typ-empty / superseded leftovers plus the clocked real-file `source_not_admitted` 12 were put into held review.
+
+### typ=`other` leftover looks — #3302 run `a3302000-…000011`
+
+13 of the 34 were already unreverted `judgment_personal` and were left alone. 3 are placeholder / test URLs and were not sent to #3302 (junk candidates, untouched):
+
+- `2a90a8df` `image_intake` `https://example.com/final_test.jpg` (clocked, 2024-06-18)
+- `c50d0713` `image_intake` `https://test.example.com/test.jpg` (clocked, 2024-06-18)
+- `522651ec` `image_intake` `https://test-trigger-check.jpg` (no clock, created-at day 2026-03-19)
+
+The remaining 18 unlogged real-file typ=`other` frames were second-looked (operator-viewed; concrete reason each; `already_classified_personal` was not used — none is `is_sensitive`) and dry-run, then signed apply `a3302000-0000-4000-8000-000000000011` at **18:49:00 AST** (America/St_Barthelemy), granted_by `0b9f107a-…`. All 18 accepted, 0 skipped:
+
+| Verdict | n | Frames |
+|---| ---:|---|
+| `non_vehicle` | 3 | `a67674dc` and `733ff0a5` (same empty paint-booth file, 2026-06-11); `fa2d8f45` (Snap-on tool chests, 2026-02-10) |
+| `judgment_personal` | 13 | all 2026-02-10 `photo_auto_sync` close-up face selfies in the shop yard / cab |
+| `vehicle` | 2 | `1b5b23e4` (tan headliner and visor, 2018-08-28); `fa469bc3` (instrument cluster and dash pad in a pickup bed, 2026-02-10) |
+
+The 2 vehicle looks were enqueued via `capture_sets_enqueue` (`vehicle_photo` / `non_vehicle_review` on 2018-08-28 and 2026-02-10). The rescore queue marked both days `done_at` 18:59 AST; last plan is still `applied` and both frames remain official unsorted. They are now eligible for the existing #3322 typ-other vehicle-to-review producer; they were not filed. The 13 new `judgment_personal` stays were logged only (not promoted). `dc09cf03` (typ-empty `iphoto` copy of `733ff0a5`) followed via the #3316 dupmap once the paint-booth original became `non_vehicle`. Official `GROUP BY` immediately after this apply (held unchanged at 9,079):
+
+| State | After §18.12 | After #3302 leftover looks | Δ |
+|---| ---:| ---:| ---:|
+| on_vehicle | 13,977 | 13,977 | 0 |
+| held | 9,079 | 9,079 | 0 |
+| pulled | 2,126 | 2,126 | 0 |
+| unverified | 1,986 | 1,986 | 0 |
+| private | 1,251 | 1,251 | 0 |
+| duplicate | 850 | **851** | **+1** |
+| **unsorted** | **353** | **349** | **−4** |
+| non_vehicle | 127 | **130** | **+3** |
+| waiting | 0 | 0 | 0 |
+| **n** | **29,749** | **29,749** | **0** |
+
+Looks: `/workspace/sortrun/non_vehicle_pr/looks_leftover_typ_other.jsonl`.
+
+### `capture_left_out_to_review_v1` — PR #3330
+
+PR [#3330](https://github.com/sss97133/nuke/pull/3330) (`feat/capture-left-out-to-review`, `07c625a0`) adds a signed, dry-default, cap-50, granted_by, revert-by-run producer on the #3327 / #3322 pattern. It puts clocked, non-sensitive, non-`judgment_personal` left-out frames from already-planned days (last non-dry plan exists and is not `awaiting_gate`), and never-planned frames with a real `supabase.co/storage/` URL, into an open review (held). One review per LA day, reason `left_out`, confidence 0, basis `left_out_to_review`, `set_key` includes the run id. Evidence records `left_out_kind` (`planned` or `unadmitted`) and the last chunk when there is one. It never files, never enqueues or re-arms, and never touches the gate or the forward cursor. typ=`other` / `receipt_document` stay on the #3302 path. Placeholder and test URLs (`example.com`, `test-trigger`, anything not on `supabase.co/storage/`), empty_url, the privacy-exclude set, no-clock rows, `is_sensitive`, unreverted `judgment_personal`, already-open reviews, a still-existing `left_out` review (open or resolved), already-filed / rejected / `non_vehicle` rows, and unfiled `duplicate_of` copies are skipped. The audit log is one row per review with `image_ids[]`. Contract `supabase/sql/test_capture_left_out_to_review.sql` (local `TEST_EXIT:0`). Validate 42918979351 and Frontend Tests 42918979520 (db-contracts job 130188657139) were green. Applied live at about 19:07 AST. Live producer md5 `df186fe42d5b4c6ed2c6d98118e8a9a2`; revert helper `730f33fe7aa410ffb47555293a66fc8f`.
+
+Dry `a3330000-…000001`: eligible 33, would_route 33, 14 days (18 typ-empty `user_upload` + 3 leftover superseded + 12 never-planned real-file unadmitted; the 2 typ-empty `iphoto` copies were skipped). Signed apply `a3330000-0000-4000-8000-000000000002` at **19:08:37 AST** (America/St_Barthelemy), granted_by `0b9f107a-…`, routed 33 photos into 14 open reviews, confidence 0, 0 filed, cursor unchanged (`enabled=true`, `halted=false`, `forward_cursor=2026-11-03 10:00:00+00`). A further dry (`…000003`) took 0. `47f86c5a` (typ-empty `iphoto` copy of the 2026-06-12 superseded original now held) followed via the dupmap.
+
+Official `GROUP BY` immediately after the leftover-to-review apply:
+
+| State | After #3302 looks | After #3330 apply | Δ |
+|---| ---:| ---:| ---:|
+| on_vehicle | 13,977 | 13,977 | 0 |
+| held | 9,079 | **9,112** | **+33** |
+| pulled | 2,126 | 2,126 | 0 |
+| unverified | 1,986 | 1,986 | 0 |
+| private | 1,251 | 1,251 | 0 |
+| duplicate | 851 | **852** | **+1** |
+| **unsorted** | **349** | **315** | **−34** |
+| non_vehicle | 130 | 130 | 0 |
+| waiting | 0 | 0 | 0 |
+| **n** | **29,749** | **29,749** | **0** |
+
+### Official unsorted 315 after the leftover typ=other looks and left-out-to-review — exclusive buckets
+
+Same exclusive why as §18.11 / §18.12. `source_not_admitted` is now 0. Sum 275+32+3+3+2=315.
+
+| Why | Count | Why it remains, and what it needs |
+|---| ---:|---|
+| empty_url | 275 | Leave the 276 class untouched. Needs the iOS retry / a later privacy-hold decision from Skylar; no sanctioned producer writes these |
+| planned_but_left_out | 32 | typ=`other` 31 + no-clock `iphoto` typ `vehicle_exterior` 1 (`30a2cd43`). Split: 26 leftover `judgment_personal` typ=`other` (13 earlier + 13 new 2026-02-10 selfies; stay logged, not promoted); 3 typ=`other` placeholder / test URL junk candidates (untouched); 2 typ=`other` #3302 vehicle looks still unsorted after the 18:59 rescore (`1b5b23e4`, `fa469bc3`) — they need the existing #3322 typ-other vehicle review, not a back-door file; 1 no-clock exterior that needs a clock or a no-clock admit policy (never invent a clock; #3303 is `user_upload` only) |
+| plan_refused | 3 | All `judgment_personal` typ=`other` (2 `iphoto` 2026-07-22, 1 `photo_auto_sync` 2020-09-10). The refused-day producer correctly skips them. Do not re-arm as a class. Need Skylar (or the official sensitivity classifier if it has not already run on these three) |
+| no_date | 3 | `photo_auto_sync`, typ empty, no `taken_at`, never planned (created-at day 2026-02-12). Never invent a clock. Need Skylar or a no-clock admit path that covers this source |
+| judgment_personal | 2 | `direct_pull_2026_05_23` typ=`other` (`087422b4`, `10a376ec`), logged under the #3302 log, never planned. Official classifier did not set `is_sensitive`. Need Skylar; do not promote from reviewer judgment alone. 31 `judgment_personal` remain unofficially unsorted in total (26 inside leftover, 3 inside plan_refused, 2 here) |
+
+empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks. Never re-arm refused days. The 19:17 sweep had not yet run when this apply landed; #3329 is still the live sweep body.
+
 ## 19. Known gaps and next work
 
 
 Filing work (the path that can move unsorted):
 
 1. **The 4 newly admitted stamp-DTO rows** — days re-armed at 13:16 AST and drained at 13:26 AST. Both plans were review-only (0 clear), so no visual gate fired. The two typ `vehicle_exterior` frames are now held in open review; the two typ `other` frames are still unsorted / left out of the set. Do not call `capture_landing_gate_check` as a dry-run.
-2. **238 (plus 14 XMP and 4 `direct_pull`) with no file camera clock** — #3303 (`capture_import_session_admit_v1`) is **applied live**. All 242 eligible `user_upload` rows were admitted in cap-50 runs (no DTO / `taken_at` written). 2025-11-07 and 2025-12-07 drained to review-only (3 + 234 photos held, 0 filed). The 12 `image_intake` + 4 `direct_pull` + 14 XMP stay unadmitted. Never invent a clock.
+2. **238 (plus 14 XMP and 4 `direct_pull`) with no file camera clock** — #3303 (`capture_import_session_admit_v1`) is **applied live**. All 242 eligible `user_upload` rows were admitted in cap-50 runs (no DTO / `taken_at` written). 2025-11-07 and 2025-12-07 drained to review-only (3 + 234 photos held, 0 filed). The 10 clocked real-file `image_intake` typ `vehicle_exterior` and 2 clocked `direct_pull_2026_05_23` typ `engine_bay` were later put into held review by #3330 (`source_not_admitted` is now 0). The remaining unadmitted no-clock / XMP / other `direct_pull` rows stay unadmitted. Never invent a clock.
 3. **plan_refused / planned_but_left_out vehicle-typed frames** — typ coverage and identity_conflict are already live in `capture_landing_plan_step`; typ-aware `capture_landing_supersede_v1` is already live. #3304 (`capture_replan_vehicle_leftovers_v1`) is **applied live**, and the #3311 idempotent body is **applied live** (~15:37 AST, md5 `a90186df`). Canonical first run `9a9407c8` (50 / 19 days) plus this pass `90848ff6` + `c5a7280c` (81 photos / 4 days, signed once; third run `76cc8213` took 0). The four days drained at 15:48 AST: two review-only (0 clear, 0 filed; already-held frames), two 0-set applies. 79 of the 81 leftovers were already official ledger `duplicate`; 2 stayed unsorted (no `taken_at` / superseded). Five gate_failed days (23 photos) remain skipped `refused_no_new_evidence` until new evidence arrives. Do not start another leftover cap-50 unless new unlogged, unrefused leftovers appear. #3314 (no-clock leftover skip) is **applied live** ~16:20 AST (md5 `659c5709`). Do not back-door file. typ `other` / `receipt_document` belong to #3302, not this producer.
 4. **`capture_documents_land_by_vin`** — dry-run 10 Nov (`d0c00000-...000000000001`) returned 0 candidates. Every VIN page was skipped (`no_unique_vehicle`, `vehicle_not_held_by_user`, or `check_digit_failed`). Do not apply a signed run until a unique vehicle the user holds is actually found. The 10-minute tick is already scheduled and will no-op on the same skips.
 
-5. **typ `other` / `receipt_document` (180 + 17 non-sensitive)** — #3302 (`capture_non_vehicle_review_v1`) is **applied live**. Second looks (operator-viewed; Mac was offline) then signed cap-50 runs: 127 `non_vehicle`, 26 vehicle photos enqueued, 41 `judgment_personal` logged, 3 unreadable skipped. typ alone is not a terminal. The 41 were then run through the sanctioned `VisionDecision.decide` path (the on-device rule that sets `is_sensitive`; not `vision-gate-classify.mjs`). 23 were flagged (21 document, 2 personal_face) and promoted by `privacy_promote_v1` run `fe1622c6` (private +23, unsorted −23). The remaining 18 work / no_junk_signal frames stay unsorted and logged under `00aa930c`. A personal judgment that is only the reviewer's is still not promoted.
+5. **typ `other` / `receipt_document` (180 + 17 non-sensitive)** — #3302 (`capture_non_vehicle_review_v1`) is **applied live**. Second looks (operator-viewed; Mac was offline) then signed cap-50 runs: 127 `non_vehicle`, 26 vehicle photos enqueued, 41 `judgment_personal` logged, 3 unreadable skipped. typ alone is not a terminal. The 41 were then run through the sanctioned `VisionDecision.decide` path (the on-device rule that sets `is_sensitive`; not `vision-gate-classify.mjs`). 23 were flagged (21 document, 2 personal_face) and promoted by `privacy_promote_v1` run `fe1622c6` (private +23, unsorted −23). The remaining 18 work / no_junk_signal frames stay unsorted and logged under `00aa930c`. A later leftover typ=`other` look pass (18 unlogged real files, run `a3302000-…000011` at 18:49 AST; see §18.13) added 3 `non_vehicle`, 13 `judgment_personal`, and 2 vehicle enqueues. 31 `judgment_personal` remain unofficially unsorted. A personal judgment that is only the reviewer's is still not promoted.
 6. **empty_url (275 unsorted / 276 live)** — leave alone. iOS `SyncEngine` retries failed uploads locally (`failed(retry:)` stays queued on the device; `BackgroundUploader`). The server has almost no retry signal: 3 of 276 have `capture_upload_status.stage=uploaded`, 0 failed. 42 carry `on_device_vision.is_personal` (intentional metadata-only alibi rows). **0 are newer than 4 Nov 2026**; created 19 Jun-29 Oct 2026, latest `taken_at` 28 Oct. This class does not explain a post-Nov-4 upload stall.
 7. **`capture_ledger_states` timeout (13:31 AST)** — EXPLAIN: the held CTE is 19 ms; the timeout is a generic plan plus I/O (wrong index on the date window, 4.0 s; dupmap scan of unorganized rows, 4.8 s). The held join from #3299 is not the expensive part. #3301 is **applied live** (INCLUDE-less index `idx_capture_set_review_open_user`; `plan_cache_mode=force_custom_plan`; materialized held/waiting/failed). Official `capture_ledger_states` completed in 59.9 s at 14:20 AST, then ~50–73 s on later reads. No row writes. Live ledger bodies were then replaced by #3302 (same timeout fix plus the `non_vehicle` state).
 8. **Gate reader** — #3246 is draft. Do not re-arm the 2019-09-24 reader cursor (`9cf5b7a4` stays in `done_chunks`).
@@ -1033,6 +1105,7 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3323](https://github.com/sss97133/nuke/pull/3323) | write typ from high-confidence local CLIP views | Open, **applied live** (DDL only); typ writes refused (agreement 63.2% < 90%) | typ from CLIP |
 | [#3327](https://github.com/sss97133/nuke/pull/3327) | route refused days' unfiled photos to held review | Open, **applied live** ~18:20 AST (function) and 18:22–18:43 AST (107 photos / 21 reviews) | refused-day review |
 | [#3329](https://github.com/sss97133/nuke/pull/3329) | keep flagged unfiled photos in open reviews | Open, **applied live** ~18:42 AST | Sweep nothing_left_unfiled |
+| [#3330](https://github.com/sss97133/nuke/pull/3330) | route left-out and unadmitted photos to held review | Open, **applied live** ~19:07 AST | Left-out / unadmitted review |
 
 ## 21. Unverified or out of scope in this writing
 
