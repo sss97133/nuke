@@ -97,7 +97,8 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
 test('every started photo gets one typed receipt with the URL fingerprint; a spent subscription ends the batch', async () => {
   const frames = ['a-ok.jpg', 'b-gone.jpg', 'c-corrupt.png', 'd-garbage.jpg', 'e-refused.jpg', 'f-limit.jpg', 'g-never-started.jpg'];
   await withStandIns(frames, ({ calls, summary, port }) => {
-    assert.deepEqual(calls.claims, [{ p_stage: 'classifier', p_limit: 20, p_lease_seconds: 900, p_user_id: OWNER }], 'one owner-scoped claim');
+    assert.deepEqual(calls.claims, [{ p_stage: 'classifier', p_limit: 20, p_lease_seconds: 6000, p_user_id: OWNER }],
+      'one owner-scoped claim, leased for the whole batch (20 photos one at a time, 300 s each)');
     const got = calls.receipts.map((r) => [r.p_image_id, r.p_outcome, r.p_error_class, r.p_http_status]);
     assert.deepEqual(got, [
       ['a-ok.jpg', 'succeeded', null, null],
