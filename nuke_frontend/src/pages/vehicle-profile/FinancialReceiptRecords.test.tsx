@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createHash, webcrypto } from 'node:crypto';
 const fixture = vi.hoisted(() => ({ from: vi.fn(), eq: vi.fn(), sign: vi.fn(), privatePath: vi.fn(), rpc: vi.fn(), user: null as { id: string } | null, loading: false }));
 vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '/synthetic-pdf-worker.mjs' }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from, rpc: (...args: unknown[]) => { const result = fixture.rpc(...args); return typeof result?.abortSignal === 'function' ? result : Object.assign(result, { abortSignal: () => result }); } } }));
@@ -40,6 +41,47 @@ const click = async (label: string, until: () => boolean = () => true) => {
   await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === label)!.click());
   for (let i = 0; i < 200 && !(i >= 3 && until()); i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 };
+
+const renderCitedWork = async (hash = createHash('sha256').update('https://example.test/receipt.png').digest('hex')) => {
+  vi.stubGlobal('crypto', webcrypto);
+  const read = { rows: [], isLoading: false, isError: false, total: 0, hasNextPage: false } as any;
+  const work = { rows: [{ observation_id: 'work-a', title: 'Seat covers', summary: 'Black seat covers visible.', gaps: [],
+    images: [{ image_id: 'photo-a', image_url: 'https://example.test/car.jpg', role: 'after', caption: 'Covered seats', taken_at: '2026-05-05T21:00:00Z' }],
+    receipts: [{ item_id: 'item-a', receipt_id: 'receipt-a', relation: 'candidate_material', source_table: 'vehicle_documents', source_id: 'source-a',
+      source_url_sha256: hash, vendor: 'Synthetic upholstery', page_date: '2025-09-08', description: 'Seat covers', part_number: 'EXAMPLE-1',
+      quantity: 1, hours: null, amount: null, currency: 'USD', amounts_visible: false }], receipt_links_unavailable: 0, effort_reference: null,
+    market_value: { status: 'not_established_by_cited_sources' }, paid_labor: { status: 'unreconciled' } }], isError: false, limited: false } as any;
+  await act(async () => root.render(wrapper(<ReceiptRecords vehicleId="vehicle-a" read={read} work={work} />)));
+};
+
+it('mounts cited work in one Work & parts section and opens its exact retained source', async () => {
+  await renderCitedWork();
+  expect([...host.querySelectorAll('h3')].filter(node => node.textContent === 'Work & parts')).toHaveLength(1);
+  await click('Read original source', () => !![...host.querySelectorAll('button')].find(button => button.textContent === 'Close original'));
+  expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+  expect(fixture.sign).toHaveBeenCalledWith('https://example.test/receipt.png');
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(host.textContent).toContain('Close original');
+});
+
+it('refuses a receipt URL replacement between the qualified work read and its original-source click', async () => {
+  await renderCitedWork();
+  const query = { select: () => query, eq: vi.fn(() => query), maybeSingle: async () => ({ data: { file_url: 'https://example.test/replacement.pdf' }, error: null }) };
+  fixture.from.mockImplementation(() => query);
+  await click('Read original source', () => host.textContent!.includes('Source unavailable'));
+  expect(query.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+  expect(fixture.sign).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('Source unavailable');
+  expect(host.textContent).not.toContain('Close original');
+});
+
+it('withholds a work-card original action if its source binding is missing', async () => {
+  await renderCitedWork('');
+  expect(host.textContent).toContain('Original source unavailable in this read');
+  expect(host.textContent).not.toContain('Read original source');
+  expect(fetch).not.toHaveBeenCalled();
+});
 
 it('binds the original to the same vehicle and source and returns to the selected receipt in place', async () => {
   await render(); await click('Read original source', () => !!host.querySelector('img') || host.textContent!.includes('unavailable'));

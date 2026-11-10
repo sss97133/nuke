@@ -9,6 +9,8 @@ import { bounded } from '../../services/accountingCloseout';
 import type { FieldProvenance } from './hooks/useFieldProvenance';
 import type { DayDocument } from './VehicleDayDrawer';
 import { useVehicleWorkOrderFinancials, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
+import { useVisualWork } from './hooks/useVisualWork';
+import { VisualWorkCards } from './VisualWorkCards';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
 function amountText(amount: number | null, currency: string | null): string {
@@ -17,7 +19,9 @@ function amountText(amount: number | null, currency: string | null): string {
     : `${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} · currency unrecorded`;
 }
 
-function ReceiptSource({ receipt, vehicleId }: { receipt: Pick<VehicleReceiptRecord, 'sourceId' | 'sourceTable'>; vehicleId: string }) {
+function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
+  receipt: Pick<VehicleReceiptRecord, 'sourceId' | 'sourceTable'>; vehicleId: string; expectedSourceHash?: string;
+}) {
   const [state, setState] = useState('');
   const [original, setOriginal] = useState<{ blob: Blob; filename: string } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -34,6 +38,11 @@ function ReceiptSource({ receipt, vehicleId }: { receipt: Pick<VehicleReceiptRec
           .select(image ? 'image_url' : 'file_url').eq('id', receipt.sourceId!).eq('vehicle_id', vehicleId).maybeSingle();
         const raw = data && (image ? (data as { image_url?: string }).image_url : (data as { file_url?: string }).file_url);
         if (error || !raw || !/^https?:\/\//.test(raw)) throw new Error('Unavailable');
+        if (expectedSourceHash !== undefined) {
+          const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+          const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+          if (!/^[a-f0-9]{64}$/.test(expectedSourceHash) || actual !== expectedSourceHash) throw new Error('Source changed');
+        }
         const signed = await signPrivateStorageUrl(raw);
         if (privateStoragePath(raw) && signed === raw) throw new Error('Unavailable');
         const blob = await bounded(async signal => {
@@ -175,7 +184,7 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
   </article>;
 }
 
-function ReceiptCollection({ vehicleId, read }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords> }) {
+function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords>; work?: ReturnType<typeof useVisualWork> }) {
   const { user, loading } = useAuthContext();
   const [vendor, setVendor] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -187,6 +196,12 @@ function ReceiptCollection({ vehicleId, read }: { vehicleId: string; read: Retur
   return <section id="build-receipts" aria-label="Work and parts receipts" className="vp-receipt-section">
     <div className="vp-receipt-heading"><h3>Work & parts</h3><span>Receipt collection</span></div>
     <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
+    {work && <VisualWorkCards rows={loading ? [] : work.rows} renderSource={line => line.source_url_sha256 ? <ReceiptSource
+      key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}
+      expectedSourceHash={line.source_url_sha256} receipt={{ sourceTable: line.source_table, sourceId: line.source_id }} />
+      : <p>Original source unavailable in this read.</p>} />}
+    {work?.isError && <p role="status">Photographed work could not load. <button type="button" onClick={() => void work.refetch()}>Retry work</button></p>}
+    {work?.limited && <p role="status">This view reached its work-record limit; it is not the complete work history.</p>}
     {vendors.length > 1 && <label className="vp-receipt-filter">Supplier <select value={selectedVendor} onChange={event => setVendor(event.target.value)}><option value="">All suppliers</option>{vendors.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}
     {read.isLoading && <p role="status">Reading linked receipts…</p>}
     {read.isError && <p role="status">Receipt summaries could not load. <button type="button" onClick={() => void read.refetch()}>Retry receipts</button></p>}
@@ -196,15 +211,16 @@ function ReceiptCollection({ vehicleId, read }: { vehicleId: string; read: Retur
   </section>;
 }
 
-export function ReceiptRecords({ vehicleId, read }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords> }) {
+export function ReceiptRecords({ vehicleId, read, work }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords>; work?: ReturnType<typeof useVisualWork> }) {
   const { user } = useAuthContext();
-  return <ReceiptCollection key={`${vehicleId}:${user?.id ?? 'anon'}`} vehicleId={vehicleId} read={read} />;
+  return <ReceiptCollection key={`${vehicleId}:${user?.id ?? 'anon'}`} vehicleId={vehicleId} read={read} work={work} />;
 }
 
 export function ProfileReceiptRecords({ vehicleId }: { vehicleId: string }) {
   const read = useVehicleReceiptRecords(vehicleId);
-  if (!read.isLoading && !read.isError && !read.rows.length) return null;
-  return <ReceiptRecords vehicleId={vehicleId} read={read} />;
+  const work = useVisualWork(vehicleId);
+  if (!read.isLoading && !read.isError && !read.rows.length && !work.isLoading && !work.isError && !work.rows.length) return null;
+  return <ReceiptRecords vehicleId={vehicleId} read={read} work={work} />;
 }
 
 export function WorkOrderFinancialRecords({ vehicleId }: { vehicleId: string }) {
