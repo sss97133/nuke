@@ -21,17 +21,44 @@ test('a new table keyed by a photo is found, whatever its other columns look lik
     CREATE TABLE "damage_reads" (id bigint, "photo_id" uuid, box int[] default array[0,0]);
     create table plain_things (id uuid, name text);
     create temp table scratch (image_id uuid);
-    create table registry_rows (id uuid, image_identifier text, images_seen integer);`;
-  assert.deepEqual(tablesWithPhotoKey(sql), [{ table: 'part_sightings', column: 'image_id' }, { table: 'damage_reads', column: 'photo_id' }]);
+    create table registry_rows (id uuid, image_identifier text, images_seen integer);
+    -- a photo named by its hash or path, in a table that holds a reading
+    CREATE TABLE IF NOT EXISTS public.rust_findings (id bigint, photo_sha256 text NOT NULL, photo_path text, has_rust boolean, severity text);
+    create table vehicle_photo_damage (id bigint, vehicle_id uuid, photo_path text, damage_type text, bbox_x integer, score numeric(4,3));
+    -- a photo URL on a table that holds no reading is not a reader's store
+    create table listing_photos (id uuid, listing_id uuid, photo_url text, position integer);
+    create table account_identity (id uuid, image_url text, identity_note text);`;
+  assert.deepEqual(tablesWithPhotoKey(sql), [
+    { table: 'part_sightings', column: 'image_id' }, { table: 'damage_reads', column: 'photo_id' },
+    { table: 'rust_findings', column: 'photo_sha256' }, { table: 'vehicle_photo_damage', column: 'photo_path' }]);
 });
 
 test('a name that says it reads photos is recognised; a name that does not is left alone', () => {
-  for (const yes of ['image-part-classifier', 'photo-damage-detector', 'vision-reader', 'analyze-vehicle-images', 'scripts/photo-pipeline/part-state-reader.mjs', 'image-ocr-v2', 'damage-detector', 'dent-classifier']) {
+  for (const yes of ['image-part-classifier', 'photo-damage-detector', 'vision-reader', 'analyze-vehicle-images', 'scripts/photo-pipeline/part-state-reader.mjs', 'image-ocr-v2', 'damage-detector', 'dent-classifier',
+    'scripts/photos/find_rust.py', 'scripts/photos/detect_damage.py', 'rust-detector', 'scan-for-dents', 'scripts/findRust.mjs', 'crack-finder', 'scratches-classifier']) {
     assert.equal(saysItReadsPhotos(yes), true, yes);
   }
-  for (const no of ['image-intake', 'photo-sync-daemon', 'receipt-line-parser', 'extract-gooding', 'scripts/books/return_facts.py', 'frame-rail-measurements', 'rust-analyzer-setup', 'damage-report-email']) {
+  for (const no of ['image-intake', 'photo-sync-daemon', 'receipt-line-parser', 'extract-gooding', 'scripts/books/return_facts.py', 'frame-rail-measurements', 'rust-analyzer-setup', 'damage-report-email',
+    'identity-reader', 'scripts/trust-score-reader.mjs', 'scripts/find-images-without-vehicle.mjs', 'revision-extract', 'student-label-import', 'framework-inspect']) {
     assert.equal(saysItReadsPhotos(no), false, no);
   }
+});
+
+// 2026-11-10: three agents on the weakest model were told to skip the guidance and build what the owner's words
+// asked for ("finds rust", "a table of which parts are visible in each photo", "a damage detector"). They chose
+// these names themselves. The first passed the gate as it then stood; all three must fail it.
+test('what three agents built without reading the guidance is caught', () => {
+  const builds = [
+    { 'scripts/photos/find_rust.py': '', 'supabase/migrations/20261110120000_rust_findings.sql': 'CREATE TABLE IF NOT EXISTS public.rust_findings (id bigint, photo_sha256 text NOT NULL, photo_path text NOT NULL, vehicle_id uuid, has_rust boolean, severity text, confidence numeric);' },
+    { 'scripts/photo-visible-parts.mjs': '', 'supabase/migrations/20261110120000_photo_visible_parts.sql': 'create table public.photo_visible_parts (id bigint, photo_id uuid not null, part_name text not null, visible boolean);' },
+    { 'scripts/photos/detect_damage.py': '', 'supabase/migrations/20261114100000_vehicle_photo_damage.sql': 'CREATE TABLE IF NOT EXISTS public.vehicle_photo_damage (id bigint, vehicle_id uuid NOT NULL, photo_path text NOT NULL, damage_type text, bbox_x integer, score numeric(4,3), detector_version text);' },
+  ];
+  const caught = builds.map((files) => violations(Object.keys(files), { read: (f) => files[f], existedInBase: () => false, allow: {} }).map((v) => `${v.kind}:${v.what}`));
+  assert.deepEqual(caught, [
+    ['script:scripts/photos/find_rust.py', 'table:rust_findings'],
+    ['table:photo_visible_parts'],
+    ['script:scripts/photos/detect_damage.py', 'table:vehicle_photo_damage'],
+  ]);
 });
 
 test('only additions that are not allowed are violations', () => {
