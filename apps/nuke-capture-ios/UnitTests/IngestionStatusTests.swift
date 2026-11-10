@@ -49,6 +49,58 @@ final class IngestionStatusTests: XCTestCase {
         XCTAssertEqual(IngestionRefresh.next(for: .upToDate), IngestionRefresh.interval)
     }
 
+    // MARK: Photo reading (the same reading the bar at the top shows)
+
+    private let moving = PhotoReadingStatus(state: "moving", headline: "Reading your photos",
+                                            summary: "12 read in the last hour", reasons: [], lines: ["12 read in the last hour."])
+    private let stalled = PhotoReadingStatus(state: "stalled", headline: "Photo reading has stalled",
+                                             reasons: ["The reader on the Mac has not checked in for about 3 hours.", "A second reason."])
+
+    func testAMovingReadingReplacesAnalyzingAndUpToDate() {
+        let expected = IngestionState.photoReading(headline: "Reading your photos", reason: nil, stalled: false)
+        XCTAssertEqual(state { $0.photoReading = self.moving }, expected)
+        XCTAssertEqual(state { $0.photoReading = self.moving; $0.serverPending = 3 }, expected)
+        XCTAssertEqual(expected.title, "Reading your photos")
+        XCTAssertNil(expected.detail)
+        XCTAssertEqual(expected.systemImage, "eye")
+    }
+
+    func testAStalledReadingStatesItsFirstReason() {
+        let expected = IngestionState.photoReading(headline: "Photo reading has stalled",
+                                                   reason: "The reader on the Mac has not checked in for about 3 hours.", stalled: true)
+        XCTAssertEqual(state { $0.photoReading = self.stalled }, expected)
+        XCTAssertEqual(state { $0.photoReading = self.stalled; $0.serverPending = 3 }, expected)
+        XCTAssertEqual(expected.title, "Photo reading has stalled")
+        XCTAssertEqual(expected.detail, "The reader on the Mac has not checked in for about 3 hours.")
+        XCTAssertEqual(expected.systemImage, "exclamationmark.triangle")
+    }
+
+    func testIdleOffAndAbsentReadingsLeaveTheCardAsItWas() {
+        let idle = PhotoReadingStatus(state: "idle", headline: "Photo reading is waiting")
+        let off = PhotoReadingStatus(state: "off", headline: "Photo reading is not switched on for this account")
+        XCTAssertEqual(state { $0.photoReading = idle }, .upToDate)
+        XCTAssertEqual(state { $0.photoReading = off; $0.serverPending = 3 }, .analyzing(3))
+        XCTAssertEqual(state { $0.photoReading = PhotoReadingStatus() }, .upToDate)
+        XCTAssertEqual(state { $0.photoReading = nil; $0.serverPending = 3 }, .analyzing(3))
+        XCTAssertNil(IngestionState.upToDate.detail)
+        XCTAssertNil(IngestionState.analyzing(3).detail)
+    }
+
+    func testAReadingNeverOutranksThePhoneOrWhatIsLeftForTheOwner() {
+        XCTAssertEqual(state { $0.photoReading = self.stalled; $0.authProblem = "expired" }, .signInNeeded)
+        XCTAssertEqual(state { $0.photoReading = self.stalled; $0.isPaused = true }, .paused)
+        XCTAssertEqual(state { $0.photoReading = self.moving; $0.uploadsPending = 12 }, .uploading(12))
+        XCTAssertEqual(state { $0.photoReading = self.moving; $0.scanning = true; $0.scanned = 4; $0.scanTarget = 9 }, .scanning(done: 4, total: 9))
+        XCTAssertEqual(state { $0.photoReading = self.moving; $0.suggested = 2 }, .needsReview(2))
+        XCTAssertEqual(state { $0.photoReading = self.moving; $0.serverSynced = nil; $0.serverError = true }, .unknown)
+    }
+
+    func testAReadingNeverSpeedsUpTheProfileRefresh() {
+        let reading = IngestionState.photoReading(headline: "Reading your photos", reason: nil, stalled: false)
+        XCTAssertFalse(reading.isActive)
+        XCTAssertEqual(IngestionRefresh.next(for: reading), IngestionRefresh.interval)
+    }
+
     func testParsesServerTimestamps() {
         XCTAssertNotNil(IngestionRefresh.parse("2026-10-22T20:01:02.123Z"))
         XCTAssertNotNil(IngestionRefresh.parse("2026-10-22T20:01:02+00:00"))

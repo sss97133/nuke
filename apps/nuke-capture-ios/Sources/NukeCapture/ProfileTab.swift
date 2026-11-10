@@ -332,6 +332,8 @@ struct ProfileView: View {
     @State private var syncError = false          // failed link-ledger load ≠ a fresh account
     @ObservedObject private var engine = SyncEngine.shared
     @Environment(\.scenePhase) private var scenePhase
+    /// The photo reading status the bar at the top of the app shows (MainTabView hands it down).
+    @Environment(\.photoReading) private var photoReading
 
     // Recent meaningful work — the few latest UNDERSTOOD days, each a STORY (not a
     // bare photo count). Replaces the old exhaustive 1,740-row day ledger: the
@@ -551,6 +553,7 @@ struct ProfileView: View {
             s.lastServerSync = IngestionRefresh.parse(sync.last_synced_at)
         }
         s.serverError = syncError
+        s.photoReading = photoReading
         return s
     }
     private var ingestionState: IngestionState { IngestionState.derive(ingestionSnapshot) }
@@ -563,6 +566,13 @@ struct ProfileView: View {
                 if state.isActive { ProgressView().controlSize(.small) }
                 else { Image(systemName: state.systemImage).foregroundStyle(.secondary) }
                 Text(state.title).font(.subheadline.weight(.medium)).monospacedDigit()
+            }
+            if let reason = state.detail {
+                Text(reason).font(.caption).foregroundStyle(.secondary)
+            }
+            // A reading the phone could not refresh says how old it is, here as in the bar.
+            if case .photoReading = state, let checked = PhotoReadingWords.checkedAgo(snap.photoReading) {
+                Text(checked).font(.caption2).foregroundStyle(.tertiary)
             }
             let details = [
                 snap.matched > 0 ? "\(snap.matched.formatted()) matched" : nil,

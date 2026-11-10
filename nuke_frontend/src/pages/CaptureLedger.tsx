@@ -2,6 +2,7 @@
 // One read (get_capture_ledger) draws the days; opening a day reads it once (get_capture_ledger_day). The words and
 // the row shape are the capture app's ingest bar (CaptureIngestBar.swift, CaptureIngestStatus.swift), so a photo reads
 // the same on the phone and here. "Re-scan my library" writes a request the phone claims the next time it runs.
+// A separate read (photo_reading_status) says whether photo reading is moving, waiting or stalled, in the server's words.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -19,9 +20,18 @@ type Frame = { image_id: string; taken_at: string; state: State; reason: string 
   source: string | null; file_name: string | null; thumb: string | null; set_key: string | null; candidates: { vehicle_id: string; name: string | null; score: number | null }[] | null };
 type Skip = { asset_id: string; reason: string; taken_at: string | null; decided_at: string; device: string | null };
 type Day = { day: string; frames: Frame[]; skipped: Skip[] };
+// Photo reading status (photo_reading_status): whether the reader is moving through the owner's photos, waiting or
+// stalled, and why. The state, the sentences and every number in them are decided on the server, so the phone and this
+// page cannot disagree; the page shows them as given. Every field is optional: an older or newer server still decodes.
+type ReadingStatus = { as_of?: string | null; state?: 'moving' | 'stalled' | 'idle' | 'off' | null; headline?: string | null; summary?: string | null;
+  reasons?: string[] | null; lines?: string[] | null; photos_total?: number | null; worked_through?: number | null; read_since_start?: number | null;
+  counting_since?: string | null; could_not_read?: number | null; skipped?: number | null; retrying?: number | null; with_reader?: number | null;
+  read_1h?: number | null; read_24h?: number | null; last_read_at?: string | null; last_attempt_at?: string | null; reading_from?: string | null;
+  library_from?: string | null; library_to?: string | null; library_walked_at?: string | null; reader_checked_in_at?: string | null };
 
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles'; } catch { return 'America/Los_Angeles'; } })();
 const WINDOW_DAYS = 365;
+const READING_REFRESH_MS = 120_000;
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 const shiftDays = (iso: string, n: number) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return isoDate(d); };
 const n = (v: number) => v.toLocaleString('en-US');
@@ -95,11 +105,20 @@ const rescanLine = (l: Ledger, now: number): string => {
   }
   return 'Re-detects your work sites and re-confirms what uploads. Already-uploaded photos are not sent again.';
 };
+const sentences = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string' && s.trim() !== '') : []);
+// What the status read may put on the page: a moving, stalled or waiting status with a headline. Reading that is not
+// switched on for the account, an empty answer and anything the page does not recognise all show nothing.
+function shownReading(v: unknown): ReadingStatus | null {
+  const r = v && typeof v === 'object' && !Array.isArray(v) ? (v as ReadingStatus) : null;
+  if (!r || typeof r.headline !== 'string' || !r.headline.trim()) return null;
+  return r.state === 'moving' || r.state === 'stalled' || r.state === 'idle' ? r : null;
+}
 
-const Icon = ({ kind, className }: { kind: 'up' | 'warn' | 'check' | 'check-fill' | 'dots' | 'chevron' | 'lock'; className?: string }) => {
+const Icon = ({ kind, className }: { kind: 'up' | 'go' | 'warn' | 'check' | 'check-fill' | 'dots' | 'chevron' | 'lock'; className?: string }) => {
   const common = { className, viewBox: '0 0 24 24', width: 24, height: 24, 'aria-hidden': true as const, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   switch (kind) {
     case 'up': return <svg {...common}><circle cx="12" cy="12" r="9.5" /><path d="M12 16V8m-4 4 4-4 4 4" /></svg>;
+    case 'go': return <svg {...common}><circle cx="12" cy="12" r="9.5" /><path d="M8 12h8m-4-4 4 4-4 4" /></svg>;
     case 'warn': return <svg {...common}><path d="M12 3 2.5 20h19L12 3z" /><path d="M12 9v5m0 3h.01" /></svg>;
     case 'check': return <svg {...common}><circle cx="12" cy="12" r="9.5" /><path d="m8 12.5 2.5 2.5L16 9.5" /></svg>;
     case 'check-fill': return <svg {...common} fill="currentColor" stroke="var(--surface)"><circle cx="12" cy="12" r="10" stroke="none" /><path d="m8 12.5 2.5 2.5L16 9.5" /></svg>;
@@ -142,6 +161,19 @@ function SkipRow({ s }: { s: Skip }) {
       <Text role="caption">{`${s.taken_at ? timeLabel(s.taken_at) : 'time unknown'}${s.device ? ` · ${s.device}` : ''} · never uploaded`}</Text></span>
   </div></li>;
 }
+// The state is told by the icon's shape (arrow, dots, warning triangle) and by the headline; colour only repeats it.
+function ReadingBlock({ r, now }: { r: ReadingStatus; now: number }) {
+  const stalled = r.state === 'stalled';
+  return <section className={`cl-reading cl-reading--${r.state}`} aria-label="Photo reading">
+    <Icon kind={stalled ? 'warn' : r.state === 'moving' ? 'go' : 'dots'} className="cl-reading__icon" />
+    <div className="cl-reading__text">
+      <Text role="body" as="p" className="cl-reading__headline">{r.headline}</Text>
+      {stalled && sentences(r.reasons).map((t, i) => <Text key={`reason-${i}`} role="body" as="p">{t}</Text>)}
+      {sentences(r.lines).map((t, i) => <Text key={`line-${i}`} role="caption" as="p">{t}</Text>)}
+      {r.as_of && Number.isFinite(Date.parse(r.as_of)) && <Text role="caption" as="p">{`checked ${relative(r.as_of, now)}`}</Text>}
+    </div>
+  </section>;
+}
 
 export default function CaptureLedger() {
   const [ledger, setLedger] = useState<Ledger | null>(null);
@@ -153,6 +185,7 @@ export default function CaptureLedger() {
   const [days, setDays] = useState<Record<string, Day | 'loading' | 'error'>>({});
   const [asking, setAsking] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [reading, setReading] = useState<ReadingStatus | null>(null);
 
   const read = useCallback(async () => {
     setLoading(true); setError(null);
@@ -161,6 +194,34 @@ export default function CaptureLedger() {
     setLoading(false);
   }, [from]);
   useEffect(() => { void read(); }, [read]);
+
+  // Photo reading status is its own read, sent after the ledger's and never waiting on it or holding it up. It is asked
+  // on arrival and then every two minutes while the page is on screen; a hidden page asks nothing, and coming back asks
+  // at once only when a read is overdue. Any failure (the reader not deployed yet, no session, the network) shows
+  // nothing and says nothing.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined, asked = 0, mounted = true;
+    const ask = async () => {
+      asked = Date.now();
+      let next: ReadingStatus | null = null;
+      try {
+        const { data, error: e } = await supabase.rpc('photo_reading_status', { p_tz: TZ });
+        if (!e) next = shownReading(data);
+      } catch { /* shown as nothing */ }
+      if (mounted) { setReading(next); setNow(Date.now()); }
+    };
+    const tick = () => { void ask(); timer = setTimeout(tick, READING_REFRESH_MS); };
+    const sync = () => {
+      clearTimeout(timer);
+      if (document.visibilityState === 'hidden') return;
+      if (asked) setNow(Date.now());
+      const wait = asked + READING_REFRESH_MS - Date.now();
+      if (wait <= 0) tick(); else timer = setTimeout(tick, wait);
+    };
+    sync();
+    document.addEventListener('visibilitychange', sync);
+    return () => { mounted = false; clearTimeout(timer); document.removeEventListener('visibilitychange', sync); };
+  }, []);
 
   const showEarlier = useCallback(async () => {
     const to = shiftDays(from, -1), start = shiftDays(from, -WINDOW_DAYS);
@@ -204,11 +265,12 @@ export default function CaptureLedger() {
       <div className="cl-bar__summary"><Text role="body">{summaryLine(ledger.totals, vehiclesByCount)}</Text>
         <Text role="caption">{`Since ${dayLabel(from)}${ledger.days_total > rows.length ? ` · ${n(ledger.days_total - rows.length)} more days in this window` : ''} · days in ${TZ.replace(/_/g, ' ')}`}</Text></div>
     </div>}
+    {reading && <ReadingBlock r={reading} now={now} />}
     {ledger && <section className="cl-rescan" aria-label="Re-scan my library">
       <button type="button" className="cl-rescan__button" onClick={askRescan} disabled={asking || Boolean(ledger.rescan)}><Text role="label">{ledger.rescan ? 'Re-scan requested' : 'Re-scan my library'}</Text></button>
       <span className="cl-rescan__state"><Text role="caption">{rescanLine(ledger, now)}</Text></span>
     </section>}
-    {loading && !ledger && <div role="status" className="cl-notice"><Text role="body">Reading your photos…</Text></div>}
+    {loading && !ledger && <div role="status" className="cl-notice"><Text role="body">Reading the ledger…</Text></div>}
     {ledger && rows.length === 0 && <section className="cl-notice"><Text role="body">{`No photos since ${dayLabel(from)}.`}</Text></section>}
     {rows.length > 0 && <ol className="cl-days">
       {rows.map(d => { const detail = days[d.day]; const expanded = open === d.day; return <li key={d.day}>

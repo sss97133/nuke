@@ -89,6 +89,8 @@ struct MainTabView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if session.isSignedIn { CaptureIngestBar(store: ingest) }
         }
+        // The same photo reading status goes to the profile's ingestion card, so the two cannot disagree.
+        .environment(\.photoReading, ingest.reading)
         .task(id: accountScope) {
             guard session.isSignedIn, let uid = SupabaseService.currentUserId else { return }
             #if DEBUG

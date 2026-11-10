@@ -29,6 +29,8 @@ struct IngestionSnapshot: Equatable {
     var serverFiled: Int?
     var lastServerSync: Date?
     var serverError = false
+    // Photo reading, as the server states it: the same reading the bar at the top of the app shows.
+    var photoReading: PhotoReadingStatus?
 
     var needsReview: Int { suggested + unresolved }
     /// The most recent of the device's and the server's last-sync clocks.
@@ -42,6 +44,8 @@ enum IngestionState: Equatable {
     case uploading(Int)
     case scanning(done: Int, total: Int)
     case analyzing(Int)
+    /// Photo reading on the server, in the server's own words: moving, or stalled with its first reason.
+    case photoReading(headline: String, reason: String?, stalled: Bool)
     case needsReview(Int)
     case upToDate
     case unknown
@@ -54,10 +58,21 @@ enum IngestionState: Equatable {
         if s.thermalHold && work { return .pausedHot }
         if s.isSyncing || s.uploadsPending > 0 { return .uploading(s.uploadsPending) }
         if s.scanning { return .scanning(done: s.scanned, total: s.scanTarget) }
-        if s.serverPending > 0 { return .analyzing(s.serverPending) }
+        // A reading that is moving or has stalled speaks for the server, where the card would
+        // otherwise say "Analyzing N on the server" or "Up to date". Nothing else changes place.
+        let reading = serverReading(s.photoReading)
+        if s.serverPending > 0 { return reading ?? .analyzing(s.serverPending) }
         if s.needsReview > 0 { return .needsReview(s.needsReview) }
         if s.serverSynced == nil && s.serverError { return .unknown }
-        return .upToDate
+        return reading ?? .upToDate
+    }
+
+    /// The reading as a card state; nil unless the server says moving or stalled, so a reading that
+    /// is waiting, off or absent leaves the card exactly as it was.
+    static func serverReading(_ status: PhotoReadingStatus?) -> IngestionState? {
+        guard PhotoReadingWords.leads(status), let words = PhotoReadingWords.headline(status) else { return nil }
+        let stalled = PhotoReadingWords.tone(status) == .stalled
+        return .photoReading(headline: words, reason: stalled ? PhotoReadingWords.reasons(status).first : nil, stalled: stalled)
     }
 
     var title: String {
@@ -69,10 +84,18 @@ enum IngestionState: Equatable {
         case .scanning(let done, let total):
             return total > 0 ? "Scanning library · \(done.formatted()) of \(total.formatted())" : "Scanning library"
         case .analyzing(let n): return "Analyzing \(n.formatted()) on the server"
+        case .photoReading(let headline, _, _): return headline
         case .needsReview(let n): return "\(n.formatted()) need review"
         case .upToDate: return "Up to date"
         case .unknown: return "Status unavailable"
         }
+    }
+
+    /// A second line under the title: why photo reading has stalled, in the server's words.
+    /// nil for every other state.
+    var detail: String? {
+        if case .photoReading(_, let reason, _) = self { return reason }
+        return nil
     }
 
     var systemImage: String {
@@ -83,12 +106,15 @@ enum IngestionState: Equatable {
         case .uploading: return "arrow.up.circle"
         case .scanning: return "magnifyingglass"
         case .analyzing: return "hourglass"
+        case .photoReading(_, _, let stalled): return stalled ? "exclamationmark.triangle" : "eye"
         case .needsReview: return "questionmark.circle"
         case .upToDate: return "checkmark.circle"
         case .unknown: return "exclamationmark.triangle"
         }
     }
 
+    /// Work this phone can watch finish. Photo reading is not in the list: it has its own slower
+    /// refresh (CaptureIngestStore), so it never speeds up the profile's.
     var isActive: Bool {
         switch self { case .uploading, .scanning, .analyzing: return true; default: return false }
     }

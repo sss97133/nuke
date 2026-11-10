@@ -279,6 +279,15 @@ Standing rules the code carries:
 - **A failed read says why.** `ReadFailure.text(error)` (SupabaseService.swift): no connection, a server timeout,
   an HTTP status, a refused sign-in. "Check your connection" was the copy for every failure, including the
   board's server-side 500s.
+- **Photo reading has one status, and the server words it.** `photo_reading_status(p_tz)` (migration
+  `20261113170000`; the phone's end is `PhotoReadingStatus.swift`, the one file that knows its name and keys)
+  says whether reading the owner's photos is moving, stalled, waiting or off, with its reasons and detail lines
+  as finished sentences. The phone shows them as given: no rewording, no arithmetic on the counts, never a state
+  word or key name. `CaptureIngestStore` reads it when it starts, on return to the foreground and every 120 s
+  while the app is active (doubling to 10 minutes after a failed read). The bar above every tab leads with it
+  while it is moving or stalled, and the profile's ingestion card then states the same headline in place of
+  "Analyzing N on the server" and "Up to date". A reading more than 10 minutes old says when it was checked. A
+  null answer, or a server without the function, leaves every surface as it was.
 - **Money is never anonymous.** The readers mask it at the source (#1037, #1046, #1048, and the day
   receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
   not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as
