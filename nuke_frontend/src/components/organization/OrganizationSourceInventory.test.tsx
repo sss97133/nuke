@@ -18,9 +18,18 @@ const data: SourceInventory = { source: 'mccormicks', checked_at: new Date().toI
   ] };
 let root: Root | undefined;
 let container: HTMLDivElement;
-function renderPage() { container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container); act(()=>root!.render(<MemoryRouter><OrganizationSourceInventory organizationId="test" /></MemoryRouter>)); return container; }
+function renderPage(fallback?: React.ReactNode) { container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container); act(()=>root!.render(<MemoryRouter><OrganizationSourceInventory organizationId="test" fallback={fallback} /></MemoryRouter>)); return container; }
 afterEach(()=>{ act(()=>root?.unmount()); root=undefined; document.body.innerHTML=''; });
 describe('publisher schedule and inventory', () => {
+  it('retains existing inventory for an organization without a publisher roster', () => {
+    mock.query={data:null};renderPage(<p>Existing inventory</p>);
+    expect(container.textContent).toBe('Existing inventory');
+  });
+  it('replaces legacy inventory with the publisher catalog used by overview', () => {
+    mock.query={data};renderPage(<p>Existing inventory</p>);
+    expect(container.textContent).not.toContain('Existing inventory');
+    expect(container.querySelector('a[href="/vehicle/public-car"]')).toBeTruthy();
+  });
   it('excludes sold showroom and ended-sale entries; filters by actual inventory type', () => {
     expect(currentSourceRows(data,'all','').map(r=>r.native_id)).toEqual(['1','showroom:1']);
     expect(currentSourceRows(data,'showroom','audi').map(r=>r.native_id)).toEqual(['showroom:1']);

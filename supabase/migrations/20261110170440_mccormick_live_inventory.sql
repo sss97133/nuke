@@ -99,7 +99,10 @@ WITH publisher AS (
   FROM publisher p JOIN public.vehicle_observations o ON o.source_id=p.source_id
     AND o.kind='listing' AND NOT o.is_superseded
   JOIN roster r ON o.structured_data->>'source_id'=r.native_id
-    AND o.source_url=r.source_url
+    AND (o.source_url=r.source_url OR (r.inventory_kind='auction'
+      AND o.source_url='https://www.classic-carauction.com/auction-cars'
+      AND o.structured_data->>'evidence_scope'='catalog_row'
+      AND o.structured_data->>'parser'='mccormick_catalog_v1'))
     AND upper(regexp_replace(o.structured_data->>'title','\s+',' ','g'))=upper(regexp_replace(r.title,'\s+',' ','g'))
   LEFT JOIN public.vehicles v ON v.id=o.vehicle_id
 ), binding AS (

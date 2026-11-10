@@ -387,8 +387,11 @@ SELECT '006f01c3-e5fb-44f5-ab40-e55b0654de1c',now(),'house_roster_facet','{"mcco
       'source_status','scheduled','lot_number',n::text)) FROM generate_series(1,4) n));
 INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,source_url,kind,structured_data,observed_at)
 SELECT md5('mcc-native-'||n)::uuid,md5(CASE n WHEN 1 THEN 'dated' WHEN 2 THEN 'private' WHEN 3 THEN 'deleted' ELSE 'road-art' END)::uuid,
-  '006f01c3-e5fb-44f5-ab40-e55b0654de1c','https://www.classic-carauction.com/auction-cars?auctionid='||n,
-  'listing',jsonb_build_object('source_id',n::text,'title','1970 Synthetic Dated'),now() FROM generate_series(1,4) n;
+  '006f01c3-e5fb-44f5-ab40-e55b0654de1c',CASE WHEN n=1 THEN 'https://www.classic-carauction.com/auction-cars'
+    ELSE 'https://www.classic-carauction.com/auction-cars?auctionid='||n END,
+  'listing',jsonb_build_object('source_id',n::text,'title','1970 Synthetic Dated')
+    ||CASE WHEN n=1 THEN '{"evidence_scope":"catalog_row","parser":"mccormick_catalog_v1"}'::jsonb ELSE '{}'::jsonb END,
+  now() FROM generate_series(1,4) n;
 SET ROLE anon;
 CREATE TEMP TABLE mccormick_public AS SELECT public.organization_source_inventory_read('07fbc081-986c-43bc-ab9d-df24c24e513b') body;
 CREATE TEMP TABLE mccormick_calendar AS SELECT public.auction_calendar_read(200) body;

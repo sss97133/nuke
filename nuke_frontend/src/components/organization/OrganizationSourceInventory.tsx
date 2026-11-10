@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { PrefetchLink } from '../PrefetchLink';
@@ -20,7 +20,7 @@ export function currentSourceRows(data: SourceInventory, filter: string, search:
     && (filter === 'all' || filter === r.inventory_kind || filter === r.sale_key)
     && `${r.year ?? ''} ${r.make} ${r.model} ${r.lot_number}`.toLowerCase().includes(query));
 }
-export default function OrganizationSourceInventory({ organizationId }: { organizationId: string }) {
+export default function OrganizationSourceInventory({ organizationId, fallback = null }: { organizationId: string; fallback?: ReactNode }) {
   const [filter, setFilter] = useState('all'), [search, setSearch] = useState(''), [limit, setLimit] = useState(50);
   const query = useQuery({ queryKey: ['organization-source-inventory', organizationId], queryFn: async () => {
     const { data, error } = await supabase.rpc('organization_source_inventory_read', { p_organization_id: organizationId });
@@ -30,10 +30,14 @@ export default function OrganizationSourceInventory({ organizationId }: { organi
     return data as SourceInventory;
   }, staleTime: 30_000, refetchInterval: 60_000 });
   const data = query.data;
+  const scrolledTo = useRef<string | null>(null);
   useEffect(() => {
-    if (data && window.location.hash === "#source-inventory") document.getElementById("source-inventory")?.scrollIntoView?.();
-  }, [data]);
-  if (!data) return query.isError ? <p role="status">Schedule and inventory unavailable.</p> : null;
+    if (data && scrolledTo.current !== organizationId && window.location.hash === "#source-inventory") {
+      document.getElementById("source-inventory")?.scrollIntoView?.();
+      scrolledTo.current = organizationId;
+    }
+  }, [data, organizationId]);
+  if (!data) return <>{query.isError && <p role="status">Schedule and inventory unavailable.</p>}{fallback}</>;
   const rows = currentSourceRows(data, filter, search);
   const stale = data.stale || !data.checked_at || Date.now() - Date.parse(data.checked_at) > 3_600_000;
   return <section id="source-inventory" className="organization-source-inventory" aria-label="Upcoming sales and current inventory">

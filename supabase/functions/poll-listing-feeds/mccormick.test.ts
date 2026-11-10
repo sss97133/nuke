@@ -11,12 +11,15 @@ const pages: Record<string,string>={
   '/auction-cars':'Auction 91 Auction Cars Lots 1-180 Friday <TR><TD><a href="auction-cars?auctionid=1">1</a></TD><TD>photo</TD><TD>1970</TD><TD>FORD</TD><TD>MUSTANG</TD><TD>COUPE</TD></TR>',
   '/Showroom-Inventory':'Showroom Inventory <TR><TD><a href="Showroom-Inventory?sp=1&id=1">41</a></TD><TD>2007</TD><TD>AUDI</TD><TD>A4</TD><TD>$8,500</TD><TD>Available</TD></TR>',
 };
-async function harness(options:{badCatalog?:boolean;cached?:boolean;nativeFailure?:boolean;staleReadback?:boolean;publicBinding?:boolean;movedDay?:boolean}={}) {
+async function harness(options:{badCatalog?:boolean;cached?:boolean;nativeFailure?:boolean;staleReadback?:boolean;publicBinding?:boolean;movedDay?:boolean;removed?:boolean}={}) {
   const snapshots=new Map<string,any>(), writes:any[]=[], calls:any[]=[];
   let census:any;
   let episodes:any[]=options.movedDay?[{id:'old-event',vehicle_id:'public-parent',source_platform:'mccormicks',
     source_listing_id:'mccormicks-91:1',ended_at:'2026-11-19T12:00:00Z',event_status:'upcoming',
     metadata:{native_id:'1',sale_key:'mccormicks-91',projection_method:'mccormick_live_v1'}}]:[];
+  if(options.removed)episodes=[{id:'removed-event',vehicle_id:'public-parent',source_platform:'mccormicks',
+    source_listing_id:'mccormicks-91:999',ended_at:'2026-11-20T12:00:00Z',event_status:'upcoming',
+    metadata:{native_id:'999',sale_key:'mccormicks-91',projection_method:'mccormick_live_v1'}}];
   const capture=async(url:string,_options:any)=>{
     const html=options.badCatalog&&url.endsWith('/auction-cars')?'Auction 91 Auction Cars':pages[new URL(url).pathname];
     const id=crypto.randomUUID();
@@ -115,4 +118,14 @@ Deno.test('a moved lot hides its obsolete projection, supersedes the clock, then
   eq(writes[correction].value.p_corrections.ended_at,{expected:'2026-11-19T12:00:00Z',value:'2026-11-20T12:00:00Z',precision:'day'});
   eq(episodes[0].ended_at,'2026-11-20T12:00:00Z');eq(episodes[0].metadata.auction_session_days,['2026-11-20']);
   eq(episodes[0].metadata.withdrawn_at,null);
+});
+
+Deno.test('complete catalog removal retracts before an unrelated detail fails and preserves its failed retry receipt',async()=>{
+  const {result,writes,episodes}=await harness({removed:true,nativeFailure:true});
+  eq(result.error,'HTTP 504 timeout');
+  eq(episodes[0].metadata.withdrawal_basis,'not_in_complete_current_catalog');
+  eq(episodes[0].metadata.withdrawn_at,new Date(now).toISOString());eq(episodes[0].event_status,'upcoming');
+  const retract=writes.findIndex(w=>w.table==='vehicle_events');
+  const failed=writes.findIndex(w=>w.table==='import_queue'&&w.value.status==='failed');
+  if(retract<0||failed<=retract)throw Error('Retraction must precede the failing detail pass');
 });

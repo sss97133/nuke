@@ -3805,10 +3805,9 @@ export default function OrganizationProfile() {
               </div>
             )}
 
-            <OrganizationInventory
-              organizationId={organization.id}
-              isOwner={isOwner}
-            />
+            <OrganizationSourceInventory organizationId={organization.id} fallback={
+              <OrganizationInventory organizationId={organization.id} isOwner={isOwner} />
+            } />
           </div>
         )}
 

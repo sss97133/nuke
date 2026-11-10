@@ -81,6 +81,29 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
 
     const read = await db.rpc("organization_source_inventory_read", { p_organization_id: organizationId });
     if (read.error || Date.parse(read.data?.checked_at ?? "") !== Date.parse(checkedAt) || read.data?.source !== "mccormicks" || !Array.isArray(read.data.inventory)) throw Error("mccormick_inventory_readback_failed");
+    const readEvents = async () => {
+      const events = await db.from("vehicle_events").select("id,vehicle_id,source_listing_id,metadata,ended_at,event_status")
+        .eq("source_platform", "mccormicks").eq("metadata->>sale_key", sale.sale_key).limit(1500);
+      if (events.error || (events.data?.length ?? 0) >= 1500) throw Error("mccormick_episode_lookup_unavailable");
+      return events;
+    };
+    const withdrawInvalid = async (events: any[], inventory: any[]) => {
+      const bindings = new Map(inventory.map(r => [r.native_id, r])), lotMap = new Map(lots.map(l => [l.native_id, l]));
+      for (const old of events) {
+        if (old.metadata?.projection_method !== MCCORMICK_LIVE_METHOD || old.metadata?.withdrawn_at) continue;
+        const reason = projectionWithdrawal(old, lotMap.get(old.metadata?.native_id), bindings.get(old.metadata?.native_id));
+        if (!reason) continue;
+        if (budget.remainingMs() < 12000) throw Error("mccormick_projection_reconciliation_deadline");
+        const withdrawn = await writeEpisode(db, { vehicle_id: old.vehicle_id, source_platform: "mccormicks",
+          source_listing_id: old.source_listing_id, metadata: { withdrawn_at: checkedAt, withdrawal_basis: reason,
+            source_observed_at: checkedAt, source_catalog_snapshot_id: catalog.snapshot_id } }, { sourceObservedAt: checkedAt });
+        if (withdrawn.action === "error" || withdrawn.action === "skipped") throw Error("mccormick_withdrawal_projection_failed");
+      }
+    };
+    // A complete catalog owns membership before potentially slow/failing detail
+    // revisits. Retract obsolete public projections before spending that budget.
+    await withdrawInvalid((await readEvents()).data ?? [], read.data.inventory);
+    let detailError: string | null = null;
     const latest = new Map<string, any>(read.data.inventory.map((r: any) => [r.native_id, r]));
     const ledger = new Map<string, any>();
     for (let i = 0; i < rows.length; i += 40) {
@@ -122,7 +145,7 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
       const ack = await db.from("import_queue").upsert(write.row, { onConflict: "listing_url" });
       if (ack.error) throw Error("mccormick_refresh_receipt_unavailable");
       result.ingest_outcomes.push({ url: row.source_url, status: outcome.status, vehicle_id: landed.data?.vehicle_id ?? null });
-      if (!valid) throw Error(String(outcome.error));
+      if (!valid) { detailError = String(outcome.error); break; }
       if (outcome.status === "created") result.new_ingested++;
       else if (outcome.status === "matched") result.matched_existing++;
       result.retained_inventory.details_refreshed = (result.retained_inventory.details_refreshed ?? 0) + 1;
@@ -132,9 +155,7 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
     const current = await db.rpc("organization_source_inventory_read", { p_organization_id: organizationId });
     if (current.error || Date.parse(current.data?.checked_at ?? "") !== Date.parse(checkedAt) || !Array.isArray(current.data?.inventory)) throw Error("mccormick_binding_readback_failed");
     const byNative = new Map<string, any>(current.data.inventory.map((r: any) => [r.native_id, r]));
-    const events = await db.from("vehicle_events").select("id,vehicle_id,source_listing_id,metadata,ended_at,event_status")
-      .eq("source_platform", "mccormicks").eq("metadata->>sale_key", sale.sale_key).limit(1500);
-    if (events.error || (events.data?.length ?? 0) >= 1500) throw Error("mccormick_episode_lookup_unavailable");
+    const events = await readEvents();
     const eventMap = new Map<string, any>();
     for (const e of events.data ?? []) {
       const expected = byNative.get(e.metadata?.native_id)?.vehicle_id;
@@ -178,25 +199,15 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
           ended_at_precision: "day", ended_at_method: "scheduled_run_day", sale_outcome: "unknown" } }, { sourceObservedAt: checkedAt });
       if (projected.action === "error" || projected.action === "skipped") throw Error("mccormick_episode_projection_unavailable");
     };
-    const lotMap = new Map(lots.map(l => [l.native_id, l]));
-    for (const old of events.data ?? []) {
-      if (old.metadata?.projection_method !== MCCORMICK_LIVE_METHOD || old.metadata?.withdrawn_at) continue;
-      const lot = lotMap.get(old.metadata?.native_id), binding = byNative.get(old.metadata?.native_id);
-      const reason = projectionWithdrawal(old, lot, binding);
-      if (!reason) continue;
-      if (budget.remainingMs() < 12000) throw Error("mccormick_projection_reconciliation_deadline");
-      const withdrawn = await writeEpisode(db, { vehicle_id: old.vehicle_id, source_platform: "mccormicks",
-        source_listing_id: old.source_listing_id, metadata: { withdrawn_at: checkedAt, withdrawal_basis: reason,
-          source_observed_at: checkedAt, source_catalog_snapshot_id: catalog.snapshot_id } }, { sourceObservedAt: checkedAt });
-      if (withdrawn.action === "error" || withdrawn.action === "skipped") throw Error("mccormick_withdrawal_projection_failed");
-    }
+    await withdrawInvalid(events.data ?? [], current.data.inventory);
     for (const lot of eligible.slice(0, 20)) {
       if (budget.remainingMs() < 12000) break;
       await write(lot, byNative.get(lot.native_id)); projected++;
     }
     result.retained_inventory.episodes_projected = projected;
     result.retained_inventory.detail_refresh_due = due.length;
-    await stamp(null);
+    result.error = detailError;
+    await stamp(detailError);
     return result;
   } catch (e) {
     result.error = e instanceof Error ? e.message : String(e);
