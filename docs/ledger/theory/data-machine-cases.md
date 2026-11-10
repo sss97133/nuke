@@ -559,8 +559,8 @@ separately; nothing below is a claim of fleet coverage.
   written; free signals for choosing what to read; what a reading costs; and a critic's check of all five, which
   found two of their claims wrong and two stale).
 - The keys role was tested for consistency (`docs/ledger/theory/image-keys-test.md`): three runs with no memory
-  agreed on 29 of 52 statements and drafted 30 different part keys between them; two runs given the first run's
-  decisions agreed on 50 of 52 and drafted the same 18.
+  agreed on 29 of 52 statements and drafted 30 different part keys between them; three runs given the first run's
+  decisions agreed on 49 of 52 and drafted the same 18.
 - The record is held by a test (`scripts/guardrails/no-new-photo-reader.test.mjs`): removing the "Reading photos"
   section, the direction, the keys and folds section or the gate fails pull requests.
 - The owner's test of this record exists and has run twice; it is kept out of this reading path (the guardrails
