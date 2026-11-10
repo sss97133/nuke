@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyAmount } from '../../utils/currency';
-import { recordedAudienceCount, recordedCurrency } from '../../pages/vehicle-profile/auctionEvidenceDisplay';
+import { recordedAudienceCount, recordedCurrency, readNativeListingHistory, type NativeListingHistory } from '../../pages/vehicle-profile/auctionEvidenceDisplay';
 
 interface VehicleEvent {
   id: string;
@@ -62,6 +62,12 @@ function calendarDay(value: unknown): string | null {
 const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
   const [listings, setListings] = useState<VehicleEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [nativeHistory, setNativeHistory] = useState<NativeListingHistory[]>([]);
+  const [historyUnavailable, setHistoryUnavailable] = useState(false);
+  const [historyCapped, setHistoryCapped] = useState(false);
+  const request = React.useRef(0);
+  const readAbort = React.useRef<AbortController | null>(null);
+  const [loadedVehicle, setLoadedVehicle] = useState<string | null>(null);
 
   const parseTs = (v: any): number => {
     try {
@@ -141,28 +147,43 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
   useEffect(() => {
     loadVehicleEvents();
+    return () => { request.current++; readAbort.current?.abort(); };
   }, [vehicleId]);
 
   const loadVehicleEvents = async () => {
+    const generation = ++request.current;
+    readAbort.current?.abort();
+    const controller = new AbortController(); readAbort.current = controller;
+    const deadline = setTimeout(() => controller.abort(), 10000);
+    setListings([]); setNativeHistory([]); setHistoryUnavailable(false); setHistoryCapped(false); setLoading(true);
     try {
-      const { data, error } = await supabase
+      const [events, history] = await Promise.allSettled([supabase
         .from('vehicle_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('updated_at', { ascending: false })
-        .limit(200);
-
-      if (error) throw error;
-
-      setListings(normalizeAndSortListings(data || []));
+        .abortSignal(controller.signal).limit(200), supabase.rpc('get_vehicle_specs', {
+          p_vehicle_ids: [vehicleId], p_include_typed_claims: true, p_claim_cursor: {},
+        }).abortSignal(controller.signal)]);
+      if (request.current !== generation) return;
+      if (events.status === 'fulfilled' && !events.value.error) setListings(normalizeAndSortListings(events.value.data || []));
+      else setHistoryUnavailable(true);
+      if (history.status === 'fulfilled' && !history.value.error) {
+        try {
+          const read = readNativeListingHistory(history.value.data, vehicleId);
+          setNativeHistory(read.entries); setHistoryCapped(read.hasMore);
+        } catch { setHistoryUnavailable(true); }
+      } else setHistoryUnavailable(true);
     } catch (error) {
       console.error('Error loading vehicle events:', error);
+      if (request.current === generation) setHistoryUnavailable(true);
     } finally {
-      setLoading(false);
+      clearTimeout(deadline);
+      if (request.current === generation) { setLoading(false); setLoadedVehicle(vehicleId); }
     }
   };
 
-  if (loading) {
+  if (loading || loadedVehicle !== vehicleId) {
     return (
       <div style={{ padding: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
         Loading auction history...
@@ -170,7 +191,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
     );
   }
 
-  if (listings.length === 0) {
+  if (listings.length === 0 && nativeHistory.length === 0 && !historyUnavailable) {
     return null;
   }
 
@@ -178,6 +199,26 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
     <div className="card">
       <div className="card-header">Auction history</div>
       <div className="card-body">
+        {historyUnavailable && <p role="status">Some auction source history could not be read.</p>}
+        {historyCapped && <p role="status">Showing qualified results from the latest 50 retained listing captures. Older history may exist.</p>}
+        {nativeHistory.filter(claim => !listings.some(row => normalizeListingUrlKey(row.source_url) === claim.source_url
+          && row.metadata?.source_observation_id === claim.observation_id)).map(claim => (
+          <div key={claim.observation_id} style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
+            <strong>Collecting Cars reports {claim.reported_outcome === 'sold' ? 'sold' : 'unsold'}</strong>
+            <p>{claim.reported_outcome === 'sold'
+              ? claim.reported_amount === null ? 'Sale amount not stated by the source.' : recordedAmount(claim.reported_amount, recordedCurrency(claim.currency))
+              : claim.reported_amount === null ? 'No sale reported; high bid not stated.'
+                : `Reported high bid: ${recordedAmount(claim.reported_amount, recordedCurrency(claim.currency))} · no sale reported`}</p>
+            <p>Publisher report, not independently verified. Fees are unrecorded.</p>
+            <p>Source-reported {claim.reported_outcome === 'sold' ? 'sale' : 'end'}: {claim.reported_event_at
+              ? <time dateTime={claim.reported_event_at}>{new Date(claim.reported_event_at).toISOString()}</time> : 'Date not stated'}</p>
+            <p>Source captured: <time dateTime={claim.source_captured_at}>{new Date(claim.source_captured_at).toISOString()}</time></p>
+            {claim.mileage !== null && claim.mileage_unit && <p>Source odometer: {claim.mileage.toLocaleString('en-US')} {claim.mileage_unit === 'mi' ? 'miles' : 'km'}</p>}
+            {claim.bid_count !== null && <p>Source bid count: {claim.bid_count} · aggregate count, not retained individual bid history</p>}
+            <a href={`/vehicle/${vehicleId}/observation/${claim.observation_id}`}>Retained source details</a>{' · '}
+            <a href={claim.source_url} target="_blank" rel="noopener noreferrer">View on Collecting Cars</a>
+          </div>
+        ))}
         {listings.map(listing => {
           const platformName = platformNames[listing.source_platform] || listing.source_platform;
           const platformColor = platformColors[listing.source_platform] || 'var(--accent)';

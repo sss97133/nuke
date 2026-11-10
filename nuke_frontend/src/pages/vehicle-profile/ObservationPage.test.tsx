@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // Synthetic offline contracts; no production testimony is created.
 const fixture = vi.hoisted(() => ({
   route: { vehicleId: 'offline-vehicle', obsId: 'offline-observation' },
-  auth: { user: { id: 'viewer-a' } as { id: string } | null, loading: false }, read: vi.fn(), calls: [] as any[],
+  auth: { user: { id: 'viewer-a' } as { id: string } | null, loading: false }, read: vi.fn(), calls: [] as any[], history: [] as any[],
 }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => fixture.auth }));
 vi.mock('react-router-dom', async original => ({
@@ -28,7 +28,11 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from(table: string) {
     },
   };
   return query;
-} } }));
+}, rpc: (_name: string, args: any) => ({ abortSignal: () => Promise.resolve({ data: [{
+  vehicle_id: args.p_vehicle_ids[0], schema_version: 'vehicle_data_model_v1', native_listing_history: {
+   reader: 'cc_native_profile_history_v1', capture_limit: 50, has_more_captures: false, entries: fixture.history,
+  },
+ }], error: null }) }) } }));
 import ObservationPage from './ObservationPage';
 
 const PARENT = 'offline-vehicle', OBS = 'offline-observation';
@@ -44,12 +48,27 @@ let root: Root, host: HTMLDivElement;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.auth = { user: { id: 'viewer-a' }, loading: false };
-  fixture.route = { vehicleId: PARENT, obsId: OBS }; fixture.calls = []; fixture.read.mockReset();
+  fixture.route = { vehicleId: PARENT, obsId: OBS }; fixture.calls = []; fixture.history = []; fixture.read.mockReset();
   fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call) : { data: observation(), error: null });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); });
 async function mount() { await act(async () => root.render(<MemoryRouter><ObservationPage /></MemoryRouter>)); }
+
+it('opens the sanitized publisher claim while the raw name-bearing observation remains unavailable', async () => {
+ const claim = { observation_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', source_url: 'https://collectingcars.com/for-sale/fixture-car',
+  source_listing_id: '1', source: 'collecting-cars', qualification: 'publisher_reported_unverified', reported_outcome: 'sold',
+  reported_amount: 67500, reported_amount_kind: 'sale_price', currency: 'GBP', reported_event_at: '2019-06-06T15:02:00Z', source_captured_at: '2026-01-01T00:00:00Z',
+  ingested_at: '2026-01-01T00:00:02Z', mileage: 283785, mileage_unit: 'mi', bid_count: 38 };
+ fixture.route.obsId = claim.observation_id; fixture.history = [claim]; fixture.auth.user = null;
+ fixture.read.mockImplementation(call => call.table === 'vehicles' ? parent(call) : { data: null, error: null });
+ await mount();
+ expect(host.textContent).toContain('67500'); expect(host.textContent).toContain('GBP');
+ expect(host.textContent).toContain('2019-06-06T15:02:00.000Z');
+ expect(host.textContent).toContain('Publisher report (unverified)');
+ expect(host.textContent).toContain('283785'); expect(host.textContent).toContain('mi');
+ expect(host.textContent).not.toContain('Private Seller');
+});
 
 it('gates the parent before reading the observation and binds both URL IDs', async () => {
   await mount();

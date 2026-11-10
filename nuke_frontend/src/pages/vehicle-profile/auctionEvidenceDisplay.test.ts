@@ -1,8 +1,28 @@
 import { expect, it, vi } from 'vitest';
-import { currentBidEvidenceAmount, recordedAudienceCount } from './auctionEvidenceDisplay';
+import { currentBidEvidenceAmount, recordedAudienceCount, readNativeListingHistory } from './auctionEvidenceDisplay';
 const url = 'https://collectingcars.com/for-sale/1980-porsche-928-2';
 const fact = { price_amount: 15000, source_url: url };
 const pulse = { current_bid: 15000, listing_url: `${url}/`, currency_code: 'aud' };
+const report = { observation_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', source_url: url, source_listing_id: '1',
+ source: 'collecting-cars', qualification: 'publisher_reported_unverified', reported_outcome: 'sold', reported_amount: 67500, reported_amount_kind: 'sale_price',
+ currency: 'GBP', reported_event_at: '2019-06-06T15:02:00Z', source_captured_at: '2026-01-01T00:00:00Z',
+ ingested_at: '2026-01-01T00:00:02Z', mileage: 283785, mileage_unit: 'mi', bid_count: 38 };
+const history = (entry = report) => [{ vehicle_id: 'v', schema_version: 'vehicle_data_model_v1', native_listing_history: {
+ reader: 'cc_native_profile_history_v1', capture_limit: 50, has_more_captures: false, entries: [entry],
+} }];
+it('accepts only the exact sanitized native history contract', () => {
+ expect(readNativeListingHistory(history(), 'v').entries[0]).toEqual(report);
+ expect(() => readNativeListingHistory(history(), 'another')).toThrow();
+});
+it.each([
+ { source_url: 'https://private.invalid/secret' }, { source: 'other' }, { qualification: 'verified_sale' },
+ { reported_amount: '67500' }, { reported_outcome: 'unsold', reported_amount: 67500 },
+ { reported_event_at: '2999-01-01T00:00:00Z' }, { source_captured_at: 'invalid' },
+ { reported_event_at: '2026-02-01T00:00:00Z' }, { currency: 'Private Seller' }, { currency: 'ZZZ' },
+ { mileage_unit: 'inferred miles' }, { bid_count: -1 },
+])('refuses contradictory or malformed public claim %j', patch => {
+ expect(() => readNativeListingHistory(history({ ...report, ...patch } as typeof report), 'v')).toThrow();
+});
 it('denominates the same source episode and amount in its recorded currency', () => {
   expect(currentBidEvidenceAmount(fact, pulse)).toBe('A$15,000');
 });
