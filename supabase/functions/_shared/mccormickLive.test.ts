@@ -1,4 +1,4 @@
-import { mccormickLiveLinks, parseMcCormickSale, parseMcCormickFutureSales, parseMcCormickInventory, mccormickRunDay, MCCORMICK_ORIGIN as origin } from './mccormickLive.ts';
+import { mccormickLiveLinks, parseMcCormickSale, parseMcCormickFutureSales, parseMcCormickInventory, mccormickRunDay, mccormickRunDayReader, MCCORMICK_ORIGIN as origin } from './mccormickLive.ts';
 import { mccormickTarget, parseMcCormickLot } from './mccormickParser.ts';
 import { normalizeListingUrl } from './urlNormalization.ts';
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
@@ -46,4 +46,14 @@ Deno.test('showroom native identity is separate from auction IDs and stock numbe
   const parsed = parseMcCormickLot(detail,url);
   eq(parsed.source_id,'showroom:27'); eq(parsed.raw_fields.Transmission,'Automatic');
   eq(parsed.asking_claim?.amount,8500); eq(parsed.result_claim,null);
+});
+
+Deno.test('one sale reader resolves boundary lots consistently and refuses overlap or contradictory source days',()=>{
+  const catalog='Lots 1-180 Friday Lots 181-405 Saturday Lots 406-580 Sunday';
+  const schedule='FRIDAY, November 20th LOTS 1-140 SATURDAY, November 21st LOTS 181-380 SUNDAY, November 22nd LOTS 406-550';
+  const read=mccormickRunDayReader(sale,catalog,schedule);
+  eq(['1','140','141','180','181','380','381','405','406','550','551','580','A1'].map(read),
+    ['2026-11-20','2026-11-20',null,null,'2026-11-21','2026-11-21',null,null,'2026-11-22','2026-11-22',null,null,null]);
+  eq(mccormickRunDayReader(sale,catalog+' Lots 100-200 Friday',schedule)('140'),null);
+  eq(mccormickRunDayReader(sale,catalog,schedule.replace('November 20th','November 21st'))('1'),null);
 });

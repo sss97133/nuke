@@ -1,5 +1,5 @@
 import { archiveFetch, type ArchiveFetchOptions, type ArchiveFetchResult } from "../_shared/archiveFetch.ts";
-import { MCCORMICK_LIVE_METHOD, MCCORMICK_ORIGIN, mccormickLiveLinks, mccormickRunDay,
+import { MCCORMICK_LIVE_METHOD, MCCORMICK_ORIGIN, mccormickLiveLinks, mccormickRunDayReader,
   parseMcCormickSale, parseMcCormickFutureSales, parseMcCormickInventory, type McCormickInventoryRow } from "../_shared/mccormickLive.ts";
 import { vehicleEventWriterFor } from "../_shared/vehicleEventWrite.ts";
 import { ledgerWriteFor, type IntakeBudget } from "./ledger.ts";
@@ -61,7 +61,8 @@ export async function pollMcCormick(db: any, feed: any, budget: IntakeBudget, al
     const sales = [sale, ...(future ? parseMcCormickFutureSales(future.html, future.url) : [])];
     if (new Set(sales.map(s => s.sale_key)).size !== sales.length) throw Error("mccormick_duplicate_sale_identity");
     const lots = parseMcCormickInventory(catalog.html, "auction", sale);
-    for (const lot of lots) lot.run_on = mccormickRunDay(lot.lot_number, sale, catalog.html, schedule.html);
+    const runDay = mccormickRunDayReader(sale, catalog.html, schedule.html);
+    for (const lot of lots) lot.run_on = runDay(lot.lot_number);
     const showroom = parseMcCormickInventory(showroomPage.html, "showroom");
     sale.lots_listed = lots.length;
     const checkedAt = new Date(clock()).toISOString();

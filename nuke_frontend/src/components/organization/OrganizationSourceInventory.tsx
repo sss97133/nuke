@@ -20,8 +20,8 @@ export function currentSourceRows(data: SourceInventory, filter: string, search:
     && (filter === 'all' || filter === r.inventory_kind || filter === r.sale_key)
     && `${r.year ?? ''} ${r.make} ${r.model} ${r.lot_number}`.toLowerCase().includes(query));
 }
-export default function OrganizationSourceInventory({ organizationId, fallback = null }: { organizationId: string; fallback?: ReactNode }) {
-  const [filter, setFilter] = useState('all'), [search, setSearch] = useState(''), [limit, setLimit] = useState(50);
+export default function OrganizationSourceInventory({ organizationId, fallback = null, initialFilter = 'all', children }: { organizationId: string; fallback?: ReactNode; initialFilter?: 'all' | 'auction'; children?: ReactNode }) {
+  const [filter, setFilter] = useState<string>(initialFilter), [search, setSearch] = useState(''), [limit, setLimit] = useState(50);
   const query = useQuery({ queryKey: ['organization-source-inventory', organizationId], queryFn: async () => {
     const { data, error } = await supabase.rpc('organization_source_inventory_read', { p_organization_id: organizationId });
     if (error) throw error;
@@ -38,14 +38,16 @@ export default function OrganizationSourceInventory({ organizationId, fallback =
     }
   }, [data, organizationId]);
   if (!data) return <>{query.isError && <p role="status">Schedule and inventory unavailable.</p>}{fallback}</>;
+  if (!data.checked_at) return <><section id="source-inventory" className="organization-source-inventory" aria-label="Upcoming sales and current inventory">
+    <Text as="h2" role="entity">Upcoming sales and current inventory</Text>
+    <p role="status">The first complete source reading is pending.</p>
+  </section>{children}</>;
   const rows = currentSourceRows(data, filter, search);
-  const stale = data.stale || !data.checked_at || Date.now() - Date.parse(data.checked_at) > 3_600_000;
-  return <section id="source-inventory" className="organization-source-inventory" aria-label="Upcoming sales and current inventory">
+  const stale = data.stale || Date.now() - Date.parse(data.checked_at) > 3_600_000;
+  return <><section id="source-inventory" className="organization-source-inventory" aria-label="Upcoming sales and current inventory">
     <Text as="h2" role="entity">Upcoming sales</Text>
-    <Text as="p" role="caption">McCormick’s published schedule and inventory · <span title={data.checked_at ?? undefined}>{updatedAgo(data.checked_at, Date.now()).replace('updated', 'checked')}</span></Text>
-    {(stale || data.refresh_failed || query.isError) && <p role="status">{data.checked_at
-      ? 'Refresh delayed. Showing the last complete source reading; confirm availability with McCormick’s.'
-      : 'The first complete source reading is pending.'}</p>}
+    <Text as="p" role="caption">McCormick’s published schedule and inventory · <span title={data.checked_at}>{updatedAgo(data.checked_at, Date.now()).replace('updated', 'checked')}</span></Text>
+    {(stale || data.refresh_failed || query.isError) && <p role="status">Refresh delayed. Showing the last complete source reading; confirm availability with McCormick’s.</p>}
     <ul className="organization-source-inventory__sales">{data.sales.map(sale => {
       const url = houseLink(data.source, sale.source_url);
       return <li key={sale.sale_key}>
@@ -81,5 +83,5 @@ export default function OrganizationSourceInventory({ organizationId, fallback =
     </table></div>
     {!rows.length && <p>No advertised cars match this view.</p>}
     {limit < rows.length && <button type="button" onClick={() => setLimit(n => n + 50)}>Show more cars</button>}
-  </section>;
+  </section>{children}</>;
 }
