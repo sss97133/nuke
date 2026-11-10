@@ -85,19 +85,28 @@ if (fromQueue) {
 }
 console.error(`${frames.length} frames (${fromQueue ? 'stage queue' : statuses.join('/')}) to classify for ${OWNER} with the orchestrator's ${checklist.prompt_version} checklist (model ${model}, concurrency ${conc})${dry ? ' [dry run]' : ''}`);
 
-const out = []; const summary = { frames: frames.length, source: fromQueue ? 'stage-queue' : 'status', read: 0, accepted: 0, classifier_rejected: 0, errors: 0, receipts: 0, receipt_errors: 0, stopped: null, by_type: {}, read_seconds: 0 };
+// error_classes: why frames failed, from the receipt vocabulary (fixed words, never reader text), so the heartbeat row
+// says what is wrong without anyone opening the log on the Mac.
+const out = []; const summary = { frames: frames.length, source: fromQueue ? 'stage-queue' : 'status', read: 0, accepted: 0, classifier_rejected: 0, errors: 0, error_classes: {}, receipts: 0, receipt_errors: 0, stopped: null, by_type: {}, read_seconds: 0 };
 let stop = false;
-// One typed receipt per claimed photo, written once; a receipt whose fault is the batch's (compute exhausted, login or
-// key refused, converter missing) ends the batch. Photos claimed but not started go back to the queue when the lease ends.
+// Each photo's result is typed once (receiptForResult). The type is counted in the summary on either worklist, and a
+// fault that is the batch's rather than the photo's (compute exhausted, login or key refused, a missing tool, the API
+// unreachable) ends the batch. On the stage queue the receipt is also written, once per claimed photo; photos claimed
+// but not started go back to the queue when the lease ends.
 const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
 const settled = new Set();
 const settle = async (f, result) => {
-  if (!fromQueue || settled.has(f.id)) return;
+  if (settled.has(f.id)) return;
   settled.add(f.id);
   const receipt = receiptForResult(result, { reader: READER, promptVersion: checklist.prompt_version });
+  if (receipt.error_class) {
+    const cls = String(receipt.error_class).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 48);
+    summary.error_classes[cls] = (summary.error_classes[cls] || 0) + 1;
+  }
+  if (receipt.stop) { stop = true; summary.stopped = receipt.error_class; }
+  if (!fromQueue) return;
   const saved = await recordStageReceipt(rpc, { imageId: f.id, version: f.target_version, receipt, fingerprint: inputFingerprint(f.image_url, md5) });
   if (saved.ok) summary.receipts++; else { summary.receipt_errors++; console.error(`${f.id} receipt not recorded: ${saved.error}`); }
-  if (receipt.stop) { stop = true; summary.stopped = receipt.error_class; }
 };
 if (!dry) {
   const dir = mkdtempSync(join(tmpdir(), 'nuke-classify-'));

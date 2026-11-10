@@ -16,6 +16,7 @@ import { promisify } from 'node:util';
 import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { receiptForResult } from './stage-queue.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -107,7 +108,15 @@ async function land(f, extraction) {
 
 const frames = await worklist();
 console.error(`${frames.length} document frames to read for ${OWNER} (model ${model}, concurrency ${conc})${dry ? ' [dry run]' : ''}`);
-const out = []; const summary = { frames: frames.length, read: 0, page: 0, landed: 0, waiting_no_vehicle: 0, vehicle_document: 0, errors: 0, by_type: {}, read_seconds: 0 };
+// error_classes: why frames failed, in the frame reader's fixed vocabulary (never reader text), so the heartbeat row
+// says what is wrong without anyone opening the log on the Mac.
+const out = []; const summary = { frames: frames.length, read: 0, page: 0, landed: 0, waiting_no_vehicle: 0, vehicle_document: 0, errors: 0, error_classes: {}, by_type: {}, read_seconds: 0 };
+const errorClass = (e) => {
+  const msg = String(e?.message || e);
+  const dl = msg.match(/^download (\d+)/);
+  const result = dl ? { download: { status: Number(dl[1]) } } : /fetch failed/i.test(msg) ? { download: { status: 0 } } : { reader: { error: msg, missingTool: e?.code === 'ENOENT' } };
+  return String(receiptForResult(result).error_class || 'unclassified').replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 48);
+};
 if (!dry) {
   const dir = mkdtempSync(join(tmpdir(), 'nuke-docread-'));
   let i = 0;
@@ -129,6 +138,7 @@ if (!dry) {
         console.error(`${f.id} ${t} ${res.http} ${res.landed ? 'landed ' + res.receipt_id : (res.reason || res.error || '')}`);
       } catch (e) {
         summary.errors++; out.push({ image_id: f.id, error: String(e.message || e).slice(0, 300) });
+        const cls = errorClass(e); summary.error_classes[cls] = (summary.error_classes[cls] || 0) + 1;
         console.error(`${f.id} ERROR ${String(e.message || e).slice(0, 160)}`);
       }
       for (const p of [join(dir, `${f.id}.jpg`), join(dir, `${f.id}.heic`)]) if (existsSync(p)) rmSync(p, { force: true });

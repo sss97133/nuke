@@ -40,7 +40,7 @@ if (raw.includes('corrupt')) { console.error('Error: Cannot extract image from f
 require('node:fs').copyFileSync(raw, out);
 `;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false } = {}) {
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false, statusFrames = [] } = {}) {
   const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0 };
   let port;
   const server = createServer((req, res) => {
@@ -53,7 +53,10 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         return res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
       }
       if (req.url.startsWith('/rest/v1/platform_config')) return config === 'error' ? json(503, { code: 'PGRST002' }) : json(200, config ? [{ config_value: config }] : []);
-      if (req.url.startsWith('/rest/v1/vehicle_images')) { calls.status.push(decodeURIComponent(req.url)); return json(200, []); }
+      if (req.url.startsWith('/rest/v1/vehicle_images')) {
+        calls.status.push(decodeURIComponent(req.url));
+        return json(200, statusFrames.map((n) => ({ id: n, vehicle_id: null, user_id: OWNER, image_url: `http://127.0.0.1:${port}/img/${n}`, file_name: null, taken_at: null, ai_processing_status: 'failed' })));
+      }
       if (req.url === '/rest/v1/rpc/claim_image_stage_work') {
         calls.claims.push(JSON.parse(data));
         return json(200, frameNames.map((n, i) => ({ work_id: i + 1, image_id: n, image_url: n.includes('no-url') ? '' : `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: null, lane: 'live', reason: 'missing', target_version: 1 })));
@@ -113,6 +116,8 @@ test('every started photo gets one typed receipt with the URL fingerprint; a spe
     assert.equal(calls.readings[0].reader, 'claude-cli sonnet subscription');
     assert.deepEqual([summary.source, summary.frames, summary.receipts, summary.receipt_errors, summary.accepted, summary.stopped],
       ['stage-queue', 7, 6, 0, 1, 'reader_usage_limit'], 'the summary counts receipts and names why the batch stopped');
+    assert.deepEqual(summary.error_classes, { image_http_error: 1, image_unreadable: 1, reader_output_invalid: 1, classifier_response_invalid: 1, reader_usage_limit: 1 },
+      'the summary (the heartbeat reading) says why frames failed, in fixed words');
   });
 });
 
@@ -141,6 +146,21 @@ test('the queue is used only for an owner the reconciler names; a failed config 
     assert.equal(summary, null);
     assert.deepEqual([calls.claims.length, calls.status.length, calls.receipts.length], [0, 0, 0]);
   }, { config: 'error' });
+});
+
+test('on the status worklist nothing is written to the ledger, and the summary still says why frames failed', async () => {
+  await withStandIns([], ({ calls, summary }) => {
+    assert.deepEqual([calls.claims.length, calls.receipts.length], [0, 0], 'ledger off: no claim, no receipt');
+    assert.deepEqual([summary.source, summary.frames, summary.accepted, summary.errors], ['status', 3, 1, 2]);
+    assert.deepEqual(summary.error_classes, { image_http_error: 2 }, 'two photos whose URL answers 404');
+    assert.equal(summary.stopped, null);
+  }, { config: { enabled: false, user_ids: [] }, statusFrames: ['a-gone.jpg', 'b-ok.jpg', 'c-gone.jpg'] });
+  // a spent subscription ends the batch on this worklist too, instead of failing every remaining photo
+  await withStandIns([], ({ calls, summary }) => {
+    assert.equal(calls.receipts.length, 0);
+    assert.deepEqual([summary.stopped, summary.error_classes], ['reader_usage_limit', { reader_usage_limit: 1 }]);
+    assert.equal(calls.readings.length, 0, 'the photo after the limit was not started');
+  }, { config: null, statusFrames: ['a-limit.jpg', 'b-ok.jpg'] });
 });
 
 test('no CLI on the machine stops the batch at the first photo', async () => {
