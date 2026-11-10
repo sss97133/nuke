@@ -23,6 +23,12 @@ observed on a vehicle, the values each observation may take and what each looks 
 job in hand, what earlier readings said and the view the photo shows choose which of those to ask. The
 photo answers.
 
+This is what "levels" means here. The first read gives the view. The view, the vehicle and the job choose
+the questions. The answers choose the next questions. The stage ledger (`image_pipeline_stages`,
+`image_stage_receipts`) records which level ran on which photo under which contract; it is not where a
+level's result lives. A level's result is keyed observations, and the next level's questions are chosen
+from them.
+
 Rules for every agent and every reader. Each names its mechanism or says that none exists yet.
 
 1. **A reading is finished when it is keyed, not when it is stored.** Keyed means an observation written
@@ -36,12 +42,24 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    2026-11-10 counted six hand-written photo contracts side by side. Mechanism: none yet.
 3. **Answers are closed.** A value from the registry's list, not visible, or cannot tell; where in the
    photo; who answered, with which reader, from what. `evidence_judgment_requests` already has this
-   shape for one question kind. Unknown is an answer and is stored.
+   shape for one question kind. Unknown is an answer and is stored. Mechanism: none for photos, and the
+   writer does the opposite for the keys it admits: `imageProperties.ts` refuses a null value and any
+   value outside its typed list, and the three registered photo keys say "Unknown is absent". So today
+   "not visible" and "cannot tell" can be stored only as an answer in `evidence_judgment_requests`.
+   Working default: the question and its closed answer, unknowns included, live in the question store;
+   an answer with a listed value becomes a keyed observation. Readings harvested from earlier readers
+   have no question and go straight to keyed observations.
 4. **An answer is testimony.** "The yes/no is answers. And they become factual if handled right
    creating truth from a hallucination machine." One reader's answer is never a fact. It becomes one by
    agreement across photos and across independent readers, by a receipt, or by the owner's word at
    Sign. The same state seen in thirteen photos is one claim with thirteen witnesses. A later photo
-   that shows the opposite records a change and leaves the earlier testimony in place.
+   that shows the opposite records a change and leaves the earlier testimony in place. Mechanism: none
+   yet. `observation_witnesses` is written only by the insert trigger `project_observation_image_witness`
+   (20261002213353), which reads one `structured_data.image_id` and writes one row, so an observation
+   has one photo. Thirteen sightings are thirteen keyed observations today, and "one claim" is a fold at
+   read time over vehicle, key, part and value that no reader performs yet. Nothing records agreement
+   between readers, a receipt's support or the owner's word on a claim, so no row is proven yet. Do not
+   plan one observation with many witnesses: it has no writer.
 5. **Where there is no place, the place is written, the same way every time.** "If there's no place to
    put the data it has to be written. That takes a certain degree of intelligence and most importantly
    consistency." Look first, in the registry and in every alias already recorded. If the thing is
@@ -57,56 +75,177 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    any other key before it looks at the registry. A key approved through `schema_proposals` therefore
    cannot land from a photo until that list is replaced by a read of the registry. The question store
    is the same: `evidence_judgment_ineligibility` (20261111210500) accepts one question kind. An alias
-   memory for parts does not exist yet.
+   memory for parts does not exist yet. How a place is proposed: a row in `schema_proposals`, inserted
+   by a migration that cites the readings which forced it
+   (`20261011073134_retained_engine_family_label_proposal.sql` is the pattern, and
+   `20261011230939_retained_engine_family_intake.sql` the intake that followed). An agent files and
+   never approves: approval is one row in `schema_proposal_reviews`, a human act. Draft first; file
+   after the owner or the lead has seen the draft.
 6. **Harvest before spend, and choose with prejudice.** Readings already paid for are keyed before any
    photo is read again. What is read next is chosen by what it is worth, inside a stated budget: "it's
    great if we have infinite compute. But if we don't we will not win." Date order belongs inside one
    subject once that subject is chosen. As the rule for a whole library the owner called it "a
-   dangerous mode", and the change that made it the rule (#3313) was withdrawn unmerged.
+   dangerous mode", and the change that made it the rule (#3313) was withdrawn unmerged. Mechanism: none
+   yet, and what runs today is close to the mode this rule warns about, by upload date:
+   `reconcile_image_stages` walks the account's library by `created_at` (newest uploads in the live
+   lane, oldest by cursor in the backfill), `claim_image_stage_work` hands out at most 25 a claim, and
+   a work item carries no vehicle, job or worth. The pace is settings, not a slow reader: the launchd
+   interval (600 s), and `--limit 20 --concurrency 2` in `scripts/photo-pipeline/subscription-reader-batch.sh`.
+   Each of those reads lands a description, a colour, text and sometimes an angle, and nothing keyed. A
+   request to read faster, or to read everything oldest first, is answered with those facts and one
+   question back to the owner: which vehicle or job first, and what budget on his subscription. Raising
+   a setting is not the answer and neither is refusing. That the reader keeps running meanwhile is a
+   default taken, not a ruling.
 7. **The measure is what the model gained.** "The next bar that's more important the images being
    'analysed' is the enrichment of the data model which is the real measure ... That the observations
    connect." Report keyed, connected, proven rows gained, with repeats folded: the whole library and
    its clock first, any one vehicle after (the fleet-relative contract below applies). Photos read is
-   a processing count.
+   a processing count. Mechanism: none yet; no reader reports this measure (`image_stage_coverage()` and
+   `photo_land_progress.result` count flow and stored rows). Until one exists a report gives three
+   counts, each beside the owner's `vehicle_images` total and the read time. *Keyed*:
+   `vehicle_observations` rows, not superseded, with `property_id` or `descriptor_id` set and an
+   `observation_witnesses` row on one of the owner's photos (the part cannot be counted until a part has
+   a place). *Connected*, a working definition: keyed rows that fold with another keyed row on the same
+   vehicle, key and value, or that a job, a receipt line or a change claim cites; give the folded claim
+   count beside the row count. *Proven*: folded claims with two independent readers in agreement, a
+   receipt, or the owner's decision; no store records any of these, so the count is zero by
+   construction and is reported as zero, not left out. Baseline: 0 keyed of 488 witnessed observations
+   on the proof vehicle (2026-11-10 21:33 UTC), and 0 of 94 on the vehicle measured first. The library
+   was not measured.
 8. **No new reader, prompt vocabulary or per-reader table for photos.** Extend the registry, the
    question store or the landing. Earlier attempts at this same idea are in the database and are not
    dead: `component_assembly_map` (a part, its states, what each state looks like),
    `image_question_answers` (1,021 answers with agreement and validation columns; a 2026-06-18 comment
    calls it empty and proposes dropping it, and it is not empty), the digital-twin component tables,
-   and `docs/features/image-processing/CONTEXT_DRIVEN_PROCESSING.md`. Mechanism:
-   `scripts/guardrails/check-capability-before-mint.mjs` reads the photo-reading rows of
-   `docs/ledger/CAPABILITY_MAP.md`.
+   and `docs/features/image-processing/CONTEXT_DRIVEN_PROCESSING.md`. Mechanism: the pull-request gate
+   below, and `scripts/guardrails/check-capability-before-mint.mjs`, which reads the photo-reading rows
+   of `docs/ledger/CAPABILITY_MAP.md` when an agent asks it.
+
+**Keys and folds, for photos.** The owner: "the talk on keys and folds is essential to not lose", and of
+the whole design, "the data acquires labels, keys, folds etc as connections are made". In this lane:
+
+- A **key** is what lets two rows be about the same thing without anyone reading their words: the
+  vehicle, the part of it, the state or flaw, the photo. A reading with words and no keys cannot be
+  joined, counted or cross-examined. "Hood in red oxide primer", "red-primer hood" and "hood still in
+  primer, not final paint" are one fact only once all three carry the same part key and the same value.
+- A **fold** is the step that makes one claim out of many keyed rows, by rule and not by judgment: the
+  same vehicle, part, property and value on the same capture day fold to one claim with every photo
+  behind it. A later day with a different value does not edit that claim. It is a second claim, and
+  the pair is the change: the repair, the repaint, the part replaced.
+- Keys take judgment once and memory ever after. Whether a wording means an existing key, or needs a
+  new one, is decided one time and stored; every later reader is given the decision. Without that
+  memory the same part gets a new spelling from every reader: on the first vehicle measured, 186 part
+  labels came in 126 spellings, and on the second 3,560 came in 2,678.
+- Folds take no judgment at all, so they are database logic. An agent that folds by eye will fold
+  differently tomorrow.
+- A key that is stretched is worse than a key that is missing. The engine bay is not the brake
+  booster. When no key is true the datum waits with a proposal, and the wait is visible.
+- Tried by hand on the first vehicle: 30 callouts folded to about 13 claims, one of them carried by 13
+  photos, and the two vocabularies could express 3 of the 13 without a new key. That ratio is the
+  size of the work: most of what careful readings say has no place yet.
+
+The procedure is the brief in `skills/image-keys/SKILL.md`.
+
+**The proof vehicle.** The owner, 2026-11-10: "A better example to work on is the firebird ... I know we
+need the pipeline to work but it has to be for the data we actually care about." The build is proved
+on that vehicle (`20d21fb0-4651-4469-a0ba-e751309a1e54`; its state is in C17 for the same date), not on
+the vehicle that was measured first. It is the vehicle with by far the most recent photos, it has
+already been read by the most careful reader, and none of what was read is keyed, so the whole first
+build there is keys and folds and needs no photo read again. What the reader happens to reach next in
+upload order is not a reason to work on it.
+
+**The gates.** The owner, the same day: "the architecture is the only thing that will ensure agents even
+dumb ones don't fuck up". A rule above holds only where something refuses the wrong move. Everything a
+photo reading does passes through four places. One has a gate. The other three are the build's
+definition of done: no piece of the build is finished until its gate exists.
+
+| Gate | Where | What it refuses | State |
+|---|---|---|---|
+| The pull request | `scripts/guardrails/no-new-photo-reader.mjs`, run by `pre-deploy-check.yml` | a new table keyed by a photo, or a new edge function or script whose name says it reads photos, unless `photo-stores.allow.json` lists it with the owner's approval | built 2026-11-10; it reads names and CREATE TABLE text, nothing deeper |
+| The writer | `ingest-observation` | a photo reading that carries no registered key and no part: counted first, refused once the readers key what they write | not built |
+| The scoreboard | one database reader over keyed, witnessed observations (the stage ledger's coverage reader is the thing to extend) | a progress number that is not computed from it | not built |
+| The database | an event trigger in the manner of `view_write_guard` (20261014214500) | a photo-keyed table created without an approved `schema_proposals` row, a hand-applied one included | not built |
+
+**The lane and who works it.** The card's team is lanes, each with a scoreboard, and image analysis had
+neither. It is one lane, the image fold the case ledger already names among the substrates, and its
+scoreboard is rule 7's measure. The owner, 2026-11-10: "hand the whole folds and keys stuff to a tested
+dedicated agent ... configure a team". Inside the lane:
+
+- **Keys** are a dedicated role with a fixed brief, [`skills/image-keys/SKILL.md`](../../../skills/image-keys/SKILL.md).
+  It is handed statements, a registry snapshot and the decisions made so far; it returns keyed claims,
+  proposals and its own decisions, and writes nothing. Any agent can be given the brief. What makes two
+  runs agree is the stored decisions, not the agent, and [`image-keys-test.md`](image-keys-test.md)
+  measures that.
+- **Folds** are database logic, not an agent: one claim per vehicle, part, property, value and capture
+  day, with every photo as a witness.
+- **Questions** are code that builds a photo's list from registry rows.
+- **Gates** are built by whoever builds the piece they guard.
+- **Approval and Sign** are the owner's. No agent approves a proposal or turns an answer into a fact.
+- **The test** is the owner-voice test below, run after each piece.
 
 **Acceptance.** Three questions, the owner's, must be queries that return vehicles with the photos that
 prove the answer: (1) Mustangs whose window felts were replaced during a restoration; (2) a Porsche
 that has a specific imperfection; (3) that imperfection was repaired and it is now this restored
 Porsche. Proof on one vehicle is validation scope, not fleet coverage. Under C17's rule the comparison
 is the same retained photos, the prior state against the new method, with changed claims traced into
-an existing consumer and an unchanged control.
+an existing consumer and an unchanged control. The proof vehicle is where the method is proved, not
+where the three questions are answered. The first proof is a question of the same shape on that
+vehicle: a named state of a named part, returned with its photos. The three literal questions wait on
+owner photos, since every reading lane skips listing photos: on 2026-11-10 the owner had photos on
+three Mustangs and one Porsche (C17). Say which of the two a result is.
 
-**Where the build starts.** Not started on 2026-11-10. This is a plan, not a record of work. Two agents
-given only this card and the owner's one-line request arrived at the same first three steps. On one
-vehicle, the C17 cohort of that date:
+**Where the build starts.** Not started on 2026-11-10. This is a plan, not a record of work. A full design
+and two adversarial judgments of it are in `docs/ledger/2026-11-10_image-keys-build-design.md` and
+`...-judgment.md`; read the judgment first. Both judges put the same thing first: a pull request of
+scripts only that harvests stored callouts onto condition keys, with no migration and no model call. Two agents
+given only this card and the owner's one-line request arrived at the same first three steps. On the
+proof vehicle named above:
 
-1. Read the before state: C17's counts for that vehicle, from production, with their clock.
+1. Read the before state from production, with its clock. Partly done on 2026-11-10 (C17 holds the
+   proof vehicle's counts and which Mustangs and Porsches have owner photos). Still to read: the paid
+   readings waiting to be keyed across the library, by reader and month; every
+   row of `observation_properties`, `condition_taxonomy`, `subject_taxonomy` and
+   `component_assembly_map`; and rule 7's counts for the library.
+   The ordered list is "To read from production" in `docs/ledger/2026-11-10_image-reading-map-critic.md`.
 2. Harvest before spend. By code, fold the readings already paid for (the condition observations'
    callouts and the part labels) against the registries. The output is claims that have a key, claims
    that have no place, and `schema_proposals` drafts that cite the observations which forced them.
    `scripts/lib/image-property-projection.mjs` already turns three fields of a deep reading into
-   registered property rows and is the thing to extend.
-3. Make the landing read the registry: allowed values, and the part a value is about, come from
-   registry rows in `imageProperties.ts`, so an approved key lands without a code change.
-4. Let the model ask: a question kind for a part's state in a photo, built from registry rows, in
+   registered property rows and is the thing to extend. Two limits read in its code: it defers a source
+   row whose confidence is below 0.6, and a reviewed row cannot be above 0.6 (the guard in
+   20261109213000), so run it dry first and read its deferred counts; and it lands through an intake
+   that refuses any key but the same three. The fold of callouts and part labels is new code beside it,
+   dry first: a file of claims and no rows.
+3. Land what already has a key. A `descriptor_key` that is live in `condition_taxonomy` is admitted
+   today with no code change, and its witness row follows from `structured_data.image_id`. No script
+   sends one. The claims step 2 finds a descriptor for are the first keyed rows and move rule 7's first
+   count off zero while the rulings below are pending. They name no part yet; say so in the report.
+4. Make the landing read the registry. This is not one file. The three keys and their values are typed
+   in `ingest-observation/imageProperties.ts` and checked again in `index.ts`; in
+   `ingest-observation-batch/cachedProperties.ts`; in `scripts/lib/image-property-projection.mjs`; in
+   the SQL intake `ingest_cached_image_property_batch` (20261004064216); and in the guard on projected
+   rows inside `get_field_provenance` (20261109203000). A registry row has no column for allowed
+   values, so that column is itself a proposal, and a key applied from a proposal is `pending` unless
+   the proposal asks for `core`, which is the only namespace the intake admits.
+5. Let the model ask: a question kind for a part's state in a photo, built from registry rows, in
    `evidence_judgment_requests`.
-5. Readers for the three questions, then C17's comparison on the same photos.
+6. Readers for the three questions, then C17's comparison on the same photos.
 
-Four things were read in the code that day and have to be settled before step 3. They are also the
+Four things were read in the code that day and have to be settled before step 4. They are also the
 first test of rule 5.
 
 - **A part has no place.** `vehicle_observations` has no column for the part of the vehicle a row is
   about (`subject_type` admits vehicle, organization, user, asset and external identity), a registry
   row carries no list of allowed values and no part, and no property uses a part as its discriminator.
-  This is the first thing to file through `schema_proposals`.
+  This is the first thing to file through `schema_proposals`. Decide it once, here, before anyone files
+  it: in the test of this card four agents put the part in four different places. The shapes the code
+  allows: (a) a key on the observation that resolves against `subject_taxonomy`, the way
+  `descriptor_key` resolves against `condition_taxonomy`; (b) the part as the property's
+  `discriminator_key`, the way `image_id` is used today, with the key carried in `structured_data`;
+  (c) one property per part and state, which multiplies the registry. Recommended, not ruled: (a),
+  because finding vehicles by part is then an indexed column and it mirrors the condition key. Bring
+  the owner one worked example of each on the cohort vehicle. The choice is written here and is not
+  reopened by the next reader.
 - **There are two registries.** `observation_properties` in the database, and the code registry
   `supabase/functions/_shared/cockpit/attribute-registry.ts`, whose own comment records an earlier
   owner call ("registry code is source of truth, not a DB table") and which already asks for a
@@ -122,9 +261,9 @@ first test of rule 5.
 
 **Testing this card by acting as the owner.** The owner's test: send a new agent, with no memory, the
 kind of message he would send, and see whether it goes where this card points or where the 2026-11-10
-session went. The messages, the grading and the first results are in
-[`owner-voice-test.md`](owner-voice-test.md). Run it again after any change to this section and after
-each piece of the build.
+session went. The messages and the grading are kept out of a new agent's reading path on purpose; the
+guardrails README says where they are. Run the test after any change to this section and after each
+piece of the build. An agent that is being tested does not open it.
 
 **What a person brings, and where it lives.** The owner describes how a person critiques the data:
 "based on their understanding and their patterns and their training along with their experience and
@@ -650,6 +789,17 @@ lead holds them.)
 > what you did today The obvious problem of being able to write the data model side is if it writes too much and wrong
 > and new every time. So I'm not sure how to remedy that but again if it's running we can fix it. If it never gets off
 > the ground we can't
+
+> But also the architecture is the only thing that will ensure agents even dumb ones don't fuck up
+
+> I'd think you can hand the whole folds and keys stuff to a tested dedicated agent or I'm not sure hopefully you can
+> configure a team that help you work
+
+> You'll get to a point where you'll need to test the system by acting like me. Querying to a new agent to fix the
+> image analysis pipeline. That's where this will get interesting
+
+> A better example to work on is the firebird. Also the talk on keys and folds is essential to not lose. I know we
+> need the pipeline to work but it has to be for the data we actually care about
 
 Earlier the same day, on where the first reading happens, on provider keys and on the app: "First read can take place
 the moment the image is taken like a live stream basically. And it can be routed vision api on device and all in near

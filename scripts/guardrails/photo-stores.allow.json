@@ -1,0 +1,6 @@
+{
+  "_about": "Read scripts/guardrails/no-new-photo-reader.mjs. Each entry: name -> { reason, approved }. 'approved' says where the owner's approval is recorded (for a table, the approved schema_proposals row id). An entry without his approval invents his decision.",
+  "tables": {},
+  "functions": {},
+  "scripts": {}
+}
