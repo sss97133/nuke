@@ -533,17 +533,53 @@ Fresh unsorted breakdown at 13:13 AST, n = 926 (mutually exclusive `why`, then t
 
 Non-sensitive typ `other` = 180 and typ `receipt_document` = 17 overall (they sit inside the rows above, not a separate why).
 
+## 18.5 Live apply of #3301–#3304 (14:20–15:08 AST)
+
+All four PRs were CI green (validate + db-contracts) before apply. The first #3301 apply (INCLUDE columns on the open-review index) had already rolled back earlier; the INCLUDE-less head `b32fde5d` was applied at 14:19 AST. `capture_ledger_states` then completed in 59.9 s. Immediately after #3301, official states were: on_vehicle 13,973; held 8,721; pulled 2,126; unverified 1,990; private 1,228; unsorted 924; duplicate 787; waiting 0 (n = 29,749).
+
+#3302 (`2131f84a`) was applied next (ledger md5s `379d2ec7` / `5d801d4f`, which keep the #3301 timeout fix and add `non_vehicle`). Second looks were done on the box: the Mac was offline, so frames were viewed directly (HEIC converted; 3 `image_intake` files were unreadable and skipped). 197 eligible unsorted typ `other`/`receipt_document` frames (180 + 17), excluding empty_url, the 452-id union, ledger-duplicates, held, waiting, and sensitive. Verdicts: 127 `non_vehicle`, 26 `vehicle`, 41 `judgment_personal`, 3 skip. Signed cap-50 runs (granted_by = owner): `552870ee` 50, `4cf119c4` 50, `fba83d9c` 27 non_vehicle; `efa52ea2` 26 vehicle (enqueued 2019-09-27, 2026-06-12, 2026-06-13); `00aa930c` 41 judgment_personal (logged, stayed unsorted, not promoted). After those runs: non_vehicle 127, unsorted 797, on_vehicle 13,974 / unverified 1,989 (one unverified photo filed outside these producers), other buckets unchanged. Revert a run with `capture_non_vehicle_review_revert_v1`.
+
+#3303 (`3915d951`) dry-run saw eligible 242. Five signed cap-50 runs admitted all 242 (`d8b42e64`, `359e79d7`, `f1afd224`, `54d29ccc`, `a727a1d8` 42); a sixth (`031b5f7e`) took 0. Samples: `import_session_admit=true`, no DateTimeOriginal written, `taken_at` unchanged. Ledger unchanged until drain. Revert: `capture_import_session_admit_revert_v1`.
+
+#3304 (`345e38c7`) dry-run took 50 photos on 19 leftover days. The producer does not skip already-logged leftovers, so a later loop applied the same 50 photos seven times (`9a9407c8` first, then six duplicates including a half-logged seventh `b4f5764b` at 14:48:28 AST). After the 19 days drained, the six duplicate runs were reverted (`queue_cleared` 0 — the queue rows were already `done_at`); `9a9407c8` is the live run (50 unreverted log rows). A post-drain dry-run still returns 50 rows, 44 of them the same photos, plus 6 new; another signed run was not applied, because it would re-arm the same days (including ones just skipped). A follow-up should skip already-logged unreverted image_ids before further cap-50s.
+
+Landing was enabled and not halted. Cron 717 (`capture_landing_tick`, `*/10`) and 718 (`capture_sets_drain`, `1-59/5`) stayed active and succeeded after the 14:00–14:19 AST outage (718 failed at 14:01 with job startup timeout during the 522 window). Official drain plus the local drain loop (`pid` 1198178) handled the queue. The subscription gate reader (`pid` 2452903, state dir `/workspace/sortrun/gate3`) ticked with 0 awaiting_gate chunks; `9cf5b7a4` is still in `done_chunks` (state mtime 13:05 AST). No visual gate ran: every drained plan was review-only (0 clear) or was skipped.
+
+Gate / drain outcomes (photos filed = 0 on all of these):
+
+| Day | Outcome | Notes |
+|---|---|---|
+| 2026-06-12 | applied `70e6d7d7`, review-only | 6 review sets / 21 photos, `no_clear_lead`. Unique held did not rise — those frames were already in open review |
+| 2026-06-13 | skipped `refused_no_new_evidence` | By design: a previous plan exists and drain saw no new evidence |
+| 2019-09-27 | applied `eceb1108` (0 sets), later re-armed and applied `adabab83` (0 sets) | Re-arm was from the duplicate #3304 enqueues |
+| 2025-11-07 | applied `c13fcbd3`, review-only | 3 review sets / 3 photos, `no_clear_lead` (import-session admits) |
+| 2025-12-07 | applied `71c0401a`, review-only | 1 review set / 234 photos, `no_clear_lead` (import-session admits). held +234, unsorted -234 |
+| 2019-05-22 | applied `68f23681`, review-only | 2 sets / 41 photos (`no_clear_lead`, `score_below_threshold`) |
+| 2026-02-10 | applied `30ce0124`, review-only | 8 sets / 139 photos, including 1 `identity_conflict` (not filed) |
+| 2019-09-24 | applied `e4365eb8`, 0 sets / 0 photos | Reader cursor `9cf5b7a4` left in `done_chunks` |
+| 2018-06-11 | applied `8e7c4baf`, review-only | 3 sets / 9 photos |
+| 2018-08-28 | applied `b0343fa0`, review-only | 7 sets / 98 photos, `no_clear_lead` |
+| 2019-06-02 | applied `72c3e9f5`, review-only | 1 set / 21 photos |
+| 2021-01-18 | applied `016d1bb9`, review-only | 1 set / 6 photos |
+| 2019-10-03 | applied `dc3ceeab`, 0 sets / 0 photos | |
+| 2007-10-10, 2009-02-20, 2012-02-27, 2017-01-07, 2018-08-10, 2019-02-27, 2024-06-30, 2026-02-27, 2026-03-03, 2026-03-12 | skipped `refused_no_new_evidence` | By design. 2024-06-30 finished at 15:01 AST |
+
+Net from the 14:20 AST post-#3301 ledger to 15:08 AST: non_vehicle +127; held +243 (8,721 → 8,964); unsorted -370 (924 → 554); unverified -1; on_vehicle +1 (one unverified photo filed outside these producers). pulled, private, and duplicate unchanged. n stayed 29,749. waiting 0. Photos filed by today's drained plans: 0.
+
+A project-wide authenticated API 522 window (about 14:07–14:18 AST) paused Postgres logging after the 14:00 cron wave; Management API still reported `ACTIVE_HEALTHY`. REST recovered at 14:18:53 AST. No landing halt was set.
+
 ## 19. Known gaps and next work
+
 
 Filing work (the path that can move unsorted):
 
 1. **The 4 newly admitted stamp-DTO rows** — days re-armed at 13:16 AST and drained at 13:26 AST. Both plans were review-only (0 clear), so no visual gate fired. The two typ `vehicle_exterior` frames are now held in open review; the two typ `other` frames are still unsorted / left out of the set. Do not call `capture_landing_gate_check` as a dry-run.
-2. **238 (plus 14 XMP and 4 `direct_pull`) with no file camera clock** — #3303 (`capture_import_session_admit_v1`) is the admits-by-import-session producer for the 242 `user_upload` rows: admit for scoring when a same-user neighbour within 15 minutes of `created_at` is clocked or filed, without writing DTO or `taken_at`. Draft, contract green locally, **not applied live**. The 12 `image_intake` + 4 `direct_pull` + 14 XMP stay unadmitted. Never invent a clock.
-3. **plan_refused / planned_but_left_out vehicle-typed frames** — typ coverage and identity_conflict are already live in `capture_landing_plan_step`; typ-aware `capture_landing_supersede_v1` is already live. #3304 (`capture_replan_vehicle_leftovers_v1`) enqueues those days via sanctioned `capture_sets_enqueue`. Draft, contract green locally, **not applied live**. Do not back-door file. typ `other` / `receipt_document` belong to #3302, not this producer.
+2. **238 (plus 14 XMP and 4 `direct_pull`) with no file camera clock** — #3303 (`capture_import_session_admit_v1`) is **applied live**. All 242 eligible `user_upload` rows were admitted in cap-50 runs (no DTO / `taken_at` written). 2025-11-07 and 2025-12-07 drained to review-only (3 + 234 photos held, 0 filed). The 12 `image_intake` + 4 `direct_pull` + 14 XMP stay unadmitted. Never invent a clock.
+3. **plan_refused / planned_but_left_out vehicle-typed frames** — typ coverage and identity_conflict are already live in `capture_landing_plan_step`; typ-aware `capture_landing_supersede_v1` is already live. #3304 (`capture_replan_vehicle_leftovers_v1`) is **applied live** (canonical run `9a9407c8`, 50 photos / 19 days). The 19 days have drained: 9 review-only plans (0 clear, 0 filed, one `identity_conflict` set held), 10 skipped `refused_no_new_evidence` (by design). The producer does not skip already-logged leftovers, so further cap-50s would re-arm the same days; a follow-up should exclude unreverted log rows before continuing. Do not back-door file. typ `other` / `receipt_document` belong to #3302, not this producer.
 4. **`capture_documents_land_by_vin`** — dry-run 10 Nov (`d0c00000-...000000000001`) returned 0 candidates. Every VIN page was skipped (`no_unique_vehicle`, `vehicle_not_held_by_user`, or `check_digit_failed`). Do not apply a signed run until a unique vehicle the user holds is actually found. The 10-minute tick is already scheduled and will no-op on the same skips.
-5. **typ `other` / `receipt_document` (180 + 17 non-sensitive)** — #3302 (`capture_non_vehicle_review_v1`) adds a reviewed `non_vehicle` ledger state (terminal, not on a vehicle, not private) after a second look. typ alone is not a terminal. Already-classified personal (`is_sensitive`) is routed to `privacy_promote_v1`; a personal judgment that is only the reviewer's is logged, not promoted; a frame that is actually a vehicle photo is enqueued for planning. Excludes the 276/452 holds. Draft, contract green locally, **not applied live** (needs the second look, then signed cap-50 runs).
+5. **typ `other` / `receipt_document` (180 + 17 non-sensitive)** — #3302 (`capture_non_vehicle_review_v1`) is **applied live**. Second looks (operator-viewed; Mac was offline) then signed cap-50 runs: 127 `non_vehicle`, 26 vehicle photos enqueued, 41 `judgment_personal` logged and left unsorted, 3 unreadable skipped. typ alone is not a terminal. Already-classified personal is routed to `privacy_promote_v1`; a personal judgment that is only the reviewer's is logged, not promoted.
 6. **empty_url (275 unsorted / 276 live)** — leave alone. iOS `SyncEngine` retries failed uploads locally (`failed(retry:)` stays queued on the device; `BackgroundUploader`). The server has almost no retry signal: 3 of 276 have `capture_upload_status.stage=uploaded`, 0 failed. 42 carry `on_device_vision.is_personal` (intentional metadata-only alibi rows). **0 are newer than 4 Nov 2026**; created 19 Jun-29 Oct 2026, latest `taken_at` 28 Oct. This class does not explain a post-Nov-4 upload stall.
-7. **`capture_ledger_states` timeout (13:31 AST)** — EXPLAIN: the held CTE is 19 ms; the timeout is a generic plan plus I/O (wrong index on the date window, 4.0 s; dupmap scan of unorganized rows, 4.8 s). The held join from #3299 is not the expensive part. #3301 materializes the CTEs, forces a custom plan, and adds a small open-review index. Draft, contract green locally, **not applied live**. No row writes.
+7. **`capture_ledger_states` timeout (13:31 AST)** — EXPLAIN: the held CTE is 19 ms; the timeout is a generic plan plus I/O (wrong index on the date window, 4.0 s; dupmap scan of unorganized rows, 4.8 s). The held join from #3299 is not the expensive part. #3301 is **applied live** (INCLUDE-less index `idx_capture_set_review_open_user`; `plan_cache_mode=force_custom_plan`; materialized held/waiting/failed). Official `capture_ledger_states` completed in 59.9 s at 14:20 AST, then ~50–73 s on later reads. No row writes. Live ledger bodies were then replaced by #3302 (same timeout fix plus the `non_vehicle` state).
 8. **Gate reader** — #3246 is draft. Do not re-arm the 2019-09-24 reader cursor (`9cf5b7a4` stays in `done_chunks`).
 9. **Drop-folder / other dormant stampers** are not scheduled, but `iphoto-intake.mjs` is still able to stamp `vehicle_id` until #3280 lands.
 
@@ -574,10 +610,10 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3298](https://github.com/sss97133/nuke/pull/3298) | admit a file EXIF DateTimeOriginal without Make | Draft, **applied live** 12:59 AST | Clock / admission |
 | [#3299](https://github.com/sss97133/nuke/pull/3299) | count copies of held or private originals as dups | Draft, **applied live** 13:11 AST | Ledger definition only |
 | [#3300](https://github.com/sss97133/nuke/pull/3300) | signed privacy_promote_v1 | Draft, **applied live** 13:10 AST | Privacy terminal state |
-| [#3301](https://github.com/sss97133/nuke/pull/3301) | keep capture_ledger_states under timeout | Draft, contract green locally, **not applied** | Ledger perf |
-| [#3302](https://github.com/sss97133/nuke/pull/3302) | reviewed non_vehicle ledger state | Draft, contract green locally, **not applied** | typ other / receipt |
-| [#3303](https://github.com/sss97133/nuke/pull/3303) | admit user uploads by import session | Draft, contract green locally, **not applied** | Admission, no clock invent |
-| [#3304](https://github.com/sss97133/nuke/pull/3304) | replan leftover vehicle-typed frames | Draft, contract green locally, **not applied** | Enqueue via sanctioned path |
+| [#3301](https://github.com/sss97133/nuke/pull/3301) | keep capture_ledger_states under timeout | Draft, **applied live** 14:19 AST | Ledger perf |
+| [#3302](https://github.com/sss97133/nuke/pull/3302) | reviewed non_vehicle ledger state | Draft, **applied live** 14:20 AST; looks + cap-50 done | typ other / receipt |
+| [#3303](https://github.com/sss97133/nuke/pull/3303) | admit user uploads by import session | Draft, **applied live** 14:34 AST; 242 admitted | Admission, no clock invent |
+| [#3304](https://github.com/sss97133/nuke/pull/3304) | replan leftover vehicle-typed frames | Draft, **applied live** 14:42 AST; 50 photos / 19 days | Enqueue via sanctioned path |
 
 ## 21. Unverified or out of scope in this writing
 
@@ -595,4 +631,4 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Operator log: `/workspace/sortrun/progress.md` (9–10 Nov 2026)
 - Scripts and artifacts under `/workspace/sortrun`: `gate_reader.py`, `drain_loop.py`, `ledger_now.py`, `emptyplan/*`, `fingerprint/*`, `lookalike_pilot/*`, `garage/gallery_pollution_audit.md`, `garage/visual_identity_recheck_v1.md`, `garage/gross_mismatch_v1/*`, `held/same_scene_dryrun.py`, `ingest_audit/`, `unsorted/breakdown.json`, `unsorted/fresh_20261110/*`, `stamp_dto_pr/BRIEF.md`, `receipt_order_fix/`, `ledger_live_def.txt`
 - Repository: `github.com/sss97133/nuke` — especially `docs/receipt-work-contract.md`, `supabase/migrations/20261020001000_vehicle_image_review_holds.sql`, `supabase/migrations/20261109070000_rederive_ownership_roles.sql`, `scripts/ownership/rederive-ownership-roles.mjs`, `scripts/receipt-work/reconcile-receipt-work.mjs`, `scripts/photo-pipeline/local_image_analysis.py`, `scripts/iphoto-intake.mjs`, and the PRs in §20
-- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last pass ~14:10 AST)
+- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last pass ~15:08 AST)
