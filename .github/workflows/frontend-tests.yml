@@ -76,7 +76,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify the reader heartbeat, the readers' stage-queue receipts and the stage ledger's static rules
-        run: node --test scripts/photo-pipeline/reader-heartbeat.test.mjs scripts/photo-pipeline/stage-queue.test.mjs scripts/photo-pipeline/subscription-frame-classifier.test.mjs scripts/ci/image-stage-receipts-migration.test.mjs
+        run: node --test scripts/photo-pipeline/reader-heartbeat.test.mjs scripts/photo-pipeline/stage-queue.test.mjs scripts/photo-pipeline/subscription-frame-classifier.test.mjs scripts/photo-pipeline/subscription-document-reader.test.mjs scripts/ci/image-stage-receipts-migration.test.mjs
 
   broadcast-overlay-contract:
     runs-on: ubuntu-latest
