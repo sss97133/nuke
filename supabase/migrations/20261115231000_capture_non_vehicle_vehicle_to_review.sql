@@ -118,9 +118,9 @@ BEGIN
     LIMIT p_cap
     RETURNING 1
   )
-  SELECT (SELECT count(*) FROM elig), (SELECT count(*) FROM ins),
-         (SELECT count(DISTINCT day) FROM tmp_nv_vehicle_to_review)
-    INTO n_elig, n_take, n_days;
+  SELECT (SELECT count(*) FROM elig), (SELECT count(*) FROM ins)
+    INTO n_elig, n_take;
+  SELECT count(DISTINCT day) INTO n_days FROM tmp_nv_vehicle_to_review;
 
   SELECT coalesce(jsonb_agg(jsonb_build_object(
            'image_id', t.image_id, 'day', t.day, 'typ', t.typ,
@@ -147,7 +147,7 @@ BEGIN
       run_id, user_id, set_key, image_ids, confidence, basis, evidence, reason, status)
     SELECT p_run, p_user,
            'nv_vehicle_review:' || coalesce(d.day::text, 'nodate'),
-           d.image_ids, NULL, 'non_vehicle_review_vehicle',
+           d.image_ids, 0, 'non_vehicle_review_vehicle',
            jsonb_build_object(
              'producer', 'capture_non_vehicle_vehicle_to_review_v1',
              'run', p_run, 'granted_by', p_granted_by, 'day', d.day,

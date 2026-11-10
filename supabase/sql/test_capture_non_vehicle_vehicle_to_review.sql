@@ -22,7 +22,7 @@ CREATE TABLE public.vehicle_images(
   ai_scan_metadata jsonb, is_duplicate boolean DEFAULT false, duplicate_of uuid);
 CREATE TABLE public.capture_set_review(
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), run_id uuid, user_id uuid, set_key text,
-  image_ids uuid[], confidence numeric, basis text, evidence jsonb DEFAULT '{}'::jsonb,
+  image_ids uuid[], confidence numeric NOT NULL DEFAULT 0, basis text, evidence jsonb DEFAULT '{}'::jsonb,
   reason text, status text NOT NULL DEFAULT 'open', created_at timestamptz DEFAULT now(),
   UNIQUE (run_id, set_key));
 CREATE TABLE public.capture_privacy_promote_exclude(image_id uuid PRIMARY KEY, reason text, granted_by uuid);
@@ -124,7 +124,7 @@ SELECT pg_temp.assert_true((:'apply_out'::jsonb->>'routed')::int = 3, 'applied 3
 SELECT pg_temp.assert_true((:'apply_out'::jsonb->>'reviews')::int = 2, 'one review per day');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_non_vehicle_vehicle_to_review_log WHERE reverted_at IS NULL) = 3, '3 log rows');
 SELECT pg_temp.assert_true((
-  SELECT count(*) = 2 AND bool_and(status = 'open' AND basis = 'non_vehicle_review_vehicle')
+  SELECT count(*) = 2 AND bool_and(status = 'open' AND basis = 'non_vehicle_review_vehicle' AND confidence = 0)
   FROM capture_set_review WHERE reason = 'typ_other_vehicle'
 ), 'two open typ_other_vehicle reviews');
 SELECT pg_temp.assert_true((
