@@ -12,6 +12,8 @@ export interface VisualWork {
     page_date: string | null; description: string | null; part_number: string | null; quantity: number | null;
     hours: number | null; amount: number | null; currency: string | null; amounts_visible: boolean }[];
   receipt_links_unavailable: number;
+  market_value: { status: 'not_established_by_cited_sources' };
+  paid_labor: { status: 'unreconciled' };
   effort_reference: { reference_id: string; description: string; hours_min: number; hours_max: number; hours_typical: number;
     basis: 'seed_uncalibrated' } | null;
 }

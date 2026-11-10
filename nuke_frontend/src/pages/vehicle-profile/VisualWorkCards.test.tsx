@@ -19,7 +19,8 @@ const record: VisualWork = {
  { image_id: 'after-a', image_url: 'https://images.example/after.jpg', role: 'after', caption: 'Covered seating', taken_at: '2026-05-05T21:00:00Z' }],
  receipts: [{ item_id: 'item-a', receipt_id: 'receipt-a', relation: 'candidate_material', source_table: 'vehicle_documents', source_id: 'doc-a', vendor: 'Example upholstery',
  page_date: '2025-09-08', description: 'Black upholstery', part_number: 'SYNTHETIC-1', quantity: 1, hours: null, amount: null, currency: 'USD', amounts_visible: false }],
- receipt_links_unavailable: 0, effort_reference: { reference_id: 'reference-a', description: 'Upholstery reference', hours_min: 16, hours_max: 40, hours_typical: 24, basis: 'seed_uncalibrated' },
+ receipt_links_unavailable: 0, market_value: { status: 'not_established_by_cited_sources' }, paid_labor: { status: 'unreconciled' },
+ effort_reference: { reference_id: 'reference-a', description: 'Upholstery reference', hours_min: 16, hours_max: 40, hours_typical: 24, basis: 'seed_uncalibrated' },
 };
 let host: HTMLDivElement, root: Root, client: QueryClient;
 beforeEach(() => {
@@ -40,7 +41,7 @@ it('opens the exact before/after images directly and separates all four lenses',
  for (const label of ['Recorded time', 'Inferred effort', 'Market value', 'Paid value']) expect(host.textContent).toContain(label);
  expect(host.textContent).toContain('16–40 reference hours');
  expect(host.textContent).toContain('Uncalibrated reference; not measured time.');
- expect(host.textContent).toContain('Hours not documented');
+ expect(host.textContent).toContain('No person-hours in the cited operation lines');
  expect(host.textContent).toContain('Candidate material · installation not established');
  expect(host.textContent).toContain('Read source doc-a');
  expect(host.textContent).toContain('2025');
@@ -50,9 +51,11 @@ it('keeps charged amounts and documented operation hours distinct from payment a
  const work = structuredClone(record);
  work.receipts.push({ ...work.receipts[0], item_id: 'work-line', relation: 'documented_operation', hours: 3.5, amount: 210, amounts_visible: true });
  await render([work]);
- expect(host.textContent).toContain('3.5 documented hours');
+ expect(host.textContent).toContain('3.5 documented person-hours');
  expect(host.textContent).toContain('$210.00 · line charge');
- expect(host.textContent).toContain('Labor payment not recorded');
+ expect(host.textContent).toContain('Paid labor not reconciled');
+ expect(host.textContent).toContain('Not established by these sources');
+ expect(host.textContent).not.toContain('payment not recorded');
  expect(host.textContent).toContain('Amount visible to owner & contributors');
  expect(host.textContent).not.toContain('total build time:');
 });

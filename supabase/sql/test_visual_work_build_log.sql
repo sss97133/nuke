@@ -72,6 +72,8 @@ BEGIN
  ASSERT j#>'{visual_work,0,receipts,0,amount}'='null' AND j#>'{visual_work,0,receipts,0,hours}'='null',j::text;
  ASSERT j#>>'{visual_work,0,receipts,1,hours}'='3.5',j::text;
  ASSERT j#>>'{visual_work,0,effort_reference,basis}'='seed_uncalibrated',j::text;
+ ASSERT j#>>'{visual_work,0,market_value,status}'='not_established_by_cited_sources'
+   AND j#>>'{visual_work,0,paid_labor,status}'='unreconciled','This reader does not query payment or market-rate absence';
  ASSERT j::text NOT LIKE '%private.example%' AND j::text NOT LIKE '%420%' AND j::text NOT LIKE '%999%',j::text;
  ASSERT (SELECT count(*) FROM observation_witnesses)=1,'Actual atomic witness not projected';
  PERFORM set_config('test.role','authenticated',false); PERFORM set_config('test.uid','20000000-0000-0000-0000-000000000001',false);

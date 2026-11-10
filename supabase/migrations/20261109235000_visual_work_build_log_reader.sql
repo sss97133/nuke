@@ -115,7 +115,9 @@ BEGIN
    FROM jsonb_array_elements(o.structured_data->'gaps');
   result:=result||jsonb_build_array(jsonb_build_object('observation_id',o.id,'title',public.public_text(o.structured_data->>'title'),
    'summary',public.public_text(o.structured_data->>'summary'),'images',images,'receipts',receipts,
-   'receipt_links_unavailable',missing_receipts,'gaps',gaps,'effort_reference',effort));
+   'receipt_links_unavailable',missing_receipts,'gaps',gaps,'effort_reference',effort,
+   'market_value',jsonb_build_object('status','not_established_by_cited_sources'),
+   'paid_labor',jsonb_build_object('status','unreconciled')));
  END LOOP;
  IF result='[]'::jsonb AND seen<=100 THEN RETURN '{}'::jsonb; END IF;
  RETURN jsonb_build_object('visual_work',result,'visual_work_coverage',CASE WHEN seen>100 THEN 'limit_reached' ELSE 'current_reader' END);

@@ -31,10 +31,10 @@ export function VisualWorkCards({ rows, renderSource }: {
         <small>{image.caption}</small>
       </button>)}</div>
       <dl className="vp-work-lenses">
-        <div><dt>Recorded time</dt><dd>{documentedHours.length ? `${hours} documented hours` : 'Hours not documented'}</dd><small>{documentedHours.length ? 'Only the cited operation lines; not total build time.' : 'The photo interval does not measure working time.'}</small></div>
+        <div><dt>Recorded time</dt><dd>{documentedHours.length ? `${hours} documented person-hours` : 'No person-hours in the cited operation lines'}</dd><small>{documentedHours.length ? 'Concurrent technician hours add; they are not elapsed time.' : 'The photo interval does not measure working time.'}</small></div>
         <div><dt>Inferred effort</dt><dd>{work.effort_reference ? `${work.effort_reference.hours_min}–${work.effort_reference.hours_max} reference hours` : 'No matched effort reference'}</dd><small>{work.effort_reference ? `${work.effort_reference.description}. Uncalibrated reference; not measured time.` : 'An estimate needs a matching scope and source.'}</small></div>
-        <div><dt>Market value</dt><dd>No verified rate linked</dd><small>Reference hours alone do not establish a market price.</small></div>
-        <div><dt>Paid value</dt><dd>Labor payment not recorded</dd><small>Receipt charges below remain document amounts.</small></div>
+        <div><dt>Market value</dt><dd>{work.market_value?.status === 'not_established_by_cited_sources' ? 'Not established by these sources' : 'Not reconciled'}</dd><small>Reference hours alone do not establish a market price.</small></div>
+        <div><dt>Paid value</dt><dd>Paid labor {work.paid_labor?.status === 'unreconciled' ? 'not reconciled' : 'not established by these sources'}</dd><small>Receipt charges below remain document amounts.</small></div>
       </dl>
       {work.receipts.length > 0 && <div className="vp-work-materials">{work.receipts.map(line => <div key={line.item_id}>
         <span>{line.relation === 'candidate_material' ? 'Candidate material · installation not established' : 'Work recorded on the document'}</span>
