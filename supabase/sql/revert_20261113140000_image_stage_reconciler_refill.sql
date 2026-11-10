@@ -1,8 +1,16 @@
--- Revert of 20261113140000_image_stage_reconciler_refill.sql: reconcile_image_stages as 20261113110000 defined it, and
--- no refill_below (the queue is topped up on every tick again).
+-- Revert of 20261113140000_image_stage_reconciler_refill.sql: reconcile_image_stages as 20261113110000 defined it (body
+-- and comment), and no refill_below (the backfill is topped up on every tick again). Refuses a body it does not know.
 begin;
+set local statement_timeout = '45s';
+set local lock_timeout = '25s';
+select pg_advisory_xact_lock(hashtextextended('reconcile_image_stages', 0));
 set local lock_timeout = '3s';
-set local statement_timeout = '15s';
+do $guard$
+begin
+  if (select md5(prosrc) from pg_proc where oid = 'public.reconcile_image_stages(integer)'::regprocedure) not in ('034f5feb71467b31feda531da34a7b47', 'ecc3d3ed7c93eff04c1febf6863d32db') then
+    raise exception 'reconcile_image_stages is neither the 20261113110000 nor the 20261113140000 body; review before reverting';
+  end if;
+end $guard$;
 create or replace function public.reconcile_image_stages(p_limit integer default 100)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 declare
@@ -87,5 +95,8 @@ begin
   end loop;
   return v_out || jsonb_build_object('enqueued', v_total, 'open_before', v_open, 'users', coalesce(to_jsonb(v_users), 'null'::jsonb));
 end $$;
+comment on function public.reconcile_image_stages(integer) is
+  'Finds images missing a required stage, at an outdated version or contract, or with a retryable receipt, and enqueues only that stage. Idempotent (one open item per image+stage), bounded (scan_per_lane, max_open, p_limit<=500), fair (live lane first, backfill oldest-first by cursor, unused live budget rolls over), scoped to platform_config image_stage_reconciler.user_ids when set. No provider calls, no status writes, no dependence on the paid drain''s state. Gated by image_stage_reconciler.enabled.';
+
 update public.platform_config set config_value = config_value - 'refill_below' where config_key = 'image_stage_reconciler';
 commit;
