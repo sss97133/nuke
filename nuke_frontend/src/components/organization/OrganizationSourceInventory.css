@@ -1,4 +1,6 @@
 .organization-source-inventory { margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); }
+/* Keep the heading and last-check time below both sticky headers. */
+.organization-source-inventory { scroll-margin-block-start: calc(var(--header-height, 42px) + 96px); }
 .organization-source-inventory a { color: var(--accent); }
 .organization-source-inventory__sales { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; list-style: none; padding: 0; }
 .organization-source-inventory__sales li { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); }
