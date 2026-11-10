@@ -1,11 +1,11 @@
-// Static contract for 20261112090000_image_stage_receipts_reconciler.sql. No database here: this pins the
+// Static contract for 20261113110000_image_stage_receipts_reconciler.sql. No database here: this pins the
 // properties the review depends on (closed outcomes, idempotency index, disabled-by-default, service-role-only,
 // no writes to testimony or ai_processing_status). A live replay on a disposable PG remains the real proof.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const sql = readFileSync(new URL("../../supabase/migrations/20261112090000_image_stage_receipts_reconciler.sql", import.meta.url), "utf8");
+const sql = readFileSync(new URL("../../supabase/migrations/20261113110000_image_stage_receipts_reconciler.sql", import.meta.url), "utf8");
 const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
 
 test("outcome vocabulary is closed and covers the retryable cases", () => {
@@ -35,8 +35,11 @@ test("disabled by default, bounded, rate-limited, fair", () => {
   assert.match(code, /"enabled": false/);
   assert.match(code, /least\(greatest\(p_limit, 0\)[^;]*, 500\)/);
   assert.match(code, /backfill_share/);
-  assert.match(code, /order by v\.created_at asc, v\.id asc limit v_scan/);   // oldest-first backfill, keyset tie-break
-  assert.match(code, /\(v\.created_at, v\.id\) > \(st\.cursor_created_at, st\.cursor_id\)/);
+  assert.match(code, /order by c\.created_at asc, c\.id asc limit v_scan/);   // oldest-first backfill, keyset tie-break
+  assert.match(code, /\(c\.created_at, c\.id\) > \(st\.cursor_created_at, st\.cursor_id\)/);
+  // candidates come from the user-owned partial index (id, created_at only); eligibility is judged by primary key
+  assert.match(code, /where v\.id = any \(v_cand\)/);
+  assert.match(code, /v\.id = any \(v_cand\) order by v\.created_at desc, v\.id desc limit 1/);   // cursor follows candidates
   assert.match(code, /pg_try_advisory_xact_lock/);
 });
 

@@ -1,4 +1,4 @@
--- Contract for 20261112090000_image_stage_receipts_reconciler.sql, run against a fresh disposable database.
+-- Contract for 20261113110000_image_stage_receipts_reconciler.sql, run against a fresh disposable database.
 -- Fixture = only the tables/roles the migration reads; the migration itself is replayed with \ir.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -20,7 +20,7 @@ CREATE TABLE public.photo_pipeline_provider_state (provider text PRIMARY KEY, bl
 INSERT INTO public.photo_pipeline_provider_state VALUES ('classifier', NULL);
 CREATE TABLE public.photo_pipeline_retry_state (image_id uuid PRIMARY KEY, terminal boolean NOT NULL DEFAULT false, next_attempt_at timestamptz);
 
-\ir ../migrations/20261112090000_image_stage_receipts_reconciler.sql
+\ir ../migrations/20261113110000_image_stage_receipts_reconciler.sql
 
 CREATE FUNCTION pg_temp.img(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS
   $$ SELECT ('00000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid $$;
@@ -48,11 +48,16 @@ SELECT pg_temp.ok((SELECT count(*) FROM image_pipeline_stages WHERE required) = 
 SELECT pg_temp.ok((SELECT (config_value ->> 'enabled')::boolean FROM platform_config WHERE config_key = 'image_stage_reconciler') IS FALSE, 'flag defaults off');
 SELECT pg_temp.ok(NOT has_function_privilege('anon', 'public.reconcile_image_stages(integer)', 'execute'), 'anon cannot reconcile');
 SELECT pg_temp.ok(NOT has_function_privilege('authenticated', 'public.record_image_stage_receipt(uuid,text,integer,text,text,integer,integer,text,jsonb)', 'execute'), 'authenticated cannot record');
-SELECT pg_temp.ok(NOT has_function_privilege('authenticated', 'public.claim_image_stage_work(text,integer,integer)', 'execute'), 'authenticated cannot claim');
+SELECT pg_temp.ok(NOT has_function_privilege('authenticated', 'public.claim_image_stage_work(text,integer,integer,uuid)', 'execute'), 'authenticated cannot claim');
 SELECT pg_temp.ok(has_function_privilege('service_role', 'public.reconcile_image_stages(integer)', 'execute'), 'service_role can reconcile');
 SELECT pg_temp.ok(NOT has_table_privilege('anon', 'public.image_stage_receipts', 'select'), 'anon cannot read receipts');
 SELECT pg_temp.ok(NOT has_table_privilege('authenticated', 'public.image_stage_work', 'insert'), 'authenticated cannot write work');
 SELECT pg_temp.ok(has_table_privilege('service_role', 'public.image_stage_receipts', 'select'), 'service_role reads receipts');
+
+-- The migration seeds the classifier contract (v98). Sections 2-9 exercise the reconciler with the contract cleared, where
+-- any finished legacy output stands in for a receipt (the rule this suite was written for); section 10 sets it back.
+SELECT pg_temp.ok((SELECT contract FROM image_pipeline_stages WHERE stage = 'classifier') = 'v98', 'classifier contract is seeded');
+UPDATE image_pipeline_stages SET contract = NULL WHERE stage = 'classifier';
 
 -- ===== 2. image fixture
 SELECT pg_temp.mk(1,  interval '1 hour');                                                         -- live, missing
@@ -221,5 +226,72 @@ INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, o
 UPDATE image_stage_reconciler_state SET cursor_created_at = NULL, cursor_id = NULL WHERE lane = 'backfill';
 CREATE TEMP TABLE run4 AS SELECT reconcile_image_stages(4) AS r;
 SELECT pg_temp.ok((SELECT count(*) FROM image_stage_work WHERE lane = 'backfill') = 4 AND (SELECT count(*) FROM image_stage_work WHERE lane = 'live') = 0, 'live budget unused => rolls to backfill (4 backfill)');
+
+-- ===== 10. the classifier contract: only a reading under the current contract stands in for a receipt
+UPDATE image_pipeline_stages SET contract = 'v98' WHERE stage = 'classifier';
+DELETE FROM image_stage_work;
+SELECT pg_temp.mk(301, interval '1 hour', '{"pipeline_version":"v2","classification":{"image_type":"vehicle_exterior","confidence":0.93,"classifier_ok":true,"v2":{"prompt_version":"v98","vehicle_fields":[]}}}');  -- current reading
+SELECT pg_temp.mk(302, interval '1 hour', '{"pipeline_version":"v2","classification":{"image_type":"other","confidence":0.2}}');                                   -- legacy shape C, no v2 block
+SELECT pg_temp.mk(303, interval '1 hour', '{"pipeline_version":"v2","classification":{"image_type":"engine_bay","confidence":0.9,"classifier_ok":true}}');             -- answered by the thin legacy prompt
+SELECT pg_temp.mk(304, interval '1 hour', '{"pipeline_version":"v2","classification":{"image_type":"other","confidence":0.2,"classifier_ok":false,"v2":{"prompt_version":"v98"}}}');  -- failed stand-in
+SELECT pg_temp.mk(305, interval '1 hour', '{"appraiser":{"condition":7},"byok_deep_analysis":{"scene_type":"shop"}}');                                           -- other generations only
+SELECT pg_temp.mk(306, interval '1 hour', '{"pipeline_version":"v2","classification":{"image_type":"vin_plate","confidence":0.95,"classifier_ok":true,"v2":{"prompt_version":"v97"}}}');  -- an earlier contract
+SELECT pg_temp.ok(image_stage_legacy_evidence('classifier', (SELECT ai_scan_metadata FROM vehicle_images WHERE id = pg_temp.img(301)), NULL, 'v98'), 'a reading under the contract is evidence');
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(301)])), 'a reading under the contract is not a gap');
+SELECT pg_temp.ok((SELECT array_agg(reason ORDER BY image_id) FROM image_stage_gaps(ARRAY[pg_temp.img(302), pg_temp.img(303), pg_temp.img(304), pg_temp.img(306)]))
+  = ARRAY['outdated', 'outdated', 'outdated', 'outdated'], 'legacy, thin-prompt, stand-in and earlier-contract readings are outdated gaps');
+SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(305)])) = 'missing', 'only other generations'' output on the row: the classifier stage is missing');
+-- a receipt at the required version settles the image whatever the row holds
+SELECT record_image_stage_receipt(pg_temp.img(302), 'classifier', 1, 'succeeded', NULL, NULL, NULL, NULL, '{"reader":"reader:claude-cli sonnet subscription","prompt_version":"v98"}');
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(302)])), 'a succeeded receipt closes an outdated gap');
+-- the reconciler enqueues the outdated and missing ones, once, with their reasons
+UPDATE image_stage_reconciler_state SET cursor_created_at = NULL, cursor_id = NULL WHERE lane = 'backfill';
+SELECT reconcile_image_stages(100);
+SELECT pg_temp.ok((SELECT array_agg(w.reason ORDER BY w.image_id) FROM image_stage_work w WHERE w.image_id IN (pg_temp.img(301), pg_temp.img(302), pg_temp.img(303), pg_temp.img(304), pg_temp.img(305), pg_temp.img(306)))
+  = ARRAY['outdated', 'outdated', 'missing', 'outdated'], 'queued: 303, 304 (outdated), 305 (missing), 306 (outdated); not 301 (current) or 302 (receipt)');
+-- cursor walks candidates, not only eligible rows: a page of ineligible rows still advances it
+DELETE FROM image_stage_work;
+UPDATE platform_config SET config_value = config_value || '{"scan_per_lane": 3, "live_days": 0, "min_age_minutes": 0}' WHERE config_key = 'image_stage_reconciler';
+UPDATE image_stage_reconciler_state SET cursor_created_at = NULL, cursor_id = NULL WHERE lane = 'backfill';
+UPDATE vehicle_images SET is_sensitive = true WHERE id IN (SELECT id FROM vehicle_images ORDER BY created_at, id LIMIT 3);
+CREATE TEMP TABLE run10 AS SELECT reconcile_image_stages(100) AS r;
+SELECT pg_temp.ok((SELECT (r #>> '{backfill,scanned}')::int FROM run10) = 3 AND (SELECT (r #>> '{backfill,eligible}')::int FROM run10) = 0
+  AND (SELECT cursor_created_at IS NOT NULL FROM image_stage_reconciler_state WHERE lane = 'backfill'),
+  'three ineligible candidates: scanned 3, eligible 0, cursor moved past them');
+CREATE TEMP TABLE run11 AS SELECT reconcile_image_stages(100) AS r;
+SELECT pg_temp.ok((SELECT (r #>> '{backfill,scanned}')::int FROM run11) = 3 AND (SELECT (r #>> '{backfill,eligible}')::int FROM run11) > 0, 'the next run reads the next page');
+
+-- ===== 11. a claim scoped to one user hands out only that user's photos
+DELETE FROM image_stage_work;
+UPDATE platform_config SET config_value = config_value || '{"scan_per_lane": 1000, "live_days": 2, "min_age_minutes": 15}' WHERE config_key = 'image_stage_reconciler';
+UPDATE image_stage_reconciler_state SET cursor_created_at = NULL, cursor_id = NULL WHERE lane = 'backfill';
+SELECT pg_temp.mk(401, interval '1 hour'); SELECT pg_temp.mk(402, interval '1 hour'); SELECT pg_temp.mk(403, interval '1 hour');
+UPDATE vehicle_images SET user_id = '00000000-0000-4000-8000-0000000000aa' WHERE id IN (pg_temp.img(401), pg_temp.img(402));
+UPDATE vehicle_images SET user_id = '00000000-0000-4000-8000-0000000000bb' WHERE id = pg_temp.img(403);
+SELECT reconcile_image_stages(100);
+CREATE TEMP TABLE claim_a AS SELECT * FROM claim_image_stage_work('classifier', 25, 300, '00000000-0000-4000-8000-0000000000aa');
+SELECT pg_temp.ok((SELECT array_agg(image_id ORDER BY image_id) FROM claim_a) = ARRAY[pg_temp.img(401), pg_temp.img(402)], 'a user-scoped claim returns only that user''s photos');
+SELECT pg_temp.ok((SELECT status FROM image_stage_work WHERE image_id = pg_temp.img(403)) = 'queued', 'another user''s photo stays queued');
+SELECT pg_temp.ok((SELECT count(*) FROM claim_image_stage_work('classifier', 25, 300, '00000000-0000-4000-8000-0000000000cc')) = 0, 'a user with nothing queued gets nothing');
+
+-- ===== 12. coverage reader and revert
+SELECT pg_temp.ok(NOT has_function_privilege('authenticated', 'public.image_stage_coverage()', 'execute') AND has_function_privilege('service_role', 'public.image_stage_coverage()', 'execute'), 'coverage is service-role only');
+CREATE TEMP TABLE cov AS SELECT image_stage_coverage() AS c;
+SELECT pg_temp.ok((SELECT (c ->> 'enabled')::boolean FROM cov)
+  AND (SELECT (c #>> '{stages,classifier,open,claimed}')::int FROM cov) = 2
+  AND (SELECT (c #>> '{stages,classifier,open,queued}')::int FROM cov) >= 1
+  AND (SELECT (c #>> '{stages,classifier,latest_receipt_by_outcome,succeeded}')::int FROM cov) >= 1
+  AND (SELECT c #>> '{stages,classifier,contract}' FROM cov) = 'v98'
+  AND (SELECT c #> '{reconciler,backfill}' ? 'last_run_at' FROM cov)
+  AND (SELECT (c #>> '{stages,exif,open,queued}')::int FROM cov) = 0,
+  'coverage reports open work, latest receipts by outcome, the contract and the reconciler position per stage');
+-- the revert refuses while receipts exist, and removes everything once they are gone
+SELECT pg_temp.raises($$\i supabase/sql/revert_20261113110000_image_stage_receipts_reconciler.sql$$, '42601', 'placeholder');
+CREATE TABLE cron.job (jobid bigint, jobname text);
+CREATE FUNCTION cron.unschedule(j bigint) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
+\set ON_ERROR_STOP off
+\ir revert_20261113110000_image_stage_receipts_reconciler.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.ok(to_regclass('public.image_stage_receipts') IS NOT NULL AND to_regprocedure('public.image_stage_coverage()') IS NOT NULL, 'revert refuses while receipts exist: nothing dropped');
 
 \echo image_stage_receipts_reconciler contract: ok
