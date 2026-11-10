@@ -110,7 +110,8 @@ Report what the model gained (keyed, connected, proven rows), not photos analyse
 work read "Image analysis is the model asking" at the top of
 [`data-machine.md`](docs/ledger/theory/data-machine.md) and C17's 2026-11-10 entries in
 [`data-machine-cases.md`](docs/ledger/theory/data-machine-cases.md). The acceptance is the owner's three
-questions there. These are direction; the card says which have a mechanism and which do not yet.
+questions there. A pull request that adds a photo reader or a table keyed by a photo fails
+`scripts/guardrails/no-new-photo-reader.mjs`. The card lists the other gates and which are not built.
 
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.

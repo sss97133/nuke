@@ -73,9 +73,21 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    dead: `component_assembly_map` (a part, its states, what each state looks like),
    `image_question_answers` (1,021 answers with agreement and validation columns; a 2026-06-18 comment
    calls it empty and proposes dropping it, and it is not empty), the digital-twin component tables,
-   and `docs/features/image-processing/CONTEXT_DRIVEN_PROCESSING.md`. Mechanism:
-   `scripts/guardrails/check-capability-before-mint.mjs` reads the photo-reading rows of
-   `docs/ledger/CAPABILITY_MAP.md`.
+   and `docs/features/image-processing/CONTEXT_DRIVEN_PROCESSING.md`. Mechanism: the pull-request gate
+   below, and `scripts/guardrails/check-capability-before-mint.mjs`, which reads the photo-reading rows
+   of `docs/ledger/CAPABILITY_MAP.md` when an agent asks it.
+
+**The gates.** The owner, the same day: "the architecture is the only thing that will ensure agents even
+dumb ones don't fuck up". A rule above holds only where something refuses the wrong move. Everything a
+photo reading does passes through four places. One has a gate. The other three are the build's
+definition of done: no piece of the build is finished until its gate exists.
+
+| Gate | Where | What it refuses | State |
+|---|---|---|---|
+| The pull request | `scripts/guardrails/no-new-photo-reader.mjs`, run by `pre-deploy-check.yml` | a new table keyed by a photo, or a new edge function or script whose name says it reads photos, unless `photo-stores.allow.json` lists it with the owner's approval | built 2026-11-10; it reads names and CREATE TABLE text, nothing deeper |
+| The writer | `ingest-observation` | a photo reading that carries no registered key and no part: counted first, refused once the readers key what they write | not built |
+| The scoreboard | one database reader over keyed, witnessed observations (the stage ledger's coverage reader is the thing to extend) | a progress number that is not computed from it | not built |
+| The database | an event trigger in the manner of `view_write_guard` (20261014214500) | a photo-keyed table created without an approved `schema_proposals` row, a hand-applied one included | not built |
 
 **Acceptance.** Three questions, the owner's, must be queries that return vehicles with the photos that
 prove the answer: (1) Mustangs whose window felts were replaced during a restoration; (2) a Porsche
