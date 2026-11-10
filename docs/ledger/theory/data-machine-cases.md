@@ -411,12 +411,22 @@ per-image output table.
   under any prompt version lands nothing.
 
 Repair in this change (migration `20261113100000`): `assay_photo_reading_flow()` with cron
-`photo-reading-flow-watch` fails when claimable photos wait 6 h unread, or 500+ user-owned photos lack a current
-reading and no classifier or deep reading landed in 72 h; the yield refresh finds its users from
-`photo_land_progress` and its cron carries its own statement budget; the reader heartbeat is posted by
-`scripts/photo-pipeline/reader-heartbeat.mjs`. This makes a stall visible; it reads no image. C17 stays open: no
-object records which level of which image is read under which contract, so levels cannot chain, a better reader
-cannot find its work, and every lane keeps its own worklist, store and normalizer.
+`photo-reading-flow-watch` fails on two states that reading the photos clears: pending photos (claimable or backing
+off) have waited over 6 h and no classifier reading landed in 6 h; or photos were given up on after the provider
+refused them (no credit, quota or key). "A reading landed" is any of three records: a first reading's description
+row, a paid call answering 200, or the frame reader's heartbeat reporting accepted frames. The yield refresh finds
+its users from `photo_land_progress` and recent uploads and its cron carries its own statement budget. The reader
+heartbeat is posted by `scripts/photo-pipeline/reader-heartbeat.mjs`, and only when the reader exited 0 with a JSON
+summary, so a crashed reader goes silent instead of fresh.
+
+The assay deliberately does not raise on the 15,553. On 2026-11-10 it would pass: nothing is pending, nothing was
+refused, and that is the true state of the queue. The untrue part is the queue's definition. The landing fold writes
+an image's classifier row once, on its first reading, so "images read under the current prompt" cannot be counted
+from landed rows after a re-read, and an alarm on "total minus read" could never be cleared. The reading reports
+first readings by prompt version so the gap stays visible. C17 stays open on exactly this: no object records which
+level of which image is read under which contract, so levels cannot chain, a better reader cannot find its work, and
+every lane keeps its own worklist, store and normalizer. Draft #3027 (per-image stage receipts and a reconciler) is
+that object; its SQL contract was executed for the first time on 2026-11-10 (PostgreSQL 16, passing).
 
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 

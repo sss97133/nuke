@@ -31,3 +31,4 @@ begin
   end loop;
   return n;
 end $function$;
+COMMENT ON FUNCTION public.photo_analysis_yield_daily_refresh(integer) IS NULL;

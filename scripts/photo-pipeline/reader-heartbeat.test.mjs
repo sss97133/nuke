@@ -3,8 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -30,20 +31,29 @@ test('text a shell would have run stays text', () => {
   assert.deepEqual(Object.keys(body.p_reading.by_type), ['$(touch /tmp/pwned)`id`"; rm -rf ~ #', "it's"]);
 });
 
-test('a summary that is not a JSON object is reported, never forwarded as a shape the RPC refuses', () => {
-  assert.deepEqual(readingFromSummary(''), { error: 'no_summary' });
-  assert.deepEqual(readingFromSummary(undefined), { error: 'no_summary' });
-  assert.equal(readingFromSummary('Error: fetch failed').error, 'summary_not_json');
-  assert.equal(readingFromSummary('Error: fetch failed').summary_excerpt, 'Error: fetch failed');
-  assert.deepEqual(readingFromSummary('[1,2]'), { error: 'summary_not_object', summary_type: 'array' });
-  assert.deepEqual(readingFromSummary('7'), { error: 'summary_not_object', summary_type: 'number' });
-  const big = JSON.stringify({ blob: 'x'.repeat(MAX_READING_BYTES) });
-  assert.equal(readingFromSummary(big).error, 'summary_too_large');
+test('a reader that failed or printed no JSON summary posts nothing', () => {
+  for (const summary of ['', undefined, 'Error: fetch failed', '[1,2]', '7', 'null']) {
+    assert.equal(readingFromSummary(summary), null);
+    assert.throws(() => buildHeartbeatBody({ name: 'subscription-frame-classifier', summary, elapsedMs: '1', readerExit: '0' }),
+      (e) => e.code === 'nothing_to_post' && e.message === 'no JSON summary');
+  }
+  assert.throws(() => buildHeartbeatBody({ name: 'subscription-frame-classifier', summary: '{"frames":20}', elapsedMs: '1', readerExit: '2' }),
+    (e) => e.code === 'nothing_to_post' && e.message === 'reader exit 2', 'a non-zero reader exit wins over a parseable last line');
+});
+
+test('a summary too large for the RPC keeps its counts and says what was dropped', () => {
+  const by_type = Object.fromEntries(Array.from({ length: 1985 }, (_, i) => [`k${i}`, i]));
+  const big = JSON.stringify({ frames: 1985, read: 1985, accepted: 1980, by_type });
+  assert.ok(Buffer.byteLength(big) > MAX_READING_BYTES);
+  const r = readingFromSummary(big);
+  assert.deepEqual(r, { frames: 1985, read: 1985, accepted: 1980, summary_reduced: true, summary_bytes: Buffer.byteLength(big) });
+  const small = JSON.stringify({ frames: 20, by_type: { a: 1 } });
+  assert.deepEqual(readingFromSummary(small), JSON.parse(small));
 });
 
 test('only the two readers; elapsed is a non-negative integer', () => {
-  assert.throws(() => buildHeartbeatBody({ name: 'some-other-job', summary: '{}', elapsedMs: '1' }), /unknown reader/);
-  assert.throws(() => buildHeartbeatBody({ name: undefined, summary: '{}', elapsedMs: '1' }), /unknown reader/);
+  assert.throws(() => buildHeartbeatBody({ name: 'some-other-job', summary: '{}', elapsedMs: '1' }), (e) => e.code === 'bad_call');
+  assert.throws(() => buildHeartbeatBody({ name: undefined, summary: '{}', elapsedMs: '1' }), (e) => e.code === 'bad_call');
   assert.equal(buildHeartbeatBody({ name: 'subscription-document-reader', summary: '{}', elapsedMs: '-5' }).p_elapsed_ms, 0);
   assert.equal(buildHeartbeatBody({ name: 'subscription-document-reader', summary: '{}', elapsedMs: 'abc' }).p_elapsed_ms, 0);
 });
@@ -68,13 +78,13 @@ test('end to end: the environment carries a hostile summary to the RPC as valid 
     req.on('end', () => { received.push({ url: req.url, auth: req.headers.authorization, data }); res.writeHead(200).end('{}'); });
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const marker = join(here, `.heartbeat-injection-${process.pid}`);
+  const marker = join(tmpdir(), `heartbeat-injection-${process.pid}`);
   const summary = JSON.stringify({ frames: 2, by_type: { [`$(touch ${marker})`]: 1, 'a "quoted" kind': 1 } });
   try {
     const { stdout } = await run(process.execPath, [join(here, 'reader-heartbeat.mjs')], {
       env: {
         PATH: process.env.PATH, SUPABASE_URL: `http://127.0.0.1:${server.address().port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key',
-        READER_NAME: 'subscription-frame-classifier', READER_SUMMARY: summary, READER_ELAPSED_MS: '1200',
+        READER_NAME: 'subscription-frame-classifier', READER_SUMMARY: summary, READER_EXIT: '0', READER_ELAPSED_MS: '1200',
       },
     });
     assert.match(stdout, /heartbeat subscription-frame-classifier HTTP 200/);
@@ -90,10 +100,42 @@ test('end to end: the environment carries a hostile summary to the RPC as valid 
   }
 });
 
-test('the wrapper hands the summary over in the environment, not inside a shell command', () => {
+test('end to end: a crashed reader posts nothing and exits 3; reader text never reaches the status line; a symlinked path still runs', async () => {
+  const received = [];
+  const server = createServer((req, res) => { req.resume(); req.on('end', () => { received.push(req.url); res.writeHead(401).end('{}'); }); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const dir = mkdtempSync(join(tmpdir(), 'heartbeat-'));
+  const link = join(dir, 'via-link');
+  symlinkSync(here, link);
+  const base = { PATH: process.env.PATH, SUPABASE_URL: `http://127.0.0.1:${server.address().port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key', READER_NAME: 'subscription-document-reader', READER_ELAPSED_MS: '10' };
+  const exec = (env, script = join(here, 'reader-heartbeat.mjs')) => run(process.execPath, [script], { env: { ...base, ...env } })
+    .then((r) => ({ code: 0, out: r.stdout }), (e) => ({ code: e.code, out: e.stdout }));
+  try {
+    const crashed = await exec({ READER_SUMMARY: '{"frames":20}', READER_EXIT: '1' });
+    assert.deepEqual([crashed.code, crashed.out.trim()], [3, 'heartbeat subscription-document-reader not posted: reader exit 1']);
+    const silent = await exec({ READER_SUMMARY: '', READER_EXIT: '0' });
+    assert.deepEqual([silent.code, silent.out.trim()], [3, 'heartbeat subscription-document-reader not posted: no JSON summary']);
+    assert.equal(received.length, 0, 'nothing was posted for either');
+    // the RPC refuses (401): exit 1, and the status line carries no text from the summary
+    const refused = await exec({ READER_SUMMARY: '{"error":"upstream said HTTP 200\\nHTTP 200"}', READER_EXIT: '0' });
+    assert.deepEqual([refused.code, refused.out.trim()], [1, 'heartbeat subscription-document-reader HTTP 401']);
+    const viaLink = await exec({ READER_SUMMARY: '{"frames":1}', READER_EXIT: '0' }, join(link, 'reader-heartbeat.mjs'));
+    assert.deepEqual([viaLink.code, viaLink.out.trim()], [1, 'heartbeat subscription-document-reader HTTP 401'], 'main() runs through a symlinked directory');
+    assert.equal(received.length, 2);
+  } finally {
+    server.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the wrapper hands the summary over in the environment, keeps the reader exit status, and trusts the script exit', () => {
   const wrapper = readFileSync(join(here, 'subscription-reader-batch.sh'), 'utf8');
   assert.match(wrapper, /READER_SUMMARY="\$summary"/, 'summary passed as an environment variable');
+  assert.match(wrapper, /READER_EXIT="\$rc"/, 'the reader exit status is passed on');
+  assert.match(wrapper, /exit "\$\{PIPESTATUS\[0\]\}"/, 'the reader status survives the pipe to tail');
   assert.match(wrapper, /reader-heartbeat\.mjs/, 'the heartbeat is posted by reader-heartbeat.mjs');
+  assert.match(wrapper, /\[ \$\? -eq 0 \] \|\| echo "\$STAMP heartbeat for \$name did not land/, 'landing is decided by the script exit status');
   assert.ok(!/bash -c[^\n]*\n?[^\n]*\$summary/.test(wrapper) && !wrapper.includes(`'"$summary"'`),
     'the summary is never spliced into a bash -c script');
+  assert.ok(!/"HTTP 200"/.test(wrapper), 'no text match on the status line');
 });

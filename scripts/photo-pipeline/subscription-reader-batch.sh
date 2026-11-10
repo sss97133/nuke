@@ -35,18 +35,20 @@ run_reader() { # name script args...
   local out="$LOGDIR/$name-$STAMP.json"
   local started_s; started_s=$(date +%s)
   local summary
-  summary="$(cd "$HOME/nuke" && dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" 2>>"$LOGDIR/subscription-reader.log" | tail -1)"
-  [ -n "$summary" ] || summary='{"error":"no summary"}'
-  echo "$STAMP $name $summary"
+  # the reader's own exit status, not tail's: a reader that crashed must not look like one that reported
+  summary="$(cd "$HOME/nuke" && dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
+  local rc=$?
+  echo "$STAMP $name exit=$rc ${summary:-no summary}"
   # 4. heartbeat: record_reader_heartbeat (service role only) upserts one job_assay_readings row per reader; the cron job
   #    subscription-reader-watch fails when either row is older than 40 minutes, so v_job_health shows a silent reader.
   #    The summary is model-derived text (by_type keys are read off photographed documents). It travels in the
   #    environment and reader-heartbeat.mjs parses it as JSON; it is never part of a shell command line.
   local elapsed_ms=$(( ( $(date +%s) - started_s ) * 1000 ))
+  #    No heartbeat is posted when the reader exited non-zero or printed no JSON summary (exit 3), so the watch sees it.
   local beat
-  beat="$(READER_NAME="$name" READER_SUMMARY="$summary" READER_ELAPSED_MS="$elapsed_ms" \
-    dotenvx run -q -f "$ENV_FILE" -- node "$MAIN/scripts/photo-pipeline/reader-heartbeat.mjs" 2>>"$LOGDIR/subscription-reader.log" | tail -1)"
-  case "$beat" in *"HTTP 200"*) ;; *) echo "$STAMP heartbeat for $name did not land: ${beat:-no output}" ;; esac
+  beat="$(READER_NAME="$name" READER_SUMMARY="$summary" READER_EXIT="$rc" READER_ELAPSED_MS="$elapsed_ms" \
+    dotenvx run -q -f "$ENV_FILE" -- node "$MAIN/scripts/photo-pipeline/reader-heartbeat.mjs" 2>>"$LOGDIR/subscription-reader.log")"
+  [ $? -eq 0 ] || echo "$STAMP heartbeat for $name did not land: ${beat:-no output}"
 }
 
 # 2. documents, then 3. frames (failed first, then pending)
