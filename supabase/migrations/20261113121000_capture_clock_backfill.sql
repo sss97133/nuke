@@ -13,7 +13,7 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS public.capture_clock_backfill_log (
   run_id uuid NOT NULL,
-  image_id uuid NOT NULL REFERENCES public.vehicle_images(id) ON DELETE CASCADE,
+  image_id uuid NOT NULL,  -- no FK: a lock on the hot vehicle_images table is not needed, and the log outlives its rows
   prior_exif jsonb,
   prior_taken_at timestamptz,
   new_clock timestamptz NOT NULL,
