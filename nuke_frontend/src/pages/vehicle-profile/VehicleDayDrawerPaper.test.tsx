@@ -23,7 +23,7 @@ import BarcodeTimeline from './BarcodeTimeline';
 
 const paperDay = '2024-10-07', photoDay = '2026-10-02';
 let root: Root, host: HTMLDivElement, queryClient: QueryClient, current: ReturnType<typeof useVehicleProfile>;
-let vehicleId: string, serial = 0, tied: boolean, documentDays: number;
+let vehicleId: string, serial = 0, tied: boolean, documentDays: number, supplier: string;
 let requests: { method: string; url: URL; body: any }[];
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const photo = () => ({ id: 'synthetic-photo', image_url: 'https://photos.test/synthetic.jpg', vehicle_id: vehicleId,
@@ -32,8 +32,8 @@ const vehicle = () => ({ id: vehicleId, is_public: true, year: 1973, make: 'Pont
 const pagePath = '00000000-0000-0000-0000-000000000099/financial/' + 'a'.repeat(64) + '.heic';
 // What get_vehicle_day_documents returns: the same shape for every viewer, money, payer and the page null unless tied.
 const dayDocuments = () => ({ date: paperDay, tied, documents: [{
-  receipt_id: 'synthetic-receipt', document_id: 'synthetic-document', vendor: 'Synthetic Machine Shop', vendor_address: tied ? '1 Shop St' : null,
-  vendor_org: { name: 'Synthetic Machine Shop', logo_url: 'https://nuke.ag/source-logos/synthetic.png', website: 'https://shop.test' },
+  receipt_id: 'synthetic-receipt', document_id: 'synthetic-document', vendor: supplier, vendor_address: tied ? '1 Shop St' : null,
+  vendor_org: { name: supplier, logo_url: 'https://nuke.ag/source-logos/synthetic.png', website: 'https://shop.test' },
   page: tied ? { bucket: 'user-documents', path: pagePath, bytes: 1234567, page_no: 1 } : null, page_paths: tied ? [pagePath] : null,
   document_type: 'work_order', document_kind: 'parts_service', document_number: '9810', date: paperDay, date_source: 'data_v2.transaction_date',
   date_basis: 'printed_document_date', pages: 2, payer_as_named: tied ? 'Synthetic Builder' : null, payment_method: tied ? 'Visa' : null,
@@ -70,7 +70,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: (key: string) => cache.get(key) ?? null,
     setItem: (key: string, value: string) => cache.set(key, value), removeItem: (key: string) => cache.delete(key) });
   vehicleId = `00000000-0000-0000-0000-${String(++serial).padStart(12, '0')}`;
-  requests = []; tied = false; documentDays = 1;
+  requests = []; tied = false; documentDays = 1; supplier = 'Synthetic Machine Shop';
   fixture.client = createClient('https://timeline-paper.test', 'synthetic-anon', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `synthetic-paper-${serial}` },
     global: { fetch: async (input, init) => {
@@ -128,6 +128,17 @@ async function showDay(day: string) {
 }
 const paperReads = () => requests.filter(r => r.url.pathname.endsWith('/rpc/get_vehicle_day_documents'));
 const signRequests = () => requests.filter(r => r.url.pathname.startsWith('/storage/v1/object/sign/'));
+
+it('retains the supplier handle without person annotations in day-document headings or logo alt text', async () => {
+  supplier = 'eBay seller examplespares (Jamie Example)';
+  await showDay(paperDay);
+  const document = host.querySelector('.day-drawer__document')!;
+  expect(document.innerHTML).not.toContain('Jamie Example');
+  expect(document.textContent).toContain('eBay seller examplespares');
+  expect(document.querySelector('img')?.alt).toBe('eBay seller examplespares');
+  expect(document.querySelector('a[href="https://shop.test"]')).not.toBeNull();
+  expect(document.textContent).toContain('Bore cylinders .060');
+});
 
 it('puts a document day on the calendar and opens it with one paper read, money and payer withheld as returned', async () => {
   const text = await showDay(paperDay);

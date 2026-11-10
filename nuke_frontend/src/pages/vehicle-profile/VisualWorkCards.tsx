@@ -2,6 +2,7 @@ import React from 'react';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import type { VisualWork } from './hooks/useVisualWork';
+import { receiptSupplierLabel } from './receiptSupplierLabel';
 import './visual-work.css';
 
 const date = (value: string) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -40,7 +41,7 @@ export function VisualWorkCards({ rows, renderSource }: {
       {work.receipts.length > 0 && <div className="vp-work-materials">{work.receipts.map(line => <div key={line.item_id}>
         <span>{line.relation === 'candidate_material' ? 'Candidate material · installation not established' : 'Work recorded on the document'}</span>
         <strong>{line.description || line.part_number || 'Receipt line'}</strong>
-        <small>{[line.vendor, line.part_number, line.quantity != null ? `Qty ${line.quantity}` : null, line.page_date ? date(line.page_date) : null].filter(Boolean).join(' · ')}</small>
+        <small>{[receiptSupplierLabel(line.vendor), line.part_number, line.quantity != null ? `Qty ${line.quantity}` : null, line.page_date ? date(line.page_date) : null].filter(Boolean).join(' · ')}</small>
         {line.amounts_visible ? line.amount != null && <b>{amount(line.amount, line.currency)} · line charge</b> : <small>Amount visible to owner & contributors</small>}
         {renderSource(line)}
       </div>)}</div>}

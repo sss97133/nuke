@@ -21,6 +21,7 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import { highlightVehicleDays, openVehicleDay, openVehiclePhoto, openVehiclePhotoByUrl } from './VehiclePhotoLightbox';
 import WorkSessionContext from './WorkSessionContext';
 import { ReceiptLineContext, receiptLineKey, useReceiptWorkContext } from './ReceiptWorkContext';
+import { receiptSupplierLabel } from './receiptSupplierLabel';
 import { auctionMomentDayTitle, auctionOpenDayTitle, fmtClock, fmtMoment, fmtUsd, isBatHosted, listingForPhoto, localDate, momentDay, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
@@ -372,7 +373,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
               {doc.vendor_org?.logo_url && (
                 <img
                   src={doc.vendor_org.logo_url}
-                  alt={doc.vendor_org.name || doc.vendor || 'vendor'}
+                  alt={receiptSupplierLabel(doc.vendor_org.name || doc.vendor) || 'vendor'}
                   width={14}
                   height={14}
                   loading="lazy"
@@ -381,8 +382,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                 />
               )}
               {doc.vendor_org?.website ? (
-                <a href={doc.vendor_org.website} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{doc.vendor || doc.vendor_org.name || 'Receipt'}</a>
-              ) : (doc.vendor || 'Receipt')}
+                <a href={doc.vendor_org.website} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{receiptSupplierLabel(doc.vendor || doc.vendor_org.name) || 'Receipt'}</a>
+              ) : (receiptSupplierLabel(doc.vendor) || 'Receipt')}
               <span>{[doc.document_type ? doc.document_type.replace(/_/g, ' ') : null, doc.document_number ? `#${doc.document_number}` : null].filter(Boolean).map((part) => ` · ${part}`).join('')}</span>
             </span>
             <span style={{ ...mono, display: 'inline-flex', alignItems: 'center', gap: 8 }}>

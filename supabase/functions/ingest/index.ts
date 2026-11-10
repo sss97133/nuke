@@ -488,7 +488,10 @@ async function matchOrCreateVehicle(
 
   // ── Tier 1: VIN match (confidence 0.99) ───────────────────────
   // VIN is definitive identity for post-1981 vehicles.
-  if (parsed.vin && (platform !== "collecting_cars" || parsed.vin.length === 17)) {
+  // CC native capture admission requires the exact current URL owner. Generic
+  // aliases (including a deleted VIN match) must not enrich a foreign record
+  // before that admission guard runs. With no owner, use normal creation below.
+  if (parsed.vin && platform !== "collecting_cars") {
     let vinQuery = supabaseAdmin
       .from("vehicles")
       .select("id")
@@ -508,7 +511,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2a: URL match in marketplace_listings ────────────────
-  if (parsed.url) {
+  if (parsed.url && platform !== "collecting_cars") {
     const { data: urlMatch } = await supabaseAdmin
       .from("marketplace_listings")
       .select("vehicle_id")
@@ -524,7 +527,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2b: URL match in vehicle_events.source_url ───────────
-  if (parsed.url) {
+  if (parsed.url && platform !== "collecting_cars") {
     const { data: eventUrlMatch } = await supabaseAdmin
       .from("vehicle_events")
       .select("vehicle_id")
@@ -540,7 +543,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2c: URL match in vehicles.listing_url ────────────────
-  if (canonicalUrl) {
+  if (canonicalUrl && platform !== "collecting_cars") {
     const { data: listingUrlMatch } = await supabaseAdmin
       .from("vehicles")
       .select("id")

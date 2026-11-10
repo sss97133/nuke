@@ -131,6 +131,26 @@ const renderRows = async (rows: ReturnType<typeof dated>[], error = false) => {
 const line = { line_number: 1, description: 'Machine existing block', quantity: 1, amount: 100, line_date: '2025-03-20', hours: 2, performer: 'Shop', part_number: null };
 const page = (lines = [line]) => ({ receipt_id: 'receipt-a', document_number: 'A-100', document_type: 'invoice', subtotal: 100, tax: 25, shipping: null, discount: null, lines });
 
+it('keeps seller filters and source records while omitting person annotations from visible and accessible labels', async () => {
+  const rows = [
+    dated({ id: 'seller-a', receipt_date: null, vendor_name: 'eBay seller classicspares42 (Jamie Example)', source_document_id: 'source-a' }),
+    dated({ id: 'seller-b', receipt_date: null, vendor_name: 'eBay seller classicspares42 (Taylor Example)', source_document_id: 'source-b' }),
+    dated({ id: 'supplier-c', receipt_date: null, vendor_name: 'eBay seller Example Auto Supply (examplesupplycom); message signed Morgan Example' }),
+    dated({ id: 'business-d', receipt_date: null, vendor_name: 'eBay seller rpmperformance (RPM Performance)' }),
+  ];
+  await renderRows(rows);
+  for (const name of ['Jamie Example', 'Taylor Example', 'Morgan Example']) expect(host.innerHTML).not.toContain(name);
+  expect(host.textContent).toContain('Example Auto Supply (examplesupplycom)');
+  expect(host.textContent).toContain('rpmperformance (RPM Performance)');
+  const select = host.querySelector('select')!;
+  expect([...select.options].map(option => option.value)).toContain('eBay seller classicspares42');
+  await act(async () => { select.value = 'eBay seller classicspares42'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(host.querySelectorAll('.vp-receipt-page')).toHaveLength(2);
+  expect(rows[0].vendor).toContain('Jamie Example'); // Retained evidence was not rewritten.
+  await click('Read original source', () => !!host.querySelector('img'));
+  expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+});
+
 it('shows the exact receipt work date and quantity zero without turning nearby photos into installation proof', async () => {
   fixture.rpc.mockResolvedValue({ data: { tied: false, documents: [{ ...page([{ ...line, description: 'Rear foam — backordered, shipped 0', quantity: 0 }]),
     install: { status: 'photographed', photo_day: '2025-04-03' } }, { ...page(), receipt_id: 'other-receipt', document_number: 'WRONG' }] }, error: null });
