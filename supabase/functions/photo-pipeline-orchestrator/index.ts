@@ -23,6 +23,7 @@ import { classifyImageRouted, classificationFromReader, loadManifest, renderProm
 import { qualifyVinRead, vinCitation, type VinAdmission } from "./vinAdmission.ts";
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
+import { recordReviewedAnalysis, ReviewedAnalysisError, REVIEW_SELECT } from "./reviewedAnalysis.ts";
 import { admitPhotoFields, type FieldSourceAdmission } from "./fieldSourceAdmission.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -230,6 +231,38 @@ Deno.serve(async (req) => {
 
   try {
     const input = await req.json();
+
+    if (input?.action === "record_reviewed_analysis") {
+      // Supplied review only. This returns before processing status, classification,
+      // filing, type routes, paid handlers, field admission and deep queues.
+      try {
+        const result = await recordReviewedAnalysis(input, {
+          async authorize() {
+            const writer = await authenticateWriter(req);
+            return writer.ok && writer.caller.kind === "service_role";
+          },
+          async readImage(id) {
+            const { data, error } = await supabase.from("vehicle_images").select(REVIEW_SELECT).eq("id", id).maybeSingle();
+            if (error) throw new ReviewedAnalysisError("review_source_unavailable", 503);
+            return data;
+          },
+          async ingest(observation) {
+            const { data, error } = await supabase.functions.invoke("ingest-observation", { body: observation });
+            if (error) throw new ReviewedAnalysisError("review_observation_not_persisted", 502);
+            return data;
+          },
+          async project(observationId) {
+            const { data, error } = await supabase.rpc("project_reviewed_image_analysis", { p_observation_id: observationId });
+            if (error) throw new ReviewedAnalysisError("review_projection_refused", 409);
+            return data;
+          },
+        });
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (error) {
+        return new Response(JSON.stringify({ success: false, error: error instanceof ReviewedAnalysisError ? error.code : "review_persistence_failed", model_calls: 0 }),
+          { status: error instanceof ReviewedAnalysisError ? error.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     if (input?.action === "classifier_assay") return await runClassifierAssay(req, input, supabase);
     // The checklist for a reader that runs the classification elsewhere (the owner's subscription worker): the same
