@@ -100,7 +100,7 @@ Already-filed public photos that do not belong on a vehicle are not deleted and 
 
 ## 4. Ledger states
 
-`capture_ledger_states(p_uid, p_tz, p_from, p_to)` is the official counter. The operator script is `/workspace/sortrun/ledger_now.py`. The live function body (md5 `d381b325…` when last dumped to `ledger_live_def.txt`) assigns one state per `vehicle_images` row for the user:
+`capture_ledger_states(p_uid, p_tz, p_from, p_to)` is the official counter. The operator script is `/workspace/sortrun/ledger_now.py`. The live body after PR #3299 (migration `20261115180000`, applied 10 Nov ~13:11 AST) assigns one state per `vehicle_images` row for the user. A copy's own `rejected_*` or filed state still wins over `duplicate`.
 
 | State | Meaning |
 |---|---|
@@ -109,12 +109,14 @@ Already-filed public photos that do not belong on a vehicle are not deleted and 
 | `on_vehicle` | `vehicle_id` is set and `vision_gate_status = approved` |
 | `unverified` | `vehicle_id` is set but the gate is not `approved` (including `review_needed` holds) |
 | `failed` | `capture_upload_status.stage = failed` (rare in these counts) |
+| `duplicate` | unfiled `is_duplicate` whose original is filed, held (open `capture_set_review`), `rejected_personal`, or `rejected_misattributed`. A missing original does not count. Reasons: `copy_of_filed`, `copy_of_held`, `copy_of_private`, `copy_of_pulled` |
 | `waiting` | photo sits on a **clear** set whose chunk is `awaiting_gate` |
 | `held` | photo sits on an **open** `capture_set_review` row |
 | `unsorted` | none of the above (reason is usually `not_scored`) |
-| `duplicate` | observed in live tallies as its own state in operator ledgers; the function body dumped on 9 Nov maps only the eight states above — if a later definition added `duplicate`, re-dump the live function before treating the dump as current |
 
-Display gap, confirmed and left unchanged: the 418 `is_sensitive` photos (personal / document / id_document) are not `rejected_personal`, so the ledger still lists them as **unsorted**. The scorer and landing already exclude `is_sensitive`. They are on the sensitivity path, not the sorter. Do not file them or make them public.
+There is no ledger state for "document / typ=other / non-vehicle." `typ` lives at `ai_scan_metadata#>>'{classification,image_type}'` and is used by planning (typ `other` / `receipt_document` stay out of clear sets) but does not terminate a row by itself.
+
+`privacy_promote_v1` (PR #3300, migration `20261115181000`, applied 10 Nov ~13:10 AST) moved already-classified `is_sensitive` unfiled rows to `rejected_personal`, so they now count as `private`. It does not make new judgments, does not touch photo content, and hard-skips empty `image_url` (the 276 privacy-hold class) plus IDs in `capture_privacy_promote_exclude` (the 452-id local backup union, loaded at run time, not committed in the repo). Revert a run with `capture_privacy_promote_revert_v1('<user>', '<run>')`.
 
 Days are `(COALESCE(taken_at, created_at) AT TIME ZONE p_tz)::date` with `p_tz = America/Los_Angeles`.
 
@@ -127,10 +129,10 @@ Days are `(COALESCE(taken_at, created_at) AT TIME ZONE p_tz)::date` with `p_tz =
 | `iphoto` / `iphoto-intake.mjs` | Photos-library album dump | **Still able to stamp `vehicle_id` from the album name / `--vehicle-id`**, with no visual identity. Storage path `%/iphoto/%` (excluding daemon `users/.../photo-sync/`) | Rarely used but still live. Last non-daemon stamp observed 2026-10-30. `iphoto-overnight.sh` crontab is commented out. Draft PR #3280 routes new inserts through identity-first ingest (script only, nothing to apply in Postgres) |
 | `ssd_blast` | Bulk SSD ingest | Stamped `vehicle_id` at ingest | Last write 2026-04-11; not scheduled |
 | `drop-folder` | Folder intake | Stamped `vehicle_id` at ingest. `derive-image-exif` historically stored naive DateTimeOriginal as UTC (7–8 hours early vs Los Angeles) | Last write 2026-03-27; not scheduled. Clock correction shipped in migration `20261114120000` |
-| `image_intake` | Older intake | Some stamps; 4 residual rows have a real file DateTimeOriginal but no Make, so they were never admitted | Last write 2026-05-30; not scheduled |
+| `image_intake` | Older intake | Some stamps; 4 residual rows had a real file DateTimeOriginal but no Make — admitted 10 Nov by #3298 (DTO stamped, `taken_at` unchanged) | Last write 2026-05-30; not scheduled |
 | `daily_receipt` / `daily_receipt_cascade` | `process-photo.mjs` / cascade, sometimes with `--vehicle-id` | Could auto-bless (`vision_gate_status=approved`). After the 2026-05-30 privacy incident, current `process-photo.mjs` sets `review_needed` and does not auto-bless | Last cascade write 2026-05-29; 0 daily_receipt rows created on or after 2026-05-30 |
 | `direct_pull_2026_05_23` | One-off pull | 4 unadmitted rows, outside the clock-apply `SOURCES` list | Dormant; needs a separate admission policy |
-| `user_upload` | Uploads that are not in the library-admission source list unless they have DateTimeOriginal | 242 of the 262 `source_not_admitted` pile | Still present in the unsorted leftover |
+| `user_upload` | Uploads that are not in the library-admission source list unless they have DateTimeOriginal | 242 still unadmitted (no file camera clock / no DTO in `exif_data`) | Still present in the unsorted leftover |
 
 **Gallery pollution from stamped ingest.** A read-only audit on 10 Nov 2026 (~07:09–07:15 AST) counted approved, non-sensitive, non-superseded photos whose `vehicle_id` was stamped at ingest and `user_confirmed_vehicle` is false:
 
@@ -157,7 +159,9 @@ Post-July daemon rows are not this class: 1,494 daemon iphoto rows were counted,
 
 **`capture_clock_from_file` / `capture_clock_backfill_apply`** (migration `20261113121000`, PR #3245, applied live 9 Nov ~23:58 AST). Recovers DateTimeOriginal from the stored file. Writable only for camera originals (`source = file_exif` **and**, in the live apply body, Make present). XMP dates are not written (screenshots and edited graphics). Personal / sensitive / already-filed rows are skipped. Runs were signed `c10c0000-2026-4b09-a000-000000000001` … `0005` (218 rows, 27 `taken_at` fixes). Revert a run with `capture_clock_backfill_revert(run, false)`, then the migration revert SQL if rolling back the function.
 
-**Gap that remains:** 4 `image_intake` files have a real file DateTimeOriginal and a matching `taken_at`, but no Make, so DTO was never stamped and they stay unadmitted. 238 have no camera clock in the file bytes. 14 XMP and 4 `direct_pull` need a separate policy. A narrow follow-up (migration `20261115121000`, brief in `/workspace/sortrun/stamp_dto_pr/BRIEF.md`) would admit file-EXIF DTO even without Make, still reject XMP, and not change `taken_at` when it already matches. **Not applied live** until CI and the contract test are green. Never batch the 238.
+**`capture_clock_backfill_apply` without Make** (migration `20261115121000`, PR #3298 against main, applied 10 Nov ~12:59 AST after db-contracts was green). Admits a file-EXIF DateTimeOriginal even when Make is absent. Still requires `source=file_exif`, still rejects XMP / guessed clocks, still skips personal / sensitive / already-filed / already-clocked. Signed run `b1c72d54-501f-4747-832e-a22f0155c007` wrote the 4 `image_intake` rows with `p_set_taken_at=false`; all four now admit, `taken_at` unchanged. Revert: `select capture_clock_backfill_revert('b1c72d54-501f-4747-832e-a22f0155c007', false);` then `supabase/sql/revert_20261115121000_capture_clock_backfill_exif_dto_without_make.sql`. The 238 with no camera clock in the file, 14 XMP, and 4 `direct_pull` were not stamped and still need a separate policy. Never invent a DTO from `taken_at` or from a neighbouring file.
+
+Those two days (2024-06-22 and 2024-06-25, America/Los_Angeles) were re-armed at 13:16 AST on 10 Nov via the sanctioned `capture_sets_enqueue` onto `capture_set_rescore_queue` with reason `clock_admit=b1c72d54-…`. Live `capture_sets_landing_run` only proposes and enqueues the visual gate; apply waits for `capture_landing_apply_chunk` after the gate passes. The drain waits 10 minutes after `requested_at` (`capture-sets-drain` cron `1-59/5`). 2024-06-25 is a real vehicle day (the two stamp rows are typ `vehicle_exterior` among other admitted exteriors/interiors). 2024-06-22's two stamp rows are typ `other`, so typ coverage will keep them out of clear sets; three admitted `engine_bay` frames on that day can still go to the gate.
 
 **`capture_clock_naive_utc_apply` / `_revert`** (migration `20261114120000`, PR #3263, applied live 10 Nov ~01:57 AST after db-contracts was green). Corrects drop-folder rows whose naive DateTimeOriginal was stored as UTC. `derive-image-exif` now reads `OffsetTimeOriginal`, falling back to America/Los_Angeles, never UTC. 136 eligible rows were rewritten in signed runs `c14c0000-2026-4114-8000-000000000001`…`0003`. Sample 6/6 matched (118 PDT −07:00, 18 PST −08:00). Producer sha `c8157bff8`. Revert: `select capture_clock_naive_utc_revert('<run>', false);` then `supabase/sql/revert_20261114120000_capture_clock_naive_utc.sql`.
 
@@ -177,6 +181,8 @@ Related earlier landing fixes, also live-applied (some still draft / unmerged):
 - `20261113120900` / #3243 — unseen admitted photos since a refused run count as new evidence (loop-proof via `capture_set_admission_epochs`)
 
 The hourly cron `capture-review-sweep` (`17 * * * *`, migration `20261111140000`) can enqueue days with reason `new_anchors` after a gate pass. On 10 Nov at 03:17 AST it enqueued 141 days after the Mustang filings. That was a one-shot re-score, not the empty-applied auto-arm looping. 139 days went back to review (0 new links); 2 went `awaiting_gate` and the gate then refused both (look-alike R3500, and a Mustang sheet with error_rate 0.67).
+
+**All-unclear gates** (PR #3296, migration `20261115170000`, applied 10 Nov ~12:58 AST): `capture_landing_gate_extend_v1` queues unused clear-set photos for another reader pass (never shrinks `required_n`); `capture_landing_gate_expire_all_unclear_v1` moves a fully sampled all-unclear chunk to review (`gate_undecided`), never to file. Extend run `7dbe86ed-…` queued 13 samples on chunk `ae2816b8`. Expire run `2db98281-…` expired 18 chunks (21 open reviews). The live reader then marked the 13 (11 correct / 2 unclear); the gate passed and apply filed 0 (`sets_refused=1`). Revert: `capture_landing_gate_extend_revert_v1` / `capture_landing_gate_expire_all_unclear_revert_v1`. Do not call `capture_landing_gate_check` as a dry-run (it writes and can halt landing).
 
 Apply of a passed chunk is `capture_landing_apply_chunk`. Revert a filed chunk with `capture_sets_revert('<chunk_run>', '<user_id>')`.
 
@@ -451,8 +457,18 @@ select revert_vehicle_image_review_hold('<run>', null, true);
 -- Filed capture-set chunk
 select capture_sets_revert('<chunk_run>', '0b9f107a-d124-49de-9ded-94698f63c1c4');
 
--- Clock backfill (file EXIF)
+-- Clock backfill (file EXIF, including the no-Make DTO stamp)
 select capture_clock_backfill_revert('<run>', false);
+
+-- Privacy promote (is_sensitive -> rejected_personal)
+select capture_privacy_promote_revert_v1('<user>', '<run>');
+
+-- All-unclear gate extend / expire
+select capture_landing_gate_extend_revert_v1('<run>');
+select capture_landing_gate_expire_all_unclear_revert_v1('<run>');
+
+-- Ledger dupmap (definition only; restores the filed-original-only body)
+-- supabase/sql/revert_20261115180000_capture_ledger_copy_of_held.sql
 
 -- Drop-folder naive-UTC clock
 select capture_clock_naive_utc_revert('<run>', false);
@@ -486,46 +502,49 @@ Migration rollbacks live under `supabase/sql/revert_*.sql` and `rollback_*.sql` 
 
 ## 18. Current ledger (live)
 
-Read-only `capture_ledger_states` on project `qkgaybvrernstplzjaam`, user `0b9f107a-d124-49de-9ded-94698f63c1c4`, timezone America/Los_Angeles, 10 Nov 2026 at **10:11 AST** (this writing):
+Read-only `capture_ledger_states` on project `qkgaybvrernstplzjaam`, user `0b9f107a-d124-49de-9ded-94698f63c1c4`, 10 Nov 2026 at **13:12 AST** (America/St_Barthelemy; day grouping for the breakdown uses America/Los_Angeles, the landing convention):
 
 | State | Count |
 |---| ---:|
 | on_vehicle | 13,973 |
-| held | 8,632 |
+| held | 8,719 |
 | unverified | 1,990 |
 | pulled | 2,126 |
-| **unsorted** | **1,732** |
-| private | 793 |
-| duplicate | 405 |
-| waiting | 98 |
+| private | 1,228 |
+| **unsorted** | **926** |
+| duplicate | 787 |
+| waiting | 0 |
 | **n** | **29,749** |
 
-Versus 09:58 AST: `on_vehicle` −18, `unverified` +18, everything else unchanged — exactly the three `20261110b` holds. Private and n are unchanged across the morning. Unsorted has been 1,732 since empty-applied batches 18–19 finished at 06:27 AST; gallery holds do not shrink it.
+`on_vehicle` is unchanged since the morning — 0 photos filed in the 12:40-13:12 producers. Net from 12:57 AST: waiting -84 / held +84 (18 all-unclear chunks expired to review, then `ae2816b8` gate-passed and applied with 0 filed); private +435 (`privacy_promote_v1`); unsorted -817 (418 privacy + 399 dupmap); duplicate +382 (-17 privacy-promoted copies of filed originals + 399 newly counted copies of held originals).
 
-Fresh unsorted breakdown at 10:08 AST (`/workspace/sortrun/unsorted/fresh_20261110/breakdown.json`), still n = 1,732:
+Fresh unsorted breakdown at 13:13 AST, n = 926 (mutually exclusive `why`, then typ as a cross-cut):
 
 | Why | Count | Notes |
 |---| ---:|---|
-| planned_but_left_out | 779 | Leftovers on days that now have (non-empty) plans; not the same 915 empty-applied pool, which has been processed |
-| should_be_private | 418 | All `is_sensitive`; do not file |
-| source_not_admitted | 262 | Stamp-DTO pile: 4 file-EXIF without Make, 238 with no camera clock, 14 XMP, 4 direct_pull |
-| plan_refused | 170 | Grew from 7 at 00:59 as days were planned and then refused (including former gate-pending days) |
-| gate_pending_left_out | 94 | Down from 241. Of the original 241: 94 still gate-pending, 64 now plan_refused, 10 planned_but_left_out, 73 no longer unsorted |
+| empty_url | 275 | All `capture_relay_ios`. The live privacy-hold class is 276 empty-url rows; 275 of them are still unsorted. Left untouched |
+| source_not_admitted | 258 | 242 `user_upload` with no file DTO, 12 `image_intake`, 4 `direct_pull_2026_05_23`. The 4 stamp-DTO rows have left this bucket |
+| planned_but_left_out | 154 | Including typ `other` 117 and `receipt_document` 16 |
+| plan_refused | 124 | Including typ `other` 29 and `receipt_document` 1 |
+| duplicate_of_unfiled | 71 | Copies whose original is still unsorted (or missing); the ledger correctly does not count them as `duplicate` |
+| superseded | 38 | |
 | no_date | 6 | |
-| never_planned | 3 | |
+| gate_pending_left_out / never_planned | 0 | |
 
-Of the current 94 gate-pending leftovers: 0 overlap with the privacy union; 22 `awaiting_gate` chunks exist; 17 are already in the reader's `done_chunks`; a local (non-writing) pass computation found **0 chunks that would pass**. `capture_sets_enqueue` was not called: a day whose latest chunk is `awaiting_gate` has historically been skipped as `plan_pending`.
+Non-sensitive typ `other` = 180 and typ `receipt_document` = 17 overall (they sit inside the rows above, not a separate why).
 
 ## 19. Known gaps and next work
 
 Filing work (the path that can move unsorted):
 
-1. **Stamp-DTO for the 4** file-EXIF rows without Make — versioned producer, contract test, CI, then dry-run / backup / revertible apply. Do not invent clocks for the 238.
-2. **gate_pending_left_out (94)** — characterized at 10:08 AST; 0 computed would-pass chunks. Next step needs a policy for leftover photos on already-verdicted or all-unclear awaiting_gate days, not a blind re-enqueue.
-3. **plan_refused (170)** and **planned_but_left_out leftovers (779)** — new producer work, not a re-arm of the 341 empty-applied days.
-4. **should_be_private (418)** — display-gap only; leave on the sensitivity path.
-5. **Gate reader** — still at 87 filings; next official spot-check still at ~137 if it files again. #3246 is draft.
-6. **Drop-folder / other dormant stampers** are not scheduled, but `iphoto-intake.mjs` is still able to stamp `vehicle_id` until #3280 lands.
+1. **The 4 newly admitted stamp-DTO rows** — days 2024-06-22 and 2024-06-25 were re-armed on the rescore queue at 13:16 AST; wait for `capture-sets-drain` (>=10 minutes after enqueue) and the visual gate. Do not call `capture_landing_gate_check` as a dry-run.
+2. **238 (plus 14 XMP and 4 `direct_pull`) with no file camera clock** — no existing session-anchoring admits policy. The 242 `user_upload` rows are UUID-named web uploads from two import waves (8 on 2025-11-07, 234 on 2025-12-07) that sit next to many clocked and already-filed neighbors in the same 15-minute window, but copying a neighbor's clock or inventing a DTO from `taken_at` is forbidden. A future admits-by-import-session rule (no DTO write) would be a new policy. Never batch a clock invent.
+3. **plan_refused (124)** and **planned_but_left_out leftovers (154)** — new producer work, not a re-arm of the 341 empty-applied days. typ `other` / `receipt_document` in these buckets have no terminal ledger state (see below).
+4. **`capture_documents_land_by_vin`** — dry-run 10 Nov (`d0c00000-...000000000001`) returned 0 candidates. Every VIN page was skipped (`no_unique_vehicle`, `vehicle_not_held_by_user`, or `check_digit_failed`). Do not apply a signed run until a unique vehicle the user holds is actually found. The 10-minute tick is already scheduled and will no-op on the same skips.
+5. **typ `other` / `receipt_document` (180 + 17 non-sensitive)** — the ledger has no `document` or `non_vehicle` state. Product "documents" land *onto a vehicle* by VIN (`capture_documents_land_by_vin`) or feed receipt-work questions (`receipt_work_frame_eligible` actually *excludes* `receipt_document` / paperwork). typ `other` is mixed (passports, invitations, titles) and is not a safe auto-terminal by itself. A minimal correct producer, if wanted, would be a signed, cap-50, revertible hold/review to a new reviewed `non_vehicle` (or `document`) ledger state after a human or gate confirmation — not typ-alone, and never a new privacy judgment.
+6. **empty_url (275 unsorted / 276 live)** — leave alone. iOS `SyncEngine` retries failed uploads locally (`failed(retry:)` stays queued on the device; `BackgroundUploader`). The server has almost no retry signal: 3 of 276 have `capture_upload_status.stage=uploaded`, 0 failed. 42 carry `on_device_vision.is_personal` (intentional metadata-only alibi rows). **0 are newer than 4 Nov 2026**; created 19 Jun-29 Oct 2026, latest `taken_at` 28 Oct. This class does not explain a post-Nov-4 upload stall.
+7. **Gate reader** — #3246 is draft. Do not re-arm the 2019-09-24 reader cursor (`9cf5b7a4` stays in `done_chunks`).
+8. **Drop-folder / other dormant stampers** are not scheduled, but `iphoto-intake.mjs` is still able to stamp `vehicle_id` until #3280 lands.
 
 Gallery hygiene and identity (does not shrink unsorted, but unblocks later visual tests):
 
@@ -549,14 +568,19 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3250](https://github.com/sss97133/nuke/pull/3250) | Codex image analysis batch | Merged | 50 incidental observations |
 | [#3279](https://github.com/sss97133/nuke/pull/3279) | fix(receipts): compare candidate_image_ids as a set | Draft, open, **applied live** 06:47 AST | Eligibility binding |
 | [#3280](https://github.com/sss97133/nuke/pull/3280) | fix(photos): route iphoto album intake through identity-first ingest | Draft, open, script only, **nothing to apply live** | Root-cause intake fix |
+| [#3287](https://github.com/sss97133/nuke/pull/3287) | typ other / receipt_document out of clear sets | Draft; typ coverage is live | Planning |
+| [#3296](https://github.com/sss97133/nuke/pull/3296) | extend or expire all-unclear landing gates | Draft, **applied live** 12:58 AST | Gate |
+| [#3298](https://github.com/sss97133/nuke/pull/3298) | admit a file EXIF DateTimeOriginal without Make | Draft, **applied live** 12:59 AST | Clock / admission |
+| [#3299](https://github.com/sss97133/nuke/pull/3299) | count copies of held or private originals as dups | Draft, **applied live** 13:11 AST | Ledger definition only |
+| [#3300](https://github.com/sss97133/nuke/pull/3300) | signed privacy_promote_v1 | Draft, **applied live** 13:10 AST | Privacy terminal state |
 
 ## 21. Unverified or out of scope in this writing
 
-- The live `capture_ledger_states` function body was not re-dumped; `duplicate` appears in operator ledgers (405 unchanged all morning) but is not in the 9 Nov body dump. Re-dump before commenting on how `duplicate` is assigned.
+- The live `capture_ledger_states` body was re-read on 10 Nov afternoon; `duplicate` is defined as of #3299 (filed / held / private / pulled originals). A missing original still does not count.
 - Visual confirmation of the 18 `20261110b` holds was not repeated here; runs, backups, and the ledger delta were verified.
 - `#3212` and the full set of open draft PRs were not re-surveyed.
 - Capture-set joins for ssd_blast / drop-folder / image_intake / cascade in the pollution audit were not finished (timeout / UNION type mismatch into the outage).
-- `visual_identity_recheck_v1` and the stamp-DTO-without-Make migration are designs plus (for stamp-DTO) a patch brief, not shipped producers.
+- `visual_identity_recheck_v1` is still a design, not a shipped producer. Stamp-DTO-without-Make (#3298) is now live for the 4 rows.
 - Whether every remaining-vehicle cover with `zone=null` is still the same exterior checked at 09:56 was not re-opened.
 - Mac online/offline state and reader/drain pids were not re-checked at 10:11 AST; last known healthy pids are in the 09:58 progress note.
 - The exact Postgres `granted_by` column constraint was not re-read in this writing; keeping it non-null is a standing operating rule, and the ownership rederive producer keeps the existing value.
@@ -566,4 +590,4 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Operator log: `/workspace/sortrun/progress.md` (9–10 Nov 2026)
 - Scripts and artifacts under `/workspace/sortrun`: `gate_reader.py`, `drain_loop.py`, `ledger_now.py`, `emptyplan/*`, `fingerprint/*`, `lookalike_pilot/*`, `garage/gallery_pollution_audit.md`, `garage/visual_identity_recheck_v1.md`, `garage/gross_mismatch_v1/*`, `held/same_scene_dryrun.py`, `ingest_audit/`, `unsorted/breakdown.json`, `unsorted/fresh_20261110/*`, `stamp_dto_pr/BRIEF.md`, `receipt_order_fix/`, `ledger_live_def.txt`
 - Repository: `github.com/sss97133/nuke` — especially `docs/receipt-work-contract.md`, `supabase/migrations/20261020001000_vehicle_image_review_holds.sql`, `supabase/migrations/20261109070000_rederive_ownership_roles.sql`, `scripts/ownership/rederive-ownership-roles.mjs`, `scripts/receipt-work/reconcile-receipt-work.mjs`, `scripts/photo-pipeline/local_image_analysis.py`, `scripts/iphoto-intake.mjs`, and the PRs in §20
-- Live read-only ledger and `vehicle_image_gate_changes` on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026 ~10:11 AST)
+- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last pass ~13:16 AST)
