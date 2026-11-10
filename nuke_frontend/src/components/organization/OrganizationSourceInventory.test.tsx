@@ -21,6 +21,12 @@ let container: HTMLDivElement;
 function renderPage(fallback?: React.ReactNode) { container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container); act(()=>root!.render(<MemoryRouter><OrganizationSourceInventory organizationId="test" fallback={fallback} /></MemoryRouter>)); return container; }
 afterEach(()=>{ act(()=>root?.unmount()); root=undefined; document.body.innerHTML=''; });
 describe('publisher schedule and inventory', () => {
+  it('does not turn a missing first reading into an empty inventory count', () => {
+    mock.query={data:{...data,checked_at:null,sales:[],inventory:[],stale:true}};renderPage();
+    expect(container.querySelector('[role=status]')?.textContent).toContain('first complete source reading is pending');
+    expect(container.querySelector('table')).toBeNull();
+    expect(container.textContent).not.toContain('0 cars');
+  });
   it('retains existing inventory for an organization without a publisher roster', () => {
     mock.query={data:null};renderPage(<p>Existing inventory</p>);
     expect(container.textContent).toBe('Existing inventory');

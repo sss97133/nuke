@@ -63,25 +63,39 @@ export function parseMcCormickFutureSales(html: string, sourceUrl: string): McCo
   return sales;
 }
 
+/** Parse each complete source document once, then resolve every lot against
+ * the same agreed ranges. Re-tokenizing the full catalog per lot exceeds the
+ * Edge CPU allowance on a real sale roster. */
+export function mccormickRunDayReader(sale: McCormickSale, catalogHtml: string, scheduleHtml: string): (lot: string) => string | null {
+  const catalog = plain(catalogHtml), schedule = plain(scheduleHtml);
+  const ranges = [...catalog.matchAll(/Lots\s+(\d+)\s*-\s*(\d+)\s+(Friday|Saturday|Sunday)/gi)];
+  const monthPattern = months.join("|");
+  const calendarDays = new Map<string, string>();
+  const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  for (let t = Date.parse(sale.starts_on + "T12:00:00Z"); t <= Date.parse(sale.ends_on + "T12:00:00Z"); t += 86400000) {
+    const date = new Date(t); calendarDays.set(weekdays[date.getUTCDay()], date.toISOString().slice(0, 10));
+  }
+  const rules = ranges.map(range => {
+    const weekday = range[3].toLowerCase();
+    const section = schedule.match(new RegExp(`\\b${weekday},?\\s+(${monthPattern})\\s+(\\d{1,2})(?:st|nd|rd|th)?[,]?([\\s\\S]*?)(?=\\b(?:FRIDAY|SATURDAY|SUNDAY),?\\s+(?:${monthPattern})\\s+\\d|Classic Car Auctions|$)`, "i"));
+    const stated = section?.[3].match(/LOTS\s+(\d+)\s*-\s*(\d+)/i);
+    const statedDay = stated ? day(section![1], Number(section![2]), Number(sale.starts_on.slice(0, 4))) : null;
+    return { low: Number(range[1]), high: Number(range[2]), statedLow: stated ? Number(stated[1]) : null,
+      statedHigh: stated ? Number(stated[2]) : null, on: statedDay && calendarDays.get(weekday) === statedDay ? statedDay : null };
+  });
+  return (lot: string) => {
+    if (!/^\d+$/.test(lot)) return null;
+    const number = Number(lot), matches = rules.filter(r => number >= r.low && number <= r.high);
+    if (matches.length !== 1) return null;
+    const rule = matches[0];
+    return rule.on && rule.statedLow !== null && rule.statedHigh !== null
+      && number >= rule.statedLow && number <= rule.statedHigh ? rule.on : null;
+  };
+}
+
 /** Only a run day stated by both current catalog and schedule is projected. */
 export function mccormickRunDay(lot: string, sale: McCormickSale, catalogHtml: string, scheduleHtml: string): string | null {
-  if (!/^\d+$/.test(lot)) return null;
-  const catalog = plain(catalogHtml), schedule = plain(scheduleHtml), number = Number(lot);
-  const ranges = [...catalog.matchAll(/Lots\s+(\d+)\s*-\s*(\d+)\s+(Friday|Saturday|Sunday)/gi)];
-  const candidates = ranges.filter(m => number >= Number(m[1]) && number <= Number(m[2]));
-  if (candidates.length !== 1) return null;
-  const weekday = candidates[0][3].toLowerCase();
-  const monthPattern = months.join("|");
-  const section = schedule.match(new RegExp(`\\b${weekday},?\\s+(${monthPattern})\\s+(\\d{1,2})(?:st|nd|rd|th)?[,]?([\\s\\S]*?)(?=\\b(?:FRIDAY|SATURDAY|SUNDAY),?\\s+(?:${monthPattern})\\s+\\d|Classic Car Auctions|$)`, "i"));
-  const stated = section?.[3].match(/LOTS\s+(\d+)\s*-\s*(\d+)/i);
-  if (!stated || number < Number(stated[1]) || number > Number(stated[2])) return null;
-  const statedDay = day(section![1], Number(section![2]), Number(sale.starts_on.slice(0, 4)));
-  for (let t = Date.parse(sale.starts_on + "T12:00:00Z"); t <= Date.parse(sale.ends_on + "T12:00:00Z"); t += 86400000) {
-    const date = new Date(t);
-    if (date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }).toLowerCase() === weekday
-      && date.toISOString().slice(0, 10) === statedDay) return statedDay;
-  }
-  return null;
+  return mccormickRunDayReader(sale, catalogHtml, scheduleHtml)(lot);
 }
 
 /** Enumerate real linked rows; a bad/empty page never becomes a complete empty roster. */
