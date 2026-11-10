@@ -110,7 +110,9 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
     if (prior.error) throw new Error("mccormicks_identity_lookup_unavailable");
     let resolutionIssue = prior.data?.length > 1 ? "mccormicks_ambiguous_listing_identity" : null;
     if (gate.cleaned.vin) {
-      const exact = await deps.supabase.from("vehicles").select("id,year,make").eq("vin", gate.cleaned.vin).limit(2);
+      // Merged-away aliases retain their VIN as history, not a second live identity.
+      const exact = await deps.supabase.from("vehicles").select("id,year,make").eq("vin", gate.cleaned.vin)
+        .is("deleted_at", null).is("merged_into_vehicle_id", null).or("status.is.null,status.neq.merged").limit(2);
       if (exact.error) throw new Error("mccormicks_vin_lookup_unavailable");
       if (exact.data?.length > 1) resolutionIssue = "mccormicks_ambiguous_vin_identity";
       const existing = exact.data?.[0];

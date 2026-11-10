@@ -489,10 +489,15 @@ async function matchOrCreateVehicle(
   // ── Tier 1: VIN match (confidence 0.99) ───────────────────────
   // VIN is definitive identity for post-1981 vehicles.
   if (parsed.vin && (platform !== "collecting_cars" || parsed.vin.length === 17)) {
-    const { data: vinMatch } = await supabaseAdmin
+    let vinQuery = supabaseAdmin
       .from("vehicles")
       .select("id")
-      .eq("vin", parsed.vin)
+      .eq("vin", parsed.vin);
+    // Use the same live-owner boundary as McCormick's ambiguity preflight.
+    // Otherwise an arbitrary merged alias can win the later LIMIT 1 lookup.
+    if (platform === "mccormicks") vinQuery = vinQuery
+      .is("deleted_at", null).is("merged_into_vehicle_id", null).or("status.is.null,status.neq.merged");
+    const { data: vinMatch } = await vinQuery
       .limit(1)
       .single();
 
