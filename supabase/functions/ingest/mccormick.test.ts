@@ -190,7 +190,7 @@ for (const failure of ["source", "archive", "identity", "admission", "readback",
   });
 }
 
-async function archiveWorld(mode: "complete" | "missing" | "disagreement" | "ambiguous" | "merged_aliases" | "conflicting_owner" = "complete") {
+async function archiveWorld(mode: "complete" | "missing" | "disagreement" | "ambiguous" | "merged_aliases" | "conflicting_owner" | "redirect_conflict" | "inactive_owner" | "overflow" = "complete") {
   const archiveUrl="https://www.classic-carauction.com/auction-results?auctionnbr=80&auctionid=123";
   const modern=(s:string)=>s.replaceAll("1967","2002");
   const archiveBody=modern(fixture(true)).replace('second</a>', 'second</a><a href="./upload/Auction/archive-only.jpg">original</a>');
@@ -217,7 +217,12 @@ async function archiveWorld(mode: "complete" | "missing" | "disagreement" | "amb
         if(table==="listing_page_snapshots")return {data:docs[filters.id]};
         if(table==="vehicles") {
           if (!filters.vin) return {data:[]};
-          const rows = mode === "ambiguous" ? [{id:"a"},{id:"b"}]
+          const rows = mode === "redirect_conflict" ? [
+              {id:"vehicle",year:2002,make:"Ford"},
+              {id:"alias",year:2002,make:"Ford",deleted_at:"2026-10-20",merged_into_vehicle_id:"another_live_owner"}]
+            : mode === "inactive_owner" ? [{id:"alias",deleted_at:"2026-10-20",merged_into_vehicle_id:"another_live_owner"}]
+            : mode === "overflow" ? Array.from({length:51},(_,i)=>({id:`alias-${i}`,deleted_at:"2026-10-20",merged_into_vehicle_id:"vehicle"}))
+            : mode === "ambiguous" ? [{id:"a"},{id:"b"}]
             : mode === "merged_aliases" ? [
               {id:"merged", year:1999, make:"Honda", deleted_at:"2026-10-20", merged_into_vehicle_id:"vehicle", status:"merged"},
               {id:"deleted", year:1999, make:"Honda", deleted_at:"2026-10-20", merged_into_vehicle_id:null, status:null},
@@ -304,3 +309,11 @@ Deno.test("a conflicting live VIN owner remains unresolved after ignoring histor
   eq(w.payloads.every(p => p.vehicle_id === undefined), true);
   eq(w.payloads[0].extraction_metadata.quality_issues.includes("mccormicks_vin_identity_conflict"), true);
 });
+for (const mode of ["redirect_conflict", "inactive_owner", "overflow"] as const) {
+  Deno.test(`VIN ${mode} retains source claims without choosing or minting a vehicle`, async () => {
+    const w = await archiveWorld(mode);
+    eq(w.candidate, undefined); eq(w.result.mccormick_receipt.unresolved, true);
+    eq(w.payloads.length, 2); eq(w.payloads.every(p => p.vehicle_id === undefined), true);
+    eq(w.payloads[1].structured_data.vin, "1FAFP42X62F212138");
+  });
+}
