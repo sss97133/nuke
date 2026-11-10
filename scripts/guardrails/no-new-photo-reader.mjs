@@ -112,7 +112,7 @@ function main() {
     existedInBase: (p) => { try { git(['cat-file', '-e', `${base}:${p}`]); return true; } catch { return false; } },
     allow,
   });
-  if (!found.length) { console.log(`no-new-photo-reader: clean (${added.length} added files against ${base.slice(0, 9)})`); return; }
+  if (!found.length) { console.log(`no-new-photo-reader: clean (${added.length} added files against ${/^[0-9a-f]{40}$/.test(base) ? base.slice(0, 9) : base})`); return; }
   console.error('no-new-photo-reader: this change adds a new reader or a new store for photos.\n');
   for (const v of found) console.error(`  ${v.kind}: ${v.what} (${v.detail}; ${v.where})`);
   console.error(`
