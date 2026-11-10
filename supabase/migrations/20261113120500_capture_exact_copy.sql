@@ -136,6 +136,13 @@ AS $function$
     WHERE c.user_id = p_uid AND c.state = 'awaiting_gate'
   ), failed AS (
     SELECT u.image_id, u.error_class FROM public.capture_upload_status u WHERE u.user_id = p_uid AND u.stage = 'failed'
+  ), dupmap AS MATERIALIZED (
+    -- scoped to this user's unfiled duplicates; joining vehicle_images directly in the main query
+    -- made the live ledger hit statement_timeout (2026-11-09)
+    SELECT c.id AS image_id, d.id, d.vehicle_id
+    FROM public.vehicle_images c
+    JOIN public.vehicle_images d ON d.id = c.duplicate_of AND d.vehicle_id IS NOT NULL
+    WHERE c.user_id = p_uid AND c.vehicle_id IS NULL AND c.is_duplicate IS TRUE AND c.duplicate_of IS NOT NULL
   )
   SELECT vi.id,
          (COALESCE(vi.taken_at, vi.created_at) AT TIME ZONE p_tz)::date,
@@ -166,8 +173,7 @@ AS $function$
   LEFT JOIN waiting w ON w.image_id = vi.id
   LEFT JOIN failed f ON f.image_id = vi.id
   -- 20261113120500: a byte-identical copy of a photo already on a vehicle is recorded as that photo's duplicate
-  LEFT JOIN public.vehicle_images dup ON vi.vehicle_id IS NULL AND vi.is_duplicate IS TRUE AND dup.id = vi.duplicate_of
-                                     AND dup.vehicle_id IS NOT NULL
+  LEFT JOIN dupmap dup ON dup.image_id = vi.id
   WHERE vi.user_id = p_uid
     AND COALESCE(vi.taken_at, vi.created_at) >= COALESCE(p_from::timestamp AT TIME ZONE p_tz, '-infinity'::timestamptz)
     AND COALESCE(vi.taken_at, vi.created_at) < COALESCE((p_to + 1)::timestamp AT TIME ZONE p_tz, 'infinity'::timestamptz)
@@ -192,6 +198,13 @@ AS $function$
     WHERE c.user_id = p_uid AND c.state = 'awaiting_gate'
   ), failed AS (
     SELECT u.image_id, u.error_class FROM public.capture_upload_status u WHERE u.user_id = p_uid AND u.stage = 'failed'
+  ), dupmap AS MATERIALIZED (
+    -- scoped to this user's unfiled duplicates; joining vehicle_images directly in the main query
+    -- made the live ledger hit statement_timeout (2026-11-09)
+    SELECT c.id AS image_id, d.id, d.vehicle_id
+    FROM public.vehicle_images c
+    JOIN public.vehicle_images d ON d.id = c.duplicate_of AND d.vehicle_id IS NOT NULL
+    WHERE c.user_id = p_uid AND c.vehicle_id IS NULL AND c.is_duplicate IS TRUE AND c.duplicate_of IS NOT NULL
   )
   SELECT vi.id,
          (COALESCE(vi.taken_at, vi.created_at) AT TIME ZONE p_tz)::date,
@@ -225,8 +238,7 @@ AS $function$
   LEFT JOIN waiting w ON w.image_id = vi.id
   LEFT JOIN failed f ON f.image_id = vi.id
   -- 20261113120500: a byte-identical copy of a photo already on a vehicle is recorded as that photo's duplicate
-  LEFT JOIN public.vehicle_images dup ON vi.vehicle_id IS NULL AND vi.is_duplicate IS TRUE AND dup.id = vi.duplicate_of
-                                     AND dup.vehicle_id IS NOT NULL
+  LEFT JOIN dupmap dup ON dup.image_id = vi.id
   WHERE vi.user_id = p_uid
     AND COALESCE(vi.taken_at, vi.created_at) >= COALESCE(p_from::timestamp AT TIME ZONE p_tz, '-infinity'::timestamptz)
     AND COALESCE(vi.taken_at, vi.created_at) < COALESCE((p_to + 1)::timestamp AT TIME ZONE p_tz, 'infinity'::timestamptz)
