@@ -17,7 +17,7 @@ const record: VisualWork = {
  observation_id: 'review-a', title: 'Cabin upholstery', summary: 'The earlier seating is torn; the later frame shows black covers.', gaps: ['Hidden cushion foam remains unconfirmed.'],
  images: [{ image_id: 'before-a', image_url: 'https://images.example/before.jpg', role: 'before', caption: 'Torn seating', taken_at: '2026-04-27T17:00:00Z' },
  { image_id: 'after-a', image_url: 'https://images.example/after.jpg', role: 'after', caption: 'Covered seating', taken_at: '2026-05-05T21:00:00Z' }],
- receipts: [{ item_id: 'item-a', receipt_id: 'receipt-a', relation: 'candidate_material', source_table: 'vehicle_documents', source_id: 'doc-a', vendor: 'Example upholstery',
+ receipts: [{ item_id: 'item-a', receipt_id: 'receipt-a', relation: 'candidate_material', source_table: 'vehicle_documents', source_id: 'doc-a', source_url_sha256: 'a'.repeat(64), vendor: 'Example upholstery',
  page_date: '2025-09-08', description: 'Black upholstery', part_number: 'SYNTHETIC-1', quantity: 1, hours: null, amount: null, currency: 'USD', amounts_visible: false }],
  receipt_links_unavailable: 0, market_value: { status: 'not_established_by_cited_sources' }, paid_labor: { status: 'unreconciled' },
  effort_reference: { reference_id: 'reference-a', description: 'Upholstery reference', hours_min: 16, hours_max: 40, hours_typical: 24, basis: 'seed_uncalibrated' },
@@ -68,6 +68,10 @@ it('renders no empty work shell and exposes withdrawn receipt state without an o
  await render([{ ...record, receipts: [], receipt_links_unavailable: 1 }]);
  expect(host.textContent).toContain('Some cited receipt lines are no longer available');
  expect(host.textContent).not.toContain('SYNTHETIC-1');
+});
+it('preserves a line amount without crashing or inventing a currency when the currency is malformed', async () => {
+ await render([{ ...record, receipts: [{ ...record.receipts[0], amount: 210, amounts_visible: true, currency: 'NOT-ISO' }] }]);
+ expect(host.textContent).toContain('210 · currency unrecognized');
 });
 it('does not turn a candidate or generic work mention into installation', () => {
  expect(hasRecordedInstallation([{ lifecycle_status: null, part_relation: null }])).toBe(false);

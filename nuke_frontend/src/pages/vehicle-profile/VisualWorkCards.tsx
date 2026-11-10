@@ -10,9 +10,10 @@ export function photoDate(image: VisualWork['images'][number]): string {
     timeZone, timeZoneName: 'short' }).format(new Date(image.taken_at));
   try { return format(image.capture_time_zone || 'UTC'); } catch { return format('UTC'); }
 }
-const amount = (value: number, currency: string | null) => currency
-  ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value)
-  : `${value.toLocaleString('en-US')} · currency unrecorded`;
+const amount = (value: number, currency: string | null) => {
+  if (currency) try { return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value); } catch { /* Preserve the amount without guessing currency. */ }
+  return `${value.toLocaleString('en-US')} · currency ${currency ? 'unrecognized' : 'unrecorded'}`;
+};
 
 export function VisualWorkCards({ rows, renderSource }: {
   rows: VisualWork[]; renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode;

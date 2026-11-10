@@ -90,6 +90,7 @@ BEGIN
    IF EXISTS(SELECT 1 FROM jsonb_array_elements(receipts) x WHERE x->>'item_id'=receipt_row.item_id::text) THEN CONTINUE; END IF;
    receipts:=receipts||jsonb_build_array(jsonb_build_object('item_id',receipt_row.item_id,'receipt_id',receipt_row.receipt_id,
     'relation',ref->>'relation','source_table',receipt_row.source_document_table,'source_id',receipt_row.source_document_id,
+    'source_url_sha256',encode(sha256(convert_to(ref->>'source_url','UTF8')),'hex'),
     'vendor',public.public_text(receipt_row.vendor_name),'page_date',receipt_row.page_date,
     'description',public.public_text(receipt_row.description),'part_number',public.public_text(receipt_row.part_number),
     'quantity',receipt_row.quantity,'hours',CASE WHEN ref->>'relation'='documented_operation' THEN receipt_row.hours END,

@@ -70,6 +70,7 @@ BEGIN
  ASSERT j#>>'{visual_work,0,images,0,taken_at}' LIKE '2026-04-27%',j::text;
  ASSERT j#>>'{visual_work,0,images,0,capture_time_zone}'='America/Los_Angeles',j::text;
  ASSERT j#>'{visual_work,0,receipts,0,amount}'='null' AND j#>'{visual_work,0,receipts,0,hours}'='null',j::text;
+ ASSERT j#>>'{visual_work,0,receipts,0,source_url_sha256}'=encode(sha256(convert_to('https://private.example/original.pdf','UTF8')),'hex');
  ASSERT j#>>'{visual_work,0,receipts,1,hours}'='3.5',j::text;
  ASSERT j#>>'{visual_work,0,effort_reference,basis}'='seed_uncalibrated',j::text;
  ASSERT j#>>'{visual_work,0,market_value,status}'='not_established_by_cited_sources'
