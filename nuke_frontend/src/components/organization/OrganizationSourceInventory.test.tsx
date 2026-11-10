@@ -18,17 +18,19 @@ const data: SourceInventory = { source: 'mccormicks', checked_at: new Date().toI
   ] };
 let root: Root | undefined;
 let container: HTMLDivElement;
-function renderPage(fallback?: React.ReactNode, initialFilter?: 'all' | 'auction') { container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container); act(()=>root!.render(<MemoryRouter><OrganizationSourceInventory organizationId="test" fallback={fallback} initialFilter={initialFilter} /></MemoryRouter>)); return container; }
+function renderPage(fallback?: React.ReactNode, initialFilter?: 'all' | 'auction', children?: React.ReactNode) { container=document.createElement('div'); document.body.appendChild(container); root=createRoot(container); act(()=>root!.render(<MemoryRouter><OrganizationSourceInventory organizationId="test" fallback={fallback} initialFilter={initialFilter}>{children}</OrganizationSourceInventory></MemoryRouter>)); return container; }
 afterEach(()=>{ act(()=>root?.unmount()); root=undefined; document.body.innerHTML=''; });
 describe('publisher schedule and inventory', () => {
   it('does not turn a missing first reading into an empty inventory count', () => {
-    mock.query={data:{...data,checked_at:null,sales:[],inventory:[],stale:true}};renderPage();
+    mock.query={data:{...data,checked_at:null,sales:[],inventory:[],stale:true}};renderPage(undefined,'auction',<p>Recorded auction results</p>);
     expect(container.querySelector('[role=status]')?.textContent).toContain('first complete source reading is pending');
     expect(container.querySelector('table')).toBeNull();
     expect(container.textContent).not.toContain('0 cars');
+    expect(container.textContent).toContain('Recorded auction results');
   });
   it('opens the Auctions tab with auction entries selected', () => {
-    mock.query={data};renderPage(undefined,'auction');
+    mock.query={data};renderPage(undefined,'auction',<p>Recorded auction results</p>);
+    expect(container.textContent).toContain('Recorded auction results');
     expect(container.querySelector('select')?.value).toBe('auction');
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
     expect(container.querySelector('a[href="/vehicle/public-car"]')).toBeTruthy();

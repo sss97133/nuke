@@ -3613,7 +3613,12 @@ export default function OrganizationProfile() {
         {activeTab === 'auctions' && organizationId && (
           <OrganizationSourceInventory organizationId={organizationId} initialFilter="auction" fallback={
             <OrganizationAuctionsTab organizationId={organizationId} />
-          } />
+          }>
+            <details>
+              <summary>Recorded auction results</summary>
+              <OrganizationAuctionsTab organizationId={organizationId} excludeUpcoming />
+            </details>
+          </OrganizationSourceInventory>
         )}
 
         {activeTab === 'listings' && comprehensiveData && (
