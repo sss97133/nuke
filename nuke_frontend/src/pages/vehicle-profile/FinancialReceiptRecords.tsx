@@ -1,8 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useQuery } from '@tanstack/react-query';
+import { useAuthContext } from '../../contexts/AuthContext';
+import { OrgLogo } from '../../components/common/OrgLogo';
+import './receipt-pages.css';
 import { signPrivateStorageUrl, privateStoragePath } from '../../lib/privateStorage';
 import { bounded } from '../../services/accountingCloseout';
-import { useVehicleWorkOrderFinancials, type VehicleReceiptRecord, type useVehicleReceiptRecords } from './hooks/useBuildLedger';
+import type { FieldProvenance } from './hooks/useFieldProvenance';
+import type { DayDocument } from './VehicleDayDrawer';
+import { useVehicleWorkOrderFinancials, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
+import { useVisualWork } from './hooks/useVisualWork';
+import { VisualWorkCards } from './VisualWorkCards';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
 function amountText(amount: number | null, currency: string | null): string {
@@ -11,7 +19,9 @@ function amountText(amount: number | null, currency: string | null): string {
     : `${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} · currency unrecorded`;
 }
 
-function ReceiptSource({ receipt, vehicleId }: { receipt: VehicleReceiptRecord; vehicleId: string }) {
+function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
+  receipt: Pick<VehicleReceiptRecord, 'sourceId' | 'sourceTable'>; vehicleId: string; expectedSourceHash?: string;
+}) {
   const [state, setState] = useState('');
   const [original, setOriginal] = useState<{ blob: Blob; filename: string } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -28,6 +38,11 @@ function ReceiptSource({ receipt, vehicleId }: { receipt: VehicleReceiptRecord; 
           .select(image ? 'image_url' : 'file_url').eq('id', receipt.sourceId!).eq('vehicle_id', vehicleId).maybeSingle();
         const raw = data && (image ? (data as { image_url?: string }).image_url : (data as { file_url?: string }).file_url);
         if (error || !raw || !/^https?:\/\//.test(raw)) throw new Error('Unavailable');
+        if (expectedSourceHash !== undefined) {
+          const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+          const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+          if (!/^[a-f0-9]{64}$/.test(expectedSourceHash) || actual !== expectedSourceHash) throw new Error('Source changed');
+        }
         const signed = await signPrivateStorageUrl(raw);
         if (privateStoragePath(raw) && signed === raw) throw new Error('Unavailable');
         const blob = await bounded(async signal => {
@@ -48,24 +63,164 @@ function ReceiptSource({ receipt, vehicleId }: { receipt: VehicleReceiptRecord; 
   </div>;
 }
 
-export function ReceiptRecords({ vehicleId, read }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords> }) {
-  return <section aria-label="Linked receipts"><h3>Build receipts</h3>
-    {read.isLoading && <p role="status">Reading linked receipts…</p>}
-    {read.isError && <div role="status"><p>Receipt summaries could not load.</p><button type="button" className="vp-financial-action" onClick={() => void read.refetch()}>Retry receipts</button></div>}
-    {(read.rows.length > 0 || read.total != null) && <p>{read.total == null ? `${read.rows.length} linked receipt records loaded. Total not yet read.` : `${read.rows.length} of ${read.total} linked receipt records loaded.`} Receipt readings and work-order charges can describe the same purchase; they are kept separate.</p>}
-    {read.rows.map(receipt => <details key={receipt.id} className="vp-financial-entry">
-      <summary><span><strong>{receipt.vendor || 'Linked receipt'}</strong><small>{receipt.dateConflict ? 'Date readings differ' : receipt.date || 'Date not recorded'}</small></span>
-        <strong>{receipt.amountsHidden ? "Amount visible to the vehicle's people" : receipt.amountConflict ? 'Total readings differ' : amountText(receipt.amount, receipt.currency)}</strong></summary>
-      {receipt.amountConflict && <p>Recorded totals disagree: {amountText(receipt.total, receipt.currency)} and {amountText(receipt.totalAmount, receipt.currency)}. No single amount is selected.</p>}
-      {receipt.dateConflict && <p>Recorded dates: {receipt.dates.join(' · ')}</p>}
-      {receipt.amountsHidden && <p>Receipt totals are shown to the vehicle's owner and contributors. The vendor, date and line items stay public.</p>}
-      {receipt.amount === 0 && <p>Zero is retained as an extraction reading. Check the original before treating it as a zero-cost purchase.</p>}
-      <p>Receipt reading · {receipt.processingStatus || receipt.status || 'Extraction state unknown'}. Extraction status does not establish payment or vehicle allocation.</p>
+interface PrintedLine {
+  line_number: number | null; description: string | null; part_number: string | null;
+  quantity: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null;
+}
+interface ReceiptPage {
+  receipt_id: string; document_number: string | null; document_type: string | null;
+  vendor_org?: { logo_url?: string | null; website?: string | null } | null;
+  subtotal: number | null; tax: number | null; shipping: number | null; discount: number | null;
+  lines: PrintedLine[];
+}
+
+function printedDate(value: string | null): string {
+  if (!value || !Number.isFinite(Date.parse(value))) return 'Date not recorded';
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
+/** The retained correction points to an existing receipt, whose existing reader
+ * supplies its public lines and masks money/payer/page access for this viewer. */
+export function CorrectionReceipt({ vehicleId, citation }: {
+  vehicleId: string; citation: NonNullable<FieldProvenance['current_correction']>;
+}) {
+  const { user, loading: authLoading } = useAuthContext();
+  const viewer = user?.id ?? 'anonymous';
+  const read = useQuery({
+    queryKey: ['field-correction-receipt', viewer, vehicleId, citation.correction_id, citation.receipt_id, citation.page_date],
+    enabled: !authLoading,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) => {
+      const { data, error } = await bounded(sourceSignal => supabase.rpc('get_vehicle_day_documents', {
+        p_vehicle_id: vehicleId, p_date: citation.page_date,
+      }).abortSignal(sourceSignal), signal);
+      if (error || !Array.isArray(data?.documents)) throw new Error('Receipt could not be read');
+      return (data.documents as DayDocument[]).find(doc => doc.receipt_id === citation.receipt_id) ?? null;
+    },
+  });
+  const doc = !authLoading && !read.isError ? read.data : null;
+  const showAmounts = doc?.lines.some(line => line.amount != null);
+  return <article className="field-correction-receipt" aria-label="Receipt cited by the recorded value">
+    <strong>{citation.value}</strong>
+    <p className="field-citations__note">The recorded correction cites this document.</p>
+    {(authLoading || read.isLoading) && <p role="status">Reading cited receipt…</p>}
+    {!authLoading && (read.isError || (!read.isLoading && !doc)) && <p role="status">The cited receipt is unavailable in this read.{' '}
+      <button type="button" disabled={read.isFetching} onClick={() => void read.refetch()}>Retry receipt</button>
+    </p>}
+    {doc && <>
+      <header><h3>{doc.vendor || doc.vendor_org?.name || 'Receipt'}{doc.document_number ? ` #${doc.document_number}` : ''}</h3>
+        <p>{doc.document_type?.replace(/_/g, ' ') || 'Document'} · {citation.page_date}</p>
+      </header>
+      {doc.lines.length > 0 && <table><thead><tr><th scope="col">Recorded item or work</th><th scope="col">Qty</th>{showAmounts && <th scope="col">Amount</th>}</tr></thead>
+        <tbody>{doc.lines.map((line, i) => <tr key={`${line.line_number ?? i}:${i}`}>
+          <td>{line.description || line.part_number || 'Line item'}{line.part_number && line.description && <small>{line.part_number}</small>}</td>
+          <td>{line.quantity ?? '—'}</td>
+          {showAmounts && <td>{line.amount == null ? '—' : amountText(line.amount, doc.currency)}</td>}
+        </tr>)}</tbody>
+      </table>}
+      {doc.total != null && <p className="field-correction-receipt__total">Document total <strong>{amountText(doc.total, doc.currency)}</strong></p>}
+      <ReceiptSource key={`${viewer}:${vehicleId}:${citation.source_table}:${citation.document_id}`} vehicleId={vehicleId}
+        receipt={{ sourceId: citation.document_id, sourceTable: citation.source_table }} />
+    </>}
+  </article>;
+}
+
+function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: VehicleReceiptRecord }) {
+  const { user, loading } = useAuthContext();
+  const element = useRef<HTMLElement>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    if (!element.current || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) { setNear(true); observer.disconnect(); }
+    }, { rootMargin: '600px' });
+    observer.observe(element.current);
+    return () => observer.disconnect();
+  }, []);
+  const read = useQuery({
+    queryKey: ['vehicle-receipt-page', vehicleId, receipt.date, user?.id ?? 'anon'],
+    queryFn: async ({ signal }) => {
+      const { data, error } = await bounded(requestSignal => supabase.rpc('get_vehicle_day_documents', { p_vehicle_id: vehicleId, p_date: receipt.date }).abortSignal(requestSignal), signal);
+      if (error || !data || !Array.isArray(data.documents)) throw new Error('Receipt lines unavailable');
+      return data as { documents: ReceiptPage[]; tied: boolean };
+    },
+    enabled: near && !!receipt.date && !loading, staleTime: 60_000, gcTime: 0, retry: false,
+  });
+  // Never keep a private day's response visible while the viewer changes or a refresh fails.
+  const page = !loading && !read.isError && !read.isFetching
+    ? read.data?.documents.find(document => document.receipt_id === receipt.id) : undefined;
+  const moneyVisible = !receipt.amountsHidden && read.data?.tied === true;
+  const [expanded, setExpanded] = useState(false);
+  const lines = page?.lines ?? [];
+  const visibleLines = expanded ? lines : lines.slice(0, 4);
+  if (!loading && !read.isFetching && !read.isError && read.data && !page) return null;
+  return <article ref={element} className="vp-receipt-page" aria-label={`${receipt.vendor || 'Receipt'} ${receipt.date || ''}`}>
+    <header>
+      {page?.vendor_org?.logo_url && <OrgLogo logoUrl={page.vendor_org.logo_url} businessName={receipt.vendor || ''} size={36} variant="icon" />}
+      <div><h4>{receipt.vendor || 'Linked receipt'}</h4>
+        <p>{receipt.dateConflict ? receipt.dates.map(printedDate).join(' / ') : printedDate(receipt.date)}
+          {page?.document_number ? ` · #${page.document_number}` : ''}</p></div>
+    </header>
+    {receipt.dateConflict && <p className="vp-receipt-note">Document date readings differ.</p>}
+    {lines.length > 0 && <table className="vp-receipt-lines"><thead><tr><th>Item / work</th><th>Qty</th>{moneyVisible && <th>Amount</th>}</tr></thead>
+      <tbody>{visibleLines.map((line, index) => <tr key={`${line.line_number ?? index}`}>
+        <td>{line.line_date && <time dateTime={line.line_date}>{printedDate(line.line_date)} · Work recorded</time>}
+          <span>{line.description || 'Description not recorded'}</span>
+          {(line.part_number || line.hours != null || line.performer) && <small>{[line.part_number, line.hours != null ? `${line.hours} ${line.hours === 1 ? 'hour' : 'hours'}` : null, line.performer].filter(Boolean).join(' · ')}</small>}
+        </td><td>{line.quantity ?? '—'}</td>{moneyVisible && <td>{line.amount == null ? '—' : amountText(line.amount, receipt.currency)}</td>}
+      </tr>)}</tbody></table>}
+    {lines.length > 4 && <button type="button" className="vp-receipt-expand" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Show fewer lines' : `Show all ${lines.length} lines`}</button>}
+    {!receipt.date && !receipt.dateConflict && <p className="vp-receipt-note">Open the original for its line items.</p>}
+    {receipt.date && !page && <p className="vp-receipt-note" role="status">{read.isError ? 'Line items could not load.' : read.isFetching || !near ? 'Reading receipt…' : 'Line items are not available in this view.'}
+      {(!near || read.isError) && <button type="button" onClick={() => { setNear(true); if (read.isError) void read.refetch(); }}>{read.isError ? 'Retry' : 'Read lines'}</button>}</p>}
+    <footer>
+      {moneyVisible && page && <dl>{([['Subtotal', page.subtotal], ['Shipping', page.shipping], ['Discount', page.discount], ['Tax', page.tax]] as const)
+        .filter(([, value]) => value != null && value !== 0).map(([label, value]) => <React.Fragment key={label}><dt>{label}</dt><dd>{amountText(value, receipt.currency)}</dd></React.Fragment>)}</dl>}
+      <div className="vp-receipt-total"><span>Document total</span><strong>{receipt.amountsHidden ? 'Visible to owner & contributors' : receipt.amountConflict ? 'Readings differ' : amountText(receipt.amount, receipt.currency)}</strong></div>
+      {receipt.amountConflict && <p className="vp-receipt-note">{amountText(receipt.total, receipt.currency)} / {amountText(receipt.totalAmount, receipt.currency)} · check original</p>}
+      {receipt.amount === 0 && <p className="vp-receipt-note">No charge shown in this reading; check the original.</p>}
       <ReceiptSource key={`${vehicleId}:${receipt.sourceTable}:${receipt.sourceId}`} receipt={receipt} vehicleId={vehicleId} />
-    </details>)}
+    </footer>
+  </article>;
+}
+
+function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords>; work?: ReturnType<typeof useVisualWork> }) {
+  const { user, loading } = useAuthContext();
+  const [vendor, setVendor] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const rows = [...(loading || read.isError ? [] : read.rows)].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.id.localeCompare(b.id));
+  const vendors = [...new Set(rows.map(receipt => receipt.vendor).filter((name): name is string => !!name))].sort();
+  const selectedVendor = vendors.includes(vendor) ? vendor : '';
+  const matching = selectedVendor ? rows.filter(receipt => receipt.vendor === selectedVendor) : rows;
+  const visible = showAll || selectedVendor ? matching : matching.slice(0, 6);
+  return <section id="build-receipts" aria-label="Work and parts receipts" className="vp-receipt-section">
+    <div className="vp-receipt-heading"><h3>Work & parts</h3><span>Receipt collection</span></div>
+    <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
+    {work && <VisualWorkCards rows={loading ? [] : work.rows} renderSource={line => line.source_url_sha256 ? <ReceiptSource
+      key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}
+      expectedSourceHash={line.source_url_sha256} receipt={{ sourceTable: line.source_table, sourceId: line.source_id }} />
+      : <p>Original source unavailable in this read.</p>} />}
+    {work?.isError && <p role="status">Photographed work could not load. <button type="button" onClick={() => void work.refetch()}>Retry work</button></p>}
+    {work?.limited && <p role="status">This view reached its work-record limit; it is not the complete work history.</p>}
+    {vendors.length > 1 && <label className="vp-receipt-filter">Supplier <select value={selectedVendor} onChange={event => setVendor(event.target.value)}><option value="">All suppliers</option>{vendors.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}
+    {read.isLoading && <p role="status">Reading linked receipts…</p>}
+    {read.isError && <p role="status">Receipt summaries could not load. <button type="button" onClick={() => void read.refetch()}>Retry receipts</button></p>}
+    {!loading && <div key={`${vehicleId}:${user?.id ?? 'anon'}`} className="vp-receipt-grid">{visible.map(receipt => <ReceiptReplica key={receipt.id} vehicleId={vehicleId} receipt={receipt} />)}</div>}
+    {!selectedVendor && matching.length > 6 && <button type="button" className="vp-receipt-browse" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? 'Show recent receipts' : 'Browse the receipt collection'}</button>}
     {read.hasNextPage && <button type="button" className="vp-financial-action" disabled={read.isFetchingNextPage} onClick={() => void read.fetchNextPage()}>{read.isFetchingNextPage ? 'Reading more receipts…' : 'Load more receipts'}</button>}
-    {!read.isLoading && !read.isError && !read.rows.length && <p>No receipt summaries are visible for this vehicle.</p>}
   </section>;
+}
+
+export function ReceiptRecords({ vehicleId, read, work }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords>; work?: ReturnType<typeof useVisualWork> }) {
+  const { user } = useAuthContext();
+  return <ReceiptCollection key={`${vehicleId}:${user?.id ?? 'anon'}`} vehicleId={vehicleId} read={read} work={work} />;
+}
+
+export function ProfileReceiptRecords({ vehicleId }: { vehicleId: string }) {
+  const read = useVehicleReceiptRecords(vehicleId);
+  const work = useVisualWork(vehicleId);
+  if (!read.isLoading && !read.isError && !read.rows.length && !work.isLoading && !work.isError && !work.rows.length) return null;
+  return <ReceiptRecords vehicleId={vehicleId} read={read} work={work} />;
 }
 
 export function WorkOrderFinancialRecords({ vehicleId }: { vehicleId: string }) {

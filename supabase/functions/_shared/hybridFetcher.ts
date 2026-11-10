@@ -35,7 +35,10 @@ function hasBlockedPageContent(html: string): boolean {
   // prevents removal from joining separate tokens. Browsers also terminate a
   // script at a closing tag with whitespace/attributes before its final `>`.
   const markup = html.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, " ");
-  return markup.includes('Access Denied') || markup.includes('blocked');
+  // Vehicle descriptions use "blocked" for bodywork/engines. Require a denial
+  // statement or a dedicated denial heading, rather than that word anywhere.
+  return /\baccess denied\b|\b(?:you(?: have|'ve) been|(?:your )?(?:request|access|ip(?: address)?)(?: has been| is)?) blocked\b/i.test(markup) ||
+    /<(?:title|h[1-6])\b[^>]*>\s*blocked\s*<\//i.test(markup);
 }
 
 const USER_AGENTS = [

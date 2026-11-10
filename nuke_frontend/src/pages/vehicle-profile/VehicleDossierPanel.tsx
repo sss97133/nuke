@@ -15,7 +15,8 @@ import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFac
 import { useFieldProvenance, formatProvenanceValue, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
 import { PrefetchLink } from '../../components/PrefetchLink';
-import { readProfileSourcePage, sourceValueText, type StructuredClaim } from './profileSourceClaims';
+import { readProfileSourcePage, sourceValueText, physicalRecordedValue, PHYSICAL_READING_ROLES,
+  type PhysicalReadingField, type StructuredClaim } from './profileSourceClaims';
 import { currentBidEvidenceAmount } from './auctionEvidenceDisplay';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
@@ -35,9 +36,32 @@ const STRUCTURED_RECORD_LABELS: Record<RecordField, string> = { year: 'Year', ma
   drivetrain: 'Drivetrain', color: 'Exterior color', interior_color: 'Interior color', mileage: 'Odometer' };
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
+/** Reuse the same source query as the value's first-click evidence surface. */
+function PhysicalRecordedValue({ vehicleId, field, label, fallback, fallbackNote, onInspect, optional = false }: {
+  vehicleId: string; field: PhysicalReadingField; label: string; fallback: string;
+  fallbackNote?: string;
+  onInspect?: (field: string, label: string, value: string) => void; optional?: boolean;
+}) {
+  const read = useFieldProvenance(vehicleId, field);
+  const source = physicalRecordedValue(vehicleId, field, read.isError ? undefined : read.data);
+  if (optional && source.status === 'absent' && !read.isError) return null;
+  const value = source.status === 'resolved' ? source.value : source.status === 'conflict' ? 'Review differing readings' : fallback;
+  const content = <>
+    <button type="button" className="vp-structured-record__value" disabled={!onInspect}
+      onClick={() => onInspect?.(field, label, source.status === 'conflict' ? '' : value)}>
+      {value || 'Inspect evidence'}
+    </button>
+    {source.status === 'resolved' && <div className="vp-structured-record__note">{source.note}</div>}
+    {source.status !== 'resolved' && fallbackNote && <div className="vp-structured-record__note">{fallbackNote}</div>}
+    {(read.isError || source.status === 'unavailable') && <div role="status" className="vp-structured-record__note">Source could not be read.</div>}
+  </>;
+  return optional ? <tr data-record-field={field}><th scope="row">{label}</th><td>{content}</td></tr> : content;
+}
+
 /** Read every stored field first, then admitted claims from the same owner.
  * A slow or failed source read must not hide the structured stored record. */
-export const StructuredProfileData: React.FC<{ vehicleId: string; onInspect?: (field: string, label: string, value: string) => void }> = ({ vehicleId, onInspect }) => {
+export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: boolean | null;
+  onInspect?: (field: string, label: string, value: string) => void }> = ({ vehicleId, isReplica, onInspect }) => {
   const [read, setRead] = useState<StructuredRead>(
     { id: vehicleId, status: 'loading', claims: [] });
   const generation = React.useRef(0);
@@ -122,21 +146,30 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; onInspect?: (f
           <thead><tr><th scope="col">Field</th><th scope="col">Recorded value</th></tr></thead>
           <tbody>{RECORD_FIELDS.map(key => {
             const a = current.attributes![key];
+            // A replica's retained trim can name the car it resembles. It cannot
+            // establish factory identity, even after the old claim is retired.
+            if (key === 'trim' && isReplica === true) return null;
             const derived = current.bindings?.filter(b => b.origin_column === key && (b.value !== a.value || b.unit !== a.unit || b.record_columns_disagree));
             return <tr key={key} data-record-field={key}>
               <th scope="row">{STRUCTURED_RECORD_LABELS[key]}</th>
-              <td><button type="button" className="vp-structured-record__value" disabled={!onInspect}
+              <td>{key in PHYSICAL_READING_ROLES ? <PhysicalRecordedValue vehicleId={vehicleId}
+                field={key as PhysicalReadingField} label={STRUCTURED_RECORD_LABELS[key]}
+                fallback={a.value === null ? '' : `${String(a.value)}${a.unit ? ` ${a.unit}` : ''}`}
+                fallbackNote={key === 'mileage' && a.value !== null && !a.unit ? 'Unit not established' : undefined} onInspect={onInspect} />
+                : <button type="button" className="vp-structured-record__value" disabled={!onInspect}
                 onClick={() => onInspect?.(key, STRUCTURED_RECORD_LABELS[key], a.value === null ? '' : `${String(a.value)}${a.unit ? ` ${a.unit}` : ''}`)}>
                 {a.value_status === 'unrecorded' ? 'Inspect evidence' : typeof a.value === 'string' && !a.value.trim() ? 'Inspect evidence' : `${String(a.value)}${a.unit ? ` ${a.unit}` : ''}`}
-              </button>
-                {key === 'mileage' && a.value !== null && !a.unit && <div className="vp-structured-record__note">Unit not established</div>}
+              </button>}
                 {derived?.map(b => <div key={b.property_key} className="vp-structured-record__note">
                   {b.property_key.replaceAll('_', ' ')}: {String(b.value)}{b.unit ? ` ${b.unit}` : ''}
                   {b.record_columns_disagree && ' · Conflicting record values'}
                 </div>)}
               </td>
             </tr>;
-          })}</tbody>
+          })}<PhysicalRecordedValue vehicleId={vehicleId} field="factory_color" label="Factory paint code"
+            fallback="" onInspect={onInspect} optional />
+            <PhysicalRecordedValue vehicleId={vehicleId} field="appearance" label="Appearance"
+              fallback="" onInspect={onInspect} optional /></tbody>
         </table>}
     </section>
     <section aria-label="Structured source claims" className="vp-structured-claims"
@@ -711,7 +744,7 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Info Panel */}
       <div className="vp-dossier-panel">
-        <StructuredProfileData vehicleId={vehicle.id} onInspect={(field, label, value) => openPopup(
+        <StructuredProfileData vehicleId={vehicle.id} isReplica={vehicle.is_replica} onInspect={(field, label, value) => openPopup(
           <React.Suspense fallback={<p role="status">Reading source…</p>}>
             <FieldEvidencePopup vehicleId={vehicle.id} field={field} label={label} value={value} presentation="citations" />
           </React.Suspense>, label, Math.min(720, window.innerWidth - 24), false,

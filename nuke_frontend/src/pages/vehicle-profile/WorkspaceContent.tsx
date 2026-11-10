@@ -4,6 +4,7 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import type { GalleryReadCount } from '../../components/images/ImageGallery';
 
 // Lazy-load heavy components
+const ProfileReceiptRecords = React.lazy(() => import('./FinancialReceiptRecords').then(module => ({ default: module.ProfileReceiptRecords })));
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
 const VehicleDossierPanel = React.lazy(() => import('./VehicleDossierPanel'));
 const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
@@ -172,6 +173,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   // with ~9000px of content overflowing a ~550px pane (fixed 2026-06-11).
   return (
     <div>
+      <React.Suspense fallback={null}><ProfileReceiptRecords vehicleId={vehicle.id} /></React.Suspense>
       <div className="vp-columns">
         {/* LEFT COLUMN */}
         <div
