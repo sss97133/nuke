@@ -76,3 +76,47 @@ Deno.test("structured year keeps priority and unrelated title numbers do not bec
     assertEquals([y.year, y.year_source], [null, null]);
   }
 });
+
+Deno.test("known publisher prefixes retain explicit title years without searching other numbers", () => {
+  for (const [title, year] of [
+    ["NO RESERVE: 1991 PORSCHE 911 (964) CARRERA 2", 1991],
+    ["PROJECT CAR - 1967 JAGUAR E-TYPE SERIES 1 4.2 2+2", 1967],
+    ["CHARITY AUCTION - 1976 LAND ROVER SERIES III", 1976],
+    ["CHARITY AUCTION - 1935 LANCIA AUGUSTA MARCH SPECIAL TOURER", 1935],
+  ] as const) {
+    const x = extractFromHtml(nativePage({ title, modelYear: null }), url);
+    assertEquals([x.year, x.year_source, x.title], [year, "title", title]);
+    const authoritative = extractFromHtml(nativePage({ title, modelYear: 2001 }), url);
+    assertEquals([authoritative.year, authoritative.year_source], [2001, "modelYear"]);
+  }
+  for (const title of ["NO RESERVE: ALVIS SABRE LIGHT TANK", "NO RESERVE: Porsche 1991", "NO RESERVE: 19910 Porsche",
+    "NO RESERVE: 1991-spec Porsche", "PROJECT CAR 1967 Jaguar", "CHARITY AUCTION - unknown 1976 Land Rover",
+    "RESTORED: 1991 Porsche", "NO RESERVE: CHARITY AUCTION - 1976 Land Rover", "CHARITY AUCTION - 1976"]) {
+    const x = extractFromHtml(nativePage({ title, modelYear: null }), url);
+    assertEquals([x.year, x.year_source], [null, null], title);
+  }
+});
+
+Deno.test("only explicit ended or unsold stages establish unsold; unknown and withdrawn remain unresolved", () => {
+  for (const stage of ["ended", "unsold", "withdrawn", "unknown", "cancelled", "upcoming", "comingsoon", null]) {
+    const x = extractFromHtml(nativePage({ stage, currentBid: 1500, currencyCode: "gbp", priceSold: null,
+      title: "1926 Jowett Short Two", lotType: "car", makeName: null, modelName: null }), url);
+    const closed = stage === "ended" || stage === "unsold";
+    assertEquals([x.stage, x.sale_outcome, x.sold_at], [stage, closed ? "unsold" : null, null]);
+    assertEquals([x.price_amount, x.currency, x.make, x.model], [1500, "GBP", null, null]);
+    if (closed) assertEquals(x.price_kind, "high_bid");
+    const sealed = extractFromHtml(nativePage({ stage, saleFormat: "sealed" }), url);
+    assertEquals(sealed.sale_outcome, closed ? "sealed_unsold" : null);
+  }
+});
+
+Deno.test("unknown stages retain source quotes without inventing current or sale prices", () => {
+  for (const stage of ["withdrawn", "unknown", "cancelled", null]) {
+    const x = extractFromHtml(nativePage({ stage, currentBid: 1500, currencyCode: "usd", priceSold: null }), url);
+    assertEquals([x.price_amount, x.currency, x.price_kind, x.price, x.sale_outcome], [1500, "USD", null, null, null]);
+  }
+  for (const stage of ["live", "upcoming", "comingsoon"]) {
+    const x = extractFromHtml(nativePage({ stage, currentBid: 1500, currencyCode: "usd", priceSold: null }), url);
+    assertEquals([x.price_amount, x.price_kind, x.price], [1500, "current_bid", 1500]);
+  }
+});

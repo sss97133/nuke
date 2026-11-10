@@ -116,11 +116,14 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   const stage = clean(L.stage)?.toLowerCase() ?? null;
   const soldAmount = L.priceSold != null && Number.isFinite(Number(L.priceSold)) && Number(L.priceSold) > 0 ? Number(L.priceSold) : null;
   const sold = stage === "sold" || (stage === null && soldAmount !== null);
-  const ended = stage !== null && stage !== "live" && stage !== "comingsoon" && !sold;
+  // Only source-verified terminal stages establish an unsold outcome.
+  // Withdrawn or newly introduced stages are not evidence of an auction result.
+  const ended = stage === "unsold" || stage === "ended";
   const amount = sold ? soldAmount : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
   const sealed = clean(L.saleFormat)?.toLowerCase() === "sealed";
   const outcome: CollectingCarsExtracted["sale_outcome"] = sold ? "sold" : ended ? (sealed ? "sealed_unsold" : "unsold") : stage === "live" ? "live" : null;
-  const kind: CollectingCarsExtracted["price_kind"] = amount === null ? null : sold ? "sold" : ended ? "high_bid" : "current_bid";
+  const open = stage === "live" || stage === "comingsoon" || stage === "upcoming";
+  const kind: CollectingCarsExtracted["price_kind"] = amount === null ? null : sold ? "sold" : ended ? "high_bid" : open ? "current_bid" : null;
   const currency = clean(L.currencyCode)?.toUpperCase() ?? null;
 
   const images: string[] = [];
@@ -134,7 +137,7 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   // Early lots can omit modelYear while explicitly stating the year in their
   // own title. Retain which source field supplied it; never use the URL slug.
   const modelYear = int(L.modelYear);
-  const titleYear = clean(L.title)?.match(/^((?:18|19|20)\d{2})\s+/)?.[1];
+  const titleYear = clean(L.title)?.match(/^(?:(?:NO RESERVE:|CHARITY AUCTION -|PROJECT CAR -)\s+)?((?:18|19|20)\d{2})\s+/i)?.[1];
   const year = modelYear ?? (titleYear ? Number(titleYear) : null);
 
   return {
@@ -147,7 +150,7 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
     model: clean(L.modelName),
     trim: clean(L.variantName),
     vin: clean(L.vin),
-    price: currency === "USD" && kind !== "high_bid" ? amount : null,
+    price: currency === "USD" && (kind === "sold" || kind === "current_bid") ? amount : null,
     price_amount: amount,
     currency,
     price_kind: kind,
