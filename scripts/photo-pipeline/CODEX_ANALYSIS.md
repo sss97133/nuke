@@ -28,11 +28,26 @@ python3 scripts/photo-pipeline/codex_image_analysis_ingest.py \
 ```
 
 After checking the dry run, omit `--dry-run`. Keep the same run UUID on retries.
-Existing active readings for this producer are skipped. Individual RPC retries use
+Existing active readings are skipped only after their exact reading, confidence,
+model, session, both run markers and null-vehicle incidental role match. A conflicting
+reading or duplicate active row fails the whole preflight before any new write;
+inspect the conflict and use the bounded withdrawal path before admitting a correction.
+The original producer commit remains on an unchanged retry. Individual RPC retries use
 an identical payload so an uncertain transport response does not duplicate a row.
 After a partially failed batch, read back that run before resuming. Capture stdout's
-observation IDs and verify the run's reading/provenance, null vehicle IDs and
-unchanged filing before reporting the batch admitted.
+observation IDs. The producer reads the complete active batch back, checks its
+reading/provenance and null vehicle IDs, and checks each RPC-returned ID before
+reporting success. `verified` includes exact existing rows; `written` includes
+only this invocation's new, verified admissions. A failed readback may follow
+successful writes: inspect the run before retrying. Independently check unchanged
+filing before reporting the batch admitted.
+
+Confidence values are subjective judgments, not calibrated probabilities or an
+identity verification rate. New admissions label this explicitly with
+`confidence_kind=subjective_uncalibrated` in attribution metadata. Do not derive
+confidence from image category or the good/fair/poor quality label, or use overall
+reading confidence as vehicle-match confidence. Record per-image reasons for the
+judgment. This metadata does not recalibrate historical readings.
 
 For withdrawal, repeat the same invocation with `--revert`. The deployed
 `revert_codex_image_analysis_batch` RPC accepts 1–50 image IDs, only deactivates
