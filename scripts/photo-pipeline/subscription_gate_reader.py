@@ -7,9 +7,18 @@ when >= min(10, n) were viewed and <= 5% are wrong; capture_landing_apply_chunk 
 This script is that viewer, run as `claude -p` under the owner's Claude Code login (OAuth token file; ANTHROPIC_API_KEY
 is stripped). It never writes vehicle_images: it records verdicts on pending audit rows and calls the pipeline's own RPCs.
 
-Self-agreement gate (calibration, once per state dir): before any live write the reader re-reads sheets a person viewed
-by hand (hand verdicts in <state>/verdicts.json, sheets in <state>/sheets/cNN.jpg) and must agree on >= 85% of samples
-while accepting <= 2% of the samples the person marked wrong. A failed calibration halts the reader with no live writes.
+Self-agreement gate (calibration, once per state dir): before any live write the reader re-reads samples a person viewed
+by hand (hand verdicts in <state>/verdicts.json; sheets re-rendered by this code into <state>/sheets/cal_cNN.jpg) and must
+agree on >= 85% of samples on the decision that matters (accept = "correct" vs not-accept = "wrong"/"unclear") while
+accepting <= 2% of the samples the person marked wrong. A failed calibration halts the reader with no live writes. The hand
+verdicts are only ever compared against; they are never shown to the reader. --calibrate-only runs the gate and exits.
+
+Tuning (feat/gate-reader-tuning, 2026-11-09, after the first calibration failed at 73.5% / 4 of 56 false accepts):
+  * tiles are EXIF-rotated (reference JPEGs carried orientation 3/6 and were drawn upside down / sideways);
+  * the vehicle name shown is year/make/model only: the record's colour text is not shown, and the references outrank the name;
+  * "correct" needs a named distinguishing mark shared with the references (same generation / body / make is not enough),
+    and an answer of correct without a mark is read as unclear;
+  * dark, night, blurred or tiny samples are unclear.
 
 Live: every 10 min, the newest awaiting_gate chunk per day for the owner; a chunk with any sensitive or personal sample is
 skipped untouched. Every verdict's reason carries this reader's run id and the commit sha.
@@ -29,7 +38,7 @@ def calibration_verdict(pairs):
     pairs=[(h, r if r in valid else 'unclear') for h,r in pairs if h in valid]
     n=len(pairs)
     if n==0: return {'n':0,'agreement':0.0,'false_accept_rate':1.0,'hand_wrong':0,'false_accepts':0,'passed':False}
-    agree=sum(h==r for h,r in pairs)
+    agree=sum((h=='correct')==(r=='correct') for h,r in pairs)  # binary: accept vs not-accept (wrong/unclear alike)
     hand_wrong=sum(h=='wrong' for h,_ in pairs)
     fa=sum(h=='wrong' and r=='correct' for h,r in pairs)
     far=fa/hand_wrong if hand_wrong else 0.0
@@ -48,13 +57,34 @@ def parse_verdicts(text,n):
         try: j=int(x.get('s'))
         except Exception: continue
         if 0<=j<n:
-            s=x.get('status'); out[j]={'status':s if s in ('correct','wrong','unclear') else 'unclear','why':str(x.get('why',''))[:160]}
+            s=x.get('status'); s=s if s in ('correct','wrong','unclear') else 'unclear'
+            mark=str(x.get('mark') or '').strip()
+            if s=='correct' and len(mark)<3: s='unclear'  # an accept must name the shared distinguishing mark
+            out[j]={'status':s,'why':str(x.get('why',''))[:160],'mark':mark[:120]}
     return out
 
+def vehicle_name(v):
+    """Year / make / model only. The record's colour text is not shown: the reference photos define the vehicle."""
+    return ' '.join(str(v[k]) for k in ('year','make','model') if v.get(k))
+
+PROMPT="""You are the visual gate auditor for a vehicle photo library. Open the image file {path} with the Read tool.
+Top row (green, REFn) = reference photos of the target vehicle ({name}). The reference photos define the vehicle; the name is
+only a hint. A reference can itself be a mistaken frame; trust the majority of the references.
+Below (orange, Sn) = sample photos the system wants to file on that vehicle. For EACH sample Sn decide:
+- "correct" ONLY if you can name at least one specific distinguishing mark the sample shares with the references that another
+  vehicle of the same make, model and generation would not have: the exact paint scheme and two-tone layout, a stripe or decal,
+  specific wheels, a dent, rust or primer patch, an aftermarket part, a plate, a distinctive interior. Same generation, same body
+  style or same make is NOT enough. A closeup counts only when its paint, interior or part visibly matches the references.
+- "wrong" if it is clearly a different vehicle (a different colour scheme, body style, make or generation than the references),
+  or a non-vehicle subject, a person, a document, or a screenshot of another car.
+- "unclear" otherwise, including: too dark (night, low light), blurred, or too small to see colour and marks; a closeup with no
+  matching mark; anything you are not sure about.
+Answer with ONLY JSON: {{"verdicts":[{{"s":0,"status":"correct|wrong|unclear","mark":"<the shared distinguishing mark; required for correct>","why":"<12 words"}}, ...]}} covering S0..S{last}."""
+
 def main():
-    from PIL import Image,ImageDraw,ImageFont
+    from PIL import Image,ImageDraw,ImageFont,ImageOps
     import pillow_heif; pillow_heif.register_heif_opener()
-    ap=argparse.ArgumentParser(); ap.add_argument('--state-dir',required=True); ap.add_argument('--owner',default=os.environ.get('NUKE_OWNER_ID','0b9f107a-d124-49de-9ded-94698f63c1c4'))
+    ap=argparse.ArgumentParser(); ap.add_argument('--state-dir',required=True); ap.add_argument('--owner',default=os.environ.get('NUKE_OWNER_ID','0b9f107a-d124-49de-9ded-94698f63c1c4')); ap.add_argument('--calibrate-only',action='store_true')
     args=ap.parse_args(); D=os.path.abspath(args.state_dir); os.makedirs(D+'/img',exist_ok=True); os.makedirs(D+'/sheets',exist_ok=True); os.chdir(D)
     URL=os.environ['SUPABASE_URL'].rstrip('/'); K=os.environ.get('SUPABASE_SECRET_KEY') or os.environ['SUPABASE_SERVICE_ROLE_KEY']; USER=args.owner
     H={'apikey':K,'Authorization':'Bearer '+K,'Content-Type':'application/json'}
@@ -80,13 +110,6 @@ def main():
     def available():
         try: claude('Reply with the word ok'); return True
         except Exception as e: log(ev='subscription_unavailable',why=str(e)[:160]); return False
-    PROMPT="""You are the visual gate auditor for a vehicle photo library. Open the image file {path} with the Read tool.
-    Top row (green, REFn) = approved reference photos of the target vehicle: {name}. The reference row can itself contain a
-    mistaken frame; trust the majority. Below (orange, Sn) = sample photos the system wants to file on that vehicle.
-    For EACH sample Sn decide: "correct" (clearly this same vehicle, or a closeup clearly from this same vehicle/session with matching
-    paint/interior), "wrong" (a different vehicle, a non-vehicle subject, a person, a document, a screenshot of another car), or
-    "unclear" (nothing identifies which vehicle). Be strict: a different color, body style or make is wrong.
-    Answer with ONLY JSON: {{"verdicts":[{{"s":0,"status":"correct|wrong|unclear","why":"<12 words"}}, ...]}} covering S0..S{last}."""
     F=ImageFont.load_default(size=22)
     def fetch(u):
         p='img/'+hashlib.md5(u.encode()).hexdigest()
@@ -94,7 +117,7 @@ def main():
         return p
     def tile(u,label,sz,col):
         c=Image.new('RGB',(sz,sz+28),col)
-        try: im=Image.open(fetch(u)).convert('RGB'); im.thumbnail((sz,sz)); c.paste(im,(0,28))
+        try: im=ImageOps.exif_transpose(Image.open(fetch(u))).convert('RGB'); im.thumbnail((sz,sz)); c.paste(im,(0,28))
         except Exception: pass
         ImageDraw.Draw(c).text((4,2),label,fill='black',font=F); return c
     def sheet(out,title,refs,samples):
@@ -109,12 +132,16 @@ def main():
         return parse_verdicts(txt,n)
     def calibrate():
         S=json.load(open('gate_samples.json')); I=json.load(open('sheet_index.json')); hand={v['qid']:v['status'] for v in json.load(open('verdicts.json'))}
-        R={r['veh']:r['name'] for r in json.load(open('refs.json'))}
+        R={r['veh']:r for r in json.load(open('refs.json'))}
         pairs=[]
         for ci,ch in enumerate(I['chunks']):
-            xs=[x for x in S if x['chunk']==ch]
-            got=read_sheet(f'{D}/sheets/c{ci:02d}.jpg',R[xs[0]['veh']],len(xs))
+            xs=[x for x in S if x['chunk']==ch]; r=R[xs[0]['veh']]
+            name=vehicle_name(r['vehicle']) if r.get('vehicle') else r['name']
+            path=f'{D}/sheets/cal_c{ci:02d}.jpg'
+            sheet(path,f"{xs[0].get('day','')} target: {name}",list(r['refs'])[:6],[x['url'] for x in xs])
+            got=read_sheet(path,name,len(xs))
             pairs+=[(hand[x['qid']],g['status']) for x,g in zip(xs,got)]
+            for x,g in zip(xs,got): log(ev='calibration_sample',sheet=ci,qid=x['qid'],hand=hand[x['qid']],read=g['status'],mark=g.get('mark',''),why=g.get('why',''))
             log(ev='calibration_sheet',sheet=ci,**calibration_verdict(pairs))
         return calibration_verdict(pairs)
     def live_once():
@@ -131,7 +158,7 @@ def main():
             if any(im[x['image_id']].get('is_sensitive') or im[x['image_id']].get('vision_gate_status')=='rejected_personal' for x in q):
                 log(ev='skip_sensitive',chunk=c['id']); st['done_chunks'].append(c['id']); save(); continue
             vid=q[0]['vehicle_id']; v=get(f'vehicles?id=eq.{vid}&select=year,make,model,color')[0]
-            name=' '.join(str(v[k]) for k in ('year','make','model','color') if v.get(k))
+            name=vehicle_name(v)
             refs=[r['thumbnail_url'] or r['image_url'] for r in get(f"vehicle_images?vehicle_id=eq.{vid}&vision_gate_status=eq.approved&is_sensitive=is.false&ai_scan_metadata->classification->>image_type=eq.vehicle_exterior&select=image_url,thumbnail_url&order=taken_at.desc.nullslast&limit=6")]
             path=f"{D}/sheets/live_{c['id'][:8]}.jpg"; sheet(path,f"{c['t_from'][:10]} target: {name}",refs,[im[x['image_id']]['thumbnail_url'] or im[x['image_id']]['image_url'] for x in q])
             got=read_sheet(path,name,len(q))
@@ -152,6 +179,7 @@ def main():
             if not available(): time.sleep(900); continue
             if st['calibration'] is None:
                 st['calibration']=calibrate(); save(); log(ev='calibration',**st['calibration'])
+            if args.calibrate_only: log(ev='calibrate_only_done',passed=st['calibration']['passed']); break
             if not st['calibration']['passed']: log(ev='halt',why='calibration failed; no live writes'); break
             n=live_once(); log(ev='tick',chunks=n); time.sleep(600)
         except Exception as e:
