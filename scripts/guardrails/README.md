@@ -50,6 +50,8 @@ runtime caller rejection is implemented by the guarded function and must be veri
 of `docs/ledger/theory/data-machine.md`): a new agent with no memory gets the kind of message he would send, and
 is graded on where it goes. It holds the messages, the grading, the results of each round and the script. It is
 the answer key, so nothing in the record links to it and an agent under test must not open it.
+`owner-voice-other-model.mjs` runs the same messages against a model from another provider (Grok, GPT) with a
+read-only view of main; the answer key says how to run and grade it.
 
 ## Use the existing checks
 
