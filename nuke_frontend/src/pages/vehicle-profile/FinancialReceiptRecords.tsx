@@ -71,6 +71,8 @@ interface ReceiptPage {
   receipt_id: string; document_number: string | null; document_type: string | null;
   vendor_org?: { logo_url?: string | null; website?: string | null } | null;
   subtotal: number | null; tax: number | null; shipping: number | null; discount: number | null;
+  recorded_payment?: { amount: number | null; date: string | null } | null;
+  recorded_hours?: number | null; hour_entries?: number;
   lines: PrintedLine[];
 }
 
@@ -119,6 +121,8 @@ export function CorrectionReceipt({ vehicleId, citation }: {
         </tr>)}</tbody>
       </table>}
       {doc.total != null && <p className="field-correction-receipt__total">Document total <strong>{amountText(doc.total, doc.currency)}</strong></p>}
+      {doc.recorded_payment && <p>Recorded payment <strong>{amountText(doc.recorded_payment.amount, doc.currency)}</strong>{doc.recorded_payment.date ? ` · ${printedDate(doc.recorded_payment.date)}` : ''}</p>}
+      {doc.recorded_hours != null && <p>{doc.recorded_hours} recorded person-hours · {doc.hour_entries} entries on this receipt</p>}
       <ReceiptSource key={`${viewer}:${vehicleId}:${citation.source_table}:${citation.document_id}`} vehicleId={vehicleId}
         receipt={{ sourceId: citation.document_id, sourceTable: citation.source_table }} />
     </>}
@@ -177,6 +181,9 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
       {moneyVisible && page && <dl>{([['Subtotal', page.subtotal], ['Shipping', page.shipping], ['Discount', page.discount], ['Tax', page.tax]] as const)
         .filter(([, value]) => value != null && value !== 0).map(([label, value]) => <React.Fragment key={label}><dt>{label}</dt><dd>{amountText(value, receipt.currency)}</dd></React.Fragment>)}</dl>}
       <div className="vp-receipt-total"><span>Document total</span><strong>{receipt.amountsHidden ? 'Visible to owner & contributors' : receipt.amountConflict ? 'Readings differ' : amountText(receipt.amount, receipt.currency)}</strong></div>
+      {moneyVisible && page?.recorded_payment && <div className="vp-receipt-total"><span>Recorded payment{page.recorded_payment.date ? ` · ${printedDate(page.recorded_payment.date)}` : ''}</span><strong>{amountText(page.recorded_payment.amount, receipt.currency)}</strong></div>}
+      {moneyVisible && page?.recorded_payment && <p className="vp-receipt-note">Payment and document total are separate readings of this receipt; they are not added together.</p>}
+      {page?.recorded_hours != null && <p className="vp-receipt-note"><strong>{page.recorded_hours} recorded person-hours</strong> · {page.hour_entries} entries on this receipt. Concurrent entries count separately.</p>}
       {receipt.amountConflict && <p className="vp-receipt-note">{amountText(receipt.total, receipt.currency)} / {amountText(receipt.totalAmount, receipt.currency)} · check original</p>}
       {receipt.amount === 0 && <p className="vp-receipt-note">No charge shown in this reading; check the original.</p>}
       <ReceiptSource key={`${vehicleId}:${receipt.sourceTable}:${receipt.sourceId}`} receipt={receipt} vehicleId={vehicleId} />

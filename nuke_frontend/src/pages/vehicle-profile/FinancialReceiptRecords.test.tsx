@@ -157,6 +157,34 @@ it('withholds a previous viewer’s line amounts immediately during an auth tran
   await renderRows([dated()], true); expect(host.querySelector('article')).toBeNull();
 });
 
+it('separates a printed payment from the document total and retains concurrent person-hour entries', async () => {
+  fixture.user = { id: 'owner-a' };
+  fixture.rpc.mockResolvedValue({ data: { tied: true, documents: [{ ...page(),
+    recorded_payment: { amount: 130, date: '2025-04-03' }, recorded_hours: 16, hour_entries: 2 }] }, error: null });
+  await renderRows([dated()]); await click('Read lines', () => host.textContent!.includes('Recorded payment'));
+  const totals = [...host.querySelectorAll('.vp-receipt-total')].map(node => node.textContent);
+  expect(totals).toEqual(['Document total$125.00', 'Recorded payment · Apr 3, 2025$130.00']);
+  expect(host.textContent).toContain('16 recorded person-hours');
+  expect(host.textContent).toContain('2 entries on this receipt');
+  expect(host.textContent).not.toContain('$255');
+  fixture.loading = true; await renderRows([dated()]);
+  expect(host.textContent).not.toContain('$130');
+  expect(host.textContent).not.toContain('Recorded payment');
+});
+
+it('withholds payment data for an untied viewer and preserves a literal zero payment for a tied viewer', async () => {
+  fixture.rpc.mockResolvedValue({ data: { tied: false, documents: [{ ...page(),
+    recorded_payment: { amount: 130, date: '2025-04-03' } }] }, error: null });
+  await renderRows([dated({ total: null, amounts_visible: false })]);
+  await click('Read lines', () => host.textContent!.includes('A-100'));
+  expect(host.textContent).not.toContain('Recorded payment');
+  expect(host.textContent).not.toContain('$130');
+  fixture.user = { id: 'owner-a' };
+  fixture.rpc.mockResolvedValue({ data: { tied: true, documents: [{ ...page(), recorded_payment: { amount: 0, date: null } }] }, error: null });
+  await renderRows([dated()]); await click('Read lines', () => host.textContent!.includes('Recorded payment'));
+  expect(host.textContent).toContain('Recorded payment$0.00');
+});
+
 it('removes a receipt whose current day reader no longer returns it, without showing a different receipt’s lines', async () => {
   fixture.rpc.mockResolvedValue({ data: { tied: false, documents: [{ ...page(), receipt_id: 'other' }] }, error: null });
   await renderRows([dated()]); await click('Read lines', () => !host.querySelector('article'));
