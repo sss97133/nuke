@@ -17,7 +17,10 @@ test('the model can find the direction from the root of the repository', () => {
 test('the answer key is never shown to the model under test', () => {
   assert.match(tools.read_file({ path: 'scripts/guardrails/owner-voice-test.md' }), /^no such file/);
   assert.ok(!tools.list_dir({ path: 'scripts/guardrails' }).includes('owner-voice-test'));
-  assert.ok(!tools.search({ pattern: 'answer key', path: 'scripts/guardrails' }).includes('owner-voice-test.md'));
+  // A match is "path:line:text". Other files may name the answer key; no match may come from it.
+  const from = tools.search({ pattern: 'answer key', path: 'scripts/guardrails' }).split('\n').map((row) => row.split(':')[0]);
+  assert.ok(from.includes('scripts/guardrails/README.md'), 'the search itself works');
+  assert.ok(!from.some((path) => /owner-voice-test/.test(path)), 'no match comes from the answer key');
 });
 
 test('reads are bounded and a missing path is said plainly', () => {
