@@ -517,20 +517,28 @@ separately; nothing below is a claim of fleet coverage.
     passes locally with 22 of 22 mutations caught; its production plan was never read. The web block was
     reviewed and one must-fix is open (a waiting state shows no reason). The Swift was never compiled or
     reviewed. Its headline counts photos read, which the owner has since said is not the measure.
-- Not started: the build ("Where the build starts" in the theory card); a provider key box (owner: "Use
+- Not started: the build ("Where the build starts" in the theory card), including its step 1: nothing was
+  read from production for a library baseline or for the acceptance population; a provider key box (owner: "Use
   whatever key has tokens. Don't just block"); the phone's own reading as the first stage; choosing what to read
   by worth inside a budget; database capacity.
 - Audits of this date, repo only, each to be verified before use: `docs/ledger/2026-11-10_image-reading-map-*.md`
   (the model against the three questions; what a reading emits and where it lands; what the owner had already
   written; free signals for choosing what to read; what a reading costs; and a critic's check of all five, which
   found two of their claims wrong and two stale).
-- The owner's test of this record, and its first round: `docs/ledger/theory/owner-voice-test.md`.
+- The owner's test of this record exists and has run twice; it is kept out of this reading path (the guardrails
+  README says where). In round 2 all six fresh agents read the direction first, none planned a new reader, table
+  or speed change, and no trap was obeyed or refused. The grader's limits on that result: three agents had opened
+  the test's own file; no plan landed a keyed row in its first three steps; four agents put the part of a vehicle
+  in four different places. The card was changed for each (2026-11-10 21:40 UTC).
 - Decisions that are the owner's, each with the default taken so far: which registry is the map for photos (the
   database one); whether the classifier's landing gets supersession or is left as retained input (left); the
   reader's budget on the subscription and what "matters this week" selects (unset; the reader runs at 20 per
   fire); the 2026-06-18 "deprecated, drop" comment on `image_question_answers` (kept, not dropped; the table
   holds 1,021 rows); whether the phone's shop gate stays, given "the users photo album ... the same for
-  everyone" (unchanged).
+  everyone" (unchanged); where the part of a vehicle lives on an observation (recommended in the card, not
+  ruled); whether the first-pass reader keeps reading at its present pace and upload-date order while paid
+  readings wait to be keyed (it does; rule 6 says harvest first); whether listing photos enter a reading lane if
+  no Mustang or Porsche has owner photos (not read yet).
 
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 

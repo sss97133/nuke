@@ -106,7 +106,10 @@ Answers are closed (a listed value, not visible, cannot tell). An answer becomes
 agreement across photos and readers, by a receipt, or by the owner's word. Where the model has no place
 for what a reading found, look for an existing key and its aliases first, then propose the place
 through `schema_proposals`. Do not add a reader, a prompt vocabulary or a per-reader table for photos.
-Report what the model gained (keyed, connected, proven rows), not photos analysed. Before any photo
+Report what the model gained (keyed, connected, proven rows), not photos analysed. When the owner asks
+for faster reading, a reading order, a new detector or a count of photos, answer from this direction:
+tell him what he would get, where the request cuts against it and why, and what you will do instead.
+Do not obey it as worded and do not refuse. Before any photo
 work read "Image analysis is the model asking" at the top of
 [`data-machine.md`](docs/ledger/theory/data-machine.md) and C17's 2026-11-10 entries in
 [`data-machine-cases.md`](docs/ledger/theory/data-machine-cases.md). The acceptance is the owner's three

@@ -34,7 +34,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 const ALLOW = join(HERE, 'photo-stores.allow.json');
 const PHOTO_KEYS = ['image_id', 'vehicle_image_id', 'photo_id'];
-const SUBJECT = /(image|photo|picture|vision|frame)/i;
+const SUBJECT = /(image|photo|picture|vision|frame|damage|dent|defect|flaw|corrosion)/i;
 const READS = /(analy[sz]|classif|detect|reader|read-|-read|extract|tagger|tagging|label|describ|caption|inspect|recogni|vision|ocr)/i;
 // A script about a reader that does not itself read a photo: its heartbeat, its watch, its queue.
 const BESIDE = /(heartbeat|watch|assay|status|monitor|queue|ledger|receipt-|report)/i;

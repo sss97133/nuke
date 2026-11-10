@@ -44,6 +44,13 @@ The local ratchets permit existing findings up to the configured baseline. They 
 that all code satisfies the design requirements. The write-guard scanner checks source wiring;
 runtime caller rejection is implemented by the guarded function and must be verified separately.
 
+## The owner-voice test
+
+`owner-voice-test.md` in this folder is the owner's test of the image analysis record (the direction at the top
+of `docs/ledger/theory/data-machine.md`): a new agent with no memory gets the kind of message he would send, and
+is graded on where it goes. It holds the messages, the grading, the results of each round and the script. It is
+the answer key, so nothing in the record links to it and an agent under test must not open it.
+
 ## Use the existing checks
 
 From the checkout being published:

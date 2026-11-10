@@ -20,10 +20,10 @@ test('a new table keyed by a photo is found, whatever its other columns look lik
 });
 
 test('a name that says it reads photos is recognised; a name that does not is left alone', () => {
-  for (const yes of ['image-part-classifier', 'photo-damage-detector', 'vision-reader', 'analyze-vehicle-images', 'scripts/photo-pipeline/part-state-reader.mjs', 'image-ocr-v2']) {
+  for (const yes of ['image-part-classifier', 'photo-damage-detector', 'vision-reader', 'analyze-vehicle-images', 'scripts/photo-pipeline/part-state-reader.mjs', 'image-ocr-v2', 'damage-detector', 'dent-classifier']) {
     assert.equal(saysItReadsPhotos(yes), true, yes);
   }
-  for (const no of ['image-intake', 'photo-sync-daemon', 'receipt-line-parser', 'extract-gooding', 'scripts/books/return_facts.py', 'frame-rail-measurements']) {
+  for (const no of ['image-intake', 'photo-sync-daemon', 'receipt-line-parser', 'extract-gooding', 'scripts/books/return_facts.py', 'frame-rail-measurements', 'rust-analyzer-setup', 'damage-report-email']) {
     assert.equal(saysItReadsPhotos(no), false, no);
   }
 });
