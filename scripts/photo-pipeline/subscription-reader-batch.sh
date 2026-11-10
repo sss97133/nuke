@@ -40,11 +40,13 @@ run_reader() { # name script args...
   echo "$STAMP $name $summary"
   # 4. heartbeat: record_reader_heartbeat (service role only) upserts one job_assay_readings row per reader; the cron job
   #    subscription-reader-watch fails when either row is older than 40 minutes, so v_job_health shows a silent reader.
+  #    The summary is model-derived text (by_type keys are read off photographed documents). It travels in the
+  #    environment and reader-heartbeat.mjs parses it as JSON; it is never part of a shell command line.
   local elapsed_ms=$(( ( $(date +%s) - started_s ) * 1000 ))
-  dotenvx run -q -f "$ENV_FILE" -- bash -c 'curl -sS --max-time 20 -o /dev/null -w "%{http_code}" -X POST "$SUPABASE_URL/rest/v1/rpc/record_reader_heartbeat" \
-    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" \
-    -d "{\"p_jobname\":\"'"$name"'\",\"p_reading\":'"$summary"',\"p_elapsed_ms\":'"$elapsed_ms"'}"' \
-    | { read -r code; [ "$code" = "200" ] || echo "$STAMP heartbeat for $name returned HTTP $code"; }
+  local beat
+  beat="$(READER_NAME="$name" READER_SUMMARY="$summary" READER_ELAPSED_MS="$elapsed_ms" \
+    dotenvx run -q -f "$ENV_FILE" -- node "$MAIN/scripts/photo-pipeline/reader-heartbeat.mjs" 2>>"$LOGDIR/subscription-reader.log" | tail -1)"
+  case "$beat" in *"HTTP 200"*) ;; *) echo "$STAMP heartbeat for $name did not land: ${beat:-no output}" ;; esac
 }
 
 # 2. documents, then 3. frames (failed first, then pending)

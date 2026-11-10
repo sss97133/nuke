@@ -373,6 +373,51 @@ historical component-row rewrite or evidence of current installation/completion.
 must preserve this comparison and test a separately selected failure; repeated source-free assertions
 or an inactive reader alone cannot establish an improved operating workload.
 
+**C17 operating census — 2026-11-10 15:10–15:19 UTC, read-only.** Population: `vehicle_images` rows with a
+`user_id` (listing photos are outside every reading lane by design: the claim requires `user_id IS NOT NULL`).
+Readers: direct aggregates over `llm_cost_tracking`, `photo_pipeline_retry_state`, `cron.job_run_details`,
+`net._http_response`, `image_descriptions`, `photo_extracted_fields`, `photo_land_progress`, the 2026-11-03
+`photo_analysis_yield_snapshot` (26,941 images of one user) and month counts of `created_at`/`observed_at` on each
+per-image output table.
+
+- *The paid classifier is not reading.* No logged Gemini call by any caller succeeded from 2026-10-15, the first
+  logged day (`llm_cost_tracking`; the orchestrator's 261 October calls all answered 402). OpenAI took over
+  2026-11-02: 12,076 calls, 11,006 answered 200 (13, then 10,924 on 2026-11-03, then 69 on 2026-11-04), then only
+  429. No orchestrator row after 2026-11-07. The breaker row read `healthy` with last error 429: `photo_pipeline_clear_retry` resets it
+  on any completed image, including one a subscription reader supplied without a provider call.
+- *Idle and stopped look the same.* Crons 556 and 684 each succeeded 298 times in 6 h; all 28 drain responses in
+  the 15 minutes sampled were `{"message":"No pending images","processed":0}`. 75 user rows were `pending`, all 75 with a
+  terminal retry row, 0 claimable. 404 of 407 retry rows were terminal (318 `image_http_error` 400).
+- *The monitors were stopped too.* Cron 685 `photo-analysis-yield-hourly` failed every run from 2026-11-03
+  (statement timeout at 10 s; `photo_analysis_yield_daily` 0 rows). The subscription readers' last heartbeat was the
+  hand run of 2026-11-08: the wrapper built its request inside `bash -c`, so the body was never JSON and the summary
+  text was shell-evaluated.
+- *"Completed" is not "read".* In the snapshot 8,816 images had no classification and 6,737 carried a legacy
+  `other` classification at mean confidence 0.283 with no receipt and no `v2` block (a 400-row sample: 392 held a
+  deep verdict, none held a `v2` block). 15,553 of 26,941 (58%) therefore hold no reading under the
+  current classifier contract and are never claimed again, because their status is `completed`. Completion
+  timestamps cluster in three bursts: 6,411 in 2025-12, 901 in 2026-05, 9,691 on 2026-11-03.
+- *Deeper levels have no producer.* Of 35 catalog fields applicable to a `vehicle_exterior` image
+  (`photo_analysis_field_catalog`), the zone, condition, damage, component and camera-pose slots carry no extraction
+  path. Coverage by type in the snapshot: exterior 0.26, interior 0.345, engine bay 0.36, undercarriage 0.38, against
+  0.861 for `other` (six applicable fields), which is what lifts the headline 0.605.
+- *Each push wrote a different store.* Month counts: `image_work_extractions` 200,101 in 2025-12 and none after;
+  `image_camera_position` 606,126 in 2026-02; `image_descriptions` 179,545 in 2026-03; `scene_micro_atom_evidence`
+  94,709 in 2026-06/07; `component_identifications` 37,580 in 2026-07; `image_analysis_records` 13,821 in 2026-10;
+  `photo_extracted_fields` 83,826 in 2026-11 (82,386 on one day). In 2026-11 `image_observations` gained 14,556
+  `local_image_analysis_v1` and 739 `codex_image_analysis_v1` readings with `vehicle_id` NULL that nothing in the repo reads.
+- *First write wins.* Live unique keys: `photo_extracted_fields (image_id, field_name, source)` and
+  `photo_text_lines (image_id, line_idx, source)`, written `ON CONFLICT DO NOTHING`; a second reading of an image
+  under any prompt version lands nothing.
+
+Repair in this change (migration `20261113100000`): `assay_photo_reading_flow()` with cron
+`photo-reading-flow-watch` fails when claimable photos wait 6 h unread, or 500+ user-owned photos lack a current
+reading and no classifier or deep reading landed in 72 h; the yield refresh finds its users from
+`photo_land_progress` and its cron carries its own statement budget; the reader heartbeat is posted by
+`scripts/photo-pipeline/reader-heartbeat.mjs`. This makes a stall visible; it reads no image. C17 stays open: no
+object records which level of which image is read under which contract, so levels cannot chain, a better reader
+cannot find its work, and every lane keeps its own worklist, store and normalizer.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026
