@@ -94,3 +94,18 @@ test("legacy classifier evidence accepts the live shapes and requires pipeline_v
   assert.match(code, /'legacy-' \|\| btrim\(p_meta ->> 'pipeline_version'\)/);
   assert.match(code, /revoke all on function public\.image_stage_legacy_version\(text, jsonb\)/);
 });
+
+test("the reconciler replacement (20261113140000) waits out a run in flight and is replay-safe", () => {
+  const refill = readFileSync(new URL("../../supabase/migrations/20261113140000_image_stage_reconciler_refill.sql", import.meta.url), "utf8");
+  const body = refill.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").trim();
+  assert.match(body, /^begin;/);
+  assert.match(body, /commit;$/);
+  // the reconciler's own lock, taken before anything is replaced: a tick in flight finishes on the old body first
+  const lock = body.indexOf("select pg_advisory_xact_lock(hashtextextended('reconcile_image_stages', 0));");
+  assert.ok(lock > 0 && lock < body.indexOf("create or replace function public.reconcile_image_stages"), "lock precedes the replacement");
+  assert.match(body, /md5\(prosrc\)[^;]*reconcile_image_stages\(integer\)/);
+  // the cursor is reset only on first application, and a tuned mark is kept
+  assert.match(body, /and not exists \(select 1 from public\.platform_config where config_key = 'image_stage_reconciler' and config_value \? 'refill_below'\)/);
+  assert.match(body, /'\{"refill_below": 100\}'::jsonb \|\| config_value/);
+  assert.doesNotMatch(body, /update\s+public\.vehicle_images/i);
+});
