@@ -9,9 +9,10 @@
  * into their own table and no observation carried a key; this check exists so the sixth cannot merge unnoticed.
  *
  * It looks only at what a change ADDS, compared with its base:
- *   1. a table created in a new migration that carries a photo key column (image_id, vehicle_image_id, photo_id);
+ *   1. a table created in a new migration that carries a photo key column (image_id, vehicle_image_id, photo_id),
+ *      or that names a photo by its hash, path or URL and also holds a reading (a finding, a severity, a box);
  *   2. a new edge function folder whose name says it reads photos;
- *   3. a new script whose path says it reads photos.
+ *   3. a new script whose path says it reads photos, or that it looks for a flaw ("find rust", "scan for dents").
  * Each fails unless it is listed in scripts/guardrails/photo-stores.allow.json with a reason and where the
  * owner's approval is recorded (for a table: the approved schema_proposals row). An entry there is a statement
  * that the owner approved it; writing one without that is inventing his decision.
@@ -34,8 +35,18 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 const ALLOW = join(HERE, 'photo-stores.allow.json');
 const PHOTO_KEYS = ['image_id', 'vehicle_image_id', 'photo_id'];
-const SUBJECT = /(image|photo|picture|vision|frame|damage|dent|defect|flaw|corrosion)/i;
-const READS = /(analy[sz]|classif|detect|reader|read-|-read|extract|tagger|tagging|label|describ|caption|inspect|recogni|vision|ocr)/i;
+// A column that names one photo another way. It counts only when the table also holds a reading (HOLDS_A_READING),
+// so a listing's photo_url column is left alone and rust_findings (photo_sha256, severity) is not.
+const PHOTO_REF = /^(?:vehicle_)?(?:image|photo|picture)_(?:sha256|sha|hash|md5|path|url|uri|file|filename|key|ref)$/;
+const HOLDS_A_READING = /(?<![a-z])(?:finding|detect|analy[sz]|classif|damage|rust|dent|defect|flaw|corrosion|scratch|crack|severity|confidence|bbox)/i;
+// Whole words only: "identity" is not a dent, "trust" is not rust, "revision" is not vision.
+const word = (alts) => new RegExp(`(?<![a-z])(?:${alts})(?:s|es|d|ed|y|ing)?(?![a-z])`, 'i');
+const SUBJECT = /(image|photo|picture|(?<![a-z])vision(?![a-z])|(?<![a-z])frames?(?![a-z]))/i;
+const FLAW = word('damage|dent|defect|flaw|corrosion|scratch|crack');
+const RUST = word('rust');
+const READS = /(analy[sz]|classif|detect|reader|read-|-read|extract|tagger|tagging|label|describ|caption|inspect|recogni|(?<![a-z])vision|ocr)/i;
+// Verbs of looking that only count beside a flaw: "find_rust", "scan-for-dents", "crack-finder".
+const LOOKS = /(?<![a-z])(?:find|scan|spot|grade|grading|assess|survey)/i;
 // A script about a reader that does not itself read a photo: its heartbeat, its watch, its queue.
 const BESIDE = /(heartbeat|watch|assay|status|monitor|queue|ledger|receipt-|report)/i;
 
@@ -55,18 +66,21 @@ export function tablesWithPhotoKey(sql) {
       if (body[j] === '(') d++; else if (body[j] === ')') d--; else if (body[j] === ',' && d === 0) { cols.push(body.slice(start, j)); start = j + 1; }
     }
     cols.push(body.slice(start));
-    for (const c of cols) {
-      const name = (c.trim().match(/^"?([a-z_][a-z0-9_]*)"?\s/i) ?? [])[1]?.toLowerCase();
-      if (name && PHOTO_KEYS.includes(name)) { found.push({ table: m[1].replace(/"/g, '').replace(/^public\./i, '').toLowerCase(), column: name }); break; }
-    }
+    const table = m[1].replace(/"/g, '').replace(/^public\./i, '').toLowerCase();
+    const names = cols.map((c) => (c.trim().match(/^"?([a-z_][a-z0-9_]*)"?\s/i) ?? [])[1]?.toLowerCase()).filter(Boolean);
+    const key = names.find((n) => PHOTO_KEYS.includes(n))
+      ?? (HOLDS_A_READING.test([table, ...names].join(' ')) ? names.find((n) => PHOTO_REF.test(n)) : undefined);
+    if (key) found.push({ table, column: key });
   }
   return found;
 }
 
 /** Does a function folder name or a script path say that it reads photos? */
 export function saysItReadsPhotos(nameOrPath) {
-  const s = String(nameOrPath);
-  return SUBJECT.test(s) && READS.test(s);
+  const s = String(nameOrPath).replace(/([a-z0-9])([A-Z])/g, '$1-$2');   // findRust reads as find-Rust
+  if ((SUBJECT.test(s) || FLAW.test(s)) && READS.test(s)) return true;
+  if ((FLAW.test(s) || RUST.test(s)) && LOOKS.test(s)) return true;
+  return RUST.test(s) && READS.test(s) && !/rust-analyzer/i.test(s);     // rust-detector, not the Rust language tool
 }
 
 /** Violations for a set of added files. `read(path)` returns a file's text; `existedInBase(path)` says whether a path existed before. */
