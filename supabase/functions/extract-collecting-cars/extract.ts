@@ -8,6 +8,7 @@ export interface CollectingCarsExtracted {
   url: string;
   title: string | null;
   year: number | null;
+  year_source: "modelYear" | "title" | null;
   make: string | null;
   model: string | null;
   trim: string | null;
@@ -113,9 +114,10 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   // mid-auction kept as the price, an unsold or sealed-bid lot called sold, and a native-currency amount stored as dollars.
   // A sale is the page's stage "sold" with priceSold; an ended lot without it is a high bid, never a price.
   const stage = clean(L.stage)?.toLowerCase() ?? null;
-  const sold = (stage === null || stage === "sold") && L.priceSold != null && Number(L.priceSold) > 0;
+  const soldAmount = L.priceSold != null && Number.isFinite(Number(L.priceSold)) && Number(L.priceSold) > 0 ? Number(L.priceSold) : null;
+  const sold = stage === "sold" || (stage === null && soldAmount !== null);
   const ended = stage !== null && stage !== "live" && stage !== "comingsoon" && !sold;
-  const amount = sold ? Number(L.priceSold) : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
+  const amount = sold ? soldAmount : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
   const sealed = clean(L.saleFormat)?.toLowerCase() === "sealed";
   const outcome: CollectingCarsExtracted["sale_outcome"] = sold ? "sold" : ended ? (sealed ? "sealed_unsold" : "unsold") : stage === "live" ? "live" : null;
   const kind: CollectingCarsExtracted["price_kind"] = amount === null ? null : sold ? "sold" : ended ? "high_bid" : "current_bid";
@@ -129,12 +131,18 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   const slug = url.match(/\/for-sale\/([^/?#]+)/)?.[1];
   const place = [clean(L.areaName), clean(L.countryName)].filter(Boolean).join(", ") || null;
   const bodyStyle = (L.productAttributes ?? []).find((a: any) => a?.attributeName === "bodyStyle")?.attributeValue;
+  // Early lots can omit modelYear while explicitly stating the year in their
+  // own title. Retain which source field supplied it; never use the URL slug.
+  const modelYear = int(L.modelYear);
+  const titleYear = clean(L.title)?.match(/^((?:18|19|20)\d{2})\s+/)?.[1];
+  const year = modelYear ?? (titleYear ? Number(titleYear) : null);
 
   return {
     listing_id: String(L.auctionId),
     url: slug ? `https://collectingcars.com/for-sale/${slug}` : url,
     title: clean(L.title),
-    year: int(L.modelYear),
+    year,
+    year_source: modelYear !== null ? "modelYear" : titleYear ? "title" : null,
     make: clean(L.makeName) ?? clean(L.productMake),
     model: clean(L.modelName),
     trim: clean(L.variantName),

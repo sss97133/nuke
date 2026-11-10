@@ -38,6 +38,14 @@ Deno.test("odometer in km is converted to miles and the raw text is kept", () =>
   assertEquals([x.mileage, x.mileage_unit, x.mileage_raw], [15329, "km", "24,669 Km (Indicated)"]);
 });
 
+Deno.test("a source-declared sale with no disclosed price stays sold without promoting its last bid", () => {
+  const soldPage = swap(html, '\\"stage\\":\\"unsold\\"', '\\"stage\\":\\"sold\\"');
+  for (const replacement of ['null', '0']) {
+    const x = extractFromHtml(swap(soldPage, '\\"priceSold\\":null', `\\"priceSold\\":${replacement}`), url);
+    assertEquals([x.sale_outcome, x.price_amount, x.price_kind, x.price], ["sold", null, null, null]);
+  }
+});
+
 Deno.test("description resolves through its flight reference and the gallery is the full image list", () => {
   const x = extractFromHtml(html, url);
   assert(x.description?.startsWith("KEY FACTS"), x.description ?? "null");
@@ -50,4 +58,21 @@ Deno.test("a page without the lot payload is an error", () => {
   let threw = false;
   try { extractFromHtml("<html></html>", url); } catch { threw = true; }
   assert(threw);
+});
+
+const nativePage = (fields: Record<string, unknown>) =>
+  `<script>self.__next_f.push([1,${JSON.stringify(JSON.stringify({ auctionId: "1", stage: "sold", ...fields }))}])</script>`;
+
+Deno.test("historical title supplies an explicit year when modelYear is absent", () => {
+  const x = extractFromHtml(nativePage({ title: "1989 PORSCHE 911 SPEEDSTER", modelYear: null }), url);
+  assertEquals([x.year, x.year_source], [1989, "title"]);
+});
+
+Deno.test("structured year keeps priority and unrelated title numbers do not become years", () => {
+  const x = extractFromHtml(nativePage({ title: "1989 PORSCHE 911 SPEEDSTER", modelYear: "1990" }), url);
+  assertEquals([x.year, x.year_source], [1990, "modelYear"]);
+  for (const title of [null, "Porsche 911 - 1989", "19890 Porsche", "911 Porsche", "1989-spec Porsche"]) {
+    const y = extractFromHtml(nativePage({ title, modelYear: null }), url);
+    assertEquals([y.year, y.year_source], [null, null]);
+  }
 });
