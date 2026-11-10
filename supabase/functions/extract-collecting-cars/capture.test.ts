@@ -4,11 +4,12 @@ const base = 'https://fixture.supabase.test', key = 'sb_secret_cc_capture_fixtur
 Deno.env.set('SUPABASE_URL', base); Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', key);
 Deno.env.set('SUPABASE_SECRET_KEYS', JSON.stringify({ default: key }));
 const url = 'https://collectingcars.com/for-sale/2017-porsche-911-991-2-carrera-s-2';
-const html = await Deno.readTextFile(new URL('./fixtures/lot-911.html', import.meta.url));
+let html = await Deno.readTextFile(new URL('./fixtures/lot-911.html', import.meta.url));
 const snapshot = '22222222-2222-4222-8222-222222222222';
 const clock = new Date(Date.now() - 3_600_000).toISOString();
 const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(x => x.toString(16).padStart(2, '0')).join('');
-const hash = await sha(html);
+const originalHtml = html;
+let hash = await sha(html);
 let mode = 'cache', calls: any[] = [], archivePayload: any;
 globalThis.fetch = async (input, init) => {
   const req = new Request(input, init), u = new URL(req.url), read = ['GET', 'HEAD'].includes(req.method);
@@ -47,7 +48,10 @@ let handler: (request: Request) => Response | Promise<Response>;
 (Deno as any).serve = (fn: typeof handler) => { handler = fn; return { finished: Promise.resolve() }; };
 await import('./index.ts');
 async function run(next: string, sourceUrl = url) {
-  mode = next; calls = []; archivePayload = null;
+  html = next.startsWith('noncar-') ? originalHtml.replace(String.raw`\"lotType\":\"car\"`, String.raw`\"lotType\":\"part\"`) : originalHtml;
+  if (next.startsWith('noncar-')) assert(html !== originalHtml, 'Native fixture type changed');
+  hash = await sha(html);
+  mode = next.replace(/^noncar-/, ''); calls = []; archivePayload = null;
   const response = await handler(new Request(base + '/functions/v1/extract-collecting-cars', { method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ url: sourceUrl,
       ...(next.startsWith('pinned') ? { cc_snapshot: { snapshot_id: snapshot, expected_sha256: hash } } : {}) }) }));
@@ -91,4 +95,13 @@ Deno.test('authenticated user cannot use service-only historical replay', async 
     headers: { authorization: `Bearer ${signing}.${b64(new Uint8Array(signature))}`, 'content-type': 'application/json' },
     body: JSON.stringify({ url, cc_snapshot: { snapshot_id: snapshot, expected_sha256: hash } }) }));
   assertEquals(r.status, 403); assertEquals(calls.length, 0);
+});
+
+Deno.test('non-car classification carries durable native capture before structural skip', async () => {
+ const r=await run('noncar-cache'); assertEquals(r.status,200); assertEquals(r.body.skipped,true);
+ assertEquals(r.body.extracted.lot_type,'part');
+ assertEquals(r.body.source_capture,{snapshot_id:snapshot,sha256:hash,observed_at:clock,source_url:url});
+});
+for(const mode of ['failed','changed']) Deno.test(`non-car ${mode} custody cannot become a settled skip`,async()=>{
+ const r=await run('noncar-'+mode); assertEquals(r.status,500); assertEquals(r.body.skipped,undefined);
 });
