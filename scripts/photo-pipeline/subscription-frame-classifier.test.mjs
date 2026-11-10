@@ -40,7 +40,7 @@ if (raw.includes('corrupt')) { console.error('Error: Cannot extract image from f
 require('node:fs').copyFileSync(raw, out);
 `;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false, statusFrames = [] } = {}) {
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false, statusFrames = [], extraArgs = [] } = {}) {
   const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0 };
   let port;
   const server = createServer((req, res) => {
@@ -58,8 +58,10 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         return json(200, statusFrames.map((n) => ({ id: n, vehicle_id: null, user_id: OWNER, image_url: `http://127.0.0.1:${port}/img/${n}`, file_name: null, taken_at: null, ai_processing_status: 'failed' })));
       }
       if (req.url === '/rest/v1/rpc/claim_image_stage_work') {
+        // the line hands out one photo per claim, in order, then nothing
         calls.claims.push(JSON.parse(data));
-        return json(200, frameNames.map((n, i) => ({ work_id: i + 1, image_id: n, image_url: n.includes('no-url') ? '' : `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: null, lane: 'live', reason: 'missing', target_version: 1 })));
+        const n = frameNames[calls.claims.length - 1];
+        return json(200, n === undefined ? [] : [{ work_id: calls.claims.length, image_id: n, image_url: n.includes('no-url') ? '' : `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: null, lane: 'live', reason: 'missing', target_version: 1 }]);
       }
       if (req.url === '/rest/v1/rpc/record_image_stage_receipt') {
         if (failFirstReceipt && ++calls.receiptAttempts === 1) return json(503, { message: 'upstream connect error' });
@@ -81,7 +83,7 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
   if (claude) { writeFileSync(join(bin, 'claude'), FAKE_CLAUDE); chmodSync(join(bin, 'claude'), 0o755); }
   if (sips) { writeFileSync(join(bin, 'sips'), FAKE_SIPS); chmodSync(join(bin, 'sips'), 0o755); }
   try {
-    const result = await run(process.execPath, [join(here, 'subscription-frame-classifier.mjs'), '--owner', OWNER, '--concurrency', '1', '--limit', '20'], {
+    const result = await run(process.execPath, [join(here, 'subscription-frame-classifier.mjs'), '--owner', OWNER, '--concurrency', '1', '--limit', '20', ...extraArgs], {
       // PATH holds only the stand-ins (they run under this node by absolute path): a real `claude` or `sips` on the
       // machine, which can sit in node's own directory, is never reached
       env: { PATH: bin, HOME: bin, SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key' },
@@ -97,8 +99,9 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
 test('every started photo gets one typed receipt with the URL fingerprint; a spent subscription ends the batch', async () => {
   const frames = ['a-ok.jpg', 'b-gone.jpg', 'c-corrupt.png', 'd-garbage.jpg', 'e-refused.jpg', 'f-limit.jpg', 'g-never-started.jpg'];
   await withStandIns(frames, ({ calls, summary, port }) => {
-    assert.deepEqual(calls.claims, [{ p_stage: 'classifier', p_limit: 20, p_lease_seconds: 6000, p_user_id: OWNER }],
-      'one owner-scoped claim, leased for the whole batch (20 photos one at a time, 300 s each)');
+    // one photo per claim: six photos taken, and the seventh is never claimed because the limit ended the fire
+    assert.equal(calls.claims.length, 6);
+    for (const c of calls.claims) assert.deepEqual(c, { p_stage: 'classifier', p_limit: 1, p_lease_seconds: 600, p_user_id: OWNER }, 'owner-scoped, one photo, a 10-minute lease');
     const got = calls.receipts.map((r) => [r.p_image_id, r.p_outcome, r.p_error_class, r.p_http_status]);
     assert.deepEqual(got, [
       ['a-ok.jpg', 'succeeded', null, null],
@@ -116,7 +119,7 @@ test('every started photo gets one typed receipt with the URL fingerprint; a spe
     assert.deepEqual(calls.readings.map((b) => b.image_id), ['a-ok.jpg', 'e-refused.jpg'], 'only parsed readings reach the orchestrator');
     assert.equal(calls.readings[0].reader, 'claude-cli sonnet subscription');
     assert.deepEqual([summary.source, summary.frames, summary.receipts, summary.receipt_errors, summary.accepted, summary.stopped],
-      ['stage-queue', 7, 6, 0, 1, 'reader_usage_limit'], 'the summary counts receipts and names why the batch stopped');
+      ['stage-queue', 6, 6, 0, 1, 'reader_usage_limit'], 'six photos taken, six receipts; the summary names why the fire stopped');
     assert.deepEqual(summary.error_classes, { image_http_error: 1, image_unreadable: 1, reader_output_invalid: 1, classifier_response_invalid: 1, reader_usage_limit: 1 },
       'the summary (the heartbeat reading) says why frames failed, in fixed words');
   });
@@ -162,6 +165,18 @@ test('on the status worklist nothing is written to the ledger, and the summary s
     assert.deepEqual([summary.stopped, summary.error_classes], ['reader_usage_limit', { reader_usage_limit: 1 }]);
     assert.equal(calls.readings.length, 0, 'the photo after the limit was not started');
   }, { config: null, statusFrames: ['a-limit.jpg', 'b-ok.jpg'] });
+});
+
+test('the reader keeps taking photos until the line is empty, and takes none once its time budget has passed', async () => {
+  const many = Array.from({ length: 27 }, (_, i) => `p${String(i).padStart(2, '0')}-ok.jpg`);
+  await withStandIns(many, ({ calls, summary }) => {
+    assert.equal(calls.receipts.length, 27, 'more than one old batch of 20: every photo in the line is read in this fire');
+    assert.equal(calls.claims.length, 28, '27 claims that returned a photo and the one that found the line empty');
+    assert.deepEqual([summary.frames, summary.accepted, summary.receipts, summary.stopped], [27, 27, 27, null]);
+  });
+  await withStandIns(many, ({ calls, summary }) => {
+    assert.deepEqual([calls.claims.length, calls.receipts.length, summary.frames, summary.stopped], [0, 0, 0, 'time_budget'], 'budget spent: nothing is claimed, so nothing is left claimed and unread');
+  }, { extraArgs: ['--budget-seconds', '0'] });
 });
 
 test('no CLI on the machine stops the batch at the first photo', async () => {

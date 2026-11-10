@@ -6,12 +6,14 @@
 // posts the JSON back to the orchestrator as classification_raw. The orchestrator validates it exactly like a provider
 // answer and runs the rest of its pipeline unchanged (routing, filing through attribute_testimony, the observation).
 //
-// Worklist (--source auto, the default): when the stage ledger is switched on (platform_config
-// image_stage_reconciler.enabled), the photos come from claim_image_stage_work('classifier') for this owner and each
-// one gets a typed receipt through record_image_stage_receipt (stage-queue.mjs); otherwise the worklist is the owner's
-// rows by ai_processing_status, as before, and nothing here writes to the database.
+// Worklist (--source auto, the default): when the stage ledger is switched on for this owner (platform_config
+// image_stage_reconciler), the reader takes ONE photo at a time from claim_image_stage_work('classifier'), reads it,
+// writes its typed receipt (record_image_stage_receipt, stage-queue.mjs) and takes the next, until the line is empty or
+// --budget-seconds has passed (default 520: launchd starts the next fire at 600). The line hands out the newest upload
+// first, then the backlog from the earliest photo taken. Otherwise the worklist is the owner's rows by
+// ai_processing_status (--limit of them), as before, and nothing here writes to the database.
 //
-//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model sonnet] [--status failed,pending] [--source auto|stage-queue|status] [--dry-run] [--out receipt.json]
+//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model sonnet] [--status failed,pending] [--source auto|stage-queue|status] [--budget-seconds 520] [--dry-run] [--out receipt.json]
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -29,6 +31,8 @@ if (process.env.ANTHROPIC_API_KEY) { console.error('refusing: ANTHROPIC_API_KEY 
 const OWNER = args.owner;
 const limit = args.limit && args.limit !== true ? Number(args.limit) : 200;
 const conc = args.concurrency && args.concurrency !== true ? Number(args.concurrency) : 2;
+const budgetSeconds = args['budget-seconds'] !== undefined && args['budget-seconds'] !== true && Number.isFinite(Number(args['budget-seconds'])) ? Number(args['budget-seconds']) : 520;
+const startedAt = Date.now();
 const model = args.model && args.model !== true ? String(args.model) : 'sonnet';
 const statuses = (args.status && args.status !== true ? String(args.status) : 'failed,pending').split(',').map((s) => s.trim()).filter(Boolean);
 const dry = args['dry-run'] === true;
@@ -72,22 +76,16 @@ function claudePrint(text, env) {
 const checklist = await orchestrator({ action: 'classifier_prompt' });
 if (checklist.http !== 200 || typeof checklist.prompt !== 'string') { console.error(`could not get the checklist: ${checklist.http} ${checklist.error ?? ''}`); process.exit(1); }
 const fromQueue = source === 'stage-queue' || (source === 'auto' && await stageQueueEnabled(rest, OWNER));
-let frames;
-if (fromQueue) {
-  // The ledger hands out the work: eligibility (privacy holds, duplicates, superseded rows) was judged by the reconciler.
-  // The lease covers the whole batch: every photo is claimed up front, and one read can take up to 240 s plus the
-  // download and the orchestrator. A lease shorter than the batch hands this fire's unread photos back to the queue
-  // while it is still working through them.
-  const leaseSeconds = Math.max(900, Math.ceil(Math.min(limit, 25) / Math.max(1, conc)) * 300);
-  const work = dry ? [] : await claimStageWork(rpc, { limit, leaseSeconds, userId: OWNER });
-  frames = work.map((w) => ({ id: w.image_id, vehicle_id: w.vehicle_id, user_id: w.user_id, image_url: w.image_url, target_version: w.target_version, lane: w.lane, reason: w.reason }));
-} else {
+// status worklist: listed up front. Stage queue: nothing is taken up front; each worker claims its next photo when it
+// is free, so a fire that stops early (a usage limit, the time budget) leaves nothing claimed and unread.
+let frames = [];
+if (!fromQueue) {
   const statusFilter = statuses.length === 1 ? `ai_processing_status=eq.${statuses[0]}` : `ai_processing_status=in.(${statuses.join(',')})`;
   // the same holds the ledger applies: nothing sensitive, personal, duplicate, superseded or external goes to a reader
   const holds = 'is_sensitive=not.is.true&is_duplicate=not.is.true&is_superseded=not.is.true&is_external=not.is.true&or=(vision_gate_status.is.null,vision_gate_status.neq.rejected_personal)';
   frames = await rest(`vehicle_images?select=id,vehicle_id,user_id,image_url,file_name,taken_at,ai_processing_status&user_id=eq.${OWNER}&${statusFilter}&image_url=like.http*&${holds}&order=taken_at.desc.nullslast&limit=${limit}`);
 }
-console.error(`${frames.length} frames (${fromQueue ? 'stage queue' : statuses.join('/')}) to classify for ${OWNER} with the orchestrator's ${checklist.prompt_version} checklist (model ${model}, concurrency ${conc})${dry ? ' [dry run]' : ''}`);
+console.error(`${fromQueue ? `stage queue, one at a time for up to ${budgetSeconds} s` : `${frames.length} frames (${statuses.join('/')})`} to classify for ${OWNER} with the orchestrator's ${checklist.prompt_version} checklist (model ${model}, concurrency ${conc})${dry ? ' [dry run]' : ''}`);
 
 // error_classes: why frames failed, from the receipt vocabulary (fixed words, never reader text), so the heartbeat row
 // says what is wrong without anyone opening the log on the Mac.
@@ -95,8 +93,7 @@ const out = []; const summary = { frames: frames.length, source: fromQueue ? 'st
 let stop = false;
 // Each photo's result is typed once (receiptForResult). The type is counted in the summary on either worklist, and a
 // fault that is the batch's rather than the photo's (compute exhausted, login or key refused, a missing tool, the API
-// unreachable) ends the batch. On the stage queue the receipt is also written, once per claimed photo; photos claimed
-// but not started go back to the queue when the lease ends.
+// unreachable) ends the batch. On the stage queue the receipt is also written, once per claimed photo.
 const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
 const settled = new Set();
 const settle = async (f, result) => {
@@ -115,9 +112,22 @@ const settle = async (f, result) => {
 if (!dry) {
   const dir = mkdtempSync(join(tmpdir(), 'nuke-classify-'));
   let i = 0;
+  // The next photo for a free worker. Status worklist: the next row of the list. Stage queue: one claim of one photo,
+  // leased for 10 minutes (a read is cut off at 240 s); null when the line is empty, the batch was stopped, the time
+  // budget has passed, or the claim failed (the next fire tries again).
+  const next = async () => {
+    if (stop) return null;
+    if (!fromQueue) return i < frames.length ? frames[i++] : null;
+    if ((Date.now() - startedAt) / 1000 >= budgetSeconds) { summary.stopped = summary.stopped ?? 'time_budget'; return null; }
+    let w;
+    try { [w] = await claimStageWork(rpc, { limit: 1, leaseSeconds: 600, userId: OWNER }); }
+    catch (e) { console.error(`claim failed: ${String(e.message || e).slice(0, 160)}`); summary.claim_errors = (summary.claim_errors || 0) + 1; return null; }
+    if (!w) return null;
+    summary.frames++;
+    return { id: w.image_id, vehicle_id: w.vehicle_id, user_id: w.user_id, image_url: w.image_url, target_version: w.target_version, lane: w.lane, reason: w.reason };
+  };
   const worker = async () => {
-    while (i < frames.length && !stop) {
-      const f = frames[i++];
+    for (let f = await next(); f; f = await next()) {
       const t0 = Date.now();
       let stage = 'download';
       try {

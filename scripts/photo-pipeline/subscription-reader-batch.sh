@@ -53,4 +53,6 @@ run_reader() { # name script args...
 
 # 2. documents, then 3. frames (failed first, then pending)
 run_reader subscription-document-reader "$MAIN/scripts/photo-pipeline/subscription-document-reader.mjs" --limit "$DOCS_LIMIT" --concurrency 2
-run_reader subscription-frame-classifier "$MAIN/scripts/photo-pipeline/subscription-frame-classifier.mjs" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending
+# On the stage queue the frame reader takes one photo at a time until the line is empty or 520 s have passed (launchd
+# starts the next fire at 600 s; a fire still running is skipped above). --limit applies to the status worklist only.
+run_reader subscription-frame-classifier "$MAIN/scripts/photo-pipeline/subscription-frame-classifier.mjs" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending --budget-seconds 520
