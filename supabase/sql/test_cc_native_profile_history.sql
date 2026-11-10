@@ -16,8 +16,11 @@ SET statement_timeout='3s'; SET lock_timeout='1s';
 \i supabase/migrations/20261110050835_cc_native_profile_history.sql
 SELECT pg_temp.ok('migration preserves caller budgets',current_setting('statement_timeout')='3s' AND current_setting('lock_timeout')='1s');
 SELECT pg_temp.ok('existing profile outputs and ACL unchanged',
- (SELECT pg_temp.profile()-'native_listing_history'=value AND acl=(SELECT proacl FROM pg_proc
+ (SELECT pg_temp.profile()-'native_listing_history'-'read_at'=value-'read_at' AND acl=(SELECT proacl FROM pg_proc
  WHERE oid='public.get_vehicle_specs(uuid[],boolean,jsonb)'::regprocedure) FROM before_history));
+SELECT pg_temp.ok('existing read_at remains the actual current statement clock',
+ (SELECT (pg_temp.profile()->>'read_at')::timestamptz=statement_timestamp()
+ AND (pg_temp.profile()->>'read_at')::timestamptz>=(value->>'read_at')::timestamptz FROM before_history));
 INSERT INTO public.listing_page_snapshots VALUES('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','collectingcars',
  'https://collectingcars.com/for-sale/fixture-car',true,200,repeat('a',64),'{}','2026-01-01T00:00Z','2026-01-01T00:00:01Z');
 INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,kind,source_url,observed_at,ingested_at,extraction_method,
