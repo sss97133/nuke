@@ -1,0 +1,118 @@
+// node --test scripts/photo-pipeline/subscription-frame-classifier.test.mjs
+// The frame reader against the stage queue, end to end with stand-ins: a local HTTP server plays PostgREST, the
+// orchestrator and the image host; `claude` and `sips` are small scripts on PATH. What is checked is the bookkeeping:
+// every photo the reader starts gets exactly one typed receipt, and a spent subscription ends the batch.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const run = promisify(execFile);
+const OWNER = '00000000-0000-4000-8000-0000000000aa';
+const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
+
+// `claude -p --output-format json`: the prompt arrives on stdin and names the image file; the file name picks the answer.
+const FAKE_CLAUDE = `#!/usr/bin/env node
+let input = '';
+process.stdin.on('data', (d) => { input += d; });
+process.stdin.on('end', () => {
+  const name = (input.match(/file at (\\S+)\\./) || [])[1] || '';
+  if (name.includes('-limit')) {
+    process.stdout.write(JSON.stringify({ type: 'result', is_error: true, api_error_status: 429, result: "You've hit your 5-hour limit · resets 3pm" }));
+    process.exit(1);
+  }
+  if (name.includes('-garbage')) { process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: 'I could not decide.' })); return; }
+  if (name.includes('-refused')) { process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: '{"image_type":"nonsense"}' })); return; }
+  process.stdout.write(JSON.stringify({ type: 'result', is_error: false, duration_ms: 1000, result: 'Here it is: {"image_type":"engine_bay","confidence":0.9}' }));
+});
+`;
+const FAKE_SIPS = `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const raw = args[args.indexOf('--out') - 1], out = args[args.indexOf('--out') + 1];
+if (raw.includes('corrupt')) { console.error('Error: Cannot extract image from file.'); process.exit(13); }
+require('node:fs').copyFileSync(raw, out);
+`;
+
+async function withStandIns(frameNames, fn, { sips = true } = {}) {
+  const calls = { receipts: [], claims: [], readings: [] };
+  let port;
+  const server = createServer((req, res) => {
+    let data = '';
+    req.on('data', (c) => { data += c; });
+    req.on('end', () => {
+      const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body)); };
+      if (req.url.startsWith('/img/')) {
+        if (req.url.includes('gone')) return res.writeHead(404).end();
+        return res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+      }
+      if (req.url.startsWith('/rest/v1/platform_config')) return json(200, [{ config_value: { enabled: true } }]);
+      if (req.url === '/rest/v1/rpc/claim_image_stage_work') {
+        calls.claims.push(JSON.parse(data));
+        return json(200, frameNames.map((n, i) => ({ work_id: i + 1, image_id: n, image_url: `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: null, lane: 'live', reason: 'missing', target_version: 1 })));
+      }
+      if (req.url === '/rest/v1/rpc/record_image_stage_receipt') { calls.receipts.push(JSON.parse(data)); return json(200, calls.receipts.length); }
+      if (req.url === '/functions/v1/photo-pipeline-orchestrator') {
+        const body = JSON.parse(data);
+        if (body.action === 'classifier_prompt') return json(200, { prompt: 'Classify the photo.', prompt_version: 'v98' });
+        calls.readings.push(body);
+        if (body.classification_raw?.image_type === 'nonsense') return json(200, { success: false, classifier_ok: false, error_class: 'classifier_response_invalid', requeued: true });
+        return json(200, { success: true, classifier_ok: true });
+      }
+      json(404, { error: 'not found' });
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  port = server.address().port;
+  const bin = mkdtempSync(join(tmpdir(), 'frame-reader-bin-'));
+  writeFileSync(join(bin, 'claude'), FAKE_CLAUDE); chmodSync(join(bin, 'claude'), 0o755);
+  if (sips) { writeFileSync(join(bin, 'sips'), FAKE_SIPS); chmodSync(join(bin, 'sips'), 0o755); }
+  try {
+    const result = await run(process.execPath, [join(here, 'subscription-frame-classifier.mjs'), '--owner', OWNER, '--concurrency', '1', '--limit', '20'], {
+      // only the stand-ins and node itself are on PATH: a real `claude` or `sips` on the machine is never reached
+      env: { PATH: `${bin}:${dirname(process.execPath)}`, HOME: bin, SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key' },
+    }).then((r) => ({ code: 0, ...r }), (e) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));
+    await fn({ calls, summary: JSON.parse(result.stdout.trim().split('\n').pop()), port, result });
+  } finally {
+    server.close();
+    rmSync(bin, { recursive: true, force: true });
+  }
+}
+
+test('every started photo gets one typed receipt with the URL fingerprint; a spent subscription ends the batch', async () => {
+  const frames = ['a-ok.jpg', 'b-gone.jpg', 'c-corrupt.png', 'd-garbage.jpg', 'e-refused.jpg', 'f-limit.jpg', 'g-never-started.jpg'];
+  await withStandIns(frames, ({ calls, summary, port }) => {
+    assert.deepEqual(calls.claims, [{ p_stage: 'classifier', p_limit: 20, p_lease_seconds: 900, p_user_id: OWNER }], 'one owner-scoped claim');
+    const got = calls.receipts.map((r) => [r.p_image_id, r.p_outcome, r.p_error_class, r.p_http_status]);
+    assert.deepEqual(got, [
+      ['a-ok.jpg', 'succeeded', null, null],
+      ['b-gone.jpg', 'blocked_input', 'image_http_error', 404],
+      ['c-corrupt.png', 'blocked_input', 'image_unreadable', null],
+      ['d-garbage.jpg', 'unavailable', 'reader_output_invalid', null],
+      ['e-refused.jpg', 'unavailable', 'classifier_response_invalid', 200],
+      ['f-limit.jpg', 'rate_limited', 'reader_usage_limit', 429],
+    ]);
+    for (const r of calls.receipts) {
+      assert.equal(r.p_input_fingerprint, md5(`http://127.0.0.1:${port}/img/${r.p_image_id}`), 'fingerprint is md5 of the URL that was read');
+      assert.equal(r.p_producer_version, 1);
+      assert.deepEqual([r.p_detail.reader, r.p_detail.prompt_version], ['claude-cli sonnet subscription', 'v98']);
+    }
+    assert.deepEqual(calls.readings.map((b) => b.image_id), ['a-ok.jpg', 'e-refused.jpg'], 'only parsed readings reach the orchestrator');
+    assert.equal(calls.readings[0].reader, 'claude-cli sonnet subscription');
+    assert.deepEqual([summary.source, summary.frames, summary.receipts, summary.receipt_errors, summary.accepted, summary.stopped],
+      ['stage-queue', 7, 6, 0, 1, 'reader_usage_limit'], 'the summary counts receipts and names why the batch stopped');
+  });
+});
+
+test('no converter on the machine stops the batch instead of blocking every non-JPEG photo', async () => {
+  await withStandIns(['a-first.heic', 'b-second.heic'], ({ calls, summary }) => {
+    assert.deepEqual(calls.receipts.map((r) => [r.p_image_id, r.p_outcome, r.p_error_class]), [['a-first.heic', 'unavailable', 'reader_tool_missing']]);
+    assert.equal(summary.stopped, 'reader_tool_missing');
+  }, { sips: false });
+});

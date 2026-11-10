@@ -35,8 +35,27 @@
 --    (platform_config 'image_stage_reconciler'.enabled=false): the cron is a no-op until the owner enables it AND a
 --    stage worker consumes image_stage_work.
 
-set statement_timeout = '60s';
-set lock_timeout = '10s';
+--
+-- Reviewed 2026-11-10 by two independent readers, with the contract executed on PostgreSQL 16; what they found is in
+-- this version:
+--  * One transaction. CI applies files with psql and no -1, so every statement used to commit on its own, and a lock
+--    timeout on a vehicle_images foreign key would have left tables without their revokes. The two foreign keys are
+--    added last, under a short lock_timeout, so SHARE ROW EXCLUSIVE on vehicle_images is held only until commit.
+--  * service_role holds SELECT only on the four tables (default privileges gave it ALL); the definer functions write.
+--  * The paid provider's breaker and retry table gate neither the reconciler nor a claim: the subscription reader never
+--    calls that provider, and the breaker was blocking it. Rows are skipped only while a run is in flight.
+--  * image_stage_reconciler.user_ids scopes the reconciler to users who have a reader; unclaimed work for other users
+--    would otherwise fill max_open and stop the queue.
+--  * A claim re-checks privacy eligibility and drops items for photos that became sensitive, personal, duplicate or
+--    superseded while queued.
+--  * Retryable outcomes past max_attempts are offered again after a day (a reader-wide outage must not retire photos).
+--  * A photo the orchestrator policy-skipped is a finished decision, not a gap. A failed stand-in is not a reading.
+--  * blocked_input is offered again when the image URL changes (input_fingerprint = md5(image_url)).
+--  * The backfill lane walks everything older than the grace period, so a bulk upload larger than the live scan waits
+--    minutes, not days.
+begin;
+set local statement_timeout = '60s';
+set local lock_timeout = '2s';
 
 -- ---------------------------------------------------------------- registry
 create table if not exists public.image_pipeline_stages (
@@ -50,23 +69,24 @@ create table if not exists public.image_pipeline_stages (
   contract text,
   description text not null
 );
+alter table public.image_pipeline_stages add column if not exists contract text;   -- the 2026-11-07 draft shape lacked it
 comment on table public.image_pipeline_stages is
   'Photo pipeline stages. required=true: the reconciler enqueues images that lack a receipt at required_version. Bump required_version to declare older receipts outdated. contract: the output contract a pre-receipt reading must carry to count as done (NULL = any finished output counts). Closed list of applicability predicates, no executable SQL.';
 comment on column public.image_pipeline_stages.contract is
-  'Output contract an existing (pre-receipt) reading must carry to stand in for a receipt. classifier: the prompt_version in ai_scan_metadata.classification.v2 (v98 on 2026-11-10). NULL accepts any finished output. Read 2026-11-10: of 26,941 owner images in the yield snapshot, 8,816 had no classification and 6,737 carried a legacy "other" classification with no v2 block (mean confidence 0.283); under contract v98 both are gaps, under NULL only the first.';
+  'Output contract an existing (pre-receipt) reading must carry to stand in for a receipt. classifier: the prompt_version in ai_scan_metadata.classification.v2 (v98 on 2026-11-10). NULL accepts any finished output. Read 2026-11-10: of 26,941 owner images in the yield snapshot, 8,816 had no classification and 6,737 carried a legacy "other" classification with no v2 block (mean confidence 0.283); under contract v98 both are gaps, under NULL only the first. Seeded once; a later change by the owner survives a replay of this file.';
 
-insert into public.image_pipeline_stages (stage, producer, required_version, required, applies_when, legacy_unavailable_key, description) values
-  ('classifier',  'photo-pipeline-orchestrator', 1, true,  'always',        null,                 'First-level reading of one photo under the classifier contract: image type, description, text lines, cited vehicle fields, VIN, angle, document kind. Read by a provider or by a subscription reader posting classification_raw.'),
-  ('exif',        'derive-image-exif',           1, false, 'always',        null,                 'Capture time / GPS from the original bytes. Registered, not yet required: flip required after a canary.'),
-  ('engine_bay',  'analyze-engine-bay',          1, false, 'always',        'analyze-engine-bay', 'Engine-bay analysis; #3024 records stage_unavailable when the function is not deployed.'),
-  ('receipt_ocr', 'receipt-extract',             1, false, 'document_like', 'receipt-photo-ocr',  'OCR / itemization for receipt-like photos. Not required until the route is verified live.')
+insert into public.image_pipeline_stages (stage, producer, required_version, required, applies_when, legacy_unavailable_key, contract, description) values
+  ('classifier',  'photo-pipeline-orchestrator', 1, true,  'always',        null,                 'v98', 'First-level reading of one photo under the classifier contract: image type, description, text lines, cited vehicle fields, VIN, angle, document kind. Read by a provider or by a subscription reader posting classification_raw.'),
+  ('exif',        'derive-image-exif',           1, false, 'always',        null,                 null,  'Capture time / GPS from the original bytes. Registered, not yet required: flip required after a canary.'),
+  ('engine_bay',  'analyze-engine-bay',          1, false, 'always',        'analyze-engine-bay', null,  'Engine-bay analysis; #3024 records stage_unavailable when the function is not deployed.'),
+  ('receipt_ocr', 'receipt-extract',             1, false, 'document_like', 'receipt-photo-ocr',  null,  'OCR / itemization for receipt-like photos. Not required until the route is verified live.')
 on conflict (stage) do nothing;
-update public.image_pipeline_stages set contract = 'v98' where stage = 'classifier' and contract is null;
 
 -- ---------------------------------------------------------------- receipts (append-only)
+-- The foreign keys to vehicle_images are added at the end of this file.
 create table if not exists public.image_stage_receipts (
   id bigint generated always as identity primary key,
-  image_id uuid not null references public.vehicle_images(id) on delete cascade,
+  image_id uuid not null,
   stage text not null references public.image_pipeline_stages(stage),
   producer text not null,
   producer_version integer not null check (producer_version >= 1),
@@ -86,17 +106,17 @@ create table if not exists public.image_stage_receipts (
   constraint stage_receipt_detail_object check (jsonb_typeof(detail) = 'object')
 );
 comment on table public.image_stage_receipts is
-  'Append-only: one row per stage attempt on an image (producer, version, outcome, clock). Outcomes: succeeded, policy_skip (decided not to run), blocked_input (input unusable until it changes), unavailable (stage not deployed), rate_limited (provider said wait), failed. Written only by record_image_stage_receipt().';
+  'Append-only: one row per stage attempt on an image (producer, version, outcome, clock). Outcomes: succeeded, policy_skip (decided not to run), blocked_input (input unusable until it changes), unavailable (transient fault or stage not deployed), rate_limited (compute said wait), failed (not retried). Written only by record_image_stage_receipt(); the service role can read it and nothing else.';
 comment on column public.image_stage_receipts.producer_version is 'Integer version of the stage producer; compared with image_pipeline_stages.required_version.';
 comment on column public.image_stage_receipts.retry_after is 'Earliest next attempt for unavailable / rate_limited; NULL otherwise.';
-comment on column public.image_stage_receipts.input_fingerprint is 'Hash of the input the stage read (e.g. file_hash); a changed input makes a blocked_input receipt retryable.';
+comment on column public.image_stage_receipts.input_fingerprint is 'Hash of the input the stage read (readers pass md5(image_url)). A blocked_input receipt is offered again when md5 of the image''s current URL differs.';
 create index if not exists image_stage_receipts_latest_idx on public.image_stage_receipts (image_id, stage, producer_version desc, attempt desc);
 create index if not exists image_stage_receipts_stage_time_idx on public.image_stage_receipts (stage, observed_at desc);
 
 -- ---------------------------------------------------------------- work queue
 create table if not exists public.image_stage_work (
   id bigint generated always as identity primary key,
-  image_id uuid not null references public.vehicle_images(id) on delete cascade,
+  image_id uuid not null,
   stage text not null references public.image_pipeline_stages(stage),
   target_version integer not null,
   reason text not null check (reason in ('missing', 'outdated', 'retryable_outcome')),
@@ -108,7 +128,7 @@ create table if not exists public.image_stage_work (
   finished_at timestamptz
 );
 comment on table public.image_stage_work is
-  'Stage-level requeue written by reconcile_image_stages(); claimed by claim_image_stage_work(). One open item per (image, stage).';
+  'Stage-level requeue written by reconcile_image_stages(); claimed by claim_image_stage_work(). One open item per (image, stage). dropped = the photo stopped being eligible while queued.';
 -- idempotency: the reconciler can run any number of times and never double-queues
 create unique index if not exists image_stage_work_one_open on public.image_stage_work (image_id, stage) where status in ('queued', 'claimed');
 create index if not exists image_stage_work_claim_idx on public.image_stage_work (stage, lane, not_before, id) where status = 'queued';
@@ -130,22 +150,26 @@ alter table public.image_pipeline_stages enable row level security;
 alter table public.image_stage_receipts enable row level security;
 alter table public.image_stage_work enable row level security;
 alter table public.image_stage_reconciler_state enable row level security;
-revoke all on public.image_pipeline_stages, public.image_stage_receipts, public.image_stage_work, public.image_stage_reconciler_state from public, anon, authenticated;
+-- default privileges in production give service_role ALL on new tables: take it back, then grant reads only
+revoke all on public.image_pipeline_stages, public.image_stage_receipts, public.image_stage_work, public.image_stage_reconciler_state from public, anon, authenticated, service_role;
+revoke all on sequence public.image_stage_receipts_id_seq, public.image_stage_work_id_seq from public, anon, authenticated, service_role;
 grant select on public.image_pipeline_stages, public.image_stage_receipts, public.image_stage_work, public.image_stage_reconciler_state to service_role;
 
 insert into public.platform_config (config_key, config_value, description) values
   ('image_stage_reconciler',
    '{"enabled": false, "live_days": 2, "scan_per_lane": 1000, "max_open": 300, "backfill_share": 0.5, "min_age_minutes": 15}'::jsonb,
-   'reconcile_image_stages(): enabled gate, live window, rows scanned per lane per run, cap on open work items, backfill share of each run budget, grace before an upload is considered a gap.')
+   'reconcile_image_stages(): enabled gate; user_ids (array of user uuids that have a reader; absent = every user); live window in days; rows scanned per lane per run; cap on open work items; backfill share of each run budget; grace before an upload is considered a gap.')
 on conflict (config_key) do nothing;
 
 -- ---------------------------------------------------------------- latest-receipt view
+-- Newest receipt per (image, stage): highest version first; within a version a success or policy skip outranks a later
+-- non-success (two workers on one item must not turn a read photo back into work), then the highest attempt.
 create or replace view public.image_stage_current with (security_invoker = true) as
-  select distinct on (image_id, stage) image_id, stage, producer, producer_version, outcome, attempt, observed_at, retry_after, error_class
+  select distinct on (image_id, stage) image_id, stage, producer, producer_version, outcome, attempt, observed_at, retry_after, error_class, input_fingerprint
   from public.image_stage_receipts
-  order by image_id, stage, producer_version desc, attempt desc;
-comment on view public.image_stage_current is 'Newest receipt per (image, stage) by version then attempt.';
-revoke all on public.image_stage_current from public, anon, authenticated;
+  order by image_id, stage, producer_version desc, (outcome in ('succeeded', 'policy_skip')) desc, attempt desc;
+comment on view public.image_stage_current is 'Current receipt per (image, stage): highest version; within it a success or policy skip wins, then the highest attempt.';
+revoke all on public.image_stage_current from public, anon, authenticated, service_role;
 grant select on public.image_stage_current to service_role;
 
 -- ---------------------------------------------------------------- writer for producers
@@ -174,25 +198,23 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------- legacy evidence (reads, never writes)
--- true = an output for this stage already exists on the row, so the stage is not paid for again.
--- Classifier shapes seen on live completed rows (parent read-only sample, 2026-11-07 05:05 AST; a sample, not a census):
---   A  classification.classifier_ok = true                      (~60%, newest orchestrator)
---   B  photo_pipeline.receipt.outcome = 'completed'             (orchestrator receipt)
---   C  classification{image_type, confidence} + pipeline_version ('v2' mostly, some 'v1'); no classifier_ok, no receipt
---      (the rest of completed rows; extra keys such as description, is_automotive, detected_text, vin_detected vary)
---   none: no pipeline_version / no classification (~3%) => a real gap.
--- Shape C needs all three: image_type a non-empty string, confidence a JSON number, pipeline_version a non-empty string.
--- A bare classification object without pipeline_version is not evidence of a finished run.
--- Legacy v1 vs required_version: required_version counts receipt versions (image_stage_receipts.producer_version), a
--- different scale from the legacy pipeline_version label. v1 produced the same fields (image_type + confidence) the
--- consumers read, so it is NOT outdated; re-paying the classifier on it would buy no field it lacks. A real quality
--- change is declared by bumping required_version AND writing receipts; legacy evidence never invents a receipt.
--- image_stage_legacy_version() names the legacy producer ('legacy-v1', 'legacy-v2') for reports; it is a read, not a receipt.
+-- What an image row already holds for a stage, so finished work is not done twice. Classifier shapes on live rows:
+--   current   classification.v2.prompt_version (the contract), classifier_ok true, classifier_receipt
+--   receipt   photo_pipeline.receipt.outcome = 'completed', or classifier_ok = true, with no v2 block (thin prompt)
+--   legacy C  classification{image_type, confidence} + pipeline_version, no classifier_ok, no receipt
+--   skip      the orchestrator decided not to read it: top-level skipped, or photo_pipeline.receipt.outcome = 'policy_skip'
+--   stand-in  classification{image_type 'other', confidence 0.2, classifier_ok false}: a failure, never a reading
+-- image_stage_legacy_version() names what is there, for reports and for the 'outdated' reason; it is a read, not a receipt.
 create or replace function public.image_stage_legacy_version(p_stage text, p_meta jsonb)
 returns text language sql immutable as $$
   select case p_stage
     when 'classifier' then
-      case when coalesce(p_meta #>> '{photo_pipeline,receipt,outcome}', '') = 'completed'
+      case when coalesce(p_meta #>> '{photo_pipeline,receipt,outcome}', '') = 'policy_skip'
+                or jsonb_typeof(p_meta -> 'skipped') = 'string'
+             then 'orchestrator-policy-skip'
+           when coalesce(p_meta #>> '{classification,classifier_ok}', '') = 'false'
+             then null
+           when coalesce(p_meta #>> '{photo_pipeline,receipt,outcome}', '') = 'completed'
                 or coalesce(p_meta #>> '{classification,classifier_ok}', '') = 'true'
              then 'orchestrator-receipt'
            when jsonb_typeof(p_meta -> 'classification') = 'object'
@@ -206,19 +228,21 @@ returns text language sql immutable as $$
     else null end
 $$;
 
--- p_contract (image_pipeline_stages.contract): when set, a classifier reading stands in for a receipt only if it was
--- produced under that contract (classification.v2.prompt_version) and was not a failed stand-in (classifier_ok false).
--- An older finished reading is then reported as 'outdated' by image_stage_gaps, not as done.
+-- true = the row already holds this stage's output, so no receipt is needed.
+-- p_contract (image_pipeline_stages.contract): when set, a classifier reading counts only if it was produced under that
+-- contract (classification.v2.prompt_version) and was not a failed stand-in; an older finished reading is then reported
+-- as 'outdated' by image_stage_gaps. A policy skip counts under any contract: the decision not to read stands.
 create or replace function public.image_stage_legacy_evidence(p_stage text, p_meta jsonb, p_exif jsonb, p_contract text default null)
 returns boolean language sql immutable as $$
-  select case p_stage
+  select coalesce(case p_stage
     when 'classifier' then
-      case when p_contract is null then public.image_stage_legacy_version('classifier', p_meta) is not null
-           else coalesce(p_meta #>> '{classification,v2,prompt_version}', '') = p_contract
-                and coalesce(p_meta #>> '{classification,classifier_ok}', 'true') <> 'false'
-                and jsonb_typeof(p_meta #> '{classification,image_type}') = 'string' end
+      public.image_stage_legacy_version('classifier', p_meta) = 'orchestrator-policy-skip'
+      or case when p_contract is null then public.image_stage_legacy_version('classifier', p_meta) is not null
+              else coalesce(p_meta #>> '{classification,v2,prompt_version}', '') = p_contract
+                   and coalesce(p_meta #>> '{classification,classifier_ok}', 'true') <> 'false'
+                   and jsonb_typeof(p_meta #> '{classification,image_type}') = 'string' end
     when 'exif' then p_exif is not null and p_exif <> '{}'::jsonb
-    else false end
+    else false end, false)
 $$;
 
 -- #3024: ai_scan_metadata.stage_unavailable = [{stage, status:'unavailable', retryable:true, at}] keyed by function name.
@@ -234,10 +258,11 @@ $$;
 --   missing           no receipt at any version and no finished output on the row
 --   outdated          newest receipt is below required_version, or the row holds a finished reading that does not meet
 --                     the stage's contract (an older generation's output)
---   retryable_outcome newest receipt at the required version is unavailable / rate_limited, retry_after has passed and
---                     attempts remain; or a #3024 stage_unavailable marker with no newer receipt
--- Not gaps: succeeded / policy_skip / blocked_input / failed at the required version (typed, not blindly retried;
--- blocked_input becomes retryable by an input change = a new input_fingerprint, handled by the producer writing a new receipt).
+--   retryable_outcome the current receipt at the required version is unavailable / rate_limited and its retry_after has
+--                     passed (while attempts remain, or once a day after they run out: an outage is not the photo's
+--                     fault); or it is blocked_input and the image URL has changed since; or a #3024 stage_unavailable
+--                     marker with no newer receipt
+-- Not gaps: succeeded / policy_skip / failed at the required version, and blocked_input while the input is unchanged.
 create or replace function public.image_stage_gaps(p_image_ids uuid[])
 returns table(image_id uuid, stage text, reason text, target_version integer, not_before timestamptz)
 language sql stable set search_path = public, pg_temp as $$
@@ -261,22 +286,33 @@ language sql stable set search_path = public, pg_temp as $$
       or (c.producer_version < s.required_version and not public.image_stage_legacy_evidence(s.stage, v.ai_scan_metadata, v.exif_data, s.contract))
       or (c.producer_version >= s.required_version and c.outcome in ('unavailable', 'rate_limited')
           and c.retry_after <= now()
-          and c.attempt < s.max_attempts)
+          and (c.attempt < s.max_attempts or c.observed_at < now() - interval '1 day'))
+      or (c.producer_version >= s.required_version and c.outcome = 'blocked_input'
+          and c.input_fingerprint is not null and c.input_fingerprint <> md5(coalesce(v.image_url, '')))
     )
 $$;
 
 -- ---------------------------------------------------------------- reconciler
+-- Eligibility, stated once and repeated verbatim in claim_image_stage_work (a contract test compares the two): a photo
+-- with an owner and a URL that is not a duplicate, not sensitive, not external, not superseded and not rejected as
+-- personal. A row is skipped only while a pipeline run is in flight on it (status 'processing', started under 30 minutes
+-- ago). The paid drain's 'pending' status, its retry rows and its provider breaker are not consulted: they describe one
+-- producer, and that producer being down is exactly when this queue is needed.
 create or replace function public.reconcile_image_stages(p_limit integer default 100)
-returns jsonb language plpgsql security definer set search_path = public, pg_temp set statement_timeout = '30s' as $$
+returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 declare
-  v_cfg jsonb; v_open int; v_budget int; v_live_budget int; v_back_budget int;
+  v_cfg jsonb; v_open int; v_budget int; v_live_budget int; v_back_budget int; v_users uuid[];
   v_lane text; v_lane_budget int; v_scan int; v_cand uuid[]; v_ids uuid[]; v_last record; v_enq int;
-  v_classifier_blocked boolean; v_out jsonb := '{}'::jsonb; v_carry int := 0; v_total int := 0;
+  v_out jsonb := '{}'::jsonb; v_carry int := 0; v_total int := 0;
 begin
   -- one reconciler at a time; a second caller is a no-op rather than a queue of waiters
   if not pg_try_advisory_xact_lock(hashtextextended('reconcile_image_stages', 0)) then return jsonb_build_object('skipped', 'already_running'); end if;
   select config_value into v_cfg from public.platform_config where config_key = 'image_stage_reconciler';
   if v_cfg is null or coalesce((v_cfg ->> 'enabled')::boolean, false) is not true then return jsonb_build_object('skipped', 'disabled'); end if;
+  -- users who have a reader; absent or not an array = every user
+  if jsonb_typeof(v_cfg -> 'user_ids') = 'array' then
+    select coalesce(array_agg(x::uuid), '{}') into v_users from jsonb_array_elements_text(v_cfg -> 'user_ids') x;
+  end if;
 
   select count(*) into v_open from public.image_stage_work where status in ('queued', 'claimed');
   v_budget := least(greatest(p_limit, 0), greatest(coalesce((v_cfg ->> 'max_open')::int, 300) - v_open, 0), 500);
@@ -285,46 +321,41 @@ begin
   v_back_budget := floor(v_budget * least(greatest(coalesce((v_cfg ->> 'backfill_share')::numeric, 0.5), 0), 1));
   v_live_budget := v_budget - v_back_budget;
   v_scan := least(greatest(coalesce((v_cfg ->> 'scan_per_lane')::int, 1000), 1), 5000);
-  -- the classifier is provider-gated (#3025 breaker): while it cools down do not pile up classifier work
-  v_classifier_blocked := exists (select 1 from public.photo_pipeline_provider_state p where p.provider = 'classifier' and p.blocked_until > now());
 
   foreach v_lane in array array['live', 'backfill'] loop
     v_lane_budget := case v_lane when 'live' then v_live_budget else v_back_budget + v_carry end;
-    -- candidate scan: bounded, keyset-paged on (created_at, id); eligibility mirrors claim_photo_pipeline_batch + privacy holds
     -- Two steps, read from production's plan on 2026-11-10: (1) candidate ids by (created_at, id) from the partial index
     -- idx_vehicle_images_capture_ledger (user_id IS NOT NULL, INCLUDE id, created_at: an index-only scan of ~32k entries),
     -- (2) eligibility judged on at most v_scan rows by primary key. The cursor advances over candidates, not over the
     -- eligible subset, so ineligible rows are never rescanned.
     if v_lane = 'live' then
+      -- newest uploads past the grace period, inside the live window
       select coalesce(array_agg(x.id), '{}') into v_cand from (
         select c.id from public.vehicle_images c
-        where c.user_id is not null
+        where c.user_id is not null and (v_users is null or c.user_id = any (v_users))
           and c.created_at >= now() - make_interval(days => coalesce((v_cfg ->> 'live_days')::int, 2))
           and c.created_at <= now() - make_interval(mins => coalesce((v_cfg ->> 'min_age_minutes')::int, 15))
         order by c.created_at desc, c.id desc limit v_scan) x;
     else
+      -- everything past the grace period, oldest first, by cursor; overlaps the live window on purpose so a bulk upload
+      -- larger than the live scan is still reached within one pass (the one-open-item index prevents double queuing)
       select coalesce(array_agg(x.id), '{}') into v_cand from (
         select c.id from public.vehicle_images c, public.image_stage_reconciler_state st
         where st.lane = 'backfill'
-          and c.user_id is not null
+          and c.user_id is not null and (v_users is null or c.user_id = any (v_users))
           and (st.cursor_created_at is null or (c.created_at, c.id) > (st.cursor_created_at, st.cursor_id))
-          and c.created_at < now() - make_interval(days => coalesce((v_cfg ->> 'live_days')::int, 2))
-        order by c.created_at asc, c.id asc limit v_scan) x;   -- oldest first
+          and c.created_at <= now() - make_interval(mins => coalesce((v_cfg ->> 'min_age_minutes')::int, 15))
+        order by c.created_at asc, c.id asc limit v_scan) x;
     end if;
     select coalesce(array_agg(v.id), '{}') into v_ids
       from public.vehicle_images v
      where v.id = any (v_cand)
-       and v.is_duplicate is not true and v.image_url is not null
-       and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false
-       and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'
-       and coalesce(v.ai_processing_status, '') not in ('pending', 'processing');
+       and v.is_duplicate is not true and v.image_url is not null and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'
+       and not (coalesce(v.ai_processing_status, '') = 'processing' and coalesce(v.ai_processing_started_at, '-infinity'::timestamptz) > now() - interval '30 minutes');
 
     with gaps as (
       select g.*, v.created_at from public.image_stage_gaps(v_ids) g join public.vehicle_images v on v.id = g.image_id
-      where not (v_classifier_blocked and g.stage = 'classifier')
-        and not exists (select 1 from public.image_stage_work w where w.image_id = g.image_id and w.stage = g.stage and w.status in ('queued', 'claimed'))
-        -- #3025: an image still inside its own rate-limit backoff belongs to that path
-        and not exists (select 1 from public.photo_pipeline_retry_state r where g.stage = 'classifier' and r.image_id = g.image_id and (r.terminal or r.next_attempt_at > now()))
+      where not exists (select 1 from public.image_stage_work w where w.image_id = g.image_id and w.stage = g.stage and w.status in ('queued', 'claimed'))
       order by case when v_lane = 'live' then extract(epoch from v.created_at) else -extract(epoch from v.created_at) end desc, g.stage
       limit v_lane_budget
     ), ins as (
@@ -349,26 +380,37 @@ begin
     v_out := v_out || jsonb_build_object(v_lane, jsonb_build_object('scanned', coalesce(array_length(v_cand, 1), 0), 'eligible', coalesce(array_length(v_ids, 1), 0), 'enqueued', v_enq, 'budget', v_lane_budget));
     v_total := v_total + v_enq;
   end loop;
-  return v_out || jsonb_build_object('enqueued', v_total, 'open_before', v_open, 'classifier_blocked', v_classifier_blocked);
+  return v_out || jsonb_build_object('enqueued', v_total, 'open_before', v_open, 'users', coalesce(to_jsonb(v_users), 'null'::jsonb));
 end $$;
 comment on function public.reconcile_image_stages(integer) is
-  'Finds images missing a required stage, at an outdated version, or with a retryable unavailable/rate_limited receipt and enqueues only that stage. Idempotent (one open item per image+stage), bounded (scan_per_lane, max_open, p_limit<=500), fair (live lane first, backfill oldest-first, unused live budget rolls over). No provider calls, no status writes. Gated by platform_config image_stage_reconciler.enabled.';
+  'Finds images missing a required stage, at an outdated version or contract, or with a retryable receipt, and enqueues only that stage. Idempotent (one open item per image+stage), bounded (scan_per_lane, max_open, p_limit<=500), fair (live lane first, backfill oldest-first by cursor, unused live budget rolls over), scoped to platform_config image_stage_reconciler.user_ids when set. No provider calls, no status writes, no dependence on the paid drain''s state. Gated by image_stage_reconciler.enabled.';
 
 -- ---------------------------------------------------------------- claim (for stage workers)
 -- p_user_id scopes a claim to one user's photos (a reader running on that user's own subscription reads only theirs).
+-- Eligibility is judged again here: an item can wait for hours, and a photo marked sensitive or personal meanwhile must
+-- not reach a reader. Items for photos that stopped being eligible are dropped (bounded per call).
 create or replace function public.claim_image_stage_work(p_stage text, p_limit integer default 8, p_lease_seconds integer default 300, p_user_id uuid default null)
 returns table(work_id bigint, image_id uuid, image_url text, user_id uuid, vehicle_id uuid, lane text, reason text, target_version integer)
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_n int := least(greatest(p_limit, 1), 25);
 begin
-  if p_stage = 'classifier' and exists (select 1 from public.photo_pipeline_provider_state p where p.provider = 'classifier' and p.blocked_until > now()) then return; end if;
+  update public.image_stage_work d set status = 'dropped', finished_at = now(), lease_until = null
+   where d.id in (
+     select w.id from public.image_stage_work w
+     left join public.vehicle_images v on v.id = w.image_id
+     where w.stage = p_stage and w.status = 'queued' and w.not_before <= now()
+       and (p_user_id is null or v.user_id = p_user_id or v.id is null)
+       and not coalesce(v.is_duplicate is not true and v.image_url is not null and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal', false)
+     order by w.id limit 200 for update of w skip locked);
   return query
   with due as (
     select w.id, w.lane,
            row_number() over (partition by w.lane order by case when w.lane = 'live' then -extract(epoch from w.created_at) else extract(epoch from w.created_at) end, w.id) rn
     from public.image_stage_work w
+    join public.vehicle_images v on v.id = w.image_id
     where w.stage = p_stage and w.status = 'queued' and w.not_before <= now()
-      and (p_user_id is null or exists (select 1 from public.vehicle_images o where o.id = w.image_id and o.user_id = p_user_id))
+      and (p_user_id is null or v.user_id = p_user_id)
+      and v.is_duplicate is not true and v.image_url is not null and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'
     ), pick as (
       -- interleave: live #1, backfill #1, live #2, ... ; a lane with nothing due simply yields to the other
       select d.id from due d order by d.rn, case when d.lane = 'live' then 0 else 1 end limit v_n
@@ -391,15 +433,16 @@ returns integer language sql security definer set search_path = public, pg_temp 
 $$;
 
 -- ---------------------------------------------------------------- coverage (pure read, small tables only)
--- Per stage: the queue (open items by lane and reason, oldest queued, items due now), the latest receipt per image by
+-- Per stage: the queue (open items by lane and reason, oldest queued, items due now), the current receipt per image by
 -- outcome, receipts in the last 6 h and 24 h, and the reconciler's position. Reads image_stage_* only; it does not
--- count images that still need no receipt because an existing reading meets the contract (that needs each row's
+-- count images that need no receipt because an existing reading meets the contract (that needs each row's
 -- ai_scan_metadata, which only the reconciler's bounded scan reads).
 create or replace function public.image_stage_coverage()
 returns jsonb language sql stable security definer set search_path = public, pg_temp as $$
   select jsonb_build_object(
     'checked_at', now(),
     'enabled', coalesce((select (config_value ->> 'enabled')::boolean from public.platform_config where config_key = 'image_stage_reconciler'), false),
+    'user_ids', (select config_value -> 'user_ids' from public.platform_config where config_key = 'image_stage_reconciler'),
     'reconciler', (select coalesce(jsonb_object_agg(lane, jsonb_build_object('cursor_created_at', cursor_created_at, 'last_run_at', last_run_at,
                       'last_scanned', last_scanned, 'last_enqueued', last_enqueued, 'wrapped_at', wrapped_at)), '{}'::jsonb)
                      from public.image_stage_reconciler_state),
@@ -415,29 +458,54 @@ returns jsonb language sql stable security definer set search_path = public, pg_
                    'by_reason', coalesce((select jsonb_object_agg(reason, n) from (select w3.reason, count(*) n from public.image_stage_work w3
                                            where w3.stage = s.stage and w3.status in ('queued', 'claimed') group by 1) r), '{}'::jsonb))
                  from public.image_stage_work w where w.stage = s.stage and w.status in ('queued', 'claimed')),
-        'latest_receipt_by_outcome', coalesce((select jsonb_object_agg(outcome, n) from (select c.outcome, count(*) n from public.image_stage_current c
+        'closed', coalesce((select jsonb_object_agg(status, n) from (select w4.status, count(*) n from public.image_stage_work w4
+                                           where w4.stage = s.stage and w4.status in ('done', 'dropped') group by 1) d), '{}'::jsonb),
+        'current_receipt_by_outcome', coalesce((select jsonb_object_agg(outcome, n) from (select c.outcome, count(*) n from public.image_stage_current c
                                                 where c.stage = s.stage group by 1) o), '{}'::jsonb),
+        'out_of_attempts', (select count(*) from public.image_stage_current c where c.stage = s.stage
+                             and c.outcome in ('unavailable', 'rate_limited') and c.attempt >= s.max_attempts),
         'receipts_6h', (select count(*) from public.image_stage_receipts r where r.stage = s.stage and r.observed_at > now() - interval '6 hours'),
         'receipts_24h', (select count(*) from public.image_stage_receipts r where r.stage = s.stage and r.observed_at > now() - interval '24 hours'),
         'last_receipt_at', (select max(r.observed_at) from public.image_stage_receipts r where r.stage = s.stage))), '{}'::jsonb)
       from public.image_pipeline_stages s))
 $$;
 comment on function public.image_stage_coverage() is
-  'Per stage: open work (queued, claimed, due now, by lane and reason), the latest receipt per image by outcome, receipts in 6 h and 24 h, and the reconciler cursor. Reads image_stage_* only. Service role only.';
-revoke all on function public.image_stage_coverage() from public, anon, authenticated;
-grant execute on function public.image_stage_coverage() to service_role;
+  'Per stage: open work (queued, claimed, due now, by lane and reason), closed work (done, dropped), the current receipt per image by outcome, images out of retry attempts, receipts in 6 h and 24 h, and the reconciler cursor and user scope. Reads image_stage_* only. Service role only.';
 
 -- only the service role may call any of these
+revoke all on function public.image_stage_coverage() from public, anon, authenticated;
 revoke all on function public.record_image_stage_receipt(uuid, text, integer, text, text, integer, integer, text, jsonb) from public, anon, authenticated;
 revoke all on function public.image_stage_gaps(uuid[]) from public, anon, authenticated;
 revoke all on function public.reconcile_image_stages(integer) from public, anon, authenticated;
 revoke all on function public.claim_image_stage_work(text, integer, integer, uuid) from public, anon, authenticated;
 revoke all on function public.release_expired_image_stage_work() from public, anon, authenticated;
 revoke all on function public.image_stage_legacy_version(text, jsonb), public.image_stage_legacy_evidence(text, jsonb, jsonb, text), public.image_stage_legacy_unavailable(jsonb, text) from public, anon, authenticated;
-grant execute on function public.record_image_stage_receipt(uuid, text, integer, text, text, integer, integer, text, jsonb),
+grant execute on function public.image_stage_coverage(), public.record_image_stage_receipt(uuid, text, integer, text, text, integer, integer, text, jsonb),
   public.image_stage_gaps(uuid[]), public.reconcile_image_stages(integer), public.claim_image_stage_work(text, integer, integer, uuid),
   public.release_expired_image_stage_work(), public.image_stage_legacy_version(text, jsonb), public.image_stage_legacy_evidence(text, jsonb, jsonb, text), public.image_stage_legacy_unavailable(jsonb, text) to service_role;
 
 -- ---------------------------------------------------------------- cron (inert until platform_config enabled=true)
-select cron.schedule('image-stage-reconciler', '*/5 * * * *',
-  $c$set statement_timeout = '30s'; select public.release_expired_image_stage_work(); select public.reconcile_image_stages(100)$c$);
+-- Every 10 minutes on an offset minute (20261112070000 moved jobs off :00/:10/...); the only consumer reads 20 frames
+-- per 10 minutes and max_open is 300, so a faster cadence buys nothing.
+do $$
+declare j bigint;
+begin
+  if to_regnamespace('cron') is null then return; end if;
+  for j in select jobid from cron.job where jobname = 'image-stage-reconciler' loop perform cron.unschedule(j); end loop;
+  perform cron.schedule('image-stage-reconciler', '8-59/10 * * * *',
+    $c$set statement_timeout = '30s'; select public.release_expired_image_stage_work(); select public.reconcile_image_stages(100)$c$);
+end $$;
+
+-- ---------------------------------------------------------------- foreign keys to vehicle_images, last
+-- Each takes SHARE ROW EXCLUSIVE on vehicle_images until commit; both tables are empty, so nothing is validated. With
+-- lock_timeout 2 s a busy moment fails the whole file cleanly (nothing is left behind) and the deploy is re-run.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'image_stage_receipts_image_id_fkey' and conrelid = 'public.image_stage_receipts'::regclass) then
+    alter table public.image_stage_receipts add constraint image_stage_receipts_image_id_fkey foreign key (image_id) references public.vehicle_images(id) on delete cascade;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'image_stage_work_image_id_fkey' and conrelid = 'public.image_stage_work'::regclass) then
+    alter table public.image_stage_work add constraint image_stage_work_image_id_fkey foreign key (image_id) references public.vehicle_images(id) on delete cascade;
+  end if;
+end $$;
+commit;

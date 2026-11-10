@@ -43,15 +43,37 @@ test("disabled by default, bounded, rate-limited, fair", () => {
   assert.match(code, /pg_try_advisory_xact_lock/);
 });
 
-test("compatible with #3024 and #3025 state, without redefining it", () => {
+test("reads #3024 stage_unavailable; independent of the paid drain's breaker and retry table; redefines neither", () => {
   assert.match(code, /stage_unavailable/);
-  assert.match(code, /photo_pipeline_provider_state/);
-  assert.match(code, /photo_pipeline_retry_state/);
+  // a reader on the owner's subscription must keep working while the paid provider is refused
+  assert.doesNotMatch(code, /photo_pipeline_provider_state/);
+  assert.doesNotMatch(code, /photo_pipeline_retry_state/);
   assert.doesNotMatch(code, /create (or replace )?(table|function) (if not exists )?public\.(photo_pipeline_|claim_photo_pipeline)/i);
 });
 
+test("one transaction, short lock wait, foreign keys to vehicle_images added last", () => {
+  const body = code.trim();
+  assert.match(body, /^begin;/);
+  assert.match(body, /commit;$/);
+  assert.match(code, /set local lock_timeout = '2s'/);
+  assert.doesNotMatch(code, /statement_timeout\s*=\s*'?0/);
+  assert.doesNotMatch(code, /create table[^;]*references public\.vehicle_images/i);   // not inline: added in the last block
+  const fk = code.indexOf("foreign key (image_id) references public.vehicle_images(id)");
+  assert.ok(fk > code.indexOf("cron.schedule('image-stage-reconciler'"), "the vehicle_images lock is taken after everything else");
+});
+
+test("privacy is judged at enqueue and again at claim; scope by user", () => {
+  const eligible = "v.is_duplicate is not true and v.image_url is not null and v.is_sensitive is not true and v.is_external is not true and coalesce(v.is_superseded, false) = false and coalesce(v.vision_gate_status::text, '') <> 'rejected_personal'";
+  assert.ok(code.split(eligible).length - 1 >= 3, "the same predicate in the reconciler, the claim and the claim's drop");
+  assert.match(code, /set status = 'dropped'/);
+  assert.match(code, /v_cfg -> 'user_ids'/);
+  assert.match(code, /p_user_id is null or v\.user_id = p_user_id/);
+});
+
 test("service role only; anon/authenticated revoked on every object", () => {
-  assert.match(code, /revoke all on public\.image_pipeline_stages, public\.image_stage_receipts, public\.image_stage_work, public\.image_stage_reconciler_state from public, anon, authenticated/);
+  assert.match(code, /revoke all on public\.image_pipeline_stages, public\.image_stage_receipts, public\.image_stage_work, public\.image_stage_reconciler_state from public, anon, authenticated, service_role/);
+  assert.match(code, /grant select on public\.image_pipeline_stages, public\.image_stage_receipts, public\.image_stage_work, public\.image_stage_reconciler_state[^;]* to service_role/);
+  assert.doesNotMatch(code, /grant (all|insert|update|delete)[^;]* on (table )?public\.image_/i);
   for (const fn of ["record_image_stage_receipt", "image_stage_gaps", "reconcile_image_stages", "claim_image_stage_work", "release_expired_image_stage_work"]) {
     assert.match(code, new RegExp(`revoke all on function public\\.${fn}\\(`));
   }
@@ -59,8 +81,9 @@ test("service role only; anon/authenticated revoked on every object", () => {
 });
 
 test("cron is defined in the migration and is inert until enabled", () => {
-  assert.match(code, /cron\.schedule\('image-stage-reconciler'/);
-  assert.match(code, /reconcile_image_stages\(100\)/);
+  assert.match(code, /cron\.schedule\('image-stage-reconciler', '8-59\/10 \* \* \* \*'/);   // off the :00/:10 slots the drains use
+  assert.match(code, /cron\.unschedule\(j\)/);   // a replay leaves one job
+  assert.match(code, /set statement_timeout = '30s'; select public\.release_expired_image_stage_work\(\); select public\.reconcile_image_stages\(100\)/);
 });
 
 test("legacy classifier evidence accepts the live shapes and requires pipeline_version, image_type and numeric confidence", () => {

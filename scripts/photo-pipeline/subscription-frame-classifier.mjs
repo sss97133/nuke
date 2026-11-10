@@ -13,11 +13,12 @@
 //
 //   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model sonnet] [--status failed,pending] [--source auto|stage-queue|status] [--dry-run] [--out receipt.json]
 import { execFile, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { claimStageWork, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
+import { claimStageWork, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -60,7 +61,10 @@ function claudePrint(text, env) {
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
     child.on('error', (e) => { clearTimeout(timer); reject(e); });
-    child.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`claude exited ${code}: ${err.slice(0, 200)}`)); });
+    // A run that ends in an error (a usage limit, an API error) can exit non-zero with its JSON result on stdout: hand
+    // that result on so the caller reads is_error and api_error_status instead of an empty stderr.
+    const hasResult = () => { try { return typeof JSON.parse(out) === 'object' && JSON.parse(out) !== null; } catch { return false; } };
+    child.on('close', (code) => { clearTimeout(timer); code === 0 || hasResult() ? resolve(out) : reject(new Error(`claude exited ${code}: ${(err || out).slice(0, 200)}`)); });
     child.stdin.end(text);
   });
 }
@@ -81,11 +85,15 @@ console.error(`${frames.length} frames (${fromQueue ? 'stage queue' : statuses.j
 
 const out = []; const summary = { frames: frames.length, source: fromQueue ? 'stage-queue' : 'status', read: 0, accepted: 0, classifier_rejected: 0, errors: 0, receipts: 0, receipt_errors: 0, stopped: null, by_type: {}, read_seconds: 0 };
 let stop = false;
-// One typed receipt per claimed photo; a receipt that says the reader's compute is exhausted ends the batch.
+// One typed receipt per claimed photo, written once; a receipt whose fault is the batch's (compute exhausted, login or
+// key refused, converter missing) ends the batch. Photos claimed but not started go back to the queue when the lease ends.
+const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
+const settled = new Set();
 const settle = async (f, result) => {
-  if (!fromQueue) return;
+  if (!fromQueue || settled.has(f.id)) return;
+  settled.add(f.id);
   const receipt = receiptForResult(result, { reader: READER, promptVersion: checklist.prompt_version });
-  const saved = await recordStageReceipt(rpc, { imageId: f.id, version: f.target_version, receipt });
+  const saved = await recordStageReceipt(rpc, { imageId: f.id, version: f.target_version, receipt, fingerprint: inputFingerprint(f.image_url, md5) });
   if (saved.ok) summary.receipts++; else { summary.receipt_errors++; console.error(`${f.id} receipt not recorded: ${saved.error}`); }
   if (receipt.stop) { stop = true; summary.stopped = receipt.error_class; }
 };
@@ -104,15 +112,21 @@ if (!dry) {
         if (!res.ok) { await settle(f, { download: { status: res.status } }); throw new Error(`download ${res.status}`); }
         writeFileSync(raw, Buffer.from(await res.arrayBuffer()));
         let img = raw;
-        if (ext !== 'jpg' && ext !== 'jpeg') { img = join(dir, `${f.id}.jpg`); await run('sips', ['-s', 'format', 'jpeg', '-Z', '1600', raw, '--out', img]); }
+        if (ext !== 'jpg' && ext !== 'jpeg') {
+          stage = 'convert';
+          img = join(dir, `${f.id}.jpg`);
+          await run('sips', ['-s', 'format', 'jpeg', '-Z', '1600', raw, '--out', img]);
+        }
         const env = { ...process.env }; delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT; delete env.ANTHROPIC_API_KEY;
         stage = 'reader';
         const stdout = await claudePrint(`${checklist.prompt}\n\nThe image is the file at ${img}. Read it first, then answer with ONLY the JSON object.`, env);
-        const outer = JSON.parse(stdout);
-        if (outer.is_error) throw new Error(`reader error: ${String(outer.result ?? '').slice(0, 200)}`);
+        // an answer that does not parse is the reader's invalid output, whatever the parser's message happens to contain
+        const invalid = (why) => Object.assign(new Error(why), { invalidOutput: true });
+        let outer; try { outer = JSON.parse(stdout); } catch { throw invalid('no JSON in the reader output'); }
+        if (outer.is_error) throw Object.assign(new Error(`reader error: ${String(outer.result ?? '').slice(0, 200)}`), { apiStatus: outer.api_error_status ?? null });
         const m = String(outer.result ?? '').match(/\{[\s\S]*\}/);
-        if (!m) throw new Error('no JSON in the reader output');
-        const classification_raw = JSON.parse(m[0]);
+        if (!m) throw invalid('no JSON in the reader output');
+        let classification_raw; try { classification_raw = JSON.parse(m[0]); } catch { throw invalid('the reader output is not valid JSON'); }
         summary.read++; summary.read_seconds += Math.round((outer.duration_ms || (Date.now() - t0)) / 1000);
         stage = 'orchestrator';
         const r = await orchestrator({ image_id: f.id, image_url: f.image_url, vehicle_id: f.vehicle_id, user_id: f.user_id, classification_raw, reader: READER });
@@ -126,8 +140,12 @@ if (!dry) {
         console.error(`${f.id} ${t} ${r.http} ${r.success === false ? (r.error_class || 'refused') : (r.skipped ? 'skipped:' + r.classification : 'ok')}`);
         for (const p of [raw, img]) if (existsSync(p)) rmSync(p, { force: true });
       } catch (e) {
-        // download failures were settled where they happened; a reader or orchestrator fault is settled here
-        if (stage === 'reader') await settle(f, { reader: { error: String(e.message || e) } });
+        // Every claimed photo gets exactly one receipt (settle ignores a second call): an HTTP refusal was settled where
+        // it happened; a body that could not be read, bytes that would not convert, a reader fault and an orchestrator
+        // fault are settled here. Without one, the item would return to the queue on lease expiry with no attempt counted.
+        if (stage === 'download') await settle(f, { download: { status: 0 } });
+        else if (stage === 'convert') await settle(f, { convert: { missingTool: e?.code === 'ENOENT' } });
+        else if (stage === 'reader') await settle(f, { reader: { error: String(e.message || e), apiStatus: e.apiStatus ?? null, invalidOutput: e.invalidOutput === true } });
         else if (stage === 'orchestrator') await settle(f, { orchestrator: { http: 0, error_class: 'orchestrator_request_error' } });
         summary.errors++; out.push({ image_id: f.id, error: String(e.message || e).slice(0, 300) });
         console.error(`${f.id} ERROR ${String(e.message || e).slice(0, 160)}`);

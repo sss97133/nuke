@@ -10,12 +10,15 @@ DO $$ DECLARE r text; BEGIN
   END LOOP;
 END $$;
 CREATE SCHEMA cron;
-CREATE FUNCTION cron.schedule(job text, sched text, cmd text) RETURNS bigint LANGUAGE sql AS $$ SELECT 1::bigint $$;
+CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text, schedule text, command text);
+CREATE FUNCTION cron.schedule(job text, sched text, cmd text) RETURNS bigint LANGUAGE sql AS
+  $$ INSERT INTO cron.job (jobname, schedule, command) VALUES (job, sched, cmd) RETURNING jobid $$;
+CREATE FUNCTION cron.unschedule(j bigint) RETURNS boolean LANGUAGE sql AS $$ DELETE FROM cron.job WHERE jobid = j RETURNING true $$;
 CREATE TABLE public.platform_config (config_key text PRIMARY KEY, config_value jsonb, description text);
 CREATE TABLE public.vehicle_images (
   id uuid PRIMARY KEY, user_id uuid, vehicle_id uuid, image_url text, created_at timestamptz NOT NULL DEFAULT now(),
   is_duplicate boolean, is_sensitive boolean, is_external boolean, is_superseded boolean, vision_gate_status text,
-  ai_processing_status text, ai_scan_metadata jsonb, exif_data jsonb);
+  ai_processing_status text, ai_processing_started_at timestamptz, ai_scan_metadata jsonb, exif_data jsonb);
 CREATE TABLE public.photo_pipeline_provider_state (provider text PRIMARY KEY, blocked_until timestamptz);
 INSERT INTO public.photo_pipeline_provider_state VALUES ('classifier', NULL);
 CREATE TABLE public.photo_pipeline_retry_state (image_id uuid PRIMARY KEY, terminal boolean NOT NULL DEFAULT false, next_attempt_at timestamptz);
@@ -68,10 +71,10 @@ SELECT pg_temp.mk(5,  interval '1 hour');                                       
 SELECT pg_temp.mk(6,  interval '1 hour');                                                         -- live, policy_skip
 SELECT pg_temp.mk(7,  interval '1 hour', sens => true);                                           -- sensitive
 SELECT pg_temp.mk(8,  interval '1 hour', dup => true);                                            -- duplicate
-SELECT pg_temp.mk(9,  interval '1 hour', status => 'pending');                                    -- pending: the classifier drain owns it
+SELECT pg_temp.mk(9,  interval '1 hour', status => 'processing');                                 -- a run is in flight on it
 SELECT pg_temp.mk(10, interval '1 hour', ext => true);                                            -- external
 SELECT pg_temp.mk(11, interval '1 hour');                                                         -- live, failed (typed, not blindly retried)
-SELECT pg_temp.mk(12, interval '1 hour');                                                         -- live, inside #3025 backoff
+SELECT pg_temp.mk(12, interval '1 hour', status => 'processing');                                 -- in flight, and holding a paid-drain retry row
 SELECT pg_temp.mk(13, interval '1 hour');                                                         -- live, blocked_input
 SELECT pg_temp.mk(14, interval '10 days');                                                        -- backfill, missing
 SELECT pg_temp.mk(16, interval '1 hour', '{"pipeline_version":"v2","classification":{"image_type":"exterior","confidence":0.91,"description":"x","is_automotive":true}}');  -- legacy shape C, v2
@@ -79,6 +82,7 @@ SELECT pg_temp.mk(17, interval '1 hour', '{"pipeline_version":"v1","classificati
 SELECT pg_temp.mk(18, interval '1 hour', '{"photo_pipeline":{"receipt":{"outcome":"completed"}}}');                                    -- shape B
 SELECT pg_temp.mk(15, interval '5 minutes');                                                      -- too new: inside min_age grace
 INSERT INTO photo_pipeline_retry_state VALUES (pg_temp.img(12), false, now() + interval '1 hour');
+UPDATE vehicle_images SET ai_processing_started_at = now() - interval '5 minutes' WHERE id IN (pg_temp.img(9), pg_temp.img(12));
 
 -- ===== 3. receipt constraints (direct inserts hit the table's own CHECK/UNIQUE)
 SELECT pg_temp.raises(format($q$INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, error_class) VALUES (%L,'classifier','p',1,'weird','x')$q$, pg_temp.img(1)), '23514', 'outcome vocabulary is closed');
@@ -97,7 +101,7 @@ SELECT record_image_stage_receipt(pg_temp.img(4), 'classifier', 1, 'rate_limited
 SELECT record_image_stage_receipt(pg_temp.img(5), 'classifier', 1, 'unavailable', 'stage_not_deployed', NULL, 0);
 SELECT record_image_stage_receipt(pg_temp.img(6), 'classifier', 1, 'policy_skip');
 SELECT record_image_stage_receipt(pg_temp.img(11), 'classifier', 1, 'failed', 'image_download_error');
-SELECT record_image_stage_receipt(pg_temp.img(13), 'classifier', 1, 'blocked_input', 'image_unreadable', NULL, NULL, 'hash-a');
+SELECT record_image_stage_receipt(pg_temp.img(13), 'classifier', 1, 'blocked_input', 'image_unreadable', NULL, NULL, md5('https://example.test/13.jpg'));
 SELECT pg_temp.ok((SELECT retry_after > now() + interval '55 minutes' FROM image_stage_receipts WHERE image_id = pg_temp.img(4)), 'rate_limited retry_after = now + requested seconds');
 SELECT pg_temp.ok((SELECT retry_after IS NULL FROM image_stage_receipts WHERE image_id = pg_temp.img(2)), 'succeeded carries no retry_after');
 SELECT pg_temp.ok((SELECT retry_after IS NULL FROM image_stage_receipts WHERE image_id = pg_temp.img(13)), 'blocked_input carries no retry_after');
@@ -157,9 +161,9 @@ SELECT pg_temp.ok((SELECT reason FROM image_stage_work WHERE image_id = pg_temp.
 SELECT pg_temp.ok((SELECT reason FROM image_stage_work WHERE image_id = pg_temp.img(5)) = 'retryable_outcome', 'image 5 reason retryable_outcome');
 SELECT pg_temp.ok((SELECT lane FROM image_stage_work WHERE image_id = pg_temp.img(1)) = 'live' AND (SELECT lane FROM image_stage_work WHERE image_id = pg_temp.img(14)) = 'backfill', 'lanes assigned by age');
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_work WHERE image_id IN (pg_temp.img(7), pg_temp.img(8), pg_temp.img(9), pg_temp.img(10), pg_temp.img(15))),
-  'sensitive, duplicate, pending, external and too-new images are skipped');
-SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_work WHERE image_id = pg_temp.img(12)), 'image inside #3025 backoff is left to that path');
-SELECT pg_temp.ok((SELECT count(*) FROM vehicle_images WHERE ai_processing_status IS DISTINCT FROM CASE WHEN id = pg_temp.img(9) THEN 'pending' END) = 0, 'reconciler never writes ai_processing_status');
+  'sensitive, duplicate, in-flight, external and too-new images are skipped');
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_work WHERE image_id = pg_temp.img(12)), 'a row with a run in flight is left alone');
+SELECT pg_temp.ok((SELECT count(*) FROM vehicle_images WHERE ai_processing_status IS DISTINCT FROM CASE WHEN id IN (pg_temp.img(9), pg_temp.img(12)) THEN 'processing' END) = 0, 'reconciler never writes ai_processing_status');
 -- idempotent
 CREATE TEMP TABLE run2 AS SELECT reconcile_image_stages(100) AS r;
 SELECT pg_temp.ok((SELECT (r ->> 'enqueued')::int FROM run2) = 0, 'second run enqueues nothing');
@@ -168,11 +172,8 @@ SELECT pg_temp.raises(format($q$INSERT INTO image_stage_work (image_id, stage, t
 SELECT pg_temp.raises(format($q$INSERT INTO image_stage_work (image_id, stage, target_version, reason, lane) VALUES (%L,'classifier',1,'because','live')$q$, pg_temp.img(2)), '23514', 'work reason vocabulary closed');
 
 -- ===== 8. claim / release
--- the provider breaker holds classifier work back
-UPDATE photo_pipeline_provider_state SET blocked_until = now() + interval '1 hour' WHERE provider = 'classifier';
-SELECT pg_temp.ok((SELECT count(*) FROM claim_image_stage_work('classifier', 8)) = 0, 'claim yields nothing while the provider is blocked');
-SELECT pg_temp.ok(reconcile_image_stages(100) ->> 'classifier_blocked' = 'true', 'reconciler reports the breaker');
-UPDATE photo_pipeline_provider_state SET blocked_until = NULL WHERE provider = 'classifier';
+-- the paid provider's breaker is not this queue's business (section 13 claims through a blocked breaker)
+SELECT pg_temp.ok(NOT (reconcile_image_stages(100) ? 'classifier_blocked'), 'the reconciler does not consult the provider breaker');
 SELECT pg_temp.ok((SELECT count(*) FROM claim_image_stage_work('engine_bay', 8)) = 0, 'claim is per stage');
 CREATE TEMP TABLE claimed AS SELECT * FROM claim_image_stage_work('classifier', 1);
 SELECT pg_temp.ok((SELECT count(*) FROM claimed) = 1, 'limit respected');
@@ -204,7 +205,9 @@ SELECT pg_temp.ok((reconcile_image_stages(100) ->> 'enqueued')::int = 0, 'no gap
 -- ===== 9. fairness budget, queue cap
 DELETE FROM image_stage_work;  -- fixture reset
 SELECT pg_temp.mk(100 + g, interval '1 hour' + g * interval '1 minute') FROM generate_series(1, 6) g;   -- six live gaps
-SELECT pg_temp.mk(200 + g, interval '5 days' + g * interval '1 minute') FROM generate_series(1, 6) g;   -- six backfill gaps, newer than the cursor
+SELECT pg_temp.mk(200 + g, interval '5 days' + g * interval '1 minute') FROM generate_series(1, 6) g;   -- six older gaps
+-- a new pass: the backfill lane walks everything past the grace period oldest first, so it reaches the older six first
+UPDATE image_stage_reconciler_state SET cursor_created_at = NULL, cursor_id = NULL WHERE lane = 'backfill';
 CREATE TEMP TABLE run3 AS SELECT reconcile_image_stages(4) AS r;
 SELECT pg_temp.ok((SELECT (r ->> 'enqueued')::int FROM run3) = 4, 'p_limit bounds the run');
 SELECT pg_temp.ok((SELECT count(*) FROM image_stage_work WHERE lane = 'live') = 2 AND (SELECT count(*) FROM image_stage_work WHERE lane = 'backfill') = 2,
@@ -239,7 +242,7 @@ SELECT pg_temp.mk(306, interval '1 hour', '{"pipeline_version":"v2","classificat
 SELECT pg_temp.ok(image_stage_legacy_evidence('classifier', (SELECT ai_scan_metadata FROM vehicle_images WHERE id = pg_temp.img(301)), NULL, 'v98'), 'a reading under the contract is evidence');
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(301)])), 'a reading under the contract is not a gap');
 SELECT pg_temp.ok((SELECT array_agg(reason ORDER BY image_id) FROM image_stage_gaps(ARRAY[pg_temp.img(302), pg_temp.img(303), pg_temp.img(304), pg_temp.img(306)]))
-  = ARRAY['outdated', 'outdated', 'outdated', 'outdated'], 'legacy, thin-prompt, stand-in and earlier-contract readings are outdated gaps');
+  = ARRAY['outdated', 'outdated', 'missing', 'outdated'], 'legacy, thin-prompt and earlier-contract readings are outdated gaps; a failed stand-in is not a reading at all');
 SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(305)])) = 'missing', 'only other generations'' output on the row: the classifier stage is missing');
 -- a receipt at the required version settles the image whatever the row holds
 SELECT record_image_stage_receipt(pg_temp.img(302), 'classifier', 1, 'succeeded', NULL, NULL, NULL, NULL, '{"reader":"reader:claude-cli sonnet subscription","prompt_version":"v98"}');
@@ -248,7 +251,7 @@ SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(3
 UPDATE image_stage_reconciler_state SET cursor_created_at = NULL, cursor_id = NULL WHERE lane = 'backfill';
 SELECT reconcile_image_stages(100);
 SELECT pg_temp.ok((SELECT array_agg(w.reason ORDER BY w.image_id) FROM image_stage_work w WHERE w.image_id IN (pg_temp.img(301), pg_temp.img(302), pg_temp.img(303), pg_temp.img(304), pg_temp.img(305), pg_temp.img(306)))
-  = ARRAY['outdated', 'outdated', 'missing', 'outdated'], 'queued: 303, 304 (outdated), 305 (missing), 306 (outdated); not 301 (current) or 302 (receipt)');
+  = ARRAY['outdated', 'missing', 'missing', 'outdated'], 'queued: 303 (outdated), 304 and 305 (missing), 306 (outdated); not 301 (current) or 302 (receipt)');
 -- cursor walks candidates, not only eligible rows: a page of ineligible rows still advances it
 DELETE FROM image_stage_work;
 UPDATE platform_config SET config_value = config_value || '{"scan_per_lane": 3, "live_days": 0, "min_age_minutes": 0}' WHERE config_key = 'image_stage_reconciler';
@@ -280,18 +283,109 @@ CREATE TEMP TABLE cov AS SELECT image_stage_coverage() AS c;
 SELECT pg_temp.ok((SELECT (c ->> 'enabled')::boolean FROM cov)
   AND (SELECT (c #>> '{stages,classifier,open,claimed}')::int FROM cov) = 2
   AND (SELECT (c #>> '{stages,classifier,open,queued}')::int FROM cov) >= 1
-  AND (SELECT (c #>> '{stages,classifier,latest_receipt_by_outcome,succeeded}')::int FROM cov) >= 1
+  AND (SELECT (c #>> '{stages,classifier,current_receipt_by_outcome,succeeded}')::int FROM cov) >= 1
   AND (SELECT c #>> '{stages,classifier,contract}' FROM cov) = 'v98'
   AND (SELECT c #> '{reconciler,backfill}' ? 'last_run_at' FROM cov)
   AND (SELECT (c #>> '{stages,exif,open,queued}')::int FROM cov) = 0,
-  'coverage reports open work, latest receipts by outcome, the contract and the reconciler position per stage');
--- the revert refuses while receipts exist, and removes everything once they are gone
-SELECT pg_temp.raises($$\i supabase/sql/revert_20261113110000_image_stage_receipts_reconciler.sql$$, '42601', 'placeholder');
-CREATE TABLE cron.job (jobid bigint, jobname text);
-CREATE FUNCTION cron.unschedule(j bigint) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
+  'coverage reports open work, current receipts by outcome, the contract and the reconciler position per stage');
+
+-- ===== 13. what the review of 2026-11-10 found, as cases
+DELETE FROM image_stage_work;
+UPDATE platform_config SET config_value = '{"enabled": true, "live_days": 2, "scan_per_lane": 1000, "max_open": 300, "backfill_share": 0.5, "min_age_minutes": 15}' WHERE config_key = 'image_stage_reconciler';
+UPDATE image_stage_reconciler_state SET cursor_created_at = NULL, cursor_id = NULL WHERE lane = 'backfill';
+UPDATE image_pipeline_stages SET contract = 'v98' WHERE stage = 'classifier';
+-- settle everything made so far, so only this section's images are gaps
+SELECT count(record_image_stage_receipt(v.id, 'classifier', 1, 'succeeded')) FROM vehicle_images v
+ WHERE NOT EXISTS (SELECT 1 FROM image_stage_receipts r WHERE r.image_id = v.id AND r.outcome = 'succeeded');
+SELECT pg_temp.mk(501, interval '1 hour', status => 'pending');     -- the paid drain's 'pending' is not a hold
+SELECT pg_temp.mk(502, interval '1 hour', status => 'failed');      -- nor is its terminal retry row
+SELECT pg_temp.mk(503, interval '1 hour', status => 'processing');  -- a run that died an hour ago
+SELECT pg_temp.mk(504, interval '1 hour', status => 'processing');  -- a run in flight
+SELECT pg_temp.mk(505, interval '1 hour', '{"pipeline_version":"v2","skipped":"apple_ml_non_automotive","photo_pipeline":{"receipt":{"outcome":"policy_skip"}}}', 'completed');  -- the orchestrator decided not to read it
+SELECT pg_temp.mk(506, interval '1 hour', '{"classification":{"classifier_ok":true,"v2":{"prompt_version":"v98"}}}');  -- contract block without image_type
+INSERT INTO photo_pipeline_retry_state VALUES (pg_temp.img(502), true, NULL);
+UPDATE vehicle_images SET ai_processing_started_at = now() - interval '1 hour' WHERE id = pg_temp.img(503);
+UPDATE vehicle_images SET ai_processing_started_at = now() - interval '2 minutes' WHERE id = pg_temp.img(504);
+UPDATE vehicle_images SET user_id = '00000000-0000-4000-8000-0000000000aa' WHERE id BETWEEN pg_temp.img(501) AND pg_temp.img(506);
+UPDATE photo_pipeline_provider_state SET blocked_until = now() + interval '6 hours' WHERE provider = 'classifier';
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(505)])), 'a policy-skipped photo is a finished decision, not a gap');
+SELECT pg_temp.ok(image_stage_legacy_evidence('classifier', '{"classification":{"classifier_ok":true,"v2":{"prompt_version":"v98"}}}', NULL, 'v98') IS FALSE, 'evidence is false, never NULL, for a contract block with no image_type');
+CREATE TEMP TABLE run13 AS SELECT reconcile_image_stages(100) AS r;
+SELECT pg_temp.ok((SELECT array_agg(image_id ORDER BY image_id) FROM image_stage_work WHERE status = 'queued')
+  = ARRAY[pg_temp.img(501), pg_temp.img(502), pg_temp.img(503), pg_temp.img(506)],
+  'queued through a blocked provider breaker: the pending row, the row with a terminal paid-drain retry, the dead run and the incomplete reading; not the run in flight, not the policy skip');
+-- the claim is not gated by the paid provider either
+CREATE TEMP TABLE claim13 AS SELECT * FROM claim_image_stage_work('classifier', 25, 900, '00000000-0000-4000-8000-0000000000aa');
+SELECT pg_temp.ok((SELECT count(*) FROM claim13) = 4, 'the reader claims while the paid provider is blocked');
+UPDATE photo_pipeline_provider_state SET blocked_until = NULL WHERE provider = 'classifier';
+-- a photo marked sensitive while it waits is dropped at the claim, never handed out
+UPDATE image_stage_work SET status = 'queued', lease_until = NULL WHERE image_id IN (pg_temp.img(501), pg_temp.img(502));
+UPDATE vehicle_images SET is_sensitive = true WHERE id = pg_temp.img(501);
+UPDATE vehicle_images SET vision_gate_status = 'rejected_personal' WHERE id = pg_temp.img(502);
+SELECT pg_temp.ok((SELECT count(*) FROM claim_image_stage_work('classifier', 25, 900, '00000000-0000-4000-8000-0000000000aa')) = 0, 'photos that became sensitive or personal while queued are not handed out');
+SELECT pg_temp.ok((SELECT array_agg(status ORDER BY image_id) FROM image_stage_work WHERE image_id IN (pg_temp.img(501), pg_temp.img(502))) = ARRAY['dropped', 'dropped'], 'and their items are dropped');
+SELECT pg_temp.ok((image_stage_coverage() #>> '{stages,classifier,closed,dropped}')::int = 2, 'coverage counts dropped items');
+-- a reader-wide outage must not retire a photo: out of attempts, it is offered again after a day
+SELECT record_image_stage_receipt(pg_temp.img(503), 'classifier', 1, 'unavailable', 'reader_exited', NULL, 0);
+UPDATE image_pipeline_stages SET max_attempts = 1 WHERE stage = 'classifier';
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(503)])), 'out of attempts today: not offered');
+SELECT pg_temp.ok((image_stage_coverage() #>> '{stages,classifier,out_of_attempts}')::int >= 1, 'coverage lists images out of attempts');
+SET session_replication_role = replica;  -- fixture only: age the receipt (the table is append-only to every role but the owner)
+UPDATE image_stage_receipts SET observed_at = now() - interval '25 hours', retry_after = now() - interval '24 hours' WHERE image_id = pg_temp.img(503);
+SET session_replication_role = DEFAULT;
+SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(503)])) = 'retryable_outcome', 'a day later it is offered again');
+UPDATE image_pipeline_stages SET max_attempts = 6 WHERE stage = 'classifier';
+-- blocked_input comes back when the image URL changes, and only then
+SELECT record_image_stage_receipt(pg_temp.img(506), 'classifier', 1, 'blocked_input', 'image_http_error', 404, NULL, md5('https://example.test/506.jpg'));
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(506)])), 'blocked_input with the same URL is not offered');
+UPDATE vehicle_images SET image_url = 'https://example.test/506-restored.jpg' WHERE id = pg_temp.img(506);
+SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(506)])) = 'retryable_outcome', 'a changed URL offers a blocked_input photo again');
+SELECT record_image_stage_receipt(pg_temp.img(504), 'classifier', 1, 'blocked_input', 'image_http_error', 404, NULL, NULL);
+UPDATE vehicle_images SET image_url = 'https://example.test/504-moved.jpg' WHERE id = pg_temp.img(504);
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM image_stage_gaps(ARRAY[pg_temp.img(504)])), 'a blocked_input receipt with no fingerprint is never re-offered blindly');
+-- two workers on one item: a late non-success does not undo a success
+SELECT record_image_stage_receipt(pg_temp.img(505), 'classifier', 1, 'succeeded');
+SELECT record_image_stage_receipt(pg_temp.img(505), 'classifier', 1, 'rate_limited', 'reader_usage_limit', NULL, 0);
+SELECT pg_temp.ok((SELECT outcome FROM image_stage_current WHERE image_id = pg_temp.img(505) AND stage = 'classifier') = 'succeeded', 'the current receipt stays the success');
+-- user scope: with user_ids set, other users' photos are never queued
+DELETE FROM image_stage_work;
+SELECT pg_temp.mk(601, interval '1 hour'); SELECT pg_temp.mk(602, interval '1 hour');
+UPDATE vehicle_images SET user_id = '00000000-0000-4000-8000-0000000000aa' WHERE id = pg_temp.img(601);
+UPDATE vehicle_images SET user_id = '00000000-0000-4000-8000-0000000000bb' WHERE id = pg_temp.img(602);
+UPDATE platform_config SET config_value = config_value || '{"user_ids": ["00000000-0000-4000-8000-0000000000aa"]}' WHERE config_key = 'image_stage_reconciler';
+UPDATE image_stage_reconciler_state SET cursor_created_at = NULL, cursor_id = NULL WHERE lane = 'backfill';
+SELECT reconcile_image_stages(100);
+SELECT pg_temp.ok(EXISTS (SELECT 1 FROM image_stage_work WHERE image_id = pg_temp.img(601)) AND NOT EXISTS (SELECT 1 FROM image_stage_work WHERE image_id = pg_temp.img(602)),
+  'only the scoped user''s photo is queued');
+-- grants: the service role reads, and writes only through the functions
+SELECT pg_temp.ok(has_table_privilege('service_role', 'public.image_stage_receipts', 'select')
+  AND NOT has_table_privilege('service_role', 'public.image_stage_receipts', 'insert') AND NOT has_table_privilege('service_role', 'public.image_stage_receipts', 'update')
+  AND NOT has_table_privilege('service_role', 'public.image_stage_receipts', 'delete') AND NOT has_table_privilege('service_role', 'public.image_stage_work', 'update')
+  AND NOT has_table_privilege('service_role', 'public.image_pipeline_stages', 'update'), 'service_role holds SELECT only on the ledger tables');
+SELECT pg_temp.ok((SELECT count(*) FROM cron.job WHERE jobname = 'image-stage-reconciler' AND schedule = '8-59/10 * * * *') = 1, 'one cron job, on an offset 10-minute slot');
+SELECT pg_temp.ok((SELECT count(*) FROM pg_constraint WHERE conrelid IN ('public.image_stage_receipts'::regclass, 'public.image_stage_work'::regclass) AND contype = 'f' AND confrelid = 'public.vehicle_images'::regclass) = 2, 'both foreign keys to vehicle_images exist');
+-- applying the file again changes nothing the owner set
+UPDATE image_pipeline_stages SET contract = NULL WHERE stage = 'classifier';
+\ir ../migrations/20261113110000_image_stage_receipts_reconciler.sql
+SELECT pg_temp.ok((SELECT contract FROM image_pipeline_stages WHERE stage = 'classifier') IS NULL AND (SELECT count(*) FROM cron.job WHERE jobname = 'image-stage-reconciler') = 1
+  AND (SELECT (config_value ->> 'enabled')::boolean FROM platform_config WHERE config_key = 'image_stage_reconciler'),
+  'a replay keeps the owner''s contract, the enabled flag and a single cron job');
+
+-- ===== 14. revert: refuses while receipts exist; removes everything once they are gone
 \set ON_ERROR_STOP off
 \ir revert_20261113110000_image_stage_receipts_reconciler.sql
 \set ON_ERROR_STOP on
-SELECT pg_temp.ok(to_regclass('public.image_stage_receipts') IS NOT NULL AND to_regprocedure('public.image_stage_coverage()') IS NOT NULL, 'revert refuses while receipts exist: nothing dropped');
+SELECT pg_temp.ok(to_regclass('public.image_stage_receipts') IS NOT NULL AND to_regprocedure('public.image_stage_coverage()') IS NOT NULL
+  AND (SELECT count(*) FROM cron.job WHERE jobname = 'image-stage-reconciler') = 1, 'revert refuses while receipts exist: nothing dropped, cron still scheduled');
+SET session_replication_role = replica;
+DELETE FROM image_stage_receipts;
+SET session_replication_role = DEFAULT;
+\ir revert_20261113110000_image_stage_receipts_reconciler.sql
+SELECT pg_temp.ok((SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND (c.relname LIKE 'image_stage%' OR c.relname = 'image_pipeline_stages')) = 0
+  AND (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND (p.proname LIKE '%image_stage%' OR p.proname = 'reconcile_image_stages')) = 0
+  AND NOT EXISTS (SELECT 1 FROM platform_config WHERE config_key = 'image_stage_reconciler')
+  AND (SELECT count(*) FROM cron.job WHERE jobname = 'image-stage-reconciler') = 0
+  AND (SELECT count(*) FROM pg_constraint WHERE confrelid = 'public.vehicle_images'::regclass AND contype = 'f') = 0,
+  'revert with no receipts: no table, view, function, config row, cron job or foreign key left');
 
 \echo image_stage_receipts_reconciler contract: ok

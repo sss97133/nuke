@@ -7,10 +7,12 @@
 //
 //   succeeded      the orchestrator accepted the reading
 //   policy_skip    the orchestrator decided the photo is not read (duplicate, non-automotive, junk URL)
-//   blocked_input  the photo cannot be fetched (4xx): nothing to retry until the input changes
-//   failed         the reading was refused as invalid
-//   unavailable    a transient fault (reader timeout, 5xx, network): retry after a pause
+//   blocked_input  the photo cannot be fetched (4xx) or its bytes are not an image: nothing to retry until the URL changes
+//   unavailable    a fault that another try can clear (reader timeout or invalid answer, 5xx, network): retry after a pause
 //   rate_limited   the reader's compute is exhausted: retry later, and stop this batch
+//
+// 'failed' is in the ledger's vocabulary but no reader result maps to it: the ledger never retries a failed receipt, and
+// nothing a reader sees is known to be permanent for the photo except missing or undecodable bytes (blocked_input).
 //
 // Pure functions plus two thin RPC wrappers; no model, no file system.
 
@@ -26,19 +28,31 @@ export async function stageQueueEnabled(rest) {
   }
 }
 
-/** Claim up to `limit` photos for a stage. Returns [] when nothing is due or the provider breaker is closed. */
+/** Claim up to `limit` photos for a stage (at most 25 a call). Returns [] when nothing is due. */
 export async function claimStageWork(rpc, { stage = STAGE, limit = 20, leaseSeconds = 900, userId = null } = {}) {
   const rows = await rpc('claim_image_stage_work', { p_stage: stage, p_limit: Math.min(Math.max(limit, 1), 25), p_lease_seconds: leaseSeconds, p_user_id: userId });
   return Array.isArray(rows) ? rows : [];
 }
 
-const USAGE_LIMIT = /usage limit|limit reached|rate.?limit|quota|429|overloaded/i;
+// The subscription's own words for "no compute left" (Claude Code prints "You've hit your 5-hour limit · resets 3pm",
+// "You're out of extra usage", earlier "Claude usage limit reached"), plus an API rate-limit or overload error. A bare
+// number is not a signal: "JSON at position 429" and "(req 4291)" are not rate limits, and "Context limit reached" is
+// about one photo's prompt, not the account.
+const USAGE_LIMIT = /usage limit|hit your [\w' -]{0,24}limit|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b/i;
+const OUTPUT_INVALID = /no JSON|not valid JSON|in JSON at position|Unexpected (?:token|end)|is not valid JSON/i;
+
+/** md5 of the image URL: the same value as md5(coalesce(image_url, '')) in image_stage_gaps, which re-offers a blocked photo only when it differs. */
+export function inputFingerprint(imageUrl, md5) {
+  return md5(String(imageUrl ?? ''));
+}
 
 /**
  * The receipt for one frame.
- *   { download: {status} }                       the image fetch failed with that HTTP status (0 = network)
- *   { reader: {error} }                          `claude -p` failed, timed out, or printed no JSON
- *   { orchestrator: {http, success, skipped, classifier_ok, error_class}, image_type }   the orchestrator answered
+ *   { download: {status} }                       the image fetch failed with that HTTP status (0 = network or body read)
+ *   { convert: {missingTool} }                   the bytes could not be turned into a JPEG (missingTool: the converter is not installed)
+ *   { reader: {error, apiStatus, invalidOutput} } `claude -p` failed, timed out, hit a limit, or printed no usable JSON
+ *   { orchestrator: {http, success, skipped, classification, classifier_ok, error_class}, image_type }   the orchestrator answered
+ * `stop: true` means the fault is the batch's, not the photo's: the caller ends the batch.
  */
 export function receiptForResult(result, { reader, promptVersion } = {}) {
   const detail = { reader: reader ?? null, prompt_version: promptVersion ?? null };
@@ -49,30 +63,46 @@ export function receiptForResult(result, { reader, promptVersion } = {}) {
     }
     return { outcome: 'unavailable', error_class: s ? 'image_http_error' : 'image_download_error', http_status: s || null, retry_after_seconds: 900, detail };
   }
+  if (result.convert) {
+    // no converter on this machine is the machine's fault, and every non-JPEG photo would fail the same way
+    if (result.convert.missingTool) return { outcome: 'unavailable', error_class: 'reader_tool_missing', retry_after_seconds: 3600, stop: true, detail };
+    return { outcome: 'blocked_input', error_class: 'image_unreadable', detail };
+  }
   if (result.reader) {
     const msg = String(result.reader.error ?? '');
-    if (USAGE_LIMIT.test(msg)) return { outcome: 'rate_limited', error_class: 'reader_usage_limit', retry_after_seconds: 3600, stop: true, detail };
-    const cls = /timed out/i.test(msg) ? 'reader_timeout' : /no JSON|Unexpected token|JSON/i.test(msg) ? 'reader_output_invalid' : 'reader_exited';
-    return { outcome: 'unavailable', error_class: cls, retry_after_seconds: 1800, detail };
+    const api = Number(result.reader.apiStatus) || 0;
+    if (/timed out/i.test(msg)) return { outcome: 'unavailable', error_class: 'reader_timeout', retry_after_seconds: 1800, detail };
+    if (result.reader.invalidOutput || OUTPUT_INVALID.test(msg)) return { outcome: 'unavailable', error_class: 'reader_output_invalid', retry_after_seconds: 1800, detail };
+    if (api === 429 || api === 529 || USAGE_LIMIT.test(msg)) return { outcome: 'rate_limited', error_class: 'reader_usage_limit', http_status: api || null, retry_after_seconds: 3600, stop: true, detail };
+    // a login that stopped working fails every photo the same way
+    if (api === 401 || api === 403) return { outcome: 'unavailable', error_class: 'reader_unauthorized', http_status: api, retry_after_seconds: 3600, stop: true, detail };
+    return { outcome: 'unavailable', error_class: 'reader_exited', http_status: api || null, retry_after_seconds: 1800, detail };
   }
   const o = result.orchestrator ?? {};
   const d = { ...detail, image_type: result.image_type ?? null, orchestrator_http: o.http ?? null };
-  if (o.http === 200 && o.skipped) return { outcome: 'policy_skip', detail: { ...d, skipped: String(o.skipped) } };
+  if (o.http === 200 && o.skipped) {
+    // the orchestrator answers {skipped: true, classification: 'junk_url'}: keep the name of the decision, not "true"
+    const why = typeof o.skipped === 'string' ? o.skipped : typeof o.classification === 'string' ? o.classification : 'skipped';
+    return { outcome: 'policy_skip', detail: { ...d, skipped: why } };
+  }
   if (o.http === 200 && o.success !== false) return { outcome: 'succeeded', detail: d };
   if (o.classifier_ok === false || /^classifier_response_/.test(String(o.error_class ?? ''))) {
-    return { outcome: 'failed', error_class: String(o.error_class || 'classifier_response_invalid'), http_status: o.http ?? null, detail: d };
+    // the orchestrator refused this answer; another reading of the same photo can be valid, so it is retried, not retired
+    return { outcome: 'unavailable', error_class: String(o.error_class || 'classifier_response_invalid'), http_status: o.http ?? null, retry_after_seconds: 900, detail: d };
   }
   if (o.http === 429) return { outcome: 'rate_limited', error_class: 'orchestrator_rate_limited', http_status: 429, retry_after_seconds: 900, detail: d };
+  // the service key was refused: the receipt cannot be written either, and every remaining photo would fail the same way
+  if (o.http === 401 || o.http === 403) return { outcome: 'unavailable', error_class: 'orchestrator_unauthorized', http_status: o.http, retry_after_seconds: 900, stop: true, detail: d };
   return { outcome: 'unavailable', error_class: String(o.error_class || 'orchestrator_http_error'), http_status: o.http ?? null, retry_after_seconds: 900, detail: d };
 }
 
 /** Write the receipt (closes the open work item). Never throws: a reader must not lose a batch to its bookkeeping. */
-export async function recordStageReceipt(rpc, { imageId, stage = STAGE, version, receipt }) {
+export async function recordStageReceipt(rpc, { imageId, stage = STAGE, version, receipt, fingerprint = null }) {
   try {
     const id = await rpc('record_image_stage_receipt', {
       p_image_id: imageId, p_stage: stage, p_producer_version: version, p_outcome: receipt.outcome,
       p_error_class: receipt.error_class ?? null, p_http_status: receipt.http_status ?? null,
-      p_retry_after_seconds: receipt.retry_after_seconds ?? null, p_input_fingerprint: null, p_detail: receipt.detail ?? {},
+      p_retry_after_seconds: receipt.retry_after_seconds ?? null, p_input_fingerprint: fingerprint, p_detail: receipt.detail ?? {},
     });
     return { ok: true, id };
   } catch (e) {

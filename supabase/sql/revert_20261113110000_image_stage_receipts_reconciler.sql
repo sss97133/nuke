@@ -1,8 +1,11 @@
 -- Revert of 20261113110000_image_stage_receipts_reconciler.sql. Refuses while receipts exist: a receipt is a record of
 -- work done and is not dropped by a revert. Disable instead (platform_config image_stage_reconciler.enabled = false).
+-- Dropping the two tables removes their foreign-key triggers from vehicle_images, which takes ACCESS EXCLUSIVE on
+-- vehicle_images: every read of it queues behind a waiting revert. So lock_timeout is 2 s; if it fails, run it again
+-- rather than let it wait.
 -- One transaction: when the guard raises, nothing below it runs.
 begin;
-set local lock_timeout = '10s';
+set local lock_timeout = '2s';
 set local statement_timeout = '60s';
 do $$
 declare j bigint;
