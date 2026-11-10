@@ -8,6 +8,7 @@ export interface CollectingCarsExtracted {
   url: string;
   title: string | null;
   year: number | null;
+  year_source: "modelYear" | "title" | null;
   make: string | null;
   model: string | null;
   trim: string | null;
@@ -129,12 +130,18 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   const slug = url.match(/\/for-sale\/([^/?#]+)/)?.[1];
   const place = [clean(L.areaName), clean(L.countryName)].filter(Boolean).join(", ") || null;
   const bodyStyle = (L.productAttributes ?? []).find((a: any) => a?.attributeName === "bodyStyle")?.attributeValue;
+  // Early lots can omit modelYear while explicitly stating the year in their
+  // own title. Retain which source field supplied it; never use the URL slug.
+  const modelYear = int(L.modelYear);
+  const titleYear = clean(L.title)?.match(/^((?:18|19|20)\d{2})\s+/)?.[1];
+  const year = modelYear ?? (titleYear ? Number(titleYear) : null);
 
   return {
     listing_id: String(L.auctionId),
     url: slug ? `https://collectingcars.com/for-sale/${slug}` : url,
     title: clean(L.title),
-    year: int(L.modelYear),
+    year,
+    year_source: modelYear !== null ? "modelYear" : titleYear ? "title" : null,
     make: clean(L.makeName) ?? clean(L.productMake),
     model: clean(L.modelName),
     trim: clean(L.variantName),

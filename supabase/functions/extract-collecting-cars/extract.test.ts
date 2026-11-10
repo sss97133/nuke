@@ -51,3 +51,20 @@ Deno.test("a page without the lot payload is an error", () => {
   try { extractFromHtml("<html></html>", url); } catch { threw = true; }
   assert(threw);
 });
+
+const nativePage = (fields: Record<string, unknown>) =>
+  `<script>self.__next_f.push([1,${JSON.stringify(JSON.stringify({ auctionId: "1", stage: "sold", ...fields }))}])</script>`;
+
+Deno.test("historical title supplies an explicit year when modelYear is absent", () => {
+  const x = extractFromHtml(nativePage({ title: "1989 PORSCHE 911 SPEEDSTER", modelYear: null }), url);
+  assertEquals([x.year, x.year_source], [1989, "title"]);
+});
+
+Deno.test("structured year keeps priority and unrelated title numbers do not become years", () => {
+  const x = extractFromHtml(nativePage({ title: "1989 PORSCHE 911 SPEEDSTER", modelYear: "1990" }), url);
+  assertEquals([x.year, x.year_source], [1990, "modelYear"]);
+  for (const title of [null, "Porsche 911 - 1989", "19890 Porsche", "911 Porsche", "1989-spec Porsche"]) {
+    const y = extractFromHtml(nativePage({ title, modelYear: null }), url);
+    assertEquals([y.year, y.year_source], [null, null]);
+  }
+});
