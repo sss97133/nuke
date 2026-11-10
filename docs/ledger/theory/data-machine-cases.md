@@ -545,8 +545,9 @@ separately; nothing below is a claim of fleet coverage.
     passes locally with 22 of 22 mutations caught; its production plan was never read. The web block was
     reviewed and one must-fix is open (a waiting state shows no reason). The Swift was never compiled or
     reviewed. Its headline counts photos read, which the owner has since said is not the measure.
-- Not started: the build ("Where the build starts" in the theory card), including its step 1: nothing was
-  read from production for a library baseline or for the acceptance population; a provider key box (owner: "Use
+- Not started: the build ("Where the build starts" in the theory card), on the proof vehicle the owner named
+  (the 21:31 entry above). Of its step 1, that vehicle and the acceptance population were read; the library
+  baseline was not. Also not started: a provider key box (owner: "Use
   whatever key has tokens. Don't just block"); the phone's own reading as the first stage; choosing what to read
   by worth inside a budget; database capacity.
 - Audits of this date, repo only, each to be verified before use: `docs/ledger/2026-11-10_image-reading-map-*.md`
