@@ -2012,10 +2012,11 @@ Deno.serve(async (req: Request) => {
   if (req.method === "GET") {
     return new Response(JSON.stringify({
       name: "nuke.ingest",
-      capabilities: { collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
+      capabilities: { collecting_cars_pinned_closed_replay: true, collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
       description: "Universal vehicle ingestion endpoint. Accepts structured data, URLs, or free text.",
       methods: { POST: "Ingest vehicle(s)", GET: "This schema documentation" },
       fields: {
+        cc_snapshot: { type: 'object', required: false, description: 'Service writers only: {snapshot_id, expected_sha256} with url and no other item fields. Replays verified retained sold/unsold Collecting Cars full HTML for one existing unique URL owner, preserving source clocks; refusal never fetches a replacement page.' },
         url:          { type: "string",   required: false, example: "https://facebook.com/marketplace/item/123456", description: "Source listing URL — auto-detects platform" },
         text:         { type: "string",   required: false, example: "1980 Chevy C10 $27,500 Greeneville TN", description: "Free-text vehicle description — parsed for year/make/model/price/location" },
         year:         { type: "number",   required: false, example: 1978, description: "Model year (1885–current+2)" },
