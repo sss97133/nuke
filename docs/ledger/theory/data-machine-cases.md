@@ -550,6 +550,9 @@ separately; nothing below is a claim of fleet coverage.
   baseline was not. Also not started: a provider key box (owner: "Use
   whatever key has tokens. Don't just block"); the phone's own reading as the first stage; choosing what to read
   by worth inside a budget; database capacity.
+- The build's design and its two judgments, repo only, to be verified: `docs/ledger/2026-11-10_image-keys-build-design.md`
+  and `2026-11-10_image-keys-build-design-judgment.md` (read the judgment first; it corrects the design and names a
+  first pull request of scripts only).
 - Audits of this date, repo only, each to be verified before use: `docs/ledger/2026-11-10_image-reading-map-*.md`
   (the model against the three questions; what a reading emits and where it lands; what the owner had already
   written; free signals for choosing what to read; what a reading costs; and a critic's check of all five, which

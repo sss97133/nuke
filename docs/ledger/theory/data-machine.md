@@ -194,7 +194,10 @@ vehicle: a named state of a named part, returned with its photos. The three lite
 owner photos, since every reading lane skips listing photos: on 2026-11-10 the owner had photos on
 three Mustangs and one Porsche (C17). Say which of the two a result is.
 
-**Where the build starts.** Not started on 2026-11-10. This is a plan, not a record of work. Two agents
+**Where the build starts.** Not started on 2026-11-10. This is a plan, not a record of work. A full design
+and two adversarial judgments of it are in `docs/ledger/2026-11-10_image-keys-build-design.md` and
+`...-judgment.md`; read the judgment first. Both judges put the same thing first: a pull request of
+scripts only that harvests stored callouts onto condition keys, with no migration and no model call. Two agents
 given only this card and the owner's one-line request arrived at the same first three steps. On the
 proof vehicle named above:
 
