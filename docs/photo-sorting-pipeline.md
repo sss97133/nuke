@@ -682,7 +682,7 @@ Walking each chain to the root (cap depth 8, cycle-safe):
 
 Live dupmap looks only at the immediate `duplicate_of`. So 44 copies of already-resolved roots (24 filed + 20 held) stay official unsorted. If the immediate original later becomes held / private / filed / `non_vehicle`, the 20 length-1 copies would follow today; the 44 would not, until dupmap walks the chain (or `duplicate_of` is flattened to the root).
 
-Should `non_vehicle` originals count? Yes — a copy of a reviewed non-vehicle is a duplicate, same as a copy of a held / private / pulled / filed original. A tiny ledger-definition PR (no row writes) on the #3302 body should add `copy_of_non_vehicle` and, to make the stated invariant actually hold, walk `duplicate_of` chains to the first resolved root with cycle protection. That PR was not opened or applied this pass. It would move 0 rows for `non_vehicle` today and about 44 of these 85 if chain-walking is included. Official `duplicate` / unsorted would shift only after that body is applied.
+Should `non_vehicle` originals count? Yes — a copy of a reviewed non-vehicle is a duplicate, same as a copy of a held / private / pulled / filed original. A tiny ledger-definition PR (no row writes) on the #3302 body should add `copy_of_non_vehicle` and, to make the stated invariant actually hold, walk `duplicate_of` chains to the first resolved root with cycle protection. That PR was not opened or applied in the typ-gap pass. It was subsequently opened and applied as [#3316](https://github.com/sss97133/nuke/pull/3316) at about 16:35 AST (America/St_Barthelemy). See §18.8.
 
 ### leftovers_v1 no-clock fix — #3314, not yet applied
 
@@ -696,9 +696,58 @@ A write-scan of the producer logs in 19:00–19:35 UTC found no expire, extend, 
 
 A later official in-database `GROUP BY` at ~16:20 AST, immediately after the #3314 apply, read held 8,943 / unsorted 557 / duplicate 782 (n still 29,749). That is the same shape as 15:08→15:28 (held −2, duplicate −1, unsorted +3). #3314 itself cannot be the cause: it only replaced leftovers_v1 (ledger md5s still `379d2ec7` / `5d801d4f`; no review, link, or log writes). What did change is open review membership: open reviews 2,187 → 2,180 (resolved 5,562 → 5,569), unique photos in open reviews 9,021 → 9,019. `capture_set_review` has no `updated_at` / resolve log, so a status change from `open` to `resolved` is invisible to a created_at scan. Most of the 7 resolved reviews overlapped still-open reviews (memberships dropped by more than unique photos); 2 unique photos left `held`, and 1 official duplicate of one of them followed, which accounts for +3 unsorted.
 
-So the 15:08 official `GROUP BY` may have been real, driven by the same silent review-resolution path, not (or not only) a REST pagination scramble. The resolver is not identified in this pass and needs a follow-up; it is not a leftover or typ producer, and it is not a ledger-function regression. Live leftovers_v1 is `659c5709`; `capture_day_replan_state` `def_md5` is still `eff69f49`.
+So the 15:08 official `GROUP BY` was real, driven by the same review-resolution path, not a REST pagination scramble (pagination can still scramble REST bucket counts, which is why official counts stay in-database `GROUP BY`). The resolver is identified in §18.8 as the sanctioned hourly `capture_set_review_sweep`. It is not a leftover or typ producer, and it is not a ledger-function regression. Live leftovers_v1 is `659c5709`; `capture_day_replan_state` `def_md5` is still `eff69f49`.
 
 Official in-database ledger at ~16:20 AST: on_vehicle 13,974; held 8,943; pulled 2,126; unverified 1,989; private 1,251; duplicate 782; unsorted 557; non_vehicle 127; waiting 0; n 29,749.
+
+
+## 18.8 Ledger dup-chain walk (#3316) and the review sweep (16:21–16:35 AST)
+
+### #3316 — walk `duplicate_of` chains and count `non_vehicle` copies
+
+PR [#3316](https://github.com/sss97133/nuke/pull/3316) (`fix/capture-ledger-dup-chain`, feature commit `7dcc1102`, title "fix(capture-ledger): walk dup chains and count non_vehicle copies"). Stacked on #3302 so the parent ledger and `capture_non_vehicle_log` are present; merged `origin/main` so CI ran against current main. Function-only, no row writes.
+
+Migration `20261115220000` replaces `capture_ledger_states` and `capture_ledger_frames`. Dupmap now walks `duplicate_of` to the first resolved root (filed, held, private, pulled, or reviewed `non_vehicle`), with cycle protection (`seen[]`) and a depth cap of 16 (8 was too low for two live chains). A missing original, a cycle, or an unresolved chain still does not count. A copy of a reviewed `non_vehicle` original is `copy_of_non_vehicle`. Immediate copies of filed / held / private / pulled originals stay counted as they were. The #3301 / #3302 timeout fix is intact (`plan_cache_mode=force_custom_plan`; materialized held / waiting / failed / `non_vehicle` / dupmap). Revert SQL restores the 20261115191000 (#3302) bodies.
+
+Contract: `supabase/sql/test_capture_ledger_dup_chain.sql` (guard `dm_refinement_capture_ledger_dup_chain%`). Pre-migration: immediate filed / held / private / pulled copies already `duplicate`; a copy of `non_vehicle`, a second-hop copy behind an unfiled mid, a copy of a missing original, and a two-node cycle stay unsorted. Post-migration: `copy_of_non_vehicle` and length-2 chains to filed / held / `non_vehicle` become `duplicate`; cycle and missing original still do not count; timeout settings still present. Local `TEST_EXIT:0` on 127.0.0.1:55521 (`PGUSER=postgres`). Validate passed (run 42895027958) and db-contracts passed (job on run 42895027981, completed 16:34 AST). Applied live at about 16:35 AST.
+
+Live ledger md5s are now states `ba4646aeeab075f0d54f7f9f30db4d55` and frames `52d8f857b78e2f811c7671f9c1c621b6` (were `379d2ec7` / `5d801d4f`). `proconfig` still includes `plan_cache_mode=force_custom_plan`.
+
+Official in-database `GROUP BY` immediately before apply (16:34 AST): held 8,942; unsorted 557; duplicate 782; private 1,251; on_vehicle 13,974; pulled 2,126; unverified 1,989; non_vehicle 127; waiting 0; **n 29,748**. (Versus the ~16:20 official: held 8,943 / n 29,749. That one-row library change is independent of #3316 and of the :17 sweep; the next sweep is 17:17 AST.)
+
+Official in-database `GROUP BY` immediately after apply (~16:35 AST):
+
+| State | Before | After | Δ |
+|---| ---:| ---:| ---:|
+| on_vehicle | 13,974 | 13,974 | 0 |
+| held | 8,942 | 8,942 | 0 |
+| pulled | 2,126 | 2,126 | 0 |
+| unverified | 1,989 | 1,989 | 0 |
+| private | 1,251 | 1,251 | 0 |
+| duplicate | 782 | **826** | **+44** |
+| **unsorted** | **557** | **513** | **−44** |
+| non_vehicle | 127 | 127 | 0 |
+| waiting | 0 | 0 | 0 |
+| **n** | **29,748** | **29,748** | **0** |
+
+Exactly 44 official unsorted copies of already-resolved roots moved to `duplicate`. Nothing else regressed. Post-apply `duplicate` reasons: `copy_of_filed` 412, `copy_of_held` 405, `copy_of_private` 9, `copy_of_pulled` 0, `copy_of_non_vehicle` 0 (no live unfiled copies of the 127 `non_vehicle` originals). 26 official-unsorted rows are still `is_duplicate` with a missing or unresolved original; those correctly stay unsorted. empty_url / the 276 class was not touched.
+
+### Silent `capture_set_review` resolver — identified, legitimate, already logged
+
+The closes are not Skylar resolving in the app, and they are not a ledger-function regression. The only production writer of `capture_set_review.status` is `capture_set_review_sweep` (service_role only, md5 `f021b75c81be85388884d9c16d42ca49`), from migration `20261111140000_capture_review_drain.sql`. Hourly cron job `capture-review-sweep` (jobid 720, schedule `17 * * * *`, active, command `SET statement_timeout = '55s'; SELECT public.capture_set_review_sweep(NULL, 200)`). No later patch to the sweep was found. A repo search of edge functions and app / website / iOS code found no other closer — planning paths only `INSERT` new review rows; the website reads none of the capture tables.
+
+The sweep (1) resolves open rows superseded by a newer row for the same `(user_id, set_key)` as `how=superseded_by_newer_run`; (2) resolves open rows with no unfiled photo left as `how=nothing_left_unfiled`; (3) re-arms up to `p_rearm_limit` user-days via `capture_sets_enqueue` reason `new_anchors`. Resolution is already logged on the row: `status='resolved'` and `evidence.resolved={how, by, at}`. The table has no `updated_at`, so a `created_at` scan misses closes; that is why the 15:08→15:28 and ~16:20 shifts first looked silent. A dedicated resolve-log / `updated_at` PR is not required.
+
+Today's :17 batches (America/St_Barthelemy), all `superseded_by_newer_run` by `capture_set_review_sweep`:
+
+- 15:17:00 AST (19:17:00.793973+00): 43 reviews, 539 memberships — this is the 15:08→15:28 official move (held −19, unsorted +23, duplicate −4). Older reviews from today's earlier re-plans were superseded by later runs for the same `set_key`.
+- 16:17:00 AST (20:17:00.130702+00): 7 reviews, 25 memberships — this is the ~16:20 official move (held 8,945→8,943, unsorted 554→557, duplicate 783→782). It resolved 7 older 2026-06-12 reviews from run `70e6d7d7` and one 06-11 review from `510e7d2a` as superseded by the 15:48 leftover-drain reviews.
+
+Subtle product note, not treated as a bug this pass: the sweep keys only on `set_key`, so a newer smaller review for the same `set_key` can drop unique photos from `held` (seen earlier on 2026-06-11: an older 4-photo review vs a newer 2-photo review).
+
+### CLIP-to-typ producer — not built
+
+No CLIP-to-typ producer was built. typ is not new evidence under `capture_day_replan_state`, so a typ write would not re-arm `refused_no_new_evidence` days. empty_url / the 276 class stays untouched. Do not start another leftover cap-50 unless new unlogged, unrefused, clocked leftovers appear. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`.
 
 ## 19. Known gaps and next work
 
@@ -749,10 +798,11 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3304](https://github.com/sss97133/nuke/pull/3304) | replan leftover vehicle-typed frames | Draft, **applied live** 14:42 AST; 50 photos / 19 days; included in #3311 | Enqueue via sanctioned path |
 | [#3311](https://github.com/sss97133/nuke/pull/3311) | skip logged leftovers and refused days | Draft, **applied live** ~15:37 AST; remaining 81 leftovers signed once | Leftovers idempotency |
 | [#3314](https://github.com/sss97133/nuke/pull/3314) | skip no-clock leftovers the scorer cannot use | Draft, **applied live** ~16:20 AST | Leftovers / scorer match |
+| [#3316](https://github.com/sss97133/nuke/pull/3316) | walk dup chains and count non_vehicle copies | Draft, **applied live** ~16:35 AST | Ledger definition only |
 
 ## 21. Unverified or out of scope in this writing
 
-- The live `capture_ledger_states` body was re-read on 10 Nov afternoon; `duplicate` is defined as of #3299 (filed / held / private / pulled originals). A missing original still does not count.
+- The live `capture_ledger_states` body was re-read after the #3316 apply on 10 Nov afternoon; `duplicate` is defined as of #3316 (filed / held / private / pulled / `non_vehicle` originals, including through other unfiled copies, depth cap 16). A missing original, a cycle, or an unresolved chain still does not count. Live md5s: states `ba4646ae`, frames `52d8f857`.
 - Visual confirmation of the 18 `20261110b` holds was not repeated here; runs, backups, and the ledger delta were verified.
 - `#3212` and the full set of open draft PRs were not re-surveyed.
 - Capture-set joins for ssd_blast / drop-folder / image_intake / cascade in the pollution audit were not finished (timeout / UNION type mismatch into the outage).
@@ -766,4 +816,4 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Operator log: `/workspace/sortrun/progress.md` (9–10 Nov 2026)
 - Scripts and artifacts under `/workspace/sortrun`: `gate_reader.py`, `drain_loop.py`, `ledger_now.py`, `emptyplan/*`, `fingerprint/*`, `lookalike_pilot/*`, `garage/gallery_pollution_audit.md`, `garage/visual_identity_recheck_v1.md`, `garage/gross_mismatch_v1/*`, `held/same_scene_dryrun.py`, `ingest_audit/`, `unsorted/breakdown.json`, `unsorted/fresh_20261110/*`, `stamp_dto_pr/BRIEF.md`, `receipt_order_fix/`, `ledger_live_def.txt`
 - Repository: `github.com/sss97133/nuke` — especially `docs/receipt-work-contract.md`, `supabase/migrations/20261020001000_vehicle_image_review_holds.sql`, `supabase/migrations/20261109070000_rederive_ownership_roles.sql`, `scripts/ownership/rederive-ownership-roles.mjs`, `scripts/receipt-work/reconcile-receipt-work.mjs`, `scripts/photo-pipeline/local_image_analysis.py`, `scripts/iphoto-intake.mjs`, and the PRs in §20
-- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~16:20 AST)
+- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~16:35 AST)
