@@ -1099,6 +1099,62 @@ function ccSupplementFixture(overrides={}) {
   return {...f,urls,indexUrl,xml,receipts};
 }
 
+function retainedDiscoveryManifest(urls, extra={}) {
+  return {version:1,origin_sha256:'a'.repeat(64),discovered_at:'2020-01-01T00:00:00Z',urls,...extra};
+}
+
+test('retained legacy discovery uses existing source owner, shares100slots and admits only via normal native intake',async()=>{
+  const f=ccSupplementFixture(),urls=f.urls.slice(100,112);
+  f.feed.search_criteria.history_retained_discovery=retainedDiscoveryManifest(urls);
+  const first=await f.request({force:true});
+  assert.equal(f.targets.size,100);assert.equal(f.feed.search_criteria.history_sitemap_offset,88);
+  assert.match(f.feed.search_criteria.history_retained_discovery_ack,/^[a-f0-9]{64}$/);
+  for(const url of urls) {
+    const target=f.targets.get(url);
+    assert.equal(target.source_slug,'collecting-cars');assert.equal(target.sitemap_file,`retained-discovery:sha256:${'a'.repeat(64)}`);
+    assert.notEqual(target.last_seen_at,'2020-01-01T00:00:00Z');
+  }
+  const receipt=first.body.results[0].retained_inventory.retained_discovery;
+  assert.equal(receipt.source_read_at,null);assert.equal(receipt.candidate_urls,12);assert.equal(receipt.discovery_slots_used,12);
+  assert.deepEqual(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').map(c=>c.body),urls.slice(0,2).map(url=>({url})));
+  const writes=()=>f.calls.filter(c=>c.path==='/rest/v1/source_targets'&&c.method==='POST'&&c.body.some(r=>r.sitemap_file?.startsWith('retained-discovery:')));
+  assert.equal(writes().length,1);
+  const second=await f.request({force:true});assert.equal(writes().length,1);
+  assert.equal(second.body.results[0].retained_inventory.retained_discovery.discovery_slots_used,0);
+  assert.equal(f.calls.filter(c=>c.path.startsWith('/sitemap-listings-')).length,1);
+});
+
+test('retained discovery preserves existing registry provenance and cannot overwrite a foreign source',async()=>{
+  for(const source of ['collecting-cars','bat']) {
+    const url='https://collectingcars.com/for-sale/1960-sitemap-101';
+    const existing={id:1,listing_url:url,source_slug:source,sitemap_file:'prior-native-sitemap',last_seen_at:'2021-01-01T00:00:00Z'};
+    const f=ccSupplementFixture({sourceTargets:[existing]});
+    f.feed.search_criteria.history_retained_discovery=retainedDiscoveryManifest([url]);
+    await f.request({force:true});assert.deepEqual(f.targets.get(url),existing);
+    if(source==='bat') {
+      assert.equal(f.feed.search_criteria.history_retained_discovery_ack,undefined);
+      assert.equal(f.calls.some(c=>c.path==='/functions/v1/ingest'&&c.method==='POST'),false);
+    }
+  }
+});
+
+test('invalid retained manifests, source holds and unacknowledged writes never become discovered or ingested success',async()=>{
+  const url='https://collectingcars.com/for-sale/1960-sitemap-101';
+  for(const patch of [{version:2},{origin_sha256:'bad'},{discovered_at:'2999-01-01T00:00:00Z'},
+    {urls:[]},{urls:[url,url]},{urls:[url+'/']},{urls:['https://foreign.invalid/for-sale/a']},
+    {urls:Array.from({length:21},(_,i)=>url+i)},{auctionId:1}]) {
+    const f=ccSupplementFixture();f.feed.search_criteria.history_retained_discovery=retainedDiscoveryManifest([url],patch);
+    await f.request({force:true});assert.equal(f.targets.size,0);
+    assert.equal(f.feed.search_criteria.history_retained_discovery_ack,undefined);
+    assert.equal(f.calls.some(c=>c.path==='/functions/v1/ingest'&&c.method==='POST'),false);
+  }
+  for(const options of [{controls:{enabled:false,max_ingests:2}},{targetWriteFailure:true},{historyCheckpointFailure:true}]) {
+    const f=ccSupplementFixture(options);f.feed.search_criteria.history_retained_discovery=retainedDiscoveryManifest([url]);
+    await f.request({force:true});assert.equal(f.feed.search_criteria.history_retained_discovery_ack,undefined);
+    assert.equal(f.calls.some(c=>c.path==='/functions/v1/ingest'&&c.method==='POST'),false);
+  }
+});
+
 test('history supplement retains raw sitemap before bounded discoveries and resumes a fixed target page under cap',async()=>{
   const f=ccSupplementFixture();
   const first=await f.request({force:true});assert.equal(first.status,200);
