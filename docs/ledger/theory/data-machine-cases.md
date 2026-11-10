@@ -495,6 +495,34 @@ theory card ("Image analysis is the model asking"), and the acceptance is his th
 made capture-date order the rule for the whole backfill and let the reader run to the subscription's limit, was
 withdrawn unmerged on his word within the hour: "Earliest photos first is a dangerous mode."
 
+**C17, same day, 21:31–21:33 UTC: the proof vehicle.** Read-only. The owner named it: "A better example to work on
+is the firebird ... it has to be for the data we actually care about." Readers: `vehicle_images` by owner and
+vehicle (the capture ledger index), `observation_witnesses` joined to `vehicle_observations`, one count per table
+with an index led by `image_id`, and counts by `vehicle_id` on the work tables named. Population first: of the
+owner's 29,749 photos, 16,345 are on one of 135 vehicles. This vehicle (`20d21fb0-4651-4469-a0ba-e751309a1e54`)
+holds 453 of them over 7 capture days, 414 dated 2026-10 and 420 inside the last 60 days; the next most recent
+vehicle has 65. One vehicle: validation scope.
+
+- Read: 452 photos carry a classifier reading (435 under v98) and 444 a deep reading, 443 of those under
+  `reviewed_image_analysis_v1`. None has a stage receipt: the first pass queues only photos with no reading.
+- What the deep readings hold: 1,157 callouts; 3,560 part labels in 2,678 spellings; a non-empty
+  `damage_localized` (label, box, severity) on 284 photos; 443 open questions, most marked with why they could not
+  be answered (a closer photo is needed, or a document the graph does not hold). The callouts say what a photo
+  does not establish as carefully as what it shows.
+- Around it: 66 `receipt_vehicle_links`; 1,090 `garage_derivation_evidence` rows; 595 `evidence_judgment_requests`,
+  which is most of the 774 that exist; 4 work sessions; 6 timeline events; 27 `field_evidence` rows.
+- Keyed: of 488 witnessed observations on these photos (457 condition, 20 media, 7 work record, 4 specification),
+  none has a `descriptor_id` or a `property_id`. The vehicle has 0 `component_identifications`, 0
+  `component_events` and 0 `vehicle_change_claims`.
+- For the three questions: the owner has photos on three Mustangs (1,922, 65 and 27 photos) and on one Porsche
+  (21), so they can be asked of owner photos. Some of this vehicle's November photos are photographs of printed
+  pictures of earlier work (panels off, surface preparation, the engine out), which is the shape of "during a
+  restoration, with photographic proof".
+
+So the vehicle the owner cares about most is the most thoroughly read vehicle measured and has no keyed fact. The
+first build on it needs no photo read again. The reader, meanwhile, spent the day on 2025-09 uploads of other
+vehicles; nothing chooses what it reads.
+
 **C17 pickup, 2026-11-10 21:10 UTC: where everything stands.** Written for whoever continues. Stages are named
 separately; nothing below is a claim of fleet coverage.
 

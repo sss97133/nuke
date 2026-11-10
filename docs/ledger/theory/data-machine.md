@@ -109,8 +109,9 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    vehicle, key and value, or that a job, a receipt line or a change claim cites; give the folded claim
    count beside the row count. *Proven*: folded claims with two independent readers in agreement, a
    receipt, or the owner's decision; no store records any of these, so the count is zero by
-   construction and is reported as zero, not left out. Baseline: 0 keyed of 94 witnessed observations
-   on the cohort vehicle (2026-11-10 20:28 UTC). The library was not measured.
+   construction and is reported as zero, not left out. Baseline: 0 keyed of 488 witnessed observations
+   on the proof vehicle (2026-11-10 21:33 UTC), and 0 of 94 on the vehicle measured first. The library
+   was not measured.
 8. **No new reader, prompt vocabulary or per-reader table for photos.** Extend the registry, the
    question store or the landing. Earlier attempts at this same idea are in the database and are not
    dead: `component_assembly_map` (a part, its states, what each state looks like),
@@ -119,6 +120,39 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    and `docs/features/image-processing/CONTEXT_DRIVEN_PROCESSING.md`. Mechanism: the pull-request gate
    below, and `scripts/guardrails/check-capability-before-mint.mjs`, which reads the photo-reading rows
    of `docs/ledger/CAPABILITY_MAP.md` when an agent asks it.
+
+**Keys and folds, for photos.** The owner: "the talk on keys and folds is essential to not lose", and of
+the whole design, "the data acquires labels, keys, folds etc as connections are made". In this lane:
+
+- A **key** is what lets two rows be about the same thing without anyone reading their words: the
+  vehicle, the part of it, the state or flaw, the photo. A reading with words and no keys cannot be
+  joined, counted or cross-examined. "Hood in red oxide primer", "red-primer hood" and "hood still in
+  primer, not final paint" are one fact only once all three carry the same part key and the same value.
+- A **fold** is the step that makes one claim out of many keyed rows, by rule and not by judgment: the
+  same vehicle, part, property and value on the same capture day fold to one claim with every photo
+  behind it. A later day with a different value does not edit that claim. It is a second claim, and
+  the pair is the change: the repair, the repaint, the part replaced.
+- Keys take judgment once and memory ever after. Whether a wording means an existing key, or needs a
+  new one, is decided one time and stored; every later reader is given the decision. Without that
+  memory the same part gets a new spelling from every reader: on the first vehicle measured, 186 part
+  labels came in 126 spellings, and on the second 3,560 came in 2,678.
+- Folds take no judgment at all, so they are database logic. An agent that folds by eye will fold
+  differently tomorrow.
+- A key that is stretched is worse than a key that is missing. The engine bay is not the brake
+  booster. When no key is true the datum waits with a proposal, and the wait is visible.
+- Tried by hand on the first vehicle: 30 callouts folded to about 13 claims, one of them carried by 13
+  photos, and the two vocabularies could express 3 of the 13 without a new key. That ratio is the
+  size of the work: most of what careful readings say has no place yet.
+
+The procedure is the brief in `skills/image-keys/SKILL.md`.
+
+**The proof vehicle.** The owner, 2026-11-10: "A better example to work on is the firebird ... I know we
+need the pipeline to work but it has to be for the data we actually care about." The build is proved
+on that vehicle (`20d21fb0-4651-4469-a0ba-e751309a1e54`; its state is in C17 for the same date), not on
+the vehicle that was measured first. It is the vehicle with by far the most recent photos, it has
+already been read by the most careful reader, and none of what was read is keyed, so the whole first
+build there is keys and folds and needs no photo read again. What the reader happens to reach next in
+upload order is not a reason to work on it.
 
 **The gates.** The owner, the same day: "the architecture is the only thing that will ensure agents even
 dumb ones don't fuck up". A rule above holds only where something refuses the wrong move. Everything a
@@ -154,21 +188,21 @@ prove the answer: (1) Mustangs whose window felts were replaced during a restora
 that has a specific imperfection; (3) that imperfection was repaired and it is now this restored
 Porsche. Proof on one vehicle is validation scope, not fleet coverage. Under C17's rule the comparison
 is the same retained photos, the prior state against the new method, with changed claims traced into
-an existing consumer and an unchanged control. The cohort vehicle is where the method is proved, not
+an existing consumer and an unchanged control. The proof vehicle is where the method is proved, not
 where the three questions are answered. The first proof is a question of the same shape on that
 vehicle: a named state of a named part, returned with its photos. The three literal questions wait on
-a read of which Mustangs and Porsches have owner photos at all, since every reading lane skips listing
-photos. Say which of the two a result is.
+owner photos, since every reading lane skips listing photos: on 2026-11-10 the owner had photos on
+three Mustangs and one Porsche (C17). Say which of the two a result is.
 
 **Where the build starts.** Not started on 2026-11-10. This is a plan, not a record of work. Two agents
-given only this card and the owner's one-line request arrived at the same first three steps. On one
-vehicle, the C17 cohort of that date:
+given only this card and the owner's one-line request arrived at the same first three steps. On the
+proof vehicle named above:
 
-1. Read the before state from production, with its clock. Not done on 2026-11-10. In this order: which
-   Mustangs and Porsches have any owner photo (if none do, say so first: the three questions cannot be
-   met from the lanes that exist); the paid readings waiting to be keyed, by reader and month; every
+1. Read the before state from production, with its clock. Partly done on 2026-11-10 (C17 holds the
+   proof vehicle's counts and which Mustangs and Porsches have owner photos). Still to read: the paid
+   readings waiting to be keyed across the library, by reader and month; every
    row of `observation_properties`, `condition_taxonomy`, `subject_taxonomy` and
-   `component_assembly_map`; C17's counts for the cohort vehicle and rule 7's counts for the library.
+   `component_assembly_map`; and rule 7's counts for the library.
    The ordered list is "To read from production" in `docs/ledger/2026-11-10_image-reading-map-critic.md`.
 2. Harvest before spend. By code, fold the readings already paid for (the condition observations'
    callouts and the part labels) against the registries. The output is claims that have a key, claims
@@ -752,6 +786,17 @@ lead holds them.)
 > what you did today The obvious problem of being able to write the data model side is if it writes too much and wrong
 > and new every time. So I'm not sure how to remedy that but again if it's running we can fix it. If it never gets off
 > the ground we can't
+
+> But also the architecture is the only thing that will ensure agents even dumb ones don't fuck up
+
+> I'd think you can hand the whole folds and keys stuff to a tested dedicated agent or I'm not sure hopefully you can
+> configure a team that help you work
+
+> You'll get to a point where you'll need to test the system by acting like me. Querying to a new agent to fix the
+> image analysis pipeline. That's where this will get interesting
+
+> A better example to work on is the firebird. Also the talk on keys and folds is essential to not lose. I know we
+> need the pipeline to work but it has to be for the data we actually care about
 
 Earlier the same day, on where the first reading happens, on provider keys and on the app: "First read can take place
 the moment the image is taken like a live stream basically. And it can be routed vision api on device and all in near
