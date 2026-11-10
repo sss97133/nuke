@@ -271,7 +271,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
 
           {/* Work — jobs on this vehicle, Plan the work (listing plan + inspection order), Post a job */}
           <React.Suspense fallback={null}>
-            <VehicleWorkCard vehicleId={vehicle.id} signedIn={!!session?.user?.id}
+            <VehicleWorkCard vehicleId={vehicle.id} signedIn={!!session?.user?.id} hideWhenEmpty
               vehicleTitle={[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')} />
           </React.Suspense>
 
