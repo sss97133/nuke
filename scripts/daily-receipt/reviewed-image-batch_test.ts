@@ -111,7 +111,7 @@ Deno.test("only the known pre-turn experimental configuration warning is retaine
   assertThrows(() => parseStage(stream() + "\n" + warning, ["image"], "gpt-6-astra"), Error, "unexpected_model_tool");
   assertThrows(() => parseStage(warning.replace("Under-development", "Unknown") + "\n" + stream(), ["image"], "gpt-6-astra"), Error, "unexpected_model_tool");
 });
-for (const reason of ["workspace routing discovery timed out", "stream disconnected before completion: Connection reset by peer (os error 54)"])
+for (const reason of ["workspace routing discovery timed out", "workspace routing discovery failed", "connection failed: socket hang up", "stream disconnected: TLS handshake timeout", "HTTP 503 Service Unavailable", "unexpected EOF", "stream disconnected before completion: Connection reset by peer (os error 54)"])
 Deno.test(`recovered ${reason} warning retains successful answer but not terminal or incomplete reads`, () => {
   const warning = JSON.stringify({ type: "error", message: `Reconnecting... 2/5 (${reason})` });
   const add = (s: string) => s.split("\n").flatMap(line => JSON.parse(line).type === "turn.started" ? [line, warning] : [line]).join("\n");
@@ -119,6 +119,22 @@ Deno.test(`recovered ${reason} warning retains successful answer but not termina
   for (const bad of [add(stream({ noComplete: true })), add(stream({ failed: true })), warning + "\n" + stream(), stream() + "\n" + warning,
     add(stream()).replace(reason, "authentication refused")])
     assertThrows(() => parseStage(bad, ["image"], "gpt-6-astra"), Error, "reader_stage_failed");
+});
+Deno.test("known transport recovery requires a completed turn and preserves the diagnostic", () => {
+  const message = "Falling back from WebSockets to HTTPS transport. workspace routing discovery failed";
+  const warning = JSON.stringify({ type: "item.completed", item: { type: "error", message } });
+  const add = (s: string) => s.split("\n").flatMap(line => JSON.parse(line).type === "turn.started" ? [line, warning] : [line]).join("\n");
+  assertEquals(parseStage(add(stream()), ["image"], "gpt-6-astra").warnings, [message]);
+  for (const bad of [add(stream({ noComplete: true })), add(stream({ failed: true })), warning + "\n" + stream(), stream() + "\n" + warning,
+    add(stream()).replace(message, "Falling back to an API key"), add(stream({ tool: "mcp_tool_call" }))])
+    assertThrows(() => parseStage(bad, ["image"], "gpt-6-astra"));
+});
+Deno.test("transport-looking account, quota, provider and post-turn diagnostics remain failures", () => {
+  const add = (message: string) => stream().split("\n").flatMap(line => JSON.parse(line).type === "turn.started" ? [line, JSON.stringify({type:"error",message})] : [line]).join("\n");
+  for (const reason of ["socket authentication refused", "HTTP 429 rate limit", "network quota exceeded", "stream usage limit reached", "connection failed: API key required", "network provider fallback", "invalid input JSON", "output schema failed", "HTTP 401", "HTTP 403"])
+    assertThrows(() => parseStage(add(`Reconnecting... 3/8 (${reason})`), ["image"], "gpt-6-astra"));
+  assertThrows(() => parseStage(add("invalid input JSON"), ["image"], "gpt-6-astra"));
+  assertThrows(() => parseStage(stream() + "\n" + JSON.stringify({type:"item.completed",item:{type:"agent_message",text:"{}"}}), ["image"], "gpt-6-astra"), Error, "reader_stage_failed");
 });
 Deno.test("wrong or repeated IDs refuse; order never rewrites identity", () => {
   assertThrows(() => exactRows([{ image_id: other }], work()), Error, "identity_mismatch");

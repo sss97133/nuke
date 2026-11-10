@@ -59,6 +59,17 @@ export function cliArgs(model: string, directory: string, schemaPath: string, ou
     ...mcpNames.flatMap(n => ["-c", `mcp_servers.${n}={enabled=false,command="/usr/bin/false"}`]),
     ...images.flatMap(p => ["--image", p])];
 }
+function transportRecovery(message: unknown) {
+  if (typeof message !== "string") return false;
+  // CLI transport diagnostics are not terminal turn results. Permit the
+  // reconnect/transport shapes, not arbitrary errors, and never launder an
+  // account/quota/provider failure as network recovery.
+  if (/auth|unauthori[sz]ed|forbidden|credential|api[ _-]?key|quota|rate[ _-]?limit|billing|credit|out of tokens|usage limit|\b(?:401|403|429)\b|provider|model fallback/i.test(message)) return false;
+  const reconnect = /^Reconnecting\.{3} \d+\/\d+ \(([\s\S]+)\)$/.exec(message);
+  const protocol = /^Falling back from WebSockets? to HTTPS transport\.(?: ([\s\S]+))?$/.exec(message);
+  if (protocol) return true;
+  return Boolean(reconnect && /\b(?:routing|network|sockets?|websockets?|connection|connectivity|stream|transport|TLS|SSL|DNS|EOF|EPIPE|ETIMEDOUT|ECONN\w*|timeout)\b|timed out|\bHTTP[^\n]*\b(?:408|5\d\d)\b/i.test(reconnect[1]));
+}
 export function parseStage(stream: string, sourcePaths: string[], requestedModel: string) {
   // Codex exec JSONL: https://learn.chatgpt.com/docs/non-interactive-mode .
   // Pixels are explicit CLI attachments, not an invented Read-tool receipt.
@@ -66,12 +77,13 @@ export function parseStage(stream: string, sourcePaths: string[], requestedModel
   let turnStarted = false, turnEnded = false;
   ensure(sourcePaths.length > 0 && new Set(sourcePaths).size === sourcePaths.length, "source_images_missing");
   for (const e of events) {
-    if (turnStarted && !turnEnded && e.type === "error" && /^Reconnecting\.\.\. [1-5]\/5 \((?:workspace routing discovery timed out|stream disconnected before completion: Connection reset by peer \(os error 54\))\)$/.test(e.message ?? "")) {
-      // The CLI may reconnect successfully and then finish this same turn.
-      // Keep the warning; the completed-turn/final-answer checks below still
-      // refuse an exhausted/failed or incomplete read. Never repeat a paid turn
-      // solely because its successful event stream includes this diagnostic.
-      warnings.push(e.message); continue;
+    const diagnostic = e.type === "error" ? e.message : e.type === "item.completed" && e.item?.type === "error" ? e.item.message : null;
+    if (turnStarted && !turnEnded && transportRecovery(diagnostic)) {
+      // Process exit0 is required by the caller. Below we also require a final
+      // completed turn, matching validated answer/schema and no tool events.
+      // Retain every recovered diagnostic verbatim; never repeat a completed
+      // model stage just because its network transport had to reconnect.
+      warnings.push(diagnostic); continue;
     }
     ensure(!["error", "turn.failed"].includes(e.type), "reader_stage_failed");
     if (e.type === "turn.started") turnStarted = true;
@@ -88,7 +100,7 @@ export function parseStage(stream: string, sourcePaths: string[], requestedModel
   }
   const completed = events.filter(e => e.type === "turn.completed"), threads = events.filter(e => e.type === "thread.started");
   const answers = events.filter(e => e.type === "item.completed" && e.item?.type === "agent_message");
-  ensure(completed.length === 1 && threads.length === 1 && answers.length > 0, "reader_stage_failed");
+  ensure(completed.length === 1 && threads.length === 1 && answers.length > 0 && events.at(-1)?.type === "turn.completed", "reader_stage_failed");
   ensure(models.size <= 1, "reader_model_not_attributed");
   const actualModel = [...models][0] ?? null;
   return { value: JSON.parse(answers.at(-1)!.item.text),
