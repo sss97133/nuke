@@ -802,6 +802,49 @@ The 21 unique typ=`other` photos dropped at 15:17 (19) and 16:17 (2) are back in
 
 empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`.
 
+## 18.10 typ=`other` into held review, CLIP typ producer, and plan_refused (17:11–17:42 AST)
+
+#3302 eligibility already accepts typ=`other` / `receipt_document` and does not exclude leftover or superseded frames. typ alone is not a terminal. Of the 42 typ=`other` leftover + superseded frames:
+
+- 26 already logged as `vehicle` (14 leftover `capture_relay_ios` + 12 superseded `capture_relay_ios`, including 5 on gate_failed 2026-06-13). Enqueue alone left them in limbo: typ-aware scoring keeps typ `other` out of clear sets and can also leave them out of review sets. They belong in **held review**, not `non_vehicle`.
+- 13 already logged as `judgment_personal` (12 `photo_auto_sync` + 1 `capture_relay_ios`). Stay unsorted and logged.
+- 3 unlogged `image_intake` with placeholder URLs (`https://example.com/final_test.jpg`, `https://test.example.com/test.jpg`, `https://test-trigger-check.jpg`). No viewable photo, one of them has no clock (never invent one). Not sent to `non_vehicle`. Stay unsorted.
+
+No eligibility extension of #3302 was required. The gap was the vehicle apply path (enqueue only).
+
+PR [#3322](https://github.com/sss97133/nuke/pull/3322) (`feat/capture-nv-vehicle-to-review`, `fc91a628` then `83f8520c`) adds `capture_non_vehicle_vehicle_to_review_v1`: signed, dry-default, cap 50, `granted_by`, revert-by-run. It routes typ=`other` / `receipt_document` frames with an unreverted #3302 `vehicle` verdict into an open `capture_set_review` (one review per day, reason `typ_other_vehicle`, confidence 0 because there is no scorer score). Skips empty_url, the privacy-exclude set, already filed, already in an open review, and `non_vehicle` log rows. Does not re-arm refused days or invent clocks. Contract `supabase/sql/test_capture_non_vehicle_vehicle_to_review.sql` (local `TEST_EXIT:0`).
+
+The first signed apply (run `a3322000-…0002`) rolled back cleanly: live `capture_set_review.confidence` is `NOT NULL` and the first body inserted NULL. Follow-up `20261115231100` writes confidence 0. Validate + db-contracts were green on both the original (validate 42903923934, db-contracts job on 42903923953) and the fix (validate 42905380264, db-contracts job on 42905380191). Applied live: 231000 shortly before 17:28 AST, 231100 then the signed run after the fix CI. Live producer md5 `be9edd486954747388bae9ec19647b95`; revert helper `c14e2c273f2fd7d697978162abbf20f8`.
+
+Dry `a3322000-…0003`: eligible 26, would_route 26, 3 days. Signed apply `a3322000-0000-4000-8000-000000000004` at about 17:42 AST (granted_by `0b9f107a-…`) routed 26 photos into 3 open reviews (`nv_vehicle_review:2019-09-27` 1, `2026-06-12` 20, `2026-06-13` 5). A second dry (`…0005`) took 0. Revert-by-run is unused. Prior #3302 vehicle look was `efa52ea2`. 7 unfiled copies of those originals followed via the #3316 dupmap.
+
+Official in-database `GROUP BY` immediately before the signed apply versus immediately after:
+
+| State | Before | After | Δ |
+|---| ---:| ---:| ---:|
+| on_vehicle | 13,974 | 13,974 | 0 |
+| held | 8,963 | **8,989** | **+26** |
+| pulled | 2,126 | 2,126 | 0 |
+| unverified | 1,989 | 1,989 | 0 |
+| private | 1,251 | 1,251 | 0 |
+| duplicate | 833 | **840** | **+7** |
+| **unsorted** | **485** | **452** | **−33** |
+| non_vehicle | 127 | 127 | 0 |
+| waiting | 0 | 0 | 0 |
+| **n** | **29,748** | **29,748** | **0** |
+
+### CLIP typ producer (#3323) — landed, no typ writes
+
+PR [#3323](https://github.com/sss97133/nuke/pull/3323) (`feat/capture-typ-from-local-observation`, `1f979d6b`) adds `capture_typ_from_local_observation_v1`. Conservative fixed mapping of active `local_image_analysis_v1` views at `view_confidence >= 0.80`: `exterior_*` → `vehicle_exterior`, `interior` → `vehicle_interior`, `engine` → `engine_bay`, `document` → `receipt_document`, `screenshot` → `other`. CAS on empty typ only; existing typ is never overwritten. Provenance is `classification.image_type_provenance` with `source=local_clip` and the run id. Dry-default, cap 50, `granted_by`, revert-by-run. Excludes empty_url, the privacy-exclude set, and `is_sensitive`. Apply writes only when exact agreement vs already-typed frames is at least 90%. Contract `supabase/sql/test_capture_typ_from_local_observation.sql` (local `TEST_EXIT:0`). Validate passed (run 42903925817) and db-contracts passed (job on run 42903925779). Applied live (DDL only). Live md5 `a1cc9e1ddc5a2280d7cc42ab8f8de17b`; revert helper `173c54cbde4b71391ed953e5507bb078`.
+
+Live dry `a3323000-0000-4000-8000-000000000001`: comparable 2,236, agree 1,414, disagree 822, **agree_pct 63.2%**, `agreement_ok=false`, eligible typ-empty 928, **would_write 0**, typ log 0. Exact agreement by threshold: 0.50 → 61.3%, 0.80 → 63.2%, 0.99 → 72.2%. The bulk of disagreements is official typ=`other` vs a more specific CLIP map (and `document` → `receipt_document`, whose official typ is usually `other`). The 90% gate therefore refused typ writes. leftovers_v1 / the scorer were not invoked. typ is still not new evidence under `capture_day_replan_state`.
+
+### plan_refused 94 — no sanctioned review-routing path
+
+Last plan on those days is `gate_failed`, not `awaiting_gate`. None of the unfiled photos are in an open review. The existing review writers are the scorer / landing pipeline (review sets at plan time), `capture_landing_gate_expire_all_unclear_v1` (fully sampled all-unclear **awaiting_gate** chunks only; waiting → held), the #3318 reopen producer (resolved `superseded_by_newer_run` reviews with uncovered photos), and the new #3322 typ-other vehicle path (already-logged #3302 vehicle typ only). `expire_all_unclear` does not match refused days. typ is not new evidence, so leftovers_v1 will not re-arm them. There is no sanctioned function that puts a refused day's unfiled photos into held review for a human. Not used; not built this pass. Do not re-arm refused days as a class.
+
+empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks.
+
 ## 19. Known gaps and next work
 
 
@@ -853,6 +896,8 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3314](https://github.com/sss97133/nuke/pull/3314) | skip no-clock leftovers the scorer cannot use | Draft, **applied live** ~16:20 AST | Leftovers / scorer match |
 | [#3316](https://github.com/sss97133/nuke/pull/3316) | walk dup chains and count non_vehicle copies | Draft, **applied live** ~16:35 AST | Ledger definition only |
 | [#3318](https://github.com/sss97133/nuke/pull/3318) | keep unique photos when a newer review supersedes | Draft, **applied live** ~16:56 AST (sweep) and ~17:10 AST (fast reopen) | Sweep fix + signed reopen |
+| [#3322](https://github.com/sss97133/nuke/pull/3322) | route typ-other vehicle looks to held review | Open, **applied live** ~17:42 AST (26 photos / 3 reviews) | typ other into held |
+| [#3323](https://github.com/sss97133/nuke/pull/3323) | write typ from high-confidence local CLIP views | Open, **applied live** (DDL only); typ writes refused (agreement 63.2% < 90%) | typ from CLIP |
 
 ## 21. Unverified or out of scope in this writing
 
@@ -870,4 +915,4 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Operator log: `/workspace/sortrun/progress.md` (9–10 Nov 2026)
 - Scripts and artifacts under `/workspace/sortrun`: `gate_reader.py`, `drain_loop.py`, `ledger_now.py`, `emptyplan/*`, `fingerprint/*`, `lookalike_pilot/*`, `garage/gallery_pollution_audit.md`, `garage/visual_identity_recheck_v1.md`, `garage/gross_mismatch_v1/*`, `held/same_scene_dryrun.py`, `ingest_audit/`, `unsorted/breakdown.json`, `unsorted/fresh_20261110/*`, `stamp_dto_pr/BRIEF.md`, `receipt_order_fix/`, `ledger_live_def.txt`
 - Repository: `github.com/sss97133/nuke` — especially `docs/receipt-work-contract.md`, `supabase/migrations/20261020001000_vehicle_image_review_holds.sql`, `supabase/migrations/20261109070000_rederive_ownership_roles.sql`, `scripts/ownership/rederive-ownership-roles.mjs`, `scripts/receipt-work/reconcile-receipt-work.mjs`, `scripts/photo-pipeline/local_image_analysis.py`, `scripts/iphoto-intake.mjs`, and the PRs in §20
-- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~17:11 AST)
+- Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~17:42 AST)
