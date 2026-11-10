@@ -24,7 +24,7 @@ import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 import { decodeVin } from "../_shared/vin-decoder.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craigslistImages.ts";
@@ -47,6 +47,7 @@ import { mccormickTarget } from "../_shared/mccormickParser.ts";
 import { ingestMcCormick } from "./mccormick.ts";
 import { ingestVicari } from "./vicari.ts";
 import { collectingCarsCapture, collectingCarsOwner, landCollectingCarsCapture, type CollectingCarsCapture } from "./collectingCars.ts";
+import { ccSnapshotPin, type CcSnapshotPin } from "../extract-collecting-cars/historicalReplay.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -459,7 +460,7 @@ async function recordConditionObservation(
 async function matchOrCreateVehicle(
   parsed: ParsedVehicle & VehicleEnrichment,
   platform?: string | null,
-  opts?: { identityUncertain?: boolean; extractorVehicleId?: string },
+  opts?: { identityUncertain?: boolean; extractorVehicleId?: string; ccReplay?: boolean },
 ): Promise<MatchResult> {
   // Only tryAutoEnrich's successful database read-back supplies this id. The
   // source writer has already resolved and written the entity; do not create
@@ -481,6 +482,7 @@ async function matchOrCreateVehicle(
       await enrichVehicle(owner, parsed, platform);
       return { vehicleId: owner, isNew: false, matchTier: 2, matchConfidence: 0.99 };
     }
+    if (opts?.ccReplay) throw Error('cc_replay_existing_url_owner_required');
     if (!parsed.model) throw Error("cc_listing_owner_missing_for_unknown_model");
   }
 
@@ -905,7 +907,7 @@ type EnrichResult =
   | { ok: true; data: EnrichedData }
   | { ok: false; skipped?: boolean; error: string };
 
-async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResult> {
+async function tryAutoEnrich(url: string, platform: string, ccPin?: CcSnapshotPin): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = projectSecretKey()!;
 
@@ -1072,7 +1074,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         "Authorization": `Bearer ${serviceKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ url, save_to_db: platform !== "craigslist", ...(extractorName === "extract-rmsothebys" ? { action: "extract" } : {}) }),
+      body: JSON.stringify({ url, save_to_db: platform !== "craigslist", ...(ccPin ? { cc_snapshot: ccPin } : {}), ...(extractorName === "extract-rmsothebys" ? { action: "extract" } : {}) }),
       signal: AbortSignal.timeout(75_000),
     });
 
@@ -1115,10 +1117,14 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
       return { ok: false, error: `${extractorName} returned no identity fields (year/make/vin)` };
     }
 
+    const ccCapture = platform === 'collecting_cars' ? collectingCarsCapture(result, url.replace(/\/$/, '')) : undefined;
+    if (ccPin && (!ccCapture || ccCapture.snapshot_id !== ccPin.snapshot_id || ccCapture.sha256 !== ccPin.expected_sha256
+      || !['sold', 'unsold'].includes(ccCapture.fields.stage ?? '') || result.replay?.kind !== 'pinned_closed_listing'))
+      throw Error('cc_replay_receipt_mismatch');
     return {
       ok: true,
       data: {
-        cc_capture: platform === "collecting_cars" ? collectingCarsCapture(result, url) : undefined,
+        cc_capture: ccCapture,
         year: vehicle.year || null,
         make: vehicle.make || null,
         model: vehicle.model || null,
@@ -1153,6 +1159,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
 // ── Single Ingestion ────────────────────────────────────────────
 
 interface IngestInput {
+  cc_snapshot?: CcSnapshotPin;
   url?: string;
   text?: string;
   year?: number;
@@ -1242,6 +1249,10 @@ function normalizeLocation(loc: unknown): string | null {
 
 async function ingestOne(input: IngestInput, userId: string | null): Promise<IngestResult> {
   try {
+    const ccPin = input.cc_snapshot === undefined ? undefined : ccSnapshotPin(input.cc_snapshot);
+    if (ccPin && (Object.keys(input).some(k => !['url', 'cc_snapshot'].includes(k))
+      || !input.url || detectSource(input.url).platform !== 'collecting_cars'))
+      return { status: 'rejected', reason: 'cc_replay_requires_exact_url_and_pin' };
     // Strict boolean: a JSON string "false" must not silently turn a real ingest
     // into a preview (refuter finding, 2026-07-12).
     const isPreview = input.preview === true;
@@ -1380,7 +1391,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let gatewayReceipt: Record<string, unknown> | undefined;
 
     if (listingUrl && (["vicari", "mccormicks", "collecting_cars"].includes(platform) || (platform === "gr_auto_gallery" || platform === "streetside_classics") || platform === "gateway_classics" || (input.enrich !== false && !input.description))) {
-      const enrichResult = await tryAutoEnrich(listingUrl, platform);
+      const enrichResult = await tryAutoEnrich(listingUrl, platform, ccPin);
       if (["gr_auto_gallery", "streetside_classics", "gateway_classics"].includes(platform) && !enrichResult.ok) return { status: "rejected", reason: `enrichment_failed: ${enrichResult.error}`, source: platform };
       if (enrichResult.ok) {
         enrichmentSucceeded = true;
@@ -1707,7 +1718,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       bodyStyle: input.body_style,
       titleStatus: input.title_status,
       sellerName: input.seller_name,
-    }, platform, { identityUncertain, extractorVehicleId });
+    }, platform, { identityUncertain, extractorVehicleId, ccReplay: !!ccPin });
 
     if (ccCapture) ccReceipt = await landCollectingCarsCapture(supabaseAdmin, ccCapture, match.vehicleId);
     if (dealerCapture) dealerReceipt = await landDealerCapture(supabaseAdmin, dealerCapture, match.vehicleId);
@@ -2001,10 +2012,11 @@ Deno.serve(async (req: Request) => {
   if (req.method === "GET") {
     return new Response(JSON.stringify({
       name: "nuke.ingest",
-      capabilities: { collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
+      capabilities: { collecting_cars_pinned_closed_replay: true, collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
       description: "Universal vehicle ingestion endpoint. Accepts structured data, URLs, or free text.",
       methods: { POST: "Ingest vehicle(s)", GET: "This schema documentation" },
       fields: {
+        cc_snapshot: { type: 'object', required: false, description: 'Service writers only: {snapshot_id, expected_sha256} with url and no other item fields. Replays verified retained sold/unsold Collecting Cars full HTML for one existing unique URL owner, preserving source clocks; refusal never fetches a replacement page.' },
         url:          { type: "string",   required: false, example: "https://facebook.com/marketplace/item/123456", description: "Source listing URL — auto-detects platform" },
         text:         { type: "string",   required: false, example: "1980 Chevy C10 $27,500 Greeneville TN", description: "Free-text vehicle description — parsed for year/make/model/price/location" },
         year:         { type: "number",   required: false, example: 1978, description: "Model year (1885–current+2)" },
@@ -2087,6 +2099,11 @@ Deno.serve(async (req: Request) => {
   }
 
   // Allow service role to specify user_id explicitly
+  if (body.cc_snapshot !== undefined || (Array.isArray(body.batch) && body.batch.some((item: any) => item?.cc_snapshot !== undefined))) {
+    const auth = await authenticateWriter(req);
+    if (!auth.ok || auth.caller.kind !== 'service_role') return new Response(JSON.stringify({ error: 'Historical replay requires a service writer' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
   if (body.user_id && !userId) {
     userId = body.user_id;
   }

@@ -20,6 +20,11 @@ globalThis.fetch = async (input, init) => {
   }
   assertEquals(u.origin, base, 'No other network or paid-service call');
   if (u.pathname === '/rest/v1/listing_page_snapshots') {
+    if (mode.startsWith('pinned')) {
+      assertEquals(read, true); assertEquals(u.searchParams.get('id'), `eq.${snapshot}`);
+      return Response.json({ id: snapshot, listing_url: url, platform: mode === 'pinned-wrong' ? 'collecting-cars' : 'collectingcars',
+        html, html_sha256: hash, success: true, http_status: 200, fetched_at: '2020-01-01T00:00:00Z', created_at: '2020-01-01T00:00:00Z' });
+    }
     if (!read) {
       archivePayload = body;
       if (mode === 'failed') return Response.json({ code: '57014', message: 'synthetic retention unavailable' }, { status: 500 });
@@ -44,7 +49,8 @@ await import('./index.ts');
 async function run(next: string, sourceUrl = url) {
   mode = next; calls = []; archivePayload = null;
   const response = await handler(new Request(base + '/functions/v1/extract-collecting-cars', { method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }) }));
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ url: sourceUrl,
+      ...(next.startsWith('pinned') ? { cc_snapshot: { snapshot_id: snapshot, expected_sha256: hash } } : {}) }) }));
   return { status: response.status, body: await response.json() };
 }
 Deno.test('real CC extractor cache receipt retains original clock and normalizes slash without fetching source', async () => {
@@ -63,4 +69,26 @@ for (const scenario of ['dedup', 'nul']) Deno.test(`real CC archive ${scenario} 
 for (const scenario of ['failed', 'changed']) Deno.test(`real CC capture ${scenario} refuses success`, async () => {
   const r = await run(scenario); assertEquals(r.status, 500); assertEquals(r.body.success, undefined);
   assert(typeof r.body.error === 'string'); assertEquals(r.body.source_capture, undefined);
+});
+Deno.test('real extractor explicit historical pin never enters cache TTL or publisher path', async () => {
+  const r = await run('pinned'); assertEquals(r.status, 200);
+  assertEquals(r.body.source_capture.observed_at, '2020-01-01T00:00:00Z'); assertEquals(r.body.replay.kind, 'pinned_closed_listing');
+  assertEquals(calls.length, 1); assertEquals(calls[0].method, 'GET'); assertEquals(archivePayload, null);
+});
+Deno.test('real extractor wrong historical pin fails without fresh-fetch fallback', async () => {
+  const r = await run('pinned-wrong'); assertEquals(r.status, 500); assertEquals(calls.length, 1); assertEquals(archivePayload, null);
+});
+Deno.test('authenticated user cannot use service-only historical replay', async () => {
+  const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const jwk = await crypto.subtle.exportKey('jwk', keys.publicKey);
+  Deno.env.set('SUPABASE_JWKS', JSON.stringify({ keys: [{ ...jwk, kid: 'cc-replay-user-test', alg: 'ES256' }] }));
+  const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  const encode = (value: unknown) => b64(new TextEncoder().encode(JSON.stringify(value)));
+  const signing = `${encode({ alg: 'ES256', kid: 'cc-replay-user-test' })}.${encode({ role: 'authenticated', sub: snapshot, exp: Math.floor(Date.now() / 1000) + 60 })}`;
+  const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, keys.privateKey, new TextEncoder().encode(signing));
+  calls = [];
+  const r = await handler(new Request(base + '/functions/v1/extract-collecting-cars', { method: 'POST',
+    headers: { authorization: `Bearer ${signing}.${b64(new Uint8Array(signature))}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ url, cc_snapshot: { snapshot_id: snapshot, expected_sha256: hash } }) }));
+  assertEquals(r.status, 403); assertEquals(calls.length, 0);
 });

@@ -32,6 +32,12 @@ globalThis.fetch = async (input, init) => {
   if (u.pathname.startsWith('/auth/')) return Response.json({ message: 'synthetic service key has no user' }, { status: 401 });
   if (u.pathname === '/functions/v1/extract-collecting-cars') {
     assertEquals(body.url, url);
+    if (body.cc_snapshot) {
+      assertEquals(body.cc_snapshot, { snapshot_id: snapshot, expected_sha256: 'a'.repeat(64) });
+      return Response.json({ success: true, extracted: { ...fields, stage: failure === 'live-replay' ? 'live' : 'unsold' },
+        source_capture: { snapshot_id: failure === 'wrong-replay' ? observationId : snapshot, sha256: 'a'.repeat(64), observed_at: clock, source_url: url },
+        replay: { kind: 'pinned_closed_listing' } });
+    }
     return Response.json(failure === 'capture' ? { success: true, extracted: fields } : { success: true, extracted: fields,
       source_capture: { snapshot_id: snapshot, sha256: 'a'.repeat(64), observed_at: clock, source_url: url } });
   }
@@ -72,9 +78,9 @@ globalThis.fetch = async (input, init) => {
 let handler: (request: Request) => Response | Promise<Response>;
 (Deno as any).serve = (fn: typeof handler) => { handler = fn; return { finished: Promise.resolve() }; };
 await import('./index.ts');
-async function run() {
+async function run(extra: Record<string, unknown> = {}) {
   const response = await handler(new Request(base + '/functions/v1/ingest', { method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ url }) }));
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ url, ...extra }) }));
   return await response.json();
 }
 Deno.test('actual CC ingest routes deterministic capture, inserts all266 photos and reads them back without fabricating bids', async () => {
@@ -94,6 +100,23 @@ Deno.test('actual CC ingest routes deterministic capture, inserts all266 photos 
 for (const mode of ['capture', 'admission', 'gallery']) Deno.test(`actual CC handler ${mode} failure cannot report complete capture`, async () => {
   reset(mode); const r = await run(); assertEquals(r.status, 'error'); assertEquals(r.collecting_cars_receipt, undefined);
   if (mode === 'capture') assertEquals(seen.filter(x => x.method !== 'GET' && x.path.startsWith('/rest/')).length, 0);
+});
+
+const ccPin = { snapshot_id: snapshot, expected_sha256: 'a'.repeat(64) };
+Deno.test('actual historical ingest forwards pin and retains full gallery/canonical old-clock receipt', async () => {
+  reset(); const r = await run({ cc_snapshot: ccPin }); assertEquals(r.status, 'matched');
+  assertEquals(r.collecting_cars_receipt.images, 266); assertEquals(observation.observed_at, clock);
+  assertEquals(observation.structured_data.stage, 'unsold');
+  assertEquals(seen.filter(x => x.path === '/functions/v1/extract-collecting-cars').length, 1);
+});
+for (const mode of ['no-owner', 'ambiguous-owner', 'wrong-replay', 'live-replay']) Deno.test(`actual pinned ${mode} refuses without attribution writes`, async () => {
+  reset(mode); const r = await run({ cc_snapshot: ccPin }); assertEquals(r.status, 'error');
+  assertEquals(gallery.length, 0); assertEquals(observation, null);
+  assertEquals(seen.filter(x => x.method === 'PATCH' || (x.method === 'POST' && x.path.startsWith('/rest/'))).length, 0);
+});
+Deno.test('historical pin cannot mix caller-supplied identity or price', async () => {
+  reset(); const r = await run({ cc_snapshot: ccPin, price: 99 }); assertEquals(r.status, 'rejected');
+  assertEquals(seen.some(x => x.path.startsWith('/functions/')), false);
 });
 
 function blueBird(mode = '') {
