@@ -622,13 +622,17 @@ export function frameClock(row) {
   return { value, basis, day: date ? `${date[1]}-${date[2]}-${date[3]}` : 'unknown' };
 }
 
-export async function loadAnalysisImages(client, vehicleId) {
+export async function loadAnalysisImages(client, vehicleId, imageIds = null) {
   const all = [], page = 1000;
   for (let offset = 0; ; offset += page) {
-    const { data, error } = await client.from('vehicle_images')
+    let query = client.from('vehicle_images')
       .select('id, user_id, image_url, file_name, taken_at, created_at, updated_at, source, ai_scan_metadata, apple_ml_labels, latitude, longitude, location_name, exif_data, stale, vehicle_image_gallery_eligible, is_sensitive, is_superseded, is_duplicate, image_vehicle_match_status, vision_gate_status')
       .eq('vehicle_id', vehicleId).eq('vehicle_image_gallery_eligible', true)
-      .or('is_sensitive.is.null,is_sensitive.eq.false')
+      .or('is_sensitive.is.null,is_sensitive.eq.false');
+    // A bounded explicit batch still uses the current source/eligibility owner,
+    // but need not transfer every other image's classification and EXIF payload.
+    if (imageIds) query = query.in('id', imageIds);
+    const { data, error } = await query
       .order('created_at', { ascending: true }).order('id', { ascending: true })
       .range(offset, offset + page - 1).abortSignal(AbortSignal.timeout(20000));
     if (error || !Array.isArray(data)) throw new Error(`prepare: image query failed: ${error?.message || 'missing result'}`);
@@ -685,8 +689,11 @@ export async function prepare(client = sb, options = {}) {
   mkdirSync(dirname(WORKLIST), { recursive: true });
   writeFileSync(WORKLIST, '');
   writeFileSync(`${WORKLIST}.date`, '');
+  const imageIds = options.imageIds ?? (arg('--image-ids') ? arg('--image-ids').split(',') : null);
+  if (imageIds && (!Array.isArray(imageIds) || imageIds.length < 1 || imageIds.length > LIMIT ||
+    imageIds.some(id => !sourceUuid(id)) || new Set(imageIds).size !== imageIds.length)) throw new Error('prepare: invalid exact image selection');
   // Preparation performs no remote writes; choosing a frame is not analysis.
-  const all = await loadAnalysisImages(client, VEHICLE_ID);
+  const all = await loadAnalysisImages(client, VEHICLE_ID, imageIds);
 
   const SHARD_COUNT = parseInt(arg('--shard-count', '1'));
   const SHARD_INDEX = parseInt(arg('--shard-index', '0'));
@@ -717,10 +724,7 @@ export async function prepare(client = sb, options = {}) {
 
   let pending;
   let chosenDay = null;
-  const imageIds = options.imageIds ?? (arg('--image-ids') ? arg('--image-ids').split(',') : null);
   if (imageIds) {
-    if (!Array.isArray(imageIds) || imageIds.length < 1 || imageIds.length > LIMIT ||
-      imageIds.some(id => !sourceUuid(id)) || new Set(imageIds).size !== imageIds.length) throw new Error('prepare: invalid exact image selection');
     const selected = new Map(pendingAll.map(row => [row.id, row]));
     if (imageIds.some(id => !selected.has(id))) throw new Error('prepare: requested image is unavailable or already analyzed for this pass');
     pending = imageIds.map(id => selected.get(id));
@@ -814,7 +818,7 @@ export async function prepare(client = sb, options = {}) {
   } else {
     console.log(`prepare: ${pending.length} rows → ${WORKLIST}`);
   }
-  console.log(`         eligible gallery pool = ${all.length}; pending selection = ${pendingAll.length}; remaining selection = ${pendingAll.length - pending.length}. Documents use the receipt workflow; duplicate, withdrawn and sensitive frames are excluded.`);
+  console.log(`         ${imageIds ? 'eligible requested images' : 'eligible gallery pool'} = ${all.length}; pending selection = ${pendingAll.length}; remaining selection = ${pendingAll.length - pending.length}. ${imageIds ? 'Whole-inventory coverage was not queried. ' : ''}Documents use the receipt workflow; duplicate, withdrawn and sensitive frames are excluded.`);
 }
 
 // The existing deep intake delegates to the guarded photo owner. No raw cache,
