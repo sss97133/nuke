@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { computeSaturation, factFingerprint, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT,
-  attributionDoubt, landEntityPage, frameClock, loadAnalysisImages, receiptRoster, receiptRosterLine } from './deep-image-analysis-byok.mjs';
+  attributionDoubt, landEntityPage, frameClock, loadAnalysisImages, receiptRoster, receiptRosterLine, prepare } from './deep-image-analysis-byok.mjs';
 import { projectImageProperties } from './lib/image-property-projection.mjs';
 
 const now = '2026-10-30T20:00:00Z';
@@ -250,4 +253,22 @@ test('receipt grounding preserves order, shipment and return lines and exact sou
   const transactionOnly = receiptRoster([{ ...line, id: 'transaction-only', receipts: { ...receipt, receipt_date: null, transaction_date: '2025-11-01' } }])[0];
   assert.match(receiptRosterLine(transactionOnly), /transaction_date=2025-11-01/);
   assert.doesNotMatch(receiptRosterLine(transactionOnly), /document date|receipt_date=/);
+});
+
+
+test('successful empty preparation replaces a stale worklist for image and day selections', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'byok-empty-'));
+  const worklist = join(dir, 'work.jsonl');
+  const client = { from() {
+    const q = new Proxy({}, { get(_, method) { return () => method === 'abortSignal'
+      ? Promise.resolve({ data: [], error: null }) : q; } }); return q;
+  } };
+  try {
+    for (const byDay of [false, true]) {
+      writeFileSync(worklist, '{"image_id":"stale"}\n'); writeFileSync(`${worklist}.date`, '2025-01-01');
+      await prepare(client, { vehicleId: 'vehicle', limit: 3, worklist, byDay });
+      assert.equal(readFileSync(worklist, 'utf8'), '');
+      assert.equal(readFileSync(`${worklist}.date`, 'utf8'), '');
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

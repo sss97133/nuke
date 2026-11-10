@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useBuildLedger, useVehicleReceiptRecords } from './hooks/useBuildLedger';
-import { ReceiptRecords, WorkOrderFinancialRecords } from './FinancialReceiptRecords';
+const WorkOrderFinancialRecords = React.lazy(() => import('./FinancialReceiptRecords').then(module => ({ default: module.WorkOrderFinancialRecords })));
 import FinancialLedger from './FinancialLedger';
 import { moneyLabel } from './hooks/useVehicleFinancials';
 
@@ -11,7 +11,7 @@ function recordedDate(value: string | null) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
 
-function FinancialDetails({ vehicleId, market }: { vehicleId: string; market: React.ReactNode }) {
+function FinancialDetails({ vehicleId, market, onClose }: { vehicleId: string; market: React.ReactNode; onClose: () => void }) {
   const { user } = useAuthContext();
   const ledger = useBuildLedger(vehicleId, false);
   const receipts = useVehicleReceiptRecords(vehicleId);
@@ -22,7 +22,7 @@ function FinancialDetails({ vehicleId, market }: { vehicleId: string; market: Re
       {ledger.error && <div role="status"><p>Some financial records could not load. Available records remain shown; missing reads do not establish a zero balance.</p><button className="vp-financial-action" type="button" onClick={() => void ledger.retry()}>Retry financial records</button></div>}
       <FinancialLedger vehicleId={vehicleId} />
       <details className="vp-financial-sources"><summary>Work orders and historical build records</summary>
-      <WorkOrderFinancialRecords vehicleId={vehicleId} />
+      <React.Suspense fallback={null}><WorkOrderFinancialRecords vehicleId={vehicleId} /></React.Suspense>
       {ledger.data.hasAudit && <section><h3>Build records and reported obligations</h3>
         <p>Recorded evidence and attribution remain attached to each entry. These records are kept separate from booked costs.</p>
         {ledger.data.groups.flatMap(group => group.entries).map(entry => <details key={entry.id} className="vp-financial-entry">
@@ -45,10 +45,7 @@ function FinancialDetails({ vehicleId, market }: { vehicleId: string; market: Re
       </section>}
       </details>
     </>}
-    {(receipts.isLoading || receipts.isError || receipts.rows.length > 0) && <details className="vp-financial-sources">
-      <summary>Receipt sources</summary>
-      <ReceiptRecords vehicleId={vehicleId} read={receipts} />
-    </details>}
+    {receipts.rows.length > 0 && <a href="#build-receipts" onClick={onClose}>View work & parts receipts</a>}
   </div>;
 }
 
@@ -80,7 +77,7 @@ export default function ProfileFinancials({ vehicleId, market, reducedMarket, op
         const next = !reduced; setReduction({ key: preference, reduced: next });
         try { localStorage.setItem(preference, next ? 'reduced' : 'expanded'); } catch { /* A display preference can remain session-only. */ }
       }}>{reduced ? 'Show header amount' : 'Reduce header amount'}</button></div>}
-      <FinancialDetails key={`${user?.id ?? 'anon'}:${vehicleId}`} vehicleId={vehicleId} market={market} />
+      <FinancialDetails key={`${user?.id ?? 'anon'}:${vehicleId}`} vehicleId={vehicleId} market={market} onClose={onClose} />
     </HeaderPopover>}
   </>;
 }
