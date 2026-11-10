@@ -45,6 +45,39 @@ columns say whether the model had a key that is true of the claim on 2026-11-10.
 Three of the thirteen have both a part key and a condition key that are true of them. Thirteen photos of one
 primered hood are one claim, and before the fold they were thirteen sentences in thirteen places.
 
-## Results
+## Results, 2026-11-10 21:14 to 21:56 UTC
 
-Round 1 started 2026-11-10 21:14 UTC. Its numbers are added here when it finishes.
+52 statements (30 callouts, 22 part labels). Every run accounted for every statement.
+
+| | Runs | Same part | Same state | Same on both | New part keys drafted, per run | Distinct across the runs | Drafted by every run |
+|---|---|---|---|---|---|---|---|
+| No memory | 3 | 34 of 52 | 34 of 52 | 29 of 52 | 18, 16, 21 | 30 | 11 |
+| Given the first run's decisions | 3 | 50 of 52 | 49 of 52 | 49 of 52 | 18, 18, 18 | 18 | 18 |
+
+A statement counts as the same only when every run returned the same set of claims for it; a run that also listed
+it under `not_a_claim`, or returned one claim more, counts as different. New state and condition keys went the same
+way: 10 distinct across the three no-memory runs, 3 of them drafted by all.
+
+What the runs did:
+
+- With no memory, all three folded the thirteen primer-hood statements into one claim, on the same drafted part key
+  and `image_visible_paint_stage` = primer. The fold is not where they differ.
+- With no memory they named the same new thing differently: `engine.fender.inner` and `engine.bay.fender.inner`;
+  `exterior.cab.bed.gap` and `exterior.gap.cab.bed`; `exterior.surface.dust` and `exterior.surface.soiling`. One run
+  drafted a key for the door-jamb label where another used the existing `document.vin.door`.
+- Given the decisions, all three runs drafted the same 18 part keys. The three statements that still differ do
+  not differ on a key: twice one run also listed a statement under `not_a_claim`, and once one run also returned a
+  "seen" claim beside a wheel's state.
+
+What this shows: the stored decisions carry the consistency, not the agent. An agent without them writes the model
+"new every time", which is the owner's worry, measured; the same agent with them does not.
+
+What it does not show:
+
+- That the keys are right. The decisions handed to the second half were one run's unreviewed drafts. Agreement is
+  not correctness; whether a drafted key is the right one is a curator's and the owner's call.
+- Anything beyond one vehicle's capture day and one family of model for every run.
+- The trap case. No statement was planted that no key is true of, so "never stretch" was not tested.
+
+Next rounds: the proof vehicle's statements; a planted trap; decisions that a person has approved; a cheaper
+model given the same decisions.

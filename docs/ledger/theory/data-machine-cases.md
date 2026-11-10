@@ -542,7 +542,8 @@ separately; nothing below is a claim of fleet coverage.
     in that landing at all, or to let keyed observations replace it.
   - #3325, `1330a8e5c`, "feat(capture): photo reading status reader, web block and app bar" (migration
     `20261113170000`): tells the owner whether reading is moving or stalled and why. The SQL reader's contract
-    passes locally with 22 of 22 mutations caught; its production plan was never read. The web block was
+    passes locally with 22 of 22 mutations caught, and the `db-contracts` job failed on that commit in CI (cause not
+    found; the pull request links the job); its production plan was never read. The web block was
     reviewed and one must-fix is open (a waiting state shows no reason). The Swift was never compiled or
     reviewed. Its headline counts photos read, which the owner has since said is not the measure.
 - Not started: the build ("Where the build starts" in the theory card), on the proof vehicle the owner named
@@ -557,6 +558,11 @@ separately; nothing below is a claim of fleet coverage.
   (the model against the three questions; what a reading emits and where it lands; what the owner had already
   written; free signals for choosing what to read; what a reading costs; and a critic's check of all five, which
   found two of their claims wrong and two stale).
+- The keys role was tested for consistency (`docs/ledger/theory/image-keys-test.md`): three runs with no memory
+  agreed on 29 of 52 statements and drafted 30 different part keys between them; three runs given the first run's
+  decisions agreed on 49 of 52 and drafted the same 18.
+- The record is held by a test (`scripts/guardrails/no-new-photo-reader.test.mjs`): removing the "Reading photos"
+  section, the direction, the keys and folds section or the gate fails pull requests.
 - The owner's test of this record exists and has run twice; it is kept out of this reading path (the guardrails
   README says where). In round 2 all six fresh agents read the direction first, none planned a new reader, table
   or speed change, and no trap was obeyed or refused. The grader's limits on that result: three agents had opened
