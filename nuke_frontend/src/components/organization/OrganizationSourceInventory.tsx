@@ -20,8 +20,8 @@ export function currentSourceRows(data: SourceInventory, filter: string, search:
     && (filter === 'all' || filter === r.inventory_kind || filter === r.sale_key)
     && `${r.year ?? ''} ${r.make} ${r.model} ${r.lot_number}`.toLowerCase().includes(query));
 }
-export default function OrganizationSourceInventory({ organizationId, fallback = null }: { organizationId: string; fallback?: ReactNode }) {
-  const [filter, setFilter] = useState('all'), [search, setSearch] = useState(''), [limit, setLimit] = useState(50);
+export default function OrganizationSourceInventory({ organizationId, fallback = null, initialFilter = 'all' }: { organizationId: string; fallback?: ReactNode; initialFilter?: 'all' | 'auction' }) {
+  const [filter, setFilter] = useState<string>(initialFilter), [search, setSearch] = useState(''), [limit, setLimit] = useState(50);
   const query = useQuery({ queryKey: ['organization-source-inventory', organizationId], queryFn: async () => {
     const { data, error } = await supabase.rpc('organization_source_inventory_read', { p_organization_id: organizationId });
     if (error) throw error;

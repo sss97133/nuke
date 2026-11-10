@@ -3611,7 +3611,9 @@ export default function OrganizationProfile() {
 
         {/* AUCTIONS TAB */}
         {activeTab === 'auctions' && organizationId && (
-          <OrganizationAuctionsTab organizationId={organizationId} />
+          <OrganizationSourceInventory organizationId={organizationId} initialFilter="auction" fallback={
+            <OrganizationAuctionsTab organizationId={organizationId} />
+          } />
         )}
 
         {activeTab === 'listings' && comprehensiveData && (
