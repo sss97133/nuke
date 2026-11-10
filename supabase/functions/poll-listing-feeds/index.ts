@@ -59,6 +59,7 @@ import { parseKslSearchCards } from "./kslCards.ts";
 import { splitByYear } from "./yearFilter.ts";
 import { selectCollectingCarsReplay } from "./collectingCarsReplay.ts";
 import { prepareCollectingCarsHistory } from "./collectingCarsHistory.ts";
+// Native history preparation also admits bounded, explicitly configured retained discovery manifests.
 import { nextYield } from "./schedule.ts";
 import { pollPurplewave } from "./purplewave.ts";
 import { CC_LISTING_METHOD, CC_OBSERVATION_COLUMNS, collectingCarsReceipt, collectingCarsAdmissionMatches,

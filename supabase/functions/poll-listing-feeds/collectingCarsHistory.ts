@@ -1,6 +1,6 @@
 import { retainFetchedCapture } from "../_shared/archiveFetch.ts";
 import { ledgerDecision, type LedgerKnown } from "./ledger.ts";
-import { discoverCollectingCarsSitemap, prepareCollectingCarsTargets, readCollectingCarsRetry } from "./collectingCarsSupplement.ts";
+import { admitCollectingCarsRetainedDiscovery, discoverCollectingCarsSitemap, prepareCollectingCarsTargets, readCollectingCarsRetry } from "./collectingCarsSupplement.ts";
 
 const ENDPOINT = "https://dora.production.collecting.com/multi_search";
 // Publisher's existing public, search-only client key (same discovery owner).
@@ -55,13 +55,16 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
   const supplement = config.history_supplement_version === 1;
   if (config.history_supplement_version != null && !supplement) throw Error("cc_history_supplement_version_invalid");
   const control = { get: () => config, checkpoint };
-  const sitemap = supplement ? await discoverCollectingCarsSitemap(db, control, signal, fetcher) : null;
+  if (!supplement && config.history_retained_discovery != null) throw Error("cc_retained_discovery_requires_supplement");
+  const retainedDiscovery = supplement ? await admitCollectingCarsRetainedDiscovery(db, control, signal) : null;
+  const sitemap = supplement ? await discoverCollectingCarsSitemap(db, control, signal, fetcher, 100 - (retainedDiscovery?.discovery_slots_used ?? 0)) : null;
   const retry = supplement ? await readCollectingCarsRetry(db, control, signal) : null;
   if (supplement && ![undefined, "index", "targets"].includes(config.history_phase)) throw Error("cc_history_phase_invalid");
   if (supplement && config.history_phase === "targets") {
     const targets = await prepareCollectingCarsTargets(db, control, signal);
     attachRetry(targets, retry);
     targets.receipt.sitemap_discovery = sitemap;
+    if (retainedDiscovery) targets.receipt.retained_discovery = retainedDiscovery;
     return { ...targets, async finish(...args: Parameters<typeof targets.finish>) { preparing = false; return await targets.finish(...args); } };
   }
   let capture: Capture | null = config.history_capture ?? null, response: any;
@@ -148,6 +151,7 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
   } };
   attachRetry(result, retry);
   if (sitemap) receipt.sitemap_discovery = sitemap;
+  if (retainedDiscovery) receipt.retained_discovery = retainedDiscovery;
   return result;
 }
 

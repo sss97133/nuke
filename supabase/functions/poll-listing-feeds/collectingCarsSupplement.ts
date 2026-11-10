@@ -28,8 +28,39 @@ export function collectingCarsSitemapUrls(xml: string): string[] {
   return [...new Set(locs.map(url => url.replace(/\/$/, "")))];
 }
 
-/** One retained XML file, <=100 durable discoveries per invocation. No paid renderer or fallback. */
-export async function discoverCollectingCarsSitemap(db: any, control: Control, signal: AbortSignal, fetcher = fetch) {
+/** Curated retained discovery is URL membership only, never native auction testimony. */
+export async function admitCollectingCarsRetainedDiscovery(db: any, control: Control, signal: AbortSignal) {
+  const manifest = control.get().history_retained_discovery;
+  if (manifest == null) return null;
+  signal.throwIfAborted();
+  if (manifest.version !== 1 || !/^[0-9a-f]{64}$/.test(manifest.origin_sha256 ?? "")
+    || !clock(manifest.discovered_at) || !Array.isArray(manifest.urls) || manifest.urls.length < 1 || manifest.urls.length > 20
+    || manifest.urls.some((url: unknown) => typeof url !== "string" || !URL_RE.test(url) || url.endsWith("/"))
+    || new Set(manifest.urls).size !== manifest.urls.length
+    || Object.keys(manifest).some(key => !["version", "origin_sha256", "discovered_at", "urls"].includes(key)))
+    throw Error("cc_retained_discovery_manifest_invalid");
+  const fingerprint = await hash(JSON.stringify([manifest.version, manifest.origin_sha256, manifest.discovered_at, manifest.urls]));
+  const receipt = { scope: "retained_discovery_manifest", origin_sha256: manifest.origin_sha256,
+    discovered_at: manifest.discovered_at, source_read_at: null, candidate_urls: manifest.urls.length,
+    coverage: "Retained URL discovery only; file provenance is operator-supplied. Native identity, car classification and capture remain unverified." };
+  if (control.get().history_retained_discovery_ack === fingerprint) return { ...receipt, acknowledged: true, discovery_slots_used: 0 };
+  const write = await db.from("source_targets").upsert(manifest.urls.map((listing_url: string) => ({
+    source_slug: "collecting-cars", listing_url, sitemap_file: `retained-discovery:sha256:${manifest.origin_sha256}`,
+    last_seen_at: new Date().toISOString(),
+  })), { onConflict: "listing_url", ignoreDuplicates: true }).abortSignal(signal);
+  if (write.error) throw Error("cc_retained_discovery_write_failed");
+  const read = await db.from("source_targets").select("listing_url,source_slug").in("listing_url", manifest.urls).abortSignal(signal);
+  if (read.error || read.data?.length !== manifest.urls.length
+    || new Set(read.data.map((row: Row) => row.listing_url)).size !== manifest.urls.length
+    || read.data.some((row: Row) => row.source_slug !== "collecting-cars" || !manifest.urls.includes(row.listing_url)))
+    throw Error("cc_retained_discovery_unacknowledged");
+  await control.checkpoint({ ...control.get(), history_retained_discovery_ack: fingerprint });
+  return { ...receipt, acknowledged: true, discovery_slots_used: manifest.urls.length };
+}
+
+/** One retained XML file, <=100 shared durable discoveries per invocation. No paid renderer or fallback. */
+export async function discoverCollectingCarsSitemap(db: any, control: Control, signal: AbortSignal, fetcher = fetch, discoveryLimit = 100) {
+  if (!integer(discoveryLimit, 1) || discoveryLimit > 100) throw Error("cc_sitemap_discovery_limit_invalid");
   let c = control.get();
   const file = c.history_sitemap_index ?? 0, offset = c.history_sitemap_offset ?? 0;
   if (!integer(file) || file >= SITEMAPS.length || !integer(offset)) throw Error("cc_sitemap_cursor_invalid");
@@ -87,7 +118,7 @@ export async function discoverCollectingCarsSitemap(db: any, control: Control, s
   }
   const urls = collectingCarsSitemapUrls(xml);
   if (offset > urls.length) throw Error("cc_sitemap_offset_invalid");
-  const page = urls.slice(offset, offset + 100);
+  const page = urls.slice(offset, offset + discoveryLimit);
   if (page.length) {
     const write = await db.from("source_targets").upsert(page.map(listing_url => ({ source_slug: "collecting-cars", listing_url,
       sitemap_file: url, last_seen_at: capture.read_at })), { onConflict: "listing_url", ignoreDuplicates: true }).abortSignal(signal);
