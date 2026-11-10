@@ -66,6 +66,18 @@ jobs:
       - name: Verify immutable assets, retry receipts and revision discovery
         run: node --test scripts/ingest-autotrader-history.test.mjs
 
+  subscription-reader-heartbeat-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js for the subscription reader heartbeat
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify the reader summary reaches the heartbeat RPC as JSON and never through a shell
+        run: node --test scripts/photo-pipeline/reader-heartbeat.test.mjs
+
   broadcast-overlay-contract:
     runs-on: ubuntu-latest
     steps:
