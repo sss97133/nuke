@@ -50,6 +50,19 @@ struct ExploreFeedItem: Identifiable, Equatable {
         NukeDisplay.joined([location, facts, seen])
     }
 
+    /// The source's mark as nuke.ag hosts it (the files the web's source board shows), or nil when
+    /// none is known for this source, in which case the card keeps the text pill.
+    var sourceLogoURL: URL? {
+        Self.logoFiles[source].flatMap { URL(string: "https://nuke.ag/source-logos/\($0).png") }
+    }
+
+    /// Display name (as `source` holds it) → file in nuke_frontend/public/source-logos.
+    private static let logoFiles: [String: String] = [
+        "Bring a Trailer": "bat", "Cars & Bids": "cars-and-bids", "Craigslist": "craigslist",
+        "Facebook Marketplace": "facebook_marketplace", "KSL": "ksl", "Mecum": "mecum",
+        "Barrett-Jackson": "barrett-jackson",
+    ]
+
     /// "Ends in 3d 4h" for a live lot, nil when there is no end time on record.
     func timeLeft(now: Date) -> String? {
         guard let endsAt else { return nil }
@@ -182,7 +195,8 @@ struct ExploreHeroCard: View {
 
     var body: some View {
         NukeHeroCard(imageURL: NukeImage.thumb(item.image, width: 1080), title: item.title,
-                     subtitle: item.subtitle, pills: [item.source]) {
+                     subtitle: item.subtitle, pills: item.sourceLogoURL == nil ? [item.source] : [],
+                     sourceLogoURL: item.sourceLogoURL, sourceName: item.source) {
             HStack(alignment: .bottom) {
                 if let amt = item.amount {
                     VStack(alignment: .leading, spacing: 0) {
@@ -198,7 +212,7 @@ struct ExploreHeroCard: View {
                 if item.endsAt != nil {
                     TimelineView(.periodic(from: .now, by: 60)) { ctx in
                         if let left = item.timeLeft(now: ctx.date) {
-                            NukePill(text: left, icon: "clock", onPhoto: true)
+                            NukePill(text: left, icon: "clock", onPhoto: true, textColor: Color.red)
                         }
                     }
                 }
