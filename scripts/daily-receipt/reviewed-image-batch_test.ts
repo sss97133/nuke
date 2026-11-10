@@ -2,6 +2,7 @@ import { assert, assertEquals, assertRejects, assertThrows } from "jsr:@std/asse
 import { cliArgs, eligibleWorklist, exactRows, packReviews, parseStage, requireSubscription,
   subscriptionEnvironment, validateEnvelopeBatch, runBatch } from "./reviewed-image-batch.ts";
 import { admitReviewedBatch, persistReviewedBatchReceipt } from "../deep-image-analysis-byok.mjs";
+import { recordReviewedAnalysis } from "../../supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis.ts";
 
 const vehicle = "20000000-0000-4000-8000-000000000001", image = "10000000-0000-4000-8000-000000000001";
 const other = "10000000-0000-4000-8000-000000000002", now = new Date().toISOString();
@@ -101,6 +102,35 @@ Deno.test("source CAS refusal retains partial receipts and stops remaining admis
       observation_id: "30000000-0000-4000-8000-000000000001", image_observation_id: "40000000-0000-4000-8000-000000000001", model_calls: 0 } } :
       { error: { context: Response.json({ error: "review_source_changed" }, { status: 409 }) } } });
   assertEquals(calls, 2); assertEquals([result.wrote, result.failed, result.remaining], [1, 1, 1]);
+  assertEquals(result.receipts[1].error, "review_source_changed");
+});
+Deno.test("a sibling cover version change stops the next real review before its intake", async () => {
+  const batch = [envelopes()[0], structuredClone(envelopes()[0])]; batch[1].verdict.image_id = other;
+  let siblingVersion = now, admitted = 0, projected = 0;
+  const result = await admitReviewedBatch(batch, vehicle, { validate: validateEnvelopeBatch,
+    invoke: async (p: any) => {
+      try {
+        const data = await recordReviewedAnalysis(p, {
+          authorize: async () => true,
+          readImage: async (id: string) => ({ id, vehicle_id: vehicle, image_url: work()[0].image_url,
+            updated_at: id === other ? siblingVersion : now, vision_gate_status: "approved", ai_scan_metadata: {} }),
+          ingest: async () => { admitted++; return { success: true, observation_id: "30000000-0000-4000-8000-000000000001" }; },
+          project: async (id: string) => {
+            projected++;
+            // The cover writer's sibling is_primary update advances updated_at.
+            // No source bytes changed; the strict snapshot still must not be refreshed here.
+            siblingVersion = new Date(Date.parse(now) + 1000).toISOString();
+            return { success: true, observation_id: id, image_id: p.verdict.image_id, vehicle_id: vehicle,
+              image_observation_id: "40000000-0000-4000-8000-000000000001" };
+          },
+        });
+        return { data };
+      } catch (e) {
+        return { error: { context: Response.json({ error: (e as Error).message }, { status: 409 }) } };
+      }
+    } });
+  assertEquals([admitted, projected, result.wrote, result.failed], [1, 1, 1, 1]);
+  assertEquals(result.receipts[0].image_id, image);
   assertEquals(result.receipts[1].error, "review_source_changed");
 });
 Deno.test("confirmed receipt is durable while the next admission is still pending", async () => {
