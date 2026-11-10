@@ -141,7 +141,7 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
       source_url: doc.url, source_identifier: `auctionid:${id}:${doc.hash}`,
       ...(vehicleId ? { vehicle_id: vehicleId } : {}),
       content_text: [doc.lot.title, doc.lot.description].filter(Boolean).join("\n\n"),
-      structured_data: { ...doc.lot, kind_detail: "auction_listing", parser,
+      structured_data: { ...doc.lot, kind_detail: doc.lot.presentation === "showroom" ? "dealer_listing" : "auction_listing", parser,
         source_claims_only: true, observed_at_basis: "page_capture", observation_time_basis: "source_capture",
         source_captured_at: doc.snapshot.fetched_at, source_event_at: null },
       extraction_method: parser, raw_source_ref: `listing_page_snapshots:${doc.snapshot.id}`,

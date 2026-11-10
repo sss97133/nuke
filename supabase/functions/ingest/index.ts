@@ -2038,7 +2038,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "GET") {
     return new Response(JSON.stringify({
       name: "nuke.ingest",
-      capabilities: { collecting_cars_pinned_closed_replay: true, collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
+      capabilities: { mccormicks_native_listing: true, collecting_cars_pinned_closed_replay: true, collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
       description: "Universal vehicle ingestion endpoint. Accepts structured data, URLs, or free text.",
       methods: { POST: "Ingest vehicle(s)", GET: "This schema documentation" },
       fields: {

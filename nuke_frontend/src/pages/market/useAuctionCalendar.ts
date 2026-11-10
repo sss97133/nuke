@@ -16,6 +16,8 @@ export type CalendarSale = {
   lots_listed: number | null; listed_at: string | null;
   /** The same series' previous sale, from the house's own index (census meta prior_sale), when the census carries it. */
   prior_sale?: PriorSale | null;
+  source_url?: string | null;
+  organization_id?: string | null;
 };
 /** A sale series' previous sale as the house's index recorded it: its final roster and how much of it sold. */
 export type PriorSale = {
@@ -46,14 +48,14 @@ export type AuctionCalendar = {
 };
 
 const HOUSE_NAMES: Record<string, string> = {
-  mecum: 'Mecum', gooding: 'Gooding & Co', 'barrett-jackson': 'Barrett-Jackson', barrettjackson: 'Barrett-Jackson',
+  mccormicks: 'McCormick’s', mecum: 'Mecum', gooding: 'Gooding & Co', 'barrett-jackson': 'Barrett-Jackson', barrettjackson: 'Barrett-Jackson',
   'rm-sothebys': "RM Sotheby's", bonhams: 'Bonhams', broad_arrow: 'Broad Arrow', 'broad-arrow': 'Broad Arrow',
   bat: 'Bring a Trailer', cars_and_bids: 'Cars & Bids', pcarmarket: 'PCarMarket', collecting_cars: 'Collecting Cars',
 };
 export const houseName = (house: string) => HOUSE_NAMES[house] ?? house;
 
 const HOUSE_HOSTS: Record<string, string> = {
-  mecum: 'mecum.com', gooding: 'goodingco.com', 'barrett-jackson': 'barrett-jackson.com', barrettjackson: 'barrett-jackson.com',
+  mccormicks: 'classic-carauction.com', mecum: 'mecum.com', gooding: 'goodingco.com', 'barrett-jackson': 'barrett-jackson.com', barrettjackson: 'barrett-jackson.com',
   'rm-sothebys': 'rmsothebys.com', bonhams: 'bonhams.com', broad_arrow: 'broadarrowauctions.com', 'broad-arrow': 'broadarrowauctions.com',
   bat: 'bringatrailer.com', cars_and_bids: 'carsandbids.com', pcarmarket: 'pcarmarket.com', collecting_cars: 'collectingcars.com',
 };
