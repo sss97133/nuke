@@ -351,6 +351,8 @@ struct NukeHeroCard<Overlay: View>: View {
     /// The source's mark, shown ahead of the pills; leave nil to show the source as a text pill.
     var sourceLogoURL: URL? = nil
     var sourceName: String = ""
+    /// A tappable stand-in for the source's mark or pill (Explore's source door); nil keeps the static mark.
+    var sourceDoor: AnyView? = nil
     @ViewBuilder let overlay: () -> Overlay
 
     var body: some View {
@@ -369,7 +371,9 @@ struct NukeHeroCard<Overlay: View>: View {
                 if let subtitle {
                     Text(subtitle).font(.nukeDetail).foregroundStyle(.secondary).lineLimit(2)
                 }
-                if !pills.isEmpty || sourceLogoURL != nil {
+                if let sourceDoor {
+                    sourceDoor.padding(.top, 2)
+                } else if !pills.isEmpty || sourceLogoURL != nil {
                     HStack(spacing: NukeSpace.sm) {
                         if let sourceLogoURL { NukeSourceLogo(url: sourceLogoURL, name: sourceName) }
                         ForEach(pills, id: \.self) { NukePill(text: $0) }
