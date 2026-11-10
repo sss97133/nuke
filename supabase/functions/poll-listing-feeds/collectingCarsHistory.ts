@@ -77,7 +77,10 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
       || typeof row.html !== "string" || new TextEncoder().encode(row.html).length > MAX_BYTES || await digest(row.html) !== capture.sha256)
       throw Error("cc_history_capture_unavailable");
     const envelope = JSON.parse(row.html);
-    if (JSON.stringify(envelope.search) !== JSON.stringify(search) || envelope.read_at !== capture.read_at) throw Error("cc_history_capture_attribution_mismatch");
+    const envelopeClock = typeof envelope.read_at === "string" ? Date.parse(envelope.read_at) : NaN;
+    // PostgreSQL returns equivalent UTC timestamps with +00:00 instead of Z; compare the instant, never re-clock it.
+    if (JSON.stringify(envelope.search) !== JSON.stringify(search) || !Number.isFinite(envelopeClock)
+      || envelopeClock !== Date.parse(capture.read_at)) throw Error("cc_history_capture_attribution_mismatch");
     response = envelope.response;
   } else {
     signal.throwIfAborted();

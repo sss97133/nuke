@@ -80,6 +80,7 @@ export function fixture(options = {}) {
         !url.searchParams.has(field)||String(row[field])===url.searchParams.get(field).slice(3)));
       rows.sort((a,b)=>Date.parse(b.fetched_at)-Date.parse(a.fetched_at)||b.id.localeCompare(a.id));
       if(url.searchParams.has('limit'))rows=rows.slice(0,Number(url.searchParams.get('limit')));
+      if(options.postgresTimestampOffsets)rows=rows.map(row=>({...row,fetched_at:row.fetched_at?.replace(/Z$/,'+00:00')}));
       return Response.json(url.searchParams.has('limit')?rows:rows[0]??null);
     }
     if (url.hostname === 'source.invalid') {
@@ -1276,5 +1277,38 @@ test('unavailable or four-second-stalled sitemap acquisition does not block inde
     const discovery=run.body.results[0].retained_inventory.sitemap_discovery;
     assert.equal(discovery.status,'unavailable');assert.equal(discovery.source_read_at,null);assert.equal(discovery.retained_file_urls,null);
     assert.equal(f.calls.filter(c=>c.path==='/sitemap-listings-1.xml').length,1);
+  }
+});
+
+
+test('history resumes the same retained page when PostgreSQL normalizes its UTC clock spelling',async()=>{
+  const f=ccHistoryFixture({postgresTimestampOffsets:true});await f.request({force:true});
+  const capture=f.feed.search_criteria.history_capture,raw=f.snapshots.get(capture.id).html;
+  assert.ok(capture.read_at.endsWith('+00:00'));assert.ok(JSON.parse(raw).read_at.endsWith('Z'));
+  assert.equal(Date.parse(capture.read_at),Date.parse(JSON.parse(raw).read_at));
+  const before=f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length;
+  await f.request({force:true});
+  assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,before+2);
+  assert.equal(f.calls.filter(c=>c.path==='/multi_search').length,1);assert.equal(f.snapshots.size,1);
+  assert.equal(f.snapshots.get(capture.id).html,raw);assert.equal(f.feed.search_criteria.history_capture.id,capture.id);
+});
+
+test('equivalent clock spelling never permits changed source time, query, malformed clocks or mismatched raw hashes',async()=>{
+  for(const kind of ['shifted','invalid','query','hash']) {
+    const f=ccHistoryFixture({postgresTimestampOffsets:true});await f.request({force:true});
+    const capture=f.feed.search_criteria.history_capture,row=f.snapshots.get(capture.id),envelope=JSON.parse(row.html);
+    if(kind==='shifted')envelope.read_at=new Date(Date.parse(envelope.read_at)+1).toISOString();
+    if(kind==='invalid')envelope.read_at='not-a-source-clock';
+    if(kind==='query')envelope.search.q='another-query';
+    row.html=kind==='hash'?row.html+'tampered':JSON.stringify(envelope);
+    if(kind!=='hash') {
+      const sha=Buffer.from(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(row.html))).toString('hex');
+      row.html_sha256=sha;capture.sha256=sha;
+    }
+    const before=f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length;
+    await f.request({force:true});
+    assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,before,kind);
+    assert.equal(f.calls.filter(c=>c.path==='/multi_search').length,1,kind);
+    assert.equal(f.feed.search_criteria.history_after_id,0,kind);assert.equal(f.feed.search_criteria.history_capture.id,capture.id,kind);
   }
 });
