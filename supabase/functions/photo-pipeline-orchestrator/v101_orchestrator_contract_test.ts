@@ -95,7 +95,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       if (rejectWrite) return Response.json({ message: "synthetic write rejection", code: "42501" }, { status: 400 });
       if (u.searchParams.get("updated_at") !== `eq.${row.updated_at}`) return Response.json([]);
       row = { ...row, ...body, updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
-      return Response.json([{ id: row.id }]);
+      return Response.json([{ id: row.id, image_url: row.image_url, vehicle_id: row.vehicle_id }]);
     }
     if (queueMode && u.searchParams.get("ai_processing_status") === "eq.pending") {
       return u.searchParams.has("user_id") ? Response.json(legacyOwner) : Response.json(legacyBacklog);
