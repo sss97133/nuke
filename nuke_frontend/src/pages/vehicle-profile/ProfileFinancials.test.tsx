@@ -172,20 +172,14 @@ it('shows an unfinished allocation read as partial rather than a full balance', 
   expect(host.querySelector('.vp-header-money')?.textContent).toBe('$$$');
 });
 
-it('shows public receipt evidence while signed out, retaining the alternate amount field and pagination', async () => {
+it('links to the single work and parts surface instead of nesting receipt copies', async () => {
   fixture.user = null;
-  fixture.tables.receipts_public_summary = Array.from({ length: 101 }, (_, index) => ({ id: `receipt-${index}`, vendor_name: `Synthetic receipt ${index}`,
-    total: null, total_amount: 12.34, currency: null, transaction_date: '2024-06-01', status: 'processed' }));
+  fixture.tables.receipts_public_summary = [{ id: 'receipt', vendor_name: 'Synthetic receipt', total: null, amounts_visible: false }];
   open = true; await render();
-  expect(host.querySelector('.vp-header-money')?.textContent).toBe('$$$');
-  expect(host.querySelector<HTMLDetailsElement>('.vp-financial-sources')?.open).toBe(false);
-  expect(host.textContent).toContain('100 linked receipt records loaded. Total not yet read.');
-  expect(host.textContent).toContain('12.34 · currency unrecorded');
-  expect(host.textContent).not.toContain('No recorded market price');
-  expect(fixture.from.mock.calls.every(([table]) => table === 'receipts_public_summary')).toBe(true);
-  expect(fixture.rpc).not.toHaveBeenCalled();
-  await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Load more receipts')!.click());
-  await render(); expect(host.textContent).toContain('101 of 101 linked receipt records loaded');
+  const link = host.querySelector<HTMLAnchorElement>('a[href="#build-receipts"]')!;
+  expect(link.textContent).toContain('View work & parts receipts');
+  expect(host.querySelector('.vp-receipt-page')).toBeNull();
+  expect(link.getAttribute('href')).toBe('#build-receipts');
 });
 
 it('keeps conflicting receipt amount/date readings unresolved and never invents a currency', () => {
@@ -193,16 +187,6 @@ it('keeps conflicting receipt amount/date readings unresolved and never invents 
     receipt_date: '2024-06-01', transaction_date: '2024-06-02' })).toMatchObject({ amount: null, amountConflict: true, currency: null, date: null, dateConflict: true });
 });
 
-it('keeps a signed-in public-summary fallback on the same source when loading more receipts', async () => {
-  fixture.tables.receipts_public_summary = Array.from({ length: 101 }, (_, index) => ({ id: `public-${index}`, total_amount: 5 }));
-  open = true; await render();
-  expect(host.textContent).toContain('100 linked receipt records loaded. Total not yet read.');
-  const baseReads = fixture.from.mock.calls.filter(([table]) => table === 'receipts').length;
-  await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Load more receipts')!.click());
-  await render();
-  expect(host.textContent).toContain('101 of 101 linked receipt records loaded');
-  expect(fixture.from.mock.calls.filter(([table]) => table === 'receipts')).toHaveLength(baseReads);
-});
 
 it('shows authorized work-order charges and recorded payments separately from books and receipts', async () => {
   fixture.tables.work_order_receipt_unified = [{ work_order_id: 'wo', work_order_title: 'Synthetic job', work_order_status: 'in_progress',
@@ -220,6 +204,6 @@ it('keeps an actual price ahead of expenses and makes source readings a secondar
   open = true; await render(<span>Asking $900</span>);
   expect(host.querySelector('.vp-header-money')?.textContent).toBe('Asking $900$$$');
   const panel = host.querySelector('.vp-financial-panel')!;
-  expect(panel.textContent!.indexOf('Booked vehicle costs')).toBeLessThan(panel.textContent!.indexOf('Receipt sources'));
+  expect(panel.textContent!.indexOf('Booked vehicle costs')).toBeLessThan(panel.textContent!.indexOf('View work & parts receipts'));
   expect(panel.querySelector<HTMLDetailsElement>('.vp-financial-sources')?.open).toBe(false);
 });

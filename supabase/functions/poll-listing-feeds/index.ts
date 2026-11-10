@@ -60,7 +60,7 @@ import { splitByYear } from "./yearFilter.ts";
 import { nextYield } from "./schedule.ts";
 import { pollPurplewave } from "./purplewave.ts";
 import { CC_LISTING_METHOD, CC_OBSERVATION_COLUMNS, collectingCarsReceipt, collectingCarsAdmissionMatches,
-  prepareCollectingCarsLedger, readCollectingCarsInventory, type CollectingCarsReceipt } from "./collectingCars.ts";
+  prepareCollectingCarsLedger, planCollectingCarsIngests, collectingCarsCaptureInterval, readCollectingCarsInventory, type CollectingCarsReceipt } from "./collectingCars.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -928,6 +928,7 @@ async function pollFirecrawlHtmlFeed(
     // backoff and terminal native rejections remain with the ordinary planner.
     urls.sort((a, b) => Number(proved.has(a)) - Number(proved.has(b)) || (proved.get(a) ?? 0) - (proved.get(b) ?? 0));
   }
+  const ccRefreshes = new Map<string, number>();
   if (nativeCc) {
     // Board-created shells do not prove full native listing capture. Validate the
     // retained admission receipt before skipping a URL; leave failed backoff intact.
@@ -940,14 +941,18 @@ async function pollFirecrawlHtmlFeed(
       if (read.error || !Array.isArray(read.data)) return await failFeed("retained_listing_admission_lookup_failed");
       for (const row of read.data) admitted.set(row.id, row);
     }
-    const proved = prepareCollectingCarsLedger(urls, ledgerRows, nativeLedger, admitted, nativeSourceId!, feed.poll_interval_minutes);
+    const proved = prepareCollectingCarsLedger(urls, ledgerRows, nativeLedger, admitted, nativeSourceId!, collectingCarsCaptureInterval(feed.search_criteria), Date.now(), ccRefreshes);
     result.retained_inventory = { ...result.retained_inventory, eligible_after_year_filter: urls.length, current_full_listing_receipts: proved.size };
   }
-  // New URLs first, then failed ones whose retry is due; the cap applies to both.
-  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
+  // CC reserves the first slot for a due retry and keeps uncaptured lots ahead of refreshes.
+  const plan = nativeCc
+    ? planCollectingCarsIngests(urls, ledgerRows, ccRefreshes, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation))
+    : planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
     feed.source_slug === "craigslist" ? { ...CRAIGSLIST_REVISIT, max: Math.min(CRAIGSLIST_REVISIT.max, budget.revisitAllowance()) } : null);
   budget.spendRevisits(plan.revisits ?? 0);
-  result.matched_existing = plan.settled + plan.backoff;
+  result.matched_existing = nativeCc
+    ? Number(result.retained_inventory?.current_full_listing_receipts ?? 0)
+    : plan.settled + plan.backoff;
   result.retries_due = plan.retries;
   result.backing_off = plan.backoff;
   const toIngest = plan.toIngest;
@@ -1063,7 +1068,12 @@ async function pollFirecrawlHtmlFeed(
         (!ingest.vehicle_id || !ingest.dealer_receipt?.observation_id || !ingest.dealer_receipt.snapshot_id || !ingest.dealer_receipt.listing_event_id || !ingest.dealer_receipt.observed_at)) {
         ingest.status = "error"; ingest.error = "dealer canonical admission unacknowledged";
       }
-      if (nativeCc && !resp.ok) { ingest.status = "error"; ingest.error = `Collecting Cars ingest HTTP ${resp.status}`; delete ingest.collecting_cars_receipt; }
+      if (nativeCc && !resp.ok) {
+        ingest.status = "error";
+        const detail = typeof ingest.error === "string" ? ingest.error.slice(0, 300) : "";
+        ingest.error = `Collecting Cars ingest HTTP ${resp.status}${detail ? `: ${detail}` : ""}`;
+        delete ingest.collecting_cars_receipt;
+      }
       if (nativeCc && ["created", "matched", "duplicate"].includes(ingest.status ?? "")) {
         const receipt = collectingCarsReceipt(ingest.collecting_cars_receipt);
         const admission = receipt && ingest.vehicle_id ? await supabase.from("vehicle_observations")

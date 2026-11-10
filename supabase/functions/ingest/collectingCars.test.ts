@@ -13,6 +13,13 @@ Deno.test('CC capture requires durable exact-source receipt; never accepts summa
     assertThrows(() => collectingCarsCapture({ success: true, extracted: fields, source_capture: bad }, url));
   }
 });
+Deno.test('native null model remains unknown while capture identity and custody are still required', () => {
+  const native = { ...fields, model: null };
+  assertEquals(collectingCarsCapture({ success: true, extracted: native, source_capture: capture }, url).fields.model, null);
+  for (const patch of [{ year: null }, { make: null }, { listing_id: null }, { lot_type: 'part' }, { model: undefined }]) {
+    assertThrows(() => collectingCarsCapture({ success: true, extracted: { ...native, ...patch }, source_capture: capture }, url));
+  }
+});
 Deno.test('CC exact presentation wins over short chassis matching; competing or conflicting owners refuse', () => {
   const row = { id: 'vehicle', listing_url: url, year: 1965, make: 'Porsche', vin: null };
   assertEquals(collectingCarsOwner([row], fields), 'vehicle');

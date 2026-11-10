@@ -347,7 +347,7 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['1J8', 'Jeep', 'Jeep'],
     ['1J', 'Jeep', 'Jeep'],
     ['1C3', 'Chrysler', 'Chrysler'],
-    ['1C4', 'Chrysler', 'Chrysler'],
+    ['1C4', 'FCA US LLC', null], // multi-marque manufacturer, not Chrysler marque
     ['1C6', 'Dodge', 'Dodge'],
     ['1C', 'Chrysler', 'Chrysler'],
     ['2C', 'Chrysler Canada', 'Chrysler'],
@@ -356,16 +356,25 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['1N', 'Nissan', 'Nissan'],
     ['1D', 'Dodge', 'Dodge'],
     ['1B', 'Dodge', 'Dodge'],
-    ['1H', 'Honda', 'Honda'],
+    ['1HG', 'AMERICAN HONDA MOTOR CO., INC.', 'Honda'],
+    ['1HT', 'INTERNATIONAL MOTORS, LLC', null],
     ['1L', 'Lincoln', 'Lincoln'],
     ['1Z', 'Ford', 'Ford'], // Mazda/Ford
     ['2T', 'Toyota Canada', 'Toyota'],
     ['3V', 'Volkswagen Mexico', 'Volkswagen'],
     ['4T', 'Toyota', 'Toyota'],
     ['5T', 'Toyota', 'Toyota'],
-    ['JT', 'Toyota', 'Toyota'],
+    // NHTSA vPIC DecodeWMI: Toyota manufacture does not imply Toyota marque.
+    ['JTH', 'TOYOTA MOTOR CORPORATION', 'Lexus'],
+    ['JTJ', 'TOYOTA MOTOR CORPORATION', 'Lexus'],
+    ['JT8', 'TOYOTA MOTOR CORPORATION', 'Lexus'],
+    ['JTD', 'TOYOTA MOTOR CORPORATION', 'Toyota'],
+    ['JTE', 'TOYOTA MOTOR CORPORATION', null],
+    ['JTM', 'TOYOTA MOTOR CORPORATION', null],
     ['JH', 'Honda', 'Honda'],
-    ['JN', 'Nissan', 'Nissan'],
+    ['JNK', 'NISSAN MOTOR COMPANY, LTD', 'Infiniti'],
+    ['JN1', 'NISSAN MOTOR COMPANY, LTD', null],
+    ['JN8', 'NISSAN MOTOR COMPANY, LTD', null],
     ['JM', 'Mazda', 'Mazda'],
     ['WA', 'Audi', 'Audi'],
     ['WB', 'BMW', 'BMW'],
@@ -379,7 +388,10 @@ function decodeModernVin(vin: string): VINDecodeResult {
     ['ZAR', 'ALFA ROMEO S.P.A.', 'Alfa Romeo'],
     ['SA', 'Jaguar', 'Jaguar'],
     ['SJ', 'Jaguar', 'Jaguar'],
-    ['SC', 'Lotus', 'Lotus'],
+    // NHTSA vPIC: SCB is Bentley and SCC is Lotus. SC alone also spans
+    // other manufacturers (e.g. SCE); leave unrecognized identifiers unknown.
+    ['SCB', 'BENTLEY MOTORS LIMITED', 'Bentley'],
+    ['SCC', 'LOTUS CARS LIMITED', 'Lotus'],
     ['YV', 'Volvo', 'Volvo'],
   ];
 
@@ -396,6 +408,21 @@ function decodeModernVin(vin: string): VINDecodeResult {
   // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/3C6?format=json
   if (wmi === '3C6') result.manufacturer_make_candidates =
     ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/1C4?format=json
+  if (wmi === '1C4') result.manufacturer_make_candidates =
+    ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/JTE?format=json
+  if (wmi === 'JTE') result.manufacturer_make_candidates = ['Toyota', 'Lexus', 'Subaru'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/JTM?format=json
+  if (wmi === 'JTM') result.manufacturer_make_candidates = ['Toyota', 'Subaru'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/1HT?format=json
+  if (wmi === '1HT') result.manufacturer_make_candidates =
+    ['Chevrolet', 'Navistar', 'Caterpillar', 'IC Bus', 'Workhorse', 'International', 'GM'];
+  // NHTSA vPIC DecodeWMI: manufacture does not establish a single marque.
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/JN1?format=json
+  if (wmi === 'JN1') result.manufacturer_make_candidates = ['Nissan', 'Infiniti', 'Datsun'];
+  // https://vpic.nhtsa.dot.gov/api/vehicles/DecodeWMI/JN8?format=json
+  if (wmi === 'JN8') result.manufacturer_make_candidates = ['Nissan', 'Infiniti'];
 
   // Model year (position 10)
   const yearChar = vin.charAt(9);

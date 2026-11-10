@@ -5,12 +5,18 @@ const fixture = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
   queryError: null as any,
   agentFields: [] as any[],
+  images: [] as any[], imageError: null as any,
+  cachedData: {} as FieldEvidenceMap, hookError: null as Error | null,
+  viewer: null as string | null, authLoading: false, query: null as any,
   queryFn: null as null | (() => Promise<FieldEvidenceMap>),
 }));
+vi.mock('../../../lib/vehicleImageColumns', () => ({ vehicleImageGallerySource: async () => 'vehicle_images_public' }));
+vi.mock('../../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.viewer ? { id: fixture.viewer } : null, loading: fixture.authLoading }) }));
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: { queryFn: () => Promise<FieldEvidenceMap> }) => {
+    fixture.query = options;
     fixture.queryFn = options.queryFn;
-    return { data: {}, isLoading: false, error: null, refetch: vi.fn() };
+    return { data: fixture.cachedData, isLoading: false, error: fixture.hookError, refetch: vi.fn() };
   },
 }));
 vi.mock('../../../lib/supabase', () => {
@@ -18,6 +24,7 @@ vi.mock('../../../lib/supabase', () => {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     order: vi.fn(async () => ({ data: fixture.rows, error: fixture.queryError })),
+    in: vi.fn(async () => ({ data: fixture.images, error: fixture.imageError })),
   };
   return { supabase: {
     from: vi.fn(() => query),
@@ -32,10 +39,58 @@ import { supabase } from '../../../lib/supabase';
 
 beforeEach(() => {
   fixture.rows = []; fixture.queryFn = null; fixture.queryError = null; fixture.agentFields = [];
+  fixture.images = []; fixture.imageError = null;
+  fixture.cachedData = {}; fixture.hookError = null;
+  fixture.viewer = null; fixture.authLoading = false;
   vi.restoreAllMocks(); vi.clearAllMocks();
 });
 
 describe('evidence reads preserve sparse source state', () => {
+  it('keys source eligibility to the viewer and waits for resolved authentication', () => {
+    fixture.viewer = 'owner'; fixture.authLoading = true; fixture.cachedData = { make: {} } as any;
+    expect(useFieldEvidence('vehicle').evidence).toEqual({});
+    expect(fixture.query.enabled).toBe(false);
+    expect(fixture.query.queryKey).toEqual(['field-evidence', 'vehicle', 'owner']);
+    fixture.viewer = null; fixture.authLoading = false;
+    useFieldEvidence('vehicle');
+    expect(fixture.query.queryKey).toEqual(['field-evidence', 'vehicle', 'anonymous']);
+  });
+  it('withholds cached claims when a refresh cannot verify current source eligibility', () => {
+    fixture.cachedData = { make: { sources: [{ source_image_id: 'old-image' }] } } as any;
+    fixture.hookError = new Error('Cited image sources could not be checked');
+    const read = useFieldEvidence('local-vehicle');
+    expect(read.evidence).toEqual({});
+    expect(read.error).toContain('Cited image sources could not be checked');
+  });
+  it('withdraws accepted photo claims when the cited image is unavailable while preserving independent sources', async () => {
+    const row = { vehicle_id: 'local-vehicle', field_name: 'make', source_type: 'ai_visual', status: 'accepted', source_confidence: 90, created_at: '2026-01-01' };
+    const present = 'ABCDEF00-0000-4000-8000-000000000001', absent = '00000000-0000-4000-8000-000000000002';
+    fixture.rows = [
+      { ...row, id: 'present', proposed_value: 'Current reading', fallback_image_id: present },
+      { ...row, id: 'withdrawn', proposed_value: 'Unfiled image reading', source_image_id: absent },
+      { ...row, id: 'independent', proposed_value: 'Document reading', source_type: 'receipt' },
+      { ...row, id: 'broken', proposed_value: 'Broken ID reading', source_image_id: 'invalid', cited_image_url: 'https://example.test/current.jpg' },
+      { ...row, id: 'old-url', proposed_value: 'Replaced photo reading', source_image_id: present, cited_image_url: 'https://example.test/old.jpg' },
+      { ...row, id: 'disagreeing-ids', proposed_value: 'Conflicting IDs', source_image_id: present, fallback_image_id: absent },
+      { ...row, id: 'url-only', proposed_value: 'URL photo', source_image_id: null, cited_image_url: 'https://example.test/current.jpg' },
+    ];
+    fixture.images = [{ id: present.toLowerCase(), image_url: 'https://example.test/current.jpg', vision_gate_status: 'approved' }];
+    useFieldEvidence('local-vehicle'); const data = await fixture.queryFn!();
+    expect(data.make.sources.map(r => r.id).sort()).toEqual(['independent', 'present', 'url-only']);
+    expect(data.make.sources.find(r => r.id === 'present')?.source_image_id).toBe(present.toLowerCase());
+    expect(data.make.sources.find(r => r.id === 'url-only')?.source_image_id).toBe(present.toLowerCase());
+  });
+  it.each([{ is_superseded: true }, { is_sensitive: true }, { is_duplicate: true }, { vision_gate_status: 'rejected' }, { image_vehicle_match_status: 'mismatch' }])('does not promote ineligible source %j', async status => {
+    const id = '00000000-0000-4000-8000-000000000002';
+    fixture.rows = [{ id: 'claim', vehicle_id: 'local-vehicle', field_name: 'make', proposed_value: 'Reading', status: 'accepted', source_image_id: id }];
+    fixture.images = [{ id, image_url: 'https://example.test/photo.jpg', ...status }];
+    useFieldEvidence('local-vehicle'); expect(await fixture.queryFn!()).toEqual({});
+  });
+  it('reports a failed source lookup rather than treating it as an empty successful read', async () => {
+    fixture.rows = [{ id: 'claim', vehicle_id: 'local-vehicle', source_image_id: '00000000-0000-4000-8000-000000000002' }];
+    fixture.imageError = { message: 'temporary failure' };
+    useFieldEvidence('local-vehicle'); await expect(fixture.queryFn!()).rejects.toThrow('Cited image sources could not be checked');
+  });
   it('retains withdrawn source references separately without promoting their higher scores or creating conflicts', async () => {
     const row = { vehicle_id: 'offline-history', field_name: 'engine_type', source_type: 'review',
       extracted_at: null, created_at: '2026-01-01T00:00:00Z' };

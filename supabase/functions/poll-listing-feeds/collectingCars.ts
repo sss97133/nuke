@@ -1,4 +1,4 @@
-import type { LedgerKnown } from "./ledger.ts";
+import { ledgerDecision, type IngestPlan, type LedgerKnown } from "./ledger.ts";
 
 export const CC_LISTING_METHOD = "cc_native_listing_v1";
 const SOURCE = "collecting-cars";
@@ -30,7 +30,7 @@ export const CC_OBSERVATION_COLUMNS = "id,vehicle_id,source_id,source_url,kind,e
 
 /** Full listing admission, not a board price/vehicle shell, settles a URL. Failed attempts retain their existing limits. */
 export function prepareCollectingCarsLedger(urls: string[], ledger: Map<string, LedgerKnown>, raw: Map<string, any>,
-  observations: Map<string, any>, sourceId: string, intervalMinutes: number, now = Date.now()): Set<string> {
+  observations: Map<string, any>, sourceId: string, intervalMinutes: number, now = Date.now(), refreshes = new Map<string, number>()): Set<string> {
   const proved = new Set<string>();
   for (const url of urls) {
     const prior = ledger.get(url);
@@ -41,9 +41,46 @@ export function prepareCollectingCarsLedger(urls: string[], ledger: Map<string, 
     const valid = receipt && prior.vehicle_id && collectingCarsAdmissionMatches(receipt,
       observations.get(receipt.observation_id), url, prior.vehicle_id, sourceId);
     if (valid && now - Date.parse(receipt.source_read_at) < intervalMinutes * 60_000) proved.add(url);
-    else if (prior.status === "complete" || prior.status === "skipped") ledger.delete(url);
+    else if (prior.status === "complete" || prior.status === "skipped") {
+      if (valid) refreshes.set(url, Date.parse(receipt.source_read_at));
+      ledger.delete(url);
+    }
   }
   return proved;
+}
+
+/** Polling cadence controls discovery, not how often an already captured full listing is fetched. */
+export function collectingCarsCaptureInterval(criteria: any): number {
+  const minutes = criteria?.full_capture_interval_minutes;
+  return Number.isInteger(minutes) && minutes > 0 ? minutes : 1440;
+}
+
+/** Give a due failure the first actual execution slot; uncaptured lots precede optional refreshes. */
+export function planCollectingCarsIngests(urls: string[], ledger: Map<string, LedgerKnown>,
+  refreshes: Map<string, number>, now: Date, cap: number): IngestPlan {
+  const missing: string[] = [], retries: string[] = [], stale: string[] = [];
+  let settled = 0, backoff = 0;
+  for (const url of urls) {
+    const decision = ledgerDecision(ledger.get(url), now);
+    if (decision === "settled") settled++;
+    else if (decision === "backoff") backoff++;
+    else if (decision === "retry") retries.push(url);
+    else if (refreshes.has(url)) stale.push(url);
+    else missing.push(url);
+  }
+  const retryClock = (url: string) => {
+    const row = ledger.get(url);
+    for (const value of [row?.next_attempt_at, row?.processed_at]) {
+      const at = Date.parse(value ?? "");
+      if (Number.isFinite(at)) return at;
+    }
+    return 0;
+  };
+  retries.sort((a, b) => retryClock(a) - retryClock(b));
+  stale.sort((a, b) => refreshes.get(a)! - refreshes.get(b)!);
+  const limit = Number.isInteger(cap) && cap > 0 ? cap : 0;
+  return { toIngest: [...retries.slice(0, 1), ...missing, ...retries.slice(1), ...stale].slice(0, limit),
+    fresh: missing.length, retries: retries.length, settled, backoff };
 }
 
 /** Reuse one complete retained board batch. This is inventory-recorded time, never a native bid clock. */

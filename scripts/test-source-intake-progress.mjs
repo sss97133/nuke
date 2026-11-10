@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import * as ledger from '../supabase/functions/poll-listing-feeds/ledger.ts';
 import { captureLedgerFields } from '../supabase/functions/poll-listing-feeds/captureLedger.ts';
 import * as collectingCars from '../supabase/functions/poll-listing-feeds/collectingCars.ts';
+import { splitByYear } from '../supabase/functions/poll-listing-feeds/yearFilter.ts';
 import { fetchCraigslistFeed } from '../supabase/functions/poll-listing-feeds/feedFetch.ts';
 import { emptySearchHtml } from '../supabase/functions/poll-listing-feeds/fixtures/empty-search.ts';
 import { vehicleEventWriterFor } from '../supabase/functions/_shared/vehicleEventWrite.ts';
@@ -64,6 +65,7 @@ export function fixture(options = {}) {
     }
     if (url.pathname === '/rest/v1/vehicle_observations') return Response.json(url.searchParams.get('id')?.startsWith('eq.')
       ? (options.nativeObservations ?? []).find(o => o.id === url.searchParams.get('id').slice(3)) ?? null : options.nativeObservations ?? []);
+    if (url.pathname === '/rest/v1/source_targets' && method === 'POST') return Response.json(body);
     if (url.pathname === '/rest/v1/platform_config') return Response.json(options.controls ? { config_value: options.controls } : null);
     if (url.pathname === '/rest/v1/listing_feeds') {
       if (method === 'GET') {
@@ -147,7 +149,7 @@ export function fixture(options = {}) {
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
       if (name.endsWith('/kslCards.ts')) return { parseKslSearchCards: () => [] };
       if (name === './collectingCars.ts') return collectingCars;
-      if (name.endsWith('/yearFilter.ts')) return { splitByYear: (u) => ({ keep: u, rest: [] }) };
+      if (name.endsWith('/yearFilter.ts')) return { splitByYear };
       if (name.endsWith('/firecrawlGate.ts')) return { firecrawlGate: () => ({ allow: async () => true, record: async () => {} }), ALLOWANCE_EXHAUSTED: 'allowance_deferred: test' };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
@@ -639,10 +641,11 @@ function ccFixture(overrides = {}) {
   const url = 'https://collectingcars.com/for-sale/1965-porsche-911-2-0-swb-4';
   const clock = new Date(Date.now() - 60_000).toISOString();
   const sourceId = '00000000-0000-4000-8000-000000000071';
-  const receipt = { observation_id: '00000000-0000-4000-8000-000000000072', snapshot_id: '00000000-0000-4000-8000-000000000073', source_read_at: clock, images: 67 };
+  const captureClock = new Date(Date.now() - (overrides.captureAgeMs ?? 60_000)).toISOString();
+  const receipt = { observation_id: '00000000-0000-4000-8000-000000000072', snapshot_id: '00000000-0000-4000-8000-000000000073', source_read_at: captureClock, images: 67 };
   const observation = { id: receipt.observation_id, source_id: sourceId, source_url: url, kind: 'listing',
     vehicle_id: '00000000-0000-4000-8000-000000000002', extraction_method: 'cc_native_listing_v1',
-    is_superseded: false, raw_source_ref: `listing_page_snapshots:${receipt.snapshot_id}`, observed_at: clock };
+    is_superseded: false, raw_source_ref: `listing_page_snapshots:${receipt.snapshot_id}`, observed_at: captureClock };
   const f = fixture({ feed: { source_slug: 'collecting-cars', feed_url: 'https://collectingcars.com/sitemap.xml', poll_interval_minutes: 1440,
     search_criteria: { fetch_strategy: 'firecrawl_html', slug_year_min: 1964, slug_year_max: 1991 } },
     knownUrls: [url], retainLedger: true, observationSource: { id: sourceId, supported_observations: ['listing'] }, nativeObservations: [observation],
@@ -680,10 +683,104 @@ test('actual CC handler refuses old sink capability before acquiring inventory o
   assert.equal(f.calls.some(c => c.path === '/functions/v1/ingest' && c.method === 'POST'), false);
 });
 
+test('actual CC handler preserves bounded native extractor errors after HTTP failure', async () => {
+  const detail = 'no Collecting Cars lot payload on page';
+  const f = ccFixture({ ingestResult: () => Response.json({ status: 'error', error: detail + 'x'.repeat(500) }, { status: 500 }) });
+  const result = await f.poll();
+  assert.equal(result.ingest_outcomes[0].status, 'error');
+  assert.equal(result.ingest_outcomes[0].ledger, 'failed');
+  assert.match(result.ingest_outcomes[0].error, /Collecting Cars ingest HTTP 500: no Collecting Cars lot payload on page/);
+  assert.ok(result.ingest_outcomes[0].error.length <= 200);
+  assert.equal(f.queued.get(f.url).attempts, 1);
+});
+
 test('actual CC main handler preserves global/source holds before retained discovery and ingestion', async () => {
   for (const controls of [{ max_ingests: 0 }, { sources: { 'collecting-cars': { enabled: false } } }]) {
     const f = ccFixture({ controls }); const result = await f.request({ source: 'collecting-cars', force: true });
     assert.equal(result.status, 200);
     assert.equal(f.calls.some(c => c.path === '/functions/v1/ingest' || c.path === '/rest/v1/monitored_auctions'), false);
+  }
+});
+
+test('actual CC feed counts one confirmed match separately from twenty failed backoffs', async () => {
+  const clock = new Date(Date.now() - 60_000).toISOString();
+  const urls = ['https://collectingcars.com/for-sale/1965-porsche-911-2-0-swb-4',
+    ...Array.from({ length: 20 }, (_, i) => `https://collectingcars.com/for-sale/1986-backoff-${i}`)];
+  const f = ccFixture({
+    retainedInventorySource: { id: '00000000-0000-4000-8000-000000000071', last_successful_sync: clock, last_sync_error: null,
+      scraping_config: { live_board: { last_run: { at: clock, complete: true, lots: 21, upserted: 21 } } } },
+    monitoredAuctions: urls.map((url, i) => ({ id: `00000000-0000-4000-8000-${String(i + 100).padStart(12, '0')}`,
+      external_auction_id: String(94000 + i), external_auction_url: url, auction_end_time: new Date(Date.now() + 86400000).toISOString(),
+      is_live: true, last_synced_at: clock, board: 'collecting-cars' })),
+  });
+  for (const url of urls.slice(1)) f.queued.set(url, { listing_url: url, status: 'failed', attempts: 1, max_attempts: 3,
+    next_attempt_at: new Date(Date.now() + 86400000).toISOString() });
+  const result = await f.poll();
+  assert.equal(result.matched_existing, 1); assert.equal(result.backing_off, 20);
+  assert.equal(result.ingest_outcomes.length, 1); assert.equal(result.ingest_outcomes[0].status, 'matched');
+  assert.equal(f.calls.filter(c => c.path === '/functions/v1/ingest' && c.method === 'POST').length, 1);
+  for (const url of urls.slice(1)) assert.equal(f.queued.get(url).attempts, 1);
+});
+
+
+test('actual CC short-cadence handler keeps an hour-old full capture settled with the independent daily default', async () => {
+  const f = ccFixture({ captureAgeMs: 3600000, feed: { source_slug: 'collecting-cars',
+    feed_url: 'https://collectingcars.com/sitemap.xml', poll_interval_minutes: 15, search_criteria: {} } });
+  const first = await f.poll(); assert.equal(first.ingest_outcomes[0].ledger, 'complete');
+  for (let i = 0; i < 3; i++) {
+    const next = await f.poll(); assert.equal(next.retained_inventory.current_full_listing_receipts, 1);
+  }
+  assert.equal(f.calls.filter(c => c.path === '/functions/v1/ingest' && c.method === 'POST').length, 1);
+});
+
+test('actual CC handler executes the oldest due retry before fresh lots under a one-attempt allowance', async () => {
+  const clock = new Date(Date.now() - 60000).toISOString();
+  const urls = ['https://collectingcars.com/for-sale/1965-new-lot', 'https://collectingcars.com/for-sale/1965-newer-retry',
+    'https://collectingcars.com/for-sale/1965-oldest-retry'];
+  const f = ccFixture({ controls: { max_ingests: 1 },
+    retainedInventorySource: { id: '00000000-0000-4000-8000-000000000071', last_successful_sync: clock, last_sync_error: null,
+      scraping_config: { live_board: { last_run: { at: clock, complete: true, lots: 3, upserted: 3 } } } },
+    monitoredAuctions: urls.map((url, i) => ({ id: `00000000-0000-4000-8000-${String(i+100).padStart(12,'0')}`,
+      external_auction_id: String(94000+i), external_auction_url: url, auction_end_time: new Date(Date.now()+86400000).toISOString(),
+      is_live: true, last_synced_at: clock, board: 'collecting-cars' })) });
+  for (const [i,url] of urls.entries()) if(i) f.queued.set(url, { listing_url: url, status: 'failed', attempts: 1,
+    max_attempts: 3, next_attempt_at: new Date(Date.now()-i*3600000).toISOString() });
+  const result = await f.request({ source: 'collecting-cars', force: true }); assert.equal(result.status,200);
+  assert.deepEqual(f.calls.filter(c => c.path === '/functions/v1/ingest' && c.method === 'POST').map(c=>c.body.url), [urls[2]]);
+  assert.equal(f.queued.get(urls[1]).attempts,1);
+});
+
+
+test('actual CC all-year feed admits pre1964 and post1991 full receipts while explicit year filters still exclude them', async () => {
+  const urls = ['https://collectingcars.com/for-sale/1960-messerschmitt-kr200',
+    'https://collectingcars.com/for-sale/1965-porsche-911-2-0-swb-4', 'https://collectingcars.com/for-sale/2020-porsche-911'];
+  const clock = new Date(Date.now()-60000).toISOString();
+  const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+  const sourceId=uuid(71), vehicleId=uuid(2);
+  const receipts=urls.map((url,i)=>({ observation_id:uuid(200+i),snapshot_id:uuid(300+i),source_read_at:clock,images:67+i }));
+  const nativeObservations=urls.map((url,i)=>({id:receipts[i].observation_id,vehicle_id:vehicleId,source_id:sourceId,
+    source_url:url,kind:'listing',extraction_method:'cc_native_listing_v1',is_superseded:false,
+    raw_source_ref:`listing_page_snapshots:${receipts[i].snapshot_id}`,observed_at:clock}));
+  for(const restricted of [false,true]) {
+    const criteria={full_capture_interval_minutes:1440,...(restricted?{slug_year_min:1964,slug_year_max:1991}:{})};
+    const f=ccFixture({ feed:{source_slug:'collecting-cars',feed_url:'https://collectingcars.com/sitemap.xml',poll_interval_minutes:15,search_criteria:criteria},
+      knownUrls:urls,nativeObservations,
+      retainedInventorySource:{id:sourceId,last_successful_sync:clock,last_sync_error:null,
+        scraping_config:{live_board:{last_run:{at:clock,complete:true,lots:3,upserted:3}}}},
+      monitoredAuctions:urls.map((url,i)=>({id:uuid(100+i),external_auction_id:String(94000+i),external_auction_url:url,
+        auction_end_time:new Date(Date.now()+86400000).toISOString(),is_live:true,last_synced_at:clock,board:'collecting-cars'})),
+      ingestResult:url=>({status:'matched',source:'collecting-cars',vehicle_id:vehicleId,collecting_cars_receipt:receipts[urls.indexOf(url)]}) });
+    const result=await f.poll(), expected=restricted?[urls[1]]:urls;
+    assert.deepEqual(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').map(c=>c.body.url),expected);
+    assert.equal(result.retained_inventory.eligible_after_year_filter,expected.length);
+    for(const url of expected) {
+      assert.equal(f.queued.get(url).status,'complete');
+      assert.deepEqual(f.queued.get(url).raw_data.collecting_cars_receipt,receipts[urls.indexOf(url)]);
+    }
+    assert.equal(result.ingest_outcomes.every(row=>row.ledger_write_status==='acknowledged'),true);
+    const before=f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length;
+    await f.poll();
+    assert.equal(f.calls.filter(c=>c.path==='/functions/v1/ingest'&&c.method==='POST').length,before);
+    if(restricted)assert.deepEqual(f.calls.find(c=>c.path==='/rest/v1/source_targets').body.map(row=>row.listing_url),[urls[0],urls[2]]);
   }
 });

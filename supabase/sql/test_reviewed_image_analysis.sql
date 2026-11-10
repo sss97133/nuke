@@ -6,6 +6,8 @@ DO $$ BEGIN
  END IF;
 END $$;
 
+
+
 DO $$ BEGIN
  IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon; END IF;
  IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated; END IF;
@@ -32,6 +34,27 @@ CREATE TABLE vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 CREATE TABLE observation_witnesses(id uuid DEFAULT gen_random_uuid(),observation_id uuid,image_id uuid,
  witness_role text,capture_method text,image_timestamp timestamptz,attestation_notes text,
  added_by_user_id uuid,added_by_agent_key text,UNIQUE(observation_id,image_id,witness_role));
+CREATE TABLE emergent_vehicle_clusters(id uuid PRIMARY KEY);
+CREATE TABLE reattribution_audit(id uuid PRIMARY KEY);
+CREATE TABLE image_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),image_id uuid NOT NULL REFERENCES vehicle_images(id),
+ vehicle_id uuid REFERENCES vehicles(id),cluster_id uuid,role text NOT NULL,confidence numeric NOT NULL CHECK(confidence BETWEEN 0 AND 1),
+ confidence_basis jsonb NOT NULL DEFAULT '{}',layer_version jsonb NOT NULL DEFAULT '{}',observed_by text NOT NULL,
+ agent_version text,observed_at timestamptz NOT NULL DEFAULT now(),superseded_by uuid REFERENCES image_observations(id),
+ is_active boolean NOT NULL DEFAULT true,
+ is_high_confidence_subject boolean GENERATED ALWAYS AS(role='subject' AND confidence>0.85 AND is_active) STORED);
+-- Load the real current intake owner, not a spy. Its protected multi-source
+-- branches are outside this fixture; caller-byok uses its ordinary revision path.
+-- The existing DB-contract runner executes from the repository root.
+\set search_owner `sed -n '/^CREATE OR REPLACE FUNCTION public.ingest_image_observation(/,/^\$function\$;/p' supabase/migrations/20261018203000_private_subject_source_qualification.sql`
+SELECT :'search_owner' \gexec
+CREATE TABLE vehicle_image_attribution_queue(image_id uuid PRIMARY KEY);
+CREATE FUNCTION enqueue_vehicle_image_attribution() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN
+ IF NEW.role='subject' AND NEW.vehicle_id IS NOT NULL AND NEW.confidence>=0.85
+   AND (NEW.is_active OR (TG_OP='UPDATE' AND OLD.is_active)) THEN
+   INSERT INTO vehicle_image_attribution_queue(image_id) VALUES(NEW.image_id) ON CONFLICT DO NOTHING;
+ END IF; RETURN NEW; END$$;
+CREATE TRIGGER trg_enqueue_vehicle_image_attribution AFTER INSERT OR UPDATE OF vehicle_id,confidence,is_active,role
+ ON image_observations FOR EACH ROW EXECUTE FUNCTION enqueue_vehicle_image_attribution();
 CREATE TABLE pipeline_registry(table_name text,column_name text,owned_by text,description text,do_not_write_directly boolean,write_via text);
 CREATE TABLE image_descriptions(image_id uuid,vehicle_id uuid,description text,description_type text,source text,source_version text,confidence numeric,evidence jsonb);
 CREATE TABLE photo_extracted_fields(image_id uuid,user_id uuid,vehicle_id uuid,field_name text,value text,quote text,confidence numeric,source text,prompt_version text,meta jsonb,UNIQUE(image_id,field_name,source,prompt_version));
@@ -68,6 +91,7 @@ CREATE TRIGGER z_trg_capture_upload_status_upd AFTER UPDATE OF ai_processing_sta
 CREATE TRIGGER trg_user_image_counts_upd AFTER UPDATE ON vehicle_images REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION track_user_image_counts();
 CREATE TRIGGER trg_sync_vehicle_primary_image AFTER UPDATE OF is_primary,is_duplicate,image_vehicle_match_status,image_url,is_superseded ON vehicle_images FOR EACH ROW EXECUTE FUNCTION sync_vehicle_primary_image();
 CREATE TRIGGER trg_project_observation_image_witness AFTER INSERT ON vehicle_observations FOR EACH ROW WHEN(NEW.structured_data ? 'image_id') EXECUTE FUNCTION project_observation_image_witness();
+\ir ../migrations/20260619170000_get_image_deep_analysis.sql
 \ir ../migrations/20261109213000_reviewed_image_analysis.sql
 
 INSERT INTO observation_sources(slug) VALUES('photo_pipeline');
@@ -78,12 +102,12 @@ INSERT INTO vehicle_images(id,vehicle_id,user_id,source,image_url,vision_gate_st
 ('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000001','capture_relay_ios','https://example.invalid/finished.jpg','approved',3500000,
  '{"classification":{"image_type":"vehicle_exterior","confidence":0.95,"description":"Badge on car","vehicle_hints":{},"v2":{"prompt_version":"fixture","vehicle_fields":[{"field_name":"engine_type","value":"badge text must not land","evidence":"badge","confidence":0.95}],"text_lines":[],"angle":{"value":"exterior_three_quarter","confidence":0.95}}},"unrelated_namespace":{"keep":true}}');
 SELECT recompute_vehicle_primary_image('20000000-0000-4000-8000-000000000001');
-CREATE FUNCTION fixture_review(p_image uuid,p_hash text DEFAULT repeat('a',64),p_azimuth numeric DEFAULT 45) RETURNS uuid LANGUAGE plpgsql AS $$
+CREATE FUNCTION fixture_review(p_image uuid,p_hash text DEFAULT repeat('a',64),p_azimuth numeric DEFAULT 45,p_scene text DEFAULT 'body_exterior') RETURNS uuid LANGUAGE plpgsql AS $$
 DECLARE i vehicle_images%ROWTYPE; oid uuid; reviewed timestamptz=now(); v jsonb;
 BEGIN
  SELECT * INTO i FROM vehicle_images WHERE id=p_image;
  v=jsonb_build_object('image_id',i.id,'vehicle_id',i.vehicle_id,'analysis_kind','image_deep_byok','is_inferred',true,
- 'scene_type','body_exterior','build_phase_guess','final_assembly','intent','unknown','intent_confidence',0,'needs_clarification',true,
+ 'scene_type',p_scene,'build_phase_guess','final_assembly','intent','unknown','intent_confidence',0,'needs_clarification',true,
  'components_seen','[]'::jsonb,'state_observations',jsonb_build_object('rust_severity','unknown','paint_state','unknown','completeness','assembled'),
  'workshop_signals',jsonb_build_object('tools_visible','[]'::jsonb,'fixturing','unknown','lighting','natural_outdoor'),
  'presence',jsonb_build_object('person',false),'camera_pose',jsonb_build_object('framing','full vehicle','azimuth_deg',p_azimuth,'distance_est','~3m'),
@@ -97,6 +121,9 @@ BEGIN
  RETURN oid;
 END $$;
 DO $$ DECLARE oid uuid; r jsonb; prior jsonb; count_camera int; BEGIN
+ ASSERT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000001') WHERE narrative='Prior shop image'),'legacy reader behavior preserved';
+ ASSERT has_function_privilege('anon','get_image_deep_analysis(uuid)','EXECUTE')
+   AND has_function_privilege('authenticated','get_image_deep_analysis(uuid)','EXECUTE'),'reader grants preserved';
  ASSERT (SELECT primary_image_url='https://example.invalid/old.jpg' FROM vehicles),'baseline prefers old analyzed frame';
  oid=fixture_review('10000000-0000-4000-8000-000000000002');
  ASSERT EXISTS(SELECT FROM observation_witnesses WHERE observation_id=oid AND witness_role='derived'),'atomic source witness';
@@ -105,9 +132,17 @@ DO $$ DECLARE oid uuid; r jsonb; prior jsonb; count_camera int; BEGIN
  ASSERT (SELECT primary_image_url='https://example.invalid/finished.jpg' FROM vehicles),'original consumer selects newly reviewed frame';
  ASSERT NOT EXISTS(SELECT FROM field_evidence) AND NOT EXISTS(SELECT FROM photo_extracted_fields) AND NOT EXISTS(SELECT FROM fixture_helper_calls),'no old classifier claim replay';
  ASSERT (SELECT count(*)=1 FROM image_camera_position),'camera projected by actual landing trigger';
+ ASSERT EXISTS(SELECT FROM image_observations WHERE id=(r->>'image_observation_id')::uuid
+   AND image_id='10000000-0000-4000-8000-000000000002' AND vehicle_id='20000000-0000-4000-8000-000000000001'
+   AND is_active AND observed_by='caller-byok' AND confidence=0.6 AND NOT is_high_confidence_subject
+   AND confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=oid::text
+   AND confidence_basis#>>'{reviewed_image_analysis_v1,image_url}'='https://example.invalid/finished.jpg'),
+   'T2 placement cites this exact guarded observation and source without an identity vote';
+ ASSERT NOT EXISTS(SELECT FROM vehicle_image_attribution_queue),'completed review does not enqueue reattribution';
  ASSERT (SELECT ai_scan_metadata#>>'{unrelated_namespace,keep}'='true' AND vehicle_id='20000000-0000-4000-8000-000000000001' AND vision_gate_status='approved' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000002'),'source and sibling metadata retained';
  r=project_reviewed_image_analysis(oid); ASSERT r->>'projection_duplicate'='true','same receipt replay';
  ASSERT (SELECT count(*)=1 FROM image_camera_position),'replay adds no camera row';
+ ASSERT (SELECT count(*)=1 FROM image_observations),'replay adds no search row';
  SELECT ai_scan_metadata->'byok_deep_analysis' INTO prior FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000001';
  oid=fixture_review('10000000-0000-4000-8000-000000000001',repeat('c',64));
  ASSERT (SELECT extraction_metadata->'prior_analysis'=prior FROM vehicle_observations WHERE id=oid),'complete legacy before-image retained';
@@ -121,12 +156,63 @@ DO $$ DECLARE oid uuid; BEGIN
  oid=fixture_review('10000000-0000-4000-8000-000000000002',repeat('4',64),90);
  PERFORM project_reviewed_image_analysis(oid);
  ASSERT (SELECT count(*)=2 FROM image_camera_position WHERE image_id='10000000-0000-4000-8000-000000000002'),'changed review retains both camera observations';
+ ASSERT (SELECT count(*)=1 FROM image_observations WHERE image_id='10000000-0000-4000-8000-000000000002' AND is_active),'one current search revision';
+ ASSERT EXISTS(SELECT FROM image_observations old JOIN image_observations current ON old.superseded_by=current.id
+   WHERE old.image_id='10000000-0000-4000-8000-000000000002' AND NOT old.is_active AND current.is_active
+    AND current.confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=oid::text),'prior search testimony preserved through existing owner';
  ASSERT EXISTS(SELECT FROM image_camera_position WHERE source_version='review:'||oid AND azimuth_deg=90 AND evidence->>'observation_id'=oid::text),'new camera testimony points to its immutable review';
  ASSERT EXISTS(SELECT FROM image_camera_position WHERE image_id='10000000-0000-4000-8000-000000000002' AND azimuth_deg=45),'prior camera testimony preserved';
  ASSERT (SELECT ai_scan_metadata#>>'{byok_deep_analysis,observation_id}'=oid::text AND ai_scan_metadata#>>'{byok_deep_analysis,camera_pose,azimuth_deg}'='90' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000002'),'current cache selects current review';
  PERFORM project_reviewed_image_analysis(oid);
  ASSERT (SELECT count(*)=2 FROM image_camera_position WHERE image_id='10000000-0000-4000-8000-000000000002'),'changed review replay adds no camera row';
  RAISE NOTICE 'PASS: changed review retains prior camera testimony and points current cache to new review';
+END $$;
+
+-- Placement failure must roll back the entire cache/camera/search projection.
+CREATE FUNCTION fixture_refuse_search() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN
+ IF current_setting('fixture.refuse_search',true)='true' THEN RAISE EXCEPTION 'fixture search unavailable'; END IF;
+ RETURN NEW; END$$;
+CREATE TRIGGER fixture_refuse_search BEFORE INSERT ON image_observations FOR EACH ROW EXECUTE FUNCTION fixture_refuse_search();
+DO $$ DECLARE oid uuid; before_meta jsonb; before_camera int; before_search int; BEGIN
+ oid=fixture_review('10000000-0000-4000-8000-000000000002',repeat('5',64),120);
+ SELECT ai_scan_metadata INTO before_meta FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000002';
+ SELECT count(*) INTO before_camera FROM image_camera_position;
+ SELECT count(*) INTO before_search FROM image_observations;
+ PERFORM set_config('fixture.refuse_search','true',true);
+ BEGIN PERFORM project_reviewed_image_analysis(oid); RAISE EXCEPTION 'expected search failure';
+ EXCEPTION WHEN raise_exception THEN ASSERT SQLERRM='fixture search unavailable'; END;
+ PERFORM set_config('fixture.refuse_search','false',true);
+ ASSERT (SELECT ai_scan_metadata=before_meta FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000002'),'failed search leaves prior cache';
+ ASSERT (SELECT count(*)=before_camera FROM image_camera_position),'failed search rolls back camera';
+ ASSERT (SELECT count(*)=before_search FROM image_observations),'failed search adds no revision';
+ ASSERT (SELECT count(*)=1 FROM image_observations WHERE image_id='10000000-0000-4000-8000-000000000002' AND is_active),'failed search restores active prior';
+ PERFORM project_reviewed_image_analysis(oid);
+ ASSERT EXISTS(SELECT FROM image_observations WHERE is_active AND confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=oid::text),'same deferred observation can retry successfully';
+ RAISE NOTICE 'PASS: actual search failure rolls back projection and preserves retry';
+END $$;
+
+INSERT INTO vehicle_images(id,vehicle_id,source,image_url,vision_gate_status) VALUES
+('10000000-0000-4000-8000-000000000003','20000000-0000-4000-8000-000000000001','iphoto','https://example.invalid/reference.jpg','approved');
+DO $$ DECLARE oid uuid; r jsonb; BEGIN
+ oid=fixture_review('10000000-0000-4000-8000-000000000003',repeat('6',64),NULL,'receipt_document');
+ r=project_reviewed_image_analysis(oid);
+ ASSERT EXISTS(SELECT FROM image_observations WHERE id=(r->>'image_observation_id')::uuid AND is_active
+   AND vehicle_id IS NULL AND role='incidental' AND NOT is_high_confidence_subject
+   AND confidence_basis#>>'{reviewed_image_analysis_v1,evidence_role}'='reference'),
+   'document/reference reading is retained without vehicle identity or physical-part attribution';
+ ASSERT r->'search_vehicle_id'='null'::jsonb,'reference does not inflate vehicle placement';
+ oid=fixture_review('10000000-0000-4000-8000-000000000003',repeat('7',64),NULL,'data_plate');
+ r=project_reviewed_image_analysis(oid);
+ ASSERT EXISTS(SELECT FROM image_observations WHERE id=(r->>'image_observation_id')::uuid AND is_active
+   AND vehicle_id='20000000-0000-4000-8000-000000000001' AND role='part' AND confidence=0.6),
+   'physical detail keeps part role and inferred confidence';
+ ASSERT NOT EXISTS(SELECT FROM vehicle_image_attribution_queue),'neither role changes nor revisions enqueue identity changes';
+ oid=fixture_review('10000000-0000-4000-8000-000000000003',repeat('8',64));
+ UPDATE vehicle_images SET image_url='https://example.invalid/replaced.jpg' WHERE id='10000000-0000-4000-8000-000000000003';
+ BEGIN PERFORM project_reviewed_image_analysis(oid); RAISE EXCEPTION 'expected replaced source refusal';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='review_source_changed'; END;
+ ASSERT NOT EXISTS(SELECT FROM image_observations WHERE confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=oid::text),'replacement admits no search reading';
+ RAISE NOTICE 'PASS: reference/part qualification and exact source-URL refusal';
 END $$;
 
 UPDATE vehicle_images SET ai_scan_metadata=jsonb_set(ai_scan_metadata,'{classification,description}','"Changed classifier description"') WHERE id='10000000-0000-4000-8000-000000000002';
@@ -218,6 +304,76 @@ DO $$ DECLARE conn text; oid uuid; r jsonb; waiting boolean; BEGIN
  ASSERT r->>'error'='review_source_withdrawn',r::text;
  PERFORM dblink_disconnect('review_apply'); PERFORM dblink_disconnect('review_withdraw');
  RAISE NOTICE 'PASS: real concurrent source withdrawal refuses projection';
+END $$;
+
+-- Retained T2 authority follows its exact source; withdrawal preserves history
+-- and independent producers. Restoring a source never resurrects an old review.
+INSERT INTO vehicle_images(id,vehicle_id,source,image_url,vision_gate_status) VALUES
+('10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000001','iphoto','https://example.invalid/current.jpg','approved');
+DO $$ DECLARE oid uuid; r jsonb; placed uuid; independent uuid; flag text; k int=20; BEGIN
+ oid=fixture_review('10000000-0000-4000-8000-000000000004',md5('current')||md5('current'));
+ r=project_reviewed_image_analysis(oid); placed=(r->>'image_observation_id')::uuid;
+ ASSERT (project_reviewed_image_analysis(oid)->>'image_observation_id')::uuid=placed,'replay returns exact stable search ID';
+ ASSERT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000004') WHERE narrative='Whole assembled car with clear surroundings'),'actual deep reader sees current review';
+ independent=ingest_image_observation('10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000001','part',0.5,'independent-producer','v1','{}');
+ UPDATE vehicle_images SET is_primary=is_primary WHERE id='10000000-0000-4000-8000-000000000004';
+ ASSERT (SELECT is_active FROM image_observations WHERE id=placed),'benign primary update keeps placement';
+ UPDATE vehicle_images SET image_url='https://example.invalid/replacement.jpg' WHERE id='10000000-0000-4000-8000-000000000004';
+ ASSERT EXISTS(SELECT FROM image_observations old JOIN image_observations withdrawn ON old.superseded_by=withdrawn.id
+   WHERE old.id=placed AND NOT old.is_active AND NOT withdrawn.is_active
+    AND withdrawn.confidence_basis#>>'{reviewed_image_analysis_v1,state}'='withdrawn'
+    AND withdrawn.confidence_basis#>>'{reviewed_image_analysis_v1,withdrawal_reason}'='source_changed'),
+   'replacement appends explicit withdrawal preserving prior review';
+ ASSERT (SELECT is_active FROM image_observations WHERE id=independent),'independent producer untouched';
+ ASSERT (SELECT NOT ai_scan_metadata ? 'byok_deep_analysis' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000004'),'direct cache consumers cannot read withdrawn review';
+ ASSERT EXISTS(SELECT FROM vehicle_observations WHERE id=oid AND structured_data->>'narrative_one_line'='Whole assembled car with clear surroundings'),'complete review testimony retained after cache withdrawal';
+ ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000004')),'deep reader withholds cache after replacement';
+ UPDATE vehicle_images SET image_url='https://example.invalid/current.jpg' WHERE id='10000000-0000-4000-8000-000000000004';
+ BEGIN PERFORM project_reviewed_image_analysis(oid); RAISE EXCEPTION 'expected old review refusal';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='review_source_previously_withdrawn'; END;
+ ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000004')),'restoring URL does not resurrect old reading';
+ FOREACH flag IN ARRAY ARRAY['is_sensitive','is_duplicate','is_superseded','is_document','doc_flag'] LOOP
+   oid=fixture_review('10000000-0000-4000-8000-000000000004',md5(k::text)||md5(k::text)); k=k+1;
+   r=project_reviewed_image_analysis(oid); placed=(r->>'image_observation_id')::uuid;
+   EXECUTE format('UPDATE vehicle_images SET %I=true WHERE id=%L',flag,'10000000-0000-4000-8000-000000000004');
+   ASSERT NOT (SELECT is_active FROM image_observations WHERE id=placed),flag||' withdraws search authority';
+   ASSERT (SELECT NOT ai_scan_metadata ? 'byok_deep_analysis' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000004'),flag||' removes only current review cache';
+   ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000004')),flag||' withholds reader';
+   EXECUTE format('UPDATE vehicle_images SET %I=false WHERE id=%L',flag,'10000000-0000-4000-8000-000000000004');
+ END LOOP;
+ FOREACH flag IN ARRAY ARRAY['vision_gate_status','image_vehicle_match_status','vehicle_id'] LOOP
+   oid=fixture_review('10000000-0000-4000-8000-000000000004',md5(k::text)||md5(k::text)); k=k+1;
+   r=project_reviewed_image_analysis(oid); placed=(r->>'image_observation_id')::uuid;
+   IF flag='vision_gate_status' THEN UPDATE vehicle_images SET vision_gate_status='pending' WHERE id='10000000-0000-4000-8000-000000000004';
+   ELSIF flag='image_vehicle_match_status' THEN UPDATE vehicle_images SET image_vehicle_match_status='mismatch' WHERE id='10000000-0000-4000-8000-000000000004';
+   ELSE UPDATE vehicle_images SET vehicle_id=NULL WHERE id='10000000-0000-4000-8000-000000000004'; END IF;
+   ASSERT NOT (SELECT is_active FROM image_observations WHERE id=placed),flag||' withdraws search authority';
+   ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000004')),flag||' withholds reader';
+   UPDATE vehicle_images SET vision_gate_status='approved',image_vehicle_match_status=NULL,vehicle_id='20000000-0000-4000-8000-000000000001' WHERE id='10000000-0000-4000-8000-000000000004';
+ END LOOP;
+ oid=fixture_review('10000000-0000-4000-8000-000000000004',md5('fresh')||md5('fresh'),NULL,'receipt_document');
+ r=project_reviewed_image_analysis(oid);
+ ASSERT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000004')),'fresh reference review is readable without claiming vehicle identity';
+ ASSERT r->'search_vehicle_id'='null'::jsonb,'reference remains unplaced against vehicle';
+ ASSERT (SELECT is_active FROM image_observations WHERE id=independent),'all withdrawals preserve independent source';
+ ASSERT NOT EXISTS(SELECT FROM vehicle_image_attribution_queue),'withdrawal/review never promotes identity';
+ RAISE NOTICE 'PASS: retained-source withdrawal, historical revision, reader refusal and fresh-review recovery';
+END $$;
+
+-- UPDATE OF observes SET targets, not earlier BEFORE-trigger assignments.
+-- A later metadata-only classifier update can unfile this image.
+INSERT INTO vehicle_images(id,vehicle_id,source,image_url,vision_gate_status,ai_scan_metadata) VALUES
+('10000000-0000-4000-8000-000000000005','20000000-0000-4000-8000-000000000001','capture_relay_ios','https://example.invalid/hint-guard.jpg','approved',
+ '{"classification":{"image_type":"vehicle_exterior","vehicle_hints":{},"description":"Fixture body"}}');
+DO $$ DECLARE oid uuid; placed uuid; BEGIN
+ oid=fixture_review('10000000-0000-4000-8000-000000000005',md5('hint')||md5('hint'));
+ placed=(project_reviewed_image_analysis(oid)->>'image_observation_id')::uuid;
+ ASSERT (SELECT vehicle_id IS NOT NULL AND ai_scan_metadata ? 'byok_deep_analysis' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000005'),'review initially current';
+ UPDATE vehicle_images SET ai_scan_metadata=jsonb_set(ai_scan_metadata,'{classification,vehicle_hints}','{"make":"Other"}') WHERE id='10000000-0000-4000-8000-000000000005';
+ ASSERT (SELECT vehicle_id IS NULL AND NOT ai_scan_metadata ? 'byok_deep_analysis' FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000005'),'existing metadata hint guard unfiles and atomically withdraws cache';
+ ASSERT NOT (SELECT is_active FROM image_observations WHERE id=placed),'metadata-only unfile withdraws current search';
+ ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000005')),'reader also withholds unfiled review';
+ RAISE NOTICE 'PASS: actual hint-guard metadata-only unfile withdraws current review';
 END $$;
 
 -- The current contract carries inferred pose, not a measurement receipt. Do not

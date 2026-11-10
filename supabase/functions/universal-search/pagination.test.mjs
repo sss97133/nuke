@@ -403,3 +403,17 @@ test('every page of a corrected query searches the same terms', async () => {
   for (const c of f.calls.filter(c => c.rpc === 'search_vehicles_fts')) terms.add(c.args.query_text);
   assert.deepEqual([...terms], ['porsche']);
 });
+
+test('single-character model terms reach ranked search on every page', async () => {
+  for (const [query, expected] of [
+    ['2004 Ford T BIRD', '2004 & ford & t & bird'],
+    ['Ford Model T', 'ford & model & t'],
+    ['BMW 3', 'bmw & 3'],
+    ['the Ford - T', 'ford & t'],
+  ]) {
+    const f = edgeFixture();
+    const first = await f.search({ query });
+    await f.search({ query, offset: first.meta.next_offset, vehicle_source: first.meta.vehicle_source });
+    assert.deepEqual(f.calls.filter(c => c.rpc === 'search_vehicles_fts').map(c => c.args.query_text), [expected, expected]);
+  }
+});
