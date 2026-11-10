@@ -319,8 +319,9 @@ struct ProfileView: View {
     private var currentGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "owner" } }
     private var contributedGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "contributor" } }
     private var pastGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "previously_owned" } }
+    private var documentingGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "documenting" } }
     private var otherRelationships: [String] {
-        Array(Set(realGarage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor"].contains($0) }.sorted()
+        Array(Set(realGarage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor", "documenting"].contains($0) }.sorted()
     }
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
@@ -870,6 +871,16 @@ struct ProfileView: View {
         if !contributedGarage.isEmpty {
             Section("Your contributions · \(contributedGarage.count)") {
                 ForEach(contributedGarage) { v in garageRow(v) }
+            }
+        }
+        // Documenting sits beside contributions, never in the fleet: photographing a dealer's car doesn't make it yours.
+        if !documentingGarage.isEmpty {
+            Section {
+                ForEach(documentingGarage) { v in garageRow(v) }
+            } header: {
+                Text("Documenting · \(documentingGarage.count)")
+            } footer: {
+                Text(GarageCopy.documentingFooter)
             }
         }
         // Former ownership remains available as history.

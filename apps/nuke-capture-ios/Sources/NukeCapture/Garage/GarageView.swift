@@ -123,6 +123,15 @@ struct GarageView: View {
                 Text(GarageCopy.contributedFooter)
             }
         }
+        if !s.documenting.isEmpty {
+            Section {
+                ForEach(s.documenting) { v in vehicleLink(v) }
+            } header: {
+                Text("Documenting · \(s.documenting.count)")
+            } footer: {
+                Text(GarageCopy.documentingFooter)
+            }
+        }
         if !unresolved.isEmpty {
             Section {
                 ForEach(unresolved) { source in
