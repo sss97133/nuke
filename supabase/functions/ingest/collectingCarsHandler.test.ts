@@ -32,6 +32,12 @@ globalThis.fetch = async (input, init) => {
   if (u.pathname.startsWith('/auth/')) return Response.json({ message: 'synthetic service key has no user' }, { status: 401 });
   if (u.pathname === '/functions/v1/extract-collecting-cars') {
     assertEquals(body.url, url);
+    if (failure.startsWith('noncar')) return Response.json({ success: false, skipped: true,
+      skip_reason: `Collecting Cars lot type ${fields.lot_type}`, extracted: { listing_id: fields.listing_id, lot_type: fields.lot_type, url },
+      ...(failure === 'noncar-no-capture' ? {} : { source_capture: { snapshot_id: snapshot,
+        sha256: failure === 'noncar-bad-hash' ? 'invalid' : 'a'.repeat(64), observed_at: clock,
+        source_url: failure === 'noncar-wrong-url' ? url + '-other' : url } }) });
+
     if (body.cc_snapshot) {
       assertEquals(body.cc_snapshot, { snapshot_id: snapshot, expected_sha256: 'a'.repeat(64) });
       return Response.json({ success: true, extracted: { ...fields, stage: failure === 'live-replay' ? 'live' : 'unsold' },
@@ -182,3 +188,23 @@ for (const mode of ['no-owner', 'ambiguous-owner', 'owner-disappeared', 'foreign
     assertEquals(seen.some(x => x.path.startsWith('/rest/') && !['GET', 'HEAD'].includes(x.method)), false);
   });
 }
+
+for (const lotType of ['plate', 'part', 'bike', 'boat']) Deno.test(`retained native ${lotType} is a structural rejection without vehicle writes`, async () => {
+ reset('noncar'); fields.lot_type = lotType;
+ const r = await run(); assertEquals(r.status, 'rejected');
+ assertEquals(r.reason, `not_a_vehicle: Collecting Cars lot type ${lotType}`);
+ assertEquals(r.collecting_cars_noncar, { snapshot_id: snapshot, sha256: 'a'.repeat(64), observed_at: clock, source_url: url, listing_id: fields.listing_id, lot_type: lotType });
+ const { ledgerWriteFor } = await import('../poll-listing-feeds/ledger.ts');
+ const write = ledgerWriteFor({url,feedId:id,ingest:r,batch:{rows:new Map(),error:null},now:new Date()});
+ assertEquals(write?.status, 'skipped'); assertEquals(write?.row.vehicle_id, null);
+ assertEquals(seen.some(x => x.path.startsWith('/rest/') || x.path === '/functions/v1/ingest-observation'), false);
+});
+for (const mode of ['noncar-no-capture','noncar-bad-hash','noncar-wrong-url']) Deno.test(`unproved native classification ${mode} remains retryable failure`, async () => {
+ reset(mode); fields.lot_type = 'plate'; const r=await run();
+ assertEquals(r.status,'error'); assertEquals(r.collecting_cars_noncar,undefined);
+ assertEquals(seen.some(x=>x.path.startsWith('/rest/')),false);
+});
+Deno.test('unknown native type and skipped pin cannot become permanent non-car decisions', async () => {
+ reset('noncar'); fields.lot_type='unknown'; assertEquals((await run()).status,'error');
+ reset('noncar'); fields.lot_type='plate'; assertEquals((await run({cc_snapshot:ccPin})).status,'error');
+});
