@@ -9,7 +9,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ client: null as any }));
+const fixture = vi.hoisted(() => ({ client: null as any, user: null as { id: string } | null, loading: false }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.user, loading: fixture.loading }) }));
 vi.mock('../../lib/supabase', () => ({ get supabase() { return fixture.client; } }));
 vi.mock('../../hooks/useVehiclePermissions', () => ({ useVehiclePermissions: () => ({
   isOwner: false, hasContributorAccess: false, contributorRole: null, canEdit: false,
@@ -37,6 +38,7 @@ const dayDocuments = () => ({ date: paperDay, tied, documents: [{
   document_type: 'work_order', document_kind: 'parts_service', document_number: '9810', date: paperDay, date_source: 'data_v2.transaction_date',
   date_basis: 'printed_document_date', pages: 2, payer_as_named: tied ? 'Synthetic Builder' : null, payment_method: tied ? 'Visa' : null,
   subtotal: tied ? 650 : null, discount: null, shipping: null, tax: tied ? 54.76 : null, total: tied ? 2190 : null, currency: 'USD',
+  recorded_payment: tied ? { amount: 0, date: '2024-10-08' } : null, recorded_hours: 2.75, hour_entries: 1,
   link_basis: 'cited_document', link_confidence: 0.9,
   lines: [
     { line_number: 1, description: 'Bore cylinders .060', part_number: null, quantity: null, unit_price: null, amount: null, line_date: '2024-11-13', hours: 2.75, performer: 'Frank',
@@ -54,6 +56,7 @@ function Probe() {
   return <BarcodeTimeline />;
 }
 beforeEach(() => {
+  fixture.user = { id: 'owner-a' }; fixture.loading = false;
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   window.history.replaceState({}, '', '/');
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -146,6 +149,23 @@ it('prints the money and the payer when the reader returns them to a tied viewer
   expect(text).toContain('2,190 USD');
   expect(text).toContain('billed to Synthetic Builder');
   expect(text).toContain('650 USD');
+  expect(text).toContain('Recorded payment 0 USD');
+  expect(text).toContain('2.75 recorded person-hours');
+});
+it('withdraws an open receipt during a viewer transition and rereads it for the new viewer', async () => {
+  tied = true; await showDay(paperDay);
+  const rerender = async () => act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[`/vehicle/${vehicleId}`]}>
+    <Routes><Route path="/vehicle/:vehicleId" element={<VehicleProfileProvider><Probe /></VehicleProfileProvider>} /></Routes>
+  </MemoryRouter></QueryClientProvider>));
+  fixture.loading = true; await rerender();
+  expect(host.textContent).not.toContain('Recorded payment');
+  expect(host.textContent).not.toContain('Synthetic Builder');
+  fixture.user = null; fixture.loading = false; tied = false; await rerender();
+  await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+  expect(paperReads()).toHaveLength(2);
+  expect(host.textContent).toContain('Bore cylinders');
+  expect(host.textContent).not.toContain('Recorded payment');
+  expect(host.textContent).not.toContain('2,190');
 });
 it('never reads paper for a day the timeline leg did not count', async () => {
   const text = await showDay(photoDay);

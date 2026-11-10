@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ client: null as any }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: null, loading: false }) }));
 vi.mock('../../lib/supabase', () => ({ get supabase() { return fixture.client; } }));
 vi.mock('../../hooks/useVehiclePermissions', () => ({ useVehiclePermissions: () => ({
   isOwner: false, hasContributorAccess: false, contributorRole: null, canEdit: false,
