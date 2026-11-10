@@ -309,3 +309,30 @@ the verdict already captures (`components_seen`, `workshop_signals`, `presence`)
 preserved in `ai_scan_metadata.byok_deep_analysis` + the vehicle_observation's
 `structured_data`, ready for that resolution pass to consume — the data isn't lost, the
 resolver is what's unbuilt.
+
+
+### Context and worklist reconciliation (2026-11-09)
+
+The existing BYOK `prepare` reader selects the canonical gallery-eligible,
+non-sensitive population, with stable pagination and the source revision needed
+by reviewed intake. Preparation does not emit an `analyzing` event: selecting a
+frame is not performing analysis. Documents remain on their receipt workflow;
+those exclusions must remain visible in population reporting.
+
+Source-day grouping preserves the timestamp's basis. A row creation timestamp is
+never a capture fallback. A reported capture of a receipt or historical print
+never establishes the date of the depicted work, and a span between photos is not
+labor duration.
+
+The context roster retains every current receipt line with receipt/item/document
+keys, recorded quantity, amount and dates. Identical part numbers on orders,
+backorders, returns and later shipments are separate evidence. The analyst
+reconciles the physical object against those records: visible components and
+changes, corresponding recorded work, unaccounted work, and remaining completion
+issues. Visual resemblance creates a candidate relation; an exact part-number
+claim requires a legible identifier. Payments, purchased parts, installed parts,
+observed work, estimated effort and agreed labor remain distinguishable.
+
+These are input repairs. They do not establish complete image coverage, prove
+installation, or close the reviewed-intake-to-consumer acceptance case. The old
+raw ingest and batch execution path must not substitute for sanctioned intake.
