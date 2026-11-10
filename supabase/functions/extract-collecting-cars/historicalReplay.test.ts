@@ -45,5 +45,31 @@ for (const [name, change] of Object.entries({ wrongUrl: { listing_url: url + '-o
 for (const stage of ['live', 'comingsoon', 'withdrawn', 'unknown']) Deno.test(`native ${stage} is not closed-auction replay evidence`, async () => {
   const changed = html.replaceAll('\\"stage\\":\\"unsold\\"', `\\"stage\\":\\"${stage}\\"`);
   assertEquals(changed === html, false); const hash2 = await sha(changed);
-  await assertRejects(() => replayClosedCollectingCars(fixture({ html: changed, html_sha256: hash2 }).db, url, { ...pin, expected_sha256: hash2 }));
+  await assertRejects(() => replayClosedCollectingCars(fixture({ html: changed, html_sha256: hash2 }).db, url, { ...pin, expected_sha256: hash2 }), Error,
+    ['live','comingsoon'].includes(stage) ? 'cc_snapshot_open_car' : 'cc_snapshot_not_closed_car');
+});
+
+Deno.test('source index native ID fences same-URL relists before open or closed replay eligibility', async () => {
+  await assertRejects(() => replayClosedCollectingCars(fixture().db, url, pin, 'another-listing'), Error, 'cc_snapshot_listing_mismatch');
+  const opened = html.replaceAll('\\"stage\\":\\"unsold\\"', '\\"stage\\":\\"live\\"');
+  assertEquals(opened === html, false);
+  const openedHash=await sha(opened);
+  await assertRejects(() => replayClosedCollectingCars(fixture({html:opened,html_sha256:openedHash}).db,url,{...pin,expected_sha256:openedHash},'another-listing'),Error,'cc_snapshot_listing_mismatch');
+});
+
+Deno.test('edge SDK protected Storage receives a deadline through its actual global transport',async()=>{
+  // supabase-js2.45.4 ignores download's newer third fetch-parameter argument.
+  // The caller must wrap global fetch, which this real SDK contract exercises.
+  const signal=new AbortController().signal;let storageReads=0;
+  const transport=async(input:RequestInfo|URL,init?:RequestInit)=>{
+    const u=new URL(String(input));assertEquals(u.origin,'https://fixture.invalid');
+    assertEquals(init?.signal?.aborted,false);
+    if(u.pathname.startsWith('/storage/v1/object/')){storageReads++;assertEquals(init?.signal,signal);return new Response(html);}
+    return Response.json({id,listing_url:url,platform:'collectingcars',success:true,http_status:200,html:null,
+      html_storage_path:'collectingcars/retained.html',html_sha256:hash,fetched_at:clock,created_at:clock,metadata:{}});
+  };
+  const db=createClient('https://fixture.invalid','synthetic',{auth:{persistSession:false,autoRefreshToken:false},
+    global:{fetch:(input,init)=>transport(input,{...init,signal:init?.signal?AbortSignal.any([signal,init.signal]):signal})}});
+  const result=await replayClosedCollectingCars(db,url,pin,'93268');
+  assertEquals(storageReads,1);assertEquals(result.source_capture.observed_at,clock);
 });

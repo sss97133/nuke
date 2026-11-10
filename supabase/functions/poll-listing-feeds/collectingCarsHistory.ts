@@ -109,7 +109,8 @@ export async function prepareCollectingCarsHistory(db: any, feed: any, signal: A
     remaining_index_hits_at_read: page.found, completion_semantics: "keyset traversal only; full-population capture reconciliation is separate",
     capture_id: capture.id, pass: config.history_pass ?? 1, discovery_complete: config.history_discovery_complete === true,
     coverage: "Current publisher index only; delisted or absent historical lots unknown. Non-car discovery is not canonical ingestion." };
-  return { urls, receipt, async finish(ledger: Map<string, LedgerKnown>, outcomes: Row[]) {
+  const identities = new Map<string, { auctionId: number; stage: string | null }>(page.lots.map((lot: any) => [lot.url, { auctionId: lot.id, stage: typeof lot.document.listingStage === "string" ? lot.document.listingStage : null }]));
+  return { urls, identities, receipt, async finish(ledger: Map<string, LedgerKnown>, outcomes: Row[]) {
     const ack = new Set(outcomes.filter(row => row.ledger_write_status === "acknowledged" && ["complete", "skipped", "failed"].includes(row.ledger)).map(row => row.url));
     const pending = urls.filter(url => !ack.has(url) && !["settled", "backoff"].includes(ledgerDecision(ledger.get(url), new Date())));
     receipt.page_unattempted_or_unacknowledged = pending.length;
