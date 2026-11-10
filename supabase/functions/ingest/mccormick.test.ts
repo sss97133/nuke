@@ -65,7 +65,7 @@ async function catalogWorld(mode: 'complete' | 'absent' | 'disagree' | 'index_mi
   const db: any = { from(table: string) {
     const filters: Record<string, any> = {}; let inserted: any[] | null = null;
     const q: any = {};
-    for (const k of ['select', 'limit', 'in', 'range', 'order']) q[k] = () => q;
+    for (const k of ['select', 'limit', 'in', 'range', 'order', 'is', 'or']) q[k] = () => q;
     q.eq = (k: string, value: any) => { filters[k] = value; return q; };
     q.insert = (rows: any[]) => { inserted = rows; return q; };
     const result = () => {
@@ -141,7 +141,7 @@ async function world(failure?: "source" | "archive" | "admission" | "readback" |
   const db: any = {
     from(table: string) {
       const query: any = {};
-      for (const k of ["select", "eq", "in", "limit"]) query[k] = () => query;
+      for (const k of ["select", "eq", "in", "limit", "is", "or"]) query[k] = () => query;
       const result = () => {
         if (table === "observation_sources") return failure === "source" ? { error: { message: "Read timed out" } } : { data: source };
         if (table === "listing_page_snapshots") return { data: snapshot };
@@ -190,7 +190,7 @@ for (const failure of ["source", "archive", "identity", "admission", "readback",
   });
 }
 
-async function archiveWorld(mode: "complete" | "missing" | "disagreement" | "ambiguous" = "complete") {
+async function archiveWorld(mode: "complete" | "missing" | "disagreement" | "ambiguous" | "merged_aliases" | "conflicting_owner" = "complete") {
   const archiveUrl="https://www.classic-carauction.com/auction-results?auctionnbr=80&auctionid=123";
   const modern=(s:string)=>s.replaceAll("1967","2002");
   const archiveBody=modern(fixture(true)).replace('second</a>', 'second</a><a href="./upload/Auction/archive-only.jpg">original</a>');
@@ -209,11 +209,27 @@ async function archiveWorld(mode: "complete" | "missing" | "disagreement" | "amb
       const query:any={};
       for(const k of ["select","order","range","limit","in"])query[k]=()=>query;
       query.eq=(k:string,v:any)=>{filters[k]=v;return query;};
+      query.is=(k:string,v:any)=>{filters[k]=v;return query;};
+      query.or=(v:string)=>{filters.or=v;return query;};
       query.insert=(rows:any[])=>{inserted=rows;return query;};
       const result=()=>{
         if(table==="observation_sources")return {data:{id:"source",species:"block_house",supported_observations:["listing"]}};
         if(table==="listing_page_snapshots")return {data:docs[filters.id]};
-        if(table==="vehicles")return {data:mode === "ambiguous" && filters.vin ? [{id:"a"},{id:"b"}] : []};
+        if(table==="vehicles") {
+          if (!filters.vin) return {data:[]};
+          const rows = mode === "ambiguous" ? [{id:"a"},{id:"b"}]
+            : mode === "merged_aliases" ? [
+              {id:"merged", year:1999, make:"Honda", deleted_at:"2026-10-20", merged_into_vehicle_id:"vehicle", status:"merged"},
+              {id:"deleted", year:1999, make:"Honda", deleted_at:"2026-10-20", merged_into_vehicle_id:null, status:null},
+              {id:"redirected", year:1999, make:"Honda", deleted_at:null, merged_into_vehicle_id:"vehicle", status:null},
+              {id:"status_only", year:1999, make:"Honda", deleted_at:null, merged_into_vehicle_id:null, status:"merged"},
+              {id:"vehicle", year:2002, make:"Ford", deleted_at:null, merged_into_vehicle_id:null, status:null}]
+            : mode === "conflicting_owner" ? [{id:"vehicle", year:2001, make:"Ford", deleted_at:null, merged_into_vehicle_id:null, status:"active"}] : [];
+          return {data:rows.filter((r:any)=>
+            (!("deleted_at" in filters) || r.deleted_at == null) &&
+            (!("merged_into_vehicle_id" in filters) || r.merged_into_vehicle_id == null) &&
+            (filters.or !== "status.is.null,status.neq.merged" || r.status !== "merged"))};
+        }
         if(table==="vehicle_images"){
           for(const row of inserted??[])held.set(row.image_url,row);
           return {data:[...held.values()]};
@@ -274,3 +290,17 @@ for (const [raw, expected] of [["90,880", null], ["90,880 km", null], ["90,880 m
     eq(w.matched().mileage, expected); eq(w.payload().structured_data.raw_fields.Mileage, raw);
   });
 }
+
+Deno.test("merged and deleted VIN history does not turn one live owner into ambiguity", async () => {
+  const w = await archiveWorld("merged_aliases");
+  eq(w.result.vehicle_id, "vehicle");
+  eq(w.payloads.length, 2);
+  eq(w.payloads.every(p => p.vehicle_id === "vehicle"), true);
+  eq(w.payloads.every(p => !p.extraction_metadata.quality_issues.some((s:string) => s.startsWith("mccormicks_"))), true);
+});
+Deno.test("a conflicting live VIN owner remains unresolved after ignoring historical aliases", async () => {
+  const w = await archiveWorld("conflicting_owner");
+  eq(w.candidate, undefined); eq(w.result.mccormick_receipt.unresolved, true);
+  eq(w.payloads.every(p => p.vehicle_id === undefined), true);
+  eq(w.payloads[0].extraction_metadata.quality_issues.includes("mccormicks_vin_identity_conflict"), true);
+});
