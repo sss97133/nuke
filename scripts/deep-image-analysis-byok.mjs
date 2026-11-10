@@ -2,8 +2,8 @@
  * Deep image analysis — BYOK (Claude Code Agent reads via Read tool).
  *
  * Mirror of scripts/vision-gate-l4.mjs in shape: prepare a worklist for an
- * agent to consume, agent reads each image, writes verdict JSONL, ingest
- * writes structured features back as vehicle_observations.
+ * agent to consume. The foreground reviewed wrapper reads each image, validates
+ * source-bound envelopes, and optionally admits them through the photo owner.
  *
  * Companion docs: docs/library/technical/engineering-manual/18-deep-image-analysis.md
  *
@@ -12,9 +12,10 @@
  *              --vehicle-id <uuid> --limit 20 \
  *              --worklist /tmp/dia/<id>/work.jsonl
  *   ingest:  node scripts/deep-image-analysis-byok.mjs ingest \
- *              --sink /tmp/dia/<id>/verdicts.jsonl
+ *              --vehicle-id <uuid> --sink /tmp/dia/<id>/reviewed-envelopes.jsonl --apply
  *
- * Verdict line shape — what the agent writes per image:
+ * Verdict portion of a reviewed envelope (source/provenance are also required;
+ * scripts/daily-receipt/reviewed-image-batch.ts owns the complete contract):
  *   {
  *     "image_id": "<uuid>",
  *     "vehicle_id": "<uuid>",
@@ -40,9 +41,9 @@
  *     "agent_notes": "string"
  *   }
  *
- * Storage: writes into vehicle_images.ai_scan_metadata.deep_analysis (jsonb
- * merge) AND emits a kind='analysis' vehicle_observation per image with
- * observation_witness linking the image.
+ * Intake: photo-pipeline-orchestrator record_reviewed_analysis delegates to
+ * deferred ingest-observation and its guarded source-current T1/T2 projection.
+ * No direct cache writes, automatic identity promotion, work cascade or Sign.
  */
 
 import { mkdirSync, writeFileSync, readFileSync, existsSync, openSync, closeSync, fsyncSync, renameSync } from 'fs';
