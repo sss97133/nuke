@@ -53,6 +53,9 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { projectImageProperties, applyImagePropertyClaims } from './lib/image-property-projection.mjs';
 
+import { receiptContextVendor } from './lib/receipt-context-text.mjs';
+export { receiptContextVendor, contextWithoutPersonalFields } from './lib/receipt-context-text.mjs';
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
@@ -646,8 +649,27 @@ export function receiptRoster(rows) {
 }
 
 export function receiptRosterLine(r) {
-  return `    - ${r.desc} — PN ${r.pn || 'not recorded'}; recorded quantity ${r.quantity ?? '?'}; line amount ${r.amount ?? '?'}; line date ${r.lineDate || '?'}; recorded dates ${Object.entries(r.dates).filter(([, value]) => value).map(([field, value]) => `${field}=${value}`).join(', ') || '?'}; vendor ${r.vendor || '?'}; receipt ${r.receiptId}; item ${r.itemId}; source ${r.sourceTable || '?'}:${r.sourceId || '?'}`;
+  return `    - ${r.desc} — PN ${r.pn || 'not recorded'}; recorded quantity ${r.quantity ?? '?'}; line amount ${r.amount ?? '?'}; line date ${r.lineDate || '?'}; recorded dates ${Object.entries(r.dates).filter(([, value]) => value).map(([field, value]) => `${field}=${value}`).join(', ') || '?'}; vendor ${receiptContextVendor(r.vendor) || '?'}; receipt ${r.receiptId}; item ${r.itemId}; source ${r.sourceTable || '?'}:${r.sourceId || '?'}`;
 }
+export function groupReceiptRoster(rows) {
+  const groups = new Map();
+  for (const r of rows) {
+    const receipt = { receipt_id: r.receiptId, vendor: receiptContextVendor(r.vendor), dates: r.dates,
+      source_table: r.sourceTable, source_id: r.sourceId };
+    // Different retained metadata for the same receipt must not collapse.
+    const key = JSON.stringify(receipt);
+    if (!groups.has(key)) groups.set(key, { ...receipt, items: [] });
+    groups.get(key).items.push({ item_id: r.itemId, category: r.cat, description: r.desc,
+      part_number: r.pn, quantity: r.quantity, amount: r.amount, line_date: r.lineDate });
+  }
+  return [...groups.values()];
+}
+export function receiptRosterSections(rows) {
+  return groupReceiptRoster(rows).map(({ items, ...receipt }) =>
+    `Receipt ${JSON.stringify(receipt)}\n${items.map(item => `  Item ${JSON.stringify(item)}`).join('\n')}`).join('\n');
+}
+
+const sourceUuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 export async function prepare(client = sb, options = {}) {
   const VEHICLE_ID = options.vehicleId ?? arg('--vehicle-id');
@@ -695,7 +717,14 @@ export async function prepare(client = sb, options = {}) {
 
   let pending;
   let chosenDay = null;
-  if (BY_DAY) {
+  const imageIds = options.imageIds ?? (arg('--image-ids') ? arg('--image-ids').split(',') : null);
+  if (imageIds) {
+    if (!Array.isArray(imageIds) || imageIds.length < 1 || imageIds.length > LIMIT ||
+      imageIds.some(id => !sourceUuid(id)) || new Set(imageIds).size !== imageIds.length) throw new Error('prepare: invalid exact image selection');
+    const selected = new Map(pendingAll.map(row => [row.id, row]));
+    if (imageIds.some(id => !selected.has(id))) throw new Error('prepare: requested image is unavailable or already analyzed for this pass');
+    pending = imageIds.map(id => selected.get(id));
+  } else if (BY_DAY) {
     // Read source-day groups together for component lifecycle and before/after.
     // A shared recorded day does not itself establish a work session.
     // Parallel workers shard by DAY — a day is NEVER split across workers — and
@@ -873,6 +902,8 @@ async function buildContext() {
   const OUT = arg('--out');
   if (!VEHICLE_ID || !OUT) { console.error('context: --vehicle-id and --out required'); process.exit(1); }
 
+  if (arg('--audience')) throw new Error('unsupported_context_audience');
+
   let dossier = null;
   // The dossier edge function can cold-start (~30-45s). Be patient: up to 6 tries
   // with a per-request 50s timeout and a 5s backoff so a cold start doesn't fall through to thin.
@@ -1049,7 +1080,7 @@ async function buildContext() {
   if (knownPlaces.length) {
     lines.push(`\n**RESOLVED LOCATION ENTITIES (known_places — canonical, use these names verbatim):**`);
     for (const p of knownPlaces) {
-      lines.push(`- ${p.lat.toFixed(5)},${p.lon.toFixed(5)} r=${p.radius_m}m → **${p.name}** (${p.type})${p.org ? ` — org: ${p.org}` : ''}${p.address ? ` — ${p.address}` : ''}`);
+      lines.push(`- ${p.lat.toFixed(5)},${p.lon.toFixed(5)} r=${p.radius_m}m → **${p.name}** (${p.type})${p.org ? ` — org: ${p.org}` : ''}`);
     }
     lines.push(`A frame whose reported GPS falls within a radius above is geographically consistent with that place; this does not identify the performer or prove work occurred. Set \`presence.place_hint\` to the canonical name EXACTLY as written (no suffixes like "(lot)" or "(workbench)" — put sub-location detail in agent_notes). NEVER emit an open question asking to identify a location this legend resolves; an address is never an answer when the entity is known.`);
   }
@@ -1063,11 +1094,8 @@ async function buildContext() {
   if (roster.length) {
     lines.push(`\n**RECEIPT LINE EVIDENCE — ${roster.length} current receipt lines, including orders, returns, labor, fees and backorders.**`);
     lines.push(`Reconcile the physical vehicle against these records. Record what is visibly present, what changed across cited frames, which receipt lines may relate, and what remains unaccounted for. These lines do NOT prove purchase, delivery, installation or payment by themselves. Preserve printed shipped/backorder/return language; recorded quantity can be ordered quantity. A zero amount is not free work. Keep parts, labor, payments and estimates separate. Set part_number_guess only from a legible identifier on the depicted component/label and cite its text region; visual similarity to a receipt is a candidate relation in agent_notes, never exact part confirmation. Cite receipt and item IDs for every proposed relation. A receipt or later appearance does not establish an installation date or actual labor hours.`);
-    let curCat = '';
-    for (const r of roster) {
-      if (r.cat !== curCat) { curCat = r.cat; lines.push(`  · _${curCat}_`); }
-      lines.push(receiptRosterLine(r));
-    }
+    lines.push('Each receipt header supplies the exact vendor, date fields and document source for its indented items. Every item retains its own ID, category, full description, part number, recorded quantity, amount and line date. Repeated receipt metadata is printed once; no line is deduplicated or summed.');
+    lines.push(receiptRosterSections(roster));
   }
   if (garage.length > 1) {
     lines.push(`\n**RELATED VEHICLE RECORDS — ${garage.length} vehicles. A frame from this owner's library may show ANY of these, a bench part, or an off-subject car (a friend's, a car at a show) — do NOT assume it is the subject vehicle. ATTRIBUTE the frame to the right vehicle by visual evidence (body style, color, badges, interior, engine family) cross-checked with GPS + the EXIF capture date. Naming WHICH garage vehicle a frame belongs to is the high-value output; negating against the subject ("this is not the Mustang") is a wasted verdict. If a frame is a bench part or off-subject, say so plainly. When unsure between two of the owner's vehicles, name both as candidates with your reasoning — never force one.**`);

@@ -1,11 +1,16 @@
 import { assert, assertEquals, assertRejects, assertThrows } from "jsr:@std/assert";
 import { cliArgs, eligibleWorklist, exactRows, packReviews, parseStage, requireSubscription,
-  subscriptionEnvironment, validateEnvelopeBatch, runBatch } from "./reviewed-image-batch.ts";
+  subscriptionEnvironment, stageSchema, captureCommand, validateEnvelopeBatch, runBatch, sourceClockContext } from "./reviewed-image-batch.ts";
 import { admitReviewedBatch, persistReviewedBatchReceipt } from "../deep-image-analysis-byok.mjs";
 import { recordReviewedAnalysis } from "../../supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis.ts";
 
 const vehicle = "20000000-0000-4000-8000-000000000001", image = "10000000-0000-4000-8000-000000000001";
 const other = "10000000-0000-4000-8000-000000000002", now = new Date().toISOString();
+Deno.test("source clock context excludes unrelated private source properties", () => {
+  const rows = sourceClockContext([{ image_id: image, vehicle_id: vehicle, day: "2025-01-01", day_basis: "recorded_taken_at",
+    image_url: "private-storage-url", exif: { gps: "private GPS" }, file_name: "private owner", prior: "private notes" }]);
+  assertEquals(rows, [{ image_id: image, vehicle_id: vehicle, attached_image_index: 1, day: "2025-01-01", day_basis: "recorded_taken_at" }]);
+});
 function work() { return [{ image_id: image, vehicle_id: vehicle, image_url: "https://example.invalid/source.jpg",
   expected_updated_at: now, day: "unknown", day_basis: "unknown", eligibility: { gallery_eligible: true,
     is_sensitive: false, is_duplicate: false, is_superseded: false, vision_gate_status: "approved" } }]; }
@@ -20,12 +25,29 @@ function envelopes() {
     reviewed_url: work()[0].image_url, sha256: "a".repeat(64) }],
     { agent_model: "fixture-model", agent_tier: "subscription", extraction_method: "Read-only v1/teacher/v2", run_id: "fixture" }, now);
 }
-function stream(options: { failed?: boolean; toolError?: boolean; noRead?: boolean; tool?: string } = {}) {
+
+Deno.test("admission validator runs with read permission only and no environment access", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "reviewed-readonly-validator-" });
+  try {
+    const sink = `${directory}/reviewed.jsonl`;
+    await Deno.writeTextFile(sink, envelopes().map(x => JSON.stringify(x)).join("\n"));
+    const result = await new Deno.Command(Deno.execPath(), {
+      args: ["run", "--cached-only", "--node-modules-dir=none", "--allow-read",
+        new URL("./reviewed-image-batch.ts", import.meta.url).pathname,
+        "--validate-sink", sink, "--vehicle-id", vehicle],
+      stdout: "piped", stderr: "piped",
+    }).output();
+    assertEquals(result.code, 0, new TextDecoder().decode(result.stderr));
+    assert(new TextDecoder().decode(result.stdout).includes("Reviewed envelope batch valid."));
+  } finally { await Deno.remove(directory, { recursive: true }); }
+});
+function stream(options: { failed?: boolean; noComplete?: boolean; tool?: string; model?: string } = {}) {
   return [
-    { type: "assistant", message: { model: "fixture-model", content: options.noRead ? [] : [{ type: "tool_use", name: options.tool ?? "Read", id: "t1", input: { file_path: "/private/fixture/source.jpg" } }] } },
-    { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", is_error: options.toolError ?? false, content: [] }] } },
-    { type: "result", subtype: options.failed ? "error_during_execution" : "success", is_error: options.failed ?? false,
-      structured_output: { verdicts: [verdict()] }, usage: { input_tokens: 10 }, total_cost_usd: 0.1 },
+    { type: "thread.started", thread_id: "fixture-thread", ...(options.model ? { model: options.model } : {}) },
+    { type: "turn.started" },
+    ...(options.tool ? [{ type: "item.completed", item: { type: options.tool } }] : []),
+    { type: "item.completed", item: { type: "agent_message", text: JSON.stringify({ verdicts: [verdict()] }) } },
+    ...(options.noComplete ? [] : [{ type: options.failed ? "turn.failed" : "turn.completed", usage: { input_tokens: 10 } }]),
   ].map(x => JSON.stringify(x)).join("\n");
 }
 
@@ -39,27 +61,63 @@ Deno.test("current eligible source snapshot retained, including unknown source c
   assertThrows(() => eligibleWorklist(missing, vehicle, 1), Error, "snapshot_missing");
   assertThrows(() => eligibleWorklist([...work(), ...work()], vehicle, 2), Error, "identity_mismatch");
 });
-Deno.test("subscription-only auth and reader tools preserve permissions without API fallback", () => {
-  assertEquals(subscriptionEnvironment({ HOME: "/home/fixture", USER: "fixture", LOGNAME: "fixture", PATH: "/bin", CLAUDE_CODE_OAUTH_TOKEN: "oauth",
-    ANTHROPIC_API_KEY: "secret", SUPABASE_SERVICE_ROLE_KEY: "secret", ANTHROPIC_BASE_URL: "other",
-    CLAUDE_CODE_USE_BEDROCK: "1" }), { HOME: "/home/fixture", USER: "fixture", LOGNAME: "fixture", PATH: "/bin", CLAUDE_CODE_OAUTH_TOKEN: "oauth" });
-  requireSubscription({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty" });
-  for (const auth of [{ loggedIn: false }, { loggedIn: true, authMethod: "api_key", apiProvider: "firstParty" }])
+Deno.test("ChatGPT subscription and attached images retain sandbox/rules without API fallback", () => {
+  assertEquals(subscriptionEnvironment({ HOME: "/home/fixture", USER: "fixture", LOGNAME: "fixture", PATH: "/bin", CODEX_HOME: "/home/fixture/.codex",
+    OPENAI_API_KEY: "secret", CODEX_API_KEY: "secret", CLAUDE_CODE_OAUTH_TOKEN: "oauth", SUPABASE_SERVICE_ROLE_KEY: "secret", OPENAI_BASE_URL: "other" }),
+    { HOME: "/home/fixture", USER: "fixture", LOGNAME: "fixture", PATH: "/bin", CODEX_HOME: "/home/fixture/.codex" });
+  requireSubscription("Logged in using ChatGPT\n");
+  for (const auth of ["Not logged in", "Logged in using an API key", "{loggedIn:true}"])
     assertThrows(() => requireSubscription(auth), Error, "subscription_auth_required");
-  const args = cliArgs("chosen-model", "/private/fixture", {});
-  assertEquals(args[args.indexOf("--tools") + 1], "Read");
-  assertEquals(args[args.indexOf("--permission-mode") + 1], "manual");
-  assert(args.includes('Read(//private/fixture/**)'));
-  assert(args.includes('{"permissions":{"blockReadsOutsideWorkingDirectories":true}}'));
-  assert(!args.some(x => /bypass|skip-permission|bare|fallback/.test(x)));
+  const args = cliArgs("gpt-6-astra", "/private/fixture", "/private/schema.json", "/private/out.json", ["/private/fixture/image.jpg"], ["custom-server"]);
+  assertEquals(args[args.indexOf("--sandbox") + 1], "read-only");
+  assertEquals(args[args.indexOf("--image") + 1], "/private/fixture/image.jpg");
+  assert(args.indexOf("-") < args.indexOf("--image"));
+  assert(args.includes('forced_login_method="chatgpt"') && args.includes('model_provider="openai"'));
+  assert(args.includes('mcp_servers.custom-server={enabled=false,command="/usr/bin/false"}') && args.includes('web_search="disabled"'));
+  assert(!args.some(x => /bypass|ignore-rules|ignore-user-config|never|fallback/.test(x) && x !== "never")); // color never is not an approval flag
+  assert(!args.includes('approval_policy="never"'));
+  assertThrows(() => cliArgs("claude-opus", "/tmp", "schema", "out", ["image"]), Error, "openai_model_and_images_required");
 });
-Deno.test("each full frame needs a successful Read receipt before a result counts", () => {
-  const result = parseStage(stream(), ["/private/fixture/source.jpg"]);
-  assertEquals(result.model, "fixture-model"); assertEquals(result.api_equivalent_cost_usd, 0.1);
-  for (const options of [{ noRead: true }, { toolError: true }])
-    assertThrows(() => parseStage(stream(options), ["/private/fixture/source.jpg"]), Error, "source_image_not_read");
-  assertThrows(() => parseStage(stream({ failed: true }), ["/private/fixture/source.jpg"]), Error, "reader_stage_failed");
-  assertThrows(() => parseStage(stream({ tool: "Bash" }), ["/private/fixture/source.jpg"]), Error, "unexpected_model_tool");
+Deno.test("early process refusal retains stderr even when large stdin hits a closed pipe", async () => {
+  const result = await captureCommand("node", { args: ["-e", 'process.stderr.write("synthetic startup refusal\\n");process.exit(2)'] }, "x".repeat(2_000_000));
+  assertEquals(result.success, false); assertEquals(result.code, 2);
+  assert(new TextDecoder().decode(result.stderr).includes("synthetic startup refusal"));
+  assert(result.stdin_error !== null);
+});
+Deno.test("Codex completed attachment invocation retains truthful unreported model provenance", () => {
+  const result = parseStage(stream(), ["/private/fixture/source.jpg"], "gpt-6-astra");
+  assertEquals(result.actual_model, null); assertEquals(result.requested_model, "gpt-6-astra");
+  assertEquals(result.model, "codex-cli (requested gpt-6-astra; runtime model unreported)");
+  assertEquals(result.image_delivery, "codex_cli_explicit_attachments");
+  assertEquals(result.api_equivalent_cost_usd, null);
+  assertEquals(parseStage(stream({ model: "runtime-model" }), ["image"], "gpt-6-astra").actual_model, "runtime-model");
+  for (const options of [{ noComplete: true }, { failed: true }])
+    assertThrows(() => parseStage(stream(options), ["image"], "gpt-6-astra"), Error, "reader_stage_failed");
+  for (const tool of ["command_execution", "mcp_tool_call", "web_search", "file_change"])
+    assertThrows(() => parseStage(stream({ tool }), ["image"], "gpt-6-astra"), Error, "unexpected_model_tool");
+});
+Deno.test("closed provider schema retains the existing verdict fields without fabricated values", () => {
+  const schema = stageSchema("verdicts");
+  function check(x: any) {
+    if (x.type === "object") { assertEquals(x.additionalProperties, false); assertEquals(x.required, Object.keys(x.properties)); Object.values(x.properties).forEach(check); }
+    if (x.type === "array") check(x.items);
+  }
+  check(schema); check(stageSchema("reviews"));
+  assert(schema.properties.verdicts.items.properties.camera_pose.properties.azimuth_deg.type.includes("null"));
+});
+Deno.test("only the known pre-turn experimental configuration warning is retained as a warning", () => {
+  const warning = JSON.stringify({ type: "item.completed", item: { type: "error", message: "Under-development features enabled: chronicle. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set suppress_unstable_features_warning." } });
+  assertEquals(parseStage(warning + "\n" + stream(), ["image"], "gpt-6-astra").warnings.length, 1);
+  assertThrows(() => parseStage(stream() + "\n" + warning, ["image"], "gpt-6-astra"), Error, "unexpected_model_tool");
+  assertThrows(() => parseStage(warning.replace("Under-development", "Unknown") + "\n" + stream(), ["image"], "gpt-6-astra"), Error, "unexpected_model_tool");
+});
+Deno.test("recovered routing discovery warning retains successful answer but not terminal or incomplete reads", () => {
+  const warning = JSON.stringify({ type: "error", message: "Reconnecting... 2/5 (workspace routing discovery timed out)" });
+  const add = (s: string) => s.split("\n").flatMap(line => JSON.parse(line).type === "turn.started" ? [line, warning] : [line]).join("\n");
+  assertEquals(parseStage(add(stream()), ["image"], "gpt-6-astra").warnings, [JSON.parse(warning).message]);
+  for (const bad of [add(stream({ noComplete: true })), add(stream({ failed: true })), warning + "\n" + stream(), stream() + "\n" + warning,
+    add(stream()).replace("workspace routing discovery timed out", "authentication refused")])
+    assertThrows(() => parseStage(bad, ["image"], "gpt-6-astra"), Error, "reader_stage_failed");
 });
 Deno.test("wrong or repeated IDs refuse; order never rewrites identity", () => {
   assertThrows(() => exactRows([{ image_id: other }], work()), Error, "identity_mismatch");
@@ -168,6 +226,7 @@ for (const bad of [false, true]) Deno.test(`foreground v1/teacher/v2 ${bad ? "re
   const root = await Deno.makeTempDir({ prefix: "byok-reviewed-test-" });
   const oldPath = Deno.env.get("PATH")!, oldFetch = globalThis.fetch;
   const config = { work: work(), verdict: verdict(), bad, calls: `${root}/calls` };
+  Object.assign(config.work[0], { exif: { gps: { lat: 1, lon: 2 }, location_name: "PRIVATE LOCATION" }, owner_notes: "PRIVATE OWNER" });
   await Deno.writeTextFile(`${root}/config.json`, JSON.stringify(config));
   const fake = `#!/usr/bin/env node
 const fs=require('node:fs');const c=JSON.parse(fs.readFileSync(${JSON.stringify(`${root}/config.json`)},'utf8'));
@@ -175,21 +234,27 @@ const a=process.argv.slice(2), opt=k=>a[a.indexOf(k)+1];
 function log(x){fs.appendFileSync(c.calls,x+'\\n');}
 if(process.argv[1].endsWith('dotenvx')){
  if(a.includes('prepare')){log('prepare');fs.writeFileSync(opt('--worklist'),JSON.stringify(c.work[0])+'\\n');}
- else if(a.includes('context')){log('context');fs.writeFileSync(opt('--out'),'Synthetic source context; time unknown.');}
+ else if(a.includes('context')){log('context');fs.writeFileSync(opt('--out'),'Receipt part FOAM1, quantity 1, cost $123.45; shipped.');}
  else if(a.includes('ingest')){log('ingest');const sink=opt('--sink');const packets=fs.readFileSync(sink,'utf8').trim().split('\\n').map(JSON.parse);
  fs.writeFileSync(sink+'.receipts.json',JSON.stringify({wrote:packets.length,failed:0,remaining:0,receipts:packets.map(p=>({image_id:p.verdict.image_id,success:true,observation_id:'30000000-0000-4000-8000-000000000001',image_observation_id:'40000000-0000-4000-8000-000000000001'}))}));console.log('ingest: wrote '+packets.length);}
  else process.exit(90);
-}else if(a[0]==='auth'){log('auth');console.log(JSON.stringify({loggedIn:true,authMethod:'claude.ai',apiProvider:'firstParty'}));}
+}else if(a[0]==='login'){log('auth');console.log('Logged in using ChatGPT');}
+else if(a[0]==='mcp'){log('mcp');console.log(JSON.stringify([{name:'fixture-server'}]));}
 else{
- const prompt=fs.readFileSync(0,'utf8');const files=JSON.parse(prompt.split('FULL-FRAME FILES:\\n')[1].split('\\n')[0]);
+ const prompt=fs.readFileSync(0,'utf8');const files=JSON.parse(prompt.split('ATTACHED SOURCE ORDER AND RECORDED DAY BASIS:\\n')[1].split('\\n')[0]);
  const previous=fs.readFileSync(c.calls,'utf8');const stage=previous.includes('teacher\\n')?'v2':previous.includes('v1\\n')?'teacher':'v1';log(stage);
- for(const f of files){fs.readFileSync(f.path);console.log(JSON.stringify({type:'assistant',message:{model:'fixture-model',content:[{type:'tool_use',id:f.image_id,name:'Read',input:{file_path:f.path}}]}}));
- console.log(JSON.stringify({type:'user',message:{content:[{type:'tool_result',tool_use_id:f.image_id,is_error:false,content:[]}]}}));}
+ const attached=a.flatMap((v,i)=>v==='--image'?[a[i+1]]:[]);if(attached.length!==files.length||files.some((f,i)=>!attached[i].endsWith('/'+f.image_id+'.png')))process.exit(91);
+ if(prompt.includes('PRIVATE OWNER')||prompt.includes('PRIVATE LOCATION')||prompt.includes(c.work[0].image_url)||prompt.includes(attached[0]))process.exit(92);
+ if(!prompt.includes('cost $123.45'))process.exit(94);
+ for(const path of attached)fs.readFileSync(path);
+ console.log(JSON.stringify({type:'thread.started',thread_id:'fixture-thread'}));console.log(JSON.stringify({type:'turn.started'}));
  const value=stage==='teacher'?{reviews:[{image_id:c.work[0].image_id,findings:[]}]}:{verdicts:[{...c.verdict,...(c.bad&&stage==='v2'?{image_id:'10000000-0000-4000-8000-000000000099'}:{})}]};
- console.log(JSON.stringify({type:'result',subtype:'success',is_error:false,structured_output:value}));
+ fs.writeFileSync(opt('--output-last-message'),JSON.stringify(value));
+ console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:JSON.stringify(value)}}));
+ console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:10,output_tokens:20}}));
 }
 `;
-  for (const executable of ["claude", "dotenvx"]) {
+  for (const executable of ["codex", "dotenvx"]) {
     await Deno.writeTextFile(`${root}/${executable}`, fake, { mode: 0o700 });
   }
   Deno.env.set("PATH", `${root}:${oldPath}`);
@@ -205,7 +270,35 @@ else{
       assertEquals(e.source.expected_updated_at, now); assertEquals(e.verdict.image_id, image);
     }
     const calls = (await Deno.readTextFile(config.calls)).trim().split("\n");
-    assertEquals(calls, ["auth", "prepare", "context", "v1", "teacher", "v2", ...(bad ? [] : ["ingest"])]);
+    assertEquals(calls, ["auth", "mcp", "prepare", "context", "v1", "teacher", "v2", ...(bad ? [] : ["ingest"])]);
+    if (!bad) {
+      await Deno.writeTextFile(config.calls, "");
+      globalThis.fetch = (() => { throw new Error("resume must not download"); }) as typeof fetch;
+      await runBatch(["--vehicle-id", vehicle, "--limit", "1", "--out-dir", `${root}/prepare-only`, "--prepared-dir", `${root}/run`, "--prepare-only"]);
+      assertEquals((await Deno.readTextFile(config.calls)).trim().split("\n"), ["auth", "mcp"]);
+      assertEquals(JSON.parse(await Deno.readTextFile(`${root}/prepare-only/preparation-receipt.json`)).model_calls, 0);
+      await Deno.writeTextFile(config.calls, "");
+      await runBatch(["--vehicle-id", vehicle, "--limit", "1", "--out-dir", `${root}/retry`, "--prepared-dir", `${root}/run`]);
+      assertEquals((await Deno.readTextFile(config.calls)).trim().split("\n"), ["auth", "mcp", "v1", "teacher", "v2"]);
+      const retry = JSON.parse(await Deno.readTextFile(`${root}/retry/run-receipt.json`));
+      assertEquals(retry.prepared_from, `${root}/run`); assertEquals(retry.admitted, false);
+      const legacy = JSON.parse(await Deno.readTextFile(`${root}/retry/v1.process.json`));
+      delete legacy.started_at; delete legacy.finished_at; delete legacy.finished_at_basis;
+      await Deno.writeTextFile(`${root}/retry/v1.process.json`, JSON.stringify(legacy));
+      await Deno.writeTextFile(config.calls, "");
+      await runBatch(["--vehicle-id", vehicle, "--limit", "1", "--out-dir", `${root}/stage-retry`, "--prepared-dir", `${root}/run`, "--resume-stages-from", `${root}/retry`]);
+      assertEquals((await Deno.readTextFile(config.calls)).trim().split("\n"), ["auth", "mcp"]);
+      const staged = JSON.parse(await Deno.readTextFile(`${root}/stage-retry/run-receipt.json`));
+      assert(staged.stages.every((s: any) => s.reused_from === `${root}/retry`));
+      assertEquals(staged.stages[0].finished_at_basis, "resume_validation_time");
+      await runBatch(["--vehicle-id", vehicle, "--limit", "1", "--out-dir", `${root}/stage-retry-again`, "--prepared-dir", `${root}/run`, "--resume-stages-from", `${root}/stage-retry`]);
+      const again = JSON.parse(await Deno.readTextFile(`${root}/stage-retry-again/run-receipt.json`));
+      assertEquals(again.stages[0].finished_at_basis, "resume_validation_time");
+      await Deno.writeTextFile(`${root}/retry/v1.prompt.txt`, "changed context");
+      await assertRejects(() => runBatch(["--vehicle-id", vehicle, "--limit", "1", "--out-dir", `${root}/bad-stage`, "--prepared-dir", `${root}/run`, "--resume-stages-from", `${root}/retry`]), Error, "stage_resume_context_mismatch");
+      await Deno.writeTextFile(`${root}/run/${image}.png`, "changed");
+      await assertRejects(() => runBatch(["--vehicle-id", vehicle, "--limit", "1", "--out-dir", `${root}/bad-retry`, "--prepared-dir", `${root}/run`]), Error, "reviewed_bytes_changed");
+    }
   } finally {
     globalThis.fetch = oldFetch; Deno.env.set("PATH", oldPath); await Deno.remove(root, { recursive: true });
   }
