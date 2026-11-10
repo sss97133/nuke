@@ -28,7 +28,7 @@ CREATE TABLE vehicle_images(id uuid PRIMARY KEY,vehicle_id uuid,user_id uuid,sou
 CREATE TABLE observation_sources(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),slug text UNIQUE);
 CREATE TABLE vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vehicle_id uuid,kind text,
  source_id uuid,source_url text,source_identifier text UNIQUE,observed_at timestamptz NOT NULL,
- content_text text,confidence_score numeric,agent_model text,agent_tier text,extraction_method text,extractor_id text,
+ content_text text,confidence_score numeric,agent_model text,agent_tier text,extraction_method text,extractor_id uuid,
  raw_source_ref text,structured_data jsonb,extraction_metadata jsonb,analysis_deferred boolean,
  property_id uuid,is_superseded boolean DEFAULT false,submitted_by_user_id uuid);
 CREATE TABLE observation_witnesses(id uuid DEFAULT gen_random_uuid(),observation_id uuid,image_id uuid,
@@ -102,7 +102,7 @@ INSERT INTO vehicle_images(id,vehicle_id,user_id,source,image_url,vision_gate_st
 ('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','40000000-0000-4000-8000-000000000001','capture_relay_ios','https://example.invalid/finished.jpg','approved',3500000,
  '{"classification":{"image_type":"vehicle_exterior","confidence":0.95,"description":"Badge on car","vehicle_hints":{},"v2":{"prompt_version":"fixture","vehicle_fields":[{"field_name":"engine_type","value":"badge text must not land","evidence":"badge","confidence":0.95}],"text_lines":[],"angle":{"value":"exterior_three_quarter","confidence":0.95}}},"unrelated_namespace":{"keep":true}}');
 SELECT recompute_vehicle_primary_image('20000000-0000-4000-8000-000000000001');
-CREATE FUNCTION fixture_review(p_image uuid,p_hash text DEFAULT repeat('a',64),p_azimuth numeric DEFAULT 45,p_scene text DEFAULT 'body_exterior') RETURNS uuid LANGUAGE plpgsql AS $$
+CREATE FUNCTION fixture_review(p_image uuid,p_hash text DEFAULT repeat('a',64),p_azimuth numeric DEFAULT 45,p_scene text DEFAULT 'body_exterior',p_extractor uuid DEFAULT NULL) RETURNS uuid LANGUAGE plpgsql AS $$
 DECLARE i vehicle_images%ROWTYPE; oid uuid; reviewed timestamptz=now(); v jsonb;
 BEGIN
  SELECT * INTO i FROM vehicle_images WHERE id=p_image;
@@ -114,11 +114,32 @@ BEGIN
  'narrative_one_line','Whole assembled car with clear surroundings','confidence',0.95);
  INSERT INTO vehicle_observations(vehicle_id,kind,source_id,source_url,source_identifier,observed_at,content_text,confidence_score,agent_model,agent_tier,extraction_method,extractor_id,raw_source_ref,structured_data,extraction_metadata,analysis_deferred)
  VALUES(i.vehicle_id,'condition',(SELECT id FROM observation_sources WHERE slug='photo_pipeline'),i.image_url,
- 'reviewed_image_analysis_v1:'||i.id||':'||p_hash,reviewed,v->>'narrative_one_line',0.6,'fixture-model','interactive','reviewed_image_analysis_v1','photo-pipeline-orchestrator','vehicle_images:'||i.id,v,
+ 'reviewed_image_analysis_v1:'||i.id||':'||p_hash,reviewed,v->>'narrative_one_line',0.6,'fixture-model','interactive','reviewed_image_analysis_v1',p_extractor,'vehicle_images:'||i.id,v,
  jsonb_build_object('review_hash',p_hash,'reviewed_image',jsonb_build_object('image_url',i.image_url,'expected_updated_at',i.updated_at,'reviewed_url',i.image_url,'reviewed_sha256',repeat('b',64),'reviewed_at',reviewed),
  'reviewer_provenance',jsonb_build_object('agent_model','fixture-model','agent_tier','interactive','extraction_method','interactive visual review','run_id','fixture')),true)
  RETURNING id INTO oid;
  RETURN oid;
+END $$;
+-- Reproduce the production failure against the actual UUID column, including
+-- the old predicate's implicit cast even when the payload omits extractor_id.
+DO $$ BEGIN
+ BEGIN
+   PERFORM fixture_review('10000000-0000-4000-8000-000000000002');
+   RAISE EXCEPTION 'old producer-label contract unexpectedly admitted a review';
+ EXCEPTION WHEN invalid_text_representation THEN
+   ASSERT SQLERRM LIKE '%photo-pipeline-orchestrator%', SQLERRM;
+ END;
+ ASSERT NOT EXISTS(SELECT FROM vehicle_observations), 'failed intake must leave no observation';
+END $$;
+\ir ../migrations/20261110020000_reviewed_extractor_uuid_contract.sql
+DO $$ BEGIN
+ BEGIN
+   PERFORM fixture_review('10000000-0000-4000-8000-000000000002',repeat('a',64),45,'body_exterior','90000000-0000-4000-8000-000000000001');
+   RAISE EXCEPTION 'unregistered extractor identity unexpectedly admitted';
+ EXCEPTION WHEN check_violation THEN
+   ASSERT SQLERRM='invalid_review_observation',SQLERRM;
+ END;
+ ASSERT NOT EXISTS(SELECT FROM vehicle_observations),'invalid identity must leave no observation';
 END $$;
 DO $$ DECLARE oid uuid; r jsonb; prior jsonb; count_camera int; BEGIN
  ASSERT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000001') WHERE narrative='Prior shop image'),'legacy reader behavior preserved';

@@ -109,7 +109,10 @@ export async function recordReviewedAnalysis(input: unknown, deps: ReviewedAnaly
     source_url: s.image_url, source_identifier: identifier, observed_at: s.reviewed_at,
     content_text: v.narrative_one_line, agent_inferred: true, defer_analysis: true,
     confidence_score: v.confidence, agent_model: p.agent_model, agent_tier: p.agent_tier,
-    extraction_method: REVIEW_METHOD, extractor_id: "photo-pipeline-orchestrator",
+    // extractor_id is a nullable UUID registry reference, not a producer label.
+    // This supplied review has no registered extractor; retain its method and
+    // reviewer provenance without inventing that identity.
+    extraction_method: REVIEW_METHOD,
     ...(p.agent_duration_ms != null ? { agent_duration_ms: p.agent_duration_ms } : {}),
     ...(p.agent_cost_cents != null ? { agent_cost_cents: p.agent_cost_cents } : {}),
     raw_source_ref: `vehicle_images:${v.image_id}`,

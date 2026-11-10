@@ -62,6 +62,8 @@ Deno.test("actual reviewed action sends service credentials only to read, deferr
   assert(result.image_observation_id === "50000000-0000-4000-8000-000000000001");
   assert(calls.join("|") === "GET /rest/v1/vehicle_images|POST /functions/v1/ingest-observation|POST /rest/v1/rpc/project_reviewed_image_analysis");
   assert(intakeBody.defer_analysis === true && intakeBody.agent_inferred === true);
+  assert(!Object.hasOwn(intakeBody, "extractor_id"));
+  assert(intakeBody.extraction_method === "reviewed_image_analysis_v1");
   assert(intakeBody.extraction_metadata.reviewer_provenance.agent_model === "fixture-model");
 });
 Deno.test("actual reviewed action rejects anonymous caller before persistence", async () => {
