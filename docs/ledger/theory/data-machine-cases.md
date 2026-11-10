@@ -507,12 +507,12 @@ separately; nothing below is a claim of fleet coverage.
 - Withdrawn or parked, none merged. Each is a closed pull request by this session; fetch its commit by hash.
   - #3313, `089053353`: capture-date order for the backfill and a reader that claims one photo at a time.
     Withdrawn on the owner's word. Tested; never deployed.
-  - `56ead0d34`, "feat(db): photo landing supersedes an earlier reading" (migration `20261113150000`): the
+  - #3324, `56ead0d34`, "feat(db): photo landing supersedes an earlier reading" (migration `20261113150000`): the
     landing fold stops being first-write-wins. Its contract passes 101 checks on a local PostgreSQL 16; the
     adversarial verification pass did not run; nothing was read from production for it. It adds three tables to
     the classifier's own landing. Under the owner direction of this date the first question is whether to invest
     in that landing at all, or to let keyed observations replace it.
-  - `1330a8e5c`, "feat(capture): photo reading status reader, web block and app bar" (migration
+  - #3325, `1330a8e5c`, "feat(capture): photo reading status reader, web block and app bar" (migration
     `20261113170000`): tells the owner whether reading is moving or stalled and why. The SQL reader's contract
     passes locally with 22 of 22 mutations caught; its production plan was never read. The web block was
     reviewed and one must-fix is open (a waiting state shows no reason). The Swift was never compiled or

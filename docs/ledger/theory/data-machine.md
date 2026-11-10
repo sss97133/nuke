@@ -89,6 +89,23 @@ definition of done: no piece of the build is finished until its gate exists.
 | The scoreboard | one database reader over keyed, witnessed observations (the stage ledger's coverage reader is the thing to extend) | a progress number that is not computed from it | not built |
 | The database | an event trigger in the manner of `view_write_guard` (20261014214500) | a photo-keyed table created without an approved `schema_proposals` row, a hand-applied one included | not built |
 
+**The lane and who works it.** The card's team is lanes, each with a scoreboard, and image analysis had
+neither. It is one lane, the image fold the case ledger already names among the substrates, and its
+scoreboard is rule 7's measure. The owner, 2026-11-10: "hand the whole folds and keys stuff to a tested
+dedicated agent ... configure a team". Inside the lane:
+
+- **Keys** are a dedicated role with a fixed brief, [`skills/image-keys/SKILL.md`](../../../skills/image-keys/SKILL.md).
+  It is handed statements, a registry snapshot and the decisions made so far; it returns keyed claims,
+  proposals and its own decisions, and writes nothing. Any agent can be given the brief. What makes two
+  runs agree is the stored decisions, not the agent, and [`image-keys-test.md`](image-keys-test.md)
+  measures that.
+- **Folds** are database logic, not an agent: one claim per vehicle, part, property, value and capture
+  day, with every photo as a witness.
+- **Questions** are code that builds a photo's list from registry rows.
+- **Gates** are built by whoever builds the piece they guard.
+- **Approval and Sign** are the owner's. No agent approves a proposal or turns an answer into a fact.
+- **The test** is the owner-voice test below, run after each piece.
+
 **Acceptance.** Three questions, the owner's, must be queries that return vehicles with the photos that
 prove the answer: (1) Mustangs whose window felts were replaced during a restoration; (2) a Porsche
 that has a specific imperfection; (3) that imperfection was repaired and it is now this restored

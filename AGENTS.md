@@ -112,6 +112,8 @@ work read "Image analysis is the model asking" at the top of
 [`data-machine-cases.md`](docs/ledger/theory/data-machine-cases.md). The acceptance is the owner's three
 questions there. A pull request that adds a photo reader or a table keyed by a photo fails
 `scripts/guardrails/no-new-photo-reader.mjs`. The card lists the other gates and which are not built.
+Keying readings that already exist is a dedicated role: give an agent `skills/image-keys/SKILL.md` as its
+brief, with the registry snapshot and the decisions made so far.
 
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
