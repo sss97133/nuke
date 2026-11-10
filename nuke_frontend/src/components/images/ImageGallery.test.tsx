@@ -126,9 +126,10 @@ describe('ImageGallery canonical database rows', { timeout: 20_000 }, () => {
 
   it('reports source failures without reusing a prior successful analysis population', async () => {
     fixture.fetch.mockRejectedValue(new Error('source unavailable'));
-    const onAnalysisRead = vi.fn();
-    await mount({ onAnalysisRead });
+    const onAnalysisRead = vi.fn(), onReadCount = vi.fn();
+    await mount({ onAnalysisRead, onReadCount });
     expect(onAnalysisRead.mock.calls.at(-1)?.[0]).toMatchObject({ status: 'error', images: [], readAt: null });
+    expect(onReadCount.mock.calls.at(-1)?.[0]).toMatchObject({ failed: true });
   });
 
   it('does not count URL-only fallback tiles as admitted image analysis', async () => {

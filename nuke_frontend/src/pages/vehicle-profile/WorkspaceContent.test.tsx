@@ -138,3 +138,14 @@ it('waits for authentication resolution before mounting the gallery source reade
   expect(fixture.gallery).not.toHaveBeenCalled();
   expect(fixture.findings.mock.calls.at(-1)?.[0].read).toBeNull();
 });
+it('keeps failed gallery reads distinct from zero and replaces them after retry', async () => {
+  await mount();
+  const count = () => host.querySelector('.gallery-header .widget__count')?.textContent;
+  expect(count()).toBe('Reading…');
+  await act(async () => fixture.gallery.mock.calls.at(-1)![0].onReadCount({ vehicleId: 'offline-subject', filterKey: 'null', shown: 0, partial: false, failed: true }));
+  expect(count()).toBe('Unavailable');
+  await act(async () => fixture.findings.mock.calls.at(-1)![0].onRetry());
+  expect(count()).toBe('Reading…');
+  await act(async () => fixture.gallery.mock.calls.at(-1)![0].onReadCount({ vehicleId: 'offline-subject', filterKey: 'null', shown: 29, partial: false }));
+  expect(count()).toBe('29');
+});

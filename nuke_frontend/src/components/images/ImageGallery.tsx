@@ -16,7 +16,7 @@ import { isRelatedFieldImage } from '../../pages/vehicle-profile/hooks/useVehicl
 /** Profile toolbar mode: maps to viewMode + groupBySource + chronologicalMode */
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
 
-export type GalleryReadCount = { vehicleId: string; filterKey: string; shown: number; partial: boolean };
+export type GalleryReadCount = { vehicleId: string; filterKey: string; shown: number; partial: boolean; failed?: boolean };
 export type GalleryAnalysisRead = {
   vehicleId: string;
   viewerKey: string;
@@ -1432,8 +1432,9 @@ const ImageGallery = ({
     });
   }, [onAnalysisRead, vehicleId, viewerKey, allImages, usingFallback, loading, error, partialLoad, loadCoverage]);
   useEffect(() => {
-    if (!loading) onReadCount?.({ vehicleId, filterKey, shown: galleryFilteredImages.length, partial: partialLoad });
-  }, [onReadCount, vehicleId, filterKey, galleryFilteredImages.length, loading, partialLoad]);
+    if (!loading) onReadCount?.({ vehicleId, filterKey, shown: galleryFilteredImages.length, partial: partialLoad,
+      ...(error ? { failed: true } : {}) });
+  }, [onReadCount, vehicleId, filterKey, galleryFilteredImages.length, loading, partialLoad, error]);
   const matchingImageIds = useMemo(() => new Set(galleryFilteredImages.map(image => image.id)), [galleryFilteredImages]);
   const scopedSessions = galleryFilter ? sessions.map(session => ({ ...session,
     image_ids: (session.image_ids || []).filter((id: string) => matchingImageIds.has(id)),

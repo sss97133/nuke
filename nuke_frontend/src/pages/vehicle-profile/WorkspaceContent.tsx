@@ -284,7 +284,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           <React.Suspense fallback={null}>
             <VehicleFindingsCard vehicleId={vehicle.id} viewerKey={viewerKey}
               read={viewerLoading ? null : analysisRead} onSelectImages={selectAnalysisImages}
-              onRetry={() => { setAnalysisRead(null); setGalleryRetry(value => value + 1); }} />
+              onRetry={() => { setAnalysisRead(null); setGalleryRead(null); setGalleryRetry(value => value + 1); }} />
           </React.Suspense>
 
           {/* Work — jobs on this vehicle, Plan the work (listing plan + inspection order), Post a job */}
@@ -500,7 +500,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <div className="widget__header-left">
               <span className="widget__label">Images</span>
               <span className="widget__count">{galleryRead?.vehicleId === vehicle.id && galleryRead.viewerKey === viewerKey && galleryRead.filterKey === JSON.stringify(galleryFilter || null)
-                ? `${galleryRead.shown}${galleryRead.partial ? ' loaded matches' : ''}` : 'Reading…'}</span>
+                ? galleryRead.failed ? 'Unavailable' : `${galleryRead.shown}${galleryRead.partial ? ' loaded matches' : ''}` : 'Reading…'}</span>
             </div>
             <div className="widget__controls">
               <div className="gallery-toolbar" role="group" aria-label="Image view">
