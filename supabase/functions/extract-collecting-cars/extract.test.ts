@@ -100,7 +100,7 @@ Deno.test("known publisher prefixes retain explicit title years without searchin
 Deno.test("only explicit ended or unsold stages establish unsold; unknown and withdrawn remain unresolved", () => {
   for (const stage of ["ended", "unsold", "withdrawn", "unknown", "cancelled", "upcoming", "comingsoon", null]) {
     const x = extractFromHtml(nativePage({ stage, currentBid: 1500, currencyCode: "gbp", priceSold: null,
-      title: "1926 Jowett Short Two", lotType: "car", makeName: null, modelName: null }), url);
+      title: "1926 Jowett Short Two", lotType: "car", saleFormat: "auction", makeName: null, modelName: null }), url);
     const closed = stage === "ended" || stage === "unsold";
     assertEquals([x.stage, x.sale_outcome, x.sold_at], [stage, closed ? "unsold" : null, null]);
     assertEquals([x.price_amount, x.currency, x.make, x.model], [1500, "GBP", null, null]);
@@ -118,5 +118,15 @@ Deno.test("unknown stages retain source quotes without inventing current or sale
   for (const stage of ["live", "upcoming", "comingsoon"]) {
     const x = extractFromHtml(nativePage({ stage, currentBid: 1500, currencyCode: "usd", priceSold: null }), url);
     assertEquals([x.price_amount, x.price_kind, x.price], [1500, "current_bid", 1500]);
+  }
+});
+
+Deno.test("expired classified or unknown-format pages do not establish an unsold auction", () => {
+  for (const saleFormat of ["classified", null, "unknown"]) {
+    const x = extractFromHtml(nativePage({ auctionId: "27495", stage: "ended", saleFormat,
+      title: "1926 Jowett Short Two", currentBid: null, priceSold: null, noBids: null,
+      dtSoldUTC: null, dtAuctionEndUTC: "2023-12-06 23:30:00", dtAuctionEndedUTC: "2023-12-07 00:00:04", makeName: null, modelName: null }), url);
+    assertEquals([x.sale_outcome, x.price_kind, x.price, x.sold_at, x.make, x.model], [null, null, null, null, null, null]);
+    assertEquals([x.sale_format, x.auction_ended_at, x.auction_end_at], [saleFormat, "2023-12-07T00:00:04.000Z", "2023-12-06T23:30:00.000Z"]);
   }
 });

@@ -22,6 +22,7 @@ export interface CollectingCarsExtracted {
   /** What the page says happened: sold, unsold, sealed_unsold (sealed-bid lot, no sale), live, or null. */
   sale_outcome: "sold" | "unsold" | "sealed_unsold" | "live" | null;
   sold_at: string | null;
+  sale_format: string | null;
   mileage: number | null;
   mileage_unit: "mi" | "km" | null;
   mileage_raw: string | null;
@@ -40,6 +41,8 @@ export interface CollectingCarsExtracted {
   image_urls: string[];
   posted_at: string | null;
   auction_end_at: string | null;
+  /** Native dtAuctionEndedUTC; retained separately from scheduled end, qualified by sale_format. */
+  auction_ended_at: string | null;
 }
 
 export function flightText(html: string): string {
@@ -118,9 +121,10 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   const sold = stage === "sold" || (stage === null && soldAmount !== null);
   // Only source-verified terminal stages establish an unsold outcome.
   // Withdrawn or newly introduced stages are not evidence of an auction result.
-  const ended = stage === "unsold" || stage === "ended";
+  const saleFormat = clean(L.saleFormat)?.toLowerCase() ?? null;
+  const ended = stage === "unsold" || (stage === "ended" && (saleFormat === "auction" || saleFormat === "sealed"));
   const amount = sold ? soldAmount : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
-  const sealed = clean(L.saleFormat)?.toLowerCase() === "sealed";
+  const sealed = saleFormat === "sealed";
   const outcome: CollectingCarsExtracted["sale_outcome"] = sold ? "sold" : ended ? (sealed ? "sealed_unsold" : "unsold") : stage === "live" ? "live" : null;
   const open = stage === "live" || stage === "comingsoon" || stage === "upcoming";
   const kind: CollectingCarsExtracted["price_kind"] = amount === null ? null : sold ? "sold" : ended ? "high_bid" : open ? "current_bid" : null;
@@ -156,6 +160,7 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
     price_kind: kind,
     sale_outcome: outcome,
     sold_at: sold ? iso(L.dtSoldUTC) : null,
+    sale_format: saleFormat,
     mileage: mileageNum && unit === "mi" ? mileageNum : mileageNum && unit === "km" ? Math.round(mileageNum * 0.621371) : null,
     mileage_unit: unit,
     mileage_raw: mileageRaw,
@@ -174,5 +179,6 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
     image_urls: images,
     posted_at: iso(L.dtPublishedUTC),
     auction_end_at: iso(L.dtAuctionEndUTC),
+    auction_ended_at: iso(L.dtAuctionEndedUTC),
   };
 }
