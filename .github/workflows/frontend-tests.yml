@@ -75,8 +75,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify the reader summary reaches the heartbeat RPC as JSON and never through a shell
-        run: node --test scripts/photo-pipeline/reader-heartbeat.test.mjs
+      - name: Verify the reader heartbeat, the readers' stage-queue receipts and the stage ledger's static rules
+        run: node --test scripts/photo-pipeline/reader-heartbeat.test.mjs scripts/photo-pipeline/stage-queue.test.mjs scripts/photo-pipeline/subscription-frame-classifier.test.mjs scripts/ci/image-stage-receipts-migration.test.mjs
 
   broadcast-overlay-contract:
     runs-on: ubuntu-latest
