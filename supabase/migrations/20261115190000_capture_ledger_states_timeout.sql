@@ -13,9 +13,11 @@
 -- 62.7M-row index (CONCURRENTLY does not belong in a transactional apply).
 -- Revert: supabase/sql/revert_20261115190000_capture_ledger_states_timeout.sql
 
+-- No INCLUDE(image_ids): some review arrays exceed the btree row limit (live apply
+-- failed: index row size 4320 exceeds 2704). user_id alone is enough for the filter;
+-- the 15 MB heap fetch of image_ids is cheap.
 CREATE INDEX IF NOT EXISTS idx_capture_set_review_open_user
   ON public.capture_set_review (user_id)
-  INCLUDE (image_ids, created_at, reason, set_key)
   WHERE status = 'open';
 
 CREATE OR REPLACE FUNCTION public.capture_ledger_states(p_uid uuid, p_tz text, p_from date, p_to date)
