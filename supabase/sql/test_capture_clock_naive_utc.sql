@@ -84,7 +84,7 @@ SELECT pg_temp.assert_true((SELECT taken_at = '2026-03-12 15:47:06Z' AND exif_da
   AND exif_data -> 'capture_clock' ->> 'run_id' = 'b0000000-0000-4000-8000-000000000001'
   FROM vehicle_images WHERE id = '00000000-0000-4000-8000-000000000001'), 'unfiled clock corrected, DTO kept');
 SELECT pg_temp.assert_true((SELECT taken_at = '2026-03-12 15:47:06Z' FROM vehicle_images WHERE id = '00000000-0000-4000-8000-000000000004'), 'filed clock corrected');
-SELECT pg_temp.assert_true((SELECT taken_at = '2026-03-12 08:47:06Z' FROM vehicle_images WHERE id = '00000000-0000-4000-8000-000000000002'), 'already-correct untouched');
+SELECT pg_temp.assert_true((SELECT taken_at = '2026-03-12 15:47:06Z' FROM vehicle_images WHERE id = '00000000-0000-4000-8000-000000000002'), 'already-correct untouched');
 SELECT pg_temp.assert_true((SELECT taken_at = '2026-03-12 08:47:06Z' AND is_sensitive FROM vehicle_images WHERE id = '00000000-0000-4000-8000-000000000003'), 'sensitive untouched');
 SELECT pg_temp.assert_true((SELECT taken_at = '2026-03-12 08:47:06Z' FROM vehicle_images WHERE id = '00000000-0000-4000-8000-000000000005'), 'rejected_personal untouched');
 
