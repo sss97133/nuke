@@ -110,12 +110,17 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
     if (prior.error) throw new Error("mccormicks_identity_lookup_unavailable");
     let resolutionIssue = prior.data?.length > 1 ? "mccormicks_ambiguous_listing_identity" : null;
     if (gate.cleaned.vin) {
-      // Merged-away aliases retain their VIN as history, not a second live identity.
-      const exact = await deps.supabase.from("vehicles").select("id,year,make").eq("vin", gate.cleaned.vin)
-        .is("deleted_at", null).is("merged_into_vehicle_id", null).or("status.is.null,status.neq.merged").limit(2);
+      // Historical aliases can name another live owner even when that target has
+      // no VIN. Inspect redirects before discarding aliases as duplicate history.
+      const exact = await deps.supabase.from("vehicles").select("id,year,make,status,deleted_at,merged_into_vehicle_id")
+        .eq("vin", gate.cleaned.vin).limit(51);
       if (exact.error) throw new Error("mccormicks_vin_lookup_unavailable");
-      if (exact.data?.length > 1) resolutionIssue = "mccormicks_ambiguous_vin_identity";
-      const existing = exact.data?.[0];
+      const rows = exact.data ?? [];
+      const live = rows.filter((v: any) => !v.deleted_at && !v.merged_into_vehicle_id && v.status !== "merged");
+      const owners = new Set([...live.map((v: any) => v.id), ...rows.map((v: any) => v.merged_into_vehicle_id).filter(Boolean)]);
+      if (rows.length >= 51 || owners.size > 1) resolutionIssue = "mccormicks_ambiguous_vin_identity";
+      else if (rows.length && !live.length) resolutionIssue = "mccormicks_inactive_vin_identity";
+      const existing = live[0];
       if (existing && ((existing.year && Number(existing.year) !== Number(gate.cleaned.year))
         || (existing.make && normalizeMake(existing.make) !== gate.cleaned.make))) resolutionIssue = "mccormicks_vin_identity_conflict";
     }
