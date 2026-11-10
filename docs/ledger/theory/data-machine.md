@@ -12,9 +12,9 @@ what you did today."
 capture day) five readers had run over eleven months, each writing its own words into its own table.
 The most careful one recorded 30 damage callouts and 126 spellings of the vehicle's parts, and none of
 its 47 observations carried a part, a condition key or a position. The model has the places: a
-property registry the observation writer validates against, a proposal path that grows it, and a
-closed-question store with a fixed answer shape. No reading is brought to them. A photo counted as
-analysed had added a sentence, the colour again and sometimes an angle.
+property registry, a proposal path that grows it, and a closed-question store with a fixed answer
+shape. No reading is brought to them, and two of the three are narrower in code than they look (rule
+5). A photo counted as analysed had added a sentence, the colour again and sometimes an angle.
 
 **The model is the map, and it asks.** In the owner's words the data model is "the blue print the
 hypothesis the mirror of how the data needs to be interpreted", and it is "shaped even to help find
@@ -50,8 +50,14 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    decided again by the next reader. The owner's caution stands beside this rule: "The obvious problem
    of being able to write the data model side is if it writes too much and wrong and new every time
    ... if it's running we can fix it. If it never gets off the ground we can't." So it starts on one
-   vehicle, and new keys per hundred readings is a number to watch fall. Mechanism: `ingest-observation`
-   refuses an unknown key; an alias memory for parts does not exist yet.
+   vehicle, and new keys per hundred readings is a number to watch fall. Mechanism, partial:
+   `ingest-observation` refuses a `descriptor_key` that is not live in `condition_taxonomy`. For a
+   `property_key` it is narrower than the registry: `imageProperties.ts` in that function admits three
+   photo keys, with their allowed values typed in code, and two text readings, and `index.ts` refuses
+   any other key before it looks at the registry. A key approved through `schema_proposals` therefore
+   cannot land from a photo until that list is replaced by a read of the registry. The question store
+   is the same: `evidence_judgment_ineligibility` (20261111210500) accepts one question kind. An alias
+   memory for parts does not exist yet.
 6. **Harvest before spend, and choose with prejudice.** Readings already paid for are keyed before any
    photo is read again. What is read next is chosen by what it is worth, inside a stated budget: "it's
    great if we have infinite compute. But if we don't we will not win." Date order belongs inside one
@@ -77,6 +83,22 @@ that has a specific imperfection; (3) that imperfection was repaired and it is n
 Porsche. Proof on one vehicle is validation scope, not fleet coverage. Under C17's rule the comparison
 is the same retained photos, the prior state against the new method, with changed claims traced into
 an existing consumer and an unchanged control.
+
+**Where the build starts.** Not started on 2026-11-10. This is a plan, not a record of work. Two agents
+given only this card and the owner's one-line request arrived at the same first three steps. On one
+vehicle, the C17 cohort of that date:
+
+1. Read the before state: C17's counts for that vehicle, from production, with their clock.
+2. Harvest before spend. By code, fold the readings already paid for (the condition observations'
+   callouts and the part labels) against the registries. The output is claims that have a key, claims
+   that have no place, and `schema_proposals` drafts that cite the observations which forced them.
+   `scripts/lib/image-property-projection.mjs` already turns three fields of a deep reading into
+   registered property rows and is the thing to extend.
+3. Make the landing read the registry: allowed values, and the part a value is about, come from
+   registry rows in `imageProperties.ts`, so an approved key lands without a code change.
+4. Let the model ask: a question kind for a part's state in a photo, built from registry rows, in
+   `evidence_judgment_requests`.
+5. Readers for the three questions, then C17's comparison on the same photos.
 
 **What a person brings, and where it lives.** The owner describes how a person critiques the data:
 "based on their understanding and their patterns and their training along with their experience and

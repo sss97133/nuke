@@ -476,8 +476,9 @@ not fleet coverage.
   cluster; none of the 167 part rows has a `component_definition_id`; `component_events` holds 0 rows for the
   vehicle and 3 in all.
 - The places exist. `observation_properties`: 47 rows, among them `image_visible_paint_stage`,
-  `image_visible_rust_severity` and `image_visible_assembly_state` (one value per photo, none per part), validated
-  by `ingest-observation`. `schema_proposals`: 14 `add_property`, 4 `add_table` and 3 `add_column` approved.
+  `image_visible_rust_severity` and `image_visible_assembly_state` (one value per photo, none per part).
+  `ingest-observation` admits those three and two text readings from a list typed in its own code
+  (`imageProperties.ts`), and refuses any other property key before it reads the registry. `schema_proposals`: 14 `add_property`, 4 `add_table` and 3 `add_column` approved.
   `evidence_judgment_requests`: 774 rows of one kind, `receipt_part_visible` (158 answered, 548 cancelled, 68
   withdrawn). `subject_taxonomy`: 106 keys, with no hood, bed, tailgate, seam, molding or weatherstrip.
   `condition_taxonomy`: 202 keys; about 90 read as fragments of a service manual (an agent's reading of the names,
