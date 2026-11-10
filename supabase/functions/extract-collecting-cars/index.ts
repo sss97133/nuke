@@ -1,6 +1,7 @@
 // Redeployed for the allowance_deferred wording (PR 1695).
 // Redeployed 2026-10-15 for the archiveFetch login-heuristic and cache fix (PR 1616).
 // Redeployed 2026-11-09: full-page cache is isolated from collecting-cars board JSON.
+// Redeployed 2026-11-10: archive retention failures retain safe HTTP diagnostics.
 // Collecting Cars lot extractor - no LLM. The page comes through Firecrawl rawHtml when the site refuses the server;
 // the parsing lives in ./extract.ts (pure, tested against a stored page). Every fetch is archived to listing_page_snapshots by archiveFetch before it is parsed.
 // Returns { success, extracted }; `ingest` reads that shape and does the vehicle write.
