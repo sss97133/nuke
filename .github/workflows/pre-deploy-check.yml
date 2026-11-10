@@ -36,6 +36,9 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Include the PR merge parents so the migration comparison has a base.
+          fetch-depth: 2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

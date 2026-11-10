@@ -375,3 +375,25 @@ DO $$ DECLARE oid uuid; placed uuid; BEGIN
  ASSERT NOT EXISTS(SELECT FROM get_image_deep_analysis('10000000-0000-4000-8000-000000000005')),'reader also withholds unfiled review';
  RAISE NOTICE 'PASS: actual hint-guard metadata-only unfile withdraws current review';
 END $$;
+
+-- The current contract carries inferred pose, not a measurement receipt. Do not
+-- make guessing exact-looking numbers improve a cover; preserve the observations.
+\ir ../migrations/20261109220000_cover_score_observed_framing.sql
+DO $$ DECLARE unknown_pose jsonb; guessed_pose jsonb; claimed_measured jsonb; r jsonb; BEGIN
+ unknown_pose='{"byok_deep_analysis":{"scene_type":"body_exterior","build_phase_guess":"final_assembly","state_observations":{"completeness":"assembled"},"presence":{"person":false},"confidence":0.9,"camera_pose":{"framing":"full vehicle","azimuth_deg":null,"distance_est":null}}}';
+ guessed_pose=jsonb_set(unknown_pose,'{byok_deep_analysis,camera_pose}', '{"framing":"full vehicle","method":"agent_visual_estimate","azimuth_deg":45,"distance_est":"~3m","exif_present":true}');
+ claimed_measured=jsonb_set(guessed_pose,'{byok_deep_analysis,camera_pose,method}','"calibrated measurement"');
+ ASSERT image_hero_score(guessed_pose,3500000)>image_hero_score(unknown_pose,3500000),'shared duplicate score owner remains unchanged';
+ INSERT INTO vehicles(id,make,model) VALUES('20000000-0000-4000-8000-000000000002','Fixture','Pose');
+ INSERT INTO vehicle_images(id,vehicle_id,image_url,source,vision_gate_status,file_size,created_at,ai_scan_metadata) VALUES
+ ('10000000-0000-4000-8000-000000000031','20000000-0000-4000-8000-000000000002','https://example.invalid/unknown.jpg','iphoto','approved',3500000,'2023-01-01',unknown_pose),
+ ('10000000-0000-4000-8000-000000000032','20000000-0000-4000-8000-000000000002','https://example.invalid/guessed.jpg','iphoto','approved',3500000,'2021-01-01',guessed_pose),
+ ('10000000-0000-4000-8000-000000000033','20000000-0000-4000-8000-000000000002','https://example.invalid/claimed-measured.jpg','iphoto','approved',3500000,'2022-01-01',claimed_measured);
+ r=recompute_vehicle_primary_image('20000000-0000-4000-8000-000000000002');
+ ASSERT r->>'chosen_image_id'='10000000-0000-4000-8000-000000000031','unknown pose is not penalized against guessed/measured-label poses';
+ ASSERT (SELECT ai_scan_metadata=guessed_pose AND is_duplicate=false FROM vehicle_images WHERE id='10000000-0000-4000-8000-000000000032'),'stored inferred pose and duplicate flag preserved';
+ UPDATE vehicle_images SET ai_scan_metadata=jsonb_set(unknown_pose,'{byok_deep_analysis,camera_pose,framing}','"close macro crop with clutter"') WHERE id='10000000-0000-4000-8000-000000000031';
+ r=recompute_vehicle_primary_image('20000000-0000-4000-8000-000000000002');
+ ASSERT r->>'chosen_image_id'='10000000-0000-4000-8000-000000000033','visible composition change replaces cover using existing clock tie-break';
+ RAISE NOTICE 'PASS: cover ignores uncited pose, retains visible framing and leaves duplicate score/testimony unchanged';
+END $$;
