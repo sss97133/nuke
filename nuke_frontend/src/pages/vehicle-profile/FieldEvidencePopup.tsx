@@ -470,6 +470,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const recorded = leadClaim?.field_value ?? leadReport?.value ?? null;
   // A VIN decode is the registry reading; it leads over listing, photo and system claims.
   const vinReport = leadReport?.extraction_method?.startsWith('vin_decode') ? leadReport : undefined;
+  const methodReport = vinReport ?? (!leadClaim ? leadReport : undefined);
   const reportSource = (report: NonNullable<typeof leadReport>) => {
     const name = sourceLabel(report.source_slug || 'Source report');
     const url = webSourceUrl(report.source_url);
@@ -487,7 +488,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           : leadReport ? reportSource(leadReport)
             : 'None admitted'}</Row>
     {vinReport && subject?.vin && <Row label="Read from VIN">{subject.vin}</Row>}
-    {(vinReport || (!leadClaim && leadReport))?.extraction_method && <Row label="Method" role="caption">{(vinReport || leadReport)!.extraction_method}</Row>}
+    {methodReport?.extraction_method && <Row label="Method" role="caption">{methodReport.extraction_method}</Row>}
     {(provenance.data?.current_correction?.page_date || vinReport?.observed_at || (leadClaim && !leadClaim.source_type.startsWith('agent_') && leadClaim.created_at) || leadReport?.observed_at)
       && <Row label="Recorded on">{shortDay(provenance.data?.current_correction?.page_date || vinReport?.observed_at || (leadClaim && !leadClaim.source_type.startsWith('agent_') ? leadClaim.created_at : null) || leadReport?.observed_at)}</Row>}
     {sortedSources.length + (vinReport ? 1 : 0) > 1 && <Row label="Other sources" role="measure">{sortedSources.length + (vinReport ? 1 : 0) - 1}</Row>}
