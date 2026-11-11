@@ -616,6 +616,48 @@ found broken and what is still unproven:
   is not: a runner (it ran once, by an agent), a fold object (it is a query), or a place for the part (it rides in
   `structured_data`; the ruling is still the owner's). The next three things, in order: the proposals for the places
   496 claims waited on, the part's place on an observation, and something that runs the lane without an agent.
+- **2026-11-11 06:18 to 15:47 UTC, the runner, and a live test of the rules.** Every count below was read that day
+  from the reader or rows named; nothing here is an estimate.
+  - *The runner.* `photo-keys.yml` (dispatch-only) keys stored statements on the subscription with no agent. Its
+    first run asked no model: the stored `CLAUDE_CODE_OAUTH_TOKEN` is 110 characters on 2 lines and the CLI cannot
+    build a header from it. The lane now uses it without white space and says so (#3346); the secret itself is still
+    stored broken. Dry runs on one owner vehicle keyed 9 photo readings; nothing was written. `step=properties`
+    (#3347) runs the existing projection of a reading's three values one claim at a time; its dry run found 210 values
+    from 74 readings; no write was made, and `get_field_provenance` shows such rows only on a public vehicle.
+  - *Keyed rows on the proof vehicle:* 446 on 300 photos, unchanged since the first landing (14:58 UTC).
+  - *Why the first question run missed lines.* `receipt_work_lines` (logic `20261111210000`), 286 rows at 13:43 UTC:
+    115 asked of the photos; 114 `part_zone_unknown`; 35 `not_work_evidence`; 21 `work_day_unphotographed`; 1 receipt
+    with no lines. The causes are in `20261111210500`: `receipt_line_photo_zone` takes a line's area from a keyword
+    list over its printed description, and `receipt_line_kind` calls a line with no part number and no total a note,
+    which is never asked. A packing slip's lines are such lines; one whole front-end rebuild kit was never asked.
+  - *The question store* holds one kind, `receipt_part_visible`: answered 158, cancelled 548, withdrawn 68, pending 0
+    over all vehicles (14:56 UTC). The proof vehicle's 115 answers carry a session as `claimed_by`; nothing in the
+    repository calls `claim_evidence_judgments` or `answer_evidence_judgment`.
+  - *The registry.* 106 part keys (snapshot 2026-11-10); for the chassis only the suspension by corner, the frame and
+    a brake line. `condition_taxonomy` live: 60 `state`, 140 `adjective`, 18 `mechanism`; it has renewal states for
+    some domains (chrome replated, resprayed, original paint, trim and wheels, upholstery replaced, restored) and none
+    for a chassis or mechanical part. `component_assembly_map` has 3 rows, none for the front end.
+  - *The live test.* The owner: "you’re more of the agent building the system and that one is currently building
+    within the rules you’re supposed to be establisbing. Rules being the shape and nature of the environment so that
+    it forces the right moves" (his spelling). Another lane wrote 31 current `visual_work_v1` records on the proof vehicle that day
+    (cost basis by area; reader `visual_work_build_log`, fold `visual_work_master_cost_fold`, #3348). Read at 15:29
+    UTC as a test of the environment. Forced: each cited photo carries the id of its stored reading; each receipt link
+    carries line, receipt and document; each price says its kind; each record lists its gaps. Not forced: (1) keys
+    minted inside the record (`physical_material_key`, `system_key`: a part number used as a key, a kit named in a
+    key), because the registry has no place and nothing refuses an unregistered key; (2) a fresh free-text caption for
+    every cited photo: 36 photos cited, 21 of them with a keyed claim in the database, no keyed claim cited; (3)
+    researched prices stored in the row, labelled `analyst_range` with their source. Whether (3) is allowed under
+    invariant 5 is the owner's ruling and is not made.
+  - *The mechanisms these call for, none built:* a writer that refuses a key the registry does not hold unless it
+    carries a proposal, with part-level places for the chassis put to the owner as proposals; a visible-work record
+    that cites a keyed answer about a photo and not a new caption; the owner's ruling on analyst prices, enforced at
+    the writer. Each is to be tested against the other lane's live records before it is called done.
+  - *What this session got wrong, so the next does not.* It answered "what did the front end cost" from the work-order
+    reader and from the lines that had a photo question, and said nothing was held; `visual_work_build_log` held an
+    entry with the kit's packing slip, the alignment invoice and three photos. It reported a background workflow as
+    running for two hours after an interruption had ended it (its journal shows nothing after 13:36 UTC). It typed a
+    list of states for a part instead of reading the registry. Before answering a question about a vehicle, call
+    `visual_work_build_log` and `receipt_work_lines` for it; before reporting a background job, read its journal.
 - For whoever builds next, from the dry run: (1) the writer's check can start from `check_units.py`; (2) the first
   proposals to put to the owner are the places most claims waited on (paint or coating loss, "no break visible", "no
   leak visible", the hood and the front valance as parts); (3) the conventions that the skeptics found weak (a located

@@ -103,6 +103,67 @@ it('does not fetch a private object when signing fails', async () => {
   expect(host.querySelector('img')).toBeNull();
 });
 
+it('renders a private HEIC receipt from the same signed object while preserving its original download', async () => {
+  const raw = 'https://synthetic.supabase.co/storage/v1/object/authenticated/user-documents/owner/receipt.heic';
+  const query = { select: () => query, eq: fixture.eq.mockImplementation(() => query), maybeSingle: async () => ({ data: { file_url: raw }, error: null }) };
+  fixture.from.mockImplementation(() => query);
+  fixture.privatePath.mockReturnValue({ bucket: 'user-documents', path: 'owner/receipt.heic' });
+  fixture.sign.mockImplementation((_raw, ttl) => Promise.resolve(ttl === 60 ? 'https://synthetic.test/preview-signed' : 'https://synthetic.test/original-signed'));
+  const original = new Blob(['original heic'], { type: 'image/heic' });
+  const preview = new Blob(['derived preview'], { type: 'image/webp' });
+  vi.mocked(fetch).mockImplementation(async url => ({ ok: true, blob: async () => String(url).includes('preview-') ? preview : original }) as Response);
+  vi.mocked(URL.createObjectURL).mockImplementation(blob => blob === preview ? 'blob:preview' : 'blob:original');
+  await renderCitedWork(createHash('sha256').update(raw).digest('hex'));
+  await click('Read original source', () => !!host.querySelector('img[alt^="Preview of original:"]'));
+  expect(fixture.sign.mock.calls).toEqual([[raw], [raw, 60, { width: 1800, height: 1800, resize: 'contain', quality: 90 }]]);
+  expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+  expect(host.querySelector<HTMLImageElement>('img[alt^="Preview of original:"]')?.src).toBe('blob:preview');
+  expect(host.querySelector<HTMLAnchorElement>('a[download]')?.href).toBe('blob:original');
+  expect(host.querySelector<HTMLAnchorElement>('a[download]')?.download).toBe('receipt.heic');
+  expect(fetch).toHaveBeenCalledTimes(2);
+  await click('Close original');
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview');
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:original');
+});
+
+it.each(['signing denied', 'transform denied', 'non-image response'])('retains the HEIC original without a public fallback when preview is unavailable: %s', async failure => {
+  const raw = 'https://synthetic.supabase.co/storage/v1/object/authenticated/user-documents/owner/receipt.heic';
+  const query = { select: () => query, eq: vi.fn(() => query), maybeSingle: async () => ({ data: { file_url: raw }, error: null }) };
+  fixture.from.mockImplementation(() => query);
+  fixture.privatePath.mockReturnValue({ bucket: 'user-documents', path: 'owner/receipt.heic' });
+  fixture.sign.mockImplementation((_raw, ttl) => Promise.resolve(ttl === 60 ? (failure === 'signing denied' ? raw : 'https://synthetic.test/preview-signed') : 'https://synthetic.test/original-signed'));
+  vi.mocked(fetch).mockImplementation(async url => ({ ok: !String(url).includes('preview-') || failure !== 'transform denied',
+    blob: async () => new Blob(['source'], { type: String(url).includes('preview-') ? 'text/html' : 'image/heic' }) }) as Response);
+  await render();
+  await click('Read original source', () => !!host.querySelector('a[download]'));
+  expect(host.querySelector('img')).toBeNull();
+  expect(host.querySelector('iframe, object, script')).toBeNull();
+  expect(host.querySelector<HTMLAnchorElement>('a[download]')?.download).toBe('receipt.heic');
+  expect(host.textContent).toContain('Image preview unavailable');
+  expect(fetch).toHaveBeenCalledTimes(failure === 'signing denied' ? 1 : 2);
+  expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/public/'))).toBe(false);
+});
+
+it.each(['viewer change', 'source withdrawal'])('drops an in-flight private HEIC preview after %s', async change => {
+  const raw = 'https://synthetic.supabase.co/storage/v1/object/authenticated/user-documents/owner/receipt.heic';
+  const query = { select: () => query, eq: vi.fn(() => query), maybeSingle: async () => ({ data: { file_url: raw }, error: null }) };
+  fixture.from.mockImplementation(() => query);
+  fixture.privatePath.mockReturnValue({ bucket: 'user-documents', path: 'owner/receipt.heic' });
+  fixture.sign.mockImplementation((_raw, ttl) => Promise.resolve(ttl === 60 ? 'https://synthetic.test/preview-signed' : 'https://synthetic.test/original-signed'));
+  let resolvePreview!: (value: Response) => void;
+  vi.mocked(fetch).mockImplementation(async url => String(url).includes('preview-') ? new Promise<Response>(resolve => { resolvePreview = resolve; })
+    : { ok: true, blob: async () => new Blob(['original'], { type: 'image/heic' }) } as Response);
+  const hash = createHash('sha256').update(raw).digest('hex');
+  await renderCitedWork(hash);
+  await click('Read original source', () => !!resolvePreview);
+  if (change === 'viewer change') { fixture.user = { id: 'next-viewer' }; await renderCitedWork(hash); }
+  else await render();
+  await act(async () => resolvePreview({ ok: true, blob: async () => new Blob(['preview'], { type: 'image/webp' }) } as Response));
+  expect(host.querySelector('img[alt^="Preview of original:"]')).toBeNull();
+  expect(host.querySelector('a[download]')).toBeNull();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
 it('names who may see a masked amount instead of calling it unrecorded', async () => {
   const masked = parseVehicleReceiptRecord({ id: 'receipt-b', vendor_name: 'Atomic Motors', total: null, total_amount: null, amounts_visible: false,
     receipt_date: '2025-01-13', source_document_table: 'vehicle_documents', source_document_id: 'source-b' });

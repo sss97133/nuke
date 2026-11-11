@@ -46,15 +46,16 @@ interface FieldEvidencePopupProps {
 }
 
 /** The selected attribute remains framed by this vehicle; peer matches never replace its evidence. */
-function FieldContext({ field, label, value, context, reports, images, references, details }: {
-  field: string; label: string; value: string; context: ProfileFieldContext;
+function FieldContext({ field, label, value, context, answer, reports, images, references, details }: {
+  field: string; label: string; value: string; context: ProfileFieldContext; answer: React.ReactNode;
   reports: FieldProvenance['observations']; images: EvidenceImage[]; references: EvidenceImage[]; details: React.ReactNode;
 }) {
   const { openPopup } = usePopup();
   const subject = context.subject;
   const canScope = !!subject.make && !!subject.model && field !== 'make';
   const [sameModel, setSameModel] = useState(true);
-  const [showPeers, setShowPeers] = useState(false);
+  // The click shows its answer at once: peers load with the popup, no second click to reveal them.
+  const showPeers = true;
   const matchField = context.matchField || field;
   const allowed = ['year', 'make', 'model', 'series', 'trim', 'body_style', 'drivetrain', 'transmission', 'transmission_model'];
   const subjectValue = (key: string) => subject[key as keyof Vehicle];
@@ -74,18 +75,23 @@ function FieldContext({ field, label, value, context, reports, images, reference
     enabled: showPeers && filters.length > 0,
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
-      let query = supabase.from('vehicles').select(`${VEHICLE_POPUP_COLUMNS},thumbnail_url:primary_image_url`)
+      let query = supabase.from('vehicles').select(`${VEHICLE_POPUP_COLUMNS},thumbnail_url:primary_image_url`, { count: 'exact' })
         .eq('is_public', true).is('deleted_at', null).or('listing_kind.is.null,listing_kind.neq.non_vehicle_item').neq('id', subject.id);
-      for (const [column, filterValue] of filters) query = query.eq(column, filterValue);
-      const { data, error } = await query.order('updated_at', { ascending: false }).limit(8).abortSignal(signal);
+      // Recorded labels differ only by case across sources ("TRANS AM" / "Trans Am"); match them case-insensitively, never by pattern.
+      for (const [column, filterValue] of filters) query = typeof filterValue === 'string' && !/[*%_\\]/.test(filterValue)
+        ? query.ilike(column, filterValue) : query.eq(column, filterValue);
+      const { data, error, count } = await query.order('updated_at', { ascending: false }).limit(8).abortSignal(signal);
       if (error) throw error;
-      return (data || []) as (Pick<FeedVehicle, 'id' | 'year' | 'make' | 'model' | 'trim' | 'thumbnail_url' | 'created_at'> & Partial<FeedVehicle>)[];
+      return { rows: (data || []) as (Pick<FeedVehicle, 'id' | 'year' | 'make' | 'model' | 'trim' | 'thumbnail_url' | 'created_at'> & Partial<FeedVehicle>)[], count };
     },
   });
+  const rank = (column: string) => { const at = ['year', 'make', 'model'].indexOf(column); return at < 0 ? 3 : at; };
+  const scopeLabel = [...new Set([...filters].sort((a, b) => rank(a[0]) - rank(b[0])).map(([, filterValue]) => String(filterValue)))].join(' ');
+  const peerTotal = peers.data?.count ?? peers.data?.rows.length ?? 0;
   const specific = reports.filter((report, index) => reports.findIndex(other => other.id === report.id) === index).filter(report => report.value?.trim().toLowerCase() === value.trim().toLowerCase()
     || (field === 'drivetrain' && /\bNP\d{3}\b|transfer case|t-case/i.test(report.content || '')));
   return <div className="vp-field-context">
-    <p className="vp-field-context__scope">{label.replace(/^./, c => c.toUpperCase())} · this vehicle</p>
+    <div className="vp-field-context__answer" aria-label={`${label} source`}>{answer}</div>
     {specific.slice(0, 2).map(report => <article key={report.id} className="vp-field-context__report">
       {report.content && <p>{report.content}</p>}
       <small>{(report.source_slug || 'Retained report').replace(/_/g, ' ')}{report.observed_at && <> · {new Date(report.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}</>}</small>
@@ -104,29 +110,31 @@ function FieldContext({ field, label, value, context, reports, images, reference
       </button>)}</div>
     </section>}
     {filters.length > 0 && <section aria-label={`${value} data segment`}>
-      <div className="vp-field-context__segment-head"><button type="button" aria-expanded={showPeers} onClick={() => setShowPeers(current => !current)}>Other profiles with this configuration</button>
-        {showPeers && canScope && <button type="button" onClick={() => setSameModel(current => !current)}>{sameModel ? 'Wider scope' : `Within ${subject.year || ''} ${subject.model}`}</button>}
+      <div className="vp-field-context__segment-head">
+        <h3>{peers.isSuccess ? (peerTotal === 0 ? `No other public profile is recorded as ${scopeLabel}` : `${peerTotal.toLocaleString('en-US')} other public profile${peerTotal === 1 ? '' : 's'} recorded as ${scopeLabel}`) : `Other profiles recorded as ${scopeLabel}`}</h3>
+        {canScope && <button type="button" onClick={() => setSameModel(current => !current)}>{sameModel ? 'Include every make' : `Only ${subject.year || ''} ${subject.make} ${subject.model}`}</button>}
       </div>
-      {showPeers && <>
-      <p className="vp-field-context__note">{canScope && sameModel ? `${subject.year || ''} ${subject.make} ${subject.model} · ` : ''}Exact recorded labels · up to 8 other public profiles</p>
       {peers.isPending && <p role="status">Reading related profiles…</p>}
       {peers.isError && <p role="status">Related profiles could not be read. <button type="button" onClick={() => void peers.refetch()}>Retry</button></p>}
-      {peers.data?.length === 0 && <p>No other profiles returned in this scope.</p>}
-      <div className="vp-field-context__peers">{peers.data?.map(peer => <button type="button" key={peer.id} onClick={() => openPopup(
+      <div className="vp-field-context__peers">{peers.data?.rows.map(peer => <button type="button" key={peer.id} onClick={() => openPopup(
         <React.Suspense fallback={<p role="status">Reading profile…</p>}><VehiclePopup vehicle={peer} showRelatedSales={false} /></React.Suspense>,
         [peer.year, peer.make, peer.model, peer.trim].filter(Boolean).join(' '), 560,
         false,
       )}>
-        {peer.thumbnail_url && <img src={optimizeImageUrl(peer.thumbnail_url, 'thumbnail') || peer.thumbnail_url} alt="" width={56} height={42} loading="lazy" />}
+        {peer.thumbnail_url && <img src={optimizeImageUrl(peer.thumbnail_url, 'thumbnail') || peer.thumbnail_url} alt="" width={56} height={42} loading="lazy"
+          onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}
         <span>{[peer.year, peer.make, peer.model, peer.trim].filter(Boolean).join(' ')}</span>
       </button>)}</div>
-      </>}
+      {peerTotal > (peers.data?.rows.length ?? 0) && <p className="vp-field-context__note">Newest {peers.data?.rows.length} shown.</p>}
     </section>}
-    <details className="vp-field-context__evidence"><summary>Sources & observations for this vehicle</summary>{details}</details>
+    <details className="vp-field-context__evidence"><summary>Audit trail</summary>{details}</details>
   </div>;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
+  owner_import_listing: 'Owner listing import',
+  ai_visual: 'Photo reading',
+  system_update: 'System update',
   vin_decode: 'VIN decode (NHTSA)',
   nhtsa: 'NHTSA',
   bat: 'Bring a Trailer',
@@ -450,7 +458,18 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       {!imagesLoading && !imageReadFailed && sortedSources.length === 0 && citations.length === 0 && !provenance.data?.observations.length && <p>No source claim was returned for this field. The displayed value needs a source.</p>}
     </div>
   );
-  return context ? <FieldContext field={field} label={label} value={value} context={context}
+  // First line of the click: the value, who recorded it and when, or that nothing does.
+  const leadClaim = sortedSources[0];
+  const leadReport = provenanceCoverageUnavailable(provenance.data) ? undefined : provenance.data?.observations?.[0];
+  const shortDay = (at?: string | null) => at ? ` · ${new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}` : '';
+  const differs = (recorded?: string | null) => !!recorded && recorded.trim().toLowerCase() !== value.trim().toLowerCase() ? ` records “${recorded}”` : '';
+  const answer = imagesLoading || claims.loading ? <p role="status">Reading source…</p>
+    : provenance.data?.current_correction ? <p><strong>{value}</strong> · receipt correction{shortDay(provenance.data.current_correction.page_date)}</p>
+      : leadClaim ? <p><strong>{value}</strong> · {sourceLabel(leadClaim.source_type)}{differs(leadClaim.field_value)}{leadClaim.source_type.startsWith('agent_') ? '' : shortDay(leadClaim.created_at)}
+        {sortedSources.length > 1 && <> · {sortedSources.length - 1} more source{sortedSources.length > 2 ? 's' : ''}</>}</p>
+        : leadReport ? <p><strong>{value}</strong> · {(leadReport.source_slug || 'Source report').replace(/_/g, ' ')}{differs(leadReport.value)}{shortDay(leadReport.observed_at)}</p>
+          : <p><strong>{value}</strong> · no source on record. This value sits on the vehicle record with no claim behind it.</p>;
+  return context ? <FieldContext field={field} label={label} value={value} context={context} answer={answer}
     reports={[
       ...(provenanceCoverageUnavailable(provenance.data) ? [] : provenance.data?.observations || []),
       ...(context && field === 'drivetrain' && !provenanceCoverageUnavailable(drivetrainContext.data)
