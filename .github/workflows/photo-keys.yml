@@ -49,7 +49,7 @@ on:
         options: [keys, properties]
         default: keys
       pages:
-        description: properties only. How many windows of `photos` stored readings to walk, newest first (1 to 99)
+        description: properties only. How many windows of `photos` stored readings to walk, newest first (1 to 99). A reading whose values a row already holds is passed over, so a second run goes on where the first stopped
         type: string
         default: '1'
 
@@ -154,6 +154,15 @@ jobs:
       # a stored deep reading already holds rust_severity, paint_state and completeness for its photo, and the registry has
       # a property for each. No model is called and no key is needed but the database's. An owner's own photos go one
       # claim at a time through ingest-observation (--single), because the batch intake takes listing photos only.
+      - name: Install the database client for step=properties
+        if: inputs.step == 'properties'
+        # Its own step, with no secret in its environment and install scripts off. One package, at the version this
+        # was run with, installed beside the checkout and linked in: not the repository's whole tree.
+        run: |
+          mkdir -p "$RUNNER_TEMP/sb" node_modules
+          (cd "$RUNNER_TEMP/sb" && npm init -y >/dev/null && npm install --ignore-scripts --no-audit --no-fund '@supabase/supabase-js@2.119.0' >/dev/null)
+          ln -s "$RUNNER_TEMP/sb/node_modules/@supabase" node_modules/@supabase
+
       - name: Copy the stored readings' three values to their registered properties
         if: inputs.step == 'properties'
         shell: bash
@@ -173,22 +182,24 @@ jobs:
           [[ "$KEYS_PAGES" =~ $count ]] || { echo "::error::pages must be 1 to 99"; exit 2; }
           [ -n "$SUPABASE_URL" ] || { echo "::error::SUPABASE_URL not set."; exit 2; }
           [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::SUPABASE_SERVICE_ROLE_KEY not set."; exit 2; }
-          # The script needs one package. It is installed beside the checkout and linked in, not the whole tree.
-          mkdir -p "$RUNNER_TEMP/sb" node_modules
-          (cd "$RUNNER_TEMP/sb" && npm init -y >/dev/null && npm install --no-audit --no-fund '@supabase/supabase-js@^2.86.0' >/dev/null)
-          ln -s "$RUNNER_TEMP/sb/node_modules/@supabase" node_modules/@supabase
-          args=(project-cached --vehicle-id "$KEYS_VEHICLE_ID" --limit "$KEYS_PHOTOS" --pages "$KEYS_PAGES")
-          if [ "$KEYS_WRITE" = "true" ]; then args+=(--apply --single); fi
+          # --single on the dry run too, so its counts are what a write would send (the same refusals, the same skips).
+          args=(project-cached --vehicle-id "$KEYS_VEHICLE_ID" --limit "$KEYS_PHOTOS" --pages "$KEYS_PAGES" --single)
+          if [ "$KEYS_WRITE" = "true" ]; then args+=(--apply); fi
           rc=0
           node scripts/deep-image-analysis-byok.mjs "${args[@]}" >"$RUNNER_TEMP/receipt" 2>"$RUNNER_TEMP/said" || rc=$?
-          # This log is public: counts and the script's fixed reason words only. No vehicle id, no row id, no raw error text.
-          tail -n 1 "$RUNNER_TEMP/receipt" | jq -c 'del(.vehicle_id, .observations)' 2>/dev/null || echo "no receipt was printed"
-          if [ -s "$RUNNER_TEMP/said" ]; then
-            head -n 3 "$RUNNER_TEMP/said" | cut -c1-240 | sed -E 's/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/<id>/g; s/[A-Za-z0-9_-]{24,}/<long>/g'
-          fi
+          # This log is public. From the receipt: the named counts, and words made of a to z and "_" only. No vehicle
+          # id, no row id, no list. From stderr: the script's own fixed error line, or only how many lines there were.
+          show='objects | {mode, route, sampled_condition_rows, source_rows, eligible_claims, window_limit, pages_walked,
+            reached_oldest_row, model_calls, already_projected, already_projected_superseded, inserted, duplicates,
+            verified, failed, unattempted, reason,
+            deferred: ((.deferred // {}) | if type == "object" then with_entries(select((.key | test("^[a-z_]{1,40}$")) and (.value | type) == "number")) else {} end)}
+            | with_entries(select((.value | type) as $t | $t == "number" or $t == "boolean" or $t == "object" or ($t == "string" and (.value | test("^[a-z_]{1,40}$")))))'
+          line="$( { [ -s "$RUNNER_TEMP/receipt" ] && tail -n 1 "$RUNNER_TEMP/receipt" | jq -ce "$show" 2>/dev/null; } || true )"
+          if [ -n "$line" ]; then echo "$line"; else echo "no receipt was printed"; fi
+          said="$(grep -m1 -oE '^Error: project-cached: [a-z ]{1,60}$' "$RUNNER_TEMP/said" || true)"
+          if [ -n "$said" ]; then echo "$said"; elif [ -s "$RUNNER_TEMP/said" ]; then echo "stderr: $(wc -l < "$RUNNER_TEMP/said") lines withheld"; fi
           {
             echo "### Stored readings to registered properties ($([ "$KEYS_WRITE" = "true" ] && echo write || echo 'dry run'))"
-            tail -n 1 "$RUNNER_TEMP/receipt" | jq -r 'del(.vehicle_id, .observations) | to_entries[] | "- \(.key): \(.value | tojson)"' 2>/dev/null || echo "- no receipt was printed"
+            if [ -n "$line" ]; then echo "$line" | jq -r 'to_entries[] | "- \(.key): \(.value | tojson)"'; else echo "- no receipt was printed"; fi
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$rc"
-

@@ -122,12 +122,21 @@ lane does not land it: that would be a second owner of the same property on the 
 
 The projection had never run on an owner's own photos. Its batch intake takes a public vehicle's listing photos only
 (`20261004064216`). `--single` sends one claim at a time through `ingest-observation` and reads each row and its
-witness back; `--pages` walks more than one window. The same workflow runs it with `step=properties`:
+witness back. Beside that one rule it keeps what the batch intake checks: a photographed paper is deferred, the
+reading must pass the database's own `observation_is_public` (asked by RPC; no answer defers it), and a claim that a
+row already holds, current or superseded, is not sent again, so a second run goes on where the first stopped.
+`--pages` walks more than one window, by `(ingested_at, id)`, so readings stored at one instant are not skipped.
+The same workflow runs it with `step=properties`:
 
 ```bash
 gh workflow run photo-keys.yml -f step=properties -f vehicle_id=<uuid> -f user_id=<uuid> -f photos=99 -f pages=10              # dry run: counts
 gh workflow run photo-keys.yml -f step=properties -f vehicle_id=<uuid> -f user_id=<uuid> -f photos=1 -f pages=1 -f write=true  # one reading
 ```
+
+**No reader shows these rows on a private vehicle yet.** The reader the properties were registered with,
+`get_field_provenance`, returns a projected row only when its vehicle is public (`20261109203000`). On an owner's
+private vehicle the rows land, each with its property and its photo as witness, and that reader returns none of
+them, to the owner either. Opening that gate to the owner is a migration and has not been written.
 
 Measured in production on 2026-11-11, before any run (reader: the vehicles' current `image_deep_byok` condition
 rows): one vehicle has 74 such readings, each with at least one of the three values, none marked for review; the
