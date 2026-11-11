@@ -50,6 +50,7 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
     const previous = queue.data.product_result?.items?.[line.id];
     const card = await admin.rpc('receipt_item_product_card', { p_item: line.id });
     if (card.error) throw new Error('catalog_reader_unavailable');
+    let currentCard = card.data;
     // A readable quote is not evidence that a failed stock capture recovered.
     // Reuse the existing per-item retry clock for unavailable media only.
     if (card.data && card.data.image_status !== 'unavailable') {
@@ -94,9 +95,20 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
             match_basis: product.match_basis, parser: 'receipt_product_page_v1',
             page_url: page.source.listing_url, snapshot_id: page.source.id, page_sha256: page.source.html_sha256 } });
         if (saved.error || !saved.data) throw new Error('catalog_admission_failed');
+        // Completion is an acknowledgement of the current consumer, not an
+        // arbitrary historical catalog ID returned by the writer.
+        const current = await admin.rpc('receipt_item_product_card', { p_item: line.id });
+        currentCard = current.error ? null : current.data;
+        if (current.error) throw new Error('catalog_reader_unavailable');
+        if (!current.data || current.data.catalog_part_id !== saved.data
+          || current.data.page_url !== page.source.listing_url
+          || current.data.image_status !== image.image_status
+          || (image.image_status === 'retained' && current.data.image_url !== image.image_url)) {
+          throw new Error('catalog_readback_mismatch');
+        }
         if (image.image_status === 'unavailable') {
           outcomes[line.id] = { fingerprint, status: 'stock_image_unavailable', catalog_part_id: saved.data,
-            price_retained: product.price != null, retry_at: new Date(Date.now() + 3600000).toISOString() };
+            price_retained: current.data.quote_price != null, retry_at: new Date(Date.now() + 3600000).toISOString() };
           nextRetry = Math.min(nextRetry, 3600);
         } else outcomes[line.id] = { fingerprint, status: 'matched', catalog_part_id: saved.data };
         matched = true; break;
@@ -106,9 +118,9 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
       }
     }
     if (!matched) {
-      const retry = reason === 'supplier_not_integrated' ? 604800 : reason.includes('unavailable') || reason.includes('deferred') ? 3600 : 86400;
+      const retry = reason === 'supplier_not_integrated' ? 604800 : reason.includes('unavailable') || reason.includes('deferred') || reason === 'catalog_readback_mismatch' ? 3600 : 86400;
       outcomes[line.id] = { fingerprint, status: reason, retry_at: new Date(Date.now() + retry * 1000).toISOString(),
-        ...(card.data ? { catalog_part_id: card.data.catalog_part_id, price_retained: card.data.quote_price != null } : {}) };
+        ...(currentCard ? { catalog_part_id: currentCard.catalog_part_id, price_retained: currentCard.quote_price != null } : {}) };
       nextRetry = Math.min(nextRetry, retry);
     }
   }

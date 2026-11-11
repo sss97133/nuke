@@ -14,7 +14,9 @@ function fixture(count = 3, vendor = 'Classic Industries') {
  }, rpc: async (name: string, args: any) => {
    calls.push({ name, args });
    if (name === 'receipt_item_product_card') return { data: cards.get(args.p_item) ?? null };
-   const id = `catalog-${args.p_number}`; cards.set(`line-${args.p_number.split('-')[1]}`, { catalog_part_id: id, image_status: args.p_capture.image_status, quote_price: args.p_capture.price }); return { data: id };
+   const id = `catalog-${args.p_number}`; cards.set(lines.find(line => line.part_number===args.p_number)?.id, {
+     catalog_part_id: id, image_status: args.p_capture.image_status, image_url: args.p_capture.image_url,
+     page_url: args.p_capture.page_url, quote_price: args.p_capture.price }); return { data: id };
  }};
  const captures: string[] = [];
  const effects = { capturePage: async (_a: any, url: string) => {
@@ -138,4 +140,36 @@ Deno.test('optional-image revision retries the prior image-only refusal', async 
  assert(result.product_complete&&f.captures.length===1,'existing source admission retried without waiting on obsolete image refusal');
  const capture=f.calls.find(x=>x.name==='record_receipt_catalog_product').args.p_capture;
  assert(capture.image_status==='retained'&&capture.image_sha256==='b'.repeat(64),'valid stock proof unchanged');
+});
+
+Deno.test('historical writer acknowledgement cannot complete while the current reader still has the image-free revision', async () => {
+ const f=fixture(1);const rpc=f.admin.rpc;
+ f.cards.set('line-0',{catalog_part_id:'current-image-free',image_status:'unavailable',quote_price:49.95});
+ f.admin.rpc=async(name:string,args:any)=>name==='record_receipt_catalog_product'
+   ? {data:'historical-with-image'} : rpc(name,args);
+ const result=await enrichReceiptProducts(f.admin,request,f.effects);
+ const item=result.product_result.items['line-0'];
+ assert(!result.product_complete&&item.status==='catalog_readback_mismatch'&&result.retry_after_seconds===3600,'old writer ID never marks recovery complete');
+ assert(item.catalog_part_id==='current-image-free'&&item.price_retained===true,'only the current readable quote is acknowledged');
+});
+
+Deno.test('source withdrawal or media mismatch at readback stays pending and never acknowledges stale testimony', async () => {
+ for(const failure of ['withdrawn','wrong_image','wrong_status','wrong_page','reader_error']) {
+   const f=fixture(1);const rpc=f.admin.rpc;let wrote=false;
+   f.admin.rpc=async(name:string,args:any)=>{
+     const result=await rpc(name,args);
+     if(name==='record_receipt_catalog_product')wrote=true;
+     if(name==='receipt_item_product_card'&&wrote) {
+       if(failure==='withdrawn')return {data:null};
+       if(failure==='reader_error')return {data:null,error:{message:'source read failed'}};
+       return {data:{...result.data,...(failure==='wrong_image'?{image_url:'https://fixture.supabase.co/replacement.jpg'}:
+         failure==='wrong_status'?{image_status:'unavailable'}:{page_url:'https://www.classicindustries.com/other.html'})}};
+     }
+     return result;
+   };
+   const result=await enrichReceiptProducts(f.admin,request,f.effects);
+   const item=result.product_result.items['line-0'];
+   assert(!result.product_complete&&item.status===(failure==='reader_error'?'catalog_reader_unavailable':'catalog_readback_mismatch'),'completion requires current source and image acknowledgement');
+   if(failure==='withdrawn'||failure==='reader_error')assert(item.catalog_part_id===undefined&&item.price_retained===undefined,'withdrawn or unreadable quote is not claimed retained');
+ }
 });

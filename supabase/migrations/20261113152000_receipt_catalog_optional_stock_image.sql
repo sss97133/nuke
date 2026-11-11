@@ -6,8 +6,13 @@ SET LOCAL lock_timeout = '3s';
 DO $$ BEGIN
  IF md5(pg_get_functiondef('public.record_receipt_catalog_product(text,text,jsonb)'::regprocedure)) <> '09cfb9726f32a8813650a1ae6d89bb4c'
  OR md5(pg_get_functiondef('public.receipt_item_product_card(uuid)'::regprocedure)) <> '23a24947ee9315222264cad6441decf6'
+ OR md5(pg_get_indexdef('public.catalog_parts_receipt_product_capture'::regclass)) <> '6dd44219b221a359541b9bc432037efe'
  THEN RAISE EXCEPTION 'Receipt catalog owner drift'; END IF;
 END $$;
+-- Content identity is not revision identity: A -> unavailable B -> recovered A
+-- must retain all three events. Current-revision replay stays serialized by the
+-- existing writer lock; the separate current-reader lookup index is unchanged.
+DROP INDEX public.catalog_parts_receipt_product_capture;
 
 CREATE OR REPLACE FUNCTION public.record_receipt_catalog_product(p_supplier text, p_number text, p_capture jsonb)
  RETURNS uuid
@@ -15,7 +20,7 @@ CREATE OR REPLACE FUNCTION public.record_receipt_catalog_product(p_supplier text
  SECURITY DEFINER
  SET search_path TO 'pg_catalog', 'public'
 AS $function$
-DECLARE s public.listing_page_snapshots%ROWTYPE; source_id uuid; part_id uuid; host text; pn text:=public.receipt_product_number(p_number); c jsonb; image_status text; has_image boolean;
+DECLARE s public.listing_page_snapshots%ROWTYPE; current_part public.catalog_parts%ROWTYPE; source_id uuid; part_id uuid; host text; pn text:=public.receipt_product_number(p_number); c jsonb; image_status text; has_image boolean; revision_at timestamptz;
 BEGIN
  image_status:=coalesce(p_capture->>'image_status','retained');
  has_image:=image_status='retained';
@@ -52,12 +57,21 @@ BEGIN
  THEN RAISE EXCEPTION 'Unavailable stock image must not carry image proof'; END IF;
  END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended('receipt_catalog:'||p_supplier||':'||pn,0));
- SELECT id INTO part_id FROM public.catalog_parts WHERE part_number=pn
+ -- Only the reader's current namespace revision can acknowledge a replay.
+ -- Recovering old image bytes must append after a newer image-free capture.
+ SELECT * INTO current_part FROM public.catalog_parts WHERE part_number=pn
  AND application_data#>>'{receipt_product_v1,supplier_key}'=p_supplier
  AND coalesce(application_data#>>'{receipt_product_v1,line_code}','')=CASE WHEN p_supplier='oreilly' THEN p_capture->>'product_line_code' ELSE '' END
- AND application_data#>>'{receipt_product_v1,page_sha256}'=s.html_sha256
- AND (application_data#>>'{receipt_product_v1,image_sha256}') IS NOT DISTINCT FROM (p_capture->>'image_sha256');
- IF FOUND THEN RETURN part_id; END IF;
+ ORDER BY created_at DESC,id DESC LIMIT 1;
+ IF FOUND AND current_part.application_data#>>'{receipt_product_v1,snapshot_id}'=s.id::text
+ AND current_part.supplier_url=s.listing_url
+ AND current_part.application_data#>>'{receipt_product_v1,page_sha256}'=s.html_sha256
+ AND coalesce(current_part.application_data#>>'{receipt_product_v1,image_status}','retained')=image_status
+ AND (current_part.application_data#>>'{receipt_product_v1,image_sha256}') IS NOT DISTINCT FROM (p_capture->>'image_sha256')
+ THEN RETURN current_part.id; END IF;
+ -- Use lock-acquisition order even when callers started before waiting, or
+ -- several revisions are admitted inside the same SQL statement.
+ revision_at:=greatest(clock_timestamp(),current_part.created_at+interval '1 microsecond');
  SELECT id INTO source_id FROM public.catalog_sources WHERE provider=host AND base_url='https://'||host ORDER BY created_at,id LIMIT 1;
  IF source_id IS NULL THEN INSERT INTO public.catalog_sources(name,provider,base_url) VALUES(host||' product pages',host,'https://'||host) RETURNING id INTO source_id; END IF;
  -- Explicit allowlist: never copy the worker's receipt/owner context into a public catalog row.
@@ -69,7 +83,7 @@ BEGIN
  price_current,currency,application_data,created_at,updated_at)
  VALUES(source_id,pn,p_capture->>'name',p_capture->>'manufacturer',left(p_capture->>'description',12000),p_capture->>'image_url',s.listing_url,
  CASE WHEN p_capture->>'price' ~ '^\d+(\.\d+)?$' THEN (p_capture->>'price')::numeric END,p_capture->>'currency',
- jsonb_build_object('receipt_product_v1',c),statement_timestamp(),statement_timestamp()) RETURNING id INTO part_id;
+ jsonb_build_object('receipt_product_v1',c),revision_at,revision_at) RETURNING id INTO part_id;
  RETURN part_id;
 END $function$
 ;
