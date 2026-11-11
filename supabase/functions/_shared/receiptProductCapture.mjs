@@ -1,6 +1,9 @@
 // Shared deterministic receipt -> supplier query -> primary product parser.
 // Catalog testimony is separate from purchase, installation and payment.
 export const normalizePart = value => String(value ?? '').trim().replace(/^\*+/, '').toUpperCase();
+// O'Reilly prints its product-line code beside the receipt description. A part
+// number alone is not unique across its brands (e.g. hose clamps and exhaust).
+export const receiptLineCode = description => String(description ?? '').match(/\(([A-Z0-9]{2,3})(?=[,)])/i)?.[1].toUpperCase() ?? null;
 export function supplierKey(vendor) {
   if (/^classic industries$/i.test(String(vendor).trim())) return 'classic_industries';
   if (/^o['’]?reilly auto parts(?:\s*\(store \d+\))?$/i.test(String(vendor).trim())) return 'oreilly';
@@ -51,8 +54,9 @@ export function parseProductPage(html, url, expectedPart) {
   const primaryScope = scopes.length ? html.slice(scopes[0].index, scopes[1]?.index ?? html.length) : '';
   const primaryMetas = [...primaryScope.matchAll(/<meta\b[^>]*>/gi)].map(m => attrs(m[0]));
   const primaryMeta = value => primaryMetas.find(m => m.itemprop === value)?.content;
-  const rawSku=product?.sku??product?.mpn??primaryMeta('sku')??primaryMeta('mpn');
-  if(normalizePart(rawSku)!==normalizePart(expectedPart))return {status:'sku_not_verified'};
+  const identifiers = product ? [product.sku, product.mpn] : [primaryMeta('sku'), primaryMeta('mpn')];
+  const rawSku = identifiers.find(value => value != null && normalizePart(value) === normalizePart(expectedPart));
+  if(rawSku == null)return {status:'sku_not_verified'};
   const offers=Array.isArray(product?.offers)?product.offers[0]:product?.offers;
   const rawPrice=offers?.price??primaryMeta('price');
   const image=[product?.image].flat()[0]??meta('property','og:image');
@@ -71,12 +75,14 @@ export function parseProductPage(html, url, expectedPart) {
     availability:offers?.availability??null,description:clean(description).slice(0,12000),
     price_basis:'supplier_page_offer_not_receipt_cost',match_basis:'exact_primary_catalog_sku; installation_not_asserted'};
 }
-export function productLinks(html, searchUrl, part) {
+/** @param {string | null} lineCode */
+export function productLinks(html, searchUrl, part, lineCode = null) {
   const result=[];for(const m of html.matchAll(/<a\b[^>]*href=["']([^"']+)["']/gi)){
     let url;try{url=new URL(decode(m[1]),searchUrl)}catch{continue}
     if(url.hostname!==new URL(searchUrl).hostname||!allowedProductUrl(url.href)||!url.pathname.startsWith('/detail/c/'))continue;
     let segments;try{segments=url.pathname.split('/').map(decodeURIComponent)}catch{continue;}
-    if(!segments.some(x=>normalizePart(x)===normalizePart(part)))continue;
-    url.hash='';if(!result.includes(url.href))result.push(url.href);
+    if(normalizePart(segments.at(-1))!==normalizePart(part))continue;
+    if(lineCode && segments.at(-2)?.toUpperCase()!==lineCode.toUpperCase()+'0')continue;
+    url.hash='';if(!result.some(existing => new URL(existing).pathname===url.pathname))result.push(url.href);
   }return result.slice(0,3);
 }

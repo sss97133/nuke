@@ -1,7 +1,7 @@
 import { retainImage } from '../_shared/catalogStockImage.ts';
 export { allowedStockImage } from '../_shared/catalogStockImage.ts';
 import { archiveFetch, retainFetchedCapture } from '../_shared/archiveFetch.ts';
-import { allowedProductUrl, normalizePart, parseProductPage, productEligible, productLinks, supplierCandidates, supplierKey } from '../_shared/receiptProductCapture.mjs';
+import { allowedProductUrl, normalizePart, parseProductPage, productEligible, productLinks, receiptLineCode, supplierCandidates, supplierKey } from '../_shared/receiptProductCapture.mjs';
 
 const sha = async (value: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', value as BufferSource)), x => x.toString(16).padStart(2, '0')).join('');
 const uuid = /^[0-9a-f-]{36}$/i;
@@ -54,14 +54,17 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
       outcomes[line.id] = previous; nextRetry = Math.min(nextRetry, Math.ceil((Date.parse(previous.retry_at) - Date.now()) / 1000)); continue;
     }
     if (processed >= 2) { outcomes[line.id] = { fingerprint, status: 'queued' }; nextRetry = Math.min(nextRetry, 60); continue; }
-    const candidates = supplierCandidates(receipt.vendor_name, line.part_number); let reason = 'supplier_not_integrated'; let matched = false;
+    const lineCode = supplierKey(receipt.vendor_name) === 'oreilly' ? receiptLineCode(line.description) : null;
+    const missingLineCode = supplierKey(receipt.vendor_name) === 'oreilly' && !lineCode;
+    const candidates = missingLineCode ? [] : supplierCandidates(receipt.vendor_name, line.part_number);
+    let reason = missingLineCode ? 'receipt_line_code_missing' : 'supplier_not_integrated'; let matched = false;
     if (candidates.length) processed++;
     for (const candidate of candidates) {
       if (blockedHosts.has(new URL(candidate.url).hostname)) { reason = 'supplier_capture_unavailable'; continue; }
       try {
         let page = await effects.capturePage(admin, candidate.url);
         if (candidate.kind === 'search') {
-          const links = productLinks(page.html, candidate.url, line.part_number);
+          const links = productLinks(page.html, candidate.url, line.part_number, lineCode);
           if (links.length !== 1) { reason = links.length ? 'ambiguous_product_links' : 'exact_product_link_missing'; continue; }
           page = await effects.capturePage(admin, links[0]);
         }

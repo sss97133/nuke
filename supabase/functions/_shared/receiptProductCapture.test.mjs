@@ -1,11 +1,27 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {parseProductPage, productEligible, supplierCandidates, supplierKey, productLinks, allowedProductUrl} from './receiptProductCapture.mjs';
+import {parseProductPage, productEligible, supplierCandidates, supplierKey, productLinks, receiptLineCode, allowedProductUrl} from './receiptProductCapture.mjs';
 const page = p => `<script type="application/ld+json">${JSON.stringify(p)}</script>`;
 const product = {'@type':'Product',sku:'ABC-1',name:'Fuel pump',brand:{name:'Example'},image:'https://cdn.oerparts.com/assets/abc.jpg',offers:{price:'59.99',priceCurrency:'USD'}};
 const url='https://www.oerparts.com/product/abc-1.html';
 test('exact primary SKU binds dated supplier quote and image without asserting installation',()=>{
  const p=parseProductPage(page(product),url,'*abc-1');assert.equal(p.product_name,'Fuel pump');assert.equal(p.price,59.99);assert.match(p.match_basis,/installation_not_asserted/);
+});
+test('primary manufacturer part number may differ from the retailer UPC',()=>{
+ const p=parseProductPage(page({...product,sku:'733704728108',mpn:'72810'}),url,'72810');
+ assert.equal(p.status,'exact_sku_page'); assert.equal(p.printed_sku,'72810');
+ assert.equal(parseProductPage(page([{...product,sku:'UPC',mpn:'OTHER'},{...product,mpn:'72810'}]),url,'72810').status,'sku_not_verified');
+});
+test('receipt line code disambiguates duplicate part numbers across supplier brands',()=>{
+ const root='https://www.oreillyauto.com/search?q=55173';
+ const html=['mry0','wal0','mtm0'].map(code=>`<a href="/detail/c/brand/item/${code}/55173?q=55173">part</a>`).join('')+'<a href="/detail/c/brand/item/mtm0/55173?tracking=duplicate">same</a>';
+ assert.equal(productLinks(html,root,'55173').length,3);
+ assert.deepEqual(productLinks(html,root,'55173',receiptLineCode('HOSE CLAMPS (MTM)')),['https://www.oreillyauto.com/detail/c/brand/item/mtm0/55173?q=55173']);
+ assert.deepEqual(productLinks(html,root,'55173','ORC'),[]);
+ assert.equal(receiptLineCode('BATTERY (SSB, 2Y warranty)'), 'SSB');
+ assert.equal(receiptLineCode('ENGINE MOUNT (PT2) LT'),'PT2');
+ assert.equal(receiptLineCode('SEMI-MET PAD (ST)'),'ST');
+ assert.equal(receiptLineCode('Fluid without a printed code'),null);
 });
 test('matching recommendation cannot replace a mismatching primary product',()=>{
  assert.equal(parseProductPage(page([ {...product,sku:'OTHER'},product ]),url,'ABC-1').status,'sku_not_verified');
