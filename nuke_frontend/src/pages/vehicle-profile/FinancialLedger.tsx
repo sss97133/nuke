@@ -155,6 +155,5 @@ export default function FinancialLedger({ vehicleId }: { vehicleId: string }) {
       <p className="vp-financial-coverage">{read.rows.length} {read.complete ? 'of '+read.rows.length+' visible allocation entries loaded' : 'allocation entries loaded · more available'}. Customer payments and booked costs remain separate; these records do not establish a sale price, lifetime investment, or a settled job balance.</p>
     </>}
     {read.hasNextPage && <button type="button" className="vp-financial-action" disabled={read.isFetchingNextPage} onClick={() => void read.fetchNextPage()}>Load more allocations</button>}
-    {!read.isLoading && !read.isError && !read.rows.length && <p>No financial allocations are visible to this account for this vehicle.</p>}
   </section>;
 }
