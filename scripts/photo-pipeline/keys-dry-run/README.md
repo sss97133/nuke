@@ -91,9 +91,10 @@ Three things it does beyond the dry run's check, each counted in its summary:
 
 What a run says beyond its counts, all of it safe for a public log:
 
-- **Which places were missing.** For every claim it could not land: where its state is (a registered property, which
-  this lane does not send yet, or a drafted name) and the state's name when it is shaped like a key. This is the list
-  to take to the registry: an existing key or alias first, then a proposal.
+- **Which places were missing.** For every claim it could not land: where its state is (a registered property, or a
+  drafted name) and the state's name when it is shaped like a key. A drafted name is the list to take to the
+  registry: an existing key or alias first, then a proposal. A registered property is not this lane's to send (next
+  section).
 - **Why a model call failed.** The tool's own error line, and only that: a result the CLI did not mark as an error,
   or anything on stdout that is not an envelope, may be the model's answer and is never printed. Six characters in a
   row of a stored secret, a header value, an id, an address and a long token are removed before the line is cut.
@@ -110,7 +111,39 @@ python3 scripts/photo-pipeline/keys_lane.py --vehicle-id <uuid> --user-id <uuid>
 python3 scripts/photo-pipeline/keys_lane.py --vehicle-id <uuid> --user-id <uuid> --photos 1 --write    # lands
 ```
 
-What it does not do:
+### The three values a stored reading already holds
+
+Rust severity, paint stage and assembly state each have a registered property, and a deep reading already stores a
+value for each beside its statements (`state_observations.rust_severity`, `paint_state`, `completeness`). Their owner
+is the existing projection, `scripts/deep-image-analysis-byok.mjs project-cached`
+(`scripts/lib/image-property-projection.mjs`): it copies the reader's own value, calls no model and keeps the source
+row's id and a hash of it in every claim. So when the keys role places a sentence on one of these properties, the
+lane does not land it: that would be a second owner of the same property on the same photo, derived a second way.
+
+The projection had never run on an owner's own photos. Its batch intake takes a public vehicle's listing photos only
+(`20261004064216`). `--single` sends one claim at a time through `ingest-observation` and reads each row and its
+witness back. Beside that one rule it keeps what the batch intake checks: a photographed paper is deferred, the
+reading must pass the database's own `observation_is_public` (asked by RPC; no answer defers it), and a claim that a
+row already holds, current or superseded, is not sent again, so a second run goes on where the first stopped.
+`--pages` walks more than one window, by `(ingested_at, id)`, so readings stored at one instant are not skipped.
+The same workflow runs it with `step=properties`:
+
+```bash
+gh workflow run photo-keys.yml -f step=properties -f vehicle_id=<uuid> -f user_id=<uuid> -f photos=99 -f pages=10              # dry run: counts
+gh workflow run photo-keys.yml -f step=properties -f vehicle_id=<uuid> -f user_id=<uuid> -f photos=1 -f pages=1 -f write=true  # one reading
+```
+
+**No reader shows these rows on a private vehicle yet.** The reader the properties were registered with,
+`get_field_provenance`, returns a projected row only when its vehicle is public (`20261109203000`). On an owner's
+private vehicle the rows land, each with its property and its photo as witness, and that reader returns none of
+them, to the owner either. Opening that gate to the owner is a migration and has not been written.
+
+Measured in production on 2026-11-11, before any run (reader: the vehicles' current `image_deep_byok` condition
+rows): one vehicle has 74 such readings, each with at least one of the three values, none marked for review; the
+proof vehicle has 470, of which 225 are marked `needs_clarification` and are deferred by the projection's own rule.
+Neither vehicle had a row on any of the three properties.
+
+What the lane does not do:
 
 - No schedule. Nothing starts it but a person, one photo first.
 - **No check that a statement supports the key it was given.** Code checks that the quoted words are in the
