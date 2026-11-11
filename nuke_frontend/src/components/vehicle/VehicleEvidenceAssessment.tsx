@@ -7,6 +7,7 @@ export default function VehicleEvidenceAssessment({ assessment, assertions, unre
   const pkg = { assessment, listing_assertions: assertions, unresolved_fields: unresolvedFields };
   const [marketLimit, setMarketLimit] = useState(10);
   const market = assessment.market;
+  const appearances = assessment.retained_auction_appearances;
   const records = Array.isArray(market.records) ? market.records : [];
   const amount = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: market.receipt?.currency || 'USD' }).format(n);
   return <section aria-label="Vehicle evidence assessment">
@@ -30,6 +31,19 @@ export default function VehicleEvidenceAssessment({ assessment, assertions, unre
         <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer">{amount(r.amount)} · {r.eventAt}</a>
       </li>)}</ol>
       {marketLimit < records.length && <button type="button" onClick={() => setMarketLimit(n => n + 10)}>Read more market sources</button>}
+    </details>}
+    {!!appearances?.records.length && <details><summary>Publisher-reported archive results</summary>
+      <p>McCormick archive claims. Currency and fee treatment remain unestablished. No-sale bids are unsuccessful bids; these readings do not enter the qualified sale-price statistics.</p>
+      <ul>{appearances.records.map(r => <li key={r.native_appearance_key}>
+        {r.evidence_state === 'disputed' && <p>Conflicting source claims remain unresolved.</p>}
+        <ul>{r.witnesses.map(w => <li key={w.observation_id}>
+          <a href={w.source_url} target="_blank" rel="noopener noreferrer">{w.literal} · {w.source_date_interval_text}</a>
+          {' '}Captured {w.source_captured_at.slice(0, 10)}.{' '}
+          <a href={'/vehicle/' + vehicleId + '/observation/' + w.observation_id} target="_blank" rel="noopener noreferrer">Retained source reading</a>
+        </li>)}</ul>
+      </li>)}</ul>
+      <p>Repeated captures are grouped within this page. Publisher date ranges do not establish exact sale times.</p>
+      {appearances.page?.has_more && <p>More retained source readings remain beyond this page.</p>}
     </details>}
     {!!assessment.commentary.records?.length && <details><summary>Commentary sources ({assessment.commentary.records.length})</summary>
       <ul>{assessment.commentary.records.map(r => <li key={r.observation_id}>
