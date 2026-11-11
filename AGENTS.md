@@ -119,6 +119,22 @@ Keying readings that already exist is a dedicated role: give an agent `skills/im
 brief, with the registry snapshot and the decisions made so far.
 
 ## Invariants
+### Data-machine-first design — owner rule, 2026-11-11
+
+Every datum must be a planned, functional line item in the existing data machine
+before it reaches the UI. Establish its entity/episode grain, canonical data
+definition and owner, source/admission path, event and knowledge clocks, fold,
+withdrawal/supersession behavior, sanctioned reader, and useful inspection/action.
+Prove that path with representative real records before designing its presentation.
+
+The UI renders those supported line items through shared tools. Do not invent a
+page-local state machine, appraisal, direct source query, fact, or explanatory
+prose card to bypass missing admission, folds, line items or readers. Resolve the
+missing machine relationship with its existing owner first. A compact restyling
+of a bypass is still a bypass. Current owner intent: "every line item is planned
+out and like a functional tool before anything touches the ui"; "the ui is never
+raw text." This is a construction rule, not an additional owner-approval gate.
+
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.
 2. **Testimony is never overwritten or deleted.** It is superseded, and the original is kept.
