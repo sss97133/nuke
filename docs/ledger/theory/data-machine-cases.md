@@ -658,6 +658,33 @@ found broken and what is still unproven:
     running for two hours after an interruption had ended it (its journal shows nothing after 13:36 UTC). It typed a
     list of states for a part instead of reading the registry. Before answering a question about a vehicle, call
     `visual_work_build_log` and `receipt_work_lines` for it; before reporting a background job, read its journal.
+- **2026-11-11 16:53 to 17:00 UTC, the three gaps read again, and the first refusal.** Read from the raw rows behind
+  `visual_work_build_log` (31 current records, 10 superseded, 274 cost lines; the other lane's newest row was 16:43).
+  - *Gap 1, larger than recorded.* `physical_material_key`: 221 lines, 221 distinct keys, 192 of the form
+    `<system>.part.<part number>`. `physical_operation_key`: 52 distinct. `system_key`: 18 distinct, and none is a
+    registry key; 6 equal a `subject_taxonomy.category` (body, engine, glass, interior, paint, trim) and 12 match
+    nothing (104 lines, 18 records). No key was named in a `schema_proposals` row. `schema_proposals.proposal_type`
+    has no type for a `subject_taxonomy` row, so a part or a system cannot be filed there as the table stands.
+  - *Gap 2, as recorded:* 89 citations, 41 distinct captions, 36 photos, 21 with a keyed claim (29 claims), and every
+    cited observation an unkeyed `reviewed_image_analysis_v1` reading.
+  - *Gap 3, with two additions:* 21 material lines with a typed `analyst_range` price; also 24 labor lines with typed
+    analyst hour ranges, and a typed hourly rate as `rate_basis`.
+  - *The first refusal* (`20261113170000`, contract `test_visual_work_system_key_guard.sql`): an insert trigger on
+    `vehicle_observations` refuses a `visual_work_v1` record whose line carries a `system_key` that is neither a
+    `subject_taxonomy.category` in use nor declared in the record's own `key_proposals` (kind `system`, the key, the
+    nearest existing category or `none`, a reason). It is in the database, not in `ingest-observation`, so it holds for
+    every path in and reads the live registry. A declared draft is the visible wait, not a filed proposal. Stored rows
+    are not re-checked. The material and operation keys are not checked yet: a key per line is a line id, and the part
+    number belongs in its own field beside a registry part key.
+  - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on
+    reason and logic." They are the agent's reasoning, not his word, and he can overturn them. (1) A researched or
+    analyst number (price, hours, rate) is not stored as a number in a record. Invariant 5 says a number is cited from
+    a reader over rows and an agent's judgment is never seeded into a table; the supply-side rule says a supplier price
+    is testimony with a capture time. So a price is a supply-side row cited by id, hours are a reference row cited by
+    id, and where no row exists the line is unpriced and says so. Not enforced yet; the 45 lines and the rate stand as
+    retained input. (2) There is no typed list of states for a part. The states a part can have are the rows the
+    registry holds for it (`component_assembly_map.possible_states`, `condition_taxonomy` rows with `descriptor_type` `state`); a part
+    with no states waits with a draft that cites the readings which forced it.
 - For whoever builds next, from the dry run: (1) the writer's check can start from `check_units.py`; (2) the first
   proposals to put to the owner are the places most claims waited on (paint or coating loss, "no break visible", "no
   leak visible", the hood and the front valance as parts); (3) the conventions that the skeptics found weak (a located
