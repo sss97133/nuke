@@ -164,7 +164,8 @@ it('shows the server cost folds and opens a single inline calculation with direc
  expect(region.textContent).toContain('Read original doc-a');
  expect(region.textContent).toContain('Recorded operation · 3.5 documented person-hours');
  expect(region.textContent).toContain('Receipt candidate · exact installation not established');
- expect(region.textContent).toContain('seed uncalibrated');
+ expect(region.textContent).toContain('Reference allowance (not calibrated)');
+ expect(region.textContent).not.toContain('seed_uncalibrated');
  expect(region.closest('tr')?.previousElementSibling?.textContent).toContain('Install door-glass pair');
  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Open source photo: Torn seating"]')!.click());
  expect(fixture.open).toHaveBeenCalledWith('before-a');
@@ -183,6 +184,68 @@ it('filters the same ledger to a system and preserves unknown totals', async () 
  expect(host.textContent).not.toContain('Install door-glass pair');
  expect(host.textContent).toContain('Unestimated');
  expect(host.textContent).not.toContain('$0.00');
+});
+
+it('renders one readable time basis and opens the supplied labor source URLs', async () => {
+ const scoped = structuredClone(ledger);
+ scoped.scenarios[0].rows[0].reference = { type: 'analyst_range', label: 'attributed_scenario_uncalibrated',
+  derivation: 'Proposed scope from https://reference.example/allowance_(glass). Retained comparison only.' };
+ scoped.scenarios[0].rows[0].rate_basis = { rate: 100, currency: 'USD',
+  derivation: 'Comparison rate (https://supplier.example/services/rate?unit=hour&region=example). Not measured time.' };
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={scoped} renderSource={() => null} />));
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Install door-glass pair"]')!.click());
+ const detail = host.querySelector('#vp-ledger-evidence')!;
+ expect(detail.textContent?.match(/Proposed labor range/g)).toHaveLength(1);
+ expect(detail.textContent).toContain('(not calibrated)');
+ expect(detail.textContent).not.toMatch(/attributed_scenario_uncalibrated|analyst_range|seed_uncalibrated/);
+ expect(detail.textContent).toContain('2 panes × 1–2 person-hours per pane × USD 100');
+ const links = Array.from(detail.querySelectorAll<HTMLAnchorElement>('a'));
+ expect(links.map(link => link.getAttribute('href'))).toEqual([
+  'https://reference.example/allowance_(glass)', 'https://supplier.example/services/rate?unit=hour&region=example',
+ ]);
+ const followed: string[] = [];
+ for (const link of links) {
+  expect(link.target).toBe('_blank');
+  expect(link.rel).toBe('noopener noreferrer');
+  link.addEventListener('click', event => { event.preventDefault(); followed.push(link.href); });
+  await act(async () => link.click());
+ }
+ expect(followed).toEqual(links.map(link => link.href));
+ expect(detail.textContent).toContain('). Not measured time.');
+});
+
+it('shows the material price derivation and withdraws its citation when the reader removes it', async () => {
+ const scoped = structuredClone(ledger);
+ scoped.scenarios[0].rows[1].pricing = { kind: 'analyst_range',
+  derivation: 'Dated comparison https://supplier.example/product/%2Akit.html?finish=black&size=15. Freight is excluded.' };
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={scoped} renderSource={() => null} />));
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Paint materials"]')!.click());
+ const detail = host.querySelector('#vp-ledger-evidence')!;
+ const link = detail.querySelector<HTMLAnchorElement>('a')!;
+ expect(link.href).toBe('https://supplier.example/product/%2Akit.html?finish=black&size=15');
+ expect(detail.textContent).toContain('Price basis: Dated comparison');
+ expect(detail.textContent).toContain('Freight is excluded.');
+ expect(detail.textContent).toContain('Unpriced');
+ const clicked = vi.fn((event: Event) => event.preventDefault());
+ link.addEventListener('click', clicked);
+ await act(async () => link.click());
+ expect(clicked).toHaveBeenCalledOnce();
+ scoped.scenarios[0].rows[1].pricing = null;
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={scoped} renderSource={() => null} />));
+ expect(host.querySelector('#vp-ledger-evidence a')).toBeNull();
+ expect(host.textContent).not.toContain('supplier.example/product');
+});
+
+it('keeps non-HTTPS, credential-bearing and malformed references as inert text', async () => {
+ const scoped = structuredClone(ledger);
+ scoped.scenarios[0].rows[0].rate_basis = { derivation: 'http://supplier.example/plain javascript:alert(1) https://user:pass@supplier.example/private https://bad\\host.example/path https://%invalid <img src=x>' };
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={scoped} renderSource={() => null} />));
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Install door-glass pair"]')!.click());
+ const detail = host.querySelector('#vp-ledger-evidence')!;
+ expect(detail.querySelectorAll('a')).toHaveLength(0);
+ expect(detail.querySelector('img[src="x"]')).toBeNull();
+ expect(detail.textContent).toContain('javascript:alert(1)');
+ expect(detail.textContent).toContain('<img src=x>');
 });
 
 it('keeps unestimated work accessible and opens the line witness rather than the containing card photograph', async () => {

@@ -36,6 +36,31 @@ const systemName = (key: string) => (({ body: 'Body & metalwork', paint: 'Paint'
   steering: 'Steering', brakes: 'Brakes', axle: 'Rear axle', electrical: 'Electrical', cooling: 'Cooling', fuel: 'Fuel system',
   exhaust: 'Exhaust', tires: 'Wheels & tires', assembly: 'Assembly & checks' } as Record<string, string>)[key] || key.replaceAll('_', ' '));
 const reason = (value: string) => value.replaceAll('_', ' ');
+function timeBasis(reference: NonNullable<MasterCostLine['reference']>): string {
+  if (reference.type === 'analyst_range' || reference.label === 'attributed_scenario_uncalibrated') return 'Proposed labor range (not calibrated)';
+  if (reference.label === 'seed_uncalibrated') return 'Reference allowance (not calibrated)';
+  return reason(String(reference.label || reference.type || 'Unresolved reference'));
+}
+
+/** Link only URLs already present in the qualified reader text; do not fetch or infer citations. */
+function sourceText(text: string): React.ReactNode {
+  return text.split(/(https:\/\/[^\s<>"']+)/gi).map((part, index) => {
+    if (!/^https:\/\//i.test(part)) return part;
+    let href = part.replace(/[.,;:!?]+$/, '');
+    // A prose closing delimiter is not part of the source URL; balanced URL parentheses remain intact.
+    while (/[)\]}]$/.test(href)) {
+      const close = href.at(-1)!;
+      const open = ({ ')': '(', ']': '[', '}': '{' } as Record<string, string>)[close];
+      if (href.split(close).length <= href.split(open).length) break;
+      href = href.slice(0, -1);
+    }
+    try {
+      const url = new URL(href);
+      if (url.protocol !== 'https:' || !url.hostname || url.username || url.password || href.includes('\\')) return part;
+    } catch { return part; }
+    return <React.Fragment key={index}><a href={href} target="_blank" rel="noopener noreferrer">{href}</a>{part.slice(href.length)}</React.Fragment>;
+  });
+}
 function moneyTotals(values: CostTotals['currencies'] | undefined) {
   return values?.length ? values.map(v => <CostValue key={v.currency} value={v.cost} currency={v.currency} />) : 'Unpriced';
 }
@@ -62,6 +87,7 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
   const receiptLines = detailWorks.flatMap(w => w.receipts).filter((r, index, all) =>
     (!receiptItem || r.item_id === receiptItem) && all.findIndex(x => x.item_id === r.item_id) === index);
   const reference = detail?.reference;
+  const referenceName = reference?.description || reference?.name;
   const rateValue = detail?.rate_basis?.rate;
   const rateCurrency = detail?.rate_basis?.currency;
   const detailPanel = detail && <div id="vp-ledger-evidence" className="vp-ledger-evidence" role="region" aria-label={`Calculation for ${detail.label}`}>
@@ -71,11 +97,11 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
       {typeof rateValue === 'number' && <p>Rate: {amount(rateValue, typeof rateCurrency === 'string' ? rateCurrency : detail.currency)} per person-hour
         {typeof detail.rate_basis?.source === 'string' ? ` · ${reason(detail.rate_basis.source)}` : ''}.</p>}
       {detail.quantity?.derivation && <p>Quantity: {detail.quantity.derivation}</p>}
-      {reference && <p>Time basis: {String(reference.description || reference.name || reference.label || reference.type || 'unresolved reference')}
+      {reference && <p>Time basis: {typeof referenceName === 'string' ? `${referenceName} · ` : ''}{timeBasis(reference)}
         {reference.code ? ` (${String(reference.code)})` : ''}.
-        {typeof reference.label === 'string' && ` ${reason(reference.label)}.`}
-        {typeof reference.derivation === 'string' ? ` ${reference.derivation}` : ''}</p>}
-      {typeof detail.rate_basis?.derivation === 'string' && <p>{detail.rate_basis.derivation}</p>}
+        {typeof reference.derivation === 'string' && <> {sourceText(reference.derivation)}</>}</p>}
+      {typeof detail.rate_basis?.derivation === 'string' && <p>{sourceText(detail.rate_basis.derivation)}</p>}
+      {typeof detail.pricing?.derivation === 'string' && <p>Price basis: {sourceText(detail.pricing.derivation)}</p>}
       {detail.evidence_role && <p>{detail.evidence_role === 'observed_transition' ? 'A before/after sequence supports the change; hours are estimated.'
         : detail.evidence_role === 'conditional_finish' ? 'Conditional finishing scope; this does not establish that the work is required.'
         : 'Calculated reconstruction scope; this does not establish the historical installation date or labor time.'}</p>}
