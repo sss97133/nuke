@@ -71,13 +71,15 @@ export function parseProductPage(html, url, expectedPart) {
   const itemName=html.match(/<div[^>]*itemtype=["']https?:\/\/schema.org\/Product["'][^>]*>\s*<meta[^>]*itemprop=["']name["'][^>]*>/i);
   const name=product?.name||(itemName?attrs(itemName[0].slice(itemName[0].lastIndexOf('<meta'))).content:null)||clean(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]);
   let imageUrl=null;try{if(rawImage)imageUrl=new URL(rawImage,url).href}catch{}
-  if(!name||!imageUrl||!/^https:\/\//.test(imageUrl)||/logo|placeholder|no[-_]?image|image[-_]?coming/i.test(imageUrl))return {status:'exact_sku_without_product_image'};
+  if(!clean(name))return {status:'exact_sku_without_product_name'};
+  const imageStatus = !imageUrl ? 'not_provided' : !/^https:\/\//.test(imageUrl)||/logo|placeholder|no[-_]?image|image[-_]?coming/i.test(imageUrl) ? 'unqualified' : 'available';
+  if(imageStatus!=='available')imageUrl=null;
   const brandBlock=html.match(/<div[^>]*itemprop=["']brand["'][^>]*>[\s\S]*?<meta[^>]*itemprop=["']name["'][^>]*>/i);
   const brand=typeof product?.brand==='string'?product.brand:product?.brand?.name;
   const description=product?.description||html.match(/id=["']product-description-content["'][^>]*>([\s\S]*?)(?=<div[^>]+id=["']product-specs-content|<div[^>]+id=["']product-reviews-content)/i)?.[1];
   return {status:'exact_sku_page',printed_sku:String(rawSku),line_code:lineCode,product_name:clean(name),
     manufacturer:brand||(brandBlock?attrs(brandBlock[0].slice(brandBlock[0].lastIndexOf('<meta'))).content:null),
-    image_url:imageUrl,price:rawPrice!=null&&/^\d+(\.\d+)?$/.test(String(rawPrice))?Number(rawPrice):null,
+    image_url:imageUrl,image_status:imageStatus,price:rawPrice!=null&&/^\d+(\.\d+)?$/.test(String(rawPrice))&&Number.isFinite(Number(rawPrice))?Number(rawPrice):null,
     currency:offers?.priceCurrency??primaryMeta('priceCurrency')??null,
     availability:offers?.availability??null,description:clean(description).slice(0,12000),
     price_basis:'supplier_page_offer_not_receipt_cost',match_basis:'exact_primary_catalog_sku; installation_not_asserted'};
