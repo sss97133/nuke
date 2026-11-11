@@ -44,6 +44,29 @@ configuration, liquidity or report readiness. Check the actual estimate reader a
 as the history reader: a price displayed in history may still be absent from the
 estimator's qualified input.
 
+Source identity and capture location are separate locators. McCormick's canonical
+archive and showroom URLs order parameters differently from stored fetch URLs. The
+first live canary exposed a refusal despite matching native IDs, hashes and clocks.
+Admit only the observed native parameter-order equivalents; retain both original
+locators and refuse extra parameters or different room/appearance IDs. A successful
+synthetic canonical-URL example does not prove retained-capture coverage.
+
+The identity replay uses the existing seeder, property work queue and worker. Its
+separate source checkpoint preserves the generic replay and yields alternate eligible
+seeder calls to it while the finite source scope runs. Each pass selects at most 25 source observations
+and reserves up to four identity requests per source within the existing 500-item
+backpressure. Source visits and work requests are not canonical-field coverage.
+Arrivals use the existing trigger with the McCormick listing parser added to its
+gate; admission still proves capture custody and public-parent eligibility. Replaying
+a migration must not restart source progress, and an enqueue failure must not advance
+the checkpoint.
+
+Stable identity labels are the first supported property set. Configuration, condition
+and prices need their appearance and event-time context before they can be treated as
+current state or comparison features. Preserve the source's vocabulary and uncertainty;
+do not let a newly captured historical listing become a claim about today's physical
+condition merely because its capture clock is recent.
+
 Before expanding a replay, assay representative sold, no-sale, upcoming, showroom,
 unresolved, repeat-appearance and excluded-parent cases. Report the source denominator,
 eligible population, net supported consumer gain and remaining backlog. Then test
