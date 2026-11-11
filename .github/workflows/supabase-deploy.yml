@@ -159,6 +159,24 @@ jobs:
           if [ ! -s /tmp/migrations.txt ]; then echo "no migrations to apply"; exit 0; fi
           sort /tmp/migrations.txt | while read -r f; do
             [ -f "$f" ] || { echo "skip (not found): $f"; continue; }
+            # A file applied by hand before it reached main is recorded, not re-run: re-running an
+            # older body would replace the newer one that is live. The proof is checked every time.
+            proof=$(awk -F'\t' -v f="$(basename "$f")" '$1==f{print $2}' supabase/recorded-applied-migrations.tsv 2>/dev/null || true)
+            if [ -n "$proof" ]; then
+              case "$proof" in
+                history=*)  [[ "${proof#history=}" =~ ^[a-z0-9_]+$ ]] || { echo "❌ bad proof for $f: $proof"; exit 1; }
+                            q="select exists(select 1 from supabase_migrations.schema_migrations where name='${proof#history=}')" ;;
+                relation=*) [[ "${proof#relation=}" =~ ^[a-z0-9_.]+$ ]] || { echo "❌ bad proof for $f: $proof"; exit 1; }
+                            q="select to_regclass('${proof#relation=}') is not null" ;;
+                routine=*)  [[ "${proof#routine=}" =~ ^[a-z0-9_.]+$ ]] || { echo "❌ bad proof for $f: $proof"; exit 1; }
+                            q="select to_regproc('${proof#routine=}') is not null" ;;
+                *) echo "❌ bad proof for $f: $proof"; exit 1 ;;
+              esac
+              if [ "$(psql "$SUPABASE_DB_URL" -X -qAt -c "$q")" = t ]; then
+                echo "═══ recorded as already applied ($proof), not re-run: $f"; continue
+              fi
+              echo "❌ $f is listed as already applied but its proof ($proof) is not in the database"; exit 1
+            fi
             echo "═══ applying $f"
             psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
           done

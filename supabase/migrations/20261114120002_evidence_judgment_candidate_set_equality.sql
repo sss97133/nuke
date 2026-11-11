@@ -1,7 +1,7 @@
 -- candidate_image_ids comparison is set equality (order is not a context change).
 -- Membership changes still invalidate. zone_photos_total and every other context
 -- key stay exact (no tolerance).
--- Rollback: supabase/sql/rollback_20261114120000_evidence_judgment_candidate_set_equality.sql
+-- Rollback: supabase/sql/rollback_20261114120002_evidence_judgment_candidate_set_equality.sql
 -- (restores the 20261111210500 body of evidence_judgment_ineligibility).
 
 CREATE OR REPLACE FUNCTION public.jsonb_text_array_set(p jsonb)

@@ -1,0 +1,31 @@
+# Migration files that were applied to production by hand before their file reached main.
+# supabase-deploy.yml does not run a file listed here; it checks the proof against the live
+# database and fails the run when the proof is missing. Columns are tab-separated: file, proof.
+#   history=<name>   a row with that name exists in supabase_migrations.schema_migrations
+#   relation=<name>  that table or view exists
+#   routine=<name>   that function exists (for a file that only defines functions and has no
+#                    history row; weaker: it shows the function is present, not which body)
+# Add a line only for a file whose effects were verified live. 2026-11-11: every function these
+# files define was compared, body for body, with pg_proc; each is either the live body or an
+# older body that a later file in this list replaced.
+20261113120300_capture_apply_sibling_make_reads.sql	routine=public.capture_sets_apply
+20261113120400_capture_make_check_model_reads.sql	routine=public.capture_sets_apply
+20261113120700_capture_admit_unfiled_uploads.sql	relation=public.capture_admit_uploads_prev_defs
+20261113120800_capture_replan_ignore_dry_chunks.sql	routine=public.capture_day_replan_state
+20261113120900_capture_replan_unseen_admitted.sql	relation=public.capture_set_admission_epochs
+20261114120002_evidence_judgment_candidate_set_equality.sql	history=evidence_judgment_candidate_set_equality
+20261114120100_capture_replan_empty_applied.sql	history=capture_replan_empty_applied
+20261115123000_capture_no_clear_non_vehicle_type.sql	history=capture_no_clear_non_vehicle_type
+20261115135000_capture_landing_identity_conflict.sql	history=capture_landing_identity_conflict
+20261115140000_capture_landing_supersede_typ_coverage.sql	history=capture_landing_supersede_typ_coverage
+20261115150000_capture_landing_tick_cron_timeout.sql	history=capture_landing_tick_cron_timeout
+20261115160000_capture_landing_finalize_forward_cursor.sql	history=capture_landing_finalize_forward_cursor
+20261115170000_capture_landing_gate_extend_expire.sql	history=capture_landing_gate_extend_expire
+20261115180000_capture_ledger_copy_of_held.sql	history=capture_ledger_copy_of_held
+20261115190000_capture_ledger_states_timeout.sql	history=capture_ledger_states_timeout
+20261115230000_capture_review_sweep_coverage.sql	history=capture_review_sweep_coverage
+20261115230100_capture_review_reopen_uncovered_fast.sql	history=capture_review_reopen_uncovered_fast
+20261115233000_capture_refused_day_to_review.sql	history=capture_refused_day_to_review
+20261115233100_capture_refused_day_to_review_no_replan_call.sql	history=capture_refused_day_to_review_no_replan_call
+20261115234000_capture_review_sweep_nothing_left_unfiled.sql	history=capture_review_sweep_nothing_left_unfiled
+20261115235000_capture_left_out_to_review.sql	history=capture_left_out_to_review
