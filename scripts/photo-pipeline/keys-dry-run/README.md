@@ -89,6 +89,19 @@ Three things it does beyond the dry run's check, each counted in its summary:
 - A POST that gets no answer, a 5xx or a 429 is sent again with the same bytes, three times in all. The writer
   answers duplicate when an earlier attempt had landed the row, so a re-send cannot land it twice.
 
+What a run says beyond its counts, all of it safe for a public log:
+
+- **Which places were missing.** For every claim it could not land: where its state is (a registered property, which
+  this lane does not send yet, or a drafted name) and the state's name when it is shaped like a key. This is the list
+  to take to the registry: an existing key or alias first, then a proposal.
+- **Why a model call failed.** The tool's own error line, and only that: a result the CLI did not mark as an error,
+  or anything on stdout that is not an envelope, may be the model's answer and is never printed. Six characters in a
+  row of a stored secret, a header value, an id, an address and a long token are removed before the line is cut.
+- **What was wrong with the stored token.** A subscription token copied from a wrapped terminal line carries a line
+  break; the CLI then cannot build the request and no model is asked (`Header '14' has invalid value`, first run,
+  2026-11-11). The lane uses the token without its white space and says what it removed as counts. Other jobs read
+  the secret as stored, so it still has to be saved again as one line.
+
 It is started by a person: the dispatch-only workflow `Photo Keys Lane` (`.github/workflows/photo-keys.yml`), or
 
 ```bash
