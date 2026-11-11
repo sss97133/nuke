@@ -13,6 +13,46 @@ a live census. Read current [AGENTS.md](../../AGENTS.md), the
 and the [market measurement contract](MARKET_MEASUREMENT_UI_CONTRACT.md). Refresh the affected
 live atlas and writer/reader behavior before engineering; do not repeat the whole investigation.
 
+## Auction imports must reach their consumers
+
+**McCormick follow-through, 2026-11-11.** A retained catalog, searchable vehicle and
+working inventory refresh establish source delivery. They do not establish keyed
+attribute coverage, qualified sale episodes, contribution to an estimate, or estimate
+accuracy. Keep those outcomes separate in the receipt and leave the downstream work
+open after a successful intake.
+
+Use the existing observation/property, market-event, price-qualification and valuation
+owners. An auction's native appearance ID, room ID and lot number are separate
+namespaces; a vehicle can appear more than once. Derive registered property claims from
+the retained witness, with the original value and clocks. A repeated capture or derived
+claim is not an independent witness. An extractor's make/model/VIN label remains an
+unverified identity assertion and does not overwrite the physical vehicle's identity.
+
+Qualify evidence for the question being answered. A source-reported sold outcome can
+support an attributed history even when its amount lacks a currency or fee basis.
+That amount cannot silently become a monetary comparable. An unsuccessful high bid is
+not a completed sale; an asking price is not an outcome. A multi-day sale interval is
+not the lot's exact sale date. Preserve unknowns and exclusion reasons. Condition scales,
+configuration labels and venue effects need their own evidence and calibration rather
+than an automatic cross-source equivalence.
+
+The first repair connects capture-backed McCormick identity labels to the existing
+retained property intake. Its acceptance is the source claim reaching the registered
+key, replaying without duplication, and appearing through the canonical/provenance
+reader with current source and privacy checks. This alone does not close price,
+configuration, liquidity or report readiness. Check the actual estimate reader as well
+as the history reader: a price displayed in history may still be absent from the
+estimator's qualified input.
+
+Before expanding a replay, assay representative sold, no-sale, upcoming, showroom,
+unresolved, repeat-appearance and excluded-parent cases. Report the source denominator,
+eligible population, net supported consumer gain and remaining backlog. Then test
+incremental updates, corrections and withdrawals through the affected consumer.
+Accuracy requires a held-out comparison of baseline and enriched estimates across
+vehicle/time/source strata, with repeated vehicles kept out of opposing splits and
+future knowledge excluded. Report error, bias and interval coverage; neither more
+rows nor a narrower interval alone proves improvement.
+
 ## What was delivered
 
 **2026-10-10 retained-data delivery, measured at 22:26 UTC.**
