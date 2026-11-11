@@ -14,11 +14,13 @@ usage: keys_lane.py --vehicle-id <uuid> --user-id <uuid> [--photos 1] [--model s
 environment: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CLAUDE_CODE_OAUTH_TOKEN (the Claude subscription).
 Without --write it is a dry run: nothing is written anywhere. With --write each landable claim is POSTed to
 ingest-observation, the sanctioned writer, with the body keys-dry-run/land.sql builds.
-It prints counts only, because this repository's logs are public: no id but a photo's first 8 characters, no statement.
+It prints counts, the names of the places that were missing, and a tool's own error line, because this repository's
+logs are public: no id but a photo's first 8 characters, no statement, no part of a stored secret.
 
-exit: 0 work done, or nothing left to do (the summary says which); 1 a read failed, or the writer did not take what
-was sent, also when the same bytes were sent again; 2 bad arguments or environment; 3 usage limit reached (stopped
-at once, what landed is kept); 4 authentication failure; 5 photos were available and none could be keyed.
+exit: 0 work done, or nothing left to do (the summary says which); 1 a read failed, the writer did not take what
+was sent (also when the same bytes were sent again), or the model call failed for three photos in a row; 2 bad
+arguments or environment; 3 usage limit reached (stopped at once, what landed is kept); 4 authentication failure;
+5 photos were available and none could be keyed.
 """
 import argparse, collections, datetime, json, os, re, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
@@ -62,7 +64,7 @@ class Stop(Exception):
 # stage-queue.mjs (usage limit) and the retired cloud batch's authentication pattern.
 USAGE_LIMIT = re.compile(r"usage limit|(?:hit|reached) your [\w' -]{0,24}limit|(?:5-hour|session|weekly|opus|sonnet) limit reached|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b", re.I)
 AUTH = re.compile(r"authentication_error|oauth.{0,80}(?:expir|revok|invalid)|invalid.{0,30}(?:token|api key|bearer|credential)|not logged in|run /login|unauthorized|forbidden|permission_error|does not have access|API Error: 40[13]", re.I)
-SEGMENT = r'[a-z]+[0-9]{0,2}(?:_[a-z]+[0-9]{0,2}){0,2}'   # up to three words: a key's segment, not a sentence
+SEGMENT = r'[a-z]{1,20}[0-9]{0,2}(?:_[a-z]{1,20}[0-9]{0,2}){0,2}'   # up to three words: a key's segment, not a sentence
 DRAFT_NAME = re.compile(SEGMENT + r'(?:\.' + SEGMENT + r'){0,3}(?:=' + SEGMENT + r')?')
 KEEP = ('HOME', 'PATH', 'TMPDIR', 'LANG', 'LC_ALL', 'CLAUDE_CODE_OAUTH_TOKEN')
 READER_STOPS = {   # the answers after which no further photo is tried
@@ -77,19 +79,30 @@ SECRETS = ('CLAUDE_CODE_OAUTH_TOKEN', 'SUPABASE_SERVICE_ROLE_KEY')
 PUBLIC_FRONT = re.compile(r'^(?:sk-ant-[a-z0-9]+-|sb_secret_|sb_publishable_)')   # the same for every key of its kind
 ALPHABET = frozenset('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-')
 TOKEN_RUN = re.compile(r'[A-Za-z0-9_\-]+')
-CREDENTIAL = r'(?=\S*\d)\S{8,}'   # eight characters or more with a digit in them: not a word, not a dotted key name
-# 24 or more token characters that look made by a machine: a digit, or both cases. A flag, an ENV_NAME and a model id stay.
-LONG = re.compile(r'(?<![A-Za-z0-9_\-])(?!claude-)(?=[A-Za-z0-9_\-]*(?:\d|[a-z][A-Za-z0-9_\-]*[A-Z]|[A-Z][A-Za-z0-9_\-]*[a-z]))[A-Za-z0-9_\-]{24,}')
-ADDRESS = re.compile(r'[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)*\.[A-Za-z]{2,}')
+CREDENTIAL = r'(?=\S*\d)\S{8,}'   # eight characters or more with a digit in them: not a word
+KEY_NAME = r'(?![a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+(?![\w.]))'   # a dotted lower-case name is a registry key, not a credential
+LEAD = re.compile(r'(?i)\bbearer\s+' + CREDENTIAL + r'|\bbasic\s+[A-Za-z0-9+/=]{8,}|://[^\s/:@]+:[^\s/@]+@'
+                  r"""|(?:token|key|secret|password|passwd)["']?\s*[=:]\s*["']?""" + KEY_NAME + CREDENTIAL)
+LONG = re.compile(r'(?<![A-Za-z0-9_\-])[A-Za-z0-9_\-]{24,}')
+ADDRESS = re.compile(r'[\w.+\-]{1,64}@[A-Za-z][\w\-]*(?:\.[\w\-]+)*\.[A-Za-z]{2,}')
+BREAK = re.compile(r'\\+[nrt]|\\+u000[aAdD]|%0[AaDd]|&#1[03];')   # a line break as an escape: the token was cut there too
+
+
+def machine_made(m):
+    """24 or more token characters that look made by a machine: a digit in them, or both cases. A --flag, an ENV_NAME
+    and a model id stay readable."""
+    run = m.group(0)
+    return run if run.startswith('claude-') or not (re.search(r'\d', run) or (re.search('[a-z]', run) and re.search('[A-Z]', run))) else '<long>'
 
 
 def tell(text, env=None):
     """An error line from a tool, safe for a public log: one line, 240 characters, and none of these in it: six
     characters in a row of a stored secret (so not a piece, a cut-off front or a wrapped copy of it either, and
-    also when white space or a stray character cuts the six), a header value, a key of this provider's shape, a
-    credential after "Bearer", "token=" or "key:", an address, an id, a long token. All of it is removed before the
-    line is cut, so the cut cannot leave the front of one."""
-    env, grams, text = os.environ if env is None else env, set(), str(text)[:20000]
+    also when white space, an escaped line break or a stray character cuts the six), a header value, a key of this
+    provider's shape, a credential after "Bearer", "token=" or "key:", an address, an id, a long token. All of it is
+    removed before the line is cut, so the cut cannot leave the front of one."""
+    env, grams = os.environ if env is None else env, set()
+    text = BREAK.sub(lambda m: ' ' * len(m.group(0)), str(text)[:4000])
     for name in SECRETS:
         secret = ''.join(c for c in PUBLIC_FRONT.sub('', ''.join(str(env.get(name) or '').split())) if c in ALPHABET)
         grams.update(secret[i:i + 6] for i in range(len(secret) - 5))
@@ -100,15 +113,14 @@ def tell(text, env=None):
             if only[j:j + 6] in grams: hit.update(range(at[j], at[j + 5] + 1))
         text = TOKEN_RUN.sub(lambda m: m.group(0) if hit.isdisjoint(range(m.start(), m.end())) else '<withheld>', text)
     line = re.sub(r'(has invalid value:).*', r'\1 (withheld)', ws(text))
-    line = re.sub(r'\bsk-[A-Za-z0-9_\-]+\S*', '<withheld>', line)
-    line = re.sub(r'(?i)\bbearer\s+' + CREDENTIAL + r"""|(?:token|key)["']?\s*[=:]\s*["']?""" + CREDENTIAL, '<withheld>', line)
-    return LONG.sub('<long>', ADDRESS.sub('<address>', UUID.sub('<id>', line)))[:240] or '(nothing was printed)'
+    line = LEAD.sub('<withheld>', re.sub(r'\bsk-[A-Za-z0-9_\-]+\S*', '<withheld>', line))
+    return LONG.sub(machine_made, ADDRESS.sub('<address>', UUID.sub('<id>', line)))[:240] or '(nothing was printed)'
 
 
 def repeats(line, statements, short=True):
     """True when a line carries three words in a row of a statement: then it is not a tool speaking, or not a name.
     Letters and digits only are compared. With short, a statement of one or two words counts when all of it is there."""
-    words = lambda t: re.sub(r'[^a-z0-9]+', ' ', str(t).lower()).split()
+    words = lambda t: re.sub(r'[\W_]+', ' ', str(t).lower()).split()
     line = ' ' + ' '.join(words(line)) + ' '
     for w in map(words, statements):
         n = min(3, len(w)) if short else 3
@@ -138,7 +150,7 @@ def clean_token(stored):
 def read_envelope(returncode, stdout, stderr):
     """What one `claude -p --output-format json` call said: {'ok': True, 'value': <the JSON object in the answer>} or
     {'ok': False, 'error_class': ...}. A usage limit exits non-zero with its JSON on stdout, so stdout is read first."""
-    fail = lambda error_class, said=None: {'ok': False, 'error_class': error_class, **({'said': said} if said else {})}
+    fail = lambda error_class, said=None, tool=None: {'ok': False, 'error_class': error_class, **({'said': said, 'tool': tool or ''} if said else {})}
     try:
         outer = json.loads(stdout)
         if not isinstance(outer, dict): raise ValueError('not an object')
@@ -147,9 +159,9 @@ def read_envelope(returncode, stdout, stderr):
         why = f'exit {returncode}, no JSON from the CLI: ' + (tell(stderr) if (stderr or '').strip() else
                                                                f'nothing on stderr; stdout was not JSON ({len(stdout or "")} characters, withheld)')
         text = (stderr or ('' if '"result"' in (stdout or '') else stdout) or '')[:2000]   # an envelope, whole or cut off, is not read for a cause
-        if USAGE_LIMIT.search(text): return fail('reader_usage_limit', why)
-        if AUTH.search(text): return fail('reader_unauthorized', why)
-        return fail('reader_exited', why) if returncode else fail('reader_output_invalid')
+        if USAGE_LIMIT.search(text): return fail('reader_usage_limit', why, stderr)
+        if AUTH.search(text): return fail('reader_unauthorized', why, stderr)
+        return fail('reader_exited', why, stderr) if returncode else fail('reader_output_invalid')
     text = str(outer.get('result') or '')
     api = outer.get('api_error_status')
     api = api if isinstance(api, int) else 0
@@ -160,9 +172,9 @@ def read_envelope(returncode, stdout, stderr):
         subtype = str(outer.get('subtype'))
         why = (f"exit {returncode}, subtype {subtype if re.fullmatch(r'[a-z_]{1,40}', subtype) else 'other'}, api status {api or 'none'}: "
                + (tell(tool) if tool.strip() else 'the CLI gave no error text'))
-        if api in (429, 529) or USAGE_LIMIT.search(tool): return fail('reader_usage_limit', why)
-        if api in (401, 403) or (api < 500 and AUTH.search(tool)): return fail('reader_unauthorized', why)
-        return fail('reader_api_unreachable' if api >= 500 else 'reader_exited', why)
+        if api in (429, 529) or USAGE_LIMIT.search(tool): return fail('reader_usage_limit', why, tool)
+        if api in (401, 403) or (api < 500 and AUTH.search(tool)): return fail('reader_unauthorized', why, tool)
+        return fail('reader_api_unreachable' if api >= 500 else 'reader_exited', why, tool)
     found = re.search(r'\{[\s\S]*\}', text)
     try: value = json.loads(found.group(0)) if found else None
     except ValueError: value = None
@@ -404,10 +416,16 @@ def landable(rows):
 def place_name(x, statements):
     """The name of a state that had no place, for a public line. A registered property and its listed value are the
     registry's own words. A drafted name is the model's: it is printed only when it is a short key (at most four
-    segments of at most three words, 60 characters) and does not carry three words in a row of a statement."""
+    segments of at most three words) and does not carry three words in a row of a statement, spaced or run together."""
     name = x['state']
     if x['state_from'] == 'registry property': return name
-    if not isinstance(name, str) or len(name) > 60 or not DRAFT_NAME.fullmatch(name) or repeats(name, statements, short=False):
+    if not isinstance(name, str): return '(not shaped like a key)'
+    prop, _, value = name.partition('=')
+    shape = name if prop not in check_units.PROPS else value   # a registered property's name is the registry's; only its value is the model's
+    squeezed = re.sub(r'[^a-z0-9]', '', shape)
+    words = [re.sub(r'[\W_]+', ' ', str(t).lower()).split() for t in statements]
+    if (len(name) > 80 or not DRAFT_NAME.fullmatch(shape) or repeats(shape, statements, short=False)
+            or any(''.join(w[i:i + 3]) in squeezed for w in words for i in range(len(w) - 2))):
         return '(not shaped like a key)'
     return name
 
@@ -556,7 +574,7 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
     today = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
     lane_rows = f'vehicle_observations?vehicle_id=eq.{a.vehicle_id}&extraction_method=eq.{METHOD}'
     n, kinds, failures, left_out, writer, no_place = (collections.Counter() for _ in range(6))
-    before = after = cursor = stop = None
+    before = after = cursor = stop = answered = None
     out(f"keys lane: {'WRITE' if a.write else 'dry run, nothing is written anywhere'}; model {a.model}; one photo at a time")
     _, token_notes, token_usable = clean_token(env['CLAUDE_CODE_OAUTH_TOKEN'])
     token_line = 'the stored CLAUDE_CODE_OAUTH_TOKEN is not one clean token: ' + '; '.join(token_notes) if token_notes else None
@@ -592,26 +610,30 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
             if not answer.get('ok'):
                 failures[answer['error_class']] += 1
                 if answer.get('said'):   # second door: a line that repeats a statement's words is not the tool speaking
-                    out('the claude CLI said: ' + ('(withheld: it repeats words of a statement)' if repeats(answer['said'], texts.values()) else answer['said']))
+                    out('the claude CLI said: ' + ('(withheld: it repeats words of a statement)' if repeats(answer.get('tool', answer['said']), texts.values()) else answer['said']))
                 if answer['error_class'] in READER_STOPS: raise Stop(*READER_STOPS[answer['error_class']])
-                out(f'photo {number} of {len(photos)}: the reader failed'); cursor = photo['id'][:8]; n['failed in a row'] += 1
-                if n['failed in a row'] == 3: raise Stop(1, 'the model call failed for three photos in a row: stopped')
-                continue
-            n['failed in a row'] = 0
+                out(f'photo {number} of {len(photos)}: the reader failed'); n['failed in a row'] += 1
+                if n['failed in a row'] == 3:   # the cursor goes back to before the three, so --after takes them again
+                    cursor = answered; raise Stop(1, 'the model call failed for three photos in a row: stopped')
+                cursor = photo['id'][:8]; continue
+            n['failed in a row'] = 0; answered = photo['id'][:8]
             try: problems, _ = check_units.check_unit(answer['value'], dec_parts, dec_states, texts=texts)
             except Exception: problems = ['a result the check cannot walk']
             if problems:   # a result that fails the check lands nothing
                 n['rejected'] += 1; kinds.update(kind_of(p) for p in problems)
                 out(f'photo {number} of {len(photos)}: rejected by the check'); cursor = photo['id'][:8]; continue
-            rows = rows_of(photo, answer['value'], dec_parts)
-            keep, left = landable(rows)
-            more = refused_here(answer['value'], keep, texts)
+            try:   # the check passes some shapes these cannot walk (a list for a property name): a rejection, not the end of the run
+                rows = rows_of(photo, answer['value'], dec_parts)
+                keep, left = landable(rows)
+                more = refused_here(answer['value'], keep, texts)
+                places = [f"{x['state_from']}: {place_name(x, texts.values())}" for x in rows if x['state_from'] != 'registry condition key']
+            except Exception: more = ['a result the check cannot walk']
             if more:   # refused by this lane's own two rules: lands nothing, counted with the check's rejections
                 n['rejected'] += 1; kinds.update(more)
                 out(f'photo {number} of {len(photos)}: rejected by the check'); cursor = photo['id'][:8]; continue
             n['keyed'] += 1; n['claims'] += len(rows); n['landable'] += len(keep); left_out.update(left)
             # which places were missing: the state's name when it is shaped like a key (a drafted one can be free text)
-            no_place.update(f"{x['state_from']}: {place_name(x, texts.values())}" for x in rows if x['state_from'] != 'registry condition key')
+            no_place.update(places)
             src = reading_of(db, a.vehicle_id, photo['id']) if keep else {}
             held = 0   # this photo's claims the writer holds
             try:
