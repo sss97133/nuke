@@ -14,11 +14,13 @@ usage: keys_lane.py --vehicle-id <uuid> --user-id <uuid> [--photos 1] [--model s
 environment: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CLAUDE_CODE_OAUTH_TOKEN (the Claude subscription).
 Without --write it is a dry run: nothing is written anywhere. With --write each landable claim is POSTed to
 ingest-observation, the sanctioned writer, with the body keys-dry-run/land.sql builds.
-It prints counts only, because this repository's logs are public: no id but a photo's first 8 characters, no statement.
+It prints counts, the names of the places that were missing, and a tool's own error line, because this repository's
+logs are public: no id but a photo's first 8 characters, no statement, no part of a stored secret.
 
-exit: 0 work done, or nothing left to do (the summary says which); 1 a read failed, or the writer did not take what
-was sent, also when the same bytes were sent again; 2 bad arguments or environment; 3 usage limit reached (stopped
-at once, what landed is kept); 4 authentication failure; 5 photos were available and none could be keyed.
+exit: 0 work done, or nothing left to do (the summary says which); 1 a read failed, the writer did not take what
+was sent (also when the same bytes were sent again), or the model call failed for three photos in a row; 2 bad
+arguments or environment; 3 usage limit reached (stopped at once, what landed is kept); 4 authentication failure;
+5 photos were available and none could be keyed.
 """
 import argparse, collections, datetime, json, os, re, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
@@ -61,7 +63,9 @@ class Stop(Exception):
 # ---- the claude CLI: one text-only call on the subscription ----------------------------------------------------
 # stage-queue.mjs (usage limit) and the retired cloud batch's authentication pattern.
 USAGE_LIMIT = re.compile(r"usage limit|(?:hit|reached) your [\w' -]{0,24}limit|(?:5-hour|session|weekly|opus|sonnet) limit reached|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b", re.I)
-AUTH = re.compile(r"authentication_error|oauth.{0,80}expir|invalid.{0,30}(?:token|api key)|not logged in|unauthorized|API Error: 401", re.I)
+AUTH = re.compile(r"authentication_error|oauth.{0,80}(?:expir|revok|invalid)|invalid.{0,30}(?:token|api key|bearer|credential)|not logged in|run /login|unauthorized|forbidden|permission_error|does not have access|API Error: 40[13]", re.I)
+SEGMENT = r'[a-z]{1,20}[0-9]{0,2}(?:_[a-z]{1,20}[0-9]{0,2}){0,2}'   # up to three words: a key's segment, not a sentence
+DRAFT_NAME = re.compile(SEGMENT + r'(?:\.' + SEGMENT + r'){0,3}(?:=' + SEGMENT + r')?')
 KEEP = ('HOME', 'PATH', 'TMPDIR', 'LANG', 'LC_ALL', 'CLAUDE_CODE_OAUTH_TOKEN')
 READER_STOPS = {   # the answers after which no further photo is tried
     'reader_usage_limit': (3, 'usage limit reached: stopped at once, what landed is kept'),
@@ -71,25 +75,106 @@ READER_STOPS = {   # the answers after which no further photo is tried
 }
 
 
+SECRETS = ('CLAUDE_CODE_OAUTH_TOKEN', 'SUPABASE_SERVICE_ROLE_KEY')
+PUBLIC_FRONT = re.compile(r'^(?:sk-ant-[a-z0-9]+-|sb_secret_|sb_publishable_)')   # the same for every key of its kind
+ALPHABET = frozenset('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-')
+TOKEN_RUN = re.compile(r'[A-Za-z0-9_\-]+')
+CREDENTIAL = r'(?=\S*\d)\S{8,}'   # eight characters or more with a digit in them: not a word
+KEY_NAME = r'(?![a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+(?![\w.]))'   # a dotted lower-case name is a registry key, not a credential
+LEAD = re.compile(r'(?i)\bbearer\s+' + CREDENTIAL + r'|\bbasic\s+[A-Za-z0-9+/=]{8,}|://[^\s/:@]+:[^\s/@]+@'
+                  r"""|(?:token|key|secret|password|passwd)["']?\s*[=:]\s*["']?""" + KEY_NAME + CREDENTIAL)
+LONG = re.compile(r'(?<![A-Za-z0-9_\-])[A-Za-z0-9_\-]{24,}')
+ADDRESS = re.compile(r'[\w.+\-]{1,64}@[A-Za-z][\w\-]*(?:\.[\w\-]+)*\.[A-Za-z]{2,}')
+BREAK = re.compile(r'\\+[nrt]|\\+u000[aAdD]|%0[AaDd]|&#1[03];')   # a line break as an escape: the token was cut there too
+
+
+def machine_made(m):
+    """24 or more token characters that look made by a machine: a digit in them, or both cases. A --flag, an ENV_NAME
+    and a model id stay readable."""
+    run = m.group(0)
+    return run if run.startswith('claude-') or not (re.search(r'\d', run) or (re.search('[a-z]', run) and re.search('[A-Z]', run))) else '<long>'
+
+
+def tell(text, env=None):
+    """An error line from a tool, safe for a public log: one line, 240 characters, and none of these in it: six
+    characters in a row of a stored secret (so not a piece, a cut-off front or a wrapped copy of it either, and
+    also when white space, an escaped line break or a stray character cuts the six), a header value, a key of this
+    provider's shape, a credential after "Bearer", "token=" or "key:", an address, an id, a long token. All of it is
+    removed before the line is cut, so the cut cannot leave the front of one."""
+    env, grams = os.environ if env is None else env, set()
+    text = BREAK.sub(lambda m: ' ' * len(m.group(0)), str(text)[:4000])
+    for name in SECRETS:
+        secret = ''.join(c for c in PUBLIC_FRONT.sub('', ''.join(str(env.get(name) or '').split())) if c in ALPHABET)
+        grams.update(secret[i:i + 6] for i in range(len(secret) - 5))
+    if grams:
+        at = [i for i, c in enumerate(text) if c in ALPHABET]   # the line with everything but token characters taken out
+        only, hit = ''.join(text[i] for i in at), set()
+        for j in range(len(only) - 5):
+            if only[j:j + 6] in grams: hit.update(range(at[j], at[j + 5] + 1))
+        text = TOKEN_RUN.sub(lambda m: m.group(0) if hit.isdisjoint(range(m.start(), m.end())) else '<withheld>', text)
+    line = re.sub(r'(has invalid value:).*', r'\1 (withheld)', ws(text))
+    line = LEAD.sub('<withheld>', re.sub(r'\bsk-[A-Za-z0-9_\-]+\S*', '<withheld>', line))
+    return LONG.sub(machine_made, ADDRESS.sub('<address>', UUID.sub('<id>', line)))[:240] or '(nothing was printed)'
+
+
+def repeats(line, statements, short=True):
+    """True when a line carries three words in a row of a statement: then it is not a tool speaking, or not a name.
+    Letters and digits only are compared. With short, a statement of one or two words counts when all of it is there."""
+    words = lambda t: re.sub(r'[\W_]+', ' ', str(t).lower()).split()
+    line = ' ' + ' '.join(words(line)) + ' '
+    for w in map(words, statements):
+        n = min(3, len(w)) if short else 3
+        if n and any(' ' + ' '.join(w[i:i + n]) + ' ' in line for i in range(len(w) - n + 1)): return True
+    return False
+
+
+def clean_token(stored):
+    """The subscription token as one word, and what was wrong with it as stored (counts and yes/no only, never a
+    character of it). A token is one word. Copied from a terminal that wrapped it, it carries a line break, and the
+    CLI then refuses to build the request ("Header '14' has invalid value"): nothing is sent and no model is asked.
+    Returns (token, notes, usable). usable is False only when what is left cannot go in a request header at all;
+    any other oddity is a note, and the API is left to refuse the token if it is wrong."""
+    stored = str(stored); token = ''.join(stored.split()); notes = []
+    if token != stored:
+        inside = len(stored.strip()) - len(token)
+        notes.append(f'{len(stored) - len(token)} white-space characters removed, {inside} of them inside it '
+                     f'({len(stored)} characters stored on {len(stored.strip().splitlines())} lines)')
+    usable = bool(token) and all('!' <= c <= '~' for c in token)
+    if not token: notes.append('nothing is left of it')
+    elif not usable: notes.append('it holds a character a request header cannot carry')
+    elif not re.fullmatch(r'[A-Za-z0-9_\-]+', token): notes.append('it holds a character outside letters, digits, "-" and "_"')
+    elif not token.startswith('sk-ant-oat'): notes.append('it does not begin as a subscription token does')
+    return token, notes, usable
+
+
 def read_envelope(returncode, stdout, stderr):
     """What one `claude -p --output-format json` call said: {'ok': True, 'value': <the JSON object in the answer>} or
     {'ok': False, 'error_class': ...}. A usage limit exits non-zero with its JSON on stdout, so stdout is read first."""
-    fail = lambda error_class: {'ok': False, 'error_class': error_class}
+    fail = lambda error_class, said=None, tool=None: {'ok': False, 'error_class': error_class, **({'said': said, 'tool': tool or ''} if said else {})}
     try:
         outer = json.loads(stdout)
         if not isinstance(outer, dict): raise ValueError('not an object')
     except ValueError:
-        text = (stderr or stdout or '')[:2000]
-        if USAGE_LIMIT.search(text): return fail('reader_usage_limit')
-        if AUTH.search(text): return fail('reader_unauthorized')
-        return fail('reader_exited' if returncode else 'reader_output_invalid')
+        # Only stderr is the tool speaking. stdout may be a cut-off envelope, and an envelope holds the model's words.
+        why = f'exit {returncode}, no JSON from the CLI: ' + (tell(stderr) if (stderr or '').strip() else
+                                                               f'nothing on stderr; stdout was not JSON ({len(stdout or "")} characters, withheld)')
+        text = (stderr or ('' if '"result"' in (stdout or '') else stdout) or '')[:2000]   # an envelope, whole or cut off, is not read for a cause
+        if USAGE_LIMIT.search(text): return fail('reader_usage_limit', why, stderr)
+        if AUTH.search(text): return fail('reader_unauthorized', why, stderr)
+        return fail('reader_exited', why, stderr) if returncode else fail('reader_output_invalid')
     text = str(outer.get('result') or '')
     api = outer.get('api_error_status')
     api = api if isinstance(api, int) else 0
-    if outer.get('is_error') or returncode:
-        if api in (429, 529) or USAGE_LIMIT.search(text): return fail('reader_usage_limit')
-        if api in (401, 403) or AUTH.search(text): return fail('reader_unauthorized')
-        return fail('reader_api_unreachable' if api >= 500 else 'reader_exited')
+    if outer.get('is_error') is True or returncode:
+        # A result the CLI marked as an error is the tool speaking and holds no statement. A result it did not mark
+        # may be the model's answer (a non-zero exit after the answer), so it is neither echoed nor read for a cause.
+        tool = (text if outer.get('is_error') is True else '') or stderr or ''
+        subtype = str(outer.get('subtype'))
+        why = (f"exit {returncode}, subtype {subtype if re.fullmatch(r'[a-z_]{1,40}', subtype) else 'other'}, api status {api or 'none'}: "
+               + (tell(tool) if tool.strip() else 'the CLI gave no error text'))
+        if api in (429, 529) or USAGE_LIMIT.search(tool): return fail('reader_usage_limit', why, tool)
+        if api in (401, 403) or (api < 500 and AUTH.search(tool)): return fail('reader_unauthorized', why, tool)
+        return fail('reader_api_unreachable' if api >= 500 else 'reader_exited', why, tool)
     found = re.search(r'\{[\s\S]*\}', text)
     try: value = json.loads(found.group(0)) if found else None
     except ValueError: value = None
@@ -101,6 +186,7 @@ def ask_claude(prompt, model, timeout_s=240, runner=subprocess.run):
     environment that holds neither the service key nor ANTHROPIC_API_KEY. The form is the Mac readers'
     (subscription-frame-classifier.mjs) without a tool; the prompt goes in on stdin."""
     env = {k: os.environ[k] for k in KEEP if k in os.environ}
+    if 'CLAUDE_CODE_OAUTH_TOKEN' in env: env['CLAUDE_CODE_OAUTH_TOKEN'] = clean_token(env['CLAUDE_CODE_OAUTH_TOKEN'])[0]
     with tempfile.TemporaryDirectory() as cwd:
         try:
             p = runner(['claude', '-p', '--output-format', 'json', '--model', model],
@@ -327,6 +413,23 @@ def landable(rows):
     return keep, left_out
 
 
+def place_name(x, statements):
+    """The name of a state that had no place, for a public line. A registered property and its listed value are the
+    registry's own words. A drafted name is the model's: it is printed only when it is a short key (at most four
+    segments of at most three words) and does not carry three words in a row of a statement, spaced or run together."""
+    name = x['state']
+    if x['state_from'] == 'registry property': return name
+    if not isinstance(name, str): return '(not shaped like a key)'
+    prop, _, value = name.partition('=')
+    shape = name if prop not in check_units.PROPS else value   # a registered property's name is the registry's; only its value is the model's
+    squeezed = re.sub(r'[^a-z0-9]', '', shape)
+    words = [re.sub(r'[\W_]+', ' ', str(t).lower()).split() for t in statements]
+    if (len(name) > 80 or not DRAFT_NAME.fullmatch(shape) or repeats(shape, statements, short=False)
+            or any(''.join(w[i:i + 3]) in squeezed for w in words for i in range(len(w) - 2))):
+        return '(not shaped like a key)'
+    return name
+
+
 def refused_here(unit, keep, texts):
     """What this lane refuses on top of check_units.py (whose behaviour is unchanged), as kinds of problem. Both bound
     what one wrong answer can land; neither shows that a statement supports its key, and no code here does.
@@ -427,7 +530,8 @@ def post_claim(db, body, n):
         answer = answer if isinstance(answer, dict) else {}
         if status == 200 and answer.get('success') is True:
             return 'new' if not answer.get('duplicate') else RESENT if attempt else 'duplicate'
-        said = f"refused: {status} {ws(str(answer.get('error') or 'no error field'))[:120]}"
+        error = tell(answer.get('error') or 'no error field')[:120]
+        said = f"refused: {status} {'(withheld: it repeats words of the statement)' if repeats(error, [body.get('content_text')]) else error}"
         if status < 500 and status != 429: break
     return said
 
@@ -453,7 +557,7 @@ def arguments(argv, env):
         raise Stop(2, '--after must be a photo id or its first 8 characters')
     if 'ANTHROPIC_API_KEY' in env:
         raise Stop(2, 'ANTHROPIC_API_KEY is set: it would bill the API instead of the subscription. Unset it')
-    missing = [k for k in ('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CLAUDE_CODE_OAUTH_TOKEN') if not env.get(k)]
+    missing = [k for k in ('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'CLAUDE_CODE_OAUTH_TOKEN') if not (env.get(k) or '').strip()]
     if missing: raise Stop(2, 'not set: ' + ', '.join(missing))
     return a
 
@@ -462,14 +566,24 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
     """The whole lane. Returns the exit code. http, ask and sleep are parameters so the test can run it with no network and no waiting."""
     try: a = arguments(argv, env)
     except Stop as s:
-        out(f'keys lane: {s.why}'); return s.code
+        out(f'keys lane: {s.why}')
+        if env.get('GITHUB_STEP_SUMMARY'):
+            with open(env['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f: f.write(f'### Keys lane\n- {s.why} (exit {s.code})\n')
+        return s.code
     db = {'url': env['SUPABASE_URL'].rstrip('/'), 'key': env['SUPABASE_SERVICE_ROLE_KEY'], 'http': http, 'sleep': sleep}
     today = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
     lane_rows = f'vehicle_observations?vehicle_id=eq.{a.vehicle_id}&extraction_method=eq.{METHOD}'
-    n, kinds, failures, left_out, writer = (collections.Counter() for _ in range(5))
-    before = after = cursor = stop = None
+    n, kinds, failures, left_out, writer, no_place = (collections.Counter() for _ in range(6))
+    before = after = cursor = stop = answered = None
     out(f"keys lane: {'WRITE' if a.write else 'dry run, nothing is written anywhere'}; model {a.model}; one photo at a time")
+    _, token_notes, token_usable = clean_token(env['CLAUDE_CODE_OAUTH_TOKEN'])
+    token_line = 'the stored CLAUDE_CODE_OAUTH_TOKEN is not one clean token: ' + '; '.join(token_notes) if token_notes else None
+    if token_line and token_usable and 'white-space' in token_notes[0]:
+        token_line += ('. This run uses it with the white space taken out. Other jobs read it as stored: '
+                       'save it again as one line with nothing around it')
+    if token_line: out(token_line)   # said first, so a run that dies later has still said it
     try:
+        if not token_usable: raise Stop(4, 'authentication failure: the stored token cannot be sent; nothing was read and no model was asked')
         try: fr = frame()
         except (OSError, ValueError): raise Stop(2, 'the brief, the unit or the registry copy is not where this lane expects it') from None
         dec_parts, dec_states = check_units.load_decisions(os.path.join(ROOT, DECISIONS))
@@ -495,20 +609,31 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
             n['model seconds'] += round(time.monotonic() - started)
             if not answer.get('ok'):
                 failures[answer['error_class']] += 1
+                if answer.get('said'):   # second door: a line that repeats a statement's words is not the tool speaking
+                    out('the claude CLI said: ' + ('(withheld: it repeats words of a statement)' if repeats(answer.get('tool', answer['said']), texts.values()) else answer['said']))
                 if answer['error_class'] in READER_STOPS: raise Stop(*READER_STOPS[answer['error_class']])
-                out(f'photo {number} of {len(photos)}: the reader failed'); cursor = photo['id'][:8]; continue
+                out(f'photo {number} of {len(photos)}: the reader failed'); n['failed in a row'] += 1
+                if n['failed in a row'] == 3:   # the cursor goes back to before the three, so --after takes them again
+                    cursor = answered; raise Stop(1, 'the model call failed for three photos in a row: stopped')
+                cursor = photo['id'][:8]; continue
+            n['failed in a row'] = 0; answered = photo['id'][:8]
             try: problems, _ = check_units.check_unit(answer['value'], dec_parts, dec_states, texts=texts)
             except Exception: problems = ['a result the check cannot walk']
             if problems:   # a result that fails the check lands nothing
                 n['rejected'] += 1; kinds.update(kind_of(p) for p in problems)
                 out(f'photo {number} of {len(photos)}: rejected by the check'); cursor = photo['id'][:8]; continue
-            rows = rows_of(photo, answer['value'], dec_parts)
-            keep, left = landable(rows)
-            more = refused_here(answer['value'], keep, texts)
+            try:   # the check passes some shapes these cannot walk (a list for a property name): a rejection, not the end of the run
+                rows = rows_of(photo, answer['value'], dec_parts)
+                keep, left = landable(rows)
+                more = refused_here(answer['value'], keep, texts)
+                places = [f"{x['state_from']}: {place_name(x, texts.values())}" for x in rows if x['state_from'] != 'registry condition key']
+            except Exception: more = ['a result the check cannot walk']
             if more:   # refused by this lane's own two rules: lands nothing, counted with the check's rejections
                 n['rejected'] += 1; kinds.update(more)
                 out(f'photo {number} of {len(photos)}: rejected by the check'); cursor = photo['id'][:8]; continue
             n['keyed'] += 1; n['claims'] += len(rows); n['landable'] += len(keep); left_out.update(left)
+            # which places were missing: the state's name when it is shaped like a key (a drafted one can be free text)
+            no_place.update(places)
             src = reading_of(db, a.vehicle_id, photo['id']) if keep else {}
             held = 0   # this photo's claims the writer holds
             try:
@@ -548,6 +673,7 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
         f"photos taken: {n['taken']}; keyed: {n['keyed']}; rejected by the check: {n['rejected']}; reader failed: {sum(failures.values())}",
         f"rejected, by kind of problem: {dict(kinds)}", f"reader failures: {dict(failures)}",
         f"statements: {n['statements']}; claims: {n['claims']}; landable: {n['landable']}; left out: {dict(left_out)}",
+        *([f"states this lane could not land, by where they are and by name (top 25 of {len(no_place)}): {dict(no_place.most_common(25))}"] if no_place else []),
         (f"writer: new {writer['new']}, duplicate {writer['duplicate']}, no answer {writer['no answer']}, refused {sum(refused.values())} {refused or ''}".rstrip()
          if a.write else 'writer: not called (dry run)'),
         *([f"re-sends of the same bytes after no answer, a 5xx or a 429: {n['re-sends']}; claims the writer then called duplicate: {writer[RESENT]}",
@@ -560,7 +686,7 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
     for line in lines: out(line)
     if env.get('GITHUB_STEP_SUMMARY'):
         with open(env['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-            f.write(f"### Keys lane ({'write' if a.write else 'dry run'})\n" + ''.join(f'- {line}\n' for line in lines))
+            f.write(f"### Keys lane ({'write' if a.write else 'dry run'})\n" + ''.join(f'- {line}\n' for line in [*([token_line] if token_line else []), *lines]))
     return code
 
 

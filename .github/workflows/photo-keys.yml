@@ -126,7 +126,8 @@ jobs:
           args=(--vehicle-id "$KEYS_VEHICLE_ID" --user-id "$KEYS_USER_ID" --photos "$KEYS_PHOTOS" --model "$KEYS_MODEL")
           if [ -n "$KEYS_AFTER" ]; then args+=(--after "$KEYS_AFTER"); fi
           if [ "$KEYS_WRITE" = "true" ]; then args+=(--write); fi
-          # The lane's exit code is the step's: 0 work done or nothing left; 1 a read failed or the writer did not
-          # take what was sent; 2 bad input; 3 usage limit; 4 authentication; 5 no photo could be keyed.
+          # The lane's exit code is the step's: 0 work done or nothing left; 1 a read failed, the writer did not
+          # take what was sent, or the model call failed for three photos in a row; 2 bad input; 3 usage limit;
+          # 4 authentication; 5 no photo could be keyed.
           # -u: one line a photo reaches the log as it happens, so a run the timeout ends still shows how far it got.
           python3 -u scripts/photo-pipeline/keys_lane.py "${args[@]}"

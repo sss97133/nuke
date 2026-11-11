@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """python3 scripts/photo-pipeline/test_keys_lane.py
 The keys lane with no network: the database and the claude CLI are stand-ins. Every id and statement here is invented."""
-import ast, json, os, re, subprocess, sys, tempfile
+import ast, collections, json, os, re, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -11,7 +11,7 @@ from keys_lane import body_for, jsonb, landable, read_envelope, run, utc_ms
 V, U = '1b1b1b1b-2222-4333-8444-555555555555', '66666666-7777-4888-8999-aaaaaaaaaaaa'
 P1, P2, P3 = ('aaaaaaaa-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000002', 'cccccccc-0000-4000-8000-000000000003')
 S1 = '99999999-8888-4777-8666-555555555555'
-ENV = {'SUPABASE_URL': 'https://db.example.invalid', 'SUPABASE_SERVICE_ROLE_KEY': 'service-key-stand-in', 'CLAUDE_CODE_OAUTH_TOKEN': 'token-stand-in'}
+ENV = {'SUPABASE_URL': 'https://db.example.invalid', 'SUPABASE_SERVICE_ROLE_KEY': 'service-key-stand-in', 'CLAUDE_CODE_OAUTH_TOKEN': 'sk-ant-oat01-stand-in'}
 STATEMENT = 'Paint is flaking on the  driver door lower edge.'   # two spaces: the body carries the stored text, not a tidied one
 photo = lambda pid, **over: {'id': pid, 'taken_at': '2024-03-09T16:05:07.98765-07:00', 'created_at': '2024-03-10T01:02:03+00:00',
                              'image_url': 'https://img.example.invalid/1.jpg', 'scene': 'exterior_detail',
@@ -377,4 +377,279 @@ assert 'nothing left to do' not in printed and 'result: no photo left to take: 1
 db = Database([photo(P1, callouts=TWO)], writer=answers((200, NEW), (401, {'error': 'unauthorized'})))
 code, printed = lane(db, '--write', ask=says(two))
 assert code == 4 and len(db.writes) == 2 and 'again): 1' in printed, 'a stop between two claims of one photo leaves it partly landed, and the count says so'
-print(f'keys_lane: 18 groups of cases pass ({pack})')
+# 19. a failed call says why, safely: the tool's own error line, one line, with ids, addresses and tokens removed.
+#     Only the tool is echoed: a result the CLI did not mark as an error, and anything on stdout that is not an
+#     envelope, may be the model's answer, so neither is printed nor read for a cause
+word = 'sk-ant-oat01-' + 'Ab3_' * 20                                          # a made-up token, 93 characters
+other = 'Zy9-' * 8                                                            # a long token of no known shape
+said = keys_lane.read_envelope(1, json.dumps({'type': 'result', 'subtype': 'error_during_execution', 'is_error': True, 'api_error_status': None,
+    'result': f'Something broke for 0b9f107a-0000-4000-8000-000000000001 with {other} from someone@example.invalid\nsecond line'}), '')
+assert said['error_class'] == 'reader_exited' and said['said'] == ('exit 1, subtype error_during_execution, api status none: '
+    'Something broke for <id> with <long> from <address> second line'), said
+assert 'subtype other' in keys_lane.read_envelope(1, json.dumps({'is_error': True, 'subtype': 'x 0b9f107a-0000-4000-8000-000000000001\n' + word, 'result': 'boom'}), '')['said']
+by_stderr = keys_lane.read_envelope(1, '', f'broke for 0b9f107a-0000-4000-8000-000000000001 with {other}')
+assert by_stderr['error_class'] == 'reader_exited' and by_stderr['said'].endswith('broke for <id> with <long>'), by_stderr
+assert 'sk-ant' not in keys_lane.read_envelope(1, '', 'x' * 1985 + ' ' + word)['said'], 'the whole of stderr is cleaned before it is cut'
+assert keys_lane.read_envelope(1, '', 'Segmentation fault')['said'] == 'exit 1, no JSON from the CLI: Segmentation fault'
+assert 'said' in read_envelope(*NO_AUTH) and 'said' in read_envelope(*LIMIT)
+# the model's words: never echoed, and not taken for a sign-in failure
+private = 'The rear seat does not have access to the trunk. Paint is flaking. {"photo": "aaaaaaaa"}'
+for shape in (read_envelope(1, json.dumps({'is_error': False, 'result': private}), ''),              # non-zero exit after an answer
+              read_envelope(1, json.dumps({'type': 'result', 'is_error': False, 'result': private})[:70], ''),   # a cut-off envelope
+              read_envelope(1, 'notice: a newer version is available\n' + json.dumps({'is_error': False, 'result': private}), '')):
+    assert shape['error_class'] == 'reader_exited' and 'flaking' not in shape['said'] and 'rear seat' not in shape['said'], shape
+assert 'said' not in read_envelope(0, json.dumps({'is_error': False, 'result': 'no json here, only words about a private statement'}), ''), 'model text is never echoed'
+assert read_envelope(1, json.dumps({'is_error': True, 'api_error_status': 502, 'result': 'API Error: 502 Bad gateway: upstream forbidden'}), '')['error_class'] == 'reader_api_unreachable'
+for line in ('OAuth token revoked', 'OAuth session is invalid', 'Invalid credentials', 'Invalid bearer value', 'Please run /login', 'forbidden',
+             'permission_error', 'your organization does not have access', 'API Error: 403', 'API Error: 401', 'Not logged in', 'authentication_error'):
+    assert read_envelope(1, '', line)['error_class'] == 'reader_unauthorized', line
+    assert read_envelope(1, json.dumps({'is_error': True, 'result': line}), '')['error_class'] == 'reader_unauthorized', line
+# what the tool says stays readable
+for line in ('Failed to authenticate. API Error: 401 OAuth access token is invalid.', 'Invalid bearer token', 'Bearer token is missing',
+             'Error: token: expired', 'Not logged in · Please run /login', 'Credit balance is too low', 'API Error: 529 overloaded',
+             'API Error: 404 {"message":"model: claude-sonnet-4-5-20250929"}'):
+    assert keys_lane.tell(line, {}) == line, keys_lane.tell(line, {})
+assert keys_lane.tell('') == '(nothing was printed)' and len(keys_lane.tell('word ' * 100)) == 240
+# run() prints the line, unless it repeats three words in a row of one of the photo's statements
+for text, shown in (('exit 1, no JSON from the CLI: made-up failure', 'the claude CLI said: exit 1, no JSON from the CLI: made-up failure'),
+                    ('exit 1: cannot place "Paint is flaking on" anything', 'the claude CLI said: (withheld: it repeats words of a statement)')):
+    code, printed = lane(Database([photo(P1)]), ask=lambda prompt, model, text=text: {'ok': False, 'error_class': 'reader_exited', 'said': text})
+    assert code == 5 and shown in printed, printed
+
+# 20. the stored token: used without its white space, described by counts only, and no part of a secret is printed
+assert keys_lane.clean_token(word) == (word, [], True)
+token, notes, usable = keys_lane.clean_token(word[:40] + '\n' + word[40:] + '\n')
+assert token == word and usable and notes == ['2 white-space characters removed, 1 of them inside it (95 characters stored on 2 lines)'], notes
+assert keys_lane.clean_token('"' + word + '"')[1:] == (['it holds a character outside letters, digits, "-" and "_"'], True)
+assert keys_lane.clean_token('“' + word + '”')[1:] == (['it holds a character a request header cannot carry'], False)
+assert keys_lane.clean_token(word + '​')[2] is False and keys_lane.clean_token('sk-ant-oat01-abc.def~x')[2] is True
+assert keys_lane.clean_token('sk-ant-api03-madeup')[1:] == (['it does not begin as a subscription token does'], True)
+assert keys_lane.clean_token(' \n')[1:] == (['2 white-space characters removed, 0 of them inside it (2 characters stored on 0 lines)', 'nothing is left of it'], False)
+slices = lambda secret, text: [secret[i:i + 6] for i in range(13, len(secret) - 5) if secret[i:i + 6] in text]   # past the public front
+real = 'sk-ant-oat01-' + 'Qz7_Lm2-Xp9a' * 8                                   # made up; no six characters repeat the fixtures above
+stored = {'CLAUDE_CODE_OAUTH_TOKEN': real[:60] + '\n' + real[60:99] + '\n' + real[99:104] + '\n' + real[104:], 'SUPABASE_SERVICE_ROLE_KEY': 'svc-key-9-made-up'}
+for leak in (f"API Error: Header '14' has invalid value: 'Bearer {real[:60]}\n{real[60:]}'",          # the failure this was written for
+             f'Invalid API key · {real[:20]}…', f'"message":"invalid x-api-key {real[:20]}"', f'request failed api_key={real[13:35]}',
+             f'{{"access_token": "{real[13:36]}"}}', f'authorization: {real[13:36]}', f'the token {real[13:36]} was refused',
+             f'Error: credential {real} rejected', 'auth dump:\n' + '\n'.join(real[i:i + 20] for i in range(0, len(real), 20)),
+             f'refused {real[90:]} and {real[-9:]}', 'the writer saw svc-key-9-made-up', 'x' * 225 + ' ' + real):
+    line = keys_lane.tell(leak, stored)
+    assert not slices(real, line) and 'svc-key' not in line and 'sk-ant' not in line and len(line) <= 240, (leak[:40], line)
+assert keys_lane.tell(f"API Error: Header '14' has invalid value: 'Bearer short\npiece'", {}) == "API Error: Header '14' has invalid value: (withheld)"
+assert keys_lane.tell('sent Bearer abc12345 and key=abc12345 and token: "abc12345" and sk-other-1', {}) == 'sent <withheld> and <withheld> and <withheld> and <withheld>'
+os.environ['CLAUDE_CODE_OAUTH_TOKEN'] = stored['CLAUDE_CODE_OAUTH_TOKEN']     # as the lane itself calls it: from the environment
+try:
+    assert not slices(real, read_envelope(1, '', f'refused: {real[60:75]} then {real[20:40]}')['said'])
+    assert not slices(real, read_envelope(1, json.dumps({'is_error': True, 'result': f'refused: {real[60:75]}'}), '')['said'])
+    sent = []
+    def spy(command, **kw):
+        sent.append(kw['env'].get('CLAUDE_CODE_OAUTH_TOKEN'))
+        return subprocess.CompletedProcess(command, 0, json.dumps({'is_error': False, 'result': '{}'}), '')
+    keys_lane.ask_claude('x', 'sonnet', runner=spy)
+    assert sent == [real], 'the model call gets the token as one word'
+finally: del os.environ['CLAUDE_CODE_OAUTH_TOKEN']
+# through the lane: a token with a line break is used and said once, with counts only; the step summary has it too
+summary = os.path.join(tempfile.mkdtemp(), 'summary.md')
+code, printed = lane(Database([photo(P1)]), env={**ENV, 'CLAUDE_CODE_OAUTH_TOKEN': stored['CLAUDE_CODE_OAUTH_TOKEN'], 'GITHUB_STEP_SUMMARY': summary})
+text, printed = printed, printed.split('\n')
+assert code == 0 and '3 white-space characters removed, 3 of them inside it (112 characters stored on 4 lines)' in printed[1] and 'save it again as one line' in printed[1], printed[:2]
+assert text.count('not one clean token') == 1 and not slices(real, text) and 'not one clean token' in open(summary).read()
+code, printed = lane(Database([photo(P1)]))
+assert code == 0 and 'not one clean token' not in printed, 'a clean token is not remarked on'
+code, printed = lane(Database([photo(P1)]), env={**ENV, 'CLAUDE_CODE_OAUTH_TOKEN': '"' + real + '"'})
+printed = printed.split('\n')
+assert code == 0 and 'outside letters' in printed[1] and 'white space' not in printed[1], printed[1]
+# a token no header can carry: nothing is read, no model is asked, and the summary still says why
+summary = os.path.join(tempfile.mkdtemp(), 'summary.md')
+printed = []
+code = keys_lane.run(['--vehicle-id', V, '--user-id', U], {**ENV, 'CLAUDE_CODE_OAUTH_TOKEN': '“' + real + '”', 'GITHUB_STEP_SUMMARY': summary},
+                     http=lambda *a, **k: (_ for _ in ()).throw(AssertionError('nothing is read')), ask=None, out=printed.append)
+text = '\n'.join(printed)
+assert code == 4 and 'a request header cannot carry' in printed[1] and 'white space' not in printed[1] and 'no model was asked (exit 4)' in printed[-1], printed
+assert not slices(real, text) and 'cannot carry' in open(summary).read() and 'exit 4' in open(summary).read()
+assert keys_lane.run(['--vehicle-id', V, '--user-id', U], {**ENV, 'CLAUDE_CODE_OAUTH_TOKEN': ' \n '}, out=printed.append) == 2 and 'not set: CLAUDE_CODE_OAUTH_TOKEN' in printed[-1]
+
+# 21. a run says which places were missing: where each left-out state is, and its name when it is shaped like a key
+def placeless(prompt, model):
+    u = unit()
+    first_claim = u['results'][0]['claims'][0]
+    u['results'][0]['claims'] = [
+        {**first_claim, 'state': {'decision': 'property', 'property_key': 'image_visible_rust_severity', 'value_or_key': 'surface'}},
+        {**first_claim, 'state': {'decision': 'no_place', 'property_key': None, 'value_or_key': 'exterior.paint.loss'}},
+        {**first_claim, 'state': {'decision': 'no_place', 'property_key': None, 'value_or_key': 'Paint Loss near the owner mark'}}]
+    u['proposals'] = [{'kind': 'state', 'key': 'exterior.paint.loss', 'nearest_existing': 'none'}, {'kind': 'state', 'key': 'Paint Loss near the owner mark', 'nearest_existing': 'none'}]
+    return {'ok': True, 'value': u}
+code, printed = lane(Database([photo(P1)]), ask=placeless)
+line = [x for x in printed.split('\n') if x.startswith('states this lane could not land')]
+assert code == 0 and len(line) == 1 and "'registry property: image_visible_rust_severity=surface': 1" in line[0] and "'drafted: exterior.paint.loss': 1" in line[0] \
+    and "'drafted: (not shaped like a key)': 1" in line[0] and 'owner mark' not in printed, (code, line, printed)
+code, printed = lane(Database([photo(P1)]))
+assert not [x for x in printed.split('\n') if x.startswith('states this lane could not land')], 'nothing is said when every state had a place'
+
+
+# 22. the edges two rounds of review showed were untested, one case per rule
+NP = 'sk-ant-oat01-' + 'aB3dE6gH9jK2mN5pQ8sT1vW4yZ7cF0hL3nR6tX9uA2bD5eG8iJ1kM4oP7qS0wV3xY6zC9fH2jL5nQ8rT1uW4yB7dF0gK3mP6sU9vX2aE5'   # made up, no six characters repeat
+kept = {'CLAUDE_CODE_OAUTH_TOKEN': NP[:50] + '\n' + NP[50:], 'SUPABASE_SERVICE_ROLE_KEY': 'sb_secret_Zq4Wn8Kd3vHt6Lp1'}
+body = NP[13:]
+for leak in ('saw ' + body[30:36] + ' here',                                  # exactly six
+             'refused ' + NP[45:55],                                          # across the stored line break
+             'got x' + body[20:34], 'got ' + body[20:34] + 'x',               # glued inside a word, either side
+             'tail ' + NP[-6:], 'tail ' + NP[-12:],                           # the last six
+             'could not send ' + NP[:-10] + ' ' + NP[-10:-5] + ' ' + NP[-5:], # pieces of five
+             'dump: ' + ' '.join(NP[i:i + 5] for i in range(0, len(NP), 5)),  # the whole of it in fives
+             'refused value ' + NP[:-5] + '\\' + NP[-5:],                     # a stray character in it
+             'bad value Zq4Wn8Kd3vHt', 'yy ' + 'y ' * 116 + 'Zq4Wn8Kd3vHt6Lp1'):   # the service key, and at the cut
+    line = keys_lane.tell(leak, kept)
+    assert not [1 for i in range(len(body) - 5) if body[i:i + 6] in line.replace(' ', '')] and 'Zq4Wn' not in line, (leak[:30], line)
+for plain in ('prefix sk-ant-oat01- expected'.replace('sk-ant-oat01-', 'ant-oat01-'), 'sb_secret_ keys only', 'use sb_publishable_ here', 'disk-full on the runner',
+              'sent Bearer abc1234 ok', 'Error: token: v1.2 expired', 'saw ' + 'a1B2' * 5 + 'a1B',
+              'Unknown or deprecated descriptor_key: exterior.trim.pitting_light', 'set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.',
+              "error: unknown option '--dangerously-skip-permissions'", "npm error 404 '@anthropic-ai/claude-code@2.0.1' is not in this registry",
+              'OAuth error: invalid_grant token: refresh_token_expired', 'Credit balance is too low', 'Claude usage limit reached'):
+    assert keys_lane.tell(plain, kept) == plain, keys_lane.tell(plain, kept)
+for dirty, clean in (('{"access_token": "abcd1234efgh"}', '{"access_<withheld>'), ('sent Bearer abcd-1fgh-ijkl', 'sent <withheld>'),
+                     ('sent bearer abcd_efg1_ijkl', 'sent <withheld>'), ('Header has invalid value: Bearer abc', 'Header has invalid value: (withheld)'),
+                     ('got sk-abc123.def456', 'got <withheld>'), ('saw ' + 'a1B2' * 6, 'saw <long>'), ('saw c' + 'a1B2' * 6, 'saw <long>'),
+                     ('y ' * 110 + 'a1B2' * 10, ('y ' * 110 + '<long>')[:240]), ('y ' * 113 + 'Bearer abcdefgh1234', ('y ' * 113 + '<withheld>')[:240]),
+                     ('mail someone@example.invalid now', 'mail <address> now')):
+    assert keys_lane.tell(dirty, {}) == clean, keys_lane.tell(dirty, {})
+assert 'Bearer' not in read_envelope(1, '', '\n' * 1990 + ' Bearer abcd1234efgh')['said'], 'stderr is cleaned whole, then cut'
+# read_envelope: stderr only, also when stderr has something; the subtype rule, one case a part; causes
+for shape in (json.dumps({'is_error': False, 'result': private}), json.dumps({'type': 'result', 'is_error': False, 'result': private})[:70],
+              'notice: a newer version is available\n' + json.dumps({'is_error': False, 'result': private})):
+    answer = read_envelope(1, shape, 'warning: slow start')
+    assert answer['said'].endswith('warning: slow start') and 'flaking' not in answer['said'] and 'rear seat' not in answer['said'], answer
+assert 'flaking' not in read_envelope(1, json.dumps({'is_error': 'false', 'result': private}), '')['said'], 'only is_error true marks the tool speaking'
+for subtype in ('the rear seat is torn', 'error_0b9f107a', 'Rear-Seat-Torn', 'a' * 41, ['x'], None):
+    assert 'subtype other,' in read_envelope(1, json.dumps({'is_error': True, 'subtype': subtype, 'result': 'boom'}), '')['said'], subtype
+assert read_envelope(1, 'Claude usage limit reached', '')['error_class'] == 'reader_usage_limit', 'plain text on stdout is read for a cause'
+assert read_envelope(1, 'API Error: 401 {"type":"error","error":{"type":"authentication_error"}}', '')['error_class'] == 'reader_unauthorized'
+assert 'said' in read_envelope(1, '', 'Claude usage limit reached') and 'said' in read_envelope(1, '', 'Not logged in')
+assert read_envelope(1, json.dumps({'is_error': False, 'result': 'The sticker gives a rate limit of 55 {"x":1}'}), '')['error_class'] == 'reader_exited'
+late = read_envelope(1, json.dumps({'is_error': False, 'result': private}), 'OAuth token has expired')
+assert late['error_class'] == 'reader_unauthorized' and late['said'].endswith('OAuth token has expired')
+assert read_envelope(1, json.dumps({'is_error': True, 'api_error_status': 400, 'result': 'forbidden'}), '')['error_class'] == 'reader_unauthorized'
+assert read_envelope(1, json.dumps({'is_error': True, 'api_error_status': 500, 'result': 'forbidden'}), '')['error_class'] == 'reader_api_unreachable'
+# the stored token: white space of every kind, the edges of usable, the front, two notes at once
+for inside in ('\r\n', '\t', ' '):
+    lines = 2 if inside == '\r\n' else 1
+    assert keys_lane.clean_token('sk-ant-oat01-ab' + inside + 'cd') == ('sk-ant-oat01-abcd', [f'{len(inside)} white-space characters removed, '
+        f'{len(inside)} of them inside it ({17 + len(inside)} characters stored on {lines} lines)'], True), inside
+for bad in ('\x7f', 'é', '\x07'): assert keys_lane.clean_token('sk-ant-oat01-ab' + bad + 'cd')[1:] == (['it holds a character a request header cannot carry'], False), repr(bad)
+assert keys_lane.clean_token('sk-ant-oat01-ab!cd')[1:] == (['it holds a character outside letters, digits, "-" and "_"'], True)
+assert keys_lane.clean_token('sk-ant-oat02-abcd')[1] == [] and keys_lane.clean_token('sk-ant-oxx-abcd')[1] == ['it does not begin as a subscription token does']
+for quote, code in (('“', 4), ('"', 0)):
+    printed = []
+    got = keys_lane.run(['--vehicle-id', V, '--user-id', U], {**ENV, 'CLAUDE_CODE_OAUTH_TOKEN': quote + NP[:50] + '\n' + NP[50:]}, http=Database([photo(P1)]),
+                        ask=lambda prompt, model: {'ok': True, 'value': unit()}, out=printed.append, sleep=PAUSES.append)
+    assert got == code and 'white-space characters removed' in printed[1] and ('; it holds a character' in printed[1]), printed[1]
+    assert ('taken out' in printed[1]) == (code == 0), 'the extra sentence only when the token can be used'
+for name in ('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_URL'):
+    summary = os.path.join(tempfile.mkdtemp(), 'summary.md'); printed = []
+    assert keys_lane.run(['--vehicle-id', V, '--user-id', U], {**ENV, name: ' \n', 'GITHUB_STEP_SUMMARY': summary},
+                         http=lambda *a, **k: (_ for _ in ()).throw(AssertionError('nothing is read')), ask=None, out=printed.append) == 2
+    assert printed == [f'keys lane: not set: {name}'] and f'not set: {name} (exit 2)' in open(summary).read()
+# the writer's error field: cleaned, bounded, and withheld when it repeats the statement
+os.environ['SUPABASE_SERVICE_ROLE_KEY'] = kept['SUPABASE_SERVICE_ROLE_KEY']
+try:
+    for error, shown in (('row 0b9f107a-0000-4000-8000-000000000001 of someone@example.invalid refused', 'refused: 400 row <id> of <address> refused'),
+                         ('bad value Zq4Wn8Kd3vHt6Lp1', 'refused: 400 bad value <withheld>'), ('word ' * 100, 'refused: 400 ' + ('word ' * 100).strip()[:120]),
+                         ("content_text 'Paint is flaking on the  driver door lower edge.' is too long", 'refused: 400 (withheld: it repeats words of the statement)'),
+                         ('Unknown or deprecated descriptor_key: exterior.paint.delamination', 'refused: 400 Unknown or deprecated descriptor_key: exterior.paint.delamination')):
+        http_400 = lambda method, url, headers, data, error=error: (400, {}, json.dumps({'error': error}))
+        got = keys_lane.post_claim({'url': 'https://db.example.invalid', 'key': 'k', 'http': http_400, 'sleep': PAUSES.append}, {'content_text': STATEMENT}, collections.Counter())
+        assert got == shown, got
+finally: del os.environ['SUPABASE_SERVICE_ROLE_KEY']
+# the second door, a case a rule; the answers that stop a run say why first; three failures in a row stop it
+for line, held in (('cannot place "Paint is flaking" anything', True), ('saw PAINT IS FLAKING there', True), ('saw door, lower; edge there', True),
+                   ('tokens: "the","driver","door"', True), ('saw glare hides the roof there', False), ('the paint is fine', False)):
+    assert keys_lane.repeats(line, [STATEMENT, 'Chrome is pitted on the rear bumper.']) is held, line
+assert keys_lane.repeats('cannot handle: Cracked windshield.', ['Cracked windshield.']) and not keys_lane.repeats('exterior.cracked_windshield', ['Cracked windshield.'], short=False)
+assert keys_lane.repeats('saw pitted on the there', ['x', 'Chrome is pitted on the rear bumper.']), 'every statement is tried'
+for stop, code in ((NO_AUTH, 4), (LIMIT, 3)):
+    printed = []
+    assert run(['--vehicle-id', V, '--user-id', U], ENV, http=Database([photo(P1)]), ask=lambda prompt, model, stop=stop: read_envelope(*stop), out=printed.append, sleep=PAUSES.append) == code
+    said_at = [i for i, x in enumerate(printed) if x.startswith('the claude CLI said: exit 1')]
+    assert len(said_at) == 1 and said_at[0] < len(printed) - 1 and printed[-1].startswith('result:'), printed
+asked = []
+def failing(prompt, model): asked.append(1); return {'ok': False, 'error_class': 'reader_exited', 'said': 'exit 1, no JSON from the CLI: made-up failure'}
+many = [photo(f'{i:08x}-0000-4000-8000-00000000000{i}') for i in range(1, 6)]
+code, printed = lane(Database(many), '--photos', '5', ask=failing)
+assert code == 1 and len(asked) == 3 and 'the model call failed for three photos in a row: stopped (exit 1)' in printed, (code, len(asked))
+# the missing-places line prints a drafted name only when it is a short key that is not a statement in key shape
+named = lambda state: keys_lane.place_name({'state': state, 'state_from': 'drafted'}, [STATEMENT])
+for state in ('exterior.paint.loss', 'image_visible_breakage=none', 'mechanical.brake.rotor_lines', 'exterior.trim.pitting2'): assert named(state) == state, state
+for state in ('paint loss near the owner mark', 'Owner_mark_paint', 'a' * 61, 'paint.loss=Near The Owner Mark', 5, None, 'exterior.paint.flaking_on_the_driver_door_lower_edge',
+              'exterior.paint_is_flaking.door', 'a0b9f107a_0000_4000_8000_000000000001', 'paint.is.flaking.on.the', 'exterior.paint.loss\n', 'exterior.paint.losѕ'):
+    assert named(state) == '(not shaped like a key)', state
+assert keys_lane.place_name({'state': 'image_visible_rust_severity=surface', 'state_from': 'registry property'}, [STATEMENT]) == 'image_visible_rust_severity=surface'
+def numbered(prompt, model):
+    u = unit(); claim = u['results'][0]['claims'][0]
+    u['results'][0]['claims'] = [{**claim, 'state': {'decision': 'no_place', 'property_key': None, 'value_or_key': 5}}]
+    u['proposals'] = [{'kind': 'state', 'key': 5, 'nearest_existing': 'none'}]
+    return {'ok': True, 'value': u}
+code, printed = lane(Database([photo(P1)]), ask=numbered)
+assert code in (0, 5) and 'unexpected' not in printed, 'a number for a name does not stop the run'
+
+
+# 23. the third round: rules that had only been tested together are tested apart, and what that round found is held
+bare = lambda line: re.sub(r'[^A-Za-z0-9_-]', '', line)                        # the line with every non-token character taken out
+for leak in ('dump: ' + '/'.join(body[i:i + 5] for i in range(0, 30, 5)), 'saw ' + body[:8] + ' here',
+             'tail ' + NP[:-5] + '\\n' + NP[-5:], 'tail ' + NP[:-5] + '%0A' + NP[-5:], 'tail ' + NP[:-5] + '\\u000a' + NP[-5:], 'tail ' + NP[:-5] + '&#10;' + NP[-5:]):
+    line = keys_lane.tell(leak, kept)
+    assert not [1 for i in range(len(body) - 4) if body[i:i + 5] in bare(line)], (leak[:30], line)
+for dirty, clean in (('request 9f8e7d6c5b4a39281706f5e4d3c2b1a0 failed', 'request <long> failed'), ('saw abcdefghijklmNOPQRSTUVWXYZ', 'saw <long>'),
+                     ('saw ABCDEFGHIJKLMnopqrstuvwxyz', 'saw <long>'), ('saw cl9f8e7d6c5b4a39281706f5e4d3', 'saw <long>'), ('saw req_claude-9f8e7d6c5b4a392817', 'saw <long>'),
+                     ('y ' * 113 + 'someone@example.invalid', ('y ' * 113 + '<address>')[:240]), ('y ' * 110 + '0b9f107a-0000-4000-8000-000000000001', ('y ' * 110 + '<id>')[:240]),
+                     ('refused X-Api-Key: abcd1234efgh', 'refused X-Api-<withheld>'), ('sent ACCESS_TOKEN=abcd1234efgh', 'sent ACCESS_<withheld>'),
+                     ('secret: aB3dE6gH9jK2mN5pQ8sT', '<withheld>'), ('password=Hunter2Hunter2', '<withheld>'), ('Authorization: Basic dXNlcjpwYXNzd29yZDEyMw==', 'Authorization: <withheld>'),
+                     ('postgresql://postgres:hunter2secretpw@localhost:5432/postgres', 'postgresql<withheld>localhost:5432/postgres')):
+    assert keys_lane.tell(dirty, {}) == clean, keys_lane.tell(dirty, {})
+for plain in ('descriptor_key: exterior.trim.pitting2 unknown', 'pkg@1.0.0-alpha.beta is not in this registry', 'saw --dangerously-skip-permissions-now', 'saw CLAUDE_CODE_MAX_OUTPUT_TOKENS'):
+    assert keys_lane.tell(plain, kept) == plain, keys_lane.tell(plain, kept)
+started = time.time(); [keys_lane.tell(text, kept) for text in ('a' * 20000, 'abc_def-' * 2500, 'A' * 19999 + '1', 'a.' * 10000, '-' * 20000)]
+assert time.time() - started < 2, 'a long unbroken run does not take seconds'
+# repeats(): a number among the three words, another script, and only the tool's words (not this lane's prefix) are compared
+assert keys_lane.repeats('saw "ends 4471 on" there', ['The tag ends 4471 on the cowl.'])
+assert keys_lane.repeats('cannot place "Краска отслаивается на двери водителя"', ['Краска отслаивается на двери водителя'])
+for callout, stderr in (('None', 'Segmentation fault'), ('No.', 'the worker died')):
+    printed = []
+    run(['--vehicle-id', V, '--user-id', U], ENV, http=Database([photo(P1, callouts=[callout])]), ask=lambda prompt, model, stderr=stderr: read_envelope(1, '', stderr), out=printed.append, sleep=PAUSES.append)
+    assert f'the claude CLI said: exit 1, no JSON from the CLI: {stderr}' in printed, printed
+two = [STATEMENT, 'Glare hides the roof.']
+for line, error_class in (('cannot read "Glare hides the roof" here', 'reader_exited'), ('cannot read "Glare hides the roof" here', 'reader_usage_limit')):
+    code, printed = lane(Database([photo(P1, callouts=two)]), ask=lambda prompt, model, line=line, error_class=error_class: {'ok': False, 'error_class': error_class, 'said': 'exit 1: ' + line, 'tool': line})
+    assert 'the claude CLI said: (withheld: it repeats words of a statement)' in printed, printed
+code, printed = lane(Database([photo(P1, callouts=['Cracked windshield.'])]), ask=lambda prompt, model: {'ok': False, 'error_class': 'reader_exited', 'said': 'exit 1: cannot handle: Cracked windshield.', 'tool': 'cannot handle: Cracked windshield.'})
+assert '(withheld: it repeats words of a statement)' in printed
+http_400 = lambda method, url, headers, data: (400, {}, json.dumps({'error': "content_text 'Cracked windshield.' is too long"}))
+assert keys_lane.post_claim({'url': 'https://db.example.invalid', 'key': 'k', 'http': http_400, 'sleep': PAUSES.append}, {'content_text': 'Cracked windshield.'}, collections.Counter()).endswith('(withheld: it repeats words of the statement)')
+# place_name(): digits, separators, words run together, every statement, and a registered property with an unlisted value
+named = lambda state, statements=two: keys_lane.place_name({'state': state, 'state_from': 'drafted'}, statements)
+for state in ('tag.serial5550142', 'serial_tag5550142', 'trim.pitting123', 'part.a0b9f107a', 'a0b9f107a_0000_4000', 'someone@example.invalid', 'owner mark', 'owner-mark',
+              'glare_hides_the.roof', 'exterior.paintisflaking.onthedriverdoor', 'paintisflakingonthedriverdoorloweredge', 'exterior.' + 'a' * 21, 'image_visible_rust_severity=Heavy Scale'):
+    assert named(state) == '(not shaped like a key)', state
+assert named('image_visible_rust_severity=heavy') == 'image_visible_rust_severity=heavy' and named('image_visible_paint_stage=patina') == 'image_visible_paint_stage=patina'
+# run(): a result the check passes and the lane cannot walk is a rejection; the three-in-a-row count resets; the cursor goes back
+def unwalkable(prompt, model):
+    u = unit(); claim = u['results'][0]['claims'][0]
+    u['results'][0]['claims'] = [{**claim, 'state': {'decision': 'condition_key', 'property_key': [], 'value_or_key': 'exterior.paint.delamination'}}]
+    return {'ok': True, 'value': u}
+code, printed = lane(Database([photo(P1)]), ask=unwalkable)
+assert code == 5 and 'unexpected' not in printed and 'rejected by the check: 1' in printed, printed
+six = [photo(f'{i:08x}-0000-4000-8000-00000000000{i}') for i in range(1, 7)]
+rejected = lambda: {**unit(), 'results': []}                                   # accounts for no statement: the check rejects it
+for pattern, keyed in (('FKFKFK', 3), ('FRFRFK', 1), ('FFKFKF', 2)):
+    turn = iter(pattern)
+    step = lambda prompt, model: {'F': {'ok': False, 'error_class': 'reader_exited'}, 'K': {'ok': True, 'value': unit()}, 'R': {'ok': True, 'value': rejected()}}[next(turn)]
+    code, printed = lane(Database(six), '--photos', '6', ask=step)
+    assert code == 0 and f'{keyed} photos keyed' in printed and next(turn, None) is None, (pattern, code, printed[-200:])
+turn = iter('KFFF')
+code, printed = lane(Database(six), '--photos', '6', ask=lambda prompt, model: {'F': {'ok': False, 'error_class': 'reader_exited'}, 'K': {'ok': True, 'value': unit()}}[next(turn)])
+assert code == 1 and 'cursor for --after: 00000001' in printed and 'three photos in a row' in printed, printed[-300:]
+# older rules that had no case of their own
+for status in (401, 403): assert read_envelope(1, json.dumps({'is_error': True, 'api_error_status': status, 'result': 'Request not allowed'}), '')['error_class'] == 'reader_unauthorized'
+for error_class, code in (('reader_api_unreachable', 1), ('reader_tool_missing', 2)):
+    assert lane(Database([photo(P1)]), ask=lambda prompt, model, error_class=error_class: {'ok': False, 'error_class': error_class})[0] == code
+
+print(f'keys_lane: 23 groups of cases pass ({pack})')
