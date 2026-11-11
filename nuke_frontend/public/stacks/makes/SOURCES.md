@@ -104,8 +104,9 @@ system fonts set on the same crops; a range is kept only where the drawing clear
 Several sourced versions per mark, each with its own applicability in `vehicle-identities.json`. The originals are the
 unmodified upstream downloads (`sourceSha256Base64`). A headline sets each mark straight on the page, so its file is a
 cutout of the original with the background removed (`*-cut.png`, `localSha256Base64`). Each entry's `cutout` names the
-original, the crop in its pixels and the exact `nuke_frontend/scripts/cut-identity-lettering.cjs` command; rerunning
-it reproduces the file byte for byte. Single-colour print is cut as a monochrome mark (`tone: monochrome`) and drawn as a
+original, the crop in its pixels and the exact `nuke_frontend/scripts/cut-identity-lettering.cjs` command. For the
+twelve cutouts made from committed originals, rerunning the command reproduces the file byte for byte. The car's own
+decal starts from a `sips` PNG conversion of an uncommitted HEIC, so only its recorded hashes can be checked. Single-colour print is cut as a monochrome mark (`tone: monochrome`) and drawn as a
 CSS mask in the text colour, so it follows the theme. The chrome parts keep their photographed chrome and lose the white
 catalogue ground (`tone: chrome`), and the car's own decal keeps its colour (`tone: color`). `VehicleIdentity` renders the
 first headline match per role: the car's own decal, then the on-car parts, then the literature versions. Entries marked
