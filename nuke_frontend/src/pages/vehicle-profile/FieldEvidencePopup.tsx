@@ -93,7 +93,7 @@ function FieldContext({ field, label, value, context, answer, reports, images, r
     || (field === 'drivetrain' && /\bNP\d{3}\b|transfer case|t-case/i.test(report.content || '')));
   return <div className="vp-field-context">
     <div className="vp-field-context__answer" aria-label={`${label} source`}>{answer}</div>
-    {specific.slice(0, 2).map(report => <article key={report.id} className="vp-field-context__report">
+    {specific.filter(report => report.content?.trim()).slice(0, 2).map(report => <article key={report.id} className="vp-field-context__report">
       {report.content && <p>{report.content}</p>}
       <small>{(report.source_slug || 'Retained report').replace(/_/g, ' ')}{report.observed_at && <> · {new Date(report.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}</>}</small>
     </article>)}
@@ -470,6 +470,8 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const recorded = leadClaim?.field_value ?? leadReport?.value ?? null;
   // A VIN decode is the registry reading; it leads over listing, photo and system claims.
   const vinReport = leadReport?.extraction_method?.startsWith('vin_decode') ? leadReport : undefined;
+  // Distinct sources: field claims plus retained reports; the provenance evidence list repeats them.
+  const sourceCount = (claimGroup?.sources.length ?? 0) + (provenanceCoverageUnavailable(provenance.data) ? 0 : provenance.data?.observations?.length ?? 0);
   const methodReport = vinReport ?? (!leadClaim ? leadReport : undefined);
   const reportSource = (report: NonNullable<typeof leadReport>) => {
     const name = sourceLabel(report.source_slug || 'Source report');
@@ -491,7 +493,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     {methodReport?.extraction_method && <Row label="Method" role="caption">{methodReport.extraction_method}</Row>}
     {(provenance.data?.current_correction?.page_date || vinReport?.observed_at || (leadClaim && !leadClaim.source_type.startsWith('agent_') && leadClaim.created_at) || leadReport?.observed_at)
       && <Row label="Recorded on">{shortDay(provenance.data?.current_correction?.page_date || vinReport?.observed_at || (leadClaim && !leadClaim.source_type.startsWith('agent_') ? leadClaim.created_at : null) || leadReport?.observed_at)}</Row>}
-    {sortedSources.length + (vinReport ? 1 : 0) > 1 && <Row label="Other sources" role="measure">{sortedSources.length + (vinReport ? 1 : 0) - 1}</Row>}
+    {sourceCount > 1 && <Row label="Other sources" role="measure">{sourceCount - 1}</Row>}
   </Rows>;
   return context ? <FieldContext field={field} label={label} value={value} context={context} answer={answer}
     reports={[
