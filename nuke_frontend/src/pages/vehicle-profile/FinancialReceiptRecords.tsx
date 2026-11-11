@@ -25,7 +25,7 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
   receipt: Pick<VehicleReceiptRecord, 'sourceId' | 'sourceTable'>; vehicleId: string; expectedSourceHash?: string;
 }) {
   const [state, setState] = useState('');
-  const [original, setOriginal] = useState<{ blob: Blob; filename: string } | null>(null);
+  const [original, setOriginal] = useState<{ blob: Blob; filename: string; previewBlob?: Blob | null } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -53,12 +53,30 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
           return response.blob();
         });
         if (!alive.current) return;
-        setOriginal({ blob, filename: new URL(raw).pathname.split('/').pop() || 'Original receipt' });
+        const filename = new URL(raw).pathname.split('/').pop() || 'Original receipt';
+        let previewBlob: Blob | null | undefined;
+        if (privateStoragePath(raw) && (/^image\/(heic|heif)(;|$)/i.test(blob.type) || /\.(heic|heif)$/i.test(filename))) {
+          previewBlob = null;
+          // The same viewer must qualify for the same private object again. Never turn a failed signing into a public URL.
+          try {
+            const previewUrl = await signPrivateStorageUrl(raw, 60, { width: 1800, height: 1800, resize: 'contain', quality: 90 });
+            if (previewUrl === raw) throw new Error('Preview unavailable');
+            previewBlob = await bounded(async signal => {
+              const response = await fetch(previewUrl, { signal, headers: { Accept: 'image/webp,image/*;q=0.8' } });
+              if (!response.ok) throw new Error('Preview unavailable');
+              const preview = await response.blob();
+              if (!/^image\/(jpeg|png|webp|gif|avif)$/.test(preview.type)) throw new Error('Preview unavailable');
+              return preview;
+            });
+          } catch { /* Preserve the already-authorized original download if transformation is unavailable. */ }
+        }
+        if (!alive.current) return;
+        setOriginal({ blob, filename, previewBlob });
         setState('');
       } catch { if (alive.current) setState('Source unavailable or not visible to this viewer.'); }
     }}>{state === 'Reading source…' ? state : 'Read original source'}</button>
     {original && <React.Suspense fallback={<p role="status">Loading original viewer…</p>}>
-      <OriginalDocumentPreview blob={original.blob} filename={original.filename}
+      <OriginalDocumentPreview blob={original.blob} filename={original.filename} previewBlob={original.previewBlob}
         onClose={() => { setOriginal(null); trigger.current?.focus(); }} />
     </React.Suspense>}
     {state && state !== 'Reading source…' && <p role="status">{state}</p>}
