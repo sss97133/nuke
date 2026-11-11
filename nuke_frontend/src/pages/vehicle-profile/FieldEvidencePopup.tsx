@@ -134,6 +134,7 @@ function FieldContext({ field, label, value, context, answer, reports, images, r
 
 const SOURCE_LABELS: Record<string, string> = {
   owner_import_listing: 'Owner listing import',
+  gm_vin_chart: 'GM VIN chart (pre-1981)',
   ai_visual: 'Photo reading',
   system_update: 'System update',
   vin_decode: 'VIN decode (NHTSA)',
@@ -467,19 +468,29 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   // A tribute's trim is the record's trim under tribute_badge_rule_v1 (migration 20261110090000): no factory badge.
   const tribute = field === 'trim' && !!subject?.is_replica && !!subject?.trim;
   const recorded = leadClaim?.field_value ?? leadReport?.value ?? null;
-  const answer = imagesLoading || claims.loading ? <p role="status">Reading source…</p> : <Rows title={`${label} line item`}>
+  // A VIN decode is the registry reading; it leads over listing, photo and system claims.
+  const vinReport = leadReport?.extraction_method?.startsWith('vin_decode') ? leadReport : undefined;
+  const reportSource = (report: NonNullable<typeof leadReport>) => {
+    const name = sourceLabel(report.source_slug || 'Source report');
+    const url = webSourceUrl(report.source_url);
+    return url ? <a href={url} target="_blank" rel="noopener noreferrer">{name} ↗</a> : name;
+  };
+  const answer = imagesLoading || claims.loading ? <p role="status">Reading source…</p> : <Rows title="This vehicle">
     <Row label={label.replace(/^./, c => c.toUpperCase())}>{value}</Row>
     {tribute && <Row label="Recorded trim">{subject!.trim}</Row>}
     {tribute && <Row label="Tribute">Yes · vehicles.is_replica</Row>}
     {tribute && <Row label="Rule">tribute_badge_rule_v1 · a tribute earns no factory trim badge</Row>}
     {!tribute && recorded && recorded.trim().toLowerCase() !== value.trim().toLowerCase() && <Row label="Recorded">{recorded}</Row>}
     <Row label="Source">{provenance.data?.current_correction ? 'Receipt correction'
-      : leadClaim ? sourceLabel(leadClaim.source_type)
-        : leadReport ? (leadReport.source_slug || 'Source report').replace(/_/g, ' ')
-          : 'None admitted'}</Row>
-    {(provenance.data?.current_correction?.page_date || (leadClaim && !leadClaim.source_type.startsWith('agent_') && leadClaim.created_at) || leadReport?.observed_at)
-      && <Row label="Recorded on">{shortDay(provenance.data?.current_correction?.page_date || (leadClaim && !leadClaim.source_type.startsWith('agent_') ? leadClaim.created_at : null) || leadReport?.observed_at)}</Row>}
-    {sortedSources.length > 1 && <Row label="Other sources" role="measure">{sortedSources.length - 1}</Row>}
+      : vinReport ? reportSource(vinReport)
+        : leadClaim ? sourceLabel(leadClaim.source_type)
+          : leadReport ? reportSource(leadReport)
+            : 'None admitted'}</Row>
+    {vinReport && subject?.vin && <Row label="Read from VIN">{subject.vin}</Row>}
+    {(vinReport || (!leadClaim && leadReport))?.extraction_method && <Row label="Method" role="caption">{(vinReport || leadReport)!.extraction_method}</Row>}
+    {(provenance.data?.current_correction?.page_date || vinReport?.observed_at || (leadClaim && !leadClaim.source_type.startsWith('agent_') && leadClaim.created_at) || leadReport?.observed_at)
+      && <Row label="Recorded on">{shortDay(provenance.data?.current_correction?.page_date || vinReport?.observed_at || (leadClaim && !leadClaim.source_type.startsWith('agent_') ? leadClaim.created_at : null) || leadReport?.observed_at)}</Row>}
+    {sortedSources.length + (vinReport ? 1 : 0) > 1 && <Row label="Other sources" role="measure">{sortedSources.length + (vinReport ? 1 : 0) - 1}</Row>}
   </Rows>;
   return context ? <FieldContext field={field} label={label} value={value} context={context} answer={answer}
     reports={[
