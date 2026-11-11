@@ -21,12 +21,53 @@ VIEWS = {"exterior_front", "exterior_rear", "exterior_side", "interior", "engine
 CATEGORIES = {"car", "pickup_truck", "suv", "van", "motorcycle", "boat", "heavy_equipment", "none", "unknown"}
 MATCH = {"yes", "no", "unsure", "not_applicable"}
 QUALITY = {"good", "fair", "poor"}
+READING_FIELDS = ("is_vehicle", "p_vehicle", "view", "view_confidence", "category", "body_cues", "make_cues",
+                  "matches_filed_vehicle", "match_confidence", "best_gallery_vehicle_id", "quality", "notes")
+
+
+def reading_for(r, manifest):
+    return {**{k: r.get(k) for k in READING_FIELDS},
+            "filed_vehicle_id_at_read": manifest[r["image_id"]].get("filed_vehicle_id")}
+
+
+def active_readings(ids):
+    fields = "id,image_id,vehicle_id,role,confidence,confidence_basis,layer_version"
+    return with_retry(lambda: http("GET", f"/rest/v1/image_observations?observed_by=eq.{OBSERVER}"
+        f"&is_active=is.true&image_id=in.({','.join(ids)})&select={fields}")) or []
+
+
+def reconcile(rows, expected, manifest, run_id, model, session):
+    """An existing image ID is not proof that this reading was saved."""
+    verified, conflicts = {}, []
+    for row in rows:
+        image_id = row.get("image_id")
+        sig = (row.get("confidence_basis") or {}).get(OBSERVER) or {}
+        layer = row.get("layer_version") or {}
+        r = expected.get(image_id)
+        if (r is None or image_id in verified or not row.get("id")
+                or row.get("vehicle_id") is not None or row.get("role") != "incidental"
+                or sig.get("run_id") != run_id or layer.get("run_id") != run_id
+                or sig.get("contract_version") != CONTRACT_VERSION or layer.get("contract") != CONTRACT_VERSION
+                or sig.get("model") != model or sig.get("codex_session") != session
+                or sig.get("confidence") != r["confidence"] or row.get("confidence") != r["confidence"]
+                or sig.get("reading") != reading_for(r, manifest)):
+            conflicts.append(image_id)
+        else:
+            verified[image_id] = row["id"]
+    if conflicts:
+        raise ValueError("Active reading conflict for image IDs: " + json.dumps(conflicts)
+                         + "; inspect and use the bounded withdrawal path before correcting")
+    return verified
 
 
 def validate(r, manifest):
     e = []
     if not isinstance(r, dict): return ["reading must be an object"]
     if not isinstance(r.get("image_id"), str) or r.get("image_id") not in manifest: e.append("image_id not in manifest")
+    try:
+        if str(uuid.UUID(r.get("image_id"))) != r.get("image_id"): e.append("image_id must be canonical UUID")
+    except (ValueError, TypeError, AttributeError):
+        e.append("image_id must be canonical UUID")
     if not isinstance(r.get("is_vehicle"), bool): e.append("is_vehicle must be bool")
     if r.get("view") not in VIEWS: e.append("view")
     if r.get("category") not in CATEGORIES: e.append("category")
@@ -75,12 +116,13 @@ def main():
             {"p_run_id": rid, "p_image_ids": [r["image_id"] for r in good]}))
         print(json.dumps({"run_id": rid, "rows_deactivated": count, "dry_run": a.dry_run}))
         return
-    seen = set()
+    expected = {r["image_id"]: r for r in good}
+    seen = {}
     if good and not a.dry_run:
-        for i in range(0, len(good), 150):
-            ids = ",".join(r["image_id"] for r in good[i:i + 150])
-            have = with_retry(lambda: http("GET", f"/rest/v1/image_observations?observed_by=eq.{OBSERVER}&is_active=is.true&image_id=in.({ids})&select=image_id"))
-            seen |= {h["image_id"] for h in have or []}
+        try:
+            seen = reconcile(active_readings(expected), expected, manifest, rid, a.model, a.session)
+        except ValueError as error:
+            sys.exit(str(error) + "; no rows written")
     # Recheck privacy immediately before admission. The frozen manifest remains the
     # source of scope; it cannot overrule a newer privacy disposition.
     if good and not a.dry_run:
@@ -94,12 +136,10 @@ def main():
     for r in good:
         if r["image_id"] in seen:
             continue
-        m = manifest[r["image_id"]]
-        reading = {k: r.get(k) for k in ("is_vehicle", "p_vehicle", "view", "view_confidence", "category", "body_cues", "make_cues",
-                                          "matches_filed_vehicle", "match_confidence", "best_gallery_vehicle_id", "quality", "notes")}
-        reading["filed_vehicle_id_at_read"] = m.get("filed_vehicle_id")
+        reading = reading_for(r, manifest)
         sig = {"agent": "codex", "model": a.model, "codex_session": a.session, "code_commit": commit,
                "contract_version": CONTRACT_VERSION, "run_id": rid, "confidence": float(r["confidence"]),
+               "confidence_kind": "subjective_uncalibrated",
                "ingested_at": now, "producer": "scripts/photo-pipeline/codex_image_analysis_ingest.py", "reading": reading}
         out.append({"image_id": r["image_id"], "vehicle_id": None, "observed_by": OBSERVER,
                     "role": "incidental",
@@ -113,8 +153,18 @@ def main():
             # Stable payload per retry: the sanctioned RPC returns an existing
             # identical reading instead of duplicating an uncertain POST.
             admitted_ids.append(with_retry(lambda: http("POST", "/rest/v1/rpc/ingest_image_observation", payload)))
+    verified = {}
+    if good and not a.dry_run:
+        try:
+            verified = reconcile(active_readings(expected), expected, manifest, rid, a.model, a.session)
+            if set(verified) != set(expected) or any(verified[row["image_id"]] != returned
+                    for row, returned in zip(out, admitted_ids)):
+                raise ValueError("Persisted rows or returned observation IDs do not match the requested batch")
+        except ValueError as error:
+            sys.exit(str(error) + "; admission unverified, inspect this run before retrying")
     print(json.dumps({"run_id": rid, "observer": OBSERVER, "written": 0 if a.dry_run else len(out), "valid": len(good),
-                      "observation_ids": admitted_ids, "already_present": len(seen), "rejected": len(bad), "rejected_sample": bad[:5], "dry_run": a.dry_run}))
+                      "observation_ids": list(verified.values()), "already_present": len(seen), "verified": len(verified),
+                      "rejected": len(bad), "rejected_sample": bad[:5], "dry_run": a.dry_run}))
 
 
 if __name__ == "__main__":

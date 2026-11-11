@@ -1,3 +1,4 @@
+import { CatalogProductReference, type ReceiptCatalogProduct } from './CatalogProductReference';
 /**
  * VehicleDayDrawer — the complete day document for one vehicle-day.
  *
@@ -58,7 +59,7 @@ interface DayDocumentInstall {
   photo_count: number | null;
   image_id: string | null;
 }
-interface DayDocumentLine { line_number: number | null; description: string | null; part_number: string | null; quantity: number | null; unit_price: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null; install?: DayDocumentInstall | null }
+interface DayDocumentLine { product?: ReceiptCatalogProduct | null; line_number: number | null; description: string | null; part_number: string | null; quantity: number | null; unit_price: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null; install?: DayDocumentInstall | null }
 interface DayDocumentPage { bucket: string; path: string; bytes?: number | null; page_no?: number | null }
 interface DayDocumentVendor { id?: string | null; name?: string | null; logo_url?: string | null; website?: string | null }
 export interface DayDocument { receipt_id: string; vendor: string | null; vendor_org?: DayDocumentVendor | null; document_type: string | null; document_number: string | null; pages: number | null; page?: DayDocumentPage | null; page_paths?: string[] | null; payer_as_named: string | null; subtotal: number | null; tax: number | null; total: number | null; currency: string | null; date_basis: string | null; lines: DayDocumentLine[]; recorded_payment?: { amount: number | null; date: string | null } | null; recorded_hours?: number | null; hour_entries?: number }
@@ -424,6 +425,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                   </span>
                   <span style={mono}>{[line.hours != null ? `${line.hours} h` : null, line.quantity != null && line.quantity !== 1 ? `×${line.quantity}` : null, line.amount != null ? fmtReceiptMoney(line.amount, doc.currency) : null].filter(Boolean).join(' · ')}</span>
                 </div>
+                <CatalogProductReference product={line.product} />
                 <ReceiptLineContext
                   line={receiptWork.byLine.get(receiptLineKey(doc.receipt_id, line.line_number))}
                   withdrawn={receiptWork.withdrawnByLine.get(receiptLineKey(doc.receipt_id, line.line_number))}

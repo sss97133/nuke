@@ -204,12 +204,13 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
         {nativeHistory.filter(claim => !listings.some(row => normalizeListingUrlKey(row.source_url) === claim.source_url
           && row.metadata?.source_observation_id === claim.observation_id)).map(claim => (
           <div key={claim.observation_id} style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
-            <strong>Collecting Cars reports {claim.reported_outcome === 'sold' ? 'sold' : 'unsold'}</strong>
-            <p>{claim.reported_outcome === 'sold'
+            <strong>Collecting Cars reports {claim.reported_outcome === 'unknown' ? 'listing ended' : claim.reported_outcome}</strong>
+            <p>{claim.reported_outcome === 'unknown' ? 'Sale outcome unknown. An ended classified listing does not establish a sale or an unsold auction.' : claim.reported_outcome === 'sold'
               ? claim.reported_amount === null ? 'Sale amount not stated by the source.' : recordedAmount(claim.reported_amount, recordedCurrency(claim.currency))
               : claim.reported_amount === null ? 'No sale reported; high bid not stated.'
                 : `Reported high bid: ${recordedAmount(claim.reported_amount, recordedCurrency(claim.currency))} · no sale reported`}</p>
             <p>Publisher report, not independently verified. Fees are unrecorded.</p>
+            {claim.sale_format && <p>Source listing format: {claim.sale_format}</p>}
             <p>Source-reported {claim.reported_outcome === 'sold' ? 'sale' : 'end'}: {claim.reported_event_at
               ? <time dateTime={claim.reported_event_at}>{new Date(claim.reported_event_at).toISOString()}</time> : 'Date not stated'}</p>
             <p>Source captured: <time dateTime={claim.source_captured_at}>{new Date(claim.source_captured_at).toISOString()}</time></p>

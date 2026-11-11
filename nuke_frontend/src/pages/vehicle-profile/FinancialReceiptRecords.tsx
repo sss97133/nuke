@@ -1,3 +1,4 @@
+import { CatalogProductReference, type ReceiptCatalogProduct } from './CatalogProductReference';
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useQuery } from '@tanstack/react-query';
@@ -24,7 +25,7 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
   receipt: Pick<VehicleReceiptRecord, 'sourceId' | 'sourceTable'>; vehicleId: string; expectedSourceHash?: string;
 }) {
   const [state, setState] = useState('');
-  const [original, setOriginal] = useState<{ blob: Blob; filename: string } | null>(null);
+  const [original, setOriginal] = useState<{ blob: Blob; filename: string; previewBlob?: Blob | null } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -52,12 +53,30 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
           return response.blob();
         });
         if (!alive.current) return;
-        setOriginal({ blob, filename: new URL(raw).pathname.split('/').pop() || 'Original receipt' });
+        const filename = new URL(raw).pathname.split('/').pop() || 'Original receipt';
+        let previewBlob: Blob | null | undefined;
+        if (privateStoragePath(raw) && (/^image\/(heic|heif)(;|$)/i.test(blob.type) || /\.(heic|heif)$/i.test(filename))) {
+          previewBlob = null;
+          // The same viewer must qualify for the same private object again. Never turn a failed signing into a public URL.
+          try {
+            const previewUrl = await signPrivateStorageUrl(raw, 60, { width: 1800, height: 1800, resize: 'contain', quality: 90 });
+            if (previewUrl === raw) throw new Error('Preview unavailable');
+            previewBlob = await bounded(async signal => {
+              const response = await fetch(previewUrl, { signal, headers: { Accept: 'image/webp,image/*;q=0.8' } });
+              if (!response.ok) throw new Error('Preview unavailable');
+              const preview = await response.blob();
+              if (!/^image\/(jpeg|png|webp|gif|avif)$/.test(preview.type)) throw new Error('Preview unavailable');
+              return preview;
+            });
+          } catch { /* Preserve the already-authorized original download if transformation is unavailable. */ }
+        }
+        if (!alive.current) return;
+        setOriginal({ blob, filename, previewBlob });
         setState('');
       } catch { if (alive.current) setState('Source unavailable or not visible to this viewer.'); }
     }}>{state === 'Reading source…' ? state : 'Read original source'}</button>
     {original && <React.Suspense fallback={<p role="status">Loading original viewer…</p>}>
-      <OriginalDocumentPreview blob={original.blob} filename={original.filename}
+      <OriginalDocumentPreview blob={original.blob} filename={original.filename} previewBlob={original.previewBlob}
         onClose={() => { setOriginal(null); trigger.current?.focus(); }} />
     </React.Suspense>}
     {state && state !== 'Reading source…' && <p role="status">{state}</p>}
@@ -65,6 +84,7 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
 }
 
 interface PrintedLine {
+  product?: ReceiptCatalogProduct | null;
   line_number: number | null; description: string | null; part_number: string | null;
   quantity: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null;
 }
@@ -116,7 +136,7 @@ export function CorrectionReceipt({ vehicleId, citation }: {
       </header>
       {doc.lines.length > 0 && <table><thead><tr><th scope="col">Recorded item or work</th><th scope="col">Qty</th>{showAmounts && <th scope="col">Amount</th>}</tr></thead>
         <tbody>{doc.lines.map((line, i) => <tr key={`${line.line_number ?? i}:${i}`}>
-          <td>{line.description || line.part_number || 'Line item'}{line.part_number && line.description && <small>{line.part_number}</small>}</td>
+          <td>{line.description || line.part_number || 'Line item'}{line.part_number && line.description && <small>{line.part_number}</small>}<CatalogProductReference product={line.product} /></td>
           <td>{line.quantity ?? '—'}</td>
           {showAmounts && <td>{line.amount == null ? '—' : amountText(line.amount, doc.currency)}</td>}
         </tr>)}</tbody>
@@ -172,6 +192,7 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
         <td>{line.line_date && <time dateTime={line.line_date}>{printedDate(line.line_date)} · Work recorded</time>}
           <span>{line.description || 'Description not recorded'}</span>
           {(line.part_number || line.hours != null || line.performer) && <small>{[line.part_number, line.hours != null ? `${line.hours} ${line.hours === 1 ? 'hour' : 'hours'}` : null, line.performer].filter(Boolean).join(' · ')}</small>}
+          <CatalogProductReference product={line.product} />
         </td><td>{line.quantity ?? '—'}</td>{moneyVisible && <td>{line.amount == null ? '—' : amountText(line.amount, receipt.currency)}</td>}
       </tr>)}</tbody></table>}
     {lines.length > 4 && <button type="button" className="vp-receipt-expand" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Show fewer lines' : `Show all ${lines.length} lines`}</button>}
@@ -206,7 +227,7 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   return <section id="build-receipts" aria-label="Work and parts receipts" className="vp-receipt-section">
     <div className="vp-receipt-heading"><h3>Work & parts</h3><span>Receipt collection</span></div>
     <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
-    {work && <VisualWorkCards rows={loading ? [] : work.rows} renderSource={line => line.source_url_sha256 ? <ReceiptSource
+    {work && <VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger} renderSource={line => line.source_url_sha256 ? <ReceiptSource
       key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}
       expectedSourceHash={line.source_url_sha256} receipt={{ sourceTable: line.source_table, sourceId: line.source_id }} />
       : <p>Original source unavailable in this read.</p>} />}

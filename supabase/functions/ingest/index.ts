@@ -488,7 +488,10 @@ async function matchOrCreateVehicle(
 
   // ── Tier 1: VIN match (confidence 0.99) ───────────────────────
   // VIN is definitive identity for post-1981 vehicles.
-  if (parsed.vin && (platform !== "collecting_cars" || parsed.vin.length === 17)) {
+  // CC native capture admission requires the exact current URL owner. Generic
+  // aliases (including a deleted VIN match) must not enrich a foreign record
+  // before that admission guard runs. With no owner, use normal creation below.
+  if (parsed.vin && platform !== "collecting_cars") {
     let vinQuery = supabaseAdmin
       .from("vehicles")
       .select("id")
@@ -508,7 +511,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2a: URL match in marketplace_listings ────────────────
-  if (parsed.url) {
+  if (parsed.url && platform !== "collecting_cars") {
     const { data: urlMatch } = await supabaseAdmin
       .from("marketplace_listings")
       .select("vehicle_id")
@@ -524,7 +527,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2b: URL match in vehicle_events.source_url ───────────
-  if (parsed.url) {
+  if (parsed.url && platform !== "collecting_cars") {
     const { data: eventUrlMatch } = await supabaseAdmin
       .from("vehicle_events")
       .select("vehicle_id")
@@ -540,7 +543,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2c: URL match in vehicles.listing_url ────────────────
-  if (canonicalUrl) {
+  if (canonicalUrl && platform !== "collecting_cars") {
     const { data: listingUrlMatch } = await supabaseAdmin
       .from("vehicles")
       .select("id")
@@ -910,7 +913,7 @@ interface EnrichedData {
 
 type EnrichResult =
   | { ok: true; data: EnrichedData }
-  | { ok: false; skipped?: boolean; error: string };
+  | { ok: false; skipped?: boolean; error: string; cc_noncar?: Record<string, unknown> };
 
 async function tryAutoEnrich(url: string, platform: string, ccPin?: CcSnapshotPin): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -1092,6 +1095,16 @@ async function tryAutoEnrich(url: string, platform: string, ccPin?: CcSnapshotPi
 
     // Editorial gate: extractor looked at the page and said "not a vehicle listing"
     if (result.skipped === true) {
+      if (platform === "collecting_cars") {
+        const c = result.source_capture, f = result.extracted, canonical = url.replace(/\/$/, "");
+        if (ccPin || result.success !== false || result.error || c?.source_url !== canonical || f?.url !== canonical
+          || !["plate", "part", "bike", "boat"].includes(f?.lot_type) || !/^\d+$/.test(f?.listing_id ?? "")
+          || !/^[0-9a-f-]{36}$/.test(c?.snapshot_id ?? "") || !/^[0-9a-f]{64}$/.test(c?.sha256 ?? "")
+          || !Number.isFinite(Date.parse(c?.observed_at)) || Date.parse(c.observed_at) > Date.now())
+          return { ok: false, error: "cc_noncar_capture_invalid" };
+        return { ok: false, skipped: true, error: `quality_gate_reject: Collecting Cars car intake excludes native lot type ${f.lot_type}`,
+          cc_noncar: { ...c, listing_id: f.listing_id, lot_type: f.lot_type } };
+      }
       return { ok: false, skipped: true, error: result.skip_reason || result.reason || `${extractorName} skipped this page` };
     }
     if (result.success === false || result.error) {
@@ -1223,6 +1236,7 @@ interface IngestResult {
   // Craigslist only: the post's id, clocks and attribute block (and, once a vehicle exists, how the landing went).
   // The poller copies it onto the import_queue ledger row, so the ledger carries what the page said.
   listing_capture?: Record<string, unknown>;
+  collecting_cars_noncar?: Record<string, unknown>;
   // Craigslist only: the unresolved-listing observation written when the post names no model (status "unresolved").
   blip?: { observation: string; observation_id?: string; errors: string[] };
 }
@@ -1382,6 +1396,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       capture ? { listing_capture: ledgerFields(capture) } : {};
     let enrichmentSucceeded = false;
     let enrichmentSkipped = false;
+    let ccNonCar: Record<string, unknown> | undefined;
     let enrichmentError: string | null = null;
     let extractorVehicleId: string | undefined;
     let enrichedPostedAt: string | null = null;
@@ -1475,9 +1490,15 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         }
       } else {
         enrichmentSkipped = enrichResult.skipped === true;
+        ccNonCar = enrichResult.cc_noncar;
         enrichmentError = enrichResult.error;
         console.error(`Enrichment failed for ${listingUrl} (${platform}): ${enrichmentError}`);
       }
+    }
+
+    if (platform === "collecting_cars" && ccNonCar) {
+      return { status: "rejected", reason: `quality_gate_reject: Collecting Cars car intake excludes native lot type ${ccNonCar.lot_type}`, source: platform,
+        external_id: externalId, collecting_cars_noncar: ccNonCar };
     }
 
     if (["vicari", "mccormicks", "collecting_cars"].includes(platform) && enrichmentError) {
@@ -2017,7 +2038,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "GET") {
     return new Response(JSON.stringify({
       name: "nuke.ingest",
-      capabilities: { collecting_cars_pinned_closed_replay: true, collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
+      capabilities: { mccormicks_native_fresh_capture: true, mccormicks_native_listing: true, collecting_cars_pinned_closed_replay: true, collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
       description: "Universal vehicle ingestion endpoint. Accepts structured data, URLs, or free text.",
       methods: { POST: "Ingest vehicle(s)", GET: "This schema documentation" },
       fields: {

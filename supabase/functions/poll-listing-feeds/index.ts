@@ -59,8 +59,10 @@ import { parseKslSearchCards } from "./kslCards.ts";
 import { splitByYear } from "./yearFilter.ts";
 import { selectCollectingCarsReplay } from "./collectingCarsReplay.ts";
 import { prepareCollectingCarsHistory } from "./collectingCarsHistory.ts";
+// Native history preparation also admits bounded, explicitly configured retained discovery manifests.
 import { nextYield } from "./schedule.ts";
 import { pollPurplewave } from "./purplewave.ts";
+import { pollMcCormick } from "./mccormick.ts";
 import { CC_LISTING_METHOD, CC_OBSERVATION_COLUMNS, collectingCarsReceipt, collectingCarsAdmissionMatches,
   prepareCollectingCarsLedger, planCollectingCarsIngests, collectingCarsCaptureInterval, readCollectingCarsInventory, type CollectingCarsReceipt } from "./collectingCars.ts";
 
@@ -636,8 +638,11 @@ async function pollFirecrawlHtmlFeed(
     ccReplayAvailable = capability.data?.capabilities?.collecting_cars_pinned_closed_replay === true;
     try {
       if (ccHistory) {
-        historyPage = await prepareCollectingCarsHistory(supabase, feed,
-          AbortSignal.timeout(Math.max(1, Math.min(15_000, budget.remainingMs() - 10_000))));
+        const preparationSignal = AbortSignal.timeout(Math.max(1, Math.min(15_000, budget.remainingMs() - 10_000)));
+        const historyDb = createClient(Deno.env.get("SUPABASE_URL")!, projectSecretKey()!, { auth: { persistSession: false, autoRefreshToken: false },
+          global: { fetch: (input, init) => fetch(input, { ...init, // guardrail-allow: raw-fetch (internal Supabase SDK transport only)
+            signal: init?.signal ? AbortSignal.any([preparationSignal, init.signal]) : preparationSignal }) } }); // guardrail-allow: raw-fetch (deadline-bound Supabase SDK transport)
+        historyPage = await prepareCollectingCarsHistory(historyDb, feed, preparationSignal, fetch, supabase);
         urls = historyPage.urls;
         result.retained_inventory = historyPage.receipt;
         confirmedEmptySearch = true;
@@ -903,7 +908,7 @@ async function pollFirecrawlHtmlFeed(
         supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
         supabase
           .from("import_queue")
-          .select(nativeDealer || nativeCc ? "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at, raw_data" : "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
+          .select(nativeDealer || nativeCc ? "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, error_message, processed_at, raw_data" : "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
           .in("listing_url", chunk)
           .in("status", ["complete", "skipped", "failed"]),
       ]);
@@ -1021,8 +1026,13 @@ async function pollFirecrawlHtmlFeed(
           dealer_native_version: "dealer_microdata_v2", ...(w.ingest.dealer_receipt ? { dealer_receipt: w.ingest.dealer_receipt } : {}) };
       }
       if (nativeCc) {
+        if (write.status === "skipped" && w.ingest.collecting_cars_noncar) {
+          Object.assign(write.row, { error_message: null, failure_category: null, next_attempt_at: null });
+        }
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}),
           collecting_cars_native_version: CC_LISTING_METHOD,
+          ...(w.ingest.collecting_cars_noncar ? { collecting_cars_noncar: w.ingest.collecting_cars_noncar } : {}),
+          ...(historyPage?.identities.get(w.url) ? { collecting_cars_history_identity: historyPage.identities.get(w.url) } : {}),
           ...(w.ingest.collecting_cars_receipt ? { collecting_cars_receipt: w.ingest.collecting_cars_receipt } : {}) };
       }
       if (Object.keys(captureFields).length > 0) {
@@ -1051,7 +1061,18 @@ async function pollFirecrawlHtmlFeed(
   let replayPreflightMs = 0, replayPreflightFailures = 0;
   for (const url of toIngest) {
     let ccPin: { snapshot_id: string; expected_sha256: string } | undefined;
-    if (historyPage) {
+    if (historyPage?.freshClassificationUrls.has(url)) {
+      const priorIdentity = nativeLedger.get(url)?.collecting_cars_history_identity;
+      if (Number.isSafeInteger(priorIdentity?.auctionId) && priorIdentity.auctionId > 0
+        && ["sold", "unsold", "live", "upcoming", "comingsoon"].includes(priorIdentity.stage)) {
+        historyPage.identities.set(url, priorIdentity);
+        historyPage.freshClassificationUrls.delete(url);
+      } else if (String((ledgerRows.get(url) as { error_message?: string } | undefined)?.error_message ?? "").startsWith("cc_replay_preflight:")) {
+        // Target rediscovery must not erase a prior custody refusal's missing identity.
+        historyPage.freshClassificationUrls.delete(url);
+      }
+    }
+    if (historyPage && !historyPage.freshClassificationUrls.has(url)) {
       const availableMs = Math.floor(Math.min(10_000, 20_000 - replayPreflightMs, budget.remainingMs() - 10_000));
       if (availableMs <= 0 || budget.refusal(feed.source_slug)) { result.deferred_reason = "cc_replay_preflight_budget"; break; }
       const preflightSignal = AbortSignal.timeout(availableMs), preflightStarted = Date.now();
@@ -1423,6 +1444,13 @@ Deno.serve(async (req) => {
       // Curated direct-ingest strategies (Craigslist HTML via Firecrawl, BaT
       // RSS). Both bypass the legacy import_queue path entirely and route
       // through `ingest` with the share-URL ledger.
+      if (feed.source_slug === "mccormicks" && feed.search_criteria?.fetch_strategy === "mccormick_live") {
+        const nativeResult = await pollMcCormick(supabase, feed, budget, allocation);
+        results.push(nativeResult);
+        totalFound += nativeResult.items_found;
+        totalIngested += nativeResult.new_ingested;
+        continue;
+      }
       if (feed.source_slug === "purplewave" && feed.search_criteria?.fetch_strategy === "purplewave_public_json") {
         const nativeResult = await pollPurplewave(supabase, feed, budget, allocation);
         results.push(nativeResult);

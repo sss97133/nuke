@@ -32,6 +32,12 @@ globalThis.fetch = async (input, init) => {
   if (u.pathname.startsWith('/auth/')) return Response.json({ message: 'synthetic service key has no user' }, { status: 401 });
   if (u.pathname === '/functions/v1/extract-collecting-cars') {
     assertEquals(body.url, url);
+    if (failure.startsWith('noncar')) return Response.json({ success: false, skipped: true,
+      skip_reason: `Collecting Cars lot type ${fields.lot_type}`, extracted: { listing_id: fields.listing_id, lot_type: fields.lot_type, url },
+      ...(failure === 'noncar-no-capture' ? {} : { source_capture: { snapshot_id: snapshot,
+        sha256: failure === 'noncar-bad-hash' ? 'invalid' : 'a'.repeat(64), observed_at: clock,
+        source_url: failure === 'noncar-wrong-url' ? url + '-other' : url } }) });
+
     if (body.cc_snapshot) {
       assertEquals(body.cc_snapshot, { snapshot_id: snapshot, expected_sha256: 'a'.repeat(64) });
       return Response.json({ success: true, extracted: { ...fields, stage: failure === 'live-replay' ? 'live' : 'unsold' },
@@ -51,11 +57,16 @@ globalThis.fetch = async (input, init) => {
   if (u.pathname === '/rest/v1/vehicles') {
     if (read) {
       assert(!u.searchParams.has('vin'), 'Exact current URL owner must win before six-character chassis lookup');
+      if (failure === 'foreign-vin' && !u.searchParams.has('id')) return Response.json([]);
       if (u.searchParams.has('listing_url')) {
         const ownerReads = seen.filter(x => x.path === '/rest/v1/vehicles' && x.method === 'GET' && x.search.includes('listing_url=eq.')).length;
         if (failure === 'no-owner' || (failure === 'owner-disappeared' && ownerReads > 1)) return Response.json([]);
         if (failure === 'ambiguous-owner') return Response.json([vehicle, { ...vehicle, id: snapshot }]);
       }
+      return Response.json(object ? vehicle : [vehicle]);
+    }
+    if (failure === 'foreign-vin' && req.method === 'POST') {
+      vehicle = { ...body, id, country: null, origin_metadata: {}, deleted_at: null, merged_into_vehicle_id: null };
       return Response.json(object ? vehicle : [vehicle]);
     }
     assertEquals(req.method, 'PATCH', 'Existing current presentation must not fork');
@@ -97,6 +108,37 @@ Deno.test('actual CC ingest routes deterministic capture, inserts all266 photos 
   assertEquals(seen.filter(x => x.path === '/rest/v1/vehicle_images' && x.method === 'POST').length, 1);
   assertEquals(seen.filter(x => x.path.includes('auction_events') || x.path.includes('vehicle_events')).length, 0);
 });
+
+Deno.test('new CC presentation never reads or enriches a foreign deleted VIN alias before admission', async () => {
+  reset('foreign-vin');
+  fields = { ...fields, year: 1982, make: 'Land Rover', model: 'Series III', vin: 'SALLBCAV2AA102505',
+    title: '1982 Land Rover Series III', listing_id: '78' };
+  const foreign = { id: snapshot, vin: fields.vin, year: 1986, listing_url: 'conceptcarz://foreign',
+    deleted_at: '2026-03-10T05:03:39Z', status: 'inactive' };
+  vehicle = { ...foreign };
+  const r = await run();
+  assertEquals(r.status, 'created'); assertEquals(r.vehicle_id, id);
+  assertEquals(vehicle.listing_url, url); assertEquals(vehicle.vin, fields.vin);
+  assertEquals(observation.vehicle_id, id); assertEquals(gallery.length, 266);
+  assertEquals(seen.some(x => /(?:vin=|marketplace_listings|vehicle_events)/.test(x.search + x.path)), false);
+  assertEquals(seen.some(x => x.method === 'PATCH' && x.search.includes(snapshot)), false);
+  assertEquals(gallery.every(row => row.vehicle_id === id), true);
+  assertEquals(foreign.deleted_at, '2026-03-10T05:03:39Z');
+});
+
+for (const conflict of ['deleted', 'merged', 'native-id', 'vin', 'year']) {
+  Deno.test(`CC exact URL ${conflict} conflict refuses before any enrichment`, async () => {
+    reset();
+    if (conflict === 'deleted') vehicle.deleted_at = clock;
+    if (conflict === 'merged') vehicle.merged_into_vehicle_id = snapshot;
+    if (conflict === 'native-id') vehicle.origin_metadata.auction_id = 'other';
+    if (conflict === 'vin') vehicle.vin = 'DIFFERENT';
+    if (conflict === 'year') vehicle.year = 1986;
+    const r = await run(); assertEquals(r.status, 'error');
+    assertEquals(seen.some(x => x.path.startsWith('/rest/') && !['GET', 'HEAD'].includes(x.method)), false);
+    assertEquals(gallery.length, 0); assertEquals(observation, null);
+  });
+}
 for (const mode of ['capture', 'admission', 'gallery']) Deno.test(`actual CC handler ${mode} failure cannot report complete capture`, async () => {
   reset(mode); const r = await run(); assertEquals(r.status, 'error'); assertEquals(r.collecting_cars_receipt, undefined);
   if (mode === 'capture') assertEquals(seen.filter(x => x.method !== 'GET' && x.path.startsWith('/rest/')).length, 0);
@@ -146,3 +188,23 @@ for (const mode of ['no-owner', 'ambiguous-owner', 'owner-disappeared', 'foreign
     assertEquals(seen.some(x => x.path.startsWith('/rest/') && !['GET', 'HEAD'].includes(x.method)), false);
   });
 }
+
+for (const lotType of ['plate', 'part', 'bike', 'boat']) Deno.test(`retained native ${lotType} is a structural rejection without vehicle writes`, async () => {
+ reset('noncar'); fields.lot_type = lotType;
+ const r = await run(); assertEquals(r.status, 'rejected');
+ assertEquals(r.reason, `quality_gate_reject: Collecting Cars car intake excludes native lot type ${lotType}`);
+ assertEquals(r.collecting_cars_noncar, { snapshot_id: snapshot, sha256: 'a'.repeat(64), observed_at: clock, source_url: url, listing_id: fields.listing_id, lot_type: lotType });
+ const { ledgerWriteFor } = await import('../poll-listing-feeds/ledger.ts');
+ const write = ledgerWriteFor({url,feedId:id,ingest:r,batch:{rows:new Map(),error:null},now:new Date()});
+ assertEquals(write?.status, 'skipped'); assertEquals(write?.row.vehicle_id, null);
+ assertEquals(seen.some(x => x.path.startsWith('/rest/') || x.path === '/functions/v1/ingest-observation'), false);
+});
+for (const mode of ['noncar-no-capture','noncar-bad-hash','noncar-wrong-url']) Deno.test(`unproved native classification ${mode} remains retryable failure`, async () => {
+ reset(mode); fields.lot_type = 'plate'; const r=await run();
+ assertEquals(r.status,'error'); assertEquals(r.collecting_cars_noncar,undefined);
+ assertEquals(seen.some(x=>x.path.startsWith('/rest/')),false);
+});
+Deno.test('unknown native type and skipped pin cannot become permanent non-car decisions', async () => {
+ reset('noncar'); fields.lot_type='unknown'; assertEquals((await run()).status,'error');
+ reset('noncar'); fields.lot_type='plate'; assertEquals((await run({cc_snapshot:ccPin})).status,'error');
+});
