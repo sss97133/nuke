@@ -10,7 +10,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { rpc: (...args: unknown[]) => 
   const result = fixture.rpc(...args); return { abortSignal: () => result };
 } } }));
 import { VisualWorkCards, photoDate } from './VisualWorkCards';
-import { useVisualWork, type VisualWork } from './hooks/useVisualWork';
+import { useVisualWork, type MasterCostLedger, type VisualWork } from './hooks/useVisualWork';
 import { hasRecordedInstallation } from './PartPage';
 
 const record: VisualWork = {
@@ -82,7 +82,7 @@ it('does not turn a candidate or generic work mention into installation', () => 
 
 function Harness() {
  const work = useVisualWork('vehicle-a');
- return <><span>{work.isError ? 'Read failed' : ''}</span><VisualWorkCards rows={work.rows} renderSource={() => null} /></>;
+ return <><span>{work.isError ? 'Read failed' : ''}</span><VisualWorkCards rows={work.rows} ledger={work.ledger} renderSource={() => null} /></>;
 }
 const renderHook = () => act(async () => root.render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>));
 const settle = async () => { for (let i = 0; i < 6; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); }); };
@@ -120,4 +120,93 @@ it('puts a reusable stock reference beside the receipt and removes it when its s
  expect(host.querySelector('details')).toBeNull();
  await render([record]);
  expect(host.querySelector('.vp-catalog-product')).toBeNull();
+});
+
+const ledger: MasterCostLedger = {
+ version: 1, as_of: '2026-11-11T12:00:00Z', scope: 'supplied_estimate_lines_only',
+ coverage: { source_read_limited: false, cards_without_estimates: 1, scope_completeness: 'not_established' },
+ current_component_value: { status: 'not_estimated' }, documented_charges: { status: 'separate_not_added' },
+ scenarios: [{ scenario: 'reconstruct_observed',
+  coverage: { lines: 2, resolved_lines: 1, partial_lines: 0, unresolved_lines: 1, excluded_lines: 0, duplicate_claims_folded: 3, status: 'partial' },
+  totals: { hours: { min: 2, typical: 3, max: 4 }, currencies: [{ currency: 'USD', cost: { min: 200, typical: 300, max: 400 }, covered_lines: 1 }],
+   labor_currencies: [{ currency: 'USD', cost: { min: 200, typical: 300, max: 400 }, covered_lines: 1 }], material_currencies: [] },
+  systems: [{ system_key: 'glass', coverage: { lines: 1, resolved_lines: 1, partial_lines: 0, unresolved_lines: 0, excluded_lines: 0, duplicate_claims_folded: 3, status: 'complete_for_supplied_lines' },
+   totals: { hours: { min: 2, typical: 3, max: 4 }, currencies: [{ currency: 'USD', cost: { min: 200, typical: 300, max: 400 }, covered_lines: 1 }],
+    labor_currencies: [{ currency: 'USD', cost: { min: 200, typical: 300, max: 400 }, covered_lines: 1 }], material_currencies: [] } },
+   { system_key: 'paint', coverage: { lines: 1, resolved_lines: 0, partial_lines: 0, unresolved_lines: 1, excluded_lines: 0, duplicate_claims_folded: 0, status: 'partial' }, totals: { hours: null, currencies: [], labor_currencies: [], material_currencies: [] } }],
+  rows: [{ kind: 'labor', physical_key: 'door_glass.install', system_key: 'glass', label: 'Install door-glass pair', status: 'resolved', reasons: [],
+   work_observation_ids: ['review-a'], source_observation_ids: ['source-a'], source_images: record.images, quantity: { value: 2, unit: 'pane', basis: 'explicit_assumption', derivation: 'One pane per door.' },
+   reference: { code: 'GLASS-DOOR', label: 'seed_uncalibrated' }, pricing: null, rate_basis: { rate: 100, currency: 'USD', derivation: 'Synthetic comparison rate.' },
+   evidence_role: 'conditional_reconstruction', hours: { min: 2, typical: 3, max: 4 }, cost: { min: 200, typical: 300, max: 400 }, currency: 'USD',
+   overlap_group: null, selected: true, shared_access: false, input_fingerprint: 'a', claim_count: 4, formula: '2 panes × 1–2 person-hours per pane × USD 100 per person-hour' },
+   { kind: 'material', physical_key: 'paint.material', system_key: 'paint', label: 'Paint materials', status: 'unresolved', reasons: ['material_price_unresolved'],
+    work_observation_ids: ['review-a'], source_observation_ids: ['source-a'], source_images: record.images, quantity: null, reference: null, pricing: null, rate_basis: null,
+    evidence_role: null, hours: null, cost: null, currency: null, overlap_group: null, selected: true, shared_access: false, input_fingerprint: 'b', claim_count: 1, formula: null }],
+ }],
+};
+
+it('shows the server cost folds and opens a single inline calculation with direct source photos', async () => {
+ const work = structuredClone(record);
+ work.receipts.push({ ...record.receipts[0], item_id: 'documented-line', relation: 'documented_operation', hours: 3.5 });
+ await act(async () => root.render(<VisualWorkCards rows={[work]} ledger={ledger} renderSource={line => <button>Read original {line.source_id}</button>} />));
+ expect(host.textContent).toContain('Master ledger');
+ expect(host.textContent).toContain('3 repeated references counted once');
+ expect(host.textContent).toContain('1 items still need inputs');
+ expect(host.textContent).not.toContain('$0.00');
+ expect(host.textContent).not.toContain('Photographed work');
+ expect(host.querySelector('.vp-ledger-totals')?.textContent).toContain('$300.00');
+ expect(host.querySelector('.vp-ledger-totals')?.textContent).toContain('$200.00–$400.00 range');
+ const open = host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Install door-glass pair"]')!;
+ await act(async () => open.click());
+ const region = host.querySelector('[role="region"]')!;
+ expect(region.textContent).toContain('2 panes × 1–2 person-hours per pane × USD 100');
+ expect(region.textContent).toContain('Synthetic comparison rate.');
+ expect(region.textContent).toContain('Read original doc-a');
+ expect(region.textContent).toContain('Recorded operation · 3.5 documented person-hours');
+ expect(region.textContent).toContain('Receipt candidate · exact installation not established');
+ expect(region.textContent).toContain('seed uncalibrated');
+ expect(region.closest('tr')?.previousElementSibling?.textContent).toContain('Install door-glass pair');
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Open source photo: Torn seating"]')!.click());
+ expect(fixture.open).toHaveBeenCalledWith('before-a');
+ expect(host.querySelectorAll('details')).toHaveLength(0);
+ const close = Array.from(region.querySelectorAll<HTMLButtonElement>('button')).find(b => b.textContent === 'Close')!;
+ await act(async () => close.click());
+ expect(document.activeElement).toBe(open);
+ expect(host.querySelector('[role="region"]')).toBeNull();
+});
+
+it('filters the same ledger to a system and preserves unknown totals', async () => {
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={ledger} renderSource={() => null} />));
+ const select = host.querySelector('select')!;
+ await act(async () => { select.value = 'paint'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+ expect(host.textContent).toContain('Paint materials');
+ expect(host.textContent).not.toContain('Install door-glass pair');
+ expect(host.textContent).toContain('Unestimated');
+ expect(host.textContent).not.toContain('$0.00');
+});
+
+it('keeps unestimated work accessible and opens the line witness rather than the containing card photograph', async () => {
+ const other = { ...record, observation_id: 'review-unestimated', title: 'Separate recorded work', summary: 'A retained operation without an estimate.', gaps: ['Recorded scope still needs a cost basis.'] };
+ const scoped = structuredClone(ledger);
+ scoped.scenarios[0].rows[0].source_images = [{ ...record.images[0], image_id: 'line-witness', caption: 'Exact glass installation witness', image_url: 'https://images.example/glass-source.jpg' }];
+ await act(async () => root.render(<VisualWorkCards rows={[record, other]} ledger={scoped} renderSource={line => <button>Read original {line.source_id}</button>} />));
+ const retained = host.querySelector('[aria-label="Other photographed work"]')!;
+ expect(retained.textContent).toContain('Separate recorded work');
+ expect(retained.textContent).toContain('Recorded scope still needs a cost basis.');
+ expect(retained.querySelectorAll('article')).toHaveLength(1);
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Install door-glass pair"]')!.click());
+ const detail = host.querySelector('#vp-ledger-evidence')!;
+ expect(detail.querySelector('button[aria-label="Open source photo: Torn seating"]')).toBeNull();
+ await act(async () => detail.querySelector<HTMLButtonElement>('button[aria-label="Open source photo: Exact glass installation witness"]')!.click());
+ expect(fixture.open).toHaveBeenCalledWith('line-witness');
+});
+
+it('withdraws the cost ledger with a failed current-source refresh', async () => {
+ fixture.rpc.mockResolvedValue({ data: { work_records: [], visual_work: [record], master_ledger: ledger }, error: null });
+ await renderHook(); await settle(); expect(host.textContent).toContain('Master ledger');
+ fixture.rpc.mockResolvedValue({ data: null, error: new Error('source unavailable') });
+ await act(async () => client.invalidateQueries({ queryKey: ['vehicle-visual-work'] })); await settle();
+ expect(host.textContent).toContain('Read failed');
+ expect(host.textContent).not.toContain('Master ledger');
+ expect(host.textContent).not.toContain('$300.00');
 });
