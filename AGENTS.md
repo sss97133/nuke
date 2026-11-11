@@ -135,6 +135,15 @@ of a bypass is still a bypass. Current owner intent: "every line item is planned
 out and like a functional tool before anything touches the ui"; "the ui is never
 raw text." This is a construction rule, not an additional owner-approval gate.
 
+For functional item planning, use
+[`SOURCE_AWARE_ACQUISITION_CONTRACT.md`](docs/market/SOURCE_AWARE_ACQUISITION_CONTRACT.md).
+For vehicle header work, the **existing header is the banner**: its form comes
+from the qualified reader, not an additional card. Read the executable rules,
+delivery boundary and open pickup in
+[`VEHICLE_HEADER_FORM_RULES.md`](docs/market/VEHICLE_HEADER_FORM_RULES.md)
+and the dated auction-header entry in **C27 / §11** of the case ledger. The
+machine-layer delivery does not close the unfinished renderer or estimate work.
+
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.
 2. **Testimony is never overwritten or deleted.** It is superseded, and the original is kept.
