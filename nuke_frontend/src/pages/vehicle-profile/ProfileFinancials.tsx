@@ -24,10 +24,11 @@ function ReceiptTotals({ rows, total, complete, onOpenItems }: { rows: VehicleRe
   if (!rows.length) return null;
   const currencies = [...new Set(rows.flatMap(row => row.amount != null && !row.amountsHidden && row.currency ? [row.currency] : []))];
   const currency = currencies.length === 1 ? currencies[0] : null;
-  const vendors = new Map<string, { receipts: number; counted: number; cents: number }>();
+  const vendors = new Map<string, { receipts: number; counted: number; cents: number; hidden: number }>();
   for (const row of rows) {
     const vendor = row.vendor || 'Vendor not read';
-    const entry = vendors.get(vendor) ?? { receipts: 0, counted: 0, cents: 0 };
+    const entry = vendors.get(vendor) ?? { receipts: 0, counted: 0, cents: 0, hidden: 0 };
+    if (row.amountsHidden) entry.hidden += 1;
     entry.receipts += 1;
     if (currency && row.currency === currency && row.amount != null && !row.amountsHidden) { entry.counted += 1; entry.cents += cents(row.amount); }
     vendors.set(vendor, entry);
@@ -46,7 +47,7 @@ function ReceiptTotals({ rows, total, complete, onOpenItems }: { rows: VehicleRe
     </Rows>
     <Rows title="By vendor">
       {ordered.map(([vendor, v]) => <Row key={vendor} label={vendor} role="measure">
-        {currency && v.counted > 0 ? centsLabel(v.cents, currency) : 'Amount not read'} · {v.receipts} {v.receipts === 1 ? 'receipt' : 'receipts'}
+        {currency && v.counted > 0 ? centsLabel(v.cents, currency) : v.hidden === v.receipts ? 'Amount withheld' : 'Amount not read'} · {v.receipts} {v.receipts === 1 ? 'receipt' : 'receipts'}
       </Row>)}
     </Rows>
     <button type="button" className="vp-financial-action" onClick={onOpenItems}>Show each receipt and its items</button>
