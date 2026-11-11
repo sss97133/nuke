@@ -111,13 +111,14 @@ match per role, so the catalogue lists the on-car / light-ground version first a
 | year | "1973", US full-line brochure cover | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html) | all Pontiac, 1973 |
 | year | "73", GM of Canada Firebird brochure cover | [oldcarbrochures.org](https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/slides/1973_Pontiac_Firebird_Cdn-01.html) (byte-identical at [lov2xlr8.no](https://www.lov2xlr8.no/brochures/pontiac/73fire/73fire.html)) | Firebird, 1973 |
 | make | "PONTIAC" tail panel letters, OER K1049 | [oerparts.com](https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html) | Firebird, 1970-73 |
+| make | "Pontiac", Accessorizer cover (leads other 1973 Pontiacs: the same 26 KB file as the year and arrowhead) | as above | all Pontiac, 1973 |
 | make | "Pontiac", US full-line cover | as above | all Pontiac, 1973 |
-| make | "Pontiac", Accessorizer cover | as above | all Pontiac, 1973 |
 | make | "PONTIAC", Canada Firebird cover | as above | Firebird, 1973 |
 | emblem | Arrowhead, Accessorizer cover | as above | all Pontiac, 1973 |
 | emblem | Fender bird, OER 487708 | [oerparts.com](https://www.oerparts.com/product/1973/pontiac/firebird/parts/487708.html) | Firebird except Trans Am, 1970-73 |
 | model | "Firebird" fender script, OER 486904 | [oerparts.com](https://www.oerparts.com/product/1973/pontiac/firebird/parts/486904.html) | Firebird, 1971-81 |
 | model | "Firebird" heading, US full-line pp. 10-11 | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html) | Firebird, 1973 |
+| model | "Firebird", US Firebird foldout cover | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Firebird%20Foldout/slides/1973%20Pontiac%20Firebird%20Foldout%2001.html) | Firebird, 1973 |
 | model | "FIREBIRD", Canada Firebird cover | as above | Firebird, 1973 |
 | variant | "TRANS AM" spoiler name on clear, Blue, Phoenix Graphix 7375TANSC | [phoenixgraphix.com](https://www.phoenixgraphix.com/transam/7375tansc.php) | Firebird Trans Am / Trans Am-Style, 1973-75 |
 | variant | "TRANS AM" fender name on clear, Green | as above | Firebird Trans Am / Trans Am-Style, 1973 |

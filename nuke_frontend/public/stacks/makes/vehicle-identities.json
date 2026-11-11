@@ -558,8 +558,8 @@
     "role": "make",
     "file": "pontiac-firebird-tail-letters-1970-1973.jpg",
     "viewport": "0 445 1000 110",
-    "width": 218,
-    "height": 24,
+    "width": 180,
+    "height": 20,
     "sourceWidth": 1000,
     "sourceHeight": 1000,
     "source": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
@@ -569,28 +569,6 @@
     "retrievedAt": "2026-11-11",
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Photograph: OER (GM Restoration Parts licensee) reproduction part, reference identification; not an original factory photograph or evidence of installation.",
     "sourceSha256Base64": "rH/23YnVOvIB1+R8RXf7Ix457T1zAq2UmimtyybQyRI="
-  },
-  {
-    "make": "Pontiac",
-    "models": [],
-    "years": [
-      1973,
-      1973
-    ],
-    "role": "make",
-    "file": "pontiac-1973-full-line-cover.jpg",
-    "viewport": "311 226 626 189",
-    "width": 99,
-    "height": 30,
-    "sourceWidth": 1659,
-    "sourceHeight": 1892,
-    "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
-    "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/1973_Pontiac_Full_Line-01.jpg",
-    "evidence": "https://www.lov2xlr8.no/brochures/pontiac/73pfull/73pfull.html",
-    "notes": "\"Pontiac\" from the cover of the US 1973 Pontiac full-line brochure, white serif on black: the maker name as Pontiac printed it across its 1973 line. Unmodified scan; viewport isolates the word. 1973 only.",
-    "retrievedAt": "2026-11-11",
-    "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Period literature scan, reference identification; not evidence of what is installed on a specific car.",
-    "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E="
   },
   {
     "make": "Pontiac",
@@ -613,6 +591,28 @@
     "retrievedAt": "2026-11-11",
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Period literature scan, reference identification; not evidence of what is installed on a specific car.",
     "sourceSha256Base64": "4iMhCK0KTz6JWay+Jzo31Fj6nxVu5dZyxpvrAgAa/f4="
+  },
+  {
+    "make": "Pontiac",
+    "models": [],
+    "years": [
+      1973,
+      1973
+    ],
+    "role": "make",
+    "file": "pontiac-1973-full-line-cover.jpg",
+    "viewport": "311 226 626 189",
+    "width": 99,
+    "height": 30,
+    "sourceWidth": 1659,
+    "sourceHeight": 1892,
+    "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+    "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/1973_Pontiac_Full_Line-01.jpg",
+    "evidence": "https://www.lov2xlr8.no/brochures/pontiac/73pfull/73pfull.html",
+    "notes": "\"Pontiac\" from the cover of the US 1973 Pontiac full-line brochure, white serif on black: the maker name as Pontiac printed it across its 1973 line. Unmodified scan; viewport isolates the word. 1973 only.",
+    "retrievedAt": "2026-11-11",
+    "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Period literature scan, reference identification; not evidence of what is installed on a specific car.",
+    "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E="
   },
   {
     "make": "Pontiac",
@@ -699,8 +699,8 @@
     "role": "model",
     "file": "pontiac-firebird-fender-script-1971-1981.jpg",
     "viewport": "0 0 800 118",
-    "width": 136,
-    "height": 20,
+    "width": 120,
+    "height": 18,
     "sourceWidth": 800,
     "sourceHeight": 156,
     "source": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/486904.html",
@@ -745,6 +745,30 @@
       1973
     ],
     "role": "model",
+    "file": "pontiac-firebird-1973-us-foldout-cover.jpg",
+    "viewport": "1040 71 345 101",
+    "width": 103,
+    "height": 30,
+    "sourceWidth": 2417,
+    "sourceHeight": 2086,
+    "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Firebird%20Foldout/slides/1973%20Pontiac%20Firebird%20Foldout%2001.html",
+    "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Firebird%20Foldout/1973%20Pontiac%20Firebird%20Foldout%2001.jpg",
+    "evidence": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Firebird%20Foldout/index.html",
+    "notes": "\"Firebird\" from the cover of the US 1973 Firebird foldout brochure (\"Firebird / Pontiac's sports cars.\"), white serif on black. Unmodified scan; viewport isolates the word. 1973 only.",
+    "retrievedAt": "2026-11-11",
+    "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Period literature scan, reference identification; not evidence of what is installed on a specific car.",
+    "sourceSha256Base64": "+ZRrwwfKmTdlbn5gFrBPqX760LSPloRvQjbVZO1uyz0="
+  },
+  {
+    "make": "Pontiac",
+    "models": [
+      "Firebird"
+    ],
+    "years": [
+      1973,
+      1973
+    ],
+    "role": "model",
     "file": "pontiac-firebird-1973-canada-cover.jpg",
     "viewport": "801 48 303 81",
     "width": 112,
@@ -776,8 +800,8 @@
     "label": "Trans Am",
     "file": "pontiac-trans-am-names-1973-1975.png",
     "viewport": "386 72 284 32",
-    "width": 160,
-    "height": 18,
+    "width": 142,
+    "height": 16,
     "sourceWidth": 700,
     "sourceHeight": 569,
     "source": "https://www.phoenixgraphix.com/transam/7375tansc.php",

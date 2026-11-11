@@ -150,10 +150,15 @@ it('keeps a library of sourced 1973 Pontiac lettering, each version inside its d
   const tribute = files(1973, 'Firebird', [{ kind: 'trim', value: 'Trans Am-Style' }]);
   // Several versions per mark; the first is what the headline renders.
   expect(tribute.year).toEqual(['pontiac-1973-accessorizer-cover.jpg', 'pontiac-1973-full-line-cover.jpg', 'pontiac-firebird-1973-canada-cover.jpg']);
-  expect(tribute.make).toEqual(['pontiac-firebird-tail-letters-1970-1973.jpg', 'pontiac-1973-full-line-cover.jpg',
-    'pontiac-1973-accessorizer-cover.jpg', 'pontiac-firebird-1973-canada-cover.jpg']);
-  expect(tribute.model).toEqual(['pontiac-firebird-fender-script-1971-1981.jpg', 'pontiac-1973-full-line-firebird-spread.jpg', 'pontiac-firebird-1973-canada-cover.jpg']);
+  expect(tribute.make).toEqual(['pontiac-firebird-tail-letters-1970-1973.jpg', 'pontiac-1973-accessorizer-cover.jpg',
+    'pontiac-1973-full-line-cover.jpg', 'pontiac-firebird-1973-canada-cover.jpg']);
+  expect(tribute.model).toEqual(['pontiac-firebird-fender-script-1971-1981.jpg', 'pontiac-1973-full-line-firebird-spread.jpg',
+    'pontiac-firebird-1973-us-foldout-cover.jpg', 'pontiac-firebird-1973-canada-cover.jpg']);
   expect(tribute.variant).toEqual(['pontiac-trans-am-names-1973-1975.png', 'pontiac-trans-am-names-1973-1975.png', 'pontiac-firebird-1973-canada-cover.jpg']);
+  // The 1973-75 spoiler name (Blue) leads; the 1973-only Green fender name is a library alternative from the same photograph.
+  const decals = resolveVehicleArtwork({ year: 1973, make: 'Pontiac', model: 'Firebird', variants: [{ kind: 'trim', value: 'Trans Am-Style' }] })
+    .filter(a => a.role === 'variant').map(a => [a.years.join('-'), a.viewport]);
+  expect(decals.slice(0, 2)).toEqual([['1973-1975', '386 72 284 32'], ['1973-1973', '31 351 296 42']]);
   // The 1970-73 fender bird is documented "except Trans Am"; a tribute's base Firebird body is not a Trans Am.
   expect(tribute.emblem).toEqual(['pontiac-1973-accessorizer-cover.jpg', 'pontiac-firebird-fender-bird-1970-1973.jpg']);
   const genuine = files(1973, 'Firebird', [{ kind: 'trim', value: 'Trans Am' }]);
@@ -173,7 +178,8 @@ it('keeps a library of sourced 1973 Pontiac lettering, each version inside its d
   // Another 1973 Pontiac gets only the make-wide literature: no Firebird letters, script, bird or decal.
   const grandPrix = files(1973, 'Grand Prix', [{ kind: 'trim', value: 'Trans Am' }]);
   expect(grandPrix).toEqual({ year: ['pontiac-1973-accessorizer-cover.jpg', 'pontiac-1973-full-line-cover.jpg'],
-    make: ['pontiac-1973-full-line-cover.jpg', 'pontiac-1973-accessorizer-cover.jpg'], emblem: ['pontiac-1973-accessorizer-cover.jpg'], model: [], variant: [] });
+    // The 26 KB Accessorizer cover (already the year and arrowhead) leads other 1973 Pontiacs, not the 548 KB full-line scan.
+    make: ['pontiac-1973-accessorizer-cover.jpg', 'pontiac-1973-full-line-cover.jpg'], emblem: ['pontiac-1973-accessorizer-cover.jpg'], model: [], variant: [] });
   expect(resolveVehicleArtwork({ year: 1973, make: 'Chevrolet', model: 'Firebird' })).toEqual([]);
 });
 
