@@ -214,6 +214,27 @@ it('renders one readable time basis and opens the supplied labor source URLs', a
  expect(detail.textContent).toContain('). Not measured time.');
 });
 
+it('shows an identical quantity/time explanation once while retaining the basis, code and distinct explanations', async () => {
+ const scoped = structuredClone(ledger);
+ const line = scoped.scenarios[0].rows[0];
+ line.label = 'Finish-sand & polish';
+ line.quantity!.derivation = 'Level and polish the finish; comparison https://reference.example/polish.';
+ line.reference = { type: 'analyst_range', label: 'attributed_scenario_uncalibrated', code: 'POLISH',
+  derivation: `  ${line.quantity!.derivation}  ` };
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={scoped} renderSource={() => null} />));
+ const open = Array.from(host.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'See calculation: Finish-sand & polish')!;
+ await act(async () => open.click());
+ const detail = host.querySelector('#vp-ledger-evidence')!;
+ expect(detail.textContent?.match(/Level and polish the finish/g)).toHaveLength(1);
+ expect(detail.textContent).toContain('Time basis: Proposed labor range (not calibrated) (POLISH).');
+ expect(detail.querySelectorAll('a[href="https://reference.example/polish"]')).toHaveLength(1);
+ line.reference.derivation = 'Level and polish the finish, excluding primer sanding.';
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={scoped} renderSource={() => null} />));
+ expect(detail.textContent?.match(/Level and polish the finish/g)).toHaveLength(2);
+ expect(detail.textContent).toContain('Quantity: Level and polish the finish; comparison');
+ expect(detail.textContent).toContain('Level and polish the finish, excluding primer sanding.');
+});
+
 it('shows the material price derivation and withdraws its citation when the reader removes it', async () => {
  const scoped = structuredClone(ledger);
  scoped.scenarios[0].rows[1].pricing = { kind: 'analyst_range',

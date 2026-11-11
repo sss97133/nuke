@@ -96,10 +96,11 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
       {typeof detail.formula === 'string' && <p className="vp-ledger-equation">{detail.formula}</p>}
       {typeof rateValue === 'number' && <p>Rate: {amount(rateValue, typeof rateCurrency === 'string' ? rateCurrency : detail.currency)} per person-hour
         {typeof detail.rate_basis?.source === 'string' ? ` · ${reason(detail.rate_basis.source)}` : ''}.</p>}
-      {detail.quantity?.derivation && <p>Quantity: {detail.quantity.derivation}</p>}
+      {detail.quantity?.derivation && <p>Quantity: {sourceText(detail.quantity.derivation)}</p>}
       {reference && <p>Time basis: {typeof referenceName === 'string' ? `${referenceName} · ` : ''}{timeBasis(reference)}
         {reference.code ? ` (${String(reference.code)})` : ''}.
-        {typeof reference.derivation === 'string' && <> {sourceText(reference.derivation)}</>}</p>}
+        {typeof reference.derivation === 'string' && reference.derivation.trim() !== detail.quantity?.derivation?.trim()
+          && <> {sourceText(reference.derivation)}</>}</p>}
       {typeof detail.rate_basis?.derivation === 'string' && <p>{sourceText(detail.rate_basis.derivation)}</p>}
       {typeof detail.pricing?.derivation === 'string' && <p>Price basis: {sourceText(detail.pricing.derivation)}</p>}
       {detail.evidence_role && <p>{detail.evidence_role === 'observed_transition' ? 'A before/after sequence supports the change; hours are estimated.'
