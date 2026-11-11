@@ -71,3 +71,46 @@ has a place on an observation. A landed row is agent testimony capped at 0.6; it
   the next run decides the same way; it does not say the owner agreed.
 
 The results of the first run are in [`docs/ledger/theory/image-keys-test.md`](../../../docs/ledger/theory/image-keys-test.md).
+
+## The lane
+
+[`../keys_lane.py`](../keys_lane.py) is the one-photo unit run without an agent workflow. For one vehicle it takes the
+stored statements of one photo at a time, has the `claude` CLI key them on the subscription with the same brief,
+conventions and decisions, checks the result with `check_units.py` against the registry read live, and with `--write`
+sends each landable claim to `ingest-observation` with the body `land.sql` builds. It reads no photo and prints
+counts only. Its cases are in `../test_keys_lane.py`.
+
+Three things it does beyond the dry run's check, each counted in its summary:
+
+- A condition key is offered and landed only when it is live **and** in the curated list of `registry.snapshot.json`.
+  The table also holds fragments of a service manual that no column marks, and the writer admits any live key.
+- A result is rejected when one statement carries more than six claims, or when a landable claim quotes fewer than
+  two words of its statement (unless that is the whole statement).
+- A POST that gets no answer, a 5xx or a 429 is sent again with the same bytes, three times in all. The writer
+  answers duplicate when an earlier attempt had landed the row, so a re-send cannot land it twice.
+
+It is started by a person: the dispatch-only workflow `Photo Keys Lane` (`.github/workflows/photo-keys.yml`), or
+
+```bash
+# needs SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and CLAUDE_CODE_OAUTH_TOKEN; refuses to start if ANTHROPIC_API_KEY is set
+python3 scripts/photo-pipeline/keys_lane.py --vehicle-id <uuid> --user-id <uuid> --photos 1            # dry run
+python3 scripts/photo-pipeline/keys_lane.py --vehicle-id <uuid> --user-id <uuid> --photos 1 --write    # lands
+```
+
+What it does not do:
+
+- No schedule. Nothing starts it but a person, one photo first.
+- **No check that a statement supports the key it was given.** Code checks that the quoted words are in the
+  statement, nothing more: a statement that denies a flaw can still be placed on that flaw's key and land. In the
+  dry run the skeptics refuted 9 of 70 sampled states (one vehicle, 2026-11-10,
+  [`image-keys-test.md`](../../../docs/ledger/theory/image-keys-test.md)). A landed row is agent testimony and its
+  `limitation` says so. Closing this needs a refuting pass, or a second independent keying with only the claims
+  both agree on landed; neither is built.
+- No per-photo receipt yet. A photo is passed over as soon as it has one row from this lane. So a photo with
+  nothing landable is taken again on a later run, and a photo that landed only some of its claims (the writer
+  refused one after the re-sends, or the run was stopped between two claims) is **not** taken again. The run that
+  leaves one counts it ("photos left partly landed") and exits 1; a later run cannot tell, and says only that the
+  photo has a row. Keying such a photo again is not a repair: the run date and the model are in the hashed body,
+  so its landed claims would land a second time. Each run prints a cursor; `--after <cursor>` moves past it.
+- No place for the part. A claim lands on its condition key, and the part still rides in `structured_data`.
+- No proposal and no approval. A state with no registry key is counted and left out.
