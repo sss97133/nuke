@@ -79,12 +79,16 @@ DO $$ DECLARE r uuid:='60000000-0000-0000-0000-000000000001'; i uuid:='70000000-
  UPDATE derivation_queue SET status='claimed',locked_at=now()-interval '20 minutes',locked_by='dead' WHERE id=q;
  PERFORM claim_derivation_work('recovery',1,NULL);
  ASSERT (SELECT status='pending' AND locked_by IS NULL FROM derivation_queue WHERE id=q),'stale lease recovered';
- INSERT INTO listing_page_snapshots VALUES('a0000000-0000-0000-0000-000000000001','https://www.oerparts.com/product/test-1.html',repeat('a',64),200,true,now());
+ -- A valid source clock can contain the same digits as the private amount.
+ INSERT INTO listing_page_snapshots VALUES('a0000000-0000-0000-0000-000000000001','https://www.oerparts.com/product/test-1.html',repeat('a',64),200,true,date_trunc('second',now())+interval '0.420211 seconds');
  INSERT INTO storage.objects VALUES('catalog-images','receipt-products/'||repeat('b',64)||'.jpeg');
  c:=jsonb_build_object('source_role','catalog_cross_reference','match_basis','exact_primary_catalog_sku; installation_not_asserted','parser','receipt_product_page_v1','printed_sku','TEST-1','name','Public test product','snapshot_id','a0000000-0000-0000-0000-000000000001','page_sha256',repeat('a',64),'image_sha256',repeat('b',64),'page_url','https://www.oerparts.com/product/test-1.html','image_url',get_service_url()||'/storage/v1/object/public/catalog-images/receipt-products/'||repeat('b',64)||'.jpeg','image_source_url','https://cdn.oerparts.com/assets/test.jpeg','image_storage_path','receipt-products/'||repeat('b',64)||'.jpeg','price',50,'currency','USD','customer_name','PRIVATE NAME','receipt_amount',420,'receipt_id',r);
  p:=record_receipt_catalog_product('classic_industries','TEST-1',c);
  ASSERT p=record_receipt_catalog_product('classic_industries','*TEST-1',c),'idempotent capture';
- ASSERT (SELECT application_data::text NOT LIKE '%PRIVATE%' AND application_data::text NOT LIKE '%420%' AND application_data::text NOT LIKE '%'||r::text||'%' FROM catalog_parts WHERE id=p),'private context excluded';
+ ASSERT (SELECT application_data::text NOT LIKE '%PRIVATE%'
+ AND NOT ((application_data->'receipt_product_v1') ?| ARRAY['customer_name','receipt_amount','receipt_id'])
+ AND NOT jsonb_path_exists(application_data,'$.** ? (@ == 420 || @ == "420")')
+ AND application_data::text NOT LIKE '%'||r::text||'%' FROM catalog_parts WHERE id=p),'private context excluded';
  ASSERT receipt_item_product_card(i)->>'catalog_part_id'=p::text;
  BEGIN PERFORM record_receipt_catalog_product('classic_industries','WRONG',c);RAISE EXCEPTION 'wrong SKU accepted'; EXCEPTION WHEN raise_exception THEN ASSERT SQLERRM='Invalid product capture';END;
  BEGIN PERFORM record_receipt_catalog_product('oreilly','TEST-1',c||jsonb_build_object('product_line_code','ORC'));RAISE EXCEPTION 'wrong supplier accepted'; EXCEPTION WHEN raise_exception THEN ASSERT SQLERRM='Supplier source mismatch';END;
