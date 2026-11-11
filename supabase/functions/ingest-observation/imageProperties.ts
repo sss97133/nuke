@@ -2,6 +2,7 @@ import { RETAINED_PROPERTY_KEYS } from "./retainedInterior.ts";
 import { RETAINED_IDENTITY_KEYS, retainedListingIdentityValue } from "./retainedListingIdentity.ts";
 import { DESCRIPTION_ENGINE_FAMILY_LABEL_VERSION, ENGINE_FAMILY_LABEL_VERSION } from "./retainedDescriptionPowertrain.ts";
 import { TITLE_FACET_KEYS, TITLE_FACET_NORMALIZATION, type TitleFacetKey } from "./titleFacets.ts";
+import { COMPONENT_PRESENCE_PROPERTY } from "./componentEvidence.ts";
 /** Property admission only. Source lineage, clocks and replay belong to the writer. */
 export const IMAGE_PROPERTY_VALUES = {
   image_visible_rust_severity: ["none", "surface", "pitting", "perforation"],
@@ -59,6 +60,7 @@ export function validateObservationProperty(
   property: ObservationPropertyRegistryRow | null,
   retainedPropertyVerified = false,
   titleFacetVerified = false,
+  componentVerified = false,
 ): ObservationPropertyValidation {
   if (input.property_key === undefined) return { ok: true, propertyId: null };
   if (typeof input.property_key !== "string" || !input.property_key.trim()) {
@@ -66,7 +68,8 @@ export function validateObservationProperty(
   }
   const titleFacet = titleFacetVerified && TITLE_FACET_KEYS.includes(input.property_key as TitleFacetKey);
   if (!isSupportedImagePropertyKey(input.property_key) && !isImageReadingKey(input.property_key) && !titleFacet &&
-      !(retainedPropertyVerified && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
+      !(retainedPropertyVerified && RETAINED_PROPERTY_KEYS.includes(input.property_key)) &&
+      !(componentVerified && input.property_key === COMPONENT_PRESENCE_PROPERTY)) {
     return invalid("Unsupported property_key; only registered image properties are supported");
   }
   if (!property || property.namespace !== "core" || property.deprecated_at != null) {
@@ -83,6 +86,8 @@ export function validateObservationProperty(
   }
   const fields = data as Record<string, unknown>;
   const value = fields[input.property_key];
+  if (input.property_key === COMPONENT_PRESENCE_PROPERTY && (!componentVerified || input.kind !== "condition" ||
+      input.agent_inferred !== true || typeof value !== "boolean")) return invalid("Component presence requires a qualified scoped reading");
   const craigslistYear=retainedPropertyVerified&&input.kind==="listing"&&input.property_key==="year"&&fields.source_profile==="craigslist_year_attribute_v1";
   if (RETAINED_IDENTITY_KEYS.includes(input.property_key) && ((!craigslistYear&&input.kind !== "specification") ||
       retainedListingIdentityValue(input.property_key, value) === null ||

@@ -173,6 +173,17 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_public_live_events.sql
           psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_live_relisted_lot_fold.sql
           deno test --node-modules-dir=none --allow-env --allow-read --allow-run=psql --filter PostgreSQL supabase/functions/ingest-observation/batLiveCollector.test.ts
+      - name: Verify component intake through PostgreSQL and the existing build-log consumer
+        env:
+          RUN_COMPONENT_PG: '1'
+          PGDATABASE: dm_refinement_component_ci
+          PGPORT: '5432'
+        run: |
+          set -euo pipefail
+          trap 'dropdb --if-exists dm_refinement_component_ci; psql -X -v ON_ERROR_STOP=1 -d postgres -c "DROP ROLE IF EXISTS anon, authenticated, service_role"' EXIT
+          createdb dm_refinement_component_ci
+          psql -X -v ON_ERROR_STOP=1 -f supabase/sql/test_component_evidence.sql
+          PSQL_BIN="$(command -v psql)" deno test --node-modules-dir=none --allow-env --allow-run=psql supabase/functions/ingest-observation/componentEvidencePostgres.test.ts
       - name: Run each database contract in its own fresh database
         run: scripts/ci/run-db-contracts.sh --ci-service
 
