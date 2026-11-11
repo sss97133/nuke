@@ -39,6 +39,8 @@ BEGIN
 END $fixture$;
 \ir ../migrations/20261111032100_mccormick_retained_identity_keys.sql
 \ir ../migrations/20261111032100_mccormick_retained_identity_keys.sql
+\ir ../migrations/20261111034900_mccormick_capture_query_order.sql
+\ir ../migrations/20261111034900_mccormick_capture_query_order.sql
 DO $contract$
 DECLARE p public.vehicle_observations;o public.vehicle_observations;j jsonb;base jsonb:=current_setting('test.base')::jsonb;patch jsonb;k text;child jsonb;v jsonb;s jsonb;url text;native text;presentation text;
 BEGIN
@@ -84,7 +86,12 @@ BEGIN
   IF public.retained_native_listing_source(p) THEN RAISE EXCEPTION 'excluded parent accepted %',patch;END IF;
  END LOOP;
  PERFORM set_config('test.vehicles',jsonb_build_array(current_setting('test.base_vehicle')::jsonb)::text,false);
- FOR patch IN SELECT value FROM jsonb_array_elements('[{"success":false},{"http_status":403},{"platform":"other"},{"listing_url":"https://example.com"},{"html_sha256":"bad"},{"fetched_at":"2026-11-09T00:00:00.123455Z"},{"created_at":"2026-11-10T00:00:00Z"}]'::jsonb) LOOP
+ -- Actual retained archive fetches sort auctionid before auctionnbr.
+ FOR url IN SELECT unnest(ARRAY[p.source_url,'https://www.classic-carauction.com/auction-results?auctionid=7309&auctionnbr=58']) LOOP
+  PERFORM set_config('test.snapshots',jsonb_build_array(current_setting('test.base_snapshot')::jsonb||jsonb_build_object('listing_url',url))::text,false);
+  IF public.retained_native_listing_source(p) IS DISTINCT FROM true THEN RAISE EXCEPTION 'equivalent archive parameter order refused';END IF;
+ END LOOP;
+ FOR patch IN SELECT value FROM jsonb_array_elements('[{"success":false},{"http_status":403},{"platform":"other"},{"listing_url":"https://example.com"},{"listing_url":"https://www.classic-carauction.com/auction-results?auctionid=7309&auctionnbr=58&extra=1"},{"listing_url":"https://www.classic-carauction.com/auction-results?auctionid=7310&auctionnbr=58"},{"listing_url":"https://www.classic-carauction.com/auction-results?auctionid=7309&auctionnbr=59"},{"html_sha256":"bad"},{"fetched_at":"2026-11-09T00:00:00.123455Z"},{"created_at":"2026-11-10T00:00:00Z"}]'::jsonb) LOOP
   PERFORM set_config('test.snapshots',jsonb_build_array(current_setting('test.base_snapshot')::jsonb||patch)::text,false);
   IF public.retained_native_listing_source(p) THEN RAISE EXCEPTION 'broken snapshot accepted %',patch;END IF;
  END LOOP;
@@ -98,6 +105,12 @@ BEGIN
   PERFORM set_config('test.observations',jsonb_build_array(j)::text,false);PERFORM set_config('test.snapshots',jsonb_build_array(s)::text,false);
   SELECT * INTO p FROM public.vehicle_observations;
   IF public.retained_native_listing_source(p) IS DISTINCT FROM true THEN RAISE EXCEPTION 'native namespace refused %',native;END IF;
+  IF presentation='showroom' THEN
+   PERFORM set_config('test.snapshots',jsonb_build_array(s||jsonb_build_object('listing_url','https://www.classic-carauction.com/Showroom-Inventory?id=7309&sp=1'))::text,false);
+   IF public.retained_native_listing_source(p) IS DISTINCT FROM true THEN RAISE EXCEPTION 'equivalent showroom parameter order refused';END IF;
+   PERFORM set_config('test.snapshots',jsonb_build_array(s||jsonb_build_object('listing_url','https://www.classic-carauction.com/Showroom-Inventory?id=7310&sp=1'))::text,false);
+   IF public.retained_native_listing_source(p) THEN RAISE EXCEPTION 'other showroom stock accepted';END IF;
+  END IF;
  END LOOP;
  RAISE NOTICE 'PASS: native capture proof, identity child linkage, replay and privacy/mutation refusals';
 END $contract$;
