@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
-import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
 import PrefetchLink from '../components/PrefetchLink';
 import './Capsule.css';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
@@ -27,10 +26,9 @@ type CapsuleTab =
   | 'organizations'
   | 'knowledge'
   | 'streaming'
-  | 'professional'
-  | 'photos';
+  | 'professional';
 
-const capsuleTabs: CapsuleTab[] = ['dashboard', 'api-access', 'settings', 'appearance', 'financials', 'organizations', 'knowledge', 'streaming', 'professional', 'photos'];
+const capsuleTabs: CapsuleTab[] = ['dashboard', 'api-access', 'settings', 'appearance', 'financials', 'organizations', 'knowledge', 'streaming', 'professional'];
 
 const Capsule: React.FC = () => {
   const [session, setSession] = useState<any>(() => readCachedSession());
@@ -90,14 +88,13 @@ const Capsule: React.FC = () => {
     { key: 'organizations', label: 'Organizations' },
     { key: 'knowledge', label: 'Knowledge Library' },
     { key: 'streaming', label: 'Streaming' },
-    { key: 'professional', label: 'Professional' },
-    { key: 'photos', label: 'Photos' }
+    { key: 'professional', label: 'Professional' }
   ];
 
   return (
       <div className="capsule-workspace">
-        {/* Sidebar Navigation - Hidden on Photos tab */}
-        {activeTab !== 'photos' && (
+        {/* Sidebar Navigation */}
+        {(
           <div className="capsule-sidebar">
             <nav aria-label="Your workspace">
               {tabs.map(tab => (
@@ -127,7 +124,7 @@ const Capsule: React.FC = () => {
                   <div className="capsule-destinations">
                     <PrefetchLink to="/accounting"><strong>Accounting</strong><span>Books, receipts, review questions and shared access.</span><span aria-hidden="true">›</span></PrefetchLink>
                     <PrefetchLink to="/work"><strong>Work</strong><span>Jobs, work days and confirmations awaiting your review.</span><span aria-hidden="true">›</span></PrefetchLink>
-                    <PrefetchLink to="/photo-library"><strong>Your photo library</strong><span>Organize your captures and the evidence they carry.</span><span aria-hidden="true">›</span></PrefetchLink>
+                    <PrefetchLink to="/capture/ledger"><strong>Your photos</strong><span>Every photo by day, and the vehicle it landed on or why it was held.</span><span aria-hidden="true">›</span></PrefetchLink>
                     <PrefetchLink to="/settings"><strong>Settings</strong><span>Your account, connected agents and business preferences.</span><span aria-hidden="true">›</span></PrefetchLink>
                   </div>
                 </div>
@@ -226,11 +223,6 @@ const Capsule: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'photos' && (
-            <div>
-              <PersonalPhotoLibrary />
-            </div>
-          )}
         </div>
       </div>
   );
