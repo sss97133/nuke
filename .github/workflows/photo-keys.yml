@@ -71,7 +71,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22: the database client used by step=properties needs the WebSocket that Node has from 22 on.
+          node-version: '22'
 
       - uses: actions/setup-python@v5
         with:
