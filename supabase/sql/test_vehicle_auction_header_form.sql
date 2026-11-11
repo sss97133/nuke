@@ -26,7 +26,7 @@ CREATE VIEW public.organizations WITH(security_invoker=true) AS
  SELECT * FROM jsonb_to_recordset(header_fixture()->'organizations')
  AS o(id uuid,business_name text,logo_url text,is_public boolean,is_active boolean);
 CREATE VIEW public.observation_sources WITH(security_invoker=true) AS
- SELECT (header_fixture()#>>'{observations,0,source_id}')::uuid id, 'mccormicks'::text slug;
+ SELECT (header_fixture()->>'publisher_source_id')::uuid id, 'mccormicks'::text slug;
 CREATE VIEW public.listing_feeds WITH(security_invoker=true) AS
  SELECT 1 id,'mccormicks'::text source_slug,'https://www.classic-carauction.com/Home'::text feed_url,
    jsonb_build_object('organization_id',header_fixture()#>>'{organizations,0,id}',
@@ -35,7 +35,7 @@ CREATE VIEW public.listing_feeds WITH(security_invoker=true) AS
    CASE WHEN (header_fixture()->>'refresh_failed')::boolean THEN 'fixture error' END last_error;
 CREATE VIEW public.source_census WITH(security_invoker=true) AS
  SELECT '70000000-0000-0000-0000-000000000001'::uuid id,
-   (header_fixture()#>>'{observations,0,source_id}')::uuid source_id,
+   (header_fixture()->>'publisher_source_id')::uuid source_id,
    'house_roster_facet'::text census_method,
    (CASE WHEN (header_fixture()->>'stale')::boolean THEN now()-interval '2 hours'
      ELSE (header_fixture()->>'checked_at')::timestamptz END) census_at,
@@ -64,6 +64,7 @@ GRANT SELECT ON public.vehicles,public.vehicle_events,public.vehicle_observation
 
 CREATE FUNCTION public.header_base() RETURNS jsonb LANGUAGE sql STABLE AS $$
 SELECT jsonb_build_object(
+ 'publisher_source_id','30000000-0000-0000-0000-000000000001',
  'vehicles',jsonb_build_array(jsonb_build_object('id','10000000-0000-0000-0000-000000000001',
    'is_public',true,'year',2008,'make','Synthetic','model','Convertible')),
  'organizations','[{"id":"20000000-0000-0000-0000-000000000001","business_name":"Fixture Auctions","logo_url":null,"is_public":true,"is_active":true}]'::jsonb,
@@ -99,6 +100,13 @@ DO $$ BEGIN
  ASSERT header_item('auctioneer')#>>'{value,name}'='Fixture Auctions','brand via approved reader';
  ASSERT NOT has_table_privilege('anon','public.organizations','SELECT'),'no org grant expansion';
  ASSERT NOT has_function_privilege('public','public.vehicle_profile_read(uuid)','EXECUTE'),'function ACL preserved';
+ ASSERT NOT has_function_privilege('public','public.organization_source_inventory_read(uuid,text)','EXECUTE'),'scoped reader does not gain PUBLIC access';
+ ASSERT NOT EXISTS(SELECT grantee,is_grantable FROM pg_proc p,
+   LATERAL aclexplode(p.proacl) a WHERE p.oid='public.organization_source_inventory_read(uuid,text)'::regprocedure
+   EXCEPT SELECT grantee,is_grantable FROM pg_proc p,LATERAL aclexplode(p.proacl) a
+     WHERE p.oid='public.organization_source_inventory_read(uuid)'::regprocedure),'scoped signature has no additional grantees';
+ ASSERT jsonb_array_length(organization_source_inventory_read('20000000-0000-0000-0000-000000000001','123')->'inventory')=1,'native scope returns addressed roster row';
+ ASSERT jsonb_array_length(organization_source_inventory_read('20000000-0000-0000-0000-000000000001','999')->'inventory')=0,'native scope cannot substitute a different lot';
  ASSERT (SELECT NOT prosecdef AND provolatile='s' FROM pg_proc
    WHERE oid='public.vehicle_profile_read(uuid)'::regprocedure),'profile stays stable security invoker';
  ASSERT header_item('auctioneer')#>>'{value,role}'='auctioneer','representation never ownership';
@@ -121,10 +129,14 @@ DO $$ DECLARE b jsonb:=header_base(); f jsonb; s text; BEGIN
  ASSERT header_read() IS NULL,'superseded source excluded';
  PERFORM header_set(jsonb_set(b,'{observations,0,vehicle_id}','"10000000-0000-0000-0000-000000000002"'));
  ASSERT header_read() IS NULL,'source must witness addressed parent';
+ PERFORM header_set(jsonb_set(b,'{observations,0,source_id}','"30000000-0000-0000-0000-000000000002"'));
+ ASSERT header_read() IS NULL,'witness must come from independently identified publisher';
  PERFORM header_set(jsonb_set(b,'{events,0,metadata,source_observation_id}','"invalid"'));
  ASSERT header_read() IS NULL,'malformed lineage fails closed without breaking profile';
  PERFORM header_set(jsonb_set(b,'{vehicles,0,is_public}','false'));
  ASSERT header_read() IS NULL,'private parent excluded';
+ PERFORM header_set(jsonb_set(b,'{vehicles,0,deleted_at}',to_jsonb(now())));
+ ASSERT header_read() IS NULL,'deleted parent excluded';
  PERFORM header_set(jsonb_set(b,'{vehicles,0,listing_kind}','"non_vehicle_item"'));
  ASSERT header_read() IS NULL,'nonvehicle excluded';
  PERFORM header_set(jsonb_set(b,'{organizations,0,is_public}','false'));
@@ -164,6 +176,9 @@ DO $$ DECLARE b jsonb:=header_base(); f jsonb; s text; BEGIN
  ASSERT header_read()->>'form'='appearance_selection','no arbitrary tie winner';
  ASSERT jsonb_array_length(header_item('appearance')->'candidates')=3,'all tied appearances retained';
  ASSERT header_item('hammer_estimate') IS NULL,'no price context on ambiguous appearance';
+ f:=jsonb_set(jsonb_set(f,'{events,0,event_status}','"sold"'),'{events,1,event_status}','"sold"');
+ PERFORM header_set(f);
+ ASSERT header_read()->>'form'='appearance_selection','two sold rows cannot hide a third upcoming conflict';
  -- Identifier prefilter preserves the original legacy path and parent ambiguity.
  PERFORM header_set(jsonb_set(b,'{observations,0,source_identifier}','"legacy-identifier"'));
  ASSERT header_read()->>'form'='auction_acquisition','legacy identifier retains complete matching';
@@ -171,6 +186,7 @@ DO $$ DECLARE b jsonb:=header_base(); f jsonb; s text; BEGIN
    '{id}','"40000000-0000-0000-0000-000000000002"'),'{vehicle_id}','"10000000-0000-0000-0000-000000000002"'));
  PERFORM header_set(f);
  ASSERT header_read()->>'form'='auction_context','other parent binding cannot establish current offer';
+ ASSERT organization_source_inventory_read('20000000-0000-0000-0000-000000000001','123')#>'{inventory,0,vehicle_id}'='null'::jsonb,'scoped reader preserves cross-parent ambiguity';
  PERFORM header_set(jsonb_set(b,'{events,0,event_status}','"unknown"'));
  ASSERT header_read()->>'form'='auction_context','unsupported status never becomes acquisition';
  PERFORM header_set(jsonb_set(b,'{events,0,event_status}','"bid-goes-on"'));

@@ -35,7 +35,7 @@ activity, never title ownership. A missing logo remains missing.
 | Multiple equally ranked eligible appearances | `appearance_selection` | Preserve every candidate; withhold chosen appearance and price context |
 | Retracted, duplicate, superseded or malformed lineage, or ineligible parent/publisher | No auction form | Disqualified association cannot advertise the car |
 
-Rank current-roster upcoming appearances scheduled today first, then the nearest
+Rank current-roster appearances scheduled today first, then the nearest
 future current-roster offer, then the latest elapsed appearance. Unmatched future
 context follows. Never rank by generic database refresh time. Evaluate the entire
 tied set, rather than comparing only two rows.
@@ -78,6 +78,11 @@ The inventory reader filters canonical native identifiers to current roster
 candidates before decoding large retained payloads. Unknown legacy identifier forms
 retain their original matching path. All existing title, URL, parent ambiguity and
 public-parent qualification remains in place.
+
+The same reader has a native-ID scoped overload for the header. Its execution
+permissions are copied from the existing reader; the existing one-argument API
+delegates to the same implementation with no native filter. Header requests decode
+only the addressed lot's candidate payloads, retaining cross-parent ambiguity checks.
 
 These tests prove rules, not visual acceptance, source-wide readiness, calibrated
 forecasts, archive completeness or estimate accuracy improvements. Retained real

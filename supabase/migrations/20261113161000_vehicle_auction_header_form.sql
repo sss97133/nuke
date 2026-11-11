@@ -4,9 +4,11 @@ BEGIN;
 SET LOCAL statement_timeout='8s';
 SET LOCAL lock_timeout='2s';
 DO $migration$
-DECLARE d text;
+DECLARE d text; base_d text; a record;
 BEGIN
+ IF to_regprocedure('public.organization_source_inventory_read(uuid,text)') IS NULL THEN
   d := pg_get_functiondef('public.organization_source_inventory_read(uuid)'::regprocedure);
+  base_d := d;
   IF position('auction_roster_candidates_v1' in d)=0 THEN
     IF position('), matching AS MATERIALIZED (' in d)=0
       OR position($anchor$FROM publisher p JOIN public.vehicle_observations o ON o.source_id=p.source_id
@@ -39,7 +41,45 @@ BEGIN
     'name',publisher_name,'logo_url',publisher_logo_url,'role','auctioneer') FROM publisher LIMIT 1),
   'source','mccormicks','checked_at'$replacement$);
   END IF;
+  -- Scope the same canonical reader by native identity. Header reads must not
+  -- decode every current lot's retained payload. The one-argument API is retained.
+  d := replace(d,'organization_source_inventory_read(p_organization_id uuid)',
+    'organization_source_inventory_read(p_organization_id uuid, p_native_id text)');
+  d := replace(d,'), roster AS MATERIALIZED (','), source_roster AS MATERIALIZED (');
+  d := replace(d,'), listing_candidates AS MATERIALIZED (',$scope$), roster AS MATERIALIZED (
+  -- auction_header_inventory_scope_v1: no new population or binding policy.
+  SELECT * FROM source_roster WHERE p_native_id IS NULL OR native_id=p_native_id
+), listing_candidates AS MATERIALIZED ($scope$);
   EXECUTE d;
+  EXECUTE format('ALTER FUNCTION public.organization_source_inventory_read(uuid,text) OWNER TO %I',
+    (SELECT pg_get_userbyid(proowner) FROM pg_proc
+      WHERE oid='public.organization_source_inventory_read(uuid)'::regprocedure));
+  -- Remove defaults first: the new signature must not inherit extra role grants.
+  FOR a IN SELECT x.grantee FROM pg_proc p,
+    LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) x
+    WHERE p.oid='public.organization_source_inventory_read(uuid,text)'::regprocedure
+      AND x.grantee<>p.proowner
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION public.organization_source_inventory_read(uuid,text) FROM %s',
+      CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE quote_ident(pg_get_userbyid(a.grantee)) END);
+  END LOOP;
+  -- Copy the existing reader's explicit execution boundary, including grant option.
+  FOR a IN SELECT x.grantee,x.is_grantable FROM pg_proc p,
+    LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) x
+    WHERE p.oid='public.organization_source_inventory_read(uuid)'::regprocedure
+      AND x.privilege_type='EXECUTE' AND x.grantee<>p.proowner
+  LOOP
+    EXECUTE format('GRANT EXECUTE ON FUNCTION public.organization_source_inventory_read(uuid,text) TO %s%s',
+      CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE quote_ident(pg_get_userbyid(a.grantee)) END,
+      CASE WHEN a.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END);
+  END LOOP;
+  EXECUTE split_part(base_d,'AS $function$',1)||$wrapper$AS $function$
+    SELECT public.organization_source_inventory_read(p_organization_id,NULL::text);
+  $function$$wrapper$;
+ ELSIF position('auction_header_inventory_scope_v1' in
+   pg_get_functiondef('public.organization_source_inventory_read(uuid,text)'::regprocedure))=0 THEN
+   RAISE EXCEPTION 'Scoped inventory reader already has a different owner; inspect before extending';
+ END IF;
 
   d := pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure);
   IF position('auction_header_form_v1' in d)=0 THEN
@@ -66,8 +106,9 @@ header_events AS MATERIALIZED (
     AND e.metadata->>'source_catalog_sha256' ~ '^[a-f0-9]{64}$'
     AND pg_input_is_valid(e.metadata->>'source_catalog_snapshot_id','uuid')
 ), header_publishers AS MATERIALIZED (
-  SELECT source_organization_id, public.organization_source_inventory_read(source_organization_id) doc
-  FROM (SELECT DISTINCT source_organization_id FROM header_events) p
+  SELECT source_organization_id,native_id,
+    public.organization_source_inventory_read(source_organization_id,native_id) doc
+  FROM (SELECT DISTINCT source_organization_id,metadata->>'native_id' native_id FROM header_events) p
 ), header_qualified AS MATERIALIZED (
   SELECT e.*, p.doc,
     (e.ended_at AT TIME ZONE 'UTC')::date run_on,
@@ -76,7 +117,8 @@ header_events AS MATERIALIZED (
         AND r->>'sale_key'=e.metadata->>'sale_key' AND r->>'source_url'=e.source_url
         AND r->>'inventory_kind'='auction' AND r->>'source_status'='scheduled'
         AND r->>'run_on'=to_char(e.ended_at AT TIME ZONE 'UTC','YYYY-MM-DD')) current_roster_match
-  FROM header_events e JOIN header_publishers p USING(source_organization_id)
+  FROM header_events e JOIN header_publishers p ON p.source_organization_id=e.source_organization_id
+    AND p.native_id=e.metadata->>'native_id'
   JOIN public.vehicle_observations o ON o.id=CASE
     WHEN pg_input_is_valid(e.metadata->>'source_observation_id','uuid')
     THEN (e.metadata->>'source_observation_id')::uuid END
@@ -93,8 +135,8 @@ header_events AS MATERIALIZED (
     AND e.metadata->>'ended_at_method'='scheduled_run_day'
 ), header_ranked AS (
   SELECT q.*, dense_rank() OVER (ORDER BY
-    CASE WHEN event_status='upcoming' AND current_roster_match AND run_on=current_date THEN 0
-         WHEN event_status='upcoming' AND current_roster_match AND run_on>current_date THEN 1
+    CASE WHEN current_roster_match AND run_on=current_date THEN 0
+         WHEN current_roster_match AND run_on>current_date THEN 1
          WHEN run_on<current_date THEN 2 ELSE 3 END,
     CASE WHEN run_on>=current_date THEN run_on END ASC,
     CASE WHEN run_on<current_date THEN run_on END DESC) choice_rank
