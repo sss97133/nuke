@@ -46,7 +46,8 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
   for (const line of lines.data.filter(productEligible)) {
     // A repaired parser must revisit an old refusal instead of waiting out its
     // retry delay. Already acknowledged products still come from the catalog.
-    const fingerprint = await sha(new TextEncoder().encode(JSON.stringify(['optional_stock_image_v3', receipt.vendor_name, line.part_number, line.description])));
+    const parserRevision = supplierKey(receipt.vendor_name) === 'oreilly' ? 'printed_sku_link_v4' : 'optional_stock_image_v3';
+    const fingerprint = await sha(new TextEncoder().encode(JSON.stringify([parserRevision, receipt.vendor_name, line.part_number, line.description])));
     const previous = queue.data.product_result?.items?.[line.id];
     const card = await admin.rpc('receipt_item_product_card', { p_item: line.id });
     if (card.error) throw new Error('catalog_reader_unavailable');

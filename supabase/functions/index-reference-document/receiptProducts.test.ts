@@ -71,6 +71,36 @@ Deno.test('OReilly receipt without a product line stays explicit and does not sc
  const result = await enrichReceiptProducts(f.admin, request, f.effects);
  assert(!result.product_complete && result.product_result.items['line-0'].status==='receipt_line_code_missing' && !f.captures.length,'do not guess a brand');
 });
+Deno.test('OReilly printed-SKU revision revisits a refused normalized link and admits only exact primary identity', async () => {
+ for (const [primaryPart, primaryLine, expectedStatus] of [
+   ['GAL50/50', 'AFZ', 'matched'], ['GAL5050', 'AFZ', 'sku_not_verified'],
+   ['GAL50/50', 'ABC', 'product_line_code_mismatch'],
+ ]) {
+   const f=fixture(1,"O'Reilly Auto Parts");
+   f.lines[0]={id:'line-0',part_number:'GAL50/50',description:'ANTIFREEZE (AFZ) private receipt context'};
+   const oldFingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(['optional_stock_image_v3',"O'Reilly Auto Parts",f.lines[0].part_number,f.lines[0].description])))),x=>x.toString(16).padStart(2,'0')).join('');
+   f.state.prior={items:{'line-0':{fingerprint:oldFingerprint,status:'exact_product_link_missing',retry_at:new Date(Date.now()+86400000).toISOString()}}};
+   f.effects.capturePage=async(_a,url)=>{
+     f.captures.push(url);
+     return {html:url.includes('/search?')?'<a href="/detail/c/brand/coolant/afz0/gal5050?q=GAL50%2F50"><h3 class="js-product-name" data-item="GAL50/50" data-line="AFZ">Coolant</h3></a>':
+       `<h1 class="js-product-name" data-item="${primaryPart}" data-line="${primaryLine}">Coolant</h1><script type="application/ld+json">${JSON.stringify({'@type':'Product',mpn:primaryPart,name:'Coolant',offers:{price:12.34,priceCurrency:'USD'}})}</script>`,
+       source:{listing_url:url,id:'snapshot',html_sha256:'a'.repeat(64)}};
+   };
+   const result=await enrichReceiptProducts(f.admin,request,f.effects);
+   assert(f.captures.length===2&&f.captures[1].includes('/gal5050?'),'old refusal revisits the same bounded supplier path');
+   assert(result.product_result.items['line-0'].status===expectedStatus,'primary source controls admission, not the search card');
+   const writes=f.calls.filter(x=>x.name==='record_receipt_catalog_product');
+   assert(writes.length===(expectedStatus==='matched'?1:0),'only exact primary SKU and line may write');
+   if(writes.length)assert(writes[0].args.p_capture.printed_sku==='GAL50/50'&&writes[0].args.p_capture.price===12.34&&!JSON.stringify(writes).includes('private'),'source quote excludes private receipt text');
+ }
+});
+Deno.test('printed-SKU parser revision preserves other suppliers existing retry clocks', async () => {
+ const f=fixture(1);
+ const fingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(['optional_stock_image_v3','Classic Industries',f.lines[0].part_number,f.lines[0].description])))),x=>x.toString(16).padStart(2,'0')).join('');
+ f.state.prior={items:{'line-0':{fingerprint,status:'stock_image_unavailable',retry_at:new Date(Date.now()+3600000).toISOString()}}};
+ const result=await enrichReceiptProducts(f.admin,request,f.effects);
+ assert(!result.product_complete&&f.captures.length===0&&result.product_result.items['line-0'].fingerprint===fingerprint,'unrelated retry intent remains unchanged');
+});
 Deno.test('a parser revision revisits a prior refusal instead of retaining its day-long delay', async () => {
  const f=fixture(1);
  const oldFingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(['Classic Industries',f.lines[0].part_number,f.lines[0].description])))),x=>x.toString(16).padStart(2,'0')).join('');
