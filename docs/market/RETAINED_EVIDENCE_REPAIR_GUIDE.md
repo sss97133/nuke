@@ -779,3 +779,25 @@ admission or independent corroboration. The fixture anonymous reader returned
 three attributed reports and one unchanged confirmed-work control. Deployed Edge,
 PostgREST and browser behavior remain unverified. The local withdrawal test
 injects a late replay-boundary change; it is not a concurrent transaction proof.
+
+### Retained result claims in the existing assessment
+
+`readVehicleAssessment` also reads McCormick archive listing roots through the existing
+`retained_native_listing_source` computed qualifier. That qualifier rechecks current source,
+capture custody and public parent eligibility; it does not independently verify a sale.
+The assessment and listing package expose a separate `retained_auction_appearances` section,
+rendered by the shared evidence component with links to the original result and retained reading.
+
+The grain is a native auction appearance within the returned source-row page. Agreeing repeated
+captures share a group; conflicting amount, outcome or publisher date text retains every witness
+and withholds a selected result. No-sale high bids remain unsuccessful bids. Amount, literal,
+dollar symbol, original date-range text and capture/recording clocks survive; currency and fee
+basis remain unknown. No exact event instant, verified-sale count, sell-through, monetary
+statistics or comparable eligibility is inferred. This is source-backed report context,
+not improved numeric valuation accuracy or a complete auction-history population.
+
+Both existing read-only endpoints accept `appearance_after` for a bounded 200-source-row page.
+The UI declares further source readings when the sentinel is present. Page-local groups must not
+be summed as globally unique appearances. An unavailable reader remains unavailable. Existing
+qualified-price eligibility, estimator writes, access checks and listing-copy rules stay owned
+by their existing paths; result claims never autofill asserted listing copy.
