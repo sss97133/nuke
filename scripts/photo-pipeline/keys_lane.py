@@ -61,7 +61,7 @@ class Stop(Exception):
 # ---- the claude CLI: one text-only call on the subscription ----------------------------------------------------
 # stage-queue.mjs (usage limit) and the retired cloud batch's authentication pattern.
 USAGE_LIMIT = re.compile(r"usage limit|(?:hit|reached) your [\w' -]{0,24}limit|(?:5-hour|session|weekly|opus|sonnet) limit reached|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b", re.I)
-AUTH = re.compile(r"authentication_error|oauth.{0,80}expir|invalid.{0,30}(?:token|api key)|not logged in|unauthorized|API Error: 401", re.I)
+AUTH = re.compile(r"authentication_error|oauth.{0,80}(?:expir|revok|invalid)|invalid.{0,30}(?:token|api key|bearer|credential)|not logged in|run /login|unauthorized|forbidden|permission_error|does not have access|API Error: 40[13]", re.I)
 KEEP = ('HOME', 'PATH', 'TMPDIR', 'LANG', 'LC_ALL', 'CLAUDE_CODE_OAUTH_TOKEN')
 READER_STOPS = {   # the answers after which no further photo is tried
     'reader_usage_limit': (3, 'usage limit reached: stopped at once, what landed is kept'),
@@ -71,25 +71,34 @@ READER_STOPS = {   # the answers after which no further photo is tried
 }
 
 
+def tell(text):
+    """An error line from the CLI, safe for a public log: one line, ids and long tokens removed, 240 characters."""
+    line = ws(str(text))[:240]
+    return re.sub(r'[A-Za-z0-9_\-]{24,}', '<long>', UUID.sub('<id>', line)) or '(nothing was printed)'
+
+
 def read_envelope(returncode, stdout, stderr):
     """What one `claude -p --output-format json` call said: {'ok': True, 'value': <the JSON object in the answer>} or
     {'ok': False, 'error_class': ...}. A usage limit exits non-zero with its JSON on stdout, so stdout is read first."""
-    fail = lambda error_class: {'ok': False, 'error_class': error_class}
+    fail = lambda error_class, said=None: {'ok': False, 'error_class': error_class, **({'said': said} if said else {})}
     try:
         outer = json.loads(stdout)
         if not isinstance(outer, dict): raise ValueError('not an object')
     except ValueError:
         text = (stderr or stdout or '')[:2000]
-        if USAGE_LIMIT.search(text): return fail('reader_usage_limit')
-        if AUTH.search(text): return fail('reader_unauthorized')
-        return fail('reader_exited' if returncode else 'reader_output_invalid')
+        why = f'exit {returncode}, no JSON from the CLI: {tell(text)}'
+        if USAGE_LIMIT.search(text): return fail('reader_usage_limit', why)
+        if AUTH.search(text): return fail('reader_unauthorized', why)
+        return fail('reader_exited', why) if returncode else fail('reader_output_invalid')
     text = str(outer.get('result') or '')
     api = outer.get('api_error_status')
     api = api if isinstance(api, int) else 0
     if outer.get('is_error') or returncode:
-        if api in (429, 529) or USAGE_LIMIT.search(text): return fail('reader_usage_limit')
-        if api in (401, 403) or AUTH.search(text): return fail('reader_unauthorized')
-        return fail('reader_api_unreachable' if api >= 500 else 'reader_exited')
+        # The CLI's own error line. The model did not answer, so this is the tool speaking and holds no statement.
+        why = f"exit {returncode}, subtype {outer.get('subtype')}, api status {api or 'none'}: {tell(text or stderr or '')}"
+        if api in (429, 529) or USAGE_LIMIT.search(text): return fail('reader_usage_limit', why)
+        if api in (401, 403) or AUTH.search(text): return fail('reader_unauthorized', why)
+        return fail('reader_api_unreachable' if api >= 500 else 'reader_exited', why)
     found = re.search(r'\{[\s\S]*\}', text)
     try: value = json.loads(found.group(0)) if found else None
     except ValueError: value = None
@@ -495,6 +504,7 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
             n['model seconds'] += round(time.monotonic() - started)
             if not answer.get('ok'):
                 failures[answer['error_class']] += 1
+                if answer.get('said'): out(f"the claude CLI said: {answer['said']}")
                 if answer['error_class'] in READER_STOPS: raise Stop(*READER_STOPS[answer['error_class']])
                 out(f'photo {number} of {len(photos)}: the reader failed'); cursor = photo['id'][:8]; continue
             try: problems, _ = check_units.check_unit(answer['value'], dec_parts, dec_states, texts=texts)

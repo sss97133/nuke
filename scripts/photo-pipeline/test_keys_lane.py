@@ -377,4 +377,14 @@ assert 'nothing left to do' not in printed and 'result: no photo left to take: 1
 db = Database([photo(P1, callouts=TWO)], writer=answers((200, NEW), (401, {'error': 'unauthorized'})))
 code, printed = lane(db, '--write', ask=says(two))
 assert code == 4 and len(db.writes) == 2 and 'again): 1' in printed, 'a stop between two claims of one photo leaves it partly landed, and the count says so'
-print(f'keys_lane: 18 groups of cases pass ({pack})')
+# 19. a failed call says why, safely: the CLI's own error line, one line, with ids and long tokens removed
+said = keys_lane.read_envelope(1, json.dumps({'type': 'result', 'subtype': 'error_during_execution', 'is_error': True, 'api_error_status': None,
+    'result': 'Something broke for 0b9f107a-0000-4000-8000-000000000001 with key sk-ant-oat01-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\nsecond line'}), '')
+assert said['error_class'] == 'reader_exited' and '<id>' in said['said'] and '<long>' in said['said'] and '\n' not in said['said']
+assert '0b9f107a' not in said['said'] and 'ABCDEFGHIJ' not in said['said'] and 'subtype error_during_execution' in said['said']
+assert keys_lane.read_envelope(1, '', 'OAuth token revoked. Please run /login')['error_class'] == 'reader_unauthorized'
+assert keys_lane.read_envelope(1, json.dumps({'is_error': True, 'result': 'API Error: 403 forbidden'}), '')['error_class'] == 'reader_unauthorized'
+assert 'said' not in keys_lane.read_envelope(0, json.dumps({'is_error': False, 'result': 'no json here, only words about a private statement'}), ''), 'model text is never echoed'
+assert keys_lane.tell('') == '(nothing was printed)'
+
+print(f'keys_lane: 19 groups of cases pass ({pack})')
