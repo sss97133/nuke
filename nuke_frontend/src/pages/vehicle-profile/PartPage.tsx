@@ -25,6 +25,7 @@ interface PartObservation {
   part_description: string | null;
   part_category: string | null;
   lifecycle_status: string | null;
+  part_relation: string | null;
   shipment_observation_id: string | null;
   parent_receipt_id: string | null;
   witness_image_id: string | null;
@@ -53,6 +54,11 @@ const formatDate = (iso: string | null): string => {
     return iso;
   }
 };
+
+export function hasRecordedInstallation(items: Pick<PartObservation, 'lifecycle_status' | 'part_relation'>[]): boolean {
+  return items.some(item => item.lifecycle_status === 'installed'
+    && !['candidate_material', 'receipt_time_context'].includes(item.part_relation ?? ''));
+}
 
 const PartPage: React.FC = () => {
   const { vehicleId, partNumber } = useParams<{ vehicleId: string; partNumber: string }>();
@@ -144,6 +150,7 @@ const PartPage: React.FC = () => {
             part_description: sd.part_description ?? null,
             part_category: sd.part_category ?? null,
             lifecycle_status: sd.lifecycle_status ?? null,
+            part_relation: sd.part_relation ?? sd.relationship?.kind ?? sd.relation ?? null,
             shipment_observation_id: sd.shipment_observation_id ?? null,
             parent_receipt_id: sd.parent_receipt_id ?? null,
             witness_image_id: sd.witness_image_id ?? sd.install_witness_image_id ?? null,
@@ -163,13 +170,8 @@ const PartPage: React.FC = () => {
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
     : 'Vehicle';
 
-  // Compute lifecycle state — has install evidence?
-  const hasInstallEvidence = useMemo(() => {
-    // Heuristic: any non-specification observation referencing this PN
-    // counts as install/work evidence. A future install-witness pipeline can
-    // promote this to a stricter check.
-    return items.some((it) => it.kind !== 'specification');
-  }, [items]);
+  // A work mention or candidate material is not an installation relation.
+  const hasInstallEvidence = hasRecordedInstallation(items);
 
   const purchaseObs = useMemo(
     () => items.filter((it) => it.lifecycle_status === 'purchased' || it.kind === 'specification'),
@@ -236,7 +238,7 @@ const PartPage: React.FC = () => {
             fontFamily: 'Arial, sans-serif',
           }}
         >
-          {hasInstallEvidence ? 'Install evidence on file' : 'Purchased, install pending'}
+          {hasInstallEvidence ? 'Installation recorded' : 'Installation not established'}
         </span>
       </div>
       <div

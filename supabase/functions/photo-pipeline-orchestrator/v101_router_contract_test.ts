@@ -218,7 +218,10 @@ Deno.test({ name: "renderer path: storage URL fetched as 1600px JPEG first; rend
   const S = "https://supa.example.invalid/storage/v1/object/public/bucket/a.heic";
   fresh(); let t = rig();
   const r = await classifyImageRouted(S, undefined, t.fetchImpl);
-  assert(r.classifier_ok && t.log.image[0].includes("/storage/v1/render/image/public/bucket/a.heic") && t.log.image[0].includes("width=1600") && r.classifier_receipt?.image_resized === "render_1600");
+  const input = new URL(t.log.image[0], "https://supa.example.invalid");
+  assert(r.classifier_ok && input.pathname === "/storage/v1/render/image/public/bucket/a.heic"
+    && input.searchParams.get("width") === "1600" && input.searchParams.get("height") === "1600"
+    && input.searchParams.get("resize") === "contain" && r.classifier_receipt?.image_resized === "render_1600_contain");
   fresh(); t = rig({ image: () => new Response("", { status: 503 }) });
   const r2 = await classifyImageRouted(S, undefined, t.fetchImpl);
   assert(r2.classifier_ok === false && err(r2) === "image_http_error" && r2.classifier_receipt?.http_status === 503 && t.log.image.length === 1, "renderer 5xx does not fall through to the raw object");

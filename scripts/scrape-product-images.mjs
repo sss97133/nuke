@@ -1,131 +1,79 @@
 #!/usr/bin/env node
-// scrape-product-images.mjs — Scrape real product images from retailer sites
-// Uses Summit Racing, RockAuto, and manufacturer sites
-// Usage: dotenvx run -- node scripts/scrape-product-images.mjs
-
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-const VEHICLE_ID = 'e04bf9c5-b488-433b-be9a-3d307861d90b';
-
-// Search queries for finding product images
-// Map: part_number → { query, manufacturer }
-const PARTS_TO_SEARCH = [
-  // ACDelco
-  { pn: '12576341', q: 'ACDelco 217-2425 fuel injector LS3', mfr: 'ACDelco' },
-  { pn: '12611424', q: 'ACDelco D510C ignition coil LS3', mfr: 'ACDelco' },
-  { pn: '12591720', q: 'ACDelco 213-3826 cam sensor LS', mfr: 'ACDelco' },
-  { pn: '19236568', q: 'ACDelco 213-4514 coolant temp sensor', mfr: 'ACDelco' },
-  { pn: '12615626', q: 'ACDelco 213-4573 crank sensor LS', mfr: 'ACDelco' },
-  { pn: '12623730', q: 'ACDelco 213-1576 knock sensor LS', mfr: 'ACDelco' },
-  { pn: '25036751', q: 'ACDelco 25036751 IAT sensor', mfr: 'ACDelco' },
-  { pn: '55573248', q: 'ACDelco 55573248 MAP sensor', mfr: 'ACDelco' },
-  { pn: '12673134', q: 'ACDelco D1846A oil pressure sensor', mfr: 'ACDelco' },
-  { pn: '12605109', q: 'GM 12605109 throttle body LS3 DBW', mfr: 'GM' },
-  { pn: 'E1903E', q: 'ACDelco E1903E horn', mfr: 'ACDelco' },
-  // Dorman
-  { pn: '746-014', q: 'Dorman 746-014 door lock actuator', mfr: 'Dorman' },
-  { pn: '742-143', q: 'Dorman 742-143 window motor', mfr: 'Dorman' },
-  { pn: '599-5401', q: 'Dorman 599-5401 window switch', mfr: 'Dorman' },
-  { pn: '901-048', q: 'Dorman 901-048 window switch', mfr: 'Dorman' },
-  { pn: '901-001', q: 'Dorman 901-001 lock switch', mfr: 'Dorman' },
-  { pn: '923-236', q: 'Dorman 923-236 third brake light', mfr: 'Dorman' },
-  // SMP
-  { pn: 'DS-177', q: 'Standard Motor Products DS-177 headlight switch', mfr: 'SMP' },
-  { pn: 'US-14', q: 'Standard Motor Products US-14 ignition switch', mfr: 'SMP' },
-  { pn: 'TW-20', q: 'Standard Motor Products TW-20 turn signal switch', mfr: 'SMP' },
-  { pn: 'DS-807', q: 'Standard Motor Products DS-807 wiper switch', mfr: 'SMP' },
-  { pn: 'SLS-147', q: 'Standard Motor Products SLS-147 brake light switch', mfr: 'SMP' },
-  // Other
-  { pn: '8004-003', q: 'Optima 8004-003 RedTop battery', mfr: 'Optima' },
-  { pn: '403210', q: 'Speedway Motors AD244 220A alternator', mfr: 'Speedway' },
-  { pn: '30102049', q: 'SPAL 30102049 electric fan', mfr: 'SPAL' },
-  { pn: '8030', q: 'Davies Craig EWP115 electric water pump 8030', mfr: 'Davies Craig' },
-  { pn: '11101', q: 'Aeromotive A1000 fuel pump 11101', mfr: 'Aeromotive' },
-  { pn: '15633', q: 'Aeromotive fuel pressure sensor 15633', mfr: 'Aeromotive' },
-  { pn: 'P300-K5', q: 'AMP Research P300 controller', mfr: 'AMP Research' },
-  { pn: '75138-01A', q: 'AMP Research 75138-01A PowerStep', mfr: 'AMP Research' },
-  { pn: '9176', q: 'Sanden SD508 AC compressor clutch', mfr: 'Sanden' },
-  { pn: '27270C', q: 'Truck-Lite 27270C LED headlight 7 inch', mfr: 'Truck-Lite' },
-  { pn: 'ESK001', q: 'E-Stopp ESK001 electric parking brake', mfr: 'E-Stopp' },
-  { pn: '80175', q: 'Painless Performance 80175 neutral safety switch', mfr: 'Painless' },
-  { pn: '80111', q: 'Painless Performance 80111 blower resistor', mfr: 'Painless' },
-  { pn: '40-160', q: 'Cardone 40-160 wiper motor', mfr: 'Cardone' },
-  { pn: '35342', q: 'Four Seasons 35342 blower motor', mfr: 'Four Seasons' },
-  { pn: '36680', q: 'Four Seasons 36680 AC pressure switch', mfr: 'Four Seasons' },
-  { pn: '11-515', q: 'Trico 11-515 washer pump', mfr: 'Trico' },
-  { pn: 'FG12C', q: 'Spectra Premium FG12C fuel sender', mfr: 'Spectra' },
-  { pn: '5291', q: 'AutoMeter 5291 speed sensor', mfr: 'AutoMeter' },
-  { pn: 'VHX-73C-PU-K-B', q: 'Dakota Digital VHX-73C gauge cluster', mfr: 'Dakota Digital' },
-  { pn: 'DFSR-8715', q: 'Delmo Speed starter motor', mfr: 'Delmo' },
-  { pn: 'QU30048', q: 'Torque King QU30048 transfer case switch', mfr: 'Torque King' },
-  { pn: '46CXA3604T', q: 'Kicker CXA360.4 amplifier', mfr: 'Kicker' },
-  { pn: '46CSC354', q: 'Kicker CSC354 speaker', mfr: 'Kicker' },
-  { pn: '46CSC674', q: 'Kicker CSC674 speaker', mfr: 'Kicker' },
-  { pn: '50TCWC104', q: 'Kicker CompC 10 subwoofer', mfr: 'Kicker' },
-  { pn: 'LB-M4-116-03-73', q: 'RetroSound Hermosa M4 head unit', mfr: 'RetroSound' },
-  { pn: '1011200', q: 'Blue Sea Systems 1011200 12V outlet', mfr: 'Blue Sea' },
-  { pn: '1045', q: 'Blue Sea Systems 1045 dual USB', mfr: 'Blue Sea' },
-  { pn: '17025', q: 'Bosch 17025 LSU 4.9 O2 sensor', mfr: 'Bosch' },
-  { pn: '0332019150', q: 'Bosch 0332019150 relay', mfr: 'Bosch' },
-  { pn: '007794301', q: 'Hella 007794301 relay', mfr: 'Hella' },
-  { pn: 'CTL7387LED-L', q: 'United Pacific CTL7387LED tail light squarebody', mfr: 'United Pacific' },
-  { pn: '36469', q: 'United Pacific 36469 LED 1156', mfr: 'United Pacific' },
-  { pn: '110709', q: 'United Pacific 110709 cab light squarebody', mfr: 'United Pacific' },
-  { pn: '110711', q: 'United Pacific 110711 license light', mfr: 'United Pacific' },
-  { pn: '110706', q: 'United Pacific 110706 park turn light', mfr: 'United Pacific' },
-  { pn: '36480A', q: 'United Pacific 36480A LED 1157 amber', mfr: 'United Pacific' },
-  { pn: '90652', q: 'United Pacific 90652 LED flasher', mfr: 'United Pacific' },
-];
-
-// Try Summit Racing API-like URL for product images
-async function trySummitRacing(partNumber) {
-  try {
-    const url = `https://www.summitracing.com/search/${encodeURIComponent(partNumber)}`;
-    const resp = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
-      redirect: 'follow',
-    });
-    if (!resp.ok) return null;
-    const html = await resp.text();
-    // Look for product image in meta tags
-    const ogMatch = html.match(/property="og:image"\s+content="([^"]+)"/);
-    if (ogMatch) return ogMatch[1];
-    // Look for product image in img tags
-    const imgMatch = html.match(/class="product-image[^"]*"[^>]*src="([^"]+)"/);
-    if (imgMatch) return imgMatch[1];
-    return null;
-  } catch { return null; }
-}
-
-async function main() {
-  console.log(`Searching for product images for ${PARTS_TO_SEARCH.length} parts...`);
-
-  const results = {};
-  let found = 0;
-
-  for (const part of PARTS_TO_SEARCH) {
-    // Try Summit Racing
-    const summitUrl = await trySummitRacing(part.pn);
-    if (summitUrl) {
-      results[part.pn] = summitUrl;
-      console.log(`  SUMMIT ${part.pn} → ${summitUrl.slice(0, 80)}`);
-      found++;
-    } else {
-      console.log(`  MISS ${part.pn} (${part.mfr})`);
+/** Receipt-driven public catalog capture. No DB writes, inference or checkout.
+ * --input PRIVATE_LEDGER --output PRIVATE_DIR [--capture] [--limit N] [--sources JSON]
+ * sources: [{vendor,part_number,page_url,source_role}]. Successful captures are reused.
+ * Catalog references never establish installation, payment or receipt expense.
+ */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {normalizePart, lineRole as role, productEligible, parseProductPage as parseProduct} from '../supabase/functions/_shared/receiptProductCapture.mjs';
+export {normalizePart, parseProduct};
+import sharp from 'sharp';
+const sha = x => createHash('sha256').update(x).digest('hex');
+const now = () => new Date().toISOString();
+export function receiptQueries(ledger, sources = []) {
+  if (!Array.isArray(ledger.receipts)) throw Error('input must contain receipts[]');
+  const qs = new Map(), exclusions = [];
+  for (const r of ledger.receipts) for (const l of r.lines ?? []) {
+    const pn = normalizePart(l.part_number), kind = role(l);
+    if (!productEligible(l)) {
+      exclusions.push({receipt_id:r.id,line_id:l.id,reason:!pn?'no_part_number':kind}); continue;
     }
-
-    // Rate limit
-    await new Promise(r => setTimeout(r, 500));
+    const key = `${r.vendor_name}\n${pn}`;
+    if (!qs.has(key)) {
+      const candidates = sources.filter(s => s.vendor === r.vendor_name && normalizePart(s.part_number) === pn).map(s => ({page_url:s.page_url,source_role:s.source_role ?? 'same_sku_alternate_supplier'}));
+      if (r.vendor_name === 'Classic Industries' && !candidates.length) candidates.push({page_url:`https://www.oerparts.com/product/${encodeURIComponent(pn.toLowerCase())}.html`,source_role:'same_sku_catalog_cross_reference'});
+      qs.set(key,{key:sha(key).slice(0,20),vendor:r.vendor_name,part_number:pn,query:`${r.vendor_name} ${pn} ${l.description}`,candidates,receipt_lines:[]});
+    }
+    qs.get(key).receipt_lines.push({receipt_id:r.id,line_id:l.id,source_document_id:r.source_document_id,source_file:r.file_name,receipt_date:r.receipt_date,printed_part_number:l.part_number,description:l.description,quantity:l.quantity,unit_price:l.unit_price,total_price:l.total_price,role:kind});
   }
-
-  console.log(`\nFound ${found}/${PARTS_TO_SEARCH.length} via Summit Racing`);
-  console.log('\nResults JSON:');
-  console.log(JSON.stringify(results, null, 2));
+  return {ledger_read_at:ledger.read_at,source_documents:ledger.receipts.length,source_lines:ledger.receipts.reduce((n,r)=>n+(r.lines?.length??0),0),queries:[...qs.values()],exclusions};
 }
-
-main().catch(console.error);
+async function capture(url,maxBytes) {
+  const u=new URL(url);
+  if(u.protocol!=='https:'||!/^[a-z0-9.-]+$/i.test(u.hostname)||/^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(u.hostname))throw Error('public HTTPS source required');
+  const r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0'},signal:AbortSignal.timeout(25000),redirect:'error'});
+  if(!r.ok){const error=Error(`HTTP ${r.status}`);error.status=r.status;error.retryAfter=r.headers.get('retry-after');throw error;}
+  const chunks=[];let size=0;
+  for await(const b of r.body){size+=b.length;if(size>maxBytes)throw Error('capture exceeds size limit');chunks.push(b);}
+  const bytes=Buffer.concat(chunks);return {bytes,url:r.url,captured_at:now(),content_type:r.headers.get('content-type'),sha256:sha(bytes)};
+}
+export async function main(argv) {
+  const arg=n=>{const i=argv.indexOf(n);return i<0?null:argv[i+1]};
+  const input=arg('--input'),out=arg('--output');
+  if(!input||!out)throw Error('required: --input PRIVATE_LEDGER --output PRIVATE_DIR [--capture] [--limit N] [--sources JSON]');
+  const bytes=await fs.readFile(input), sources=arg('--sources')?JSON.parse(await fs.readFile(arg('--sources'),'utf8')):[];
+  const manifest=receiptQueries(JSON.parse(bytes),sources);manifest.source_ledger_sha256=sha(bytes);manifest.prepared_at=now();
+  await fs.mkdir(out,{recursive:true,mode:0o700});await fs.writeFile(path.join(out,'query-manifest.json'),JSON.stringify(manifest,null,2));
+  if(!argv.includes('--capture')){console.log(JSON.stringify({queries:manifest.queries.length,exclusions:manifest.exclusions.length}));return;}
+  let processed=0;const blockedHosts=new Set();
+  for(const q of manifest.queries.filter(q=>q.candidates.length).slice(0,Number(arg('--limit')??Infinity))) {
+    const dir=path.join(out,q.key);await fs.mkdir(dir,{recursive:true});const dest=path.join(dir,'result.json');
+    let prev;try{prev=JSON.parse(await fs.readFile(dest,'utf8'))}catch{}
+    if(prev?.status==='captured'&&!argv.includes('--refresh'))continue;
+    const result={query:q,status:'unresolved',attempts:[],prior_runs:prev?[...(prev.prior_runs??[]),{status:prev.status,attempts:prev.attempts}]:[]};
+    for(const c of q.candidates){
+      const a={...c,attempted_at:now()};result.attempts.push(a);
+      if(blockedHosts.has(new URL(c.page_url).hostname)){a.error='host_rate_limited_earlier_in_run';result.status='rate_limited';continue;}
+      try{
+        const page=await capture(c.page_url,4000000);await fs.writeFile(path.join(dir,'page.html'),page.bytes);
+        a.page={...page,bytes:page.bytes.length,path:path.join(dir,'page.html')};a.product=parseProduct(page.bytes.toString('utf8'),page.url,q.part_number);
+        if(a.product.status!=='exact_sku_page')continue;
+        const pic=await capture(a.product.image_url,15000000);
+        if(!pic.content_type?.startsWith('image/'))throw Error('image URL did not return image MIME');
+        const m=await sharp(pic.bytes).metadata();if(m.width<50||m.height<50)throw Error('image too small');
+        const imagePath=path.join(dir,`stock.${m.format}`);await fs.writeFile(imagePath,pic.bytes);
+        a.image={...pic,bytes:pic.bytes.length,path:imagePath,width:m.width,height:m.height};result.status='captured';result.source_role='catalog_reference_not_vehicle_photo';break;
+      }catch(e){a.error=String(e.message);if(e.status===429){a.retry_after=e.retryAfter;blockedHosts.add(new URL(c.page_url).hostname);result.status='rate_limited';}}
+      await new Promise(r=>setTimeout(r,400));
+    }
+    await fs.writeFile(dest,JSON.stringify(result,null,2));processed++;if(processed%10===0)console.log(JSON.stringify({processed}));
+    if(result.status!=='rate_limited')await new Promise(r=>setTimeout(r,Number(arg('--delay-ms')??5000)));
+  }
+  const results=[];for(const q of manifest.queries){try{results.push(JSON.parse(await fs.readFile(path.join(out,q.key,'result.json'),'utf8')))}catch{results.push({query:q,status:q.candidates.length?'not_attempted':'needs_source_resolution'})}}
+  const summary={as_of:now(),source_documents:manifest.source_documents,source_lines:manifest.source_lines,unique_queries:results.length,captured:results.filter(r=>r.status==='captured').length,statuses:results.reduce((a,r)=>({...a,[r.status]:(a[r.status]??0)+1}),{}),excluded_lines:manifest.exclusions.length,database_admission:'not_performed',results};
+  await fs.writeFile(path.join(out,'capture-index.json'),JSON.stringify(summary,null,2));console.log(JSON.stringify({...summary,results:undefined}));
+}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main(process.argv.slice(2)).catch(e=>{console.error(e.message);process.exitCode=1});

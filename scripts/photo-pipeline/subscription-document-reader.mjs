@@ -10,12 +10,17 @@
 //   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-document-reader.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model sonnet] [--dry-run] [--out receipt.json]
 //
 // Work list: the owner's frames whose pipeline classification named a document type (ai_scan_metadata.classification.v2
-// .document_type) or whose route hit the missing function, minus frames that already have a capture_document_pages row.
+// .document_type) or whose route hit the missing function, minus frames that already have a capture_document_pages row,
+// minus frames under a privacy hold, minus frames whose bytes could not be fetched before (the stage ledger remembers
+// them: stage receipt_ocr, outcome blocked_input, until the URL changes). Read 2026-11-10 18:50 UTC: this reader took
+// the same 3 frames on every fire and failed all 3 with an HTTP error on the image, because nothing remembered.
 import { execFile, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { inputFingerprint, receiptForResult, recordStageReceipt } from './stage-queue.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -38,6 +43,22 @@ async function rest(q) {
   if (!r.ok) throw new Error(`${q.slice(0, 60)}: ${r.status} ${(await r.text()).slice(0, 200)}`);
   return r.json();
 }
+async function rpc(name, body) {
+  const r = await fetch(`${URL_}/rest/v1/rpc/${name}`, { method: 'POST', headers: H, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`${name}: ${r.status} ${(await r.text()).slice(0, 200)}`);
+  return r.json();
+}
+const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
+const STAGE = 'receipt_ocr';
+// the holds the stage ledger applies: nothing sensitive, personal, duplicate, superseded or external goes to a reader
+const HOLDS = 'image_url=like.http*&is_sensitive=not.is.true&is_duplicate=not.is.true&is_superseded=not.is.true&is_external=not.is.true&or=(vision_gate_status.is.null,vision_gate_status.neq.rejected_personal)';
+// image id -> fingerprint of the URL that could not be fetched. No ledger (or no answer): no memory, as before.
+async function blockedInputs() {
+  try {
+    const rows = await rest(`image_stage_current?select=image_id,input_fingerprint&stage=eq.${STAGE}&outcome=eq.blocked_input&limit=5000`);
+    return new Map(rows.map((r) => [r.image_id, r.input_fingerprint]));
+  } catch (e) { console.error(`blocked-input memory unavailable: ${String(e.message || e).slice(0, 120)}`); return new Map(); }
+}
 
 // Pages the route recorded while their frame had no vehicle, now with one: from the frame (capture landing loop) or from the
 // page's own VIN (capture_documents_land_by_vin, landing_vehicle_id). The route lands them from the stored page, no second read. The view drops a page once it carries
@@ -48,10 +69,15 @@ async function toLand() {
 }
 async function worklist() {
   const done = new Set((await rest(`capture_document_pages?select=image_id&user_id=eq.${OWNER}&revoked_at=is.null&limit=5000`)).map((r) => r.image_id));
-  const typed = await rest(`vehicle_images?select=id,vehicle_id,image_url,file_name,taken_at,ai_scan_metadata->classification->v2->>document_type&user_id=eq.${OWNER}&ai_scan_metadata->classification->v2->>document_type=not.is.null&order=taken_at.desc.nullslast&limit=2000`);
-  const routed = await rest(`vehicle_images?select=id,vehicle_id,image_url,file_name,taken_at&user_id=eq.${OWNER}&ai_scan_metadata->>route_result=like.receipt-photo-ocr*&order=taken_at.desc.nullslast&limit=2000`);
+  const blocked = await blockedInputs();
+  const typed = await rest(`vehicle_images?select=id,vehicle_id,image_url,file_name,taken_at,ai_scan_metadata->classification->v2->>document_type&user_id=eq.${OWNER}&ai_scan_metadata->classification->v2->>document_type=not.is.null&${HOLDS}&order=taken_at.desc.nullslast&limit=2000`);
+  const routed = await rest(`vehicle_images?select=id,vehicle_id,image_url,file_name,taken_at&user_id=eq.${OWNER}&ai_scan_metadata->>route_result=like.receipt-photo-ocr*&${HOLDS}&order=taken_at.desc.nullslast&limit=2000`);
   const byId = new Map();
-  for (const f of [...typed, ...routed]) if (f.image_url && !done.has(f.id)) byId.set(f.id, f);
+  for (const f of [...typed, ...routed]) {
+    if (!f.image_url || done.has(f.id)) continue;
+    if (blocked.has(f.id) && blocked.get(f.id) === inputFingerprint(f.image_url, md5)) continue;  // same unreachable URL as before
+    byId.set(f.id, f);
+  }
   return [...byId.values()].slice(0, limit);
 }
 
@@ -72,7 +98,9 @@ function claudePrint(text, env) {
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
     child.on('error', (e) => { clearTimeout(timer); reject(e); });
-    child.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`claude exited ${code}: ${err.slice(0, 200)}`)); });
+    // a run that ends in an error (a usage limit, an API error) can exit non-zero with its JSON result on stdout
+    const hasResult = () => { try { return typeof JSON.parse(out) === 'object' && JSON.parse(out) !== null; } catch { return false; } };
+    child.on('close', (code) => { clearTimeout(timer); code === 0 || hasResult() ? resolve(out) : reject(new Error(`claude exited ${code}: ${(err || out).slice(0, 200)}`)); });
     child.stdin.end(text);
   });
 }
@@ -91,8 +119,8 @@ async function readFrame(f, dir) {
   const env = { ...process.env };
   delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT; delete env.ANTHROPIC_API_KEY;
   const stdout = await claudePrint(prompt(img), env);
-  const outer = JSON.parse(stdout);
-  if (outer.is_error) throw new Error(`reader error: ${String(outer.result ?? '').slice(0, 200)}`);
+  let outer; try { outer = JSON.parse(stdout); } catch { throw Object.assign(new Error('no JSON in the reader output'), { invalidOutput: true }); }
+  if (outer.is_error) throw Object.assign(new Error(`reader error: ${String(outer.result ?? '').slice(0, 200)}`), { apiStatus: outer.api_error_status ?? null });
   const extraction = parseResult(outer.result);
   return { extraction, duration_ms: outer.duration_ms, usage_cost: outer.total_cost_usd };
 }
@@ -107,12 +135,38 @@ async function land(f, extraction) {
 
 const frames = await worklist();
 console.error(`${frames.length} document frames to read for ${OWNER} (model ${model}, concurrency ${conc})${dry ? ' [dry run]' : ''}`);
-const out = []; const summary = { frames: frames.length, read: 0, page: 0, landed: 0, waiting_no_vehicle: 0, vehicle_document: 0, errors: 0, by_type: {}, read_seconds: 0 };
+// error_classes: why frames failed, in the frame reader's fixed vocabulary (never reader text), so the heartbeat row
+// says what is wrong without anyone opening the log on the Mac.
+const out = []; const summary = { frames: frames.length, read: 0, page: 0, landed: 0, waiting_no_vehicle: 0, vehicle_document: 0, errors: 0, error_classes: {}, receipts: 0, receipt_errors: 0, stopped: null, by_type: {}, read_seconds: 0 };
+let stop = false;
+const resultOf = (e) => {
+  const msg = String(e?.message || e);
+  const dl = msg.match(/^download (\d+)/);
+  if (dl) return { download: { status: Number(dl[1]) } };
+  if (/fetch failed/i.test(msg)) return { download: { status: 0 } };
+  if (e?.path === 'sips' || /\bsips\b/.test(String(e?.cmd || ''))) return { convert: { missingTool: e?.code === 'ENOENT' } };
+  return { reader: { error: msg, apiStatus: e?.apiStatus ?? null, invalidOutput: e?.invalidOutput === true, missingTool: e?.code === 'ENOENT' } };
+};
+// One typed result per frame. A fault that is the batch's (compute exhausted, login refused, a missing tool, the API
+// unreachable) ends the batch. Two outcomes are kept in the stage ledger: the read landed, and the bytes cannot be
+// fetched (so the frame is not taken again until its URL changes). Transient faults are not recorded: the next fire
+// simply tries again.
+const settle = async (f, result) => {
+  const receipt = receiptForResult(result, { reader: `claude-cli ${model} subscription`, promptVersion: 'document-read' });
+  if (receipt.error_class) {
+    const cls = String(receipt.error_class).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 48);
+    summary.error_classes[cls] = (summary.error_classes[cls] || 0) + 1;
+  }
+  if (receipt.stop) { stop = true; summary.stopped = receipt.error_class; }
+  if (receipt.outcome !== 'succeeded' && receipt.outcome !== 'blocked_input') return;
+  const saved = await recordStageReceipt(rpc, { imageId: f.id, stage: STAGE, version: 1, receipt, fingerprint: inputFingerprint(f.image_url, md5) });
+  if (saved.ok) summary.receipts++; else { summary.receipt_errors++; console.error(`${f.id} receipt not recorded: ${saved.error}`); }
+};
 if (!dry) {
   const dir = mkdtempSync(join(tmpdir(), 'nuke-docread-'));
   let i = 0;
   const worker = async () => {
-    while (i < frames.length) {
+    while (i < frames.length && !stop) {
       const f = frames[i++];
       const t0 = Date.now();
       try {
@@ -126,9 +180,11 @@ if (!dry) {
         else if (/vehicle document/.test(res.reason || '')) summary.vehicle_document++;
         if (res.error || res.http >= 400) summary.errors++;
         const t = extraction.document_type || '-'; summary.by_type[t] = (summary.by_type[t] || 0) + 1;
+        await settle(f, { orchestrator: { http: res.http, success: !res.error && res.http < 400, error_class: res.error ? 'document_route_error' : undefined }, image_type: t });
         console.error(`${f.id} ${t} ${res.http} ${res.landed ? 'landed ' + res.receipt_id : (res.reason || res.error || '')}`);
       } catch (e) {
         summary.errors++; out.push({ image_id: f.id, error: String(e.message || e).slice(0, 300) });
+        await settle(f, resultOf(e));
         console.error(`${f.id} ERROR ${String(e.message || e).slice(0, 160)}`);
       }
       for (const p of [join(dir, `${f.id}.jpg`), join(dir, `${f.id}.heic`)]) if (existsSync(p)) rmSync(p, { force: true });

@@ -7,7 +7,10 @@ export function jpegRenderUrl(imageUrl: string, width = 1600, quality = 85): str
     const u = new URL(imageUrl);
     if (!u.pathname.includes("/storage/v1/object/public/")) return null;
     u.pathname = u.pathname.replace("/storage/v1/object/public/", "/storage/v1/render/image/public/");
-    u.search = `?width=${width}&quality=${quality}`;
+    // The renderer defaults to cover: a width-only request can crop a landscape
+    // original into a tall strip before the classifier ever sees it. Fit the
+    // complete frame inside a bounded square for landscape and portrait inputs.
+    u.search = `?width=${width}&height=${width}&quality=${quality}&resize=contain`;
     return u.href;
   } catch { return null; }
 }
@@ -45,7 +48,7 @@ export async function fetchClassifierImage(imageUrl: string, fetchImpl: typeof g
     const rurl = jpegRenderUrl(imageUrl, w, q);
     if (!rurl) break;
     const r = await get(rurl, limit);
-    if ("bytes" in r) return { bytes: r.bytes, mimeType: r.mimeType, resized: w === 1600 ? "render_1600" : "render_1024" };
+    if ("bytes" in r) return { bytes: r.bytes, mimeType: r.mimeType, resized: w === 1600 ? "render_1600_contain" : "render_1024_contain" };
     if ("status" in r) { renderStatus = r.status; break; }       // renderer refused: fall through to the original
   }
   if (renderStatus !== null && (renderStatus === 429 || renderStatus >= 500)) throw new ClassifierError("image_http_error", renderStatus);

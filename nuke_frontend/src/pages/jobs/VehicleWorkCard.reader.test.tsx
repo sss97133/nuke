@@ -53,6 +53,48 @@ it('distinguishes an empty successful list and only offers posting with the read
  await render(card());expect(host.textContent).toContain('No work orders were returned');expect(host.textContent).not.toContain('Post a job');
 });
 
+it('omits the profile panel only after a successful empty read, preserving the standalone work entry point',async()=>{
+ fixture.rpc.mockImplementation((name:string)=>Promise.resolve(name==='vehicle_work_orders_read'?{data:{...orders().data,rows:[],coverage:{returned:0,total_for_vehicle:0}},error:null}:publication));
+ await render(<VehicleWorkCard vehicleId={vehicle} vehicleTitle="Synthetic vehicle" signedIn hideWhenEmpty/>);
+ expect(host.querySelector('[aria-label="Work on this vehicle"]')).toBeNull();
+ expect(host.textContent).toBe('');
+ await render(card());
+ expect(host.textContent).toContain('Plan the work');
+ expect(host.textContent).toContain('No work orders were returned');
+});
+
+it('keeps profile loading, failure and recovered positive jobs visible',async()=>{
+ let finish!:(value:unknown)=>void;
+ fixture.rpc.mockImplementation((name:string)=>name==='vehicle_work_orders_read'?new Promise(resolve=>{finish=resolve;}):Promise.resolve(publication));
+ await render(<VehicleWorkCard vehicleId={vehicle} vehicleTitle="Synthetic vehicle" signedIn hideWhenEmpty/>);
+ expect(host.textContent).toContain('Reading the work orders');
+ await act(async()=>finish({data:null,error:{message:'Work order read unavailable'}}));
+ expect(host.textContent).toContain('Work order read unavailable');
+ expect(host.textContent).not.toContain('No work orders');
+ fixture.rpc.mockImplementation((name:string)=>Promise.resolve(name==='vehicle_work_orders_read'?orders('Recorded job'):publication));
+ await click('Retry work orders');
+ expect(host.querySelector(`a[href="/jobs/${first}"]`)).not.toBeNull();
+ expect(host.textContent).toContain('Recorded job');
+ expect(host.textContent).toContain('Plan the work');
+});
+
+it('does not hide an empty cursor page when the reader has another page',async()=>{
+ fixture.rpc.mockImplementation((name:string)=>Promise.resolve(name==='vehicle_work_orders_read'?{data:{...orders('Unused',second).data,rows:[],coverage:{returned:0,total_for_vehicle:1}},error:null}:publication));
+ await render(<VehicleWorkCard vehicleId={vehicle} vehicleTitle="Synthetic vehicle" signedIn hideWhenEmpty/>);
+ expect(host.textContent).toContain('More jobs');
+});
+
+it('retains publication errors and their retry even when there are no jobs',async()=>{
+ fixture.rpc.mockImplementation((name:string)=>name==='vehicle_work_orders_read'
+  ? Promise.resolve({data:{...orders().data,rows:[],coverage:{returned:0,total_for_vehicle:0}},error:null})
+  : Promise.reject(new Error('offline')));
+ await render(<VehicleWorkCard vehicleId={vehicle} vehicleTitle="Synthetic vehicle" signedIn hideWhenEmpty/>);
+ expect(host.textContent).toContain('Publication status could not be loaded');
+ expect(host.textContent).toContain('Retry publication status');
+ fixture.rpc.mockResolvedValue(publication);await click('Retry publication status');
+ expect(host.textContent).toBe('');
+});
+
 it('loads one bounded cursor page, suppresses duplicates, and retains rows when that page fails',async()=>{
  let finish!:(value:unknown)=>void;
  fixture.rpc.mockImplementation((name:string)=>Promise.resolve(name==='vehicle_work_orders_read'?orders('First job',second):publication));
