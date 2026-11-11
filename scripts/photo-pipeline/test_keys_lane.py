@@ -11,7 +11,7 @@ from keys_lane import body_for, jsonb, landable, read_envelope, run, utc_ms
 V, U = '1b1b1b1b-2222-4333-8444-555555555555', '66666666-7777-4888-8999-aaaaaaaaaaaa'
 P1, P2, P3 = ('aaaaaaaa-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000002', 'cccccccc-0000-4000-8000-000000000003')
 S1 = '99999999-8888-4777-8666-555555555555'
-ENV = {'SUPABASE_URL': 'https://db.example.invalid', 'SUPABASE_SERVICE_ROLE_KEY': 'service-key-stand-in', 'CLAUDE_CODE_OAUTH_TOKEN': 'token-stand-in'}
+ENV = {'SUPABASE_URL': 'https://db.example.invalid', 'SUPABASE_SERVICE_ROLE_KEY': 'service-key-stand-in', 'CLAUDE_CODE_OAUTH_TOKEN': 'sk-ant-oat01-stand-in'}
 STATEMENT = 'Paint is flaking on the  driver door lower edge.'   # two spaces: the body carries the stored text, not a tidied one
 photo = lambda pid, **over: {'id': pid, 'taken_at': '2024-03-09T16:05:07.98765-07:00', 'created_at': '2024-03-10T01:02:03+00:00',
                              'image_url': 'https://img.example.invalid/1.jpg', 'scene': 'exterior_detail',
@@ -387,4 +387,29 @@ assert keys_lane.read_envelope(1, json.dumps({'is_error': True, 'result': 'API E
 assert 'said' not in keys_lane.read_envelope(0, json.dumps({'is_error': False, 'result': 'no json here, only words about a private statement'}), ''), 'model text is never echoed'
 assert keys_lane.tell('') == '(nothing was printed)'
 
-print(f'keys_lane: 19 groups of cases pass ({pack})')
+# 20. a stored token with white space in it is used without the white space, and the run says so without a character
+#     of it; a header value in an error line is withheld whole, because a broken token arrives in short pieces
+word = 'sk-ant-oat01-' + 'Ab3_' * 20
+assert keys_lane.clean_token(word) == (word, [], True)
+token, notes, usable = keys_lane.clean_token(word[:40] + '\n' + word[40:] + '\n')
+assert token == word and usable and len(notes) == 1 and '2 white-space characters removed, 1 of them inside it' in notes[0] and 'on 2 lines' in notes[0]
+assert not any(piece in ' '.join(notes) for piece in (word[:12], word[40:52]))
+assert keys_lane.clean_token('"' + word + '"')[1:] == (['it holds a character no token has'], False)
+assert keys_lane.clean_token('not-a-subscription-token')[1:] == (['it does not begin as a subscription token does'], True)
+line = keys_lane.tell("API Error: Header '14' has invalid value: 'Bearer sk-ant-oat01-short\n" + word[40:] + "'")
+assert line == "API Error: Header '14' has invalid value: (withheld)", line
+assert 'sk-ant' not in keys_lane.tell('refused bearer sk-ant-oat01-short and token=abc123') and 'abc123' not in keys_lane.tell('token=abc123')
+sent = []
+def spy(command, **kw):
+    sent.append(kw['env'].get('CLAUDE_CODE_OAUTH_TOKEN'))
+    class P: returncode, stdout, stderr = 0, json.dumps({'is_error': False, 'result': '{}'}), ''
+    return P
+os.environ['CLAUDE_CODE_OAUTH_TOKEN'] = word[:40] + '\r\n' + word[40:] + '\n'
+try: keys_lane.ask_claude('x', 'sonnet', runner=spy)
+finally: del os.environ['CLAUDE_CODE_OAUTH_TOKEN']
+assert sent == [word], 'the model call gets the token as one word'
+printed = []
+code = keys_lane.run(['--vehicle-id', V, '--user-id', U], {**ENV, 'CLAUDE_CODE_OAUTH_TOKEN': '\u201c' + word + '\u201d'}, http=lambda *a, **k: (_ for _ in ()).throw(AssertionError('nothing is read')), ask=None, out=printed.append)
+assert code == 4 and 'it holds a character no token has' in printed[1] and 'no model was asked' in printed[-1] and word[:12] not in ' '.join(printed)
+
+print(f'keys_lane: 20 groups of cases pass ({pack})')

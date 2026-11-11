@@ -72,9 +72,28 @@ READER_STOPS = {   # the answers after which no further photo is tried
 
 
 def tell(text):
-    """An error line from the CLI, safe for a public log: one line, ids and long tokens removed, 240 characters."""
+    """An error line from the CLI, safe for a public log: one line, ids and long tokens removed, 240 characters.
+    A header value is withheld whole: a token broken by a line break arrives in pieces too short to look like one."""
     line = ws(str(text))[:240]
+    line = re.sub(r'(has invalid value:).*', r'\1 (withheld)', line)
+    line = re.sub(r'(?i)\bbearer\s+\S+|\b(?:token|key)\s*[=:]\s*\S+', '<withheld>', line)
     return re.sub(r'[A-Za-z0-9_\-]{24,}', '<long>', UUID.sub('<id>', line)) or '(nothing was printed)'
+
+
+def clean_token(stored):
+    """The subscription token as one word, and what was wrong with it as stored (counts and yes/no only, never a
+    character of it). A token is one word. Copied from a terminal that wrapped it, it carries a line break, and the
+    CLI then refuses to build the request ("Header '14' has invalid value"): nothing is sent and no model is asked.
+    Returns (token, notes, usable)."""
+    stored = str(stored); token = ''.join(stored.split()); notes = []
+    if token != stored:
+        inside = len(stored.strip()) - len(token)
+        notes.append(f'{len(stored) - len(token)} white-space characters removed, {inside} of them inside it '
+                     f'({len(stored)} characters stored on {len(stored.strip().splitlines())} lines)')
+    usable = bool(re.fullmatch(r'[A-Za-z0-9_\-]+', token))
+    if not usable: notes.append('it holds a character no token has')
+    elif not token.startswith('sk-ant-oat'): notes.append('it does not begin as a subscription token does')
+    return token, notes, usable
 
 
 def read_envelope(returncode, stdout, stderr):
@@ -110,6 +129,7 @@ def ask_claude(prompt, model, timeout_s=240, runner=subprocess.run):
     environment that holds neither the service key nor ANTHROPIC_API_KEY. The form is the Mac readers'
     (subscription-frame-classifier.mjs) without a tool; the prompt goes in on stdin."""
     env = {k: os.environ[k] for k in KEEP if k in os.environ}
+    if 'CLAUDE_CODE_OAUTH_TOKEN' in env: env['CLAUDE_CODE_OAUTH_TOKEN'] = clean_token(env['CLAUDE_CODE_OAUTH_TOKEN'])[0]
     with tempfile.TemporaryDirectory() as cwd:
         try:
             p = runner(['claude', '-p', '--output-format', 'json', '--model', model],
@@ -478,6 +498,12 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
     n, kinds, failures, left_out, writer = (collections.Counter() for _ in range(5))
     before = after = cursor = stop = None
     out(f"keys lane: {'WRITE' if a.write else 'dry run, nothing is written anywhere'}; model {a.model}; one photo at a time")
+    _, token_notes, token_usable = clean_token(env['CLAUDE_CODE_OAUTH_TOKEN'])
+    if token_notes:
+        out('the stored CLAUDE_CODE_OAUTH_TOKEN is not one clean token: ' + '; '.join(token_notes) + '. This run uses it '
+            'with the white space taken out. Other jobs read it as stored: save it again as one line with nothing around it')
+    if not token_usable:
+        out('result: authentication failure: the stored token cannot be sent; nothing was read and no model was asked (exit 4)'); return 4
     try:
         try: fr = frame()
         except (OSError, ValueError): raise Stop(2, 'the brief, the unit or the registry copy is not where this lane expects it') from None
