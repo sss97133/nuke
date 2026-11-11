@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import { assertVehicleAssessment } from '../../services/listingPackageEvidence';
 import type { ListingAssessment, ListingAssertion } from '../../services/listingPackageEvidence';
 
 export default function VehicleEvidenceAssessment({ assessment, assertions, unresolvedFields, vehicleId }: {
@@ -73,5 +75,50 @@ export default function VehicleEvidenceAssessment({ assessment, assertions, unre
         <a href={'/vehicle/' + vehicleId + '/observation/' + a.observation_id} target="_blank" rel="noopener noreferrer">Statement source</a>
       </li>)}
     </ul><p>These statements retain their attribution and do not independently verify the mechanical claims.</p></details>}
+  </section>;
+}
+
+/** The existing read-only review, shared by legacy and current profile callers. */
+export function useVehicleEvidenceReview(vehicleId: string) {
+  const [review, setReview] = useState<{ id: string; loading: boolean; error?: string; assessment?: ListingAssessment }>({ id: vehicleId, loading: false });
+  const requestGeneration = useRef(0);
+  const currentVehicle = useRef(vehicleId);
+  currentVehicle.current = vehicleId;
+  useEffect(() => () => { requestGeneration.current++; }, [vehicleId]);
+  const loading = review.id === vehicleId && review.loading;
+  const assessment = review.id === vehicleId ? review.assessment : undefined;
+  const error = review.id === vehicleId ? review.error : undefined;
+
+  const read = async () => {
+    const generation = ++requestGeneration.current;
+    const subject = vehicleId;
+    setReview(previous => ({ id: subject, loading: true, assessment: previous.id === subject ? previous.assessment : undefined }));
+    try {
+      const { data: result, error } = await supabase.functions.invoke('compute-vehicle-valuation', {
+        body: { action: 'assessment', vehicle_id: subject },
+      });
+      if (error || result?.action !== 'assessment' || result?.read_only !== true) throw new Error('Vehicle evidence could not be read.');
+      assertVehicleAssessment(result.assessment, subject);
+      if (requestGeneration.current === generation && currentVehicle.current === subject) {
+        setReview({ id: subject, loading: false, assessment: result.assessment });
+      }
+    } catch (error) {
+      if (requestGeneration.current === generation && currentVehicle.current === subject) setReview(previous => ({
+        ...previous, id: subject, loading: false, error: error instanceof Error ? error.message : 'Vehicle evidence could not be read.',
+      }));
+    }
+  };
+
+  return { loading, assessment, error, read };
+}
+
+export function VehicleEvidenceReview({ vehicleId }: { vehicleId: string }) {
+  const { loading, assessment, error, read } = useVehicleEvidenceReview(vehicleId);
+  return <section aria-label="Review vehicle evidence">
+    <button type="button" className="button button-secondary btn-md" disabled={loading} onClick={() => { void read(); }}>Review evidence</button>
+    {loading && <p role="status">Reading retained evidence…</p>}
+    {error && <p role="alert">{error}</p>}
+    {assessment && <VehicleEvidenceAssessment assessment={assessment} assertions={assessment.listing.assertions}
+      unresolvedFields={assessment.unresolved_fields} vehicleId={vehicleId} />}
   </section>;
 }
