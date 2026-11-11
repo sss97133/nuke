@@ -22,7 +22,7 @@ function fixture(count = 3, vendor = 'Classic Industries') {
    return { html: `<script type="application/ld+json">${JSON.stringify({ '@type': 'Product', sku, name: 'Supplier product', image: 'https://cdn.oerparts.com/product.jpg' })}</script>`,
      source: { listing_url: url, id: 'snapshot', html_sha256: 'a'.repeat(64) } };
  }, retainImage: async () => ({ image_url: 'https://fixture.supabase.co/stock.jpg', image_sha256: 'b'.repeat(64), image_storage_path: 'stock.jpg' }) };
- return { admin, effects, calls, captures, cards, state };
+ return { admin, effects, calls, captures, cards, state, lines };
 }
 Deno.test('receipt worker bounds new captures, continues from shared catalog, and never sends private receipt text', async () => {
  const f = fixture();const first = await enrichReceiptProducts(f.admin, request, f.effects);
@@ -48,4 +48,31 @@ Deno.test('same SKU is reusable across receipts and stock hosts must be known CD
  const result = await enrichReceiptProducts(f.admin, request, f.effects);
  assert(result.product_complete && !f.captures.length, 'reuse already retained product');
  assert(allowedStockImage('https://cdn.oerparts.com/p.jpg') && !allowedStockImage('https://cdn.oerparts.com.evil.test/p.jpg') && !allowedStockImage('https://localhost/p.jpg'), 'image host qualification');
+ assert(allowedStockImage('https://images-prod.oreillyauto.com/parts/p.jpg') && !allowedStockImage('https://images-prod.oreillyauto.com.evil.test/p.jpg'), 'official production CDN only');
+});
+Deno.test('OReilly worker binds the receipt line code and primary MPN before admission', async () => {
+ const f = fixture(1, "O'Reilly Auto Parts");
+ f.lines[0] = { id: 'line-0', part_number: '72810', description: '1QT-P/SFLUID (ORC) private receipt context' };
+ f.effects.capturePage = async (_a, url) => {
+   f.captures.push(url);
+   return { html: url.includes('/search?') ? '<a href="/detail/c/brand/fluid/orc0/72810?q=72810"><h3 class="js-product-name" data-item="72810" data-line="ORC">Fluid</h3></a><a href="/detail/c/other/item/abc0/72810?q=72810"><h3 class="js-product-name" data-item="72810" data-line="ABC">Wrong brand</h3></a>'
+     : '<h1 class="js-product-name" data-item="72810" data-line="ORC">Power Steering Fluid</h1><script type="application/ld+json">{"@type":"Product","sku":"733704728108","mpn":"72810","name":"Power Steering Fluid","image":"https://images-prod.oreillyauto.com/parts/fluid.jpg"}</script>',
+     source: { listing_url: url, id: 'snapshot', html_sha256: 'a'.repeat(64) } };
+ };
+ const result = await enrichReceiptProducts(f.admin, request, f.effects);
+ assert(result.product_complete && f.captures.length===2 && f.captures[1].includes('/orc0/'), 'exact product line resolved');
+ const saved=f.calls.find(x=>x.name==='record_receipt_catalog_product');
+ assert(saved.args.p_capture.printed_sku==='72810' && !JSON.stringify(saved).includes('private'), 'primary MPN and public facts admitted');
+});
+Deno.test('OReilly receipt without a product line stays explicit and does not scrape', async () => {
+ const f = fixture(1, "O'Reilly Auto Parts");
+ const result = await enrichReceiptProducts(f.admin, request, f.effects);
+ assert(!result.product_complete && result.product_result.items['line-0'].status==='receipt_line_code_missing' && !f.captures.length,'do not guess a brand');
+});
+Deno.test('a parser revision revisits a prior refusal instead of retaining its day-long delay', async () => {
+ const f=fixture(1);
+ const oldFingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(['Classic Industries',f.lines[0].part_number,f.lines[0].description])))),x=>x.toString(16).padStart(2,'0')).join('');
+ f.state.prior={items:{'line-0':{fingerprint:oldFingerprint,status:'sku_not_verified',retry_at:new Date(Date.now()+86400000).toISOString()}}};
+ const result=await enrichReceiptProducts(f.admin,request,f.effects);
+ assert(result.product_complete&&f.captures.length===1,'old-parser refusal retried through retained capture path');
 });

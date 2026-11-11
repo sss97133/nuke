@@ -2,7 +2,7 @@
 const sha = async (value: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', value as BufferSource)), x => x.toString(16).padStart(2, '0')).join('');
 export function allowedStockImage(url: string) {
   try { const u = new URL(url); return u.protocol === 'https:' && !u.username && !u.password && !u.port &&
-    ['cdn.oerparts.com', 'cdn.classicindustries.com', 'images.oreillyauto.com'].includes(u.hostname); } catch { return false; }
+    ['cdn.oerparts.com', 'cdn.classicindustries.com', 'images.oreillyauto.com', 'images-prod.oreillyauto.com'].includes(u.hostname); } catch { return false; }
 }
 export async function retainImage(admin: any, url: string) {
   if (!allowedStockImage(url)) throw new Error('stock_image_host_unapproved');

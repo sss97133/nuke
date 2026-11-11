@@ -1,7 +1,7 @@
 import { retainImage } from '../_shared/catalogStockImage.ts';
 export { allowedStockImage } from '../_shared/catalogStockImage.ts';
 import { archiveFetch, retainFetchedCapture } from '../_shared/archiveFetch.ts';
-import { allowedProductUrl, normalizePart, parseProductPage, productEligible, productLinks, supplierCandidates, supplierKey } from '../_shared/receiptProductCapture.mjs';
+import { allowedProductUrl, normalizePart, parseProductPage, productEligible, productLinks, receiptLineCode, supplierCandidates, supplierKey } from '../_shared/receiptProductCapture.mjs';
 
 const sha = async (value: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', value as BufferSource)), x => x.toString(16).padStart(2, '0')).join('');
 const uuid = /^[0-9a-f-]{36}$/i;
@@ -44,7 +44,9 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
   let processed = 0, complete = true, nextRetry = 604800;
   const blockedHosts = new Set<string>();
   for (const line of lines.data.filter(productEligible)) {
-    const fingerprint = await sha(new TextEncoder().encode(JSON.stringify([receipt.vendor_name, line.part_number, line.description])));
+    // A repaired parser must revisit an old refusal instead of waiting out its
+    // retry delay. Already acknowledged products still come from the catalog.
+    const fingerprint = await sha(new TextEncoder().encode(JSON.stringify(['primary_identity_v2', receipt.vendor_name, line.part_number, line.description])));
     const previous = queue.data.product_result?.items?.[line.id];
     const card = await admin.rpc('receipt_item_product_card', { p_item: line.id });
     if (card.error) throw new Error('catalog_reader_unavailable');
@@ -54,22 +56,26 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
       outcomes[line.id] = previous; nextRetry = Math.min(nextRetry, Math.ceil((Date.parse(previous.retry_at) - Date.now()) / 1000)); continue;
     }
     if (processed >= 2) { outcomes[line.id] = { fingerprint, status: 'queued' }; nextRetry = Math.min(nextRetry, 60); continue; }
-    const candidates = supplierCandidates(receipt.vendor_name, line.part_number); let reason = 'supplier_not_integrated'; let matched = false;
+    const lineCode = supplierKey(receipt.vendor_name) === 'oreilly' ? receiptLineCode(line.description) : null;
+    const missingLineCode = supplierKey(receipt.vendor_name) === 'oreilly' && !lineCode;
+    const candidates = missingLineCode ? [] : supplierCandidates(receipt.vendor_name, line.part_number);
+    let reason = missingLineCode ? 'receipt_line_code_missing' : 'supplier_not_integrated'; let matched = false;
     if (candidates.length) processed++;
     for (const candidate of candidates) {
       if (blockedHosts.has(new URL(candidate.url).hostname)) { reason = 'supplier_capture_unavailable'; continue; }
       try {
         let page = await effects.capturePage(admin, candidate.url);
         if (candidate.kind === 'search') {
-          const links = productLinks(page.html, candidate.url, line.part_number);
+          const links = productLinks(page.html, candidate.url, line.part_number, lineCode);
           if (links.length !== 1) { reason = links.length ? 'ambiguous_product_links' : 'exact_product_link_missing'; continue; }
           page = await effects.capturePage(admin, links[0]);
         }
         const product = parseProductPage(page.html, page.source.listing_url, line.part_number);
         if (product.status !== 'exact_sku_page' || !product.image_url) { reason = product.status; continue; }
+        if (lineCode && product.line_code !== lineCode) { reason = 'product_line_code_mismatch'; continue; }
         const image = await effects.retainImage(admin, product.image_url);
         const saved = await admin.rpc('record_receipt_catalog_product', { p_supplier: supplierKey(receipt.vendor_name), p_number: normalizePart(line.part_number),
-          p_capture: { ...image, name: product.product_name, printed_sku: product.printed_sku, manufacturer: product.manufacturer,
+          p_capture: { ...image, name: product.product_name, printed_sku: product.printed_sku, product_line_code: product.line_code, manufacturer: product.manufacturer,
             description: product.description, price: product.price, currency: product.currency, source_role: candidate.role,
             match_basis: product.match_basis, image_source_url: product.image_url, parser: 'receipt_product_page_v1',
             page_url: page.source.listing_url, snapshot_id: page.source.id, page_sha256: page.source.html_sha256 } });
