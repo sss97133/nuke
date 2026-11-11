@@ -29,6 +29,7 @@ it('an image load failure removes only the thumbnail and its label',async()=>{
   expect(host.textContent).toContain('Supplier stock image');
   await act(async()=>host.querySelector('img')!.dispatchEvent(new Event('error')));
   expect(host.querySelector('img')).toBeNull();expect(host.textContent).not.toContain('Supplier stock image');
+  expect(host.querySelector('.vp-catalog-media')).toBeNull();
   expect(host.querySelector('a')?.href).toBe(product.page_url);expect(host.textContent).toContain('$49.95 supplier quote');
 });
 
