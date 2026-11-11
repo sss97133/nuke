@@ -676,6 +676,16 @@ found broken and what is still unproven:
     every path in and reads the live registry. A declared draft is the visible wait, not a filed proposal. Stored rows
     are not re-checked. The material and operation keys are not checked yet: a key per line is a line id, and the part
     number belongs in its own field beside a registry part key.
+  - *The first refusal, live* (#3365, read 17:39 UTC): the trigger is enabled; run over the 31 current records, 18
+    would be refused and 13 pass; no record written since 16:43, so it has refused no real write yet.
+  - *The second refusal* (`20261114101000`, contract `test_visual_work_part_key_guard.sql`). Read 17:47 UTC: none of
+    the 274 cost lines names a part; 189 of the 192 part-number keys already cite the receipt line that prints the
+    number (`pricing.receipt_item_id`), so the number in the key says nothing new. `physical_material_key` is the cost
+    fold's line identity and is left alone. Each materials and operations line now carries `part_key`: a
+    `subject_taxonomy.subject_key` in use, `not_a_part`, `cannot_tell`, or a draft declared in `key_proposals` (kind
+    `part`). The vehicle's 446 keyed photo claims carry the same field (364 named, 81 distinct keys, 191 rows on a
+    registry key), so a cost line and a photo claim can meet on a part without anyone reading their words. No reader
+    performs that join yet.
   - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on
     reason and logic." They are the agent's reasoning, not his word, and he can overturn them. (1) A researched or
     analyst number (price, hours, rate) is not stored as a number in a record. Invariant 5 says a number is cited from
