@@ -39,6 +39,8 @@ METHOD = 'photo_map_harvest_v1'
 # (docs/ledger/2026-11-10_image-keys-build-design.md: "Asking from the whole table would ask junk"), and the writer
 # admits any live key, so this lane withholds them itself.
 CURATED = frozenset(check_units.COND)
+NEGATION = re.compile(r"\b(?:no|not|none|without|never|cannot|neither|nor)\b|n't\b", re.I)
+ABSENCE_KEY = re.compile(r'(?:absent|missing)')
 MAX_CLAIMS = 6   # on one statement. The 2026-11-10 dry run made 958 claims on 724 statements (docs/ledger/theory/image-keys-test.md)
 ATTEMPTS = 3     # one POST and at most two re-sends of the same bytes
 RESENT = 'duplicate after a re-send'
@@ -330,13 +332,29 @@ def refused_here(unit, keep, texts):
     what one wrong answer can land; neither shows that a statement supports its key, and no code here does.
     - More than MAX_CLAIMS claims on one statement: otherwise one answer could put a statement on every live key.
     - A landable claim whose quoted words are empty or a single word, unless they are the whole statement: the
-      check's quote test passes on an empty quote and on any one word of the statement."""
+      check's quote test passes on an empty quote and on any one word of the statement.
+    - A landable claim that stands under a negation, unless its key is itself an absence (absent, missing): the
+      negation may be in the quoted words or just before them in the same clause, so "No flaking paint is visible"
+      quoted as "flaking paint is visible" is caught too. Of the 446 claims landed on 2026-11-11, one quoted a
+      negation, so this costs almost nothing and closes the most damaging wrong placement."""
     kinds = []
     if any(len(r.get('claims') or []) > MAX_CLAIMS for r in unit.get('results') or []): kinds.append('too many claims on one statement')
     quoted = lambda x: check_units.norm(x['said'] or '')
     if any(len(quoted(x).split()) < 2 and quoted(x) != check_units.norm(texts[f"c{x['idx']}"]) for x in keep):
         kinds.append('landable claim quoting under two words')
+    if any(negated(x['said'], texts[f"c{x['idx']}"]) and not ABSENCE_KEY.search(x['state']) for x in keep):
+        kinds.append('landable claim under a negation')
     return kinds
+
+
+def negated(quote, statement):
+    """Do the quoted words, or the words leading up to them in the same clause, deny what is quoted?"""
+    q, text = check_units.norm(quote or ''), check_units.norm(statement)
+    if NEGATION.search(q): return True
+    at = text.find(q) if q else -1
+    if at < 0: return False
+    lead = re.split(r'[;.,:]| but | while | although | though ', text[:at])[-1]
+    return bool(NEGATION.search(lead))
 
 
 # ---- the request land.sql builds --------------------------------------------------------------------------------

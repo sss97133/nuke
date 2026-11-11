@@ -324,11 +324,18 @@ assert lane(db, '--write', ask=says(answer_of(claim(said='delamination'))))[0] =
 RUST = {'decision': 'property', 'property_key': 'image_visible_rust_severity', 'value_or_key': 'surface'}
 db = Database([photo(P1)])
 assert lane(db, '--write', ask=says(answer_of(claim(), claim(RUST, said='Paint'))))[0] == 0 and len(db.writes) == 1, 'a claim that lands nothing is not held to it'
-# NOT closed, and the summary says so on every run: a true quote from a statement that denies the flaw still lands.
-# When a refuting pass exists, this case must flip to no POST.
-db = Database([photo(P1, callouts=['No flaking paint is visible on the driver door.', 'Glare hides the roof.'])])
-code, printed = lane(db, '--write', ask=says(answer_of(claim(said='flaking paint is visible on the driver door'))))
-assert code == 0 and len(db.writes) == 1 and 'not checked by code: that a statement supports the key it was given' in printed
+# A statement that denies the flaw lands nothing, whether the quote keeps the "No" or drops it. What is still NOT
+# checked by code, and the summary says so on every run: that an affirmed statement supports the key it was given.
+for quoted in ('flaking paint is visible on the driver door', 'No flaking paint is visible'):
+    db = Database([photo(P1, callouts=['No flaking paint is visible on the driver door.', 'Glare hides the roof.'])])
+    code, printed = lane(db, '--write', ask=says(answer_of(claim(said=quoted))))
+    assert code == 5 and not db.writes and "{'landable claim under a negation': 1}" in printed, quoted
+    assert 'not checked by code: that a statement supports the key it was given' in printed
+assert keys_lane.negated('rust is visible at the lower edge', 'The door is not original, and rust is visible at the lower edge.') is False, 'a negation in an earlier clause does not deny this one'
+assert keys_lane.negated('active fluid drip is resolved', 'No obvious starter housing breakage or active fluid drip is resolved in this view.') is True
+assert keys_lane.negated('creases and light surface marks', 'Exposed upholstery has creases and light surface marks without a clear visible tear.') is False
+db = Database([photo(P1, callouts=['The door is not original, and paint is flaking at the lower edge.', 'Glare hides the roof.'])])
+assert lane(db, '--write', ask=says(answer_of(claim(said='paint is flaking at the lower edge'))))[0] == 0 and len(db.writes) == 1
 
 # 17. the claims on one statement are bounded, so one answer cannot put a statement on every key
 PASSENGER = {'decision': 'existing', 'key': 'door.front.passenger', 'side': 'passenger'}
