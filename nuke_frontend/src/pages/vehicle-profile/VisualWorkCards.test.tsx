@@ -135,12 +135,12 @@ const ledger: MasterCostLedger = {
     labor_currencies: [{ currency: 'USD', cost: { min: 200, typical: 300, max: 400 }, covered_lines: 1 }], material_currencies: [] } },
    { system_key: 'paint', coverage: { lines: 1, resolved_lines: 0, partial_lines: 0, unresolved_lines: 1, excluded_lines: 0, duplicate_claims_folded: 0, status: 'partial' }, totals: { hours: null, currencies: [], labor_currencies: [], material_currencies: [] } }],
   rows: [{ kind: 'labor', physical_key: 'door_glass.install', system_key: 'glass', label: 'Install door-glass pair', status: 'resolved', reasons: [],
-   work_observation_ids: ['review-a'], source_observation_ids: ['source-a'], quantity: { value: 2, unit: 'pane', basis: 'explicit_assumption', derivation: 'One pane per door.' },
+   work_observation_ids: ['review-a'], source_observation_ids: ['source-a'], source_images: record.images, quantity: { value: 2, unit: 'pane', basis: 'explicit_assumption', derivation: 'One pane per door.' },
    reference: { code: 'GLASS-DOOR', label: 'seed_uncalibrated' }, pricing: null, rate_basis: { rate: 100, currency: 'USD', derivation: 'Synthetic comparison rate.' },
    evidence_role: 'conditional_reconstruction', hours: { min: 2, typical: 3, max: 4 }, cost: { min: 200, typical: 300, max: 400 }, currency: 'USD',
    overlap_group: null, selected: true, shared_access: false, input_fingerprint: 'a', claim_count: 4, formula: '2 panes × 1–2 person-hours per pane × USD 100 per person-hour' },
    { kind: 'material', physical_key: 'paint.material', system_key: 'paint', label: 'Paint materials', status: 'unresolved', reasons: ['material_price_unresolved'],
-    work_observation_ids: ['review-a'], source_observation_ids: ['source-a'], quantity: null, reference: null, pricing: null, rate_basis: null,
+    work_observation_ids: ['review-a'], source_observation_ids: ['source-a'], source_images: record.images, quantity: null, reference: null, pricing: null, rate_basis: null,
     evidence_role: null, hours: null, cost: null, currency: null, overlap_group: null, selected: true, shared_access: false, input_fingerprint: 'b', claim_count: 1, formula: null }],
  }],
 };
@@ -183,6 +183,22 @@ it('filters the same ledger to a system and preserves unknown totals', async () 
  expect(host.textContent).not.toContain('Install door-glass pair');
  expect(host.textContent).toContain('Unestimated');
  expect(host.textContent).not.toContain('$0.00');
+});
+
+it('keeps unestimated work accessible and opens the line witness rather than the containing card photograph', async () => {
+ const other = { ...record, observation_id: 'review-unestimated', title: 'Separate recorded work', summary: 'A retained operation without an estimate.', gaps: ['Recorded scope still needs a cost basis.'] };
+ const scoped = structuredClone(ledger);
+ scoped.scenarios[0].rows[0].source_images = [{ ...record.images[0], image_id: 'line-witness', caption: 'Exact glass installation witness', image_url: 'https://images.example/glass-source.jpg' }];
+ await act(async () => root.render(<VisualWorkCards rows={[record, other]} ledger={scoped} renderSource={line => <button>Read original {line.source_id}</button>} />));
+ const retained = host.querySelector('[aria-label="Other photographed work"]')!;
+ expect(retained.textContent).toContain('Separate recorded work');
+ expect(retained.textContent).toContain('Recorded scope still needs a cost basis.');
+ expect(retained.querySelectorAll('article')).toHaveLength(1);
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Install door-glass pair"]')!.click());
+ const detail = host.querySelector('#vp-ledger-evidence')!;
+ expect(detail.querySelector('button[aria-label="Open source photo: Torn seating"]')).toBeNull();
+ await act(async () => detail.querySelector<HTMLButtonElement>('button[aria-label="Open source photo: Exact glass installation witness"]')!.click());
+ expect(fixture.open).toHaveBeenCalledWith('line-witness');
 });
 
 it('withdraws the cost ledger with a failed current-source refresh', async () => {

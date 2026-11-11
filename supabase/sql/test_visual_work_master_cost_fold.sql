@@ -584,3 +584,85 @@ DO $$ DECLARE v uuid:='10000000-0000-0000-0000-000000000001'; p jsonb; c jsonb; 
  ASSERT vehicle_build_log_public(v,false)#>>'{master_ledger,scenarios,0,rows,0,status}'='resolved';
  RAISE NOTICE 'master cost: canonical binder context, physical anchor, no transition/time promotion, source and privacy withdrawal pass';
 END $$;
+
+DO $$ DECLARE v uuid:='10000000-0000-0000-0000-000000000001'; p jsonb; op jsonb; s jsonb; BEGIN
+ SELECT packet INTO p FROM baseline_packet; op:=p#>'{operations,0}';
+ -- The undecided broad option must not become selected when its unselected
+ -- sibling's source is withdrawn. This was previously bypassed by group n=1.
+ UPDATE vehicle_observations SET structured_data=p||jsonb_build_object('materials','[]'::jsonb,'operations',jsonb_build_array(
+  op||'{"physical_operation_key":"withdrawal.broad","overlap_group":"withdrawal.scope"}'))
+ WHERE id='a0000000-0000-0000-0000-000000000001';
+ UPDATE vehicle_observations SET is_superseded=false,structured_data=p||jsonb_build_object('materials','[]'::jsonb,'operations',jsonb_build_array(
+  op||'{"physical_operation_key":"withdrawal.child","overlap_group":"withdrawal.scope","selected":false}'))
+ WHERE id='a0000000-0000-0000-0000-000000000003';
+ s:=vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0}';
+ ASSERT s#>'{totals,currencies}'='[]' AND s#>>'{coverage,unresolved_lines}'='2';
+ UPDATE vehicle_observations SET is_superseded=true WHERE id='a0000000-0000-0000-0000-000000000003';
+ s:=vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0}';
+ ASSERT s#>'{totals,currencies}'='[]' AND s#>>'{coverage,unresolved_lines}'='1';
+ ASSERT s#>'{rows,0,reasons}' ? 'overlap_selection_unresolved';
+ UPDATE vehicle_observations SET structured_data=jsonb_set(structured_data,'{operations,0,selected}','true')
+ WHERE id='a0000000-0000-0000-0000-000000000001';
+ s:=vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0}';
+ ASSERT (s#>>'{totals,currencies,0,cost,typical}')::numeric=1280;
+ RAISE NOTICE 'master cost: withdrawn overlap sibling cannot select the sole survivor or increase subtotal';
+END $$;
+
+INSERT INTO vehicle_images(id,vehicle_id,image_url,taken_at,vision_gate_status,exif_data)
+VALUES('4abcdef3-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000001',
+ 'https://images.example/separate-line-witness.jpg','2025-10-01T23:45:00Z','approved',
+ '{"capture_time_zone":"America/Los_Angeles","capture_time_basis":"Retained source clock"}');
+INSERT INTO vehicle_observations(id,vehicle_id,source_id,source_url,kind,confidence_score,extraction_method,structured_data)
+VALUES('a5000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001',
+ 'https://images.example/separate-line-witness.jpg','condition',.6,'synthetic_current_reading',
+ '{"image_id":"4abcdef3-0000-0000-0000-000000000004","agent_notes":"PRIVATE CONTEXT MUST NOT BECOME A PHOTO CAPTION"}'),
+ ('a5000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001',
+ 'https://images.example/separate-line-witness.jpg','condition',.6,'synthetic_current_reading',
+ '{"image_id":"4abcdef3-0000-0000-0000-000000000004"}');
+CREATE TEMP TABLE retained_test_witness AS SELECT * FROM observation_witnesses WHERE observation_id='a5000000-0000-0000-0000-000000000003';
+DO $$ DECLARE v uuid:='10000000-0000-0000-0000-000000000001'; p jsonb; s jsonb; j jsonb; BEGIN
+ SELECT packet INTO p FROM baseline_packet;
+ p:=jsonb_set(p||'{"materials":[]}','{operations,0,source_observation_ids}','["a5000000-0000-0000-0000-000000000003"]');
+ UPDATE vehicle_observations SET structured_data=p WHERE id='a0000000-0000-0000-0000-000000000001';
+ j:=vehicle_build_log_public(v,false);s:=j#>'{master_ledger,scenarios,0}';
+ ASSERT s#>>'{rows,0,status}'='resolved' AND jsonb_array_length(s#>'{rows,0,source_images}')=1;
+ ASSERT s#>>'{rows,0,source_images,0,image_id}'='4abcdef3-0000-0000-0000-000000000004'
+  AND j#>>'{visual_work,0,images,0,image_id}'='4abcdef1-0000-0000-0000-000000000002';
+ ASSERT s#>>'{rows,0,source_images,0,image_url}'='https://images.example/separate-line-witness.jpg'
+  AND s#>>'{rows,0,source_images,0,role}'='source' AND s#>>'{rows,0,source_images,0,caption}'='Cited source photograph';
+ ASSERT s#>>'{rows,0,source_images,0,capture_time_zone}'='America/Los_Angeles'
+  AND s#>>'{rows,0,source_images,0,date_role}'='source_capture_not_work_date' AND s::text NOT LIKE '%PRIVATE CONTEXT%';
+ -- Different witnesses/timestamps are evidence unions, never numeric conflicts.
+ UPDATE vehicle_observations SET is_superseded=false,structured_data=(SELECT packet||'{"materials":[]}' FROM baseline_packet)
+ WHERE id='a0000000-0000-0000-0000-000000000003';
+ s:=vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0}';
+ ASSERT s#>>'{rows,0,status}'='resolved' AND s#>>'{rows,0,claim_count}'='2'
+  AND jsonb_array_length(s#>'{rows,0,source_images}')=2 AND (s#>>'{totals,currencies,0,cost,typical}')::numeric=1280;
+ -- Two readings of one image retain both citation IDs but show one photograph.
+ UPDATE vehicle_observations SET structured_data=jsonb_set(p,'{operations,0,source_observation_ids}','["a5000000-0000-0000-0000-000000000004"]')
+ WHERE id='a0000000-0000-0000-0000-000000000003';
+ s:=vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0}';
+ ASSERT s#>>'{rows,0,status}'='resolved' AND jsonb_array_length(s#>'{rows,0,source_images}')=1
+  AND jsonb_array_length(s#>'{rows,0,source_images,0,source_observation_ids}')=2;
+ UPDATE vehicle_observations SET is_superseded=true WHERE id='a0000000-0000-0000-0000-000000000003';
+ -- Source withdrawal withholds both the cost and the actual cited photograph.
+ UPDATE vehicle_images SET is_sensitive=true WHERE id='4abcdef3-0000-0000-0000-000000000004';
+ s:=vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0}';
+ ASSERT s#>>'{rows,0,status}'='unresolved' AND s#>'{rows,0,source_images}'='[]' AND s#>'{rows,0,cost}'='null';
+ UPDATE vehicle_images SET is_sensitive=false,image_url='https://images.example/replaced-line-witness.jpg' WHERE id='4abcdef3-0000-0000-0000-000000000004';
+ ASSERT vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0,rows,0,source_images}'='[]';
+ UPDATE vehicle_images SET image_url='https://images.example/separate-line-witness.jpg' WHERE id='4abcdef3-0000-0000-0000-000000000004';
+ UPDATE vehicle_observations SET is_superseded=true WHERE id='a5000000-0000-0000-0000-000000000003';
+ ASSERT vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0,rows,0,source_images}'='[]';
+ UPDATE vehicle_observations SET is_superseded=false WHERE id='a5000000-0000-0000-0000-000000000003';
+ DELETE FROM observation_witnesses WHERE observation_id='a5000000-0000-0000-0000-000000000003';
+ ASSERT vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0,rows,0,source_images}'='[]';
+ INSERT INTO observation_witnesses SELECT * FROM retained_test_witness;
+ UPDATE vehicle_images SET ai_scan_metadata='{"byok_deep_analysis":{"scene_type":"receipt_document"}}'
+ WHERE id='4abcdef3-0000-0000-0000-000000000004';
+ ASSERT vehicle_build_log_public(v,false)#>'{master_ledger,scenarios,0,rows,0,source_images}'='[]',
+  'An out-of-card document does not bypass the scoped context contract';
+ UPDATE vehicle_images SET ai_scan_metadata=NULL WHERE id='4abcdef3-0000-0000-0000-000000000004';
+ ASSERT vehicle_build_log_public(v,false)#>>'{master_ledger,scenarios,0,rows,0,status}'='resolved';
+ RAISE NOTICE 'master cost: exact out-of-card source photos, witness union, no numeric conflict and current-source withdrawal pass';
+END $$;

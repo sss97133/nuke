@@ -57,7 +57,7 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
   const detail = lines.find(r => key(r) === inspected);
   const sourcesFor = (line: MasterCostLine) => works.filter(w => line.work_observation_ids.includes(w.observation_id));
   const detailWorks = detail ? sourcesFor(detail) : [];
-  const photos = detailWorks.flatMap(w => w.images).filter((im, index, all) => all.findIndex(x => x.image_id === im.image_id) === index);
+  const photos = detail?.source_images ?? [];
   const receiptItem = detail?.pricing?.receipt_item_id;
   const receiptLines = detailWorks.flatMap(w => w.receipts).filter((r, index, all) =>
     (!receiptItem || r.item_id === receiptItem) && all.findIndex(x => x.item_id === r.item_id) === index);
@@ -115,7 +115,7 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
     <div className="vp-ledger-table-wrap"><table className="vp-ledger-table">
       <thead><tr><th>Work or material</th><th>Quantity</th><th>Hours</th><th>Calculated cost</th></tr></thead>
       <tbody>{lines.map(line => {
-        const own = sourcesFor(line); const photo = own[0]?.images[0];
+        const own = sourcesFor(line); const photo = line.source_images?.[0];
         const product = own.flatMap(w => w.receipts).find(r => r.item_id === line.pricing?.receipt_item_id)?.product;
         const thumbnail = product?.image_url || photo?.image_url;
         return <React.Fragment key={key(line)}><tr className={line.status === 'excluded' ? 'vp-ledger-excluded' : undefined}>
@@ -140,7 +140,13 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
 export function VisualWorkCards({ rows, ledger, renderSource }: {
   rows: VisualWork[]; ledger?: MasterCostLedger | null; renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode;
 }) {
-  if (ledger?.scenarios.length) return <MasterLedger ledger={ledger} works={rows} renderSource={renderSource} />;
+  if (ledger?.scenarios.length) {
+    const cited = new Set(ledger.scenarios.flatMap(s => s.rows.flatMap(r => r.work_observation_ids)));
+    const remaining = rows.filter(work => !cited.has(work.observation_id));
+    return <><MasterLedger ledger={ledger} works={rows} renderSource={renderSource} />
+      {remaining.length > 0 && <section aria-label="Other photographed work"><h4>Other photographed work</h4>
+        <VisualWorkCards rows={remaining} renderSource={renderSource} /></section>}</>;
+  }
   if (!rows.length) return null;
   return <div className="vp-visual-work">{rows.map(work => {
     const documentedHours = work.receipts.filter(line => line.relation === 'documented_operation' && line.hours != null);

@@ -19,6 +19,7 @@ export interface MasterCostLine {
   kind: 'labor' | 'material'; physical_key: string; system_key: string; label: string;
   status: 'resolved' | 'partial' | 'unresolved' | 'excluded'; reasons: string[];
   work_observation_ids: string[]; source_observation_ids: string[];
+  source_images: VisualWork['images'];
   quantity: { value: number | null; unit: string | null; basis: string | null; derivation?: string } | null;
   reference: Record<string, unknown> | null; pricing: Record<string, unknown> | null;
   rate_basis: Record<string, unknown> | null; evidence_role: string | null;
@@ -37,7 +38,7 @@ export interface MasterCostLedger {
 
 export interface VisualWork {
   observation_id: string; title: string; summary: string; gaps: string[];
-  images: { image_id: string; image_url: string; role: 'before' | 'during' | 'after' | 'context'; caption: string; taken_at: string;
+  images: { image_id: string; image_url: string; role: 'before' | 'during' | 'after' | 'context' | 'source'; caption: string; taken_at: string;
     capture_time_zone?: string | null; capture_time_basis?: string | null }[];
   receipts: { product?: ReceiptCatalogProduct | null; item_id: string; receipt_id: string; relation: 'candidate_material' | 'documented_operation';
     source_table: 'vehicle_documents' | 'vehicle_images'; source_id: string; source_url_sha256: string; vendor: string | null;

@@ -18,7 +18,7 @@ DECLARE
  card jsonb; doc jsonb; basis jsonb; line jsonb; kind text; scenario text; physical_key text;
  qty jsonb; qty_value numeric; rate_input jsonb; rate_info jsonb; rate_value numeric; currency text;
  ref jsonb; resolved jsonb; hours jsonb; unit_hours jsonb; cost jsonb; pricing jsonb; product jsonb; price_range jsonb;
- reasons jsonb; sources jsonb; basis_source_id text; source_ok boolean; reference_ok boolean;
+ reasons jsonb; sources jsonb; source_images jsonb; basis_images jsonb; basis_source_id text; source_ok boolean; reference_ok boolean;
  h_min numeric; h_typ numeric; h_max numeric; year_value integer; source_row record;
  candidates jsonb:='[]'; folded jsonb; selected_rows jsonb; scenarios jsonb:='[]'; rows_for_scope jsonb;
  systems jsonb; totals jsonb; coverage jsonb; scenario_rows jsonb; system_key text;
@@ -65,21 +65,43 @@ BEGIN
     END IF;
     -- Every basis must retain a same-car canonical witness/current source. A
     -- qualified visual work card already validated its complete multi-photo set.
-    sources:=line->'source_observation_ids'; source_ok:=true;
+    sources:=line->'source_observation_ids'; source_ok:=true; source_images:='[]';
     IF jsonb_typeof(sources) IS DISTINCT FROM 'array' THEN sources:='[]'; source_ok:=false; END IF;
     IF jsonb_array_length(sources) NOT BETWEEN 1 AND 20 THEN source_ok:=false; END IF;
     FOR basis_source_id IN SELECT value#>>'{}' FROM jsonb_array_elements(sources) LOOP
      IF basis_source_id IS NULL OR basis_source_id !~ uuid_pattern THEN source_ok:=false; CONTINUE; END IF;
-     IF NOT EXISTS(SELECT 1 FROM public.vehicle_observations o WHERE o.id=basis_source_id::uuid
-      AND o.vehicle_id=p_vehicle_id AND o.is_superseded IS FALSE
-      AND (EXISTS(SELECT 1 FROM jsonb_array_elements(p_cards) c WHERE (c->>'observation_id')::uuid=o.id)
-       OR EXISTS(SELECT 1 FROM public.observation_witnesses w JOIN public.vehicle_images i ON i.id=w.image_id
-        WHERE w.observation_id=o.id AND i.vehicle_id=p_vehicle_id AND i.image_url=o.source_url
-         AND (public.receipt_work_frame_eligible(i) OR EXISTS(SELECT 1 FROM jsonb_array_elements(card->'images') ci
-          WHERE ci->>'role'='context' AND ci->>'source_observation_id'=o.id::text AND ci->>'image_id'=i.id::text
-           AND ci->>'image_url'=i.image_url AND w.witness_role='derived'))
-         AND coalesce(i.image_vehicle_match_status,'') NOT IN ('mismatch','unrelated'))))
-      THEN source_ok:=false; END IF;
+     SELECT o.id,o.source_url INTO source_row FROM public.vehicle_observations o WHERE o.id=basis_source_id::uuid
+      AND o.vehicle_id=p_vehicle_id AND o.is_superseded IS FALSE;
+     IF NOT FOUND THEN source_ok:=false; CONTINUE; END IF;
+     -- A cited, already-qualified work card can carry several physical/context
+     -- sources. Otherwise return the actual canonical witness, even when it is
+     -- absent from this line's containing card. Never substitute that card's photo.
+     SELECT coalesce(jsonb_agg(ci||jsonb_build_object('source_observation_id',source_row.id,
+       'date_role','source_capture_not_work_date') ORDER BY ci->>'image_id'),'[]') INTO basis_images
+      FROM jsonb_array_elements(p_cards) c CROSS JOIN LATERAL jsonb_array_elements(c->'images') ci
+      WHERE (c->>'observation_id')::uuid=source_row.id;
+     IF basis_images='[]'::jsonb THEN
+      SELECT coalesce(jsonb_agg(DISTINCT jsonb_build_object('image_id',i.id,'image_url',i.image_url,
+        'source_observation_id',source_row.id,'role',coalesce(ci->>'role','source'),
+        'caption',coalesce(nullif(left(public.text_redact_contact(ci->>'caption'),300),''),'Cited source photograph'),
+        'taken_at',CASE WHEN isfinite(i.taken_at) THEN i.taken_at END,
+        'capture_time_zone',CASE WHEN ci IS NOT NULL THEN ci->>'capture_time_zone'
+         WHEN nullif(i.exif_data->>'capture_time_zone','') IS NOT NULL THEN
+          CASE WHEN EXISTS(SELECT 1 FROM pg_catalog.pg_timezone_names z
+           WHERE z.name=i.exif_data->>'capture_time_zone') THEN i.exif_data->>'capture_time_zone' END END,
+        'capture_time_basis',nullif(left(public.text_redact_contact(i.exif_data->>'capture_time_basis'),300),''),
+        'date_role','source_capture_not_work_date')),'[]') INTO basis_images
+       FROM public.observation_witnesses w JOIN public.vehicle_images i ON i.id=w.image_id
+       LEFT JOIN LATERAL (SELECT cimg FROM jsonb_array_elements(card->'images') cimg
+         WHERE cimg->>'image_id'=i.id::text AND cimg->>'image_url'=i.image_url LIMIT 1) cited ON true
+       CROSS JOIN LATERAL (SELECT cited.cimg AS ci) caption
+       WHERE w.observation_id=source_row.id AND i.vehicle_id=p_vehicle_id AND i.image_url=source_row.source_url
+        AND (public.receipt_work_frame_eligible(i) OR (ci->>'role'='context'
+         AND ci->>'source_observation_id'=source_row.id::text AND w.witness_role='derived'))
+        AND coalesce(i.image_vehicle_match_status,'') NOT IN ('mismatch','unrelated');
+     END IF;
+     IF basis_images='[]'::jsonb THEN source_ok:=false;
+     ELSE source_images:=source_images||basis_images; END IF;
     END LOOP;
     IF NOT source_ok THEN reasons:=reasons||'"source_unavailable"'::jsonb; END IF;
     qty:=line->'quantity';
@@ -198,7 +220,7 @@ BEGIN
      'physical_key',coalesce(physical_key,'unresolved:'||(card->>'observation_id')||':'||line_count),
      'system_key',coalesce(line->>'system_key','unresolved'),'label',left(public.text_redact_contact(line->>'label'),300),
      'status',CASE WHEN jsonb_array_length(reasons)=0 AND cost IS NOT NULL THEN 'resolved' WHEN hours IS NOT NULL THEN 'partial' ELSE 'unresolved' END,
-     'reasons',reasons,'work_observation_ids',jsonb_build_array(card->>'observation_id'),
+     'reasons',reasons,'work_observation_ids',jsonb_build_array(card->>'observation_id'),'source_images',source_images,
      'source_observation_ids',(SELECT coalesce(jsonb_agg(DISTINCT lower(s#>>'{}') ORDER BY lower(s#>>'{}')),'[]')
        FROM jsonb_array_elements(sources) s WHERE s#>>'{}' ~ uuid_pattern),
      'quantity',jsonb_build_object('value',qty_value,'unit',qty->>'unit','basis',qty->>'basis','derivation',left(public.text_redact_contact(qty->>'derivation'),1200)),
@@ -221,14 +243,21 @@ BEGIN
  IF candidates='[]'::jsonb THEN RETURN '{}'::jsonb; END IF;
  -- Fold repeated physical operation/material keys once across the whole car.
  -- The fingerprint is the actual normalized input, not the citing photo count.
- WITH x AS (SELECT r,md5((r-ARRAY['source_observation_ids','work_observation_ids','label','estimate_basis','reasons'])::text) sig
+ WITH x AS (SELECT r,md5((r-ARRAY['source_observation_ids','source_images','work_observation_ids','label','estimate_basis','reasons'])::text) sig
    FROM jsonb_array_elements(candidates) r), g AS (
   SELECT r->>'scenario' s,r->>'kind' k,r->>'physical_key' p,count(*) n,count(DISTINCT sig) variants,
    (jsonb_agg(r ORDER BY r#>>'{work_observation_ids,0}'))->0 first,
    jsonb_agg(r) claims,min(sig) sig FROM x GROUP BY 1,2,3)
  SELECT jsonb_agg(first||jsonb_build_object('claim_count',n,'input_fingerprint',sig,
    'work_observation_ids',(SELECT jsonb_agg(DISTINCT id ORDER BY id) FROM jsonb_array_elements(claims) c CROSS JOIN LATERAL jsonb_array_elements(c->'work_observation_ids') id),
-   'source_observation_ids',(SELECT coalesce(jsonb_agg(DISTINCT id ORDER BY id),'[]') FROM jsonb_array_elements(claims) c CROSS JOIN LATERAL jsonb_array_elements(c->'source_observation_ids') id))
+   'source_observation_ids',(SELECT coalesce(jsonb_agg(DISTINCT id ORDER BY id),'[]') FROM jsonb_array_elements(claims) c CROSS JOIN LATERAL jsonb_array_elements(c->'source_observation_ids') id),
+   'source_images',(SELECT coalesce(jsonb_agg(merged ORDER BY merged->>'image_id'),'[]') FROM (
+     SELECT ((jsonb_agg(im ORDER BY im->>'source_observation_id'))->0)-'source_observation_id'
+       ||jsonb_build_object('source_observation_ids',jsonb_agg(DISTINCT im->'source_observation_id' ORDER BY im->'source_observation_id'),
+         'role',CASE WHEN count(DISTINCT im->>'role')=1 THEN min(im->>'role') ELSE 'source' END,
+         'caption',CASE WHEN count(DISTINCT im->>'caption')=1 THEN min(im->>'caption') ELSE 'Cited source photograph' END) AS merged
+     FROM jsonb_array_elements(claims) c CROSS JOIN LATERAL jsonb_array_elements(c->'source_images') im
+     GROUP BY im->>'image_id',im->>'image_url') source_union))
    ||CASE WHEN variants>1 THEN jsonb_build_object('status','unresolved','hours',NULL,'cost',NULL,'reasons',jsonb_build_array('conflicting_physical_key')) ELSE '{}'::jsonb END
    ORDER BY s,k,p) INTO folded FROM g;
  WITH x AS (SELECT r,count(*) OVER(PARTITION BY r->>'scenario',r->>'kind',r->>'overlap_group') n,
@@ -236,7 +265,7 @@ BEGIN
    count(*) FILTER(WHERE r->>'selected' IN ('true','false')) OVER(PARTITION BY r->>'scenario',r->>'kind',r->>'overlap_group') specified
    FROM jsonb_array_elements(folded) r)
  SELECT jsonb_agg(r||CASE
-   WHEN r->>'overlap_group' IS NOT NULL AND n>1 AND (yes<>1 OR specified<>n)
+   WHEN r->>'overlap_group' IS NOT NULL AND (yes<>1 OR specified<>n)
     THEN jsonb_build_object('status','unresolved','hours',NULL,'cost',NULL,'reasons',(r->'reasons')||'"overlap_selection_unresolved"'::jsonb)
    WHEN r->>'selected'='false' THEN jsonb_build_object('status','excluded','hours',NULL,'cost',NULL,'reasons',(r->'reasons')||'"unselected_alternative"'::jsonb)
    ELSE '{}'::jsonb END ORDER BY r->>'scenario',r->>'system_key',r->>'kind',r->>'physical_key') INTO selected_rows FROM x;
