@@ -604,9 +604,18 @@ found broken and what is still unproven:
 - `evidence_judgment_requests` held 595 rows for the proof vehicle at 22:48 UTC: 115 answered, 68 withdrawn, 412
   cancelled, every one the receipt-part question. The model has been asking on this vehicle; nothing in the repo reads
   the answers into a claim.
-- Still unproven, and the definition of done has not moved: no keyed row has landed (0 of 488 on the proof vehicle,
-  read again 22:48 UTC); the writer, scoreboard and database gates are not built; the decisions memory has no store
-  but a file; no model from another provider has been put through the owner's test.
+- Still unproven at 23:50 UTC, and the definition of done has not moved: no keyed row had landed (0 of 488 on the
+  proof vehicle, read again 22:48 UTC); the writer, scoreboard and database gates are not built; the decisions
+  memory has no store but a file; no model from another provider has been put through the owner's test.
+- **2026-11-11 03:24 to 04:54 UTC, the first landing.** The owner: "Keys and folds is all that matters is it now
+  going", and when told the cloud session held no write key, "You have db acces you do it". The dry run's keyed
+  claims were landed through `ingest-observation`, called from the database as the project's own jobs call it: one
+  row first and read back, then the rest. 446 rows on 300 photos, each with a descriptor and its photo as witness;
+  keyed went from 0 of 488 to 446 of 934; folded in the database to 181 claims, 69 carried by two or more photos.
+  The queries are `land.sql` and `fold.sql` beside the harness, and the round is in `image-keys-test.md`. What this
+  is not: a runner (it ran once, by an agent), a fold object (it is a query), or a place for the part (it rides in
+  `structured_data`; the ruling is still the owner's). The next three things, in order: the proposals for the places
+  496 claims waited on, the part's place on an observation, and something that runs the lane without an agent.
 - For whoever builds next, from the dry run: (1) the writer's check can start from `check_units.py`; (2) the first
   proposals to put to the owner are the places most claims waited on (paint or coating loss, "no break visible", "no
   leak visible", the hood and the front valance as parts); (3) the conventions that the skeptics found weak (a located

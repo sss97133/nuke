@@ -3,8 +3,8 @@
 A read-only harness for the keys role ([`skills/image-keys/SKILL.md`](../../../skills/image-keys/SKILL.md)). It takes
 the statements readers have already stored about one vehicle's photos, has the keys role give each one the model's
 keys, checks every result by code, folds repeats, and joins receipt lines through the same part keys. It reads no
-photo and writes nothing to the database. It exists so a claim about what keying would add to the model can be
-measured before the writer is built, and replayed afterwards.
+photo. The dry run writes nothing to the database; landing is a separate, explicit step (below). It exists so a
+claim about what keying would add to the model can be measured first, landed deliberately, and replayed afterwards.
 
 Owner direction this follows (2026-11-10, `docs/ledger/theory/data-machine.md`, "Image analysis is the model asking"):
 a reading is finished when it is keyed; "the best type of batch is one at a time ... and then figuring out how to
@@ -23,6 +23,9 @@ a different approach, a different harness".
 | `compare.py` | The same statements keyed two ways: where one photo at a time and a batch agree. |
 | `workflows/verify.js` | The steps that need the whole set: one reconciler merges drafted names; three skeptics try to refute a sample. |
 | `fold.py` | Folding in code: same part, side, state and capture day is one claim with every photo as witness. Joins receipts. |
+| `pack_claims.py` | Chooses the keyed claims the writer can accept today and packs them, with a checksum per part. |
+| `land.sql` | **The landing.** Has the database POST each packed claim to `ingest-observation`, as the project's own jobs do. It inserts nothing itself. |
+| `fold.sql` | Reads back what landed and folds it in the database: keyed count, folded claims, photos behind each. |
 | `registry.snapshot.md`, `registry.snapshot.json` | The registry as read from production on 2026-11-10. A dated copy: read it again before a new run. |
 | `decisions.pending.2026-11-10.json` | The memory from the first run: 122 part decisions, 49 state decisions, 24 conventions. Drafted by an agent, **pending, not approved**. |
 
@@ -44,10 +47,25 @@ python3 scripts/photo-pipeline/keys-dry-run/check_units.py <workflow output> --s
 python3 scripts/photo-pipeline/keys-dry-run/fold.py --map <the reconciler's merges as {from: to}>
 ```
 
+## Landing
+
+The owner, 2026-11-11, asked whether keys and folds was going, and then: "You have db acces you do it". The first
+landing was done that hour, by hand, through the sanctioned writer:
+
+```bash
+python3 scripts/photo-pipeline/keys-dry-run/fold.py --map <merges> --json $KEYS_DRY_RUN_DATA/fold.json
+python3 scripts/photo-pipeline/keys-dry-run/pack_claims.py $KEYS_DRY_RUN_DATA/fold.json
+# land.sql: one claim first, read it back with fold.sql, then each part
+```
+
+Only a claim whose state is a live `condition_taxonomy` key lands. Its part rides in `structured_data` until a part
+has a place on an observation. A landed row is agent testimony capped at 0.6; it is replaced through
+`supersede_observation_relay` after a successor has landed, never edited.
+
 ## What it is not
 
-- Not a writer. Nothing here lands a row. A keyed claim becomes a row only through `ingest-observation`, and the
-  writer gate the theory card lists is not built.
+- Not a runner. The landing above was run once by an agent. Nothing schedules it, and the writer, scoreboard and
+  database gates the theory card lists are still not built.
 - Not a reader. It adds no vocabulary of its own: every key is a registry key, a stored decision or a proposal.
 - Not an approval. A drafted key is a proposal for the owner. The decisions file says what an agent decided so that
   the next run decides the same way; it does not say the owner agreed.

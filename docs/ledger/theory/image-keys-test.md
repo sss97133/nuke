@@ -168,3 +168,41 @@ store, shown to prove the method; none is a query the database can answer yet.
 **Limits.** One run, one vehicle, one family of model for keyer, reconciler and skeptics. The first batch's decisions
 were made by an agent and are pending. A printed photo inside a receipt frame was keyed on the day the print was
 photographed, not the day it shows. Nothing was landed: the keyed count in the database is still 0 of 488.
+
+## The first landing, 2026-11-11 03:24 to 04:54 UTC
+
+The owner, asked whether keys and folds was going after the dry run: "You have db acces you do it". The keyed claims
+of the round above were landed on the proof vehicle through `ingest-observation`, called from the database the way
+the project's scheduled jobs call it (`scripts/photo-pipeline/keys-dry-run/land.sql`). No row was inserted by hand.
+
+- **One first.** The torn-headliner statement on photo `7c257513-719d-4c9c-8587-48806f12a287` landed as observation
+  `54ee434e-0b23-4685-b9c4-122bcee7bb9d`: kind condition, `descriptor_id` set (`interior.upholstery.tear`),
+  `observed_at` the photo's capture time, one derived witness row for that photo, confidence 0.6, analysis deferred.
+- **Then the rest**, in three packed parts with a checksum each. Every request answered 200; the one claim sent twice
+  came back `duplicate` and wrote nothing.
+
+Read from the database at 04:54 UTC (`fold.sql`):
+
+| Measure | Count |
+|---|---|
+| Rows landed (`extraction_method = 'photo_map_harvest_v1'`) | 446, on 300 photos |
+| With a descriptor / with exactly one photo witness / deferred | 446 / 446 / 446 |
+| Keyed, by rule 7 (witnessed observations on the owner's photos of this vehicle that carry a key) | 446 of 934; it was 0 of 488 |
+| Folded claims (descriptor, part, side, capture day) / carried by two or more photos / largest | 181 / 69 / 27 photos |
+| Rows whose part is a registry key / whose part is not named | 242 / 82 |
+| Capture days covered | six, 2025-10-06 to 2026-11-02 |
+
+What did not land and why: 496 claims whose state has no registry key (they wait on proposals; paint or coating loss
+alone is 145), 6 from a print inside a receipt frame, 7 with a body-panel key on an interior part, 3 repeats.
+
+Choices made at landing that differ from the build design (`2026-11-10_image-keys-build-design.md` section 7.3), for
+whoever lands next to keep or overrule: `observed_at` is the photo's capture time, not the reading's time, so the
+day on the row is the day the car was in that state; `content_text` is the reader's own sentence, not a line built
+from labels. The part is in `structured_data` (`part_key`, `part_side`, `part_key_status`) because a part has no
+place on an observation; when it gets one, these rows can be given it without reading anything again.
+
+**Limits.** This was one landing, run by an agent. Nothing schedules it. The fold is a query, not a database object.
+The rows are one reader's statements placed on keys by a second model: the skeptics refuted about one in eight of
+such placements in the dry run, and a wrong one is corrected by landing its successor and superseding, not by
+editing. The acceptance chain "seen torn, later seen whole" cannot be read from these rows yet, because "no tear
+visible" has no key.
