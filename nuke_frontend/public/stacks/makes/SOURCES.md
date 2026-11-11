@@ -98,3 +98,36 @@ low-resolution brochures, with system-font controls at 0.81-0.83, is not proof);
 without a corroborating manufacturer source; OpenClipart drawings. No model lettering (911, Corvette, Mustang, Camaro,
 Bronco, Defender, Land Cruiser) met this bar. Block-capital wordmarks are also scored against similar
 system fonts set on the same crops; a range is kept only where the drawing clearly beats every font.
+
+## 1973 Pontiac and Firebird lettering library (2026-11-11)
+
+Several sourced versions per mark, each with its own applicability in `vehicle-identities.json`. Every file is the
+unmodified upstream download (SHA-256 in the catalogue); a viewport selects the mark. `VehicleIdentity` renders the first
+match per role, so the catalogue lists the on-car / light-ground version first and the literature versions after it.
+
+| Role | Version | Source | Applicability |
+| --- | --- | --- | --- |
+| year | "1973", Accessorizer & Selling Facts dealer book cover | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Accessorizer/slides/1973%20Pontiac%20Accessorizer-01.html) | all Pontiac, 1973 |
+| year | "1973", US full-line brochure cover | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html) | all Pontiac, 1973 |
+| year | "73", GM of Canada Firebird brochure cover | [oldcarbrochures.org](https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/slides/1973_Pontiac_Firebird_Cdn-01.html) (byte-identical at [lov2xlr8.no](https://www.lov2xlr8.no/brochures/pontiac/73fire/73fire.html)) | Firebird, 1973 |
+| make | "PONTIAC" tail panel letters, OER K1049 | [oerparts.com](https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html) | Firebird, 1970-73 |
+| make | "Pontiac", US full-line cover | as above | all Pontiac, 1973 |
+| make | "Pontiac", Accessorizer cover | as above | all Pontiac, 1973 |
+| make | "PONTIAC", Canada Firebird cover | as above | Firebird, 1973 |
+| emblem | Arrowhead, Accessorizer cover | as above | all Pontiac, 1973 |
+| emblem | Fender bird, OER 487708 | [oerparts.com](https://www.oerparts.com/product/1973/pontiac/firebird/parts/487708.html) | Firebird except Trans Am, 1970-73 |
+| model | "Firebird" fender script, OER 486904 | [oerparts.com](https://www.oerparts.com/product/1973/pontiac/firebird/parts/486904.html) | Firebird, 1971-81 |
+| model | "Firebird" heading, US full-line pp. 10-11 | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html) | Firebird, 1973 |
+| model | "FIREBIRD", Canada Firebird cover | as above | Firebird, 1973 |
+| variant | "TRANS AM" spoiler name on clear, Blue, Phoenix Graphix 7375TANSC | [phoenixgraphix.com](https://www.phoenixgraphix.com/transam/7375tansc.php) | Firebird Trans Am / Trans Am-Style, 1973-75 |
+| variant | "TRANS AM" fender name on clear, Green | as above | Firebird Trans Am / Trans Am-Style, 1973 |
+| variant | "TRANS AM", Canada Firebird cover model line | as above | Firebird Trans Am / Trans Am-Style, 1973 |
+
+The year role holds printed years only. No sourced period numeral set was found, so another year is never composed from
+these digits and stays text. Trans Am lettering matches a recorded Trans Am and a Trans Am-style tribute: on a tribute it
+is the lettering on the car, not factory trim, and the record's "-Style" stays visible beside it. The orange colourway
+that Pontiac paired with red cars (Phoenix lists Orange 1973-75) has no sourced photograph yet; the blue spoiler name
+leads until one is registered. Product photographs show reproduction parts by GM Restoration Parts licensees, used as
+reference identification with attribution. Not used: the Canadian full-size "PONTIAC '73" cover (another model line), the
+1973 Firebird magazine ad (lettering too small at headline size), the later flat-red fender bird (not 1973), and a Hot
+Rod road test bundled with the Canadian scans (not Pontiac literature).
