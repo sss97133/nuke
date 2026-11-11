@@ -198,6 +198,7 @@ it('withholds receipt amounts from an untied viewer instead of totalling them', 
   const block = host.querySelector('[aria-label="Receipts filed to this vehicle"]')!;
   expect(block.textContent).toContain('Withheld from this viewer');
   expect(block.textContent).not.toContain('Total on receipts');
+  expect(host.querySelector('[aria-label="By vendor"]')?.textContent).toContain('Amount withheld · 1 receipt');
 });
 
 it('keeps conflicting receipt amount/date readings unresolved and never invents a currency', () => {
