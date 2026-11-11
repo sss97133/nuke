@@ -8,7 +8,7 @@ DO $$ DECLARE r uuid:='60000000-0000-0000-0000-000000000001'; i uuid:='70000000-
  c jsonb; p uuid; with_image uuid; without_image uuid; recovered uuid; recaptured uuid; card jsonb; day jsonb; image_key text; q uuid; generation bigint; BEGIN
  UPDATE receipts SET vendor_name='Classic Industries',total=420 WHERE id=r;
  UPDATE receipt_items SET part_number='NO-IMAGE',description='Synthetic part without supplier photo' WHERE id=i;
- INSERT INTO listing_page_snapshots VALUES('a0000000-0000-0000-0000-000000000010','https://www.classicindustries.com/product/no-image.html',repeat('1',64),200,true,now()-interval '8 days');
+ INSERT INTO listing_page_snapshots VALUES('a0000000-0000-0000-0000-000000000010','https://www.classicindustries.com/product/no-image.html',repeat('1',64),200,true,date_trunc('second',now()-interval '8 days')+interval '0.420211 seconds');
  c:=jsonb_build_object('parser','receipt_product_page_v1','printed_sku','NO-IMAGE','name','Product with exact price',
  'snapshot_id','a0000000-0000-0000-0000-000000000010','page_sha256',repeat('1',64),'page_url','https://www.classicindustries.com/product/no-image.html',
  'source_role','original_receipt_supplier','match_basis','exact_primary_catalog_sku; installation_not_asserted',
@@ -16,7 +16,10 @@ DO $$ DECLARE r uuid:='60000000-0000-0000-0000-000000000001'; i uuid:='70000000-
  p:=record_receipt_catalog_product('classic_industries','NO-IMAGE',c);
  ASSERT p=record_receipt_catalog_product('classic_industries','*no-image',c),'null image identity remains idempotent under the existing writer lock';
  ASSERT (SELECT count(*)=1 FROM catalog_parts WHERE part_number='NO-IMAGE'),'no duplicate capture for null image hash';
- ASSERT (SELECT application_data::text NOT LIKE '%PRIVATE%' AND application_data::text NOT LIKE '%420%' FROM catalog_parts WHERE id=p),'private receipt context still excluded';
+ ASSERT (SELECT application_data::text NOT LIKE '%PRIVATE%'
+ AND NOT ((application_data->'receipt_product_v1') ?| ARRAY['customer_name','receipt_amount','receipt_id'])
+ AND NOT jsonb_path_exists(application_data,'$.** ? (@ == 420 || @ == "420")')
+ FROM catalog_parts WHERE id=p),'private receipt context still excluded';
  card:=receipt_item_product_card(i);
  ASSERT card->>'quote_price'='49.95' AND card->>'currency'='USD' AND (card->>'price_stale')::boolean;
  ASSERT card->'image_url'='null' AND card->'image_basis'='null' AND card->>'image_status'='unavailable','no fabricated image or stock-image claim';
