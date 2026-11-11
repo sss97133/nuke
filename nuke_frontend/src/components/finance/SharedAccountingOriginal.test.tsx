@@ -66,6 +66,26 @@ it('never executes an HTML original inside the profile', async () => {
   expect(host.querySelector('iframe, object, script')).toBeNull();
 });
 
+it('removes a derived preview when its original changes and never uses preview bytes as the original download', async () => {
+  const original = new Blob(['heic'], { type: 'image/heic' });
+  const preview = new Blob(['derived'], { type: 'image/webp' });
+  vi.mocked(URL.createObjectURL).mockImplementation(value => value === preview ? 'blob:derived' : 'blob:original');
+  await act(async () => root.render(<OriginalDocumentPreview blob={original} previewBlob={preview} filename="source.heic" onClose={() => {}} />));
+  expect(host.querySelector('img')?.src).toBe('blob:derived');
+  expect(host.querySelector<HTMLAnchorElement>('a[download]')?.href).toBe('blob:original');
+  await act(async () => root.render(<OriginalDocumentPreview blob={new Blob(['new'], { type: 'image/heic' })} filename="new.heic" onClose={() => {}} />));
+  expect(host.querySelector('img')).toBeNull();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:derived');
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:original');
+});
+
+it('does not render executable content supplied as a derived preview', async () => {
+  await act(async () => root.render(<OriginalDocumentPreview blob={new Blob(['heic'], { type: 'image/heic' })}
+    previewBlob={new Blob(['<script>bad()</script>'], { type: 'text/html' })} filename="source.heic" onClose={() => {}} />));
+  expect(host.querySelector('img, iframe, object, script')).toBeNull();
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+});
+
 it('shows bank CSV source text inline and escapes markup within its cells', async () => {
   const source = '<script>bad()</script>,12.50\nSynthetic vendor,40.00';
   const csv = Object.assign(new Blob([source], { type: 'text/csv' }), { text: () => Promise.resolve(source) });
