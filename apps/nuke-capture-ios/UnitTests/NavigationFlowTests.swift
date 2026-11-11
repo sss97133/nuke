@@ -15,12 +15,28 @@ final class NavigationFlowTests: XCTestCase {
             identity: { .refused(self.refusal("identity")) },
             inbox: { .refused(self.refusal("inbox")) },
             open: { .refused(self.refusal("open")) },
-            notifications: { .refused(self.refusal("notifications")) })
+            notifications: { .refused(self.refusal("notifications")) },
+            listings: { .refused(self.refusal("listings")) })
     }
 
     private func page(_ clock: String, next: String? = nil) throws -> MyWorkOrders {
         let data = try JSONSerialization.data(withJSONObject: ["rows": [], "as_of": clock, "next_after": next as Any? ?? NSNull()])
         return try JobReaders.decode(MyWorkOrders.self, from: data)
+    }
+
+    func testAccountSwitchDiscardsOldListingResult() async throws {
+        let started = expectation(description: "listing read started")
+        let gate = ControlledRead<JobLoad<ListingSubmissionPage>> { _ in started.fulfill() }
+        var sources = reads()
+        sources.listings = { await gate.next() }
+        var account = "first"
+        let reader = WorkConsoleReader(reads: sources, account: { account })
+        let loading = Task { await reader.loadListings() }
+        await fulfillment(of: [started], timeout: 3)
+        account = "second"
+        gate.finish(0, with: .loaded(ListingSubmissionPage(rows: [], total: 0)))
+        await loading.value
+        if case .loading = reader.listings {} else { XCTFail("old account listing must not publish") }
     }
 
     func testJobsPublishWhileSignatureReaderIsStillWaiting() async throws {

@@ -51,9 +51,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
           <div className="user-dropdown-section-label">ACCOUNT</div>
           <button onClick={() => go(`/profile/${session?.user?.id || ''}`)}>Profile</button>
           <button onClick={() => go('/brand-studio')}>Modes</button>
-          <button onClick={() => go('/inbox')}>
-            Inbox
-          </button>
+          <button onClick={() => go('/capture/ledger')}>Photos</button>
           <button onClick={() => go('/work')}>Work</button>
           <button
             onMouseEnter={() => { void import('../../pages/publishing/FinanceDashboard').catch(() => {}); }}

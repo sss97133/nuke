@@ -12,6 +12,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { eventStamp } from "../_shared/eventTime.ts";
+import { sendOutbound } from "../_shared/outbound.ts";
 
 // Until migration 20261023220000 is applied, occurred_at/ingest_kind don't exist; retry without them
 // rather than drop the photo.
@@ -213,15 +214,6 @@ async function sendClarificationSMS(
   phone: string,
   unclearImages: Array<{ url: string; hints: any; index: number }>
 ) {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromNumber = Deno.env.get("TWILIO_PHONE_NUMBER");
-
-  if (!accountSid || !authToken || !fromNumber || accountSid.includes("your-")) {
-    console.log("Twilio not configured, skipping SMS");
-    return;
-  }
-
   const count = unclearImages.length;
   const samples = unclearImages.slice(0, 3).map(img => {
     const h = img.hints;
@@ -233,21 +225,8 @@ async function sendClarificationSMS(
   const message = `${count} image${count > 1 ? 's' : ''} need vehicle ID:\n${samples.join('\n')}${count > 3 ? `\n+${count - 3} more` : ''}\n\nReply with VIN or year/make/model for each.`;
 
   try {
-    await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          To: phone.startsWith("+") ? phone : `+${phone}`,
-          From: fromNumber,
-          Body: message,
-        }),
-      }
-    );
+    const r = await sendOutbound({ channel: "sms", to: phone, text: message, caller: "image-intake" });
+    if (!r.sent) console.log(`Clarification SMS not sent: ${r.status} ${r.reason ?? r.error ?? ""}`);
   } catch (e) {
     console.error("SMS failed:", e);
   }

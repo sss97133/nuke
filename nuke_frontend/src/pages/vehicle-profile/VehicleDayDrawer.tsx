@@ -1,3 +1,4 @@
+import { CatalogProductReference, type ReceiptCatalogProduct } from './CatalogProductReference';
 /**
  * VehicleDayDrawer — the complete day document for one vehicle-day.
  *
@@ -16,9 +17,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuthContext } from '../../contexts/AuthContext';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { highlightVehicleDays, openVehicleDay, openVehiclePhoto, openVehiclePhotoByUrl } from './VehiclePhotoLightbox';
 import WorkSessionContext from './WorkSessionContext';
+import { ReceiptLineContext, receiptLineKey, useReceiptWorkContext } from './ReceiptWorkContext';
+import { receiptSupplierLabel } from './receiptSupplierLabel';
 import { auctionMomentDayTitle, auctionOpenDayTitle, fmtClock, fmtMoment, fmtUsd, isBatHosted, listingForPhoto, localDate, momentDay, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
@@ -55,10 +59,10 @@ interface DayDocumentInstall {
   photo_count: number | null;
   image_id: string | null;
 }
-interface DayDocumentLine { line_number: number | null; description: string | null; part_number: string | null; quantity: number | null; unit_price: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null; install?: DayDocumentInstall | null }
+interface DayDocumentLine { product?: ReceiptCatalogProduct | null; line_number: number | null; description: string | null; part_number: string | null; quantity: number | null; unit_price: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null; install?: DayDocumentInstall | null }
 interface DayDocumentPage { bucket: string; path: string; bytes?: number | null; page_no?: number | null }
 interface DayDocumentVendor { id?: string | null; name?: string | null; logo_url?: string | null; website?: string | null }
-interface DayDocument { receipt_id: string; vendor: string | null; vendor_org?: DayDocumentVendor | null; document_type: string | null; document_number: string | null; pages: number | null; page?: DayDocumentPage | null; page_paths?: string[] | null; payer_as_named: string | null; subtotal: number | null; tax: number | null; total: number | null; currency: string | null; date_basis: string | null; lines: DayDocumentLine[] }
+export interface DayDocument { receipt_id: string; vendor: string | null; vendor_org?: DayDocumentVendor | null; document_type: string | null; document_number: string | null; pages: number | null; page?: DayDocumentPage | null; page_paths?: string[] | null; payer_as_named: string | null; subtotal: number | null; tax: number | null; total: number | null; currency: string | null; date_basis: string | null; lines: DayDocumentLine[]; recorded_payment?: { amount: number | null; date: string | null } | null; recorded_hours?: number | null; hour_entries?: number }
 
 /** The install proofs a document's lines point at: the distinct days, oldest first. */
 export function installProofDays(doc: Pick<DayDocument, 'lines'>): string[] {
@@ -78,7 +82,7 @@ export function describeInstall(install: DayDocumentInstall | null | undefined):
 /** The page's signed render URL for this viewer (the bucket is private; signing needs the viewer's own storage policy). */
 async function signDocumentPage(page: DayDocumentPage): Promise<string | null> {
   try {
-    const { data, error } = await supabase.storage.from(page.bucket).createSignedUrl(page.path, 600, { transform: { width: 1800, quality: 80 } });
+    const { data, error } = await supabase.storage.from(page.bucket).createSignedUrl(page.path, 600, { transform: { width: 1800, height: 1800, resize: 'contain', quality: 80 } });
     return !error && data?.signedUrl ? data.signedUrl : null;
   } catch {
     return null;
@@ -131,6 +135,13 @@ function fmtMoney(n: number | null | undefined, currency: unknown): string {
   return `${Math.round(v).toLocaleString()} ${code ?? '(currency unknown)'}`;
 }
 
+function fmtReceiptMoney(n: number | null | undefined, currency: unknown): string {
+  if (n == null || !Number.isFinite(Number(n))) return '';
+  const v = Number(n);
+  const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency.trim()) ? currency.trim().toUpperCase() : null;
+  return `${v.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${code ?? '(currency unknown)'}`;
+}
+
 function fmtDayShort(date: string): string {
   const d = new Date(`${date}T12:00:00Z`);
   if (!Number.isFinite(d.getTime())) return date;
@@ -150,6 +161,7 @@ const dayPhotoCache = new Map<string, DayPhoto[]>();
 
 const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], hasWorkSummary = false, documentCount = 0, onClose, onPrev, onNext }) => {
   const { vehicleId, timelineEvents, timelineReadState } = useVehicleProfile();
+  const { user, loading: authLoading } = useAuthContext();
   const [photoRead, setPhotoRead] = useState<{ key: string; rows: DayPhoto[]; failed: boolean } | null>(null);
   const [documentRead, setDocumentRead] = useState<{ key: string; rows: DayDocument[]; failed: boolean } | null>(null);
   const [pageNote, setPageNote] = useState<string | null>(null);
@@ -228,11 +240,13 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   }, [photoContextKey]);
 
   // ── The day's paper: one read, only on a day the timeline leg counted a linked receipt ──
-  const documentKey = `${vehicleId}:${date}`;
-  const documents = documentRead?.key === documentKey ? documentRead.rows : null;
-  const documentsUnavailable = documentRead?.key === documentKey ? documentRead.failed : false;
+  const documentKey = `${vehicleId}:${date}:${user?.id ?? 'anonymous'}`;
+  const activeDocumentKey = useRef<string | null>(null);
+  activeDocumentKey.current = authLoading ? null : documentKey;
+  const documents = !authLoading && documentRead?.key === documentKey ? documentRead.rows : null;
+  const documentsUnavailable = !authLoading && documentRead?.key === documentKey ? documentRead.failed : false;
   useEffect(() => {
-    if (!vehicleId || !date || documentCount <= 0) return;
+    if (authLoading || !vehicleId || !date || documentCount <= 0) return;
     let cancelled = false;
     setDocumentRead(null);
     Promise.resolve(supabase.rpc('get_vehicle_day_documents', { p_vehicle_id: vehicleId, p_date: date }))
@@ -243,7 +257,10 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
       })
       .catch(() => { if (!cancelled) setDocumentRead({ key: documentKey, rows: [], failed: true }); });
     return () => { cancelled = true; };
-  }, [vehicleId, date, documentCount, documentKey]);
+  }, [vehicleId, date, documentCount, documentKey, authLoading]);
+
+  // ── The receipt-to-work context of the day's lines: one read, only once the day's paper has lines ──
+  const receiptWork = useReceiptWorkContext(vehicleId, date, (documents ?? []).some(d => d.lines.length > 0));
 
   // ── Day events from the already-loaded timeline ──
   const dayEvents = useMemo(
@@ -278,6 +295,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     if (!doc.page) return;
     setPageNote(null);
     const url = await signDocumentPage(doc.page);
+    if (activeDocumentKey.current !== documentKey) return;
     if (url) openVehiclePhotoByUrl(url);
     else setPageNote('The page could not be signed for this viewer.');
   };
@@ -356,7 +374,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
               {doc.vendor_org?.logo_url && (
                 <img
                   src={doc.vendor_org.logo_url}
-                  alt={doc.vendor_org.name || doc.vendor || 'vendor'}
+                  alt={receiptSupplierLabel(doc.vendor_org.name || doc.vendor) || 'vendor'}
                   width={14}
                   height={14}
                   loading="lazy"
@@ -365,8 +383,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                 />
               )}
               {doc.vendor_org?.website ? (
-                <a href={doc.vendor_org.website} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{doc.vendor || doc.vendor_org.name || 'Receipt'}</a>
-              ) : (doc.vendor || 'Receipt')}
+                <a href={doc.vendor_org.website} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{receiptSupplierLabel(doc.vendor || doc.vendor_org.name) || 'Receipt'}</a>
+              ) : (receiptSupplierLabel(doc.vendor) || 'Receipt')}
               <span>{[doc.document_type ? doc.document_type.replace(/_/g, ' ') : null, doc.document_number ? `#${doc.document_number}` : null].filter(Boolean).map((part) => ` · ${part}`).join('')}</span>
             </span>
             <span style={{ ...mono, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -377,15 +395,18 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                   style={{ ...mono, background: 'none', border: '1px solid var(--vp-ghost, #ddd)', cursor: 'pointer', fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', padding: '1px 5px', color: 'inherit' }}
                 >OPEN THE PAGE →</button>
               )}
-              {[doc.pages && doc.pages > 1 ? `${doc.pages} pages` : null, doc.total != null ? fmtMoney(doc.total, doc.currency) : null].filter(Boolean).join(' · ') || `${doc.lines.length} line${doc.lines.length === 1 ? '' : 's'}`}
+              {[doc.pages && doc.pages > 1 ? `${doc.pages} pages` : null, doc.total != null ? `Document total ${fmtReceiptMoney(doc.total, doc.currency)}` : null].filter(Boolean).join(' · ') || `${doc.lines.length} line${doc.lines.length === 1 ? '' : 's'}`}
             </span>
           </div>
           {doc.payer_as_named && <div style={{ fontSize: 8, color: 'var(--vp-pencil, #888)' }}>billed to {doc.payer_as_named}</div>}
+          {doc.recorded_payment && <p>Recorded payment {fmtReceiptMoney(doc.recorded_payment.amount, doc.currency) || 'Amount not recorded'}{doc.recorded_payment.date ? ` · ${doc.recorded_payment.date}` : ''}</p>}
+          {doc.recorded_hours != null && <p>{doc.recorded_hours} recorded person-hours · {doc.hour_entries} entries on this receipt. Concurrent entries count separately.</p>}
           {pageNote && doc.page && <div role="status" style={{ fontSize: 8, color: 'var(--vp-pencil, #888)' }}>{pageNote}</div>}
           {doc.lines.length > 0 && (
             <div style={{ fontSize: 9, color: 'var(--vp-pencil, #888)', marginTop: 2, lineHeight: 1.5 }}>
               {doc.lines.map((line, i) => (
-                <div key={`${doc.receipt_id}:${line.line_number ?? i}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <div key={`${doc.receipt_id}:${line.line_number ?? i}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span>
                     {[line.line_date && line.line_date !== date ? line.line_date : null, line.performer, line.part_number, line.description].filter(Boolean).join(' · ')}
                     {describeInstall(line.install) && (
@@ -402,7 +423,13 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                       )
                     )}
                   </span>
-                  <span style={mono}>{[line.hours != null ? `${line.hours} h` : null, line.quantity != null && line.quantity !== 1 ? `×${line.quantity}` : null, line.amount != null ? fmtMoney(line.amount, doc.currency) : null].filter(Boolean).join(' · ')}</span>
+                  <span style={mono}>{[line.hours != null ? `${line.hours} h` : null, line.quantity != null && line.quantity !== 1 ? `×${line.quantity}` : null, line.amount != null ? fmtReceiptMoney(line.amount, doc.currency) : null].filter(Boolean).join(' · ')}</span>
+                </div>
+                <CatalogProductReference product={line.product} />
+                <ReceiptLineContext
+                  line={receiptWork.byLine.get(receiptLineKey(doc.receipt_id, line.line_number))}
+                  withdrawn={receiptWork.withdrawnByLine.get(receiptLineKey(doc.receipt_id, line.line_number))}
+                />
                 </div>
               ))}
             </div>

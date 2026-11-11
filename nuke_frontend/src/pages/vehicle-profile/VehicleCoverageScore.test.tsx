@@ -61,7 +61,7 @@ beforeEach(() => {
     totalSources: 3, hasConflict: true, conflictType: 'genuine' } };
 });
 
-it('shows distinct engine claims with units, retaining the combined description in expansion', () => {
+it('shows distinct engine claims with units without repeating the structured engine field', () => {
   fixture.vehicle.engine_size = '2.5-Liter Inline-Six';
   for (const [field, value] of [['engine_configuration', 'I6'], ['engine_displacement_l', '2.5']]) {
     fixture.engineReads[field] = { data: { canonical: { status: 'resolved', value }, observations: [] }, isLoading: false };
@@ -70,7 +70,7 @@ it('shows distinct engine claims with units, retaining the combined description 
   expect(dom.window.document.querySelector('[data-field="engine_configuration"]')?.textContent).toContain('I6');
   expect(dom.window.document.querySelector('[data-field="engine_displacement_l"]')?.textContent).toContain('2.5 L');
   expect(dom.window.document.querySelector('[data-field="engine_size"]')).toBeNull();
-  expect(dom.window.document.body.textContent).toContain('original or overlapping field');
+  expect(dom.window.document.body.textContent).not.toContain('original or overlapping field');
 });
 
 it('withholds failed engine values and states a read failure rather than absence', () => {
@@ -83,10 +83,12 @@ it('withholds failed engine values and states a read failure rather than absence
 });
 
 it('provides a named keyboard control with the actual field drawer and expanded state', () => {
+  const primary = { ...fixture.evidence.mileage.primary, field_name: 'fuel_type', field_value: 'Gasoline' };
+  fixture.evidence.fuel_type = { primary, sources: [primary], totalSources: 1, agreementCount: 1, hasConflict: false };
   const dom = new JSDOM(renderToStaticMarkup(<VehicleDossierPanel />));
-  const control = dom.window.document.querySelector('[data-field="mileage"] button[aria-controls]');
+  const control = dom.window.document.querySelector('[data-field="fuel_type"] button[aria-controls]');
   expect(control?.getAttribute('type')).toBe('button');
-  expect(control?.getAttribute('aria-label')).toBe('Show MILEAGE source claims');
+  expect(control?.getAttribute('aria-label')).toBe('Show FUEL TYPE source claims');
   expect(control?.getAttribute('aria-expanded')).toBe('false');
   expect(control?.hasAttribute('disabled')).toBe(false);
   expect(dom.window.document.getElementById(control!.getAttribute('aria-controls')!)).not.toBeNull();
@@ -139,12 +141,10 @@ describe('dossier claim coverage does not assert verification', () => {
     expect(coverage.textContent).toContain('2 of 16 core fields have claim records');
     expect(coverage.textContent).toContain('2 have differing reported values');
     expect(coverage.textContent).toContain('Claim record counts do not establish independent support or verification');
-    const field = doc.querySelector('[data-field="color"]')!;
-    expect(field.getAttribute('title')).toContain('3 retained claim records');
-    expect(field.getAttribute('title')).toContain('Reported values differ');
-    expect(field.outerHTML).not.toContain('Consensus:');
-    expect(field.textContent).toContain('Blue');
-    expect(field.textContent).toContain('Red');
+    // Core values have one owner. Competing reports belong behind its source
+    // action, rather than being repeated in a second claim table.
+    expect(doc.querySelector('[data-field="color"]')).toBeNull();
+    expect(doc.body.textContent).not.toContain('Consensus:');
     expect(JSON.stringify(fixture.evidence)).toBe(before);
     expect(supabase.from).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalled();
@@ -155,7 +155,7 @@ describe('dossier claim coverage does not assert verification', () => {
     fixture.evidence.mileage.primary = fixture.evidence.mileage.sources[0];
     fixture.evidence.mileage.hasConflict = false;
     const doc = panel();
-    expect(doc.querySelector('[data-field="mileage"]')?.getAttribute('title')).toContain('verification unknown');
+    expect(doc.querySelector('[data-field="mileage"]')).toBeNull();
     expect(doc.body.innerHTML).not.toMatch(/scientifically tested|physically inspected|multi-source consensus|\d+ BEDROCK|\d+ INSPECTED|\d+ CONSENSUS|data-verification=/);
   });
 
@@ -180,7 +180,8 @@ describe('dossier claim coverage does not assert verification', () => {
     const coverage = doc.querySelector('[data-testid="source-claim-coverage"]')!;
     expect(coverage.textContent).toContain('Source claim coverage unavailable');
     expect(coverage.textContent).not.toContain('of 16 core fields');
-    expect(doc.querySelector('[data-field="mileage"]')?.textContent).toContain('87000');
+    expect(fixture.evidence.mileage.sources.map((row: any) => row.field_value)).toContain('87000');
+    expect(doc.querySelector('[data-field="mileage"]')).toBeNull();
   });
 });
 

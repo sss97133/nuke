@@ -77,7 +77,8 @@ export interface V2Extras {
   document_kind: string | null;
   document_type: string | null;
   angle: { value: string; confidence: number | null } | null;
-  vin: { value: string; confidence: number | null; checksum_ok: boolean; evidence: string | null } | null;
+  vin: { value: string; confidence: number | null; checksum_ok: boolean | null; evidence: string | null;
+    evidence_role?: "vehicle_vin_plate" | "vehicle_vin_stamp" | "body_tag" | "engine_stamp" | "transmission_stamp" | "sticker" | "document" | "unknown" } | null;
   text_lines: Array<{ text: string; confidence: number; region: number[] | null }>;
   vehicle_fields: Array<{ field_name: string; value: string; confidence: number | null; evidence: string | null }>;
   document: { fields: Record<string, unknown>; field_confidence: Record<string, number> } | null;

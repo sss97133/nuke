@@ -1,5 +1,7 @@
 node_modules
 .git
+/package.json
+/package-lock.json
 /supabase/*
 !/supabase/functions
 /supabase/functions/*

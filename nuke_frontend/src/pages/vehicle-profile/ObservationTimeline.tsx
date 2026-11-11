@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { vehicleImageGallerySource } from '../../lib/vehicleImageColumns';
 import { useVehicleProfile } from './VehicleProfileContext';
 
 /* ------------------------------------------------------------------ */
@@ -265,6 +266,31 @@ function extractHost(url: string | null): string | null {
 
 const ALL_KINDS = ['listing', 'sale_result', 'comment', 'bid', 'work_record', 'ownership', 'specification', 'provenance', 'valuation', 'condition', 'media'] as const;
 
+/** A retained description cannot outlive the image's current attribution or visibility.
+ * Absence means unavailable to this viewer, not proof of another vehicle. */
+export async function withCurrentImageSources<T extends { structured_data: Record<string, unknown> | null }>(vehicleId: string, rows: T[]): Promise<{ rows: T[]; unavailable: boolean }> {
+  const imageId = (row: T) => {
+    const id = row.structured_data?.image_id;
+    return typeof id === 'string' ? id.toLowerCase() : id;
+  };
+  const cited = rows.filter(row => imageId(row) != null);
+  if (!cited.length) return { rows, unavailable: false };
+  const ids = [...new Set(cited.map(imageId).filter((id): id is string => typeof id === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))];
+  if (!ids.length) return { rows: rows.filter(row => imageId(row) == null), unavailable: false };
+  try {
+    const { data, error } = await supabase.from(await vehicleImageGallerySource())
+      .select('id').eq('vehicle_id', vehicleId).in('id', ids)
+      .eq('vehicle_image_gallery_eligible', true);
+    if (error) throw error;
+    const available = new Set((data || []).map(image => image.id));
+    return { rows: rows.filter(row => imageId(row) == null || available.has(imageId(row) as string)), unavailable: false };
+  } catch (error) {
+    console.warn('[ObservationTimeline] image sources unavailable:', error);
+    return { rows: rows.filter(row => imageId(row) == null), unavailable: true };
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -273,12 +299,14 @@ const ObservationTimeline: React.FC = () => {
   const { vehicle, observationCount, isRowOwner } = useVehicleProfile();
   const [observations, setObservations] = useState<Observation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imageSourcesUnavailable, setImageSourcesUnavailable] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   const fetchObservations = useCallback(async () => {
     if (!vehicle?.id) return;
     setLoading(true);
+    setImageSourcesUnavailable(false);
     try {
       const { data, error } = await supabase
         .from('vehicle_observations')
@@ -309,7 +337,9 @@ const ObservationTimeline: React.FC = () => {
           source_slug: null,
         }));
         if (!isRowOwner) rows = rows.concat(await fetchPublicBuildLog(vehicle.id, new Set(rows.map(r => r.id))));
-        setObservations(rows);
+        const qualified = await withCurrentImageSources(vehicle.id, rows);
+        setObservations(qualified.rows);
+        setImageSourcesUnavailable(qualified.unavailable);
         return;
       }
 
@@ -328,7 +358,9 @@ const ObservationTimeline: React.FC = () => {
           source_slug: r.observation_sources?.slug ?? null,
         }));
         if (!isRowOwner) rows = rows.concat(await fetchPublicBuildLog(vehicle.id, new Set(rows.map(r => r.id))));
-        setObservations(rows);
+        const qualified = await withCurrentImageSources(vehicle.id, rows);
+        setObservations(qualified.rows);
+        setImageSourcesUnavailable(qualified.unavailable);
       }
     } catch (err) {
       console.error('[ObservationTimeline] error:', err);
@@ -382,7 +414,7 @@ const ObservationTimeline: React.FC = () => {
   if (!vehicle) return null;
 
   // If all observations are errors (or no observations), return null — don't render the widget
-  if (!loading && sortedObservations.length === 0) return null;
+  if (!loading && !imageSourcesUnavailable && sortedObservations.length === 0) return null;
 
   return (
     <div style={{
@@ -414,9 +446,16 @@ const ObservationTimeline: React.FC = () => {
           color: 'var(--text-secondary)',
           letterSpacing: '0.06em',
         }}>
-          {sortedObservations.length} TOTAL
+          {sortedObservations.length} {imageSourcesUnavailable ? 'SHOWN' : 'TOTAL'}
         </span>
       </div>
+
+      {imageSourcesUnavailable && (
+        <div role="status">
+          Some image evidence could not be loaded.{' '}
+          <button type="button" onClick={fetchObservations}>Retry</button>
+        </div>
+      )}
 
       {/* Kind filter badges */}
       {Object.keys(kindCounts).length > 1 && (

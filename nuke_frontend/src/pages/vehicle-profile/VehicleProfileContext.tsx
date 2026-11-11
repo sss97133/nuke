@@ -32,6 +32,8 @@ import type { HeroImageMeta } from './loadVehicleData';
 export interface GalleryFilter {
   /** A profile topic uses indexed image areas, never proof of the selected specification. */
   field?: string;
+  /** Exact image population from a gallery-backed count. Empty means no matches. */
+  imageIds?: string[];
   label?: string;
   zone?: string;
   category?: string;
