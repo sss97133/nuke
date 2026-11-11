@@ -91,11 +91,15 @@ export function productLinks(html, searchUrl, part, lineCode = null) {
     let url;try{url=new URL(href,searchUrl)}catch{continue}
     if(url.hostname!==new URL(searchUrl).hostname||!allowedProductUrl(url.href)||!url.pathname.startsWith('/detail/c/'))continue;
     let segments;try{segments=url.pathname.split('/').map(decodeURIComponent)}catch{continue;}
-    if(normalizePart(segments.at(-1))!==normalizePart(part))continue;
+    const exactPath = normalizePart(segments.at(-1))===normalizePart(part);
     if(lineCode) {
       const card=[...m[2].matchAll(/<h3\b[^>]*>/gi)].map(h=>attrs(h[0])).find(a=>a.class?.split(/\s+/).includes('js-product-name'));
       if(!card || normalizePart(card['data-item'])!==normalizePart(part) || card['data-line']!==lineCode.toUpperCase())continue;
-    }
+      // O'Reilly can omit SKU punctuation from its URL slug. Its linked,
+      // printed SKU + product line qualifies discovery; the primary detail
+      // still has to pass parseProductPage and the worker's line-code check.
+      if(!exactPath && url.hostname.replace(/^www\./,'')!=='oreillyauto.com')continue;
+    } else if(!exactPath)continue;
     url.hash='';if(!result.some(existing => new URL(existing).pathname===url.pathname))result.push(url.href);
   }return result.slice(0,3);
 }

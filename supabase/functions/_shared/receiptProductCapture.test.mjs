@@ -64,9 +64,39 @@ test('shipping/core/labor are not product queries, returned parts stay reference
 test('candidate requests never include receipt description or identity',()=>{
  assert.deepEqual(supplierCandidates('Classic Industries','ABC-1').map(c=>c.url),['https://www.classicindustries.com/product/abc-1.html','https://www.oerparts.com/product/abc-1.html']);
 });
-test('search links require exact SKU path segment and allowlisted supplier',()=>{
+test('search links without printed line proof require exact SKU path segment and allowlisted supplier',()=>{
  const root='https://www.oreillyauto.com/search?q=ABC-1';
  const html='<a href="/detail/c/brand/item/abc-10">wrong</a><a href="/detail/c/brand/item/abc-1">yes</a><a href="https://evil.test/detail/c/abc-1">no</a><a href="/detail/c/%zz/abc-1">malformed</a>';
  assert.deepEqual(productLinks(html,root,'ABC-1'),['https://www.oreillyauto.com/detail/c/brand/item/abc-1']);
  for(const u of ['https://www.oerparts.com.evil.test/p','http://www.oerparts.com/p','https://user@www.oerparts.com/p','https://127.0.0.1/p'])assert.equal(allowedProductUrl(u),false);
+});
+test('exact printed OReilly SKU and line can identify a detail URL with a punctuation-free slug',()=>{
+ const root='https://www.oreillyauto.com/search?q=GAL50%2F50';
+ const detail='https://www.oreillyauto.com/detail/c/brand/coolant/afz0/gal5050?q=GAL50%2F50';
+ const card=(item='GAL50/50',line='AFZ',href=detail)=>`<a href="${href}"><h3 class="js-product-name" data-item="${item}" data-line="${line}">Premixed coolant</h3></a>`;
+ assert.deepEqual(productLinks(card()+card('GAL50/50','AFZ',detail+'#reviews'),root,'GAL50/50','AFZ'),[detail]);
+ assert.deepEqual(productLinks(card(),root,'GAL50/50'),[]);
+ assert.deepEqual(productLinks(card('GAL5050'),root,'GAL50/50','AFZ'),[]);
+ assert.deepEqual(productLinks(card('GAL50/50','OTHER'),root,'GAL50/50','AFZ'),[]);
+ assert.deepEqual(productLinks(card(),root,'GAL5050','AFZ'),[]);
+});
+test('printed identity is bound to the same link, supplier and detail route',()=>{
+ const root='https://www.oreillyauto.com/search?q=GAL50%2F50';
+ const heading='<h3 class="js-product-name" data-item="GAL50/50" data-line="AFZ">Coolant</h3>';
+ for(const href of ['https://evil.test/detail/c/brand/coolant/afz0/gal5050','https://user@www.oreillyauto.com/detail/c/brand/coolant/afz0/gal5050','/search?q=GAL50%2F50','/detail/c/%zz/gal5050']) {
+  assert.deepEqual(productLinks(`<a href="${href}">${heading}</a>`,root,'GAL50/50','AFZ'),[]);
+ }
+ assert.deepEqual(productLinks(`<a href="/detail/c/brand/coolant/afz0/gal5050">unidentified link</a>${heading}`,root,'GAL50/50','AFZ'),[]);
+ assert.deepEqual(productLinks(`<a href="/detail/c/brand/coolant/afz0/gal5050">${heading}</a>`,'https://www.oerparts.com/search','GAL50/50','AFZ'),[]);
+});
+test('detail identity remains exact after discovery and does not inherit the search card proof',()=>{
+ const detail='https://www.oreillyauto.com/detail/c/brand/coolant/afz0/gal5050';
+ const heading='<h1 class="js-product-name" data-item="GAL50/50" data-line="AFZ">Coolant</h1>';
+ const exact=page({...product,sku:'GAL50/50'})+heading;
+ assert.equal(parseProductPage(exact,detail,'GAL50/50').status,'exact_sku_page');
+ assert.equal(parseProductPage(page({...product,sku:'GAL5050'})+heading,detail,'GAL50/50').status,'sku_not_verified');
+ assert.equal(parseProductPage(page({...product,sku:'GAL50/50'})+heading.replace('data-item="GAL50/50"','data-item="GAL5050"'),detail,'GAL50/50').status,'primary_line_code_not_verified');
+ assert.equal(parseProductPage(exact.replace('data-line="AFZ"','data-line="ALT"'),detail,'GAL50/50').line_code,'ALT');
+ // The unchanged receipt worker compares this returned primary line to AFZ;
+ // discovery does not override a different line on the actual product page.
 });
