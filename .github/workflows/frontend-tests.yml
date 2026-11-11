@@ -47,6 +47,17 @@ jobs:
           set -o pipefail
           apt_options=(-o Acquire::Retries=0 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
           native_deps=(build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev)
+          missing_deps=()
+          for package in "${native_deps[@]}"; do
+            if ! package_status=$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null) || [[ "$package_status" != 'install ok installed' ]]; then
+              missing_deps+=("$package")
+            fi
+          done
+          if (( ${#missing_deps[@]} == 0 )); then
+            echo 'All seven native build packages are fully installed; using the runner packages.'
+            exit 0
+          fi
+          printf 'Missing native build packages: %s\n' "${missing_deps[*]}"
           apt_log=$(mktemp)
           install_native_deps() {
             sudo timeout --kill-after=15s 120s apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update &&
@@ -54,7 +65,11 @@ jobs:
           }
           if install_native_deps 2>&1 | tee "$apt_log"; then exit 0; fi
           if ! grep -Eq "(Temporary failure resolving|Could not resolve) ['\"]?azure\.archive\.ubuntu\.com['\"]?([[:space:]]|$)" "$apt_log"; then exit 1; fi
-          echo 'Azure Ubuntu mirror DNS failed; retrying once through the official Ubuntu archive.'
+          ubuntu_codename=$(. /etc/os-release && printf '%s' "$VERSION_CODENAME")
+          [[ "$ubuntu_codename" =~ ^[a-z]+$ ]] || { echo 'Unknown Ubuntu codename; refusing mirror change.'; exit 1; }
+          echo 'Azure Ubuntu mirror DNS failed; checking the Linux Kernel Archives Ubuntu mirror.'
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+            --output /dev/null "https://mirrors.edge.kernel.org/ubuntu/dists/$ubuntu_codename/InRelease"
           sudo python3 - <<'PY'
           from pathlib import Path
           import re
@@ -65,7 +80,7 @@ jobs:
               if not path.is_file():
                   continue
               before = path.read_text()
-              after, count = re.subn(r'(?<!\S)https?://azure\.archive\.ubuntu\.com(/ubuntu/?)(?=\s|$)', r'https://archive.ubuntu.com\1', before)
+              after, count = re.subn(r'(?<!\S)https?://azure\.archive\.ubuntu\.com(/ubuntu/?)(?=\s|$)', r'https://mirrors.edge.kernel.org\1', before)
               if count:
                   path.write_text(after)
                   changed += count
