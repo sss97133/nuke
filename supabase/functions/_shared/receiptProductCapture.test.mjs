@@ -43,9 +43,14 @@ test('primary microdata supplies an identifier only when JSON-LD has none',()=>{
  assert.equal(parseProductPage(page({...product,sku:undefined})+micro,url,'ABC-1').status,'exact_sku_page');
  assert.equal(parseProductPage(page({...product,sku:'OTHER'})+micro,url,'ABC-1').status,'sku_not_verified');
 });
-test('missing SKU, placeholder image and missing product image remain unresolved',()=>{
+test('missing identity is refused while unavailable images do not discard an exact supplier quote',()=>{
  assert.equal(parseProductPage(page({...product,sku:undefined}),url,'ABC-1').status,'sku_not_verified');
- for(const image of [undefined,'https://cdn.oerparts.com/logo.png','https://cdn.oerparts.com/placeholder.jpg']) assert.notEqual(parseProductPage(page({...product,image}),url,'ABC-1').status,'exact_sku_page');
+ assert.equal(parseProductPage(page({...product,name:undefined}),url,'ABC-1').status,'exact_sku_without_product_name');
+ for(const image of [undefined,'https://cdn.oerparts.com/logo.png','https://cdn.oerparts.com/placeholder.jpg','http://cdn.oerparts.com/photo.jpg']) {
+   const p=parseProductPage(page({...product,image}),url,'ABC-1');
+   assert.equal(p.status,'exact_sku_page');assert.equal(p.image_url,null);assert.equal(p.price,59.99);assert.equal(p.currency,'USD');
+   assert.equal(p.image_status,image?'unqualified':'not_provided');
+ }
 });
 test('unknown price currency is preserved as unknown',()=>{
  const p=parseProductPage(page({...product,offers:{price:'59.99'}}),url,'ABC-1');assert.equal(p.currency,null);

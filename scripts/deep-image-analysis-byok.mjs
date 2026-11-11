@@ -51,7 +51,7 @@ import { dirname } from 'path';
 import { createHash } from 'crypto';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { projectImageProperties, applyImagePropertyClaims } from './lib/image-property-projection.mjs';
+import { projectCachedRun } from './lib/image-property-projection.mjs';
 
 import { receiptContextVendor } from './lib/receipt-context-text.mjs';
 export { receiptContextVendor, contextWithoutPersonalFields } from './lib/receipt-context-text.mjs';
@@ -1235,45 +1235,29 @@ async function resolve() {
  * Dry-run by default. No provider calls, downloads, queue/schedule changes or
  * 52-million-row JSON scan. Latest 500 condition rows is an explicit window,
  * not a claim of complete history. Repeat uses stable content identities.
+ *
+ *   node scripts/deep-image-analysis-byok.mjs project-cached --vehicle-id <uuid> [--limit 1..500] [--pages 1..100]
+ *        [--before <timestamp>] [--apply [--single]]
+ *
+ * It copies three values a stored deep reading already holds (rust_severity, paint_state, completeness) to the
+ * registered image properties. --single is the route for an owner's own photos, which the batch intake refuses.
  */
 async function projectCached() {
   const vehicleId = arg('--vehicle-id');
   const limit = Number(arg('--limit') || 100);
-  const before = arg('--before') || new Date().toISOString();
+  const pages = Number(arg('--pages') || 1);
+  const firstBefore = arg('--before') || new Date().toISOString();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId || '') ||
-      !Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isFinite(Date.parse(before))) {
-    throw new Error('project-cached requires --vehicle-id UUID, --limit 1..500 and optional --before timestamp');
+      !Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isFinite(Date.parse(firstBefore)) ||
+      !Number.isInteger(pages) || pages < 1 || pages > 100) {
+    throw new Error('project-cached requires --vehicle-id UUID, --limit 1..500 and optional --before timestamp, --pages 1..100');
   }
-  const apply = args.includes('--apply');
-  const result = await sb.from('vehicle_observations')
-    .select('id,vehicle_id,kind,is_superseded,observed_at,ingested_at,agent_model,agent_tier,extraction_method,confidence,confidence_score,structured_data')
-    .eq('vehicle_id', vehicleId).eq('kind', 'condition')
-    .lt('ingested_at', before)
-    .order('ingested_at', { ascending: false }).order('id', { ascending: false })
-    .limit(limit).abortSignal(AbortSignal.timeout(10000));
-  if (result.error || !Array.isArray(result.data)) throw new Error('project-cached: source query failed');
-  const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok');
-  const ids = [...new Set(sources.map(row => row.structured_data?.image_id)
-    .filter(id => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)))];
-  const images = ids.length ? await sb.from('vehicle_images')
-    .select('id,vehicle_id,is_sensitive,is_superseded,is_duplicate,vision_gate_status,image_vehicle_match_status')
-    .in('id', ids).abortSignal(AbortSignal.timeout(10000)) : { data: [], error: null };
-  if (images.error || !Array.isArray(images.data)) throw new Error('project-cached: image query failed');
-  const byId = new Map(images.data.map(row => [row.id, row]));
-  const claims = [];
-  const deferred = {};
-  for (const source of sources) {
-    const projected = projectImageProperties(source, byId.get(source.structured_data.image_id));
-    claims.push(...projected.claims);
-    if (projected.deferred) deferred[projected.deferred] = (deferred[projected.deferred] || 0) + 1;
-  }
-  const receipt = { mode: apply ? 'apply' : 'dry_run', vehicle_id: vehicleId,
-    sampled_condition_rows: result.data.length, source_rows: sources.length,
-    window_limit: limit, window_before: before, full_history_verified: false, model_calls: 0,
-    eligible_claims: claims.length, deferred,
-    ...(apply ? await applyImagePropertyClaims(sb, claims) : {}) };
+  // --single: one claim at a time through ingest-observation, the route for an owner's own photos (the batch intake
+  // takes a public vehicle's listing photos only). --pages N walks N windows of --limit readings, newest first.
+  const { receipt, exitCode } = await projectCachedRun(sb, { vehicleId, limit, pages, before: firstBefore,
+    apply: args.includes('--apply'), single: args.includes('--single') });
   console.log(JSON.stringify(receipt));
-  if (receipt.failed > 0 || (apply && claims.length === 0)) process.exitCode = 1;
+  if (exitCode) process.exitCode = exitCode;
 }
 
 // Pure ledger functions exported for unit tests (importing does not run the pipeline — see isMain).

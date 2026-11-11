@@ -129,7 +129,7 @@ const renderRows = async (rows: ReturnType<typeof dated>[], error = false) => {
   for (let i = 0; i < 4; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 };
 const line = { line_number: 1, description: 'Machine existing block', quantity: 1, amount: 100, line_date: '2025-03-20', hours: 2, performer: 'Shop', part_number: null };
-const page = (lines = [line]) => ({ receipt_id: 'receipt-a', document_number: 'A-100', document_type: 'invoice', subtotal: 100, tax: 25, shipping: null, discount: null, lines });
+const page = (lines: Record<string, unknown>[] = [line]) => ({ receipt_id: 'receipt-a', document_number: 'A-100', document_type: 'invoice', subtotal: 100, tax: 25, shipping: null, discount: null, lines });
 
 it('keeps seller filters and source records while omitting person annotations from visible and accessible labels', async () => {
   const rows = [
@@ -175,6 +175,21 @@ it('withholds a previous viewer’s line amounts immediately during an auth tran
   fixture.loading = false; fixture.user = null; await renderRows([dated({ amounts_visible: false, total: null })]);
   expect(host.textContent).not.toContain('$100');
   await renderRows([dated()], true); expect(host.querySelector('article')).toBeNull();
+});
+
+it('opens receipt lines with a source-linked supplier quote even when its stock image is absent', async () => {
+  const product = { catalog_part_id: 'synthetic-catalog', name: 'Supplier seat cover', part_number: 'SYNTHETIC-1', manufacturer: 'Example',
+    image_url: null, page_url: 'https://www.classicindustries.com/product/synthetic-1.html', captured_at: '2026-11-11T12:00:00Z',
+    source_role: 'original_receipt_supplier', quote_price: 49.95, currency: 'USD', price_stale: false };
+  const catalogLine = { ...line, amount: null, unit_price: null, product };
+  fixture.rpc.mockResolvedValue({ data: { tied: false, documents: [page([catalogLine])] }, error: null });
+  await renderRows([dated({ total: null, amounts_visible: false })]);
+  await click('Read lines', () => !!host.querySelector('.vp-catalog-product'));
+  expect(host.querySelector<HTMLAnchorElement>('.vp-catalog-product')?.href).toBe(product.page_url);
+  expect(host.textContent).toContain('$49.95 supplier quote · Nov 11, 2026');
+  expect(host.querySelector('.vp-catalog-product img')).toBeNull();
+  expect(host.textContent).not.toContain('$100');
+  expect(host.textContent).not.toContain('Supplier stock image');
 });
 
 it('separates a printed payment from the document total and retains concurrent person-hour entries', async () => {
