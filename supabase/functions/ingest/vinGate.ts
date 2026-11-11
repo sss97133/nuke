@@ -20,6 +20,12 @@ export function vinMakeCheckApplies(vin: unknown): boolean {
 /** Compatibility check only. An ambiguous manufacturer never becomes a vehicle make. */
 export function vinMakeConflict(vin: unknown, claimed: unknown, decoded: VINDecodeResult) {
   if (!vinMakeCheckApplies(vin) || typeof claimed !== "string") return null;
+  const cleanVin = (vin as string).toUpperCase().trim();
+  // A modern WMI has three characters; low-volume identifiers additionally
+  // require VIN positions 12–14. The decoder also exposes legacy two-character
+  // guesses, which cannot establish counterevidence to a source's make claim.
+  const manufacturerId = cleanVin.slice(0, 3) + (cleanVin[2] === "9" ? cleanVin.slice(11, 14) : "");
+  if (decoded.manufacturer_match_prefix !== manufacturerId) return null;
   const claimedMake = normalizeMake(claimed);
   const candidates = decoded.make ? [decoded.make] : decoded.manufacturer_make_candidates ?? [];
   const supported = candidates.map(value => normalizeMake(value)).filter(Boolean);

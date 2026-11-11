@@ -78,3 +78,45 @@ Deno.test("firecrawlMap is gated and metered like a scrape", async () => {
     assertEquals(calls[1][1].p_lane, "onboard-source");
   } finally { globalThis.fetch = realFetch; }
 });
+
+Deno.test('only original-byte requests use v2; both byte and existing HTML routes retain the allowance and spend gate', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    for (const format of ['rawBase64', 'rawHtml']) {
+      const calls: Call[] = []; const requests: any[] = [];
+      globalThis.fetch = (async (input, init) => {
+        requests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+        return new Response(JSON.stringify({ success: true, data: format === 'rawBase64'
+          ? { rawBase64: 'aW1hZ2U=', metadata: { contentType: 'image/jpeg', statusCode: 200 } }
+          : { rawHtml: '<html>retained</html>' } }), { status: 200 });
+      }) as typeof fetch;
+      const result = await firecrawlScrape({ url: 'https://images-prod.oreillyauto.com/exact.jpg', formats: [format] },
+        { apiKey: 'fixture', maxAttempts: 1, meterClient: stub({ firecrawl_allowance_for_url: { data: 1 }, firecrawl_record_url_spend: { data: 1 } }, calls) });
+      assertEquals(result.success, true);
+      assertEquals(requests[0].url, format === 'rawBase64' ? 'https://api.firecrawl.dev/v2/scrape' : 'https://api.firecrawl.dev/v1/scrape');
+      assertEquals(requests[0].body.formats, [format]);
+      assertEquals(calls.map(c => c[0]), ['firecrawl_allowance_for_url', 'firecrawl_record_url_spend']);
+      assertEquals(calls[1][1].p_credits, 1);
+      if (format === 'rawBase64') assertEquals(result.raw.data.rawBase64, 'aW1hZ2U=');
+    }
+  } finally { globalThis.fetch = realFetch; }
+});
+
+Deno.test('original-byte transport bounds oversized Content-Length and chunked envelopes before JSON parsing', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    for (const header of [true, false]) {
+      let cancelled = false; const calls: Call[] = [];
+      globalThis.fetch = (async () => new Response(new ReadableStream({
+        pull(controller) { controller.enqueue(new Uint8Array(1_000_000)); },
+        cancel() { cancelled = true; },
+      }), { headers: header ? { 'content-length': '21000001' } : {} })) as typeof fetch;
+      const result = await firecrawlScrape({ url: 'https://images-prod.oreillyauto.com/exact.jpg', formats: ['rawBase64'] },
+        { apiKey: 'fixture', maxAttempts: 1, meterClient: stub({ firecrawl_allowance_for_url: { data: 1 }, firecrawl_record_url_spend: { data: 1 } }, calls) });
+      assertEquals(result.success, false);
+      assertEquals(result.error, 'Firecrawl original-byte response too large');
+      assertEquals(cancelled, true);
+      assertEquals(calls.filter(c => c[0] === 'firecrawl_record_url_spend').length, 1);
+    }
+  } finally { globalThis.fetch = realFetch; }
+});

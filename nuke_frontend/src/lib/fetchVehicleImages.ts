@@ -28,7 +28,7 @@ interface FetchVehicleImagesOptions {
    * Told how many rows were loaded against how many the database admits (page 0 carries the exact
    * count), once the fetch settles. A caller that shows a count can then say "n of N" when a cap or
    * the deadline left rows behind, instead of presenting what loaded as the whole. Not part of the
-   * in-flight dedupe key, so a coalesced concurrent caller is not told.
+   * in-flight dedupe key; every coalesced caller receives the same coverage.
    */
   onLoadCoverage?: (coverage: { loaded: number; total: number }) => void;
 }
@@ -37,7 +37,8 @@ interface FetchVehicleImagesOptions {
 // query (select ... order by position) was observed firing 2-4x per page load
 // (StrictMode double-mount + gallery/profile both resolving images). Concurrent
 // callers share one promise; entries clear on settle — coalescing, not caching.
-const coalesceImages = createViewerScopedInflight<any[]>();
+type ImageRead<T> = { rows: T[]; coverage: { loaded: number; total: number } };
+const coalesceImages = createViewerScopedInflight<ImageRead<any>>();
 
 /**
  * Fetch all matching vehicle images even when a vehicle exceeds the REST row cap.
@@ -58,8 +59,10 @@ export async function fetchVehicleImages<T = any>(
   if (!vehicleId) return [];
 
   const key = `${vehicleId}|${selectClause}|${options.includeMismatchFilter ? 1 : 0}|${options.maxRows ?? 0}|${options.timeoutMs ?? 0}`;
-  return coalesceImages(supabase, key, assertCurrent =>
+  const result = await coalesceImages(supabase, key, assertCurrent =>
     fetchVehicleImagesUncached<T>(vehicleId, selectClause, options, assertCurrent));
+  options.onLoadCoverage?.(result.coverage);
+  return result.rows;
 }
 
 async function fetchVehicleImagesUncached<T = any>(
@@ -67,7 +70,7 @@ async function fetchVehicleImagesUncached<T = any>(
   selectClause: string,
   options: FetchVehicleImagesOptions = {},
   assertCurrent: () => void = () => {},
-): Promise<T[]> {
+): Promise<ImageRead<T>> {
   const { maxRows, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const deadline = Date.now() + Math.max(1000, timeoutMs);
   // A caller that wants only the first N rows (the hero resolver) asks for no more than that.
@@ -120,7 +123,7 @@ async function fetchVehicleImagesUncached<T = any>(
   };
 
   const first = await fetchPageBounded(0, true);
-  if (first.timedOut) return [];
+  if (first.timedOut) throw new Error('The image read timed out before its first page.');
   const rows: T[] = [...(first.data || [])];
   const total = typeof first.count === 'number' ? first.count : rows.length;
   // The row cap is server configuration. If it gave fewer rows than asked while more exist, page by what it gives
@@ -128,8 +131,7 @@ async function fetchVehicleImagesUncached<T = any>(
   if (rows.length > 0 && rows.length < pageSize && total > rows.length) pageSize = rows.length;
   const settle = (collected: T[]) => {
     assertCurrent();
-    options.onLoadCoverage?.({ loaded: collected.length, total: Math.max(total, collected.length) });
-    return collected;
+    return { rows: collected, coverage: { loaded: collected.length, total: Math.max(total, collected.length) } };
   };
 
   // Caller only wants the first N (e.g. hero/lead resolution) — stop early.

@@ -23,6 +23,17 @@ final class ExploreFeedTests: XCTestCase {
         XCTAssertEqual(out.map(\.id), ["d"])
     }
 
+    func testKnownSourcesUseTheHostedMarkAndOthersKeepTheTextPill() {
+        func source(_ name: String) -> ExploreFeedItem {
+            ExploreFeedItem(id: name, kind: .live, title: name, image: "https://x/y.jpg", amount: nil, amountLabel: "Current bid",
+                            endsAt: nil, source: name, location: nil, facts: nil, seen: nil, vehicleId: nil,
+                            year: nil, make: nil, model: nil, link: nil)
+        }
+        XCTAssertEqual(source("Bring a Trailer").sourceLogoURL?.absoluteString, "https://nuke.ag/source-logos/bat.png")
+        XCTAssertEqual(source("Craigslist").sourceLogoURL?.absoluteString, "https://nuke.ag/source-logos/craigslist.png")
+        XCTAssertNil(source("some_unmapped_source").sourceLogoURL)
+    }
+
     func testEmptyReadsGiveAnEmptyFeed() {
         XCTAssertTrue(ExploreFeedItem.interleave(live: [], classified: []).isEmpty)
     }

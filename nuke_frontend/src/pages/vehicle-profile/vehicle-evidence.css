@@ -158,6 +158,22 @@
 .field-claim-metadata { font: var(--text-caption)/1.6 var(--font-family); color: var(--text-secondary); overflow-wrap: anywhere; }
 .field-claim-value { font: 650 var(--text-callout)/1.5 var(--font-family); color: var(--text); overflow-wrap: anywhere; }
 .field-claim-context { white-space: pre-wrap; }
+.field-citations { font: var(--text-body)/1.5 var(--font-family); }
+.field-citations figure { margin: 0 0 20px; }
+.field-citations figure > button { width: 100%; padding: 0; border: 0; background: var(--surface); cursor: zoom-in; }
+.field-citations img { display: block; width: 100%; height: auto; max-height: 60vh; object-fit: contain; }
+.field-citations figcaption, .field-citations article { padding-block: 12px; border-bottom: 1px solid var(--border); }
+.field-citations p { margin: 6px 0; }
+.field-citations small, .field-citations__note { color: var(--text-secondary); font-size: var(--text-caption); }
+.field-citations a { display: inline-flex; align-items: center; min-height: 44px; margin-right: 16px; color: var(--link); }
+.field-citations blockquote { margin: 0 0 8px; white-space: pre-wrap; }
+.field-correction-receipt { padding: 16px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.field-correction-receipt h3 { margin: 16px 0 4px; font-size: var(--text-body); }
+.field-correction-receipt table { width: 100%; border-collapse: collapse; font-size: var(--text-callout); }
+.field-correction-receipt th, .field-correction-receipt td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.field-correction-receipt td small { display: block; }
+.field-correction-receipt th:not(:first-child), .field-correction-receipt td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.field-correction-receipt__total { display: flex; justify-content: space-between; gap: 16px; }
 .field-claim-history { margin-top: 12px; }
 .field-claim-history summary { cursor: pointer; min-height: var(--control-height); padding-block: 8px; }
 .field-claim-history-row { padding-block: 8px; border-top: 1px solid var(--border); }
@@ -173,7 +189,10 @@
 .vp-field-context__images button { padding: 0; overflow: hidden; border-radius: var(--radius-sm); }
 .vp-field-context__images img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 11; object-fit: cover; }
 .vp-field-context__segment-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.vp-field-context__segment-head button { font-size: var(--text-callout); }
+.vp-field-context__segment-head button { font-size: var(--text-callout); flex-shrink: 0; }
+.vp-field-context__segment-head h3 { margin: 12px 0 4px; }
+.vp-field-context__answer p { margin: 0 0 8px; color: var(--text-secondary); font-size: var(--text-callout); }
+.vp-field-context__answer strong { color: var(--text); font-size: var(--text-body); }
 .vp-field-context__peers { display: grid; gap: 4px; }
 .vp-field-context__peers button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--text); font-size: var(--text-callout); }
 .vp-field-context__peers img { flex-shrink: 0; object-fit: cover; border-radius: var(--radius-sm); }

@@ -5,7 +5,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getUserApiKey } from '../_shared/getUserApiKey.ts'
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { enrichReceiptProducts } from './receiptProducts.ts';
+import { isServiceCaller, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from '../_shared/geminiGuard.ts';
 
@@ -28,7 +29,12 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { document_id, pdf_url, user_id, mode, page_start, page_end } = await req.json()
+    const body = await req.json();
+    if (body.mode === 'receipt_products') {
+      if (!(await isServiceCaller(req))) return new Response(JSON.stringify({ error: 'service_role required' }), { status: 403, headers: corsHeaders });
+      return new Response(JSON.stringify(await enrichReceiptProducts(supabase, body)), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const { document_id, pdf_url, user_id, mode, page_start, page_end } = body
     if (!pdf_url) throw new Error('Missing pdf_url')
 
     const processingMode = mode || 'structure' // 'structure' | 'extract_parts'
@@ -128,7 +134,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'reference_document_index_failed' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

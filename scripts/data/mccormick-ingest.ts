@@ -100,17 +100,20 @@ if (has("--retain-local")) {
       const url = pending[index++];
       if (!mccormickTarget(url)) throw new Error("Invalid lot target");
       const result = await db.functions.invoke("ingest", { body: { url } });
+      const context = result.error?.context;
+      const errorDetail = context instanceof Response ? { http_status: context.status,
+        body_excerpt: (await context.clone().text().catch(() => "Response body unavailable")).slice(0, 4096) } : null;
       const receipt = result.data?.mccormick_receipt;
       const verified = !result.error && ["created", "matched", "unresolved"].includes(result.data?.status)
         && typeof receipt?.observation_id === "string" && typeof receipt?.snapshot_id === "string";
       const captureComplete = verified && receipt?.source_capture_gaps?.length === 0;
       await append({ action: "ingest", url, recorded_at: new Date().toISOString(), verified, capture_complete: captureComplete, result: result.data,
-        error: result.error ? String(result.error.message) : null });
+        error: result.error ? String(result.error.message) : null, ...(errorDetail ? { error_detail: errorDetail } : {}) });
       if (!verified) { stopped = true; break; }
       admitted++;
       if (captureComplete) completed++; else captureGaps++;
       console.log(JSON.stringify({ admitted, completed, capture_gaps: captureGaps, attempted_limit: pending.length, source_id: receipt.source_id,
-        vehicle_id: result.data.vehicle_id, images: receipt.images, unresolved: receipt.unresolved }));
+        vehicle_id: result.data.vehicle_id, images: receipt.images, unresolved: receipt.unresolved, evidence_scope: receipt.evidence_scope ?? "detail" }));
       await pause(250);
     }
   }));

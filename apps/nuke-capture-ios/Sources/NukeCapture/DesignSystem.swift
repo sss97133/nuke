@@ -278,6 +278,8 @@ struct NukePill: View {
     let text: String
     var icon: String? = nil
     var onPhoto = false
+    /// Overrides the text and icon color (Explore's time left is red); nil keeps white on a photo, secondary elsewhere.
+    var textColor: Color? = nil
 
     var body: some View {
         HStack(spacing: 4) {
@@ -285,10 +287,30 @@ struct NukePill: View {
             Text(text).lineLimit(1)
         }
         .font(.nukePill)
-        .foregroundStyle(onPhoto ? Color.white : Color.secondary)
+        .foregroundStyle(textColor ?? (onPhoto ? Color.white : Color.secondary))
         .padding(.horizontal, NukeSpace.sm + 2).padding(.vertical, 5)
         .background {
             if onPhoto { Capsule().fill(.ultraThinMaterial) } else { Capsule().fill(Color(.tertiarySystemFill)) }
+        }
+    }
+}
+
+/// A source's hosted mark at pill height on a white rounded rectangle, never a circle: square marks
+/// (BaT's) carry their own white, and cropping them into a white disc cut the mark. VoiceOver reads
+/// the source's name; until the mark loads, or if it never does, the text pill shows instead.
+struct NukeSourceLogo: View {
+    let url: URL
+    let name: String
+
+    var body: some View {
+        CachedAsyncImage(url: url, maxPixel: 160) { image in
+            image.resizable().scaledToFit()
+                .frame(height: 26)
+                .padding(.horizontal, 4)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .accessibilityLabel(Text(name))
+        } placeholder: {
+            NukePill(text: name)
         }
     }
 }
@@ -326,6 +348,11 @@ struct NukeHeroCard<Overlay: View>: View {
     let title: String
     var subtitle: String? = nil
     var pills: [String] = []
+    /// The source's mark, shown ahead of the pills; leave nil to show the source as a text pill.
+    var sourceLogoURL: URL? = nil
+    var sourceName: String = ""
+    /// A tappable stand-in for the source's mark or pill (Explore's source door); nil keeps the static mark.
+    var sourceDoor: AnyView? = nil
     @ViewBuilder let overlay: () -> Overlay
 
     var body: some View {
@@ -344,9 +371,14 @@ struct NukeHeroCard<Overlay: View>: View {
                 if let subtitle {
                     Text(subtitle).font(.nukeDetail).foregroundStyle(.secondary).lineLimit(2)
                 }
-                if !pills.isEmpty {
-                    HStack(spacing: NukeSpace.sm) { ForEach(pills, id: \.self) { NukePill(text: $0) } }
-                        .padding(.top, 2)
+                if let sourceDoor {
+                    sourceDoor.padding(.top, 2)
+                } else if !pills.isEmpty || sourceLogoURL != nil {
+                    HStack(spacing: NukeSpace.sm) {
+                        if let sourceLogoURL { NukeSourceLogo(url: sourceLogoURL, name: sourceName) }
+                        ForEach(pills, id: \.self) { NukePill(text: $0) }
+                    }
+                    .padding(.top, 2)
                 }
             }
             .padding(.horizontal, NukeSpace.xs)

@@ -1,5 +1,116 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { isGarbageHtml, pickCachedSnapshot } from "./archiveFetch.ts";
+import { archiveFetch, isGarbageHtml, pickCachedSnapshot } from "./archiveFetch.ts";
+import { extractFromHtml } from "../extract-collecting-cars/extract.ts";
+
+Deno.test("archive failures preserve safe HTTP diagnostics and never retry or acknowledge retention", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalDigest = crypto.subtle.digest;
+  const names = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS"];
+  const prior = names.map(name => Deno.env.get(name));
+  Deno.env.set(names[0], "https://synthetic.supabase.co");
+  Deno.env.set(names[1], "synthetic-key");
+  Deno.env.delete(names[2]);
+  const html = await Deno.readTextFile(new URL("../extract-collecting-cars/fixtures/lot-911.html", import.meta.url));
+  try {
+    for (const scenario of ["gateway", "database", "throw", "hash_throw", "missing_ack", "missing_id", "duplicate", "success"] as const) {
+      crypto.subtle.digest = scenario === "hash_throw" ? (() => { throw Error("private hashing failure"); }) : originalDigest;
+      let sourceCalls = 0, writes = 0;
+      globalThis.fetch = async (input, init) => {
+        const url = new URL(String(input));
+        if (url.hostname === "collectingcars.com") { sourceCalls++; return new Response(html); }
+        assertEquals(url.hostname, "synthetic.supabase.co");
+        if (init?.method !== "POST") return Response.json([]);
+        writes++;
+        assertEquals(JSON.parse(String(init.body)).html, html);
+        if (scenario === "throw") throw Error("private transport body must not escape");
+        if (scenario === "gateway") return Response.json({ title: "Origin timeout", detail: "private gateway body" }, { status: 522 });
+        if (scenario === "database") return Response.json({ code: "42501", message: "private database detail" }, { status: 403 });
+        if (scenario === "duplicate") return Response.json({ code: "23505" }, { status: 409 });
+        if (scenario === "missing_ack") return Response.json(null);
+        if (scenario === "missing_id") return Response.json({});
+        return Response.json({ id: "acknowledged-capture" });
+      };
+      const result = await archiveFetch("https://collectingcars.com/for-sale/synthetic", {
+        platform: "collectingcars", useFirecrawl: false, firecrawlOnBlock: false,
+        directFetchOptions: { publicOnly: true },
+      });
+      assertEquals([sourceCalls, writes], [1, scenario === "hash_throw" ? 0 : 1]);
+      assertEquals(result.html, html);
+      assertEquals(result.snapshotId, scenario === "success" ? "acknowledged-capture" : null);
+      if (scenario === "success") assertEquals(result.archiveError, undefined);
+      else {
+        assert(result.archiveError);
+        assert(!result.archiveError.includes("undefined") && !result.archiveError.includes("private"));
+        if (scenario === "gateway") assertEquals(result.archiveError, "listing_page_snapshots insert failed: HTTP 522");
+        if (scenario === "database") assertEquals(result.archiveError, "listing_page_snapshots insert failed: HTTP 403; code 42501");
+        if (scenario === "hash_throw") assertEquals(result.archiveError, "listing_page_snapshots retention failed before acknowledgment");
+        if (scenario === "missing_ack" || scenario === "missing_id") assertEquals(result.archiveError, "listing_page_snapshots insert returned no acknowledgment");
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    crypto.subtle.digest = originalDigest;
+    names.forEach((name, i) => prior[i] == null ? Deno.env.delete(name) : Deno.env.set(name, prior[i]!));
+  }
+});
+
+Deno.test("real archive cache isolates native listing pages before limit from newer board documents", async () => {
+  const originalFetch = globalThis.fetch;
+  const names = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS"];
+  const prior = names.map(name => Deno.env.get(name));
+  Deno.env.set(names[0], "https://synthetic.supabase.co");
+  Deno.env.set(names[1], "synthetic-key");
+  Deno.env.delete(names[2]);
+  const html = await Deno.readTextFile(new URL("../extract-collecting-cars/fixtures/lot-911.html", import.meta.url));
+  const page = { id: "full-page", platform: "collectingcars", html, markdown: null,
+    fetched_at: new Date(Date.now() - 60_000).toISOString(), fetch_method: "direct" };
+  const board = { ...page, platform: "collecting-cars", id: "native-board", html: JSON.stringify({ auctionId: "90089", currentBid: "17250" }) };
+  const retained = [...Array(6).fill(board), page];
+  let sourceCalls = 0;
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input));
+      if (url.hostname !== "synthetic.supabase.co") { sourceCalls++; throw Error("unexpected provider request"); }
+      assertEquals(init?.method ?? "GET", "GET");
+      assertEquals(url.searchParams.get("platform"), "eq.collectingcars");
+      assertEquals(url.searchParams.get("limit"), "5");
+      return Response.json(retained.filter(row => `eq.${row.platform}` === url.searchParams.get("platform")).slice(0, 5));
+    };
+    const result = await archiveFetch("https://collectingcars.com/for-sale/1965-porsche", { platform: "collectingcars", useFirecrawl: false });
+    assertEquals(result.cached, true);
+    assertEquals(result.snapshotId, page.id);
+    assertEquals(result.html, html);
+    assertEquals(extractFromHtml(result.html!, result.url).listing_id, "93268");
+    assertEquals(sourceCalls, 0);
+    assertEquals(retained.length, 7); // Neither representation is modified or deleted.
+
+    // With only board documents, the normal existing public-fetch path runs
+    // once; JSON must never reach the HTML lot parser or become a cache hit.
+    let archiveWrites = 0;
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input));
+      if (url.hostname === "collectingcars.com") { sourceCalls++; return new Response(html); }
+      assertEquals(url.hostname, "synthetic.supabase.co");
+      if (init?.method === "POST") {
+        archiveWrites++;
+        const captured = JSON.parse(String(init.body));
+        assertEquals(captured.platform, "collectingcars");
+        assertEquals(captured.html, html);
+        assertEquals(captured.success, true);
+        return Response.json({ id: "fresh-full-page" });
+      }
+      assertEquals(url.searchParams.get("platform"), "eq.collectingcars");
+      return Response.json([]);
+    };
+    const fresh = await archiveFetch(result.url, { platform: "collectingcars", useFirecrawl: false,
+      firecrawlOnBlock: false, directFetchOptions: { publicOnly: true } });
+    assertEquals([fresh.cached, fresh.snapshotId, sourceCalls, archiveWrites], [false, "fresh-full-page", 1, 1]);
+    assertEquals(extractFromHtml(fresh.html!, fresh.url).listing_id, "93268");
+  } finally {
+    globalThis.fetch = originalFetch;
+    names.forEach((name, i) => prior[i] == null ? Deno.env.delete(name) : Deno.env.set(name, prior[i]!));
+  }
+});
 
 Deno.test("a firecrawl snapshot is a cache hit for a direct read, and the reverse", () => {
   const fc = { id: "a", fetch_method: "firecrawl" };
