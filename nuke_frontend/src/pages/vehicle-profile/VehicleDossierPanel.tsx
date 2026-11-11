@@ -19,6 +19,7 @@ import { readProfileSourcePage, sourceValueText, physicalRecordedValue, PHYSICAL
   type PhysicalReadingField, type StructuredClaim } from './profileSourceClaims';
 import { currentBidEvidenceAmount } from './auctionEvidenceDisplay';
 
+const VehicleEvidenceReview = React.lazy(() => import('../../components/vehicle/VehicleEvidenceAssessment').then(m => ({ default: m.VehicleEvidenceReview })));
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
 
 const RECORD_FIELDS = ['year', 'make', 'model', 'vin', 'trim', 'body_style', 'engine_type', 'engine_size',
@@ -60,8 +61,8 @@ function PhysicalRecordedValue({ vehicleId, field, label, fallback, fallbackNote
 
 /** Read every stored field first, then admitted claims from the same owner.
  * A slow or failed source read must not hide the structured stored record. */
-export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: boolean | null;
-  onInspect?: (field: string, label: string, value: string) => void }> = ({ vehicleId, isReplica, onInspect }) => {
+export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: boolean | null; canReview?: boolean;
+  onInspect?: (field: string, label: string, value: string) => void }> = ({ vehicleId, isReplica, onInspect, canReview = false }) => {
   const [read, setRead] = useState<StructuredRead>(
     { id: vehicleId, status: 'loading', claims: [] });
   const generation = React.useRef(0);
@@ -212,7 +213,9 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: bo
       onClick={() => { void loadSourcePage(current.nextAfter ?? null); }}>
       {current.pageStatus === 'loading' ? 'Reading evidence…' : current.pageStatus === 'failed' || current.claimStatus === 'failed' ? 'Retry evidence' : 'Read more evidence'}
     </button>}
-  </section></>;
+  </section>
+    {canReview && <React.Suspense fallback={null}><VehicleEvidenceReview key={vehicleId} vehicleId={vehicleId} /></React.Suspense>}
+  </>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -579,7 +582,7 @@ const FieldRow: React.FC<{
 /* ------------------------------------------------------------------ */
 
 const VehicleDossierPanel: React.FC = () => {
-  const { vehicle, vehicleId, canEdit, isVerifiedOwner, isMobile, setGalleryFilter, auctionPulse } = useVehicleProfile();
+  const { vehicle, vehicleId, session, canEdit, isVerifiedOwner, isMobile, setGalleryFilter, auctionPulse } = useVehicleProfile();
   const navigate = useNavigate();
   const { openPopup } = usePopup();
   const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
@@ -744,7 +747,7 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Info Panel */}
       <div className="vp-dossier-panel">
-        <StructuredProfileData vehicleId={vehicle.id} isReplica={vehicle.is_replica} onInspect={(field, label, value) => openPopup(
+        <StructuredProfileData vehicleId={vehicle.id} canReview={!!session?.user} isReplica={vehicle.is_replica} onInspect={(field, label, value) => openPopup(
           <React.Suspense fallback={<p role="status">Reading source…</p>}>
             <FieldEvidencePopup vehicleId={vehicle.id} field={field} label={label} value={value} presentation="citations" />
           </React.Suspense>, label, Math.min(720, window.innerWidth - 24), false,

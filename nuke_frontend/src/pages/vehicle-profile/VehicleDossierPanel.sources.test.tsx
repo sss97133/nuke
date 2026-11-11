@@ -3,8 +3,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ rpc: vi.fn(), provenance: new Map<string, unknown>() }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: state.rpc }, SUPABASE_ANON_KEY: 'fixture', getSupabaseFunctionsUrl: () => 'https://fixture.test' }));
+const state = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn(), provenance: new Map<string, unknown>() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: state.rpc, functions: { invoke: state.invoke } }, SUPABASE_ANON_KEY: 'fixture', getSupabaseFunctionsUrl: () => 'https://fixture.test' }));
 vi.mock('./hooks/useFieldProvenance', async importOriginal => ({
   ...await importOriginal<typeof import('./hooks/useFieldProvenance')>(),
   useFieldProvenance: (_id: string, field: string) => ({ data: state.provenance.get(field), isError: false }),
@@ -34,7 +34,7 @@ let host: HTMLDivElement, root: Root;
 const render = (id = VEHICLE) => act(async () => { root.render(<MemoryRouter><StructuredProfileData vehicleId={id} /></MemoryRouter>); });
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  state.rpc.mockReset(); state.provenance.clear(); host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
+  state.rpc.mockReset(); state.invoke.mockReset(); state.provenance.clear(); host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 
@@ -171,3 +171,25 @@ function physical(field: keyof typeof PHYSICAL_READING_ROLES, value: string, lim
     is_inferred: true, visual_relation: field === 'factory_color' ? 'direct_code' : 'direct_visual',
   }] };
 }
+
+it('the current profile exposes an on-demand evidence review without a stored estimate', async () => {
+  const { fixture } = await import('../../services/__tests__/listingEvidenceFixture');
+  await import('../../components/vehicle/VehicleEvidenceAssessment');
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page() : record())) }));
+  state.invoke.mockResolvedValue({ data: { action: 'assessment', read_only: true, assessment: fixture().assessment }, error: null });
+  await act(async () => { root.render(<MemoryRouter><StructuredProfileData vehicleId={VEHICLE} canReview /></MemoryRouter>); });
+  const review = [...host.querySelectorAll('button')].find(b => b.textContent === 'Review evidence');
+  expect(review).toBeDefined(); expect(state.invoke).not.toHaveBeenCalled();
+  await act(async () => review!.click());
+  expect(state.invoke).toHaveBeenCalledWith('compute-vehicle-valuation', { body: { action: 'assessment', vehicle_id: VEHICLE } });
+  expect(host.querySelector('section[aria-label="Vehicle evidence assessment"]')).not.toBeNull();
+  expect(host.textContent).toContain('Fixture make');
+  expect(host.textContent).toContain('Installed and factory configuration remain unresolved');
+});
+it('anonymous structured profiles keep their source data without an authenticated assessment action', async () => {
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page() : record())) }));
+  await render();
+  expect(host.textContent).toContain('Fixture make');
+  expect([...host.querySelectorAll('button')].some(b => b.textContent === 'Review evidence')).toBe(false);
+  expect(state.invoke).not.toHaveBeenCalled();
+});
