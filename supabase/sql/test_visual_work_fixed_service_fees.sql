@@ -29,7 +29,9 @@ BEGIN
  ASSERT (s#>>'{rows,0,cost,typical}')::numeric=240 AND s#>'{rows,0,hours}'='null' AND s#>'{rows,0,rate_basis}'='null';
  ASSERT s#>>'{rows,0,formula}'='8 assembly × (30 / 30 / 30) USD per assembly; person-hours unknown';
  ASSERT s#>'{rows,0,reference,unit_fee}'=fee->'unit_fee' AND s#>>'{rows,0,reference,source_sha256}'=repeat('d',64);
- ASSERT s#>>'{rows,0,reference,price_basis}'='published_starting_price' AND j::text NOT LIKE '%777%';
+ ASSERT s#>>'{rows,0,reference,price_basis}'='published_starting_price'
+  AND NOT (s#>'{rows,0,reference}' ? 'rate') AND s#>'{rows,0,rate_basis}'='null',
+  'The private rate is absent from the pricing fields; unrelated timestamps may contain the same digits';
  ASSERT s#>'{totals,hours}'='null' AND s#>>'{totals,hours_coverage,status}'='unestimated'
   AND s#>>'{totals,hours_coverage,unknown_lines}'='1' AND s#>>'{totals,hours_coverage,estimated_lines}'='0';
  ASSERT (s#>>'{totals,labor_currencies,0,cost,typical}')::numeric=240 AND s#>'{totals,material_currencies}'='[]';
