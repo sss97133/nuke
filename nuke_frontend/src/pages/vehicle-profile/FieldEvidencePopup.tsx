@@ -470,8 +470,12 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   const recorded = leadClaim?.field_value ?? leadReport?.value ?? null;
   // A VIN decode is the registry reading; it leads over listing, photo and system claims.
   const vinReport = leadReport?.extraction_method?.startsWith('vin_decode') ? leadReport : undefined;
-  // Distinct sources: field claims plus retained reports; the provenance evidence list repeats them.
-  const sourceCount = (claimGroup?.sources.length ?? 0) + (provenanceCoverageUnavailable(provenance.data) ? 0 : provenance.data?.observations?.length ?? 0);
+  // Distinct sources by key: the observation writer mirrors each report into field_evidence, so a report
+  // and its field claim share one source key (e.g. gm_vin_chart) and count once.
+  const sourceCount = new Set([
+    ...(claimGroup?.sources.map(source => source.source_type) ?? []),
+    ...(provenanceCoverageUnavailable(provenance.data) ? [] : provenance.data?.observations ?? []).map(report => report.source_slug || 'report'),
+  ]).size;
   const methodReport = vinReport ?? (!leadClaim ? leadReport : undefined);
   const reportSource = (report: NonNullable<typeof leadReport>) => {
     const name = sourceLabel(report.source_slug || 'Source report');
