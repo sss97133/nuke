@@ -79,7 +79,7 @@ struct DayRollup {
 /// One day's receipt — the day-level synthesis the drill renders ABOVE its photos.
 /// Everything here is computed from LocalStore rows only (network-off by design):
 /// the measured layer (EXIF times → span/bursts, GPS → located count) is fact from
-/// the files; the read layer (intents, labor minutes, agent vehicle) exists only
+/// the files; the read layer (attributed intents, agent vehicle) exists only
 /// where cloud verdicts were cached down — absent stays absent.
 struct LocalDayReceipt {
     let day: String                 // 'yyyy-MM-dd' (device-zone bucket, same key as DayRollup)
@@ -90,14 +90,20 @@ struct LocalDayReceipt {
     let firstShot: Date?            // EXIF takenAt of the day's first/last frame
     let lastShot: Date?
     let bursts: Int                 // shoot clusters (>45 min gap splits), all frames
-    let laborFrames: Int            // cached verdicts: intent='labor', confidence ≥ 0.6
-    let laborMinutes: Int?          // web-formula estimate over labor frames; nil when none
     let intents: [(String, Int)]    // cached intent counts, desc
     let agentVehicleId: String?     // modal cloudVehicleId — the agent's read, NOT a binding
     let agentVehicleFrames: Int
     let locatedCount: Int           // frames carrying GPS
     let medianLat: Double?
     let medianLon: Double?
+
+    /// Labels describe an analysis of the depicted scene, not the photographer's
+    /// role or a record of performed work. Photo intervals establish no labor time.
+    var analysisSummary: String {
+        var parts = ["Retained analysis: \(read) of \(count) frames"]
+        for (intent, n) in intents.prefix(2) { parts.append("\(n) labeled \"\(intent)\"") }
+        return parts.joined(separator: " · ")
+    }
 }
 
 /// One row of the offline garage mirror. Mirrors prod `get_user_garage` exactly
@@ -919,6 +925,17 @@ final class LocalStore {
         try dbQueue.write { db in try review.insert(db, onConflict: .ignore) }
     }
 
+    /// Diagnostic fallback only. Consumers must qualify source version, method
+    /// and byte custody before displaying any retained observation as current.
+    func latestAlbumImageReview(localIdentifier: String) throws -> LocalAlbumImageReview? {
+        try dbQueue.read { db in
+            try LocalAlbumImageReview.fetchOne(db, sql: """
+                SELECT * FROM photo_album_image_review WHERE localIdentifier = ?
+                ORDER BY rowid DESC LIMIT 1
+                """, arguments: [localIdentifier])
+        }
+    }
+
     /// Unknown source versions must be reread; a previous result cannot establish
     /// that the current bytes are unchanged. A method change also invalidates reuse.
     func albumImageReview(for photo: LocalAlbumPhoto, methodVersion: String) throws -> LocalAlbumImageReview? {
@@ -1166,11 +1183,9 @@ final class LocalStore {
     /// cloud verdicts. Pure local read (zero network). Uses the IDENTICAL
     /// `strftime('%Y-%m-%d', takenAt, 'localtime')` day key as dayCounts()/
     /// localIdentifiers(onDay:), so the receipt describes exactly the frames the
-    /// drill shows. Labor minutes mirror the web's recompute_worth_minutes v3
-    /// formula (>45 min gap splits a burst; per burst max(span, n×5) + 10 min;
-    /// day capped at 480) over cached intent='labor' frames at confidence ≥ 0.6 —
-    /// an ESTIMATE: the cache carries the verdict's overall confidence, not prod's
-    /// intent_confidence, so the caller must label it as estimated, never signed.
+    /// drill shows.
+    /// Photo clocks and cached scene labels do not establish a performer or
+    /// elapsed labor. Keep the source span and interpretations separate.
     func dayReceipt(onDay ymd: String) -> LocalDayReceipt? {
         struct Frame {
             let takenAt: Date
@@ -1178,7 +1193,6 @@ final class LocalStore {
             let lat: Double?
             let lon: Double?
             let intent: String?
-            let confidence: Double?
             let vehicleId: String?
             let read: Bool
         }
@@ -1187,7 +1201,7 @@ final class LocalStore {
             try dbQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
                     SELECT takenAt AS tk, isVehicle AS v, latitude AS lat, longitude AS lon,
-                           cloudIntent AS ci, cloudConfidence AS cc, cloudVehicleId AS cv,
+                           cloudIntent AS ci, cloudVehicleId AS cv,
                            (cloudNarrative IS NOT NULL) AS rd
                     FROM appearance
                     WHERE takenAt IS NOT NULL AND strftime('%Y-%m-%d', takenAt, 'localtime') = ?
@@ -1196,7 +1210,7 @@ final class LocalStore {
                 for r in rows {
                     guard let tk: Date = r["tk"] else { continue }
                     frames.append(Frame(takenAt: tk, isVehicle: r["v"], lat: r["lat"], lon: r["lon"],
-                                        intent: r["ci"], confidence: r["cc"], vehicleId: r["cv"],
+                                        intent: r["ci"], vehicleId: r["cv"],
                                         read: (r["rd"] as Bool?) ?? false))
                 }
             }
@@ -1211,26 +1225,6 @@ final class LocalStore {
         var bursts = 1
         for (a, b) in zip(frames, frames.dropFirst()) where b.takenAt.timeIntervalSince(a.takenAt) > gap {
             bursts += 1
-        }
-
-        // Read: the web labor formula over cached labor frames (estimate — see doc comment).
-        let labor = frames.filter { $0.intent == "labor" && ($0.confidence ?? 0) >= 0.6 }
-        var laborMinutes: Int?
-        if !labor.isEmpty {
-            var total = 0
-            var burst: [Frame] = []
-            func close() {
-                guard let first = burst.first, let last = burst.last else { return }
-                let span = Int((last.takenAt.timeIntervalSince(first.takenAt) / 60).rounded())
-                total += max(span, burst.count * 5) + 10
-                burst = []
-            }
-            for f in labor {
-                if let prev = burst.last, f.takenAt.timeIntervalSince(prev.takenAt) > gap { close() }
-                burst.append(f)
-            }
-            close()
-            laborMinutes = min(480, total)
         }
 
         var intentCounts: [String: Int] = [:]
@@ -1252,8 +1246,6 @@ final class LocalStore {
             firstShot: frames.first?.takenAt,
             lastShot: frames.last?.takenAt,
             bursts: bursts,
-            laborFrames: labor.count,
-            laborMinutes: laborMinutes,
             intents: intentCounts.sorted { ($0.value, $1.key) > ($1.value, $0.key) },
             agentVehicleId: topVehicle?.key,
             agentVehicleFrames: topVehicle?.value ?? 0,

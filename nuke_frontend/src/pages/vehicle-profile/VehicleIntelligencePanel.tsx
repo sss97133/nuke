@@ -269,11 +269,11 @@ const ApparitionSection: React.FC<{ apparitions: Apparition[] }> = ({ apparition
                     </a>
                   ) : truncate(a.platform, 14)}
                 </td>
-                <td style={{ padding: '2px 0' }}>{a.event_type || '\u2014'}</td>
+                <td style={{ padding: '2px 0' }}>{a.schedule_status === 'accepted_awaiting_schedule' ? 'Accepted · awaiting schedule' : a.event_type || '\u2014'}</td>
                 <td style={{ padding: '2px 0', textAlign: 'right', color: a.price ? 'var(--vp-sold)' : 'inherit' }}>
                   {formatPrice(a.price)}
                 </td>
-                <td style={{ padding: '2px 0', textAlign: 'right' }}>{formatDate(a.event_date)}</td>
+                <td style={{ padding: '2px 0', textAlign: 'right' }}>{a.schedule_status === 'accepted_awaiting_schedule' ? 'Date TBD' : formatDate(a.event_date)}</td>
               </tr>
             ))}
           </tbody>

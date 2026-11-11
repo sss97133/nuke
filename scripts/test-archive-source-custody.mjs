@@ -71,6 +71,8 @@ const sources = new Map([
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
+  ['mccormickParser',compile('../supabase/functions/_shared/mccormickParser.ts')],
+  ['htmlToText',compile('../supabase/functions/_shared/htmlToText.ts')],
   ['retainedInterior',compile('../supabase/functions/ingest-observation/retainedInterior.ts')],
   ['retainedCraigslistOdometer',compile('../supabase/functions/ingest-observation/retainedCraigslistOdometer.ts')],
   ['retainedCraigslistCapture',compile('../supabase/functions/ingest-observation/retainedCraigslistCapture.ts')],
@@ -273,6 +275,8 @@ function fixture(options = {}) {
         if(specifier==='../_shared/urlNormalization.ts')return {normalizeListingUrl:value=>value,normalizeVin:value=>value};
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
         if(specifier==='./imageProperties.ts')return load('property');
+        if(specifier==='../_shared/mccormickParser.ts')return load('mccormickParser');
+        if(specifier==='./htmlToText.ts')return load('htmlToText');
         if(specifier==='./retainedInterior.ts')return load('retainedInterior');
         if(specifier==='./retainedCraigslistOdometer.ts')return load('retainedCraigslistOdometer');
         if(specifier==='./retainedCraigslistCapture.ts')return load('retainedCraigslistCapture');

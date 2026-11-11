@@ -82,3 +82,56 @@ Deno.test("Mecum index identity keeps the exact source and admits no other sourc
  assert(!deriveRetainedInterior(index,{...vehicle,is_public:false},registry,"retained_listing_model_v1"));
  assert(!deriveRetainedInterior(index,vehicle,{...registry,slug:"bat"},"retained_listing_model_v1"));
 });
+
+const mc:any={...source,source_id:"006f01c3-e5fb-44f5-ab40-e55b0654de1c",
+ source_url:"https://www.classic-carauction.com/auction-results?auctionnbr=58&auctionid=7309",
+ extraction_method:"mccormick_html_v1",observed_at:"2026-11-09T00:00:00.123456Z",
+ raw_source_ref:"listing_page_snapshots:44444444-4444-4444-8444-444444444444",
+ source_identifier:"auctionid:7309:"+"a".repeat(64),
+ extraction_metadata:{parser:"mccormick_html_v1",snapshot_id:"44444444-4444-4444-8444-444444444444",html_sha256:"a".repeat(64)},
+ structured_data:{year:1978,make:"Example Manufacturer",model:"Prototype GT",vin:"1FAFP45X0YF123456",
+  source_id:"7309",parser:"mccormick_html_v1",presentation:"archive",auction_number:"58",
+  source_claims_only:true,source_event_at:null,source_captured_at:"2026-11-09T00:00:00.123456Z",
+  result_claim:{amount:4200,status:"sold",currency:null,fee_basis:"unknown"}}};
+mc.ingested_at="2026-11-09T00:01:00.123456Z";
+const mcRegistry={id:mc.source_id,slug:"mccormicks"};
+Deno.test("McCormick retained identity labels use existing keys without promoting sale or physical identity",()=>{
+ for(const key of ["year","make","model","vin"]){
+  const d=deriveRetainedInterior(mc,vehicle,mcRegistry,`retained_listing_${key}_v1`)!;
+  assert(d?.source_slug==="mccormicks"&&d.property_key===key);
+  assert(d.structured_data[key]===mc.structured_data[key]);
+  assert(d.structured_data.identity_resolution_status==="unverified");
+  assert(d.structured_data.source_event_time_status==="unknown");
+  assert(d.source_identifier===`retained_listing_${key}_v1:${mc.id}`);
+  assert(d.observed_at===mc.ingested_at&&d.structured_data.source_observed_at===mc.observed_at);
+  assert(!("result_claim" in d.structured_data)&&!("source_sale_receipt" in d.structured_data));
+ }
+ for(const key of ["exterior_color","interior_color","transmission_type","mileage_miles"])
+  assert(!deriveRetainedInterior(mc,vehicle,mcRegistry,`retained_listing_${key}_v1`));
+});
+Deno.test("McCormick identity selector refuses catalog-only, broken custody and noncanonical native URLs",()=>{
+ const mode="retained_listing_make_v1";
+ for(const patch of [
+  {extraction_method:"mccormick_catalog_v1"}, {raw_source_ref:"listing_page_snapshots:wrong"},
+  {source_identifier:"auctionid:other:"+"a".repeat(64)},
+  {structured_data:{...mc.structured_data,source_id:"other"}},
+  {structured_data:{...mc.structured_data,source_event_at:"2020-01-01"}},
+  {structured_data:{...mc.structured_data,evidence_scope:"catalog_row"}},
+  {structured_data:{...mc.structured_data,source_captured_at:"2026-11-09T00:00:00.123455Z"}},
+  {source_url:mc.source_url+"&junk=1"}, {source_url:mc.source_url+"#other"},
+  {extraction_metadata:{...mc.extraction_metadata,html_sha256:"bad"}},
+  {vehicle_id:null}, {is_superseded:true},
+ ])assert(!deriveRetainedInterior({...mc,...patch},vehicle,mcRegistry,mode));
+ assert(!deriveRetainedInterior(mc,{...vehicle,is_public:false},mcRegistry,mode));
+ assert(!deriveRetainedInterior(mc,{...vehicle,deleted_at:"2020-01-01"},mcRegistry,mode));
+});
+Deno.test("McCormick live and showroom native namespaces remain distinct",()=>{
+ for(const [id,url,presentation] of [
+  ["7309","https://www.classic-carauction.com/auction-cars?auctionid=7309","unknown"],
+  ["showroom:7309","https://www.classic-carauction.com/Showroom-Inventory?sp=1&id=7309","showroom"]
+ ]){
+  const p={...mc,source_url:url,source_identifier:`auctionid:${id}:${"a".repeat(64)}`,
+   structured_data:{...mc.structured_data,source_id:id,presentation}};
+  assert(deriveRetainedInterior(p,vehicle,mcRegistry,"retained_listing_year_v1"));
+ }
+});

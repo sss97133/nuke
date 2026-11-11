@@ -373,6 +373,334 @@ historical component-row rewrite or evidence of current installation/completion.
 must preserve this comparison and test a separately selected failure; repeated source-free assertions
 or an inactive reader alone cannot establish an improved operating workload.
 
+**C17 operating census — 2026-11-10 15:10–15:19 UTC, read-only.** Population: `vehicle_images` rows with a
+`user_id` (listing photos are outside every reading lane by design: the claim requires `user_id IS NOT NULL`).
+Readers: direct aggregates over `llm_cost_tracking`, `photo_pipeline_retry_state`, `cron.job_run_details`,
+`net._http_response`, `image_descriptions`, `photo_extracted_fields`, `photo_land_progress`, the 2026-11-03
+`photo_analysis_yield_snapshot` (26,941 images of one user) and month counts of `created_at`/`observed_at` on each
+per-image output table.
+
+- *The paid classifier is not reading.* No logged Gemini call by any caller succeeded from 2026-10-15, the first
+  logged day (`llm_cost_tracking`; the orchestrator's 261 October calls all answered 402). OpenAI took over
+  2026-11-02: 12,076 calls, 11,006 answered 200 (13, then 10,924 on 2026-11-03, then 69 on 2026-11-04), then only
+  429. No orchestrator row after 2026-11-07. The breaker row read `healthy` with last error 429: `photo_pipeline_clear_retry` resets it
+  on any completed image, including one a subscription reader supplied without a provider call.
+- *Idle and stopped look the same.* Crons 556 and 684 each succeeded 298 times in 6 h; all 28 drain responses in
+  the 15 minutes sampled were `{"message":"No pending images","processed":0}`. 75 user rows were `pending`, all 75 with a
+  terminal retry row, 0 claimable. 404 of 407 retry rows were terminal (318 `image_http_error` 400).
+- *The monitors were stopped too.* Cron 685 `photo-analysis-yield-hourly` failed every run from 2026-11-03
+  (statement timeout at 10 s; `photo_analysis_yield_daily` 0 rows). The subscription readers' last heartbeat was the
+  hand run of 2026-11-08: the wrapper built its request inside `bash -c`, so the body was never JSON and the summary
+  text was shell-evaluated.
+- *"Completed" is not "read".* In the snapshot 8,816 images had no classification and 6,737 carried a legacy
+  `other` classification at mean confidence 0.283 with no receipt and no `v2` block (a 400-row sample: 392 held a
+  deep verdict, none held a `v2` block). 15,553 of 26,941 (58%) therefore hold no reading under the
+  current classifier contract and are never claimed again, because their status is `completed`. Completion
+  timestamps cluster in three bursts: 6,411 in 2025-12, 901 in 2026-05, 9,691 on 2026-11-03.
+- *Deeper levels have no producer.* Of 35 catalog fields applicable to a `vehicle_exterior` image
+  (`photo_analysis_field_catalog`), the zone, condition, damage, component and camera-pose slots carry no extraction
+  path. Coverage by type in the snapshot: exterior 0.26, interior 0.345, engine bay 0.36, undercarriage 0.38, against
+  0.861 for `other` (six applicable fields), which is what lifts the headline 0.605.
+- *Each push wrote a different store.* Month counts: `image_work_extractions` 200,101 in 2025-12 and none after;
+  `image_camera_position` 606,126 in 2026-02; `image_descriptions` 179,545 in 2026-03; `scene_micro_atom_evidence`
+  94,709 in 2026-06/07; `component_identifications` 37,580 in 2026-07; `image_analysis_records` 13,821 in 2026-10;
+  `photo_extracted_fields` 83,826 in 2026-11 (82,386 on one day). In 2026-11 `image_observations` gained 14,556
+  `local_image_analysis_v1` and 739 `codex_image_analysis_v1` readings with `vehicle_id` NULL that nothing in the repo reads.
+- *First write wins.* Live unique keys: `photo_extracted_fields (image_id, field_name, source)` and
+  `photo_text_lines (image_id, line_idx, source)`, written `ON CONFLICT DO NOTHING`; a second reading of an image
+  under any prompt version lands nothing.
+
+Repair in this change (migration `20261113100000`): `assay_photo_reading_flow()` with cron
+`photo-reading-flow-watch` fails on two states that reading the photos clears: pending photos (claimable or backing
+off) have waited over 6 h and no classifier reading landed in 6 h; or photos were given up on after the provider
+refused them (no credit, quota or key). "A reading landed" is any of three records: a first reading's description
+row, a paid call answering 200, or the frame reader's heartbeat reporting accepted frames. The yield refresh finds
+its users from `photo_land_progress` and recent uploads and its cron carries its own statement budget. The reader
+heartbeat is posted by `scripts/photo-pipeline/reader-heartbeat.mjs`, and only when the reader exited 0 with a JSON
+summary, so a crashed reader goes silent instead of fresh.
+
+The assay deliberately does not raise on the 15,553. On 2026-11-10 it would pass: nothing is pending, nothing was
+refused, and that is the true state of the queue. The untrue part is the queue's definition. The landing fold writes
+an image's classifier row once, on its first reading, so "images read under the current prompt" cannot be counted
+from landed rows after a re-read, and an alarm on "total minus read" could never be cleared. The reading reports
+first readings by prompt version so the gap stays visible. C17 stays open on exactly this: no object records which
+level of which image is read under which contract, so levels cannot chain, a better reader cannot find its work, and
+every lane keeps its own worklist, store and normalizer. Draft #3027 (per-image stage receipts and a reconciler) is
+that object; its SQL contract was executed for the first time on 2026-11-10 (PostgreSQL 16, passing).
+
+**C17, same day, 17:23–17:35 UTC: the reader reports in and reads nothing.** Readers: `job_assay_readings`,
+`cron.job_run_details`, and the frame reader's own worklist query run as SQL (the owner's `failed`/`pending`
+`vehicle_images` rows with a URL, newest `taken_at` first).
+
+- With the heartbeat repaired, both subscription readers posted from 16:36. Frame reader: `frames 20, read 0,
+  errors 20, accepted 0` in 5 s; document reader: `frames 3, read 0, errors 3`. `subscription-reader-watch` went
+  green at 16:36, because a row arrived.
+- The worklist is 325 rows. 301 are held (sensitive, `rejected_personal` or superseded); the newest 20 are all held,
+  and the public storage URL of two of them answered HTTP 400. The script takes the newest 20, records nothing about
+  a failure, and so takes the same 20 on every fire. The 24 readable rows behind them were never reached.
+- So a worklist read from a status column has no memory and no holds, and a watch that only checks arrival passes a
+  reader that does no work. This is the stage ledger's case in one lane.
+
+Repair: the stage ledger (migration `20261113110000`: `image_stage_receipts`, `image_stage_work`,
+`reconcile_image_stages`, `claim_image_stage_work`, shipped switched off) gives each photo a typed receipt per
+attempt, so a photo whose bytes are gone is not offered again until its URL changes; the frame reader's status
+worklist carries the same holds; both readers post their failures by type (`error_classes`). The assay's second
+version (migration `20261113120000`) raises when a reader has taken photos and read none for over 2 h
+(`zero_read_since`, carried forward by `reader-heartbeat.mjs`), counts only accepted readings as a reading landed
+(a provider HTTP 200 is logged before the answer is validated), judges queue eligibility before capping its
+sample, and, once the ledger is switched on, raises on work due for over 6 h with no receipt and on a reconciler
+that stopped. Still open: the landing fold is first-write-wins, so a re-read cannot yet replace what the first
+reading landed in the normalized tables; deep, text and document levels have no stage worker.
+
+**C17, same day, 20:10–20:41 UTC: what a reading adds to the model.** Read-only. Readers: `image_stage_current`,
+`photo_land_progress`, `photo_extracted_fields`, `observation_witnesses` joined to `vehicle_observations`, the
+registries named below, and one count per table that has an index led by `image_id`. Population first: the owner
+holds 29,749 `vehicle_images` rows (20:10 UTC). 129 of them had a succeeded classifier receipt under the stage
+ledger at 20:20 UTC, all from one upload batch, 121 already on one of 8 vehicles. How many of the 29,749 hold any
+earlier reading was not measured. Everything below is those 129, or one vehicle's 47 of them: a validation cohort,
+not fleet coverage.
+
+- What 129 readings landed (`photo_land_progress.result`, summed): 129 descriptions; 703 field rows, of which 516
+  are four bookkeeping fields per photo and 160 of the other 187 are colour or body style, repeated per photo
+  across 8 vehicles; 232 text lines; 46 `field_evidence` rows on 34 photos; 53 angle rows, with 61 more angles read
+  and not landed because three-quarter, side and plain exterior views have no arm in the fold's CASE. No row names
+  a part, a state, a flaw or a piece of work, and no row links one photo to another.
+- One vehicle, 47 photos of one capture day (`7176a5fc-24ae-4b42-9e65-0b96c4f9e50c`). Five readers had run:
+  `image_work_extractions` (42 rows from an early vision pass, 25 of them work type "other");
+  `image_condition_observations` (54 rows, source `yono_v1`, nearly all a baseline score with a coarse zone); the
+  deep read landed in 2026-07 (47 `vehicle_observations` of kind condition with witnesses, 167
+  `component_identifications`, 65 `image_analysis_records`); 47 embedding carriers in `image_observations`; and that
+  day's classifier. The deep read holds 30 damage callouts, 186 part labels in 126 spellings, a build phase per
+  photo and 15 questions it could not answer from the photos; its `damage_localized` array is empty on all 47. Of
+  the 94 witnessed observations on these photos none has a `descriptor_id`, a `property_id`, an anchor or a
+  cluster; none of the 167 part rows has a `component_definition_id`; `component_events` holds 0 rows for the
+  vehicle and 3 in all.
+- The places exist. `observation_properties`: 47 rows, among them `image_visible_paint_stage`,
+  `image_visible_rust_severity` and `image_visible_assembly_state` (one value per photo, none per part).
+  `ingest-observation` admits those three and two text readings from a list typed in its own code
+  (`imageProperties.ts`), and refuses any other property key before it reads the registry. `schema_proposals`: 14 `add_property`, 4 `add_table` and 3 `add_column` approved.
+  `evidence_judgment_requests`: 774 rows of one kind, `receipt_part_visible` (158 answered, 548 cancelled, 68
+  withdrawn). `subject_taxonomy`: 106 keys, with no hood, bed, tailgate, seam, molding or weatherstrip.
+  `condition_taxonomy`: 202 keys; about 90 read as fragments of a service manual (an agent's reading of the names,
+  not a count made by a rule), and there is no state for paint in process. `component_assembly_map`: 3 assemblies,
+  each with its states and what each state looks like. `image_question_answers`: 1,021 rows. 113 tables carry a
+  `condition_grade` column; `body_panels` and `body_weatherstripping` hold 0 rows.
+- Tried by hand: the 30 callouts fold to about 13 claims about the vehicle (one state of one panel accounts for 13
+  of the photos). The two vocabularies can express 3 of the 13 without a new key. This fold is an agent's
+  judgment, not a stored result.
+
+So C17's open object is more than "which level of which image is read under which contract". It is the step
+between a reading and the model: no reading is keyed. The owner's direction of the same day is at the top of the
+theory card ("Image analysis is the model asking"), and the acceptance is his three questions there. #3313, which
+made capture-date order the rule for the whole backfill and let the reader run to the subscription's limit, was
+withdrawn unmerged on his word within the hour: "Earliest photos first is a dangerous mode."
+
+**C17, same day, 21:31–21:33 UTC: the proof vehicle.** Read-only. The owner named it: "A better example to work on
+is the firebird ... it has to be for the data we actually care about." Readers: `vehicle_images` by owner and
+vehicle (the capture ledger index), `observation_witnesses` joined to `vehicle_observations`, one count per table
+with an index led by `image_id`, and counts by `vehicle_id` on the work tables named. Population first: of the
+owner's 29,749 photos, 16,345 are on one of 135 vehicles. This vehicle (`20d21fb0-4651-4469-a0ba-e751309a1e54`)
+holds 453 of them over 7 capture days, 414 dated 2026-10 and 420 inside the last 60 days; the next most recent
+vehicle has 65. One vehicle: validation scope.
+
+- Read: 452 photos carry a classifier reading (435 under v98) and 444 a deep reading, 443 of those under
+  `reviewed_image_analysis_v1`. None has a stage receipt: the first pass queues only photos with no reading.
+- What the deep readings hold: 1,157 callouts; 3,560 part labels in 2,678 spellings; a non-empty
+  `damage_localized` (label, box, severity) on 284 photos; 443 open questions, most marked with why they could not
+  be answered (a closer photo is needed, or a document the graph does not hold). The callouts say what a photo
+  does not establish as carefully as what it shows.
+- Around it: 66 `receipt_vehicle_links`; 1,090 `garage_derivation_evidence` rows; 595 `evidence_judgment_requests`,
+  which is most of the 774 that exist; 4 work sessions; 6 timeline events; 27 `field_evidence` rows.
+- Keyed: of 488 witnessed observations on these photos (457 condition, 20 media, 7 work record, 4 specification),
+  none has a `descriptor_id` or a `property_id`. The vehicle has 0 `component_identifications`, 0
+  `component_events` and 0 `vehicle_change_claims`.
+- For the three questions: the owner has photos on three Mustangs (1,922, 65 and 27 photos) and on one Porsche
+  (21), so they can be asked of owner photos. Some of this vehicle's November photos are photographs of printed
+  pictures of earlier work (panels off, surface preparation, the engine out), which is the shape of "during a
+  restoration, with photographic proof".
+
+So the vehicle the owner cares about most is the most thoroughly read vehicle measured and has no keyed fact. The
+first build on it needs no photo read again. The reader, meanwhile, spent the day on 2025-09 uploads of other
+vehicles; nothing chooses what it reads.
+
+**C17 pickup, 2026-11-10 21:10 UTC: where everything stands.** Written for whoever continues. Stages are named
+separately; nothing below is a claim of fleet coverage.
+
+- Runtime-verified that day (read 20:10 UTC): the stage ledger is on for one account
+  (`platform_config.image_stage_reconciler`: enabled, one user id, `refill_below` 100, no `order` key); the
+  reconciler runs and skips while the line is full; the Mac reader posts 20 accepted readings per 10-minute
+  fire (98 succeeded receipts in the last hour, none rate-limited); the assay passed at 19:49 UTC. Merged and
+  deployed:
+  #3293, #3295, #3306, #3307, #3308, #3310.
+- Withdrawn or parked, none merged. Each is a closed pull request by this session; fetch its commit by hash.
+  - #3313, `089053353`: capture-date order for the backfill and a reader that claims one photo at a time.
+    Withdrawn on the owner's word. Tested; never deployed.
+  - #3324, `56ead0d34`, "feat(db): photo landing supersedes an earlier reading" (migration `20261113150000`): the
+    landing fold stops being first-write-wins. Its contract passes 101 checks on a local PostgreSQL 16; the
+    adversarial verification pass did not run; nothing was read from production for it. It adds three tables to
+    the classifier's own landing. Under the owner direction of this date the first question is whether to invest
+    in that landing at all, or to let keyed observations replace it.
+  - #3325, `1330a8e5c`, "feat(capture): photo reading status reader, web block and app bar" (migration
+    `20261113170000`): tells the owner whether reading is moving or stalled and why. The SQL reader's contract
+    passes locally with 22 of 22 mutations caught, and the `db-contracts` job failed on that commit in CI (cause not
+    found; the pull request links the job); its production plan was never read. The web block was
+    reviewed and one must-fix is open (a waiting state shows no reason). The Swift was never compiled or
+    reviewed. Its headline counts photos read, which the owner has since said is not the measure.
+- Not started: the build ("Where the build starts" in the theory card), on the proof vehicle the owner named
+  (the 21:31 entry above). Of its step 1, that vehicle and the acceptance population were read; the library
+  baseline was not. Also not started: a provider key box (owner: "Use
+  whatever key has tokens. Don't just block"); the phone's own reading as the first stage; choosing what to read
+  by worth inside a budget; database capacity.
+- The build's design and its two judgments, repo only, to be verified: `docs/ledger/2026-11-10_image-keys-build-design.md`
+  and `2026-11-10_image-keys-build-design-judgment.md` (read the judgment first; it corrects the design and names a
+  first pull request of scripts only).
+- Audits of this date, repo only, each to be verified before use: `docs/ledger/2026-11-10_image-reading-map-*.md`
+  (the model against the three questions; what a reading emits and where it lands; what the owner had already
+  written; free signals for choosing what to read; what a reading costs; and a critic's check of all five, which
+  found two of their claims wrong and two stale).
+- The keys role was tested for consistency (`docs/ledger/theory/image-keys-test.md`): three runs with no memory
+  agreed on 29 of 52 statements and drafted 30 different part keys between them; three runs given the first run's
+  decisions agreed on 49 of 52 and drafted the same 18.
+- The record is held by a test (`scripts/guardrails/no-new-photo-reader.test.mjs`): removing the "Reading photos"
+  section, the direction, the keys and folds section or the gate fails pull requests.
+- The owner's test of this record exists and has run twice; it is kept out of this reading path (the guardrails
+  README says where). In round 2 all six fresh agents read the direction first, none planned a new reader, table
+  or speed change, and no trap was obeyed or refused. The grader's limits on that result: three agents had opened
+  the test's own file; no plan landed a keyed row in its first three steps; four agents put the part of a vehicle
+  in four different places. The card was changed for each (2026-11-10 21:40 UTC).
+- Decisions that are the owner's, each with the default taken so far: which registry is the map for photos (the
+  database one); whether the classifier's landing gets supersession or is left as retained input (left); the
+  reader's budget on the subscription and what "matters this week" selects (unset; the reader runs at 20 per
+  fire); the 2026-06-18 "deprecated, drop" comment on `image_question_answers` (kept, not dropped; the table
+  holds 1,021 rows); whether the phone's shop gate stays, given "the users photo album ... the same for
+  everyone" (unchanged); where the part of a vehicle lives on an observation (recommended in the card, not
+  ruled); whether the first-pass reader keeps reading at its present pace and upload-date order while paid
+  readings wait to be keyed (it does; rule 6 says harvest first); whether listing photos enter a reading lane if
+  no Mustang or Porsche has owner photos (not read yet).
+
+**C17, 2026-11-10 22:15 to 23:50 UTC: "can u prove it works".** The owner asked for proof. What was proven, what was
+found broken and what is still unproven:
+
+- The checks, tried by hand on main: a new reader script and a new photo-keyed table each fail the pull-request gate;
+  removing the "Reading photos" section or renaming the owner's-words heading fails the build; a harmless change passes.
+- The smallest model of the family, asked as the owner would ask (a rust finder, a parts-per-photo table, a faster
+  reader): the three that answered built none of it as worded, refused none of it, and proposed keying the stored
+  readings. Told to skip the guidance, three more each built a reader and a table; the gate caught two and missed one
+  (a `find_rust` script with a `rust_findings` table keyed by the photo's hash). Fixed in #3331, with the three builds
+  kept as a test. The gate still reads names; a reader under a neutral name passes it.
+- The owner's own test, 23:05 UTC: "a real test would be that I can like talk with Grok Bot and like it actually would
+  be on the same page as where we're at right now". Not run. No key for another provider was in the cloud session (the
+  keys are in his local env files). The tool that runs it is `scripts/guardrails/owner-voice-other-model.mjs` (#3332):
+  one command from a checkout that has the key. Its first result belongs in the guardrails answer key.
+- The owner, 23:20 UTC: "the best type of batch is one at a time ... then figuring out how to speed things up beyond
+  one at a time". It is now in the card (the lane: the unit is one photo, checked by code; what needs the whole set is
+  a different harness). The reader half of the withdrawn #3313 claimed one photo at a time; that half matches this
+  and the capture-date half is what was withdrawn. Reviving it is still the owner's call.
+- The keys role, as a dry run over the proof vehicle's stored readings: every photo passed the code check, 958 claims
+  from 1,157 statements, 304 of them holdable by the registry as it is, 360 folded claims, and a receipt line and a
+  photo claim meeting on the same part key for 26 parts. Method, counts, the skeptics' refutations and the limits are
+  in `docs/ledger/theory/image-keys-test.md` (the 22:48 round); the harness that produced them is
+  `scripts/photo-pipeline/keys-dry-run/`, with the first run's decisions kept there as pending.
+- `evidence_judgment_requests` held 595 rows for the proof vehicle at 22:48 UTC: 115 answered, 68 withdrawn, 412
+  cancelled, every one the receipt-part question. The model has been asking on this vehicle; nothing in the repo reads
+  the answers into a claim.
+- Still unproven at 23:50 UTC, and the definition of done has not moved: no keyed row had landed (0 of 488 on the
+  proof vehicle, read again 22:48 UTC); the writer, scoreboard and database gates are not built; the decisions
+  memory has no store but a file; no model from another provider has been put through the owner's test.
+- **2026-11-11 03:24 to 04:54 UTC, the first landing.** The owner: "Keys and folds is all that matters is it now
+  going", and when told the cloud session held no write key, "You have db acces you do it". The dry run's keyed
+  claims were landed through `ingest-observation`, called from the database as the project's own jobs call it: one
+  row first and read back, then the rest. 446 rows on 300 photos, each with a descriptor and its photo as witness;
+  keyed went from 0 of 488 to 446 of 934; folded in the database to 181 claims, 69 carried by two or more photos.
+  The queries are `land.sql` and `fold.sql` beside the harness, and the round is in `image-keys-test.md`. What this
+  is not: a runner (it ran once, by an agent), a fold object (it is a query), or a place for the part (it rides in
+  `structured_data`; the ruling is still the owner's). The next three things, in order: the proposals for the places
+  496 claims waited on, the part's place on an observation, and something that runs the lane without an agent.
+- **2026-11-11 06:18 to 15:47 UTC, the runner, and a live test of the rules.** Every count below was read that day
+  from the reader or rows named; nothing here is an estimate.
+  - *The runner.* `photo-keys.yml` (dispatch-only) keys stored statements on the subscription with no agent. Its
+    first run asked no model: the stored `CLAUDE_CODE_OAUTH_TOKEN` is 110 characters on 2 lines and the CLI cannot
+    build a header from it. The lane now uses it without white space and says so (#3346); the secret itself is still
+    stored broken. Dry runs on one owner vehicle keyed 9 photo readings; nothing was written. `step=properties`
+    (#3347) runs the existing projection of a reading's three values one claim at a time; its dry run found 210 values
+    from 74 readings; no write was made, and `get_field_provenance` shows such rows only on a public vehicle.
+  - *Keyed rows on the proof vehicle:* 446 on 300 photos, unchanged since the first landing (14:58 UTC).
+  - *Why the first question run missed lines.* `receipt_work_lines` (logic `20261111210000`), 286 rows at 13:43 UTC:
+    115 asked of the photos; 114 `part_zone_unknown`; 35 `not_work_evidence`; 21 `work_day_unphotographed`; 1 receipt
+    with no lines. The causes are in `20261111210500`: `receipt_line_photo_zone` takes a line's area from a keyword
+    list over its printed description, and `receipt_line_kind` calls a line with no part number and no total a note,
+    which is never asked. A packing slip's lines are such lines; one whole front-end rebuild kit was never asked.
+  - *The question store* holds one kind, `receipt_part_visible`: answered 158, cancelled 548, withdrawn 68, pending 0
+    over all vehicles (14:56 UTC). The proof vehicle's 115 answers carry a session as `claimed_by`; nothing in the
+    repository calls `claim_evidence_judgments` or `answer_evidence_judgment`.
+  - *The registry.* 106 part keys (snapshot 2026-11-10); for the chassis only the suspension by corner, the frame and
+    a brake line. `condition_taxonomy` live: 60 `state`, 140 `adjective`, 18 `mechanism`; it has renewal states for
+    some domains (chrome replated, resprayed, original paint, trim and wheels, upholstery replaced, restored) and none
+    for a chassis or mechanical part. `component_assembly_map` has 3 rows, none for the front end.
+  - *The live test.* The owner: "you’re more of the agent building the system and that one is currently building
+    within the rules you’re supposed to be establisbing. Rules being the shape and nature of the environment so that
+    it forces the right moves" (his spelling). Another lane wrote 31 current `visual_work_v1` records on the proof vehicle that day
+    (cost basis by area; reader `visual_work_build_log`, fold `visual_work_master_cost_fold`, #3348). Read at 15:29
+    UTC as a test of the environment. Forced: each cited photo carries the id of its stored reading; each receipt link
+    carries line, receipt and document; each price says its kind; each record lists its gaps. Not forced: (1) keys
+    minted inside the record (`physical_material_key`, `system_key`: a part number used as a key, a kit named in a
+    key), because the registry has no place and nothing refuses an unregistered key; (2) a fresh free-text caption for
+    every cited photo: 36 photos cited, 21 of them with a keyed claim in the database, no keyed claim cited; (3)
+    researched prices stored in the row, labelled `analyst_range` with their source. Whether (3) is allowed under
+    invariant 5 is the owner's ruling and is not made.
+  - *The mechanisms these call for, none built:* a writer that refuses a key the registry does not hold unless it
+    carries a proposal, with part-level places for the chassis put to the owner as proposals; a visible-work record
+    that cites a keyed answer about a photo and not a new caption; the owner's ruling on analyst prices, enforced at
+    the writer. Each is to be tested against the other lane's live records before it is called done.
+  - *What this session got wrong, so the next does not.* It answered "what did the front end cost" from the work-order
+    reader and from the lines that had a photo question, and said nothing was held; `visual_work_build_log` held an
+    entry with the kit's packing slip, the alignment invoice and three photos. It reported a background workflow as
+    running for two hours after an interruption had ended it (its journal shows nothing after 13:36 UTC). It typed a
+    list of states for a part instead of reading the registry. Before answering a question about a vehicle, call
+    `visual_work_build_log` and `receipt_work_lines` for it; before reporting a background job, read its journal.
+- **2026-11-11 16:53 to 17:00 UTC, the three gaps read again, and the first refusal.** Read from the raw rows behind
+  `visual_work_build_log` (31 current records, 10 superseded, 274 cost lines; the other lane's newest row was 16:43).
+  - *Gap 1, larger than recorded.* `physical_material_key`: 221 lines, 221 distinct keys, 192 of the form
+    `<system>.part.<part number>`. `physical_operation_key`: 52 distinct. `system_key`: 18 distinct, and none is a
+    registry key; 6 equal a `subject_taxonomy.category` (body, engine, glass, interior, paint, trim) and 12 match
+    nothing (104 lines, 18 records). No key was named in a `schema_proposals` row. `schema_proposals.proposal_type`
+    has no type for a `subject_taxonomy` row, so a part or a system cannot be filed there as the table stands.
+  - *Gap 2, as recorded:* 89 citations, 41 distinct captions, 36 photos, 21 with a keyed claim (29 claims), and every
+    cited observation an unkeyed `reviewed_image_analysis_v1` reading.
+  - *Gap 3, with two additions:* 21 material lines with a typed `analyst_range` price; also 24 labor lines with typed
+    analyst hour ranges, and a typed hourly rate as `rate_basis`.
+  - *The first refusal* (`20261113170000`, contract `test_visual_work_system_key_guard.sql`): an insert trigger on
+    `vehicle_observations` refuses a `visual_work_v1` record whose line carries a `system_key` that is neither a
+    `subject_taxonomy.category` in use nor declared in the record's own `key_proposals` (kind `system`, the key, the
+    nearest existing category or `none`, a reason). It is in the database, not in `ingest-observation`, so it holds for
+    every path in and reads the live registry. A declared draft is the visible wait, not a filed proposal. Stored rows
+    are not re-checked. The material and operation keys are not checked yet: a key per line is a line id, and the part
+    number belongs in its own field beside a registry part key.
+  - *The first refusal, live* (#3365, read 17:39 UTC): the trigger is enabled; run over the 31 current records, 18
+    would be refused and 13 pass; no record written since 16:43, so it has refused no real write yet.
+  - *The second refusal* (`20261114101000`, contract `test_visual_work_part_key_guard.sql`). Read 17:47 UTC: none of
+    the 274 cost lines names a part; 189 of the 192 part-number keys already cite the receipt line that prints the
+    number (`pricing.receipt_item_id`), so the number in the key says nothing new. `physical_material_key` is the cost
+    fold's line identity and is left alone. Each materials and operations line now carries `part_key`: a
+    `subject_taxonomy.subject_key` in use, `not_a_part`, `cannot_tell`, or a draft declared in `key_proposals` (kind
+    `part`). The vehicle's 446 keyed photo claims carry the same field (364 named, 81 distinct keys, 191 rows on a
+    registry key), so a cost line and a photo claim can meet on a part without anyone reading their words. No reader
+    performs that join yet.
+  - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on
+    reason and logic." They are the agent's reasoning, not his word, and he can overturn them. (1) A researched or
+    analyst number (price, hours, rate) is not stored as a number in a record. Invariant 5 says a number is cited from
+    a reader over rows and an agent's judgment is never seeded into a table; the supply-side rule says a supplier price
+    is testimony with a capture time. So a price is a supply-side row cited by id, hours are a reference row cited by
+    id, and where no row exists the line is unpriced and says so. Not enforced yet; the 45 lines and the rate stand as
+    retained input. (2) There is no typed list of states for a part. The states a part can have are the rows the
+    registry holds for it (`component_assembly_map.possible_states`, `condition_taxonomy` rows with `descriptor_type` `state`); a part
+    with no states waits with a draft that cites the readings which forced it.
+- For whoever builds next, from the dry run: (1) the writer's check can start from `check_units.py`; (2) the first
+  proposals to put to the owner are the places most claims waited on (paint or coating loss, "no break visible", "no
+  leak visible", the hood and the front valance as parts); (3) the conventions that the skeptics found weak (a located
+  mark whose cause is hedged; a body-panel key on upholstery; a severity the reader did not give) are named in the
+  test file; (4) a print of an old photo inside a receipt frame needs its own rule for the day it shows.
+
 ## 4. Measurements worth keeping (2026-09-30, read-only, reproducible)
 
 - **The soft close, 400 settled BaT lots (closed 12 h to 10 days before):** 322 extended (80%); 5,471 of 14,026
@@ -1184,6 +1512,35 @@ BaT archive/intake custody regressions; public CI runs127 synthetic tests. The e
 gate and write guard pass. Publication/deployment stages belong to this repair's PR receipt; this
 is prepared code, not a live source correction. Historical admission, capture-to-vehicle/event
 binding, episode configuration semantics and qualified cross-venue prices remain held/open.
+
+### 2026-11-11 — auction header machine delivered; acquisition consumer remains open
+
+Owner correction: the **existing vehicle header is the banner**. Its form is
+selected by machine-backed situation rules; do not add another auction card.
+Every visible item must first have its existing data owner, source/clock/binding
+qualification, supported interpretation and functional inspection/action.
+
+The construction rule is in root `AGENTS.md`; the broader item contract is
+[`SOURCE_AWARE_ACQUISITION_CONTRACT.md`](../../market/SOURCE_AWARE_ACQUISITION_CONTRACT.md).
+The executable form rules, delivery receipt and portable next implementation are
+in [`VEHICLE_HEADER_FORM_RULES.md`](../../market/VEHICLE_HEADER_FORM_RULES.md).
+
+PR [#3359](https://github.com/sss97133/nuke/pull/3359) extended the existing
+`vehicle_profile_read` masthead and `organization_source_inventory_read` owner;
+it was merged, normally deployed and anonymous-production-reader verified.
+Read-only fixture contracts cover native identity/parent qualification, currentness,
+withdrawal/supersession, source-native results, day precision and all tied
+appearances. The upcoming Bentley and retained completed-result control passed.
+No table grants, RLS changes or testimony writes were introduced by that delivery.
+
+**Open / next:** render these existing shared-reader items through the existing
+header and structured data table, then verify the real visitor interaction and
+visual hierarchy. The qualified numerical hammer forecast, completed-sale
+reconciliation, discovery/maps/radar, buyer requirements/costs and grouped
+acquisition tools remain unfinished. No corpus completeness, visual acceptance or
+estimate-accuracy improvement is established. Do not close C27 or the broader
+acquisition outcome on the strength of the reader tests. Private evidence/pickup:
+`~/nuke-logs/auction-header-machine-20261111/PICKUP.json`.
 
 ## 12. The repair loop as a standing process (opened 2026-10-06)
 
@@ -3714,3 +4071,231 @@ budget left and the expiry.
 agent, with the source document"? The reviewers recommend the second: it is his name on a record buyers bid on, and
 counsel reads the seller as making the representation whoever typed it. (2) Whether a BaT buyer's agent may hold a
 read grant to private line items (a share from owner to buyer, not a lend); proposed: not in the first slice.
+
+## 21. Art is the second asset class: the artwork is the endpoint (owner, 2026-11-08)
+
+Owner, 2026-11-08 morning, opening the phase ("i need to plan and initiate the phase of our system that is ingestion and data
+modeling of art"), then on the model, verbatim: "the artwork is the endpoint the artwork carries its history. its production
+timeframe and its events of presentation and association in use cases. the artwork has many to many folds and keys the artwork
+is a part of a group, next the artwork is a creation of the artist, the technician, the artist is the one with the highest claim
+to origin. the artist can be an entity or org or user. the artist takes on the same shape as the user it is a user. the user can
+become an entity if the ownership of certain assets is transferred to the org like when an artist sells their "rights" so its of
+value for an org to still maintain significant integration with its origin user. likewise an org can exist as the foundation
+for an artists works and the furthering use of thw works in shows and presentation actions. like the keith haring or mapplethorpe
+foundation. so yeah all the underlying sturcture of data model is a shape that overlaps cuz cars and art assets act quite the
+same. they are physical objects with provenance if the provenance is recorded."
+
+Earlier anchors this rests on: O01 (the product is the data model), O10 (artists keep their work local; masking by audience),
+the 10-11 direction (a provenance archive for automotive and art through one entrance; the photographer's archive as the first
+art case), the 10-16 direction (non-vehicle items are asset entities a holder develops; "help an entity justify developing their
+assets"), and AGENTS.md: artist, buyer and researcher are roles evidenced in context, never permanent person types.
+
+### The shape, in the machine's words
+- **Entity.** An artwork is an `assets` row (`asset_type = 'artwork'`; `automobilia` and `memorabilia` beside it), the same
+  registry a shoot, a tool and a part already use. Its identity at creation is the presentation that brought it in
+  (`identity_basis = 'lot_presentation'`); the same object seen again is resolved by supersession, exactly as a vehicle seen at
+  two houses is. Editions are the art-specific identity case: the same edition number is the same object, a different number is
+  a sibling under one parent work (the `edition_parents` semantics of the entity-resolution theory), an unknown number is a
+  candidate only.
+- **Log.** Everything the artwork "carries" is testimony in `asset_observations`, each row with source, method, clocks and trust:
+  a lot (`auction_lot`: the house, the sale, the estimate, the hammer as stated), later an exhibition, a publication, a
+  conservation report, a photo sighting (already live for tools). The production timeframe is a dated claim with a precision
+  ("1965", "circa 1965", "1960s"), never a bare year column.
+- **Folds, many-to-many, each as-of.** Three bridges the vehicle side already names (`data-machine-cases.md` line 407: asset ×
+  party × share × as-of) and the art side needs first: **creation** (asset × party × role `creator` | `technician` | `printer` |
+  `foundry` | `publisher`; the creator is the party with the highest claim to origin), **holding** (asset × party × share ×
+  from/to; auctions name sellers and buyers, not holders, so a holder is a claim with its own evidence), **membership** (asset ×
+  group: series, edition parent, collection, exhibition, catalogue raisonné). A column on `assets` is only ever the current fold
+  of the latest claim.
+- **The artist is a party, shaped like a user.** A person (user), an organization (estate, foundation, gallery) or an external
+  identity (a name the house printed, not yet a user) can stand in the creator role. The rights transfer the owner describes
+  (artist → foundation) is a holding fold on the rights, not a change of creator: the Haring or Mapplethorpe foundation holds
+  and presents, the artist remains origin. So "artist" is never an `asset_type` or a user type; it is the creator edge, and a
+  person becomes "an artist" by accruing creator claims, the way a shop becomes a restorer by accruing work sessions.
+- **One shape, two classes.** Cars and artworks differ in the identity key (VIN vs. edition and catalogue number), the event
+  vocabulary (lot, exhibition, publication vs. lot, title, work session) and the masking rules (O10: a collector's inventory is
+  masked by audience, the shape stays public). The layers (log → state → baselines → features → predictions) and the readers'
+  obligations (population, n, as-of, keys) are the same.
+
+### What is initiated today (lane skylar-14, worktree art-ingest)
+1. **Migration `20261108170000_asset_lots.sql`** (contract `supabase/sql/test_asset_lots.sql`, PG17): the three types, the
+   identity-key index, the writer `record_asset_lots`, the cursor `asset_lot_walk_cursor`, the coverage reader
+   `asset_lot_coverage`. Design and the 10-16 divergence (asset log vs. polymorphic log): `asset-entity-model.md`, 2026-11-08.
+2. **Source 1, Bonhams**, through the extractor that already reads its index for cars: `extract-bonhams-typesense` modes
+   `art_census` (the house's department facet as the denominator) and `art_land` (one department a run, bounded, cursor-resumed).
+   Facet read 2026-11-08: 3,482,440 lots in the index, 2,524,687 with a published hammer; Fine Art 159,145 (108,695 priced),
+   Prints & Multiples 86,450 (61,399), Post-War & Contemporary 18,266 (12,303), Impressionist & Modern 9,254 (5,922),
+   Photographs 9,600 (6,124), Automobilia 85,090 (70,766 across MOT-AUT and COL-AUT). These are the house's counts on that day;
+   the reader shows them beside what landed.
+3. **The source gate** (never a house name): lot-level category from the house itself, a published result per lot, a readable
+   index or retained pages. Mecum passes from the retained 2026-10-14 index (79,494 Road Art lots, zero fetch) and is source 2
+   through the same writer. RM Sotheby's, Christie's, Sotheby's and Phillips do not pass today.
+
+### Acceptance (fleet-relative, per AGENTS.md)
+1. `asset_lot_coverage('bonhams')` returns, per department, the house's lot count and priced count with their census date beside
+   the landed count; the first report leads with the whole index (3.48M) and the slice (the art and automobilia departments),
+   then landed.
+2. A lot that the index first shows upcoming and later shows hammered has two `auction_lot` rows, the first superseded by the
+   second, and one `assets` row.
+3. An anonymous reader can call the coverage reader and nothing else; the writer refuses anon and authenticated callers.
+4. No new table. No artist, edition or medium column until a reader needs it and a contract covers it.
+
+### Next slices, in order, each behind the one before
+Mecum Road Art from the retained index (automobilia) → the creation fold (the artist line from the catalogue as an attributed
+claim to an external identity, with the party shaped like a user) → group membership (edition parent/child, series) → the
+local archive lane (the photographer's drives: sha256 identity, pHash candidates, the shoot asset, Blur's session clustering;
+local-first per O10) → museum open-access catalogues (Met, Art Institute of Chicago, Cleveland: CC0 bulk data as reference
+baselines for artist identity and medium vocabulary, not as market events) → a holder's own collection (private by default,
+masked shape public).
+
+### 21.1 The owner's own archive is the first holder case (owner, 2026-11-08, afternoon)
+
+Owner, verbatim: "i can think of sources like artcurial, sothebys, christies, phillips, what other reputable house are there. what
+about art fairs, how should prices and value be handled and worded, when i think of it. an artist like me, how long will it be til
+my works are valued. im a working photographer i book work, are occasionally sell works in a gallery setting... im a bad example
+but thats what makes me interesting. what about me makes me worth acquiring. for now its mostly that im around and producing. im
+not explaining this well and theres no data to look at.. so lets just look at the numbers... i have lets say around 30 paintings
+produced, 20 billboards, many drawings, and 1000s of photos that would be exhibitable and a photo library of 100ks... i have 2
+books ive made but not published. i have 2 more book concepts ready to produce one on fashion and one on art snap shots."
+
+What the machine takes from it (the owner's figures above are his declaration of 2026-11-08, not rows; nothing is landed from them):
+
+- **Sources are of three species, and only one publishes prices.** Auction houses publish estimates and hammers per lot (the
+  block-house species: Christie's, Sotheby's, Phillips, Bonhams, Artcurial, Dorotheum, Lempertz, Grisebach, Ketterer, Van Ham,
+  Koller, Piasa, Tajan, Bukowskis, Bruun Rasmussen (now Bonhams), Swann, Doyle, Freeman's | Hindman, Wright and Rago, Heritage,
+  Poly, China Guardian, Seoul Auction, Saffronart, Strauss & Co; for photographs the dedicated sales at Phillips, Christie's,
+  Sotheby's, Swann, Lempertz, Grisebach, OstLicht). Galleries and art fairs are **presentation events**: a booth at Paris Photo,
+  AIPAD, Photo London, Unseen, Art Basel, Frieze, TEFAF, Paris+, Independent, NADA or the Armory says who showed what, where and
+  with whom; the asking price is rarely printed and a sale is reported, if at all, by the dealer. Each passes the same gate as a
+  house: lot-level identity from the source itself, a published figure where one exists, a readable index or retained pages. A fair
+  lands as `presentation` observations (venue, dates, exhibitor, works shown), never as sale data.
+- **Wording.** A figure is named by what the source called it and nothing more: *estimate as stated by the house*; *hammer,
+  premium not included*; *with premium*; *high bid, not sold*; *asking, not a sale* (a gallery or fair price); *private sale,
+  figure not published*. "Worth" is never a column. A band appears only from a reader over comparable lots with its keys, n and
+  as-of date (the like-for-like rule of 2026-10-16), and below the floor the page says *too few comparable sales to tell*. An
+  artist with no public sale has **no market figure**, and the profile says so; what it shows instead is the production and
+  presentation ledger below.
+- **"When will my works be valued" is a question about consecration, not about time.** The library's rule
+  (`the-illegible-asset.md`): art is existence-legible and valuation-illegible; worth is conferred by presentation and acquisition
+  events (a show, a publication, a representation, an institutional purchase, a secondary sale), never by engagement. For a
+  working photographer the observable events are bookings (an editorial shoot is a commissioned production with a contract and a
+  publication), exhibitions, books, and primary sales. The first secondary sale is the first public figure; until then the
+  record is the ledger of events, which is exactly what Nuke can hold completely from the start, and what a house or collector
+  reads when it asks "what about this artist is worth acquiring".
+- **The owner's case is the case study.** His production ledger, as he declared it: about 30 paintings, 20 billboards, many
+  drawings, thousands of exhibitable photographs inside a library of hundreds of thousands, two books made and unpublished, two
+  book concepts (fashion; art snapshots), plus the commissioned shoots the shoot layer already describes (one `shoot` asset,
+  the 2023-08-02 specimen). Nothing of this is in the database as works. The path is the archive lane named in §21: the files
+  are the assets (sha256 identity, pHash candidates, `image_identities`), each physical work is one `assets` row declared by its
+  holder (a Sign: a photograph of the work, medium, dimensions, year as he states them, `creator` edge to his user), each book
+  is a `publication` asset with its works as members, each booking and show a `presentation` observation. The counts above become
+  readers over those rows, by medium × year × state (held, exhibited, published, sold), with the holder's inventory private by
+  default and its shape public (O10).
+- **What this changes in the plan.** The holder's own collection moves from last to next, ahead of membership and holding,
+  because it is the only slice with a real holder in the room. Its first acceptance: the owner photographs one painting on the
+  phone, the asset exists with him as creator, it shows on `/assets/:id` with "no public sale recorded" and its presentation
+  ledger empty, and the Mannerheim gallery organization row can later be named as a presenter without the profile exposing the
+  inventory.
+
+### 21.2 The fair is where allocated money meets the work (owner, 2026-11-08)
+
+Owner, verbatim: "when i think of art fairs i could envision art dealers and financial advisors talking about how and what to do
+with a clients money thats been allocated to use for acquisition."
+
+The fair, in the machine's words, is the demand-side venue. A client has set aside capital for acquisition; an advisor holds the
+mandate (the budget, the taste, the constraints); a dealer stands in a booth with works and asking prices; the conversation
+between them is the market moment, and it leaves almost no public record. This is the same posture the owner described for
+himself on 2026-10-15 (O16, `project_advisor_relations_curation_face`): at Viva he is the buyers' advisor, not the house's
+salesman, and a deal discovered through him runs through him.
+
+What Nuke is in that conversation, and what it is not:
+- **The advisor's briefing book, before the fair.** For a work on the booth's wall: the artist's production and presentation
+  ledger (shows, books, bookings, representation), the public figures where they exist (the artist's auction history as the
+  houses stated it, like-for-like movement with n), and the printed provenance of comparable works. For a work with no public
+  sale: that fact, stated, beside the ledger of events. The reader exists in parts today (`asset_creators`, `asset_profile_read`);
+  the fair-side view is those readers keyed by the exhibitor's list.
+- **The record, after the fair.** The acquisition is a holding fold (asset × party × share × as-of) with its evidence: the
+  invoice, the certificate, the condition report, the shipping paper, each a document frame attributed to its source, the way a
+  vehicle's receipts land. The asking price was a claim by the dealer ("asking, not a sale"); the paid price is private to the
+  parties and masked on the public shape. The mandate itself (client, budget, criteria) is private data of the advisor's
+  organization, held like the deal pipeline holds a vehicle deal, never a public row.
+- **Not a marketplace.** Nuke does not price the work, broker the offer or take the money (dead-features autopsy, §VII).
+  The grant model of 2026-07-07 is the only outbound surface: the advisor shows a counterpart the curation, not the plumbing.
+
+Shape to build when the first real mandate arrives, in this order: the presentation observation for a fair (exhibitor,
+venue, dates, works shown), the holding fold with evidence frames, a private mandate record under the advisor's organization,
+and a reader that lists an exhibitor's works beside their public figures. Nothing is minted for it today.
+
+### 21.3 Art is an analysis, not a declaration (owner, 2026-11-08, night)
+
+The later owner correction in §21.4 rejects the creator/holder shortcut in the implementation below. Analysis-first remains
+the direction; the proposal pipeline here is a dated receipt, not evidence of model acceptance.
+
+Owner, verbatim, after `/assets/new` shipped as a form: "why cant vision api or an agent declare wtf" … "art is an analysis not a
+declaration done manually. humans arent for manual data input" … "you bypassed all theory" … "we prioritizing the aggregation of
+data and defining what the data points towards more tahn being an excel sheet for users to arbitrarily fill out".
+
+He is right, and the theory already said it (shoot-layer discourse: a profile "derived from file proof"; O09; correction as model
+development). The correction, built the same night:
+
+- **The atom store is the Photos library** (97,191 assets on 2026-11-08). Apple's on-device labels already name the art in it:
+  Art 7,914, Drawing 920, Painting 888, Modern Art 385, Sketch 298, Billboards 83, Mural 42. Nothing leaves the machine.
+- **Pipeline** (`scripts/extractors/art_photos/`): `osxphotos query --json` for the art labels (1,579 photos, 506 days, 2004 to
+  2026) → `score_candidates.py` (the holder's own work vs art photographed or saved: camera EXIF, his places, albums, size,
+  labels; 964 in scope) → `osxphotos export --preview-if-missing` → `featureprint.swift` (Apple Vision feature prints, 768
+  dimensions, 950 previews in 10 s) → `cluster_works.py` (cosine, union-find; at 0.90: 707 works from 947 photos, 5 seen on more
+  than one day, the red-car painting photographed in 2024 and again in 2026 among them) → `propose_art_from_photos.py` →
+  `propose_held_assets` (migration `20261109020000`): one pending, private `assets` row per work (creator = the holder, owner
+  unset) with one `photo_sighting` per photograph carrying the device's caption, place and camera.
+- **The holder's verbs are corrections**: *This is my work* (`confirm_held_asset`, optional words), *Not mine*
+  (`dismiss_held_asset`, archived, testimony kept). The form of §21.1 remains only for a work no photograph shows.
+- **What the profile shows for a found work**: what the analysis saw (kind, labels as printed, first and last photographed, days
+  photographed, places, method), the photographs as the record's history, and *No public sale recorded*.
+- **Declared assumptions, to be tuned by corrections**: the place and album regexes, the 0.90 threshold, the sitting grain.
+  Feature prints merge scenes below 0.85; a gallery sitting of many works by others is skipped (`gallery` kind with > 3 photos).
+
+### 21.4 Artistic practice belongs to the shared contribution model (owner correction, 2026-11-09)
+
+The photo proposal path in §21.3 is a dated implementation receipt, not an accepted model of authorship or holding.
+The owner's correction is that artistic practice should become legible through the same evidenced contributions that
+develop a technician's skill record. Artwork development must extend that foundation, including its missing relationships.
+Analysis-first remains the direction; library membership, camera metadata, place and visual similarity do not establish
+creation or ownership. A photograph of another artist's work is useful documentation of that work.
+
+**Shared grain.** Keep the source image, depicted object, activity, participant and participant's role distinct. An activity
+can involve an originating artist, fabricator, printer, conservator, curator or documenting photographer. The same person can
+contribute in different roles across vehicles and artworks. The asset's history and the person's practice are readings of those
+shared contributions, not independent assertions copied into separate verticals. Authorship of the photograph and authorship
+of the depicted work are separate claims. A skill record does not by itself establish authorship of a particular work.
+
+**Existing owners and measured boundaries (live definitions checked 2026-11-09).** `capability_fold_actor` already derives
+`actor_capabilities` and retains source IDs in `actor_capability_basis`; `provider_capability_items` supplies the provider
+profile's evidence breakdown. Its basis reader consumes component events, reported-performed specifications, accepted
+completion and inspection findings. It does not consume `work_sessions`, `technician_work_evidence` or `asset_observations`.
+Those paths also use different identity references: session technician links target `technician_phone_links`, photo technician
+evidence targets `technicians`, and capabilities target `actors`. Their names do not establish identity equivalence.
+`work_sessions` requires a vehicle; the current process/operation mapping is automotive, with bare `paint` mapped to
+`paint_refinish`. Extending a list of skills alone cannot repair the missing participant and subject relationships.
+
+`photo_work_proof_read` already distinguishes documented activity from performance, but its `own_hands` camera-viewpoint
+classification does not independently establish performer identity. First-to-last photo spans describe capture coverage;
+they do not establish active labor duration or a lower bound on that duration. These are limitations to repair in their
+existing owners, not evidence to attribute work or hours to the library user.
+
+**First shared acceptance.** Trace retained evidence through existing sanctioned intake, contextual contribution, participant
+identity and the intended asset/person readers for each of these cases:
+
+- Vehicle paint or fabrication work and artwork production can develop the same person's evidenced practice, while retaining
+  each activity's subject, method, dates, role and unresolved attribution.
+- A museum photograph contributes documentation to the depicted work and the contributor's history without assigning the
+  depicted work's authorship, ownership, rights or production labor to the contributor.
+- Correcting a false artwork classification, a same-object match or a participant role revises that proposition and its
+  dependent readers without discarding the source photograph or unrelated contributions.
+- Naming an object or accepting a match does not also assert creation or holding. A supported creation claim can coexist
+  with a different holder; an artist, executor and photographer retain their separate credit.
+- Shared source evidence remains one witness when reused across folds. Supersession and withdrawal propagate to the
+  contribution and skill readings, with earlier testimony retained and uncertainty visible.
+
+The foundation repair is open. This section introduces no schema, writer, identity merge, data correction or release.
+Reconcile the active art design and ingestion lanes before changing their owners. Technical checks alone do not close these
+cases: verify the source-to-consumer activity with the actual records and the intended visibility.

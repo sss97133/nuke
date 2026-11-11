@@ -65,7 +65,7 @@ beforeEach(() => {
   fixture.gallery.mockReset();
   fixture.read = mustangRead();
   fixture.auctionRows = []; fixture.eventRows = [];
-  fixture.request.mockReset().mockImplementation((table: string) => Promise.resolve({ data: table === 'auction_events' ? fixture.auctionRows : fixture.eventRows, error: null }));
+  fixture.request.mockReset().mockImplementation((table: string) => Promise.resolve({ data: table === 'auction_events_canonical' ? fixture.auctionRows : fixture.eventRows, error: null }));
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 const render = () => act(async () => root.render(<ProfileHeader priceLotId="lot-1" />));
@@ -92,12 +92,20 @@ it('says where the car is listed and what the listing waits on, only when the re
   fixture.read = read;
   await renderLoaded();
   const line = host.querySelector('.vp-header-listing');
-  expect(line?.textContent).toContain("Bring a Trailer: draft pending the seller's approval since Nov 3, 2026");
-  expect(line?.querySelector('a')?.getAttribute('href')).toBe('https://bringatrailer.com/listing/1973-pontiac-firebird-26/');
+  expect(line?.getAttribute('aria-label')).toBe("Bring a Trailer: draft pending the seller's approval since Nov 3, 2026");
+  expect(line?.textContent?.trim()).toBe('Pending');
+  expect(line?.querySelector('img')?.getAttribute('src')).toBe('/source-logos/bat.png');
+  expect(line?.querySelector('a')).toBeNull();
+  await act(async () => (line?.querySelector('button') as HTMLButtonElement).click());
+  const panel = document.body.querySelector('[aria-label="Listing"][role="group"]');
+  expect(panel?.textContent).toContain("Seller's approval of the draft");
+  expect(panel?.textContent).toContain('Nov 3, 2026');
+  expect(document.body.querySelector('a[href="https://bringatrailer.com/listing/1973-pontiac-firebird-26/"]')?.textContent).toContain('Open on Bring a Trailer');
   if (masthead.kind === 'masthead') masthead.listing = { platform: 'bat', status: 'active', activated_at: '2026-11-10T16:00:00+00:00', url: 'https://bringatrailer.com/listing/x', visibility: 'public' };
   fixture.read = { ...read };
   await renderLoaded();
-  expect(host.querySelector('.vp-header-listing')?.textContent).toContain('Live on Bring a Trailer since Nov 10, 2026');
+  expect(host.querySelector('.vp-header-listing')?.getAttribute('aria-label')).toBe('Live on Bring a Trailer since Nov 10, 2026');
+  expect(host.querySelector('.vp-header-listing')?.textContent?.trim()).toBe('Live');
 });
 
 it('retains exact lot enrichment without changing the price owner or its source observation clock', async () => {
@@ -178,7 +186,7 @@ it('keeps an errored response stale payload out and names the unavailable enrich
 });
 
 it('preserves an exact positive result when the other additive reader fails', async () => {
-  fixture.request.mockImplementation((table: string) => table === 'auction_events'
+  fixture.request.mockImplementation((table: string) => table === 'auction_events_canonical'
     ? Promise.resolve({ data: [auction()], error: null }) : Promise.reject(new Error('PRIVATE REJECTED READ')));
   await renderLoaded(); openPrice();
   expect(document.body.textContent).toContain('Lot EXACT-LOT');

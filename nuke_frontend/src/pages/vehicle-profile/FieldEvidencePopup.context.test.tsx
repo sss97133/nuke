@@ -48,28 +48,27 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); cache.clear(); host.remove(); expect(globalThis.fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); });
-async function render(field = 'transmission', value = '6L90', matchField = 'transmission_model') {
+async function render(field = 'transmission', value = '6L90', matchField = 'transmission_model', extra: Record<string, unknown> = {}) {
   await act(async () => root.render(<QueryClientProvider client={cache}><FieldEvidencePopup vehicleId="subject" field={field} label={field} value={value}
-    context={{ subject: { id: 'subject', year: 1977, make: 'Synthetic', model: 'Specimen', transmission: 'Automatic' }, matchField }} /></QueryClientProvider>));
+    context={{ subject: { id: 'subject', year: 1977, make: 'Synthetic', model: 'Specimen', transmission: 'Automatic', ...extra }, matchField }} /></QueryClientProvider>));
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 }
 
 it('opens the specific component through this vehicle and widens the same label without leaving the page', async () => {
   await render();
-  expect(requests).toHaveLength(0);
-  await act(async () => (host.querySelector('.vp-field-context__segment-head button') as HTMLButtonElement).click());
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  const answer = host.querySelector('.vp-field-context__answer [role="group"]');
+  expect(answer?.textContent).toContain('Source'); expect(answer?.textContent).toContain('synthetic source');
   const first = requests[0].searchParams;
-  expect(Object.fromEntries(first)).toMatchObject({ transmission_model: 'eq.6L90', year: 'eq.1977', make: 'eq.Synthetic', model: 'eq.Specimen', id: 'neq.subject', is_public: 'eq.true', limit: '8' });
+  expect(Object.fromEntries(first)).toMatchObject({ transmission_model: 'ilike.6L90', year: 'eq.1977', make: 'ilike.Synthetic', model: 'ilike.Specimen', id: 'neq.subject', is_public: 'eq.true', limit: '8' });
   expect(first.has('transmission')).toBe(false);
   expect(host.querySelector('.vp-field-context__report')?.textContent).toContain('Specific transmission retained');
   expect(host.querySelector('.vp-field-context__images')?.querySelectorAll('button')).toHaveLength(1);
   await act(async () => (host.querySelector('.vp-field-context__images button') as HTMLButtonElement).click());
   expect(fixture.photo).toHaveBeenCalledWith('transmission-photo');
-  await act(async () => ([...host.querySelectorAll('button')].find(button => button.textContent === 'Wider scope') as HTMLButtonElement).click());
+  await act(async () => ([...host.querySelectorAll('button')].find(button => button.textContent === 'Include every make') as HTMLButtonElement).click());
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   const wider = requests[1].searchParams;
-  expect(wider.get('transmission_model')).toBe('eq.6L90');
+  expect(wider.get('transmission_model')).toBe('ilike.6L90');
   expect(wider.has('make')).toBe(false); expect(wider.has('model')).toBe(false); expect(wider.has('year')).toBe(false);
   await act(async () => (host.querySelector('.vp-field-context__peers button') as HTMLButtonElement).click());
   expect(fixture.open).toHaveBeenCalledOnce();
@@ -78,8 +77,6 @@ it('opens the specific component through this vehicle and widens the same label 
 
 it('reports a failed segment read without turning it into an empty population', async () => {
   fail = true; await render();
-  await act(async () => (host.querySelector('.vp-field-context__segment-head button') as HTMLButtonElement).click());
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   expect(host.textContent).toContain('Related profiles could not be read');
   expect(host.textContent).not.toContain('No other profiles returned');
 });
@@ -94,7 +91,6 @@ it('keeps references in a separate inspectable group and excludes paper from bot
   expect(host.querySelector('img[src="https://images.test/receipt.jpg"]')).toBeNull();
   await act(async () => (references?.querySelector('button') as HTMLButtonElement).click());
   expect(fixture.photo).toHaveBeenCalledWith('reference-engine');
-  expect(requests).toHaveLength(0);
 });
 
 it('retains an accepted reference citation once in the contextual reference group', async () => {
@@ -117,8 +113,14 @@ it('withholds refused source collections in the contextual presentation as well 
 });
 it('keeps the model doorway within the observed year and model instead of mixing generations', async () => {
   await render('model', 'Specimen', 'model');
-  await act(async () => (host.querySelector('.vp-field-context__segment-head button') as HTMLButtonElement).click());
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
-  expect(Object.fromEntries(requests[0].searchParams)).toMatchObject({ model: 'eq.Specimen', make: 'eq.Synthetic', year: 'eq.1977' });
+  expect(Object.fromEntries(requests[0].searchParams)).toMatchObject({ model: 'ilike.Specimen', make: 'ilike.Synthetic', year: 'eq.1977' });
   expect(host.querySelector('.vp-sold-context')).toBeNull();
+});
+
+it('shows a tribute trim as the recorded trim under the tribute rule, as line items', async () => {
+  await render('trim', 'Specimen-Style', 'trim', { trim: 'SPECIMEN', is_replica: true });
+  const answer = host.querySelector('.vp-field-context__answer [role="group"]');
+  expect(answer?.textContent).toContain('Recorded trimSPECIMEN');
+  expect(answer?.textContent).toContain('tribute_badge_rule_v1');
+  expect(answer?.textContent).toContain('vehicles.is_replica');
 });

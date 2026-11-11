@@ -25,7 +25,14 @@ export interface LiveAuction {
   // The verdict the read computed (market_pulse_live v3, slot 17, heat_of() with the server's clock); null when the
   // read made none. Absent on older payloads, where the page computes it with heatOf.
   serverHeat?: ServerHeat | null;
+  /** The published rate a bid in another currency is converted to dollars at; absent for dollar lots and for a
+   *  currency with no published rate in the read's window. */
+  fx?: FxRate | null;
 }
+
+/** USD per one unit of a currency as fx_usd_rate(currency, date) returns it: the most-preferred provider's latest
+ *  reference date on or before the date asked, within 7 days (fx_rates, appended daily from the ECB file). */
+export interface FxRate { currency: string; rate: number; rateDate: string; source: string; sourceUrl: string | null }
 
 export interface ServerHeat { ratio: number; state: 'hot' | 'cold' | 'in line'; typicalNow: number; share: number; hoursLeft: number }
 
@@ -91,10 +98,58 @@ export function houseName(house: string, short = false): string {
   return (short ? HOUSE_SHORT : HOUSE_NAMES)[house] ?? SENT_LABELS.get(house) ?? house;
 }
 
-/** The bid in US dollars, or null when the lot is not bid in dollars or has no bid. No rate table exists, so a
- *  foreign-currency bid is never converted or added into a dollar figure. */
-export function usdBid(a: Pick<LiveAuction, 'currentBid' | 'currency'>): number | null {
+/** The bid in US dollars: a dollar bid as recorded, a bid in another currency at its published rate (a.fx), or null
+ *  when the lot has no bid or its currency has no rate. A converted bid is a derived value; its rate travels with it. */
+export function usdBid(a: Pick<LiveAuction, 'currentBid' | 'currency' | 'fx'>): number | null {
+  if (a.currentBid == null) return null;
+  if (a.currency === 'USD') return a.currentBid;
+  return a.fx && a.fx.currency === a.currency ? Math.round(a.currentBid * a.fx.rate) : null;
+}
+
+/** The bid as recorded in US dollars, never converted: the unit live_board_snapshots keeps (bid_usd), so a comparison
+ *  with those readings stays like for like. */
+export function recordedUsdBid(a: Pick<LiveAuction, 'currentBid' | 'currency'>): number | null {
   return a.currency === 'USD' ? a.currentBid : null;
+}
+
+const FX_PROVIDERS: [RegExp, string][] = [
+  [/ecb\.europa\.eu/, 'ECB reference rate'], [/bankofengland\.co\.uk/, 'Bank of England'], [/(federalreserve\.gov|stlouisfed\.org)/, 'Federal Reserve H.10'],
+];
+/** The publisher of a rate in a few words, from its source URL; otherwise the source text it was recorded with. */
+export function fxSourceName(fx: Pick<FxRate, 'source' | 'sourceUrl'>): string {
+  return FX_PROVIDERS.find(([re]) => re.test(fx.sourceUrl ?? ''))?.[1] ?? fx.source;
+}
+
+/** "≈ $52,140 at 1.3385 USD per GBP (ECB reference rate, 2026-11-06)", or null for a dollar lot or one not converted. */
+export function fxNote(a: Pick<LiveAuction, 'currentBid' | 'currency' | 'fx'>): string | null {
+  const usd = usdBid(a);
+  if (usd == null || a.currency === 'USD' || !a.fx) return null;
+  return `≈ ${moneyIn(usd, 'USD')} at ${Number(a.fx.rate.toPrecision(5))} USD per ${a.currency} (${fxSourceName(a.fx)}, ${a.fx.rateDate})`;
+}
+
+/** The rate for each currency on a date, one fx_usd_rate read per currency. A currency whose read fails or finds no
+ *  rate in the window is left out, and its lots stay unconverted. */
+export async function fetchFxRates(currencies: string[], on: string): Promise<Map<string, FxRate>> {
+  const read = await Promise.all(currencies.map(async (currency): Promise<FxRate | null> => {
+    try {
+      const { data, error } = await supabase.rpc('fx_usd_rate', { p_currency: currency, p_on: on });
+      const r = !error && Array.isArray(data) ? data[0] : null;
+      const rate = Number(r?.rate);
+      if (!r || !(rate > 0) || typeof r.rate_date !== 'string') return null;
+      return { currency, rate, rateDate: r.rate_date, source: String(r.source ?? ''), sourceUrl: r.source_url ?? null };
+    } catch {
+      return null;
+    }
+  }));
+  return new Map(read.filter((r): r is FxRate => r != null).map((r) => [r.currency, r]));
+}
+
+/** Each lot bid in another currency with the rate of the board's read date (UTC), when one is published. */
+export async function withFx(auctions: LiveAuction[], at: number): Promise<LiveAuction[]> {
+  const currencies = [...new Set(auctions.filter((a) => a.currency !== 'USD').map((a) => a.currency))].sort();
+  if (!currencies.length) return auctions;
+  const rates = await fetchFxRates(currencies, new Date(at).toISOString().slice(0, 10));
+  return auctions.map((a) => (a.currency !== 'USD' && rates.has(a.currency) ? { ...a, fx: rates.get(a.currency) } : a));
 }
 
 /** A bid in its own currency, e.g. "£44,694" or "€38,250"; dollars read "$65,000". */
@@ -112,7 +167,8 @@ export function moneyIn(n: number | null | undefined, currency: string, compact 
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
 export const NO_MAKE = 'NO MAKE';
 
-// Disjoint ranges of the current bid in US dollars; missing is not zero.
+// Disjoint ranges of the current bid in US dollars (a foreign bid at its published rate); missing is not zero.
+// 'Other currency' holds only bids in a currency with no published rate.
 export const BID_BUCKETS = [
   { id: 'under10k', label: 'Under $10K' },
   { id: '10k25k', label: '$10K–25K' },
@@ -134,13 +190,19 @@ export function bidBucket(bid: number | null, currency = 'USD'): BidBucket {
   return '100kplus';
 }
 
+/** A lot's range: its dollar bid, converted when its currency has a rate; otherwise as recorded. */
+export function lotBidBucket(a: Pick<LiveAuction, 'currentBid' | 'currency' | 'fx'>): BidBucket {
+  const usd = usdBid(a);
+  return usd != null ? bidBucket(usd) : bidBucket(a.currentBid, a.currency);
+}
+
 export function currentBidDistribution(auctions: LiveAuction[]) {
   const counts = Object.fromEntries(BID_BUCKETS.map(b => [b.id, 0])) as Record<BidBucket, number>;
   const bids: number[] = [];
   for (const a of auctions) {
-    const bucket = bidBucket(a.currentBid, a.currency);
+    const bucket = lotBidBucket(a);
     counts[bucket] += 1;
-    if (bucket !== 'unknown' && bucket !== 'otherCurrency') bids.push(a.currentBid as number);
+    if (bucket !== 'unknown' && bucket !== 'otherCurrency') bids.push(usdBid(a) as number);
   }
   bids.sort((a, b) => a - b);
   const mid = Math.floor(bids.length / 2);
@@ -267,15 +329,17 @@ export async function fetchHouses(): Promise<{ auctions: LiveAuction[]; houses: 
   };
 }
 
-/** Every live auction on the board: BaT's (with its bands, verdicts and baseline) and the other houses' beside it.
- *  Without the other houses' read the board is BaT's alone and says so. */
+/** Every live auction on the board: BaT's (with its bands, verdicts and baseline) and the other houses' beside it,
+ *  each bid in another currency carrying the published rate of the board's read date. Without the other houses' read
+ *  the board is BaT's alone and says so. */
 export async function fetchBoard(): Promise<MarketPulse> {
   const [bat, others] = await Promise.all([fetchPulse(), fetchHouses().then((h) => ({ ok: true as const, ...h }), () => ({ ok: false as const }))]);
   if (!others.ok) return { ...bat, housesFailed: true };
   const batHouse: HouseStatus = { house: BAT_HOUSE, lots: bat.auctions.length, readAt: bat.syncedAt, onBoard: true };
+  const priced = await withFx(others.auctions, bat.syncedAt ?? Date.now());
   return {
     ...bat,
-    auctions: [...bat.auctions, ...others.auctions].sort((a, b) => a.endsAt - b.endsAt),
+    auctions: [...bat.auctions, ...priced].sort((a, b) => a.endsAt - b.endsAt),
     houses: [batHouse, ...others.houses],
   };
 }
@@ -383,13 +447,23 @@ export function increasedBids(previous: LiveAuction[], current: LiveAuction[]): 
 // This polls recorded state, not the source or a complete stream of bid events.
 const REFETCH_MS = 60_000;
 
-// Bids from Bring a Trailer's live feed as the live stream records them (live_bid_tape: each bid once, about a minute
-// behind the source), read every 15 s. A tape bid lifts its lot's recorded bid while the board's 15-minute sync is
-// behind it, so every reader of the board keeps one bid per lot, the newest Nuke holds.
+// Public receipts from native bid events and qualified source snapshots, read every 15 seconds.
+// Their source, receipt and admission clocks stay separate; only the matching auction episode can be lifted.
 const TAPE_MS = 15_000;
-// A bid read more than this long after it was placed (a backgrounded tab, a stalled stream) shows at once.
-const PLAYBACK_MAX_LAG_MS = 150_000;
-export interface TapeBid { id: string; vehicleId: string; amount: number; bidAt: number; endAt: number | null }
+export interface TapeBid {
+  id: string; vehicleId: string; amount: number; bidAt: number; endAt: number | null;
+  observationId?: string; house?: string; sourceUrl?: string; currency?: string;
+  eventKind?: 'bid' | 'bid_snapshot' | 'price_snapshot'; recovered?: boolean; ingestedAt?: number; receivedAt?: number; latestBidAt?: number;
+  transport?: string; clockBasis?: string; bidCount?: number; sourceEventId?: string; projectionError?: string;
+}
+
+export const tapeEpisode = (url: string | null | undefined) => {
+  try { const u = new URL(url ?? ''); return `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/$/, '')}`; } catch { return null; }
+};
+export function tapeMatches(a: LiveAuction, b: TapeBid): boolean {
+  return b.eventKind !== 'price_snapshot' && a.id === b.vehicleId && b.house === a.house && b.currency === a.currency
+    && tapeEpisode(a.listingUrl) != null && tapeEpisode(a.listingUrl) === tapeEpisode(b.sourceUrl) && !b.projectionError;
+}
 
 export function parseTape(data: unknown): TapeBid[] {
   const bids = (data as { bids?: unknown } | null)?.bids;
@@ -398,24 +472,73 @@ export function parseTape(data: unknown): TapeBid[] {
     const r = (b ?? {}) as Record<string, unknown>;
     const amount = Number(r.amount);
     const bidAt = Date.parse(String(r.bid_at ?? ''));
-    const endAt = r.end_at ? Date.parse(String(r.end_at)) : NaN;
+    const endAt = Date.parse(String(r.end_at ?? r.listing_end_at ?? ''));
     if (typeof r.id !== 'string' || typeof r.vehicle_id !== 'string' || !(amount > 0) || !Number.isFinite(bidAt)) return [];
-    return [{ id: r.id, vehicleId: r.vehicle_id, amount, bidAt, endAt: Number.isFinite(endAt) ? endAt : null }];
+    const extra: Partial<TapeBid> = {};
+    for (const [wire, field] of [['observation_id', 'observationId'], ['house', 'house'], ['source_url', 'sourceUrl'], ['currency', 'currency'],
+      ['clock_basis', 'clockBasis'], ['transport', 'transport'], ['source_event_id', 'sourceEventId'], ['projection_error', 'projectionError']] as const) {
+      if (typeof r[wire] === 'string') extra[field] = r[wire] as string;
+    }
+    if (typeof r.recovered === 'boolean') extra.recovered = r.recovered;
+    if (r.event_kind === 'bid' || r.event_kind === 'bid_snapshot' || r.event_kind === 'price_snapshot') extra.eventKind = r.event_kind;
+    for (const [wire, field] of [['ingested_at', 'ingestedAt'], ['received_at', 'receivedAt'], ['latest_bid_at', 'latestBidAt']] as const) {
+      const at = Date.parse(String(r[wire] ?? '')); if (Number.isFinite(at)) extra[field] = at;
+    }
+    if (typeof r.bid_count === 'number' && Number.isInteger(r.bid_count) && r.bid_count >= 0) extra.bidCount = r.bid_count;
+    return [{ id: r.id, vehicleId: r.vehicle_id, amount, bidAt, endAt: Number.isFinite(endAt) ? endAt : null, ...extra }];
   });
 }
 
-async function fetchTape(): Promise<TapeBid[]> {
+export interface DeliveryQueueStatus { state: 'recorded' | 'invalid' | 'unrecorded'; count?: number; measuredAt: number | null; updatedAt?: number; oldestReadAt?: number | null }
+export function parseDeliveryQueue(raw: any, now = Date.now()): DeliveryQueueStatus | undefined {
+  if (!raw || !['recorded','invalid','unrecorded'].includes(raw.state)) return undefined;
+  const measured = Date.parse(raw.measured_at), updated = Date.parse(raw.state_updated_at), oldest = Date.parse(raw.oldest_source_read_at);
+  const measuredAt = Number.isFinite(measured) && measured <= now ? measured : null;
+  if (raw.state !== 'recorded') return { state: raw.state, measuredAt };
+  if (measuredAt == null || !Number.isFinite(updated) || updated > measuredAt
+    || !Number.isInteger(raw.queued_receipts) || raw.queued_receipts < 0 || raw.queued_receipts > 1000
+    || (raw.queued_receipts > 0 && (!Number.isFinite(oldest) || oldest > updated))
+    || (raw.queued_receipts === 0 && raw.oldest_source_read_at != null)) return { state: 'invalid', measuredAt };
+  return { state: 'recorded', count: raw.queued_receipts, measuredAt, updatedAt: updated, oldestReadAt: raw.queued_receipts ? oldest : null };
+}
+export interface SourceReceiptStatus { house: string; readAt: number | null; lots: number | null; state: string | null; hasError: boolean; discoveryState?: string; discoveryAttemptAt?: number | null; collectionState?: string; deliveryQueue?: DeliveryQueueStatus; nativePollMinutes?: number }
+async function fetchTape(): Promise<{ bids: TapeBid[]; sources: string[]; status: SourceReceiptStatus[] }> {
   const { data, error } = await supabase.rpc('live_bid_tape', { p_minutes: 5 });
   if (error) throw error;
-  return parseTape(data);
+  if (data?.receipt_version !== 2) throw new Error('Source receipt reader is not deployed');
+  const status: SourceReceiptStatus[] = (Array.isArray(data.source_status) ? data.source_status : []).flatMap((s: any) => {
+    if (typeof s.house !== 'string') return [];
+    if (typeof s.label === 'string') SENT_LABELS.set(s.house, s.label);
+    const readAt = Date.parse(s.read_at);
+    const discoveryAttemptAt = Date.parse(s.discovery_attempt_at);
+    return [{ house:s.house, readAt:Number.isFinite(readAt) ? readAt : null, lots:typeof s.lots === 'number' ? s.lots : null, state:typeof s.state === 'string' ? s.state : null, hasError:s.has_error === true,
+      discoveryState: ['unrecorded','disabled','no_listings_parsed','blocked','error','unverified'].includes(s.discovery_state) ? s.discovery_state : undefined,
+      discoveryAttemptAt: Number.isFinite(discoveryAttemptAt) ? discoveryAttemptAt : null,
+      collectionState: ['paused','scheduled'].includes(s.collection_state) ? s.collection_state : undefined,
+      deliveryQueue: s.house === 'ebay-motors' ? parseDeliveryQueue(s.delivery_queue) : undefined,
+      nativePollMinutes: s.house === 'purplewave' && Number.isInteger(s.native_poll_minutes) && s.native_poll_minutes > 0 && s.native_poll_minutes <= 10080 ? s.native_poll_minutes : undefined }];
+  });
+  return { status, bids: parseTape(data), sources: Array.isArray(data?.sources) ? data.sources.filter((s: unknown): s is string => typeof s === 'string') : [] };
+}
+
+export function useAuctionReceipts() {
+  return useQuery({
+    queryKey: ['live-bid-tape'],
+    queryFn: fetchTape,
+    refetchInterval: TAPE_MS,
+    staleTime: TAPE_MS / 2,
+    retry: 0,
+  });
 }
 
 /** Each lot at the newest bid Nuke holds: the board's recorded bid, or a newer tape bid (and the end it moved to). */
 export function withTapeBids(auctions: LiveAuction[], best: ReadonlyMap<string, TapeBid>): LiveAuction[] {
   if (!best.size) return auctions;
   return auctions.map((a) => {
-    const b = best.get(a.id);
-    if (!b || !(b.amount > (a.currentBid ?? 0))) return a;
+    const b = [...best.values()].filter(b => tapeMatches(a, b)).sort((x, y) => y.bidAt - x.bidAt)[0];
+    // updatedAt is a conservative row-write clock, not proof of a bid. Withhold an overlay
+    // unless its source observation is strictly newer; this also permits qualified corrections downward.
+    if (!b || !Number.isFinite(a.updatedAt) || a.updatedAt <= 0 || !(b.bidAt > a.updatedAt)) return a;
     return { ...a, currentBid: b.amount, updatedAt: Math.max(a.updatedAt, b.bidAt),
       endsAt: b.endAt != null && b.endAt > a.endsAt ? b.endAt : a.endsAt };
   });
@@ -429,20 +552,12 @@ export function useMarketPulse() {
     staleTime: REFETCH_MS / 2,
     retry: 1,
   });
-  const tape = useQuery({
-    queryKey: ['live-bid-tape'],
-    queryFn: fetchTape,
-    refetchInterval: TAPE_MS,
-    staleTime: TAPE_MS / 2,
-    retry: 0,
-  });
+  const tape = useAuctionReceipts();
 
   // The newest tape bid per lot; bids already read are not replayed. The first read sets the baseline quietly.
-  // Later bids are played back at their own moments, one steady delay behind the source, instead of all at once
-  // when the 15 s read lands: each shows at bid_at + lag, where lag is the slowest arrival seen recently.
+  // New receipts display immediately on arrival; never add playback delay or call a snapshot an individual bid.
   const best = useRef(new Map<string, TapeBid>());
   const seen = useRef<Set<string> | null>(null);
-  const lag = useRef(0);
   const timers = useRef(new Set<number>());
   const shown = useRef(new Map<string, { amount: number; at: number }>());
   const [tapeTick, setTapeTick] = useState(0);
@@ -450,7 +565,7 @@ export function useMarketPulse() {
   const [newBids, setNewBids] = useState<TapeBid[]>([]);
   useEffect(() => () => { timers.current.forEach((t) => window.clearTimeout(t)); timers.current.clear(); }, []);
   useEffect(() => {
-    const bids = tape.data;
+    const bids = tape.data?.bids;
     if (!bids) return;
     const first = seen.current == null;
     const known = seen.current ?? new Set<string>();
@@ -459,43 +574,37 @@ export function useMarketPulse() {
     for (const b of fresh) seen.current.add(b.id);
     if (!fresh.length) return;
     const land = (b: TapeBid) => {
-      const cur = best.current.get(b.vehicleId);
-      if (!cur || b.amount > cur.amount) best.current.set(b.vehicleId, b);
+      const key = `${b.house}:${tapeEpisode(b.sourceUrl)}:${b.vehicleId}`;
+      const cur = best.current.get(key);
+      if (!cur || b.bidAt >= cur.bidAt) best.current.set(key, b);
     };
     if (first) {
       fresh.forEach(land);
       setTapeTick((t) => t + 1);
       return;
     }
-    const now = Date.now();
-    const arrival = Math.max(...fresh.map((b) => now - b.bidAt));
-    lag.current = arrival > PLAYBACK_MAX_LAG_MS ? lag.current : Math.max(lag.current * 0.9, arrival);
+    setNewBids(fresh.filter(b => b.eventKind !== 'price_snapshot' && !b.recovered && b.bidAt <= Date.now() && Date.now() - b.bidAt < 60_000));
     for (const b of fresh) {
       const play = () => {
         land(b);
         shown.current.set(b.vehicleId, { amount: b.amount, at: Date.now() });
         setTapeTick((t) => t + 1);
-        setNewBids([b]);
-        setTapeRisen((prev) => new Set(prev).add(b.vehicleId));
+        if (!b.recovered && Date.now() - b.bidAt < 60_000 && query.data?.auctions.some(a => tapeMatches(a, b))) setTapeRisen((prev) => new Set(prev).add(b.vehicleId));
         const off = window.setTimeout(() => {
           timers.current.delete(off);
           setTapeRisen((prev) => { const next = new Set(prev); next.delete(b.vehicleId); return next; });
         }, 1800);
         timers.current.add(off);
       };
-      const wait = b.bidAt + lag.current - now;
-      if (wait <= 0 || now - b.bidAt > PLAYBACK_MAX_LAG_MS) { play(); continue; }
-      const t = window.setTimeout(() => { timers.current.delete(t); play(); }, wait);
-      timers.current.add(t);
+      play();
     }
   }, [tape.data]);
   const data = useMemo(() => {
     const d = query.data;
     if (!d) return d;
     // A tape bid stops lifting its lot once the board's own read has caught up with it.
-    for (const a of d.auctions) {
-      const b = best.current.get(a.id);
-      if (b && (a.currentBid ?? 0) >= b.amount) best.current.delete(a.id);
+    for (const [key, b] of best.current) {
+      if ((b.ingestedAt != null && Date.now() - b.ingestedAt > 1800_000) || d.auctions.some(a => tapeMatches(a, b) && a.updatedAt >= b.bidAt)) best.current.delete(key);
     }
     return { ...d, auctions: withTapeBids(d.auctions, best.current) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -523,5 +632,5 @@ export function useMarketPulse() {
   }, [query.data]);
 
   const risen = useMemo(() => (tapeRisen.size ? new Set([...risenIds, ...tapeRisen]) : risenIds), [risenIds, tapeRisen]);
-  return { ...query, data, risenIds: risen, newBids };
+  return { ...query, data, risenIds: risen, newBids, tape: tape.data?.bids ?? [], tapeSources: tape.data?.sources ?? [], tapeStatus: tape.data?.status ?? [], tapeError: tape.isError, tapeUpdatedAt: tape.dataUpdatedAt };
 }

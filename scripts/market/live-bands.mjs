@@ -43,13 +43,18 @@ const rest = async (path, { key = SERVICE, method = 'GET', body, prefer } = {}) 
 
 // 1. the public live board
 const pulse = await rest('rpc/market_pulse_live', { key: ANON, method: 'POST', body: {} });
+// The moment comes from the source, never a machine's clock: the board's synced_at is the latest read of BaT's live
+// page (sync-live-auctions). Rows, hours to close and comp ages count from it. (2026-11-07: the Mac ran 3 h 35 min slow.)
+const now = new Date(pulse?.synced_at ?? NaN);
+if (!Number.isFinite(now.getTime())) throw new Error('market_pulse_live has no synced_at; nothing is written without the source time');
 const lots = (pulse?.auctions ?? []).map((r) => ({ id: r[0], bid: r[4], endsAt: Date.parse(r[5]), noReserve: r[9] === true, title: r[11] }))
-  .filter((l) => l.title && l.endsAt > Date.now());
+  .filter((l) => l.title && l.endsAt > now.getTime());
 const clean = (s) => String(s).replace(/[\t\r\n]/g, ' ');
 writeFileSync(liveTsv, lots.map((l) => [l.id, l.bid ?? '', l.noReserve, clean(l.title)].join('\t')).join('\n') + '\n');
 
 // 2. bands from the archive (read-only)
-const sql = readFileSync(SQL_FILE, 'utf8').replaceAll('__LIVE_TSV__', liveTsv).replaceAll('__BANDS_CSV__', bandsCsv);
+const sql = readFileSync(SQL_FILE, 'utf8').replaceAll('__LIVE_TSV__', liveTsv).replaceAll('__BANDS_CSV__', bandsCsv)
+  .replaceAll('__NOW__', now.toISOString());
 execFileSync('duckdb', ['-readonly', ARCHIVE], { input: sql, stdio: ['pipe', 'inherit', 'inherit'] });
 const [header, ...lines] = readFileSync(bandsCsv, 'utf8').trim().split('\n');
 const cols = header.split(',');
@@ -64,7 +69,6 @@ for (let i = 0; i < bands.length; i += 200) {
   for (const r of rows ?? []) existing.add(r.vehicle_id);
 }
 const tier = (p) => (p < 25000 ? 'a' : p < 50000 ? 'b' : p < 100000 ? 'c' : 'd');
-const now = new Date();
 const rows = bands.filter((b) => !existing.has(b.vehicle_id)).map((b) => {
   const lot = byId.get(b.vehicle_id);
   const p50 = Number(b.p50);

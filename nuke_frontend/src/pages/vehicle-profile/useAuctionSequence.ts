@@ -51,7 +51,7 @@ export async function fetchNativeAuctionComments(
     for (let page = 0; page < 100; page++) {
       if (controller.signal.aborted) throw new Error('auction_activity_read_incomplete');
       let query = supabase.from('auction_comments')
-        .select('id,vehicle_id,posted_at,comment_type,bid_amount,author_username,is_seller,comment_text,bat_comment_id,source_url,sequence_number,comment_likes')
+        .select('id,vehicle_id,posted_at,comment_type,bid_amount,author_username,is_seller,comment_text,bat_comment_id,source_url,sequence_number,comment_likes,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
         .eq('vehicle_id', vehicleId).order('id', { ascending: true }).limit(250)
         .abortSignal(controller.signal);
       if (after) query = query.gt('id', after);
@@ -97,7 +97,7 @@ async function fetchRows(vehicleId: string, signal?: AbortSignal): Promise<RawRo
   const [comments, auctionEvents, vehicleEvents, images] = await Promise.all([
     fetchNativeAuctionComments(vehicleId, signal),
     supabase
-      .from('auction_events')
+      .from('auction_events_canonical')
       .select('id,source,source_url,lot_number,outcome,winning_bid,total_bids,winning_bidder,seller_name,page_views,watchers,comments_count')
       .eq('vehicle_id', vehicleId)
       .limit(5),

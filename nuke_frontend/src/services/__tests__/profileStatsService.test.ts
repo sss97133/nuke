@@ -16,7 +16,8 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from(table: string) {
     if (table !== 'auction_comments') return { data: [], error: null };
     if (fixture.commentError) return { data: null, error: fixture.commentError };
     const rows = fixture.comments.filter(c => read.filters.every(([field, value]) => c[field] === value)
-      && read.nulls.every(field => c[field] == null) && read.nonnulls.every(field => c[field] != null));
+      && read.nulls.every(field => c[field] == null) && read.nonnulls.every(field => c[field] != null)
+      && (!read.or.includes('canonical.not.is.null') || c.auction_event_id == null || c.canonical != null));
     if (read.ascending) rows.sort((a,b) => String(a.posted_at).localeCompare(String(b.posted_at)));
     return { data: rows.slice(0, read.limit), count: rows.length, error: null };
   };
@@ -114,4 +115,15 @@ describe('public source-account comments', () => {
     const native = fixture.reads.find(r => r.table === 'bat_listings')!;
     expect(native.or).toContain(`seller_username.eq.${JSON.stringify(fixture.identity.handle)}`);
   });
+});
+
+
+it('filters duplicate-linked history before the profile comment limit and count while retaining unkeyed testimony', async () => {
+  const normal = fixture.comments[0], unkeyed = fixture.comments[1];
+  fixture.comments = [...Array.from({length: 200}, (_,n) => ({...normal,id:`duplicate-${n}`,auction_event_id:'duplicate',canonical:null})),
+    {...normal,auction_event_id:'canonical',canonical:{id:'canonical'}}, {...unkeyed,auction_event_id:null,canonical:null}];
+  const profile = await getPublicProfileByExternalIdentity('source-account');
+  expect(profile?.comments.map(c => c.id)).toEqual(['first','second']);
+  expect(profile?.stats.total_comments).toBe(2);
+  expect(fixture.reads.filter(r => r.table === 'auction_comments').every(r => r.or === 'auction_event_id.is.null,canonical.not.is.null')).toBe(true);
 });

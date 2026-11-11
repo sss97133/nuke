@@ -209,6 +209,14 @@ struct NukeCaptureApp: App {
                 // Foreground sync — only once ignition is done. During the
                 // scan NOTHING may upload (the UPLOADED 0 gauge is real).
                 guard session.isSignedIn, ignitionComplete else { return }
+                // A "Re-scan my library" asked for on the website: claim it, re-arm ignition the way
+                // the Account button does, and let the next pass close it with its summary.
+                Task {
+                    if await CaptureLedgerReporter.shared.claimRescan() != nil {
+                        SyncEngine.shared.resetForReignition()
+                        ignitionComplete = false
+                    }
+                }
                 // BUG #1 defect (c): book the processing-task drain the moment
                 // we learn work exists — not only on .background. If on-site
                 // photos are owed (backfill queue or fresh captures), the drain

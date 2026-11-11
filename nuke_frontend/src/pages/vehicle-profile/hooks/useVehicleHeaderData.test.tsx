@@ -49,10 +49,10 @@ it('reads seller history through one platform identity and keyed public auction 
   await act(async () => root.render(<SellerSubject />));
   expect(output.popoverData.sellerEvidence.sold).toBe(1);
   expect(fixture.fromCalls).toContainEqual(['external_identities','eq','platform','bat']);
-  expect(fixture.fromCalls).toContainEqual(['auction_events','eq','seller_external_identity_id','canonical']);
-  expect(fixture.fromCalls).toContainEqual(['auction_events','neq','vehicle_id','subject']);
-  expect(fixture.fromCalls).toContainEqual(['auction_events','eq','vehicle.is_public',true]);
-  expect(fixture.fromCalls).toContainEqual(['auction_events','limit',51]);
+  expect(fixture.fromCalls).toContainEqual(['auction_events_canonical','eq','seller_external_identity_id','canonical']);
+  expect(fixture.fromCalls).toContainEqual(['auction_events_canonical','neq','vehicle_id','subject']);
+  expect(fixture.fromCalls).toContainEqual(['auction_events_canonical','eq','vehicle.is_public',true]);
+  expect(fixture.fromCalls).toContainEqual(['auction_events_canonical','limit',51]);
   expect(fixture.fromCalls.filter(c => c[1] === 'select').some(c => /seller_username|proof_url|claimed_by,/.test(c[2]))).toBe(false);
 });
 it('keeps an unreadable seller history distinct from a seller with no sales', async () => {

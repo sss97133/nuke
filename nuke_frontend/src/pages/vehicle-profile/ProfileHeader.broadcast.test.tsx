@@ -58,7 +58,7 @@ beforeEach(() => {
     if (method !== 'GET') throw new Error(`Unexpected mutation: ${method} ${url.pathname}`);
     const table = url.pathname.replace('/rest/v1/', '');
     let rows: any[];
-    if (table === 'auction_events') rows = auctionRows;
+    if (table === 'auction_events_canonical') rows = auctionRows;
     else if (table === 'vehicle_events') rows = eventRows;
     else if (table === 'vehicle_observations') {
       if (observationError) return json({ code: '57014', message: 'synthetic observation read failure' }, 500);

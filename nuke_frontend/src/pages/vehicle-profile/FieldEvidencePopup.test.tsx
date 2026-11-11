@@ -26,6 +26,66 @@ beforeEach(() => {
     { id: 'local-observation', value: 'SOURCE-VIN', confidence: 0.6, source_url: 'https://example.com/listing', source_slug: 'listing-source', observed_at: '2026-10-03T12:00:00Z' },
   ] } };
 });
+it('opens a cited object and quotation immediately without claim drawers or scores', () => {
+  fixture.inventory.data.images = [{ id: 'cited-image', image_url: 'https://example.test/physical.jpg' }];
+  const row = { id: 'reading', source_image_id: 'cited-image', field_value: 'Stamped text', source_type: 'ai_visual',
+    extraction_context: 'photo-pipeline landing v1: text on the physical plate' };
+  fixture.claims.evidence.vin = { sources: [row, { ...row, id: 'copy', source_type: 'system_update' }] };
+  const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="vin" label="VIN" value="Stored value" presentation="citations" />);
+  expect(html).toContain('https://example.test/physical.jpg');
+  expect(html).toContain('text on the physical plate');
+  expect(html).not.toContain('<details');
+  expect(html).not.toContain('CLAIM RECORDS');
+  expect(html).not.toContain('Stored score');
+  expect(html).not.toContain('system update');
+});
+it('opens an appearance witness directly but never attaches its reading to replacement bytes', () => {
+  fixture.provenance.data.observations = [];
+  fixture.provenance.data.image_observations = [{ observation_id: 'appearance-reading', image_id: 'appearance-image',
+    image_url: 'https://example.test/reviewed.jpg', source_url: 'https://example.test/reviewed.jpg',
+    value: 'Sport-style', image_region: { label: 'Visible exterior treatment' },
+    limitation: 'Factory trim is not established by this photograph.' }];
+  fixture.inventory.data.images = [{ id: 'appearance-image', image_url: 'https://example.test/reviewed.jpg' }];
+  const view = () => renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="appearance" label="Appearance" value="Sport-style" presentation="citations" />);
+  const current = view();
+  expect(current).toContain('reviewed.jpg'); expect(current).toContain('Visible exterior treatment');
+  expect(current).not.toContain('<details'); expect(current).not.toContain('CLAIM RECORDS');
+  fixture.inventory.data.images[0].image_url = 'https://example.test/replacement.jpg';
+  fixture.provenance.data.image_observations[0].image_url = 'https://example.test/replacement.jpg';
+  const replaced = view();
+  expect(replaced).not.toContain('<img'); expect(replaced).not.toContain('Visible exterior treatment');
+  expect(replaced).toContain('Current image citation unavailable');
+  expect(replaced).toContain('/vehicle/local-vehicle/observation/appearance-reading');
+  fixture.inventory.isLoading = true;
+  expect(view()).toContain('Reading sources');
+  expect(view()).not.toContain('Current image citation unavailable');
+});
+it('preserves denied and refused source responses in the citation presentation', () => {
+  fixture.claims.evidence.vin = { sources: [{ id: 'retained-claim', field_value: 'WITHHELD-CLAIM', source_type: 'manual_review', source_image_id: 'retained-image' }] };
+  fixture.inventory.data.images = [{ id: 'retained-image', image_url: 'https://example.test/withheld.jpg' }];
+  fixture.provenance.data = null;
+  const citations = () => renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-private" field="vin" label="VIN" value="WITHHELD-VALUE" presentation="citations" />);
+  expect(citations()).toContain('unavailable or this record is private');
+  expect(citations()).not.toContain('WITHHELD');
+  expect(citations()).not.toContain('withheld.jpg');
+  fixture.provenance.data = { coverage: { status: 'refused_input_limit' } };
+  expect(citations()).toContain('Coverage is unknown');
+  expect(citations()).not.toContain('WITHHELD');
+  expect(citations()).not.toContain('withheld.jpg');
+});
+it('retries a failed claims reader from the citation presentation', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const claimsRetry = vi.fn(), sourceRetry = vi.fn(), imageRetry = vi.fn();
+  fixture.claims.error = new Error('claim read failed'); fixture.claims.refetch = claimsRetry;
+  fixture.provenance.refetch = sourceRetry; fixture.inventory.refetch = imageRetry;
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  await act(async () => root.render(<FieldEvidencePopup vehicleId="local-vehicle" field="vin" label="VIN" value="Unknown" presentation="citations" />));
+  const retry = [...host.querySelectorAll('button')].find(button => button.textContent === 'Retry sources')!;
+  await act(async () => retry.click());
+  expect(claimsRetry).toHaveBeenCalledOnce();
+  expect(sourceRetry).not.toHaveBeenCalled(); expect(imageRetry).not.toHaveBeenCalled();
+  await act(async () => root.unmount()); host.remove();
+});
 describe('canonical value -> attributed observation', () => {
   it('makes a retained claim and its correction history reachable even without a parent-supplied group', () => {
     const row = { id: 'local-claim', vehicle_id: 'local-vehicle', field_name: 'vin', field_value: 'SOURCE-VIN',
