@@ -6,7 +6,6 @@ import './SourceSaleDistribution.css';
 
 type Comparison = ReturnType<typeof comparePriceToSourceSales>;
 export interface SourceSaleGraphProps {
-  initialView?: 'records' | 'timeline' | 'distribution';
   sales: readonly DatedSourceSale[];
   currency: string;
   label: string;
@@ -52,7 +51,7 @@ function cutoffStamp(raw: string) {
 // candidate ranking reuses the existing audited calculator, never a new market fold.
 export default function SourceSaleDistribution(props: SourceSaleGraphProps) {
   const { sales, currency, label, basis, memberRows, minimumSales, summary, comparison } = props;
-  const [view, setView] = useState<'records' | 'timeline' | 'distribution'>(props.initialView ?? 'records');
+  const [view, setView] = useState<'records' | 'timeline' | 'distribution'>('records');
   const [selected, setSelected] = useState<string | null>(null);
   const sourceRows = useMemo(() => [...sales].sort((a, b) => (a.eventAt ?? '').localeCompare(b.eventAt ?? '') || (a.sourceUrl ?? '').localeCompare(b.sourceUrl ?? '')), [sales]);
   const rows = useMemo(() => view === 'timeline' ? sourceRows : [...sourceRows].sort((a,b) => (a.amount ?? 0) - (b.amount ?? 0) || (a.sourceUrl ?? '').localeCompare(b.sourceUrl ?? '')), [sourceRows, view]);

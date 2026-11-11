@@ -1,84 +1,94 @@
-# Source-aware acquisition
+# Acquisition line items through the data machine
 
-Owner direction, November 11, 2026: the McCormick organization roster and the
-2008 Bentley profile must help a buyer act before the auction. An imported car
-is an acquisition candidate, with a state derived from its source appearance.
-The profile should persist after that appearance ends.
+Owner construction rule, November 11, 2026: every item is planned as a functional
+tool in the data machine before presentation. The UI consumes supported items;
+it does not create facts, state, an appraisal, or explanatory source summaries.
+The rejected frontend experiment is not an accepted implementation of this contract.
 
-This extends MARKET_MEASUREMENT_UI_CONTRACT.md; it does not qualify new money,
-turn an auctioneer into the vehicle owner, or authorize transactions.
+## Existing ownership and the missing connection
 
-## Source state
+The log, native appearance and public profile already have owners:
 
-Read the existing vehicle × venue × listing episode in `vehicle_events`, not
-the vehicle's most recent generic write or an earlier sale of the physical car.
-Retain the source URL/native key, lot, auction dates, date precision, source
-observation clock and auctioneer organization. A typed upcoming auction
-appearance establishes an advertised offer. It does not establish the private
-seller's identity, title, inspection findings or a bid.
+- Retained publisher captures and admitted listing envelopes reach the existing
+  `ingest-observation` path. A multi-field envelope without a property FK is not
+  evidence that its contents are absent.
+- `poll-listing-feeds/mccormick.ts`, `vehicleEventWriterFor` and sanctioned episode
+  supersession maintain `vehicle_events`, at vehicle × venue × native appearance
+  grain. An invalidated physical binding is retracted in projection metadata;
+  that is not a source auction outcome.
+- `observation_properties` defines registered properties. Missing vocabulary uses
+  `schema_proposals` and its existing curator/apply path, not an invented property
+  key in a component or a new parallel registry.
+- `vehicle_profile_read` owns the viewer-scoped `ProfileDocument` consumed by the
+  header. `get_vehicle_specs` owns the structured vehicle model and its data-table
+  bindings. Extend the appropriate existing reader after the machine relationship
+  is established; do not add a direct frontend event query as another state owner.
 
-The current profile presents the auctioneer, scheduled lot day, day-precision
-timer, venue, source check and deliberate Sources access. Known representation
-replaces the misleading orphaned-profile notice; VIN verification remains an
-acquisition question. The header uses auction state rather than undated
-activity. A date passing produces awaiting-result, never an inferred sale.
-Explicit sold, no-sale and withdrawal evidence resolve distinct states.
-Disappearance and refreshing an old page are not new outcomes.
+The missing connection is a qualified, actionable appearance reading carried
+through those owners. A new card is not that connection.
 
-## Price band
+## Item contracts
 
-The target is a dated, versioned prediction interval for the final hammer,
-conditional on a sale, alongside the separate probability/outcome of no sale.
-It must declare currency, fee basis, evidence cutoff, model and eligible
-comparison population. A no-sale high bid is not a hammer transaction.
-An observed sale-price distribution is a separate display, not the prediction.
+These are work definitions, not admitted facts or newly registered property keys.
+Each row must become an executable, tested tool through its existing owner before
+any new presentation is built.
 
-Unknown specification, mileage, service history and condition contribute
-uncertainty. Receiving consistent independent evidence may narrow the interval;
-correction, conflict or an adverse inspection may move or widen it. Counting
-filled fields or adding a fixed confidence bonus per input cannot measure this.
-Preserve each revision with its evidence so the buyer can inspect what changed.
+| Item | Entity and grain | Existing owner / required relationship | Useful tool behavior | Missing or invalid evidence |
+| --- | --- | --- | --- | --- |
+| Source appearance | One native auction appearance, separately bound to a physical vehicle | Retained capture → admitted listing → sanctioned episode writer; exact native source key and current public-parent qualification | Inspect the addressed retained source reading and its binding | Retracted, superseded, private or conflicting binding cannot advertise the old parent |
+| Auction state | Reported offer/result of that appearance, plus a separately defined temporal phase | Existing episode state owner; source-native statuses need an explicit supported interpretation | Inspect the state clause, source witness and transition history; select among appearances | No sale inferred from time passing, disappearance, a high bid or a generic database refresh |
+| Auctioneer | Auction activity’s party relationship, not physical ownership | Source/platform entity and the episode’s organization FK; verify the relationship’s role | Open that organization and the addressed sale roster | An auctioneer, agent, seller and title owner are distinct; unknown ownership stays unknown |
+| Lot / sale | Native appearance’s lot designation and sale membership | Existing native appearance and retained roster identities | Open the exact sale population while retaining this appearance | Same vehicle, repeated captures, repeated appearances and duplicate projections are distinct |
+| Schedule | Source-supported run day or date interval for this appearance | Existing source schedule capture and episode projection, preserving precision | Inspect schedule evidence; format a countdown from the returned interval and clock | No fabricated exact close; an elapsed schedule does not resolve outcome |
+| Venue | Scheduled auction venue relationship | Source venue claim bound through the existing geography owner with its role preserved | Find the scheduled sale and its lots on the map | An auction venue is not evidence of the car’s present physical location |
+| Source currentness | Source reading / knowledge clock, separately from event time | Protected capture and admission clocks; existing source refresh owner | Inspect last complete reading, failed refresh and retraction/supersession | Generic `updated_at` cannot make testimony current or select the latest auction |
+| Market comparison | Purpose-qualified source episodes in a stated cohort/window/currency/basis | Existing `valuation_by_ymm` and its source qualification, retaining earlier episodes of the same car | Inspect actual sale records and their evidence; change comparison scope | A recorded distribution is not a vehicle appraisal; unsupported units/outcomes/configuration remain excluded or explicitly unresolved |
+| Estimate band | A versioned prediction for this appearance at a knowledge cutoff | Existing estimate/prediction owner, declared target and validation; no page-local calculation | Inspect band, evidence, model, revisions and measured performance | No confidence invented from filled-field counts; no live-bid model applied to a pre-auction listing without qualification |
+| Buyer requirements / costs | Cited terms with applicability to this sale/channel/date | Retained terms admission → existing `platform_fee_schedules` / `all_in_buyer_cost` ownership | Inspect source terms, applicable fee rules, documents and the cost calculation | Undated current policy cannot qualify every historic sale; no numerical policy constants in UI |
+| Acquisition opportunity | A defined bid/ask and supported cost/value scenario for this appearance | Existing opportunity/acquisition owners, qualified price and cost inputs | Inspect the proposed bid, evidence, costs, uncertainties and decision basis | No bid is not a zero price; missing costs do not produce a good-deal label |
+| Grouped acquisition | An explicit set of native appearances and a scenario | Existing scenario/acquisition ownership after its schema/reader contract is inspected | Compare capital, fees, inspection, transport and dependencies across the set | Shared savings and correlated uncertainty need evidence; do not sum margins into an unsupported bundle-confidence score |
 
-Use the existing estimate/prediction owners. Before enabling a pre-auction
-numeric forecast, freeze knowledge before each historic appearance and compare
-with qualified final outcomes. Hold out physical vehicles and sale events to
-avoid leakage; compare with the existing baseline. Report interval coverage,
-width and error by venue, vehicle segment, evidence quality and forecast horizon,
-with support counts and unknown outcomes. Calibration on live BaT bids does not
-establish pre-auction McCormick accuracy. The existing model's heuristic interval
-is not a measured probability interval. Unsupported intervals remain unavailable.
+## Required envelope for a functional item
 
-## Finding and preparing an acquisition
+Identify its registered definition or canonical column/relationship; subject and
+appearance keys; value type and units; source witness; event interval and precision;
+capture/admission/knowledge clocks; fold owner and revision; eligibility and refusal;
+withdrawal/supersession; viewer visibility; sanctioned reader; and inspection/action.
+The datum remains distinguishable from its label, formatting and visualization.
 
-Search, the brand/model radar, retained listings, calendars and maps need to
-consume the same source episode and state. A scheduled auction venue is a
-different location role from the car's confirmed present location. Display
-that role; never manufacture a vehicle-location observation from a venue.
-An ended auction should retain its source, revisions, comparisons and result.
+The same item must serve the structured table, header, search, map, reports and
+acquisition tools. A new rendering must not reconstruct its meaning from raw
+metadata, repeat prose around it, or call a separate private fact/state reader.
+Shared controls may format supported values and expose their tools; control labels
+are not a place to encode facts or missing model behavior.
 
-The lot opens an inspection inside Nuke, preserving roster filters and position.
-Qualified recorded sales expose dates, amounts, units, fees and actual records.
-Source documents are deliberate supporting links. Buyer preparation can assemble
-the auctioneer's registration, payment, inspection and removal requirements with
-their source and effective/check dates. The current pages are not a signed buyer
-contract. Submission, signing, payment and seller contact are distinct actions.
+## State and prediction acceptance before presentation
 
-A possible deal needs an acquisition price or proposed bid, a supported value
-reference, fees and a cost/uncertainty allowance. No bid does not mean a free car.
-Multi-car acquisition scenarios must retain each lot, outcome dependency, fees,
-transport and capital constraints. Shared transport savings require actual cost
-evidence; summing independent intervals does not establish a bundle confidence.
+Prove the actual source → admission → fold → sanctioned reading, plus corrections:
 
-## Acceptance
+- The addressed upcoming lot and its source/organization/schedule have exact
+  witnesses. A later capture does not manufacture a later event.
+- Invalidated bindings, withdrawn projections, superseded episodes and private
+  parents lose eligibility in every affected consumer, including discovery.
+- Source chronology survives an older row refresh. All equally ranked appearances
+  are checked for disagreement; inspecting only a pair cannot establish consensus.
+- Native unsuccessful outcomes are interpreted through their source contract.
+  An unsuccessful auction and an ongoing post-auction offer remain distinct.
+- Earlier sales of the same physical vehicle remain separate, usable episodes;
+  excluding the current source episode does not exclude the entire physical car.
+- Missing vocabulary and absent readers are exposed as machine work. They do not
+  authorize hardcoded facts, prose placeholders or UI-only estimates.
 
-The Bentley and representative other lots show their source-backed state and
-timing in the actual profile. A buyer can inspect market records, follow a mark
-to evidence, and return to their roster. Source-only stock remains inspectable
-without a fake vehicle ID. Terminal, missing-date, duplicate, changed-source and
-failed-reader cases remain explicit. Check the same cars in search and relevant
-maps/radar; an inventory row or a green build is not discovery acceptance.
+A hammer prediction must fill the data machine’s six blanks: moment, population,
+outcome, distribution form, grading rule and baseline. Keep no-sale probability
+separate from the hammer conditional on sale, and hammer separate from buyer cost.
+Freeze knowledge, group evaluation by physical identity, prevent later-capture and
+repeat-sale leakage, and measure interval width together with realized coverage.
+New consistent evidence may narrow a band; conflict or an adverse inspection may
+move or widen it. Preserve revisions and their evidence rather than forcing
+monotonic narrowing. Calibration for live bidding does not establish pre-auction
+or different-venue performance.
 
-Open outcomes remain: a calibrated pre-auction band and revision reader,
-cross-surface episode/location-role propagation, radar/deal qualification,
-multi-lot planning, effective source-terms admission and completed-result
-reconciliation. The UI source-state repair alone does not complete them.
+Only after the item contract and functional tool pass these cases should the
+shared UI render them. This contract does not claim those missing connections,
+forecast bands, discovery relationships or grouped acquisition tools are delivered.

@@ -98,11 +98,7 @@ async function openRecording() {
   expect(requests.find(r => r.path.endsWith('/rpc/vehicle_identity_artwork'))?.body).toEqual({ p_vehicle_id: vehicleId });
   // The activity clock's own read of the contribution days (photos, work, paper), once per mount.
   expect(requests.find(r => r.path.endsWith('/rpc/get_vehicle_contribution_days'))?.body).toEqual({ p_vehicle_id: vehicleId });
-  // The shared source-state reader is distinct from price provenance. It may
-  // read only this subject's episodes; it must not create a listing or a bid.
-  const stateRead = requests.find(r => r.path.endsWith('/vehicle_events') && r.query.select === '*');
-  expect(stateRead).toMatchObject({ method: 'GET', query: { vehicle_id: `eq.${vehicleId}` } });
-  expect(requests).toHaveLength(7);
+  expect(requests).toHaveLength(6);
   return document.querySelector('iframe')?.getAttribute('src') ?? null;
 }
 const embed = (video: string, start: number) => `https://www.youtube.com/embed/${video}?autoplay=1&rel=0&start=${start}&end=${start + 50}`;

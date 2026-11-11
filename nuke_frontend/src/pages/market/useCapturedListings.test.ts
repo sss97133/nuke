@@ -4,14 +4,6 @@ const fixture = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from } }));
 import { readCapturedListings, sourceLink } from './useCapturedListings';
 
-it('recognizes exact McCormick lot URLs without allowing lookalike hosts or unrelated pages', () => {
-  expect(sourceLink('mccormicks', 'https://www.classic-carauction.com/auction-cars?auctionid=15411')).toContain('auctionid=15411');
-  for (const url of ['https://classic-carauction.com.evil.test/auction-cars?auctionid=15411',
-    'https://www.classic-carauction.com/Home', 'https://www.classic-carauction.com/auction-cars?auctionid=15411&redirect=bad']) {
-    expect(sourceLink('mccormicks', url)).toBeNull();
-  }
-});
-
 const vehicleId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 function row(id: string, vehicle_id: string | null = null, source_url = 'https://www.craigslist.org/view/d/fixture-listing/SyntheticShareToken0000') {
   return { id, vehicle_id, source_url, source_platform: 'craigslist', source_listing_id: '7000000000', current_price: 0,
