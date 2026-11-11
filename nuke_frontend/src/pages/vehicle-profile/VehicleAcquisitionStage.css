@@ -1,0 +1,11 @@
+.vehicle-acquisition-stage { margin: 12px; padding: 16px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 15px; }
+.vehicle-acquisition-stage__heading, .vehicle-acquisition-stage__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.vehicle-acquisition-stage h2 { margin: 4px 0; font-size: 18px; }
+.vehicle-acquisition-stage__timer { margin-inline-start: auto; font-size: 18px; font-variant-numeric: tabular-nums; }
+.vehicle-acquisition-stage p { margin: 10px 0; }
+.vehicle-acquisition-stage__note { color: var(--text-secondary); font-size: 12px; }
+.vehicle-acquisition-stage a, .buyer-market-evidence a { color: var(--accent); }
+.vehicle-acquisition-stage button, .buyer-market-evidence button { min-height: 44px; padding: 8px 12px; font: inherit; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); }
+.vehicle-acquisition-stage summary { cursor: pointer; padding-block: 12px; }
+.buyer-market-evidence { margin-block: 16px; max-width: 100%; min-width: 0; overflow-wrap: anywhere; font-size: 15px; }
+.buyer-market-evidence .source-sales-chart { width: 100%; }

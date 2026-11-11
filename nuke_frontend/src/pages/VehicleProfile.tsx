@@ -29,6 +29,7 @@ const VehiclePerformance = React.lazy(() => import('./stacks/VehicleCohort').the
 const VehiclePhotoLightbox = React.lazy(() => import('./vehicle-profile/VehiclePhotoLightbox'));
 const VehicleEvidenceView = React.lazy(() => import('./vehicle-profile/VehicleEvidenceView'));
 const VehicleSourceProfile = React.lazy(() => import('./vehicle-profile/VehicleSourceProfile'));
+const VehicleAcquisitionStage = React.lazy(() => import('./vehicle-profile/VehicleAcquisitionStage'));
 
 
 const VehicleProfileInner: React.FC = () => {
@@ -206,6 +207,10 @@ const VehicleProfileInner: React.FC = () => {
         <ProfileHeader key={vehicleId} priceLotId={selectedEpisode.data?.lots.find(lot =>
           priceFacts?.source_url && lot.source_url.replace(/\/+$/, '') === priceFacts.source_url.replace(/\/+$/, '')
         )?.id} />
+
+        <React.Suspense fallback={null}>
+          <VehicleAcquisitionStage key={vehicle.id} vehicleId={vehicle.id} year={vehicle.year ?? null} make={vehicle.make ?? ''} model={vehicle.model ?? ''} />
+        </React.Suspense>
 
         {/* Banners: BaT data flag, live auction, external auction, orphaned vehicle, merge proposals */}
         <React.Suspense fallback={null}>

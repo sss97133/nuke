@@ -43,7 +43,7 @@ type Stats = {
   possible_outlier?: boolean;
 };
 
-type ValuationResult = {
+export type ValuationResult = {
   query: { year: number | null; make: string; model: string | null };
   stats: Stats;
   comparables: Comparable[];

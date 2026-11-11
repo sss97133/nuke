@@ -3,6 +3,7 @@ import { isAuctionPresentation } from './buildAuctionPulse';
 import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import { useVehicleProfile } from './VehicleProfileContext';
 import OrphanedVehicleBanner from '../../components/vehicle/OrphanedVehicleBanner';
+import { useAuctionAcquisition } from './useAuctionAcquisition';
 
 const SellerStackButton = React.lazy(() => import('./SellerStackButton'));
 const LiveAuctionBanner = React.lazy(() => import('../../components/auction/LiveAuctionBanner'));
@@ -19,6 +20,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
   externalAuctionInHeader = false,
 }) => {
   const { vehicle, session, permissions, auctionPulse, auctionCurrency, isVerifiedOwner } = useVehicleProfile();
+  const acquisition = useAuctionAcquisition(vehicle?.id).current;
   const activeExternal = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const { data: commentStats } = useAuctionCommentStats(activeExternal ? vehicle?.id : undefined, auctionPulse?.listing_url);
   if (!vehicle) return null;
@@ -86,11 +88,11 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
       )}
 
       {/* Orphaned Vehicle Banner - Visible to all users */}
-      <OrphanedVehicleBanner
+      {!acquisition?.event.source_organization_id && <OrphanedVehicleBanner
         vehicle={vehicle}
         session={session}
         permissions={permissions}
-      />
+      />}
 
       {/* Merge Proposals Panel - Only visible to verified owners */}
       {isVerifiedOwner && (

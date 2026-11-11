@@ -7,6 +7,7 @@ import OrganizationSourceInventory, { currentSourceRows, type SourceInventory } 
 const mock = vi.hoisted(() => ({ query: {} as any }));
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => mock.query }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
+vi.mock('../market/BuyerMarketEvidence', () => ({ default: ({ make, model }: any) => <p>Buyer evidence for {make} {model}</p> }));
 vi.mock('../PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a href={to}>{children}</a> }));
 const data: SourceInventory = { source: 'mccormicks', checked_at: new Date().toISOString(), refresh_failed: false, stale: false,
   sales: [{ sale_key: 'mccormicks-91', name: 'Synthetic auction', starts_on: '2099-11-20', ends_on: '2099-11-22', location: 'Synthetic venue', source_url: 'https://www.classic-carauction.com/Auction-91', lots_listed: 1 },
@@ -55,9 +56,21 @@ describe('publisher schedule and inventory', () => {
     expect(container.textContent).toContain('Catalog not published');
     expect(container.querySelector('a[href="/vehicle/public-car"]')).toBeTruthy();
     expect(container.querySelector('a[href="/vehicle/null"]')).toBeNull();
-    expect([...container.querySelectorAll('a')].filter(a=>a.textContent==='McCormick’s listing')).toHaveLength(2);
+    expect([...container.querySelectorAll('a')].filter(a=>a.textContent==='McCormick’s listing ↗')).toHaveLength(2);
     act(()=>{ const select=container.querySelector('select')!; select.value='showroom'; select.dispatchEvent(new Event('change',{bubbles:true})); });
     expect(container.querySelector('a[href="/vehicle/public-car"]')).toBeNull();
+  });
+  it('selects an auction inside Nuke and opens lot evidence beneath its row', async () => {
+    mock.query={data};renderPage();
+    const sale = [...container.querySelectorAll('button')].find(b => b.textContent === 'Synthetic auction')!;
+    act(() => sale.click());
+    expect(container.querySelector('select')?.value).toBe('mccormicks-91');
+    const identity = container.querySelector<HTMLButtonElement>('tbody button[aria-expanded]')!;
+    await act(async () => identity.click());
+    expect(identity.getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('Buyer evidence for FORD MUSTANG');
+    expect(container.querySelector('a[href="/vehicle/public-car"]')).toBeTruthy();
+    expect(container.querySelector('tbody details a')?.getAttribute('target')).toBe('_blank');
   });
   it('keeps retained inventory visible with a delayed refresh warning', () => {
     mock.query={ data:{...data,stale:true,refresh_failed:true},isError:true };

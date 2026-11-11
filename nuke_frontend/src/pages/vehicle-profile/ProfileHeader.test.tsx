@@ -3,8 +3,9 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import type { ProfileRead } from './profileDocument';
+vi.mock('./useAuctionAcquisition', () => ({ useAuctionAcquisition: () => ({ current: fixture.acquisition }) }));
 const fixture = vi.hoisted(() => ({ vehicle: {} as Record<string, unknown>, pulse: null as Record<string, unknown> | null, read: null as ProfileRead | null,
-  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn(), gallery: vi.fn() }));
+  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn(), gallery: vi.fn(), acquisition: null as any }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
   let vehicleId: string;
   const query: any = { select: () => query, eq: (_key: string, id: string) => { vehicleId = id; return query; },
@@ -62,6 +63,7 @@ beforeEach(() => {
   root = createRoot(host);
   fixture.vehicle = { id: 'v-1', year: 1966, make: 'Ford', model: 'Mustang', listing_kind: 'vehicle' };
   fixture.pulse = null;
+  fixture.acquisition = null;
   fixture.gallery.mockReset();
   fixture.read = mustangRead();
   fixture.auctionRows = []; fixture.eventRows = [];
@@ -70,6 +72,16 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 const render = () => act(async () => root.render(<ProfileHeader priceLotId="lot-1" />));
 const renderLoaded = render;
+
+it('uses source-backed auction state in the activity and estimate positions before bidding', async () => {
+  fixture.acquisition = { event: { id: 'upcoming-lot' }, state: { house: 'McCormick’s', timer: 'in 9 days', stage: 'Upcoming auction · offered for sale' } };
+  await renderLoaded();
+  expect(host.textContent).toContain('McCormick’s · in 9 days');
+  expect(host.textContent).toContain('Hammer estimate');
+  expect(host.textContent).toContain('Not yet established');
+  expect(host.textContent).not.toContain('Activity undated');
+  expect(host.querySelector('a[href="#acquisition-upcoming-lot"]')).toBeTruthy();
+});
 const openPrice = () => act(() => (host.querySelector('.k-masthead__result button.k-claim__value') as HTMLButtonElement).click());
 function priceSource(vehicleId: string, url: string | null) {
   fixture.vehicle = { id: vehicleId, year: 1966, make: 'Ford', model: 'Mustang', listing_kind: 'vehicle' };

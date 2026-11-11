@@ -193,7 +193,9 @@ it('shows authorized work-order charges and recorded payments separately from bo
     parts_count: 1, labor_count: 0, payment_count: 1, invoice_total: 100, payments_total: 40, balance_due: 60 }];
   fixture.tables.work_orders = [{ id: 'wo', currency: 'USD' }];
   open = true; await render();
-  expect(host.textContent).toContain('Synthetic job');
+  // The work-order department is lazy; a fixed number of event-loop ticks does
+  // not establish that its module and dependent reads have finished.
+  await vi.waitFor(() => expect(host.textContent).toContain('Synthetic job'));
   expect(host.textContent).toContain('Parts and labor charges$100.00');
   expect(host.textContent).toContain('Completed payments$40.00');
   expect(host.querySelector('.vp-financial-measures strong')?.textContent).toBe('$40.00');

@@ -12,3 +12,6 @@
 .organization-source-inventory table { width: 100%; border-collapse: collapse; }
 .organization-source-inventory th, .organization-source-inventory td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border); }
 .organization-source-inventory th { font-size: 12px; color: var(--text-secondary); }
+.organization-source-inventory button, .organization-source-inventory input, .organization-source-inventory select { min-height: 44px; }
+.organization-source-inventory summary { cursor: pointer; padding-block: 12px; }
+.organization-source-inventory .buyer-market-evidence { white-space: normal; min-width: 260px; font-size: 15px; }

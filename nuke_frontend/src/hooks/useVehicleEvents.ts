@@ -15,5 +15,6 @@ export function useVehicleEvents(vehicleId: string | undefined) {
     },
     enabled: !!vehicleId,
     staleTime: 2 * 60 * 1000,
+    refetchInterval: 60_000,
   });
 }

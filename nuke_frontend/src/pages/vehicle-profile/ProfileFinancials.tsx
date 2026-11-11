@@ -49,9 +49,10 @@ function FinancialDetails({ vehicleId, market, onClose }: { vehicleId: string; m
   </div>;
 }
 
-export default function ProfileFinancials({ vehicleId, market, reducedMarket, open, onToggle, onClose, boundaryRef }: {
+export default function ProfileFinancials({ vehicleId, market, reducedMarket, open, onToggle, onClose, boundaryRef, triggerLabel }: {
   vehicleId: string; market: React.ReactNode; open: boolean; onToggle: () => void; onClose: () => void;
   reducedMarket?: React.ReactNode;
+  triggerLabel?: string;
   boundaryRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const { user } = useAuthContext();
@@ -70,7 +71,7 @@ export default function ProfileFinancials({ vehicleId, market, reducedMarket, op
     <div className="vp-header-money">
       {/* Only the canonical price owner supplies header money. Costs and receipt counts are not prices. */}
       {reduced ? reducedMarket : market}
-      <button ref={trigger} type="button" className="vp-financial-trigger" aria-label="Explore vehicle financials" aria-haspopup="dialog" aria-expanded={open} onClick={onToggle}>$$$</button>
+      <button ref={trigger} type="button" className="vp-financial-trigger" aria-label="Explore vehicle financials" aria-haspopup="dialog" aria-expanded={open} onClick={onToggle}>{triggerLabel ?? '$$$'}</button>
     </div>
     {open && <HeaderPopover open title="Financials" width={640} align="right" onClose={() => { onClose(); trigger.current?.focus(); }} dismissBoundaryRef={boundaryRef}>
       {market && <div className="vp-financial-preference"><button type="button" className="vp-financial-action" onClick={() => {

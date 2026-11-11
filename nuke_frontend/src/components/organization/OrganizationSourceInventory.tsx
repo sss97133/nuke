@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { PrefetchLink } from '../PrefetchLink';
@@ -6,6 +6,7 @@ import { VehicleIdentity } from '../common/MakeIdentity';
 import { Text } from '../../kit';
 import { houseLink, updatedAgo } from '../../pages/market/useAuctionCalendar';
 import './OrganizationSourceInventory.css';
+const BuyerMarketEvidence = lazy(() => import('../market/BuyerMarketEvidence'));
 
 type Sale = { sale_key: string; name: string; starts_on: string; ends_on: string; location: string; source_url: string; lots_listed: number | null };
 type Row = { native_id: string; source_url: string; inventory_kind: 'auction' | 'showroom'; sale_key: string | null;
@@ -22,6 +23,7 @@ export function currentSourceRows(data: SourceInventory, filter: string, search:
 }
 export default function OrganizationSourceInventory({ organizationId, fallback = null, initialFilter = 'all', children }: { organizationId: string; fallback?: ReactNode; initialFilter?: 'all' | 'auction'; children?: ReactNode }) {
   const [filter, setFilter] = useState<string>(initialFilter), [search, setSearch] = useState(''), [limit, setLimit] = useState(50);
+  const [inspected, setInspected] = useState<string | null>(null);
   const query = useQuery({ queryKey: ['organization-source-inventory', organizationId], queryFn: async () => {
     const { data, error } = await supabase.rpc('organization_source_inventory_read', { p_organization_id: organizationId });
     if (error) throw error;
@@ -51,11 +53,12 @@ export default function OrganizationSourceInventory({ organizationId, fallback =
     <ul className="organization-source-inventory__sales">{data.sales.map(sale => {
       const url = houseLink(data.source, sale.source_url);
       return <li key={sale.sale_key}>
-        <Text as="h3" role="entity">{url ? <a href={url} target="_blank" rel="noopener noreferrer">{sale.name}</a> : sale.name}</Text>
+        <Text as="h3" role="entity">{sale.lots_listed !== null ? <button type="button" onClick={() => { setFilter(sale.sale_key); setLimit(50); }}>{sale.name}</button> : sale.name}</Text>
         <p>{date(sale.starts_on)} – {date(sale.ends_on)}</p>
         <Text as="p" role="caption">{sale.location}</Text>
         {sale.lots_listed === null ? <p>Catalog not published</p> : <button type="button" onClick={() => { setFilter(sale.sale_key); setLimit(50); }}>
           View {sale.lots_listed.toLocaleString()} entered cars</button>}
+        {url && <details><summary>Sources</summary><a href={url} target="_blank" rel="noopener noreferrer">Published sale schedule ↗</a></details>}
       </li>;
     })}</ul>
     <Text as="h2" role="entity">Current inventory</Text>
@@ -69,16 +72,20 @@ export default function OrganizationSourceInventory({ organizationId, fallback =
     </div>
     <Text as="p" role="caption">Auction entries are scheduled consignments. Showroom stock is advertised as available by McCormick’s. Availability can change.</Text>
     <div className="organization-source-inventory__scroll"><table>
-      <thead><tr><th scope="col">Lot / stock</th><th scope="col">Vehicle</th><th scope="col">Sale / availability</th><th scope="col">Source</th></tr></thead>
+      <thead><tr><th scope="col">Lot / stock</th><th scope="col">Vehicle</th><th scope="col">Sale / availability</th><th scope="col">Sources</th></tr></thead>
       <tbody>{rows.slice(0, limit).map(row => {
         const source = houseLink(data.source, row.source_url);
         const identity = <VehicleIdentity year={row.year} make={row.make} model={row.model} compact scale="text" />;
-        return <tr key={`${row.inventory_kind}:${row.native_id}`}>
+        const key = `${row.inventory_kind}:${row.native_id}`;
+        return <Fragment key={key}><tr>
           <td>{row.lot_number}</td>
-          <td>{row.vehicle_id ? <PrefetchLink to={`/vehicle/${row.vehicle_id}`}>{identity}</PrefetchLink> : identity}</td>
+          <td><button type="button" aria-expanded={inspected === key} aria-controls={`inspect-${key}`} onClick={() => setInspected(value => value === key ? null : key)}>{identity}</button>
+            {row.vehicle_id && <div><PrefetchLink to={`/vehicle/${row.vehicle_id}`}>Vehicle profile →</PrefetchLink></div>}</td>
           <td>{row.inventory_kind === 'showroom' ? 'Showroom · advertised available' : row.run_on ? date(row.run_on) : 'Auction entry · run day unconfirmed'}</td>
-          <td>{source && <a href={source} target="_blank" rel="noopener noreferrer">McCormick’s listing</a>}</td>
-        </tr>;
+          <td>{source && <details><summary>Sources</summary><a href={source} target="_blank" rel="noopener noreferrer">McCormick’s listing ↗</a></details>}</td>
+        </tr>{inspected === key && <tr><td colSpan={4}><div id={`inspect-${key}`}>
+          <Suspense fallback={<p role="status">Opening market evidence…</p>}><BuyerMarketEvidence key={key} year={row.year} make={row.make} model={row.model} vehicleId={row.vehicle_id} /></Suspense>
+        </div></td></tr>}</Fragment>;
       })}</tbody>
     </table></div>
     {!rows.length && <p>No advertised cars match this view.</p>}
