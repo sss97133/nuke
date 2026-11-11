@@ -164,7 +164,7 @@ definition of done: no piece of the build is finished until its gate exists.
 | Gate | Where | What it refuses | State |
 |---|---|---|---|
 | The pull request | `scripts/guardrails/no-new-photo-reader.mjs` and its test, run by `pre-deploy-check.yml` | a new table keyed by a photo, or a new edge function or script whose name says it reads photos, unless `photo-stores.allow.json` lists it with the owner's approval; and the removal of this direction, the keys and folds section or the "Reading photos" rule | built 2026-11-10; it reads names, CREATE TABLE text and headings, nothing deeper |
-| The writer | `ingest-observation` | a photo reading that carries no registered key and no part: counted first, refused once the readers key what they write | not built |
+| The writer | `ingest-observation` | a photo reading that carries no registered key and no part: counted first, refused once the readers key what they write | not built for photo readings. For `visual_work_v1` records a database trigger (`guard_visual_work_keys_insert`, 2026-11-11) refuses an unregistered system key and a cost line with no registered part key, unless the record declares the key as a draft |
 | The scoreboard | one database reader over keyed, witnessed observations (the stage ledger's coverage reader is the thing to extend) | a progress number that is not computed from it | not built |
 | The database | an event trigger in the manner of `view_write_guard` (20261014214500) | a photo-keyed table created without an approved `schema_proposals` row, a hand-applied one included | not built |
 
