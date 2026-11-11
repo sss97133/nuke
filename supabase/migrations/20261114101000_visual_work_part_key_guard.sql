@@ -31,7 +31,8 @@ CREATE FUNCTION public.visual_work_unplaced_part_keys(p_doc jsonb)
 RETURNS text[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path=''
 AS $fn$
  WITH lines AS (
-  SELECT CASE WHEN jsonb_typeof(l.line->'part_key')='string' THEN nullif(btrim(l.line->>'part_key'),'') END AS k
+  -- The value is judged exactly as it will be stored: a padded key is not the registry's key.
+  SELECT CASE WHEN jsonb_typeof(l.line->'part_key')='string' AND btrim(l.line->>'part_key')<>'' THEN l.line->>'part_key' END AS k
   FROM (VALUES (p_doc->'materials'),(p_doc->'operations')) a(arr)
   CROSS JOIN LATERAL jsonb_array_elements(
     CASE WHEN jsonb_typeof(a.arr)='array' THEN a.arr ELSE '[]'::jsonb END) l(line)),

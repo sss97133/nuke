@@ -38,6 +38,9 @@ DO $$ DECLARE r text; BEGIN
  r:=pg_temp.try('visual_work_v1','{"materials":[{"system_key":"engine","part_key":"undercarriage.brake.rotor"},{"system_key":"engine","part_key":"retired.thing"},
    {"system_key":"engine","part_key":" "},{"system_key":"engine","part_key":7},{"system_key":"engine","part_key":null}]}');
  ASSERT r LIKE 'unregistered_part_key: retired.thing, undercarriage.brake.rotor, (no part_key on 3 cost lines).%',r;
+ -- A padded registry key is not the registry's key: it is stored as written, so it is refused as written.
+ ASSERT pg_temp.try('visual_work_v1','{"materials":[{"system_key":"engine","part_key":" engine.block "}]}') LIKE 'unregistered_part_key:  engine.block .%';
+ ASSERT pg_temp.try('visual_work_v1','{"materials":[{"system_key":"engine","part_key":"not_a_part "}]}') LIKE 'unregistered_part_key: not_a_part .%';
  -- A declared draft is admitted: nearest existing subject key, or none, and a reason.
  ASSERT pg_temp.try('visual_work_v1','{"materials":[{"system_key":"engine","part_key":"undercarriage.brake.rotor"},{"system_key":"engine","part_key":"engine.carburetor"}],"key_proposals":[
    {"kind":"part","key":"undercarriage.brake.rotor","nearest_existing":"undercarriage.brake.line","reason":"the disc itself"},
