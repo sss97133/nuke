@@ -133,7 +133,7 @@ discovery/maps/radar; buyer requirements/costs; and multi-car acquisition scenar
 Do not label a broad market distribution or an uncalibrated/live-bid model as a
 qualified preauction forecast. No estimate-accuracy gain has been established.
 
-The full owner exchanges, requirement-to-evidence receipt, anonymous probe and
+Relevant original owner corrections, requirement-to-evidence receipt, anonymous probe and
 known rejected approach are retained privately under
 `~/nuke-logs/auction-header-machine-20261111/`, with the previous lane linked from
 its `PICKUP.json`. Another checkout can discover the contract, executable tests,
