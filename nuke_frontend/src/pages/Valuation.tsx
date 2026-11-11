@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { comparePriceToSourceSales, compareSaleEvidenceEvaluations, type SourceSaleEvidence as SaleEvidence, type SaleComparisonOptions } from '../lib/dealRead/batComps';
+import { comparePriceToSourceSales, compareSaleEvidenceEvaluations, type SourceSaleEvidence as SaleEvidence } from '../lib/dealRead/batComps';
+import { canonicalBatSource, saleReceiptSubject } from '../lib/dealRead/saleReceiptSubject';
 import { PrefetchLink } from '../components/PrefetchLink';
 import '../styles/unified-design-system.css';
 import SourceSaleDistribution from '../components/market/SourceSaleDistribution';
@@ -87,25 +88,7 @@ const utcClock = (value: string | null | undefined) => value
   ? new Date(value).toISOString().replace('T', ' ').replace('Z', ' UTC') : 'Unknown';
 const opaqueId = (value: string | null | undefined) => value && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value) ? value : null;
 const parserReference = (value: string | null | undefined) => value && /^batParser:[a-z0-9_.:-]{1,100}$/i.test(value) ? value : 'Unknown';
-function canonicalBatSource(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value), slug = /^\/listing\/([a-z0-9-]+)\/?$/i.exec(url.pathname)?.[1];
-    return ['http:', 'https:'].includes(url.protocol) && /^(www\.)?bringatrailer\.com$/i.test(url.hostname)
-      && !url.username && !url.password && !url.port && slug ? `https://bringatrailer.com/listing/${slug.toLowerCase()}/` : null;
-  } catch { return null; }
-}
-
-function receiptSubject(lookup: ValuationLookup): Pick<SaleComparisonOptions['subject'], 'vehicleId' | 'sourceUrl' | 'exclusionBasis'> {
-  const requested = lookup.request.p_subject_vehicle_id, receipt = lookup.result.receipt;
-  if (!requested || receipt.sale_population_basis !== 'source_qualified_episodes_of_current_public_members') return { vehicleId: requested };
-  const subject = receipt.subject, source = canonicalBatSource(subject?.source_url ?? null);
-  if (opaqueId(requested) && subject?.vehicle_id === requested && subject.exclusion_basis === 'exact_source_episode'
-    && source === subject.source_url && subject.source_key === source?.replace('https://', '').replace(/\/$/, '')) {
-    return { vehicleId: requested, sourceUrl: source, exclusionBasis: 'exact_source_episode' };
-  }
-  return { vehicleId: requested, exclusionBasis: 'unestablished' };
-}
+const receiptSubject = (lookup: ValuationLookup) => saleReceiptSubject(lookup.request.p_subject_vehicle_id, lookup.result.receipt);
 
 // Design system tokens (strict — 8 to 12px only)
 const FS = {

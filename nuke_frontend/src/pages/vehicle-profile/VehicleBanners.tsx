@@ -20,7 +20,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
   externalAuctionInHeader = false,
 }) => {
   const { vehicle, session, permissions, auctionPulse, auctionCurrency, isVerifiedOwner } = useVehicleProfile();
-  const acquisition = useAuctionAcquisition(vehicle?.id).current;
+  const represented = useAuctionAcquisition(vehicle?.id).episodes.some(({ event }) => !!event.source_organization_id);
   const activeExternal = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const { data: commentStats } = useAuctionCommentStats(activeExternal ? vehicle?.id : undefined, auctionPulse?.listing_url);
   if (!vehicle) return null;
@@ -88,7 +88,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
       )}
 
       {/* Orphaned Vehicle Banner - Visible to all users */}
-      {!acquisition?.event.source_organization_id && <OrphanedVehicleBanner
+      {!represented && <OrphanedVehicleBanner
         vehicle={vehicle}
         session={session}
         permissions={permissions}

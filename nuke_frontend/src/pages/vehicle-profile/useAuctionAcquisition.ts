@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useVehicleEvents } from '../../hooks/useVehicleEvents';
-import { auctionAcquisitionState } from './auctionAcquisitionState';
+import { auctionAcquisitionState, selectAcquisitionEpisode } from './auctionAcquisitionState';
 
 export function useAuctionAcquisition(vehicleId: string | undefined) {
   const query = useVehicleEvents(vehicleId);
@@ -16,6 +16,6 @@ export function useAuctionAcquisition(vehicleId: string | undefined) {
     return state ? [{ event, state }] : [];
   });
   // A later/current offer takes priority over a historical appearance of the same car.
-  const current = episodes.find(({ state }) => state.timer != null) ?? episodes[0];
-  return { ...query, episodes, current, now };
+  const current = selectAcquisitionEpisode(episodes);
+  return { ...query, episodes, current, now, ambiguous: episodes.length > 1 && current == null };
 }

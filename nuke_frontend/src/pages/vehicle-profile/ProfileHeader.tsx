@@ -157,7 +157,10 @@ export function extractInlineLotProvenance(vehicle: Record<string, any> | null |
 export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const { vehicle, auctionPulse, auctionCurrency, setGalleryFilter, timelineEvents, timelineReadState } = useVehicleProfile();
   const contributionDays = useContributionDays(vehicle?.id);
-  const acquisition = useAuctionAcquisition(vehicle?.id).current;
+  const acquisitionRead = useAuctionAcquisition(vehicle?.id);
+  const acquisition = acquisitionRead.current;
+  const acquisitionTarget = acquisition?.event.id ?? acquisitionRead.episodes?.[0]?.event.id;
+  const acquisitionUnresolved = acquisitionRead.ambiguous || acquisition && !acquisition.state.resolved;
   const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
   const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
@@ -349,10 +352,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     })}
   </div>;
 
-  const market = (reduced = false) => acquisition && !acquisition.state.resolved && !priceOwnedByLiveStack ? <div>
+  const market = (reduced = false) => acquisitionUnresolved && !priceOwnedByLiveStack ? <div>
       <Text role="label">Hammer estimate</Text>
-      {!reduced && <Text role="body" as="div">Not yet established</Text>}
-      <a href={`#acquisition-${acquisition.event.id}`}>Assess acquisition →</a>
+      {!reduced && <Text role="body" as="div">{acquisitionRead.ambiguous ? 'Select an auction appearance' : 'Not yet established'}</Text>}
+      <a href={`#acquisition-${acquisitionTarget}`}>Assess acquisition →</a>
     </div> : priceOwnedByLiveStack && auctionPulse ? <React.Suspense fallback={null}><ExternalAuctionSummary
         currentBid={auctionPulse.current_bid} currencyCode={auctionCurrency} endDate={auctionPulse.end_date} listingStatus={auctionPulse.listing_status}
         sourceObservedAt={auctionPulse.source_observed_at}
@@ -373,12 +376,12 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       <Masthead result={<div className="vp-header-departments">
         {acquisition ? <a className="vp-profile-activity" href={`#acquisition-${acquisition.event.id}`} aria-label={`Auction state: ${acquisition.state.stage}`}>
           {acquisition.state.house} · {acquisition.state.timer ?? acquisition.state.stage}
-        </a> : <ProfileActivity vehicleId={vehicle.id} events={timelineEvents ?? []} pulse={auctionPulse} days={contributionDays} readState={timelineReadState}
+        </a> : acquisitionRead.ambiguous ? <a className="vp-profile-activity" href={`#acquisition-${acquisitionTarget}`}>Multiple auction appearances</a> : <ProfileActivity vehicleId={vehicle.id} events={timelineEvents ?? []} pulse={auctionPulse} days={contributionDays} readState={timelineReadState}
           open={activityOpen} onToggle={() => { setFinancialOpen(false); setLiveOpen(false); setActiveFacet(null); setActivityOpen(current => !current); }}
           onClose={() => setActivityOpen(false)} boundaryRef={sticky} />}
         <ProfileFinancials vehicleId={vehicle.id} market={market()} reducedMarket={market(true)} open={financialOpen}
           onToggle={() => { setActivityOpen(false); setLiveOpen(false); setActiveFacet(null); setFinancialOpen(current => !current); }}
-          onClose={() => setFinancialOpen(false)} boundaryRef={sticky} triggerLabel={acquisition && !acquisition.state.resolved ? 'Estimate details' : undefined} />
+          onClose={() => setFinancialOpen(false)} boundaryRef={sticky} triggerLabel={acquisitionUnresolved ? 'Estimate details' : undefined} />
       </div>}>
         <Text role="entity" as="h1" aria-label={title}>
           {asArtwork

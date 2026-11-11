@@ -5,6 +5,22 @@ export interface AcquisitionEpisode {
   source_organization_id?: string | null; duplicate_of_event_id?: string | null;
   metadata?: Record<string, unknown> | null;
 }
+
+export type AcquisitionReading = { event: AcquisitionEpisode; state: NonNullable<ReturnType<typeof auctionAcquisitionState>> };
+/** Source schedule order, never generic updated_at. A refreshed older sale must
+ * not replace a later appearance whose outcome is still unknown. */
+export function selectAcquisitionEpisode(episodes: AcquisitionReading[]): AcquisitionReading | undefined {
+  const rank = ({ state }: AcquisitionReading) => state.timer?.startsWith('running') ? 0 : state.timer ? 1
+    : state.scheduled || state.runOn.length ? 2 : 3;
+  const on = (reading: AcquisitionReading) => rank(reading) === 1
+    ? reading.state.runOn[0] ?? reading.state.scheduled?.startsOn ?? ''
+    : reading.state.runOn[reading.state.runOn.length - 1] ?? reading.state.scheduled?.endsOn ?? '';
+  const sorted = [...episodes].sort((a, b) => rank(a) - rank(b)
+    || (rank(a) === 1 ? on(a).localeCompare(on(b)) : on(b).localeCompare(on(a))) || a.event.id.localeCompare(b.event.id));
+  const [first, second] = sorted;
+  if (second && rank(first) === rank(second) && (rank(first) === 3 || on(first) === on(second) && first.state.stage !== second.state.stage)) return undefined;
+  return first;
+}
 const day = (value: unknown): string | null => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const time = Date.parse(`${value}T12:00:00Z`);
@@ -17,6 +33,10 @@ export function auctionAcquisitionState(event: AcquisitionEpisode, now = Date.no
   const sourceUrl = houseLink(event.source_platform, event.source_url);
   if (event.duplicate_of_event_id || event.event_type !== 'auction' || !sourceUrl) return null;
   const meta = event.metadata ?? {};
+  // The live importer withdraws an invalid physical-vehicle binding through
+  // metadata, without changing the source auction's outcome. It cannot keep
+  // advertising that old parent as a current acquisition candidate.
+  if (event.source_platform === 'mccormicks' && meta.projection_method === 'mccormick_live_v1' && meta.withdrawn_at) return null;
   const startsOn = day(meta.sale_starts_on), endsOn = day(meta.sale_ends_on);
   const scheduled = startsOn && endsOn && startsOn <= endsOn ? { startsOn, endsOn } : null;
   // Don't turn every historical auction into a current acquisition candidate.

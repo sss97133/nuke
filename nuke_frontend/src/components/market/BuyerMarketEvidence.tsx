@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { PrefetchLink } from '../PrefetchLink';
 import { comparePriceToSourceSales } from '../../lib/dealRead/batComps';
+import { saleReceiptSubject } from '../../lib/dealRead/saleReceiptSubject';
 import type { ValuationResult } from '../../pages/Valuation';
 import SourceSaleDistribution from './SourceSaleDistribution';
 import { retryColdTimeout } from '../../pages/market/useRecordedSales';
@@ -34,7 +35,7 @@ export default function BuyerMarketEvidence({ year, make, model, vehicleId }: {
     }, staleTime: 5 * 60_000, retry: retryColdTimeout, refetchOnWindowFocus: false });
   const receipt = query.data?.receipt;
   const qualified = receipt ? comparePriceToSourceSales(receipt.eligible, {
-    cohort: receipt.cohort, subject: { amount: null, currency: 'USD', priceBasis: 'published_bid_excluding_fees', vehicleId },
+    cohort: receipt.cohort, subject: { amount: null, currency: 'USD', priceBasis: 'published_bid_excluding_fees', ...saleReceiptSubject(vehicleId ?? null, receipt) },
     eventFrom: receipt.event_from, eventBefore: receipt.event_before, evidenceAsOf: receipt.evidence_as_of,
     computedAt: receipt.computed_at, knowledgeMode: receipt.knowledge_mode, minimumSales: receipt.minimum_sales,
   }) : null;

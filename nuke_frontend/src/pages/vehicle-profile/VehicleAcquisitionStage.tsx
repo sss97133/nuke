@@ -43,8 +43,8 @@ function SourceStage({ event, vehicleId, year, make, model, now }: {
     </Suspense>}</div>
     {event.source_platform === 'mccormicks' && <details><summary>Prepare to bid at McCormick’s</summary>
       <p>Publisher information checked November 11, 2026; confirm current terms for this sale before registering.</p>
-      <ul><li>Bidder registration is required. The registration page lists a $30 regular registration including a guest, in-person bidding, and documents to sign on arrival.</li>
-        <li>The buyer information page lists a 6% auction buy fee. Tax, title, transport and repairs need a separate allowance; this is not an all-in quote.</li>
+      <ul><li>Read the registration page for bidder registration, admission, bidding arrangements and documents to sign on arrival.</li>
+        <li>Confirm the buyer fee and payment requirements for this sale. Tax, title, transport and repairs need a separate allowance; this is not an all-in quote.</li>
         <li>A bank letter of guarantee is required if paying by check. The bidder documents page explains the requirement.</li></ul>
       <p><a href="https://www.classic-carauction.com/Buyer-Registration" target="_blank" rel="noopener noreferrer">Registration requirements ↗</a>{' · '}
         <a href="https://www.classic-carauction.com/Buyer-General-Info" target="_blank" rel="noopener noreferrer">Published buyer fee and payment information ↗</a>{' · '}
