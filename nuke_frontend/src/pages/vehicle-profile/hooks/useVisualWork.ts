@@ -11,6 +11,8 @@ export interface CostCoverage {
 }
 export interface CostTotals {
   hours: CostRange | null;
+  hours_coverage?: { labor_lines: number; estimated_lines: number; unknown_lines: number;
+    status: 'not_applicable' | 'unestimated' | 'partial' | 'complete_for_supplied_lines' };
   currencies: { currency: string; cost: CostRange; covered_lines: number }[];
   labor_currencies?: { currency: string; cost: CostRange; covered_lines: number }[];
   material_currencies?: { currency: string; cost: CostRange; covered_lines: number }[];
