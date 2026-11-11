@@ -227,7 +227,8 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   return <section id="build-receipts" aria-label="Work and parts receipts" className="vp-receipt-section">
     <div className="vp-receipt-heading"><h3>Work & parts</h3><span>Receipt collection</span></div>
     <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
-    {work && <VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger} renderSource={line => line.source_url_sha256 ? <ReceiptSource
+    {work && <VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger}
+      components={loading ? null : work.components} renderSource={line => line.source_url_sha256 ? <ReceiptSource
       key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}
       expectedSourceHash={line.source_url_sha256} receipt={{ sourceTable: line.source_table, sourceId: line.source_id }} />
       : <p>Original source unavailable in this read.</p>} />}

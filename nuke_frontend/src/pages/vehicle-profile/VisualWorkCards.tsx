@@ -2,14 +2,16 @@ import React, { useRef, useState } from 'react';
 import { CatalogProductReference } from './CatalogProductReference';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
-import type { CostRange, CostTotals, MasterCostLedger, MasterCostLine, VisualWork } from './hooks/useVisualWork';
+import type { ComponentEvidence, ComponentReading, CostRange, CostTotals, MasterCostLedger, MasterCostLine, VisualWork } from './hooks/useVisualWork';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 import './visual-work.css';
 
 const date = (value: string) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-export function photoDate(image: VisualWork['images'][number]): string {
+export function photoDate(image: { taken_at: string | null; capture_time_zone?: string | null }): string {
+  if (!image.taken_at || !Number.isFinite(Date.parse(image.taken_at))) return 'Photo date unknown';
+  const captured = new Date(image.taken_at);
   const format = (timeZone: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric',
-    timeZone, timeZoneName: 'short' }).format(new Date(image.taken_at));
+    timeZone, timeZoneName: 'short' }).format(captured);
   try { return format(image.capture_time_zone || 'UTC'); } catch { return format('UTC'); }
 }
 const amount = (value: number, currency: string | null) => {
@@ -166,18 +168,66 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
   </section>;
 }
 
-export function VisualWorkCards({ rows, ledger, renderSource }: {
-  rows: VisualWork[]; ledger?: MasterCostLedger | null; renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode;
+function ComponentSources({ evidence, renderSource }: { evidence?: ComponentEvidence | null;
+  renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode }) {
+  if (!evidence?.components.length) return null;
+  const reading = (item: ComponentReading, label: string) => item.images.map(image => <button type="button"
+    key={`${item.observation_id}:${image.image_id}`} className="vp-component-reading"
+    onClick={() => openVehiclePhoto(image.image_id)} aria-label={`Open ${label.toLowerCase()}: ${item.quote}`}>
+    <span className="vp-component-frame"><img src={optimizeImageUrl(image.image_url, 'medium') || image.image_url}
+      alt={image.caption || item.quote} width={320} height={240} loading="lazy" />
+      <span className="vp-component-region" aria-hidden="true" style={{ left: `${image.bbox[0] / 999 * 100}%`,
+        top: `${image.bbox[1] / 999 * 100}%`, width: `${(image.bbox[2] - image.bbox[0]) / 999 * 100}%`,
+        height: `${(image.bbox[3] - image.bbox[1]) / 999 * 100}%` }} /></span>
+    <strong>{label}</strong><span>{item.quote}</span>
+    <small title={image.capture_time_basis || 'Source photo clock'}>{photoDate(image) === 'Photo date unknown'
+      ? 'Photo date unknown' : `Photo · ${photoDate(image)}`}</small>
+    <small>Read {date(item.evidence_time)} · attributed image reading</small>
+  </button>);
+  return <section className="vp-component-evidence" aria-label="Component evidence">
+    <header><h4>Parts on the car</h4><p>Open a photo to inspect the outlined part. Related purchases sit beside it.</p></header>
+    {evidence.components.map(component => <article key={component.subject_id} aria-label={`${component.label} evidence`}>
+      <h5>{component.label}</h5><div className="vp-component-columns">
+        <div className="vp-component-readings">
+          {component.presence.readings.map(item => reading(item, item.value === 'present' ? 'Read as visible' : 'Read as absent in this view'))}
+          {component.condition.readings.map(item => reading(item, 'Condition reading'))}
+        </div>
+        {!!component.purchase_candidates.length && <div className="vp-component-purchases">{component.purchase_candidates.map(item => <div key={item.receipt_item_id}>
+          <small>Related receipt · {item.association_basis === 'same_printed_part_number' ? 'matching part number' : 'possible component match'}</small>
+          <strong>{item.description}</strong><span>{item.printed_part_number}{item.printed_quantity != null ? ` · Qty ${item.printed_quantity}` : ''}</span>
+          {item.amounts_visible && item.documented_amount != null && <span>{amount(item.documented_amount, item.currency)} recorded charge</span>}
+          <CatalogProductReference product={item.product} />
+          {renderSource({ item_id: item.receipt_item_id, receipt_id: item.receipt_id, relation: 'candidate_material',
+            source_table: item.source_table, source_id: item.source_id, source_url_sha256: item.source_url_sha256,
+            vendor: null, page_date: item.page_date, description: item.description, part_number: item.printed_part_number,
+            quantity: item.printed_quantity, hours: null, amount: item.documented_amount, currency: item.currency,
+            amounts_visible: item.amounts_visible, product: item.product })}
+        </div>)}</div>}
+      </div>
+      {!!component.unresolved.length && <p className="vp-component-next">Still to establish: {component.unresolved.map(key => ({
+        physical_unit_identity_unestablished: 'exact unit identity', installation_time_unestablished: 'installation date',
+        functional_inspection_unestablished: 'functional inspection',
+      } as Record<string, string>)[key] || key.replaceAll('_', ' ')).join(' · ')}.</p>}
+    </article>)}
+    <p className="vp-component-coverage">Photo readings and related purchases are shown separately; a purchase does not yet identify the pictured unit. {evidence.expected_population.status === 'unknown'
+      ? 'An applicable build reference is still needed to measure coverage of the whole car.' : ''}
+      {evidence.coverage.truncated ? ' More component readings remain beyond this page.' : ''}</p>
+  </section>;
+}
+
+export function VisualWorkCards({ rows, ledger, components, renderSource }: {
+  rows: VisualWork[]; ledger?: MasterCostLedger | null; components?: ComponentEvidence | null;
+  renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode;
 }) {
   if (ledger?.scenarios.length) {
     const cited = new Set(ledger.scenarios.flatMap(s => s.rows.flatMap(r => r.work_observation_ids)));
     const remaining = rows.filter(work => !cited.has(work.observation_id));
-    return <><MasterLedger ledger={ledger} works={rows} renderSource={renderSource} />
+    return <><ComponentSources evidence={components} renderSource={renderSource} /><MasterLedger ledger={ledger} works={rows} renderSource={renderSource} />
       {remaining.length > 0 && <section aria-label="Other photographed work"><h4>Other photographed work</h4>
         <VisualWorkCards rows={remaining} renderSource={renderSource} /></section>}</>;
   }
-  if (!rows.length) return null;
-  return <div className="vp-visual-work">{rows.map(work => {
+  if (!rows.length) return <ComponentSources evidence={components} renderSource={renderSource} />;
+  return <><ComponentSources evidence={components} renderSource={renderSource} /><div className="vp-visual-work">{rows.map(work => {
     const documentedHours = work.receipts.filter(line => line.relation === 'documented_operation' && line.hours != null);
     const hours = documentedHours.reduce((sum, line) => sum + line.hours!, 0);
     return <article key={work.observation_id} aria-label={work.title}>
@@ -206,5 +256,5 @@ export function VisualWorkCards({ rows, ledger, renderSource }: {
       {work.receipt_links_unavailable > 0 && <p className="vp-work-note">Some cited receipt lines are no longer available in this read.</p>}
       {work.gaps.length > 0 && <div className="vp-work-open"><strong>Still to reconcile</strong><ul>{work.gaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div>}
     </article>;
-  })}</div>;
+  })}</div></>;
 }
