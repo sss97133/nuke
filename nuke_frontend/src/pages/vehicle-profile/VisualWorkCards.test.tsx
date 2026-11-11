@@ -104,3 +104,20 @@ it('removes cached conclusions when a current-source refresh fails', async () =>
  await act(async () => client.invalidateQueries({ queryKey: ['vehicle-visual-work'] })); await settle();
  expect(host.textContent).toContain('Read failed'); expect(host.textContent).not.toContain('Cabin upholstery');
 });
+
+it('puts a reusable stock reference beside the receipt and removes it when its source is withdrawn', async () => {
+ const work = structuredClone(record);
+ work.receipts[0].product = { catalog_part_id: 'catalog-a', name: 'Supplier upholstery set', part_number: 'SYNTHETIC-1', manufacturer: 'FixtureCo',
+ image_url: 'https://images.example/stock.jpg', page_url: 'https://supplier.example/product', captured_at: '2026-11-10T12:00:00Z',
+ quote_price: 99, currency: 'USD', price_stale: false, source_role: 'original_receipt_supplier' };
+ await render([work]);
+ const link = host.querySelector<HTMLAnchorElement>('a[aria-label="View Supplier upholstery set at the supplier"]')!;
+ expect(link.href).toBe('https://supplier.example/product');
+ expect(link.querySelector('img')?.getAttribute('src')).toBe('https://images.example/stock.jpg');
+ expect(host.textContent).toContain('$99.00 supplier quote');
+ expect(host.textContent).toContain('Amount visible to owner & contributors');
+ expect(host.textContent).toContain('Candidate material · installation not established');
+ expect(host.querySelector('details')).toBeNull();
+ await render([record]);
+ expect(host.querySelector('.vp-catalog-product')).toBeNull();
+});

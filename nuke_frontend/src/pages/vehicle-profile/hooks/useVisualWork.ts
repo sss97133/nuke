@@ -1,3 +1,4 @@
+import type { ReceiptCatalogProduct } from '../CatalogProductReference';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthContext } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
@@ -7,7 +8,7 @@ export interface VisualWork {
   observation_id: string; title: string; summary: string; gaps: string[];
   images: { image_id: string; image_url: string; role: 'before' | 'during' | 'after'; caption: string; taken_at: string;
     capture_time_zone?: string | null; capture_time_basis?: string | null }[];
-  receipts: { item_id: string; receipt_id: string; relation: 'candidate_material' | 'documented_operation';
+  receipts: { product?: ReceiptCatalogProduct | null; item_id: string; receipt_id: string; relation: 'candidate_material' | 'documented_operation';
     source_table: 'vehicle_documents' | 'vehicle_images'; source_id: string; source_url_sha256: string; vendor: string | null;
     page_date: string | null; description: string | null; part_number: string | null; quantity: number | null;
     hours: number | null; amount: number | null; currency: string | null; amounts_visible: boolean }[];

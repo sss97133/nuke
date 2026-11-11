@@ -51,6 +51,8 @@ jobs:
         run: npm ci
       - name: Verify actual BaT extractor canonical identity and stream fencing
         run: node --test scripts/test-bat-vehicle-identity.mjs scripts/test-bat-inventory-price-custody.mjs
+      - name: Verify receipt product identity and catalog parsing
+        run: node --test supabase/functions/_shared/receiptProductCapture.test.mjs
       - name: Verify deterministic source masking and metadata removal
         run: node --test scripts/receipts/redacted-source.test.mjs
 
@@ -650,7 +652,7 @@ jobs:
       - name: Verify registered contributor review uses retained sources and fenced leases
         run: |
           deno check --node-modules-dir=none supabase/functions/contributor-intake/index.ts supabase/functions/derive-dispatch/index.ts
-          deno test --node-modules-dir=none --allow-env supabase/functions/contributor-intake/reviewWork.test.ts supabase/functions/derive-dispatch/handler.test.ts
+          deno test --node-modules-dir=none --allow-env supabase/functions/contributor-intake/reviewWork.test.ts supabase/functions/derive-dispatch/handler.test.ts supabase/functions/index-reference-document/receiptProducts.test.ts
       - name: Verify listing packages preserve contributor sources, supersession and private evidence boundaries
         run: |
           deno check --node-modules-dir=none supabase/functions/generate-listing-package/index.ts supabase/functions/compute-vehicle-valuation/index.ts

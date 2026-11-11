@@ -1,3 +1,4 @@
+import { CatalogProductReference, type ReceiptCatalogProduct } from './CatalogProductReference';
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useQuery } from '@tanstack/react-query';
@@ -65,6 +66,7 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
 }
 
 interface PrintedLine {
+  product?: ReceiptCatalogProduct | null;
   line_number: number | null; description: string | null; part_number: string | null;
   quantity: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null;
 }
@@ -116,7 +118,7 @@ export function CorrectionReceipt({ vehicleId, citation }: {
       </header>
       {doc.lines.length > 0 && <table><thead><tr><th scope="col">Recorded item or work</th><th scope="col">Qty</th>{showAmounts && <th scope="col">Amount</th>}</tr></thead>
         <tbody>{doc.lines.map((line, i) => <tr key={`${line.line_number ?? i}:${i}`}>
-          <td>{line.description || line.part_number || 'Line item'}{line.part_number && line.description && <small>{line.part_number}</small>}</td>
+          <td>{line.description || line.part_number || 'Line item'}{line.part_number && line.description && <small>{line.part_number}</small>}<CatalogProductReference product={line.product} /></td>
           <td>{line.quantity ?? '—'}</td>
           {showAmounts && <td>{line.amount == null ? '—' : amountText(line.amount, doc.currency)}</td>}
         </tr>)}</tbody>
@@ -172,6 +174,7 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
         <td>{line.line_date && <time dateTime={line.line_date}>{printedDate(line.line_date)} · Work recorded</time>}
           <span>{line.description || 'Description not recorded'}</span>
           {(line.part_number || line.hours != null || line.performer) && <small>{[line.part_number, line.hours != null ? `${line.hours} ${line.hours === 1 ? 'hour' : 'hours'}` : null, line.performer].filter(Boolean).join(' · ')}</small>}
+          <CatalogProductReference product={line.product} />
         </td><td>{line.quantity ?? '—'}</td>{moneyVisible && <td>{line.amount == null ? '—' : amountText(line.amount, receipt.currency)}</td>}
       </tr>)}</tbody></table>}
     {lines.length > 4 && <button type="button" className="vp-receipt-expand" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Show fewer lines' : `Show all ${lines.length} lines`}</button>}
