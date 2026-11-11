@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { Rows, Row } from '../../kit';
 import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
@@ -461,14 +462,25 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   // First line of the click: the value, who recorded it and when, or that nothing does.
   const leadClaim = sortedSources[0];
   const leadReport = provenanceCoverageUnavailable(provenance.data) ? undefined : provenance.data?.observations?.[0];
-  const shortDay = (at?: string | null) => at ? ` · ${new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}` : '';
-  const differs = (recorded?: string | null) => !!recorded && recorded.trim().toLowerCase() !== value.trim().toLowerCase() ? ` records “${recorded}”` : '';
-  const answer = imagesLoading || claims.loading ? <p role="status">Reading source…</p>
-    : provenance.data?.current_correction ? <p><strong>{value}</strong> · receipt correction{shortDay(provenance.data.current_correction.page_date)}</p>
-      : leadClaim ? <p><strong>{value}</strong> · {sourceLabel(leadClaim.source_type)}{differs(leadClaim.field_value)}{leadClaim.source_type.startsWith('agent_') ? '' : shortDay(leadClaim.created_at)}
-        {sortedSources.length > 1 && <> · {sortedSources.length - 1} more source{sortedSources.length > 2 ? 's' : ''}</>}</p>
-        : leadReport ? <p><strong>{value}</strong> · {(leadReport.source_slug || 'Source report').replace(/_/g, ' ')}{differs(leadReport.value)}{shortDay(leadReport.observed_at)}</p>
-          : <p><strong>{value}</strong> · no source on record. This value sits on the vehicle record with no claim behind it.</p>;
+  const shortDay = (at?: string | null) => at ? new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+  const subject = context?.subject as (Partial<Vehicle> & { is_replica?: boolean | null }) | undefined;
+  // A tribute's trim is the record's trim under tribute_badge_rule_v1 (migration 20261110090000): no factory badge.
+  const tribute = field === 'trim' && !!subject?.is_replica && !!subject?.trim;
+  const recorded = leadClaim?.field_value ?? leadReport?.value ?? null;
+  const answer = imagesLoading || claims.loading ? <p role="status">Reading source…</p> : <Rows title={`${label} line item`}>
+    <Row label={label.replace(/^./, c => c.toUpperCase())}>{value}</Row>
+    {tribute && <Row label="Recorded trim">{subject!.trim}</Row>}
+    {tribute && <Row label="Tribute">Yes · vehicles.is_replica</Row>}
+    {tribute && <Row label="Rule">tribute_badge_rule_v1 · a tribute earns no factory trim badge</Row>}
+    {!tribute && recorded && recorded.trim().toLowerCase() !== value.trim().toLowerCase() && <Row label="Recorded">{recorded}</Row>}
+    <Row label="Source">{provenance.data?.current_correction ? 'Receipt correction'
+      : leadClaim ? sourceLabel(leadClaim.source_type)
+        : leadReport ? (leadReport.source_slug || 'Source report').replace(/_/g, ' ')
+          : 'None admitted'}</Row>
+    {(provenance.data?.current_correction?.page_date || (leadClaim && !leadClaim.source_type.startsWith('agent_') && leadClaim.created_at) || leadReport?.observed_at)
+      && <Row label="Recorded on">{shortDay(provenance.data?.current_correction?.page_date || (leadClaim && !leadClaim.source_type.startsWith('agent_') ? leadClaim.created_at : null) || leadReport?.observed_at)}</Row>}
+    {sortedSources.length > 1 && <Row label="Other sources" role="measure">{sortedSources.length - 1}</Row>}
+  </Rows>;
   return context ? <FieldContext field={field} label={label} value={value} context={context} answer={answer}
     reports={[
       ...(provenanceCoverageUnavailable(provenance.data) ? [] : provenance.data?.observations || []),

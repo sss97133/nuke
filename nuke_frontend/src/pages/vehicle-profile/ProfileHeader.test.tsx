@@ -95,7 +95,12 @@ it('says where the car is listed and what the listing waits on, only when the re
   expect(line?.getAttribute('aria-label')).toBe("Bring a Trailer: draft pending the seller's approval since Nov 3, 2026");
   expect(line?.textContent?.trim()).toBe('Pending');
   expect(line?.querySelector('img')?.getAttribute('src')).toBe('/source-logos/bat.png');
-  expect(line?.querySelector('a')?.getAttribute('href')).toBe('https://bringatrailer.com/listing/1973-pontiac-firebird-26/');
+  expect(line?.querySelector('a')).toBeNull();
+  await act(async () => (line?.querySelector('button') as HTMLButtonElement).click());
+  const panel = document.body.querySelector('[aria-label="Listing"][role="group"]');
+  expect(panel?.textContent).toContain("Seller's approval of the draft");
+  expect(panel?.textContent).toContain('Nov 3, 2026');
+  expect(document.body.querySelector('a[href="https://bringatrailer.com/listing/1973-pontiac-firebird-26/"]')?.textContent).toContain('Open on Bring a Trailer');
   if (masthead.kind === 'masthead') masthead.listing = { platform: 'bat', status: 'active', activated_at: '2026-11-10T16:00:00+00:00', url: 'https://bringatrailer.com/listing/x', visibility: 'public' };
   fixture.read = { ...read };
   await renderLoaded();

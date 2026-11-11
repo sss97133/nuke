@@ -3,7 +3,7 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import ProfileIdentity from './ProfileIdentity';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { getVehicleTitle } from '../../hooks/usePageTitle';
-import { Masthead, Facet, ClaimView, Text, formatMeasure, day } from '../../kit';
+import { Masthead, Facet, ClaimView, Text, Rows, Row, formatMeasure, day } from '../../kit';
 import { resolveSourceLogo } from '../../kit/Claim';
 import type { Claim, ListingState } from '../../kit';
 import { supabase } from '../../lib/supabase';
@@ -181,6 +181,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const sticky = useRef<HTMLDivElement>(null);
   const [activeFacet, setActiveFacet] = useState<{ field: string; value: string; matchField?: string } | null>(null);
   const [liveOpen, setLiveOpen] = useState(false);
+  const [listingOpen, setListingOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [lotRead, setLotRead] = useState<LotProvenanceRead | null>(null);
@@ -197,7 +198,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     observer.observe(el);
     return () => { observer.disconnect(); page.style.removeProperty('--vp-h-masthead'); };
   }, [vehicle?.id, hasMasthead]);
-  useEffect(() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); }, [vehicle?.id]);
+  useEffect(() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); }, [vehicle?.id]);
   useEffect(() => setLiveOpen(false), [vehicle?.id, auctionPulse?.listing_url, priceOwnedByLiveStack]);
 
   const masthead = doc?.sections.find(s => s.kind === 'masthead');
@@ -350,7 +351,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   if (!vehicle || !doc || !masthead) return null;
   const asArtwork = !!masthead.model && vehicle.listing_kind !== 'non_vehicle_item';
   const explore = (field: string, value: string, matchField?: string) => {
-    setLiveOpen(false); setFinancialOpen(false); setActivityOpen(false);
+    setLiveOpen(false); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false);
     const evidenceField = field === 'engine' ? 'engine_type' : field;
     setActiveFacet(current => current?.field === evidenceField ? null : { field: evidenceField, value, matchField });
     setGalleryFilter?.(['transmission', 'drivetrain', 'engine_type', 'body_style', 'mileage'].includes(evidenceField)
@@ -385,10 +386,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     <div ref={sticky} className="vp-header-sticky">
       <Masthead result={<div className="vp-header-departments">
         <ProfileActivity vehicleId={vehicle.id} events={timelineEvents ?? []} pulse={auctionPulse} days={contributionDays} readState={timelineReadState}
-          open={activityOpen} onToggle={() => { setFinancialOpen(false); setLiveOpen(false); setActiveFacet(null); setActivityOpen(current => !current); }}
+          open={activityOpen} onToggle={() => { setFinancialOpen(false); setLiveOpen(false); setActiveFacet(null); setListingOpen(false); setActivityOpen(current => !current); }}
           onClose={() => setActivityOpen(false)} boundaryRef={sticky} />
         <ProfileFinancials vehicleId={vehicle.id} market={market()} reducedMarket={market(true)} open={financialOpen}
-          onToggle={() => { setActivityOpen(false); setLiveOpen(false); setActiveFacet(null); setFinancialOpen(current => !current); }}
+          onToggle={() => { setActivityOpen(false); setLiveOpen(false); setActiveFacet(null); setListingOpen(false); setFinancialOpen(current => !current); }}
           onClose={() => setFinancialOpen(false)} boundaryRef={sticky} />
       </div>}>
         <Text role="entity" as="h1" aria-label={title}>
@@ -402,13 +403,26 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           const logo = resolveSourceLogo(venue, listing.url);
           const mark = <>{logo ? <img className="k-claim__logo" src={logo} alt={venue} width={40} height={16} /> : <span>{venue}</span>} <span>{listingWord(listing)}</span></>;
           return <Text role="label" as="p" className="vp-header-listing" aria-label={describeListing(listing)} title={describeListing(listing)}>
-            {listing.url ? <a href={listing.url} target="_blank" rel="noreferrer">{mark}</a> : mark}
+            <button type="button" className="vp-header-listing__mark" aria-expanded={listingOpen} aria-label={`${describeListing(listing)}. Show listing`}
+              onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setLiveOpen(false); setListingOpen(current => !current); }}>{mark}</button>
           </Text>;
         })()}
         {priceOwnedByLiveStack ? <details className="vp-header-configuration"><summary>Configuration</summary>{configuration}</details> : configuration}
       </Masthead>
       {liveOpen && priceOwnedByLiveStack && auctionPulse && <HeaderPopover open title="Live auction" width={680} onClose={() => setLiveOpen(false)} dismissBoundaryRef={sticky}>
         <HeaderLiveAuction vehicleId={vehicle.id} pulse={auctionPulse} currency={auctionCurrency} />
+      </HeaderPopover>}
+      {listingOpen && masthead.listing && <HeaderPopover open title={LISTING_VENUES[masthead.listing.platform] ?? masthead.listing.platform} width={420} onClose={() => setListingOpen(false)} dismissBoundaryRef={sticky}>
+        <Rows title="Listing">
+          <Row label="Status">{listingWord(masthead.listing)}</Row>
+          {masthead.listing.stage === 'draft_pending_approval' && <Row label="Waiting on">Seller's approval of the draft</Row>}
+          {masthead.listing.stage_since && <Row label="Since">{day(masthead.listing.stage_since)}</Row>}
+          {masthead.listing.submitted_at && <Row label="Submitted">{day(masthead.listing.submitted_at)}</Row>}
+          {masthead.listing.activated_at && <Row label="Live since">{day(masthead.listing.activated_at)}</Row>}
+          {masthead.listing.external_listing_id && <Row label="Listing id">{masthead.listing.external_listing_id}</Row>}
+          <Row label="Source" role="caption">vehicle_listing_state{masthead.listing.as_of ? ` · as of ${day(masthead.listing.as_of)}` : ''}</Row>
+        </Rows>
+        {masthead.listing.url && <a className="k-body" href={masthead.listing.url} target="_blank" rel="noreferrer">Open on {LISTING_VENUES[masthead.listing.platform] ?? masthead.listing.platform} ↗</a>}
       </HeaderPopover>}
       {activeFacet && <HeaderPopover open onClose={() => setActiveFacet(null)} title={activeFacet.value} width={560} dismissBoundaryRef={sticky}>
         <React.Suspense fallback={<p role="status">Reading vehicle context…</p>}>
