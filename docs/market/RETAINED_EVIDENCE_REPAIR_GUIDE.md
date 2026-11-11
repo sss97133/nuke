@@ -801,3 +801,12 @@ The UI declares further source readings when the sentinel is present. Page-local
 be summed as globally unique appearances. An unavailable reader remains unavailable. Existing
 qualified-price eligibility, estimator writes, access checks and listing-copy rules stay owned
 by their existing paths; result claims never autofill asserted listing copy.
+
+The first runtime interleaving exposed a dispatch failure in the existing generic record pass:
+PostgreSQL reported cancellation during source-row scanning and enqueue, and the worker returned
+`listing_work_unavailable`. The source checkpoint alone therefore did not establish processing.
+The generic page now visits at most25 vehicles and dispatches at most25 source rows instead of500,
+within the existing deadline and worker limits. Dense-vehicle source continuation, unsupported
+vehicle continuation and completion boundaries use the same reduced page size. No cursor or
+source checkpoint is reset. The local contract proves no skipped/duplicate work across those
+boundaries; actual scheduled completions remain the runtime acceptance case.
