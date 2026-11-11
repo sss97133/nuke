@@ -150,7 +150,8 @@ it('keeps a library of sourced 1973 Pontiac lettering, each version inside its d
       resolveVehicleArtwork({ year, make: 'Pontiac', model, variants, vehicleId }).filter(a => a.role === role).map(a => a.file)]));
   const tribute = files(1973, 'Firebird', [{ kind: 'trim', value: 'Trans Am-Style' }]);
   // Several versions per mark; the first headline-eligible one is what the headline renders.
-  expect(tribute.year).toEqual(['pontiac-1973-accessorizer-year-cut.png', 'pontiac-1973-full-line-year-cut.png', 'pontiac-firebird-1973-canada-73-cut.png']);
+  // The heavy full-line cover numeral leads; the hairline Accessorizer year stays in the library order behind it.
+  expect(tribute.year).toEqual(['pontiac-1973-full-line-year-cut.png', 'pontiac-1973-accessorizer-year-cut.png', 'pontiac-firebird-1973-canada-73-cut.png']);
   expect(tribute.make).toEqual(['pontiac-firebird-tail-letters-1970-1973-cut.png', 'pontiac-1973-accessorizer-pontiac-cut.png',
     'pontiac-1973-full-line-pontiac-cut.png', 'pontiac-firebird-1973-canada-pontiac-cut.png']);
   expect(tribute.model).toEqual(['pontiac-firebird-fender-script-1971-1981-cut.png', 'pontiac-1973-full-line-firebird-cut.png',
@@ -167,6 +168,15 @@ it('keeps a library of sourced 1973 Pontiac lettering, each version inside its d
       expect(asset.cutout.command).toContain(`nuke_frontend/public/stacks/makes/${asset.file}`);
       expect(asset.localSha256Base64).toBeTruthy();
       expect(['monochrome', 'chrome', 'color']).toContain(asset.tone);
+      // Where its capitals sit in the file, measured on a named reference glyph's columns, so every mark shares one cap
+      // height and baseline. Top-level, so the build's provenance projection keeps it.
+      const { capHeight, baseline, glyph, columns } = asset.capMetrics!;
+      expect(capHeight).toBeGreaterThan(0.8);
+      expect(capHeight + baseline).toBeLessThanOrEqual(1);
+      expect(glyph).toBeTruthy();
+      const [c0, c1] = columns.split('-').map(Number);
+      expect(c0).toBeGreaterThanOrEqual(0);
+      expect(c1).toBeLessThan(asset.sourceWidth);
     } else expect(asset.headline).toBe('library');
   }
   expect(all.filter(a => a.headline === 'library').map(a => [a.role, a.viewport])).toEqual([
@@ -190,7 +200,7 @@ it('keeps a library of sourced 1973 Pontiac lettering, each version inside its d
   expect(files(1976, 'Firebird', [{ kind: 'trim', value: 'Trans Am' }]).variant).toEqual([]);
   // Another 1973 Pontiac gets only the make-wide literature: no Firebird letters, script, bird or decal.
   const grandPrix = files(1973, 'Grand Prix', [{ kind: 'trim', value: 'Trans Am' }]);
-  expect(grandPrix).toEqual({ year: ['pontiac-1973-accessorizer-year-cut.png', 'pontiac-1973-full-line-year-cut.png'],
+  expect(grandPrix).toEqual({ year: ['pontiac-1973-full-line-year-cut.png', 'pontiac-1973-accessorizer-year-cut.png'],
     make: ['pontiac-1973-accessorizer-pontiac-cut.png', 'pontiac-1973-full-line-pontiac-cut.png'], emblem: ['pontiac-1973-accessorizer-cover.jpg'], model: [], variant: [] });
   expect(resolveVehicleArtwork({ year: 1973, make: 'Chevrolet', model: 'Firebird' })).toEqual([]);
 });
@@ -206,11 +216,15 @@ it('sets the 1973 tribute headline in cutout lettering on the page surface, keep
       variants={[{ kind: 'trim', value: 'Trans Am-Style' }]} onExplore={() => {}} />));
     // Printed single-colour lettering is a mask in the text colour; chrome and the car's own decal keep their colour.
     expect(marks()).toEqual([
-      ['year', 'mask', '/stacks/makes/pontiac-1973-accessorizer-year-cut.png'],
+      ['year', 'mask', '/stacks/makes/pontiac-1973-full-line-year-cut.png'],
       ['make', 'image', '/stacks/makes/pontiac-firebird-tail-letters-1970-1973-cut.png'],
       ['model', 'image', '/stacks/makes/pontiac-firebird-fender-script-1971-1981-cut.png'],
       ['variant', 'image', '/stacks/makes/pontiac-firebird-trans-am-style-owner-decal-cut.png'],
     ]);
+    // Each mark carries its catalogue cap metrics, which the stylesheet turns into one shared cap band.
+    expect([...host.querySelectorAll<HTMLElement>('.vehicle-identity__art')].map(node =>
+      [node.style.getPropertyValue('--art-cap'), node.style.getPropertyValue('--art-base')])).toEqual([
+      ['0.936', '0.029'], ['0.954', '0.023'], ['0.974', '0.018'], ['0.913', '0.029']]);
     // No arrowhead box, no shadowed decal photograph, no nameplate panel.
     expect(host.querySelector('image')).toBeNull();
     expect(host.querySelector('.vehicle-identity')?.getAttribute('data-inline-artwork')).toBe('true');

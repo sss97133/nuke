@@ -91,11 +91,13 @@ function variantQualifier(asset: VehicleArtwork, name: string) {
 function VehicleArtworkImage({ asset, fallback, text = false }: { asset: VehicleArtwork; fallback?: string; text?: boolean }) {
   const [failed, setFailed] = useState(false);
   if (failed) return fallback ? <span>{fallback}</span> : null;
-  // A cutout (no background) sits on the page surface at the headline's height: a single-colour print is a mask in the
-  // text colour; photographed chrome and the car's own decal keep their colour.
+  // A cutout (no background) sits on the page surface: a single-colour print is a mask in the text colour; photographed
+  // chrome and the car's own decal keep their colour. Its catalogue capMetrics (where its capitals sit in the file) let
+  // every mark share one cap height and baseline.
   if (asset.cutout && !text) {
     const src = `/stacks/makes/${asset.file}`;
-    const style = { '--art-ratio': asset.sourceWidth / asset.sourceHeight, '--art-src': `url("${src}")` } as React.CSSProperties;
+    const style = { '--art-ratio': asset.sourceWidth / asset.sourceHeight, '--art-src': `url("${src}")`,
+      ...(asset.capMetrics ? { '--art-cap': asset.capMetrics.capHeight, '--art-base': asset.capMetrics.baseline } : {}) } as React.CSSProperties;
     return asset.tone === 'monochrome'
       ? <span className="vehicle-identity__art vehicle-identity__art--cutout vehicle-identity__art--mask" data-role={asset.role} style={style}>
         <img src={src} alt="" hidden onError={() => setFailed(true)} />

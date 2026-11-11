@@ -497,25 +497,66 @@
     ],
     "label": "Trans Am",
     "file": "pontiac-firebird-trans-am-style-owner-decal-cut.png",
-    "viewport": "0 0 568 103",
+    "viewport": "0 0 566 103",
     "width": 110,
     "height": 20,
-    "sourceWidth": 568,
+    "sourceWidth": 566,
     "sourceHeight": 103,
     "tone": "color",
     "cutout": {
       "from": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
-      "viewport": "61 157 568 103",
-      "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs key IMG_5010.png \"50 145 600 130\" nuke_frontend/public/stacks/makes/pontiac-firebird-trans-am-style-owner-decal-cut.png g 50 110 \"--level=-8.65@20 1110 720 330\""
+      "viewport": "62 157 566 103",
+      "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs key IMG_5010.png \"50 145 600 130\" nuke_frontend/public/stacks/makes/pontiac-firebird-trans-am-style-owner-decal-cut.png g 40 90 \"--level=-8.65@20 1110 720 330\" --min-area=200 --defringe=1 --cap=200-330"
+    },
+    "capMetrics": {
+      "capHeight": 0.913,
+      "baseline": 0.029,
+      "glyph": "N, S",
+      "columns": "200-330"
     },
     "source": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
     "sourceAsset": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
     "evidence": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
-    "notes": "The \"TRANS AM\" fender decal on this vehicle (orange tri-line lettering), from its own profile photograph IMG_5010. For this tribute it is the lettering on the car, not a claim of factory Trans Am trim. Derivation: the HEIC converted to PNG (sips -s format png), the decal region levelled by -8.65 degrees, then keyed on the green channel (50-110) so the paint and shadow fall away and the orange keeps its colour. Matched for this vehicle id only.",
+    "notes": "The \"TRANS AM\" fender decal on this vehicle (orange tri-line lettering), from its own profile photograph IMG_5010. For this tribute it is the lettering on the car, not a claim of factory Trans Am trim. Derivation: the HEIC converted to PNG (sips -s format png), the decal region levelled by -8.65 degrees, then keyed on the green channel (50-110) so the paint and shadow fall away and the orange keeps its colour. Matched for this vehicle id only. Re-cut 2026-11-11: keyed on green 40-90 (fuller strokes), the rim pulled in 1 px and every edge pixel given the decal's own orange (--defringe), so no paint-dark fringe or jagged rim remains.",
     "retrievedAt": "2026-11-11",
     "attribution": "Photograph of this vehicle from its own profile (the vehicle_images row; original HEIC 4032x3024, taken 2026-10-28). It shows the lettering on this car, not factory trim. Trans Am is a General Motors trademark.",
     "sourceSha256Base64": "4FdsAvPCqmD2Wd8cAAYV8WRRazBj1o7CJVJKKdcAyJg=",
-    "localSha256Base64": "7tFxe3jIecUK0Xaf0MDRNe5USqggqjwAquRjeDSm4jE="
+    "localSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A="
+  },
+  {
+    "make": "Pontiac",
+    "models": [],
+    "years": [
+      1973,
+      1973
+    ],
+    "role": "year",
+    "file": "pontiac-1973-full-line-year-cut.png",
+    "viewport": "0 0 341 172",
+    "width": 40,
+    "height": 20,
+    "sourceWidth": 341,
+    "sourceHeight": 172,
+    "tone": "monochrome",
+    "cutout": {
+      "from": "pontiac-1973-full-line-cover.jpg",
+      "viewport": "988 223 341 172",
+      "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-1973-full-line-cover.jpg \"979 201 359 202\" nuke_frontend/public/stacks/makes/pontiac-1973-full-line-year-cut.png l light 90 220 --min-area=50 --cap=1-60"
+    },
+    "capMetrics": {
+      "capHeight": 0.936,
+      "baseline": 0.029,
+      "glyph": "1",
+      "columns": "1-60"
+    },
+    "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+    "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/1973_Pontiac_Full_Line-01.jpg",
+    "evidence": "https://www.lov2xlr8.no/brochures/pontiac/73pfull/73pfull.html",
+    "notes": "\"1973\" from the cover of the US 1973 Pontiac full-line brochure (\"Pontiac 1973\"), white serif on black. One printed year, 1973 only. The same brochure is also hosted at lov2xlr8.no. Single-colour print, so the cutout is a monochrome mark set in the text colour. Headline file: a cutout of the unmodified original (committed beside it), background removed; `cutout` records the command. The headline year (2026-11-11): the heaviest period numeral in the library, filled in the identity's ink. Re-cut with specks under 50 px dropped (--min-area), which also tightened its crop.",
+    "retrievedAt": "2026-11-11",
+    "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Period literature scan, reference identification; not evidence of what is installed on a specific car.",
+    "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+    "localSha256Base64": "Zdtq6WJ8I+d+4emUpkSPUtPrX/fdtVFzTPgS0t+Rz0k="
   },
   {
     "make": "Pontiac",
@@ -537,6 +578,12 @@
       "viewport": "104 353 123 67",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-1973-accessorizer-cover.jpg \"104 353 126 68\" nuke_frontend/public/stacks/makes/pontiac-1973-accessorizer-year-cut.png r dark 25 200"
     },
+    "capMetrics": {
+      "capHeight": 0.866,
+      "baseline": 0.06,
+      "glyph": "1",
+      "columns": "4-19"
+    },
     "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Accessorizer/slides/1973%20Pontiac%20Accessorizer-01.html",
     "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Accessorizer/1973%20Pontiac%20Accessorizer-01.jpg",
     "evidence": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Accessorizer/slides/1973%20Pontiac%20Accessorizer-01.html",
@@ -545,35 +592,6 @@
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Period literature scan, reference identification; not evidence of what is installed on a specific car.",
     "sourceSha256Base64": "4iMhCK0KTz6JWay+Jzo31Fj6nxVu5dZyxpvrAgAa/f4=",
     "localSha256Base64": "5zEbTHr7113aB+xm6eJLKzQpBVprO+2D74fIXKCwLjI="
-  },
-  {
-    "make": "Pontiac",
-    "models": [],
-    "years": [
-      1973,
-      1973
-    ],
-    "role": "year",
-    "file": "pontiac-1973-full-line-year-cut.png",
-    "viewport": "0 0 349 196",
-    "width": 36,
-    "height": 20,
-    "sourceWidth": 349,
-    "sourceHeight": 196,
-    "tone": "monochrome",
-    "cutout": {
-      "from": "pontiac-1973-full-line-cover.jpg",
-      "viewport": "980 205 349 196",
-      "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-1973-full-line-cover.jpg \"979 201 359 202\" nuke_frontend/public/stacks/makes/pontiac-1973-full-line-year-cut.png l light 90 220"
-    },
-    "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
-    "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/1973_Pontiac_Full_Line-01.jpg",
-    "evidence": "https://www.lov2xlr8.no/brochures/pontiac/73pfull/73pfull.html",
-    "notes": "\"1973\" from the cover of the US 1973 Pontiac full-line brochure (\"Pontiac 1973\"), white serif on black. One printed year, 1973 only. The same brochure is also hosted at lov2xlr8.no. Single-colour print, so the cutout is a monochrome mark set in the text colour. Headline file: a cutout of the unmodified original (committed beside it), background removed; `cutout` records the command.",
-    "retrievedAt": "2026-11-11",
-    "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Period literature scan, reference identification; not evidence of what is installed on a specific car.",
-    "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
-    "localSha256Base64": "oy8Qq9KSKP24s48GBOMfYLns8jM4rh2ovokP81E8vL4="
   },
   {
     "make": "Pontiac",
@@ -597,6 +615,12 @@
       "viewport": "1132 55 80 69",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-firebird-1973-canada-cover.jpg \"1125 49 93 81\" nuke_frontend/public/stacks/makes/pontiac-firebird-1973-canada-73-cut.png l light 40 200"
     },
+    "capMetrics": {
+      "capHeight": 0.957,
+      "baseline": 0.014,
+      "glyph": "73",
+      "columns": "0-79"
+    },
     "source": "https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/slides/1973_Pontiac_Firebird_Cdn-01.html",
     "sourceAsset": "https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/1973_Pontiac_Firebird_Cdn-01.jpg",
     "evidence": "https://www.lov2xlr8.no/brochures/pontiac/73fire/73fire.html",
@@ -617,25 +641,31 @@
     ],
     "role": "make",
     "file": "pontiac-firebird-tail-letters-1970-1973-cut.png",
-    "viewport": "0 0 1000 89",
-    "width": 225,
+    "viewport": "0 0 1000 87",
+    "width": 230,
     "height": 20,
     "sourceWidth": 1000,
-    "sourceHeight": 89,
+    "sourceHeight": 87,
     "tone": "chrome",
     "cutout": {
       "from": "pontiac-firebird-tail-letters-1970-1973.jpg",
-      "viewport": "0 456 1000 89",
-      "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs chrome nuke_frontend/public/stacks/makes/pontiac-firebird-tail-letters-1970-1973.jpg \"0 445 1000 110\" nuke_frontend/public/stacks/makes/pontiac-firebird-tail-letters-1970-1973-cut.png "
+      "viewport": "0 456 1000 87",
+      "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs chrome nuke_frontend/public/stacks/makes/pontiac-firebird-tail-letters-1970-1973.jpg \"0 445 1000 110\" nuke_frontend/public/stacks/makes/pontiac-firebird-tail-letters-1970-1973-cut.png --min-area=200 --defringe=1 --cap=0-999"
+    },
+    "capMetrics": {
+      "capHeight": 0.954,
+      "baseline": 0.023,
+      "glyph": "PONTIAC",
+      "columns": "0-999"
     },
     "source": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
     "sourceAsset": "https://cdn.oerparts.com/assets/images/ProductImg/K/K1049.jpg",
     "evidence": "https://cdn.oerparts.com/assets/images/ProductImg/K/K1049_V2.JPG",
-    "notes": "OER K1049: reproduction of the original \"PONTIAC\" rear tail panel letters for all 1970-73 Firebird models (GM 9855976-9855982), chrome die-cast with white painted faces. OER's installed photo (evidence) shows the letters on the tail panel. Firebird 1970-73 only. The cutout keeps the photographed chrome and painted faces and drops the white catalogue ground (enclosed counters too), with a feathered rim and no halo. Headline file: a cutout of the unmodified original (committed beside it), background removed; `cutout` records the command.",
+    "notes": "OER K1049: reproduction of the original \"PONTIAC\" rear tail panel letters for all 1970-73 Firebird models (GM 9855976-9855982), chrome die-cast with white painted faces. OER's installed photo (evidence) shows the letters on the tail panel. Firebird 1970-73 only. The cutout keeps the photographed chrome and painted faces and drops the white catalogue ground (enclosed counters too), with a feathered rim and no halo. Headline file: a cutout of the unmodified original (committed beside it), background removed; `cutout` records the command. Re-cut 2026-11-11: isolated specks under 200 px dropped (--min-area) and the rim pulled in 1 px with its colour taken from the chrome beside it (--defringe), so no crumbs sit between the letters and no ground rims them.",
     "retrievedAt": "2026-11-11",
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Photograph: OER (GM Restoration Parts licensee) reproduction part, reference identification; not an original factory photograph or evidence of installation.",
     "sourceSha256Base64": "rH/23YnVOvIB1+R8RXf7Ix457T1zAq2UmimtyybQyRI=",
-    "localSha256Base64": "QT1EHl+EjlqXsSD+aZUB5aGhUsME4abiVngmHntyVGE="
+    "localSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk="
   },
   {
     "make": "Pontiac",
@@ -656,6 +686,12 @@
       "from": "pontiac-1973-accessorizer-cover.jpg",
       "viewport": "239 375 159 43",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-1973-accessorizer-cover.jpg \"235 371 177 47\" nuke_frontend/public/stacks/makes/pontiac-1973-accessorizer-pontiac-cut.png r dark 25 200"
+    },
+    "capMetrics": {
+      "capHeight": 0.884,
+      "baseline": 0.047,
+      "glyph": "P",
+      "columns": "2-22"
     },
     "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Accessorizer/slides/1973%20Pontiac%20Accessorizer-01.html",
     "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Accessorizer/1973%20Pontiac%20Accessorizer-01.jpg",
@@ -685,6 +721,12 @@
       "from": "pontiac-1973-full-line-cover.jpg",
       "viewport": "317 232 614 178",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-1973-full-line-cover.jpg \"311 226 626 189\" nuke_frontend/public/stacks/makes/pontiac-1973-full-line-pontiac-cut.png l light 90 220"
+    },
+    "capMetrics": {
+      "capHeight": 0.899,
+      "baseline": 0.09,
+      "glyph": "P",
+      "columns": "2-100"
     },
     "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
     "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/1973_Pontiac_Full_Line-01.jpg",
@@ -716,6 +758,12 @@
       "from": "pontiac-firebird-1973-canada-cover.jpg",
       "viewport": "455 54 330 75",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-firebird-1973-canada-cover.jpg \"448 48 343 82\" nuke_frontend/public/stacks/makes/pontiac-firebird-1973-canada-pontiac-cut.png l light 40 200"
+    },
+    "capMetrics": {
+      "capHeight": 0.88,
+      "baseline": 0.093,
+      "glyph": "PONTIAC",
+      "columns": "0-329"
     },
     "source": "https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/slides/1973_Pontiac_Firebird_Cdn-01.html",
     "sourceAsset": "https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/1973_Pontiac_Firebird_Cdn-01.jpg",
@@ -788,25 +836,31 @@
     ],
     "role": "model",
     "file": "pontiac-firebird-fender-script-1971-1981-cut.png",
-    "viewport": "0 0 800 117",
-    "width": 137,
+    "viewport": "0 0 800 114",
+    "width": 140,
     "height": 20,
     "sourceWidth": 800,
-    "sourceHeight": 117,
+    "sourceHeight": 114,
     "tone": "chrome",
     "cutout": {
       "from": "pontiac-firebird-fender-script-1971-1981.jpg",
-      "viewport": "0 0 800 117",
-      "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs chrome nuke_frontend/public/stacks/makes/pontiac-firebird-fender-script-1971-1981.jpg \"0 0 800 118\" nuke_frontend/public/stacks/makes/pontiac-firebird-fender-script-1971-1981-cut.png "
+      "viewport": "0 0 800 114",
+      "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs chrome nuke_frontend/public/stacks/makes/pontiac-firebird-fender-script-1971-1981.jpg \"0 0 800 118\" nuke_frontend/public/stacks/makes/pontiac-firebird-fender-script-1971-1981-cut.png \"--ground=100,27;350,55;350,84;462,71;730,72\" --min-area=50 --defringe=1 --cap=0-135"
+    },
+    "capMetrics": {
+      "capHeight": 0.974,
+      "baseline": 0.018,
+      "glyph": "F",
+      "columns": "0-135"
     },
     "source": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/486904.html",
     "sourceAsset": "https://cdn.oerparts.com/assets/images/ProductImg/4/486904.JPG",
     "evidence": "https://promo2.classicindustries.com/hubfs/Classic_Industries/pdf-catalogs/Firebird/F_SEC_F.pdf?hsLang=en#page=1",
-    "notes": "OER 486904: reproduction \"Firebird\" front fender script, 1971-81 Pontiac Firebird (OER fitment includes 1973; Classic Industries Firebird catalogue p.1 lists 486904 for 1971-81). Viewport excludes the mounting nuts. The cutout keeps the photographed chrome and drops the white catalogue ground, with a feathered rim and no halo. Headline file: a cutout of the unmodified original (committed beside it), background removed; `cutout` records the command.",
+    "notes": "OER 486904: reproduction \"Firebird\" front fender script, 1971-81 Pontiac Firebird (OER fitment includes 1973; Classic Industries Firebird catalogue p.1 lists 486904 for 1971-81). Viewport excludes the mounting nuts. The cutout keeps the photographed chrome and drops the white catalogue ground, with a feathered rim and no halo. Headline file: a cutout of the unmodified original (committed beside it), background removed; `cutout` records the command. Re-cut 2026-11-11: the counters seen through the part (F loop, both e counters, b and d bowls; --ground points) are ground, not metal; specks dropped and the rim pulled in 1 px with chrome-coloured edges (--defringe), so it sits clean on night and day surfaces.",
     "retrievedAt": "2026-11-11",
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Photograph: OER (GM Restoration Parts licensee) reproduction part, reference identification; not an original factory photograph or evidence of installation.",
     "sourceSha256Base64": "+vtlw+HcI+2IMG535sfKECaJpiRIqXQ/YcE1xcfOcZ0=",
-    "localSha256Base64": "h6g+4zirfvfuzXLfJDntZM5wnu0mr+tfCVZX3cLdleY="
+    "localSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M="
   },
   {
     "make": "Pontiac",
@@ -829,6 +883,12 @@
       "from": "pontiac-1973-full-line-firebird-spread.jpg",
       "viewport": "69 78 271 74",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-1973-full-line-firebird-spread.jpg \"66 72 278 84\" nuke_frontend/public/stacks/makes/pontiac-1973-full-line-firebird-cut.png l dark 90 220"
+    },
+    "capMetrics": {
+      "capHeight": 0.878,
+      "baseline": 0.027,
+      "glyph": "F",
+      "columns": "2-60"
     },
     "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html",
     "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/1973_Pontiac_Full_Line-10-11.jpg",
@@ -861,6 +921,12 @@
       "viewport": "1045 77 335 89",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-firebird-1973-us-foldout-cover.jpg \"1040 71 345 101\" nuke_frontend/public/stacks/makes/pontiac-firebird-1973-us-foldout-firebird-cut.png l light 40 200"
     },
+    "capMetrics": {
+      "capHeight": 0.899,
+      "baseline": 0.045,
+      "glyph": "F",
+      "columns": "2-77"
+    },
     "source": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Firebird%20Foldout/slides/1973%20Pontiac%20Firebird%20Foldout%2001.html",
     "sourceAsset": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Firebird%20Foldout/1973%20Pontiac%20Firebird%20Foldout%2001.jpg",
     "evidence": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Firebird%20Foldout/index.html",
@@ -891,6 +957,12 @@
       "from": "pontiac-firebird-1973-canada-cover.jpg",
       "viewport": "808 55 290 74",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-firebird-1973-canada-cover.jpg \"801 48 303 81\" nuke_frontend/public/stacks/makes/pontiac-firebird-1973-canada-firebird-cut.png l light 40 200"
+    },
+    "capMetrics": {
+      "capHeight": 0.878,
+      "baseline": 0.108,
+      "glyph": "FIREBIRD",
+      "columns": "0-289"
     },
     "source": "https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/slides/1973_Pontiac_Firebird_Cdn-01.html",
     "sourceAsset": "https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/1973_Pontiac_Firebird_Cdn-01.jpg",
@@ -927,6 +999,12 @@
       "from": "pontiac-firebird-1973-canada-cover.jpg",
       "viewport": "571 159 141 26",
       "command": "node nuke_frontend/scripts/cut-identity-lettering.cjs mono nuke_frontend/public/stacks/makes/pontiac-firebird-1973-canada-cover.jpg \"566 153 152 37\" nuke_frontend/public/stacks/makes/pontiac-firebird-1973-canada-trans-am-cut.png l light 40 200"
+    },
+    "capMetrics": {
+      "capHeight": 0.923,
+      "baseline": 0.038,
+      "glyph": "TRANS AM",
+      "columns": "0-140"
     },
     "source": "https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/slides/1973_Pontiac_Firebird_Cdn-01.html",
     "sourceAsset": "https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/1973_Pontiac_Firebird_Cdn-01.jpg",
