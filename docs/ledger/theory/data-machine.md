@@ -111,7 +111,9 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    receipt, or the owner's decision; no store records any of these, so the count is zero by
    construction and is reported as zero, not left out. Baseline: 0 keyed of 488 witnessed observations
    on the proof vehicle (2026-11-10 21:33 UTC), and 0 of 94 on the vehicle measured first. The library
-   was not measured.
+   was not measured. After the first landing: 446 keyed of 934 on the proof vehicle, folding to 181
+   claims, 69 of them carried by two or more photos (2026-11-11 04:54 UTC,
+   `scripts/photo-pipeline/keys-dry-run/fold.sql`; [`image-keys-test.md`](image-keys-test.md)).
 8. **No new reader, prompt vocabulary or per-reader table for photos.** Extend the registry, the
    question store or the landing. Earlier attempts at this same idea are in the database and are not
    dead: `component_assembly_map` (a part, its states, what each state looks like),
