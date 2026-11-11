@@ -1086,6 +1086,12 @@ jobs:
           deno-version: v2.x
       - name: Verify reply-email sends for the service key or an active admin only, before any provider call
         run: deno test --node-modules-dir=none --allow-env --allow-net supabase/functions/_shared/writeGuard.test.ts supabase/functions/reply-email/handler.test.ts
+      - name: Verify the outbound gate holds every message to a recipient off the allowlist (off, internal_only, live)
+        run: deno test --no-check --node-modules-dir=none --allow-env --allow-net supabase/functions/_shared/outbound.test.ts supabase/functions/_shared/email.test.ts
+      - name: No edge function reaches a message provider except through the outbound gate
+        run: |
+          node --test scripts/guardrails/check-outbound-gate.test.mjs
+          node scripts/guardrails/check-outbound-gate.mjs
 
   vision-listing-read:
     runs-on: ubuntu-latest
