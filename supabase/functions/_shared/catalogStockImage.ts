@@ -43,8 +43,12 @@ export async function retainImage(admin: any, url: string, effects = { fetch, fi
     const encoded = data?.rawBase64;
     if (typeof encoded !== 'string' || encoded.length > Math.ceil(MAX_BYTES / 3) * 4) refuseRemote('stock_image_too_large');
     if (encoded.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) refuseRemote('stock_image_format_unrecognized');
-    const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
-    if (bytes.length > MAX_BYTES) refuseRemote('stock_image_too_large');
+    const decoded = atob(encoded);
+    if (decoded.length > MAX_BYTES) refuseRemote('stock_image_too_large');
+    // A string iterator materializes millions of characters before constructing
+    // a typed array. Fill the bounded buffer directly within the Edge heap limit.
+    const bytes = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
     response = new Response(bytes, { headers: { 'content-type': remoteMime } });
   }
   if (!response.ok || Number(response.headers.get('content-length')) > MAX_BYTES) throw new Error('stock_image_unavailable');

@@ -53,6 +53,20 @@ Deno.test('an unapproved host or a non403 failure cannot trigger paid acquisitio
   assertEquals(f.requests.length, 0);
 });
 
+Deno.test('maximum allowed remote image retains exact bytes without a character iterator allocation', async () => {
+  const f = fixture();
+  const decoded = '\xff\xd8\xff\xe0' + '\x00'.repeat(14_999_995) + '\x7f';
+  f.payload.data.rawBase64 = btoa(decoded);
+  const image = await retainImage(f.admin, url, f.effects);
+  const stored = f.objects.get(image.image_storage_path)!;
+  assertEquals(stored.length, 15_000_000);
+  assertEquals(stored.slice(0, 4), jpeg.slice(0, 4));
+  assertEquals(stored[stored.length - 1], 0x7f);
+  assertEquals(image.image_sha256, Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', stored as BufferSource)),
+    x => x.toString(16).padStart(2, '0')).join(''));
+  assertEquals(f.requests.length, 1); assertEquals(f.uploads(), 1);
+});
+
 Deno.test('remote error pages, screenshots, wrong source, MIME/signature mismatch and oversized data never enter storage', async () => {
   const mutations = [
     (f: ReturnType<typeof fixture>) => { f.payload.data.metadata.statusCode = 403; },
