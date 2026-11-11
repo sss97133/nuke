@@ -434,7 +434,9 @@ DO $$ DECLARE v uuid:='10000000-0000-0000-0000-000000000001'; p jsonb; op jsonb;
  UPDATE vehicle_observations SET structured_data=p||'{"materials":[],"rate_basis":{"kind":"reported","rate":777,"currency":"USD"}}'
  WHERE id='a0000000-0000-0000-0000-000000000001';
  j:=vehicle_build_log_public(v,false);
- ASSERT j::text NOT LIKE '%777%' AND j#>'{master_ledger,scenarios,0,rows,0,reasons}' ? 'private_rate_withheld';
+ ASSERT j#>'{master_ledger,scenarios,0,rows,0,rate_basis}'='{"kind":"reported","status":"unresolved"}'::jsonb
+ AND NOT jsonb_path_exists(j,'$.** ? (@ == 777 || @ == "777")')
+ AND j#>'{master_ledger,scenarios,0,rows,0,reasons}' ? 'private_rate_withheld';
  RAISE NOTICE 'master cost: overlap alternatives, additive shared access, year applicability, transition role, quantities and rate provenance pass';
 END $$;
 
