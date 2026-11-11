@@ -176,6 +176,19 @@ dedicated agent ... configure a team". Inside the lane:
   proposals and its own decisions, and writes nothing. Any agent can be given the brief. What makes two
   runs agree is the stored decisions, not the agent, and [`image-keys-test.md`](image-keys-test.md)
   measures that.
+- **The unit is one photo, and it is checked by code.** The owner: "it's really not batches. It's one at a
+  time til done", and again: "the best type of batch is one at a time ... and then figuring out how to
+  speed things up beyond one at a time ... if they can't do one, they definitely can't do [many]". One
+  photo's statements go in, one keyed result comes out, and code refuses it unless every statement is
+  accounted for, every quoted word is in the reading and every key is a registry key, a stored decision or
+  a draft with its proposal. Anything larger is built only on a unit that passes, and is held to the same
+  check photo by photo. Measured on the proof vehicle: one photo keyed in about 20 seconds; a single agent
+  given 119 statements at once produced nothing in 21 minutes
+  ([`image-keys-test.md`](image-keys-test.md), the 22:48 round).
+- **What needs the whole set is a different harness.** The owner: "the thing kind of changes when you have
+  to analyze batch contextual information but that's like a different approach a different harness."
+  Three things need it: the shared decisions (without them two runs agreed on 11 of 32 claims, with them
+  21 of 27), merging the names drafted in parallel, and the fold. None of them is the unit's job.
 - **Folds** are database logic, not an agent: one claim per vehicle, part, property, value and capture
   day, with every photo as a witness.
 - **Questions** are code that builds a photo's list from registry rows.
@@ -797,6 +810,14 @@ lead holds them.)
 
 > You'll get to a point where you'll need to test the system by acting like me. Querying to a new agent to fix the
 > image analysis pipeline. That's where this will get interesting
+
+> For me, a real test would be that I can like talk with Grok Bot and like it actually would be on the same page as
+> where we're at right now if that makes sense
+
+> Like I said, the best type of batch is one at a time, unfortunately and then figuring out how to speed things up
+> beyond one at a time. Does that make sense? You can generate it on that idea but if they can't do one, they
+> definitely can't do, but the thing is kind of changes when you have to analyze batch contextual information but
+> that's like a different approach a different harness.
 
 > A better example to work on is the firebird. Also the talk on keys and folds is essential to not lose. I know we
 > need the pipeline to work but it has to be for the data we actually care about
