@@ -10,6 +10,11 @@ name: Photo Keys Lane
 # block (which the log prints), and the lane prints counts only. No artifact is uploaded.
 #
 #   gh workflow run photo-keys.yml -f vehicle_id=<uuid> -f user_id=<uuid> -f photos=1 -f write=false
+#
+# step=properties runs the other thing this vehicle's stored readings can give without a model: the three values a
+# deep reading already holds (rust severity, paint stage, assembly state), copied to their registered properties by
+# the existing projection. It needs the two database secrets only.
+#   gh workflow run photo-keys.yml -f step=properties -f vehicle_id=<uuid> -f user_id=<uuid> -f photos=99 -f pages=10
 
 on:
   workflow_dispatch:
@@ -38,6 +43,15 @@ on:
         description: Land the keyed claims (false = dry run, nothing is written)
         type: boolean
         default: false
+      step:
+        description: "keys = place stored statements on keys (a model call a photo). properties = copy the three values a stored reading already holds (no model call)"
+        type: choice
+        options: [keys, properties]
+        default: keys
+      pages:
+        description: properties only. How many windows of `photos` stored readings to walk, newest first (1 to 99)
+        type: string
+        default: '1'
 
 permissions:
   contents: read
@@ -64,10 +78,12 @@ jobs:
           python-version: '3.12'
 
       - name: Install the claude CLI
+        if: inputs.step != 'properties'
         # The lane itself is standard-library Python; the CLI is its only dependency.
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Check the subscription sign-in (no model call, no database call)
+        if: inputs.step != 'properties'
         shell: bash
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -94,6 +110,7 @@ jobs:
           JS
 
       - name: Run keys lane
+        if: inputs.step != 'properties'
         shell: bash
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -131,3 +148,46 @@ jobs:
           # 4 authentication; 5 no photo could be keyed.
           # -u: one line a photo reaches the log as it happens, so a run the timeout ends still shows how far it got.
           python3 -u scripts/photo-pipeline/keys_lane.py "${args[@]}"
+
+      # The existing projection (scripts/deep-image-analysis-byok.mjs project-cached, scripts/lib/image-property-projection.mjs):
+      # a stored deep reading already holds rust_severity, paint_state and completeness for its photo, and the registry has
+      # a property for each. No model is called and no key is needed but the database's. An owner's own photos go one
+      # claim at a time through ingest-observation (--single), because the batch intake takes listing photos only.
+      - name: Copy the stored readings' three values to their registered properties
+        if: inputs.step == 'properties'
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          KEYS_PHOTOS: ${{ inputs.photos }}
+          KEYS_PAGES: ${{ inputs.pages }}
+          KEYS_WRITE: ${{ inputs.write }}
+        run: |
+          KEYS_VEHICLE_ID="$(jq -r '.inputs.vehicle_id // ""' "$GITHUB_EVENT_PATH")"
+          uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          count='^[1-9][0-9]?$'
+          [[ "$KEYS_VEHICLE_ID" =~ $uuid ]] || { echo "::error::vehicle_id is not a lowercase uuid"; exit 2; }
+          echo "::add-mask::$KEYS_VEHICLE_ID"
+          [[ "$KEYS_PHOTOS" =~ $count ]] || { echo "::error::photos must be 1 to 99"; exit 2; }
+          [[ "$KEYS_PAGES" =~ $count ]] || { echo "::error::pages must be 1 to 99"; exit 2; }
+          [ -n "$SUPABASE_URL" ] || { echo "::error::SUPABASE_URL not set."; exit 2; }
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::SUPABASE_SERVICE_ROLE_KEY not set."; exit 2; }
+          # The script needs one package. It is installed beside the checkout and linked in, not the whole tree.
+          mkdir -p "$RUNNER_TEMP/sb" node_modules
+          (cd "$RUNNER_TEMP/sb" && npm init -y >/dev/null && npm install --no-audit --no-fund '@supabase/supabase-js@^2.86.0' >/dev/null)
+          ln -s "$RUNNER_TEMP/sb/node_modules/@supabase" node_modules/@supabase
+          args=(project-cached --vehicle-id "$KEYS_VEHICLE_ID" --limit "$KEYS_PHOTOS" --pages "$KEYS_PAGES")
+          if [ "$KEYS_WRITE" = "true" ]; then args+=(--apply --single); fi
+          rc=0
+          node scripts/deep-image-analysis-byok.mjs "${args[@]}" >"$RUNNER_TEMP/receipt" 2>"$RUNNER_TEMP/said" || rc=$?
+          # This log is public: counts and the script's fixed reason words only. No vehicle id, no row id, no raw error text.
+          tail -n 1 "$RUNNER_TEMP/receipt" | jq -c 'del(.vehicle_id, .observations)' 2>/dev/null || echo "no receipt was printed"
+          if [ -s "$RUNNER_TEMP/said" ]; then
+            head -n 3 "$RUNNER_TEMP/said" | cut -c1-240 | sed -E 's/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/<id>/g; s/[A-Za-z0-9_-]{24,}/<long>/g'
+          fi
+          {
+            echo "### Stored readings to registered properties ($([ "$KEYS_WRITE" = "true" ] && echo write || echo 'dry run'))"
+            tail -n 1 "$RUNNER_TEMP/receipt" | jq -r 'del(.vehicle_id, .observations) | to_entries[] | "- \(.key): \(.value | tojson)"' 2>/dev/null || echo "- no receipt was printed"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+

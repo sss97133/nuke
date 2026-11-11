@@ -1235,45 +1235,71 @@ async function resolve() {
  * Dry-run by default. No provider calls, downloads, queue/schedule changes or
  * 52-million-row JSON scan. Latest 500 condition rows is an explicit window,
  * not a claim of complete history. Repeat uses stable content identities.
+ *
+ *   node scripts/deep-image-analysis-byok.mjs project-cached --vehicle-id <uuid> [--limit 1..500] [--pages 1..100]
+ *        [--before <timestamp>] [--apply [--single]]
+ *
+ * It copies three values a stored deep reading already holds (rust_severity, paint_state, completeness) to the
+ * registered image properties. --single is the route for an owner's own photos, which the batch intake refuses.
  */
 async function projectCached() {
   const vehicleId = arg('--vehicle-id');
   const limit = Number(arg('--limit') || 100);
-  const before = arg('--before') || new Date().toISOString();
+  const pages = Number(arg('--pages') || 1);
+  const firstBefore = arg('--before') || new Date().toISOString();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId || '') ||
-      !Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isFinite(Date.parse(before))) {
-    throw new Error('project-cached requires --vehicle-id UUID, --limit 1..500 and optional --before timestamp');
+      !Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isFinite(Date.parse(firstBefore)) ||
+      !Number.isInteger(pages) || pages < 1 || pages > 100) {
+    throw new Error('project-cached requires --vehicle-id UUID, --limit 1..500 and optional --before timestamp, --pages 1..100');
   }
   const apply = args.includes('--apply');
-  const result = await sb.from('vehicle_observations')
-    .select('id,vehicle_id,kind,is_superseded,observed_at,ingested_at,agent_model,agent_tier,extraction_method,confidence,confidence_score,structured_data')
-    .eq('vehicle_id', vehicleId).eq('kind', 'condition')
-    .lt('ingested_at', before)
-    .order('ingested_at', { ascending: false }).order('id', { ascending: false })
-    .limit(limit).abortSignal(AbortSignal.timeout(10000));
-  if (result.error || !Array.isArray(result.data)) throw new Error('project-cached: source query failed');
-  const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok');
-  const ids = [...new Set(sources.map(row => row.structured_data?.image_id)
-    .filter(id => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)))];
-  const images = ids.length ? await sb.from('vehicle_images')
-    .select('id,vehicle_id,is_sensitive,is_superseded,is_duplicate,vision_gate_status,image_vehicle_match_status')
-    .in('id', ids).abortSignal(AbortSignal.timeout(10000)) : { data: [], error: null };
-  if (images.error || !Array.isArray(images.data)) throw new Error('project-cached: image query failed');
-  const byId = new Map(images.data.map(row => [row.id, row]));
-  const claims = [];
+  // The batch intake takes a public vehicle's listing photos only (20261004064216). --single lands one claim at a
+  // time through ingest-observation and reads each row and its witness back: the route for an owner's own photos.
+  const single = args.includes('--single');
+  // --pages N walks N windows of --limit rows, newest first, each window starting where the last one ended.
+  const counts = { sampled_condition_rows: 0, source_rows: 0, eligible_claims: 0 };
+  const landed = { inserted: 0, duplicates: 0, verified: 0, failed: 0, unattempted: 0 };
   const deferred = {};
-  for (const source of sources) {
-    const projected = projectImageProperties(source, byId.get(source.structured_data.image_id));
-    claims.push(...projected.claims);
-    if (projected.deferred) deferred[projected.deferred] = (deferred[projected.deferred] || 0) + 1;
+  let before = firstBefore, walked = 0, reachedOldest = false, last = {};
+  while (walked < pages) {
+    const result = await sb.from('vehicle_observations')
+      .select('id,vehicle_id,kind,is_superseded,observed_at,ingested_at,agent_model,agent_tier,extraction_method,confidence,confidence_score,structured_data')
+      .eq('vehicle_id', vehicleId).eq('kind', 'condition')
+      .lt('ingested_at', before)
+      .order('ingested_at', { ascending: false }).order('id', { ascending: false })
+      .limit(limit).abortSignal(AbortSignal.timeout(10000));
+    if (result.error || !Array.isArray(result.data)) throw new Error('project-cached: source query failed');
+    walked++;
+    const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok');
+    const ids = [...new Set(sources.map(row => row.structured_data?.image_id)
+      .filter(id => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)))];
+    const images = ids.length ? await sb.from('vehicle_images')
+      .select('id,vehicle_id,is_sensitive,is_superseded,is_duplicate,vision_gate_status,image_vehicle_match_status')
+      .in('id', ids).abortSignal(AbortSignal.timeout(10000)) : { data: [], error: null };
+    if (images.error || !Array.isArray(images.data)) throw new Error('project-cached: image query failed');
+    const byId = new Map(images.data.map(row => [row.id, row]));
+    const claims = [];
+    for (const source of sources) {
+      const projected = projectImageProperties(source, byId.get(source.structured_data.image_id));
+      claims.push(...projected.claims);
+      if (projected.deferred) deferred[projected.deferred] = (deferred[projected.deferred] || 0) + 1;
+    }
+    counts.sampled_condition_rows += result.data.length; counts.source_rows += sources.length; counts.eligible_claims += claims.length;
+    if (apply && claims.length) {
+      last = await applyImagePropertyClaims(sb, claims, single ? { mode: 'legacy' } : {});
+      for (const key of Object.keys(landed)) landed[key] += last[key] || 0;
+      if (last.failed > 0) break;
+    }
+    if (result.data.length < limit) { reachedOldest = true; break; }
+    // Rows that share the last row's instant and fell outside this window are not seen: the receipt's counts say so.
+    before = result.data[result.data.length - 1].ingested_at;
   }
-  const receipt = { mode: apply ? 'apply' : 'dry_run', vehicle_id: vehicleId,
-    sampled_condition_rows: result.data.length, source_rows: sources.length,
-    window_limit: limit, window_before: before, full_history_verified: false, model_calls: 0,
-    eligible_claims: claims.length, deferred,
-    ...(apply ? await applyImagePropertyClaims(sb, claims) : {}) };
+  const receipt = { mode: apply ? 'apply' : 'dry_run', route: single ? 'single' : 'batch', vehicle_id: vehicleId,
+    ...counts, window_limit: limit, window_before: firstBefore, pages_walked: walked, reached_oldest_row: reachedOldest,
+    full_history_verified: false, model_calls: 0, deferred,
+    ...(apply ? (pages === 1 ? last : { ...landed, ...(last.reason ? { reason: last.reason } : {}) }) : {}) };
   console.log(JSON.stringify(receipt));
-  if (receipt.failed > 0 || (apply && claims.length === 0)) process.exitCode = 1;
+  if (receipt.failed > 0 || (apply && counts.eligible_claims === 0)) process.exitCode = 1;
 }
 
 // Pure ledger functions exported for unit tests (importing does not run the pipeline — see isMain).
