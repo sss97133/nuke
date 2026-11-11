@@ -55,8 +55,8 @@ Deno.test('OReilly worker binds the receipt line code and primary MPN before adm
  f.lines[0] = { id: 'line-0', part_number: '72810', description: '1QT-P/SFLUID (ORC) private receipt context' };
  f.effects.capturePage = async (_a, url) => {
    f.captures.push(url);
-   return { html: url.includes('/search?') ? '<a href="/detail/c/brand/fluid/orc0/72810?q=72810">Fluid</a><a href="/detail/c/other/item/abc0/72810?q=72810">Wrong brand</a>'
-     : '<script type="application/ld+json">{"@type":"Product","sku":"733704728108","mpn":"72810","name":"Power Steering Fluid","image":"https://images-prod.oreillyauto.com/parts/fluid.jpg"}</script>',
+   return { html: url.includes('/search?') ? '<a href="/detail/c/brand/fluid/orc0/72810?q=72810"><h3 class="js-product-name" data-item="72810" data-line="ORC">Fluid</h3></a><a href="/detail/c/other/item/abc0/72810?q=72810"><h3 class="js-product-name" data-item="72810" data-line="ABC">Wrong brand</h3></a>'
+     : '<h1 class="js-product-name" data-item="72810" data-line="ORC">Power Steering Fluid</h1><script type="application/ld+json">{"@type":"Product","sku":"733704728108","mpn":"72810","name":"Power Steering Fluid","image":"https://images-prod.oreillyauto.com/parts/fluid.jpg"}</script>',
      source: { listing_url: url, id: 'snapshot', html_sha256: 'a'.repeat(64) } };
  };
  const result = await enrichReceiptProducts(f.admin, request, f.effects);

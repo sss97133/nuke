@@ -7,7 +7,15 @@ DO $$ DECLARE def text; anchor text; BEGIN
  def:=pg_get_functiondef('public.record_receipt_catalog_product(text,text,jsonb)'::regprocedure);
  anchor:=$a$images\.oreillyauto\.com$a$;
  IF (length(def)-length(replace(def,anchor,'')))/length(anchor)<>1 THEN RAISE EXCEPTION 'Catalog image host anchor drift'; END IF;
- EXECUTE replace(def,anchor,$a$images(-prod)?\.oreillyauto\.com$a$);
+ def:=replace(def,anchor,$a$images(-prod)?\.oreillyauto\.com$a$);
+ anchor:=$a$OR p_capture->>'parser' IS DISTINCT FROM 'receipt_product_page_v1'$a$;
+ IF position(anchor in def)=0 THEN RAISE EXCEPTION 'Catalog product-line validation anchor drift'; END IF;
+ def:=replace(def,anchor,anchor||$a$
+ OR (p_supplier='oreilly' AND coalesce(p_capture->>'product_line_code','') !~ '^[A-Z0-9]{2,3}$')$a$);
+ anchor:=$a$'supplier_key',p_supplier,'snapshot_id',s.id$a$;
+ IF position(anchor in def)=0 THEN RAISE EXCEPTION 'Catalog product-line metadata anchor drift'; END IF;
+ def:=replace(def,anchor,$a$'supplier_key',p_supplier,'line_code',p_capture->>'product_line_code','snapshot_id',s.id$a$);
+ EXECUTE def;
 
  def:=pg_get_functiondef('public.receipt_item_product_card(uuid)'::regprocedure);
  anchor:='supplier text; pn text;';
@@ -22,7 +30,7 @@ DO $$ DECLARE def text; anchor text; BEGIN
  anchor:=$a$AND application_data#>>'{receipt_product_v1,supplier_key}'=supplier ORDER BY$a$;
  IF position(anchor in def)=0 THEN RAISE EXCEPTION 'Catalog product namespace anchor drift'; END IF;
  def:=replace(def,anchor,$a$AND application_data#>>'{receipt_product_v1,supplier_key}'=supplier
- AND (supplier<>'oreilly' OR substring(catalog_parts.supplier_url from '/([a-zA-Z0-9]+)0/[^/?#]+(?:[?#]|$)')=lower(line_code)) ORDER BY$a$);
+ AND (supplier<>'oreilly' OR application_data#>>'{receipt_product_v1,line_code}'=line_code) ORDER BY$a$);
  EXECUTE def;
 END $$;
 COMMENT ON FUNCTION public.receipt_item_product_card(uuid) IS 'Internal receipt-to-catalog reader; caller qualifies receipt visibility. OReilly identity includes the printed product-line code, because part numbers repeat across brands. Latest source withdrawal suppresses that product card.';

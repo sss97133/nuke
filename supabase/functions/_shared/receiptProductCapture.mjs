@@ -57,6 +57,12 @@ export function parseProductPage(html, url, expectedPart) {
   const identifiers = product ? [product.sku, product.mpn] : [primaryMeta('sku'), primaryMeta('mpn')];
   const rawSku = identifiers.find(value => value != null && normalizePart(value) === normalizePart(expectedPart));
   if(rawSku == null)return {status:'sku_not_verified'};
+  let lineCode = null;
+  if (new URL(url).hostname.replace(/^www\./,'') === 'oreillyauto.com') {
+    const heading = [...html.matchAll(/<h1\b[^>]*>/gi)].map(m=>attrs(m[0])).find(a=>a.class?.split(/\s+/).includes('js-product-name'));
+    if (!heading || normalizePart(heading['data-item']) !== normalizePart(expectedPart) || !/^[A-Z0-9]{2,3}$/.test(heading['data-line']??'')) return {status:'primary_line_code_not_verified'};
+    lineCode = heading['data-line'];
+  }
   const offers=Array.isArray(product?.offers)?product.offers[0]:product?.offers;
   const rawPrice=offers?.price??primaryMeta('price');
   const image=[product?.image].flat()[0]??meta('property','og:image');
@@ -68,7 +74,7 @@ export function parseProductPage(html, url, expectedPart) {
   const brandBlock=html.match(/<div[^>]*itemprop=["']brand["'][^>]*>[\s\S]*?<meta[^>]*itemprop=["']name["'][^>]*>/i);
   const brand=typeof product?.brand==='string'?product.brand:product?.brand?.name;
   const description=product?.description||html.match(/id=["']product-description-content["'][^>]*>([\s\S]*?)(?=<div[^>]+id=["']product-specs-content|<div[^>]+id=["']product-reviews-content)/i)?.[1];
-  return {status:'exact_sku_page',printed_sku:String(rawSku),product_name:clean(name),
+  return {status:'exact_sku_page',printed_sku:String(rawSku),line_code:lineCode,product_name:clean(name),
     manufacturer:brand||(brandBlock?attrs(brandBlock[0].slice(brandBlock[0].lastIndexOf('<meta'))).content:null),
     image_url:imageUrl,price:rawPrice!=null&&/^\d+(\.\d+)?$/.test(String(rawPrice))?Number(rawPrice):null,
     currency:offers?.priceCurrency??primaryMeta('priceCurrency')??null,
@@ -77,12 +83,16 @@ export function parseProductPage(html, url, expectedPart) {
 }
 /** @param {string | null} lineCode */
 export function productLinks(html, searchUrl, part, lineCode = null) {
-  const result=[];for(const m of html.matchAll(/<a\b[^>]*href=["']([^"']+)["']/gi)){
-    let url;try{url=new URL(decode(m[1]),searchUrl)}catch{continue}
+  const result=[];for(const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)){
+    const href = attrs(m[1]).href; if(!href)continue;
+    let url;try{url=new URL(href,searchUrl)}catch{continue}
     if(url.hostname!==new URL(searchUrl).hostname||!allowedProductUrl(url.href)||!url.pathname.startsWith('/detail/c/'))continue;
     let segments;try{segments=url.pathname.split('/').map(decodeURIComponent)}catch{continue;}
     if(normalizePart(segments.at(-1))!==normalizePart(part))continue;
-    if(lineCode && segments.at(-2)?.toUpperCase()!==lineCode.toUpperCase()+'0')continue;
+    if(lineCode) {
+      const card=[...m[2].matchAll(/<h3\b[^>]*>/gi)].map(h=>attrs(h[0])).find(a=>a.class?.split(/\s+/).includes('js-product-name'));
+      if(!card || normalizePart(card['data-item'])!==normalizePart(part) || card['data-line']!==lineCode.toUpperCase())continue;
+    }
     url.hash='';if(!result.some(existing => new URL(existing).pathname===url.pathname))result.push(url.href);
   }return result.slice(0,3);
 }

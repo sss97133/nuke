@@ -14,7 +14,7 @@ test('primary manufacturer part number may differ from the retailer UPC',()=>{
 });
 test('receipt line code disambiguates duplicate part numbers across supplier brands',()=>{
  const root='https://www.oreillyauto.com/search?q=55173';
- const html=['mry0','wal0','mtm0'].map(code=>`<a href="/detail/c/brand/item/${code}/55173?q=55173">part</a>`).join('')+'<a href="/detail/c/brand/item/mtm0/55173?tracking=duplicate">same</a>';
+ const html=['mry0','wal0','mtm0'].map(code=>`<a href="/detail/c/brand/item/${code}/55173?q=55173"><h3 class="js-product-name" data-item="55173" data-line="${code.slice(0,-1).toUpperCase()}">part</h3></a>`).join('')+'<a href="/detail/c/brand/item/mtm0/55173?tracking=duplicate"><h3 class="js-product-name" data-item="55173" data-line="MTM">same</h3></a>';
  assert.equal(productLinks(html,root,'55173').length,3);
  assert.deepEqual(productLinks(html,root,'55173',receiptLineCode('HOSE CLAMPS (MTM)')),['https://www.oreillyauto.com/detail/c/brand/item/mtm0/55173?q=55173']);
  assert.deepEqual(productLinks(html,root,'55173','ORC'),[]);
@@ -22,6 +22,16 @@ test('receipt line code disambiguates duplicate part numbers across supplier bra
  assert.equal(receiptLineCode('ENGINE MOUNT (PT2) LT'),'PT2');
  assert.equal(receiptLineCode('SEMI-MET PAD (ST)'),'ST');
  assert.equal(receiptLineCode('Fluid without a printed code'),null);
+});
+test('printed product-line code is independent of the URL brand abbreviation',()=>{
+ const detail='https://www.oreillyauto.com/detail/c/precision/hose/opr0/13401332';
+ const heading='<h1 class="js-product-name" data-line="PPS" data-item="13401332">Steering hose</h1>';
+ const body=page({...product,sku:'UPC',mpn:'13401332'})+heading;
+ assert.equal(parseProductPage(body,detail,'13401332').line_code,'PPS');
+ assert.equal(parseProductPage(body.replace('data-item="13401332"','data-item="WRONG"'),detail,'13401332').status,'primary_line_code_not_verified');
+ const card=`<a href="${detail}"><h3 class="js-product-name" data-line="PPS" data-item="13401332">Steering hose</h3></a>`;
+ assert.deepEqual(productLinks(card,'https://www.oreillyauto.com/search?q=13401332','13401332','PPS'),[detail]);
+ assert.deepEqual(productLinks(card,'https://www.oreillyauto.com/search?q=13401332','13401332','OPR'),[]);
 });
 test('matching recommendation cannot replace a mismatching primary product',()=>{
  assert.equal(parseProductPage(page([ {...product,sku:'OTHER'},product ]),url,'ABC-1').status,'sku_not_verified');

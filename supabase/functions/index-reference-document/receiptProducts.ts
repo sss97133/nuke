@@ -72,9 +72,10 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
         }
         const product = parseProductPage(page.html, page.source.listing_url, line.part_number);
         if (product.status !== 'exact_sku_page' || !product.image_url) { reason = product.status; continue; }
+        if (lineCode && product.line_code !== lineCode) { reason = 'product_line_code_mismatch'; continue; }
         const image = await effects.retainImage(admin, product.image_url);
         const saved = await admin.rpc('record_receipt_catalog_product', { p_supplier: supplierKey(receipt.vendor_name), p_number: normalizePart(line.part_number),
-          p_capture: { ...image, name: product.product_name, printed_sku: product.printed_sku, manufacturer: product.manufacturer,
+          p_capture: { ...image, name: product.product_name, printed_sku: product.printed_sku, product_line_code: product.line_code, manufacturer: product.manufacturer,
             description: product.description, price: product.price, currency: product.currency, source_role: candidate.role,
             match_basis: product.match_basis, image_source_url: product.image_url, parser: 'receipt_product_page_v1',
             page_url: page.source.listing_url, snapshot_id: page.source.id, page_sha256: page.source.html_sha256 } });
