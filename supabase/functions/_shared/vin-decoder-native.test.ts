@@ -71,3 +71,13 @@ Deno.test("1C4 preserves manufacturer compatibility without assigning Jeep or Ch
   assertEquals(decoded.manufacturer, "FCA US LLC");
   assertEquals(decoded.manufacturer_make_candidates, ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia']);
 });
+
+Deno.test('1972-80 GM car layout: engine letter at 5, year at 6, plant at 7; Pontiac F-body series', () => {
+  const r = decodeVin('2S87D3N100001');
+  assertEquals([r.make, r.model, r.series, r.series_code, r.body_style], ['Pontiac', 'Firebird', 'Firebird', 'S', 'Coupe']);
+  assertEquals([r.year, r.engine_code, r.engine_size, r.plant, r.plant_name, r.serial_number], [1973, 'D', '250', 'N', 'Norwood, Ohio', '100001']);
+  const ta = decodeVin('2V87Y3N100002');
+  assertEquals([ta.year, ta.series, ta.engine_size], [1973, 'Trans Am', '455 4bbl']);
+  // A 1970 Chevrolet (no engine letter) keeps the pre-1972 positions.
+  assertEquals(decodeVin('136807Z130419').year, 1970);
+});
