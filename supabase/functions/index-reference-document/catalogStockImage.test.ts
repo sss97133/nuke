@@ -89,3 +89,23 @@ Deno.test('actual Firecrawl allowance refusal leaves image pending without API r
   await assertRejects(() => retainImage(f.admin, url, f.effects), Error, 'stock_image_budget_deferred');
   assertEquals(calls, 1); assertEquals(f.uploads(), 0);
 });
+
+Deno.test('remote refusal event excludes URLs, byte payloads, tokens and arbitrary provider error text', async () => {
+  const f = fixture(); const messages: unknown[][] = []; const realWarn = console.warn;
+  f.remote.ok = false; f.remote.httpStatus = 401; f.remote.error = 'private-provider-token-and-context';
+  f.payload.data.metadata.sourceURL = 'https://example.test/private-source?credential=private-token';
+  f.payload.data.metadata.url = 'https://example.test/private-final?credential=private-token';
+  f.payload.data.metadata.contentType = 'private-content-type';
+  f.payload.data.rawBase64 = btoa('private-byte-payload');
+  console.warn = (...args) => { messages.push(args); };
+  try {
+    await assertRejects(() => retainImage(f.admin, url, f.effects), Error, 'stock_image_remote_unqualified');
+  } finally { console.warn = realWarn; }
+  assertEquals(messages.length, 1);
+  assertEquals(JSON.parse(String(messages[0][0])), { event: 'catalog_stock_image_remote_refused', code: 'stock_image_remote_unqualified',
+    api_status: 401, origin_status: 200, requested_source_matches: false, final_source_matches: false,
+    content_type: 'other', original_bytes_present: true });
+  const serialized = JSON.stringify(messages);
+  for (const excluded of ['https://', 'private-', f.payload.data.rawBase64]) assertEquals(serialized.includes(excluded), false);
+  assertEquals(f.uploads(), 0);
+});
