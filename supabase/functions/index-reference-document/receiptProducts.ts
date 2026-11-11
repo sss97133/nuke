@@ -44,7 +44,9 @@ export async function enrichReceiptProducts(admin: any, body: any, effects = { c
   let processed = 0, complete = true, nextRetry = 604800;
   const blockedHosts = new Set<string>();
   for (const line of lines.data.filter(productEligible)) {
-    const fingerprint = await sha(new TextEncoder().encode(JSON.stringify([receipt.vendor_name, line.part_number, line.description])));
+    // A repaired parser must revisit an old refusal instead of waiting out its
+    // retry delay. Already acknowledged products still come from the catalog.
+    const fingerprint = await sha(new TextEncoder().encode(JSON.stringify(['primary_identity_v2', receipt.vendor_name, line.part_number, line.description])));
     const previous = queue.data.product_result?.items?.[line.id];
     const card = await admin.rpc('receipt_item_product_card', { p_item: line.id });
     if (card.error) throw new Error('catalog_reader_unavailable');

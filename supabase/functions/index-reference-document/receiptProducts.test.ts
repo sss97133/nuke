@@ -69,3 +69,10 @@ Deno.test('OReilly receipt without a product line stays explicit and does not sc
  const result = await enrichReceiptProducts(f.admin, request, f.effects);
  assert(!result.product_complete && result.product_result.items['line-0'].status==='receipt_line_code_missing' && !f.captures.length,'do not guess a brand');
 });
+Deno.test('a parser revision revisits a prior refusal instead of retaining its day-long delay', async () => {
+ const f=fixture(1);
+ const oldFingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(['Classic Industries',f.lines[0].part_number,f.lines[0].description])))),x=>x.toString(16).padStart(2,'0')).join('');
+ f.state.prior={items:{'line-0':{fingerprint:oldFingerprint,status:'sku_not_verified',retry_at:new Date(Date.now()+86400000).toISOString()}}};
+ const result=await enrichReceiptProducts(f.admin,request,f.effects);
+ assert(result.product_complete&&f.captures.length===1,'old-parser refusal retried through retained capture path');
+});
