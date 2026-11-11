@@ -17,42 +17,71 @@ photo = lambda pid, **over: {'id': pid, 'taken_at': '2024-03-09T16:05:07.98765-0
                              'image_url': 'https://img.example.invalid/1.jpg', 'scene': 'exterior_detail',
                              'callouts': [STATEMENT, 'Glare hides the roof.'], 'reader_model': 'reader-model-b', 'prompt_version': 'deep-v3', **over}
 SUBJECT_ROWS = [{'subject_key': k, 'side': s} for k, s in (('door.front.driver', 'driver'), ('door.front.passenger', 'passenger'), ('interior.dashboard', 'center'), ('interior.seat.front.driver', 'driver'))]
-CONDITION_ROWS = [{'canonical_key': k, 'descriptor_type': t} for k, t in (('exterior.body.deformation', 'mechanism'), ('exterior.paint.delamination', 'mechanism'), ('exterior.paint.respray', 'state'), ('interior.dashboard.cracking', 'mechanism'))]
+FRAGMENT = 'manual.sec_6a.fig_12.clearance'   # live in the table and not in the curated list: stands for a service-manual fragment
+CONDITION_ROWS = [{'canonical_key': k, 'descriptor_type': t} for k, t in (('exterior.body.deformation', 'mechanism'), ('exterior.paint.delamination', 'mechanism'), ('exterior.paint.respray', 'state'), ('interior.dashboard.cracking', 'mechanism'), (FRAGMENT, 'mechanism'))]
 DOOR = {'decision': 'existing', 'key': 'door.front.driver', 'side': 'driver'}
-FLAKING = {'decision': 'condition_key', 'property_key': None, 'value_or_key': 'exterior.paint.delamination'}
+on_key = lambda key, decision='condition_key': {'decision': decision, 'property_key': None, 'value_or_key': key}
+FLAKING, DENT = on_key('exterior.paint.delamination'), on_key('exterior.body.deformation')
+claim = lambda state=FLAKING, said='Paint is flaking on the driver door', part=DOOR: {'part': part, 'state': state, 'said': said}
 unit = lambda said='Paint is flaking on the driver door': {'photo': 'aaaaaaaa', 'proposals': [], 'unsure': 'nothing', 'results': [
     {'sid': 'c0', 'claims': [{'part': DOOR, 'state': FLAKING, 'said': said}], 'not_a_claim': None, 'question': None},
     {'sid': 'c1', 'claims': [], 'not_a_claim': 'a limit of the photo', 'question': None}]}
+# the same result with any claims on its first statement, and a model stand-in that answers with one value
+answer_of = lambda *claims, proposals=(): {**unit(), 'proposals': list(proposals), 'results': [{'sid': 'c0', 'claims': list(claims), 'not_a_claim': None, 'question': None}, unit()['results'][1]]}
+says = lambda value: lambda prompt, model: {'ok': True, 'value': value}
+NEW = {'success': True, 'duplicate': False, 'observation_id': S1}
+PAUSES = []   # the waits between re-sends, recorded and not waited
+
+
+class Lost(TimeoutError):
+    """The connection dropped before the writer's answer arrived. committed: the writer had stored the row first."""
+    def __init__(self, committed=False): super().__init__('no answer'); self.committed = committed
+
+
+def answers(*script):
+    """A writer that gives each POST the next scripted answer, (status, body) or an exception to raise, and then says new."""
+    left = list(script)
+    def writer(body):
+        said = left.pop(0) if left else (200, NEW)
+        if isinstance(said, Exception): raise said
+        return said
+    return writer
 
 
 class Database:
-    """Stands in for PostgREST and the writer. Records every call."""
-    def __init__(self, photos, keyed=(), reading=(), writer=lambda body: (200, {'success': True, 'duplicate': False, 'observation_id': S1}), lands=True):
-        self.photos, self.keyed, self.reading, self.writer, self.lands, self.calls, self.landed = photos, list(keyed), list(reading), writer, lands, [], 0
+    """Stands in for PostgREST and the writer. Records every call. Like the writer, it answers duplicate to bytes it
+    has stored, so a re-send that differed by a byte would land a second row and show in the count."""
+    def __init__(self, photos, keyed=(), reading=(), writer=answers(), lands=True):
+        self.photos, self.keyed, self.reading, self.writer, self.lands, self.calls, self.stored = photos, list(keyed), list(reading), writer, lands, [], []
     def __call__(self, method, url, headers, body=None):
         self.calls.append((method, url, body))
         assert headers['Authorization'] == 'Bearer service-key-stand-in'
         if method == 'POST':
-            status, answer = self.writer(json.loads(body))
-            self.landed += bool(self.lands and answer.get('success') and not answer.get('duplicate'))
+            if body in self.stored: return 200, {}, json.dumps({'success': True, 'duplicate': True, 'observation_id': S1, 'message': 'Observation already exists'})
+            try: status, answer = self.writer(json.loads(body))
+            except Lost as lost:
+                if lost.committed: self.stored.append(body)
+                raise
+            if self.lands and status == 200 and answer.get('success') and not answer.get('duplicate'): self.stored.append(body)
             return status, {}, json.dumps(answer)
         path = url.split('/rest/v1/')[1]; table = path.split('?')[0]
         offset = int((re.search(r'offset=(\d+)', path) or [0, 0])[1])
-        if method == 'HEAD': return 200, {'content-range': '0-0/%d' % (len(self.photos) if table == 'vehicle_images' else len(self.keyed) + self.landed)}, ''
+        lane_rows = self.keyed + [json.loads(b)['source_identifier'] for b in self.stored]
+        if method == 'HEAD': return 200, {'content-range': '0-0/%d' % (len(self.photos) if table == 'vehicle_images' else len(lane_rows))}, ''
         if table == 'vehicle_images':
             after = re.search(r'id=gt\.([0-9a-f-]+)', path)
             return 200, {}, json.dumps([p for p in self.photos if not after or p['id'] > after[1]])
         rows = (SUBJECT_ROWS if table == 'subject_taxonomy' else CONDITION_ROWS if table == 'condition_taxonomy'
-                else self.reading if 'reviewed_image_analysis_v1' in path else [{'source_identifier': s} for s in self.keyed])
+                else self.reading if 'reviewed_image_analysis_v1' in path else [{'source_identifier': s} for s in lane_rows])
         return 200, {}, json.dumps(rows[offset:offset + 1000])
     writes = property(lambda self: [c for c in self.calls if c[0] not in ('GET', 'HEAD')])
 
 
 def lane(db, *flags, ask=lambda prompt, model: {'ok': True, 'value': unit()}, env=ENV):
     lines = []
-    code = run(['--vehicle-id', V, '--user-id', U, *flags], env, http=db, ask=ask, out=lines.append)
+    code = run(['--vehicle-id', V, '--user-id', U, *flags], env, http=db, ask=ask, out=lines.append, sleep=PAUSES.append)
     printed = '\n'.join(lines)
-    for private in (V, U, P1, P2, P3, S1, 'flaking', 'Glare', 'service-key-stand-in', 'example.invalid'):
+    for private in (V, U, P1, P2, P3, S1, 'flaking', 'Glare', 'dented', 'service-key-stand-in', 'example.invalid'):
         assert private not in printed, f'the lane printed something private: {private}'
     return code, printed
 
@@ -164,7 +193,9 @@ code, printed = lane(db, ask=keyed)
 assert code == 0 and not db.writes, 'a dry run writes nothing anywhere'
 assert 'dry run' in printed and 'keyed: 1' in printed and 'landable: 1' in printed and 'writer: not called (dry run)' in printed
 assert 'before 0, after 0, landed 0' in printed and 'cursor for --after: aaaaaaaa' in printed and '1 claims would be sent' in printed
-assert "left out: {}" in printed and 'registry read live: 4 part keys, 4 condition keys' in printed
+assert "left out: {}" in printed and 'registry read live: 4 part keys, 4 condition keys (live and in the curated list; 1 live keys outside it withheld)' in printed
+assert 'not checked by code: that a statement supports the key it was given' in printed and 're-sends' not in printed and 'partly landed' not in printed
+assert FRAGMENT not in prompts[0] and '1 further live keys are not listed' in prompts[0], 'a live key outside the curated list is not offered'
 assert len(prompts) == 1 and '"id": "c0"' in prompts[0] and '"id": "c1"' in prompts[0] and 'Paint is flaking on the driver door lower edge.' in prompts[0]
 assert 'door.front.driver [driver]' in prompts[0] and 'exterior.paint.respray (state)' in prompts[0] and 'image_visible_rust_severity: none, surface' in prompts[0]
 assert fr['task'] in prompts[0] and fr['brief'] in prompts[0] and '"part_decisions"' in prompts[0]
@@ -190,11 +221,13 @@ assert code == 0 and 'new 0, duplicate 1' in printed and 'landed 0' in printed
 db = Database([photo(P1)], writer=lambda body: (400, {'error': 'Unknown or deprecated descriptor_key: exterior.paint.delamination', 'hint': 'never printed'}))
 code, printed = lane(db, '--write')
 assert code == 1 and "refused 1 {'400 Unknown or deprecated descriptor_key: exterior.paint.delamination': 1}" in printed and 'never printed' not in printed
+assert len(db.writes) == 1 and 'again): 0' in printed, 'a 4xx is the writer\'s answer: not sent again, and a photo with nothing landed is not partly landed'
 db = Database([photo(P1)], writer=lambda body: (401, {'error': 'unauthorized', 'message': 'no'}))
 assert lane(db, '--write')[0] == 4, 'the writer refusing the key is an authentication failure'
-def lost(body): raise TimeoutError('no answer')
-code, printed = lane(Database([photo(P1)], writer=lost), '--write')
-assert code == 1 and 'no answer 1' in printed, 'a lost answer is unknown, not zero and not retried'
+db = Database([photo(P1)], writer=answers(Lost(), Lost(), Lost()))
+code, printed = lane(db, '--write')
+assert code == 1 and 'no answer 1' in printed and len(db.writes) == keys_lane.ATTEMPTS == 3, 'a lost answer is unknown, not zero; the same bytes are sent a bounded number of times'
+assert len({sent for _, _, sent in db.writes}) == 1 and 'landed 0' in printed
 code, printed = lane(Database([photo(P1)], lands=False), '--write')   # the writer says new, the count does not move
 assert code == 1 and 'new 1' in printed and 'landed 0' in printed, 'success is rows landed, not what the writer said'
 
@@ -222,7 +255,7 @@ library = [photo(P3), photo(P1), photo(P2, scene='receipt_document'), photo('ddd
 library.sort(key=lambda p: p['id'])
 db = Database(library, keyed=[f'photo_map_harvest_v1:{P1}:0:exterior.paint.delamination:door.front.driver:driver'])
 code, printed = lane(db, '--photos', '5')
-assert code == 0 and 'seen: 3 (already keyed by this lane: 1; receipt_document, not asked: 1)' in printed and 'photos taken: 1' in printed and 'cursor for --after: cccccccc' in printed
+assert code == 0 and 'seen: 3 (with at least one row from this lane, not taken again: 1; receipt_document, not asked: 1)' in printed and 'photos taken: 1' in printed and 'cursor for --after: cccccccc' in printed
 code, printed = lane(Database(library), '--after', 'aaaaaaaa')
 assert code == 0 and 'photos taken: 1' in printed and 'cursor for --after: cccccccc' in printed, 'the cursor is honoured'
 code, printed = lane(Database(library), '--after', 'cccccccc')
@@ -268,4 +301,73 @@ if os.path.exists(PACK):   # run the file itself on these rows and compare what 
     pack = 'pack_claims.py itself was run on the same rows and agrees'
 else:
     pack = 'pack_claims.py is NOT in this checkout: its rules were compared as written out in this test, not by running it'
-print(f'keys_lane: 14 groups of cases pass ({pack})')
+
+# 15. a condition key is offered and landed only when it is live AND in the curated list (registry.snapshot.json)
+assert FRAGMENT not in keys_lane.CURATED and len(keys_lane.CURATED) == 53 and 'exterior.metal.perforation' in keys_lane.CURATED
+for key, why in ((FRAGMENT, 'live, not curated'), ('exterior.metal.perforation', 'curated, not live')):
+    db = Database([photo(P1)])
+    code, printed = lane(db, '--write', ask=says(answer_of(claim(on_key(key)))))
+    assert code == 5 and not db.writes and "{'condition key not in the registry': 1}" in printed, f'a key that is {why} is not a registry key for this lane'
+db = Database([photo(P1)])   # drafted as a new key with a proposal: the check passes it, and it is left out, not landed
+code, printed = lane(db, '--write', ask=says(answer_of(claim(on_key(FRAGMENT, 'no_place')), proposals=[{'kind': 'condition_key', 'key': FRAGMENT}])))
+assert code == 0 and not db.writes and "left out: {'state has no registry key': 1}" in printed and '0 rows landed' in printed
+
+# 16. a landable claim must quote two words or more, or the whole statement; the check alone passes '' and any one word
+for thin in ('', '  ', 'Paint', 'door.'):
+    db = Database([photo(P1)])
+    code, printed = lane(db, '--write', ask=says(answer_of(claim(said=thin))))
+    assert code == 5 and not db.writes and 'rejected by the check: 1' in printed and "{'landable claim quoting under two words': 1}" in printed, repr(thin)
+db = Database([photo(P1)])
+assert lane(db, '--write', ask=says(answer_of(claim(said='Paint is'))))[0] == 0 and len(db.writes) == 1
+db = Database([photo(P1, callouts=['Delamination.', 'Glare hides the roof.'])])
+assert lane(db, '--write', ask=says(answer_of(claim(said='delamination'))))[0] == 0 and len(db.writes) == 1, 'a one-word statement quoted whole is all there is to quote'
+RUST = {'decision': 'property', 'property_key': 'image_visible_rust_severity', 'value_or_key': 'surface'}
+db = Database([photo(P1)])
+assert lane(db, '--write', ask=says(answer_of(claim(), claim(RUST, said='Paint'))))[0] == 0 and len(db.writes) == 1, 'a claim that lands nothing is not held to it'
+# NOT closed, and the summary says so on every run: a true quote from a statement that denies the flaw still lands.
+# When a refuting pass exists, this case must flip to no POST.
+db = Database([photo(P1, callouts=['No flaking paint is visible on the driver door.', 'Glare hides the roof.'])])
+code, printed = lane(db, '--write', ask=says(answer_of(claim(said='flaking paint is visible on the driver door'))))
+assert code == 0 and len(db.writes) == 1 and 'not checked by code: that a statement supports the key it was given' in printed
+
+# 17. the claims on one statement are bounded, so one answer cannot put a statement on every key
+PASSENGER = {'decision': 'existing', 'key': 'door.front.passenger', 'side': 'passenger'}
+every = [claim(on_key(r['canonical_key']), said='the driver', part=part) for r in CONDITION_ROWS[:4] for part in (DOOR, PASSENGER)]
+for too_many in (every, [claim()] * (keys_lane.MAX_CLAIMS + 1)):
+    db = Database([photo(P1)])
+    code, printed = lane(db, '--write', ask=says(answer_of(*too_many)))
+    assert code == 5 and not db.writes and "{'too many claims on one statement': 1}" in printed
+db = Database([photo(P1)])
+code, printed = lane(db, '--write', ask=says(answer_of(*every[:keys_lane.MAX_CLAIMS])))
+assert keys_lane.MAX_CLAIMS == 6 and code == 0 and len(db.writes) == 6 and 'landed 6' in printed, 'the bound itself is allowed'
+
+# 18. a claim the writer did not take is sent again with the same bytes; what is still not taken is counted, and a
+#     later run does not call the photo done
+for unknown in ((503, {'error': 'Property registry unavailable'}), (429, {'error': 'rate limited'}), Lost()):
+    del PAUSES[:]
+    db = Database([photo(P1)], writer=answers(unknown))
+    code, printed = lane(db, '--write')
+    assert code == 0 and len(db.writes) == 2 and db.writes[0][2] == db.writes[1][2] and PAUSES == [3], 'one re-send, byte for byte, after a pause'
+    assert 'writer: new 1, duplicate 0, no answer 0, refused 0' in printed and 'before 0, after 1, landed 1' in printed
+    assert 're-sends of the same bytes after no answer, a 5xx or a 429: 1; claims the writer then called duplicate: 0' in printed
+db = Database([photo(P1)], writer=answers(Lost(committed=True)))   # the row landed and the answer was lost
+code, printed = lane(db, '--write')
+assert code == 0 and len(db.writes) == 2 and 'writer: new 0, duplicate 0' in printed and 'claims the writer then called duplicate: 1' in printed
+assert 'before 0, after 1, landed 1' in printed and '1 rows landed' in printed, 'a re-send cannot land a second row, and the row it found is counted as landed'
+TWO = ['Paint is flaking on the driver door.', 'The driver door is dented near the handle.']
+two = {**unit(), 'results': [{'sid': 'c0', 'claims': [claim()], 'not_a_claim': None, 'question': None},
+                             {'sid': 'c1', 'claims': [claim(DENT, said='driver door is dented')], 'not_a_claim': None, 'question': None}]}
+FAIL = (500, {'error': 'Failed to insert observation', 'details': 'never printed'})
+db = Database([photo(P1, callouts=TWO)], writer=answers((200, NEW), FAIL, FAIL, FAIL))
+code, printed = lane(db, '--write', ask=says(two))
+assert code == 1 and len(db.writes) == 4 and "writer: new 1, duplicate 0, no answer 0, refused 1 {'500 Failed to insert observation': 1}" in printed and 'never printed' not in printed
+assert 'photos left partly landed (some claims taken, some not; a later run does not take the photo again): 1' in printed
+assert 'result: the writer did not take everything that was sent; photos left partly landed: 1 (exit 1)' in printed and 'landed 1' in printed
+asked = []
+code, printed = lane(db, '--write', ask=lambda prompt, model: asked.append(1))   # the next run: the photo has one row
+assert code == 0 and not asked and len(db.writes) == 4 and 'photos taken: 0' in printed
+assert 'nothing left to do' not in printed and 'result: no photo left to take: 1 passed over because each has at least one row from this lane' in printed
+db = Database([photo(P1, callouts=TWO)], writer=answers((200, NEW), (401, {'error': 'unauthorized'})))
+code, printed = lane(db, '--write', ask=says(two))
+assert code == 4 and len(db.writes) == 2 and 'again): 1' in printed, 'a stop between two claims of one photo leaves it partly landed, and the count says so'
+print(f'keys_lane: 18 groups of cases pass ({pack})')

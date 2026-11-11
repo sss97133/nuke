@@ -4,7 +4,10 @@
 One photo at a time (owner, 2026-11-10: "the best type of batch is one at a time ... if they can't do one, they
 definitely can't do [many]"). It reads no photo and adds no vocabulary: the prompt is the keys role's brief
 (skills/image-keys/SKILL.md) and the unit's conventions (keys-dry-run/workflows/one-photo.js), the keys are the
-registry read live, and a photo's result passes the code check (keys-dry-run/check_units.py) or lands nothing.
+registry read live (condition keys: the curated ones that are still live), and a photo's result passes the code
+check (keys-dry-run/check_units.py) or lands nothing.
+NOT checked by code: that a statement supports the key it was given. The check is only that the quoted words are in
+the statement, so a wrong placement by the model can land. Each row is agent testimony and its limitation says so.
 
 usage: keys_lane.py --vehicle-id <uuid> --user-id <uuid> [--photos 1] [--model sonnet]
                     [--after <photo id, or the 8-character cursor a run printed>] [--write]
@@ -14,8 +17,8 @@ ingest-observation, the sanctioned writer, with the body keys-dry-run/land.sql b
 It prints counts only, because this repository's logs are public: no id but a photo's first 8 characters, no statement.
 
 exit: 0 work done, or nothing left to do (the summary says which); 1 a read failed, or the writer did not take what
-was sent; 2 bad arguments or environment; 3 usage limit reached (stopped at once, what landed is kept);
-4 authentication failure; 5 photos were available and none could be keyed.
+was sent, also when the same bytes were sent again; 2 bad arguments or environment; 3 usage limit reached (stopped
+at once, what landed is kept); 4 authentication failure; 5 photos were available and none could be keyed.
 """
 import argparse, collections, datetime, json, os, re, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
@@ -31,6 +34,14 @@ CHECK = 'scripts/photo-pipeline/keys-dry-run/check_units.py'
 DECISIONS = 'scripts/photo-pipeline/keys-dry-run/decisions.pending.2026-11-10.json'   # the binding memory; pending, not approved
 SNAPSHOT_MD = 'scripts/photo-pipeline/keys-dry-run/registry.snapshot.md'
 METHOD = 'photo_map_harvest_v1'
+# The usable condition keys: registry.snapshot.json's hand-chosen list, copied here before use_registry() replaces
+# check_units.COND. condition_taxonomy also holds fragments of a service manual that no column marks
+# (docs/ledger/2026-11-10_image-keys-build-design.md: "Asking from the whole table would ask junk"), and the writer
+# admits any live key, so this lane withholds them itself.
+CURATED = frozenset(check_units.COND)
+MAX_CLAIMS = 6   # on one statement. The 2026-11-10 dry run made 958 claims on 724 statements (docs/ledger/theory/image-keys-test.md)
+ATTEMPTS = 3     # one POST and at most two re-sends of the same bytes
+RESENT = 'duplicate after a re-send'
 UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 LIMITATION = ("One reader's statement about one photo, placed on existing keys by an agent. The part is carried as text until "
               "a part has a place on an observation. Not confirmed by a second reader, a receipt or the owner.")
@@ -139,15 +150,18 @@ def count(db, path):
 
 
 def live_registry(db):
-    """Places and parts, and condition keys, as they are now, in the shape of registry.snapshot.json.
+    """Places and parts, and condition keys, as they are now, in the shape of registry.snapshot.json, with the
+    number of live condition keys withheld. A condition key is offered and landed only when it is live AND in the
+    curated list: the live read drops a curated key that has been deprecated and adds none.
     The three image properties and their allowed values are NOT read here: they are typed in code
     (supabase/functions/ingest-observation/imageProperties.ts), not stored in a column, so they stay as
     registry.snapshot.json has them (check_units.PROPS)."""
     subject = {r['subject_key']: r['side'] for r in pages(db, 'subject_taxonomy?select=subject_key,side&is_active=is.true&order=subject_key.asc')}
-    condition = {r['canonical_key']: ('state' if r['descriptor_type'] == 'state' else None)
-                 for r in pages(db, 'condition_taxonomy?select=canonical_key,descriptor_type&deprecated_at=is.null&order=canonical_key.asc')}
-    if not subject or not condition: raise Stop(1, 'read failed: the live registry came back empty')
-    return subject, condition
+    live = {r['canonical_key']: ('state' if r['descriptor_type'] == 'state' else None)
+            for r in pages(db, 'condition_taxonomy?select=canonical_key,descriptor_type&deprecated_at=is.null&order=canonical_key.asc')}
+    condition = {k: v for k, v in live.items() if k in CURATED}
+    if not subject or not condition: raise Stop(1, 'read failed: the live registry came back empty, or no curated condition key is live')
+    return subject, condition, len(live) - len(condition)
 
 
 PHOTOS = ('vehicle_images?select=id,taken_at,created_at,image_url'
@@ -207,7 +221,7 @@ def frame():
             'assemblies': md[md.index('### Assemblies with states'):].strip()}
 
 
-def registry_text(subject, condition, assemblies, today):
+def registry_text(subject, condition, withheld, assemblies, today):
     """The live registry in the layout of registry.snapshot.md."""
     return '\n'.join([
         f'## Registry snapshot (read from production {today})', '',
@@ -215,7 +229,7 @@ def registry_text(subject, condition, assemblies, today):
         *(f"- {k}: {', '.join(v)}" for k, v in check_units.PROPS.items()), '',
         '### Places and parts (subject_taxonomy keys; [side] where the key carries one). No aliases are recorded.',
         ', '.join(f'{k} [{side}]' if side else k for k, side in sorted(subject.items())), '',
-        '### Condition keys (condition_taxonomy; every live key)',
+        f'### Condition keys (condition_taxonomy; the usable ones that are live now. {withheld} further live keys are not listed)',
         ', '.join(f'{k} (state)' if state else k for k, state in sorted(condition.items())), '',
         assemblies, '(The assemblies are the dated copy in registry.snapshot.md; this run did not read them again.)'])
 
@@ -285,14 +299,15 @@ def state_of(s):
 
 
 def rows_of(photo, unit, dec_parts):
-    """One row per claim of a checked result, as fold.py makes them; idx is the statement's index in damage_callouts."""
+    """One row per claim of a checked result, as fold.py makes them; idx is the statement's index in damage_callouts.
+    said is the claim's quoted words, kept for refused_here()."""
     rows = []
     for r in unit.get('results') or []:
         for c in r.get('claims') or []:
             part, side, part_from = part_of(c.get('part') or {}, dec_parts)
             state, state_from = state_of(c.get('state') or {})
             rows.append({'photo': photo['id'], 'idx': int(r['sid'][1:]), 'scene': photo.get('scene'), 'part': part, 'side': side,
-                         'part_from': part_from, 'state': state, 'state_from': state_from})
+                         'part_from': part_from, 'state': state, 'state_from': state_from, 'said': c.get('said')})
     return rows
 
 
@@ -308,6 +323,20 @@ def landable(rows):
         if key in seen: left_out['same claim twice'] += 1; continue
         seen.add(key); keep.append(x)
     return keep, left_out
+
+
+def refused_here(unit, keep, texts):
+    """What this lane refuses on top of check_units.py (whose behaviour is unchanged), as kinds of problem. Both bound
+    what one wrong answer can land; neither shows that a statement supports its key, and no code here does.
+    - More than MAX_CLAIMS claims on one statement: otherwise one answer could put a statement on every live key.
+    - A landable claim whose quoted words are empty or a single word, unless they are the whole statement: the
+      check's quote test passes on an empty quote and on any one word of the statement."""
+    kinds = []
+    if any(len(r.get('claims') or []) > MAX_CLAIMS for r in unit.get('results') or []): kinds.append('too many claims on one statement')
+    quoted = lambda x: check_units.norm(x['said'] or '')
+    if any(len(quoted(x).split()) < 2 and quoted(x) != check_units.norm(texts[f"c{x['idx']}"]) for x in keep):
+        kinds.append('landable claim quoting under two words')
+    return kinds
 
 
 # ---- the request land.sql builds --------------------------------------------------------------------------------
@@ -362,17 +391,27 @@ def body_for(vehicle_id, photo, x, src, model, today):
             'limitation': LIMITATION}})
 
 
-def post_claim(db, body):
-    """One claim to the sanctioned writer. Returns 'new', 'duplicate', 'no answer', or 'refused: <HTTP status> <the
-    writer's error field>'. No answer is an unknown result (the writer may have committed), so it is never retried."""
+def post_claim(db, body, n):
+    """One claim to the sanctioned writer. Returns 'new', 'duplicate', RESENT, 'no answer', or 'refused: <HTTP status>
+    <the writer's error field>'. No answer, a 5xx or a 429 is an unknown result (the writer may have committed), so
+    the SAME bytes are sent again, ATTEMPTS times in all. That cannot land a second row: the writer hashes what it
+    receives and answers duplicate when an earlier attempt had committed (RESENT counts those apart from a row that
+    was there before this run). A claim still not taken after that is lost to later runs once its photo has one row,
+    so the run counts the photo as partly landed."""
     headers = {'Authorization': 'Bearer ' + db['key'], 'apikey': db['key'], 'Content-Type': 'application/json'}
-    try: status, _, text = db['http']('POST', db['url'] + '/functions/v1/ingest-observation', headers, json.dumps(body, ensure_ascii=False).encode())
-    except OSError: return 'no answer'
-    try: answer = json.loads(text)
-    except ValueError: answer = None
-    answer = answer if isinstance(answer, dict) else {}
-    if status == 200 and answer.get('success') is True: return 'duplicate' if answer.get('duplicate') else 'new'
-    return f"refused: {status} {ws(str(answer.get('error') or 'no error field'))[:120]}"
+    data, said = json.dumps(body, ensure_ascii=False).encode(), 'no answer'
+    for attempt in range(ATTEMPTS):
+        if attempt: n['re-sends'] += 1; db['sleep'](3 * attempt)
+        try: status, _, text = db['http']('POST', db['url'] + '/functions/v1/ingest-observation', headers, data)
+        except OSError: said = 'no answer'; continue
+        try: answer = json.loads(text)
+        except ValueError: answer = None
+        answer = answer if isinstance(answer, dict) else {}
+        if status == 200 and answer.get('success') is True:
+            return 'new' if not answer.get('duplicate') else RESENT if attempt else 'duplicate'
+        said = f"refused: {status} {ws(str(answer.get('error') or 'no error field'))[:120]}"
+        if status < 500 and status != 429: break
+    return said
 
 
 # ---- the run ------------------------------------------------------------------------------------------------------
@@ -401,12 +440,12 @@ def arguments(argv, env):
     return a
 
 
-def run(argv, env, http=http, ask=ask_claude, out=print):
-    """The whole lane. Returns the exit code. http and ask are parameters so the test can run it with no network."""
+def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
+    """The whole lane. Returns the exit code. http, ask and sleep are parameters so the test can run it with no network and no waiting."""
     try: a = arguments(argv, env)
     except Stop as s:
         out(f'keys lane: {s.why}'); return s.code
-    db = {'url': env['SUPABASE_URL'].rstrip('/'), 'key': env['SUPABASE_SERVICE_ROLE_KEY'], 'http': http}
+    db = {'url': env['SUPABASE_URL'].rstrip('/'), 'key': env['SUPABASE_SERVICE_ROLE_KEY'], 'http': http, 'sleep': sleep}
     today = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
     lane_rows = f'vehicle_observations?vehicle_id=eq.{a.vehicle_id}&extraction_method=eq.{METHOD}'
     n, kinds, failures, left_out, writer = (collections.Counter() for _ in range(5))
@@ -418,10 +457,10 @@ def run(argv, env, http=http, ask=ask_claude, out=print):
         dec_parts, dec_states = check_units.load_decisions(os.path.join(ROOT, DECISIONS))
         if count(db, f'vehicle_images?vehicle_id=eq.{a.vehicle_id}&user_id=eq.{a.user_id}') == 0:
             raise Stop(2, 'this user has no photo on this vehicle; nothing was keyed')
-        subject, condition = live_registry(db)
+        subject, condition, n['withheld'] = live_registry(db)
         check_units.use_registry(subject, condition)
         n['part keys'], n['condition keys'] = len(subject), len(condition)
-        registry = registry_text(subject, condition, fr['assemblies'], today)
+        registry = registry_text(subject, condition, n['withheld'], fr['assemblies'], today)
         before = count(db, lane_rows)
         # a photo already has a row from this lane when its id is the second field of a source_identifier
         already = {r['source_identifier'].split(':')[1] for r in pages(db, lane_rows + '&select=source_identifier&order=id.asc')
@@ -447,13 +486,22 @@ def run(argv, env, http=http, ask=ask_claude, out=print):
                 out(f'photo {number} of {len(photos)}: rejected by the check'); cursor = photo['id'][:8]; continue
             rows = rows_of(photo, answer['value'], dec_parts)
             keep, left = landable(rows)
+            more = refused_here(answer['value'], keep, texts)
+            if more:   # refused by this lane's own two rules: lands nothing, counted with the check's rejections
+                n['rejected'] += 1; kinds.update(more)
+                out(f'photo {number} of {len(photos)}: rejected by the check'); cursor = photo['id'][:8]; continue
             n['keyed'] += 1; n['claims'] += len(rows); n['landable'] += len(keep); left_out.update(left)
             src = reading_of(db, a.vehicle_id, photo['id']) if keep else {}
-            for x in sorted(keep, key=lambda x: (x['idx'], x['state'], x['part'] or '')):
-                body = body_for(a.vehicle_id, photo, x, src, a.model, today)
-                if not a.write: continue
-                said_by_writer = post_claim(db, body); writer[said_by_writer] += 1
-                if said_by_writer[:12] in ('refused: 401', 'refused: 403'): raise Stop(4, 'authentication failure: the writer refused the service key')
+            held = 0   # this photo's claims the writer holds
+            try:
+                for x in sorted(keep, key=lambda x: (x['idx'], x['state'], x['part'] or '')):
+                    body = body_for(a.vehicle_id, photo, x, src, a.model, today)
+                    if not a.write: continue
+                    said_by_writer = post_claim(db, body, n); writer[said_by_writer] += 1
+                    held += said_by_writer in ('new', 'duplicate', RESENT)
+                    if said_by_writer[:12] in ('refused: 401', 'refused: 403'): raise Stop(4, 'authentication failure: the writer refused the service key')
+            finally:   # one row is enough for a later run to pass the photo over, so its other claims are never sent
+                if 0 < held < len(keep): n['partly landed'] += 1
             out(f'photo {number} of {len(photos)}: keyed, {len(rows)} claims, {len(keep)} landable')
             cursor = photo['id'][:8]
     except Stop as s: stop = s
@@ -465,20 +513,28 @@ def run(argv, env, http=http, ask=ask_claude, out=print):
     landed = after - before if after is not None else None
     refused = {k[9:]: v for k, v in writer.items() if k.startswith('refused: ')}
     if stop: code, result = stop.code, stop.why
-    elif not n['taken']: code, result = 0, 'nothing left to do'
+    elif not n['taken'] and not n['already keyed']: code, result = 0, 'nothing left to do'
+    elif not n['taken']:   # a row shows the photo was reached once, not that every claim of it landed
+        code, result = 0, (f"no photo left to take: {n['already keyed']} passed over because each has at least one row from this lane, "
+                           "which does not show that all of its claims landed")
     elif not n['keyed']: code, result = 5, 'photos were available and none could be keyed'
-    elif a.write and (refused or writer['no answer']): code, result = 1, 'the writer did not take everything that was sent'
-    elif a.write and landed != writer['new']: code, result = 1, 'the row count did not move by the number the writer called new'
+    elif a.write and (refused or writer['no answer']):
+        code, result = 1, f"the writer did not take everything that was sent; photos left partly landed: {n['partly landed']}"
+    elif a.write and not writer['new'] <= landed <= writer['new'] + writer[RESENT]: code, result = 1, 'the row count did not move by the number the writer called new'
     elif a.write: code, result = 0, f"work done: {n['keyed']} photos keyed, {landed} rows landed"
     else: code, result = 0, f"work done (dry run): {n['keyed']} photos keyed, {n['landable']} claims would be sent, nothing written"
     lines = [
-        f"registry read live: {n['part keys']} part keys, {n['condition keys']} condition keys" if n['part keys'] else 'registry: not read',
-        f"photos with stored statements seen: {n['seen']} (already keyed by this lane: {n['already keyed']}; receipt_document, not asked: {n['receipt']})",
+        (f"registry read live: {n['part keys']} part keys, {n['condition keys']} condition keys (live and in the curated list; "
+         f"{n['withheld']} live keys outside it withheld)" if n['part keys'] else 'registry: not read'),
+        f"photos with stored statements seen: {n['seen']} (with at least one row from this lane, not taken again: {n['already keyed']}; receipt_document, not asked: {n['receipt']})",
         f"photos taken: {n['taken']}; keyed: {n['keyed']}; rejected by the check: {n['rejected']}; reader failed: {sum(failures.values())}",
         f"rejected, by kind of problem: {dict(kinds)}", f"reader failures: {dict(failures)}",
         f"statements: {n['statements']}; claims: {n['claims']}; landable: {n['landable']}; left out: {dict(left_out)}",
         (f"writer: new {writer['new']}, duplicate {writer['duplicate']}, no answer {writer['no answer']}, refused {sum(refused.values())} {refused or ''}".rstrip()
          if a.write else 'writer: not called (dry run)'),
+        *([f"re-sends of the same bytes after no answer, a 5xx or a 429: {n['re-sends']}; claims the writer then called duplicate: {writer[RESENT]}",
+           f"photos left partly landed (some claims taken, some not; a later run does not take the photo again): {n['partly landed']}"] if a.write else []),
+        'not checked by code: that a statement supports the key it was given (only that the quoted words are in the statement)',
         f"lane rows on this vehicle: before {first(before, 'not read')}, after {first(after, 'not read')}, landed {first(landed, 'unknown')}",
         f"model time: {n['model seconds']} s over {n['taken']} photos",
         f"cursor for --after: {cursor or 'none'}",
