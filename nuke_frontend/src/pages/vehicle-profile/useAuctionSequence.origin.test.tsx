@@ -70,7 +70,7 @@ beforeEach(() => {
       if (!['GET', 'HEAD'].includes(read.method) || !path.startsWith('/rest/v1/')) throw new Error('Synthetic transport denies non-read requests');
       const table = path.split('/').pop();
       if (table === 'vehicles') { expect(read.url.searchParams.get('id')).toBe(`eq.${vehicleId}`); return json(parentDenied ? [] : [{ id: vehicleId }]); }
-      if (['auction_comments', 'auction_events', 'vehicle_events', 'vehicle_images'].includes(table!)) {
+      if (['auction_comments', 'auction_events_canonical', 'vehicle_events', 'vehicle_images'].includes(table!)) {
         expect(read.url.searchParams.get('vehicle_id')).toBe(`eq.${vehicleId}`);
         if (table === refusedTable) return json({ message: 'Synthetic private error detail' }, 403);
         if (contextBodies.has(table!)) return json(contextBodies.get(table!));
@@ -80,7 +80,7 @@ beforeEach(() => {
           if (failCommentContinuation && read.url.searchParams.has('id')) return json({ message: 'Synthetic private error detail' }, 403);
           return json(read.url.searchParams.has('id') ? [] : comments);
         }
-        if (table === 'auction_events') { expect(read.url.searchParams.get('limit')).toBe('5'); return json(auctions); }
+        if (table === 'auction_events_canonical') { expect(read.url.searchParams.get('limit')).toBe('5'); return json(auctions); }
         if (table === 'vehicle_events') { expect(read.url.searchParams.get('limit')).toBe('10'); return json(events); }
         return json([]);
       }
@@ -264,7 +264,7 @@ const incomplete = 'Auction activity could not be fully read. Timeline activity 
 const sequenceKey = () => ['auction-sequence', vehicleId];
 const queryState = () => queryClient.getQueryState<any>(sequenceKey())!;
 const contextReads = (table: string) => reads.filter(r => r.url.pathname === `/rest/v1/${table}` &&
-  r.url.searchParams.get('select') === ({ auction_events: 'id,source,source_url,lot_number,outcome,winning_bid,total_bids,winning_bidder,seller_name,page_views,watchers,comments_count',
+  r.url.searchParams.get('select') === ({ auction_events_canonical: 'id,source,source_url,lot_number,outcome,winning_bid,total_bids,winning_bidder,seller_name,page_views,watchers,comments_count',
     vehicle_events: 'id,source_platform,source_url,started_at,ended_at,sold_at,final_price,event_status', vehicle_images: 'id,taken_at,source,source_url' } as Record<string, string>)[table]);
 async function refetchSequence() {
   await act(async () => { await queryClient.refetchQueries({ queryKey: sequenceKey(), exact: true }); });
@@ -277,21 +277,21 @@ function assertRetainedBid(amount = '$100') {
   expect(host.querySelector('.auction-band__svg')?.getAttribute('aria-label')).toBe('auction sequence: 1 bids, 0 comments shown');
   expect([...host.querySelectorAll<HTMLAnchorElement>(`.auction-band a[href="${valid}#comment-123"]`)].some(link => link.textContent?.includes(amount))).toBe(true);
 }
-it.each(['vehicle_images', 'auction_events', 'vehicle_events'])('retains complete native bids and independently readable context when %s refuses', async table => {
+it.each(['vehicle_images', 'auction_events_canonical', 'vehicle_events'])('retains complete native bids and independently readable context when %s refuses', async table => {
   timeline = []; refusedTable = table; await draw(false); assertRetainedBid();
   expect(host.textContent).toContain(incomplete); expect(queryState().status).toBe('error'); expect(queryState().data).toBeUndefined();
-  expect(nativeReads()).toHaveLength(2); for (const name of ['vehicle_images', 'auction_events', 'vehicle_events']) expect(contextReads(name)).toHaveLength(1);
+  expect(nativeReads()).toHaveLength(2); for (const name of ['vehicle_images', 'auction_events_canonical', 'vehicle_events']) expect(contextReads(name)).toHaveLength(1);
   const band = host.querySelector('.auction-band')!;
   if (table !== 'vehicle_events') expect(band.textContent).toContain('auction end recorded by the extractor');
   else expect(band.textContent).toContain('End clock unknown');
   await openReceipt(); expect(host.querySelector('.day-drawer__auction-list a')?.getAttribute('href')).toBe(`${valid}#comment-123`);
   expect(host.querySelector('[data-day-drawer]')?.textContent).toContain('BID $100');
 });
-it.each(['vehicle_images', 'auction_events', 'vehicle_events'])('does not certify null %s as a successful empty context read', async table => {
+it.each(['vehicle_images', 'auction_events_canonical', 'vehicle_events'])('does not certify null %s as a successful empty context read', async table => {
   timeline = []; contextBodies.set(table, null); await draw(false); assertRetainedBid();
   expect(host.textContent).toContain(incomplete); expect(queryState().status).toBe('error'); expect(queryState().data).toBeUndefined();
 });
-it.each(['vehicle_images', 'auction_events', 'vehicle_events'])('refuses malformed %s context shape while preserving the readable native interaction', async table => {
+it.each(['vehicle_images', 'auction_events_canonical', 'vehicle_events'])('refuses malformed %s context shape while preserving the readable native interaction', async table => {
   timeline = []; contextBodies.set(table, { invalid: 'Synthetic shape' }); await draw(false); assertRetainedBid();
   expect(host.textContent).toContain(incomplete); expect(queryState().status).toBe('error');
 });

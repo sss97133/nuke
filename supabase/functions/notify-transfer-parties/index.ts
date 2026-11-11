@@ -24,22 +24,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticateWriter, writeAuthResponse } from '../_shared/writeGuard.ts';
 import { sendEmail } from '../_shared/email.ts';
+import { sendOutbound } from '../_shared/outbound.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = projectSecretKey()!;
 const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://nuke.ag';
 
-const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
 
 type EventType = 'seeded' | 'milestone_advanced' | 'stalled' | 'overdue';
 
 interface NotifyResult {
   recipient: 'buyer' | 'seller';
   channel: 'sms' | 'email';
-  status: 'sent' | 'skipped' | 'failed';
+  status: 'sent' | 'skipped' | 'failed' | 'held';
   reason?: string;
 }
 
@@ -154,6 +152,7 @@ Deno.serve(async (req) => {
         'buyer', sent, skipped, errors,
       );
       await sendEmail({
+        caller: 'notify-transfer-parties',
         to: transfer.buyer_email ?? '',
         subject: `Your ${vehicleName} transfer has started`,
         html: emailHtml({
@@ -173,6 +172,7 @@ Deno.serve(async (req) => {
         'seller', sent, skipped, errors,
       );
       await sendEmail({
+        caller: 'notify-transfer-parties',
         to: transfer.seller_email ?? '',
         subject: `Your ${vehicleName} sold — transfer started`,
         html: emailHtml({
@@ -254,47 +254,34 @@ async function sendSMS(
     skipped.push(`${recipient}:sms — no phone`);
     return;
   }
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-    skipped.push(`${recipient}:sms — Twilio not configured`);
-    return;
-  }
-
-  // Normalize to E.164 (US numbers)
-  const normalized = phone.replace(/\D/g, '');
-  const e164 = normalized.length === 10 ? `+1${normalized}` : `+${normalized}`;
 
   try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-    const res = await fetch(url, { // guardrail-allow: raw-fetch (Twilio Messages API: a service API send, not a page fetch)
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ To: e164, From: TWILIO_PHONE_NUMBER, Body: message }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      errors.push(`${recipient}:sms — Twilio ${res.status}: ${errText.slice(0, 200)}`);
+    const r = await sendOutbound({ channel: 'sms', to: phone, text: message, caller: 'notify-transfer-parties' });
+    if (r.held) {
+      skipped.push(`${recipient}:sms — held by outbound gate (${r.reason ?? 'not allowlisted'})`);
       return;
     }
-
-    const data = await res.json();
-    sent.push({ recipient, channel: 'sms', status: 'sent', reason: data.sid });
+    if (!r.sent) {
+      if (r.error === 'Twilio not configured') skipped.push(`${recipient}:sms — Twilio not configured`);
+      else errors.push(`${recipient}:sms — ${r.error}`);
+      return;
+    }
+    sent.push({ recipient, channel: 'sms', status: 'sent', reason: r.id });
   } catch (err) {
     errors.push(`${recipient}:sms — ${String(err)}`);
   }
 }
 
 function recordEmailResult(
-  result: { success: boolean; id?: string; error?: string },
+  result: { success: boolean; id?: string; error?: string; held?: boolean },
   recipient: 'buyer' | 'seller',
   sent: NotifyResult[],
   skipped: string[],
   errors: string[],
 ): void {
-  if (!result.success && result.error === 'Email service not configured') {
+  if (result.held) {
+    skipped.push(`${recipient}:email — held by outbound gate`);
+  } else if (!result.success && result.error === 'Email service not configured') {
     skipped.push(`${recipient}:email — Resend not configured`);
   } else if (!result.success) {
     errors.push(`${recipient}:email — ${result.error}`);

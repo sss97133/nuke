@@ -4,12 +4,24 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ share: { data: undefined as any, isError: false }, pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any> }));
+const fixture = vi.hoisted(() => ({ share: { data: undefined as any, isError: false }, pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any>, track: undefined as any, calendar: { data: undefined } as any, rosterFor: vi.fn() }));
+vi.mock('./useAuctionCalendar', async importOriginal => ({
+  ...await importOriginal<typeof import('./useAuctionCalendar')>(),
+  useAuctionCalendar: () => fixture.calendar,
+  useSaleRoster: (sale: any) => { fixture.rosterFor(sale); return { isPending: false, isError: false, hasNextPage: false, isFetchingNextPage: false,
+    data: { pages: [{ roster: { lots: 2, rows: [
+      { event_id: 'r1', vehicle_id: 'rv1', run_on: '2026-10-08', year: 1967, make: 'Porsche', model: '911', prior: [], vin_present: true },
+      { event_id: 'r2', vehicle_id: 'rv2', run_on: '2026-10-08', year: 1970, make: 'Ford', model: 'Mustang', prior: [], vin_present: true },
+    ] } }] } }; },
+}));
 vi.mock('./HouseShare', async importOriginal => ({
   ...await importOriginal<typeof import('./HouseShare')>(),
   useHouseShare: () => fixture.share,
 }));
-vi.mock('./useFinishEstimates', () => ({ useFinishEstimates: () => ({ data: { fresh: true, writerAt: null, byId: fixture.finish } }) }));
+vi.mock('./useFinishEstimates', async importOriginal => ({
+  ...await importOriginal<typeof import('./useFinishEstimates')>(),
+  useFinishEstimates: () => ({ data: { fresh: true, writerAt: null, byId: fixture.finish } }), useFinishTrackRecord: () => ({ data: fixture.track }),
+}));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
   useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: fixture.sameHour }), useInventoryTaxonomy: () => fixture.taxonomy,
@@ -39,7 +51,7 @@ vi.mock('./RecordedSalesComparison', () => ({
 }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
 
-import MarketPulse, { matchesFamilyScope } from './MarketPulse';
+import MarketPulse, { closeGroup, matchesFamilyScope } from './MarketPulse';
 import { currentBidDistribution, type LiveAuction } from './useMarketPulse';
 
 
@@ -74,7 +86,8 @@ beforeEach(() => {
     observe() { this.callback([{ contentRect: { width: window.innerWidth } }]); }
     disconnect() {}
   });
-  fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = []; fixture.finish = new Map();
+  fixture.calendar = { data: undefined }; fixture.rosterFor.mockReset();
+  fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = []; fixture.finish = new Map(); fixture.track = undefined;
   fixture.taxonomy = { data: [], isLoading: false, isError: false, isSuccess: true, refetch: fixture.retry };
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { fn(); return 0; });
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -163,7 +176,7 @@ describe('market answer -> supporting lots', () => {
     expect(container.querySelector('[aria-label="Listing activity evidence"]')?.textContent).toContain(id);
     const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
     expect(row.nextElementSibling?.id).toBe(`lot-inspection-${id}`);
-    expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
+    expect(document.activeElement).toBe(row.querySelector('.market-lot-image'));
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
   });
   it('keeps smaller brands reachable and drills from an explicit brand view into models', async () => {
@@ -192,68 +205,45 @@ describe('market answer -> supporting lots', () => {
     expect(boardTitles()).toEqual(['small-79']);
     await click('All makes');
     expect(boardTitles()).toHaveLength(24);
-    expect(container.textContent).toContain('1–24 of 84 lots');
+    expect(container.textContent).toContain('Loading more · 24 of 84');
     expect(container.querySelector('.inventory-map-remainder')).toBeNull();
-    await click('Next 24 lots');
+    await click('Loading more');
     expect(window.location.search).toContain('board=2');
-    expect(boardTitles()).toHaveLength(24);
-    expect(boardTitles()[0]).toBe('small-23');
+    expect(boardTitles()).toHaveLength(48);
+    expect(boardTitles()[24]).toBe('small-23');
     await render('map=lots&mapBy=make&make=all&board=4');
-    expect(boardTitles()).toHaveLength(12);
-    expect(container.textContent).toContain('73–84 of 84 lots');
-    expect(container.querySelector('[aria-label="Next 24 lots"]')).toBeNull();
+    expect(boardTitles()).toHaveLength(84);
+    expect(container.textContent).toContain('All 84 lots shown');
+    expect([...container.querySelectorAll('button')].some(b => b.textContent?.startsWith('Loading more'))).toBe(false);
     await click('Ending in 24 h');
     expect(window.location.search).toContain('board=1');
   });
-  it('opens a shared lot on the page that holds it and returns to the first page by link', async () => {
+  it('loads a shared lot with every lot ahead of it and opens it beneath its row', async () => {
     const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
     fixture.pulse.data.auctions = [...Array.from({ length: 30 }, (_, i) => lot(`early-${i}`, 'PORSCHE', null, 1)),
       { ...lot(id, 'PORSCHE', 1000, 2), year: 1999, model: '911' }];
     await render(`lot=${id}&inspect=auction`);
-    expect(boardTitles()).toHaveLength(7);
-    expect(container.textContent).toContain('25–31 of 31 lots');
+    expect(boardTitles()).toHaveLength(31);
+    expect(container.textContent).toContain('All 31 lots shown');
     const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
     expect(row.nextElementSibling?.id).toBe(`lot-inspection-${id}`);
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
-    await click('Previous 24 lots');
-    expect(window.location.search).toContain('board=1');
-    expect(window.location.search).not.toContain('lot=');
-    expect(boardTitles()).toHaveLength(24);
-    expect(container.querySelector('[aria-label="Previous 24 lots"]')).toBeNull();
   });
-  it.each([
-    ['Next 24 lots', 1, 2], ['Previous 24 lots', 2, 1],
-  ])('moves keyboard focus from %s to the replacement page first title', async (pager, from, to) => {
+  it('adds the next lots under the ones shown, keeping the filters and the viewer\'s focus', async () => {
     fixture.pulse.data.auctions = Array.from({ length: 60 }, (_, i) => lot(`page-${i}`, 'PORSCHE', 1000 + i, i + 1));
-    await render(`make=PORSCHE&board=${from}&sort=ending`);
-    const opener = button(pager); opener.focus(); await act(async () => opener.click());
-    expect(window.location.search).toContain(`board=${to}`);
+    await render('make=PORSCHE&sort=ending');
+    expect(boardTitles()).toHaveLength(24);
+    const control = button('Bid sounds off'); control.focus();
+    await click('Loading more');
+    expect(window.location.search).toContain('board=2');
     expect(window.location.search).toContain('make=PORSCHE');
     expect(window.location.search).toContain('sort=ending');
-    expect(boardTitles()[0]).toBe(`page-${(to - 1) * 24}`);
-    expect(document.activeElement).toBe(container.querySelector('.market-lot-name'));
-    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenLastCalledWith({ block: 'start' });
-  });
-  it('keeps an explicit paging action reachable if the board empties during that render', async () => {
-    fixture.pulse.data.auctions = Array.from({ length: 60 }, (_, i) => lot(`page-${i}`, 'PORSCHE', 1000, i + 1));
-    await render('board=1');
-    const opener = button('Next 24 lots'); opener.focus();
-    fixture.pulse.data = { ...fixture.pulse.data, auctions: [] };
-    await act(async () => opener.click());
-    expect(boardTitles()).toEqual([]);
-    expect(document.activeElement).toBe(container.querySelector('[aria-label="Live lots"]'));
-    expect(container.textContent).toContain('No open lots match these filters');
-  });
-  it('keeps current focus on deep-linked pages and background board refreshes', async () => {
-    fixture.pulse.data.auctions = Array.from({ length: 60 }, (_, i) => lot(`page-${i}`, 'PORSCHE', 1000, i + 1));
-    await render('board=1');
-    const control = button('Bid sounds off'); control.focus();
-    await render('board=2');
-    expect(boardTitles()[0]).toBe('page-24');
+    expect(boardTitles()).toHaveLength(48);
+    expect(boardTitles()[0]).toBe('page-0');
     expect(document.activeElement).toBe(control);
-    fixture.pulse.data = { ...fixture.pulse.data, auctions: fixture.pulse.data.auctions.map((a: LiveAuction) => ({ ...a, currentBid: 2000 })) };
-    await render('board=2');
-    expect(document.activeElement).toBe(control);
+    await click('Loading more');
+    expect(boardTitles()).toHaveLength(60);
+    expect(container.textContent).toContain('All 60 lots shown');
   });
   it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
     await render('map=lots&make=PORSCHE&mapBy=model&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
@@ -336,7 +326,7 @@ describe('market answer -> supporting lots', () => {
     await render();
     expect(container.textContent).toContain('Comparison scope all');
     expect(container.querySelector('[aria-label="Live lot make"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Current bid distribution"]')?.closest('details')?.open).toBe(false);
+    expect(container.querySelector('[aria-label="Current bid distribution"]')).toBeTruthy();
     await click('Choose Ford cohort');
     expect(window.location.search).toContain('make=FORD');
     expect(boardTitles().slice(-1)).toEqual(['other-make']);
@@ -356,12 +346,11 @@ describe('market answer -> supporting lots', () => {
   });
   it('uses the make for headline denominator and graph, opens all supporting lots in close order', async () => {
     await render('make=PORSCHE');
-    expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
-    expect(container.textContent).toContain('Current bids in US dollars as recorded');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('2 of 3 lots have a bid in US dollars, recorded or converted at a published rate');
+    expect(container.textContent).toContain("the bid's hover gives the rate, its publisher and its date");
     expect(container.querySelector('.market-bid')?.textContent).toMatch(/^\$[\d,]+$/);
     expect(cohortCount()).toBe('3');
-    expect(container.querySelector('.market-board__scope')?.textContent).toBe('3 of 4 lots · PORSCHE');
-    expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
+    expect(container.querySelector('.market-board__scope')?.textContent).toBe('3 of 4 live lotsPorsche');
     await click('Ending in 24 h');
     expect(button('Ending in 24 h').getAttribute('aria-pressed')).toBe('true');
     await click('Ending in 24 h');
@@ -369,26 +358,26 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).toContain('board=1');
   });
   it('drills a graph range into exactly its lots, preserves make, and toggles back', async () => {
-    await render('make=PORSCHE'); await click('$25,000–49,999:');
+    await render('make=PORSCHE'); await click('$25K–50K:');
     expect(window.location.search).toContain('make=PORSCHE');
     expect(boardTitles()).toEqual(['later']);
-    expect(button('$25,000–49,999:').getAttribute('aria-pressed')).toBe('true');
-    await click('$25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
+    expect(button('$25K–50K:').getAttribute('aria-pressed')).toBe('true');
+    await click('$25K–50K:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
   });
   it('drills unknown bids without treating them as zero and scopes the graph to the window', async () => {
-    await render('map=lots&make=PORSCHE&mapBy=model'); await click('Unrecorded:');
+    await render('map=lots&make=PORSCHE&mapBy=model'); await click('No bid recorded:');
     expect(boardTitles()).toEqual(['unknown']);
     await click('Ending in 24 h');
     expect(window.location.search).not.toContain('bidRange');
-    expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('1 of 2 lots');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('1 of 2 lots have a bid in US dollars, recorded or converted at a published rate');
     expect(container.querySelector('button[aria-label="Local fixture: 2 captured lots. Filter this recorded model"]')).toBeTruthy();
     expect(container.querySelector('a[href*="bringatrailer.com/listing"]')).toBeNull();
-    expect(container.textContent).toContain('Source read time and bid event time are unavailable');
+    expect(container.textContent).toContain('a bid can trail the house by a few minutes');
   });
   it('makes an empty scope recoverable and does not display a zero median', async () => {
     await render('make=MISSING');
     expect(container.textContent).toContain('No open lots match these filters');
-    expect(container.textContent).toContain('0 of 0 lots have a recorded bid number');
+    expect(container.textContent).toContain('No open lots in this scope.');
     expect(container.textContent).not.toContain('Median current bid');
     await click('Clear market filters'); expect(cohortCount()).toBe('4');
   });
@@ -402,7 +391,7 @@ describe('market answer -> supporting lots', () => {
     expect(container.textContent).toContain('Existing feed fallback');
     fixture.pulse.data = { auctions: [lot('cached', 'PORSCHE', 10_000, 2)] };
     await render('make=PORSCHE'); expect(container.textContent).toContain('Refresh failed');
-    expect(container.textContent).toContain('1 of 1 lots have a recorded bid number');
+    expect(container.querySelector('[aria-label="Current bid distribution"]')?.getAttribute('title')).toBe('1 of 1 lots have a bid in US dollars, recorded or converted at a published rate');
   });
   it('shows no hot or cold verdict, and marks no reserve in the row and in the filters', async () => {
     fixture.pulse.data.curve = { fixture: [[120, 0.2], [0, 1]] };
@@ -413,7 +402,7 @@ describe('market answer -> supporting lots', () => {
     expect(container.querySelector('.market-heat')).toBeNull();
     expect(container.querySelector('[data-vehicle-id="later"] .market-no-reserve')?.textContent).toBe('No reserve');
     expect(container.querySelector('[data-vehicle-id="first"] .market-no-reserve')).toBeNull();
-    expect(button('No reserve').className).toContain('market-chip--nr');
+    expect(button('No reserve').className).toContain('market-option--nr');
     await click('No reserve');
     expect(boardTitles()).toEqual(['later']);
   });
@@ -462,6 +451,99 @@ describe('where a lot should finish', () => {
     expect(line.querySelectorAll('svg line')).toHaveLength(2);
     expect(container.querySelector('[data-vehicle-id="first"] .market-lot-finish')).toBeNull();
   });
+  it('says on hover how often estimates made this far out finished inside their range', async () => {
+    fixture.finish.set('later', { vehicleId: 'later', estimate: 33000, low: 25500, high: 45100, grade: 'A', coverage: 0.8,
+      sentence: null, estimatedAt: Date.now(), bidAtEstimate: 25000, compsThrough: '2026-09-27', model: 33 });
+    fixture.track = [{ model: 33, fromHours: 0, toHours: null, lots: 555, inside: 448, medianMissPct: 16.6,
+      firstClose: Date.parse('2026-10-17T20:00:00Z'), lastClose: Date.parse('2026-10-20T21:00:00Z') }];
+    await render();
+    const line = container.querySelector('[data-vehicle-id="later"] .market-lot-finish')!;
+    expect(line.getAttribute('title')).toContain('448 of 555 finished inside the range, half within 17%');
+    expect(line.textContent).toBe('likely $33K · +32% to go · $26K–$45K');
+  });
+  it('gives another house\'s estimate no BaT track record', async () => {
+    fixture.pulse.data.auctions = fixture.pulse.data.auctions.map((x: any) => x.id === 'later' ? { ...x, house: 'pcarmarket' } : x);
+    fixture.finish.set('later', { vehicleId: 'later', estimate: 33000, low: 25500, high: 45100, grade: 'A', coverage: 0.8,
+      sentence: null, estimatedAt: Date.now(), bidAtEstimate: 25000, compsThrough: '2026-09-27', model: 32 });
+    fixture.track = [{ model: 32, fromHours: 0, toHours: null, lots: 721, inside: 575, medianMissPct: 20,
+      firstClose: Date.parse('2026-10-17T20:00:00Z'), lastClose: Date.parse('2026-10-20T21:00:00Z') }];
+    await render();
+    const line = container.querySelector('[data-vehicle-id="later"] .market-lot-finish');
+    expect(line).not.toBeNull();
+    expect(line!.getAttribute('title')).toBeNull();
+  });
+});
+
+describe('the board in time sections', () => {
+  it('places each lot in its section by the viewer\'s own day', () => {
+    const now = new Date(2026, 9, 3, 12, 0).getTime();
+    expect(closeGroup(now + 30 * 60_000, now)).toBe('hour');
+    expect(closeGroup(new Date(2026, 9, 3, 23, 0).getTime(), now)).toBe('today');
+    expect(closeGroup(new Date(2026, 9, 4, 1, 0).getTime(), now)).toBe('tomorrow');
+    expect(closeGroup(new Date(2026, 9, 7, 12, 0).getTime(), now)).toBe('week');
+    expect(closeGroup(new Date(2026, 9, 20, 12, 0).getTime(), now)).toBe('later');
+  });
+  it('heads each section once with its count in close order, ticks only the last hour, and drops the sections in another order', async () => {
+    fixture.pulse.data.auctions = [lot('soon', 'PORSCHE', 1000, 0.5), lot('day-a', 'PORSCHE', 1000, 30), lot('day-b', 'PORSCHE', 1000, 31)];
+    await render('make=PORSCHE');
+    const heads = [...container.querySelectorAll('.market-board-group')].map(h => h.textContent);
+    expect(heads).toEqual(['Ending within the hour 1 lot', 'Tomorrow 2 lots']);
+    expect(container.querySelector('[data-vehicle-id="soon"] .market-lot-ends')?.textContent).toContain('left');
+    expect(container.querySelector('[data-vehicle-id="day-a"] .market-lot-ends')?.textContent).toMatch(/^ends /);
+    const select = container.querySelector<HTMLSelectElement>('[aria-label="Sort lots"]')!;
+    await act(async () => { select.value = 'bid'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(container.querySelector('.market-board-group')).toBeNull();
+  });
+});
+
+describe('the scheduled sales at the end of the board', () => {
+  // System time is 2026-10-03 12:00Z: an ended sale, a sale running today, two ahead (given out of order) and an empty one.
+  const sale = (sale_key: string, starts_on: string, ends_on: string, lots: number, lots_listed: number | null = null) => ({
+    house: 'mecum', sale_key, sale_name: `Fixture ${sale_key}`, location: null, starts_on, ends_on, lots, lots_listed, listed_at: null,
+    seen_before: 1, no_reserve: 2, first_seen_at: null, first_seen_7d: 3, updated_at: null, run_days: [{ day: starts_on, lots }] });
+  beforeEach(() => {
+    fixture.calendar = { data: { as_of: '2026-10-03T12:00:00Z', horizon_days: 200, population: {}, roster: null, sales: [
+      sale('ended', '2026-09-20', '2026-09-22', 40),
+      { ...sale('later', '2026-11-12', '2026-11-14', 165, 169), listed_at: '2026-10-03T10:00:00Z', updated_at: '2026-10-03T11:48:00Z' },
+      sale('soon', '2026-10-08', '2026-10-08', 25), sale('today', '2026-10-02', '2026-10-04', 12), sale('empty', '2026-10-20', '2026-10-21', 0, 0)] } };
+  });
+  it('lists the sales still to run in date order after the last time section, each datum once, and opens a roster in place', async () => {
+    await render('make=PORSCHE');
+    const heads = [...container.querySelectorAll('.market-board-group')].map(h => h.textContent);
+    expect(heads[heads.length - 1]).toBe('Scheduled sales 3 sales');
+    const rows = [...container.querySelectorAll('.market-board-scheduled tr.auction-sale')];
+    expect(rows.map(r => r.querySelector('.k-entity')?.textContent)).toEqual(['Fixture today', 'Fixture soon', 'Fixture later']);
+    expect(rows[0].textContent).toContain('running · day 2 of 3');
+    expect(rows[1].textContent).toContain('in 5 days');
+    expect(rows[2].textContent).toContain('165 of 169 lots');
+    // The census and landing clocks stay one hover away.
+    expect(rows[2].querySelector('.k-measure[title]')?.getAttribute('title')).toBe('Mecum lists 169, read 2 h ago · lots updated 12 min ago');
+    // Compact: the calendar's census and history lines stay on the calendar.
+    expect(rows[2].textContent).not.toMatch(/lists 169|first seen|no reserve/);
+    expect(container.querySelector('.market-board-scheduled .auction-track')).toBeNull();
+    expect(fixture.rosterFor).not.toHaveBeenCalled();
+    await act(async () => rows[1].querySelector<HTMLButtonElement>('button.auction-sale__open')!.click());
+    expect(new URLSearchParams(window.location.search).get('sale')).toBe('mecum:soon');
+    expect(fixture.rosterFor).toHaveBeenLastCalledWith({ house: 'mecum', key: 'soon' });
+    // The board's make scope narrows the opened roster.
+    const roster = container.querySelector('.market-board-scheduled .auction-roster')!;
+    expect(roster.querySelector('a[href="/vehicle/rv1"]')).not.toBeNull();
+    expect(roster.querySelector('a[href="/vehicle/rv2"]')).toBeNull();
+    // A lot with no earlier record says nothing on the board; the calendar keeps the line.
+    expect(roster.textContent).not.toContain('No earlier record');
+    expect(container.querySelector('.market-board-scheduled th')?.textContent).toBe('When');
+  });
+  it('shows only in close order, outside a house, window or bid-range filter, and not at all without sales', async () => {
+    await render('sort=bid');
+    expect(container.querySelector('.market-board-scheduled')).toBeNull();
+    await render('live=nr');
+    expect(container.querySelector('.market-board-scheduled')).toBeNull();
+    await render('');
+    expect(container.querySelector('.market-board-scheduled')).not.toBeNull();
+    fixture.calendar = { data: { ...fixture.calendar.data, sales: [sale('ended', '2026-09-20', '2026-09-22', 40)] } };
+    await render('');
+    expect(container.querySelector('.market-board-scheduled')).toBeNull();
+  });
 });
 
 describe('how far a lot has to run', () => {
@@ -475,34 +557,59 @@ describe('how far a lot has to run', () => {
 });
 
 describe('the board in its own history', () => {
-  it('places each figure against the same hour on earlier weeks, once, and keeps no second copy of the totals', async () => {
-    fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
-    fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 86_400_000, bids: 100_000, n: 3, byMake: null, source: 'live' };
-    fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 50_000 + i * 1_000, n: 2, byMake: null, source: i === 0 ? 'archive' : 'live' }));
+  // Every house's own reading a week ago and its 15-minute line since (live_board_share).
+  const weekOfShare = (bidsAgo: number, lotsAgo: number) => {
+    const t0 = Date.now() - 7 * 86_400_000;
+    return { isError: false, data: { firstAt: t0, convertedFirstAt: null, firstAtByHouse: { bringatrailer: t0 },
+      weekAgo: { bringatrailer: { at: t0, bidUsd: bidsAgo, lots: lotsAgo, lotsWithBid: lotsAgo, bidUsdConverted: null } },
+      points: [0, 1, 2].map(i => ({ at: t0 + i * 3 * 86_400_000, house: 'bringatrailer', bidUsd: bidsAgo + i * 5_000, lots: lotsAgo, lotsWithBid: lotsAgo, bidUsdConverted: null })) } };
+  };
+  it('reads each figure as a ticker: the number, one change on last week, and the line it moved along', async () => {
+    fixture.share = weekOfShare(100_000, 3);
     await render('make=all');
     const [bids, lots] = [...container.querySelectorAll('.market-figure__item')];
     expect(bids.querySelector('.k-figure')?.textContent).toBe('$125K');
-    expect(bids.textContent).toContain('+25.0% on a week ago · higher than all 7 weeks at this hour');
-    expect(bids.querySelectorAll('.market-range__tick')).toHaveLength(7);
+    const chg = bids.querySelector('.market-figure__chg')!;
+    expect(chg.className).toContain('is-up');
+    expect(chg.textContent).toBe('▲ 25.0%vs last week');
+    // the line: three readings and now, with last week's level dotted
+    expect(bids.querySelector('.market-figure__chart polyline')?.getAttribute('points')?.split(' ')).toHaveLength(4);
+    expect(bids.querySelector('.market-stock__spark-base')).toBeTruthy();
+    expect(bids.querySelector('button')?.getAttribute('aria-label')).toBe('$125K bid now, +25.0% vs last week');
+    expect(bids.querySelector('button')?.getAttribute('title')).toContain('against their own readings');
     expect(lots.querySelector('.k-figure')?.textContent).toBe('4');
-    expect(lots.textContent).toContain('+0.0% on a week ago · higher than all 7 weeks at this hour');
-    // Said once: no second, longer copy of the total on the page (hover titles aside).
-    const visible = container.cloneNode(true) as HTMLElement;
-    visible.querySelectorAll('title').forEach(t => t.remove());
-    expect(visible.textContent).not.toContain('$125,000');
-    expect(container.querySelector('[aria-label="Edges of the board\'s own history"]')).toBeNull();
-    expect(container.querySelector('[aria-label="The board in its own history"]')).toBeNull();
-  });
-  it('says nothing comparative without readings, and says ties as level', async () => {
-    await render();
-    expect(container.querySelector('.market-range')).toBeNull();
-    expect(container.querySelector('.market-figure')?.textContent).not.toContain('weeks at this hour');
-    fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
-    fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 100_000 + i * 10_000, n: 3, byMake: null, source: 'live' }));
+    expect(lots.querySelector('.market-figure__chg')?.textContent).toBe('▲ 33.3%vs last week');
+    // One change per figure: no ranks, no house-by-house list, no second, longer copy of the total under the headline.
+    const visible = container.querySelector('.market-figure')!.textContent!;
+    expect(visible).not.toMatch(/weeks at this hour|week on week|on a week ago|\$125,000/);
+    fixture.share = weekOfShare(150_000, 5);
     await render('make=all');
+    expect(container.querySelector('.market-figure__chg')?.className).toContain('is-down');
+    expect(container.querySelector('.market-figure__chg')?.textContent).toBe('▼ 16.7%vs last week');
+  });
+  it('compares a make on BaT\'s own hourly index, with the readings at this hour on earlier weeks as its line', async () => {
+    fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
+    fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 86_400_000, bids: 900_000, n: 30, byMake: { PORSCHE: [20_000, 2] }, source: 'live' };
+    fixture.sameHour = Array.from({ length: 4 }, (_, i) => ({ day: `2026-09-${12 + i * 7}`, bids: 1, n: 1, byMake: { PORSCHE: [10_000 + i * 1_000, 2] }, source: 'live' }));
+    await render('make=PORSCHE');
     const [bids, lots] = [...container.querySelectorAll('.market-figure__item')];
-    expect(bids.textContent).toContain('lower than 4 of 7 weeks at this hour');
-    expect(lots.textContent).toContain('level with all 7 weeks at this hour');
+    expect(bids.querySelector('.market-figure__chg')?.textContent).toBe('▲ 25.0%vs last week');
+    expect(bids.querySelector('.market-figure__chg img')).toBeNull();
+    expect(bids.querySelector('.market-figure__chart polyline')?.getAttribute('points')?.split(' ')).toHaveLength(5);
+    expect(bids.querySelector('button')?.getAttribute('title')).toContain('Now higher than all 4 Saturdays at this hour');
+    expect(lots.querySelector('.market-figure__chg')?.textContent).toBe('▲ 0.0%vs last week');
+  });
+  it('says nothing comparative without a reading a week old, and draws no line', async () => {
+    await render();
+    expect(container.querySelector('.market-figure__chg')).toBeNull();
+    expect(container.querySelector('.market-figure__chart')).toBeNull();
+    fixture.share = { isError: true, data: undefined };
+    await render();
+    expect(container.querySelector('.market-figure__chg')).toBeNull();
+    // a family has no series of its own
+    fixture.share = weekOfShare(100_000, 3);
+    await render('make=PORSCHE&family_name=911');
+    expect(container.querySelector('.market-figure__chg')).toBeNull();
   });
   it('opens the map of what each figure is made of, by dollars or by lots, and closes it again', async () => {
     await render();
@@ -541,7 +648,7 @@ describe('the market document', () => {
   it('names the population once, counts the cohort in the masthead and states its coverage in the strip', async () => {
     await render('make=PORSCHE');
     const h1 = container.querySelector('h1')!;
-    expect(h1.textContent).toBe('Live auctions · PORSCHE');
+    expect(h1.textContent).toBe('Live auctions · Porsche');
     expect(h1.className).toContain('k-entity');
     expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$25K');
     expect(cohortCount()).toBe('3');
@@ -600,7 +707,8 @@ describe('inline market row inspection', () => {
     expect(container.textContent).not.toContain('Arbitrary promotional headline');
     expect(container.textContent).toContain('6-speed manual');
     expect(container.querySelector(`[data-vehicle-id="${id}"]`)?.textContent).not.toContain('CA · 90210');
-    expect(container.querySelector(`[data-vehicle-id="${id}"] .market-lot-metrics`)?.textContent).toContain('Stack A bidding depth');
+    // The row's answer is the bid (and the finish when estimated); how the bidding went opens in the drawer.
+    expect(container.querySelector(`[data-vehicle-id="${id}"] .market-lot-metrics`)?.textContent).toBe('$42,000');
     expect(container.querySelector('a[href*="bringatrailer.com/listing"]')).toBeNull();
     await click('Inspect auction for 2004 BMW M3');
     const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
@@ -609,7 +717,7 @@ describe('inline market row inspection', () => {
     expect([...container.querySelectorAll(`[data-vehicle-id="${id}"] .market-lot-facts button`)]).toHaveLength(0);
     await click('Close listing evidence');
     expect(window.location.search).not.toContain('lot=');
-    expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
+    expect(document.activeElement).toBe(row.querySelector('.market-lot-image'));
   });
   it('scopes live auctions to a drilled model family from the URL and shows the family in the heading', async () => {
     fixture.pulse.data.auctions = [
@@ -618,11 +726,67 @@ describe('inline market row inspection', () => {
       { ...lot('f-1', 'FORD', 24000, 4, 'f-150-raptor'), year: 2018, model: 'F-150' },
     ];
     await render('make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang');
-    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · FORD · Mustang');
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · Ford · Mustang');
     expect(boardTitles()).toEqual(['m-1', 'm-2']);
 
     await render('make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang&model=Mustang+GT');
     expect(boardTitles()).toEqual(['m-1']);
+  });
+});
+
+describe("a row's title drills the board in place", () => {
+  const scope = () => new URLSearchParams(window.location.search);
+  it('re-scopes to the make, the model and the year, each a toggle, without opening the lot', async () => {
+    await render();
+    const row = container.querySelector('[data-vehicle-id="later"]')!;
+    expect(row.querySelector('.market-lot-name button[aria-haspopup]')).toBeNull();
+    await click('Show Ford lots');
+    expect(scope().get('make')).toBe('FORD');
+    expect(scope().get('lot')).toBeNull();
+    expect(boardTitles()).toEqual(['other-make']);
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · Ford');
+    await click('Show every make');
+    expect(scope().get('make')).toBe('all');
+    await click('Show Porsche Local fixture lots');
+    expect(scope().get('make')).toBe('PORSCHE');
+    expect(scope().get('model')).toBe('Local fixture');
+    expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
+    await click('Show 2000 lots');
+    expect(scope().get('era')).toBe('2000-2000');
+    expect(scope().get('model')).toBe('Local fixture');
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · Porsche · 2000');
+    await click('Show every year');
+    expect(scope().get('era')).toBeNull();
+    await click('Show every Porsche model');
+    expect(scope().get('model')).toBeNull();
+    expect(scope().get('make')).toBe('PORSCHE');
+  });
+  it('scopes to a year across every make', async () => {
+    fixture.pulse.data.auctions[3] = { ...fixture.pulse.data.auctions[3], year: 1967 };
+    await render();
+    await click('Show 1967 lots');
+    expect(scope().get('era')).toBe('1967-1967');
+    expect(scope().get('make')).toBeNull();
+    expect(boardTitles()).toEqual(['other-make']);
+    expect(container.querySelector('h1')?.textContent).toBe('Live auctions · 1967');
+  });
+  it('opens the lot from the rest of the row, and keeps text for a lot without a recorded model', async () => {
+    const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
+    fixture.pulse.data.auctions[0] = { ...lot(id, 'BMW', 42000, 2), year: 2004, model: null };
+    await render();
+    const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
+    expect(row.querySelector('.market-lot-name')?.textContent).toBe('2004 BMW');
+    expect(row.querySelector('.market-lot-name button')).toBeNull();
+    await act(async () => row.querySelector<HTMLElement>('.market-lot-close')!.click());
+    expect(scope().get('lot')).toBe(id);
+  });
+  it('keeps the title as text even where the catalogue has headline-scale period lettering', async () => {
+    fixture.pulse.data.auctions = [{ ...lot('k5', 'CHEVROLET', 20000, 2), year: 1985, model: 'K5 Blazer' }];
+    await render();
+    const name = container.querySelector('[data-vehicle-id="k5"] .market-lot-name')!;
+    expect(name.querySelector('.vehicle-identity')?.getAttribute('data-period-artwork')).toBe('false');
+    expect(name.querySelector('.vehicle-identity__art')).toBeNull();
+    expect(name.querySelector('.sr-only')?.textContent).toBe('1985 Chevrolet K5 Blazer');
   });
 });
 
@@ -680,8 +844,8 @@ describe('headline movement inspection', () => {
     await click('Choose Ford cohort');
     expect(container.querySelector('[aria-label="Bid total movement"]')?.textContent).toContain('Starting observation');
     expect(container.querySelector('.market-history__change')).toBeNull();
-    expect(container.querySelector('.market-navigation > summary')?.textContent).toContain('Explore market');
-    const select = container.querySelector<HTMLSelectElement>('[aria-label="Market navigation sort"]')!;
+    expect(container.querySelector('nav[aria-label="Market views"] [aria-label="Market scope"]')).toBeTruthy();
+    const select = container.querySelector<HTMLSelectElement>('[aria-label="Sort lots"]')!;
     await act(async () => { select.value = 'bid'; select.dispatchEvent(new Event('change', { bubbles: true })); });
     expect(window.location.search).toContain('sort=bid');
     expect(window.location.search).toContain('make=FORD');
@@ -717,18 +881,38 @@ describe('every live house on one board', () => {
     expect(container.querySelector('.market-venue__marks img')?.getAttribute('src')).toBe('/source-logos/bat.png');
     expect(cohortCount()).toBe('5');
   });
-  it('adds only dollar bids into the headline, and says what it left out and which house is held off', async () => {
+  it('adds only dollar bids into the headline when no rate is published, and says what it left out and which house is held off', async () => {
     await render();
     expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$60K');
     const note = container.querySelector('.market-figure__note')!.textContent!;
-    expect(note).toContain('2 lots bid in another currency are listed but not added to the dollar total');
+    expect(note).not.toContain('not added');
     expect(note).toContain('Cars & Bids: 188 lots held off, last read Oct 1');
+    expect(container.querySelector('.market-figure__value')?.getAttribute('title')).toContain('2 lots bid in EUR and GBP listed but not added: no published rate');
+  });
+  it('adds a foreign bid at its published rate, names the rate and its date, and keeps the house figure as the bid', async () => {
+    const ecb = (currency: string, rate: number) => ({ currency, rate, rateDate: '2026-11-06', source: `ECB euro foreign exchange reference rates 2026-11-06 (${currency})`,
+      sourceUrl: 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml' });
+    fixture.pulse.data.auctions = fixture.pulse.data.auctions.map((a: LiveAuction) => a.currency === 'GBP' ? { ...a, fx: ecb('GBP', 1.338488281) }
+      : a.currency === 'EUR' ? { ...a, fx: ecb('EUR', 1.1165) } : a);
+    await render();
+    // $60,000 in dollars + £44,694 x 1.338488281 ($59,822) + €38,250 x 1.1165 ($42,706)
+    expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$163K');
+    const hover = container.querySelector('.market-figure__value')!.getAttribute('title')!;
+    expect(hover).toContain('2 lots bid in EUR and GBP added in dollars at the ECB reference rate of 2026-11-06');
+    expect(hover).not.toContain('not added');
+    const gbp = container.querySelector('[data-vehicle-id="cc-gbp"]')!;
+    expect(gbp.textContent).toContain('£44,694');
+    expect(gbp.querySelector('.market-bid')?.getAttribute('title')).toContain('≈ $59,822 at 1.3385 USD per GBP (ECB reference rate, 2026-11-06)');
+    const d = currentBidDistribution(fixture.pulse.data.auctions);
+    expect(d.counts.otherCurrency).toBe(0);
+    expect(d.counts['50k100k']).toBe(1);
+    expect(d.counts['25k50k']).toBe(2);
+    expect(d.total).toBe(60_000 + 59_822 + 42_706);
   });
   it('shows each lot in its own currency with its house', async () => {
     await render();
     const gbp = container.querySelector('[data-vehicle-id="cc-gbp"]')!;
-    expect(gbp.textContent).toContain('GBP');
-    expect(gbp.textContent).toContain('44,694');
+    expect(gbp.textContent).toContain('£44,694');
     expect(gbp.textContent).not.toContain('$44,694');
     expect(gbp.querySelector('.market-lot-house')?.textContent).toBe('Collecting Cars');
     expect(container.querySelector('[data-vehicle-id="bat-1"] .market-lot-house')?.textContent).toBe('BaT');
@@ -746,12 +930,16 @@ describe('every live house on one board', () => {
     await click('All houses');
     expect(window.location.search).not.toContain('house=');
   });
-  it('compares with last week on BaT lots only, and says so', async () => {
+  it('compares on BaT alone when no house history can be read, and shows the BaT mark beside the change', async () => {
+    fixture.share = { isError: true, data: undefined };
     fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 24 * HOUR, bids: 25_000, n: 2, byMake: null, source: 'live' };
     await render();
-    expect(container.textContent).toContain('BaT +100.0% on a week ago');
+    const chg = container.querySelector('.market-figure__chg')!;
+    expect(chg.textContent).toContain('100.0%');
+    expect(chg.querySelector('img')?.getAttribute('alt')).toBe('BaT');
+    expect(container.querySelector('.market-figure__value')?.getAttribute('aria-label')).toBe('$60K bid now, +100.0% vs last week on BaT');
     await click('Collecting Cars, 2 lots');
-    expect(container.textContent).not.toContain('on a week ago');
+    expect(container.querySelector('.market-figure__chg')).toBeNull();
   });
   it('bids high to low by dollars; a bid in another currency is its own range, never an unrecorded one', async () => {
     await render();
@@ -782,7 +970,7 @@ describe('every live house on one board', () => {
     const stock = container.querySelector('[aria-label="Dollars bid, every house"]')!;
     expect(stock).toBeTruthy();
     expect(stock.textContent).toContain('Nothing before that is estimated');
-    expect(stock.textContent).toContain('Dollar bids only');
+    expect(stock.textContent).toContain('Bids recorded in dollars only, the unit these readings keep');
     // the total went from $60,000 to $61,500: up, drawn as a green line with a last-price tag
     expect(stock.querySelector('.market-stock__chg')?.className).toContain('is-up');
     expect(stock.querySelector('.market-stock__chg')?.textContent).toContain('+2.50%');
@@ -818,13 +1006,22 @@ describe('every live house on one board', () => {
     expect(stock.textContent).toContain('Recording starts now');
     expect(stock.querySelector('polyline')).toBeNull();
   });
-  it('compares each house with its own week-ago reading, and says which houses have no week of history yet', async () => {
+  it('compares each house with its own week-ago reading in the watchlist, and marks the houses with no week of history yet', async () => {
     const t0 = Date.parse('2026-09-26T12:00:00Z');
     fixture.share = { isError: false, data: { firstAt: t0, firstAtByHouse: { pcarmarket: Date.parse('2026-10-02T12:00:00Z'), 'collecting-cars': t0 }, points: [],
       weekAgo: { 'collecting-cars': { at: t0, bidUsd: 0, lots: 1, lotsWithBid: 1 } } } };
-    await render();
-    const text = container.querySelector('.market-figure')!.textContent!;
-    expect(text).toContain('PCarMarket: no week of history yet (recorded since Oct 2)');
+    await render('map=lots');
+    const row = (alt: string) => [...container.querySelectorAll('.market-stock__watch tbody tr')].find(r => r.querySelector(`img[alt="${alt}"]`))!;
+    const week = (alt: string) => row(alt).querySelectorAll('td')[3];
+    expect(week('Collecting Cars').textContent).toBe('+100.00%');
+    expect(week('Collecting Cars').className).toBe('is-up');
+    expect(week('PCarMarket').textContent).toBe('—');
+    expect(week('PCarMarket').getAttribute('title')).toContain('No week of readings yet (recorded since Oct 2');
+    // the headline lots compare only the house with a week of readings, under its mark; the hover names the rest
+    const lots = container.querySelectorAll('.market-figure__item')[1];
+    expect(lots.querySelector('.market-figure__chg img')?.getAttribute('alt')).toBe('Collecting Cars');
+    expect(lots.querySelector('button')?.getAttribute('title')).toContain('BaT, PCarMarket: no week of readings yet, not in the change');
+    expect(container.querySelector('.market-figure')!.textContent).not.toContain('no week of history');
   });
   it('keeps the price axis readable: neighbouring ticks differ even when the range is a sliver of the total', async () => {
     const t0 = Date.parse('2026-10-03T08:00:00Z');

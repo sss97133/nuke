@@ -653,7 +653,7 @@ def board(anon):
     d = rest('rpc/market_pulse_live', anon, 'POST', {})
     cols = d.get('columns') or []
     L = pd.DataFrame([dict(zip(cols, r)) for r in d.get('auctions', [])]).rename(columns={'id': 'vehicle_id'})
-    return L
+    return L, d.get('synced_at')
 
 
 def latest_rows(anon, ids):
@@ -855,8 +855,12 @@ def run(args):
     if not os.environ.get('VITE_SUPABASE_URL') or not anon or not service:
         raise SystemExit('VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are required (dotenvx run --)')
     a = load_artifacts()
-    lots = board(anon)
-    now = time.time()
+    # The moment comes from the source, never a machine's clock: the board's synced_at is the latest read of BaT's live
+    # page, so hours to close count from then and a stalled sync ages the rows out of the reader (see live-finish.mjs).
+    lots, synced_at = board(anon)
+    now = epoch(synced_at)
+    if not isinstance(now, float) or math.isnan(now):
+        raise SystemExit('market_pulse_live has no synced_at; nothing is written without the source time')
     lots['moment'] = now
     lots['ends'] = [epoch(e) for e in lots.ends_at]
     lots['hours_left'] = (lots.ends - lots.moment) / 3600.0

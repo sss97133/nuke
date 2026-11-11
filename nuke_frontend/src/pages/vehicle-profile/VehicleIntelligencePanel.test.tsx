@@ -18,6 +18,17 @@ async function mount(commentIntel?: any) {
   if (commentIntel) fixture.context.vehicleIntel = { comment_intel: commentIntel };
   await act(async () => root.render(<VehicleIntelligencePanel />));
 }
+it('shows an acceptance milestone as awaiting schedule without an auction date', async () => {
+  fixture.context.vehicleIntel = { apparitions: [
+    { platform: 'bat', event_type: 'auction', event_date: null, price: null, url: null, schedule_status: 'accepted_awaiting_schedule' },
+    { platform: 'owner_import', event_type: 'listing', event_date: null, price: null, url: null },
+  ] };
+  await mount();
+  const heading = [...host.querySelectorAll('button,[role="button"]')].find(element => element.textContent?.includes('Apparition History')) as HTMLElement;
+  await act(async () => heading.click());
+  expect(host.textContent).toContain('Accepted · awaiting schedule');
+  expect(host.textContent).toContain('Date TBD');
+});
 
 it('qualifies stored interpretations without certifying experts, excerpts or market performance', async () => {
   await mount({ overall_sentiment: 'positive', comment_count: 73,

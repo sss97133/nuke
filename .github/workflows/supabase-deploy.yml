@@ -175,7 +175,9 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if [ ! -s /tmp/functions.txt ]; then echo "no functions to deploy"; exit 0; fi
-          npx -y supabase@latest --version
+          # Pinned to 3.0.0: the version every green deploy on 2026-11-08 ran (six runs, 19:24-20:01Z). 2.79.0 rejects the
+          # v3 config key [local_smtp] ("config.config has invalid keys"), and 3.0.0 only deprecates --project-ref (v4 removes it).
+          npx -y supabase@3.0.0 --version
           FNS=""
           while read -r fn; do
             [ -d "supabase/functions/$fn" ] || { echo "skip (no dir): $fn"; continue; }
@@ -193,7 +195,7 @@ jobs:
           # guardrail step above.
           # No --jobs: the CLI accepts it only with --use-api (server-side bundling), and every deploy so far
           # bundled locally — keep the bundler that is known to work (run 36331008968 died on the flag).
-          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt --yes
+          npx -y supabase@3.0.0 functions deploy $FNS --remote=qkgaybvrernstplzjaam --no-verify-jwt --yes
           echo "✅ functions deployed"
 
       - name: Activate installed retained VIN intake

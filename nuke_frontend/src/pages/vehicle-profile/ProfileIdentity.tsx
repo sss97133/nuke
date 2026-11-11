@@ -48,5 +48,5 @@ export default function ProfileIdentity({ vehicleId, ...identity }: {
     return () => { cancelled = true; };
   }, [vehicleId, subject]);
   const artwork = answer?.subject === subject ? modelIdentityArtwork(answer.data, vehicleId, identity.model) : null;
-  return <VehicleIdentity {...identity} modelArtwork={artwork} />;
+  return <VehicleIdentity {...identity} vehicleId={vehicleId} modelArtwork={artwork} />;
 }

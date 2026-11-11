@@ -41,6 +41,16 @@ Two rules outrank taste:
    Swift twin; `RootedValueView` (`RootedValue.swift`) is the one primitive that renders a value, with its
    trust rung, its clock and its drill (or its honest refusal to drill). A bare value is a bug.
 
+**Book allocations use the existing accounting readers.** `AllocationEvidence.swift` opens
+`accounting_vehicle_financials` independently of the legacy investment fold. Its pages preserve
+book, vehicle, currency, phase and qualification; loaded records are not a complete financial
+picture. Each allocation opens its exact current book or bank record through
+`accounting_record_evidence`, with an allocation recheck before and after the source read.
+An account change, withdrawal, ambiguous identity or changed source reference clears the result.
+Amounts remain decimal text; a bank source supplies its own currency and date. Witness references
+do not become costs, payment proof, work completion or filing actions. This path adds no financial
+totals, original-file access, SQL, grants or writes.
+
 **The header is on the read.** `vehicle_profile_read(uuid)` (migration `20261013143000`, SECURITY
 INVOKER, callable by anon and authenticated) returns the vehicle page's header as one ProfileDocument: a
 `masthead` (identity columns, the one headline price as a Claim with its kind, platform and clock), a
@@ -65,6 +75,10 @@ Standing rules the code carries:
   Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
   the raw original outside the full-screen viewer.
 - **Payments open Stripe, never compose an amount.** A job's `pay_invoice` action comes only from the server (`viewer.actions`, offered to the work order customer while a balance is due). `JobPayment.swift` passes back its `work_order_id` to `create-work-order-invoice-checkout` and opens the returned page only when it is https on stripe.com. Nothing is charged until the customer finishes on Stripe; the payment reaches the job through `stripe-webhook`. Collection only: the app shows no payout or release.
+- **Listing submissions are recorded obligations.** Work reads the account's prepared/submitted `listing_exports`
+  through its existing own-row policy, showing the latest five with the exact eligible total and read clock.
+  Transport status `submitted` is distinct from a recorded `draft_pending_approval` stage; neither proves a live auction.
+  Rows open the vehicle or recorded HTTPS listing; the full submissions page opens on nuke.ag. Reading signs nothing.
 - **Job history is testimony until someone signs.** A stage's `retained_testimony` (counts of claims quoted from retained work messages) renders in `JobTestimony.swift` on the attributed rung as "N messages from the shop say…", never as accepted, done or paid, and never changes the stage. `JobOperationsSection` takes each operation's rung from `work_order_operations_read`'s `requested_by_basis` (signed → proven, quoted from the work order's text → attributed, no source → recorded); a "complete" line status is the record's mark, not a completion Sign. `JobEvidenceSection` shows `work_order_evidence_read` filings, counting photos the viewer may not see, and names an operation for visitors only in the operations reader's redacted words.
 - **Providers are placed by their band, never pinned.** "Choose who does it" (`Jobs/ProviderMatchesView.swift`, from the job while nobody is accepted and from Job posted) renders `work_order_provider_matches_read` in its own order (rank by passed checks, ties shared) with every input in third-person words. Service area and availability are the provider's self-claimed Signs and say so. The readers return no coordinates for people, so the map draws each stated band as a circle around its city's center (MapKit geocoding of the public "City, ST") and the job's public city; no business pin until a reader returns a public business place. Filters cover only the reader's inputs and a stated mobile band. Standing comes from `provider_profile_read` with its basis; Accept offer appears only when `work_order_offers_read` names it. The screen contacts nobody.
 - **A job's who-and-where card shows only what the server placed.** `JobProviderPlaceCard.swift` renders `work_order_provider_place_read`: the work order's organization (rating "Not rated" unless reviews are recorded, hours as written), the people on the job (accepted through Nuke apart from recorded assignment rows), and a tracker whose steps, evidence (Sign, record, status) and clocks come from the server's job path; messages are counted under a step and never fill it. A pin, Directions and Call appear only for a storefront business the server located; a personal collection, an untyped organization or a provider's self-stated band is a city-level circle labelled approximate, never a pin.
@@ -269,6 +283,27 @@ Standing rules the code carries:
   receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
   not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as
   recorded; nothing masks plate-shaped text yet, so do not claim it.
+- **Receipt depth follows the current source.** Investment Parts audit rows open the exact receipt through
+  its currently visible `receipt_vehicle_links.page_date` and `get_vehicle_day_documents`. The phone requires
+  exact receipt/day membership and the reader's `tied` verdict, then rechecks the link and current account.
+  Unknown dates, withheld links, retired/duplicate records and failed reads stay explicit; no guessed date
+  or older extraction fallback. Detail adds returned lines and source/date qualifications without another
+  total panel, payment/allocation/work inference, original-page download, or local financial sum. A read
+  timestamp is a snapshot, not a promise that the record cannot change. Older investment-fold clock,
+  labor and overlap qualifications remain separate unresolved work.
+- **Legacy financial inputs stay evidence.** The legacy proof's `confirmed_labor` is a sum of session
+  `total_job_cost`, which can include parts and tools; confirmation records testimony, not payment.
+  Its widget keeps receipt, payment/contribution and session record doors, without presenting mixed
+  totals, projected photo labor, party totals or ROI as reconciled investment/cash. Session and receipt
+  readings omit an invented currency; audit values are explicitly rounded and session dates carry
+  no invented timezone. Payment reports retain their declared USD unit and attributed
+  status. A missing confirmation is unknown, not an action grant. Existing confirmation/contribution
+  writers keep their effects. Session confirmation is displayed only after an explicit successful
+  acknowledgement for that session; an HTTP200 refusal, absent/malformed receipt or transport error
+  remains unconfirmed with retry. This establishes no vehicle holding or work/payment role.
+  The legacy receipt curve is withheld pending a qualified money/clock
+  contract; its first receipt is not an acquisition. The canonical valuation/price section is unchanged. This does
+  not repair the server folds or replace the canonical book/vehicle accounting service.
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.

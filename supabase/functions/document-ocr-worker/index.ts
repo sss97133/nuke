@@ -486,6 +486,52 @@ async function classifyDocument(storagePath: string): Promise<{ document_type: s
 
 // ─── EXTRACTION (Claude Sonnet → GPT-4o → xAI) ────────────────────────────
 
+// Gemini first (2026-11-08): the only provider whose key answers today. Measured on the capture document route:
+// Anthropic 401 invalid x-api-key, OpenAI 429, xAI 403, so every document failed "All providers failed". Classification
+// already runs on Gemini through the shared guard; extraction takes the same road, with the same per-day cap.
+async function extractWithGemini(base64Image: string, mediaType: string, docType: string): Promise<any> {
+  const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
+  if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured");
+  const mType = mediaType.includes("png") ? "image/png" : mediaType.includes("webp") ? "image/webp" : mediaType.includes("heic") ? "image/heic" : "image/jpeg";
+  const model = "gemini-flash-latest";
+  const response = await geminiFetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: buildExtractionPrompt(docType) + "\n\nRespond with ONLY the JSON object, no markdown fences." },
+            { inline_data: { mime_type: mType, data: base64Image } },
+          ],
+        }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 4000, responseMimeType: "application/json" },
+      }),
+      signal: AbortSignal.timeout(60000),
+    },
+    "document-ocr-worker",
+  );
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Gemini ${response.status}: ${err.substring(0, 300)}`);
+  }
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Empty Gemini response");
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(text);
+  const usage = data.usageMetadata || {};
+  return {
+    result: parsed,
+    provider: "google",
+    model,
+    tokens_input: usage.promptTokenCount || 0,
+    tokens_output: usage.candidatesTokenCount || 0,
+    cost_usd: 0,
+  };
+}
+
 async function extractWithClaude(base64Image: string, mediaType: string, docType: string): Promise<any> {
   const apiKey = Deno.env.get("NUKE_CLAUDE_API") || Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("No Anthropic API key");
@@ -621,7 +667,15 @@ async function extractDocument(storagePath: string, docType: string): Promise<an
   const imageUrl = await getImageUrl(storagePath);
   const errors: string[] = [];
 
-  // Try Claude Sonnet first (best at dense document OCR)
+  // Gemini first: the provider that answers (see extractWithGemini)
+  try {
+    return await extractWithGemini(base64, mediaType, docType);
+  } catch (e) {
+    errors.push(`Gemini: ${(e as Error).message}`);
+    console.warn("Gemini extraction failed:", (e as Error).message);
+  }
+
+  // Then Claude Sonnet (best at dense document OCR when its key is valid)
   try {
     return await extractWithClaude(base64, mediaType, docType);
   } catch (e) {

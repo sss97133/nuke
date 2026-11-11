@@ -2,11 +2,12 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ query: {} as any, activity: {} as any, book: null as any, finish: undefined as any }));
+const fixture = vi.hoisted(() => ({ query: {} as any, activity: {} as any, book: null as any, finish: undefined as any, track: undefined as any }));
 vi.mock('../../hooks/useAuctionComments', () => ({ EPISODE_READ_LIMIT: 100, useAuctionEpisode: () => fixture.query }));
 vi.mock('../stacks/orderBookReader', async importOriginal => ({ ...await importOriginal<any>(), useBidBook: () => ({ data: fixture.book }) }));
 vi.mock('./useLotMovement', () => ({ useLotMovement: () => fixture.activity }));
-vi.mock('./useFinishEstimates', () => ({ useFinishAnalogs: () => ({ data: fixture.finish }) }));
+vi.mock('./useFinishEstimates', async importOriginal => ({ ...await importOriginal<any>(),
+  useFinishAnalogs: () => ({ data: fixture.finish }), useFinishTrackRecord: () => ({ data: fixture.track }) }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...p }: any) => <a href={to} {...p} /> }));
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
 let root: Root, container: HTMLDivElement;
@@ -30,7 +31,7 @@ beforeEach(() => {
     ] } };
   fixture.book = null;
   fixture.activity = { coverage: { lots: [] } };
-  fixture.finish = undefined;
+  fixture.finish = undefined; fixture.track = undefined;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -200,6 +201,18 @@ it('opens with where the lot should finish: estimate, range, measured confidence
   expect(block.textContent).toContain('high bid $21,500');
   expect(block.textContent).toContain('Comparable sales through Sep 27, 2026');
   expect(block.textContent).toContain('estimated 10 min ago at a $25,000 bid');
+});
+it('says under the range how often estimates made this far out finished inside it', async () => {
+  const at = Date.now() - 10 * 60_000;
+  fixture.finish = { board: { fresh: true, writerAt: null, byId: new Map([[id, { vehicleId: id, estimate: 33000, low: 25500, high: 45100,
+    grade: 'A', coverage: 0.8, sentence: null, estimatedAt: at, bidAtEstimate: 25000, compsThrough: null, model: 33 }]]) }, analogs: [] };
+  fixture.track = [{ model: 33, fromHours: 24, toHours: 72, lots: 555, inside: 448, medianMissPct: 16.6,
+    firstClose: Date.parse('2026-10-17T20:00:00Z'), lastClose: Date.parse('2026-10-20T21:00:00Z') }];
+  await act(async () => root.render(<AuctionEvidence vehicleId={id} sourceUrl={source} endsAt={at + 30 * 3_600_000} compact onClose={() => {}} />));
+  const block = container.querySelector('[aria-label="Where it should finish"]')!;
+  expect(block.textContent).toContain('So far, estimated 1–3 days out: 448 of 555 finished inside the range');
+  await act(async () => root.render(<AuctionEvidence vehicleId={id} sourceUrl={source} endsAt={at + 3 * 3_600_000} compact onClose={() => {}} />));
+  expect(container.querySelector('[aria-label="Where it should finish"]')!.textContent).not.toContain('So far');
 });
 it('says nothing about the finish when there is no estimate', async () => {
   await act(async () => root.render(<AuctionEvidence vehicleId={id} sourceUrl={source} compact onClose={() => {}} />));

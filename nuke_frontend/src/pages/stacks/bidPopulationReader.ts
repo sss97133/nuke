@@ -14,7 +14,7 @@ export async function readBidPopulation(request: PopulationRequest, signal?: Abo
   // Close selection extends by 14 days to retain sequences with bids crossing New Year.
   const from = new Date(Date.UTC(request.year, 0, 1)).toISOString();
   const end = new Date(Math.min(Date.UTC(request.year + 1, 0, 15), Date.now())).toISOString();
-  let query = supabase.from('auction_events').select(POPULATION_LOT_SELECT)
+  let query = supabase.from('auction_events_canonical').select(POPULATION_LOT_SELECT)
     .in('source', ['bat', 'bringatrailer']).eq('outcome', 'sold')
     .gte('auction_end_date', from).lt('auction_end_date', end)
     .eq('vehicles.is_public', true).is('vehicles.deleted_at', null)
@@ -28,7 +28,7 @@ export async function readBidPopulation(request: PopulationRequest, signal?: Abo
   for (let i = 0; i < candidates.length; i += 40) {
     const ids = candidates.slice(i, i + 40).map(l => l.id); let after: string | null = null, complete = false;
     for (let page = 0; page < 8; page++) {
-      let read = supabase.from('auction_comments').select(POPULATION_BID_SELECT)
+      let read = supabase.from('auction_comments').select(`${POPULATION_BID_SELECT},canonical:auction_events_canonical(id)`).or('auction_event_id.is.null,canonical.not.is.null')
         .in('auction_event_id', ids).eq('comment_type', 'bid').gt('bid_amount', 0)
         .eq('vehicles.is_public', true).is('vehicles.deleted_at', null)
         .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item', { referencedTable: 'vehicles' })

@@ -119,21 +119,13 @@ export default function ImageProcessingDashboard() {
   useEffect(() => {
     if (!autoRefresh) return;
     let active = true;
-    let pending: ReturnType<typeof setTimeout> | null = null;
-    setLiveState('connecting');
-    const channel = supabase.channel('image-processing-updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicle_observations' }, payload => {
-        const row = payload.new as { kind?: string; structured_data?: { analysis_kind?: string } };
-        if (row.kind !== 'condition' || row.structured_data?.analysis_kind !== 'image_deep_byok' || document.visibilityState !== 'visible' || pending) return;
-        // Coalesce bursts; the recent feed refreshes at most once a minute.
-        pending = setTimeout(() => {
-          pending = null;
-          if (active && document.visibilityState === 'visible') void loadStats(false);
-        }, Math.max(0, 60_000 - (Date.now() - lastFeedAttempt.current)));
-      }).subscribe(status => {
-        if (active) setLiveState(status === 'SUBSCRIBED' ? 'connected' : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED' ? 'unavailable' : 'connecting');
-      });
-    return () => { active = false; if (pending) clearTimeout(pending); void supabase.removeChannel(channel); };
+    // The recent feed re-reads once a minute while the page is visible. It used to wait on a Realtime insert stream of
+    // vehicle_observations, which left the supabase_realtime publication on 2026-11-09 (its decoding cost ~460 s/h).
+    setLiveState('connected');
+    const id = window.setInterval(() => {
+      if (active && document.visibilityState === 'visible') void loadStats(false);
+    }, 60_000);
+    return () => { active = false; window.clearInterval(id); };
   }, [autoRefresh, loadStats]);
 
   const confident = activity?.filter(a => a.confidence != null && a.confidence >= 0.6).length;
@@ -153,7 +145,7 @@ export default function ImageProcessingDashboard() {
       </header>
       {loading && <p role="status">Reading processing data…</p>}
       {autoRefresh && <p role="status" className={liveState === 'unavailable' ? 'image-processing-error' : 'image-processing-note'}>
-        {liveState === 'connected' ? 'Listening for analysis events. The recent feed updates at most once a minute while this page is visible; coverage updates with Refresh data.' : liveState === 'unavailable' ? 'Live updates are unavailable. Use Refresh data to read the latest results.' : 'Connecting to feed updates…'}
+        {liveState === 'connected' ? 'The recent feed updates once a minute while this page is visible; coverage updates with Refresh data.' : liveState === 'unavailable' ? 'Live updates are unavailable. Use Refresh data to read the latest results.' : 'Connecting to feed updates…'}
       </p>}
       {feedError && <p role="alert" className="image-processing-error">Recent activity could not be refreshed: {feedError} {activity !== null ? 'Showing the last successful feed.' : 'Activity counts are unknown.'}</p>}
       {coverageError && <p role="alert" className="image-processing-error">Coverage could not be refreshed: {coverageError} {coverage !== null ? 'Showing the last successful coverage.' : 'Coverage is unknown.'}</p>}

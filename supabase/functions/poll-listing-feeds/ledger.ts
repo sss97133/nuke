@@ -82,6 +82,7 @@ export interface VehicleLandedRow {
 
 /** The part of the `ingest` response the ledger reads. */
 export interface IngestOutcome {
+  collecting_cars_noncar?: Record<string, unknown>;
   status?: string;
   source?: string;
   vehicle_id?: string | null;

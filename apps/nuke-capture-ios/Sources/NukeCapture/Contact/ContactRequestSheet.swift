@@ -82,6 +82,7 @@ struct ContactRequestSheet: View {
                     }
                 }
             }
+            .accessibilityIdentifier("contact.form")
             .navigationTitle("Contact via Nuke")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

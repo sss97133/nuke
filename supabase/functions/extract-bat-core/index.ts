@@ -2,6 +2,8 @@
 /**
  * extract-bat-core
  *
+ * Version: 4.5.9 — read every publisher category; a Parts + Race Cars bundle remains a vehicle.
+ *   Re-extraction corrects the same canonical lot and records the category decision in its fetch receipt.
  * Version: 4.5.8 — vehicles.description stores the full post body (was a 480-char summary + "…"); a stored legacy
  *   cut of the same body is replaced, never a longer/different text; sets description_truncated / description_length_source (2026-10-25)
  * Version: 4.5.2 — the lot's own "Private Party or Dealer" line lands in auction_events.seller_type (raw text in raw_data.party_type_raw) (2026-10-20)
@@ -40,6 +42,7 @@
 
 import { fullDescriptionText, shouldReplaceDescription } from "./descriptionText.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { batListingClassification, listingKindUpdate } from "./listingKind.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { decideLotAttribution, mergeEventMetadata, monitorForSeller, type BatEventRow } from "./sellerAttribution.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
@@ -53,18 +56,19 @@ import { readBatPartyLine, type BatSellerType } from "../_shared/batSellerType.t
 import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { sourceReadClock } from "./sourceReadClock.ts";
+import { resolveBatVehicleIdentity } from "./vehicleIdentity.ts";
 import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type EndRow } from "./auctionClose.ts";
 import { recordListingDescription } from "./descriptionObservation.ts";
 import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
 import { handoffBatLiveCollection } from "./liveStream.ts";
-import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
+import { admitBatHtmlRecovery, findBatHtmlRecoveryMonitor } from "./batHtmlRecovery.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { retainFetchedCapture, type CaptureAcknowledgement } from "../_shared/archiveFetch.ts";
 import { landIdentifierClaims } from "../_shared/landIdentifierClaims.ts";
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:4.5.8';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.12';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -1339,7 +1343,7 @@ Deno.serve(async (req) => {
         fetchedAt: sourceFetchedAt,
         errorMessage: null,
         html,
-        metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
+        metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent, listing_classification: batListingClassification(html) },
       });
     }
 
@@ -1362,7 +1366,7 @@ Deno.serve(async (req) => {
         console.warn(`extract-bat-core terminal evidence: ${terminalCapture.reason}`);
       if (htmlSource === "direct" && terminalCapture.status === "not_terminal") await trySaveHtmlSnapshot({
         supabase, listingUrl: listingUrlNorm, httpStatus, success: true, fetchedAt: sourceFetchedAt,
-        errorMessage: null, html, metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
+        errorMessage: null, html, metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent, listing_classification: batListingClassification(html) },
       });
     }
     // the comments JSON, parsed once: the first comment or bid is the auction's public start, the sale /
@@ -1414,7 +1418,8 @@ Deno.serve(async (req) => {
     let bidsWritten = 0;
 
     const batCategory = essentials.listing_category ? String(essentials.listing_category).trim() : null;
-    const listingKind = batCategory && batCategory.toLowerCase() === "parts" ? "non_vehicle_item" : "vehicle";
+    const listingClassification = batListingClassification(html);
+    const listingKind = listingClassification.kind ?? "vehicle";
     const descriptionRaw = extractDescription(html);
     const description = fullDescriptionText(descriptionRaw);
     const images = extractImages(html);
@@ -1495,14 +1500,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    const identityResolution = await resolveBatVehicleIdentity(supabase, {
+      vehicleId, vin: essentials.vin, sourceUrl: listingUrlCanonical, comments: rawComments,
+    });
+    if (identityResolution.redirectedFrom) existing = null;
+    vehicleId = identityResolution.vehicleId;
     mark("resolve_vehicle");
     let streamOwnsAuction = false;
     if (vehicleId) {
-      const { data: liveMonitor } = await supabase.from("monitored_auctions")
-        .select("stream_state").eq("vehicle_id", vehicleId).in("external_auction_url", urlCandidates).limit(1).maybeSingle();
-      const state = liveMonitor?.stream_state;
-      streamOwnsAuction = Object.values(state?.sessions || {}).some((s: any) => s.connected && Date.parse(s.at) > Date.now() - 15000)
-        || (state?.last_frame_received_at && Date.parse(state.last_frame_received_at) > Date.parse(sourceFetchedAt || ""));
+      const monitorOwners = [...new Set([vehicleId, identityResolution.redirectedFrom].filter(Boolean))];
+      const { data: liveMonitors, error: liveMonitorError } = await supabase.from("monitored_auctions")
+        .select("stream_state").in("vehicle_id", monitorOwners).in("external_auction_url", urlCandidates).limit(3);
+      if (liveMonitorError) throw Error(`BaT native stream ownership unavailable: ${liveMonitorError.message}`);
+      if (!Array.isArray(liveMonitors) || liveMonitors.length > 2) throw Error('BaT native stream ownership ambiguous');
+      streamOwnsAuction = (liveMonitors ?? []).some((monitor: any) => {
+        const state = monitor.stream_state;
+        return Object.values(state?.sessions || {}).some((s: any) => s.connected && Date.parse(s.at) > Date.now() - 15000)
+          || (state?.last_frame_received_at && Date.parse(state.last_frame_received_at) > Date.parse(sourceFetchedAt || ""));
+      });
     }
     const createdIds: string[] = [];
     const updatedIds: string[] = [];
@@ -1622,8 +1637,9 @@ Deno.serve(async (req) => {
         listing_url: existing?.listing_url || listingUrlCanonical,
         listing_source: existing?.listing_source || "bat",
         platform_source: existing?.platform_source || "bringatrailer", // C7: fill the platform key when missing
-        // Prefer to only mark non-vehicle, never downgrade.
-        ...(listingKind === "non_vehicle_item" ? { listing_kind: "non_vehicle_item" } : {}),
+        // Re-read all source categories; correct prior Parts-only classification
+        // only for this canonical presentation, never a different source/lot.
+        ...listingKindUpdate(listingClassification, existing?.listing_url || existing?.discovery_url, listingUrlCanonical),
         updated_at: new Date().toISOString(),
         extractor_version: EXTRACTOR_VERSION,
       };
@@ -2866,26 +2882,28 @@ Deno.serve(async (req) => {
     // uses (sha256 of 'bat'|url|sequence|posted_at|author|text; rows built by the shared builder), so the two writers dedupe on
     // (vehicle_id, content_hash); bids also into bat_bids when the lot has a bat_listings row. Skylar's rule:
     // a BaT auction's comments, bids, open and close belong on the vehicle's timeline at their precise moments.
-    const closingCommentMonitor = vehicleId && auction.parsed ? await supabase.from("monitored_auctions")
-      .select("id,auction_end_time,stream_state").eq("vehicle_id",vehicleId).in("external_auction_url",urlCandidates).limit(1).maybeSingle() : null;
-    const closingCommentId = closingCommentMonitor?.data?.id;
+    const closingCommentMonitor = vehicleId && auction.parsed
+      ? await findBatHtmlRecoveryMonitor(supabase, urlCandidates, vehicleId) : null;
+    const closingCommentId = closingCommentMonitor?.id;
     const nativeClosingIntake = closingCommentId && (streamOwnsAuction ||
-      (Date.parse(closingCommentMonitor!.data!.auction_end_time) <= Date.now()+15*60000
-        && Date.parse(closingCommentMonitor!.data!.auction_end_time) > Date.now()-24*60*60000));
-    if (nativeClosingIntake) {
+      (Date.parse(closingCommentMonitor!.auction_end_time) <= Date.now()+15*60000
+        && Date.parse(closingCommentMonitor!.auction_end_time) > Date.now()-24*60*60000));
+    const scheduledBidRecovery = closingCommentId && closingCommentMonitor?.is_live === true;
+    if (nativeClosingIntake || scheduledBidRecovery) {
       // Shared front door and monitor lock with the WebSocket reader. An HTML
       // fallback cannot race its native comment/profile INSERT or create a fork.
-      for (let at=0;at<rawComments.length;at+=50) {
+      await admitBatHtmlRecovery({ monitorId: closingCommentId, comments: rawComments,
+        receivedAt: sourceFetchedAt, bidsOnly: !nativeClosingIntake, admit: async body => {
         const response = await fetch(`${supabaseUrl}/functions/v1/ingest-observation`, {
           method:"POST",headers:{Authorization:`Bearer ${serviceRoleKey}`,"Content-Type":"application/json"},
-          body:JSON.stringify({mode:BAT_LIVE_MODE,heartbeats:[],frames:rawComments.slice(at,at+50).map((comment:any)=>({
-            monitored_auction_id:closingCommentId,event:"comment-added",data:{post_id:Number(comment.post),comment},
-            received_at:sourceFetchedAt || new Date().toISOString(),transport:"direct_html"}))}),
+          body:JSON.stringify(body),
           signal:AbortSignal.timeout(15000),
         });
-        if (!response.ok || (await response.json()).success!==true) throw new Error("Closing HTML native intake failed; no raw comment fallback");
-      }
-    } else if (vehicleId && auction.parsed && !streamOwnsAuction) {
+        if (!response.ok) throw new Error("BaT HTML native intake failed; no lossy bid fallback");
+        return await response.json();
+      }});
+    }
+    if (!nativeClosingIntake && vehicleId && auction.parsed && !streamOwnsAuction) {
       try {
         const endAt = essentials.auction_end_at ? new Date(essentials.auction_end_at) : (auction.recordAt ? new Date(auction.recordAt) : null);
         // one builder for the reader and the archive loader (_shared/batAuctionRecord.ts); every comment lands,
@@ -3068,6 +3086,11 @@ Deno.serve(async (req) => {
         vehicles_updated: updatedIds.length,
         created_vehicle_ids: createdIds,
         updated_vehicle_ids: updatedIds,
+        vehicle_resolution: identityResolution.redirectedFrom ? {
+          basis: 'exact_source_vin_over_native_inventory_locator',
+          inventory_locator_id: identityResolution.redirectedFrom,
+          canonical_vehicle_id: vehicleId,
+        } : null,
         issues: terminalCapture.status === "failed" || terminalCapture.status === "unavailable" ? ["terminal_evidence_" + terminalCapture.reason] : [],
         extraction_method: "direct_html_parsing_free_mode",
         timings: { ...timings, total_ms: Date.now() - phaseStart },

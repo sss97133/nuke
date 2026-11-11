@@ -8,6 +8,10 @@ same model page, of the same make and of a near model year are preferred. The es
 weighted median rise from that hour to their close. The 80% range is their 10th to 90th percentile rise, widened by a
 correction measured on the archive's last 90 days per hours to close x no-reserve flag x grade. It is never below the bid.
 
+Another house's lot (a lot object with "house" other than bringatrailer, and its "currency") is read only when the
+coverage file's "houses" block shows that house, in its currency and within its max_hours; its read is then moved by
+house_adjust and carries that house's held-out in-range share and miss (scripts/market/live-finish-houses.py).
+
 Grade A: the lot's model page has comparables within 3 model years, and at least 5 of the 50 analogs are on that page.
 Grade B: the page has comparables, fewer same-page analogs. Grade C: no comparables on the page; priced from the make.
 
@@ -598,6 +602,28 @@ def tier(p):
     return 'a' if p < 25000 else 'b' if p < 50000 else 'c' if p < 100000 else 'd'
 
 
+def house_at(by_h, h, key):
+    """A house calibration value (shift or widen, per calibration horizon) at h hours, interpolated in ln h."""
+    pts = sorted((float(b), v[key]) for b, v in by_h.items() if v.get(key) is not None)
+    if h <= pts[0][0]:
+        return pts[0][1]
+    if h >= pts[-1][0]:
+        return pts[-1][1]
+    for (a, va), (b, vb) in zip(pts[:-1], pts[1:]):
+        if a <= h <= b:
+            return va + (vb - va) * (math.log(h) - math.log(a)) / (math.log(b) - math.log(a))
+
+
+def house_adjust(bid, est, lo, hi, h, hc):
+    """Model 32's BaT read moved onto another house's lot: the estimate and range shifted by the house's measured
+    ln(final / estimate) at this hour, the range widened (or narrowed) by its measured correction, never below the bid.
+    hc is the house's block of live-finish-coverage.json, fitted by scripts/market/live-finish-houses.py on that house's
+    closed lots; the same function scores the backtest, so the shown range is the one measured."""
+    s, w = house_at(hc['by_h'], h, 'shift'), house_at(hc['by_h'], h, 'widen')
+    e = max(bid, est * math.exp(s))
+    return e, max(bid, min(e, lo * math.exp(s - w))), max(e, hi * math.exp(s + w))
+
+
 NOT_CARS = {'MOTORCYCLE'}     # vehicles.canonical_vehicle_type never priced as a car (TRAILER is not used: a Scout II carried it, 2026-10-16)
 KNOWN_FROM = {'lbidders': 'bidders_t', 'lcom': 'ncom_t', 'l24': 'nb24', 'lsince': 'since_s'}
 
@@ -649,8 +675,25 @@ def run(args):
     lots['year'] = pd.to_numeric(lots.year, errors='coerce')
     lots['nr'] = lots.no_reserve.fillna(False).astype(bool).astype(int)
     t_map = time.time() - t0
+    cov = load_coverage(args.coverage)
+    houses = cov.get('houses', {})
+    if 'house' not in lots.columns:
+        lots['house'] = None
+    if 'currency' not in lots.columns:
+        lots['currency'] = None
     keep = []
     for r in lots.itertuples():
+        # A lot of another house is read only when its house's backtest passed (live-finish-coverage.json "houses"),
+        # in the currency it was measured in; the reason a house is not read rides on the skip.
+        hc = houses.get(r.house) if isinstance(r.house, str) and r.house != 'bringatrailer' else None
+        if isinstance(r.house, str) and r.house != 'bringatrailer':
+            if not hc or not hc.get('show'):
+                skip(r.vehicle_id, f'{r.house}: no finish estimate ({(hc or {}).get("reason", "no backtest")})'); continue
+            if (r.currency or 'USD') != hc.get('currency', 'USD'):
+                skip(r.vehicle_id, f'{r.house}: bid in {r.currency}, measured in {hc.get("currency", "USD")} only'); continue
+            if r.hours_left == r.hours_left and r.hours_left > hc['max_hours']:
+                skip(r.vehicle_id, f'{r.house}: estimated only in the last {hc["max_hours"]:g} h (the held-out backtest)',
+                     hours_left=round(r.hours_left, 2)); continue
         if not (r.ends == r.ends) or not (r.moment == r.moment):
             skip(r.vehicle_id, 'no close time'); continue
         if r.hours_left <= 0:
@@ -679,7 +722,6 @@ def run(args):
         T['pattern'] = [tuple(k for k, src in KNOWN_FROM.items() if pd.notna(getattr(r, src))) for r in T.itertuples()]
         T['g'] = [min(range(len(GRID)), key=lambda i: abs(math.log(GRID[i]) - math.log(h))) for h in T.hours_left]
     t_level = time.time() - t0
-    cov = load_coverage(args.coverage)
     for (g, nr, pattern), Tg in (T.groupby(['g', 'nr', 'pattern']) if len(T) else []):
         Sg = cache['states'][g]
         pool = Sg[(Sg.nr == nr) & (Sg.f_epoch < Tg.moment.min() - 3600) & (Sg.f_epoch >= Tg.moment.max() - 365 * DAY)].reset_index(drop=True)
@@ -705,6 +747,14 @@ def run(args):
             prod_cover, prod_n, prod_window = (pc['coverage'], pc['n'], pc['window']) if pc else (None, 0, None)
             measures = [(c, n_, w) for c, n_, w in ((arch_cover, arch_n, cal['window']), (prod_cover, prod_n, prod_window)) if c is not None]
             cover, cover_n, window = min(measures, key=lambda m: m[0]) if measures else (None, 0, None)
+            hc = houses.get(r.house) if isinstance(r.house, str) and r.house != 'bringatrailer' else None
+            if hc:
+                # another house: the read moved by that house's measured calibration, and its own measured in-range
+                # share and miss at the nearest horizon (the BaT measurements say nothing about it)
+                est, lo, hi = house_adjust(r.bid, est, lo, hi, r.hours_left, hc)
+                hm = hc['by_h'][min(hc['by_h'], key=lambda b: abs(math.log(float(b)) - math.log(r.hours_left)))]
+                hm = hm['by_grade'][gr] if hm.get('by_grade', {}).get(gr, {}).get('n', 0) >= 50 else hm
+                cover, half, cover_n, window = hm['coverage'], hm['median_miss'], hm['n'], hc['window']
             analogs = []
             for i, why in picks:
                 p = pool.iloc[i]; lot = LS.loc[p.slug]
@@ -720,6 +770,11 @@ def run(args):
                      'n_analogs': int(min(K, len(pool))),
                      'method': 'analog v1 price-only' if mode == 'price' else 'analog v1 with engagement (' + ', '.join(pattern) + ')',
                      'analogs': analogs}
+            if hc:
+                notes.update({'house': r.house, 'coverage_archive': None, 'coverage_archive_n': 0, 'coverage_prod': None,
+                              'coverage_prod_n': 0, 'coverage_house': round(float(cover), 3), 'coverage_house_n': int(cover_n),
+                              'window': {'house': hc['window'], 'archive': notes['window']['archive']},
+                              'method': notes['method'] + f', BaT analogs moved by the {r.house} calibration ({hc["fitted"]})'})
             rows_out[r.vehicle_id] = {
                 'vehicle_id': r.vehicle_id, 'current_bid': int(round(r.bid)), 'hours_remaining': round(r.hours_left, 1),
                 'time_window': 'live', 'price_tier': tier(est), 'model_version': 32,
