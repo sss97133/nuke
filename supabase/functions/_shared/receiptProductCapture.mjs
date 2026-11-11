@@ -54,7 +54,8 @@ export function parseProductPage(html, url, expectedPart) {
   const primaryScope = scopes.length ? html.slice(scopes[0].index, scopes[1]?.index ?? html.length) : '';
   const primaryMetas = [...primaryScope.matchAll(/<meta\b[^>]*>/gi)].map(m => attrs(m[0]));
   const primaryMeta = value => primaryMetas.find(m => m.itemprop === value)?.content;
-  const identifiers = product ? [product.sku, product.mpn] : [primaryMeta('sku'), primaryMeta('mpn')];
+  const primaryIdentifiers = [product?.sku, product?.mpn].filter(value=>value != null && String(value).trim()!=='');
+  const identifiers = primaryIdentifiers.length ? primaryIdentifiers : [primaryMeta('sku'), primaryMeta('mpn')];
   const rawSku = identifiers.find(value => value != null && normalizePart(value) === normalizePart(expectedPart));
   if(rawSku == null)return {status:'sku_not_verified'};
   let lineCode = null;

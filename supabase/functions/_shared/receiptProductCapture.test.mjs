@@ -38,6 +38,11 @@ test('matching recommendation cannot replace a mismatching primary product',()=>
  const html='<div itemscope itemtype="https://schema.org/Product"><meta itemprop="name" content="Wrong"><div itemscope itemtype="https://schema.org/Product"><meta itemprop="sku" content="ABC-1">';
  assert.equal(parseProductPage(html,url,'ABC-1').status,'sku_not_verified');
 });
+test('primary microdata supplies an identifier only when JSON-LD has none',()=>{
+ const micro='<div itemscope itemtype="https://schema.org/Product"><meta itemprop="sku" content="ABC-1"></div>';
+ assert.equal(parseProductPage(page({...product,sku:undefined})+micro,url,'ABC-1').status,'exact_sku_page');
+ assert.equal(parseProductPage(page({...product,sku:'OTHER'})+micro,url,'ABC-1').status,'sku_not_verified');
+});
 test('missing SKU, placeholder image and missing product image remain unresolved',()=>{
  assert.equal(parseProductPage(page({...product,sku:undefined}),url,'ABC-1').status,'sku_not_verified');
  for(const image of [undefined,'https://cdn.oerparts.com/logo.png','https://cdn.oerparts.com/placeholder.jpg']) assert.notEqual(parseProductPage(page({...product,image}),url,'ABC-1').status,'exact_sku_page');

@@ -50,6 +50,14 @@ BEGIN
  RETURN 5;
 END $$;
 \ir ../migrations/20261113150000_receipt_catalog_enrichment.sql
+-- Upgrade fixture: the previous writer admitted a number-only capture with no
+-- product-line namespace. Replay must append a readable revision of these bytes.
+INSERT INTO listing_page_snapshots VALUES('a0000000-0000-0000-0000-000000000009','https://www.oreillyauto.com/detail/c/brand/clamps/dag0/LEGACY1',repeat('9',64),200,true,now());
+INSERT INTO storage.objects VALUES('catalog-images','receipt-products/'||repeat('8',64)||'.jpeg');
+SELECT record_receipt_catalog_product('oreilly','LEGACY1',jsonb_build_object(
+ 'source_role','original_receipt_supplier','match_basis','exact_primary_catalog_sku; installation_not_asserted','parser','receipt_product_page_v1','printed_sku','LEGACY1','name','Legacy clamps',
+ 'snapshot_id','a0000000-0000-0000-0000-000000000009','page_sha256',repeat('9',64),'image_sha256',repeat('8',64),'page_url','https://www.oreillyauto.com/detail/c/brand/clamps/dag0/LEGACY1',
+ 'image_url',get_service_url()||'/storage/v1/object/public/catalog-images/receipt-products/'||repeat('8',64)||'.jpeg','image_source_url','https://images.oreillyauto.com/parts/clamps.jpg','image_storage_path','receipt-products/'||repeat('8',64)||'.jpeg'));
 \ir ../migrations/20261113151000_receipt_catalog_primary_identity.sql
 
 DO $$ DECLARE r uuid:='60000000-0000-0000-0000-000000000001'; i uuid:='70000000-0000-0000-0000-000000000001';q uuid;g bigint;c jsonb;p uuid;j jsonb;BEGIN
@@ -117,4 +125,19 @@ DO $$ DECLARE r uuid:='60000000-0000-0000-0000-000000000001'; i uuid:='70000000-
  ASSERT receipt_item_product_card(i) IS NULL,'withdrawal cannot fall back to another brand';
  BEGIN PERFORM record_receipt_catalog_product('oreilly','55173',c||jsonb_build_object('image_source_url','https://images-prod.oreillyauto.com.evil.test/clamps.jpg'));RAISE EXCEPTION 'unapproved CDN accepted';EXCEPTION WHEN raise_exception THEN ASSERT SQLERRM='Invalid product capture'; END;
  RAISE NOTICE 'receipt catalog runtime: official CDN, product-line namespace, public reader and withdrawal pass';
+END $$;
+
+DO $$ DECLARE i uuid:='70000000-0000-0000-0000-000000000001'; old_id uuid; new_id uuid; c jsonb; BEGIN
+ SELECT id INTO old_id FROM catalog_parts WHERE part_number='LEGACY1';
+ INSERT INTO storage.objects VALUES('catalog-images','receipt-products/'||repeat('8',64)||'.jpeg');
+ UPDATE receipt_items SET part_number='LEGACY1',description='CLAMPS (MTM)' WHERE id=i;
+ ASSERT receipt_item_product_card(i) IS NULL,'legacy capture is not yet line-qualified';
+ c:=jsonb_build_object('source_role','original_receipt_supplier','match_basis','exact_primary_catalog_sku; installation_not_asserted','parser','receipt_product_page_v1','printed_sku','LEGACY1','name','Legacy clamps','product_line_code','MTM',
+ 'snapshot_id','a0000000-0000-0000-0000-000000000009','page_sha256',repeat('9',64),'image_sha256',repeat('8',64),'page_url','https://www.oreillyauto.com/detail/c/brand/clamps/dag0/LEGACY1',
+ 'image_url',get_service_url()||'/storage/v1/object/public/catalog-images/receipt-products/'||repeat('8',64)||'.jpeg','image_source_url','https://images.oreillyauto.com/parts/clamps.jpg','image_storage_path','receipt-products/'||repeat('8',64)||'.jpeg');
+ new_id:=record_receipt_catalog_product('oreilly','LEGACY1',c);
+ ASSERT old_id<>new_id AND (SELECT count(*)=2 FROM catalog_parts WHERE part_number='LEGACY1'),'line-qualified revision preserves legacy testimony';
+ ASSERT record_receipt_catalog_product('oreilly','LEGACY1',c)=new_id,'new namespace remains idempotent';
+ ASSERT receipt_item_product_card(i)->>'catalog_part_id'=new_id::text,'replayed legacy bytes now reach receipt consumer';
+ RAISE NOTICE 'receipt catalog upgrade: legacy byte replay appends a readable line-qualified revision';
 END $$;
