@@ -4289,3 +4289,64 @@ identity and the intended asset/person readers for each of these cases:
 The foundation repair is open. This section introduces no schema, writer, identity merge, data correction or release.
 Reconcile the active art design and ingestion lanes before changing their owners. Technical checks alone do not close these
 cases: verify the source-to-consumer activity with the actual records and the intended visibility.
+
+## 22. Every photo is signal: the whole library lands, vision sorts it, the unused frames are reverse signal (owner, 2026-11-11)
+
+**Owner, 2026-11-11 (in substance):** "16k of 90k. You're asking the wrong questions; you're looking at remnants of never
+fully proven systems. The system is supposed to take all signal. First we use vision to identify the usable, relevant
+images, but also to categorize the images we don't use, as reverse signal to validate things: we know the guy wasn't
+working on the car because he was somewhere else, and the somewhere else is private photos."
+
+### What this says, in the vocabulary
+
+1. **The universe is the owner's whole library**, not the photos someone chose to upload. Every frame is one observation
+   with a clock and usually a place. The capture app, iPhoto albums, drop folders and uploads are carriers into one log,
+   not separate systems.
+2. **Vision runs on every frame and sorts it into kinds**: vehicle work (lands on a vehicle), document (receipt, title,
+   plate: goes to its reader), and everything else (people, travel, home). Nothing is dropped for being irrelevant.
+3. **An unused frame is still testimony about the holder: where they were and when.** Its pixels stay private (never
+   shown, never uploaded beyond what the owner allows), but its clock and place are evidence. That is the **reverse
+   signal**: it refutes claims. A photo in St Barth at 14:00 means no work at the Boulder City shop at 14:00. It bounds
+   work sessions, labor hours (§ labor lenses), possession and the filer's candidates.
+4. Privacy is line-item masking (`feedback_profiles_public_line_items_masked`): the frame is private, and the fact
+   derived from it ("away from the shop, 11:00-18:00") is what the readers use.
+
+### Measured state, 2026-11-11 (iphoto-census `25cfbf13`, prod)
+
+| | count |
+|---|---:|
+| Library photos (visible) | 83,131 (+6,888 videos, 6,329 hidden) |
+| Reached Nuke as a `vehicle_images` row | 17,243 (20.7%) |
+| Apple's vehicle-like label (upper bound on car frames) | 34,436; of those in Nuke 9,429 (27.4%) |
+| On a vehicle | 9,335 (11.2% of the library) |
+| Original only in iCloud (not on the Mac) | 83,080 |
+| Of the 16,345 photos on vehicles: put there by the filer | 1,740 (first filing 2026-10-22); 13,332 by the owner's own albums and per-car uploads |
+
+### What exists that contradicts this
+
+- The phone's GPS site gate **discards** off-site frames and reports a skip "with no coordinates, no pixels"
+  (`capture_skips`, 0 rows for the owner ever). That throws away the reverse signal by design.
+- No table holds the holder's whereabouts from photos (`user_presence` is who is on a vehicle page now).
+- The filer (`capture_sets_score`) scores a shoot against every vehicle ever on the account; it never reads dates,
+  possession, or where the owner was.
+- The census that measures coverage (`ag.nuke.iphoto-census`) failed silently from 2026-10-04 to 2026-11-11 (its
+  worktree was removed); repaired 2026-11-11.
+
+### The chain the system owns
+
+```
+whole library (iCloud originals) ─▶ one log row per frame: clock, place, device, Apple labels, content hash
+   ─▶ vision kind: vehicle_work | document | other (private)            (every frame, nothing dropped)
+   ─▶ vehicle_work → filer, with candidates limited to vehicles held on that day and at that place
+   ─▶ document     → its reader (receipt, title, VIN/cowl plate)
+   ─▶ other        → holder whereabouts (time, place cell; pixels private) ─▶ bounds work sessions, labor, possession
+```
+
+### Acceptance (the scoreboard is the census, nightly)
+
+- Coverage: library frames with a log row / library frames, rising toward 100%; reported with the census date.
+- Filing: vehicle-work frames filed by the system / vehicle-work frames, judged on the owner's album-sorted photos as a
+  day-held-out answer key.
+- Reverse signal: for every work session, the share of its hours that has no off-site frame inside it; a session that
+  overlaps an off-site frame is flagged, not silently kept.
+- Case: 2026-10-28 (§17), the 2-4 h cutting-and-polishing gap: frames elsewhere in that window refute it; none supports it.
