@@ -156,7 +156,9 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
         return <React.Fragment key={key(line)}><tr className={line.status === 'excluded' ? 'vp-ledger-excluded' : undefined}>
           <td><button type="button" onClick={e => { trigger.current = e.currentTarget; setInspected(inspected === key(line) ? null : key(line)); }}
             aria-expanded={inspected === key(line)} aria-controls="vp-ledger-evidence">
-            {thumbnail && <img src={optimizeImageUrl(thumbnail, 'thumbnail') || thumbnail} alt="" loading="lazy" />}
+            {thumbnail && (product?.image_url
+              ? <span className="vp-catalog-media"><img src={optimizeImageUrl(thumbnail, 'thumbnail') || thumbnail} alt="Supplier stock image" width={48} height={38} loading="lazy" /></span>
+              : <img src={optimizeImageUrl(thumbnail, 'thumbnail') || thumbnail} alt="" width={48} height={38} loading="lazy" />)}
             <span><strong>{line.label}</strong><small>{systemName(line.system_key)} · {line.kind === 'labor' ? 'Labor' : 'Material'}
               {line.status === 'excluded' ? ' · Excluded from subtotal' : line.status === 'unresolved' ? ' · Needs inputs' : ''}
               {line.reference?.type === 'fixed_service_fee' && (line.reference.price_basis === 'published_starting_price' ? ' · Starting-price comparison' : ' · Service-menu comparison')}</small></span>

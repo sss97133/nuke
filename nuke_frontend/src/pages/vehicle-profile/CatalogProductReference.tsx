@@ -19,8 +19,8 @@ export function CatalogProductReference({ product }: { product?: ReceiptCatalogP
   }
   return <a className="vp-catalog-product" href={product.page_url} target="_blank" rel="noopener noreferrer"
     aria-label={`View ${product.name} at the supplier`}>
-    {imageUrl && <img src={imageUrl} alt={product.name} width={112} height={88}
-      loading="lazy" onError={() => setFailedImage(imageUrl)} />}
+    {imageUrl && <span className="vp-catalog-media"><img src={imageUrl} alt={product.name} width={112} height={88}
+      loading="lazy" onError={() => setFailedImage(imageUrl)} /></span>}
     <span className="vp-catalog-product__body"><strong>{product.name}</strong>
       <span>{[product.manufacturer, product.part_number].filter(Boolean).join(' · ')}</span>
       <small>{imageUrl ? 'Supplier stock image · ' : ''}View product ↗</small>

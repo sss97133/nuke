@@ -233,6 +233,7 @@ test('analysis worklist paginates the canonical eligible, nonsensitive populatio
   assert.equal(calls.filter(c => c[0] === 'eq' && c[1] === 'vehicle_image_gallery_eligible' && c[2] === true).length, 2);
   assert.equal(calls.filter(c => c[0] === 'or' && c[1] === 'is_sensitive.is.null,is_sensitive.eq.false').length, 2);
   assert.deepEqual(calls.filter(c => c[0] === 'range'), [['range', 0, 999], ['range', 1000, 1999]]);
+  assert.ok(!calls.some(c => c[0] === 'in'), 'whole-queue selection remains unbounded by explicit IDs');
   assert.ok(!calls.some(c => ['insert', 'update', 'upsert', 'delete'].includes(c[0])));
   await assert.rejects(loadAnalysisImages({ from() {
     const q = new Proxy({}, { get(_, method) { return () => method === 'abortSignal' ? Promise.resolve({ data: null, error: { message: 'unavailable' } }) : q; } }); return q;
@@ -313,4 +314,50 @@ test('exact representative selection preserves IDs across days and refuses alrea
     assert.equal(readFileSync(worklist, 'utf8'), '');
     await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [second, second] }), /invalid exact/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('exact preparation queries only requested current eligible sources and preserves their clocks', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'byok-targeted-')), worklist = join(dir, 'work.jsonl');
+  const id = n => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const rows = Array.from({ length: 6 }, (_, i) => ({ id: id(i + 1), vehicle_id: 'vehicle',
+    image_url: `https://example.invalid/${i + 1}.jpeg`, updated_at: now, taken_at: '2025-01-01T12:00:00Z',
+    vehicle_image_gallery_eligible: true, is_sensitive: false, ai_scan_metadata: {} }));
+  rows[2].vehicle_id = 'other-vehicle'; rows[3].vehicle_image_gallery_eligible = false; rows[4].is_sensitive = true;
+  const calls = [], logs = [], oldLog = console.log;
+  const client = { from(table) {
+    assert.equal(table, 'vehicle_images'); let selected = rows;
+    const q = new Proxy({}, { get(_, method) { return (...values) => {
+      calls.push([method, ...values]);
+      if (method === 'eq') selected = selected.filter(r => r[values[0]] === values[1]);
+      if (method === 'or') selected = selected.filter(r => r.is_sensitive == null || r.is_sensitive === false);
+      if (method === 'in') selected = selected.filter(r => values[1].includes(r[values[0]]));
+      if (method === 'abortSignal') return Promise.resolve({ data: selected, error: null });
+      return q;
+    }; } }); return q;
+  } };
+  try {
+    console.log = message => logs.push(message);
+    rows[1].updated_at = '2026-11-10T12:34:56.123456Z';
+    await prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [id(2), id(1)] });
+    assert.deepEqual(calls.filter(c => c[0] === 'in'), [['in', 'id', [id(2), id(1)]]]);
+    assert.ok(calls.some(c => c[0] === 'eq' && c[1] === 'vehicle_id' && c[2] === 'vehicle'));
+    assert.ok(calls.some(c => c[0] === 'eq' && c[1] === 'vehicle_image_gallery_eligible' && c[2] === true));
+    assert.ok(calls.some(c => c[0] === 'or' && c[1] === 'is_sensitive.is.null,is_sensitive.eq.false'));
+    const work = readFileSync(worklist, 'utf8').trim().split('\n').map(JSON.parse);
+    assert.deepEqual(work.map(w => w.image_id), [id(2), id(1)]);
+    assert.equal(work[0].expected_updated_at, rows[1].updated_at);
+    assert.equal(work[0].image_url, rows[1].image_url);
+    assert.equal(work[0].day_basis, 'recorded_taken_at');
+    assert.match(logs.join('\n'), /eligible requested images = 2/);
+    assert.match(logs.join('\n'), /Whole-inventory coverage was not queried/);
+    for (const excluded of [id(3), id(4), id(5), id(99)]) {
+      await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [id(1), excluded] }), /unavailable or already analyzed/);
+      assert.equal(readFileSync(worklist, 'utf8'), '', 'never process an incomplete requested cohort');
+    }
+    rows[0].ai_scan_metadata.byok_deep_analysis = { already: 'read' };
+    await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [id(1)] }), /already analyzed/);
+    const queryCount = calls.length;
+    await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: ['bad-id'] }), /invalid exact/);
+    assert.equal(calls.length, queryCount, 'invalid IDs refuse before database access');
+  } finally { console.log = oldLog; rmSync(dir, { recursive: true, force: true }); }
 });

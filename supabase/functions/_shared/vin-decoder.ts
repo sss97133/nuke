@@ -20,6 +20,12 @@ export interface VINDecodeResult {
   plant: string | null;
   serial_number: string | null;
   is_pre_1981: boolean;
+  /** Pre-1981 GM: engine letter (position 5, 1972-80), series name/letter, plant name and the chart the decode follows. */
+  engine_code?: string | null;
+  series?: string | null;
+  series_code?: string | null;
+  plant_name?: string | null;
+  rule_source?: string | null;
 }
 
 /**
@@ -76,6 +82,32 @@ function decodeGmYearDigit(yearChar: string): number | null {
   if (d >= 7 && d <= 9) return 1960 + d; // 7=1967 .. 9=1969
   return null;
 }
+
+/** The chart the Pontiac F-body rows below are read from (retrieved 2026-11-11). */
+export const GM_PONTIAC_F_BODY_SOURCE = 'https://news.classicindustries.com/trans-am-firebird-vin-decoder';
+
+/** 1972-1980 Firebird series letters (position 2), per GM_PONTIAC_F_BODY_SOURCE. */
+const GM_PONTIAC_F_BODY_SERIES: Record<string, { series: string; years: [number, number] }> = {
+  S: { series: 'Firebird', years: [1972, 1980] },
+  T: { series: 'Esprit', years: [1972, 1980] },
+  U: { series: 'Formula', years: [1972, 1980] },
+  V: { series: 'Trans Am', years: [1972, 1975] },
+  W: { series: 'Trans Am', years: [1976, 1980] },
+};
+
+/** 1972-1976 Firebird engine letters (position 5) listed by GM_PONTIAC_F_BODY_SOURCE for those years. */
+const GM_PONTIAC_F_BODY_ENGINES: Record<string, { engine: string; years: [number, number] }> = {
+  D: { engine: '250', years: [1972, 1976] },
+  N: { engine: '350 2bbl', years: [1972, 1974] },
+  P: { engine: '400 2bbl', years: [1972, 1974] },
+  R: { engine: '400 2bbl', years: [1972, 1974] },
+  S: { engine: '400 4bbl', years: [1973, 1975] },
+  T: { engine: '400 4bbl', years: [1972, 1974] },
+  X: { engine: '455 SD 4bbl', years: [1972, 1974] },
+  Y: { engine: '455 4bbl', years: [1973, 1974] },
+};
+
+const GM_PONTIAC_F_BODY_PLANTS: Record<string, string> = { N: 'Norwood, Ohio', L: 'Van Nuys, California' };
 
 /**
  * GM passenger car series codes (position 2 of pre-1981 VIN).
@@ -262,14 +294,37 @@ function decodePre1981Vin(vin: string): VINDecodeResult {
       }
     }
 
-    // Year (position 5 for all GM passenger cars)
-    result.year = decodeGmYearDigit(vin.charAt(4));
+    // 1972-1980 GM cars carry an engine letter at position 5, moving the year to 6 and the plant to 7
+    // (Classic Industries Firebird VIN decoder, GM_PONTIAC_F_BODY_SOURCE). Before 1972, year is position 5.
+    const engineLetterLayout = /[A-Z]/.test(vin.charAt(4)) && /\d/.test(vin.charAt(5));
+    if (engineLetterLayout) {
+      result.engine_code = vin.charAt(4);
+      result.year = decodeGmYearDigit(vin.charAt(5));
+      if (result.year != null && result.year < 1972) result.year += 10; // the 1972 layout runs 1972-1980
+      if (result.year != null && result.year > 1980) result.year = null;
+      result.plant = vin.charAt(6);
+      result.serial_number = vin.substring(7);
+    } else {
+      // Year (position 5 for pre-1972 GM passenger cars)
+      result.year = decodeGmYearDigit(vin.charAt(4));
+      result.plant = vin.charAt(5);
+      result.serial_number = vin.substring(6);
+    }
 
-    // Plant code (position 6)
-    result.plant = vin.charAt(5);
-
-    // Sequential number
-    result.serial_number = vin.substring(6);
+    // Pontiac F-body (Firebird) 1972-1980: series letter at position 2, body 87 coupe.
+    if (divisionCode === '2' && engineLetterLayout && vin.substring(2, 4) === '87') {
+      const series = GM_PONTIAC_F_BODY_SERIES[vin.charAt(1)];
+      if (series && result.year != null && result.year >= series.years[0] && result.year <= series.years[1]) {
+        result.model = 'Firebird';
+        result.series = series.series;
+        result.body_style = 'Coupe';
+        result.series_code = vin.charAt(1);
+        const engine = GM_PONTIAC_F_BODY_ENGINES[result.engine_code!];
+        if (engine && result.year >= engine.years[0] && result.year <= engine.years[1]) result.engine_size = engine.engine;
+        result.plant_name = GM_PONTIAC_F_BODY_PLANTS[result.plant] ?? null;
+        result.rule_source = GM_PONTIAC_F_BODY_SOURCE;
+      }
+    }
   }
 
   // ── Ford pre-1981 ───────────────────────────────────────────────────

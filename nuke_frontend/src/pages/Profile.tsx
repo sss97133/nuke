@@ -29,7 +29,6 @@ const DatabaseDiagnostic = React.lazy(() => import('../components/debug/Database
 const OrganizationAffiliations = React.lazy(() => import('../components/profile/OrganizationAffiliations'));
 const PublicAuctionTrackRecord = React.lazy(() => import('../components/profile/PublicAuctionTrackRecord'));
 const VehicleMergeInterface = React.lazy(() => import('../components/vehicle/VehicleMergeInterface'));
-const PersonalPhotoLibrary = React.lazy(() => import('./PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
 const ShopFinancials = React.lazy(() => import('./ShopFinancials'));
 const TechInbox = React.lazy(() => import('../components/profile/TechInbox'));
 const ProfileListingsTab = React.lazy(() => import('../components/profile/ProfileListingsTab').then(m => ({ default: m.ProfileListingsTab })));
@@ -747,7 +746,6 @@ const Profile: React.FC = () => {
             { key: 'discoveries', label: 'Discoveries', public: true },
             { key: 'collection', label: 'Collection', public: true },
             { key: 'gallery', label: 'Gallery', public: true },
-            { key: 'photos', label: 'Photos' },
             { key: 'professional', label: 'Professional' },
             { key: 'organizations', label: 'My Organizations' },
             { key: 'auctions', label: 'My Auctions' },
@@ -957,12 +955,6 @@ const Profile: React.FC = () => {
               </div>
             )}
             
-            {activeTab === 'photos' && isOwnProfile && (
-              <div style={{ marginTop: 'var(--space-4)' }}>
-                <PersonalPhotoLibrary />
-              </div>
-            )}
-
             {activeTab === 'financials' && isOwnProfile && (
               <div style={{ marginTop: 'var(--space-4)' }}>
                 <ShopFinancials />
