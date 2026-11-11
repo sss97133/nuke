@@ -189,7 +189,10 @@
 .vp-field-context__images button { padding: 0; overflow: hidden; border-radius: var(--radius-sm); }
 .vp-field-context__images img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 11; object-fit: cover; }
 .vp-field-context__segment-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.vp-field-context__segment-head button { font-size: var(--text-callout); }
+.vp-field-context__segment-head button { font-size: var(--text-callout); flex-shrink: 0; }
+.vp-field-context__segment-head h3 { margin: 12px 0 4px; }
+.vp-field-context__answer p { margin: 0 0 8px; color: var(--text-secondary); font-size: var(--text-callout); }
+.vp-field-context__answer strong { color: var(--text); font-size: var(--text-body); }
 .vp-field-context__peers { display: grid; gap: 4px; }
 .vp-field-context__peers button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--text); font-size: var(--text-callout); }
 .vp-field-context__peers img { flex-shrink: 0; object-fit: cover; border-radius: var(--radius-sm); }

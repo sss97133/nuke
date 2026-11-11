@@ -4,6 +4,7 @@ import ProfileIdentity from './ProfileIdentity';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { getVehicleTitle } from '../../hooks/usePageTitle';
 import { Masthead, Facet, ClaimView, Text, formatMeasure, day } from '../../kit';
+import { resolveSourceLogo } from '../../kit/Claim';
 import type { Claim, ListingState } from '../../kit';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
@@ -33,6 +34,24 @@ export function describeListing(listing: ListingState): string {
         default: return `${venue}: submitted ${day(listing.submitted_at)}`;
       }
     default: return `${venue}: ${listing.status}`;
+  }
+}
+
+/** The masthead's one word for the listing's stage; the full sentence stays on the line's label. */
+export function listingWord(listing: ListingState): string {
+  switch (listing.status) {
+    case 'active': return 'Live';
+    case 'sold': return 'Sold';
+    case 'expired': return 'No sale';
+    case 'prepared': return 'Prepared';
+    case 'submitted':
+      switch (listing.stage) {
+        case 'draft_pending_approval': return 'Pending';
+        case 'accepted': return 'Accepted';
+        case 'scheduled': return 'Scheduled';
+        default: return 'Submitted';
+      }
+    default: return String(listing.status).replace(/^./, c => c.toUpperCase());
   }
 }
 
@@ -377,10 +396,15 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
             ? <ProfileIdentity vehicleId={vehicle.id} compact year={vehicle.year} make={vehicle.make ?? ''} model={masthead.model!} variants={masthead.identity.differentiators} onExplore={explore} />
             : title}
         </Text>
-        {masthead.listing && <Text role="label" as="p" className="vp-header-listing" aria-label="Listing">
-          {describeListing(masthead.listing)}
-          {masthead.listing.url && <> · <a href={masthead.listing.url} target="_blank" rel="noreferrer">open</a></>}
-        </Text>}
+        {masthead.listing && (() => {
+          const listing = masthead.listing;
+          const venue = LISTING_VENUES[listing.platform] ?? listing.platform;
+          const logo = resolveSourceLogo(venue, listing.url);
+          const mark = <>{logo ? <img className="k-claim__logo" src={logo} alt={venue} width={40} height={16} /> : <span>{venue}</span>} <span>{listingWord(listing)}</span></>;
+          return <Text role="label" as="p" className="vp-header-listing" aria-label={describeListing(listing)} title={describeListing(listing)}>
+            {listing.url ? <a href={listing.url} target="_blank" rel="noreferrer">{mark}</a> : mark}
+          </Text>;
+        })()}
         {priceOwnedByLiveStack ? <details className="vp-header-configuration"><summary>Configuration</summary>{configuration}</details> : configuration}
       </Masthead>
       {liveOpen && priceOwnedByLiveStack && auctionPulse && <HeaderPopover open title="Live auction" width={680} onClose={() => setLiveOpen(false)} dismissBoundaryRef={sticky}>
