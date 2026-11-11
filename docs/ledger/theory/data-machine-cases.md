@@ -1503,6 +1503,35 @@ gate and write guard pass. Publication/deployment stages belong to this repair's
 is prepared code, not a live source correction. Historical admission, capture-to-vehicle/event
 binding, episode configuration semantics and qualified cross-venue prices remain held/open.
 
+### 2026-11-11 — auction header machine delivered; acquisition consumer remains open
+
+Owner correction: the **existing vehicle header is the banner**. Its form is
+selected by machine-backed situation rules; do not add another auction card.
+Every visible item must first have its existing data owner, source/clock/binding
+qualification, supported interpretation and functional inspection/action.
+
+The construction rule is in root `AGENTS.md`; the broader item contract is
+[`SOURCE_AWARE_ACQUISITION_CONTRACT.md`](../../market/SOURCE_AWARE_ACQUISITION_CONTRACT.md).
+The executable form rules, delivery receipt and portable next implementation are
+in [`VEHICLE_HEADER_FORM_RULES.md`](../../market/VEHICLE_HEADER_FORM_RULES.md).
+
+PR [#3359](https://github.com/sss97133/nuke/pull/3359) extended the existing
+`vehicle_profile_read` masthead and `organization_source_inventory_read` owner;
+it was merged, normally deployed and anonymous-production-reader verified.
+Read-only fixture contracts cover native identity/parent qualification, currentness,
+withdrawal/supersession, source-native results, day precision and all tied
+appearances. The upcoming Bentley and retained completed-result control passed.
+No table grants, RLS changes or testimony writes were introduced by that delivery.
+
+**Open / next:** render these existing shared-reader items through the existing
+header and structured data table, then verify the real visitor interaction and
+visual hierarchy. The qualified numerical hammer forecast, completed-sale
+reconciliation, discovery/maps/radar, buyer requirements/costs and grouped
+acquisition tools remain unfinished. No corpus completeness, visual acceptance or
+estimate-accuracy improvement is established. Do not close C27 or the broader
+acquisition outcome on the strength of the reader tests. Private evidence/pickup:
+`~/nuke-logs/auction-header-machine-20261111/PICKUP.json`.
+
 ## 12. The repair loop as a standing process (opened 2026-10-06)
 
 **Owner direction, 2026-10-06.** The owner asked where the 24/7 process is defined, what to call its parts, and for
