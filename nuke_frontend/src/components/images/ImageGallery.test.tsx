@@ -34,6 +34,7 @@ vi.mock('./SensitiveImageOverlay', () => ({ SensitiveImageOverlay: ({ imageUrl }
 vi.mock('../onboarding/OnboardingSlideshow', () => ({ OnboardingSlideshow: () => null }));
 
 import ImageGallery from './ImageGallery';
+import VehicleFindingsCard from '../../pages/vehicle-profile/VehicleFindingsCard';
 
 let root: Root;
 let container: HTMLDivElement;
@@ -50,7 +51,10 @@ beforeEach(() => {
   vi.useFakeTimers();
   fixture.rows = photos();
   fixture.sessions = [];
-  fixture.fetch.mockReset().mockImplementation(async () => fixture.rows);
+  fixture.fetch.mockReset().mockImplementation(async (_id, _select, options) => {
+    options?.onLoadCoverage?.({ loaded: fixture.rows.length, total: fixture.rows.length });
+    return fixture.rows;
+  });
   fixture.queueStats.mockReset().mockResolvedValue({ pending: 0, failed: 0 });
   fixture.requests = [];
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -82,6 +86,65 @@ async function mount(props: Record<string, any> = {}) {
 
 // Each case renders 399 rows through 20 timer steps (about 0.6 s locally, near 5 s on loaded CI runners; one timed out on 2026-10-13).
 describe('ImageGallery canonical database rows', { timeout: 20_000 }, () => {
+  it('opens an analysis count into the same deduplicated photos and lightbox collection', async () => {
+    fixture.rows = photos(4).map((row, index) => ({ ...row,
+      ai_classification: index < 2 ? { image_type: 'vehicle_exterior' } : null,
+      ai_byok_scene: index % 2 === 0 ? 'body_exterior' : null,
+      ai_review_version: index === 0 ? 'reviewed_image_analysis_v1' : null,
+      ai_review_observation: index === 0 ? '11111111-1111-4111-8111-111111111111' : null,
+    }));
+    fixture.rows.push({ ...fixture.rows[0], id: 'duplicate-url' });
+    const reads = vi.fn();
+    function Harness() {
+      const [read, setRead] = React.useState<any>(null), [filter, setFilter] = React.useState<any>(null);
+      const record = React.useCallback((value: any) => { reads(value); setRead(value); }, []);
+      return <><VehicleFindingsCard vehicleId="vehicle-fixture" viewerKey="anonymous" read={read}
+        onRetry={() => {}} onSelectImages={(imageIds, label) => setFilter({ imageIds, label })} />
+        <ImageGallery vehicleId="vehicle-fixture" showUpload={false} galleryView="FULL"
+          galleryFilter={filter} onAnalysisRead={record} /></>;
+    }
+    await act(async () => root.render(<Harness />));
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(reads.mock.calls.at(-1)?.[0].images).toHaveLength(4);
+    const reviewed = container.querySelector<HTMLButtonElement>('[aria-label="Show 1 reviewed images"]')!;
+    expect(reviewed.textContent).toBe('1 / 4');
+    await act(async () => reviewed.click());
+    expect(galleryPhotos().map(image => (image as HTMLImageElement).src)).toEqual([fixture.rows[0].image_url]);
+    const count = container.querySelector<HTMLButtonElement>('[aria-label="Show 2 detailed observations images"]')!;
+    expect(count.textContent).toBe('2 / 4');
+    await act(async () => count.click());
+    expect(galleryPhotos()).toHaveLength(2);
+    expect(galleryPhotos().map(image => (image as HTMLImageElement).src)).toEqual([fixture.rows[0].image_url, fixture.rows[2].image_url]);
+    await act(async () => galleryPhotos()[0].dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.querySelector('[data-testid="lightbox-title"]')?.textContent).toBe('1 of 2');
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="lightbox-next"]')!.click());
+    expect(container.querySelector('[data-testid="lightbox"]')?.textContent).toBe(fixture.rows[2].id);
+    // Filtering does not shrink the analysis denominator or issue a second source read.
+    expect(count.textContent).toBe('2 / 4');
+    expect(fixture.fetch).toHaveBeenCalledOnce();
+  });
+
+  it('reports source failures without reusing a prior successful analysis population', async () => {
+    fixture.fetch.mockRejectedValue(new Error('source unavailable'));
+    const onAnalysisRead = vi.fn(), onReadCount = vi.fn();
+    await mount({ onAnalysisRead, onReadCount });
+    expect(onAnalysisRead.mock.calls.at(-1)?.[0]).toMatchObject({ status: 'error', images: [], readAt: null });
+    expect(onReadCount.mock.calls.at(-1)?.[0]).toMatchObject({ failed: true });
+  });
+
+  it('does not count URL-only fallback tiles as admitted image analysis', async () => {
+    fixture.rows = [];
+    const onAnalysisRead = vi.fn();
+    await mount({ fallbackImageUrls: ['https://bringatrailer.com/wp-content/uploads/2026/09/fallback.jpg'], onAnalysisRead });
+    expect(onAnalysisRead.mock.calls.at(-1)?.[0]).toMatchObject({ status: 'ready', images: [] });
+  });
+
+  it('keeps an empty exact-image filter empty', async () => {
+    fixture.rows = photos(4); const onReadCount = vi.fn();
+    await mount({ galleryFilter: { imageIds: [] }, onReadCount });
+    expect(galleryPhotos()).toHaveLength(0);
+    expect(onReadCount.mock.calls.at(-1)?.[0].shown).toBe(0);
+  });
   it.each([false, true])('groups the complete classified collection and opens a source beyond the thumbnail page (filtered=%s)', async (filtered) => {
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} unobserve() {} });
     fixture.rows = photos(120).map((photo, index) => ({ ...photo,

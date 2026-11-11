@@ -4,6 +4,11 @@ const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export type ListingAssessment = {
   method: string; vehicle_id: string;
   market: { status: string; records?: Array<{ sourceUrl: string; amount: number; eventAt: string }>; statistics?: { sold_count: number; median: number | null }; receipt?: { currency?: string } };
+  retained_auction_appearances?: { status: string; source_scope?: string; page?: { has_more: boolean };
+    records: Array<{ native_appearance_key: string; evidence_state: string; witnesses: Array<{
+      observation_id: string; source_url: string; literal: string; source_date_interval_text: string;
+      source_captured_at: string; outcome: string; currency: null; fee_basis: 'unknown';
+    }> }> };
   class: { status: string; configuration_specific: { eligible: boolean } };
   commentary: { status: string; records?: Array<{ observation_id: string; source_url: string; quote: string; statement_kind: string; subject_scope: string }>;
     page?: { has_more: boolean }; exclusions?: unknown[] };
@@ -22,6 +27,15 @@ export function assertVehicleAssessment(input: unknown, vehicleId: string): asse
     || !Array.isArray(input.unresolved_fields) || !Array.isArray(input.attestations)
     || !['market', 'class', 'commentary', 'photo_audit'].every(s => object(input[s]) && typeof input[s].status === 'string')) {
     throw new Error('Vehicle evidence assessment is unavailable.');
+  }
+  const history = input.retained_auction_appearances;
+  if (history !== undefined && (!object(history) || typeof history.status !== 'string' || !Array.isArray(history.records)
+    || history.records.some((r: Row) => !object(r) || typeof r.native_appearance_key !== 'string'
+      || !Array.isArray(r.witnesses) || r.witnesses.some((w: Row) => !object(w) || !UUID.test(w.observation_id)
+        || typeof w.literal !== 'string' || typeof w.source_date_interval_text !== 'string'
+        || typeof w.source_captured_at !== 'string' || w.currency !== null || w.fee_basis !== 'unknown'
+        || typeof w.source_url !== 'string' || !/^https:\/\/www\.classic-carauction\.com\/auction-results\?auctionnbr=[1-9][0-9]*&auctionid=[1-9][0-9]*$/.test(w.source_url))))) {
+    throw new Error('Retained auction source receipt is unavailable.');
   }
 }
 

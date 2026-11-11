@@ -172,14 +172,33 @@ it('shows an unfinished allocation read as partial rather than a full balance', 
   expect(host.querySelector('.vp-header-money')?.textContent).toBe('$$$');
 });
 
-it('links to the single work and parts surface instead of nesting receipt copies', async () => {
+it('folds filed receipts in place by vendor with a readable total and keeps item pages in one owner', async () => {
+  fixture.tables.receipts = [
+    { id: 'r1', vendor_name: 'Synthetic parts house', total: 100.5, currency: 'USD', receipt_date: '2025-04-24' },
+    { id: 'r2', vendor_name: 'Synthetic parts house', total: 20, currency: 'USD', receipt_date: '2025-05-13' },
+    { id: 'r3', vendor_name: 'Synthetic machine shop', total: 300, currency: 'USD', receipt_date: '2025-06-01' },
+    { id: 'r4', vendor_name: 'Synthetic machine shop', total: null, currency: 'USD', receipt_date: '2025-06-02' },
+  ];
+  open = true; await render();
+  const block = host.querySelector('[aria-label="Receipts filed to this vehicle"]')!;
+  expect(block.textContent).toContain('Total on receipts$420.50');
+  expect(block.textContent).toContain('3 of 4 receipts · 1 without a readable amount');
+  const vendors = [...host.querySelectorAll('[aria-label="By vendor"] .k-row')].map(row => row.textContent);
+  expect(vendors[0]).toContain('Synthetic machine shop'); expect(vendors[0]).toContain('$300.00 · 2 receipts');
+  expect(vendors[1]).toContain('$120.50 · 2 receipts');
+  expect(host.textContent).not.toContain('No financial allocations');
+  expect(host.querySelector('a[href="#build-receipts"]')).toBeNull();
+  expect([...host.querySelectorAll('button')].some(b => b.textContent === 'Show each receipt and its items')).toBe(true);
+});
+
+it('withholds receipt amounts from an untied viewer instead of totalling them', async () => {
   fixture.user = null;
   fixture.tables.receipts_public_summary = [{ id: 'receipt', vendor_name: 'Synthetic receipt', total: null, amounts_visible: false }];
   open = true; await render();
-  const link = host.querySelector<HTMLAnchorElement>('a[href="#build-receipts"]')!;
-  expect(link.textContent).toContain('View work & parts receipts');
-  expect(host.querySelector('.vp-receipt-page')).toBeNull();
-  expect(link.getAttribute('href')).toBe('#build-receipts');
+  const block = host.querySelector('[aria-label="Receipts filed to this vehicle"]')!;
+  expect(block.textContent).toContain('Withheld from this viewer');
+  expect(block.textContent).not.toContain('Total on receipts');
+  expect(host.querySelector('[aria-label="By vendor"]')?.textContent).toContain('Amount withheld · 1 receipt');
 });
 
 it('keeps conflicting receipt amount/date readings unresolved and never invents a currency', () => {
@@ -204,6 +223,6 @@ it('keeps an actual price ahead of expenses and makes source readings a secondar
   open = true; await render(<span>Asking $900</span>);
   expect(host.querySelector('.vp-header-money')?.textContent).toBe('Asking $900$$$');
   const panel = host.querySelector('.vp-financial-panel')!;
-  expect(panel.textContent!.indexOf('Booked vehicle costs')).toBeLessThan(panel.textContent!.indexOf('View work & parts receipts'));
+  expect(panel.textContent!.indexOf('Booked vehicle costs')).toBeLessThan(panel.textContent!.indexOf('Receipts filed to this vehicle'));
   expect(panel.querySelector<HTMLDetailsElement>('.vp-financial-sources')?.open).toBe(false);
 });

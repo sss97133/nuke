@@ -228,7 +228,9 @@ export function SaleTable({ sales, now, selected, onChoose, scope = {}, horizon,
           <td><Text role="measure" dense as="div" title={compact ? [sale.lots_listed != null
               ? `${houseName(sale.house)} lists ${count(sale.lots_listed)}, ${updatedAgo(sale.listed_at, now).replace('updated', 'read')}` : null,
               sale.lots > 0 ? `lots ${updatedAgo(sale.updated_at, now)}` : null].filter(Boolean).join(' · ') || undefined : undefined}>{sale.lots_listed != null && sale.lots_listed !== sale.lots
-              ? `${count(sale.lots)} of ${count(sale.lots_listed)} lots` : `${count(sale.lots)} ${sale.lots === 1 ? 'lot' : 'lots'}`}</Text>
+              ? `${count(sale.lots)} of ${count(sale.lots_listed)} lots` : sale.house === 'mccormicks' && sale.lots === 0 && sale.lots_listed === null ? 'Catalog not published' : `${count(sale.lots)} ${sale.lots === 1 ? 'lot' : 'lots'}`}</Text>
+            {sale.organization_id && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(sale.organization_id) && <Text role="caption" as="div"><PrefetchLink to={`/org/${sale.organization_id}#source-inventory`}>View current inventory</PrefetchLink></Text>}
+            {houseLink(sale.house, sale.source_url ?? null) && <a href={houseLink(sale.house, sale.source_url ?? null)!} target="_blank" rel="noopener noreferrer">Official sale details</a>}
             {!compact && <>
             {sale.lots_listed != null && <Text role="caption" as="div">{houseName(sale.house)} lists {count(sale.lots_listed)}, {updatedAgo(sale.listed_at, now).replace('updated', 'read')}</Text>}
             {priorSaleLine(sale.house, sale.prior_sale) && <Text role="caption" as="div">{priorSaleLine(sale.house, sale.prior_sale)}</Text>}
