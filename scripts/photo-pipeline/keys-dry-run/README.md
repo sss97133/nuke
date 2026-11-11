@@ -71,3 +71,27 @@ has a place on an observation. A landed row is agent testimony capped at 0.6; it
   the next run decides the same way; it does not say the owner agreed.
 
 The results of the first run are in [`docs/ledger/theory/image-keys-test.md`](../../../docs/ledger/theory/image-keys-test.md).
+
+## The lane
+
+[`../keys_lane.py`](../keys_lane.py) is the one-photo unit run without an agent workflow. For one vehicle it takes the
+stored statements of one photo at a time, has the `claude` CLI key them on the subscription with the same brief,
+conventions and decisions, checks the result with `check_units.py` against the registry read live, and with `--write`
+sends each landable claim to `ingest-observation` with the body `land.sql` builds. It reads no photo and prints
+counts only. Its cases are in `../test_keys_lane.py`.
+
+It is started by a person: the dispatch-only workflow `Photo Keys Lane` (`.github/workflows/photo-keys.yml`), or
+
+```bash
+# needs SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and CLAUDE_CODE_OAUTH_TOKEN; refuses to start if ANTHROPIC_API_KEY is set
+python3 scripts/photo-pipeline/keys_lane.py --vehicle-id <uuid> --user-id <uuid> --photos 1            # dry run
+python3 scripts/photo-pipeline/keys_lane.py --vehicle-id <uuid> --user-id <uuid> --photos 1 --write    # lands
+```
+
+What it does not do:
+
+- No schedule. Nothing starts it but a person, one photo first.
+- No per-photo receipt yet. A photo is passed over only when it already has a row from this lane, so a photo with
+  nothing landable is taken again on a later run. Each run prints a cursor; `--after <cursor>` moves past it.
+- No place for the part. A claim lands on its condition key, and the part still rides in `structured_data`.
+- No proposal and no approval. A state with no registry key is counted and left out.

@@ -19,6 +19,14 @@ KEY_SHAPE = re.compile(r'^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$')
 norm = lambda s: re.sub(r'\s+', ' ', str(s)).strip().lower().strip('.…')
 
 
+def use_registry(subject, condition):
+    """Replace the dated snapshot with the registry as read live (keys_lane.py does this before it keys anything).
+    subject: {subject_key: side or None}; condition: {canonical_key: 'state' or None}. Changed in place, so every
+    importer sees it. The property values stay as they are: they are typed in code, not stored in a column."""
+    SUBJECT.clear(); SUBJECT.update(subject)
+    COND.clear(); COND.update(condition)
+
+
 def load_decisions(path):
     if not path or not os.path.exists(path): return set(), set()
     d = json.load(open(path))
