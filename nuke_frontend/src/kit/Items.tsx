@@ -35,6 +35,11 @@ export const ratioText = (v: unknown): string | null => {
   return parts.length ? parts.join(' / ') : null;
 };
 
+/** An equation as the reader wrote it, with its variable and item names as words: `top_gear_ratio` → "top gear ratio",
+ * `as_built.type` → "as built type", `<>` → "≠", `pi()` → "π". The arithmetic is unchanged. */
+export const equationText = (s: string) =>
+  codeText(s.replace(/\bpi\(\)/g, 'π').replace(/<>/g, '≠').replace(/([a-z_])\.([a-z_])/g, '$1 $2'));
+
 const AVAILABLE: Record<string, string> = { true: 'available', false: 'not available', implied: 'available by inference' };
 
 /** A value as words. Arrays are sequences (gear ratios), objects are the area shapes the location items carry. */
@@ -112,7 +117,7 @@ function RuleLine({ rule }: { rule: Record<string, unknown> }) {
 function EquationLine({ equation }: { equation: Record<string, unknown> }) {
   const expression = typeof equation.expression === 'string' ? equation.expression : null;
   if (!expression) return null;
-  return <Text role="caption" as="p" className="k-item__line">Computed: {expression}</Text>;
+  return <Text role="caption" as="p" className="k-item__line">Computed: {equationText(expression)}</Text>;
 }
 
 /** One item: name, value and status on one row, then its sources, rule or equation, and what would establish it. */
