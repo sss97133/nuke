@@ -9,7 +9,8 @@
 -- 20261116012000 (both functions in PL/pgSQL) changes none of it; every assertion below runs against it.
 -- 20261116026000 (the fold tests the photo's point, marker photo_gps_cover_v1) changes none of these answers either, a
 -- photo that loses its point stops counting, and with 20261116025000's partial covering index the photos lookup is an
--- index-only scan on it.
+-- index-only scan on it. 20261116035000 (one lateral probe per photo, marker photo_gps_cover_v2) changes none of the
+-- answers either; every assertion below runs against it.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
  IF current_database() NOT LIKE 'dm_refinement_%' OR to_regclass('public.vehicles') IS NOT NULL
@@ -87,12 +88,20 @@ GRANT SELECT ON public.base_location TO anon, authenticated;
 \ir ../migrations/20261116026000_vehicle_location_fold_gps_cover_predicate.sql
 \ir ../migrations/20261116026000_vehicle_location_fold_gps_cover_predicate.sql
 DO $$ BEGIN
+ ASSERT md5(pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) = '1055b8fed97e6c1cbcfb36a32479d07b',
+   '20261116035000 guard: the 026000 fold here has the md5 production has';
+END $$;
+\ir ../migrations/20261116035000_vehicle_location_fold_probe_per_photo.sql
+\ir ../migrations/20261116035000_vehicle_location_fold_probe_per_photo.sql
+DO $$ BEGIN
  ASSERT position('photo_gps_cover_v1' in pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) > 0,
    '026000: marker';
  ASSERT (SELECT l.lanname FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
          WHERE p.oid = 'public.vehicle_location_fold(uuid)'::regprocedure) = 'plpgsql', '026000: still plpgsql';
  ASSERT NOT has_function_privilege('anon','public.vehicle_location_fold(uuid)','execute')
    AND NOT has_function_privilege('authenticated','public.vehicle_location_fold(uuid)','execute'), '026000: grants kept';
+ ASSERT position('photo_gps_cover_v2' in pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) > 0,
+   '035000: marker';
 END $$;
 DO $$ BEGIN
  ASSERT (SELECT array_agg(l.lanname::text ORDER BY p.proname) FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
@@ -223,4 +232,24 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 ROLLBACK;
+-- 035000: the fold's photo lookup is one index probe per photo on (vehicle_id, id), even when the vehicle has many
+-- photos with a point and the planner thinks ids has one row. The 026000 form rescanned the vehicle's cover entries
+-- for every photo, with id as a join filter (043c6d8b: 2.2 s). The plan is read from the live function body.
+INSERT INTO public.vehicle_images(id,vehicle_id,image_url,source,vision_gate_status,taken_at,latitude,longitude)
+SELECT gen_random_uuid(),'11111111-1111-1111-1111-111111111111','https://x.invalid/n'||g||'.jpg','user_upload',NULL,
+       '2026-10-01T00:00Z',35.9,-114.8
+FROM generate_series(1,3000) g;
+-- Production's estimate for one vehicle is a few dozen rows (it is not among the most common values of 63.8M rows);
+-- without column statistics the fixture estimates the same way.
+ALTER TABLE public.vehicle_images ALTER COLUMN vehicle_id SET STATISTICS 0;
+VACUUM (ANALYZE) public.vehicle_images;
+DO $$ DECLARE body text; plan text := ''; r record; BEGIN
+ SELECT p.prosrc INTO body FROM pg_proc p WHERE p.oid = 'public.vehicle_location_fold(uuid)'::regprocedure;
+ body := substring(body from 'RETURN \((.*)\);\s*END');
+ ASSERT body IS NOT NULL, 'fold body: RETURN (...) not found';
+ body := replace(body, 'p_vehicle_id', '''11111111-1111-1111-1111-111111111111''::uuid');
+ FOR r IN EXECUTE 'EXPLAIN (COSTS OFF) SELECT (' || body || ')' LOOP plan := plan || r."QUERY PLAN" || E'\n'; END LOOP;
+ ASSERT plan ~ 'on vehicle_images i\s+Index Cond: \(\(vehicle_id = [^\n]*\) AND \(id = p\.image_id\)\)', '035000: probe per photo' || E'\n' || plan;
+ ASSERT plan !~ 'Join Filter: \(p\.image_id = i\.id\)', '035000: no rescan per photo' || E'\n' || plan;
+END $$;
 SELECT 'PASS: photo-GPS location areas, area grain for anonymous callers, point only for the tied viewer; vehicle_location_areas matches' AS result;
