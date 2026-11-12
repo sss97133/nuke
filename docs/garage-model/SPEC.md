@@ -1,5 +1,7 @@
 # The garage model — one place, many cars, many people, a timeline
 
+See also: [`JOIN_LINK.md`](JOIN_LINK.md) — the join link end to end (mint, preview, redeem, approve; iOS and server drafts).
+
 Status: **DRAFT SPEC, nothing applied.** Companion files: `supabase/drafts/garage-model/migrations/20261112100000_garage_core.sql`
 (draft DDL, not applied), `supabase/drafts/garage-model/README.md`, `supabase/sql/test_garage_core.sql` (about 85 assertions, passes).
 Written 2026-11-12 by the SPEC lane against `origin/main` `69db0229a` and the live project `qkgaybvrernstplzjaam`
