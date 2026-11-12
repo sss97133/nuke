@@ -98,6 +98,8 @@ if node --test "$ROOT/scripts/data/declared-source-reader.test.mjs" >"$CI_TMP_DI
 else red "  ✗ declared-source reader mapping FAILED"; cat "$CI_TMP_DIR/ci_declared_reader_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/books/expense-footprints.test.mjs" >"$CI_TMP_DIR/ci_expense_footprints_tests.out" 2>&1; then grn "  ✓ expense-footprints collector contract"
 else red "  ✗ expense-footprints collector contract FAILED"; cat "$CI_TMP_DIR/ci_expense_footprints_tests.out"; fail=1; fi
+if python3 -I "$ROOT/scripts/client_evidence/test_client_evidence.py" >"$CI_TMP_DIR/ci_client_evidence_tests.out" 2>&1; then grn "  ✓ client-evidence producer contract (synthetic)"
+else red "  ✗ client-evidence producer contract FAILED"; cat "$CI_TMP_DIR/ci_client_evidence_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/invalid-indexes.test.mjs" >"$CI_TMP_DIR/ci_invalid_indexes_tests.out" 2>&1; then grn "  ✓ invalid-index detector contract"
 else red "  ✗ invalid-index detector contract FAILED"; cat "$CI_TMP_DIR/ci_invalid_indexes_tests.out"; fail=1; fi
 if node --test "$ROOT/scripts/ci/function-drift-check.test.mjs" >"$CI_TMP_DIR/ci_fn_drift_tests.out" 2>&1; then grn "  ✓ function drift detector contract"
