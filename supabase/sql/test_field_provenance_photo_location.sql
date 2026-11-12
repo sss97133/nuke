@@ -7,6 +7,9 @@
 -- get_field_provenance answer byte-identical (anonymous, untied, owner, other fields); vehicle_location_areas returns
 -- the same areas without point for every viewer (owner included), [] for a private vehicle; anon cannot call the fold.
 -- 20261116012000 (both functions in PL/pgSQL) changes none of it; every assertion below runs against it.
+-- 20261116026000 (the fold tests the photo's point, marker photo_gps_cover_v1) changes none of these answers either, a
+-- photo that loses its point stops counting, and with 20261116025000's partial covering index the photos lookup is an
+-- index-only scan on it.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
  IF current_database() NOT LIKE 'dm_refinement_%' OR to_regclass('public.vehicles') IS NOT NULL
@@ -79,6 +82,18 @@ GRANT SELECT ON public.base_location TO anon, authenticated;
 \ir ../migrations/20261116007000_vehicle_location_areas.sql
 \ir ../migrations/20261116012000_vehicle_location_fold_plpgsql.sql
 \ir ../migrations/20261116012000_vehicle_location_fold_plpgsql.sql
+\ir ../migrations/20261116025000_vehicle_images_gps_cover_index.sql
+\ir ../migrations/20261116025000_vehicle_images_gps_cover_index.sql
+\ir ../migrations/20261116026000_vehicle_location_fold_gps_cover_predicate.sql
+\ir ../migrations/20261116026000_vehicle_location_fold_gps_cover_predicate.sql
+DO $$ BEGIN
+ ASSERT position('photo_gps_cover_v1' in pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) > 0,
+   '026000: marker';
+ ASSERT (SELECT l.lanname FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
+         WHERE p.oid = 'public.vehicle_location_fold(uuid)'::regprocedure) = 'plpgsql', '026000: still plpgsql';
+ ASSERT NOT has_function_privilege('anon','public.vehicle_location_fold(uuid)','execute')
+   AND NOT has_function_privilege('authenticated','public.vehicle_location_fold(uuid)','execute'), '026000: grants kept';
+END $$;
 DO $$ BEGIN
  ASSERT (SELECT array_agg(l.lanname::text ORDER BY p.proname) FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
          WHERE p.proname IN ('vehicle_location_fold','vehicle_location_areas')) = ARRAY['plpgsql','plpgsql'], '012000: plpgsql';
@@ -177,6 +192,27 @@ DO $$ DECLARE p jsonb; BEGIN
  ASSERT (public.vehicle_location_areas('11111111-1111-1111-1111-111111111111')->0->>'photos')::int = 2, 'header reader withdraws too';
 END $$;
 RESET ROLE;
+
+-- 026000: day 1 photo g2 loses its point and stops counting (day 1 keeps g1; day 2 has no visible photo by now).
+UPDATE public.vehicle_images SET latitude = NULL WHERE id = '55555555-5555-5555-5555-000000000002';
+SET LOCAL ROLE anon;
+DO $$ DECLARE p jsonb; BEGIN
+ p := public.get_field_provenance('11111111-1111-1111-1111-111111111111','location');
+ ASSERT (p->'location_areas'->0->>'photos')::int = 1 AND (p->'location_areas'->0->>'days')::int = 1, p::text;
+END $$;
+RESET ROLE;
+-- 026000 + 025000: the photos lookup (the fold's own predicates) is answered from the partial covering index alone.
+SET LOCAL enable_seqscan = off; SET LOCAL enable_bitmapscan = off;
+DO $$ DECLARE plan text; BEGIN
+ EXECUTE $q$EXPLAIN (COSTS OFF) select i.taken_at, i.latitude, i.longitude from public.vehicle_images i
+   where i.id = '55555555-5555-5555-5555-000000000001' and i.vehicle_id = '11111111-1111-1111-1111-111111111111'
+     and i.latitude is not null and i.longitude is not null and nullif(btrim(i.image_url), '') is not null
+     and i.is_sensitive is not true and i.is_superseded is not true and i.is_duplicate is not true
+     and (i.vision_gate_status is null or i.vision_gate_status::text = 'approved')
+     and coalesce(i.image_vehicle_match_status, '') not in ('mismatch', 'unrelated')$q$ INTO plan;
+ ASSERT plan LIKE 'Index Only Scan using idx_vehicle_images_gps_cover%', plan;
+END $$;
+RESET enable_seqscan; RESET enable_bitmapscan;
 
 -- A private vehicle: nothing for anon.
 UPDATE public.vehicles SET is_public = false WHERE id = '11111111-1111-1111-1111-111111111111';
