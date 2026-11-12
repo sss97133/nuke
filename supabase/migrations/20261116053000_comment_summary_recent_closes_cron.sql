@@ -14,8 +14,9 @@ SET LOCAL lock_timeout = '2s';
 
 DO $job$
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
-     AND NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'comment-summary-recent-closes') THEN
+  -- Nested, because a disposable contract database has no cron schema and the planner resolves cron.job before the IF runs.
+  IF to_regnamespace('cron') IS NULL THEN RETURN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'comment-summary-recent-closes') THEN
     EXECUTE $s$ SELECT cron.schedule('comment-summary-recent-closes', '4-59/10 * * * *', $c$
       SELECT net.http_post(
         url := get_service_url() || '/functions/v1/batch-comment-discovery',
