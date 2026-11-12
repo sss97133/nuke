@@ -37,7 +37,7 @@ tools/type/build.sh --only trans-am-1973-decal
 | Family | Files | Glyphs (with .notdef) | cmap | traced | derived | designed | Traced fidelity (IoU) |
 |---|---|---|---|---|---|---|---|
 | Pontiac 1973 Block | Regular, Face | 45 | 70 | 7 | 1 | 35 | P .958 T .975 I .954 N .948 O .934 C .917 A .857 |
-| Firebird 1971 Script | Regular | 39 | 38 | 6 | 17 | 14 | F .981 e .979 i .978 b .977 d .976 r .908 (flag trimmed) |
+| Firebird 1971 Script | Regular | 39 | 38 | 6 | 17 | 14 | b .919 i .915 e .907 F .899 d .897 r .841 (flag trimmed), against the chrome face |
 | Trans Am 1973 Decal | Regular | 45 | 70 | 6 | 1 | 36 | S .946 N .930 T .921 A .921 M .920 R .910 |
 | Pontiac 1973 Brochure Numerals | Regular | 30 | 28 | 15 | 9 | 4 | cover .974-.981, spread F r e b d .929-.955 |
 
@@ -59,23 +59,25 @@ Counts exclude `.notdef` and `space`. Block and Decal map lowercase to the capit
 
 ### Firebird 1971 Script
 
-- **Source:** the 1971-81 fender emblem, OER 486904 (`pontiac-firebird-fender-script-1971-1981-cut.png`). The
-  outlines follow that cutout. Measured across the i stem, the b ascender and the F stem, the cutout runs past
-  the dark bevel pair that bounds the chrome face into a flat grey band (L about 195) on the far side: that band
-  is the casting's side wall, seen in perspective. The fonts are therefore the casting as photographed. They are
-  heavier than the face alone (stems are about 13-15 px in the cutout against about 8 px between the bevels), and
-  the IoUs are measured against the cutout, not the face.
+- **Source:** the 1971-81 fender emblem, OER 486904 (`pontiac-firebird-fender-script-1971-1981-cut.png`). v0.1
+  traced the cutout, which runs past the dark bevel pair into the casting's side wall (a flat grey band, L about
+  195, seen in perspective), so it set the casting, not the lettering. v0.2 traces the chrome face between the
+  bevels: a 3x3 luminance range over 100 or L under 120 marks the bevel lines, the region between them is closed,
+  hole-filled under 150 px and smoothed, and the mounting studs below the baseline are clipped. Stems are now 64
+  units (about 8 px in the photograph) against about 14 px for the cutout.
+- **Fidelity:** the IoUs are measured against that face mask. They are lower than v0.1's cutout IoUs because the
+  face edge is set by reflections, which the mask follows and the outline smooths.
 - **Coverage:** a-z, the capitals of the model names (E F G L M P T), and `. , - '`.
 - **Slant:** 13.5 degrees (0.24 px/px), measured by column-projection variance. Every glyph is drawn upright and
   slanted at the end.
-- **Style:** an italic slab script, not a pen script. Stems carry flat slab serifs, the i dots are balls, and the
-  lowercase stands on one continuous baseline slab (105 units) that joins the word. Every lowercase carries the
-  slab edge to edge, with a 6-unit overlap, so any two letters join.
+- **Style:** a contrasted italic serif. Stems are 64 units, hairlines 34. Stems carry flat serifs, the i dots are
+  balls, and the lowercase stands on a 48-unit baseline hairline that joins the word. Every lowercase carries the
+  hairline edge to edge, with a 6-unit overlap, so any two letters join.
 - **Derived letters:** o is the b's bowl made symmetric. n, m, h and u reuse the r's stem and entry serif with the
   o's arch. a, q and g come from the d; p and l from the b; c from the o with the i's ball. E, L and T are the F's
   parts.
 - **Designed letters:** G, P and M carry drawn bars, bowls and diagonals and are labelled designed. t, f, j, k, s, v,
-  w, x, y and z are designed in the same stems, slab and slant.
+  w, x, y and z are designed in the same stems, hairline and slant.
 
 ### Trans Am 1973 Decal
 
@@ -103,7 +105,7 @@ Counts exclude `.notdef` and `space`. Block and Decal map lowercase to the capit
   built from 3, 7 and 1 parts.
 - **Identity:** the brochure face may be a period phototype face; its identity is not confirmed.
 
-## Sizes and weak points (v0.100)
+## Sizes and weak points (v0.2)
 
 - **Chrome:** reads at 24 px and up. Below that, the two-layer gradient turns to noise. Set plain fill
   (`color: currentColor`) under 24 px.
@@ -113,16 +115,18 @@ Counts exclude `.notdef` and `space`. Block and Decal map lowercase to the capit
   constructed glyphs are geometric with a print radius. They are close at header sizes and visibly different above
   96 px. The next pass is a hand redraw of the traces to the construction, or the taper added to the construction.
 - **Decal figures:** 2, 4, 5 and 8 are the weakest drawings, from split skeletons with a junction blob at the 5.
-- **Script slab:** the slab reads as an underline in long lowercase runs. The joins keep the small notches of the
-  emblem's own feet.
+- **Script joiner:** the baseline hairline still reads as an underline in long lowercase runs. The joins keep the
+  small notches of the emblem's own feet.
+- **Script edges:** the traced letters follow a face mask bounded by reflections, so their edges are slightly lumpy
+  at display sizes above 96 px. The next pass redraws them to the measured stems.
 - **Script capitals:** limited to E F G L M P T. A, S and the rest are not drawn. "Trans Am" in the script needs them.
-- **Script r:** its flag is trimmed upright where it ran into the e (IoU .908 against the untrimmed source).
+- **Script r:** its flag is trimmed upright where it ran into the e (IoU .841 against the untrimmed face).
 - **Block:** & and J are the weakest designed glyphs. M and W are wide. The C's width is a lower bound, because the
   photograph clips it.
 - **Brochure numerals:** 5 has a junction blob, 8 has waist notches, 2 and 4 are tight, and the spread letters come
   from a 63 px source.
-- **Script weight:** this is the casting's weight. It includes the side wall, so it is heavier than the chrome face.
-  The v0.2 fix is to trace between the bevel lines.
+- **Qualifiers:** words such as "-Style" are set in the UI face, never a period face. Each period face sets only
+  the lettering its source carries.
 - **Not built:** COLRv1. Chrome is the CSS layering in `period-fonts.css`. On 2026-11-11 it rendered with all five
   faces loaded in Playwright Chromium and Playwright WebKit 26.5, light and dark. It was not checked on an iOS
   device.

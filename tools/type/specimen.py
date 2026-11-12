@@ -31,7 +31,7 @@ SIDE = {k: json.load(open(os.path.join(PERIOD, v[1][:-4] + '.provenance.json')))
 
 SETTINGS = [
     [('1973', 'numerals'), (' ', None), ('PONTIAC', 'block'), (' ', None), ('Firebird', 'script'), (' ', None),
-     ('TRANS AM', 'decal'), ('-Style', 'ui')]   # the tribute qualifier is Nuke's statement: UI face, never period,
+     ('TRANS AM', 'decal'), ('-Style', 'ui')],  # the tribute qualifier is Nuke's statement: UI face, never period
     [('1974', 'numerals'), (' ', None), ('PONTIAC', 'block'), (' ', None), ('Firebird Formula', 'script')],
     [('1970', 'numerals'), (' ', None), ('PONTIAC', 'block'), (' ', None), ('Firebird Esprit', 'script')],
     [('1981', 'numerals'), (' ', None), ('TRANS AM', 'decal')],
