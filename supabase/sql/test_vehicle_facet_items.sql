@@ -177,6 +177,9 @@ END $$;
 -- Applied twice: the second run must be a no-op.
 \ir ../migrations/20261116016000_vehicle_facet_items.sql
 \ir ../migrations/20261116016000_vehicle_facet_items.sql
+-- The reader reads observations by id (row policies on the rows that can speak to a token); applied twice: a no-op.
+\ir ../migrations/20261116031000_vehicle_facet_items_observation_ids.sql
+\ir ../migrations/20261116031000_vehicle_facet_items_observation_ids.sql
 
 -- Seeds. v1 a documented VIN-decoded car; v2 listing-sourced with a transmission conflict and cited gearing;
 -- v3 thin evidence; v4 private; v5 deleted.
@@ -566,6 +569,20 @@ BEGIN
   txt := public.vehicle_facet_items('10000000-0000-0000-0000-000000000001')::text;
   PERFORM public.t_assert(txt !~ '35\.972|35\.973|114\.855|114\.856|36\.209|115\.98|35\.97[^0-9]' AND txt NOT LIKE '%latitude%'
     AND txt NOT LIKE '%Fixture Lane%' AND txt NOT LIKE '%Pahrump%', 'no coordinate or raw address reaches any item');
+
+  -- The observation id list: only rows that can speak to a token, and none for a vehicle the viewer cannot see.
+  PERFORM public.t_assert(NOT ('60000000-0000-0000-0000-00000000001d'::uuid = ANY (public.vehicle_facet_observation_ids(
+      '10000000-0000-0000-0000-000000000001', ARRAY['cowl_tag_style', 'engine_block_casting'])))
+    AND '60000000-0000-0000-0000-00000000001a'::uuid = ANY (public.vehicle_facet_observation_ids(
+      '10000000-0000-0000-0000-000000000001', ARRAY['cowl_tag_style', 'engine_block_casting'])),
+    'the id list keeps the mapped roles and drops the harvest note');
+  PERFORM public.t_assert(cardinality(public.vehicle_facet_observation_ids('10000000-0000-0000-0000-000000000004',
+      ARRAY['cowl_tag_style'])) = 0 AND cardinality(public.vehicle_facet_observation_ids('10000000-0000-0000-0000-000000000005',
+      ARRAY['cowl_tag_style'])) = 0, 'no ids for a private or deleted vehicle');
+  PERFORM public.t_assert(position('obs_ids' in pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure)) > 0
+    AND (length(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure))
+      - length(replace(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure), 'obs_ids AS MATERIALIZED', '')))
+      / length('obs_ids AS MATERIALIZED') = 1, 'the reader reads observations by id, patched once');
 
   -- Private and deleted vehicles return nothing.
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000004') IS NULL, 'private vehicle: nothing');
