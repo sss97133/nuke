@@ -157,8 +157,8 @@ GRANT SELECT (id, user_id, owner_id, uploaded_by, entry_type, is_public, deleted
 \ir ../migrations/20261110093000_vehicles_is_replica_column_grant.sql
 \ir ../migrations/20261110100000_listing_submission_state.sql
 -- Applied twice: the second run must be a no-op.
-\ir ../migrations/20261116005000_vehicle_facet_items.sql
-\ir ../migrations/20261116005000_vehicle_facet_items.sql
+\ir ../migrations/20261116011000_vehicle_facet_items.sql
+\ir ../migrations/20261116011000_vehicle_facet_items.sql
 
 -- Seeds. v1 a documented VIN-decoded car; v2 listing-sourced with a transmission conflict and cited gearing;
 -- v3 thin evidence; v4 private; v5 deleted.

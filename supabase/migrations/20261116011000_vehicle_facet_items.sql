@@ -62,7 +62,7 @@ COMMENT ON TABLE public.vehicle_decode_rules IS
   'value.positions = {field: "position"}). qualifiers narrows a row further (unit year, ratio-set name). Every row '
   'carries citation_url; a newer row supersedes an older one (superseded_by, superseded_at), never an update in place. '
   'Gear ratios are looked up by code only: when several current rows for the identified model disagree, the reader '
-  'reports the candidates and computes nothing. Read by vehicle_facet_items. Created empty by 20261116005000.';
+  'reports the candidates and computes nothing. Read by vehicle_facet_items. Created empty by 20261116011000.';
 
 -- 2. Public source label ----------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.observation_source_label(p_source_id uuid)
