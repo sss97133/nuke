@@ -725,7 +725,7 @@ found broken and what is still unproven:
     Not forced: all 19 rows landed with no `property_id`, their values under field names the registry does not hold,
     so they wait unkeyed and nothing counts the wait. The writer gate for photo readings would have counted them; it is
     still not built. The proposals wait on a human approval.
-  - *The photo-reading scoreboard, one vehicle* (`20261116041000`, `image_stage_coverage(vehicle)`, contract
+  - *The photo-reading scoreboard, one vehicle* (`20261116042000`, `image_stage_coverage(vehicle)`, contract
     `test_image_stage_coverage_model_gain.sql`): rule 7's counts as an overload of the existing coverage reader.
     Proof vehicle, read by the same query 2026-11-12 12:45 UTC: 467 photos, 461 with a witnessed reading; 982 witnessed
     observations, 446 keyed, 536 unkeyed (462 of them `reviewed_image_analysis_v1`); 181 folded claims, 70 carried by

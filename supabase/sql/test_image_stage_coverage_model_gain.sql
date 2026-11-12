@@ -65,13 +65,13 @@ INSERT INTO public.observation_witnesses VALUES
 INSERT INTO public.schema_proposals (status, motivating_observation_ids) VALUES
  ('open', ARRAY['c1000000-0000-0000-0000-000000000006'::uuid]), ('open', NULL), ('approved', ARRAY['c1000000-0000-0000-0000-000000000006'::uuid]),
  ('withdrawn', NULL), ('under_review', ARRAY['f9000000-0000-0000-0000-000000000009'::uuid]);
-\ir ../migrations/20261116041000_image_stage_coverage_model_gain.sql
+\ir ../migrations/20261116042000_image_stage_coverage_model_gain.sql
 DO $$ DECLARE c jsonb; g jsonb; BEGIN
  -- The library reader is exactly as it was: same definition, same answer.
  ASSERT (SELECT def FROM before_gain) = md5(pg_get_functiondef('public.image_stage_coverage()'::regprocedure)), 'the no-argument reader is untouched';
  ASSERT (public.image_stage_coverage() - 'checked_at') = ((SELECT b.c FROM before_gain b) - 'checked_at');
  c := public.image_stage_coverage('a1000000-0000-0000-0000-000000000001'); g := c -> 'model_gain';
- ASSERT c ->> 'vehicle_id' = 'a1000000-0000-0000-0000-000000000001' AND c ->> 'logic_version' = 'image_stage_coverage(vehicle)/20261116041000', c::text;
+ ASSERT c ->> 'vehicle_id' = 'a1000000-0000-0000-0000-000000000001' AND c ->> 'logic_version' = 'image_stage_coverage(vehicle)/20261116042000', c::text;
  -- This vehicle only: five photos, four of them witnessed.
  ASSERT (g ->> 'photos')::int = 5 AND (g ->> 'photos_witnessed')::int = 4, g::text;
  -- Witnessed: current rows with a witness (k1-k4, u1, u2); a row with two witness roles counts once;

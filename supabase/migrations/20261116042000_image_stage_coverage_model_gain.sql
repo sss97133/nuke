@@ -62,7 +62,7 @@ AS $fn$
   WHERE k.id IN (SELECT id FROM in_fold) OR k.id::text IN (SELECT id FROM cited))
  SELECT jsonb_build_object(
   'checked_at',statement_timestamp(),'vehicle_id',p_vehicle_id,
-  'logic_version','image_stage_coverage(vehicle)/20261116041000',
+  'logic_version','image_stage_coverage(vehicle)/20261116042000',
   'model_gain',jsonb_build_object(
    'measure','photo direction rule 7: keyed, connected, proven, repeats folded',
    'photos',(SELECT count(*) FROM public.vehicle_images i WHERE i.vehicle_id=p_vehicle_id),
