@@ -729,7 +729,9 @@ found broken and what is still unproven:
     `test_image_stage_coverage_model_gain.sql`): rule 7's counts as an overload of the existing coverage reader.
     Proof vehicle, read by the same query 2026-11-12 12:45 UTC: 467 photos, 461 with a witnessed reading; 982 witnessed
     observations, 446 keyed, 536 unkeyed (462 of them `reviewed_image_analysis_v1`); 181 folded claims, 70 carried by
-    two or more rows; 335 connected rows, all by folding, 0 cited by a work record; 0 proven; 17 open proposals citing a
+    two or more rows (the day is the witnessed photo's `taken_at`, not the reading's own clock; 0 keyed rows had no
+    capture day; read again 14:06 UTC with that clock, same counts); 335 connected rows, all by folding, 0 cited by a
+    work record; 0 proven; 17 open proposals citing a
     witnessed reading. The library form was tried first and measured: cancelled twice by the 10 s statement timeout
     (39,952 witness rows, each a separate read in a 12 GB table). A library total needs a stored fold and is not built.
   - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on

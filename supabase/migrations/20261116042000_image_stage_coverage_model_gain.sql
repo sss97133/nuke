@@ -5,7 +5,9 @@
 -- hand-written query each time (scripts/photo-pipeline/keys-dry-run/fold.sql, one method).
 --   witnessed  current observations of the vehicle with an observation_witnesses row
 --   keyed      of those, property_id or descriptor_id set
---   folded     keyed rows grouped by key, part, side, value and capture day
+--   folded     keyed rows grouped by key, part, side, value and the photo's capture day
+--              (vehicle_images.taken_at of the witnessed photo; a row with no capture time
+--              folds with nothing and is counted)
 --   connected  keyed rows that share a fold with another row, or that a current work record
 --              cites in visual_sources[].keyed_claim_ids
 --   proven     zero by construction: no store records reader agreement, a receipt's support
@@ -13,9 +15,8 @@
 -- Why per vehicle and not the library: measured on production 2026-11-12. The library form (every
 -- witness row joined to its observation) was cancelled twice by the 10 s statement timeout:
 -- observation_witnesses holds 39,952 rows and each one is a separate read in a 12 GB table. The
--- vehicle form reads by vehicle_id and returned inside the limit on the proof vehicle: 467
--- photos, 982 witnessed, 446 keyed, 181 folded claims (70 carried by two or more rows), 0 cited
--- by a work record, 17 open proposals citing a witnessed reading. A library total needs a stored
+-- vehicle form reads by vehicle_id and returned inside the limit on the proof vehicle (its
+-- counts are in the case ledger, C17, with their read time). A library total needs a stored
 -- fold; it is not built here and the no-argument reader is left exactly as it was.
 -- Read-only. No new table, trigger or reader of photos; the name is the existing one.
 BEGIN;
@@ -34,7 +35,13 @@ CREATE FUNCTION public.image_stage_coverage(p_vehicle_id uuid)
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=''
 AS $fn$
  WITH wo AS MATERIALIZED (
-  SELECT o.id,o.descriptor_id,o.property_id,o.extraction_method,o.observed_at,
+  SELECT o.id,o.descriptor_id,o.property_id,o.extraction_method,
+   -- The fold's day is the photo's capture day, read from the witnessed photo. An observation's own
+   -- observed_at mixes capture, review and recording clocks (a projected property carries the time
+   -- its source reading was recorded), so it is never used as the capture day. Unknown stays unknown.
+   (SELECT (min(i.taken_at) AT TIME ZONE 'UTC')::date FROM public.observation_witnesses w
+     JOIN public.vehicle_images i ON i.id=w.image_id
+     WHERE w.observation_id=o.id AND i.taken_at IS NOT NULL AND isfinite(i.taken_at)) AS capture_day,
    CASE WHEN o.descriptor_id IS NOT NULL OR o.property_id IS NOT NULL THEN o.structured_data->>'part_key' END AS part_key,
    CASE WHEN o.descriptor_id IS NOT NULL OR o.property_id IS NOT NULL THEN o.structured_data->>'part_side' END AS part_side,
    CASE WHEN o.property_id IS NOT NULL THEN o.structured_data->>p.property_key END AS val
@@ -44,9 +51,12 @@ AS $fn$
    AND EXISTS(SELECT 1 FROM public.observation_witnesses w WHERE w.observation_id=o.id)),
  keyed AS MATERIALIZED (SELECT * FROM wo WHERE descriptor_id IS NOT NULL OR property_id IS NOT NULL),
  folds AS (
-  SELECT coalesce(descriptor_id,property_id) AS key_id,part_key,part_side,val,
-   (observed_at AT TIME ZONE 'UTC')::date AS capture_day,count(*) AS n,array_agg(id) AS ids
-  FROM keyed GROUP BY 1,2,3,4,5),
+  -- A keyed row whose photo has no capture time folds with nothing: it is its own claim.
+  SELECT coalesce(descriptor_id,property_id) AS key_id,part_key,part_side,val,capture_day,count(*) AS n,array_agg(id) AS ids
+  FROM keyed WHERE capture_day IS NOT NULL GROUP BY 1,2,3,4,5
+  UNION ALL
+  SELECT coalesce(descriptor_id,property_id),part_key,part_side,val,NULL::date,1,ARRAY[id]
+  FROM keyed WHERE capture_day IS NULL),
  in_fold AS (SELECT unnest(ids) AS id FROM folds WHERE n>=2),
  cited AS (
   SELECT DISTINCT c.value#>>'{}' AS id
@@ -70,6 +80,7 @@ AS $fn$
    'witnessed_observations',(SELECT count(*) FROM wo),
    'keyed',(SELECT count(*) FROM keyed),
    'unkeyed',(SELECT count(*) FROM wo)-(SELECT count(*) FROM keyed),
+   'keyed_with_unknown_capture_day',(SELECT count(*) FROM keyed WHERE capture_day IS NULL),
    'folded_claims',(SELECT count(*) FROM folds),
    'claims_carried_by_2plus_rows',(SELECT count(*) FROM folds WHERE n>=2),
    'connected_rows',(SELECT count(*) FROM connected),

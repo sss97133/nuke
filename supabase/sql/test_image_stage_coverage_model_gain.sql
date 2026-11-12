@@ -30,24 +30,32 @@ CREATE TABLE public.observation_witnesses (observation_id uuid REFERENCES public
 CREATE TABLE public.schema_proposals (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), status text, motivating_observation_ids uuid[]);
 CREATE TEMP TABLE before_gain AS SELECT public.image_stage_coverage() AS c,
  md5(pg_get_functiondef('public.image_stage_coverage()'::regprocedure)) AS def;
+ALTER TABLE public.vehicle_images ADD COLUMN taken_at timestamptz;
 INSERT INTO public.vehicle_images (id, vehicle_id) VALUES
  ('b1000000-0000-0000-0000-000000000001','a1000000-0000-0000-0000-000000000001'),('b2000000-0000-0000-0000-000000000002','a1000000-0000-0000-0000-000000000001'),
  ('b3000000-0000-0000-0000-000000000003','a1000000-0000-0000-0000-000000000001'),('b4000000-0000-0000-0000-000000000004','a1000000-0000-0000-0000-000000000001'),
  ('b6000000-0000-0000-0000-000000000006','a1000000-0000-0000-0000-000000000001'),('b5000000-0000-0000-0000-000000000005','a2000000-0000-0000-0000-000000000002');
+-- The photos' own capture times: b1 and b2 on the 28th, b3 on the 29th, b4 on the 28th, b7 unknown.
+UPDATE public.vehicle_images SET taken_at = '2026-10-28T10:00:00Z' WHERE id IN ('b1000000-0000-0000-0000-000000000001','b4000000-0000-0000-0000-000000000004');
+UPDATE public.vehicle_images SET taken_at = '2026-10-28T23:30:00Z' WHERE id = 'b2000000-0000-0000-0000-000000000002';
+UPDATE public.vehicle_images SET taken_at = '2026-10-29T10:00:00Z' WHERE id = 'b3000000-0000-0000-0000-000000000003';
+INSERT INTO public.vehicle_images (id, vehicle_id) VALUES ('b7000000-0000-0000-0000-000000000007','a1000000-0000-0000-0000-000000000001');
 INSERT INTO public.observation_properties VALUES ('aa000000-0000-0000-0000-000000000001', 'image_visible_paint_stage');
 -- Vehicle a1. k1,k2: the same descriptor, part and day on two photos (one fold of two).
 -- k3: the same descriptor on another day (its own fold). k4: a property value, alone, cited by a work record.
--- k5: superseded keyed row. u1,u2: witnessed, unkeyed, one method each. n1: keyed, no witness. Vehicle a2: one keyed row.
+-- ka,kb: keyed, same descriptor and part, on a photo with no capture time. k5: superseded keyed row. u1,u2: witnessed, unkeyed, one method each. n1: keyed, no witness. Vehicle a2: one keyed row.
 INSERT INTO public.vehicle_observations (id, vehicle_id, kind, extraction_method, structured_data, is_superseded, descriptor_id, property_id, observed_at) VALUES
- ('c1000000-0000-0000-0000-000000000001','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{"part_key":"engine.block"}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-10-28T10:00:00Z'),
- ('c1000000-0000-0000-0000-000000000002','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{"part_key":"engine.block"}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-10-28T15:00:00Z'),
- ('c1000000-0000-0000-0000-000000000003','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{"part_key":"engine.block"}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-10-29T10:00:00Z'),
+ ('c1000000-0000-0000-0000-000000000001','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{"part_key":"engine.block"}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-11-11T04:00:00Z'),
+ ('c1000000-0000-0000-0000-000000000002','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{"part_key":"engine.block"}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-11-11T04:00:00Z'),
+ ('c1000000-0000-0000-0000-000000000003','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{"part_key":"engine.block"}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-11-11T04:00:00Z'),
  ('c1000000-0000-0000-0000-000000000004','a1000000-0000-0000-0000-000000000001','condition','image_property_projection','{"image_visible_paint_stage":"primer"}',false,NULL,'aa000000-0000-0000-0000-000000000001','2026-10-28T10:00:00Z'),
  ('c1000000-0000-0000-0000-000000000005','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{}',true,'dd000000-0000-0000-0000-000000000001',NULL,'2026-10-28T10:00:00Z'),
  ('c1000000-0000-0000-0000-000000000006','a1000000-0000-0000-0000-000000000001','specification','cowl_tag_decode_v1','{}',false,NULL,NULL,'2026-10-28T10:00:00Z'),
  ('c1000000-0000-0000-0000-000000000007','a1000000-0000-0000-0000-000000000001','media','reviewed_image_analysis_v1','{}',false,NULL,NULL,'2026-10-28T10:00:00Z'),
  ('c1000000-0000-0000-0000-000000000008','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-10-28T10:00:00Z'),
  ('c1000000-0000-0000-0000-000000000009','a2000000-0000-0000-0000-000000000002','condition','photo_map_harvest_v1','{}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-10-28T10:00:00Z'),
+ ('c1000000-0000-0000-0000-00000000000a','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{"part_key":"engine.block"}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-11-11T04:00:00Z'),
+ ('c1000000-0000-0000-0000-00000000000b','a1000000-0000-0000-0000-000000000001','condition','photo_map_harvest_v1','{"part_key":"engine.block"}',false,'dd000000-0000-0000-0000-000000000001',NULL,'2026-11-11T04:00:00Z'),
  ('e1000000-0000-0000-0000-000000000001','a1000000-0000-0000-0000-000000000001','work_record','visual_work_v1',
    '{"contract":"visual_work_v1","visual_sources":[{"image_id":"b4000000-0000-0000-0000-000000000004","keyed_claim_ids":["c1000000-0000-0000-0000-000000000004"]}]}',false,NULL,NULL,'2026-11-01T10:00:00Z'),
  ('e1000000-0000-0000-0000-000000000002','a1000000-0000-0000-0000-000000000001','work_record','visual_work_v1',
@@ -61,7 +69,9 @@ INSERT INTO public.observation_witnesses VALUES
  ('c1000000-0000-0000-0000-000000000005','b1000000-0000-0000-0000-000000000001','derived'),
  ('c1000000-0000-0000-0000-000000000006','b1000000-0000-0000-0000-000000000001','derived'),
  ('c1000000-0000-0000-0000-000000000007','b2000000-0000-0000-0000-000000000002','derived'),
- ('c1000000-0000-0000-0000-000000000009','b5000000-0000-0000-0000-000000000005','derived');
+ ('c1000000-0000-0000-0000-000000000009','b5000000-0000-0000-0000-000000000005','derived'),
+ ('c1000000-0000-0000-0000-00000000000a','b7000000-0000-0000-0000-000000000007','derived'),
+ ('c1000000-0000-0000-0000-00000000000b','b7000000-0000-0000-0000-000000000007','derived');
 INSERT INTO public.schema_proposals (status, motivating_observation_ids) VALUES
  ('open', ARRAY['c1000000-0000-0000-0000-000000000006'::uuid]), ('open', NULL), ('approved', ARRAY['c1000000-0000-0000-0000-000000000006'::uuid]),
  ('withdrawn', NULL), ('under_review', ARRAY['f9000000-0000-0000-0000-000000000009'::uuid]);
@@ -72,13 +82,16 @@ DO $$ DECLARE c jsonb; g jsonb; BEGIN
  ASSERT (public.image_stage_coverage() - 'checked_at') = ((SELECT b.c FROM before_gain b) - 'checked_at');
  c := public.image_stage_coverage('a1000000-0000-0000-0000-000000000001'); g := c -> 'model_gain';
  ASSERT c ->> 'vehicle_id' = 'a1000000-0000-0000-0000-000000000001' AND c ->> 'logic_version' = 'image_stage_coverage(vehicle)/20261116042000', c::text;
- -- This vehicle only: five photos, four of them witnessed.
- ASSERT (g ->> 'photos')::int = 5 AND (g ->> 'photos_witnessed')::int = 4, g::text;
+ -- This vehicle only: six photos, five of them witnessed.
+ ASSERT (g ->> 'photos')::int = 6 AND (g ->> 'photos_witnessed')::int = 5, g::text;
  -- Witnessed: current rows with a witness (k1-k4, u1, u2); a row with two witness roles counts once;
  -- the superseded row, the unwitnessed keyed row and the other vehicle's row do not count.
- ASSERT (g ->> 'witnessed_observations')::int = 6 AND (g ->> 'keyed')::int = 4 AND (g ->> 'unkeyed')::int = 2, g::text;
- -- Folds: day-28 descriptor (2 rows), day-29 descriptor, the property value.
- ASSERT (g ->> 'folded_claims')::int = 3 AND (g ->> 'claims_carried_by_2plus_rows')::int = 1, g::text;
+ ASSERT (g ->> 'witnessed_observations')::int = 8 AND (g ->> 'keyed')::int = 6 AND (g ->> 'unkeyed')::int = 2, g::text;
+ -- Folds follow the photos' capture days, not the readings' clocks. All five descriptor rows were recorded at the
+ -- same instant: the two photos of the 28th fold, the photo of the 29th stands apart, and the two rows on a photo
+ -- with no capture time fold with nothing, each its own claim. Plus the property value.
+ ASSERT (g ->> 'keyed_with_unknown_capture_day')::int = 2, g::text;
+ ASSERT (g ->> 'folded_claims')::int = 5 AND (g ->> 'claims_carried_by_2plus_rows')::int = 1, g::text;
  -- Connected: the two rows that fold together, and the row a current work record cites. A superseded record's citation does not count.
  ASSERT (g ->> 'connected_rows')::int = 3 AND (g ->> 'cited_by_a_work_record')::int = 1, g::text;
  -- Proven is reported, as zero, with the reason.
