@@ -1,4 +1,4 @@
--- Read-only dry run for data fixes B (20261114100100) and C (20261114100200). Run after 20261114100000 (the read functions, additive)
+-- Read-only dry run for data fixes B (20261116050100) and C (20261116050200). Run after 20261116050000 (the read functions, additive)
 -- and before B and C. Everything is inside a READ ONLY transaction and rolled back: it cannot write.
 --   psql -X -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/sql/dryrun_profile_data_fix_20261114.sql
 -- 2026-11-09 answers (read-only, against qkgaybvrernstplzjaam with the functions' bodies inlined):

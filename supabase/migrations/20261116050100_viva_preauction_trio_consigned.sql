@@ -100,7 +100,7 @@ ins AS (
   SELECT 'c433d27e-2159-4f8c-b4ae-32a5e44a77cf', trio.vehicle_id, 'consigner', 'active', 'auction_soon', NULL,
          '0b9f107a-d124-49de-9ded-94698f63c1c4', false,
          true, '0b9f107a-d124-49de-9ded-94698f63c1c4', now(),
-         'Viva pre-auction consigned inventory, confirmed by Skylar 2026-11-09. Skylar (0b9f107a) is the contributor (photographer), not the owner. Data fix B 20261114100100.'
+         'Viva pre-auction consigned inventory, confirmed by Skylar 2026-11-09. Skylar (0b9f107a) is the contributor (photographer), not the owner. Data fix B 20261116050100.'
   FROM trio
   ON CONFLICT (organization_id, vehicle_id, relationship_type) DO NOTHING
   RETURNING id, vehicle_id, relationship_type, status, listing_status)
@@ -118,7 +118,7 @@ WITH trio(vehicle_id) AS (
 ins AS (
   INSERT INTO public.vehicle_contributors (vehicle_id, user_id, role, status, can_sell, notes)
   SELECT trio.vehicle_id, '0b9f107a-d124-49de-9ded-94698f63c1c4', 'photographer', 'active', false,
-         'Contributor of photos of Viva consigned inventory; not the owner. Data fix B 20261114100100.'
+         'Contributor of photos of Viva consigned inventory; not the owner. Data fix B 20261116050100.'
   FROM trio
   WHERE NOT EXISTS (SELECT 1 FROM public.vehicle_contributors c
                     WHERE c.vehicle_id = trio.vehicle_id AND c.user_id = '0b9f107a-d124-49de-9ded-94698f63c1c4')

@@ -1,7 +1,7 @@
 -- Data fix C: the vehicles whose owner_id is Skylar and whose entry_type is the column default 'owner_claim', reclassified from evidence,
 -- and the entry_type default changed so a new record no longer asserts ownership.
 --
--- Approved by Skylar on 2026-11-09 ("read-side and clean the rows"). Rule: _profile_ownership_class_v1 (migration 20261114100000), the
+-- Approved by Skylar on 2026-11-09 ("read-side and clean the rows"). Rule: _profile_ownership_class_v1 (migration 20261116050000), the
 -- same rule profile_vehicle_relationships_read_v1 shows, so the read side and the rows agree:
 --   owner        a title verification, a purchase record (acquisition book entry, purchase agreement / bill of sale, outgoing payment)
 --                or a deal jacket he created                                            -> unchanged (owner_id stays, entry_type stays)
@@ -43,10 +43,10 @@ SET LOCAL lock_timeout = '5s';
 DO $guard$
 BEGIN
   IF to_regprocedure('public._profile_ownership_class_v1(uuid)') IS NULL THEN
-    RAISE EXCEPTION 'fix C needs 20261114100000_profile_read_functions_v1 applied first';
+    RAISE EXCEPTION 'fix C needs 20261116050000_profile_read_functions_v1 applied first';
   END IF;
   IF to_regclass('public.profile_data_fix_backup_20261114') IS NULL THEN
-    RAISE EXCEPTION 'fix C needs 20261114100100_viva_preauction_trio_consigned applied first (it creates the backup table)';
+    RAISE EXCEPTION 'fix C needs 20261116050100_viva_preauction_trio_consigned applied first (it creates the backup table)';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = '0b9f107a-d124-49de-9ded-94698f63c1c4') THEN
     RAISE EXCEPTION 'fix C: profile 0b9f107a-... not found';

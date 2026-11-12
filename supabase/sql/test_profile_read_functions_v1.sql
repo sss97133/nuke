@@ -1,8 +1,8 @@
 -- Empty disposable PG17 only, as a superuser, from the repo root:
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_profile_read_functions_v1 -f supabase/sql/test_profile_read_functions_v1.sql
 -- scripts/ci/run-db-contracts.sh runs it that way in the db-contracts job.
--- Contract for 20261114100000_profile_read_functions_v1.sql, 20261114100100_viva_preauction_trio_consigned.sql and
--- 20261114100200_owner_claim_reclassify_from_evidence.sql. Synthetic rows only; never production. The ids of the real profile, Viva and
+-- Contract for 20261116050000_profile_read_functions_v1.sql, 20261116050100_viva_preauction_trio_consigned.sql and
+-- 20261116050200_owner_claim_reclassify_from_evidence.sql. Synthetic rows only; never production. The ids of the real profile, Viva and
 -- the reviewed vehicles are reused so the two data fixes run unchanged; every other row is invented.
 --   * labor: owner-confirmed and inferred minutes are separate buckets, never added; ids only for the account; null with no sessions.
 --   * money: one total per (scope, direction, basis, currency); NULL currency stays NULL; junk vendors, self-named vendors, implausible
@@ -203,8 +203,8 @@ INSERT INTO public.deal_jackets (id, vehicle_id, created_by, organization_id, en
   ('00000000-0000-0000-0000-00000000f002', NULL, NULL, 'c433d27e-2159-4f8c-b4ae-32a5e44a77cf', 'viva', 'consignment', '2025-01-01', NULL, NULL, NULL, 15000, NULL),
   ('00000000-0000-0000-0000-00000000f003', NULL, '13450c45-3e8b-4124-9f5b-5c512094ff04', '00000000-0000-0000-0000-0000000000b2', 'skylar', 'sale', '2025-01-01', '2025-02-01', 1, 2, 3, 4);
 
-\ir ../migrations/20261114100000_profile_read_functions_v1.sql
-\ir ../migrations/20261114100000_profile_read_functions_v1.sql
+\ir ../migrations/20261116050000_profile_read_functions_v1.sql
+\ir ../migrations/20261116050000_profile_read_functions_v1.sql
 
 CREATE TEMP TABLE got (k text PRIMARY KEY, j jsonb);
 GRANT ALL ON got TO anon, authenticated, service_role;
@@ -342,8 +342,8 @@ END $t$;
 
 -- Fix B, twice ----------------------------------------------------------------------------------------------------------------------
 TRUNCATE public.org_stats_calls;
-\ir ../migrations/20261114100100_viva_preauction_trio_consigned.sql
-\ir ../migrations/20261114100100_viva_preauction_trio_consigned.sql
+\ir ../migrations/20261116050100_viva_preauction_trio_consigned.sql
+\ir ../migrations/20261116050100_viva_preauction_trio_consigned.sql
 DO $t$ BEGIN
   ASSERT (SELECT count(*) FROM public.organization_vehicles WHERE organization_id = 'c433d27e-2159-4f8c-b4ae-32a5e44a77cf'
             AND relationship_type = 'consigner' AND status = 'active' AND listing_status = 'auction_soon' AND user_confirmed
@@ -368,9 +368,9 @@ END $t$;
 
 -- Fix C, twice ----------------------------------------------------------------------------------------------------------------------
 CREATE TEMP TABLE before_c AS SELECT id, owner_id, entry_type FROM public.vehicles;
-\ir ../migrations/20261114100200_owner_claim_reclassify_from_evidence.sql
+\ir ../migrations/20261116050200_owner_claim_reclassify_from_evidence.sql
 CREATE TEMP TABLE after_c1 AS SELECT id, owner_id, entry_type FROM public.vehicles;
-\ir ../migrations/20261114100200_owner_claim_reclassify_from_evidence.sql
+\ir ../migrations/20261116050200_owner_claim_reclassify_from_evidence.sql
 DO $t$ BEGIN
   ASSERT (SELECT array_agg(a.id ORDER BY a.id) FROM after_c1 a JOIN before_c b USING (id)
           WHERE (a.owner_id, a.entry_type) IS DISTINCT FROM (b.owner_id, b.entry_type))
