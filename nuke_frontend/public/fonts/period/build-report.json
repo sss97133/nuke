@@ -1,8 +1,15 @@
 {
- "nuke_frontend/public/fonts/period/pontiac-1973-brochure-numerals/Pontiac1973BrochureNumerals-Regular.otf": {
-  "file": "Pontiac1973BrochureNumerals-Regular.otf",
-  "glyphs": 30,
-  "cmap": 28,
+ "nuke_frontend/public/fonts/period/pontiac-1973-block/Pontiac1973Block-Regular.otf": {
+  "file": "Pontiac1973Block-Regular.otf",
+  "glyphs": 45,
+  "cmap": 70,
+  "missing": [],
+  "emptyOutlines": []
+ },
+ "nuke_frontend/public/fonts/period/pontiac-1973-block/Pontiac1973Block-Face.otf": {
+  "file": "Pontiac1973Block-Face.otf",
+  "glyphs": 45,
+  "cmap": 70,
   "missing": [],
   "emptyOutlines": []
  }

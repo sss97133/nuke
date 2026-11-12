@@ -116,10 +116,11 @@ def component_mask(src: Source, anchors, min_area=20, margin=6, tol=6, clip=None
         if best is None:
             raise ValueError(f'no component near {ax},{ay} in {src.file}')
         chosen.append(best[1:])
-    X0 = min(bb[0] for _, bb in chosen) - margin
-    Y0 = min(bb[1] for _, bb in chosen) - margin
-    X1 = max(bb[2] for _, bb in chosen) + margin
-    Y1 = max(bb[3] for _, bb in chosen) + margin
+    Hh, Ww = lab.shape
+    X0 = max(0, min(bb[0] for _, bb in chosen) - margin)
+    Y0 = max(0, min(bb[1] for _, bb in chosen) - margin)
+    X1 = min(Ww, max(bb[2] for _, bb in chosen) + margin)
+    Y1 = min(Hh, max(bb[3] for _, bb in chosen) + margin)
     a = src.array()[Y0:Y1, X0:X1]
     L = lab[Y0:Y1, X0:X1]
     keep = np.isin(L, [i for i, _ in chosen])
