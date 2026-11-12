@@ -715,6 +715,25 @@ found broken and what is still unproven:
     fault. It calls the trigger's own four functions, so the two cannot disagree. Whether this vehicle's work log is
     done is this query's `failing` reaching zero, not an agent's statement. Service role only. It is not rule 7's
     measure for photo readings (keyed, connected, proven over the library); that reader is still not built.
+  - *The work-record scoreboard, live* (#3436, read 2026-11-12 10:50 UTC): 31 records, 2 passing, 29 failing; 0
+    drafts declared; newest record still 2026-11-11 16:43.
+  - *A second live test, another lane* (read 10:50 UTC). Between 00:33 and 00:38 UTC a drivetrain-decode lane wrote
+    19 `specification` observations on the proof vehicle under four new methods (`cowl_tag_decode_v1`,
+    `engine_block_decode_v1`, `trans_id_stamp_decode_v1`, `physical_transcription_v1`). Forced, or done right unforced:
+    each row has its photo as witness, a cited reference with a locator, a stated limitation and confidence 0.6; and
+    the lane filed its places as `add_property` proposals (20 open at 01:34, two earlier batches superseded by it).
+    Not forced: all 19 rows landed with no `property_id`, their values under field names the registry does not hold,
+    so they wait unkeyed and nothing counts the wait. The writer gate for photo readings would have counted them; it is
+    still not built. The proposals wait on a human approval.
+  - *The photo-reading scoreboard, one vehicle* (`20261116042000`, `image_stage_coverage(vehicle)`, contract
+    `test_image_stage_coverage_model_gain.sql`): rule 7's counts as an overload of the existing coverage reader.
+    Proof vehicle, read by the same query 2026-11-12 12:45 UTC: 467 photos, 461 with a witnessed reading; 982 witnessed
+    observations, 446 keyed, 536 unkeyed (462 of them `reviewed_image_analysis_v1`); 181 folded claims, 70 carried by
+    two or more rows (the day is the witnessed photo's `taken_at`, not the reading's own clock; 0 keyed rows had no
+    capture day; read again 14:06 UTC with that clock, same counts); 335 connected rows, all by folding, 0 cited by a
+    work record; 0 proven; 17 open proposals citing a
+    witnessed reading. The library form was tried first and measured: cancelled twice by the 10 s statement timeout
+    (39,952 witness rows, each a separate read in a 12 GB table). A library total needs a stored fold and is not built.
   - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on
     reason and logic." They are the agent's reasoning, not his word, and he can overturn them. (1) A researched or
     analyst number (price, hours, rate) is not stored as a number in a record. Invariant 5 says a number is cited from
