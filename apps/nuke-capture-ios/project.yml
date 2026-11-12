@@ -84,6 +84,12 @@ targets:
       properties:
         com.apple.developer.applesignin:
           - Default
+        # Garage join links: https://nuke.ag/join/<token> opens the app. Needs the Associated Domains
+        # capability on the ag.nuke.capture App ID AND nuke.ag serving /.well-known/apple-app-site-association
+        # (draft: supabase/drafts/garage-model/web/AASA.md). The custom scheme ag.nuke.capture://join/<token>
+        # (CFBundleURLTypes below) works without either.
+        com.apple.developer.associated-domains:
+          - applinks:nuke.ag
     info:
       path: Generated/Info.plist
       properties:
