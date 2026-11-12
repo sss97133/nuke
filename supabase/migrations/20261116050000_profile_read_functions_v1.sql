@@ -324,7 +324,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $fn$
            'conflict', 'sale_document', 'receipts', r.id, NULL, coalesce(r.receipt_date, r.transaction_date)::timestamptz, 0.5,
            jsonb_build_object('document_kind', r.document_kind, 'vendor', r.vendor_name)
     FROM public.receipts r
-    WHERE r.user_id = p_user_id AND r.document_kind::text IN ('vehicle_sale', 'vehicle_transaction') AND r.duplicate_of IS NULL
+    WHERE r.user_id = p_user_id AND r.document_kind::text IN ('vehicle_sale', 'vehicle_transaction') AND r.duplicate_of IS NULL AND r.is_superseded IS NOT TRUE
     UNION ALL
     SELECT d.vehicle_id, 'conflict', 'book_entry', 'vehicle_documents', d.id, NULL, d.created_at, 0.5,
            jsonb_build_object('document_type', d.document_type, 'title', d.title)
@@ -456,9 +456,14 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $fn$
     SELECT veh.id, veh.year,
            jsonb_build_object(
              'vehicle_id', veh.id, 'year', veh.year, 'make', veh.make, 'model', veh.model,
+             -- A visitor sees owner only when a title backs it; a private purchase, payment or jacket stays unresolved.
              'ownership_class', CASE WHEN (SELECT own FROM viewer) THEN c.ownership_class
-                                     WHEN c.ownership_class IN ('owner', 'contributor') THEN c.ownership_class ELSE 'unresolved' END,
-             'ownership_confidence', c.confidence,
+                                     WHEN c.ownership_class = 'contributor' THEN c.ownership_class
+                                     WHEN c.ownership_class = 'owner' AND c.owner_ids::text LIKE '%ownership_verifications:%' THEN 'owner'
+                                     ELSE 'unresolved' END,
+             'ownership_confidence', CASE WHEN (SELECT own FROM viewer) OR c.ownership_class = 'contributor'
+                                            OR (c.ownership_class = 'owner' AND c.owner_ids::text LIKE '%ownership_verifications:%')
+                                          THEN c.confidence END,
              'roles', (SELECT jsonb_agg(jsonb_build_object(
                          'role', r.role, 'organization_id', r.organization_id, 'confidence', r.confidence,
                          'evidence_count', r.evidence_count, 'evidence_kinds', r.kinds,

@@ -330,6 +330,10 @@ BEGIN
   ASSERT v ->> 'ownership_class' = 'unresolved' AND v -> 'conflicts' = 'null'::jsonb AND v -> 'asserted' = 'null'::jsonb,
     'relationships: visitor sees no private testimony ' || v::text;
   ASSERT (SELECT bool_and(r -> 'evidence_ids' = 'null'::jsonb) FROM jsonb_array_elements(v -> 'roles') r), 'relationships: visitor saw photo ids';
+  ASSERT NOT EXISTS (SELECT 1 FROM jsonb_array_elements(a -> 'vehicles') x
+                     WHERE x ->> 'vehicle_id' = '1db5daca-526e-42c6-99ae-7faee79b5bad'
+                       AND (x ->> 'ownership_class' <> 'unresolved' OR x -> 'ownership_confidence' <> 'null'::jsonb)),
+    'relationships: a visitor saw ownership resting on a private purchase entry';
   SELECT x INTO v FROM jsonb_array_elements(o -> 'vehicles') x WHERE x ->> 'vehicle_id' = 'ef844607-46fc-40a5-a27b-ad245ffe5ef5';
   ASSERT v ->> 'ownership_class' = 'ambiguous' AND jsonb_array_length(v -> 'conflicts') = 1
      AND (v #>> '{asserted,owner_id_is_user}')::boolean, 'relationships: own view shows conflicts and the assertion ' || v::text;
