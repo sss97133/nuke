@@ -364,6 +364,70 @@ CREATE FUNCTION public.t_item(p_vehicle uuid, p_dim text, p_key text) RETURNS js
   SELECT i FROM jsonb_array_elements(public.vehicle_facet_items(p_vehicle, p_dim)) i WHERE i->>'key' = p_key $$;
 GRANT EXECUTE ON FUNCTION public.t_assert(boolean, text), public.t_item(uuid, text, text) TO anon, authenticated;
 
+-- Visibility is unchanged by the observation-id patch (20261116031000): every viewer (logged out, signed in but untied,
+-- the owner) gets the same items from every reader call, on a public and on a private vehicle, before and after it.
+CREATE TABLE public.t_facet_snap (phase text, who text, vid uuid, call text, doc jsonb);
+CREATE FUNCTION public.t_facet_snapshot(p_phase text) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE w record; c record; d jsonb;
+BEGIN
+  FOR w IN SELECT * FROM (VALUES
+      ('anon', 'anon', ''),
+      ('untied', 'authenticated', '20000000-0000-0000-0000-000000000099'),
+      ('owner_v1', 'authenticated', '20000000-0000-0000-0000-000000000001'),
+      ('owner_v4', 'authenticated', '20000000-0000-0000-0000-000000000004')) x(who, role, uid) LOOP
+    FOR c IN SELECT * FROM (VALUES
+        ('10000000-0000-0000-0000-000000000001'::uuid), ('10000000-0000-0000-0000-000000000002'::uuid),
+        ('10000000-0000-0000-0000-000000000004'::uuid), ('10000000-0000-0000-0000-000000000005'::uuid)) v(vid)
+      CROSS JOIN (VALUES ('all'), ('masthead'), ('location'), ('profile')) k(call) LOOP
+      PERFORM set_config('test.auth_role', w.role, true);
+      PERFORM set_config('test.auth_uid', w.uid, true);
+      EXECUTE format('SET LOCAL ROLE %I', w.role);
+      d := CASE c.call
+        WHEN 'all' THEN public.vehicle_facet_items(c.vid)
+        WHEN 'profile' THEN public.vehicle_profile_read(c.vid)#>'{sections,0,token_items}'
+        ELSE public.vehicle_facet_items(c.vid, c.call) END;
+      RESET ROLE;
+      INSERT INTO public.t_facet_snap VALUES (p_phase, w.who, c.vid, c.call, d);
+    END LOOP;
+  END LOOP;
+  PERFORM set_config('test.auth_role', '', true);
+  PERFORM set_config('test.auth_uid', '', true);
+END $$;
+SELECT public.t_facet_snapshot('before');
+-- The reader reads observations by id (row policies on the rows that can speak to a token); applied twice: a no-op.
+\ir ../migrations/20261116031000_vehicle_facet_items_observation_ids.sql
+\ir ../migrations/20261116031000_vehicle_facet_items_observation_ids.sql
+SELECT public.t_facet_snapshot('after');
+DO $$ BEGIN
+  PERFORM public.t_assert((SELECT count(*) FROM public.t_facet_snap WHERE phase = 'before') = 64, 'snapshot taken');
+  PERFORM public.t_assert(NOT EXISTS (
+    SELECT 1 FROM public.t_facet_snap b JOIN public.t_facet_snap a
+      ON a.phase = 'after' AND a.who = b.who AND a.vid = b.vid AND a.call = b.call
+    WHERE b.phase = 'before' AND a.doc IS DISTINCT FROM b.doc), 'every viewer, every call: the same items before and after');
+  PERFORM public.t_assert((SELECT bool_and(doc IS NULL OR doc = 'null'::jsonb) FROM public.t_facet_snap
+    WHERE vid = '10000000-0000-0000-0000-000000000004' AND who IN ('anon', 'untied', 'owner_v1')),
+    'private vehicle: nothing to anyone but its party');
+  PERFORM public.t_assert((SELECT bool_and(doc IS NOT NULL) FROM public.t_facet_snap
+    WHERE vid = '10000000-0000-0000-0000-000000000004' AND who = 'owner_v4' AND call <> 'profile'),
+    'private vehicle: its owner reads its items');
+  PERFORM public.t_assert((SELECT bool_and(doc IS NOT NULL AND jsonb_typeof(doc) <> 'null') FROM public.t_facet_snap
+    WHERE vid = '10000000-0000-0000-0000-000000000001'), 'public vehicle: everyone reads its items');
+  PERFORM public.t_assert((SELECT bool_and(doc IS NULL OR doc = 'null'::jsonb) FROM public.t_facet_snap
+    WHERE vid = '10000000-0000-0000-0000-000000000005'), 'deleted vehicle: nothing to anyone');
+END $$;
+-- The id helper: ids only, no PUBLIC execute.
+DO $$ BEGIN
+  PERFORM public.t_assert((SELECT prosecdef AND prorettype = 'uuid[]'::regtype FROM pg_proc
+    WHERE oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure), 'helper returns ids only');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
+    WHERE p.oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure AND a.grantee = 0), 'helper: no PUBLIC execute');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
+    WHERE p.oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure AND a.privilege_type = 'EXECUTE'
+      AND a.grantee <> p.proowner
+      AND NOT has_function_privilege(pg_get_userbyid(a.grantee), 'public.vehicle_facet_items(uuid,text)', 'EXECUTE')),
+    'helper: EXECUTE only for roles that run the reader');
+END $$;
+
 -- 0. Shape of the machine: invoker, stable, the profile reader's grants, no PUBLIC execute.
 DO $$ BEGIN
   PERFORM public.t_assert((SELECT NOT prosecdef AND provolatile = 's' FROM pg_proc
@@ -566,6 +630,20 @@ BEGIN
   txt := public.vehicle_facet_items('10000000-0000-0000-0000-000000000001')::text;
   PERFORM public.t_assert(txt !~ '35\.972|35\.973|114\.855|114\.856|36\.209|115\.98|35\.97[^0-9]' AND txt NOT LIKE '%latitude%'
     AND txt NOT LIKE '%Fixture Lane%' AND txt NOT LIKE '%Pahrump%', 'no coordinate or raw address reaches any item');
+
+  -- The observation id list: only rows that can speak to a token, and none for a vehicle the viewer cannot see.
+  PERFORM public.t_assert(NOT ('60000000-0000-0000-0000-00000000001d'::uuid = ANY (public.vehicle_facet_observation_ids(
+      '10000000-0000-0000-0000-000000000001', ARRAY['cowl_tag_style', 'engine_block_casting'])))
+    AND '60000000-0000-0000-0000-00000000001a'::uuid = ANY (public.vehicle_facet_observation_ids(
+      '10000000-0000-0000-0000-000000000001', ARRAY['cowl_tag_style', 'engine_block_casting'])),
+    'the id list keeps the mapped roles and drops the harvest note');
+  PERFORM public.t_assert(cardinality(public.vehicle_facet_observation_ids('10000000-0000-0000-0000-000000000004',
+      ARRAY['cowl_tag_style'])) = 0 AND cardinality(public.vehicle_facet_observation_ids('10000000-0000-0000-0000-000000000005',
+      ARRAY['cowl_tag_style'])) = 0, 'no ids for a private or deleted vehicle');
+  PERFORM public.t_assert(position('obs_ids' in pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure)) > 0
+    AND (length(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure))
+      - length(replace(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure), 'obs_ids AS MATERIALIZED', '')))
+      / length('obs_ids AS MATERIALIZED') = 1, 'the reader reads observations by id, patched once');
 
   -- Private and deleted vehicles return nothing.
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000004') IS NULL, 'private vehicle: nothing');
