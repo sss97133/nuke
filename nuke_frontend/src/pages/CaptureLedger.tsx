@@ -8,9 +8,9 @@ import { supabase } from '../lib/supabase';
 import { Text } from '../kit';
 import './capture-ledger.css';
 
-type State = 'on_vehicle' | 'unverified' | 'waiting' | 'held' | 'pulled' | 'private' | 'unsorted' | 'failed';
+type State = 'on_vehicle' | 'unverified' | 'duplicate' | 'waiting' | 'held' | 'pulled' | 'private' | 'unsorted' | 'failed';
 type DayRow = { day: string; taken: number; on_vehicle: number; unverified: number; waiting: number; held: number; pulled: number;
-  private: number; unsorted: number; failed: number; skipped: number; vehicles: { vehicle_id: string; name: string; n: number }[];
+  private: number; unsorted: number; failed: number; duplicate?: number; skipped: number; vehicles: { vehicle_id: string; name: string; n: number }[];
   held_reasons: Record<string, number>; skip_reasons: Record<string, number> };
 type Rescan = { id: string; requested_at: string; acked_at: string | null; device: string | null; finished_at: string | null; result: Record<string, unknown> | null };
 type Ledger = { generated_at: string; tz: string; days: DayRow[]; days_total: number; totals: Omit<DayRow, 'day' | 'vehicles' | 'held_reasons' | 'skip_reasons'>;
@@ -51,6 +51,7 @@ export function stageLabel(f: Frame): string {
   switch (f.state) {
     case 'on_vehicle': return `Added to ${f.vehicle ?? 'a vehicle'}`;
     case 'unverified': return `On ${f.vehicle ?? 'a vehicle'}, not yet checked`;
+    case 'duplicate': return `Copy of a photo on ${f.vehicle ?? 'a vehicle'}`;
     case 'waiting': return 'Waiting on a check';
     case 'held': return `Held: ${words(HELD, f.reason, 'no clear match')}`;
     case 'pulled': return `Taken back off${f.vehicle ? ` ${f.vehicle}` : ''}`;
@@ -79,6 +80,7 @@ export function summaryLine(t: Ledger['totals'], vehicles: { name: string; n: nu
   if (t.waiting) parts.push(`${n(t.waiting)} waiting on a check`);
   if (t.held) parts.push(`${n(t.held)} held`);
   if (t.unsorted) parts.push(`${n(t.unsorted)} not sorted yet`);
+  if (t.duplicate) parts.push(`${plural(t.duplicate, 'copy', 'copies')} of filed photos`);
   if (t.pulled) parts.push(`${n(t.pulled)} taken back off`);
   if (t.private) parts.push(`${n(t.private)} kept private`);
   if (t.skipped) parts.push(`${n(t.skipped)} skipped on the phone`);
@@ -108,7 +110,7 @@ const Icon = ({ kind, className }: { kind: 'up' | 'warn' | 'check' | 'check-fill
     default: return <svg {...common}><circle cx="12" cy="12" r="9.5" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></svg>;
   }
 };
-const frameIcon = (s: State) => s === 'on_vehicle' ? 'check-fill' : s === 'failed' || s === 'pulled' ? 'warn' : s === 'private' ? 'lock' : s === 'unverified' ? 'check' : s === 'waiting' || s === 'held' || s === 'unsorted' ? 'dots' : 'up';
+const frameIcon = (s: State) => s === 'on_vehicle' ? 'check-fill' : s === 'failed' || s === 'pulled' ? 'warn' : s === 'private' ? 'lock' : s === 'unverified' || s === 'duplicate' ? 'check' : s === 'waiting' || s === 'held' || s === 'unsorted' ? 'dots' : 'up';
 
 function DayPills({ d }: { d: DayRow }) {
   const pills: { key: string; text: string; tone?: string }[] = [];
@@ -118,6 +120,7 @@ function DayPills({ d }: { d: DayRow }) {
   if (d.waiting) pills.push({ key: 'waiting', text: `${n(d.waiting)} waiting` });
   if (d.held) pills.push({ key: 'held', text: `${n(d.held)} held` });
   if (d.unsorted) pills.push({ key: 'unsorted', text: `${n(d.unsorted)} not sorted` });
+  if (d.duplicate) pills.push({ key: 'duplicate', text: plural(d.duplicate, 'copy', 'copies') });
   if (d.pulled) pills.push({ key: 'pulled', text: `${n(d.pulled)} taken off`, tone: 'pulled' });
   if (d.private) pills.push({ key: 'private', text: `${n(d.private)} private` });
   if (d.skipped) pills.push({ key: 'skipped', text: `${n(d.skipped)} skipped` });

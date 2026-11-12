@@ -84,6 +84,8 @@
 .k-facet { all: unset; cursor: pointer; padding: 4px 6px; border-bottom: 2px solid transparent; white-space: nowrap; }
 .k-facet:hover, .k-facet[aria-expanded="true"] { border-bottom-color: var(--text); }
 .k-facet:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.k-facet--gap .k-label { color: var(--text-disabled); font-weight: 400; }
+.k-facet--gap { border-bottom-style: dashed; }
 
 /* Phones: the masthead wraps and the result drops under the entity. */
 @media (max-width: 420px) {

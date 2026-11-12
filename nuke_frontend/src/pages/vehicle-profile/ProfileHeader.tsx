@@ -354,12 +354,13 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const asArtwork = !!masthead.model && vehicle.listing_kind !== 'non_vehicle_item';
   // A header token opens its line items (vehicle_facet_items). Identity variant kinds the reader has no token for
   // (series, package) are trim.
-  const explore = (field: string, value: string) => {
+  const explore = (field: string, value: string, gap = false) => {
     setLiveOpen(false); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false);
     const evidenceField = field === 'engine' ? 'engine_type' : field;
     const dimension = field === 'engine_type' ? 'engine' : TOKEN_DIMENSIONS.has(field) ? field : 'trim';
     setActiveFacet(current => current?.field === evidenceField ? null : { field: evidenceField, value, dimension });
-    setGalleryFilter?.(['transmission', 'drivetrain', 'engine_type', 'body_style', 'mileage'].includes(evidenceField)
+    // A gap has no member to filter the gallery by.
+    setGalleryFilter?.(!gap && ['transmission', 'drivetrain', 'engine_type', 'body_style', 'mileage'].includes(evidenceField)
       ? { field: evidenceField, label: value } : null);
   };
   const configuration = strip && <div className="vp-header-facets" role="group" aria-label="Explore this vehicle">
@@ -370,6 +371,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         ariaLabel={`Explore ${label} in this profile`}
         onClick={() => explore(f.dimension, label)} />;
     })}
+    {(strip.gaps ?? []).map(g => <Facet key={`gap:${g.dimension}`} gap label={g.label}
+      expanded={activeFacet?.field === (g.dimension === 'engine' ? 'engine_type' : g.dimension)}
+      ariaLabel={`${g.label}: not established. Show what would establish it`}
+      onClick={() => explore(g.dimension, g.label, true)} />)}
   </div>;
 
   const market = (reduced = false) => priceOwnedByLiveStack && auctionPulse ? <React.Suspense fallback={null}><ExternalAuctionSummary
