@@ -116,7 +116,7 @@ SELECT t_assert(t_refused(format($q$INSERT INTO garage_join_links(garage_id, tok
 SELECT t_assert(t_refused($q$UPDATE garage_join_links SET uses_count = 5$q$), 'uses cannot exceed max_uses');
 
 INSERT INTO garage_sites(garage_id, lat, lon, radius_m, valid_from, source, confirmed_by, confirmed_at)
-  VALUES (:'g', 35.977, -114.854, 150, '2017-01-01', 'test', '00000000-0000-0000-0000-0000000000a1', now());
+  VALUES (:'g', 36.100, -115.100, 150, '2017-01-01', 'test', '00000000-0000-0000-0000-0000000000a1', now());
 SELECT t_assert(t_refused(format($q$INSERT INTO garage_sites(garage_id, lat, lon, source) VALUES (%L, 95, 0, 'test')$q$, :'g')), 'latitude out of range refused');
 SELECT t_assert(t_refused(format($q$INSERT INTO garage_sites(garage_id, lat, lon, radius_m, source) VALUES (%L, 1, 1, 0, 'test')$q$, :'g')), 'zero radius refused');
 SELECT t_assert(t_refused(format($q$INSERT INTO garage_sites(garage_id, lat, lon, valid_from, valid_to, source) VALUES (%L, 1, 1, '2020-01-01', '2019-01-01', 'test')$q$, :'g')),
