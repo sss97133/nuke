@@ -907,6 +907,77 @@ BEGIN
     OR NOT (public.vehicle_profile_read('10000000-0000-0000-0000-000000000004') ? 'sections'), 'private vehicle: no strip');
 END $$;
 RESET ROLE;
+-- 5. 20261116051000: the as-built transmission items carry the cited factory availability for the car's VIN series
+-- and engine (model_availability rows), every source kept, and name that rule. Status and value do not move.
+-- v1 decodes as series S, engine D, 1973 Pontiac Firebird. Rows for another year, series, engine or model do not apply.
+INSERT INTO public.vehicle_decode_rules (rule_key, make, model, code, year_min, year_max, value, qualifiers, citation_url,
+  citation_title, citation_locator) VALUES
+ ('model_availability', 'Pontiac', 'Firebird', 'S87:D:M20', 1973, 1973,
+  '{"transmission":"M20 4-speed","available":"implied","quoted":"fixture options row","inference":"fixture inference"}',
+  '{"market":"US","source_type":"enthusiast reference","conflicts_with":"fixture catalogue"}',
+  'https://example.org/options-1973', 'Fixture options table', 'options row'),
+ ('model_availability', 'Pontiac', 'Firebird', 'S87:D:M20', 1973, 1973,
+  '{"transmission":"4-speed manual","available":false,"quoted":"fixture catalogue column"}',
+  '{"market":"Canada","source_type":"factory catalogue"}',
+  'https://example.org/catalogue-1973', 'Fixture catalogue', 'specifications table'),
+ ('model_availability', 'Pontiac', 'Firebird', 'S87:D:M20', 1974, 1974, '{"available":false,"quoted":"other year"}', '{}',
+  'https://example.org/options-1974', 'Fixture options table 1974', 'options row'),
+ ('model_availability', 'Pontiac', 'Firebird', 'T87:D:M20', 1973, 1973, '{"available":true,"quoted":"other series"}', '{}',
+  'https://example.org/options-1973', 'Fixture options table', 'options row'),
+ ('model_availability', 'Pontiac', 'Firebird', 'S87:M:M20', 1973, 1973, '{"available":true,"quoted":"other engine"}', '{}',
+  'https://example.org/options-1973', 'Fixture options table', 'options row'),
+ ('model_availability', 'Chevrolet', 'Camaro', 'S87:D:M20', 1973, 1973, '{"available":true,"quoted":"other model"}', '{}',
+  'https://example.org/options-1973', 'Fixture options table', 'options row');
+CREATE TABLE public.t_avail_snap (vid uuid, dim text, doc jsonb);
+GRANT SELECT, INSERT ON public.t_avail_snap TO anon;
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+INSERT INTO public.t_avail_snap SELECT v, d, public.vehicle_facet_items(v, d)
+FROM unnest(ARRAY['10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002',
+                  '10000000-0000-0000-0000-000000000003']::uuid[]) v,
+     unnest(ARRAY['year', 'make', 'model', 'body_style', 'trim', 'engine', 'transmission', 'drivetrain']) d;
+RESET ROLE;
+\ir ../migrations/20261116051000_vehicle_facet_items_model_availability.sql
+\ir ../migrations/20261116051000_vehicle_facet_items_model_availability.sql
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE i jsonb; k text;
+BEGIN
+  PERFORM public.t_assert((length(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure))
+      - length(replace(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure), 'facet_availability_v1', '')))
+      / length('facet_availability_v1') = 1, 'availability patched once');
+  FOREACH k IN ARRAY ARRAY['transmission.as_built.type', 'transmission.as_built.model'] LOOP
+    i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', k);
+    PERFORM public.t_assert(i->>'status' = 'missing' AND i->'value' = 'null', k || ': availability states no as-built fact');
+    PERFORM public.t_assert(jsonb_array_length(i->'availability') = 2
+      AND (SELECT array_agg(a->>'citation_url' ORDER BY a->>'citation_url') FROM jsonb_array_elements(i->'availability') a)
+          = ARRAY['https://example.org/catalogue-1973', 'https://example.org/options-1973'],
+      k || ': both 1973 S/D sources, none chosen; other year, series, engine and model excluded');
+    PERFORM public.t_assert((SELECT bool_or(a->'available' = 'false'::jsonb) AND bool_or(a->>'available' = 'implied')
+      AND bool_or(a->>'quoted' = 'fixture options row' AND a->>'inference' = 'fixture inference'
+                  AND a->>'conflicts_with' = 'fixture catalogue')
+      FROM jsonb_array_elements(i->'availability') a), k || ': each side with its quote, inference and conflict');
+    PERFORM public.t_assert(i#>>'{rule,key}' = 'model_availability' AND i#>>'{rule,series_code}' = 'S'
+      AND i#>>'{rule,engine_code}' = 'D' AND jsonb_array_length(i#>'{rule,rule_ids}') = 2, k || ': the rule is named');
+  END LOOP;
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.as_built.type');
+  PERFORM public.t_assert(jsonb_array_length(i->'examined') = 2, 'examined readings stay');
+  -- Every other item, and every item of the cars without a decode, is unchanged.
+  PERFORM public.t_assert(NOT EXISTS (
+    SELECT 1 FROM public.t_avail_snap s
+    WHERE (SELECT coalesce(jsonb_agg(x ORDER BY x->>'key'), '[]') FROM jsonb_array_elements(s.doc) x
+           WHERE s.vid <> '10000000-0000-0000-0000-000000000001' OR x->>'key' NOT LIKE 'transmission.as_built.%')
+       IS DISTINCT FROM
+          (SELECT coalesce(jsonb_agg(x ORDER BY x->>'key'), '[]') FROM jsonb_array_elements(public.vehicle_facet_items(s.vid, s.dim)) x
+           WHERE s.vid <> '10000000-0000-0000-0000-000000000001' OR x->>'key' NOT LIKE 'transmission.as_built.%')),
+    'only the two as-built transmission items of the decoded car change');
+  i := public.t_item('10000000-0000-0000-0000-000000000003', 'transmission', 'transmission.as_built.model');
+  PERFORM public.t_assert(NOT (i ? 'availability') AND i->'rule' = 'null', 'no decode: no availability, no rule');
+END $$;
+RESET ROLE;
 -- The documented fixture car as a logged-out viewer sees it (printed for review).
 SET ROLE anon;
 SET test.auth_role = 'anon';
