@@ -81,8 +81,10 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
   const key = (line: MasterCostLine) => `${scenario.scenario}:${line.kind}:${line.physical_key}`;
   const detail = lines.find(r => key(r) === inspected);
   const sourcesFor = (line: MasterCostLine) => works.filter(w => line.work_observation_ids.includes(w.observation_id));
+  // Rows cite photographs by image_id through the ledger's image map; an object is a row-specific citation.
+  const photoOf = (ref: MasterCostLine['source_images'][number] | undefined) => typeof ref === 'string' ? ledger.images?.[ref] : ref;
   const detailWorks = detail ? sourcesFor(detail) : [];
-  const photos = detail?.source_images ?? [];
+  const photos = (detail?.source_images ?? []).map(photoOf).filter((im): im is VisualWork['images'][number] => !!im);
   const receiptItem = detail?.pricing?.receipt_item_id;
   const receiptLines = detailWorks.flatMap(w => w.receipts).filter((r, index, all) =>
     (!receiptItem || r.item_id === receiptItem) && all.findIndex(x => x.item_id === r.item_id) === index);
@@ -150,7 +152,7 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
     <div className="vp-ledger-table-wrap"><table className="vp-ledger-table">
       <thead><tr><th>Work or material</th><th>Quantity</th><th>Hours</th><th>Calculated cost</th></tr></thead>
       <tbody>{lines.map(line => {
-        const own = sourcesFor(line); const photo = line.source_images?.[0];
+        const own = sourcesFor(line); const photo = photoOf(line.source_images?.[0]);
         const product = own.flatMap(w => w.receipts).find(r => r.item_id === line.pricing?.receipt_item_id)?.product;
         const thumbnail = product?.image_url || photo?.image_url;
         return <React.Fragment key={key(line)}><tr className={line.status === 'excluded' ? 'vp-ledger-excluded' : undefined}>

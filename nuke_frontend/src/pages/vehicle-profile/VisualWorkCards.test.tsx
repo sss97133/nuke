@@ -355,6 +355,22 @@ it('keeps unestimated work accessible and opens the line witness rather than the
  expect(fixture.open).toHaveBeenCalledWith('line-witness');
 });
 
+it('reads line photographs by image_id through the ledger image map', async () => {
+ const scoped = structuredClone(ledger);
+ const witness = { ...record.images[0], image_id: 'mapped-witness', caption: 'Mapped glass witness', image_url: 'https://images.example/mapped.jpg' };
+ const inline = { ...witness, image_id: 'inline-witness', caption: 'Row-specific witness', image_url: 'https://images.example/inline.jpg' };
+ scoped.images = { 'mapped-witness': witness };
+ scoped.scenarios[0].rows[0].source_images = ['mapped-witness', inline, 'missing-from-map'];
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={scoped} renderSource={() => null} />));
+ expect(host.querySelector('.vp-ledger-table img[src*="mapped.jpg"]')).not.toBeNull();
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Install door-glass pair"]')!.click());
+ const detail = host.querySelector('#vp-ledger-evidence')!;
+ expect(detail.querySelectorAll('.vp-work-photos button')).toHaveLength(2);
+ expect(detail.querySelector('button[aria-label="Open source photo: Row-specific witness"]')).not.toBeNull();
+ await act(async () => detail.querySelector<HTMLButtonElement>('button[aria-label="Open source photo: Mapped glass witness"]')!.click());
+ expect(fixture.open).toHaveBeenCalledWith('mapped-witness');
+});
+
 it('withdraws the cost ledger with a failed current-source refresh', async () => {
  fixture.rpc.mockResolvedValue({ data: { work_records: [], visual_work: [record], master_ledger: ledger }, error: null });
  await renderHook(); await settle(); expect(host.textContent).toContain('Master ledger');
