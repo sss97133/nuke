@@ -2,7 +2,7 @@
 -- Proves 20261116005000 on synthetic rows: an admitted photo-GPS row (source_type exif, confidence >= 0.50) places a
 -- vehicle like any latest observation; a withdrawn one (confidence 0) neither places the vehicle nor hides its earlier
 -- place; a sale is placed by its listing before any photo row, and never by a withdrawn row; the migration is
--- idempotent. The fixture is the one test_map_facts_state_from_region.sql builds, with a confidence column.
+-- idempotent. Then 20261116010000: no photo row places a sale at all. The fixture is the one test_map_facts_state_from_region.sql builds, with a confidence column.
 -- PostGIS is not in the CI image: a county is a "minlon minlat maxlon maxlat" box. Every row is synthetic seed data.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -106,3 +106,25 @@ SELECT fixture_assert(NOT has_function_privilege('anon', 'public.fold_map_facts_
   AND NOT has_function_privilege('anon', 'public.fold_map_facts_sale(date, date, timestamptz)', 'execute'), 'anon cannot run the folds');
 SELECT public.rebuild_map_facts();
 SELECT fixture_assert((SELECT count(*) = 1 FROM public.write_receipts WHERE writer = 'rebuild_map_facts'), 'the nightly rebuild runs whole');
+
+-- 20261116010000: e is sold yesterday on bat and has only an admitted photo row in Clark, no listing place.
+-- Under 005000 the photo row places the sale in Clark under platform bat; after 010000 no photo row places a sale.
+INSERT INTO public.vehicles VALUES (md5('ple')::uuid, true, NULL, 1000);
+INSERT INTO public.vehicle_location_observations (vehicle_id, source_type, source_platform, observed_at, county_fips, region_code, country_code, confidence)
+VALUES (md5('ple')::uuid, 'exif', 'photo_exif', now() - interval '2 days', '32003', 'NV', 'US', 0.7);
+INSERT INTO public.vehicle_events (vehicle_id, event_status, sold_at, final_price, source_platform)
+VALUES (md5('ple')::uuid, 'sold', now() - interval '1 day', 9000, 'bat');
+SELECT public.fold_map_facts_sale(current_date - 3, current_date, clock_timestamp());
+SELECT fixture_assert((SELECT sum(entities) = 1 FROM public.map_facts WHERE layer = 'sale' AND level = 'county'
+  AND area_key = '32003' AND source_platform = 'bat'), 'before 010000: a photo row places a bat sale in Clark');
+\ir ../migrations/20261116010000_map_facts_sale_without_photo_gps.sql
+\ir ../migrations/20261116010000_map_facts_sale_without_photo_gps.sql
+SELECT public.fold_map_facts_sale(current_date - 3, current_date, clock_timestamp());
+SELECT fixture_assert((SELECT coalesce(sum(entities), 0) = 0 FROM public.map_facts WHERE layer = 'sale' AND level = 'county' AND area_key = '32003')
+  AND (SELECT sum(entities) = 2 FROM public.map_facts WHERE layer = 'sale' AND level = 'county' AND area_key = '06037'),
+  'after 010000: no sale is placed by a photo row; listed sales keep their listing place');
+SELECT public.fold_map_facts_vehicle(current_date - 12, current_date, clock_timestamp());
+SELECT fixture_assert((SELECT sum(entities) = 3 FROM public.map_facts WHERE layer = 'vehicle' AND level = 'county'
+  AND area_key = '32003' AND source_platform = 'photo_exif'), 'the vehicle layer still places e under the photo_exif facet');
+SELECT fixture_assert(NOT has_function_privilege('anon', 'public.fold_map_facts_sale(date, date, timestamptz)', 'execute'),
+  'anon cannot run the sale fold');
