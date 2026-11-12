@@ -24,11 +24,20 @@ describe('signPrivateStorageUrl', () => {
   it('returns a signed URL for a private document and the URL unchanged otherwise', async () => {
     createSignedUrl.mockResolvedValueOnce({ data: { signedUrl: 'https://signed.invalid/1' }, error: null });
     await expect(signPrivateStorageUrl(`${base}/public/deal-documents/d/1.jpg`)).resolves.toBe('https://signed.invalid/1');
-    expect(createSignedUrl).toHaveBeenCalledWith('d/1.jpg', 3600);
+    expect(createSignedUrl).toHaveBeenCalledWith('d/1.jpg', 3600, undefined);
     await expect(signPrivateStorageUrl(`${base}/public/vehicle-images/v/1.jpg`)).resolves.toBe(`${base}/public/vehicle-images/v/1.jpg`);
   });
   it('keeps the stored URL when signing is refused', async () => {
     createSignedUrl.mockResolvedValueOnce({ data: null, error: { message: 'not allowed' } });
     await expect(signPrivateStorageUrl(`${base}/public/user-documents/u/1.jpg`)).resolves.toBe(`${base}/public/user-documents/u/1.jpg`);
+  });
+  it('signs transformation options on the same private object and leaves refusals private', async () => {
+    const raw = `${base}/authenticated/user-documents/u/receipt.heic`;
+    const transform = { width: 1800, height: 1800, resize: 'contain' as const, quality: 90 };
+    createSignedUrl.mockResolvedValueOnce({ data: { signedUrl: 'https://signed.invalid/preview' }, error: null });
+    await expect(signPrivateStorageUrl(raw, 60, transform)).resolves.toBe('https://signed.invalid/preview');
+    expect(createSignedUrl).toHaveBeenLastCalledWith('u/receipt.heic', 60, { transform });
+    createSignedUrl.mockResolvedValueOnce({ data: null, error: { message: 'not allowed' } });
+    await expect(signPrivateStorageUrl(raw, 60, transform)).resolves.toBe(raw);
   });
 });

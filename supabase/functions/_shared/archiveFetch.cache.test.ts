@@ -2,6 +2,58 @@ import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.t
 import { archiveFetch, isGarbageHtml, pickCachedSnapshot } from "./archiveFetch.ts";
 import { extractFromHtml } from "../extract-collecting-cars/extract.ts";
 
+Deno.test("archive failures preserve safe HTTP diagnostics and never retry or acknowledge retention", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalDigest = crypto.subtle.digest;
+  const names = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS"];
+  const prior = names.map(name => Deno.env.get(name));
+  Deno.env.set(names[0], "https://synthetic.supabase.co");
+  Deno.env.set(names[1], "synthetic-key");
+  Deno.env.delete(names[2]);
+  const html = await Deno.readTextFile(new URL("../extract-collecting-cars/fixtures/lot-911.html", import.meta.url));
+  try {
+    for (const scenario of ["gateway", "database", "throw", "hash_throw", "missing_ack", "missing_id", "duplicate", "success"] as const) {
+      crypto.subtle.digest = scenario === "hash_throw" ? (() => { throw Error("private hashing failure"); }) : originalDigest;
+      let sourceCalls = 0, writes = 0;
+      globalThis.fetch = async (input, init) => {
+        const url = new URL(String(input));
+        if (url.hostname === "collectingcars.com") { sourceCalls++; return new Response(html); }
+        assertEquals(url.hostname, "synthetic.supabase.co");
+        if (init?.method !== "POST") return Response.json([]);
+        writes++;
+        assertEquals(JSON.parse(String(init.body)).html, html);
+        if (scenario === "throw") throw Error("private transport body must not escape");
+        if (scenario === "gateway") return Response.json({ title: "Origin timeout", detail: "private gateway body" }, { status: 522 });
+        if (scenario === "database") return Response.json({ code: "42501", message: "private database detail" }, { status: 403 });
+        if (scenario === "duplicate") return Response.json({ code: "23505" }, { status: 409 });
+        if (scenario === "missing_ack") return Response.json(null);
+        if (scenario === "missing_id") return Response.json({});
+        return Response.json({ id: "acknowledged-capture" });
+      };
+      const result = await archiveFetch("https://collectingcars.com/for-sale/synthetic", {
+        platform: "collectingcars", useFirecrawl: false, firecrawlOnBlock: false,
+        directFetchOptions: { publicOnly: true },
+      });
+      assertEquals([sourceCalls, writes], [1, scenario === "hash_throw" ? 0 : 1]);
+      assertEquals(result.html, html);
+      assertEquals(result.snapshotId, scenario === "success" ? "acknowledged-capture" : null);
+      if (scenario === "success") assertEquals(result.archiveError, undefined);
+      else {
+        assert(result.archiveError);
+        assert(!result.archiveError.includes("undefined") && !result.archiveError.includes("private"));
+        if (scenario === "gateway") assertEquals(result.archiveError, "listing_page_snapshots insert failed: HTTP 522");
+        if (scenario === "database") assertEquals(result.archiveError, "listing_page_snapshots insert failed: HTTP 403; code 42501");
+        if (scenario === "hash_throw") assertEquals(result.archiveError, "listing_page_snapshots retention failed before acknowledgment");
+        if (scenario === "missing_ack" || scenario === "missing_id") assertEquals(result.archiveError, "listing_page_snapshots insert returned no acknowledgment");
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    crypto.subtle.digest = originalDigest;
+    names.forEach((name, i) => prior[i] == null ? Deno.env.delete(name) : Deno.env.set(name, prior[i]!));
+  }
+});
+
 Deno.test("real archive cache isolates native listing pages before limit from newer board documents", async () => {
   const originalFetch = globalThis.fetch;
   const names = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEYS"];

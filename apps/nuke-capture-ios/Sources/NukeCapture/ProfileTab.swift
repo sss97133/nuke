@@ -8,8 +8,8 @@
 //   get_user_contribution_days(uuid)  → the work-day record (one row per
 //                                       day·kind; grouped here into day rows)
 //   get_user_day_receipt(uuid, date)  → tap a day, get the receipt
-//   v_user_connections                → own profile only (auth-scoped view):
-//                                       the user's grants as kind+count rows
+//   get_user_producer_signals(uuid)   → the header's activity line and chips
+//                                       (work hours are LOGGED, not confirmed)
 //
 // v1 entry to other profiles = search by handle (.searchable over
 // profiles.username).
@@ -30,9 +30,11 @@ struct ProfileRow: Decodable, Identifiable {
     let role: String?
 }
 
-/// get_user_producer_signals → the profile's live + lifetime PROOF-OF-WORK read.
+/// get_user_producer_signals → the profile's live + lifetime work read.
 /// A signal is a function over the user's atomic data (a live feed), not a vanity
-/// count. We never surface confirmed-$ (all sessions unconfirmed → would lie).
+/// count. hours_* and work_days_* sum work_sessions of EVERY status (completed,
+/// derived, auto-inferred); almost none are owner-confirmed, so the header says
+/// "logged, unconfirmed", never "proven". We never surface confirmed-$ either.
 struct ProducerSignals: Decodable {
     let last_worked: String?
     let worked_today: Bool?
@@ -63,8 +65,8 @@ struct CalendarDay: Decodable {
     let day: String          // "yyyy-MM-dd"
     let photos: Int
     let events: Int
-    let work: Int            // confirmed work SESSIONS that day
-    let work_minutes: Int    // confirmed labor minutes — the real value signal
+    let work: Int            // work sessions logged that day, any status (not owner-confirmed)
+    let work_minutes: Int    // logged labor minutes, any status — unconfirmed
     /// Job dollars on confirmed work. Null for everyone but the record's own user since
     /// #1048 (money_masked true), so a non-owner's calendar must decode, not throw.
     let work_cost: Int?
@@ -319,8 +321,9 @@ struct ProfileView: View {
     private var currentGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "owner" } }
     private var contributedGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "contributor" } }
     private var pastGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "previously_owned" } }
+    private var documentingGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "documenting" } }
     private var otherRelationships: [String] {
-        Array(Set(realGarage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor"].contains($0) }.sorted()
+        Array(Set(realGarage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor", "documenting"].contains($0) }.sorted()
     }
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
@@ -715,10 +718,8 @@ struct ProfileView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // profiles.role is a self-claim, never a decided context: dim, at the record rung.
-            if let role = profile?.role, !role.isEmpty {
-                NukePill(text: role.replacingOccurrences(of: "_", with: " ").capitalized)
-            }
+            // No role pill: profiles.role is an account default ("user"), not evidence. Roles return
+            // only as inferred from the record, with their confidence and rows.
 
             // LIVE STATE — is this node producing NOW? The first "worth-connecting-to"
             // read. Capture-or-work based (uploading today counts), honest when idle.
@@ -727,7 +728,7 @@ struct ProfileView: View {
                     Circle()
                         .fill(p.active_today == true ? Color.green : Color.secondary)
                         .frame(width: 7, height: 7)
-                    Text(activityLine(p))
+                    Text(ProfileHeaderCopy.activityLine(p))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -736,7 +737,7 @@ struct ProfileView: View {
             // ("8 vehicles" was a dead count; this is "did they do the work".)
             if let p = producer {
                 HStack(spacing: 22) {
-                    if let hy = p.hours_year, hy > 0 { stat("\(hy)h", "this year") }
+                    if let hours = ProfileHeaderCopy.hoursYearStat(p) { stat(hours.value, hours.label) }
                     if let wy = p.work_days_year, wy > 0 { stat("\(wy)", "work-days") }
                     if let ls = p.longest_streak, ls > 0 { stat("\(ls)", "best streak") }
                     // A count with its population: analyzed frames out of the record's frames.
@@ -750,41 +751,18 @@ struct ProfileView: View {
                 }
             }
 
-            // THE FLEET — the maker headline the VEHICLE profile earns, lifted to the
-            // whole body of work: proven LABOR (worth-hiring, Tenet 9) across the
-            // fleet, and the fleet's defensible WORTH in the SAME est/block grammar a
-            // single vehicle uses — never a firm price, "Not priced yet" at zero. The
-            // per-car evidence drills one section down (the garage rows). Own profile.
+            // THE FLEET — owned vehicles and the logged labor behind the record (own profile).
+            // Logged hours are not confirmed hours; the line says so.
             if isOwn, let p = producer, !currentGarage.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     Divider().padding(.vertical, 2)
-                    Text(fleetLaborLine(p))
+                    Text(ProfileHeaderCopy.fleetLine(owned: currentGarage.count, p))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                    // Shown only when a price is on record; an unpriced fleet says nothing, never a guess.
-                    if fleetPricedCount > 0 {
-                        Text(fleetWorthLine)
-                            .font(.footnote).monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
                 }
             }
         }
-    }
-
-    /// "Active today · 220 photos" when producing now; "Last worked 24 days ago"
-    /// when idle — honest either way, never a fake streak.
-    private func activityLine(_ p: ProducerSignals) -> String {
-        if p.worked_today == true { return "Worked today" }
-        if p.active_today == true {
-            let n = p.images_today ?? 0
-            return n > 0 ? "Active today · \(NukeDisplay.count(n, "photo"))" : "Active today"
-        }
-        if let last = p.last_worked {
-            return "Last worked \(last)"
-        }
-        return "No work logged yet"
     }
 
     @ViewBuilder private func stat(_ value: String, _ label: String) -> some View {
@@ -792,40 +770,6 @@ struct ProfileView: View {
             Text(value).font(.system(.title3, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(Color.primary)
             Text(label).font(.caption).foregroundStyle(.secondary)
         }
-    }
-
-    // ─── Fleet headline — the maker's whole body of work, mirroring the VEHICLE
-    //     profile's worth read. Summed in-view from already-fetched data
-    //     (get_user_garage est values + get_user_producer_signals); no new fetch,
-    //     no new RPC, no drill sheet (the per-car evidence is the garage section
-    //     one row down — each car drills to its own WorthBracketView, C10).
-    /// Defensible fleet worth = sum of the class-stratified "est" values already on
-    /// the garage rows (get_user_garage only emits defensible estimates).
-    /// Zero until the garage reader carries a defense verdict per vehicle: the same rule that hides
-    /// an undefended estimate on the vehicle page (#1065) hides its sum here.
-    private var fleetWorth: Double { 0 }
-    private var fleetPricedCount: Int { 0 }
-
-    /// The Tenet-9 worth-hiring sentence — proven LABOR across the fleet, not a
-    /// vanity count. Lifetime totals, distinct from the "this year" producer chips
-    /// above (no fact stated twice).
-    private func fleetLaborLine(_ p: ProducerSignals) -> String {
-        var parts = ["\(currentGarage.count) vehicle\(currentGarage.count == 1 ? "" : "s")"]
-        if let h = p.hours_total, h > 0 { parts.append("\(h)h proven") }
-        if let d = p.work_days_total, d > 0 { parts.append("\(d) logged days") }
-        return parts.joined(separator: " · ")
-    }
-
-    /// The fleet's worth in the SAME est/tilde/block grammar a single vehicle uses:
-    /// "~est $210,000 · 3 of 8 priced" when thin, "Not priced yet" when none of the
-    /// fleet is defensibly priced — never a firm fleet number (the valuation law).
-    private var fleetWorthLine: String {
-        guard fleetPricedCount > 0 else {
-            return "Not priced by the reader — a body of work, not a comp average"
-        }
-        let money = fleetWorth.formatted(.currency(code: "USD").precision(.fractionLength(0)))
-        let thin = fleetPricedCount < currentGarage.count
-        return "\(thin ? "~" : "")est \(money) · \(fleetPricedCount) of \(currentGarage.count) priced"
     }
 
     // ─── Garage ──────────────────────────────────────────────────────────────
@@ -870,6 +814,16 @@ struct ProfileView: View {
         if !contributedGarage.isEmpty {
             Section("Your contributions · \(contributedGarage.count)") {
                 ForEach(contributedGarage) { v in garageRow(v) }
+            }
+        }
+        // Documenting sits beside contributions, never in the fleet: photographing a dealer's car doesn't make it yours.
+        if !documentingGarage.isEmpty {
+            Section {
+                ForEach(documentingGarage) { v in garageRow(v) }
+            } header: {
+                Text("Documenting · \(documentingGarage.count)")
+            } footer: {
+                Text(GarageCopy.documentingFooter)
             }
         }
         // Former ownership remains available as history.
@@ -1239,7 +1193,7 @@ struct ProfileView: View {
         do {
             let rows: [ProfileRow] = try await SupabaseService.client
                 .from("profiles")
-                .select("id,username,full_name,avatar_url,bio,location,city,role")
+                .select("id,username,full_name,avatar_url,bio,location,city")
                 .eq("id", value: userId)
                 .limit(1)
                 .execute()
@@ -1789,6 +1743,40 @@ private struct PhotoFullScreenView: View {
     }
 }
 
+// ─── Header copy: the identity header's strings, as pure functions ────────────
+//
+// get_user_producer_signals sums work_sessions of every status — completed, derived and
+// auto-inferred — and only a handful are owner-confirmed. So hours read "logged,
+// unconfirmed", never "proven" or "confirmed", until a labor reader splits them by status.
+enum ProfileHeaderCopy {
+    struct Stat: Equatable { let value: String; let label: String }
+
+    /// "151h" / "logged this year · unconfirmed"; nil when no hours are on record.
+    static func hoursYearStat(_ p: ProducerSignals) -> Stat? {
+        guard let h = p.hours_year, h > 0 else { return nil }
+        return Stat(value: "\(h.formatted())h", label: "logged this year · unconfirmed")
+    }
+
+    /// "2 owned · 1,446h logged, unconfirmed · 810 logged days".
+    static func fleetLine(owned: Int, _ p: ProducerSignals) -> String {
+        var parts = ["\(owned.formatted()) owned"]
+        if let h = p.hours_total, h > 0 { parts.append("\(h.formatted())h logged, unconfirmed") }
+        if let d = p.work_days_total, d > 0 { parts.append("\(d.formatted()) logged day\(d == 1 ? "" : "s")") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// "Active today · 220 photos" when producing now; "Last worked 2026-06-20" when idle.
+    static func activityLine(_ p: ProducerSignals) -> String {
+        if p.worked_today == true { return "Worked today" }
+        if p.active_today == true {
+            let n = p.images_today ?? 0
+            return n > 0 ? "Active today · \(NukeDisplay.count(n, "photo"))" : "Active today"
+        }
+        if let last = p.last_worked { return "Last worked \(last)" }
+        return "No work logged yet"
+    }
+}
+
 // ─── Organizations: memberships with each relation's weight ────────────────────
 //
 // One read, `user_org_relations`: the person's memberships (organization_contributors) with the relation's weight at
@@ -1824,7 +1812,7 @@ struct OrgAffiliationsSection: View {
                 } header: {
                     Text("Organizations · \(rows.count)")
                 } footer: {
-                    Text("Active relations only. Each is kept warm by contributions, such as photos taken at the business, and goes dormant a day after the last one.")
+                    Text(Self.footer(rows))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             } else if let failureText {
@@ -1848,11 +1836,25 @@ struct OrgAffiliationsSection: View {
                     Circle().fill(RelationWeight.color(r.relation)).frame(width: 6, height: 6)
                     Text(RelationWeight.word(r.relation)).font(.caption.weight(.semibold))
                 }
-                Text(RelationWeight.ago(r.relation.last_contribution_at) ?? "nothing in 2 days")
+                Text(Self.lastContribution(r.relation))
                     .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
             }
         }
         .contentShape(Rectangle())
+    }
+
+    /// The footer says what the list is: warm relations only, or the dormant fallback.
+    static func footer(_ rows: [Row]) -> String {
+        let warmth = "A relation is kept warm by contributions, such as photos taken at the business, and goes dormant a day after the last one."
+        if !rows.isEmpty && rows.allSatisfy({ $0.relation.state == "live" || $0.relation.state == "stalling" }) {
+            return "Live and stalling relations, warmest first. " + warmth
+        }
+        return "None is live or stalling now; these are dormant, most recent contribution first. " + warmth
+    }
+
+    /// The reader looks back 48 h: a missing date is unknown, not "nothing".
+    static func lastContribution(_ r: OrgPage.Relation) -> String {
+        RelationWeight.ago(r.last_contribution_at) ?? "last contribution unknown"
     }
 
     private static func words(_ s: String) -> String {

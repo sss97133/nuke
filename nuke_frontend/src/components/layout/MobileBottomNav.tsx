@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Home, Layers, Plus, Inbox, UserRound } from 'lucide-react';
+import { Home, Layers, Plus, Images, UserRound } from 'lucide-react';
 import { PrefetchLink } from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 
@@ -8,7 +8,7 @@ export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const [inboxCount, setInboxCount] = useState(0);
 
-  // Fetch unorganized item count for inbox badge
+  // Photos not yet on a vehicle, for the Photos badge
   useEffect(() => {
     let cancelled = false;
     const fetchCount = async () => {
@@ -30,7 +30,7 @@ export const MobileBottomNav: React.FC = () => {
     { to: '/', label: 'Home', icon: Home, match: (p: string) => p === '/' },
     { to: '/stacks', label: 'Stacks', icon: Layers, match: (p: string) => p.startsWith('/stacks') },
     { to: '/capture', label: 'Capture', icon: Plus, match: (p: string) => p === '/capture', isAdd: true },
-    { to: '/inbox', label: 'Inbox', icon: Inbox, match: (p: string) => p.startsWith('/inbox') || p.startsWith('/photo-library'), badge: inboxCount },
+    { to: '/capture/ledger', label: 'Photos', icon: Images, match: (p: string) => p.startsWith('/capture/ledger'), badge: inboxCount },
     { to: '/profile', label: 'Profile', icon: UserRound, match: (p: string) => p.startsWith('/profile') },
   ];
 

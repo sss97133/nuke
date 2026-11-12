@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
     // Send via email
     if (send_email && email_to) {
       delivery.email = await sendEmail({
+        caller: "daily-report",
         to: email_to,
         subject: `Nuke Daily Report — ${new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`,
         html: formatEmailHtml(report, hours),

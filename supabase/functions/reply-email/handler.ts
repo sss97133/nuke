@@ -1,9 +1,9 @@
 /**
  * Reply to Inbound Email: the work behind index.ts, after requireWriteAuth.
  *
- * Sends a reply via Resend from the nuke.ag address the email came to, and marks the contact_inbox record replied.
+ * Sends a reply (through the outbound gate) from the nuke.ag address the email came to, and marks the contact_inbox record replied.
  * Called from the admin inbox UI. Only the service key or an active admin may send (requireAdminOrService), and that
- * is judged before anything else: before the request body is read, before the inbox row is looked up, before Resend.
+ * is judged before anything else: before the request body is read, before the inbox row is looked up, before the gate.
  * Any other caller, signed in or not, gets a 403. Sign-up is open and anonymous sign-in is on, so "signed in" alone
  * let anyone mail Nuke's correspondents from Nuke's addresses (2026-10-14).
  */
@@ -12,8 +12,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { authenticateWriter, requireAdminOrService, type WriteGuardDeps } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-
-const RESEND_API_URL = "https://api.resend.com/emails";
+import { sendOutbound } from "../_shared/outbound.ts";
 
 // Map incoming address to reply-from address
 const REPLY_FROM: Record<string, string> = {
@@ -53,11 +52,6 @@ export async function handleReplyEmail(req: Request, deps: ReplyDeps = {}): Prom
     return new Response("Method not allowed", { status: 405 });
   }
 
-  const resendApiKey = env("RESEND_API_KEY");
-  if (!resendApiKey) {
-    return json({ error: "RESEND_API_KEY not configured" }, 500);
-  }
-
   try {
     // The replier: the admin's user id, or nobody for the service key.
     const verdict = await authenticateWriter(req, { deps: guardDeps });
@@ -88,35 +82,29 @@ export async function handleReplyEmail(req: Request, deps: ReplyDeps = {}): Prom
     // Determine from address
     const fromAddr = REPLY_FROM[original.to_address] || `Nuke <${original.to_address}>`;
 
-    // Send reply via Resend
-    const res = await doFetch(RESEND_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromAddr,
-        to: [original.from_address],
-        subject: original.subject.startsWith("Re: ")
-          ? original.subject
-          : `Re: ${original.subject}`,
-        html: reply_html || `<p>${reply_text}</p>`,
-        text: reply_text || undefined,
-        reply_to: original.to_address,
-        headers: {
-          "In-Reply-To": original.message_id || undefined,
-          References: original.message_id || undefined,
-        },
-      }),
-    });
+    // Send the reply through the outbound gate. In internal_only mode a recipient off the allowlist is held (an
+    // outbound_messages row), and the inbox record is NOT marked replied.
+    const subject = original.subject.startsWith("Re: ") ? original.subject : `Re: ${original.subject}`;
+    const sent = await sendOutbound({
+      channel: "email",
+      from: fromAddr,
+      to: original.from_address,
+      subject,
+      html: reply_html || `<p>${reply_text}</p>`,
+      text: reply_text || undefined,
+      replyTo: original.to_address,
+      headers: { "In-Reply-To": original.message_id || undefined, References: original.message_id || undefined },
+      caller: "reply-email",
+    }, { env, fetch: doFetch });
 
-    const resendData = await res.json();
-
-    if (!res.ok) {
-      console.error("Resend reply error:", resendData);
-      return json({ error: resendData.message || "Failed to send reply" }, 500);
+    if (sent.held) {
+      return json({ held: true, outbox_id: sent.outboxId ?? null, reason: sent.reason, error: sent.error }, 202);
     }
+    if (!sent.sent) {
+      console.error("Reply send error:", sent.error);
+      return json({ error: sent.error || "Failed to send reply" }, 500);
+    }
+    const resendData = { id: sent.id };
 
     // Update inbox record
     await supabase

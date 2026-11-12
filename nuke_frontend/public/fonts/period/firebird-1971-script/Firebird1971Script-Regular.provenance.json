@@ -1,0 +1,744 @@
+{
+ "family": "Firebird 1971 Script",
+ "style": "Regular",
+ "version": "0.100",
+ "unitsPerEm": 1000,
+ "capHeight": 700,
+ "xHeight": 440,
+ "ascender": 900,
+ "descender": -280,
+ "license": "Drawn for Nuke (nuke.ag) from the cited period sources listed in the provenance sidecar. Descriptive family name; not an official General Motors or Pontiac typeface and not endorsed by General Motors. Pontiac, Firebird and Trans Am are trademarks of General Motors. Font software: SIL Open Font License 1.1.",
+ "glyphCount": 39,
+ "glyphs": {
+  "i": {
+   "unicode": "U+0069",
+   "advance": 336,
+   "provenance": "traced",
+   "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
+   "fidelity": {
+    "iou": 0.9149,
+    "maxDevPx": 5.83,
+    "meanDevPx": 1.329
+   },
+   "fidelityAgainst": "chrome face mask (v0.2)",
+   "sourceBoxPx": [
+    [
+     155,
+     206,
+     28,
+     90
+    ],
+    [
+     136,
+     186,
+     90,
+     114
+    ],
+    [
+     155,
+     190,
+     8,
+     34
+    ]
+   ],
+   "source": "pontiac-firebird-fender-script-1971-1981-cut.png",
+   "sourceSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M=",
+   "page": "Fender script, 1971-1981 Firebird (reproduction part photograph, OER 486904)",
+   "url": null,
+   "deslant": 0.24,
+   "slant": 0.24,
+   "lint": {
+    "nodes": 36,
+    "missingExtrema": 3,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "r": {
+   "unicode": "U+0072",
+   "advance": 588,
+   "provenance": "traced",
+   "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
+   "fidelity": {
+    "iou": 0.8413,
+    "maxDevPx": 70.84,
+    "meanDevPx": 3.734
+   },
+   "fidelityAgainst": "chrome face mask (v0.2)",
+   "sourceBoxPx": [
+    [
+     206,
+     288,
+     30,
+     114
+    ]
+   ],
+   "source": "pontiac-firebird-fender-script-1971-1981-cut.png",
+   "sourceSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M=",
+   "page": "Fender script, 1971-1981 Firebird (reproduction part photograph, OER 486904)",
+   "url": null,
+   "deslant": 0.24,
+   "slant": 0.24,
+   "lint": {
+    "nodes": 22,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "e": {
+   "unicode": "U+0065",
+   "advance": 894,
+   "provenance": "traced",
+   "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
+   "fidelity": {
+    "iou": 0.9071,
+    "maxDevPx": 6.0,
+    "meanDevPx": 1.623
+   },
+   "fidelityAgainst": "chrome face mask (v0.2)",
+   "sourceBoxPx": [
+    [
+     292,
+     405,
+     30,
+     62
+    ],
+    [
+     287,
+     405,
+     62,
+     114
+    ]
+   ],
+   "source": "pontiac-firebird-fender-script-1971-1981-cut.png",
+   "sourceSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M=",
+   "page": "Fender script, 1971-1981 Firebird (reproduction part photograph, OER 486904)",
+   "url": null,
+   "deslant": 0.24,
+   "slant": 0.24,
+   "lint": {
+    "nodes": 64,
+    "missingExtrema": 3,
+    "microSegments": 0,
+    "nearKinks": 13
+   }
+  },
+  "b": {
+   "unicode": "U+0062",
+   "advance": 780,
+   "provenance": "traced",
+   "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
+   "fidelity": {
+    "iou": 0.9193,
+    "maxDevPx": 10.0,
+    "meanDevPx": 1.76
+   },
+   "fidelityAgainst": "chrome face mask (v0.2)",
+   "sourceBoxPx": [
+    [
+     398,
+     500,
+     0,
+     62
+    ],
+    [
+     404,
+     500,
+     62,
+     96
+    ],
+    [
+     398,
+     500,
+     96,
+     114
+    ]
+   ],
+   "source": "pontiac-firebird-fender-script-1971-1981-cut.png",
+   "sourceSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M=",
+   "page": "Fender script, 1971-1981 Firebird (reproduction part photograph, OER 486904)",
+   "url": null,
+   "deslant": 0.24,
+   "slant": 0.24,
+   "lint": {
+    "nodes": 57,
+    "missingExtrema": 4,
+    "microSegments": 0,
+    "nearKinks": 12
+   }
+  },
+  "d": {
+   "unicode": "U+0064",
+   "advance": 808,
+   "provenance": "traced",
+   "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
+   "fidelity": {
+    "iou": 0.8973,
+    "maxDevPx": 15.0,
+    "meanDevPx": 1.964
+   },
+   "fidelityAgainst": "chrome face mask (v0.2)",
+   "sourceBoxPx": [
+    [
+     690,
+     800,
+     0,
+     70
+    ],
+    [
+     683,
+     800,
+     70,
+     114
+    ]
+   ],
+   "source": "pontiac-firebird-fender-script-1971-1981-cut.png",
+   "sourceSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M=",
+   "page": "Fender script, 1971-1981 Firebird (reproduction part photograph, OER 486904)",
+   "url": null,
+   "deslant": 0.24,
+   "slant": 0.24,
+   "lint": {
+    "nodes": 54,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 13
+   }
+  },
+  "F": {
+   "unicode": "U+0046",
+   "advance": 1149,
+   "provenance": "traced",
+   "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
+   "fidelity": {
+    "iou": 0.8992,
+    "maxDevPx": 5.39,
+    "meanDevPx": 1.732
+   },
+   "fidelityAgainst": "chrome face mask (v0.2)",
+   "sourceBoxPx": [
+    [
+     0,
+     154,
+     0,
+     60
+    ],
+    [
+     0,
+     136,
+     60,
+     114
+    ]
+   ],
+   "source": "pontiac-firebird-fender-script-1971-1981-cut.png",
+   "sourceSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M=",
+   "page": "Fender script, 1971-1981 Firebird (reproduction part photograph, OER 486904)",
+   "url": null,
+   "deslant": 0.24,
+   "slant": 0.24,
+   "lint": {
+    "nodes": 88,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 19
+   }
+  },
+  "o": {
+   "unicode": "U+006F",
+   "advance": 652,
+   "provenance": "derived",
+   "from": [
+    "b"
+   ],
+   "method": "the b's bowl, its right half mirrored about the counter's centre",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 37,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 5
+   }
+  },
+  "n": {
+   "unicode": "U+006E",
+   "advance": 711,
+   "provenance": "derived",
+   "from": [
+    "r",
+    "b"
+   ],
+   "method": "the r's stem and entry serif; the o's upper half (0.8 wide) as the arch; right stem carried to the baseline",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 44,
+    "missingExtrema": 3,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "m": {
+   "unicode": "U+006D",
+   "advance": 905,
+   "provenance": "derived",
+   "from": [
+    "r",
+    "b"
+   ],
+   "method": "n with two arches at 0.62 of the o width",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 61,
+    "missingExtrema": 4,
+    "microSegments": 0,
+    "nearKinks": 12
+   }
+  },
+  "h": {
+   "unicode": "U+0068",
+   "advance": 582,
+   "provenance": "derived",
+   "from": [
+    "b",
+    "r"
+   ],
+   "method": "the b's ascender stem with the n's arch",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 52,
+    "missingExtrema": 3,
+    "microSegments": 0,
+    "nearKinks": 13
+   }
+  },
+  "u": {
+   "unicode": "U+0075",
+   "advance": 690,
+   "provenance": "derived",
+   "from": [
+    "r",
+    "b"
+   ],
+   "method": "the o's lower half (0.8 wide) between the r's stem top and a full r stem",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 46,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 3
+   }
+  },
+  "l": {
+   "unicode": "U+006C",
+   "advance": 288,
+   "provenance": "derived",
+   "from": [
+    "b"
+   ],
+   "method": "the b's ascender stem and foot without the bowl",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 30,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "a": {
+   "unicode": "U+0061",
+   "advance": 808,
+   "provenance": "derived",
+   "from": [
+    "d"
+   ],
+   "method": "the d cut down to the x-height (single-storey a)",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 46,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 10
+   }
+  },
+  "q": {
+   "unicode": "U+0071",
+   "advance": 808,
+   "provenance": "derived",
+   "from": [
+    "d"
+   ],
+   "method": "the a with the d stem carried to the descender and a foot",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 54,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 10
+   }
+  },
+  "p": {
+   "unicode": "U+0070",
+   "advance": 884,
+   "provenance": "derived",
+   "from": [
+    "b",
+    "r"
+   ],
+   "method": "the b cut to the x-height with the r's entry serif; stem to a foot",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 52,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "g": {
+   "unicode": "U+0067",
+   "advance": 808,
+   "provenance": "derived",
+   "from": [
+    "d",
+    "b"
+   ],
+   "method": "the a with the d stem carried down into the o's lower half",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 65,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 13
+   }
+  },
+  "c": {
+   "unicode": "U+0063",
+   "advance": 652,
+   "provenance": "derived",
+   "from": [
+    "b",
+    "i"
+   ],
+   "method": "the o opened at the right, the i's ball as its terminal",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 42,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "t": {
+   "unicode": "U+0074",
+   "advance": 418,
+   "provenance": "designed",
+   "from": [],
+   "method": "stem cut at a slant above the x-height, hairline crossbar, foot",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 17,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "f": {
+   "unicode": "U+0066",
+   "advance": 384,
+   "provenance": "designed",
+   "from": [],
+   "method": "stem with a hooked top from the o arch, hairline crossbar",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 30,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 5
+   }
+  },
+  "j": {
+   "unicode": "U+006A",
+   "advance": 286,
+   "provenance": "derived",
+   "from": [
+    "i",
+    "b"
+   ],
+   "method": "the i's stem, ball and serif carried into a descender hook",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 56,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 11
+   }
+  },
+  "k": {
+   "unicode": "U+006B",
+   "advance": 568,
+   "provenance": "designed",
+   "from": [],
+   "method": "the b's ascender with a hairline arm and a heavy leg",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 43,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "s": {
+   "unicode": "U+0073",
+   "advance": 434,
+   "provenance": "designed",
+   "from": [],
+   "method": "one spine at the stem weight, terminals with upright serifs",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 52,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "v": {
+   "unicode": "U+0076",
+   "advance": 518,
+   "provenance": "designed",
+   "from": [],
+   "method": "heavy falling, hairline rising stroke, flat serifs",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 26,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "w": {
+   "unicode": "U+0077",
+   "advance": 738,
+   "provenance": "designed",
+   "from": [],
+   "method": "two v constructions sharing a stroke",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 37,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "x": {
+   "unicode": "U+0078",
+   "advance": 518,
+   "provenance": "designed",
+   "from": [],
+   "method": "heavy falling, hairline rising stroke, flat serifs",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 25,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "y": {
+   "unicode": "U+0079",
+   "advance": 538,
+   "provenance": "designed",
+   "from": [],
+   "method": "the v with its rising stroke carried to a descender foot",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 37,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "z": {
+   "unicode": "U+007A",
+   "advance": 452,
+   "provenance": "designed",
+   "from": [],
+   "method": "hairline top bar, heavy diagonal, base",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 14,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "E": {
+   "unicode": "U+0045",
+   "advance": 1149,
+   "provenance": "derived",
+   "from": [
+    "F"
+   ],
+   "method": "the F (middle beak dropped) with its top arm mirrored to the baseline",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 99,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 19
+   }
+  },
+  "L": {
+   "unicode": "U+004C",
+   "advance": 1124,
+   "provenance": "derived",
+   "from": [
+    "F"
+   ],
+   "method": "the F's stem and swash with the mirrored top arm as its foot",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 51,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "T": {
+   "unicode": "U+0054",
+   "advance": 1772,
+   "provenance": "derived",
+   "from": [
+    "F"
+   ],
+   "method": "the F's stem under its top arm made symmetric",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 61,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 8
+   }
+  },
+  "G": {
+   "unicode": "U+0047",
+   "advance": 825,
+   "provenance": "designed",
+   "from": [
+    "b"
+   ],
+   "method": "designed on the b's bowl made symmetric and scaled to the capital; bar and spur designed",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 41,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 3
+   }
+  },
+  "P": {
+   "unicode": "U+0050",
+   "advance": 627,
+   "provenance": "designed",
+   "from": [
+    "F",
+    "b"
+   ],
+   "method": "designed: the F's stem and swash carry a bowl drawn from the b's",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 57,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 13
+   }
+  },
+  "M": {
+   "unicode": "U+004D",
+   "advance": 1040,
+   "provenance": "designed",
+   "from": [
+    "F"
+   ],
+   "method": "designed: two F stems with a heavy falling and a light rising diagonal",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 73,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 12
+   }
+  },
+  "period": {
+   "unicode": "U+002E",
+   "advance": 200,
+   "provenance": "derived",
+   "from": [
+    "i"
+   ],
+   "method": "the i's ball dot on the baseline",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 9,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "comma": {
+   "unicode": "U+002C",
+   "advance": 200,
+   "provenance": "derived",
+   "from": [
+    "i"
+   ],
+   "method": "the ball with a falling tail",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 12,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "hyphen": {
+   "unicode": "U+002D",
+   "advance": 300,
+   "provenance": "designed",
+   "method": "a bar at the bowl-top weight",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 4,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "quotesingle": {
+   "unicode": "U+0027",
+   "advance": 150,
+   "provenance": "designed",
+   "method": "a tapered wedge",
+   "slant": 0.24,
+   "lint": {
+    "nodes": 4,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "space": {
+   "unicode": "U+0020",
+   "advance": 260,
+   "provenance": "designed",
+   "method": "word space",
+   "lint": {
+    "nodes": 0,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  }
+ },
+ "rules": "Firebird 1971 Script: the fender script of the 1971-1981 Firebird (\"Firebird\", die-cast chrome, OER 486904),\ntraced, de-slanted, and extended to a connecting lowercase and the capitals of the Pontiac model names.\n\nSource: pontiac-firebird-fender-script-1971-1981-cut.png (the emblem silhouette; 800 x 114 px).\nMeasured (de-slanted by 0.24 px/px = 13.5 degrees about the baseline, row 109; F height 108 px = 700 units,\n6.48 units/px):\n  1. It is an italic slab script, not a pen script: stems carry flat slab serifs, the lowercase stands on one\n     continuous baseline slab that joins the word (the i, r, b, i, r feet run into each other), and the i dots\n     are balls.\n  2. The slant is 13.5 degrees; every glyph is built upright and slanted at the end by the same shear.\n  3. Contrast is vertical: stems and the sides of bowls are heavy, the tops of bowls and the arms thin out.\nConstruction of the rest (rule-derived from the traced parts, never redrawn from memory of a typeface):\n  - o is the b's bowl made symmetric (its right half mirrored); c, a, q, p, g are that bowl with the d's stem, the\n    b's stem or a designed hook; n, m, h, u reuse the r's stem and entry serif with the upper half of the o as arch;\n    l, h, k take the b's ascender; t, f, j, s, v, w, x, y, z are designed in the same stems, slab and slant.\n  - Every lowercase stands on the slab (84 units high) from its left to its right edge, so any two letters join.\n  - The capitals beyond F (E, G, L, M, P, T, ...) are designed from the F's stem, arms and serifs.\n",
+ "slab": 48,
+ "stem": 64
+}
