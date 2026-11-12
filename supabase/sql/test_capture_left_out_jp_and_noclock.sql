@@ -152,7 +152,7 @@ SELECT pg_temp.assert_true((
      AND count(*) FILTER (WHERE i->>'left_out_kind' = 'no_clock') = 2
   FROM jsonb_array_elements((:'dry_cls'::jsonb)->'items') i
 ), 'two jp overrides, two no-clock, three planned');
-SELECT pg_temp.assert_true((SELECT count(*) FROM capture_left_out_classifier_override_log) = 0, 'dry wrote no classifier log');
+SELECT pg_temp.assert_true((SELECT coalesce(sum(jsonb_array_length(classifier_items)),0) FROM capture_left_out_to_review_log) = 0, 'dry wrote no classifier items');
 
 -- Invalid classifier payload refused
 DO $$
@@ -178,7 +178,7 @@ SELECT public.capture_left_out_to_review_v1(
 SELECT pg_temp.assert_true((:'apply1'::jsonb->>'routed')::int = 5, 'applied 5');
 SELECT pg_temp.assert_true((:'apply1'::jsonb->>'reviews')::int = 3, 'one review per day/kind (planned + two no_clock days)');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_left_out_to_review_log WHERE reverted_at IS NULL) = 3, 'three log rows');
-SELECT pg_temp.assert_true((SELECT count(*) FROM capture_left_out_classifier_override_log WHERE reverted_at IS NULL) = 2, 'two signed classifier overrides');
+SELECT pg_temp.assert_true((SELECT coalesce(sum(jsonb_array_length(classifier_items)),0) FROM capture_left_out_to_review_log WHERE reverted_at IS NULL) = 2, 'two signed classifier overrides on the existing log');
 SELECT pg_temp.assert_true((
   SELECT bool_and(status = 'open' AND confidence = 0)
      AND bool_or(evidence->>'classifier_overrides_jp' = 'true'
@@ -236,7 +236,6 @@ SELECT public.capture_left_out_to_review_revert_v1(
   '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000f1') AS rev1 \gset
 SELECT pg_temp.assert_true((:'rev1'::jsonb->>'reverted_log')::int = 3, 'reverted three log rows');
 SELECT pg_temp.assert_true((:'rev1'::jsonb->>'deleted_open_reviews')::int = 3, 'deleted three reviews');
-SELECT pg_temp.assert_true((:'rev1'::jsonb->>'reverted_classifier_overrides')::int = 2, 'reverted two classifier rows');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_review WHERE reason = 'left_out') = 0, 'no left_out reviews remain');
 SELECT pg_temp.assert_true((
   SELECT taken_at IS NULL FROM vehicle_images WHERE id = '00000000-0000-4000-8000-0000000000e1'
@@ -245,7 +244,11 @@ SELECT pg_temp.assert_true((
 \i supabase/sql/revert_20261116244000_capture_left_out_jp_and_noclock.sql
 SELECT pg_temp.assert_true(to_regprocedure('public.capture_left_out_to_review_v1(uuid,uuid,uuid,boolean,integer,jsonb)') IS NULL, '6-arg function dropped');
 SELECT pg_temp.assert_true(to_regprocedure('public.capture_left_out_to_review_v1(uuid,uuid,uuid,boolean,integer)') IS NOT NULL, '5-arg parent restored');
-SELECT pg_temp.assert_true(to_regclass('public.capture_left_out_classifier_override_log') IS NULL, 'classifier log dropped');
+SELECT pg_temp.assert_true(
+  NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'capture_left_out_to_review_log' AND column_name = 'classifier_items'
+  ), 'classifier_items column dropped');
 SELECT pg_temp.assert_true(
   NOT EXISTS (
     SELECT 1 FROM information_schema.columns

@@ -22,28 +22,8 @@ SET statement_timeout = '30s';
 SET lock_timeout = '5s';
 
 ALTER TABLE public.capture_left_out_to_review_log
-  ADD COLUMN IF NOT EXISTS clock_missing boolean NOT NULL DEFAULT false;
-
-CREATE TABLE IF NOT EXISTS public.capture_left_out_classifier_override_log (
-  id bigserial PRIMARY KEY,
-  run_id uuid NOT NULL,
-  image_id uuid NOT NULL,
-  user_id uuid NOT NULL,
-  granted_by uuid NOT NULL,
-  category text NOT NULL,
-  reason text,
-  signature text NOT NULL,
-  applied_at timestamptz NOT NULL DEFAULT now(),
-  reverted_at timestamptz,
-  UNIQUE (run_id, image_id)
-);
-CREATE INDEX IF NOT EXISTS capture_left_out_classifier_override_log_live_idx
-  ON public.capture_left_out_classifier_override_log (user_id, run_id)
-  WHERE reverted_at IS NULL;
-
-REVOKE ALL ON public.capture_left_out_classifier_override_log FROM PUBLIC, anon, authenticated;
-GRANT ALL ON public.capture_left_out_classifier_override_log TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.capture_left_out_classifier_override_log_id_seq TO service_role;
+  ADD COLUMN IF NOT EXISTS clock_missing boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS classifier_items jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 DROP FUNCTION IF EXISTS public.capture_left_out_to_review_v1(uuid, uuid, uuid, boolean, integer);
 
@@ -259,19 +239,12 @@ BEGIN
   )
   INSERT INTO public.capture_left_out_to_review_log(
       run_id, review_id, user_id, granted_by, day, chunk_id, left_out_kind,
-      chunk_state, set_key, image_ids, signature, clock_missing)
+      chunk_state, set_key, image_ids, signature, clock_missing, classifier_items)
   SELECT p_run, r.id, p_user, p_granted_by, d.day, d.chunk_id, d.left_out_kind,
-         d.chunk_state, r.set_key, r.image_ids, v_sig, d.clock_missing
+         d.chunk_state, r.set_key, r.image_ids, v_sig, d.clock_missing, d.classifier_items
   FROM days d
   JOIN ins_rev r ON r.image_ids = d.image_ids;
 
-  INSERT INTO public.capture_left_out_classifier_override_log(
-      run_id, image_id, user_id, granted_by, category, reason, signature)
-  SELECT p_run, t.image_id, p_user, p_granted_by,
-         t.classifier_category, t.classifier_reason, v_sig
-  FROM tmp_left_out_to_review t
-  WHERE t.classifier_category IS NOT NULL
-  ON CONFLICT (run_id, image_id) DO NOTHING;
 
   RETURN jsonb_build_object(
     'run', p_run, 'dry_run', false, 'granted_by', p_granted_by, 'signature', v_sig,
@@ -294,7 +267,6 @@ AS $function$
 DECLARE
   n_log int := 0;
   n_rev int := 0;
-  n_cls int := 0;
 BEGIN
   IF p_user IS NULL OR p_run IS NULL THEN
     RAISE EXCEPTION 'capture_left_out_to_review_revert_v1: user and run required';
@@ -318,14 +290,8 @@ BEGIN
    WHERE user_id = p_user AND run_id = p_run AND reverted_at IS NULL;
   GET DIAGNOSTICS n_log = ROW_COUNT;
 
-  UPDATE public.capture_left_out_classifier_override_log
-     SET reverted_at = now()
-   WHERE user_id = p_user AND run_id = p_run AND reverted_at IS NULL;
-  GET DIAGNOSTICS n_cls = ROW_COUNT;
-
   RETURN jsonb_build_object(
-    'run_id', p_run, 'reverted_log', n_log, 'deleted_open_reviews', n_rev,
-    'reverted_classifier_overrides', n_cls);
+    'run_id', p_run, 'reverted_log', n_log, 'deleted_open_reviews', n_rev);
 END
 $function$;
 
