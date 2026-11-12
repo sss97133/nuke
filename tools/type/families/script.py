@@ -271,15 +271,15 @@ def capitals(T):
     cx, cy = (Ob[0] + Ob[2]) / 2, CAP / 2
     G = geom.difference(O, geom.poly((cx, cy), (Ob[2] + 60, cy + 30), (Ob[2] + 60, CAP - 80)))
     G = U(G, geom.rect(cx + 40, cy - 60, Ob[2] + 10, cy + 20), geom.rect(Ob[2] - 120, 0, Ob[2] - 10, cy))
-    out['G'] = (G, ('derived', ['b'], "the b's bowl made symmetric and scaled to the capital, opened with a bar and spur"))
+    out['G'] = (G, ('designed', ['b'], "designed on the b's bowl made symmetric and scaled to the capital; bar and spur designed"))
     bowl = clip(O, cx, -50, 2000, CAP + 20)
     bowl = scale(bowl, 0.95, 0.56, cx, CAP)
     P = U(stemF, clip(top, -20, 560, 420, 720), move(bowl, 233 - cx), geom.rect(233, 280, 380, 380))
-    out['P'] = (P, ('derived', ['F', 'b'], "the F's stem and swash with the b-derived bowl"))
+    out['P'] = (P, ('designed', ['F', 'b'], "designed: the F's stem and swash carry a bowl drawn from the b's"))
     st2 = clip(F, 120, -40, 360, 600)
     M = U(stemF, move(st2, 640), stroke([(250, CAP - 40), (520, 40)], 140), stroke([(520, 40), (820, CAP - 40)], LIGHT),
           geom.rect(80, CAP - 70, 300, CAP), geom.rect(760, CAP - 70, 980, CAP))
-    out['M'] = (M, ('derived', ['F'], "two F stems with a heavy falling and a light rising diagonal"))
+    out['M'] = (M, ('designed', ['F'], "designed: two F stems with a heavy falling and a light rising diagonal"))
     return out
 
 
@@ -300,15 +300,17 @@ def build_family(out_dir, proof_dir=None):
         if n == 'r':
             # the r's flag runs into the e on the emblem; standing alone it ends upright 60 units short of the join
             con = clip(con, -50, -50, 470, 800)
+        fid = t.score(con)
         items[n] = (con, {'provenance': 'traced', 'method': 'potrace of the de-slanted fender script, refit',
-                          'fidelity': t.score(), 'sourceBoxPx': REGIONS[n], **src_meta}, 'lower')
+                          'fidelity': fid, 'sourceBoxPx': REGIONS[n], **src_meta}, 'lower')
         if proof_dir:
-            overlay_png(t, con, os.path.join(proof_dir, 'script', f'{n}.png'), zoom=6, title=f'{n} {t.score()["iou"]}')
+            overlay_png(t, con, os.path.join(proof_dir, 'script', f'{n}.png'), zoom=6, title=f'{n} IoU {fid["iou"]}')
     con, t = T['F']
+    fid = t.score(con)
     items['F'] = (con, {'provenance': 'traced', 'method': 'potrace of the de-slanted fender script, refit',
-                        'fidelity': t.score(), 'sourceBoxPx': REGIONS['F'], **src_meta}, 'cap')
+                        'fidelity': fid, 'sourceBoxPx': REGIONS['F'], **src_meta}, 'cap')
     if proof_dir:
-        overlay_png(t, con, os.path.join(proof_dir, 'script', 'F.png'), zoom=6, title=f'F {t.score()["iou"]}')
+        overlay_png(t, con, os.path.join(proof_dir, 'script', 'F.png'), zoom=6, title=f'F IoU {fid["iou"]}')
     for n, (con, (prov, frm, method)) in lowercase(T).items():
         items[n] = (con, {'provenance': prov, 'from': frm, 'method': method}, 'lower')
     for n, (con, (prov, frm, method)) in capitals(T).items():
@@ -332,7 +334,7 @@ def build_family(out_dir, proof_dir=None):
         if kind == 'lower':
             con = move(con, SB - x0)
             adv = (x1 - x0) + 2 * SB
-            con = U(con, geom.rect(-14, 0, adv + 14, SLAB))
+            con = U(con, geom.rect(-6, 0, adv + 6, SLAB))   # 6-unit overlap: joins without seams, no overhang at word ends
         elif kind == 'cap':
             con = move(con, CAPS_SB[0] - x0)
             adv = (x1 - x0) + sum(CAPS_SB)

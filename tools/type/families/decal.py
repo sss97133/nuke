@@ -42,6 +42,9 @@ H = 700
 w = 56           # band
 g = 60           # channel
 D = 2 * w + g    # split stroke overall
+RO_A = 134        # rounds: inner band's outer semi-axis (O 500 wide, with the S and R)
+RO_C = 260
+PRINT_R = 16
 BAR = 72         # single bars (the T bar measures 80, other bars 56-70)
 
 SRC = Source('pontiac-firebird-trans-am-style-owner-decal-cut.png', 'alpha', 0.0, 1.0, cap_px=88.0,
@@ -153,7 +156,9 @@ def draw(strokes, ylo=0, yhi=H, xlo=-2000, xhi=4000):
     out = geom.intersection(out, geom.rect(xlo, ylo, xhi, yhi))
     out = geom.clean(out)
     out = geom.clean(refit(out, tol=1.2, corner_deg=28, step=2.0))
-    return out
+    # the decal is screen-printed: corners carry the ink's radius (the traced ends measure 10-20 units)
+    from lib.shapes import round_corners
+    return geom.clean(round_corners(out, PRINT_R))
 
 
 def arc_ellipse(cx, cy, a, b, start, end, n=2.0):
@@ -217,13 +222,13 @@ def letters():
 
     # designed by the rule
     g_('B', [St(P((hs, -60), (hs, H + 60)), 'split'),
-             split_round(hs + 20, 548, 190, 152, x_from=hs + 20), split_round(hs + 20, 200, 220, 200, x_from=hs + 20),
+             split_round(hs + 20, 548, 160, 152, x_from=hs + 20), split_round(hs + 20, 200, 185, 200, x_from=hs + 20),
              St(P((hs, H - w / 2), (hs + 21, H - w / 2)), width=w), St(P((hs, 400 - w / 2), (hs + 21, 400 - w / 2)), width=w),
              St(P((hs, w / 2), (hs + 21, w / 2)), width=w)],
        method='split stem; two split bowls (crescent channel, as the R bowl), the lower 30 wider')
-    g_('C', [split_round(240 + 58, 350, 240, 362, wedge=(-40, 40))], ylo=-12, yhi=H + 12,
+    g_('C', [split_round(RO_C, 350, RO_A, 362, wedge=(-40, 40))], ylo=-12, yhi=H + 12,
        method='split round (crescent channel) opened from -40 to 40 degrees')
-    g_('D', [St(P((hs, -60), (hs, H + 60)), 'split'), split_round(hs + 40, 350, 240, 350, x_from=hs + 40),
+    g_('D', [St(P((hs, -60), (hs, H + 60)), 'split'), split_round(hs + 40, 350, 200, 350, x_from=hs + 40),
              St(P((hs, H - w / 2), (hs + 41, H - w / 2)), width=w), St(P((hs, w / 2), (hs + 41, w / 2)), width=w)],
        method='split stem; split bowl with a crescent channel (rounds are heavy at the sides)')
     g_('E', [St(P((hs, -60), (hs, H + 60)), 'split', c1=200),
@@ -233,8 +238,8 @@ def letters():
     g_('F', [St(P((hs, -60), (hs, H + 60)), 'split', c1=200),
              St(P((0, H - BAR / 2), (400, H - BAR / 2)), width=BAR), St(P((0, 340), (340, 340)), width=BAR)],
        method='E without the bottom bar')
-    g_('G', [split_round(298, 350, 240, 362, wedge=(0, 40)),
-             St(P((300, 350 - BAR / 2), (298 + 240 + g + w, 350 - BAR / 2)), width=BAR)],
+    g_('G', [split_round(RO_C, 350, RO_A, 362, wedge=(0, 40)),
+             St(P((RO_C, 350 - BAR / 2), (RO_C + RO_A + g + w, 350 - BAR / 2)), width=BAR)],
        ylo=-12, yhi=H + 12, method='the C closed round to the half height, with a single inward bar under the band ends')
     g_('H', [St(P((hs, -60), (hs, H + 60)), 'split'), St(P((480 - hs, -60), (480 - hs, H + 60)), 'split'),
              St(P((hs, 360), (480 - hs, 360)), width=BAR)],
@@ -248,12 +253,12 @@ def letters():
        method='split stem; single rising arm; split falling leg')
     g_('L', [St(P((hs, -60), (hs, H + 60)), 'split', c0=200), St(P((0, BAR / 2), (390, BAR / 2)), width=BAR)],
        method='split stem; single foot bar cut by the channel')
-    g_('O', [split_round(298, 350, 240, 362)], ylo=-12, yhi=H + 12,
+    g_('O', [split_round(RO_C, 350, RO_A, 362)], ylo=-12, yhi=H + 12,
        method='split round: a ring of the band width with crescent channel and outer band')
-    g_('P', [St(P((hs, -60), (hs, H + 60)), 'split'), split_round(hs + 20, 515, 210, 185, x_from=hs + 20),
+    g_('P', [St(P((hs, -60), (hs, H + 60)), 'split'), split_round(hs + 20, 515, 180, 185, x_from=hs + 20),
              St(P((hs, H - w / 2), (hs + 21, H - w / 2)), width=w), St(P((hs, 330 + w / 2), (hs + 21, 330 + w / 2)), width=w)],
        method='split stem; split bowl with a crescent channel, as the traced R')
-    g_('Q', [split_round(298, 350, 240, 362), St(P((330, 170), (560, -80)))], ylo=-80, yhi=H + 12,
+    g_('Q', [split_round(RO_C, 350, RO_A, 362), St(P((RO_C + 40, 170), (RO_C + 250, -80)))], ylo=-80, yhi=H + 12,
        method='the O with a single tail')
     g_('U', [St(P((hs, H + 60), (hs, 230), ((hs, 90), (130, hs - 12), (240, hs - 12)),
                   ((350, hs - 12), (480 - hs, 90), (480 - hs, 230)), (480 - hs, H + 60)), 'split')], ylo=-12,
@@ -272,7 +277,7 @@ def letters():
        method='single bars; split diagonal (heavy in a roman Z)')
 
     # figures: the Phoenix Graphix "400" decal shows split figures in the same family
-    g_('zero', [split_round(268, 350, 205, 362)], ylo=-12, yhi=H + 12, method='split round, narrower than O')
+    g_('zero', [split_round(RO_C, 350, RO_A - 14, 362)], ylo=-12, yhi=H + 12, method='split round, narrower than O')
     g_('one', [St(P((240, -60), (240, H + 60)), 'split'), St(P((60, 560), (200, H)))],
        method='split stem with a single flag')
     two = P((40, 540), ((70, 660), (160, H - hs + 12), (240, H - hs + 12)),

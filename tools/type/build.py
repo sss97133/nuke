@@ -43,6 +43,13 @@ def main():
         chars = claimed or getattr(m, 'CLAIMED', '')
         for otf in otfs:
             v = validate(otf, chars)
+            side = json.load(open(otf[:-4] + '.provenance.json'))
+            counts = {}
+            for gname, gi in side['glyphs'].items():
+                if gname in ('space', '.notdef'):
+                    continue
+                counts[gi.get('provenance', 'designed')] = counts.get(gi.get('provenance', 'designed'), 0) + 1
+            v['provenance'] = counts
             report[os.path.relpath(otf, REPO)] = v
             ok = not v['missing'] and not v['emptyOutlines']
             print(('OK  ' if ok else 'FAIL'), json.dumps(v))

@@ -186,23 +186,23 @@
   },
   "B": {
    "unicode": "U+0042",
-   "advance": 522,
+   "advance": 487,
    "provenance": "designed",
    "method": "split stem; two split bowls (crescent channel, as the R bowl), the lower 30 wider",
    "lint": {
-    "nodes": 41,
+    "nodes": 35,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 0
+    "nearKinks": 2
    }
   },
   "C": {
    "unicode": "U+0043",
-   "advance": 691,
+   "advance": 526,
    "provenance": "designed",
    "method": "split round (crescent channel) opened from -40 to 40 degrees",
    "lint": {
-    "nodes": 22,
+    "nodes": 25,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -210,14 +210,14 @@
   },
   "D": {
    "unicode": "U+0044",
-   "advance": 562,
+   "advance": 522,
    "provenance": "designed",
    "method": "split stem; split bowl with a crescent channel (rounds are heavy at the sides)",
    "lint": {
-    "nodes": 18,
+    "nodes": 29,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 4
    }
   },
   "E": {
@@ -226,7 +226,7 @@
    "provenance": "designed",
    "method": "split stem; three single bars; the channel cuts the top bar like the T",
    "lint": {
-    "nodes": 16,
+    "nodes": 32,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -238,7 +238,7 @@
    "provenance": "designed",
    "method": "E without the bottom bar",
    "lint": {
-    "nodes": 14,
+    "nodes": 28,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -246,14 +246,14 @@
   },
   "G": {
    "unicode": "U+0047",
-   "advance": 793,
+   "advance": 580,
    "provenance": "designed",
    "method": "the C closed round to the half height, with a single inward bar under the band ends",
    "lint": {
     "nodes": 34,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 0
+    "nearKinks": 1
    }
   },
   "H": {
@@ -262,7 +262,7 @@
    "provenance": "designed",
    "method": "two split stems, single bar",
    "lint": {
-    "nodes": 20,
+    "nodes": 40,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -274,7 +274,7 @@
    "provenance": "designed",
    "method": "split stem",
    "lint": {
-    "nodes": 8,
+    "nodes": 16,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -289,19 +289,19 @@
     "nodes": 40,
     "missingExtrema": 1,
     "microSegments": 0,
-    "nearKinks": 4
+    "nearKinks": 5
    }
   },
   "K": {
    "unicode": "U+004B",
-   "advance": 505,
+   "advance": 501,
    "provenance": "designed",
    "method": "split stem; single rising arm; split falling leg",
    "lint": {
-    "nodes": 35,
+    "nodes": 53,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 10
    }
   },
   "L": {
@@ -310,7 +310,7 @@
    "provenance": "designed",
    "method": "split stem; single foot bar cut by the channel",
    "lint": {
-    "nodes": 10,
+    "nodes": 20,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -318,11 +318,11 @@
   },
   "O": {
    "unicode": "U+004F",
-   "advance": 782,
+   "advance": 570,
    "provenance": "designed",
    "method": "split round: a ring of the band width with crescent channel and outer band",
    "lint": {
-    "nodes": 20,
+    "nodes": 24,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -330,11 +330,11 @@
   },
   "P": {
    "unicode": "U+0050",
-   "advance": 497,
+   "advance": 467,
    "provenance": "designed",
    "method": "split stem; split bowl with a crescent channel, as the traced R",
    "lint": {
-    "nodes": 20,
+    "nodes": 27,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -342,14 +342,14 @@
   },
   "Q": {
    "unicode": "U+0051",
-   "advance": 792,
+   "advance": 596,
    "provenance": "designed",
    "method": "the O with a single tail",
    "lint": {
-    "nodes": 30,
+    "nodes": 42,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 4
    }
   },
   "U": {
@@ -358,58 +358,58 @@
    "provenance": "designed",
    "method": "one split U",
    "lint": {
-    "nodes": 57,
-    "missingExtrema": 0,
-    "microSegments": 0,
-    "nearKinks": 1
-   }
-  },
-  "V": {
-   "unicode": "U+0056",
-   "advance": 503,
-   "provenance": "designed",
-   "method": "split falling stroke, single rising stroke",
-   "lint": {
-    "nodes": 15,
-    "missingExtrema": 0,
-    "microSegments": 0,
-    "nearKinks": 0
-   }
-  },
-  "W": {
-   "unicode": "U+0057",
-   "advance": 711,
-   "provenance": "designed",
-   "method": "two V constructions",
-   "lint": {
-    "nodes": 38,
-    "missingExtrema": 0,
+    "nodes": 52,
+    "missingExtrema": 1,
     "microSegments": 0,
     "nearKinks": 4
    }
   },
+  "V": {
+   "unicode": "U+0056",
+   "advance": 496,
+   "provenance": "designed",
+   "method": "split falling stroke, single rising stroke",
+   "lint": {
+    "nodes": 29,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "W": {
+   "unicode": "U+0057",
+   "advance": 706,
+   "provenance": "designed",
+   "method": "two V constructions",
+   "lint": {
+    "nodes": 61,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 20
+   }
+  },
   "X": {
    "unicode": "U+0058",
-   "advance": 461,
+   "advance": 451,
    "provenance": "designed",
    "method": "split falling, single rising",
    "lint": {
-    "nodes": 20,
-    "missingExtrema": 0,
+    "nodes": 42,
+    "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 0
+    "nearKinks": 12
    }
   },
   "Y": {
    "unicode": "U+0059",
-   "advance": 457,
+   "advance": 450,
    "provenance": "designed",
    "method": "split left arm turning into the split stem (one channel), single right arm",
    "lint": {
-    "nodes": 30,
-    "missingExtrema": 0,
+    "nodes": 39,
+    "missingExtrema": 1,
     "microSegments": 0,
-    "nearKinks": 0
+    "nearKinks": 7
    }
   },
   "Z": {
@@ -418,19 +418,19 @@
    "provenance": "designed",
    "method": "single bars; split diagonal (heavy in a roman Z)",
    "lint": {
-    "nodes": 23,
+    "nodes": 34,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 5
    }
   },
   "zero": {
    "unicode": "U+0030",
-   "advance": 722,
+   "advance": 552,
    "provenance": "designed",
    "method": "split round, narrower than O",
    "lint": {
-    "nodes": 20,
+    "nodes": 24,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -442,10 +442,10 @@
    "provenance": "designed",
    "method": "split stem with a single flag",
    "lint": {
-    "nodes": 13,
+    "nodes": 25,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 2
    }
   },
   "two": {
@@ -455,9 +455,9 @@
    "method": "split curve and diagonal; single base bar",
    "lint": {
     "nodes": 46,
-    "missingExtrema": 0,
+    "missingExtrema": 1,
     "microSegments": 0,
-    "nearKinks": 10
+    "nearKinks": 7
    }
   },
   "three": {
@@ -466,10 +466,10 @@
    "provenance": "designed",
    "method": "two split bowls",
    "lint": {
-    "nodes": 75,
+    "nodes": 73,
     "missingExtrema": 1,
     "microSegments": 0,
-    "nearKinks": 5
+    "nearKinks": 6
    }
   },
   "four": {
@@ -478,10 +478,10 @@
    "provenance": "designed",
    "method": "split stem; single diagonal and bar (after the Phoenix Graphix 400 decal)",
    "lint": {
-    "nodes": 27,
+    "nodes": 45,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 0
+    "nearKinks": 1
    }
   },
   "five": {
@@ -490,10 +490,10 @@
    "provenance": "designed",
    "method": "single bar and stem; split bowl entering square",
    "lint": {
-    "nodes": 82,
+    "nodes": 68,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 11
+    "nearKinks": 13
    }
   },
   "six": {
@@ -502,10 +502,10 @@
    "provenance": "designed",
    "method": "split loop under a split stem curve",
    "lint": {
-    "nodes": 54,
+    "nodes": 52,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 3
+    "nearKinks": 2
    }
   },
   "nine": {
@@ -517,22 +517,22 @@
    ],
    "method": "the 6 turned 180 degrees",
    "lint": {
-    "nodes": 54,
+    "nodes": 52,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 3
+    "nearKinks": 2
    }
   },
   "seven": {
    "unicode": "U+0037",
-   "advance": 537,
+   "advance": 536,
    "provenance": "designed",
    "method": "single bar; split diagonal",
    "lint": {
-    "nodes": 22,
+    "nodes": 33,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 8
    }
   },
   "eight": {
@@ -553,7 +553,7 @@
    "provenance": "designed",
    "method": "a square of the bar weight",
    "lint": {
-    "nodes": 4,
+    "nodes": 8,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -565,10 +565,10 @@
    "provenance": "designed",
    "method": "the period square with a falling tail",
    "lint": {
-    "nodes": 10,
+    "nodes": 13,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 2
    }
   },
   "hyphen": {
@@ -577,7 +577,7 @@
    "provenance": "designed",
    "method": "single bar",
    "lint": {
-    "nodes": 4,
+    "nodes": 8,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -589,10 +589,10 @@
    "provenance": "designed",
    "method": "single rising stroke",
    "lint": {
-    "nodes": 10,
+    "nodes": 12,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 4
+    "nearKinks": 5
    }
   },
   "quotesingle": {
@@ -601,7 +601,7 @@
    "provenance": "designed",
    "method": "single stroke",
    "lint": {
-    "nodes": 4,
+    "nodes": 8,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -613,7 +613,7 @@
    "provenance": "designed",
    "method": "two single strokes",
    "lint": {
-    "nodes": 8,
+    "nodes": 16,
     "missingExtrema": 0,
     "microSegments": 0,
     "nearKinks": 0
@@ -621,14 +621,14 @@
   },
   "ampersand": {
    "unicode": "U+0026",
-   "advance": 636,
+   "advance": 634,
    "provenance": "designed",
    "method": "single loops, split falling stroke",
    "lint": {
-    "nodes": 41,
+    "nodes": 49,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 4
    }
   },
   "space": {

@@ -88,6 +88,26 @@ class Source:
             self._arr = a
         return self._arr
 
+    def rgb(self) -> np.ndarray:
+        """The photograph itself (cutouts over white), with the same levelling and de-shear as array()."""
+        im = Image.open(os.path.join(MAKES, self.file)).convert('RGBA')
+        bg = Image.new('RGBA', im.size, (255, 255, 255, 255))
+        bg.alpha_composite(im)
+        rgb = np.asarray(bg.convert('RGB')).astype(float) / 255.0
+        chans = []
+        for k in range(3):
+            a = rgb[..., k]
+            if self.tilt_deg:
+                a = ndimage.rotate(a, self.tilt_deg, reshape=False, order=1, mode='constant', cval=1)
+            if self.shear:
+                pv = self.baseline_px if self.shear_pivot_px is None else self.shear_pivot_px
+                pad = int(math.ceil(abs(self.shear) * pv)) + 2
+                a = np.pad(a, ((0, 0), (0, pad)), constant_values=1)
+                a = ndimage.affine_transform(a, [[1, 0], [self.shear, 1]], offset=[0, -self.shear * pv], order=1,
+                                             cval=1)
+            chans.append(a)
+        return np.stack(chans, -1)
+
     def sha(self) -> str:
         return sha256_b64(os.path.join(MAKES, self.file))
 

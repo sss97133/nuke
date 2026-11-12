@@ -59,7 +59,12 @@ def overlay_png(t: Traced, contours_placed, out_path, zoom=6, title=None):
     """Source crop (as the mask sees it, in grey) with the shipped outline stroked on top, at `zoom` x."""
     m = t.mask
     H, W = m.shape
-    base = Image.fromarray((255 - m * 180).astype(np.uint8)).convert('RGB').resize((W * zoom, H * zoom), Image.LANCZOS)
+    try:   # the photograph under the outline, cropped to the traced region
+        ox, oy = t.origin
+        rgb = t.src.rgb()[oy:oy + H, ox:ox + W]
+        base = Image.fromarray((rgb * 255).astype(np.uint8)).resize((W * zoom, H * zoom), Image.LANCZOS)
+    except Exception:
+        base = Image.fromarray((255 - m * 180).astype(np.uint8)).convert('RGB').resize((W * zoom, H * zoom), Image.LANCZOS)
     d = ImageDraw.Draw(base, 'RGBA')
     f = t.to_px(zoom)
     for con in contours_placed:
