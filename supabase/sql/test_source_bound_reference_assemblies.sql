@@ -30,6 +30,10 @@ CREATE TABLE public.vehicle_images(id uuid PRIMARY KEY,image_url text,taken_at t
 CREATE TABLE public.observation_witnesses(observation_id uuid,image_id uuid);
 CREATE FUNCTION public.vehicle_user_has_access(uuid,uuid) RETURNS boolean LANGUAGE sql AS $$SELECT false$$;
 CREATE FUNCTION public.component_reading_matches(public.vehicle_observations,public.vehicle_observations,public.vehicle_images) RETURNS boolean LANGUAGE sql AS $$SELECT false$$;
+-- Roles referenced by migration REVOKE/GRANT statements
+DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 \ir fixtures/reference_component_fold_owner.sql
 \ir fixtures/reference_assembly_owners.sql
 \ir ../migrations/20261111170449_source_bound_reference_assemblies.sql
