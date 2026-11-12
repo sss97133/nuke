@@ -28,6 +28,10 @@ tools/type/build.sh --only trans-am-1973-decal
 - **Validation:** `build.py` reopens each font with fontTools and checks that every claimed character maps to a
   glyph with an outline. It writes glyph count, cmap size and traced/derived/designed counts to `build-report.json`.
   The table below is copied from that file, and the file is the record.
+- **Manifest:** the build also writes `manifest.json`: per family, its WOFF2 files (Regular first) and the characters
+  its cmap draws. A `vehicle-identities.json` entry's `font` names a family in it. The vehicle identity loads that
+  family's faces only when the entry matches, sets the recorded word in it once they load, and keeps the raster cutout
+  for any word with a character the family does not draw.
 - **Specimen:** `tools/type/specimen.py OUT --proofs DIR` writes the specimen page. It refuses any string whose
   characters a family does not map. `node tools/type/shoot.mjs OUT/specimen.html OUT`, run from `nuke_frontend/`,
   screenshots the page in light and dark and fails if any period font did not load.

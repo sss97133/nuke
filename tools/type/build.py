@@ -55,8 +55,30 @@ def main():
             print(('OK  ' if ok else 'FAIL'), json.dumps(v))
             if not ok:
                 sys.exit(1)
-    with open(os.path.join(OUT, 'build-report.json'), 'w') as fh:
+    path = os.path.join(OUT, 'build-report.json')
+    if a.only and os.path.exists(path):
+        # A partial build keeps the other families' records.
+        report = {**json.load(open(path)), **report}
+    with open(path, 'w') as fh:
         json.dump(report, fh, indent=1)
+    write_manifest()
+
+
+def write_manifest():
+    """manifest.json: per family, its WOFF2 files (Regular first) and the characters its cmap draws. The vehicle
+    identity reads it to load a family and to refuse any word the family does not draw."""
+    from fontTools.ttLib import TTFont
+    manifest = {}
+    for _, folder, _ in FAMILIES:
+        d = os.path.join(OUT, folder)
+        files = sorted((f for f in os.listdir(d) if f.endswith('.woff2')), key=lambda f: (not f.endswith('-Regular.woff2'), f))
+        if not files:
+            continue
+        cmap = TTFont(os.path.join(d, files[0])).getBestCmap()
+        manifest[folder] = {'files': [f'{folder}/{f}' for f in files], 'chars': ''.join(sorted(chr(c) for c in cmap))}
+    with open(os.path.join(OUT, 'manifest.json'), 'w') as fh:
+        json.dump(manifest, fh, indent=1, ensure_ascii=False)
+        fh.write('\n')
 
 
 if __name__ == '__main__':

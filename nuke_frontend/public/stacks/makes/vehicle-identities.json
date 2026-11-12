@@ -521,7 +521,8 @@
     "retrievedAt": "2026-11-11",
     "attribution": "Photograph of this vehicle from its own profile (the vehicle_images row; original HEIC 4032x3024, taken 2026-10-28). It shows the lettering on this car, not factory trim. Trans Am is a General Motors trademark.",
     "sourceSha256Base64": "4FdsAvPCqmD2Wd8cAAYV8WRRazBj1o7CJVJKKdcAyJg=",
-    "localSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A="
+    "localSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A=",
+    "font": "trans-am-1973-decal"
   },
   {
     "make": "Pontiac",
@@ -556,7 +557,8 @@
     "retrievedAt": "2026-11-11",
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Period literature scan, reference identification; not evidence of what is installed on a specific car.",
     "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
-    "localSha256Base64": "Zdtq6WJ8I+d+4emUpkSPUtPrX/fdtVFzTPgS0t+Rz0k="
+    "localSha256Base64": "Zdtq6WJ8I+d+4emUpkSPUtPrX/fdtVFzTPgS0t+Rz0k=",
+    "font": "pontiac-1973-brochure-numerals"
   },
   {
     "make": "Pontiac",
@@ -665,7 +667,8 @@
     "retrievedAt": "2026-11-11",
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Photograph: OER (GM Restoration Parts licensee) reproduction part, reference identification; not an original factory photograph or evidence of installation.",
     "sourceSha256Base64": "rH/23YnVOvIB1+R8RXf7Ix457T1zAq2UmimtyybQyRI=",
-    "localSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk="
+    "localSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk=",
+    "font": "pontiac-1973-block"
   },
   {
     "make": "Pontiac",
@@ -860,7 +863,8 @@
     "retrievedAt": "2026-11-11",
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Photograph: OER (GM Restoration Parts licensee) reproduction part, reference identification; not an original factory photograph or evidence of installation.",
     "sourceSha256Base64": "+vtlw+HcI+2IMG535sfKECaJpiRIqXQ/YcE1xcfOcZ0=",
-    "localSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M="
+    "localSha256Base64": "8ErH4pMlPI1s4GuPaH82x+aRV4qwjOrK50uaxP5zv5M=",
+    "font": "firebird-1971-script"
   },
   {
     "make": "Pontiac",

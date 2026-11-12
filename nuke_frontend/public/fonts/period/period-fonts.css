@@ -1,5 +1,7 @@
 /* Period type for the 1970s Pontiac Firebird header. Drawn for Nuke from cited period sources; see README.md and the
-   provenance sidecars. Not official General Motors typefaces. Nothing in the app loads this file yet. */
+   provenance sidecars. Not official General Motors typefaces. The app does not load this file: the vehicle identity
+   (MakeIdentity) adds each face when a catalogue entry's `font` matches, with the same materials in MakeIdentity.css.
+   This file serves the specimen and standalone pages. */
 
 @font-face { font-family: 'Pontiac 1973 Block'; src: url('pontiac-1973-block/Pontiac1973Block-Regular.woff2') format('woff2'); font-display: swap; }
 @font-face { font-family: 'Pontiac 1973 Block Face'; src: url('pontiac-1973-block/Pontiac1973Block-Face.woff2') format('woff2'); font-display: swap; }
