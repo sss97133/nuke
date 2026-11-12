@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { MakeIdentity, resolveVehicleArtwork, VehicleIdentity } from './MakeIdentity';
 
 it('selects the documented script and nose emblem independently across model years', () => {
@@ -242,4 +242,74 @@ it('sets the 1973 tribute headline in cutout lettering on the page surface, keep
     expect(host.querySelector('.vehicle-identity__qualifier')).toBeNull();
     expect(marks().at(-1)).toEqual(['variant', 'mask', '/stacks/makes/pontiac-firebird-1973-canada-trans-am-cut.png']);
   } finally { await act(async () => root.unmount()); }
+});
+
+it('sets the 1973 lettering in its period fonts once they load, injected on match only, raster until then', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const CAR = '20d21fb0-4651-4469-a0ba-e751309a1e54';
+  const requested: string[] = [], added: string[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  vi.stubGlobal('FontFace', class {
+    family: string;
+    constructor(family: string, source: string) { this.family = family; requested.push(source); }
+    load() { return gate.then(() => this); }
+  });
+  Object.defineProperty(document, 'fonts', { configurable: true, value: { add: (face: { family: string }) => added.push(face.family) } });
+  vi.resetModules();
+  const { VehicleIdentity: Fresh } = await import('./MakeIdentity');
+  const host = document.createElement('div'), root = createRoot(host);
+  try {
+    // A make with no period font requests nothing.
+    await act(async () => root.render(<Fresh year={1963} make="Chevrolet" model="Corvette" />));
+    expect(requested).toEqual([]);
+    await act(async () => root.render(<Fresh compact year={1973} make="Pontiac" model="Firebird" vehicleId={CAR}
+      variants={[{ kind: 'trim', value: 'Trans Am-Style' }]} onExplore={() => {}} />));
+    // The loader is a lazy chunk: let it resolve.
+    await act(async () => { await import('./PeriodLettering'); await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(requested).toEqual([
+      'url("/fonts/period/pontiac-1973-brochure-numerals/Pontiac1973BrochureNumerals-Regular.woff2") format("woff2")',
+      'url("/fonts/period/pontiac-1973-block/Pontiac1973Block-Regular.woff2") format("woff2")',
+      'url("/fonts/period/pontiac-1973-block/Pontiac1973Block-Face.woff2") format("woff2")',
+      'url("/fonts/period/firebird-1971-script/Firebird1971Script-Regular.woff2") format("woff2")',
+      'url("/fonts/period/trans-am-1973-decal/TransAm1973Decal-Regular.woff2") format("woff2")',
+    ]);
+    // Until the faces load, the raster cutouts stand.
+    expect(host.querySelectorAll('.vehicle-identity__art img')).toHaveLength(4);
+    expect(host.querySelector('.vehicle-identity__type')).toBeNull();
+    await act(async () => { release(); await gate; });
+    expect(added).toEqual(['Pontiac1973BrochureNumerals-Regular', 'Pontiac1973Block-Regular', 'Pontiac1973Block-Face',
+      'Firebird1971Script-Regular', 'TransAm1973Decal-Regular']);
+    const set = [...host.querySelectorAll<HTMLElement>('.vehicle-identity__art--type')].map(node =>
+      [node.dataset.role, node.dataset.font, node.textContent]);
+    expect(set).toEqual([
+      ['year', 'Pontiac1973BrochureNumerals-Regular', '1973'],
+      ['make', 'Pontiac1973Block-Regular', 'Pontiac'],
+      ['model', 'Firebird1971Script-Regular', 'Firebird'],
+      ['variant', 'TransAm1973Decal-Regular', 'Trans Am'],
+    ]);
+    expect(host.querySelector('.vehicle-identity__art img')).toBeNull();
+    // "-Style" is Nuke's qualifier, set in the UI face beside the decal, never in a period font.
+    expect(host.querySelector('.vehicle-identity__qualifier')?.closest('.vehicle-identity__art--type')).toBeNull();
+    expect(host.querySelector('.vehicle-identity__qualifier')?.textContent).toBe('-Style');
+    expect(host.querySelector('.sr-only')?.textContent).toBe('1973 Pontiac Firebird Trans Am-Style');
+    // Faces already loaded set the type on first render, with no raster flash and no second request.
+    await act(async () => root.render(<span />));
+    await act(async () => root.render(<Fresh compact year={1973} make="Pontiac" model="Firebird" vehicleId={CAR}
+      variants={[{ kind: 'trim', value: 'Trans Am-Style' }]} />));
+    expect(host.querySelectorAll('.vehicle-identity__art--type')).toHaveLength(4);
+    expect(requested).toHaveLength(5);
+    // A word with a character its family does not draw (the script has no figures) keeps the raster; so does an
+    // unknown family.
+    const { default: Period } = await import('./PeriodLettering');
+    await act(async () => root.render(<>
+      <Period family="firebird-1971-script" role="model" tone="chrome" lettering="Firebird 400" fallback={<i>raster</i>} />
+      <Period family="no-such-family" role="model" lettering="Firebird" fallback={<i>raster</i>} />
+    </>));
+    expect(host.innerHTML).toBe('<i>raster</i><i>raster</i>');
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+    delete (document as any).fonts;
+  }
 });
