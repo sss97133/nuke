@@ -720,7 +720,7 @@ jobs:
           deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/api-v1-vehicles/sourceProfile.test.ts
           node --test scripts/ecr-retained-replay.test.mjs
       - name: Verify native dealer microdata, source qualification and canonical replay
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/_shared/vin-decoder-native.test.ts supabase/functions/ingest/dealer.test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/_shared/vin-decoder-native.test.ts supabase/functions/api-v1-vin-lookup/vinRequest.test.ts supabase/functions/ingest/dealer.test.ts
       - name: Verify native Gateway browser evidence, admission and replay
         run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/gatewayParser.test.ts supabase/functions/ingest/gateway.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
