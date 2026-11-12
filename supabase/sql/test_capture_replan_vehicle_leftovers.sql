@@ -1,6 +1,8 @@
 -- capture_replan_vehicle_leftovers_v1: enqueue leftover vehicle-typed days; do not file.
 -- Also covers the 20261115200000 idempotent follow-up: skip unreverted log rows and
 -- days refused_no_new_evidence until capture_day_replan_state reports new evidence.
+-- Also covers 20261115210000: a no-clock leftover (taken_at null, day from created_at)
+-- is not enqueued, because the live scorer cannot use it.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_capture_replan_vehicle_leftovers%' OR to_regclass('public.vehicle_images') IS NOT NULL THEN
@@ -54,6 +56,7 @@ BEGIN IF NOT coalesce(ok, false) THEN RAISE EXCEPTION 'contract failed: %', msg;
 
 \i supabase/migrations/20261115193000_capture_replan_vehicle_leftovers.sql
 \i supabase/migrations/20261115200000_capture_replan_vehicle_leftovers_idempotent.sql
+\i supabase/migrations/20261115210000_capture_replan_vehicle_leftovers_require_clock.sql
 
 INSERT INTO vehicle_images(id, user_id, vehicle_id, taken_at, source, is_sensitive, image_url, file_name, exif_data, ai_scan_metadata) VALUES
  -- leftover exterior on a previously planned day (LA 2026-03-01)
@@ -67,6 +70,10 @@ INSERT INTO vehicle_images(id, user_id, vehicle_id, taken_at, source, is_sensiti
  ('00000000-0000-4000-8000-0000000000d9', '00000000-0000-4000-8000-0000000000aa', NULL, '2026-04-01 20:00+00', 'photo_auto_sync', false, 'https://example.invalid/n1', 'n1.jpg', '{"DateTimeOriginal":"2026:04:01 12:00:00"}', '{"classification":{"image_type":"vehicle_exterior"}}'),
  -- leftover on a gate-failed day the helper still reports as refused_no_new_evidence
  ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000aa', NULL, '2026-05-01 20:00+00', 'photo_auto_sync', false, 'https://example.invalid/b1', 'b1.jpg', '{"DateTimeOriginal":"2026:05:01 12:00:00"}', '{"classification":{"image_type":"vehicle_exterior"}}');
+INSERT INTO vehicle_images(id, user_id, vehicle_id, taken_at, created_at, source, is_sensitive, image_url, file_name, exif_data, ai_scan_metadata) VALUES
+ -- no-clock leftover on the already-planned day: created_at falls on 2026-03-01 LA, taken_at is null
+ ('00000000-0000-4000-8000-0000000000e1', '00000000-0000-4000-8000-0000000000aa', NULL, NULL, '2026-03-01 20:30+00', 'photo_auto_sync', false, 'https://example.invalid/nclock', 'nclock.jpg', '{}', '{"classification":{"image_type":"vehicle_exterior"}}');
+
 
 INSERT INTO capture_landing_chunks(id, user_id, state, dry, t_from, t_to) VALUES
  ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000aa', 'applied', false, '2026-03-01 08:00+00', '2026-03-02 08:00+00'),
@@ -81,12 +88,16 @@ SELECT pg_temp.assert_true((:'dry')::jsonb->>'taken' = '2', 'dry takes two lefto
 SELECT pg_temp.assert_true((:'dry')::jsonb->>'days' = '1', 'one day');
 SELECT pg_temp.assert_true(NOT ((:'dry')::jsonb->'items' @> '[{"image_id":"00000000-0000-4000-8000-0000000000b1"}]'::jsonb),
   'dry skips the refused_no_new_evidence day');
+SELECT pg_temp.assert_true(NOT ((:'dry')::jsonb->'items' @> '[{"image_id":"00000000-0000-4000-8000-0000000000e1"}]'::jsonb),
+  'dry skips the no-clock leftover the scorer cannot use');
 SELECT pg_temp.assert_true(NOT EXISTS (SELECT 1 FROM capture_set_rescore_queue), 'dry does not enqueue');
 
 SELECT public.capture_replan_vehicle_leftovers_v1(
   '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-000000000102',
   '00000000-0000-4000-8000-0000000000cc', false, 50) AS ap \gset
 SELECT pg_temp.assert_true((:'ap')::jsonb->>'taken' = '2', 'apply takes 2');
+SELECT pg_temp.assert_true(NOT EXISTS (SELECT 1 FROM capture_replan_vehicle_log WHERE image_id = '00000000-0000-4000-8000-0000000000e1'),
+  'apply does not log the no-clock leftover');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_rescore_queue) = 1, 'one day enqueued');
 SELECT pg_temp.assert_true((SELECT day FROM capture_set_rescore_queue) = '2026-03-01', 'LA day 2026-03-01');
 SELECT pg_temp.assert_true(NOT EXISTS (SELECT 1 FROM vehicle_images WHERE vehicle_id IS NOT NULL), 'did not file');
@@ -114,6 +125,8 @@ SELECT public.capture_replan_vehicle_leftovers_v1(
   '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-000000000104',
   '00000000-0000-4000-8000-0000000000cc', false, 50) AS ap3 \gset
 SELECT pg_temp.assert_true((:'ap3')::jsonb->>'taken' = '3', 'after revert and new evidence, takes the original two plus the unblocked leftover');
+SELECT pg_temp.assert_true(NOT ((:'ap3')::jsonb->'items' @> '[{"image_id":"00000000-0000-4000-8000-0000000000e1"}]'::jsonb),
+  'no-clock leftover still skipped after new evidence on the refused day');
 SELECT pg_temp.assert_true((:'ap3')::jsonb->>'days' = '2', 'both days enqueued once evidence arrives');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_rescore_queue) = 2, 'two days in the queue');
 SELECT pg_temp.assert_true((SELECT count(*) FROM capture_set_rescore_queue WHERE day IN ('2026-03-01','2026-05-01')) = 2, '2026-03-01 and 2026-05-01');
