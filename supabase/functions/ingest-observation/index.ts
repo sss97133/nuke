@@ -30,7 +30,7 @@ import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.t
 import { FINANCIAL_EVIDENCE_MODE, financialActor, ingestFinancialEvidence } from "./financialEvidence.ts";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
-import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey } from "./imageProperties.ts";
+import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey, isPhysicalReadingKey } from "./imageProperties.ts";
 import { prepareComponentEvidence, componentReadingSelector, COMPONENT_PRESENCE_PROPERTY, COMPONENT_READING_METHOD,
   type ComponentEvidenceResult } from "./componentEvidence.ts";
 import { observationContentHash, observationClockMicroseconds } from "../_shared/observationContentHash.ts";
@@ -1015,6 +1015,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     let propertyRow = null;
     if (input.property_key !== undefined) {
       if (!isSupportedImagePropertyKey(input.property_key) && !isImageReadingKey(input.property_key) &&
+          !isPhysicalReadingKey(input.property_key) &&
           !(titleFacetVerified && (TITLE_FACET_KEYS as readonly string[]).includes(input.property_key)) &&
           !(retainedSourceId && RETAINED_PROPERTY_KEYS.includes(input.property_key)) &&
           !(component && input.property_key === COMPONENT_PRESENCE_PROPERTY)) {
