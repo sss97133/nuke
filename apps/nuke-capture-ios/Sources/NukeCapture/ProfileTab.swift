@@ -303,28 +303,20 @@ struct ProfileView: View {
     @State private var garageIsCached = false
     @State private var garageCachedAt: Date?
     @State private var openVehicle: GarageVehicle?
-    /// Today's garage activity (own profile only) and the recency order it gives the fleet.
-    @StateObject private var garageActivity = GarageActivityStore()
-    @State private var showPast = false           // "Past & contributions" stays collapsed
     @State private var photoEvidence: LocalProfileEvidence?
     @State private var photoEvidenceError: String?
-    @State private var showAlbums = false
+    @State private var showPhotoRecord = false
+    @State private var showGarage = false
+    @Environment(\.openGarageTab) private var openGarageTab
     @ObservedObject private var libraryIngest = LibraryIngest.shared
 
-    // Stewardship and contribution are separate current relationships. A newly
-    // photographed vehicle remains visible without implying that the photographer owns it.
-    // Only previous ownership belongs in collapsed history.
-    // Intake placeholders (e.g. "UNRESOLVED / Intake Quarantine") are holding areas, not vehicles:
-    // kept out of the fleet lists and shown apart (PhotoPresentation.isPlaceholderVehicle).
-    private var realGarage: [GarageVehicle] { garageActivity.sorted(garage.filter { !$0.isPlaceholder }) }
+    // Each fact once: your own profile carries one line of relationship counts that opens the Garage
+    // tab (the list lives there); a visitor sees the public owned vehicles. Intake placeholders
+    // (e.g. "UNRESOLVED / Intake Quarantine") are holding areas, not vehicles: kept out of the counts
+    // and shown under the photo record (PhotoPresentation.isPlaceholderVehicle).
+    private var realGarage: [GarageVehicle] { garage.filter { !$0.isPlaceholder } }
     private var heldGarage: [GarageVehicle] { garage.filter(\.isPlaceholder) }
     private var currentGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "owner" } }
-    private var contributedGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "contributor" } }
-    private var pastGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "previously_owned" } }
-    private var documentingGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "documenting" } }
-    private var otherRelationships: [String] {
-        Array(Set(realGarage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor", "documenting"].contains($0) }.sorted()
-    }
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
     // server-side truth (the RPC); `engine` is this device's local truth.
@@ -354,8 +346,6 @@ struct ProfileView: View {
             Section { identityHeader }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-
-            if isOwn { photoEvidenceSection }
 
             // BARCODE — the proof-of-work graph, directly under the identity (the
             // labor story IS the headline; it belongs with the producer signals,
@@ -396,12 +386,11 @@ struct ProfileView: View {
             // showing up"; UserWorkspaceContent.tsx), and the web shows them only on the signed-in capsule.
             if isOwn { OrgAffiliationsSection(rows: affiliations, failureText: affiliationsFailure) }
 
-            // GARAGE — the user's vehicles, the way into the whole drill chain.
-            // Empty + own profile → a LIVING state that says what's coming, not a
-            // hidden section that reads as a dead profile (the cold-start gravestone).
-            if isOwn { GarageDoorSection(userId: userId) }
+            // GARAGE — own profile: one line of relationship counts that opens the Garage tab;
+            // a visitor: the public owned vehicles. Empty + own profile → a LIVING state that says
+            // what's coming, not a hidden section that reads as a dead profile (the cold-start gravestone).
             if !garage.isEmpty || !unresolvedGarageSources.isEmpty {
-                garageSection
+                if isOwn { garageCountsSection } else { garageSection }
             } else if garageError {
                 // A failed load is NOT an empty garage — say so, with a way back.
                 // (This is the 29.5s-timeout incident: the owner's full garage
@@ -412,7 +401,6 @@ struct ProfileView: View {
             }
 
             if isOwn { ObservedCarsSection(userId: userId) }
-            if isOwn { SourceInboxSection(userId: userId) }
 
             // SYNC — owner-only ledger that proves the phone↔record link.
             if isOwn { syncSection }
@@ -457,7 +445,11 @@ struct ProfileView: View {
             DayReceiptView(userId: userId, date: day.day)
                 .presentationDetents([.medium, .large])
         }
-        .sheet(isPresented: $showAlbums) { LibraryAlbumsView(userId: userId) }
+        .navigationDestination(isPresented: $showPhotoRecord) {
+            ProfilePhotoRecordView(userId: userId, sync: sync, evidence: photoEvidence, vehicles: garage, held: heldGarage,
+                                   evidenceError: photoEvidenceError, albumSyncSummary: libraryIngest.albumSyncSummary)
+        }
+        .navigationDestination(isPresented: $showGarage) { GarageView(userId: userId) }
         // (openVehicle sheet moved onto garageSection — avoids two .sheet on one view)
         .onReceive(NotificationCenter.default.publisher(for: SubjectResolutionEngine.didChange)) { _ in
             Task { await loadGarage() }
@@ -478,31 +470,6 @@ struct ProfileView: View {
         }
         .onChange(of: libraryIngest.running) { _, running in
             if !running && isOwn { Task { await loadPhotoEvidence() } }
-        }
-    }
-
-    @ViewBuilder private var photoEvidenceSection: some View {
-        Section("Photo record") {
-            Button { showAlbums = true } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let evidence = photoEvidence {
-                        if let visible = evidence.catalog.photos?.count {
-                            Text("\(visible) accessible photos · \(evidence.reviewed) read on-device")
-                                .monospacedDigit()
-                        }
-                        if evidence.catalog.accessScope == "full" {
-                            Text("\(evidence.catalog.albums.count) albums · \(evidence.matched) serial matches")
-                                .font(.caption).foregroundStyle(.secondary)
-                        } else { Text("Album coverage unknown").font(.caption).foregroundStyle(.secondary) }
-                        if evidence.unresolved > 0 {
-                            Text("\(evidence.unresolved) vehicle frames awaiting identity")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    } else { Label("Albums & source photos", systemImage: "photo.on.rectangle") }
-                }
-            }
-            if let photoEvidenceError { Text(photoEvidenceError).font(.caption).foregroundStyle(.secondary) }
-            if let summary = libraryIngest.albumSyncSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
         }
     }
 
@@ -740,14 +707,22 @@ struct ProfileView: View {
                     if let hours = ProfileHeaderCopy.hoursYearStat(p) { stat(hours.value, hours.label) }
                     if let wy = p.work_days_year, wy > 0 { stat("\(wy)", "work-days") }
                     if let ls = p.longest_streak, ls > 0 { stat("\(ls)", "best streak") }
-                    // A count with its population: analyzed frames out of the record's frames.
-                    if let an = p.images_analyzed, an > 0 {
-                        if let total = p.images_total, total > 0 {
-                            stat("\(an.formatted()) of \(total.formatted())", "analyzed")
-                        } else {
-                            stat(an.formatted(), "analyzed · total unknown")
-                        }
+                }
+            }
+
+            // PHOTOS — said once: uploaded · filed · analyzed. Your own line opens the photo record,
+            // then what was uploaded, filed and analyzed; a visitor's is the count alone.
+            if let line = ProfilePhotoLine.text(sync: isOwn ? sync : nil, producer: producer) {
+                if isOwn {
+                    Button { showPhotoRecord = true } label: {
+                        Label(line, systemImage: "photo.on.rectangle")
+                            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens your photo record")
+                } else {
+                    Label(line, systemImage: "photo.on.rectangle")
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
 
@@ -773,119 +748,57 @@ struct ProfileView: View {
     }
 
     // ─── Garage ──────────────────────────────────────────────────────────────
-    @ViewBuilder private var garageSection: some View {
-      Group {
-        if isOwn {
-            GarageActivitySections(
-                store: garageActivity,
-                retry: { Task { await garageActivity.refresh(vehicles: realGarage) } },
-                open: { id in openVehicle = garage.first { $0.vehicle_id.lowercased() == id.lowercased() } })
+    /// Your own garage, said once: the record's relationship counts. The vehicles are listed on the Garage tab.
+    @ViewBuilder private var garageCountsSection: some View {
+        let sections = GarageSections(realGarage)
+        Section {
+            Button {
+                if let openGarageTab { openGarageTab() } else { showGarage = true }
+            } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ProfileGarageCounts.headline(sections))
+                        .font(.nukeCardTitle).monospacedDigit()
+                        .foregroundStyle(Color.primary)
+                    Text(ProfileGarageCounts.detail(sections, unresolved: unresolvedGarageSources.count))
+                        .font(.footnote).monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    // Offline mirror notice — never let cached rows silently pass as live.
+                    if garageIsCached {
+                        Label {
+                            Text("Showing saved data" + (garageCachedAt.map { " from \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date()))" } ?? "") + " — may be out of date")
+                        } icon: {
+                            Image(systemName: "wifi.slash")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: NukeSize.minTap, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the Garage tab")
+        } header: {
+            Text("Garage")
         }
+    }
+
+    /// A visitor's view: the public vehicles the person owns (loadPublicGarage).
+    @ViewBuilder private var garageSection: some View {
         if !currentGarage.isEmpty {
             Section {
-                // Offline mirror notice — never let cached rows silently pass as
-                // live. Shown once per section, not per row.
-                if garageIsCached {
-                    Label {
-                        Text("Showing saved data" + (garageCachedAt.map { " from \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date()))" } ?? "") + " — may be out of date")
-                    } icon: {
-                        Image(systemName: "wifi.slash")
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
                 ForEach(currentGarage) { v in garageRow(v) }
             } header: {
-                // "The fleet" (was "Garage") — the worth/labor headline lives up in
-                // the identity head now; this just labels the list (Tenet 2: the
-                // fleet figure is stated once, in the headline, not restated here).
                 Text("The fleet · \(currentGarage.count)")
             }
             // Vehicle sheet lives HERE (on the garage section), NOT stacked as a second
             // .sheet on the same List as the day-receipt sheet — two .sheet(item:) on one
             // view is the SwiftUI pitfall where the second silently fails to present.
-        }
-        ForEach(otherRelationships, id: \.self) { role in
-            let rows = realGarage.filter { $0.relationship == role }
-            Section(rows.first?.relationshipLabel ?? role) {
-                ForEach(rows) { v in garageRow(v) }
+            .sheet(item: $openVehicle) { v in
+                VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
             }
         }
-        if !contributedGarage.isEmpty {
-            Section("Your contributions · \(contributedGarage.count)") {
-                ForEach(contributedGarage) { v in garageRow(v) }
-            }
-        }
-        // Documenting sits beside contributions, never in the fleet: photographing a dealer's car doesn't make it yours.
-        if !documentingGarage.isEmpty {
-            Section {
-                ForEach(documentingGarage) { v in garageRow(v) }
-            } header: {
-                Text("Documenting · \(documentingGarage.count)")
-            } footer: {
-                Text(GarageCopy.documentingFooter)
-            }
-        }
-        // Former ownership remains available as history.
-        if !pastGarage.isEmpty {
-            Section {
-                if showPast { ForEach(pastGarage) { v in garageRow(v) } }
-            } header: {
-                Button { withAnimation(.snappy(duration: 0.2)) { showPast.toggle() } } label: {
-                    HStack {
-                        Text("History · \(pastGarage.count)")
-                        Spacer()
-                        Image(systemName: showPast ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        if isOwn {
-            Section {
-                NavigationLink {
-                    ProfilePhotosView(userId: userId, vehicles: garage)
-                } label: {
-                    Label("Your photos", systemImage: "photo.on.rectangle.angled")
-                }
-                ForEach(heldGarage) { v in
-                    LabeledContent("Intake holding area") {
-                        Text("\(v.image_count.formatted()) photos · not a vehicle").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Photos")
-            } footer: {
-                if !heldGarage.isEmpty {
-                    Text("Photos waiting to be re-homed appear under Your photos → Needs sorting, not as a vehicle.")
-                }
-            }
-        }
-        if isOwn && SupabaseService.currentUserId == userId.lowercased() && !unresolvedGarageSources.isEmpty {
-            Section("Identity pending") {
-                if garageIsCached { Text("Showing saved source statements — may be out of date").font(.caption).foregroundStyle(.secondary) }
-                ForEach(unresolvedGarageSources) { source in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(source.label).font(.subheadline.weight(.medium))
-                        Text(source.statedRoles.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: " · ") + " · account stated")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text("Photo evidence still needs to identify this vehicle.").font(.caption).foregroundStyle(.secondary)
-                        if let quote = source.sourceExcerpt {
-                            DisclosureGroup("Source statement") {
-                                Text(quote).font(.caption)
-                                Text("Recorded \(source.observedAt.prefix(10))").font(.caption2).foregroundStyle(.secondary)
-                            }.font(.caption)
-                        }
-                    }
-                }
-            }
-        }
-      }
-      .sheet(item: $openVehicle) { v in
-          VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
-      }
     }
 
     @ViewBuilder private func garageRow(_ v: GarageVehicle) -> some View {
@@ -912,9 +825,6 @@ struct ProfileView: View {
                     }
                     if let period = v.relationshipPeriod {
                         Text(period).font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let line = GarageActivityFeed.lastActivity(garageActivity.latestByVehicle[v.vehicle_id.lowercased()], now: Date()) {
-                        Text(line).font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
                     }
                 }
                 Spacer()
@@ -981,8 +891,6 @@ struct ProfileView: View {
             if isOwn && SupabaseService.currentUserId == userId.lowercased() {
                 try LocalStore.shared.cacheUnresolvedGarageSources(userId: userId, sources: unresolved)
             }
-            // The activity feed reads on its own clock; it never holds up the garage rows.
-            Task { await garageActivity.refresh(vehicles: rows.filter { !$0.isPlaceholder }) }
             if isOwn { await loadPhotoEvidence() }
         } catch {
             if Self.isPermissionDenied(error) { signInNeeded = true; garageError = false; return }
@@ -1079,35 +987,12 @@ struct ProfileView: View {
             }
 
             if let sync {
-                LabeledContent("Synced") {
-                    Text("\(sync.synced_total)").monospacedDigit()
-                }
-
-                // ANALYZED → drill into the understood photos (only when any).
-                if sync.analyzed_total > 0 {
-                    NavigationLink {
-                        AnalyzedPhotosView(userId: userId)
-                    } label: {
-                        LabeledContent("Analyzed") {
-                            Text("\(sync.analyzed_total)").monospacedDigit()
-                        }
-                    }
-                } else {
-                    LabeledContent("Analyzed") {
-                        Text("\(sync.analyzed_total)").monospacedDigit()
-                    }
-                }
-
+                // Synced, filed and analyzed are said once, on the header's photo line.
                 if sync.pending_total > 0 {
                     LabeledContent("Pending") {
                         Text("\(sync.pending_total)")
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
-                    }
-                }
-                if sync.filed_total > 0 {
-                    LabeledContent("Filed") {
-                        Text("\(sync.filed_total)").monospacedDigit()
                     }
                 }
                 if let last = sync.last_synced_at {
