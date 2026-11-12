@@ -5,6 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './maplibreWorker';
 import './one-map.css';
 import { CARTO_LIGHT } from './constants';
+import { SUPABASE_URL } from '../../lib/env';
 import { BAND_RGBA, BANDS, BOUNDARY_TILES, band, eligible, makeLabel, outcome, platformName, readArea, readAreas, readBusinesses, readSellers, readZip, zipBounds, type AreaLayers, type BusinessLink, type LocationRow, type SellerLink } from './oneMapService';
 
 /**
@@ -21,7 +22,12 @@ const money = (n: number | null | undefined) => (n == null ? '' : `$${Math.round
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : 'date unknown');
 const utc = (d: Date) => d.toISOString().slice(0, 10);
 
-export default function OneMap() {
+/** One place on the map, for a reader that shows an area in place: the county's outline from the boundary tiles, the
+ * county file's ZIP shapes (map-data/geo/v1/county/{fips}.geojson) and the area's public centre. No URL sync, no
+ * counts, no panels. */
+export type OneMapFocus = { countyFips: string; geojsonPath?: string | null; centroid?: { lat: number; lng: number } | null; label?: string | null };
+
+export default function OneMap({ focus }: { focus?: OneMapFocus } = {}) {
   const p = useMemo(() => new URLSearchParams(window.location.search), []);
   const mapRef = useRef<MLMap | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,17 +55,19 @@ export default function OneMap() {
   const windowLabel = WINDOWS.find((w) => w.key === windowKey)!.label;
 
   useEffect(() => {
+    if (focus) return;
     const m = mapRef.current;
     const url = new URL(window.location.href);
     url.searchParams.set('layer', layer); url.searchParams.set('window', windowKey);
     if (selected) url.searchParams.set('zip', selected.zip); else url.searchParams.delete('zip');
     if (m) { const c = m.getCenter(); url.searchParams.set('lng', c.lng.toFixed(3)); url.searchParams.set('lat', c.lat.toFixed(3)); url.searchParams.set('z', m.getZoom().toFixed(2)); }
     window.history.replaceState(null, '', url);
-  }, [layer, windowKey, selected, viewKey]);
+  }, [layer, windowKey, selected, viewKey, focus]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = new MLMap({ container: containerRef.current, style: CARTO_LIGHT, center: [Number(p.get('lng')) || -115.1, Number(p.get('lat')) || 36.1], zoom: Number(p.get('z')) || 9.3, minZoom: 4, maxZoom: 16, attributionControl: { compact: true } });
+    const center: [number, number] = focus?.centroid ? [focus.centroid.lng, focus.centroid.lat] : [Number(p.get('lng')) || -115.1, Number(p.get('lat')) || 36.1];
+    const map = new MLMap({ container: containerRef.current, style: CARTO_LIGHT, center, zoom: focus ? 8.5 : Number(p.get('z')) || 9.3, minZoom: 4, maxZoom: 16, attributionControl: { compact: true } });
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
     map.on('load', () => {
       map.addSource('bounds', { type: 'vector', tiles: [BOUNDARY_TILES], minzoom: 0, maxzoom: 9, attribution: 'ZIP areas: U.S. Census Bureau 2020' });
@@ -69,12 +77,23 @@ export default function OneMap() {
       map.addLayer({ id: 'zcta-selected', type: 'line', source: 'bounds', 'source-layer': 'zctas', paint: { 'line-color': 'rgb(0,122,255)', 'line-width': 1.6 }, filter: ['==', ['id'], -1] });
       map.addLayer({ id: 'county-fill', type: 'fill', source: 'bounds', 'source-layer': 'counties', paint: { 'fill-color': 'rgba(0,0,0,0)' } });
       map.addLayer({ id: 'county-line', type: 'line', source: 'bounds', 'source-layer': 'counties', paint: { 'line-color': 'rgba(60,60,67,0.45)', 'line-width': 0.8 } });
+      if (focus) {
+        map.addLayer({ id: 'county-focus', type: 'line', source: 'bounds', 'source-layer': 'counties', paint: { 'line-color': 'rgb(0,122,255)', 'line-width': 2 }, filter: ['==', ['to-number', ['get', 'fips']], Number(focus.countyFips)] });
+        if (focus.geojsonPath) {
+          map.addSource('focus-zips', { type: 'geojson', data: `${SUPABASE_URL}/storage/v1/object/public/${focus.geojsonPath}` });
+          map.addLayer({ id: 'focus-zips', type: 'line', source: 'focus-zips', paint: { 'line-color': 'rgba(0,122,255,0.35)', 'line-width': 0.6 } });
+        }
+        if (focus.centroid) {
+          map.addSource('focus-centre', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [focus.centroid.lng, focus.centroid.lat] } } });
+          map.addLayer({ id: 'focus-centre', type: 'circle', source: 'focus-centre', paint: { 'circle-radius': 5, 'circle-color': 'rgb(0,122,255)', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 } });
+        }
+      }
       setReady(true); setViewKey((k) => k + 1);
     });
     map.on('idle', () => setViewKey((k) => k + 1));
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
-  }, [p]);
+  }, [p, focus]);
 
   // The ZIPs and counties in view.
   useEffect(() => {
@@ -95,13 +114,13 @@ export default function OneMap() {
     paintedRef.current = new Set(counts.keys());
   }, []);
   useEffect(() => {
-    if (!ready || !visible.zips.length) { setInView(null); return; }
+    if (focus || !ready || !visible.zips.length) { setInView(null); return; }
     const ctl = new AbortController();
     readAreas('zcta', layer, win.from, win.to, visible.zips.slice(0, 2000), ctl.signal)
       .then((r) => { paint(new Map(r.areas.map((a) => [a.key, a.entities]))); setInView({ total: r.totals.entities, areas: r.totals.areas, asOf: r.as_of }); setNote(''); })
       .catch((e) => { if (e.name !== 'AbortError') setNote(String(e.message ?? e)); });
     return () => ctl.abort();
-  }, [ready, visible, layer, win.from, win.to, paint]);
+  }, [ready, visible, layer, win.from, win.to, paint, focus]);
 
   useEffect(() => { const m = mapRef.current; if (m?.getLayer('zcta-selected')) m.setFilter('zcta-selected', ['==', ['id'], selected ? Number(selected.zip) : -1]); }, [selected, ready]);
 
@@ -127,7 +146,7 @@ export default function OneMap() {
   // Tap a ZIP (its county and state come from the tiles under the tap).
   useEffect(() => {
     const map = mapRef.current;
-    if (!ready || !map) return;
+    if (focus || !ready || !map) return;
     const onClick = (e: MapMouseEvent) => {
       const z = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] })[0] as MapGeoJSONFeature | undefined;
       const c = map.queryRenderedFeatures(e.point, { layers: ['county-fill'] })[0] as MapGeoJSONFeature | undefined;
@@ -137,7 +156,7 @@ export default function OneMap() {
     const onMove = (e: MapMouseEvent) => { map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ['zcta-fill'] }).length ? 'pointer' : ''; };
     map.on('click', onClick); map.on('mousemove', onMove);
     return () => { map.off('click', onClick); map.off('mousemove', onMove); };
-  }, [ready]);
+  }, [ready, focus]);
 
   const search = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,6 +187,9 @@ export default function OneMap() {
   const doll = (a: AreaLayers | null, key: string) => a?.layers.find((l) => l.layer === key);
 
   const word = LAYER_WORD[layer];
+  if (focus) return <div className="om om--focus" data-testid="one-map-focus" role="img" aria-label={focus.label ? `Map of ${focus.label}` : 'Map of the area'}>
+    <div ref={containerRef} className="om-canvas" />
+  </div>;
   return (
     <div className="om" data-testid="one-map">
       <div ref={containerRef} className="om-canvas" />
