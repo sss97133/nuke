@@ -12,7 +12,7 @@ CREATE TEMP TABLE before_ledger(amounts_visible boolean PRIMARY KEY, output json
 INSERT INTO before_ledger SELECT t,public.visual_work_build_log_compute('10000000-0000-0000-0000-000000000001',t) FROM unnest(ARRAY[false,true]) t;
 CREATE TEMP TABLE before_digest AS SELECT public.visual_work_build_log_inputs_digest('10000000-0000-0000-0000-000000000001') d;
 
-\ir ../migrations/20261116025000_visual_work_ledger_image_map.sql
+\ir ../migrations/20261116027000_visual_work_ledger_image_map.sql
 
 -- Re-expansion used by this contract only: string entries resolve through the map.
 CREATE FUNCTION pg_temp.expand(j jsonb) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
