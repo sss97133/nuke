@@ -430,7 +430,16 @@ CREATE OR REPLACE FUNCTION public.profile_vehicle_relationships_read_v1(p_user_i
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $fn$
   WITH viewer AS (
     SELECT coalesce((SELECT auth.uid()) = p_user_id, false) OR coalesce((SELECT auth.role()) = 'service_role', false) AS own),
-  e AS (SELECT * FROM public._profile_vehicle_evidence_v1(p_user_id, NULL)),
+  -- A deal jacket is shown only when the account itself may read it (its creator, a public jacket, or an active
+  -- member of the jacket's organization for a non-privileged one), mirroring the deal_jackets policies.
+  e AS (SELECT ev.* FROM public._profile_vehicle_evidence_v1(p_user_id, NULL) ev
+        WHERE ev.evidence_table <> 'deal_jackets'
+           OR EXISTS (SELECT 1 FROM public.deal_jackets dj WHERE dj.id = ev.evidence_id
+                        AND (dj.created_by = p_user_id OR dj.visibility::text = 'public'
+                             OR (dj.visibility::text IN ('org', 'principals')
+                                 AND dj.organization_id IN (SELECT oc.organization_id FROM public.organization_contributors oc
+                                   WHERE oc.user_id = p_user_id AND oc.status = 'active'
+                                     AND oc.role IN ('owner', 'admin', 'co_founder', 'board_member', 'manager', 'employee', 'technician')))))),
   c AS (SELECT * FROM public._profile_ownership_class_v1(p_user_id)),
   roles AS (
     SELECT e.vehicle_id,
@@ -476,7 +485,9 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $fn$
                        ORDER BY r.role, r.organization_id NULLS FIRST)
                        FROM roles r WHERE r.vehicle_id = veh.id
                          AND ((SELECT own FROM viewer)
-                              OR r.role IN ('contributor', 'organization_inventory', 'organization_past_inventory', 'custody')
+                              OR r.role = 'contributor'
+                              -- visitors see an organization role only from a public organization link, never from a jacket
+                              OR (r.role IN ('organization_inventory', 'custody') AND r.kinds ? 'org_link')
                               OR (r.role = 'owner' AND r.kinds ? 'title_verification'))),
              'conflicts', CASE WHEN (SELECT own FROM viewer) THEN c.conflict_ids END,
              'denials', CASE WHEN (SELECT own FROM viewer) THEN c.denial_ids END,
