@@ -38,7 +38,8 @@ def char_name(ch):
 
 
 def build(out_dir, family, style, glyphs: list[Glyph], *, ascender, descender, cap_height, x_height,
-          kerning=None, fea_extra='', description='', designer_note='', sidecar_extra=None, file_stem=None):
+          kerning=None, fea_extra='', description='', designer_note='', sidecar_extra=None, file_stem=None,
+          extra_cmap=None):
     """Write <out_dir>/<stem>.otf, .woff2 and <stem>.provenance.json. Returns the TTFont path."""
     os.makedirs(out_dir, exist_ok=True)
     stem = file_stem or (family + '-' + style).replace(' ', '')
@@ -53,7 +54,10 @@ def build(out_dir, family, style, glyphs: list[Glyph], *, ascender, descender, c
         raise ValueError('family needs a space glyph')
     fb = FontBuilder(UPM, isTTF=False)
     fb.setupGlyphOrder(order)
-    fb.setupCharacterMap({g.unicode: g.name for g in glyphs if g.unicode is not None})
+    cmap = {g.unicode: g.name for g in glyphs if g.unicode is not None}
+    for cp, name in (extra_cmap or {}).items():
+        cmap.setdefault(cp, name)
+    fb.setupCharacterMap(cmap)
     charstrings, metrics = {}, {}
     for name in order:
         g = by[name]
