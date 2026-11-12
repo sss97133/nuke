@@ -179,7 +179,7 @@ SELECT pg_temp.fixtures();
 SELECT public.capture_set_review_sweep(NULL, 200);
 SELECT pg_temp.assert_true(pg_temp.queued() = '2026-10-25,2026-10-27,2026-11-03', 'before: an unrelated filing re-arms all three days');
 
-\i supabase/migrations/20261113120000_capture_replan_backoff.sql
+\i supabase/migrations/20261113120001_capture_replan_backoff.sql
 SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.capture_day_replan_state(uuid, date)', 'EXECUTE')
   AND NOT has_function_privilege('authenticated', 'public.capture_day_replan_state(uuid, date)', 'EXECUTE'), 'the state helper is not callable by anon or authenticated');
 
@@ -222,7 +222,7 @@ UPDATE capture_set_rescore_queue SET done_at = NULL, requested_at = now() - inte
 SELECT public.capture_sets_drain(5);
 SELECT pg_temp.assert_true(pg_temp.chunks('2026-10-27') = 2, 'a photo of the refused day arriving after the refusal lets it be planned again');
 
-\i supabase/sql/revert_20261113120000_capture_replan_backoff.sql
+\i supabase/sql/revert_20261113120001_capture_replan_backoff.sql
 SELECT pg_temp.assert_true(md5(pg_get_functiondef('public.capture_set_review_sweep(uuid, integer)'::regprocedure)) = '98acf91af0045795437226d6e9a8872f'
   AND md5(pg_get_functiondef('public.capture_sets_drain(integer)'::regprocedure)) = 'fe4310724f82af8181e84ad3ec1039a7'
   AND to_regprocedure('public.capture_day_replan_state(uuid, date)') IS NULL, 'revert restores both bodies and drops the helper');

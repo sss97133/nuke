@@ -146,7 +146,7 @@ SELECT pg_temp.assert_true(md5(pg_get_functiondef('public.capture_set_review_swe
   AND md5(pg_get_functiondef('public.capture_sets_drain(integer)'::regprocedure)) = 'fe4310724f82af8181e84ad3ec1039a7', 'stand-ins match the live fingerprints the migration pins');
 
 
-\i supabase/migrations/20261113120000_capture_replan_backoff.sql
+\i supabase/migrations/20261113120001_capture_replan_backoff.sql
 SELECT pg_temp.assert_true(md5(pg_get_functiondef('public.capture_set_review_sweep(uuid, integer)'::regprocedure)) = '4220544e9d0951cb074fc7f24a51459b'
   AND md5(pg_get_functiondef('public.capture_day_replan_state(uuid, date)'::regprocedure)) = '48f434a988614531f5c29ada12cf4e18', '20261113120000 bodies match the live fingerprints 20261113120100 pins');
 

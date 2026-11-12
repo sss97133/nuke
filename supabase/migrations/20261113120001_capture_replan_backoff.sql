@@ -15,7 +15,7 @@
 --   capture_sets_drain marks a blocked queued day done with reasons += {"skipped": <reason>, "chunk": ...} instead of
 --     planning it again; a day whose newest reason is new photos ("arrival") or a new text read is always planned.
 -- Nothing is deleted or filed. Refuses on drift (live bodies read 2026-11-09).
--- Revert: supabase/sql/revert_20261113120000_capture_replan_backoff.sql. Contract: supabase/sql/test_capture_replan_backoff.sql.
+-- Revert: supabase/sql/revert_20261113120001_capture_replan_backoff.sql. Contract: supabase/sql/test_capture_replan_backoff.sql.
 -- Lane: photo/document/library (Codex reviews). Not applied live.
 BEGIN;
 SET LOCAL statement_timeout = '30s';

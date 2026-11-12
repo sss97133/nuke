@@ -1,4 +1,4 @@
--- Revert 20261113120000_capture_replan_backoff: the 2026-11-09 sweep and drain bodies, then drop capture_day_replan_state.
+-- Revert 20261113120001_capture_replan_backoff: the 2026-11-09 sweep and drain bodies, then drop capture_day_replan_state.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 CREATE OR REPLACE FUNCTION public.capture_set_review_sweep(p_user uuid DEFAULT NULL::uuid, p_rearm_limit integer DEFAULT 200)

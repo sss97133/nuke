@@ -5,7 +5,7 @@
 -- is the signed, logged, per-run revertible write for that correction. Producer:
 --   scripts/photo-pipeline/capture_clock_from_file.py --correct-naive-utc
 -- Revert a run: SELECT capture_clock_backfill_revert('<run>', false);
--- Migration revert: supabase/sql/revert_20261114120000_capture_clock_naive_utc.sql
+-- Migration revert: supabase/sql/revert_20261114120001_capture_clock_naive_utc.sql
 
 CREATE OR REPLACE FUNCTION public.capture_clock_naive_utc_apply(
   p_run uuid, p_image uuid, p_clock timestamptz, p_keys jsonb)

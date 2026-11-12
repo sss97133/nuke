@@ -53,7 +53,7 @@ INSERT INTO vehicle_images VALUES
     '{}', '2026-03-12 08:47:06Z', false, NULL);
 
 \i supabase/migrations/20261113121000_capture_clock_backfill.sql
-\i supabase/migrations/20261114120000_capture_clock_naive_utc.sql
+\i supabase/migrations/20261114120001_capture_clock_naive_utc.sql
 
 SELECT pg_temp.assert_true(NOT has_function_privilege('anon', 'public.capture_clock_naive_utc_apply(uuid,uuid,timestamptz,jsonb)', 'EXECUTE'), 'anon cannot apply');
 SELECT pg_temp.assert_true(NOT has_function_privilege('authenticated', 'public.capture_clock_naive_utc_apply(uuid,uuid,timestamptz,jsonb)', 'EXECUTE'), 'authenticated cannot apply');
