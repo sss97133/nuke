@@ -749,6 +749,55 @@ BEGIN
     'withdrawn photo: its day leaves the area at read time');
 END $$;
 ROLLBACK;
+-- 4. 20261116037000: the strip names each header token it holds no value for (a gap), so every token can be opened.
+-- Applied twice: a no-op. Read as a logged-out viewer, before and after.
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+SELECT set_config('t.gaps_before', public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')::text, false) IS NOT NULL AS read_before;
+RESET ROLE;
+\ir ../migrations/20261116037000_vehicle_profile_strip_token_gaps.sql
+\ir ../migrations/20261116037000_vehicle_profile_strip_token_gaps.sql
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE p jsonb; s jsonb; dims text[];
+BEGIN
+  PERFORM public.t_assert((length(pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure))
+      - length(replace(pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure), 'token_gaps_v1', '')))
+      / length('token_gaps_v1') = 1, 'gaps patched once');
+  -- v1 records trim, body style, engine, transmission and location; drivetrain is its only gap.
+  p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
+  s := (SELECT x FROM jsonb_array_elements(p->'sections') x WHERE x->>'kind' = 'strip');
+  PERFORM public.t_assert(s->'gaps' = '[{"dimension": "drivetrain", "label": "Drivetrain"}]'::jsonb, 'v1: drivetrain is the gap');
+  PERFORM public.t_assert(s - 'gaps' = (SELECT x FROM jsonb_array_elements(current_setting('t.gaps_before')::jsonb->'sections') x
+    WHERE x->>'kind' = 'strip'), 'v1: the rest of the strip is unchanged');
+  PERFORM public.t_assert(p - 'read_at' - 'sections' = current_setting('t.gaps_before')::jsonb - 'read_at' - 'sections'
+    AND p#>'{sections,0}' = current_setting('t.gaps_before')::jsonb#>'{sections,0}', 'v1: masthead and the rest unchanged');
+  -- The thin car records none: it gains a strip of six gaps, in header order, each with a label.
+  p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000003');
+  s := (SELECT x FROM jsonb_array_elements(p->'sections') x WHERE x->>'kind' = 'strip');
+  PERFORM public.t_assert(s IS NOT NULL AND s->'facets' = '[]'::jsonb, 'thin car: a strip with no facets');
+  SELECT array_agg(g->>'dimension' ORDER BY n) INTO dims FROM jsonb_array_elements(s->'gaps') WITH ORDINALITY AS t(g, n);
+  PERFORM public.t_assert(dims = ARRAY['trim', 'body_style', 'engine', 'transmission', 'drivetrain', 'location'], 'thin car: six gaps in order');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(s->'gaps') g WHERE nullif(g->>'label', '') IS NULL),
+    'every gap has a label');
+  -- Every gap opens items: the masthead carries the eager tokens, location is read on click.
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM unnest(dims) d WHERE d <> 'location' AND p#>ARRAY['sections', '0', 'token_items', d] IS NULL),
+    'thin car: each gap has its items in the masthead');
+  PERFORM public.t_assert(jsonb_array_length(public.vehicle_facet_items('10000000-0000-0000-0000-000000000003', 'location')) > 0,
+    'thin car: the location gap opens items on click');
+  -- v2 names a series-less, trim-less record: trim is a gap there too, the recorded tokens are not.
+  p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000002');
+  s := (SELECT x FROM jsonb_array_elements(p->'sections') x WHERE x->>'kind' = 'strip');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(s->'gaps') g, jsonb_array_elements(s->'facets') f
+    WHERE g->>'dimension' = f->>'dimension'), 'no token is both a facet and a gap');
+  -- Private and deleted vehicles still return nothing to a logged-out viewer.
+  PERFORM public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000004') IS NULL
+    OR NOT (public.vehicle_profile_read('10000000-0000-0000-0000-000000000004') ? 'sections'), 'private vehicle: no strip');
+END $$;
+RESET ROLE;
 -- The documented fixture car as a logged-out viewer sees it (printed for review).
 SET ROLE anon;
 SET test.auth_role = 'anon';
