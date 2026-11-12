@@ -778,7 +778,7 @@ loc_areas AS MATERIALIZED (
          (a.e->>'first_taken_at')::timestamptz AS first_taken_at, (a.e->>'last_taken_at')::timestamptz AS last_taken_at,
          (a.e->>'confidence')::numeric AS confidence, a.e->>'latest_observation_id' AS latest_observation_id,
          a.e->>'method' AS method,
-         CASE WHEN jsonb_typeof(a.e->'centroid') = 'object' THEN a.e->'centroid' - 'point' END AS centroid,
+         CASE WHEN jsonb_typeof(a.e->'centroid') = 'object' THEN (a.e->'centroid') - 'point' END AS centroid,
          lower(concat_ws(',', nullif(btrim(a.e->>'city'), ''), nullif(btrim(a.e->>'region_code'), ''))) AS area_norm
   FROM v CROSS JOIN LATERAL jsonb_array_elements(
     CASE WHEN p_dimension IS NULL OR p_dimension = 'location' THEN
