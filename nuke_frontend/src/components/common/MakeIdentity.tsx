@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import type { VehicleIdentityToken } from '../../utils/vehicleIdentity';
 import artwork from '../../../public/stacks/makes/wordmarks.json';
 import vehicleArtwork from '../../../public/stacks/makes/vehicle-identities.json';
@@ -88,8 +88,19 @@ function variantQualifier(asset: VehicleArtwork, name: string) {
   return name.slice(label.length).trim();
 }
 
-function VehicleArtworkImage({ asset, fallback, text = false }: { asset: VehicleArtwork; fallback?: string; text?: boolean }) {
+// Period fonts drawn from the same sources as the cutouts (public/fonts/period/README.md). A catalogue entry's `font`
+// names its family in the font build's manifest. The loader is its own chunk, fetched only when an identity with a font
+// matches, so no other vehicle's route carries it; the raster stands until the faces load.
+const PeriodLettering = lazy(() => import('./PeriodLettering'));
+
+function VehicleArtworkImage({ asset, fallback, text = false, lettering }: { asset: VehicleArtwork; fallback?: string; text?: boolean;
+  /** The words the catalogue's period font sets in place of the raster (the recorded make, model, year or label). */
+  lettering?: string }) {
   const [failed, setFailed] = useState(false);
+  if (asset.font && lettering && !text && !failed) {
+    const raster = <VehicleArtworkImage asset={asset} fallback={fallback} />;
+    return <Suspense fallback={raster}><PeriodLettering family={asset.font} role={asset.role} tone={asset.tone} lettering={lettering} fallback={raster} /></Suspense>;
+  }
   if (failed) return fallback ? <span>{fallback}</span> : null;
   // A cutout (no background) sits on the page surface: a single-colour print is a mask in the text colour; photographed
   // chrome and the car's own decal keep their colour. Its catalogue capMetrics (where its capitals sit in the file) let
@@ -146,7 +157,7 @@ export function VehicleIdentity({ make, model, year, variants = [], compact = fa
   // Every mark shown is a cutout: no nameplate panel, the lettering sits on the page surface.
   const shown = [maker, emblem, variantScript, yearArt, (!variantScript || compact) && !sourcedModel ? script : undefined].filter(Boolean);
   const inline = shown.length > 0 && !sourcedModel && shown.every(asset => asset?.cutout);
-  const yearContent = yearArt && year ? <VehicleArtworkImage key={yearArt.file + yearArt.viewport} asset={yearArt} fallback={String(year)} /> : year;
+  const yearContent = yearArt && year ? <VehicleArtworkImage key={yearArt.file + yearArt.viewport} asset={yearArt} fallback={String(year)} lettering={String(year)} /> : year;
   const part = (field: string, value: string, content: React.ReactNode) => onExplore
     ? <button type="button" className="vehicle-identity__explore" aria-haspopup={exploreLabel ? undefined : 'dialog'}
       aria-label={exploreLabel ? exploreLabel(field, value) : `Explore ${value} in this profile`} title={exploreLabel?.(field, value)}
@@ -156,7 +167,7 @@ export function VehicleIdentity({ make, model, year, variants = [], compact = fa
     {compact && year && <span className="vehicle-identity__year" aria-hidden={onExplore ? undefined : true}>{part('year', String(year), yearContent)}</span>}
     <span className="vehicle-identity__maker" aria-hidden={onExplore ? undefined : true}>
       {part('make', make, <>
-      {maker ? <VehicleArtworkImage key={maker.file} asset={maker} fallback={make} text={text} /> : <span>{make}</span>}
+      {maker ? <VehicleArtworkImage key={maker.file} asset={maker} fallback={make} text={text} lettering={make} /> : <span>{make}</span>}
       {!compact && <span className="vehicle-identity__year">{yearContent}{variantScript && <>{year ? ' · ' : ''}<span className="vehicle-identity__model">{model}</span></>}</span>}
       </>)}
     </span>
@@ -166,10 +177,10 @@ export function VehicleIdentity({ make, model, year, variants = [], compact = fa
         {sourcedModel ? <span className="vehicle-identity__art vehicle-identity__art--model"><img src={sourcedModel.path}
           width={sourcedModel.width} height={sourcedModel.height} alt="" title={sourcedModel.description}
           onError={() => setFailedArtwork(sourcedModel.path)} /></span>
-          : script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} text={text} /> : model}
+          : script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} text={text} lettering={model} /> : model}
       </>)}</span>}
       {variantScript && <span className="vehicle-identity__variant" aria-hidden={onExplore ? undefined : true}>{part('trim', variantName, <>
-        <VehicleArtworkImage key={variantScript.file + variantScript.viewport} asset={variantScript} fallback={qualifier ? variantName.slice(0, -qualifier.length).trim() : variantName} />
+        <VehicleArtworkImage key={variantScript.file + variantScript.viewport} asset={variantScript} fallback={qualifier ? variantName.slice(0, -qualifier.length).trim() : variantName} lettering={variantScript.label} />
         {qualifier && <span className="vehicle-identity__qualifier">{qualifier}</span>}
       </>)}</span>}
       {variants.filter(token => !variantScript || (token.kind !== 'series' && token.kind !== 'trim')).map(token =>

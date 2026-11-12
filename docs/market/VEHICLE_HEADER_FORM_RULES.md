@@ -149,8 +149,12 @@ has now and should discuss gearing etc ... should perfectly define that the heck
 transmission is"; on location, "we have an awesome map system its a shame we dont use it".
 
 Each strip facet (`trim`, `body_style`, `engine`, `transmission`, `drivetrain`,
-`location`) and each identity token (`year`, `make`, `model`) carries `items` from
-`vehicle_profile_read`. The item list is the definition of the token. It is the same
+`location`) and each identity token (`year`, `make`, `model`) has its items from one
+reader, `vehicle_facet_items(vehicle, token)`. `vehicle_profile_read` carries the items of
+every token but `location` on the masthead as `token_items`. Location items are read when
+the token is clicked, with `vehicle_facet_items(vehicle, 'location')`, in the same shape:
+the photo GPS fold costs 0.3 to 2 s cold on a large gallery (prod, 2026-11-11), too much
+to put on every profile load. The item list is the definition of the token. It is the same
 for every vehicle; a vehicle differs only in which items are established. A click
 renders these items; the frontend chooses no lead source, ranks no trust and folds no
 sources.
@@ -175,7 +179,7 @@ sources.
 | `year`, `make`, `model`, `body_style` | `decode` from the VIN under its chart (position and rule); recorded value; title/registration claim |
 | `engine` | `as_built.engine` (VIN engine code under the chart); `current.family`, `current.displacement`, `current.block_casting`, `current.block_date`, `current.engine_code_stamp`, `current.heads`, `current.induction`, `current.cam`, `current.machine_work` (receipts, work orders); `derived.changed` (as built vs current, citing the change claim) |
 | `transmission` | `as_built.type`, `as_built.model` (body tag, order code, build documents, owner statement as `claim`); `current.type`, `current.model`, `current.id_stamp`, `current.date_code`, `current.gear_ratios` (rule table for the identified model), `current.shifter`; `axle.as_built.ratio`, `axle.current.ratio` (axle tag or stamp, receipt); `current.tire_size`; `derived.final_drive` per gear and `derived.rpm_at_60` (equation over the ratio, axle and tire items) |
-| `location` | `current.area` (ZCTA or city), sources (photo GPS fold: photo count and date range; listing location), `map` (ZCTA and bounds for the one map); public area grain only, never photo points |
+| `location` | `current.area` (ZCTA or city), sources (photo GPS fold: photo count and date range; listing location), `map` (area label and level, county FIPS, ZCTA when keyed; bounds are the county outline `map-data/geo/v1/county/{county_fips}.geojson`, the file OneMap and the iOS map draw, because no ZCTA geometry exists; centroid is the city's public centre); public area grain only, never photo points |
 | `trim` | Recorded trim; tribute rule (`tribute_badge_rule_v1`); factory trim decode where a chart exists |
 
 Rule tables (gear ratios by transmission model, axle codes, engine codes and casting

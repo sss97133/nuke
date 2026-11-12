@@ -81,23 +81,32 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
   const key = (line: MasterCostLine) => `${scenario.scenario}:${line.kind}:${line.physical_key}`;
   const detail = lines.find(r => key(r) === inspected);
   const sourcesFor = (line: MasterCostLine) => works.filter(w => line.work_observation_ids.includes(w.observation_id));
+  // Rows cite photographs by image_id through the ledger's image map; an object is a row-specific citation.
+  const photoOf = (ref: MasterCostLine['source_images'][number] | undefined) => typeof ref === 'string' ? ledger.images?.[ref] : ref;
   const detailWorks = detail ? sourcesFor(detail) : [];
-  const photos = detail?.source_images ?? [];
+  const photos = (detail?.source_images ?? []).map(photoOf).filter((im): im is VisualWork['images'][number] => !!im);
   const receiptItem = detail?.pricing?.receipt_item_id;
   const receiptLines = detailWorks.flatMap(w => w.receipts).filter((r, index, all) =>
     (!receiptItem || r.item_id === receiptItem) && all.findIndex(x => x.item_id === r.item_id) === index);
   const reference = detail?.reference;
+  const serviceFee = reference?.type === 'fixed_service_fee';
   const referenceName = reference?.description || reference?.name;
   const rateValue = detail?.rate_basis?.rate;
   const rateCurrency = detail?.rate_basis?.currency;
   const detailPanel = detail && <div id="vp-ledger-evidence" className="vp-ledger-evidence" role="region" aria-label={`Calculation for ${detail.label}`}>
       <div className="vp-ledger-detail-heading"><h5>{detail.label}</h5><button type="button" onClick={() => { setInspected(null); trigger.current?.focus(); }}>Close</button></div>
-      <p><strong><CostValue value={detail.cost} currency={detail.currency} /></strong>{detail.hours && <> · <CostValue value={detail.hours} /> estimated person-hours</>}</p>
+      <p><strong><CostValue value={detail.cost} currency={detail.currency} /></strong>{detail.hours && <> · <CostValue value={detail.hours} /> estimated person-hours</>}
+        {serviceFee && <> · Person-hours unknown</>}</p>
       {typeof detail.formula === 'string' && <p className="vp-ledger-equation">{detail.formula}</p>}
       {typeof rateValue === 'number' && <p>Rate: {amount(rateValue, typeof rateCurrency === 'string' ? rateCurrency : detail.currency)} per person-hour
         {typeof detail.rate_basis?.source === 'string' ? ` · ${reason(detail.rate_basis.source)}` : ''}.</p>}
       {detail.quantity?.derivation && <p>Quantity: {sourceText(detail.quantity.derivation)}</p>}
-      {reference && <p>Time basis: {typeof referenceName === 'string' ? `${referenceName} · ` : ''}{timeBasis(reference)}
+      {serviceFee && <p>Price basis: {reference.price_basis === 'published_starting_price' ? 'Published starting-price comparison' : 'Published service-menu comparison'}.
+        {' '}This is not a vehicle-specific quote.
+        {typeof reference.derivation === 'string' && <> {sourceText(reference.derivation)}</>}
+        {typeof reference.source_url === 'string' && <> Source: {sourceText(reference.source_url)}.</>}
+        {typeof reference.source_retrieved_at === 'string' && <> Captured {date(reference.source_retrieved_at)}.</>}</p>}
+      {reference && !serviceFee && <p>Time basis: {typeof referenceName === 'string' ? `${referenceName} · ` : ''}{timeBasis(reference)}
         {reference.code ? ` (${String(reference.code)})` : ''}.
         {typeof reference.derivation === 'string' && reference.derivation.trim() !== detail.quantity?.derivation?.trim()
           && <> {sourceText(reference.derivation)}</>}</p>}
@@ -130,19 +139,20 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
       <span>{coverage.resolved_lines + coverage.partial_lines} of {coverage.lines} items have a calculation</span>
     </div>
     <dl className="vp-ledger-totals">
-      <div><dt>Estimated person-hours</dt><dd>{totals.hours ? <CostValue value={totals.hours} /> : 'Unestimated'}</dd></div>
+      <div><dt>Estimated person-hours{totals.hours_coverage?.status === 'partial' ? ' (partial)' : ''}</dt><dd>{totals.hours ? <CostValue value={totals.hours} /> : 'Unestimated'}</dd></div>
       <div><dt>Labor estimate</dt><dd>{moneyTotals(totals.labor_currencies)}</dd></div>
       <div><dt>Replacement materials</dt><dd>{moneyTotals(totals.material_currencies)}</dd></div>
       <div><dt>Priced subtotal</dt><dd>{moneyTotals(totals.currencies)}</dd></div>
     </dl>
     <p className="vp-ledger-qualification">{coverage.unresolved_lines > 0 ? `${coverage.unresolved_lines} items still need inputs. ` : ''}
+      {!!totals.hours_coverage?.unknown_lines && `${totals.hours_coverage.unknown_lines} labor ${totals.hours_coverage.unknown_lines === 1 ? 'item has' : 'items have'} unknown person-hours; a service price does not measure time. `}
       {coverage.partial_lines > 0 ? `${coverage.partial_lines} calculations have incomplete ranges or inputs. ` : ''}
       {coverage.duplicate_claims_folded > 0 ? `${coverage.duplicate_claims_folded} repeated references counted once. ` : ''}
       Reference and analyst estimates remain separate from documented charges in the receipts below. Vehicle sale value and current component value are not calculated here.</p>
     <div className="vp-ledger-table-wrap"><table className="vp-ledger-table">
       <thead><tr><th>Work or material</th><th>Quantity</th><th>Hours</th><th>Calculated cost</th></tr></thead>
       <tbody>{lines.map(line => {
-        const own = sourcesFor(line); const photo = line.source_images?.[0];
+        const own = sourcesFor(line); const photo = photoOf(line.source_images?.[0]);
         const product = own.flatMap(w => w.receipts).find(r => r.item_id === line.pricing?.receipt_item_id)?.product;
         const thumbnail = product?.image_url || photo?.image_url;
         return <React.Fragment key={key(line)}><tr className={line.status === 'excluded' ? 'vp-ledger-excluded' : undefined}>
@@ -152,10 +162,11 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
               ? <span className="vp-catalog-media"><img src={optimizeImageUrl(thumbnail, 'thumbnail') || thumbnail} alt="Supplier stock image" width={48} height={38} loading="lazy" /></span>
               : <img src={optimizeImageUrl(thumbnail, 'thumbnail') || thumbnail} alt="" width={48} height={38} loading="lazy" />)}
             <span><strong>{line.label}</strong><small>{systemName(line.system_key)} · {line.kind === 'labor' ? 'Labor' : 'Material'}
-              {line.status === 'excluded' ? ' · Excluded from subtotal' : line.status === 'unresolved' ? ' · Needs inputs' : ''}</small></span>
+              {line.status === 'excluded' ? ' · Excluded from subtotal' : line.status === 'unresolved' ? ' · Needs inputs' : ''}
+              {line.reference?.type === 'fixed_service_fee' && (line.reference.price_basis === 'published_starting_price' ? ' · Starting-price comparison' : ' · Service-menu comparison')}</small></span>
           </button></td>
           <td>{line.quantity?.value != null ? `${number(line.quantity.value)} ${line.quantity.unit || ''}` : '—'}</td>
-          <td>{line.hours ? <CostValue value={line.hours} /> : '—'}</td>
+          <td>{line.hours ? <CostValue value={line.hours} /> : line.kind === 'labor' && line.status !== 'excluded' ? 'Unknown' : '—'}</td>
           <td><button type="button" className="vp-ledger-value" onClick={e => { trigger.current = e.currentTarget; setInspected(inspected === key(line) ? null : key(line)); }}
             aria-label={`See calculation: ${line.label}`} aria-expanded={inspected === key(line)} aria-controls="vp-ledger-evidence">
             {line.status === 'excluded' ? 'Excluded' : <CostValue value={line.cost} currency={line.currency} />}</button></td>

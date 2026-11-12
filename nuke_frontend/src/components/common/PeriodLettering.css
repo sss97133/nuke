@@ -1,0 +1,52 @@
+/* Loaded with the PeriodLettering chunk, only when a vehicle identity with a period font matches. */
+/* Period lettering set in type (catalogue `font`; public/fonts/period/README.md). It takes the cutout's box: its font
+   size is the cutout height, so its capitals fill the shared cap band. --art-cap is the font's cap height and
+   --art-base its baseline above the 1em line box (line-height 1; hhea ascent 900, descent 250 or 280 per 1000). */
+.vehicle-identity .vehicle-identity__art.vehicle-identity__art--type { width:auto; max-width:none; font-size:var(--art-h); line-height:1; white-space:nowrap; letter-spacing:0; font-weight:400; font-style:normal; }
+.vehicle-identity__type { position:relative; display:block; }
+.vehicle-identity__art--type[data-font^="Pontiac1973Block"] { --art-cap:0.7; --art-base:0.175; font-family:"Pontiac1973Block-Regular"; }
+.vehicle-identity__art--type[data-font^="Firebird1971Script"] { --art-cap:0.7; --art-base:0.19; font-family:"Firebird1971Script-Regular"; }
+.vehicle-identity__art--type[data-font^="TransAm1973Decal"] { --art-cap:0.7; --art-base:0.175; font-family:"TransAm1973Decal-Regular"; }
+/* Lining figures stand 720 against capitals of 700. */
+.vehicle-identity__art--type[data-font^="Pontiac1973BrochureNumerals"] { --art-cap:0.72; --art-base:0.175; font-family:"Pontiac1973BrochureNumerals-Regular"; }
+/* Materials. Chrome is lit, not recoloured: a rim (the Regular silhouette), a face (the Face font, the same advances
+   inset 30 units) and a horizon line, lit for the surface it sits on. The decal keeps its orange ink. Under 24 px
+   (data-material="plain") every material is the text colour. */
+.vehicle-identity__art--type {
+  --chrome-rim-a:#2b2f35; --chrome-rim-b:#7d8590; --chrome-rim-c:#1d2025;
+  --chrome-face-a:#fff; --chrome-face-b:#c9d0d8; --chrome-face-c:#59616b; --chrome-face-d:#e9edf1;
+  --chrome-edge:rgb(0 0 0 / 35%); --decal-ink:#e8741c;
+  /* The script's hairlines are a pixel at header size: on a light surface its face is lit darker so it holds. */
+  --script-a:#8d96a1; --script-b:#4a525c; --script-c:#1d2025; --script-d:#7d8590;
+}
+:root[data-theme="dark"] .vehicle-identity__art--type {
+  --chrome-rim-a:#9aa3ad; --chrome-rim-b:#e6eaee; --chrome-rim-c:#6c747e;
+  --chrome-face-a:#f4f6f8; --chrome-face-b:#8d96a1; --chrome-face-c:#3a4048; --chrome-face-d:#c4cbd3;
+  --chrome-edge:rgb(0 0 0 / 80%); --decal-ink:#f08a35;
+  --script-a:#f4f6f8; --script-b:#8d96a1; --script-c:#3a4048; --script-d:#c4cbd3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .vehicle-identity__art--type {
+    --chrome-rim-a:#9aa3ad; --chrome-rim-b:#e6eaee; --chrome-rim-c:#6c747e;
+    --chrome-face-a:#f4f6f8; --chrome-face-b:#8d96a1; --chrome-face-c:#3a4048; --chrome-face-d:#c4cbd3;
+    --chrome-edge:rgb(0 0 0 / 80%); --decal-ink:#f08a35;
+    --script-a:#f4f6f8; --script-b:#8d96a1; --script-c:#3a4048; --script-d:#c4cbd3;
+  }
+}
+.vehicle-identity__art--type[data-material="chrome"][data-font^="Pontiac1973Block"] .vehicle-identity__type {
+  color:transparent; -webkit-background-clip:text; background-clip:text;
+  background-image:linear-gradient(180deg, var(--chrome-rim-a) 0%, var(--chrome-rim-b) 48%, var(--chrome-rim-c) 52%, var(--chrome-rim-b) 100%);
+  filter:drop-shadow(0 .03em .02em var(--chrome-edge));
+}
+.vehicle-identity__art--type[data-material="chrome"][data-font^="Pontiac1973Block"] .vehicle-identity__type::after {
+  content:attr(data-text); position:absolute; inset:0; font-family:"Pontiac1973Block-Face";
+  color:transparent; -webkit-background-clip:text; background-clip:text;
+  background-image:linear-gradient(180deg, var(--chrome-face-a) 0%, var(--chrome-face-b) 46%, var(--chrome-face-c) 50%, var(--chrome-face-d) 56%, var(--chrome-face-a) 100%);
+}
+/* The script's edge is a filter, not -webkit-text-stroke: a stroke outlines every glyph and seams each join. */
+.vehicle-identity__art--type[data-material="chrome"][data-font^="Firebird1971Script"] .vehicle-identity__type {
+  color:transparent; -webkit-background-clip:text; background-clip:text;
+  background-image:linear-gradient(180deg, var(--script-a) 0%, var(--script-b) 40%, var(--script-c) 50%, var(--script-d) 62%, var(--script-b) 100%);
+  filter:drop-shadow(0 0 .01em var(--chrome-rim-a)) drop-shadow(0 0 .006em var(--chrome-rim-a)) drop-shadow(0 .02em .015em var(--chrome-edge));
+}
+.vehicle-identity__art--type[data-material="color"][data-font^="TransAm1973Decal"] { color:var(--decal-ink); }

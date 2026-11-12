@@ -5,12 +5,12 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/env';
 
 export interface LocationRow {
   id: string; observed_at: string | null; source_type: string | null; source_platform: string | null; source_url: string | null;
-  postal_code: string | null; county_fips: string | null; city: string | null; precision: string | null; confidence: number | null;
+  postal_code: string | null; zcta: string | null; county_fips: string | null; city: string | null; precision: string | null; confidence: number | null;
   vehicles: { id: string; year: number | null; make: string | null; model: string | null; trim: string | null; primary_image_url: string | null;
     city: string | null; state: string | null; status: string | null; deleted_at: string | null;
     asking_price: number | null; sale_price: number | null; sold_price: number | null; sale_status: string | null; auction_outcome: string | null };
 }
-const SELECT = 'id,observed_at,source_type,source_platform,source_url,postal_code,county_fips,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at,asking_price,sale_price,sold_price,sale_status,auction_outcome)';
+const SELECT = 'id,observed_at,source_type,source_platform,source_url,postal_code,zcta,county_fips,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at,asking_price,sale_price,sold_price,sale_status,auction_outcome)';
 const NOT_ELIGIBLE = new Set(['deleted', 'merged', 'rejected', 'duplicate']);
 const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 
@@ -99,7 +99,8 @@ export function foldByZip(rows: LocationRow[], opts: { make?: string; from?: Dat
     if (opts.make && (r.vehicles.make ?? '').trim().toLowerCase() !== opts.make.toLowerCase()) continue;
     if (opts.from && (!r.observed_at || new Date(r.observed_at) < opts.from)) continue;
     all.add(r.vehicles.id);
-    const z = zip5(r.postal_code);
+    // A photo-GPS row has no postal code; its ZIP is the zcta its photos' cell falls in (admit_photo_gps_locations).
+    const z = zip5(r.postal_code) ?? zip5(r.zcta);
     if (!z) { noZip++; continue; }
     const g = groups.get(z) ?? { zip: z, vehicles: new Map() };
     const list = g.vehicles.get(r.vehicles.id) ?? [];
