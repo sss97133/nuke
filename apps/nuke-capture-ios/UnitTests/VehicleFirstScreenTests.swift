@@ -18,7 +18,7 @@ final class VehicleFirstScreenTests: XCTestCase {
 
     func testAgeReadsPostgresAndDayOnlyClocks() {
         XCTAssertEqual(VehicleFirstScreen.age("2026-11-08 12:00:00+00:00", now: now), "3d ago")
-        XCTAssertEqual(VehicleFirstScreen.age("2026-11-08T12:00:00.123456+00:00", now: now), "3d ago")
+        XCTAssertEqual(VehicleFirstScreen.age("2026-11-08T11:00:00.123456+00:00", now: now), "3d ago")
         XCTAssertEqual(VehicleFirstScreen.age("2026-11-01", now: now), "10d ago")
     }
 
