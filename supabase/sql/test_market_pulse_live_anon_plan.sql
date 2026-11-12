@@ -24,8 +24,6 @@ GRANT SELECT ON plan_viewers TO anon,authenticated,service_role;
 
 SELECT assert_contract((SELECT proacl FROM pg_proc WHERE oid='public.market_pulse_live()'::regprocedure)
  IS NOT DISTINCT FROM (SELECT proacl FROM plan_acl),'grants unchanged');
-SELECT assert_contract((SELECT indisvalid FROM pg_index WHERE indexrelid=to_regclass('public.idx_vehicle_events_bat_open_episode_url')),
- 'open episode index valid');
 SELECT assert_contract(strpos(pg_get_functiondef('public.market_pulse_live()'::regprocedure),'stable_episodes AS MATERIALIZED')>0,
  'new plan installed');
 

@@ -1,7 +1,4 @@
-SET statement_timeout = '300s';
-SET lock_timeout = '60s';
--- market_pulse_live: read the board's per-lot identity work in a plan that touches a tenth of the rows, and a
--- small partial index for the BaT lots' current episodes.
+-- market_pulse_live: plan the board's per-lot identity work so anon reads touch half the buffers.
 --
 -- WHY. The home page's POST /rest/v1/rpc/market_pulse_live returned 500 at 2026-11-12 05:15:27Z (57014, the
 -- function's 10 s statement_timeout). It runs as invoker, so as anon under row security.
@@ -21,35 +18,13 @@ SET lock_timeout = '60s';
 --      compared with the inventory row's locator id, which the join already equates with locator.id); the
 --      locator and canonical vehicles are then read for the 129 lots that have one.
 --   3. native reads the event's observation by primary key in a LATERAL ... OFFSET 0 with the same two conditions.
---   4. idx_vehicle_events_bat_open_episode_url: btree (source_url) on BaT auction episodes that are active or live,
---      unsold and not duplicates (2,451 of 909,521 rows on 2026-11-12), the predicate both episode probes state.
---      The 1,266 probes read it instead of the 124 MB source_url index and its heap rows.
--- After (1-3), EXPLAIN as anon, warm: 261 ms, 18,684 buffers. Output byte-identical for anon, an untied
+-- After, EXPLAIN as anon, warm: 261 ms, 18,684 buffers. Output byte-identical for anon, an untied
 -- authenticated user and an owner on prod (md5 4970f2da..., 79a2cb67..., 6df10bfe... old = new, same statement).
 -- CONTRACT: supabase/sql/test_market_pulse_live_anon_plan.sql (PG17 fixture of the BaT board contracts).
 --
--- BUILD. vehicle_events is 1.4 GB (heap). CREATE INDEX CONCURRENTLY runs outside a transaction (the deploy applies
--- this file with psql -f in autocommit); statement_timeout above governs it over the deploy's 120 s PGOPTIONS. An
--- interrupted build leaves an INVALID index; the drop below clears it on a re-run.
--- Reversal: DROP INDEX CONCURRENTLY public.idx_vehicle_events_bat_open_episode_url; restore the body from
--- 20261109032705 (the patch below is fragment-for-fragment).
-
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_vehicle_events_bat_open_episode_url;
-
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vehicle_events_bat_open_episode_url
-  ON public.vehicle_events (source_url)
-  WHERE source_platform = 'bat' AND event_type = 'auction' AND event_status IN ('active','live')
-    AND sold_at IS NULL AND duplicate_of_event_id IS NULL;
-
-DO $check$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_index WHERE indexrelid = to_regclass('public.idx_vehicle_events_bat_open_episode_url') AND indisvalid) THEN
-    RAISE EXCEPTION 'idx_vehicle_events_bat_open_episode_url is missing or INVALID after the build; DROP INDEX CONCURRENTLY it and re-run';
-  END IF;
-END $check$;
-
-COMMENT ON INDEX public.idx_vehicle_events_bat_open_episode_url IS
-'BaT auction episodes that are active or live, unsold and not duplicates, by source_url. market_pulse_live probes it for each board lot''s current episode. Built CONCURRENTLY 2026-11-12.';
+-- A partial index on open BaT episodes (vehicle_events, written by the live jobs) is left for a separate
+-- CONCURRENTLY migration, only if anon cold reads miss 1 s after this change.
+-- Reversal: restore the body from 20261109032705 (the patch below is fragment-for-fragment).
 
 BEGIN;
 SET LOCAL statement_timeout = '30s';
