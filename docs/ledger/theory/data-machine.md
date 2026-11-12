@@ -258,9 +258,13 @@ first test of rule 5.
   `descriptor_key` resolves against `condition_taxonomy`; (b) the part as the property's
   `discriminator_key`, the way `image_id` is used today, with the key carried in `structured_data`;
   (c) one property per part and state, which multiplies the registry. Recommended, not ruled: (a),
-  because finding vehicles by part is then an indexed column and it mirrors the condition key. Bring
-  the owner one worked example of each on the cohort vehicle. The choice is written here and is not
-  reopened by the next reader.
+  because finding vehicles by part is then an indexed column and it mirrors the condition key.
+  **Owner ruling, 2026-11-11:** use (a), the existing taxonomy FK, with the existing observation
+  intake, source witnesses and build-log fold. “That ghost is the data machine,” and “not a scrap
+  file on local”: the model is the product, not a separate reconstructed BOM artifact. The prepared
+  `component_subject_id` / `component_visible_present` increment follows that choice; its open
+  proposals, curator review and deployment remain distinct stages. It has not established a full
+  vehicle population or an installed-unit register.
 - **There are two registries.** `observation_properties` in the database, and the code registry
   `supabase/functions/_shared/cockpit/attribute-registry.ts`, whose own comment records an earlier
   owner call ("registry code is source of truth, not a DB table") and which already asks for a
@@ -273,6 +277,33 @@ first test of rule 5.
 - **Nothing in the repo answers a question.** The claim and answer functions of
   `evidence_judgment_requests` exist and no script, function or app calls them; the answers in
   production were written from outside the repo.
+
+**First component contract, prepared 2026-11-11 (release held).** The existing
+`ingest-observation` resolves `component_key` against active `subject_taxonomy` and retains the
+original reviewed observation, scalar selector, SHA-256 and canonical image witness. A part-level
+boolean means *visible present* or *explicitly absent in a qualified named view*. `not_visible`
+and `cannot_tell` remain unanswered inspection questions. The analysis clock and photograph's
+separate capture label are exposed; presence then is neither installation time nor current tested
+condition. Re-keying the same retained scalar folds once and retains the derived observation IDs;
+it is not independent agreement. Condition descriptors must match the component's subject domain
+and category, rather than borrowing a whole-image assembly state.
+
+The three initial source cases are a visible 78PRMJ battery with a matching receipt candidate,
+an alternator with acquisition and test status unknown, and a windshield with silver-gray molding
+beside a black-molding stock candidate. A shared SKU and position do not prove unit identity; color
+difference alone does not prove a contradiction. Purchase candidates, reported work, later visible
+condition and actual inspection remain independent dimensions. Current-source withdrawal or
+supersession removes the qualified reading from `vehicle_build_log_public`, preserving testimony.
+The implementation's local contracts cover the real handler, source guard, witness projection,
+reader, concurrent withdrawal and false joins. They are not production or native-UI acceptance.
+
+Expected population stays unknown until a source-attributed applicable template exists. The live
+`component_assembly_map` inspected on this date has three GM-truck templates and none applicable to
+the 1973 Firebird; it also has no reference-document FK. The next concrete input is the retained GM
+1973 FS87/FT87 molding chart (printed “1973 MOULDING CHART PAGE 1”, PDF page 33), which distinguishes
+five windshield-molding pieces. Its page and applicability must enter the existing reference/model
+owners before it can establish expected slots. A manual's expected pieces do not establish parts
+installed on this vehicle, and unknown applicability never becomes a completion percentage.
 
 **Testing this card by acting as the owner.** The owner's test: send a new agent, with no memory, the
 kind of message he would send, and see whether it goes where this card points or where the 2026-11-10

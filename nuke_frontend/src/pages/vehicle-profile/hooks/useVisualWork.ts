@@ -56,6 +56,54 @@ export interface VisualWork {
     basis: 'seed_uncalibrated' } | null;
 }
 
+export interface ComponentReading {
+  observation_id: string; quote: string; value?: 'present' | 'absent'; descriptor_id?: string;
+  evidence_time: string; recorded_at: string; agreement_status: string;
+  clock_basis: 'source_analysis_time'; source_role: 'attributed_retained_image_reading';
+  images: (Omit<VisualWork['images'][number], 'taken_at'> & { taken_at: string | null; bbox: [number, number, number, number] })[];
+}
+export interface ComponentEvidence {
+  version: 1; as_of: string;
+  expected_population: { status: string; reason?: string };
+  coverage: { examined_readings: number; qualified_readings: number; truncated: boolean };
+  components: {
+    subject_id: string; component_key: string; label: string; identity_basis: 'position_only';
+    presence: { status: string; readings: ComponentReading[] };
+    condition: { status: string; readings: ComponentReading[] };
+    purchase_candidates: {
+      receipt_item_id: string; receipt_id: string; source_table: 'vehicle_documents' | 'vehicle_images';
+      source_id: string; source_url_sha256: string; description: string; printed_part_number: string;
+      printed_quantity: number | null; page_date: string | null; association_basis: string;
+      product: ReceiptCatalogProduct | null; documented_amount: number | null; currency: string | null;
+      amounts_visible: boolean; installation_status: 'unestablished';
+    }[];
+    unresolved: string[];
+  }[];
+}
+
+/** Malformed or withdrawn evidence must not leave an older component conclusion visible. */
+export function isComponentEvidence(value: unknown): value is ComponentEvidence {
+  const object = (v: unknown): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const source = (r: unknown) => object(r) && typeof r.observation_id === 'string' && typeof r.quote === 'string'
+    && typeof r.evidence_time === 'string' && Number.isFinite(Date.parse(r.evidence_time))
+    && r.clock_basis === 'source_analysis_time' && r.source_role === 'attributed_retained_image_reading'
+    && Array.isArray(r.images) && r.images.length > 0 && r.images.every((i: unknown) => object(i)
+      && typeof i.image_id === 'string' && typeof i.image_url === 'string' && /^https:\/\//.test(i.image_url)
+      && Array.isArray(i.bbox) && i.bbox.length === 4 && i.bbox.every((n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 999)
+      && i.bbox[0] < i.bbox[2] && i.bbox[1] < i.bbox[3]);
+  return object(value) && value.version === 1 && object(value.expected_population) && object(value.coverage)
+    && Array.isArray(value.components) && value.components.every((c: unknown) => object(c)
+      && typeof c.subject_id === 'string' && typeof c.component_key === 'string' && typeof c.label === 'string'
+      && object(c.presence) && Array.isArray(c.presence.readings) && c.presence.readings.every((r: unknown) => source(r)
+        && object(r) && ['present', 'absent'].includes(r.value))
+      && object(c.condition) && Array.isArray(c.condition.readings) && c.condition.readings.every(source)
+      && Array.isArray(c.unresolved) && c.unresolved.every((r: unknown) => typeof r === 'string')
+      && Array.isArray(c.purchase_candidates) && c.purchase_candidates.every((p: unknown) => object(p)
+        && typeof p.receipt_item_id === 'string' && ['vehicle_documents', 'vehicle_images'].includes(p.source_table)
+        && typeof p.source_id === 'string' && typeof p.source_url_sha256 === 'string' && /^[a-f0-9]{64}$/.test(p.source_url_sha256)
+        && typeof p.description === 'string' && typeof p.amounts_visible === 'boolean'));
+}
+
 /** The existing build-log reader owns both the source qualification and money masks. */
 export function useVisualWork(vehicleId: string) {
   const { user, loading: authLoading } = useAuthContext();
@@ -76,12 +124,15 @@ export function useVisualWork(vehicleId: string) {
           !Array.isArray(scenario.rows) || !Array.isArray(scenario.systems) || !scenario.totals || !scenario.coverage))) {
         throw new Error('Cost ledger response is incomplete');
       }
+      if (data.component_evidence != null && !isComponentEvidence(data.component_evidence)) throw new Error('Component source response is incomplete');
       return { rows: (data.visual_work ?? []) as VisualWork[], ledger: (data.master_ledger ?? null) as MasterCostLedger | null,
+        components: (data.component_evidence ?? null) as ComponentEvidence | null,
         limited: data.visual_work_coverage === 'limit_reached' };
     },
   });
   // A prior viewer's or failed refresh's source permissions never survive in the card.
   return { ...query, rows: authLoading || query.isError || query.isFetching ? [] : query.data?.rows ?? [],
     ledger: authLoading || query.isError || query.isFetching ? null : query.data?.ledger ?? null,
+    components: authLoading || query.isError || query.isFetching ? null : query.data?.components ?? null,
     limited: !authLoading && !query.isError && query.data?.limited === true };
 }

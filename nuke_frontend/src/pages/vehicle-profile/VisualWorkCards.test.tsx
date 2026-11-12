@@ -10,7 +10,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { rpc: (...args: unknown[]) => 
   const result = fixture.rpc(...args); return { abortSignal: () => result };
 } } }));
 import { VisualWorkCards, photoDate } from './VisualWorkCards';
-import { useVisualWork, type MasterCostLedger, type VisualWork } from './hooks/useVisualWork';
+import { isComponentEvidence, useVisualWork, type ComponentEvidence, type MasterCostLedger, type VisualWork } from './hooks/useVisualWork';
 import { hasRecordedInstallation } from './PartPage';
 
 const record: VisualWork = {
@@ -82,10 +82,77 @@ it('does not turn a candidate or generic work mention into installation', () => 
 
 function Harness() {
  const work = useVisualWork('vehicle-a');
- return <><span>{work.isError ? 'Read failed' : ''}</span><VisualWorkCards rows={work.rows} ledger={work.ledger} renderSource={() => null} /></>;
+ return <><span>{work.isError ? 'Read failed' : ''}</span><VisualWorkCards rows={work.rows} ledger={work.ledger} components={work.components} renderSource={() => null} /></>;
 }
 const renderHook = () => act(async () => root.render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>));
 const settle = async () => { for (let i = 0; i < 6; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); }); };
+const componentEvidence: ComponentEvidence = {
+ version: 1, as_of: '2026-11-11T12:00:00Z', expected_population: { status: 'unknown' },
+ coverage: { examined_readings: 1, qualified_readings: 1, truncated: false },
+ components: [{ subject_id: 'battery-position', component_key: 'fluid.battery', label: 'Battery', identity_basis: 'position_only',
+   presence: { status: 'attributed_reading', readings: [{ observation_id: 'battery-reading', quote: 'Battery marked EXAMPLE-78',
+     value: 'present', evidence_time: '2026-11-10T12:00:00Z', recorded_at: '2026-11-11T12:00:00Z', agreement_status: 'not_established',
+     clock_basis: 'source_analysis_time', source_role: 'attributed_retained_image_reading',
+     images: [{ ...record.images[0], image_id: 'battery-photo', caption: 'Battery marked EXAMPLE-78', bbox: [100, 200, 500, 700] }] }] },
+   condition: { status: 'unknown', readings: [] }, purchase_candidates: [{ receipt_item_id: 'battery-item', receipt_id: 'battery-receipt',
+     source_table: 'vehicle_documents', source_id: 'battery-doc', source_url_sha256: 'b'.repeat(64), description: 'Battery purchase',
+     printed_part_number: 'EXAMPLE-78', printed_quantity: 1, page_date: '2025-09-10', association_basis: 'same_printed_part_number',
+     product: null, documented_amount: null, currency: 'USD', amounts_visible: false, installation_status: 'unestablished' }],
+   unresolved: ['physical_unit_identity_unestablished', 'installation_time_unestablished', 'functional_inspection_unestablished'] }],
+};
+it('opens component pixels and original receipt directly without turning the match into installation or a completion score', async () => {
+ await act(async () => root.render(<VisualWorkCards rows={[]} components={componentEvidence}
+   renderSource={line => <button data-source-hash={line.source_url_sha256}>Read source {line.source_id}</button>} />));
+ await act(async () => host.querySelector<HTMLButtonElement>('[aria-label^="Open read as visible"]')!.click());
+ expect(fixture.open).toHaveBeenCalledWith('battery-photo');
+ expect(host.querySelector('[data-source-hash]')?.getAttribute('data-source-hash')).toBe('b'.repeat(64));
+ expect(host.textContent).toContain('matching part number');
+ expect(host.textContent).toContain('Still to establish: exact unit identity · installation date · functional inspection');
+ expect(host.textContent).toContain('An applicable build reference is still needed');
+ expect(host.textContent).not.toMatch(/installed|100%|complete restoration/i);
+ const box = host.querySelector<HTMLElement>('.vp-component-region')!;
+ expect(parseFloat(box.style.left)).toBeCloseTo(100 / 999 * 100);
+ expect(parseFloat(box.style.top)).toBeCloseTo(200 / 999 * 100);
+ expect(host.querySelector('details')).toBeNull();
+});
+it('keeps disagreeing views and condition readings attributed instead of inventing a resolved state', async () => {
+ const evidence = structuredClone(componentEvidence), c = evidence.components[0], first = c.presence.readings[0];
+ c.presence.readings.push({ ...first, observation_id: 'absent-reading', value: 'absent', quote: 'Battery is absent.' });
+ c.condition.readings.push({ ...first, observation_id: 'condition-reading', value: undefined, descriptor_id: 'condition-a', quote: 'Corrosion at terminal' });
+ await act(async () => root.render(<VisualWorkCards rows={[]} components={evidence} renderSource={() => null} />));
+ expect(host.querySelectorAll('.vp-component-reading')).toHaveLength(3);
+ expect(host.textContent).toContain('Read as absent in this view'); expect(host.textContent).toContain('Condition reading');
+ expect(host.textContent).not.toContain('Verified');
+});
+it('does not expose hidden recorded charges and removes withdrawn components on refresh and auth transition', async () => {
+ const evidence = structuredClone(componentEvidence); evidence.components[0].purchase_candidates[0].documented_amount = 777;
+ fixture.user = { id: 'owner-a' };
+ fixture.rpc.mockResolvedValue({ data: { work_records: [], component_evidence: evidence }, error: null });
+ await renderHook(); await settle(); expect(host.textContent).toContain('Battery'); expect(host.textContent).not.toContain('777');
+ fixture.loading = true; await renderHook(); expect(host.textContent).not.toContain('Battery');
+ fixture.loading = false; fixture.user = null;
+ fixture.rpc.mockResolvedValue({ data: { work_records: [], component_evidence: { ...evidence, components: [] } }, error: null });
+ await renderHook(); await settle(); expect(host.textContent).not.toContain('Battery');
+ expect(host.querySelector('[aria-label="Component evidence"]')).toBeNull();
+});
+it('rejects unbounded component regions and incomplete receipt pointers, then drops stale conclusions', async () => {
+ const malformed = structuredClone(componentEvidence); malformed.components[0].presence.readings[0].images[0].bbox = [0, 0, 1001, 999];
+ expect(isComponentEvidence(malformed)).toBe(false);
+ const missingPointer = structuredClone(componentEvidence); missingPointer.components[0].purchase_candidates[0].source_url_sha256 = '';
+ expect(isComponentEvidence(missingPointer)).toBe(false);
+ fixture.rpc.mockResolvedValue({ data: { work_records: [], component_evidence: componentEvidence }, error: null });
+ await renderHook(); await settle(); expect(host.textContent).toContain('Battery');
+ fixture.rpc.mockResolvedValue({ data: { work_records: [], component_evidence: malformed }, error: null });
+ await act(async () => client.invalidateQueries({ queryKey: ['vehicle-visual-work'] })); await settle();
+ expect(host.textContent).toContain('Read failed'); expect(host.textContent).not.toContain('Battery');
+});
+it('keeps the analysis clock distinct when the photo clock is missing or malformed', async () => {
+ const evidence = structuredClone(componentEvidence); evidence.components[0].presence.readings[0].images[0].taken_at = 'Infinity';
+ await act(async () => root.render(<VisualWorkCards rows={[]} components={evidence} renderSource={() => null} />));
+ expect(host.textContent).toContain('Photo date unknown'); expect(host.textContent).toContain('Read Nov 10, 2026');
+ expect(photoDate({ taken_at: null })).toBe('Photo date unknown');
+ evidence.components[0].presence.readings[0].evidence_time = 'Invalid'; expect(isComponentEvidence(evidence)).toBe(false);
+});
 it('scopes the reader to the current viewer and withholds cached private data during auth changes', async () => {
  fixture.user = { id: 'owner-a' };
  fixture.rpc.mockResolvedValue({ data: { work_records: [], visual_work: [{ ...record, receipts: [{ ...record.receipts[0], amount: 420, amounts_visible: true }] }] }, error: null });
