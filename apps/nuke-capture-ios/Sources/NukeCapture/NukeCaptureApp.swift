@@ -39,6 +39,8 @@ struct NukeCaptureApp: App {
     @StateObject private var session = SessionStore()
     /// Ignition phase drives the denied-grant detour (below).
     @ObservedObject private var ignition = IgnitionEngine.shared
+    /// A garage join link (https://nuke.ag/join/<token> or ag.nuke.capture://join/<token>) opens a sheet over any root.
+    @ObservedObject private var joinLinks = JoinLinkCoordinator.shared
     /// Flipped by IgnitionEngine when the first-run sequence completes.
     @AppStorage(IgnitionEngine.completeKey) private var ignitionComplete = false
     /// The constellation's Explore path — the app without auth (read-only
@@ -188,6 +190,18 @@ struct NukeCaptureApp: App {
             }
             .environmentObject(session)
             .onOpenURL(perform: handleOpenURL)
+            // Universal links (Associated Domains applinks:nuke.ag) can arrive as a browsing-web activity.
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                if let url = activity.webpageURL { joinLinks.handle(url: url) }
+            }
+            .sheet(item: $joinLinks.route) { route in
+                JoinLinkView(token: route.token, session: session) { joinLinks.closed() }
+                    .environmentObject(session)
+            }
+            // A link tapped while signed out is kept; signing in (or relaunching signed in) brings it back.
+            .onChange(of: session.isSignedIn, initial: true) { _, signedIn in
+                if signedIn { joinLinks.resumePending() }
+            }
             #if DEBUG
             .overlay(alignment: .topLeading) { if FixtureBackend.isActive { FixtureWriteLogOverlay() } }
             #endif
@@ -276,6 +290,7 @@ struct NukeCaptureApp: App {
     /// personal automation "When Camera is closed → Open Nuke" opens this URL, so a frame uploads
     /// the moment the shutter is put away, with no tap in the app.
     private func handleOpenURL(_ url: URL) {
+        if joinLinks.handle(url: url) { return }
         guard url.scheme == Config.oauthRedirectURL.scheme, url.host == Config.syncURLHost else { return }
         guard session.isSignedIn, ignitionComplete else { return }
         Task { await SyncEngine.shared.start() }

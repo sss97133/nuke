@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.ag.nuke.capture"],
+        "components": [
+          { "/": "/join/*", "comment": "Garage join links: https://nuke.ag/join/<token>" }
+        ]
+      }
+    ]
+  }
+}

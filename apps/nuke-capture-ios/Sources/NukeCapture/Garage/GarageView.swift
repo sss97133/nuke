@@ -63,6 +63,14 @@ struct GarageView: View {
                 } footer: {
                     Text(GarageCopy.organizeScope)
                 }
+                // The shared place (garage model): a manager sends a join link. Degrades in words when the server lacks it.
+                Section {
+                    GarageInviteRow()
+                } header: {
+                    Text("People")
+                } footer: {
+                    Text("Anyone who joins from your link waits for your approval first.")
+                }
             }
         }
         .navigationTitle("Garage")
