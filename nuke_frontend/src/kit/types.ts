@@ -89,7 +89,7 @@ export type GalleryImage = { id: string; url: string; taken_at?: string | null; 
 export type FacetItemStatus = 'established' | 'reading' | 'claim' | 'conflict' | 'missing';
 export type FacetItemSource = {
   slug?: string | null; label?: string | null; kind?: string | null; class?: string | null; url?: string | null;
-  method?: string | null; observed_at?: string | null; value?: unknown; limitation?: string | null;
+  method?: string | null; observed_at?: string | null; value?: unknown; value_label?: string | null; limitation?: string | null;
   decoded?: Record<string, unknown> | null; witness?: { kind: string; id: string; thumb?: string | null } | null;
 };
 export type FacetItem = {
@@ -98,6 +98,8 @@ export type FacetItem = {
   equation: Record<string, unknown> | null; needed: string | null; normalized?: string | null; stated?: string | null;
   lead?: boolean; sides?: Array<{ value: unknown; normalized?: string | null; sources: FacetItemSource[] }>;
   candidates?: Array<Record<string, unknown>>; examined?: Array<Record<string, unknown>>;
+  /** Cited factory availability rows (model_availability) for the car's decoded series and engine; every source kept. */
+  availability?: Array<Record<string, unknown>>;
 };
 /** Every token's items, keyed by token (year, make, model, body_style, trim, engine, transmission, drivetrain,
  * location). The profile masthead carries all but location, which is read when its token is opened. */
