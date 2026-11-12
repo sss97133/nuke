@@ -421,6 +421,11 @@ DO $$ BEGIN
     WHERE oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure), 'helper returns ids only');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
     WHERE p.oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure AND a.grantee = 0), 'helper: no PUBLIC execute');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
+    WHERE p.oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure AND a.privilege_type = 'EXECUTE'
+      AND a.grantee <> p.proowner
+      AND NOT has_function_privilege(pg_get_userbyid(a.grantee), 'public.vehicle_facet_items(uuid,text)', 'EXECUTE')),
+    'helper: EXECUTE only for roles that run the reader');
 END $$;
 
 -- 0. Shape of the machine: invoker, stable, the profile reader's grants, no PUBLIC execute.
