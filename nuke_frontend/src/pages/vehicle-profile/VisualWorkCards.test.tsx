@@ -313,6 +313,30 @@ it('shows the server cost folds and opens a single inline calculation with direc
  expect(host.querySelector('[role="region"]')).toBeNull();
 });
 
+it('keeps the photographs of ledger-itemized work on the page, one strip per title and each photo once', async () => {
+ // Two records of one job cite the same after-photo; the ledger itemizes both. A third record has no cost line.
+ const second = { ...record, observation_id: 'review-b', images: [record.images[1], { ...record.images[1], image_id: 'after-b', caption: 'Rear seat covered' }] };
+ const other = { ...record, observation_id: 'review-unestimated', title: 'Separate recorded work' };
+ const both = structuredClone(ledger);
+ both.scenarios[0].rows[0].work_observation_ids = ['review-a', 'review-b'];
+ await act(async () => root.render(<VisualWorkCards rows={[record, second, other]} ledger={both} renderSource={() => null} />));
+ const photos = host.querySelector('[aria-label="Work photos"]')!;
+ expect(photos.querySelectorAll('article')).toHaveLength(1);
+ expect(photos.querySelector('article')!.getAttribute('aria-label')).toBe('Cabin upholstery photos');
+ expect(Array.from(photos.querySelectorAll('img')).map(img => img.getAttribute('alt'))).toEqual(['Torn seating', 'Covered seating', 'Rear seat covered']);
+ // The strip shows photographs only: no summary, lenses or receipt lines are repeated beside the ledger.
+ expect(photos.textContent).not.toContain('The earlier seating is torn');
+ expect(photos.querySelector('.vp-work-lenses')).toBeNull();
+ // It sits before the ledger, and the uncosted record keeps its full card after it.
+ expect(photos.compareDocumentPosition(host.querySelector('.vp-master-ledger')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+ expect(host.querySelector('[aria-label="Other photographed work"]')!.querySelectorAll('article')).toHaveLength(1);
+ await act(async () => photos.querySelector<HTMLButtonElement>('button[aria-label="Open after photo: Rear seat covered"]')!.click());
+ expect(fixture.open).toHaveBeenCalledWith('after-b');
+ // A ledger whose cited work has no photographs draws no empty section.
+ await act(async () => root.render(<VisualWorkCards rows={[{ ...record, images: [] }]} ledger={ledger} renderSource={() => null} />));
+ expect(host.querySelector('[aria-label="Work photos"]')).toBeNull();
+});
+
 it('filters the same ledger to a system and preserves unknown totals', async () => {
  await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={ledger} renderSource={() => null} />));
  const select = host.querySelector('select')!;
