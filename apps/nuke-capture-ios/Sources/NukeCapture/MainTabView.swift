@@ -122,7 +122,7 @@ struct MainTabView: View {
     }
 
     private var profileTab: some View {
-        // Explore mode passes nil → sample profile + a Sign In door in the
+        // Explore mode passes nil → profile search + a Sign In door in the
         // ProfileTab toolbar (not-signing-in is never a dead end).
         ProfileTab(
             ownUserId: session.isSignedIn ? SupabaseService.currentUserId : nil,

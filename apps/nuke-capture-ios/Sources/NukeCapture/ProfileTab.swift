@@ -147,7 +147,8 @@ struct DayReceipt: Decodable {
 // ─── Tab root: own profile (or the sample) + handle search ──────────────────
 
 struct ProfileTab: View {
-    /// Signed-in user id, or nil (explore mode → the sample profile).
+    /// Signed-in user id, or nil (explore mode: handle search and the Sign In door, no profile of anyone's
+    /// standing in as a sample). A visitor sees the public view of whichever profile they open.
     let ownUserId: String?
     /// Explore mode: the door back to sign-in (toolbar). nil when signed in.
     var onSignIn: (() -> Void)? = nil
@@ -159,15 +160,31 @@ struct ProfileTab: View {
     @State private var searchRequests = ReadRequestGuard()
     @State private var showAccount = false
 
-    private var rootUserId: String {
-        ownUserId ?? Config.sampleProfileUserId
+    /// The profile the tab opens on: your own, or none when signed out. Never someone else's account as a sample.
+    static func rootUserId(signedInAs ownUserId: String?) -> String? {
+        guard let id = ownUserId?.trimmingCharacters(in: .whitespaces), !id.isEmpty else { return nil }
+        return id
     }
 
     var body: some View {
         NavigationStack {
             Group {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    ProfileView(userId: rootUserId, isOwn: ownUserId != nil, onSignIn: onSignIn)
+                    if let root = Self.rootUserId(signedInAs: ownUserId) {
+                        ProfileView(userId: root, isOwn: true, onSignIn: onSignIn)
+                    } else {
+                        // Signed out: no stand-in profile. Search opens anyone's public view.
+                        ContentUnavailableView {
+                            Label("Find a profile", systemImage: "person.crop.circle")
+                        } description: {
+                            Text("Search a handle to open the public view of that profile. Sign in to see your own.")
+                        } actions: {
+                            if let onSignIn {
+                                Button("Sign in", action: onSignIn)
+                                    .buttonStyle(.borderedProminent)
+                            }
+                        }
+                    }
                 } else if searching {
                     ProgressView("Searching profiles…")
                 } else if searchError && results.isEmpty {
