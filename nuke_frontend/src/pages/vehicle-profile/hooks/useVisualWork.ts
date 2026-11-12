@@ -21,7 +21,8 @@ export interface MasterCostLine {
   kind: 'labor' | 'material'; physical_key: string; system_key: string; label: string;
   status: 'resolved' | 'partial' | 'unresolved' | 'excluded'; reasons: string[];
   work_observation_ids: string[]; source_observation_ids: string[];
-  source_images: VisualWork['images'];
+  /** An image_id resolves through MasterCostLedger.images; an object is a row-specific citation. */
+  source_images: (string | VisualWork['images'][number])[];
   quantity: { value: number | null; unit: string | null; basis: string | null; derivation?: string } | null;
   reference: Record<string, unknown> | null; pricing: Record<string, unknown> | null;
   rate_basis: Record<string, unknown> | null; evidence_role: string | null;
@@ -31,6 +32,8 @@ export interface MasterCostLine {
 }
 export interface MasterCostLedger {
   version: number; as_of: string; scope: string;
+  /** Each identically cited source photograph once, keyed by image_id. */
+  images?: Record<string, VisualWork['images'][number]>;
   scenarios: { scenario: 'reconstruct_observed' | 'finish_scenario'; rows: MasterCostLine[];
     totals: CostTotals; coverage: CostCoverage;
     systems: { system_key: string; totals: CostTotals; coverage: CostCoverage }[] }[];
