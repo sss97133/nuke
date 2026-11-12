@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
       const prompt = SENTIMENT_PROMPT.replace("{{OBSERVATIONS}}", formattedObs);
 
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-haiku-5-5",
         max_tokens: 2000,
         messages: [{ role: "user", content: prompt }]
       });
@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
                 discovery_type: "sentiment",
                 raw_extraction: sentimentData,
                 confidence_score: sentimentData.confidence || 0.7,
-                model_used: "claude-sonnet-4-20250514",
+                model_used: "claude-haiku-5-5",
                 prompt_version: "v1"
               })
               .select()
@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
       const prompt = MARKET_SIGNALS_PROMPT.replace("{{OBSERVATIONS}}", formattedObs);
 
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-haiku-5-5",
         max_tokens: 2000,
         messages: [{ role: "user", content: prompt }]
       });
@@ -247,7 +247,7 @@ Deno.serve(async (req) => {
                 discovery_type: "market_signals",
                 raw_extraction: marketData,
                 confidence_score: marketData.confidence || 0.6,
-                model_used: "claude-sonnet-4-20250514",
+                model_used: "claude-haiku-5-5",
                 prompt_version: "v1"
               })
               .select()
