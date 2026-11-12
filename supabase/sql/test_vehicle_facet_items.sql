@@ -172,9 +172,11 @@ DO $$ BEGIN
     RAISE EXCEPTION 'the shared fold from 20261116007000 was not applied';
   END IF;
 END $$;
+-- The live fold: the same bodies as plpgsql (its guard checks the bodies above are 007000's, unchanged).
+\ir ../migrations/20261116012000_vehicle_location_fold_plpgsql.sql
 -- Applied twice: the second run must be a no-op.
-\ir ../migrations/20261116008000_vehicle_facet_items.sql
-\ir ../migrations/20261116008000_vehicle_facet_items.sql
+\ir ../migrations/20261116016000_vehicle_facet_items.sql
+\ir ../migrations/20261116016000_vehicle_facet_items.sql
 
 -- Seeds. v1 a documented VIN-decoded car; v2 listing-sourced with a transmission conflict and cited gearing;
 -- v3 thin evidence; v4 private; v5 deleted.
@@ -192,6 +194,9 @@ INSERT INTO public.vehicles (id, year, make, model, transmission, transmission_m
  ('10000000-0000-0000-0000-000000000002', 1970, 'Synthetic', 'Roadster', 'Automatic', 'TH400', 3.42, 'P225/70R15', 'Austin, TX',
   'V8', 101.6, 76.2);
 INSERT INTO public.vehicles (id, year, make, model) VALUES ('10000000-0000-0000-0000-000000000003', 1990, 'Acme', 'Thing');
+-- v6: a model named, no case casting read: nothing narrows the ratio sets.
+INSERT INTO public.vehicles (id, year, make, model, transmission, transmission_model) VALUES
+ ('10000000-0000-0000-0000-000000000006', 1972, 'Synthetic', 'Coupe', 'manual', 'M20 or M21');
 INSERT INTO public.vehicles (id, user_id, is_public, year, make, model, transmission) VALUES
  ('10000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000004', false, 1988, 'Chevrolet', 'Blazer', 'automatic');
 INSERT INTO public.vehicles (id, user_id, deleted_at, year, make, model) VALUES
@@ -494,6 +499,11 @@ BEGIN
     AND (SELECT array_agg(c->>'code' ORDER BY c->>'code') FROM jsonb_array_elements(i->'candidates') c) = ARRAY['M20', 'M21']
     AND (SELECT bool_and(c->>'countershaft_in' = '7/8') FROM jsonb_array_elements(i->'candidates') c)
     AND i::text NOT LIKE '%2.52%', 'the case casting''s countershaft narrows the sets; the car''s year never picks one');
+  i := public.t_item('10000000-0000-0000-0000-000000000006', 'transmission', 'transmission.current.gear_ratios');
+  PERFORM public.t_assert(i->>'status' = 'missing' AND i->'value' = 'null' AND i#>'{rule,narrowed_by}' = 'null'
+    AND jsonb_array_length(i->'candidates') = 4 AND i::text LIKE '%2.52%' AND i::text LIKE '%2.56%'
+    AND i->>'needed' LIKE 'countershaft size from the case casting%',
+    'no case casting: every candidate set for the named codes, and the case casting named as needed');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.derived.final_drive');
   PERFORM public.t_assert(i->>'status' = 'missing' AND i->'value' = 'null', 'nothing computed over candidates');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.derived.rpm_at_60');
@@ -549,9 +559,10 @@ BEGIN
     AND i#>>'{value,areas,0,latest_observation_id}' = p->>'latest_observation_id' AND NOT (p ? 'point'),
     'the header carries the shared fold''s area unchanged');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'location', 'location.map');
-  PERFORM public.t_assert(i#>>'{value,county_fips}' = '32003' AND i#>'{value,bounds}' = 'null' AND i->>'needed' LIKE 'the ZCTA%'
+  PERFORM public.t_assert(i#>>'{value,county_fips}' = '32003' AND i->>'needed' LIKE 'the ZCTA%'
+    AND i#>'{value,bounds}' = '{"grain": "county", "county_fips": "32003", "geojson": "map-data/geo/v1/county/32003.geojson"}'::jsonb
     AND i#>>'{value,centroid,lat}' = '35.9786' AND i#>>'{value,centroid,basis}' = 'city_centroid',
-    'map at city grain, centred on the city''s published centre; ZCTA and bounds named as needed');
+    'map at city grain: the county outline as bounds, centred on the city''s published centre; the ZCTA named as needed');
   txt := public.vehicle_facet_items('10000000-0000-0000-0000-000000000001')::text;
   PERFORM public.t_assert(txt !~ '35\.972|35\.973|114\.855|114\.856|36\.209|115\.98|35\.97[^0-9]' AND txt NOT LIKE '%latitude%'
     AND txt NOT LIKE '%Fixture Lane%' AND txt NOT LIKE '%Pahrump%', 'no coordinate or raw address reaches any item');
@@ -561,9 +572,16 @@ BEGIN
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000004', 'location') IS NULL, 'private location: nothing');
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000005') IS NULL, 'deleted vehicle: nothing');
 
-  -- The profile reader carries the items.
+  -- The profile reader carries the items of the eight eager tokens; location is read on click, in the same shape.
   p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
-  PERFORM public.t_assert((SELECT count(*) FROM jsonb_object_keys(p#>'{sections,0,token_items}')) = 9, 'masthead carries every token');
+  PERFORM public.t_assert((SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(p#>'{sections,0,token_items}') k)
+    = ARRAY['body_style', 'drivetrain', 'engine', 'make', 'model', 'transmission', 'trim', 'year'],
+    'masthead carries every token but location');
+  PERFORM public.t_assert(p#>'{sections,0,token_items}' = public.vehicle_facet_items('10000000-0000-0000-0000-000000000001') - 'location',
+    'the masthead tokens are the full reader''s, item for item');
+  PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'location')
+    = public.vehicle_facet_items('10000000-0000-0000-0000-000000000001')->'location',
+    'the click call returns the location items the full reader returns');
   PERFORM public.t_assert(p#>'{sections,0,token_items,drivetrain}' IS NOT NULL, 'a token with no strip facet still has items');
   PERFORM public.t_assert(p#>'{sections,0,token_items,transmission}' = public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'transmission'),
     'masthead items are the reader''s items');
@@ -588,6 +606,28 @@ BEGIN
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000005') IS NULL, 'deleted: nothing even to a party');
 END $$;
 RESET ROLE;
+
+-- 2b. The profile read never calls the photo GPS fold: with the fold replaced by a trap, the profile still reads,
+-- while the location click call trips it.
+BEGIN;
+CREATE OR REPLACE FUNCTION public.vehicle_location_areas(p_vehicle_id uuid) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $trap$
+BEGIN RAISE EXCEPTION 'fold_trap: vehicle_location_areas was called'; END $trap$;
+SET LOCAL ROLE anon;
+SET LOCAL test.auth_role = 'anon';
+SET LOCAL test.auth_uid = '';
+DO $$
+DECLARE p jsonb; tripped boolean := false;
+BEGIN
+  p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
+  PERFORM public.t_assert(p#>'{sections,0,token_items,engine}' IS NOT NULL, 'profile read with the fold trapped: no fold call');
+  BEGIN
+    PERFORM public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'location');
+  EXCEPTION WHEN raise_exception THEN tripped := SQLERRM LIKE 'fold_trap%';
+  END;
+  PERFORM public.t_assert(tripped, 'the location click call reads the fold (the trap is live)');
+END $$;
+ROLLBACK;
 
 -- 3. A photo withdrawn after the fold ran drops out at once, before the hourly writer runs.
 BEGIN;

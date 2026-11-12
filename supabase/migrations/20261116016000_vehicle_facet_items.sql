@@ -10,13 +10,17 @@
 -- 3. vehicle_facet_norm(kind, value): the comparison key two testimonies must share to agree (displacement in liters,
 --    transmission type, drive layout, engine configuration, ratio, tire diameter, year, number, text).
 -- 4. vehicle_facet_items(vehicle, dimension): STABLE security invoker, so every source is bounded by the viewer's own
---    row policies, plus the vehicle visibility test stated here. Dimension NULL returns every token's items as one object.
+--    row policies, plus the vehicle visibility test stated here. Dimension NULL returns every token's items as one object;
+--    dimension 'masthead' returns every token except location, and never calls the photo GPS fold.
 --    Photo readings keyed by a closed claim role (cowl tag, transmission ID stamp and castings, engine block and code
 --    stamp) land on their items with their image as witness and their uncertain characters as a limitation.
 --    Location reads photo GPS areas from vehicle_location_areas (20261116007000), the one fold that
 --    get_field_provenance('location') also reads, at area grain only; it is called only for the location token.
--- 5. vehicle_profile_read: the masthead carries `token_items`, every token's items, read once. It is the single home
---    for items; strip facets are unchanged. Patched at anchors; refuses drift; skipped when already present.
+-- 5. vehicle_profile_read: the masthead carries `token_items`, the items of the eight cheap tokens,
+--    read once (dimension 'masthead'). The location token's items are read on click with
+--    vehicle_facet_items(id, 'location'), in the same shape: the photo GPS fold costs 0.3-2 s cold on a large gallery
+--    (measured on prod 2026-11-11), too much to put on every profile load. It is the single home for items; strip
+--    facets are unchanged. Patched at anchors; refuses drift; skipped when already present.
 BEGIN;
 SET LOCAL statement_timeout = '20s';
 SET LOCAL lock_timeout = '3s';
@@ -64,7 +68,7 @@ COMMENT ON TABLE public.vehicle_decode_rules IS
   'qualifiers holds scope (oem_group, lookup_by, variants), never the value. Every row carries citation_url; a newer '
   'row supersedes an older one (superseded_by, superseded_at), never an update in place. Gear ratios are looked up by '
   'code, never by the car''s year, narrowed by the countershaft of the case casting read off the unit; when sets still '
-  'disagree the reader reports the candidates and computes nothing. Created empty by 20261116008000.';
+  'disagree the reader reports the candidates and computes nothing. Created empty by 20261116016000.';
 
 -- 2. Public source label ----------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.observation_source_label(p_source_id uuid)
@@ -877,13 +881,18 @@ loc_items AS (
   UNION ALL
   SELECT 'location.map', jsonb_build_object(
     'value', CASE WHEN a.area IS NOT NULL THEN jsonb_build_object('label', a.area->'label', 'level', a.area->'level',
-      'county_fips', a.area->'county_fips', 'zcta', a.area->'zcta', 'bounds', NULL,
+      'county_fips', a.area->'county_fips', 'zcta', a.area->'zcta',
+      -- Bounds are the county's outline: Nuke's own immutable county file (scripts/map/build-tiles.mjs writes every
+      -- ZCTA touching the county, Census 2020), the file OneMap and the iOS map already draw. No ZCTA geometry exists.
+      'bounds', CASE WHEN a.area->>'county_fips' ~ '^[0-9]{5}$' THEN jsonb_build_object('grain', 'county',
+        'county_fips', a.area->>'county_fips',
+        'geojson', 'map-data/geo/v1/county/' || (a.area->>'county_fips') || '.geojson') END,
       -- The city's public centre (city_geocode_lookup via the fold), the same for every viewer; never the photos' point.
       'centroid', CASE WHEN a.basis = 'photo' THEN (SELECT centroid FROM loc_top) END) END,
     'status', CASE WHEN a.area IS NULL THEN 'missing' ELSE a.status END, 'sources', '[]'::jsonb,
     'needed', CASE WHEN a.area IS NULL THEN 'an established area at ZCTA grain'
-                   WHEN a.area->>'zcta' IS NULL THEN 'the ZCTA for this area (photo areas carry none until a ZIP keyer exists) and its boundary geometry (us_zctas holds codes only)'
-                   ELSE 'ZCTA boundary geometry for bounds (us_zctas holds codes only)' END)
+                   WHEN NOT coalesce(a.area->>'county_fips' ~ '^[0-9]{5}$', false) THEN 'the county of this area, for its outline'
+                   WHEN a.area->>'zcta' IS NULL THEN 'the ZCTA of this area, to mark it inside its county (photo areas carry none until the ZIP keyer lands)' END)
   FROM loc_area a
 ),
 loc_docs AS (
@@ -912,13 +921,16 @@ per_dim AS (
 SELECT CASE
   WHEN NOT EXISTS (SELECT 1 FROM v) THEN NULL
   WHEN p_dimension IS NULL THEN (SELECT jsonb_object_agg(dim, items) FROM per_dim)
+  -- The profile masthead: every token but location, whose photo GPS fold is read only when its token is clicked.
+  WHEN p_dimension = 'masthead' THEN (SELECT jsonb_object_agg(dim, items) FROM per_dim WHERE dim <> 'location')
   ELSE (SELECT items FROM per_dim WHERE dim = p_dimension) END
 $function$;
 COMMENT ON FUNCTION public.vehicle_facet_items(uuid, text) IS
   'Header facet items (facet_items_v1): for one vehicle and one token (year, make, model, body_style, trim, engine, '
   'transmission, drivetrain, location), the fixed item list with each item''s value, status (established, reading, '
   'claim, conflict, missing), deduplicated sources with witness and clock, rule, equation and needed evidence. '
-  'Dimension NULL returns every token as one object. Security invoker: the viewer''s row policies bound every source; '
+  'Dimension NULL returns every token as one object; ''masthead'' returns every token except location without '
+  'calling the photo GPS fold (vehicle_profile_read reads it; location is read on click). Security invoker: the viewer''s row policies bound every source; '
   'location is area grain only, from vehicle_location_areas. '
   'Spec: docs/market/VEHICLE_HEADER_FORM_RULES.md "Facet items".';
 
@@ -937,7 +949,7 @@ BEGIN
   END LOOP;
 END $grants$;
 
--- 5. Profile reader: every token's items on the masthead, read once ------------------------------------------------
+-- 5. Profile reader: the eight eager tokens' items on the masthead, read once ---------------------------------------
 CREATE OR REPLACE FUNCTION pg_temp.patch_once(p_text text, p_anchor text, p_replacement text, p_what text) RETURNS text
 LANGUAGE plpgsql AS $f$
 DECLARE n integer := (length(p_text) - length(replace(p_text, p_anchor, ''))) / greatest(length(p_anchor), 1);
@@ -952,8 +964,8 @@ BEGIN
   d := pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure);
   IF position('facet_items_v1' in d) = 0 THEN
     d := pg_temp.patch_once(d, E'\nstrip AS (',
-      E'\n-- facet_items_v1: every token''s line items (vehicle_facet_items), read once.\n'
-      || E'token_items AS (SELECT public.vehicle_facet_items(p_vehicle_id) AS doc),\nstrip AS (',
+      E'\n-- facet_items_v1: the line items of every token but location (read on click), read once.\n'
+      || E'token_items AS (SELECT public.vehicle_facet_items(p_vehicle_id, ''masthead'') AS doc),\nstrip AS (',
       'vehicle_profile_read strip CTE');
     d := pg_temp.patch_once(d,
       $a$'price', (SELECT claim FROM price_claim),$a$,
