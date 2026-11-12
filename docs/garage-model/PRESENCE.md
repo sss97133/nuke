@@ -192,3 +192,10 @@ The reasons, in the order I'd expect them to matter:
 * No index was created or measured for the photo arm (§4 step 7); performance on 64M rows is untested.
 * `garage_inbound_feed` is still the core's stub (the task did not include it).
 * No coordinates of any site are in this repo; sites are seeded from his confirmation, by id.
+
+## Orchestrator review notes (2026-11-12, ~11:30 AM AST)
+
+- `garage_now` returns `my_visibility = 'full'` for every row it shows and hides the rest. VISIBILITY's
+  `garage_vehicle_visibility()` (full / summary / none) is the intended source, so the follow-up wiring is noted in
+  VISIBILITY.md. The four garage contracts pass together on a merged check branch.
+- The fixture coordinates in `test_garage_presence.sql` are neutral, not the shop's.
