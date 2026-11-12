@@ -3,7 +3,8 @@
 Drawn for Nuke from period sources committed in `nuke_frontend/public/stacks/makes/`. Every glyph records how it was
 made in its family's `*.provenance.json` sidecar:
 
-- **traced**: the source pixels outlined (potrace), refit, and scored against the source by IoU.
+- **traced**: outlined from the source pixels (potrace, then refit) or, in the Block, a construction fitted to
+  them. Every traced glyph carries its IoU against the source mask.
 - **derived**: built only from traced parts (mirrored, cut, recombined) by a written rule.
 - **designed**: drawn by the family's rules where the sources show no such letter.
 
@@ -33,7 +34,7 @@ tools/type/build.sh --only trans-am-1973-decal
 
 ## Families
 
-| Family | Files | Glyphs | cmap | traced | derived | designed | Traced fidelity (IoU) |
+| Family | Files | Glyphs (with .notdef) | cmap | traced | derived | designed | Traced fidelity (IoU) |
 |---|---|---|---|---|---|---|---|
 | Pontiac 1973 Block | Regular, Face | 45 | 70 | 7 | 1 | 35 | P .958 T .975 I .954 N .948 O .934 C .917 A .857 |
 | Firebird 1971 Script | Regular | 39 | 38 | 6 | 17 | 14 | F .981 e .979 i .978 b .977 d .976 r .908 (flag trimmed) |
@@ -59,7 +60,11 @@ Counts exclude `.notdef` and `space`. Block and Decal map lowercase to the capit
 ### Firebird 1971 Script
 
 - **Source:** the 1971-81 fender emblem, OER 486904 (`pontiac-firebird-fender-script-1971-1981-cut.png`). The
-  silhouette is the casting: its face is the bright chrome that photographs nearly white.
+  outlines follow that cutout. Measured across the i stem, the b ascender and the F stem, the cutout runs past
+  the dark bevel pair that bounds the chrome face into a flat grey band (L about 195) on the far side: that band
+  is the casting's side wall, seen in perspective. The fonts are therefore the casting as photographed. They are
+  heavier than the face alone (stems are about 13-15 px in the cutout against about 8 px between the bevels), and
+  the IoUs are measured against the cutout, not the face.
 - **Coverage:** a-z, the capitals of the model names (E F G L M P T), and `. , - '`.
 - **Slant:** 13.5 degrees (0.24 px/px), measured by column-projection variance. Every glyph is drawn upright and
   slanted at the end.
@@ -116,4 +121,8 @@ Counts exclude `.notdef` and `space`. Block and Decal map lowercase to the capit
   photograph clips it.
 - **Brochure numerals:** 5 has a junction blob, 8 has waist notches, 2 and 4 are tight, and the spread letters come
   from a 63 px source.
-- **Not built:** COLRv1. Chrome is the CSS layering in `period-fonts.css`, which Safari and Chrome both render.
+- **Script weight:** this is the casting's weight. It includes the side wall, so it is heavier than the chrome face.
+  The v0.2 fix is to trace between the bevel lines.
+- **Not built:** COLRv1. Chrome is the CSS layering in `period-fonts.css`. On 2026-11-11 it rendered with all five
+  faces loaded in Playwright Chromium and Playwright WebKit 26.5, light and dark. It was not checked on an iOS
+  device.

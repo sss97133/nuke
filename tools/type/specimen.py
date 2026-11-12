@@ -53,9 +53,9 @@ def check(text, fam):
 
 def run(text, fam, size=None):
     if fam is None:
-        return html.escape(text)
+        return '<span class="gap"></span>'
     check(text, fam)
-    cls = FAM[fam][2]
+    cls = FAM[fam][2] + (' plain' if size and size < 24 and fam in ('block', 'script') else '')
     st = f' style="font-size:{size}px"' if size else ''
     data = f' data-text="{html.escape(text)}"' if fam == 'block' else ''
     return f'<span class="{cls}" data-fam="{fam}"{data}{st}>{html.escape(text)}</span>'
@@ -91,8 +91,9 @@ def main():
         name = FAM[fam][0]
         c = counts(fam)
         cs = charset(fam)
-        parts.append(f'<section><h2>{name}</h2><p class="meta">{len(SIDE[fam]["glyphs"])} glyphs: '
+        parts.append(f'<section><h2>{name}</h2><p class="meta">{SIDE[fam]["glyphCount"]} glyphs (with .notdef): '
                      + ', '.join(f'{v} {k}' for k, v in sorted(c.items())) + '</p>')
+        parts.append('<p class="meta">Sizes 12-18 in plain fill (the outline); the material classes need 24 px and up.</p>')
         for size in SIZES:
             parts.append(f'<div class="row"><span class="sz">{size}</span>' + run(CONTROL[fam][1], fam, size) + '</div>')
         parts.append('<h3>Character set</h3><div class="row">' + run(cs, fam, 48) + '</div>')
@@ -124,6 +125,9 @@ h1 {{ font-size:18px; margin:0 0 4px; }} h2 {{ font-size:15px; margin:40px 0 8px
 h3 {{ font-size:12px; color:var(--muted); font-weight:500; margin:20px 0 6px; text-transform:uppercase; letter-spacing:.06em; }}
 .meta, .sz {{ color:var(--muted); font-size:12px; }} .sz {{ display:inline-block; width:36px; }}
 .row {{ margin:6px 0; overflow-wrap:anywhere; }} .setting {{ margin:14px 0; line-height:1.1; }}
+.gap {{ display:inline-block; width:22px; }}
+.plain, .plain::after {{ color:var(--fg) !important; background:none !important; -webkit-text-stroke:0 !important; filter:none !important; }}
+.plain::after {{ display:none; }}
 .ov img {{ height:240px; margin:0 8px 8px 0; border:1px solid var(--rule); background:#fff; }}
 </style></head><body><h1>Period type for the 1973 Firebird header</h1>
 <p class="meta">Pontiac 1973 Block, Firebird 1971 Script, Trans Am 1973 Decal, Pontiac 1973 Brochure Numerals. Version 0.100.
