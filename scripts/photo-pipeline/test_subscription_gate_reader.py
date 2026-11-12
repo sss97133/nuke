@@ -28,15 +28,70 @@ class Calibration(unittest.TestCase):
         r = gr.calibration_verdict([('wrong', 'CORRECT'), ('wrong', None)] + pairs(c=10, w=10))
         self.assertEqual(r['false_accepts'], 0)
 
+class Tuning(unittest.TestCase):
+    def test_binary_agreement_wrong_vs_unclear_agrees(self):
+        r = gr.calibration_verdict([('wrong', 'unclear')] * 10 + [('unclear', 'wrong')] * 10 + pairs(c=10, w=1))
+        self.assertEqual(r['agreement'], 1.0); self.assertEqual(r['false_accepts'], 0)
+    def test_binary_accept_disagreement_counts(self):
+        r = gr.calibration_verdict([('unclear', 'correct')] * 2 + [('correct', 'unclear')] * 2 + pairs(c=6, w=1))
+        self.assertAlmostEqual(r['agreement'], 7 / 11)
+    def test_correct_without_a_mark_is_unclear(self):
+        v = gr.parse_verdicts('{"verdicts":[{"s":0,"status":"correct","why":"same truck"},{"s":1,"status":"correct","mark":" "},{"s":2,"status":"correct","mark":"primer patch on left fender"}]}', 3)
+        self.assertEqual([x['status'] for x in v], ['unclear', 'unclear', 'correct'])
+    def test_vehicle_name_leaves_out_colour(self):
+        self.assertEqual(gr.vehicle_name({'year': 1983, 'make': 'GMC', 'model': 'K2500', 'color': 'Midnight Blue'}), '1983 GMC K2500')
+    def test_prompt_rules(self):
+        p = gr.PROMPT.lower()
+        for must in ('distinguishing mark', 'same generation', 'not enough', 'too dark', 'only a hint', '"mark"', 'lookalike', 'same-generation-and-colour', 'red crew cab'):
+            self.assertIn(must, p)
+        self.assertNotIn('{color}', p)
+
 class Parse(unittest.TestCase):
     def test_parses_and_fills_missing_as_unclear(self):
-        v = gr.parse_verdicts('ok {"verdicts":[{"s":0,"status":"correct","why":"same car"},{"s":2,"status":"wrong"}]}', 3)
+        v = gr.parse_verdicts('ok {"verdicts":[{"s":0,"status":"correct","mark":"white roof over blue","why":"same car"},{"s":2,"status":"wrong"}]}', 3)
         self.assertEqual([x['status'] for x in v], ['correct', 'unclear', 'wrong'])
     def test_bad_status_and_out_of_range_index_never_become_correct(self):
         v = gr.parse_verdicts('{"verdicts":[{"s":0,"status":"yes"},{"s":9,"status":"correct"},{"s":"x","status":"correct"}]}', 2)
         self.assertEqual([x['status'] for x in v], ['unclear', 'unclear'])
     def test_no_json_is_all_unclear(self):
         self.assertEqual({x['status'] for x in gr.parse_verdicts('I cannot see the image', 4)}, {'unclear'})
+
+class VehicleSpecificMark(unittest.TestCase):
+    def test_fa_generation_marks_are_not_specific(self):
+        veh = {'year': 1989, 'make': 'Chevrolet', 'model': 'Pickup R3500 Cheyenne'}
+        for mark in (
+            'Faded red crew-cab square-body Chevrolet with a dark lower body, as in REF5',
+            "Red crew-cab long-bed square-body with a dark lower body, matching REF5's profile",
+            'Faded red paint with a dark lower body and a Chevrolet square-body front',
+            'Red crew-cab square-body with a dark lower body, as in REF5',
+        ):
+            self.assertFalse(gr.mark_is_vehicle_specific(mark, veh), mark)
+
+    def test_concrete_marks_are_specific(self):
+        veh = {'year': 1989, 'make': 'Chevrolet', 'model': 'Pickup R3500 Cheyenne'}
+        for mark in (
+            'primer patch on the left rear fender',
+            'dent above the right tail light',
+            'California plate 1ABC123',
+            'aftermarket tube bumper with a welded hook',
+        ):
+            self.assertTrue(gr.mark_is_vehicle_specific(mark, veh), mark)
+
+    def test_correct_with_a_generic_mark_is_unclear(self):
+        v = gr.parse_verdicts('{"verdicts":[{"s":0,"status":"correct","mark":"Faded red crew-cab square-body Chevrolet with a dark lower body, as in REF5","why":"same truck"},{"s":1,"status":"correct","mark":"primer patch on left fender","why":"same patch"}]}', 2, vehicle={'make':'Chevrolet','model':'Pickup R3500 Cheyenne','year':1989})
+        self.assertEqual([x['status'] for x in v], ['unclear', 'correct'])
+
+    def test_competing_owned_same_generation_and_color(self):
+        target = {'id':'t','year':1989,'make':'Chevrolet','model':'R3500','color':'Red'}
+        owned = [
+            target,
+            {'id':'a','year':1987,'make':'GMC','model':'K2500','color':'Red'},      # same family, close year, same color
+            {'id':'b','year':1988,'make':'Chevrolet','model':'C1500','color':'Blue'}, # different color
+            {'id':'c','year':2005,'make':'Chevrolet','model':'Silverado','color':'Red'}, # too far in year
+            {'id':'d','year':1990,'make':'Ford','model':'F-150','color':'Red'},     # different make
+        ]
+        ids = {v['id'] for v in gr.competing_owned(owned, target)}
+        self.assertEqual(ids, {'a'})
 
 if __name__ == '__main__':
     unittest.main()
