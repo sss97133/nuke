@@ -92,6 +92,63 @@ export function qualifyAssessmentMarket(input: unknown, expectedQuery?: Row) {
       'Recorded source-label membership does not prove the subject belongs to a mechanical comparison class.'] };
 }
 
+/** Report retained publisher outcomes separately from qualified monetary sales.
+ * The existing DB computed qualifier rechecks current root/capture/public-parent
+ * custody. It does not independently verify a transaction or establish units. */
+export function qualifyAssessmentAppearances(input: unknown, vehicleId: string) {
+  if (!Array.isArray(input) || input.length > 201 || input.some(r => !object(r) || !UUID.test(r.id))) {
+    return unavailable('appearance_reader_unavailable');
+  }
+  const selected = input.slice(0, 200) as Row[];
+  const groups = new Map<string, Row[]>(); const exclusions: Row[] = [];
+  for (const r of selected) {
+    const d = r.structured_data, claim = d?.result_claim;
+    const reject = (reason: string) => exclusions.push({ observation_id: r.id, reason });
+    if (r.vehicle_id !== vehicleId || r.source_id !== '006f01c3-e5fb-44f5-ab40-e55b0654de1c'
+      || r.retained_native_listing_source !== true || r.is_superseded !== false || r.kind !== 'listing'
+      || r.property_id !== null || r.extraction_method !== 'mccormick_html_v1' || !object(d)
+      || d.parser !== 'mccormick_html_v1' || d.presentation !== 'archive'
+      || !/^[1-9][0-9]{0,9}$/.test(d.source_id) || !/^[1-9][0-9]{0,3}$/.test(d.auction_number)
+      || r.source_url !== `https://www.classic-carauction.com/auction-results?auctionnbr=${d.auction_number}&auctionid=${d.source_id}`
+      || !Number.isFinite(clock(r.observed_at)) || !Number.isFinite(clock(r.ingested_at))
+      || clock(r.observed_at) > clock(r.ingested_at) || clock(r.ingested_at) > Date.now()) {
+      exclusions.push({ reason: 'current_archive_custody_unestablished' }); continue;
+    }
+    const literal = typeof claim?.literal === 'string' ? claim.literal : '';
+    const match = literal.match(/^(Sold for:|High Bid\s*:?|No Sale\s*:?)\s*\$\s*([\d,]+(?:\.\d{2})?)$/i);
+    if (!object(claim) || !['sold', 'no_sale'].includes(claim.status) || !finite(claim.amount) || claim.amount <= 0
+      || claim.currency !== null || claim.currency_symbol !== '$' || claim.fee_basis !== 'unknown'
+      || !match || Number(match[2].replace(/,/g, '')) !== claim.amount
+      || (/^Sold for:/i.test(match[1]) ? 'sold' : 'no_sale') !== claim.status
+      || typeof d.auction_dates_text !== 'string' || !d.auction_dates_text.trim() || d.auction_dates_text.length > 120) {
+      reject('retained_result_shape_unestablished'); continue;
+    }
+    const key = `${d.auction_number}:${d.source_id}`;
+    const witness = { observation_id: r.id, source_url: r.source_url, source_captured_at: r.observed_at,
+      recorded_at: r.ingested_at, source_date_interval_text: d.auction_dates_text,
+      outcome: claim.status, amount: claim.amount, currency_symbol: '$', currency: null,
+      fee_basis: 'unknown', literal };
+    groups.set(key, [...(groups.get(key) ?? []), witness]);
+  }
+  const records = [...groups].map(([nativeKey, witnesses]) => {
+    const signatures = new Set(witnesses.map(w => JSON.stringify([w.outcome, w.amount, w.source_date_interval_text])));
+    const coherent = signatures.size === 1;
+    return { source: 'mccormicks', native_appearance_key: nativeKey, vehicle_id: vehicleId,
+      evidence_state: coherent ? 'reported' : 'disputed', reported_result: coherent ? witnesses[0] : null,
+      witnesses, witness_count: witnesses.length, monetary_comparable_eligible: false,
+      exclusions: ['currency_unestablished', 'fee_basis_unestablished', 'independent_transaction_verification_unestablished',
+        ...(coherent ? [] : ['conflicting_retained_result_claims'])] };
+  });
+  const hasMore = input.length > 200;
+  return { status: records.length ? 'retained_publisher_claims' : 'not_assessed', records, exclusions,
+    source_scope: 'mccormicks_archived_listing_claims_only', group_scope: 'returned_page_only',
+    page: { limit: 200, has_more: hasMore, next_after: hasMore ? selected.at(-1)?.id : null },
+    verified_sale_count: null, sell_through: null, price_statistics: null,
+    limitations: ['Repeated captures are grouped within this page; records are native appearances, not distinct physical vehicles.',
+      'Publisher date text is an interval label, not an exact sale instant. Capture/recording clocks do not establish historical knowledge.',
+      'No-sale amounts are reported unsuccessful bids, not realized sale prices. No currency, fees, conversion or value adjustment is established.'] };
+}
+
 /** Revalidate retained atoms against their actual current source and the
  * existing parser. Questions and model-level claims never become car facts. */
 export function qualifyAssessmentCommentary(atoms: Row[], comments: Row[], vehicleId: string) {
@@ -138,11 +195,11 @@ export function qualifyAssessmentCommentary(atoms: Row[], comments: Row[], vehic
 }
 
 export async function readVehicleAssessment(db: any, vehicle: Row, options: {
-  photos?: Row[]; photoHasMore?: boolean; contributorEvidence?: any; claimAfter?: string; commentAfter?: string; photoAfter?: string;
+  photos?: Row[]; photoHasMore?: boolean; contributorEvidence?: any; claimAfter?: string; commentAfter?: string; photoAfter?: string; appearanceAfter?: string;
 } = {}) {
   const vehicleId = vehicle.id;
   if (!UUID.test(vehicleId) || (options.claimAfter && !UUID.test(options.claimAfter)) || (options.commentAfter && !UUID.test(options.commentAfter))
-    || (options.photoAfter && !UUID.test(options.photoAfter))) {
+    || (options.photoAfter && !UUID.test(options.photoAfter)) || (options.appearanceAfter && !UUID.test(options.appearanceAfter))) {
     throw new Error('Invalid assessment scope');
   }
   const asOf = new Date().toISOString();
@@ -162,7 +219,14 @@ export async function readVehicleAssessment(db: any, vehicle: Row, options: {
     if (options.photoAfter) photoRequest = photoRequest.gt('id', options.photoAfter);
     photoRequest = photoRequest.order('id').limit(201);
   }
-  const [p, m, a, gallery] = await Promise.allSettled([profile, market, bounded(atoms.order('id').limit(201)), bounded(photoRequest)]);
+  let appearances = db.from('vehicle_observations')
+    .select('id,vehicle_id,source_id,kind,property_id,source_url,observed_at,ingested_at,structured_data,extraction_method,is_superseded,retained_native_listing_source')
+    .eq('vehicle_id', vehicleId).eq('source_id', '006f01c3-e5fb-44f5-ab40-e55b0654de1c')
+    .eq('kind', 'listing').is('property_id', null).eq('is_superseded', false).eq('retained_native_listing_source', true);
+  if (options.appearanceAfter) appearances = appearances.gt('id', options.appearanceAfter);
+  const [p, m, a, gallery, history] = await Promise.allSettled([profile, market, bounded(atoms.order('id').limit(201)),
+    bounded(photoRequest), bounded(appearances.order('id').limit(201))]);
+  const retainedAppearances = qualifyAssessmentAppearances(history.status === 'fulfilled' && !history.value.error ? history.value.data : null, vehicleId);
   const claims = qualifyAssessmentClaims(p.status === 'fulfilled' && !p.value.error ? p.value.data : null, vehicleId);
   const listing = qualifyListingAssertions(claims);
   const qualifiedMarket = qualifyAssessmentMarket(m.status === 'fulfilled' && !m.value.error ? m.value.data : null,
@@ -196,7 +260,7 @@ export async function readVehicleAssessment(db: any, vehicle: Row, options: {
       body_specific: { eligible: false, reasons: ['Current physical body-class qualification remains unestablished.'] },
       records: claims.records.filter(c => MECHANICAL.has(c.property_key)), source_page: 'page' in claims ? claims.page : null,
       exclusions: listing.unresolved },
-    commentary, photo_audit: photoAudit, source_claims: claims, listing,
+    commentary, retained_auction_appearances: retainedAppearances, photo_audit: photoAudit, source_claims: claims, listing,
     attestations: options.contributorEvidence?.status === 'available' ? options.contributorEvidence.testimony : [],
     attestation_status: options.contributorEvidence?.status ?? 'not_requested',
     unresolved_fields: listing.unresolved };

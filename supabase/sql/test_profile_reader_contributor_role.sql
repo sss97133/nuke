@@ -1,6 +1,7 @@
 -- Reuse the complete invoker/RLS profile contract before exercising creator roles.
 \ir test_vehicle_profile_read.sql
 ALTER TABLE public.vehicles ADD COLUMN entry_type text;
+GRANT SELECT (entry_type) ON public.vehicles TO anon, authenticated; -- the fixture grants vehicles column by column
 \ir ../migrations/20261019021500_profile_reader_contributor_role.sql
 \ir ../migrations/20261019021500_profile_reader_contributor_role.sql
 

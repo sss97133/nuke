@@ -24,11 +24,12 @@ END $$;
 
 -- The tables the read touches, with the live SELECT policies that matter to it.
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, user_id uuid, owner_id uuid, uploaded_by uuid,
+  id uuid PRIMARY KEY, user_id uuid, owner_id uuid, uploaded_by uuid, created_by_user_id uuid,
   is_public boolean NOT NULL DEFAULT true, deleted_at timestamptz,
   year integer, make text, model text, normalized_model text, series text, trim text,
   transmission text, transmission_model text, mileage integer, mileage_source text,
   canonical_body_style text, body_style text, engine_size text, engine_type text, drivetrain text,
+  is_replica boolean,
   city text, state text, location text, listing_location text, bat_location text, discovery_url text, listing_title text);
 CREATE TABLE public.field_evidence (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, field_name text, proposed_value text,
@@ -43,6 +44,14 @@ CREATE TABLE public.vehicle_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, kind text, content_text text, source_url text,
   extraction_method text, observed_at timestamptz, is_superseded boolean, structured_data jsonb,
   confidence_score numeric, ingested_at timestamptz DEFAULT now());
+-- listing_exports as the listing-state reader uses it (own-user row policies; the reader is its own gate).
+CREATE TABLE public.listing_exports (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid NOT NULL, platform text NOT NULL,
+  export_format text NOT NULL, title text NOT NULL, description text, status text DEFAULT 'prepared',
+  external_listing_url text, external_listing_id text, submitted_at timestamptz, activated_at timestamptz, metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE public.listing_exports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY view_own_exports ON public.listing_exports FOR SELECT USING (user_id = (SELECT auth.uid()));
 CREATE TABLE public.test_price_facts (
   vehicle_id uuid PRIMARY KEY, price_kind text, price_amount numeric, price_as_of timestamptz,
   price_live boolean, platform text, source_url text);
@@ -83,6 +92,12 @@ ALTER TABLE public.vehicle_contributors ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_rows ON public.vehicle_contributors FOR SELECT USING (user_id = (SELECT auth.uid()));
 GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+-- Production grants vehicles column by column (338 columns on 2026-11-06). The reader may read only granted columns:
+-- the fixture grants what the live grant held before 20261110093000, which adds is_replica.
+REVOKE SELECT ON public.vehicles FROM anon, authenticated;
+GRANT SELECT (id, user_id, owner_id, uploaded_by, is_public, deleted_at, year, make, model, normalized_model, series, trim,
+  transmission, transmission_model, mileage, mileage_source, canonical_body_style, body_style, engine_size, engine_type,
+  drivetrain, city, state, location, listing_location, bat_location, discovery_url, listing_title) ON public.vehicles TO anon, authenticated;
 
 \ir ../migrations/20261013143000_vehicle_profile_read.sql
 \ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
@@ -97,6 +112,10 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261018200000_identity_marks_require_recorded_trim.sql
 \ir ../migrations/20261018220000_profile_read_title_claims.sql
 \ir ../migrations/20261018230000_identity_marks_series_label_fallback.sql
+\ir ../migrations/20261110090000_tribute_badges_and_engine_correction.sql
+\ir ../migrations/20261110090000_tribute_badges_and_engine_correction.sql
+\ir ../migrations/20261110093000_vehicles_is_replica_column_grant.sql
+\ir ../migrations/20261110100000_listing_submission_state.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -157,6 +176,15 @@ CREATE FUNCTION public.t_assert(p_ok boolean, p_what text) RETURNS void LANGUAGE
 BEGIN IF NOT coalesce(p_ok, false) THEN RAISE EXCEPTION 'FAIL: %', p_what; END IF; END $$;
 GRANT EXECUTE ON FUNCTION public.t_assert(boolean, text) TO anon, authenticated;
 
+-- v1 is submitted to a venue and its draft is pending: the masthead says so only to the vehicle's people.
+SET test.auth_role = 'service_role';
+SET statement_timeout = '5s';
+SELECT public.record_listing_submission('10000000-0000-0000-0000-000000000001', 'bat', 'submitted', 'draft_pending_approval', '2026-11-03T21:44:33Z',
+  '126086136', 'https://bringatrailer.com/listing/x/', '{"type":"gmail","ref":"1a1a35f039b8d7b3","title":"Required - Approve or suggest changes","asserted_by":"contract"}',
+  'The venue sent the seller a draft to approve.');
+RESET statement_timeout;
+SET test.auth_role = '';
+
 -- 1. Anonymous reader.
 SET ROLE anon;
 SET test.auth_role = 'anon';
@@ -170,6 +198,7 @@ BEGIN
   PERFORM public.t_assert((SELECT string_agg(x->>'kind', ',' ORDER BY o) FROM jsonb_array_elements(d->'sections') WITH ORDINALITY AS t(x, o)) = 'masthead,strip,timeline', 'masthead, strip and timeline');
   m := d->'sections'->0;
   PERFORM public.t_assert(m->>'kind' = 'masthead' AND m->>'model' = 'Mustang' AND (m->>'year')::int = 1966, 'masthead identity');
+  PERFORM public.t_assert(m->'listing' = 'null'::jsonb, format('anon reads no listing state while the draft is pending; got %s', m->'listing'));
   PERFORM public.t_assert(m->'identity_source'->>'normalized_model' = 'Mustang', 'identity_source for the client tokens');
   PERFORM public.t_assert((m->'price'->>'value')::numeric = 24000 AND m->'price'->>'unit' = 'USD', 'typed price value and unit');
   PERFORM public.t_assert(m->>'priceLabel' = 'Last recorded sale', 'a sale is the last recorded sale');
@@ -287,12 +316,16 @@ DECLARE d jsonb;
 BEGIN
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
   PERFORM public.t_assert(d->>'viewer' = 'owner', 'owner_id is the owner');
+  PERFORM public.t_assert(d->'sections'->0->'listing'->>'stage' = 'draft_pending_approval' AND d->'sections'->0->'listing'->>'visibility' = 'tied',
+    format('the owner reads the masthead listing state; got %s', d->'sections'->0->'listing'));
   PERFORM public.t_assert(d->'sections'->1->'facets'->2->'member'->'source'->>'kind' = 'document'
     AND (d->'sections'->1->'facets'->2->'member'->>'trust')::numeric = 0.95, 'an authenticated reader sees the invoice attribution');
   PERFORM public.t_assert((d->'sections'->1->'coverage'->>'n')::int = 4, 'coverage counts the invoice attribution for this viewer');
 END $$;
 SET test.auth_uid = '20000000-0000-0000-0000-000000000002';
 SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->>'viewer' = 'contributor', 'the uploader is a contributor');
+SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'sections'->0->'listing'->>'stage' = 'draft_pending_approval',
+  'the uploader reads the masthead listing state');
 SET test.auth_uid = '20000000-0000-0000-0000-000000000003';
 SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->>'viewer' = 'owner', 'an approved verification with both documents is the owner');
 SET test.auth_uid = '20000000-0000-0000-0000-000000000005';
@@ -376,6 +409,41 @@ BEGIN
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000016');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'series_code' IS NOT NULL),
     format('a Pickup whose record names no series code gets no series plate; got %s', d->'sections'->0->'identity_marks'));
+END $$;
+RESET ROLE;
+
+-- 2d. Tribute and uncoded badges. The catalog's uncoded Pontiac plate (no family, series code or trim package) resolved
+-- for every 1964-2002 Pontiac with any recorded series or trim; a tribute (vehicles.is_replica) earns no factory series
+-- or trim badge, and the masthead's identity_source says so.
+INSERT INTO public.vehicle_identity_marks (brand, family, series_code, trim_package, body_style, year_start, year_end, mark_kind, display_label, sub_label, rpo_code, fender_placement, svg_markup, provenance_note) VALUES
+ ('Pontiac', NULL, NULL, NULL, NULL, 1964, 2002, 'series_badge', 'GTO · TRANS AM · JUDGE', 'PMD Arrowhead', 'W62 / WS6 / WT1', 'Hood Scoop', '<svg/>', 'Fixture: the live uncoded Pontiac plate.'),
+ ('Pontiac', 'Firebird', 'Trans Am', 'Trans Am WS6', NULL, 1970, 1981, 'trim_badge', 'TRANS AM · WS6', 'Screaming Chicken', 'WS4 / WS6 / W72', 'Hood Decal', '<svg/>', 'Fixture: the live WS6 plate.');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, series, trim, body_style, is_replica) VALUES
+ ('10000000-0000-0000-0000-000000000017', 1979, 'Pontiac', 'Firebird', 'Firebird', 'Trans Am', 'Trans Am WS6', 'Coupe', true),
+ ('10000000-0000-0000-0000-000000000018', 1979, 'Pontiac', 'Firebird', 'Firebird', 'Trans Am', 'Trans Am WS6', 'Coupe', false),
+ ('10000000-0000-0000-0000-000000000019', 1973, 'Pontiac', 'Firebird', 'Firebird', NULL, 'TRANS AM', 'Coupe', NULL);
+SET ROLE anon;
+SET test.auth_role = 'anon';
+DO $$
+DECLARE d jsonb;
+BEGIN
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000018');
+  PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'display_label' = 'TRANS AM · WS6'),
+    format('v18 (1979 Trans Am WS6, factory) earns the WS6 plate; got %s', d->'sections'->0->'identity_marks'));
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'display_label' = 'GTO · TRANS AM · JUDGE'),
+    format('the uncoded Pontiac plate never resolves; got %s', d->'sections'->0->'identity_marks'));
+  PERFORM public.t_assert((d->'sections'->0->'identity_source'->>'is_replica')::boolean = false, 'v18 identity_source: not a tribute');
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000017');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'mark_kind' IN ('trim_badge', 'series_badge')),
+    format('v17 (the same car recorded as a tribute) earns no series or trim badge; got %s', d->'sections'->0->'identity_marks'));
+  PERFORM public.t_assert((d->'sections'->0->'identity_source'->>'is_replica')::boolean = true, 'v17 identity_source carries is_replica');
+  PERFORM public.t_assert(d->'sections'->0->'identity_marks' = d->'identity_marks', 'v17 masthead marks equal the document marks');
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000019');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'mark_kind' IN ('trim_badge', 'series_badge')),
+    format('v19 (1973 Firebird recorded as TRANS AM, no series) gets no plate from the uncoded mark; got %s', d->'sections'->0->'identity_marks'));
+  PERFORM public.t_assert((d->'sections'->0->'identity_source'->>'is_replica')::boolean = false, 'v19 identity_source: null is_replica reads false');
 END $$;
 RESET ROLE;
 

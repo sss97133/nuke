@@ -21,7 +21,7 @@ import { recordRevision } from "../_shared/revision.ts";
 import { htmlToText } from "../_shared/htmlToText.ts";
 import { endedRow } from "../poll-listing-feeds/removal.ts";
 import { aspectFilterFor, BrowseClient, ItemGone, QuotaExceeded, yearAspect } from "./browseApi.ts";
-import { CLASS_RANK, classifySeller, type IdentityClaim, linkVin, listingKey, TIERS, toLanding, type SellerClass } from "./browseMap.ts";
+import { CLASS_RANK, classifySeller, currentEpisodePrice, type IdentityClaim, linkVin, listingKey, TIERS, toLanding, type SellerClass } from "./browseMap.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { landPlace, newPlaceCtx } from "./browsePlace.ts";
 import { deletedLookup, handleHashes, type Lookup, tombstoneItem } from "./deletedMembers.ts";
@@ -187,11 +187,16 @@ export async function landItem(supabase: any, raw: any, rep: Report, now = new D
   if (vehicleId && obs.observationId) {
     const ev = await writeVehicleEventByKey(supabase, {
       vehicle_id: vehicleId, source_platform: PLATFORM, source_listing_id: landing.listingKey, source_url: landing.url,
-      event_type: "listing", event_status: "active", ...(landing.price.amount != null ? { current_price: landing.price.amount } : {}),
-      metadata: { ...landing.eventMetadata, ...(opts.extra ? { page: opts.extra } : {}), observation_id: obs.observationId, snapshot_id: snapshotId, source_observed_at: now, last_checked_at: now },
+      event_type: "listing", event_status: "active", currency_code: landing.price.currency, bid_count: Number.isInteger(raw.bidCount) && raw.bidCount >= 0 ? raw.bidCount : null, current_price: currentEpisodePrice(raw),
+      metadata: { ...landing.eventMetadata,
+        // This general landing has not admitted an auction-state snapshot. Never inherit an older proof pointer for a new quote.
+        ...(raw.buyingOptions?.includes("AUCTION") ? { auction_observation_id: null, auction_snapshot_id: null,
+          current_bid: raw.currentBidPrice?.value ?? null, current_bid_kind: raw.bidCount == null ? "unknown" : raw.bidCount > 0 ? "high_bid" : "opening_price",
+          buy_it_now: raw.buyingOptions?.includes("FIXED_PRICE") ? raw.price?.value ?? null : null, capture_kind: "auction_quote_pending_admission" } : {}),
+        ...(opts.extra ? { page: opts.extra } : {}), observation_id: obs.observationId, snapshot_id: snapshotId, source_observed_at: now, last_checked_at: now },
     }, { preserveEventStatus: true, sourceObservedAt: now });
     if (ev.action === "error") rep.errors.push(`listing event ${landing.listingKey}: ${ev.error}`);
-    if (landing.price.amount != null) {
+    if (!raw.buyingOptions?.includes("AUCTION") && landing.price.amount != null && landing.price.kind === "buy_it_now") {
       softWrite(`price log ${landing.listingKey}`, await supabase.from("vehicle_price_history").insert({
         vehicle_id: vehicleId, price_type: "asking", value: landing.price.amount, source: PLATFORM, as_of: now, confidence: 70,
         proof_type: "listing", proof_url: landing.url, notes: `ebay item ${landing.listingKey}`,

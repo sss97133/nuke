@@ -2,6 +2,7 @@ import { RETAINED_PROPERTY_KEYS } from "./retainedInterior.ts";
 import { RETAINED_IDENTITY_KEYS, retainedListingIdentityValue } from "./retainedListingIdentity.ts";
 import { DESCRIPTION_ENGINE_FAMILY_LABEL_VERSION, ENGINE_FAMILY_LABEL_VERSION } from "./retainedDescriptionPowertrain.ts";
 import { TITLE_FACET_KEYS, TITLE_FACET_NORMALIZATION, type TitleFacetKey } from "./titleFacets.ts";
+import { COMPONENT_PRESENCE_PROPERTY } from "./componentEvidence.ts";
 /** Property admission only. Source lineage, clocks and replay belong to the writer. */
 export const IMAGE_PROPERTY_VALUES = {
   image_visible_rust_severity: ["none", "surface", "pitting", "perforation"],
@@ -11,6 +12,18 @@ export const IMAGE_PROPERTY_VALUES = {
 
 /** Text a model read off one image: a badge's printed words, or a GM SPID label's RPO codes. A reading, not a build record. */
 export const IMAGE_READING_KEYS = ["image_visible_badge_text", "image_spid_rpo_codes"] as const;
+/**
+ * A marking transcribed off one photographed part or tag: a body tag line, a casting number, an ID stamp.
+ * The value is the characters as read, never their meaning; decodes come from vehicle_decode_rules.
+ */
+const MARKING = /^[A-Z0-9][A-Z0-9 .\/-]{0,39}$/;
+const TAG_CODE = /^[A-Z0-9]{1,4}$/;
+export const PHYSICAL_READING_KEYS = [
+  "body_tag_style", "body_tag_body_number", "body_tag_build_date", "body_tag_trim_code", "body_tag_line5",
+  "body_tag_paint_code", "body_tag_option_codes", "transmission_id_stamp", "transmission_case_casting",
+  "transmission_tailhousing_casting", "transmission_side_cover_casting", "bellhousing_casting",
+  "shifter_bracket_marking", "engine_block_casting", "engine_code_stamp", "engine_head_date_code",
+] as const;
 const BADGE_TEXT = /^[A-Z0-9][A-Z0-9 .\/&'+-]{0,39}$/;
 const RPO_CODE = /^[A-Z0-9]{3}$/;
 
@@ -49,6 +62,28 @@ export function isImageReadingKey(value: unknown): value is typeof IMAGE_READING
   return typeof value === "string" && (IMAGE_READING_KEYS as readonly string[]).includes(value);
 }
 
+/** Single-claim intake only, like the reading keys above. */
+export function isPhysicalReadingKey(value: unknown): value is typeof PHYSICAL_READING_KEYS[number] {
+  return typeof value === "string" && (PHYSICAL_READING_KEYS as readonly string[]).includes(value);
+}
+
+function physicalReadingValueOk(key: string, value: unknown): boolean {
+  if (key === "body_tag_paint_code") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const paint = value as Record<string, unknown>;
+    return Object.keys(paint).every(k => ["lower", "upper", "top"].includes(k)) &&
+      typeof paint.lower === "string" && TAG_CODE.test(paint.lower) &&
+      (paint.upper === undefined || (typeof paint.upper === "string" && TAG_CODE.test(paint.upper))) &&
+      (paint.top === undefined || (typeof paint.top === "string" && TAG_CODE.test(paint.top)));
+  }
+  if (key === "body_tag_option_codes") {
+    // An empty list is a reading: the option lines were read and are blank.
+    return Array.isArray(value) && value.length <= 40 && new Set(value).size === value.length &&
+      value.every(code => typeof code === "string" && TAG_CODE.test(code));
+  }
+  return typeof value === "string" && MARKING.test(value);
+}
+
 /**
  * The caller looks up the exact property_key and handles lookup failures as 503.
  * Unregistered/pending/deprecated keys fail closed. Values are never inferred or
@@ -59,14 +94,17 @@ export function validateObservationProperty(
   property: ObservationPropertyRegistryRow | null,
   retainedPropertyVerified = false,
   titleFacetVerified = false,
+  componentVerified = false,
 ): ObservationPropertyValidation {
   if (input.property_key === undefined) return { ok: true, propertyId: null };
   if (typeof input.property_key !== "string" || !input.property_key.trim()) {
     return invalid("property_key must be a nonempty string");
   }
   const titleFacet = titleFacetVerified && TITLE_FACET_KEYS.includes(input.property_key as TitleFacetKey);
-  if (!isSupportedImagePropertyKey(input.property_key) && !isImageReadingKey(input.property_key) && !titleFacet &&
-      !(retainedPropertyVerified && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
+  if (!isSupportedImagePropertyKey(input.property_key) && !isImageReadingKey(input.property_key) &&
+      !isPhysicalReadingKey(input.property_key) && !titleFacet &&
+      !(retainedPropertyVerified && RETAINED_PROPERTY_KEYS.includes(input.property_key)) &&
+      !(componentVerified && input.property_key === COMPONENT_PRESENCE_PROPERTY)) {
     return invalid("Unsupported property_key; only registered image properties are supported");
   }
   if (!property || property.namespace !== "core" || property.deprecated_at != null) {
@@ -83,6 +121,8 @@ export function validateObservationProperty(
   }
   const fields = data as Record<string, unknown>;
   const value = fields[input.property_key];
+  if (input.property_key === COMPONENT_PRESENCE_PROPERTY && (!componentVerified || input.kind !== "condition" ||
+      input.agent_inferred !== true || typeof value !== "boolean")) return invalid("Component presence requires a qualified scoped reading");
   const craigslistYear=retainedPropertyVerified&&input.kind==="listing"&&input.property_key==="year"&&fields.source_profile==="craigslist_year_attribute_v1";
   if (RETAINED_IDENTITY_KEYS.includes(input.property_key) && ((!craigslistYear&&input.kind !== "specification") ||
       retainedListingIdentityValue(input.property_key, value) === null ||
@@ -165,6 +205,21 @@ export function validateObservationProperty(
          !value.every(code => typeof code === "string" && RPO_CODE.test(code)) || new Set(value).size !== value.length ||
          fields.reading_role !== "spid_label_rpo_codes" || fields.vin_match_status !== "not_evaluated")) {
       return invalid("A SPID reading is a list of distinct three-character RPO codes; the label's VIN match is not evaluated here");
+    }
+  }
+  if (isPhysicalReadingKey(input.property_key)) {
+    if (input.kind !== "specification" || input.agent_inferred !== true) {
+      return invalid("Physical readings require specification observations with agent_inferred=true");
+    }
+    if (typeof fields.image_id !== "string" || !UUID.test(fields.image_id) ||
+        fields.source_family !== `image:${fields.image_id}`) {
+      return invalid("Physical readings require a canonical image_id UUID and its image source_family");
+    }
+    if (!["direct_code", "direct_transcription"].includes(fields.visual_relation as string)) {
+      return invalid("Physical readings are direct transcriptions of a visible marking");
+    }
+    if (!physicalReadingValueOk(input.property_key, value)) {
+      return invalid("A physical reading is the marking as read: capitals, digits and separators, or the tag's code list");
     }
   }
   return { ok: true, propertyId: property.id };

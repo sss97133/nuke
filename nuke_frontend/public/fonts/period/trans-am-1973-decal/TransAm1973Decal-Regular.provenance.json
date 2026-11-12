@@ -1,0 +1,650 @@
+{
+ "family": "Trans Am 1973 Decal",
+ "style": "Regular",
+ "version": "0.100",
+ "unitsPerEm": 1000,
+ "capHeight": 700,
+ "xHeight": 700,
+ "ascender": 900,
+ "descender": -250,
+ "license": "Drawn for Nuke (nuke.ag) from the cited period sources listed in the provenance sidecar. Descriptive family name; not an official General Motors or Pontiac typeface and not endorsed by General Motors. Pontiac, Firebird and Trans Am are trademarks of General Motors. Font software: SIL Open Font License 1.1.",
+ "glyphCount": 45,
+ "glyphs": {
+  "T": {
+   "unicode": "U+0054",
+   "advance": 538,
+   "provenance": "traced",
+   "method": "potrace of the de-sheared decal at the letter's own cap height, Schneider refit; the construction rule (bar 500 x 72 single; split stem; the channel runs out through the bar) is what the derived letters copy",
+   "fidelity": {
+    "iou": 0.9211,
+    "maxDevPx": 4.0,
+    "meanDevPx": 1.201
+   },
+   "sourceBoxPx": [
+    31,
+    94,
+    13,
+    101
+   ],
+   "source": "pontiac-firebird-trans-am-style-owner-decal-cut.png",
+   "sourceSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A=",
+   "page": "This car's own TRANS AM decal (owner photograph)",
+   "url": null,
+   "vehicleImage": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
+   "deshear": 0.33,
+   "lint": {
+    "nodes": 24,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "R": {
+   "unicode": "U+0052",
+   "advance": 529,
+   "provenance": "traced",
+   "method": "potrace of the de-sheared decal at the letter's own cap height, Schneider refit; the construction rule (split stem; single bowl; split leg falling from the bowl to the baseline) is what the derived letters copy",
+   "fidelity": {
+    "iou": 0.9095,
+    "maxDevPx": 5.39,
+    "meanDevPx": 1.338
+   },
+   "sourceBoxPx": [
+    98,
+    159,
+    11,
+    101
+   ],
+   "source": "pontiac-firebird-trans-am-style-owner-decal-cut.png",
+   "sourceSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A=",
+   "page": "This car's own TRANS AM decal (owner photograph)",
+   "url": null,
+   "vehicleImage": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
+   "deshear": 0.33,
+   "lint": {
+    "nodes": 48,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "A": {
+   "unicode": "U+0041",
+   "advance": 598,
+   "provenance": "traced",
+   "method": "potrace of the de-sheared decal at the letter's own cap height, Schneider refit; the construction rule (vertical left side single; falling right leg split; crossbar single at 250) is what the derived letters copy",
+   "fidelity": {
+    "iou": 0.9205,
+    "maxDevPx": 5.39,
+    "meanDevPx": 1.307
+   },
+   "sourceBoxPx": [
+    395,
+    469,
+    5,
+    99
+   ],
+   "source": "pontiac-firebird-trans-am-style-owner-decal-cut.png",
+   "sourceSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A=",
+   "page": "This car's own TRANS AM decal (owner photograph)",
+   "url": null,
+   "vehicleImage": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
+   "deshear": 0.33,
+   "lint": {
+    "nodes": 39,
+    "missingExtrema": 4,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "N": {
+   "unicode": "U+004E",
+   "advance": 499,
+   "provenance": "traced",
+   "method": "potrace of the de-sheared decal at the letter's own cap height, Schneider refit; the construction rule (single verticals; split diagonal) is what the derived letters copy",
+   "fidelity": {
+    "iou": 0.9303,
+    "maxDevPx": 4.24,
+    "meanDevPx": 1.132
+   },
+   "sourceBoxPx": [
+    238,
+    295,
+    8,
+    100
+   ],
+   "source": "pontiac-firebird-trans-am-style-owner-decal-cut.png",
+   "sourceSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A=",
+   "page": "This car's own TRANS AM decal (owner photograph)",
+   "url": null,
+   "vehicleImage": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
+   "deshear": 0.33,
+   "lint": {
+    "nodes": 28,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 3
+   }
+  },
+  "S": {
+   "unicode": "U+0053",
+   "advance": 530,
+   "provenance": "traced",
+   "method": "potrace of the de-sheared decal at the letter's own cap height, Schneider refit; the construction rule (one split S curve; terminals cut along the band normal) is what the derived letters copy",
+   "fidelity": {
+    "iou": 0.9455,
+    "maxDevPx": 4.47,
+    "meanDevPx": 0.947
+   },
+   "sourceBoxPx": [
+    306,
+    365,
+    9,
+    96
+   ],
+   "source": "pontiac-firebird-trans-am-style-owner-decal-cut.png",
+   "sourceSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A=",
+   "page": "This car's own TRANS AM decal (owner photograph)",
+   "url": null,
+   "vehicleImage": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
+   "deshear": 0.33,
+   "lint": {
+    "nodes": 25,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "M": {
+   "unicode": "U+004D",
+   "advance": 720,
+   "provenance": "traced",
+   "method": "potrace of the de-sheared decal at the letter's own cap height, Schneider refit; the construction rule (single left stem, split falling diagonal, single rising diagonal, split right stem) is what the derived letters copy",
+   "fidelity": {
+    "iou": 0.9196,
+    "maxDevPx": 6.0,
+    "meanDevPx": 1.468
+   },
+   "sourceBoxPx": [
+    479,
+    567,
+    2,
+    98
+   ],
+   "source": "pontiac-firebird-trans-am-style-owner-decal-cut.png",
+   "sourceSha256Base64": "SsU93OGnfPvglNmVYiBJWLHVF+WgbSHWiNVDmVSij/A=",
+   "page": "This car's own TRANS AM decal (owner photograph)",
+   "url": null,
+   "vehicleImage": "vehicle_images:9b8ec6d9-8e27-41f4-9428-5c025a1c46f0",
+   "deshear": 0.33,
+   "lint": {
+    "nodes": 43,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "B": {
+   "unicode": "U+0042",
+   "advance": 487,
+   "provenance": "designed",
+   "method": "split stem; two split bowls (crescent channel, as the R bowl), the lower 30 wider",
+   "lint": {
+    "nodes": 35,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "C": {
+   "unicode": "U+0043",
+   "advance": 526,
+   "provenance": "designed",
+   "method": "split round (crescent channel) opened from -40 to 40 degrees",
+   "lint": {
+    "nodes": 25,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "D": {
+   "unicode": "U+0044",
+   "advance": 522,
+   "provenance": "designed",
+   "method": "split stem; split bowl with a crescent channel (rounds are heavy at the sides)",
+   "lint": {
+    "nodes": 29,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "E": {
+   "unicode": "U+0045",
+   "advance": 480,
+   "provenance": "designed",
+   "method": "split stem; three single bars; the channel cuts the top bar like the T",
+   "lint": {
+    "nodes": 32,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "F": {
+   "unicode": "U+0046",
+   "advance": 480,
+   "provenance": "designed",
+   "method": "E without the bottom bar",
+   "lint": {
+    "nodes": 28,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "G": {
+   "unicode": "U+0047",
+   "advance": 580,
+   "provenance": "designed",
+   "method": "the C closed round to the half height, with a single inward bar under the band ends",
+   "lint": {
+    "nodes": 34,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "H": {
+   "unicode": "U+0048",
+   "advance": 560,
+   "provenance": "designed",
+   "method": "two split stems, single bar",
+   "lint": {
+    "nodes": 40,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "I": {
+   "unicode": "U+0049",
+   "advance": 252,
+   "provenance": "designed",
+   "method": "split stem",
+   "lint": {
+    "nodes": 16,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "J": {
+   "unicode": "U+004A",
+   "advance": 501,
+   "provenance": "designed",
+   "method": "split stem turning into a split hook",
+   "lint": {
+    "nodes": 40,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 5
+   }
+  },
+  "K": {
+   "unicode": "U+004B",
+   "advance": 501,
+   "provenance": "designed",
+   "method": "split stem; single rising arm; split falling leg",
+   "lint": {
+    "nodes": 53,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 10
+   }
+  },
+  "L": {
+   "unicode": "U+004C",
+   "advance": 445,
+   "provenance": "designed",
+   "method": "split stem; single foot bar cut by the channel",
+   "lint": {
+    "nodes": 20,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "O": {
+   "unicode": "U+004F",
+   "advance": 570,
+   "provenance": "designed",
+   "method": "split round: a ring of the band width with crescent channel and outer band",
+   "lint": {
+    "nodes": 24,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "P": {
+   "unicode": "U+0050",
+   "advance": 467,
+   "provenance": "designed",
+   "method": "split stem; split bowl with a crescent channel, as the traced R",
+   "lint": {
+    "nodes": 27,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "Q": {
+   "unicode": "U+0051",
+   "advance": 596,
+   "provenance": "designed",
+   "method": "the O with a single tail",
+   "lint": {
+    "nodes": 42,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "U": {
+   "unicode": "U+0055",
+   "advance": 560,
+   "provenance": "designed",
+   "method": "one split U",
+   "lint": {
+    "nodes": 52,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "V": {
+   "unicode": "U+0056",
+   "advance": 496,
+   "provenance": "designed",
+   "method": "split falling stroke, single rising stroke",
+   "lint": {
+    "nodes": 29,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "W": {
+   "unicode": "U+0057",
+   "advance": 706,
+   "provenance": "designed",
+   "method": "two V constructions",
+   "lint": {
+    "nodes": 61,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 20
+   }
+  },
+  "X": {
+   "unicode": "U+0058",
+   "advance": 451,
+   "provenance": "designed",
+   "method": "split falling, single rising",
+   "lint": {
+    "nodes": 42,
+    "missingExtrema": 3,
+    "microSegments": 0,
+    "nearKinks": 12
+   }
+  },
+  "Y": {
+   "unicode": "U+0059",
+   "advance": 450,
+   "provenance": "designed",
+   "method": "split left arm turning into the split stem (one channel), single right arm",
+   "lint": {
+    "nodes": 39,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "Z": {
+   "unicode": "U+005A",
+   "advance": 566,
+   "provenance": "designed",
+   "method": "single bars; split diagonal (heavy in a roman Z)",
+   "lint": {
+    "nodes": 34,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 5
+   }
+  },
+  "zero": {
+   "unicode": "U+0030",
+   "advance": 552,
+   "provenance": "designed",
+   "method": "split round, narrower than O",
+   "lint": {
+    "nodes": 24,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "one": {
+   "unicode": "U+0031",
+   "advance": 365,
+   "provenance": "designed",
+   "method": "split stem with a single flag",
+   "lint": {
+    "nodes": 25,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "two": {
+   "unicode": "U+0032",
+   "advance": 553,
+   "provenance": "designed",
+   "method": "split curve and diagonal; single base bar",
+   "lint": {
+    "nodes": 46,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "three": {
+   "unicode": "U+0033",
+   "advance": 565,
+   "provenance": "designed",
+   "method": "two split bowls",
+   "lint": {
+    "nodes": 73,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 6
+   }
+  },
+  "four": {
+   "unicode": "U+0034",
+   "advance": 558,
+   "provenance": "designed",
+   "method": "split stem; single diagonal and bar (after the Phoenix Graphix 400 decal)",
+   "lint": {
+    "nodes": 45,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "five": {
+   "unicode": "U+0035",
+   "advance": 565,
+   "provenance": "designed",
+   "method": "single bar and stem; split bowl entering square",
+   "lint": {
+    "nodes": 68,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 13
+   }
+  },
+  "six": {
+   "unicode": "U+0036",
+   "advance": 551,
+   "provenance": "designed",
+   "method": "split loop under a split stem curve",
+   "lint": {
+    "nodes": 52,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "nine": {
+   "unicode": "U+0039",
+   "advance": 551,
+   "provenance": "derived",
+   "from": [
+    "six"
+   ],
+   "method": "the 6 turned 180 degrees",
+   "lint": {
+    "nodes": 52,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "seven": {
+   "unicode": "U+0037",
+   "advance": 536,
+   "provenance": "designed",
+   "method": "single bar; split diagonal",
+   "lint": {
+    "nodes": 33,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 8
+   }
+  },
+  "eight": {
+   "unicode": "U+0038",
+   "advance": 540,
+   "provenance": "designed",
+   "method": "two split loops, the upper narrower",
+   "lint": {
+    "nodes": 33,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "period": {
+   "unicode": "U+002E",
+   "advance": 160,
+   "provenance": "designed",
+   "method": "a square of the bar weight",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "comma": {
+   "unicode": "U+002C",
+   "advance": 185,
+   "provenance": "designed",
+   "method": "the period square with a falling tail",
+   "lint": {
+    "nodes": 13,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "hyphen": {
+   "unicode": "U+002D",
+   "advance": 380,
+   "provenance": "designed",
+   "method": "single bar",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "slash": {
+   "unicode": "U+002F",
+   "advance": 492,
+   "provenance": "designed",
+   "method": "single rising stroke",
+   "lint": {
+    "nodes": 12,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 5
+   }
+  },
+  "quotesingle": {
+   "unicode": "U+0027",
+   "advance": 136,
+   "provenance": "designed",
+   "method": "single stroke",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "quotedbl": {
+   "unicode": "U+0022",
+   "advance": 256,
+   "provenance": "designed",
+   "method": "two single strokes",
+   "lint": {
+    "nodes": 16,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "ampersand": {
+   "unicode": "U+0026",
+   "advance": 634,
+   "provenance": "designed",
+   "method": "single loops, split falling stroke",
+   "lint": {
+    "nodes": 49,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "space": {
+   "unicode": "U+0020",
+   "advance": 220,
+   "provenance": "designed",
+   "method": "measured word space of the decal",
+   "lint": {
+    "nodes": 0,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  }
+ },
+ "rules": "Trans Am 1973 Decal: the \"TRANS AM\" fender decal lettering, from the photograph of this car's own decal, extended\nto A-Z and 0-9 in the same construction.\n\nSource: pontiac-firebird-trans-am-style-owner-decal-cut.png (the car's decal, cut from vehicle_images\n9b8ec6d9-8e27-41f4-9428-5c025a1c46f0, levelled -8.65 degrees by the cutter). The photograph looks along the fender,\nso every vertical leans 0.33 px per px (18 degrees); the trace removes that shear before measuring.\n\nConstruction, measured on the de-sheared decal (each letter scaled to cap 700 on its own height, 88 px at the T to\n96 px at the M, which also removes the perspective scale):\n  1. Every stroke is a band of one width (50-60 units, drawn 56); the letters are condensed (T 0.72 H wide, N 0.61,\n     M 0.93) and upright.\n  2. Strokes that would be heavy in a broad-pen roman are split into two bands with a channel of about 60 units: the\n     T, R and E-like stems, the falling diagonals of A, N and M, the M's right stem, the R leg and the whole S. Light\n     strokes stay single: the A's left leg, the N's verticals, the M's left stem and rising diagonal, the bars.\n  3. Rounds split only where a pen round is heavy: the inner band is a full ring, the channel and the outer band are\n     crescents that run out to nothing at the top and bottom (the R bowl; the S does the same at its terminals).\n  4. The channel of a split stroke runs on through the stroke it meets and out of the letter (the T's channel cuts\n     the bar to the top; the N's split diagonal joins the left stem at the top and the right stem at the base).\n  5. In the M the split falling stroke separates: its first band reaches the baseline, its second meets the single\n     rising diagonal at a vertex 200 units up.\n  The six letters on the car (T R A N S M) ship as traces: potrace at 8x, Schneider refit at 0.8 px, straight runs\n  within 1.2 px redrawn as single lines and stems set upright. Their print-softened ends and the taper of the\n  diagonals are the decal's own; every other glyph is built from rules 1-4.\nThe decal is orange on the car; the colour is a finish (CSS colour or the COLR layer), not part of the outline.\n",
+ "band": 56,
+ "channel": 60
+}

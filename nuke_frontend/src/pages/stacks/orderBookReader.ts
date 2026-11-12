@@ -137,7 +137,7 @@ export function chooseLot(lots: LotRow[], listingUrl: string | null, lotId: stri
   if (lotId === 'latest') return lots[0] ?? null;
   if (lotId) {
     const asked = lots.find((l) => l.id === lotId);
-    if (asked) return asked;
+    return asked ?? null; // An explicit historical episode never falls back to another lot.
   }
   const current = listingUrl ? lots.find((l) => trimUrl(l.source_url) === trimUrl(listingUrl)) : undefined;
   return current ?? lots[0] ?? null;
@@ -158,7 +158,7 @@ async function readBook(vehicleId: string, lotId: string | null, signal?: AbortS
   if (bidProjection && (!BAT_LOT_URL.test(bidProjection.sourceUrl)
     || trimUrl(vehicle.listing_url ?? '') !== trimUrl(bidProjection.sourceUrl))) return null;
 
-  const lotsRes = await supabase.from('auction_events').select(LOT_SELECT)
+  const lotsRes = await supabase.from('auction_events_canonical').select(LOT_SELECT)
     .eq('vehicle_id', vehicleId).in('source', ['bat', 'bringatrailer'])
     .order('auction_end_date', { ascending: false, nullsFirst: false }).limit(50).abortSignal(abort);
   if (lotsRes.error || !Array.isArray(lotsRes.data)) throw unreadable();
@@ -173,7 +173,7 @@ async function readBook(vehicleId: string, lotId: string | null, signal?: AbortS
   const url = trimUrl(lot.source_url);
   const [comments, unkeyed, frames] = await Promise.all([
     readAll<CommentRow>((after) => {
-      let q = supabase.from('auction_comments').select(bidProjection ? COMMENT_SELECT.replace(',comment_text', '') : COMMENT_SELECT)
+      let q = supabase.from('auction_comments').select(`${bidProjection ? COMMENT_SELECT.replace(',comment_text', '') : COMMENT_SELECT},canonical:auction_events_canonical(id)`).or('auction_event_id.is.null,canonical.not.is.null')
         .eq('auction_event_id', lot.id).eq('vehicle_id', vehicleId)
         .eq('vehicles.is_public', true).is('vehicles.deleted_at', null)
         .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item', { referencedTable: 'vehicles' })
@@ -182,7 +182,7 @@ async function readBook(vehicleId: string, lotId: string | null, signal?: AbortS
       if (after) q = q.gt('id', after);
       return q;
     }),
-    bidProjection ? Promise.resolve({ error: null, count: 0 }) : supabase.from('auction_comments').select('id', { count: 'exact', head: true })
+    bidProjection ? Promise.resolve({ error: null, count: 0 }) : supabase.from('auction_comments').select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null')
       .eq('vehicle_id', vehicleId).is('auction_event_id', null).in('source_url', [url, `${url}/`]).abortSignal(abort),
     bidProjection ? Promise.resolve([] as FrameRow[]) : readAll<FrameRow>((after) => {
       let q = supabase.from('vehicle_observations').select(FRAME_SELECT)

@@ -91,3 +91,41 @@ Deno.test("NUL normalization keeps separate original and stored representation h
     equal(f.payload().metadata.original_html_sha256 === f.payload().html_sha256, false);
   } finally { input.html = original; }
 });
+
+Deno.test('real forced archive refresh returns the verified old snapshot on two unchanged network checks', async () => {
+  const { archiveFetch } = await import('./archiveFetch.ts');
+  const originalFetch=globalThis.fetch;
+  const names=['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_SECRET_KEYS'];
+  const previous=names.map(n=>Deno.env.get(n));
+  Deno.env.set(names[0],'https://synthetic.supabase.co');Deno.env.set(names[1],'synthetic-key');Deno.env.delete(names[2]);
+  const url='https://www.classic-carauction.com/Home';
+  const html='<html><body>McCormick synthetic publisher schedule '+ 'retained public catalog '.repeat(100)+'</body></html>';
+  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(html)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  const row={id:snapshotId,platform:'mccormicks',listing_url:url,success:true,http_status:200,
+    html,html_sha256:hash,html_storage_path:null,fetched_at:'2026-01-01T00:00:00Z'};
+  let sources=0,inserts=0,reads=0;
+  try {
+    globalThis.fetch=async(request:any,init:any)=>{
+      const u=new URL(String(request));
+      if(u.hostname==='www.classic-carauction.com'){sources++;return new Response(html);}
+      equal(u.hostname,'synthetic.supabase.co');
+      if(init?.method==='POST'){inserts++;return Response.json({code:'23505'},{status:409});}
+      reads++;equal(u.searchParams.get('platform'),'eq.mccormicks');
+      equal(u.searchParams.get('listing_url'),'eq.'+url);equal(u.searchParams.get('html_sha256'),'eq.'+hash);
+      return Response.json([row]);
+    };
+    for(let i=0;i<2;i++){
+      const result=await archiveFetch(url,{platform:'mccormicks',forceRefresh:true,useFirecrawl:false,firecrawlOnBlock:false});
+      equal(result.snapshotId,snapshotId);equal(result.cached,false);equal(result.archiveError,undefined);
+      equal(result.html,html);equal(row.fetched_at,'2026-01-01T00:00:00Z');
+    }
+    equal([sources,inserts,reads],[2,2,2]);
+    row.html='different retained body';
+    const refused=await archiveFetch(url,{platform:'mccormicks',forceRefresh:true,useFirecrawl:false,firecrawlOnBlock:false});
+    equal(refused.snapshotId,null);
+    equal(refused.archiveError,'listing_page_snapshots duplicate acknowledgment failed: stored_body_hash_mismatch');
+  } finally {
+    globalThis.fetch=originalFetch;
+    names.forEach((n,i)=>previous[i]===undefined?Deno.env.delete(n):Deno.env.set(n,previous[i]!));
+  }
+});

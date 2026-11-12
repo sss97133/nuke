@@ -297,6 +297,67 @@ Deno.test("slow recovery stays at two reads while every lot keeps its socket sub
     .every(h => h.error === "recovery_pending"));
 }));
 
+Deno.test("periodic reconciliation preserves connected coverage but reports an actual recovery failure", async () => {
+  for (const failPeriodic of [false, true]) await withCollectorClock(async () => {
+    const start = Date.now(), heartbeats: { elapsed: number; heartbeat: any }[] = [];
+    let reads = 0;
+    const socket: any = { readyState: 1, close() { this.readyState = 3; this.onclose?.(); }, send(raw: string) {
+      const f = JSON.parse(raw);
+      if (f.event === "pusher:subscribe") queueMicrotask(() => this.onmessage({ data: JSON.stringify({
+        event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) }));
+      if (f.event === "pusher:ping") queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) }));
+    } };
+    await collectBatLive([{ ...target }], {
+      socket: () => { queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
+      admit: async (_f, h) => { heartbeats.push(...h.map(heartbeat => ({ elapsed: Date.now() - start, heartbeat }))); },
+      missed: async () => {
+        reads++;
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        if (reads > 1 && failPeriodic) throw new Error("source unavailable");
+        return { comments: [], metadata: { post_id: target.post_id, current_numeric: 100, count: 1 } };
+      },
+    }, 53000);
+    assert.equal(reads, 2, "same initial and periodic source reads; no expanded polling");
+    assert.ok(heartbeats.some(({ elapsed, heartbeat: h }) => elapsed < 4000 && h.connected && h.error === "recovery_pending"),
+      "initial reconciliation remains unqualified until it succeeds");
+    const duringPeriodic = heartbeats.filter(({ elapsed, heartbeat: h }) => elapsed >= 47000 && elapsed < 49000 && h.connected);
+    assert.ok(duringPeriodic.length > 0);
+    assert.ok(duringPeriodic.every(({ heartbeat: h }) => h.error === null),
+      "routine reconciliation does not invent a disconnected interval");
+    const afterPeriodic = heartbeats.filter(({ elapsed, heartbeat: h }) => elapsed >= 51000 && h.connected);
+    assert.ok(afterPeriodic.length > 0);
+    assert.ok(afterPeriodic.every(({ heartbeat: h }) => failPeriodic ? h.error?.includes("source unavailable") : h.error === null),
+      "an actual failed recovery still fails coverage");
+  });
+});
+
+Deno.test("a control event during recovery requires a new reconciliation before coverage qualifies", () => withCollectorClock(async () => {
+  const start = Date.now(), heartbeats: { elapsed: number; heartbeat: any }[] = [];
+  let reads = 0;
+  const socket: any = { readyState: 1, close() { this.readyState = 3; this.onclose?.(); }, send(raw: string) {
+    const f = JSON.parse(raw);
+    if (f.event === "pusher:subscribe") queueMicrotask(() => this.onmessage({ data: JSON.stringify({
+      event: "pusher_internal:subscription_succeeded", channel: f.data.channel, data: {} }) }));
+    if (f.event === "pusher:ping") queueMicrotask(() => this.onmessage({ data: JSON.stringify({ event: "pusher:pong", data: {} }) }));
+  } };
+  await collectBatLive([{ ...target }], {
+    socket: () => { queueMicrotask(() => socket.onmessage({ data: JSON.stringify({ event: "pusher:connection_established", data: {} }) })); return socket; },
+    admit: async (_f, h) => { heartbeats.push(...h.map(heartbeat => ({ elapsed: Date.now() - start, heartbeat }))); },
+    missed: async () => {
+      reads++;
+      if (reads === 1) setTimeout(() => socket.onmessage({ data: JSON.stringify({ event: "comment-deleted",
+        channel: `post;single;${target.post_id}`, data: { post_id: target.post_id } }) }), 1000);
+      await new Promise(resolve => setTimeout(resolve, 4000));
+      return { comments: [], metadata: { post_id: target.post_id, current_numeric: 100, count: 1 } };
+    },
+  }, 10000);
+  assert.equal(reads, 2);
+  const between = heartbeats.filter(({ elapsed, heartbeat: h }) => elapsed >= 5000 && elapsed < 8000 && h.connected);
+  assert.ok(between.length > 0);
+  assert.ok(between.every(({ heartbeat: h }) => h.error === "recovery_pending"), "the first response predates the control event");
+  assert.ok(heartbeats.some(({ elapsed, heartbeat: h }) => elapsed >= 8000 && h.connected && h.error === null));
+}));
+
 Deno.test("slow historical admission cannot stop socket pings or connected coverage heartbeats", () => withCollectorClock(async () => {
   let release!: () => void;
   const slowAdmission = new Promise<void>(resolve => { release = resolve; });

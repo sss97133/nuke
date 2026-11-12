@@ -202,3 +202,44 @@ Deno.test('an insert race re-reads the winning newer capture and leaves its pric
     { action: 'skipped', reason: 'older source observation' });
   equal(calls.map(c => c.op), ['select', 'insert', 'select']);
 });
+
+Deno.test('opt-in active auction uses compact full CAS and refuses terminal, ownership, newer and locked rows', async () => {
+  const row = { ...ROW, source_url: 'https://collectingcars.com/for-sale/fixture', event_type: 'auction', event_status: 'active', ended_at: '2099-01-03T00:00:00Z' };
+  const policy = { sourceObservedAt: '2026-11-09T01:00:00Z', preserveEventStatus: true, compactMetadataCas: true,
+    activeAuction: { sourceUrl: row.source_url, now: '2026-11-09T02:00:00Z' } };
+  const live = { id: 'event', event_status: 'active', event_type: 'auction', source_url: row.source_url,
+    sold_at: null, ended_at: '2099-01-02T00:00:00Z', metadata: { gallery: 'x'.repeat(80000) }, vehicle_event_metadata_digest: 'a'.repeat(64) };
+  for (const patch of [{ event_status: 'sold' }, { source_url: 'https://collectingcars.com/for-sale/other' },
+    { identity_check: 'mismatch' }, { metadata: { source_observed_at: '2026-11-09T01:01:00Z' } },
+    { metadata: { clock_locked_by_supersession: true } }, { vehicle_event_metadata_digest: null }]) {
+    const f = stubClient([{ data: [{ ...live, ...patch }] }]);
+    const result = await writeVehicleEventByKey(f.client, row, policy);
+    equal(result.action, 'skipped'); equal(f.calls.length, 1);
+  }
+  const f = stubClient([{ data: [live] }, { data: [{ id: 'event' }] }]);
+  equal((await writeVehicleEventByKey(f.client, row, policy)).action, 'updated');
+  const filters = f.calls[1].filters;
+  equal(filters.some(([key]) => key === 'metadata'), false);
+  equal(filters.some(([k,v]) => k === 'vehicle_event_metadata_digest' && v === 'a'.repeat(64)), true);
+  equal(filters.some(([k,v]) => k === 'event_status' && v === 'active'), true);
+  equal((f.calls[1].row as any).ended_at, row.ended_at);
+  const race = stubClient([{ data: [live] }, { data: [] }]);
+  equal((await writeVehicleEventByKey(race.client, row, policy)).action, 'skipped');
+});
+
+Deno.test('active native testimony repairs an expired scheduled end but equal clocks cannot revise it', async () => {
+  const row = { ...ROW, source_url: 'https://collectingcars.com/for-sale/fixture', event_type: 'auction', event_status: 'active', ended_at: '2099-01-03T00:00:00Z' };
+  const live = { id: 'event', event_type: 'auction', event_status: 'active', source_url: row.source_url, sold_at: null,
+    ended_at: '2026-11-09T00:00:00Z', metadata: { source_observed_at: '2026-11-08T23:00:00Z' }, vehicle_event_metadata_digest: 'a'.repeat(64) };
+  const policy = { sourceObservedAt: '2026-11-09T01:00:00Z', compactMetadataCas: true,
+    activeAuction: { sourceUrl: row.source_url, now: '2026-11-09T02:00:00Z' } };
+  const db = stubClient([{ data: [live] }, { data: [{ id: 'event' }] }]);
+  equal((await writeVehicleEventByKey(db.client, row, policy)).action, 'updated');
+  equal((db.calls[1].row as any).ended_at, row.ended_at);
+  equal(db.calls[1].filters.some(([k,v]) => k === 'ended_at' && v === live.ended_at), true);
+  const noClock = stubClient([]);
+  equal((await writeVehicleEventByKey(noClock.client, row, { activeAuction: policy.activeAuction })).action, 'skipped');
+  equal(noClock.calls.length, 0);
+  const same = stubClient([{ data: [live] }]);
+  equal((await writeVehicleEventByKey(same.client, row, { ...policy, sourceObservedAt: live.metadata.source_observed_at })).action, 'skipped');
+});

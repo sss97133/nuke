@@ -74,11 +74,38 @@ export const RANK_FLOOR = 5;
 
 export type IdentityTokens = { primary: VehicleIdentityToken[]; differentiators: VehicleIdentityToken[] };
 
+/** The vehicle's newest listing submission, as vehicle_listing_state serves it: a tied viewer gets the stage and clocks,
+ *  anyone else only a live or sold listing. Never a price. */
+export type ListingState = {
+  platform: string; status: string; stage?: string | null; stage_since?: string | null; submitted_at?: string | null;
+  activated_at?: string | null; url?: string | null; external_listing_id?: string | null; as_of?: string | null;
+  visibility?: 'tied' | 'public';
+};
+
 export type GalleryImage = { id: string; url: string; taken_at?: string | null; gate: 'approved' };
 
+/** One line item of a header token, exactly as vehicle_facet_items returns it (docs/market/VEHICLE_HEADER_FORM_RULES.md
+ * "Facet items"). The reader decides status, lead and source order; a renderer shows them and folds nothing. */
+export type FacetItemStatus = 'established' | 'reading' | 'claim' | 'conflict' | 'missing';
+export type FacetItemSource = {
+  slug?: string | null; label?: string | null; kind?: string | null; class?: string | null; url?: string | null;
+  method?: string | null; observed_at?: string | null; value?: unknown; limitation?: string | null;
+  decoded?: Record<string, unknown> | null; witness?: { kind: string; id: string; thumb?: string | null } | null;
+};
+export type FacetItem = {
+  key: string; facet: 'as_built' | 'current' | 'decode' | 'derived'; value: unknown; unit: string | null;
+  status: FacetItemStatus; sources: FacetItemSource[]; rule: Record<string, unknown> | null;
+  equation: Record<string, unknown> | null; needed: string | null; normalized?: string | null; stated?: string | null;
+  lead?: boolean; sides?: Array<{ value: unknown; normalized?: string | null; sources: FacetItemSource[] }>;
+  candidates?: Array<Record<string, unknown>>; examined?: Array<Record<string, unknown>>;
+};
+/** Every token's items, keyed by token (year, make, model, body_style, trim, engine, transmission, drivetrain,
+ * location). The profile masthead carries all but location, which is read when its token is opened. */
+export type TokenItems = Record<string, FacetItem[]>;
+
 export type Section =
-  | { kind: 'masthead'; identity: IdentityTokens; year: number | null; make: string | null; model: string | null; transmissionModel?: string | null; price?: Claim<number> | null; priceLabel?: string | null; identity_marks?: Record<string, unknown>[] }
-  | { kind: 'strip'; coverage: Coverage; facets: Array<{ dimension: string; label: string; member: Claim<string> }>; odometer?: Claim<number> | null }
+  | { kind: 'masthead'; identity: IdentityTokens; year: number | null; make: string | null; model: string | null; transmissionModel?: string | null; price?: Claim<number> | null; priceLabel?: string | null; identity_marks?: Record<string, unknown>[]; listing?: ListingState | null; token_items?: TokenItems | null }
+  | { kind: 'strip'; coverage: Coverage; facets: Array<{ dimension: string; label: string; member: Claim<string> }>; gaps?: Array<{ dimension: string; label: string }> | null; odometer?: Claim<number> | null }
   | { kind: 'measures'; stack: string; title: string; coverage: Coverage; items: Measure[] }
   | { kind: 'timeline'; coverage: Coverage; days: Array<{ day: string; kinds: Record<string, number> }> }
   | { kind: 'table'; title: string; coverage: Coverage; columns: string[]; rows: Claim[][] }

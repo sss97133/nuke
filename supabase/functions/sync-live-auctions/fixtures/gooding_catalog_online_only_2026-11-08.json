@@ -1,0 +1,14 @@
+{
+ "source": "https://cdn.goodingco.com/graphql getVehicles(filtersInput: {auctionType: [\"Online Only\"]}, sortBy: ENDING_SOONEST, hitsPerPage: 1) (fetched 2026-11-08, the query syncGooding asks first)",
+ "data": {
+  "getVehicles": {
+   "vehicles": [
+    {
+     "auctionName": "Geared Online | Spring Automobilia",
+     "auctionEndDate": "1744995600000",
+     "upcomingAuctionEndDate": "9999999999999"
+    }
+   ]
+  }
+ }
+}

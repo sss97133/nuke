@@ -198,7 +198,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       // Get recent bids from auction_comments
       const { data: bids } = await supabase
         .from('auction_comments')
-        .select('id, author_username, bid_amount, posted_at, is_seller')
+        .select('id, author_username, bid_amount, posted_at, is_seller,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
         .eq('vehicle_id', vehicleId)
         .not('bid_amount', 'is', null)
         .order('posted_at', { ascending: false })
@@ -218,7 +218,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       // Get seller username from a seller comment
       const { data: sellerComment } = await supabase
         .from('auction_comments')
-        .select('author_username')
+        .select('author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
         .eq('vehicle_id', vehicleId)
         .eq('is_seller', true)
         .limit(1)
@@ -297,7 +297,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
 
         // Load ALL auction events for this vehicle/platform (multi-auction aware)
         const { data: auctionEvents } = await supabase
-          .from('auction_events')
+          .from('auction_events_canonical')
           .select('source, source_url, lot_number, outcome, auction_start_date, auction_end_date, high_bid, winning_bid, winning_bidder, seller_name, total_bids, comments_count, page_views, watchers')
           .eq('vehicle_id', vehicleId)
           .eq('source', platform)

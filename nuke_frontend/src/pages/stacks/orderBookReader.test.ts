@@ -10,7 +10,7 @@ vi.mock('../../lib/supabase', () => ({
       fixture.reads.push(read);
       const q: Record<string, (...args: unknown[]) => unknown> = {
         then: (fn: unknown) => Promise.resolve(table === 'vehicles' ? { data: fixture.parent, error: null }
-          : table === 'auction_events' ? { data: fixture.lots, error: null }
+          : table === 'auction_events_canonical' ? { data: fixture.lots, error: null }
           : table === 'auction_comments' ? { data: fixture.bidPages.shift() ?? [], error: fixture.bidError ? new Error('read failed') : null, count: 0 }
           : { data: [], error: null, count: 0 })
           .then(fn as (v: unknown) => unknown),
@@ -174,13 +174,13 @@ describe('coverage', () => {
 });
 
 describe('lot choice and the public gate', () => {
-  it('takes the asked lot, else the listing URL with or without a slash, else the newest', () => {
+  it('keeps an explicit historical lot strict; otherwise uses the listing URL or newest', () => {
     const a = lot({ id: 'a', source_url: 'https://bringatrailer.com/listing/old' });
     const b = lot({ id: 'b', source_url: URL });
     expect(chooseLot([a, b], `${URL}/`, null)?.id).toBe('b');
     expect(chooseLot([a, b], `${URL}/`, 'a')?.id).toBe('a');
     expect(chooseLot([a, b], `${URL}/`, 'latest')?.id).toBe('a');
-    expect(chooseLot([a, b], null, 'missing')?.id).toBe('a');
+    expect(chooseLot([a, b], null, 'missing')).toBeNull();
     expect(chooseLot([], URL, null)).toBeNull();
   });
 
@@ -247,7 +247,7 @@ it('reads the compact projection to an empty page, with public gates and no pros
   fixture.bidPages = [[bid(20, 900, ID_A)], [bid(10, 1000, ID_B)], []];
   const read = await readBidBook(VEHICLE, URL);
   expect(read?.bids).toHaveLength(2);
-  expect(fixture.reads.map(r => r.table)).toEqual(['vehicles', 'auction_events', 'auction_comments', 'auction_comments', 'auction_comments']);
+  expect(fixture.reads.map(r => r.table)).toEqual(['vehicles', 'auction_events_canonical', 'auction_comments', 'auction_comments', 'auction_comments']);
   const reads = fixture.reads.filter(r => r.table === 'auction_comments');
   for (const r of reads) {
     expect(r.calls).toContainEqual(['eq', ['comment_type', 'bid']]);
@@ -261,7 +261,7 @@ it('refuses duplicate episode ownership and failures instead of returning partia
   fixture.parent = { id: VEHICLE, listing_url: URL };
   fixture.lots = [lot(), lot({ id: 'duplicate' })];
   expect(await readBidBook(VEHICLE, URL)).toBeNull();
-  expect(fixture.reads.map(r => r.table)).toEqual(['vehicles', 'auction_events']);
+  expect(fixture.reads.map(r => r.table)).toEqual(['vehicles', 'auction_events_canonical']);
   fixture.lots = [lot()]; fixture.bidError = true;
   await expect(readBidBook(VEHICLE, URL)).rejects.toThrow('could not be read completely');
 });

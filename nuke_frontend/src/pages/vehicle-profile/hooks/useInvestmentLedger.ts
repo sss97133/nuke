@@ -104,12 +104,13 @@ export function useInvestmentLedger(vehicleId: string | undefined) {
       if (!receiptsRes.error && (receiptsRes.data == null || receiptsRes.data.length === 0)) {
         const publicReceiptsRes = await supabase
           .from('receipts_public_summary')
-          .select('id, vendor_name, total, receipt_date, invoice_number')
+          .select('id, vendor_name, total, receipt_date, invoice_number, amounts_visible')
           .eq('vehicle_id', vehicleId)
           .eq('status', 'processed')
           .order('receipt_date');
         if (!publicReceiptsRes.error && publicReceiptsRes.data) {
-          receiptsRes.data = publicReceiptsRes.data;
+          // The view masks total for a viewer not tied to the vehicle; a masked receipt is not a $0 one, so it stays out of the sums.
+          receiptsRes.data = publicReceiptsRes.data.filter((r: any) => r.amounts_visible !== false);
         }
       }
 

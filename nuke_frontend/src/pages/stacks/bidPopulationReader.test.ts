@@ -26,6 +26,11 @@ it('gates both episodes and child bids to publicly readable non-deleted vehicle 
     expect(r.calls).toContainEqual(['abortSignal',[abort.signal]]);
     expect(r.calls.find(c => c[0] === 'select')?.[1][0]).toContain('vehicles!inner');
   }
+  expect(fixture.reads[0].table).toBe('auction_events_canonical');
+  for (const read of fixture.reads.slice(1)) {
+    expect(read.calls).toContainEqual(['or',['auction_event_id.is.null,canonical.not.is.null']]);
+    expect(read.calls).toContainEqual(['in',['auction_event_id',['lot']]]);
+  }
   expect(fixture.reads[0].calls).toContainEqual(['limit',[POPULATION_LIMIT + 1]]);
   expect(fixture.reads[0].calls).toContainEqual(['in',['vehicles.make',['Chevrolet','chevrolet','CHEVROLET']]]);
   expect(fixture.reads[2].calls).toContainEqual(['gt',['id','000200']]);

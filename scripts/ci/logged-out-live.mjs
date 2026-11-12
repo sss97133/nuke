@@ -33,10 +33,11 @@ const VEHICLES = (process.env.LIVE_VEHICLES ||
 const PROFILE = process.env.LIVE_PROFILE || '01718395-bd19-47d3-b701-9867b653dd5b';
 const PAGES = ['/', '/market', `/profile/${PROFILE}`, ...VEHICLES.map(v => `/vehicle/${v}`)];
 // Pages that belong to the signed-in owner. A visitor is redirected to /login; nothing of the books may load for them.
-const PRIVATE_PAGES = ['/accounting', '/publishing/finance', '/profile'];
-// The books readers: the accounting RPCs and the book's views and tables. A visitor's page load must not call any of them.
-const BOOKS_READERS = /supabase\.co\/rest\/v1\/(rpc\/(accounting_|books_|get_user_reconciliation|related_party|list_accounting_access|owner_working_notes)|(v_books_|v_financial_|financial_documents|financial_document_|financial_review_queue|accounting_access_grants))/;
-const PRIVATE_TEXT = /Books docket|Finish your taxes|Your private office|Open the books docket/;
+const PRIVATE_PAGES = ['/accounting', '/publishing/finance', '/profile', '/capture/ledger'];
+// The books readers: the accounting RPCs and the book's views and tables, and the owner's capture ledger. A visitor's page
+// load must not call any of them.
+const BOOKS_READERS = /supabase\.co\/rest\/v1\/(rpc\/(accounting_|books_|get_user_reconciliation|related_party|list_accounting_access|owner_working_notes|get_capture_ledger|request_capture_rescan)|(v_books_|v_financial_|financial_documents|financial_document_|financial_review_queue|accounting_access_grants|capture_skips|capture_rescan_requests))/;
+const PRIVATE_TEXT = /Books docket|Finish your taxes|Your private office|Open the books docket|Capture ledger|Re-scan my library/;
 // Reads a stranger's browser makes that no page load reliably triggers: policy-guarded tables and the gate on its own.
 const ANON_READS = ['observation_witnesses?select=id&witness_role=eq.derived&limit=1'];
 const ERROR_TEXT = /Failed to load|permission denied|Something went wrong|Application error/i;
@@ -53,17 +54,29 @@ async function visit(route, mobile, privatePage = false) {
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 } });
   // LIVE_BREAK=<substring>: answer matching data requests with 401, to prove this check catches a broken grant.
   if (process.env.LIVE_BREAK) await context.route(u => API.test(u.href) && u.href.includes(process.env.LIVE_BREAK), r => r.fulfill({ status: 401, contentType: 'application/json', body: '{"code":"42501","message":"permission denied for table vehicle_images"}' }));
+  // LIVE_SKEW=1: answer the first entry-bundle request with the app shell, as Vercel does when a page from the previous
+  // deployment names a bundle the new one no longer has (2026-11-08: the cause of every "page shows none" flake).
+  let skewed = !process.env.LIVE_SKEW;
+  if (!skewed) await context.route(/\/assets\/index-[^/]+\.js$/, async r => {
+    if (skewed) return r.continue();
+    skewed = true;
+    r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: await (await fetch(SITE + '/')).text() });
+  });
   const page = await context.newPage();
+  let loads = 0;
   const bad = [];
   const soft = [];
+  let apiSeen = 0;
   const consoleErrors = [];
   const booksCalls = [];
   page.on('request', r => {
+    if (r.isNavigationRequest() && r.frame() === page.mainFrame()) loads++;
     if (privatePage && BOOKS_READERS.test(r.url())) booksCalls.push(`${r.method()} ${decodeURIComponent(r.url()).replace(/^https:\/\/[^/]+/, '').slice(0, 120)}`);
   });
   page.on('response', r => {
     const url = r.url();
     if (!API.test(url)) return;
+    apiSeen++;
     if (!anonKey) { anonKey = r.request().headers()['apikey'] || ''; supabaseOrigin = new URL(url).origin; }
     const s = r.status();
     const label = `${s} ${decodeURIComponent(url).replace(/^https:\/\/[^/]+/, '').slice(0, 160)}`;
@@ -83,18 +96,25 @@ async function visit(route, mobile, privatePage = false) {
   }
   if (anonPhotos > 0) {
     // The text-first response can become idle before React mounts. Wait for an admitted photo, then sample again.
-    await page.waitForFunction(() => {
-      const root = document.querySelector('.vehicle-profile-page') || document.body;
-      return [...root.querySelectorAll('img')].some(i => i.complete && i.naturalWidth > 50 && i.getBoundingClientRect().width > 40);
-    }, null, { timeout: 30000 }).catch(() => {});
+    // A second attempt covers a wait that a self-reload interrupted.
+    for (let i = 0; i < 2; i++) {
+      const shown = await page.waitForFunction(() => {
+        const root = document.querySelector('.vehicle-profile-page') || document.body;
+        return [...root.querySelectorAll('img')].some(i => i.complete && i.naturalWidth > 50 && i.getBoundingClientRect().width > 40);
+      }, null, { timeout: 30000 }).then(() => true, () => false);
+      if (shown || loads < 2) break;
+    }
   }
-  const seen = await page.evaluate(() => {
+  // A page that reloaded itself (the deploy-skew recovery in index.html) destroys the context mid-sample; settle and retry once.
+  const sample = () => page.evaluate(() => {
     const root = document.querySelector('.vehicle-profile-page') || document.body;
     const text = document.body.innerText || '';
     const imgs = [...root.querySelectorAll('img')].filter(i => i.complete && i.naturalWidth > 50 && i.getBoundingClientRect().width > 40);
     return { text: text.slice(0, 20000), images: imgs.length };
   });
+  const seen = await sample().catch(async () => { await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {}); return sample(); });
   const tag = `${route}${mobile ? ' (mobile)' : ''}`;
+  if (loads > 1) warnings.push({ page: tag, what: `the page reloaded itself ${loads - 1} time(s) (deploy skew recovery)`, detail: [] });
   if (navigationError) {
     const idleTimeout = navigationError.name === 'TimeoutError' && seen.text.trim().length > 0;
     (idleTimeout ? warnings : failures).push({ page: tag,
@@ -110,6 +130,8 @@ async function visit(route, mobile, privatePage = false) {
     const leaked = seen.text.match(PRIVATE_TEXT);
     if (leaked) failures.push({ page: tag, what: `a private heading is on a visitor page: "${leaked[0]}"`, detail: [] });
   }
+  // A public page that made no data request never started the app: the visitor sees the text-only shell (2026-11-08).
+  if (!privatePage && !navigationError && apiSeen === 0) failures.push({ page: tag, what: 'the app did not start (no data request from the page)', detail: [] });
   if (bad.length) failures.push({ page: tag, what: 'data API refused or rejected requests', detail: [...new Set(bad)].slice(0, 6) });
   if (consoleErrors.length) failures.push({ page: tag, what: 'permission errors in the console', detail: [...new Set(consoleErrors)].slice(0, 3) });
   const errText = seen.text.match(ERROR_TEXT);
