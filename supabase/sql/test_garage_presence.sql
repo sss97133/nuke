@@ -106,14 +106,14 @@ INSERT INTO garage_organizations(garage_id, organization_id, kind) VALUES
   (:'g', '00000000-0000-0000-0000-0000000000c2', 'hosted'), (:'g', '00000000-0000-0000-0000-0000000000c3', 'tenant');
 -- Site A: first location, valid from 2019-06-01 to 2022-12-31. Site B: valid from 2023-01-01. Both confirmed; 150 m; about 20 km apart.
 INSERT INTO garage_sites(garage_id, lat, lon, radius_m, valid_from, valid_to, source, confirmed_by, confirmed_at) VALUES
-  (:'g', 35.9770, -114.8540, 150, DATE '2019-06-01', DATE '2022-12-31', 'fixture', '00000000-0000-0000-0000-0000000000a1', now()),
+  (:'g', 36.0500, -115.0500, 150, DATE '2019-06-01', DATE '2022-12-31', 'fixture', '00000000-0000-0000-0000-0000000000a1', now()),
   (:'g', 36.1000, -115.0000, 150, DATE '2023-01-01', NULL,              'fixture', '00000000-0000-0000-0000-0000000000a1', now());
 
 -- Helpers for fixture rows. A photo at a site; created_at is a day after taken_at unless stated (so it is not an upload-time fallback).
 CREATE FUNCTION public.t_photo(p_vehicle uuid, p_user uuid, p_site text, p_taken timestamptz) RETURNS void LANGUAGE sql AS $$
   INSERT INTO public.vehicle_images(vehicle_id, user_id, latitude, longitude, taken_at, created_at)
-  VALUES (p_vehicle, p_user, CASE p_site WHEN 'A' THEN 35.9770 WHEN 'B' THEN 36.1000 WHEN 'B_near' THEN 36.1005 WHEN 'off' THEN 36.2000 END,
-          CASE p_site WHEN 'A' THEN -114.8540 WHEN 'B' THEN -115.0000 WHEN 'B_near' THEN -115.0000 WHEN 'off' THEN -115.2000 END,
+  VALUES (p_vehicle, p_user, CASE p_site WHEN 'A' THEN 36.0500 WHEN 'B' THEN 36.1000 WHEN 'B_near' THEN 36.1005 WHEN 'off' THEN 36.2000 END,
+          CASE p_site WHEN 'A' THEN -115.0500 WHEN 'B' THEN -115.0000 WHEN 'B_near' THEN -115.0000 WHEN 'off' THEN -115.2000 END,
           p_taken, p_taken + interval '1 day') $$;
 CREATE FUNCTION public.t_link(p_vehicle uuid, p_org int, p_rel text, p_status text, p_start date) RETURNS void LANGUAGE sql AS $$
   INSERT INTO public.organization_vehicles(organization_id, vehicle_id, relationship_type, status, start_date, created_at)
