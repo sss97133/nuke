@@ -317,6 +317,16 @@ garage question*, not in general. "Signal" uses §4.2's classes. Nothing here ha
 | `organization_inventory_sync_queue` | **Nothing**: scraper queue for org websites | n/a | | 4,050 est `[catalog]` |
 | `vehicle_images.exif_data.uuid` / `capture_landing_sets` / `capture_set_links` | **Provenance of placement** (why a photo is on a car) | High (cited legs) | 8,598 of 8,891 sets held for review `[study]` | `[study]` |
 
+### 6.4 Also found by the source inventory (see `SOURCES.md`, DISCOVERY lane)
+
+* **`lot_presence_read(p_as_of)`** already exists live: a single-user, 180-day "on lot / departed / unknown" reader over the
+  caller's GPS photos (service-role only, called by no client). It is the closest existing reference for `garage_now`.
+* **`user_org_relations`** and **`org_site_photos`** already keep *who made the evidence* apart from *which org's place it
+  belongs to*. iOS and web call `user_org_relations` today.
+* **Skylar's own relationship statements** sit as ~21 observations (roles such as `owner_current`, `consignment`,
+  `business_handling`). They are the natural seed for `garage_stay_assertions`.
+* **`known_places`** holds 3 hand-seeded places (one is a home, which must never become a garage site) and is read by nothing.
+
 ### 6.3 What cannot be known from any source today
 
 Which building a no-GPS photo was taken in; where the shop was before the earliest known site; who physically carried a car in or out;
