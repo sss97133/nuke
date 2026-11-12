@@ -1,0 +1,48 @@
+{
+  "_about": "Read scripts/guardrails/no-new-photo-reader.mjs. Each entry: name -> { reason, approved }. 'approved' says where the owner's approval is recorded (for a table, the approved schema_proposals row id). An entry without his approval invents his decision.",
+  "tables": {
+    "capture_clock_backfill_log": {
+      "reason": "Revert log of a capture clock backfill run: the prior exif and taken_at of each photo it changed. Holds no reading. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "capture_exact_copy_log": {
+      "reason": "Revert log of the exact-copy run: which photo was marked a duplicate of which. Holds no reading. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "capture_non_vehicle_log": {
+      "reason": "Revert log of the non-vehicle review run: the prior state of each photo it moved. Holds no reading. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "capture_non_vehicle_vehicle_to_review_log": {
+      "reason": "Revert log of the run that sends vehicle-looking non-vehicle photos to review. Holds no reading. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "capture_privacy_promote_exclude": {
+      "reason": "List of photos the privacy-promote run must leave alone. Holds no reading. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "capture_privacy_promote_log": {
+      "reason": "Revert log of the privacy-promote run: the prior privacy state of each photo. Holds no reading. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "capture_replan_vehicle_log": {
+      "reason": "Revert log of the leftover-replan run: which leftover photos it queued. Holds no reading. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "capture_session_admit_log": {
+      "reason": "Revert log of the import-session admit run: which uploads it admitted. Holds no reading. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "capture_typ_from_local_observation_log": {
+      "reason": "Revert log of the run that writes typ from a local CLIP view: the prior typ of each photo. Holds no reading of its own. Already in production (created by hand 2026-11-10).",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    }
+  },
+  "functions": {},
+  "scripts": {
+    "scripts/photo-pipeline/subscription_gate_reader.py": {
+      "reason": "Subscription gate reader and landing drain driver from #3184/#3246; its pull request says the reader stays off.",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    }
+  }
+}

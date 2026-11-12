@@ -60,7 +60,7 @@ function endOfDayIso(dateStr: string): string | null {
   return d.toISOString();
 }
 
-export function OrganizationAuctionsTab({ organizationId }: { organizationId: string }) {
+export function OrganizationAuctionsTab({ organizationId, excludeUpcoming = false }: { organizationId: string; excludeUpcoming?: boolean }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<AuctionRow[]>([]);
@@ -153,13 +153,14 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
         const now = Date.now();
 
         // Canonical source for *all* auction platforms (BaT, Cars & Bids, Mecum, etc.)
-        const extRes = await supabase
+        let events = supabase
           .from('vehicle_events')
           .select(
             'id, vehicle_id, source_platform, source_url, event_status, ended_at, current_price, final_price, bid_count, view_count, watcher_count, reserve_price'
           )
-          .eq('source_organization_id', organizationId)
-          .order('ended_at', { ascending: false })
+          .eq('source_organization_id', organizationId);
+        if (excludeUpcoming) events = events.or('event_status.is.null,event_status.not.in.(upcoming,pending)');
+        const extRes = await events.order('ended_at', { ascending: false })
           .limit(600);
 
         const extRows: AuctionRow[] =
@@ -259,7 +260,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
     return () => {
       mounted = false;
     };
-  }, [organizationId]);
+  }, [organizationId, excludeUpcoming]);
 
   const filtered = useMemo(() => {
     const now = Date.now();

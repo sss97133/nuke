@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { mergeMarketplaceAuctions, auctionPlatform, auctionHouse, type MarketplaceAuction } from './AuctionMarketplace';
+import { recentAuctionEnd, mergeMarketplaceAuctions, auctionPlatform, auctionHouse, type MarketplaceAuction } from './AuctionMarketplace';
 import type { MarketPulse, LiveAuction, TapeBid } from './market/useMarketPulse';
 const now = Date.parse('2026-11-08T18:00:00Z');
 const lot: LiveAuction = { id:'v', house:'ebay-motors', listingUrl:'https://www.ebay.com/itm/123', year:1990, make:'Ford', model:'F-150', currentBid:1234.25, currency:'USD', endsAt:now+60000, updatedAt:now-60000, listedAt:now-86400000, imageUrl:null, noReserve:false, title:null, band:null };
@@ -23,3 +23,14 @@ it('maps every established board alias to the event platform and back',()=>{ for
 it('preserves a shared Purple Wave episode independently of its canonical board listing',()=>{ const pulse=board([{...lot,house:'purplewave',listingUrl:'https://www.purplewave.com/auction/261111A/item/EX2391'}]); pulse.houses=[{house:'purplewave',onBoard:true,lots:1,readAt:now}]; const shared=event('purplewave','https://www.purplewave.com/auction/261111A/item/EX2392'); expect(mergeMarketplaceAuctions([shared],pulse,[],now)).toHaveLength(2); });
 
 it('retains a fresh PW episode when the canonical board has no equivalent inventory but suppresses a stale witness',()=>{ const pulse=board([]);pulse.houses=[{house:'purplewave',onBoard:false,lots:0,readAt:null}];const lot=event('purplewave','https://www.purplewave.com/auction/261111A/item/EX2392');expect(mergeMarketplaceAuctions([lot],pulse,[],now)).toHaveLength(1);expect(mergeMarketplaceAuctions([{...lot,source_observed_at:new Date(now-7*3600000).toISOString()}],pulse,[],now)).toHaveLength(0); });
+
+
+it('includes only finite ended clocks within the stated recent window',()=>{
+ expect(recentAuctionEnd('2026-11-08T17:36:30Z',now)).toBe('2026-11-08T17:36:30.000Z');
+ expect(recentAuctionEnd(new Date(now).toISOString(),now)).toBe(new Date(now).toISOString());
+ expect(recentAuctionEnd(new Date(now-30*86400000).toISOString(),now)).not.toBeNull();
+ for(const end of ['2437-07-20T18:00:00Z',new Date(now+1).toISOString(),new Date(now-30*86400000-1).toISOString(),'not a date','Infinity','',null,NaN]) {
+   expect(recentAuctionEnd(end,now)).toBeNull();
+ }
+ expect(recentAuctionEnd('2026-11-08T17:36:30Z',NaN)).toBeNull();
+});

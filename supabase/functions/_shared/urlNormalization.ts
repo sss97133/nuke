@@ -69,7 +69,7 @@ export function normalizeListingUrl(url: string | null | undefined): NormalizedU
   const trimmed = url.trim();
 
   const mccormick = mccormickTarget(trimmed);
-  if (mccormick) return { original: trimmed, normalized: `https://www.classic-carauction.com/auction-cars?auctionid=${mccormick.id}`,
+  if (mccormick) return { original: trimmed, normalized: mccormick.showroom ? mccormick.url : `https://www.classic-carauction.com/auction-cars?auctionid=${mccormick.id}`,
     canonicalListingId: `mccormicks:${mccormick.id}`, platform: "mccormicks" };
 
   // Vicari's query parameter is the identity; stripping it collapses every lot into one URL.

@@ -11,9 +11,18 @@ function visible(html: string): string {
   return html;
 }
 /** auctionid identifies an appearance; auctionnbr identifies its room, never its vehicle. */
-export function mccormickTarget(raw: string): { id: string; auction: string | null; url: string; archive: boolean } | null {
+export function mccormickTarget(raw: string): { id: string; auction: string | null; url: string; archive: boolean; showroom?: boolean } | null {
   try {
     const u = new URL(raw), ids = u.searchParams.getAll("auctionid"), auctions = u.searchParams.getAll("auctionnbr");
+    if (/^https?:$/.test(u.protocol) && /^(www\.)?classic-carauction\.com$/i.test(u.hostname)
+      && !u.username && !u.password && !u.port && /^\/Showroom-Inventory\/?$/i.test(u.pathname)
+      && u.searchParams.getAll("id").length === 1 && /^[1-9]\d{0,9}$/.test(u.searchParams.get("id")!)
+      && u.searchParams.getAll("sp").length === 1 && u.searchParams.get("sp") === "1"
+      && [...u.searchParams.keys()].every(k => ["id", "sp"].includes(k))) {
+      const id = u.searchParams.get("id")!;
+      return { id: `showroom:${id}`, auction: null, archive: false, showroom: true,
+        url: `${origin}/Showroom-Inventory?sp=1&id=${id}` };
+    }
     if (!/^https?:$/.test(u.protocol) || !/^(www\.)?classic-carauction\.com$/i.test(u.hostname)
       || u.username || u.password || u.port || !/^\/(auction-cars|featured-cars|auction-results)\/?$/i.test(u.pathname)
       || ids.length !== 1 || !/^[1-9]\d{0,9}$/.test(ids[0]) || auctions.length > 1
@@ -31,7 +40,8 @@ export interface McCormickLot {
   source_id: string; source_url: string; auction_number: string | null; auction_dates_text: string | null;
   title: string; lot_number: string; year: number | null; make: string | null; model: string | null;
   vin: string | null; description: string; raw_fields: Record<string, string>; condition_ratings: Record<string, string>;
-  image_urls: string[]; presentation: "archive" | "unknown";
+  image_urls: string[]; presentation: "archive" | "unknown" | "showroom";
+  asking_claim?: { amount: number; currency: null; literal: string } | null;
   result_claim: { status: "sold" | "no_sale"; amount: number; currency_symbol: "$"; currency: null; fee_basis: "unknown"; literal: string } | null;
   evidence_scope?: "detail_unavailable" | "catalog_row" | "featured_card";
   description_is_excerpt?: boolean;
@@ -99,6 +109,7 @@ export function parseMcCormickFeaturedLot(html: string, source_url: string, iden
 export function parseMcCormickLot(html: string, url: string): McCormickLot {
   const target = mccormickTarget(url);
   if (!target) throw new Error("invalid_mccormick_listing_url");
+  if (target.showroom) return parseMcCormickShowroomLot(html, target.url);
   const body = visible(html);
   const heading = body.match(/<div\b[^>]*class=["']bcopy12["'][^>]*>\s*<b>([^<>]+)<\/b>\s*<br\s*\/?>\s*Lot Nbr\.\s*([^<]+)/i);
   if (!heading && text(body).includes("Sorry, but details about this car are not available.")) {
@@ -161,6 +172,48 @@ export function parseMcCormickLot(html: string, url: string): McCormickLot {
       currency_symbol: "$", currency: null, fee_basis: "unknown", literal: match[0] } : null };
 }
 
+/** A showroom id and its stock number are different keys; neither is an auction id. */
+export function parseMcCormickShowroomLot(html: string, url: string): McCormickLot {
+  const target = mccormickTarget(url);
+  if (!target?.showroom) throw Error("invalid_mccormick_showroom_url");
+  const body = visible(html);
+  const heading = body.match(/<div\b[^>]*class=["']bcopy12["'][^>]*>\s*<b>([^<>]+)<\/b>\s*<br\s*\/?>\s*Stock No\.\s*([^<\r\n]+)/i);
+  if (!heading) throw Error("mccormick_showroom_heading_missing");
+  const detail = body.slice(heading.index!);
+  const ratingStart = detail.search(/<B>Component<\/B>/i);
+  const specifications = ratingStart >= 0 ? detail.slice(0, ratingStart) : detail;
+  const raw: Record<string, string> = {};
+  for (const row of specifications.matchAll(/<TD\b[^>]*>\s*<div\b[^>]*>([^<>]+:)\s*<\/TD>\s*<TD\b[^>]*>\s*<div\b[^>]*>([\s\S]*?)<\/TD>/gi)) {
+    const key = text(row[1]).replace(/:$/, "");
+    if (key === "Owner Comments") continue;
+    const value = text(row[2]);
+    if (key in raw && raw[key] !== value) throw Error("mccormick_conflicting_field");
+    raw[key] = value;
+  }
+  const title = text(heading[1]), year = /^\d{4}$/.test(raw["Model Year"] ?? "") ? Number(raw["Model Year"]) : null;
+  const make = known(raw.Make);
+  if (!make || !year || !title.toUpperCase().startsWith(`${year} ${make.toUpperCase()} `)) throw Error("mccormick_showroom_identity_incomplete");
+  const ownerStart = detail.indexOf("Owner Comments:");
+  const beforeOwner = detail.slice(0, ownerStart >= 0 ? ownerStart : detail.length);
+  const info = text(beforeOwner);
+  const offered = info.match(/Offered at:\s*\$\s*([\d,]+(?:\.\d{2})?)/i);
+  const sold = info.match(/Sold for:\s*\$\s*([\d,]+(?:\.\d{2})?)/i);
+  const owner = detail.match(/Owner Comments:\s*<\/TD>\s*<TD\b[^>]*>([\s\S]*?)<\/TD>/i);
+  const photoStart = body.lastIndexOf('<IMG ID="Picture1"', heading.index!);
+  const own = body.slice(photoStart >= 0 ? photoStart : heading.index!, heading.index!) + beforeOwner;
+  const images = [...own.matchAll(/<(?:a|img)\b[^>]*\b(?:href|src)=["']([^"']+)["']/gi)].flatMap(tag => {
+    try { const u = new URL(tag[1].replace(/&amp;/g, "&"), origin);
+      return u.origin === origin && /^\/upload\/showroom\/[^?#]+\.(?:jpe?g|png|gif|webp)$/i.test(u.pathname) ? [u.href] : [];
+    } catch { return []; }
+  });
+  const vin = known(raw["Vin No."]);
+  return { ...emptyLot(target.id, target.url), title, year, make, model: known(title.slice(`${year} ${make}`.length)),
+    lot_number: text(heading[2]), raw_fields: raw, presentation: "showroom", description: owner ? text(owner[1]) : "",
+    vin: vin && /^[A-HJ-NPR-Z0-9]{5,17}$/i.test(vin) ? vin.toUpperCase() : null, image_urls: [...new Set(images)],
+    asking_claim: offered ? { amount: Number(offered[1].replace(/,/g, "")), currency: null, literal: offered[0] } : null,
+    result_claim: sold ? { status: "sold", amount: Number(sold[1].replace(/,/g, "")), currency_symbol: "$", currency: null, fee_basis: "unknown", literal: sold[0] } : null };
+}
+
 /** Follow advertised lot and event links only; never guess numeric listing IDs. */
 export function mccormickLinks(html: string, base: string): { lots: string[]; catalogs: string[] } {
   const lots = new Set<string>(), catalogs = new Set<string>();
@@ -179,3 +232,6 @@ export function mccormickLinks(html: string, base: string): { lots: string[]; ca
   }
   return { lots: [...lots], catalogs: [...catalogs] };
 }
+
+/** Shared fixed-point removal of non-visible publisher blocks before text parsing. */
+export { visible as mccormickVisibleHtml };
