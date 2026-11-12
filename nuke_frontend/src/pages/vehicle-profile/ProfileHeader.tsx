@@ -55,7 +55,9 @@ export function listingWord(listing: ListingState): string {
   }
 }
 
-const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
+const HeaderTokenItems = React.lazy(() => import('./HeaderTokenItems'));
+/** The tokens vehicle_facet_items reads (docs/market/VEHICLE_HEADER_FORM_RULES.md, "Facet items"). */
+const TOKEN_DIMENSIONS = new Set(['year', 'make', 'model', 'body_style', 'trim', 'engine', 'transmission', 'drivetrain', 'location']);
 const ExternalAuctionSummary = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner').then(module => ({ default: module.ExternalAuctionSummary })));
 const ExternalAuctionLiveBanner = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner'));
 const SellerStackButton = React.lazy(() => import('./SellerStackButton'));
@@ -179,7 +181,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
   const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
   const sticky = useRef<HTMLDivElement>(null);
-  const [activeFacet, setActiveFacet] = useState<{ field: string; value: string; matchField?: string } | null>(null);
+  const [activeFacet, setActiveFacet] = useState<{ field: string; value: string; dimension: string } | null>(null);
   const [liveOpen, setLiveOpen] = useState(false);
   const [listingOpen, setListingOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
@@ -350,10 +352,13 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
 
   if (!vehicle || !doc || !masthead) return null;
   const asArtwork = !!masthead.model && vehicle.listing_kind !== 'non_vehicle_item';
-  const explore = (field: string, value: string, matchField?: string) => {
+  // A header token opens its line items (vehicle_facet_items). Identity variant kinds the reader has no token for
+  // (series, package) are trim.
+  const explore = (field: string, value: string) => {
     setLiveOpen(false); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false);
     const evidenceField = field === 'engine' ? 'engine_type' : field;
-    setActiveFacet(current => current?.field === evidenceField ? null : { field: evidenceField, value, matchField });
+    const dimension = field === 'engine_type' ? 'engine' : TOKEN_DIMENSIONS.has(field) ? field : 'trim';
+    setActiveFacet(current => current?.field === evidenceField ? null : { field: evidenceField, value, dimension });
     setGalleryFilter?.(['transmission', 'drivetrain', 'engine_type', 'body_style', 'mileage'].includes(evidenceField)
       ? { field: evidenceField, label: value } : null);
   };
@@ -363,7 +368,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       const label = f.dimension === 'transmission' ? masthead.transmissionModel || f.label : f.label;
       return <Facet key={f.dimension} label={label} expanded={activeFacet?.field === (f.dimension === 'engine' ? 'engine_type' : f.dimension)}
         ariaLabel={`Explore ${label} in this profile`}
-        onClick={() => explore(f.dimension, label, f.dimension === 'transmission' && masthead.transmissionModel ? 'transmission_model' : undefined)} />;
+        onClick={() => explore(f.dimension, label)} />;
     })}
   </div>;
 
@@ -425,9 +430,8 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         {masthead.listing.url && <a className="k-body" href={masthead.listing.url} target="_blank" rel="noreferrer">Open on {LISTING_VENUES[masthead.listing.platform] ?? masthead.listing.platform} ↗</a>}
       </HeaderPopover>}
       {activeFacet && <HeaderPopover open onClose={() => setActiveFacet(null)} title={activeFacet.value} width={560} dismissBoundaryRef={sticky}>
-        <React.Suspense fallback={<p role="status">Reading vehicle context…</p>}>
-          <FieldEvidencePopup key={`${vehicle.id}:${activeFacet.field}`} field={activeFacet.field} label={activeFacet.field.replace(/_/g, ' ')}
-            value={activeFacet.value} vehicleId={vehicle.id} context={{ subject: vehicle, matchField: activeFacet.matchField }} />
+        <React.Suspense fallback={<p role="status">Reading line items…</p>}>
+          <HeaderTokenItems key={`${vehicle.id}:${activeFacet.dimension}`} vehicleId={vehicle.id} dimension={activeFacet.dimension} items={masthead.token_items} />
         </React.Suspense>
       </HeaderPopover>}
     </div>

@@ -18,7 +18,8 @@ vi.mock('./profileDocument', async (original) => {
   return { ...real, useProfileDocument: (vehicleId: string | undefined, priceOwnedByLiveStack: boolean) =>
     vehicleId && fixture.read ? real.profileDocumentFrom(fixture.read, priceOwnedByLiveStack) : null };
 });
-vi.mock('./FieldEvidencePopup', () => ({ default: ({ field, value, context }: any) => <div data-testid="field-context" data-field={field} data-match-field={context.matchField}>{value} vehicle context</div> }));
+// A header token opens its line items; the item renderer has its own suite (HeaderTokenItems.test.tsx).
+vi.mock('./HeaderTokenItems', () => ({ default: ({ dimension, items }: any) => <div data-testid="token-items" data-dimension={dimension} data-items={items ? 'carried' : 'none'}>{dimension} line items</div> }));
 // This suite owns price provenance; the financial department has its own reader/interaction tests.
 vi.mock('./ProfileFinancials', () => ({ default: ({ market }: any) => <>{market}<button>$$$</button></> }));
 vi.mock('../../components/auction/ExternalAuctionLiveBanner', () => ({ default: () => null,
@@ -337,16 +338,16 @@ it('opens the price source with its platform, clock and the stack link', async (
   expect(document.body.querySelector('a[href="/stacks/order-book/v-1?lot=lot-1"]')).not.toBeNull();
 });
 
-it('a facet opens vehicle context and coordinates the photo topic without navigation', async () => {
+it('a facet opens its line items and coordinates the photo topic without navigation', async () => {
   await render();
   await act(async () => (host.querySelectorAll('button.k-facet')[0] as HTMLButtonElement).click());
-  expect(document.body.textContent).toContain('Coupe vehicle context');
+  expect(document.body.textContent).toContain('body_style line items');
   expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'body_style', label: 'Coupe' });
-  expect(host.querySelector('[data-testid="field-context"]')?.getAttribute('data-field')).toBe('body_style');
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('body_style');
   expect(host.textContent).not.toContain('Auction performance unavailable');
 });
 
-it('retains the specific transmission model and uses its existing transmission evidence context', async () => {
+it('retains the specific transmission model and opens the transmission line items', async () => {
   const masthead = fixture.read!.sections[0];
   if (masthead.kind === 'masthead') masthead.identity_source.transmission_model = '6L90';
   await render();
@@ -354,9 +355,7 @@ it('retains the specific transmission model and uses its existing transmission e
   expect(control).not.toBeNull();
   expect(host.querySelector('[aria-label="Explore Automatic in this profile"]')).toBeNull();
   await act(async () => control.click());
-  const panel = host.querySelector('[data-testid="field-context"]');
-  expect(panel?.getAttribute('data-field')).toBe('transmission');
-  expect(panel?.getAttribute('data-match-field')).toBe('transmission_model');
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('transmission');
   expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'transmission', label: '6L90' });
 });
 
