@@ -58,6 +58,7 @@ CREATE TABLE public.vehicle_observations (
   confidence_score numeric, ingested_at timestamptz DEFAULT now(), source_id uuid, property_id uuid,
   source_observation_id uuid);
 CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid, image_url text DEFAULT 'https://x.invalid/i.jpg',
+  thumbnail_url text DEFAULT 'https://x.invalid/t.jpg', medium_url text,
   is_sensitive boolean DEFAULT false, is_superseded boolean DEFAULT false, is_duplicate boolean DEFAULT false,
   vision_gate_status text, image_vehicle_match_status text, taken_at timestamptz, latitude numeric, longitude numeric);
 CREATE TABLE public.vehicle_location_observations (
@@ -415,14 +416,39 @@ DO $$ BEGIN
   PERFORM public.t_assert((SELECT bool_and(doc IS NULL OR doc = 'null'::jsonb) FROM public.t_facet_snap
     WHERE vid = '10000000-0000-0000-0000-000000000005'), 'deleted vehicle: nothing to anyone');
 END $$;
+-- 20261116032000: image witnesses carry their thumbnail, and the id helper takes no role list. Every viewer's items are
+-- the same as before apart from the added thumbnails.
+\ir ../migrations/20261116032000_vehicle_facet_items_witness_thumb.sql
+\ir ../migrations/20261116032000_vehicle_facet_items_witness_thumb.sql
+SELECT public.t_facet_snapshot('thumb');
+DO $$ BEGIN
+  PERFORM public.t_assert(NOT EXISTS (
+    SELECT 1 FROM public.t_facet_snap b JOIN public.t_facet_snap a
+      ON a.phase = 'thumb' AND a.who = b.who AND a.vid = b.vid AND a.call = b.call
+    WHERE b.phase = 'after'
+      AND regexp_replace(a.doc::text, ', "thumb": (null|"[^"]*")', '', 'g') IS DISTINCT FROM b.doc::text),
+    'every viewer, every call: the same items once thumbnails are set aside');
+  PERFORM public.t_assert((SELECT count(*) FROM public.t_facet_snap WHERE phase = 'thumb' AND doc::text LIKE '%"thumb": "https://x.invalid/t.jpg"%') > 0,
+    'image witnesses carry their thumbnail');
+  PERFORM public.t_assert(to_regprocedure('public.vehicle_facet_observation_ids(uuid,text[])') IS NULL,
+    'the caller-supplied role list is gone');
+  -- Every claim role the reader maps is in the helper's fixed list (a role missing there would drop its readings).
+  PERFORM public.t_assert(NOT EXISTS (
+    SELECT 1 FROM regexp_matches(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure),
+      E'\\n  \\(''([a-z_]+)'', ''[a-z_]+'', ''[a-z_]+\\.', 'g') m
+    WHERE position('''' || m[1] || '''' in pg_get_functiondef('public.vehicle_facet_observation_ids(uuid)'::regprocedure)) = 0)
+    AND (SELECT count(*) FROM regexp_matches(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure),
+      E'\\n  \\(''([a-z_]+)'', ''[a-z_]+'', ''[a-z_]+\\.', 'g')) >= 18,
+    'the helper lists every role the reader maps');
+END $$;
 -- The id helper: ids only, no PUBLIC execute.
 DO $$ BEGIN
   PERFORM public.t_assert((SELECT prosecdef AND prorettype = 'uuid[]'::regtype FROM pg_proc
-    WHERE oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure), 'helper returns ids only');
+    WHERE oid = 'public.vehicle_facet_observation_ids(uuid)'::regprocedure), 'helper returns ids only');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
-    WHERE p.oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure AND a.grantee = 0), 'helper: no PUBLIC execute');
+    WHERE p.oid = 'public.vehicle_facet_observation_ids(uuid)'::regprocedure AND a.grantee = 0), 'helper: no PUBLIC execute');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
-    WHERE p.oid = 'public.vehicle_facet_observation_ids(uuid,text[])'::regprocedure AND a.privilege_type = 'EXECUTE'
+    WHERE p.oid = 'public.vehicle_facet_observation_ids(uuid)'::regprocedure AND a.privilege_type = 'EXECUTE'
       AND a.grantee <> p.proowner
       AND NOT has_function_privilege(pg_get_userbyid(a.grantee), 'public.vehicle_facet_items(uuid,text)', 'EXECUTE')),
     'helper: EXECUTE only for roles that run the reader');
@@ -633,13 +659,13 @@ BEGIN
 
   -- The observation id list: only rows that can speak to a token, and none for a vehicle the viewer cannot see.
   PERFORM public.t_assert(NOT ('60000000-0000-0000-0000-00000000001d'::uuid = ANY (public.vehicle_facet_observation_ids(
-      '10000000-0000-0000-0000-000000000001', ARRAY['cowl_tag_style', 'engine_block_casting'])))
+      '10000000-0000-0000-0000-000000000001')))
     AND '60000000-0000-0000-0000-00000000001a'::uuid = ANY (public.vehicle_facet_observation_ids(
-      '10000000-0000-0000-0000-000000000001', ARRAY['cowl_tag_style', 'engine_block_casting'])),
+      '10000000-0000-0000-0000-000000000001')),
     'the id list keeps the mapped roles and drops the harvest note');
-  PERFORM public.t_assert(cardinality(public.vehicle_facet_observation_ids('10000000-0000-0000-0000-000000000004',
-      ARRAY['cowl_tag_style'])) = 0 AND cardinality(public.vehicle_facet_observation_ids('10000000-0000-0000-0000-000000000005',
-      ARRAY['cowl_tag_style'])) = 0, 'no ids for a private or deleted vehicle');
+  PERFORM public.t_assert(cardinality(public.vehicle_facet_observation_ids('10000000-0000-0000-0000-000000000004')) = 0
+    AND cardinality(public.vehicle_facet_observation_ids('10000000-0000-0000-0000-000000000005')) = 0,
+    'no ids for a private or deleted vehicle');
   PERFORM public.t_assert(position('obs_ids' in pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure)) > 0
     AND (length(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure))
       - length(replace(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure), 'obs_ids AS MATERIALIZED', '')))
