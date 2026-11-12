@@ -46,8 +46,8 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.vehicle_decode_rules WHERE citation_title IS NULL OR citation_locator IS NULL OR cited_on IS NULL)
     THEN RAISE EXCEPTION 'uncited row'; END IF;
   -- Each cited document has its chart_source row.
-  IF EXISTS (SELECT DISTINCT citation_url FROM public.vehicle_decode_rules r WHERE rule_key <> 'chart_source'
-             AND NOT EXISTS (SELECT 1 FROM public.vehicle_decode_rules s WHERE s.rule_key = 'chart_source' AND s.citation_url = r.citation_url))
+  IF EXISTS (SELECT DISTINCT citation_url FROM public.vehicle_decode_rules d WHERE rule_key <> 'chart_source'
+             AND NOT EXISTS (SELECT 1 FROM public.vehicle_decode_rules s WHERE s.rule_key = 'chart_source' AND s.citation_url = d.citation_url))
     THEN RAISE EXCEPTION 'citation without a chart_source row'; END IF;
 
   -- Muncie: a 7/8-inch countershaft case (3851325, 1964-65) carries the 2.56 M20 or the 2.20 M21 set.
