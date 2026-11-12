@@ -145,6 +145,76 @@ const ledger: MasterCostLedger = {
  }],
 };
 
+function serviceFeeLedger(): MasterCostLedger {
+ const scoped = structuredClone(ledger);
+ const scenario = scoped.scenarios[0];
+ scenario.rows = [{ ...scenario.rows[0], physical_key: 'machine.pistons', system_key: 'machining', label: 'Mount pistons on rods',
+  reference: { type: 'fixed_service_fee', unit_fee: { min: 30, typical: 30, max: 30 }, unit: 'assembly', currency: 'USD',
+   price_basis: 'published_starting_price', source_url: 'https://machine.example/services', source_retrieved_at: '2026-01-01T12:00:00Z',
+   source_sha256: 'd'.repeat(64), source_role: 'attributed_public_menu_capture', derivation: 'Conditional service comparison; excludes vehicle installation and custom fitting.' },
+  rate_basis: null, hours: null, cost: { min: 240, typical: 240, max: 240 },
+  quantity: { value: 8, unit: 'assembly', basis: 'explicit_assumption', derivation: 'Eight assemblies in this reconstruction scenario.' },
+  formula: '8 assembly × (30 / 30 / 30) USD per assembly; person-hours unknown', claim_count: 1 }];
+ scenario.coverage = { lines: 1, resolved_lines: 1, partial_lines: 0, unresolved_lines: 0, excluded_lines: 0,
+  duplicate_claims_folded: 0, status: 'complete_for_supplied_lines' };
+ scenario.totals = { hours: null, hours_coverage: { labor_lines: 1, estimated_lines: 0, unknown_lines: 1, status: 'unestimated' },
+  currencies: [{ currency: 'USD', cost: { min: 240, typical: 240, max: 240 }, covered_lines: 1 }],
+  labor_currencies: [{ currency: 'USD', cost: { min: 240, typical: 240, max: 240 }, covered_lines: 1 }], material_currencies: [] };
+ scenario.systems = [{ system_key: 'machining', totals: scenario.totals, coverage: scenario.coverage }];
+ return scoped;
+}
+
+it('opens a fixed service fee with its source and equation while leaving hours unknown', async () => {
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={serviceFeeLedger()} renderSource={() => null} />));
+ const totals = host.querySelector('.vp-ledger-totals')!;
+ expect(totals.textContent).toContain('Estimated person-hoursUnestimated');
+ expect(totals.textContent).toContain('Labor estimate$240.00');
+ expect(host.textContent).toContain('1 labor item has unknown person-hours');
+ expect(host.textContent).toContain('Starting-price comparison');
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Mount pistons on rods"]')!.click());
+ const detail = host.querySelector('#vp-ledger-evidence')!;
+ expect(detail.textContent).toContain('8 assembly × (30 / 30 / 30) USD per assembly; person-hours unknown');
+ expect(detail.textContent).toContain('Price basis: Published starting-price comparison');
+ expect(detail.textContent).toContain('This is not a vehicle-specific quote');
+ expect(detail.textContent).toContain('Captured Jan 1, 2026');
+ expect(detail.textContent).not.toMatch(/Time basis:|Rate:|fixed_service_fee|0 estimated person-hours/);
+ const citation = detail.querySelector<HTMLAnchorElement>('a')!;
+ expect(citation.href).toBe('https://machine.example/services');
+ expect(citation.rel).toBe('noopener noreferrer');
+ const clicked: string[] = [];
+ citation.addEventListener('click', event => { event.preventDefault(); clicked.push(citation.href); });
+ await act(async () => citation.click());
+ expect(clicked).toEqual(['https://machine.example/services']);
+ await act(async () => detail.querySelector<HTMLButtonElement>('button[aria-label="Open source photo: Torn seating"]')!.click());
+ expect(fixture.open).toHaveBeenCalledWith('before-a');
+});
+
+it('marks mixed time coverage as partial and switches to unknown time for the fee-only system', async () => {
+ const scoped = serviceFeeLedger();
+ scoped.scenarios[0].rows.push(structuredClone(ledger.scenarios[0].rows[0]));
+ scoped.scenarios[0].totals = { ...scoped.scenarios[0].totals, hours: { min: 2, typical: 3, max: 4 },
+  hours_coverage: { labor_lines: 2, estimated_lines: 1, unknown_lines: 1, status: 'partial' } };
+ await act(async () => root.render(<VisualWorkCards rows={[record]} ledger={scoped} renderSource={() => null} />));
+ expect(host.querySelector('.vp-ledger-totals')?.textContent).toContain('Estimated person-hours (partial)');
+ expect(host.textContent).toContain('1 labor item has unknown person-hours');
+ const select = host.querySelector<HTMLSelectElement>('select[aria-label="System"]')!;
+ await act(async () => { select.value = 'machining'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+ expect(host.querySelector('.vp-ledger-totals')?.textContent).toContain('Estimated person-hoursUnestimated');
+ expect(host.textContent).not.toContain('Install door-glass pair');
+});
+
+it('removes the open service cost and citation when the current-source reader withdraws it', async () => {
+ fixture.rpc.mockResolvedValue({ data: { work_records: [], visual_work: [record], master_ledger: serviceFeeLedger() }, error: null });
+ await renderHook(); await settle();
+ await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="See calculation: Mount pistons on rods"]')!.click());
+ expect(host.textContent).toContain('$240.00');
+ expect(host.querySelector('a[href="https://machine.example/services"]')).not.toBeNull();
+ fixture.rpc.mockResolvedValue({ data: { work_records: [], visual_work: [], master_ledger: null }, error: null });
+ await act(async () => client.invalidateQueries({ queryKey: ['vehicle-visual-work'] })); await settle();
+ expect(host.textContent).not.toContain('$240.00');
+ expect(host.querySelector('a[href="https://machine.example/services"]')).toBeNull();
+});
+
 it('shows the server cost folds and opens a single inline calculation with direct source photos', async () => {
  const work = structuredClone(record);
  work.receipts.push({ ...record.receipts[0], item_id: 'documented-line', relation: 'documented_operation', hours: 3.5 });
