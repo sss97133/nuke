@@ -1,5 +1,6 @@
 SET statement_timeout = '45min';
 SET lock_timeout = '15min';
+SET maintenance_work_mem = '256MB';
 -- idx_vehicle_images_gps_cover: the photo-GPS readers answer from a small partial index instead of the 57 GB heap.
 --
 -- WHY. Two readers touch every GPS photo they need through the heap:
@@ -36,6 +37,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vehicle_images_gps_cover
   INCLUDE (taken_at, latitude, longitude, is_sensitive, is_superseded, is_duplicate, vision_gate_status,
            image_vehicle_match_status)
   WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND nullif(btrim(image_url), '') IS NOT NULL;
+RESET maintenance_work_mem;
 RESET lock_timeout;
 RESET statement_timeout;
 
