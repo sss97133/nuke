@@ -1259,26 +1259,23 @@ struct VehicleDetailView: View {
     // LIVE AUCTION — the BaT-style living instrument, driven by the server-arbitrated
     // vehicle_pulse. Shows ONLY when the arbiter reports a live auction (never faked); a
     // pulsing LIVE dot, the current bid, and a countdown derived client-side from ends_at
-    // (TimelineView ticks it smoothly; turns red under 30s). A real new bid chimes (applyPulse).
+    // (TimelineView ticks it each second, always red, d/h/m/s). A real new bid chimes (applyPulse).
     @ViewBuilder private var liveAuctionBanner: some View {
         if let p = pulse, p.is_live {
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                let secs = p.endsAtDate.map { Int(max(0, $0.timeIntervalSince(ctx.date))) }
                 HStack(spacing: 8) {
                     Circle().fill(.red).frame(width: 8, height: 8)
                         .opacity(Int(ctx.date.timeIntervalSinceReferenceDate) % 2 == 0 ? 1 : 0.35)
                     Text("LIVE").font(.caption2.weight(.heavy)).foregroundStyle(.red)
                     Text(p.headline_label ?? "Current Bid").font(.caption2).foregroundStyle(.secondary)
-                    Text(p.headline_amount.map { money0($0) } ?? "—")
+                    Text(VehicleLiveBanner.bid(p.headline_amount))
                         .font(.title3.weight(.bold)).monospacedDigit()
+                        .foregroundStyle(NukeDisplay.money(p.headline_amount) == nil ? Color.secondary : Color.primary)
                     Spacer(minLength: 8)
-                    if let s = secs {
-                        HStack(spacing: 4) {
-                            Image(systemName: "timer")
-                            Text("\(s / 60):\(String(format: "%02d", s % 60))").monospacedDigit()
-                        }
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(s <= 30 ? .red : .primary)
+                    if let ends = p.endsAtDate {
+                        // Red always, the same pill as the Explore card's clock (d/h/m/s, never "2880:00").
+                        NukePill(text: VehicleLiveBanner.countdown(ends, now: ctx.date), icon: "clock",
+                                 textColor: Color.red)
                     }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
@@ -1523,7 +1520,9 @@ struct VehicleDetailView: View {
                 out.append(.init(kind: .contributions, text: "\(e.contribution_count)"))
             }
         }
-        if let val = valuation, let mid = val.value, mid > 0 {
+        // Same gate as the body's estimate (marketDefendsEstimate): an unlisted, unpriced car
+        // shows no estimate in the header either.
+        if marketDefendsEstimate, let val = valuation, let mid = val.value, mid > 0 {
             out.append(.init(kind: .estimate, text: PulseSignal.shortMoney(mid)))
         }
         // STORM — auction now ROUTED via the server-arbitrated vehicle_pulse. Lights ONLY

@@ -100,17 +100,16 @@ function FieldContext({ field, label, value, context, answer, reports, images, r
     {images.length > 0 && <section aria-label={`${value} related photographs`}>
       <h3>Related photographs</h3>
       <div className="vp-field-context__images" data-image-context="physical">{images.slice(0, 6).map(image => <button key={image.id} type="button" onClick={() => openVehiclePhoto(image.id)} aria-label={`Inspect ${image.vehicle_zone?.replace(/_/g, ' ') || label}`}>
-        <img src={image.thumbnail_url || image.medium_url || image.image_url} alt="" width={160} height={110} loading="lazy" />
+        <img src={tileUrl(image)} alt="" width={160} height={110} loading="lazy" />
       </button>)}</div>
-      <p className="vp-field-context__note">Related views help inspection; they do not establish the specific configuration.</p>
     </section>}
     {references.length > 0 && <section aria-label={`${value} reference material`}>
       <h3>Reference material</h3>
       <div className="vp-field-context__images" data-image-context="reference">{references.slice(0, 6).map(image => <button key={image.id} type="button" onClick={() => openVehiclePhoto(image.id)} aria-label={`Inspect reference: ${image.vehicle_zone?.replace(/_/g, ' ') || label}`}>
-        <img src={image.thumbnail_url || image.medium_url || image.image_url} alt="" width={160} height={110} loading="lazy" />
+        <img src={tileUrl(image)} alt="" width={160} height={110} loading="lazy" />
       </button>)}</div>
     </section>}
-    {filters.length > 0 && <section aria-label={`${value} data segment`}>
+    {filters.length > 0 && field !== 'location' && !(peers.isSuccess && peerTotal === 0) && <section aria-label={`${value} data segment`}>
       <div className="vp-field-context__segment-head">
         <h3>{peers.isSuccess ? (peerTotal === 0 ? `No other public profile is recorded as ${scopeLabel}` : `${peerTotal.toLocaleString('en-US')} other public profile${peerTotal === 1 ? '' : 's'} recorded as ${scopeLabel}`) : `Other profiles recorded as ${scopeLabel}`}</h3>
         {canScope && <button type="button" onClick={() => setSameModel(current => !current)}>{sameModel ? 'Include every make' : `Only ${subject.year || ''} ${subject.make} ${subject.model}`}</button>}
@@ -131,6 +130,10 @@ function FieldContext({ field, label, value, context, answer, reports, images, r
     <details className="vp-field-context__evidence"><summary>Audit trail</summary>{details}</details>
   </div>;
 }
+
+/** Popup tiles use the transcoded derivative: originals may be HEIC, which browsers do not render. */
+const tileUrl = (image: { thumbnail_url?: string | null; medium_url?: string | null; image_url?: string | null }) =>
+  optimizeImageUrl(image.thumbnail_url || image.medium_url || image.image_url, 'thumbnail') || image.thumbnail_url || image.medium_url || image.image_url || '';
 
 const SOURCE_LABELS: Record<string, string> = {
   owner_import_listing: 'Owner listing import',
