@@ -371,6 +371,18 @@ async function processVehicle(
       return { success: false, error: `Failed to parse discovery JSON (stop_reason ${result.stop_reason}, ${result.usage?.output_tokens} output tokens)` };
     }
 
+    // A quote is shown as the commenter's words, so keep only quotes found word for word in the comments sent.
+    if (Array.isArray(discovered.key_quotes)) {
+      const flat = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const source = flat(formatted);
+      const before = discovered.key_quotes.length;
+      discovered.key_quotes = discovered.key_quotes.filter((q: any) => {
+        const text = flat(String(q?.quote ?? ""));
+        return text.length > 0 && source.includes(text);
+      });
+      discovered.key_quotes_dropped_not_verbatim = before - discovered.key_quotes.length;
+    }
+
     // Extract top-level fields for quick access
     const sentiment = discovered.sentiment?.overall || null;
     const sentimentScore = discovered.sentiment?.score || null;

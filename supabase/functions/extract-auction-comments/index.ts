@@ -922,19 +922,8 @@ Deno.serve(async (req) => {
       writeErrors.push(`BaT table upserts: ${e?.message || String(e)}`)
     }
 
-    // Trigger AI analysis on comments (async, don't wait)
-    if (comments.length > 0 && vehicleId) {
-      const serviceKey = projectSecretKey() ?? ''
-      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/discover-from-observations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceKey}`,
-        },
-        body: JSON.stringify({ vehicle_id: vehicleId, kinds: ['comment'], discovery_types: ['sentiment', 'themes'] }),
-        signal: AbortSignal.timeout(30000),
-      }).then(res => res.text().catch(() => {})).catch(e => console.error('Failed to trigger analysis:', e instanceof Error ? e.message : String(e)))
-    }
+    // No model call here. The profile's comment summary is written once per closed lot by the scheduled
+    // batch-comment-discovery run (cron comment-summary-recent-closes), which reads auction_comments.
 
     return new Response(JSON.stringify({
       success: writeErrors.length === 0,
