@@ -357,7 +357,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         }) : { status: 401, body: { error: 'Accounting sign-in required' } };
         return new Response(JSON.stringify(result.body), { status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
       }
-      const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [["read", "tax_read"].includes(action) ? "read" : "write"] } };
+      const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [["read", "tax_read", "projection_read"].includes(action) ? "read" : "write"] } };
       const identity = await authenticateWriter(req, options);
       const actor = identity.ok ? financialActor(identity.caller, action) : null;
       if (!actor) return new Response(
