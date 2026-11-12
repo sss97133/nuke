@@ -330,8 +330,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $fn$
            jsonb_build_object('document_type', d.document_type, 'title', d.title)
     FROM public.vehicle_documents d
     WHERE d.uploaded_by = p_user_id AND d.document_type IN ('books_decision', 'provenance_citation', 'legal_document')
-      AND NOT ((d.document_type = 'books_decision' AND d.title ~* '^expense:.*acquisition' AND d.amount > 0)
-            OR (d.document_type = 'legal_document' AND coalesce(d.title, '') ~* '(purchase agreement|bill of sale|certificate of title|^title$)'))
+      AND NOT coalesce((d.document_type = 'books_decision' AND d.title ~* '^expense:.*acquisition' AND d.amount > 0)
+            OR (d.document_type = 'legal_document' AND coalesce(d.title, '') ~* '(purchase agreement|bill of sale|certificate of title|^title$)'), false)
     UNION ALL
     SELECT o.vehicle_id, 'conflict', 'ownership_fold', 'vehicle_ownerships', o.id, NULL, o.created_at, 0.5,
            jsonb_build_object('role', o.role, 'ownership_type', o.ownership_type, 'is_current', o.is_current, 'end_date', o.end_date,
