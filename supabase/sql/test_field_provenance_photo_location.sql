@@ -21,8 +21,12 @@ CREATE TABLE public.vehicle_location_observations(id uuid PRIMARY KEY, vehicle_i
 CREATE TEMP TABLE before_engine AS SELECT public.get_field_provenance('11111111-1111-1111-1111-111111111111','engine_type') AS p;
 \ir ../migrations/20261116003000_field_provenance_photo_location.sql
 \ir ../migrations/20261116003000_field_provenance_photo_location.sql
+CREATE TABLE public.city_geocode_lookup(city text, state text, latitude numeric, longitude numeric, sample_size integer,
+  source text, PRIMARY KEY (city, state));
 \ir ../migrations/20261116004000_field_provenance_photo_location_ids.sql
 \ir ../migrations/20261116004000_field_provenance_photo_location_ids.sql
+\ir ../migrations/20261116006000_field_provenance_photo_location_centroid.sql
+\ir ../migrations/20261116006000_field_provenance_photo_location_centroid.sql
 DO $$ BEGIN
  ASSERT public.get_field_provenance('11111111-1111-1111-1111-111111111111','engine_type')
    = (SELECT p FROM before_engine), 'other fields unchanged';
@@ -53,6 +57,9 @@ INSERT INTO public.vehicle_location_observations(id,vehicle_id,source_type,sourc
  ('66666666-6666-6666-6666-000000000004','11111111-1111-1111-1111-111111111111','listing','bat','2026-09-01T00:00Z',
   'Reno, NV','US','NV','Reno',NULL,NULL,'city',0.8,'{}');
 
+-- The city's published centre (two spellings; the larger sample wins).
+INSERT INTO public.city_geocode_lookup VALUES ('Boulder City','NV',35.96001,-114.84002,40,'bat_listing'),
+  ('BOULDER CITY','NV',35.5,-114.5,3,'bat_listing');
 SET LOCAL ROLE anon;
 DO $$ DECLARE p jsonb; a jsonb; BEGIN
  p := public.get_field_provenance('11111111-1111-1111-1111-111111111111','location');
@@ -64,6 +71,7 @@ DO $$ DECLARE p jsonb; a jsonb; BEGIN
  ASSERT (a->>'first_taken_at')::timestamptz = '2026-10-06T15:00Z' AND (a->>'last_taken_at')::timestamptz = '2026-10-07T01:00Z', a::text;
  ASSERT a->>'latest_observation_id' = '66666666-6666-6666-6666-000000000002' AND jsonb_array_length(a->'observation_ids') = 2, a::text;
  ASSERT a->'point' = 'null'::jsonb, 'anonymous: no point';
+ ASSERT a->'centroid' = '{"lat":35.9600,"lng":-114.8400,"source":"city_geocode_lookup","basis":"city_centroid"}'::jsonb, a->>'centroid';
  ASSERT jsonb_array_length(p->'photo_locations') = 2 AND (SELECT bool_and(e->'point' = 'null'::jsonb) FROM jsonb_array_elements(p->'photo_locations') e),
    'anonymous: per-day rows without points';
  ASSERT p::text !~ '35\.97|114\.85', 'anonymous: no coordinate anywhere in the response';
