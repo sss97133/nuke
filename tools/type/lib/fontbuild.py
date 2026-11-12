@@ -107,7 +107,7 @@ def build(out_dir, family, style, glyphs: list[Glyph], *, ascender, descender, c
         addOpenTypeFeaturesFromString(fb.font, fea)
     otf = os.path.join(out_dir, stem + '.otf')
     fb.save(otf)
-    f = TTFont(otf)
+    f = TTFont(otf, recalcTimestamp=False)   # keep the fixed head dates: byte-identical rebuilds
     f.flavor = 'woff2'
     f.save(os.path.join(out_dir, stem + '.woff2'))
     side = {
