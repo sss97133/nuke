@@ -6,6 +6,7 @@
 -- And 20261116007000_vehicle_location_areas.sql: the fold moved into vehicle_location_fold leaves every
 -- get_field_provenance answer byte-identical (anonymous, untied, owner, other fields); vehicle_location_areas returns
 -- the same areas without point for every viewer (owner included), [] for a private vehicle; anon cannot call the fold.
+-- 20261116012000 (both functions in PL/pgSQL) changes none of it; every assertion below runs against it.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
  IF current_database() NOT LIKE 'dm_refinement_%' OR to_regclass('public.vehicles') IS NOT NULL
@@ -76,6 +77,15 @@ GRANT SELECT ON public.base_location TO anon, authenticated;
 
 \ir ../migrations/20261116007000_vehicle_location_areas.sql
 \ir ../migrations/20261116007000_vehicle_location_areas.sql
+\ir ../migrations/20261116012000_vehicle_location_fold_plpgsql.sql
+\ir ../migrations/20261116012000_vehicle_location_fold_plpgsql.sql
+DO $$ BEGIN
+ ASSERT (SELECT array_agg(l.lanname::text ORDER BY p.proname) FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
+         WHERE p.proname IN ('vehicle_location_fold','vehicle_location_areas')) = ARRAY['plpgsql','plpgsql'], '012000: plpgsql';
+ ASSERT has_function_privilege('anon','public.vehicle_location_areas(uuid)','execute')
+   AND NOT has_function_privilege('anon','public.vehicle_location_fold(uuid)','execute')
+   AND NOT has_function_privilege('authenticated','public.vehicle_location_fold(uuid)','execute'), '012000: grants kept';
+END $$;
 DO $$ BEGIN
  ASSERT public.get_field_provenance('11111111-1111-1111-1111-111111111111','engine_type')
    = (SELECT p FROM before_engine), 'other fields unchanged';
