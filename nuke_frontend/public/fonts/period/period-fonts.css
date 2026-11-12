@@ -52,8 +52,10 @@
   font-family: 'Firebird 1971 Script'; color: transparent;
   background: linear-gradient(180deg, var(--chrome-face-a) 0%, var(--chrome-face-b) 40%, var(--chrome-face-c) 50%, var(--chrome-face-d) 62%, var(--chrome-face-b) 100%);
   -webkit-background-clip: text; background-clip: text;
-  -webkit-text-stroke: .012em var(--chrome-rim-a);
-  filter: drop-shadow(0 .02em .015em var(--chrome-edge));
+  /* the edge is a filter, not -webkit-text-stroke: a stroke draws every glyph's outline and shows a seam at each
+     joined slab */
+  filter: drop-shadow(0 0 .01em var(--chrome-rim-a)) drop-shadow(0 0 .006em var(--chrome-rim-a))
+          drop-shadow(0 .02em .015em var(--chrome-edge));
 }
 
 .period-decal { font-family: 'Trans Am 1973 Decal'; color: var(--decal-ink); }
