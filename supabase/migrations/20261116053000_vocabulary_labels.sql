@@ -39,7 +39,7 @@ CREATE POLICY vocabulary_labels_read ON public.vocabulary_labels FOR SELECT TO a
 INSERT INTO public.vocabulary_labels (domain, code, label, note) VALUES
   ('rule', 'gm_1972_1980_car_vin_v1', 'VIN chart, GM cars 1972–1980',
    'Decodes a 13-character GM car VIN position by position.'),
-  ('rule', 'tribute_badge_rule_v1', 'Tribute cars earn no factory badge',
+  ('rule', 'tribute_badge_rule_v1', 'Tribute rule',
    'A tribute (vehicles.is_replica) is not given a factory series or trim badge.'),
   ('rule', 'model_availability', 'Factory availability by series and engine',
    'Cited sources on what the factory offered for the VIN series and engine; bounds the build, never states it.'),
