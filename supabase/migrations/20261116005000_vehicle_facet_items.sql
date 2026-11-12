@@ -56,8 +56,8 @@ GRANT SELECT ON public.vehicle_decode_rules TO anon, authenticated;
 GRANT ALL ON public.vehicle_decode_rules TO service_role;
 COMMENT ON TABLE public.vehicle_decode_rules IS
   'Cited decode rules (grain: one rule row for one key, optionally narrowed by make, model, year range and qualifiers). '
-  'rule_key names the table: transmission_gear_ratios (code = transmission model, value.gears = numeric array '
-  'first..top, value.reverse), axle_code (value.ratio, value.limited_slip), engine_code (code = VIN engine character, '
+  'rule_key names the table: transmission_gear_ratios (code = the bare model code as stamped or cast, e.g. M20, TH400, '
+  'with no maker prefix; value.gears = numeric array first..top, value.reverse), axle_code (value.ratio, value.limited_slip), engine_code (code = VIN engine character, '
   'value.displacement_ci, value.family), block_casting, body_tag_code, vin_chart (code = decode rule key, '
   'value.positions = {field: "position"}). qualifiers narrows a row further (unit year, ratio-set name). Every row '
   'carries citation_url; a newer row supersedes an older one (superseded_by, superseded_at), never an update in place. '
@@ -217,36 +217,6 @@ defs (dim, ord, key, facet, unit, needed) AS (VALUES
   ('location', 2, 'location.sources.listing', 'current', NULL, 'a dated listing location'),
   ('location', 3, 'location.map', 'current', NULL, 'an established area at ZCTA grain')
 ),
--- Observations in the viewer's row policies that can speak to a token.
-obs AS MATERIALIZED (
-  SELECT o.id, o.kind::text AS kind, o.extraction_method AS method, o.source_url, o.observed_at, o.structured_data AS sd,
-         o.source_observation_id, o.property_id, o.source_id, o.structured_data->>'claim_role' AS role,
-         coalesce(p.property_key, o.structured_data->>'property_key') AS pk,
-         CASE WHEN o.structured_data->>'image_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-              THEN (o.structured_data->>'image_id')::uuid END AS image_id
-  FROM v JOIN public.vehicle_observations o ON o.vehicle_id = v.id
-  LEFT JOIN public.observation_properties p ON p.id = o.property_id
-  WHERE o.is_superseded IS NOT TRUE
-    AND (o.property_id IS NOT NULL OR o.structured_data ? 'property_key' OR o.structured_data ? 'claim_role'
-         OR (o.extraction_method LIKE 'vin\_decode\_%' AND o.structured_data ? 'decode_rule'))
-),
--- An image witness only when the viewer can see the image; else the observation itself.
-obs_w AS MATERIALIZED (
-  SELECT o.*, CASE WHEN o.image_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.vehicle_images i WHERE i.id = o.image_id)
-                   THEN jsonb_build_object('kind', 'image', 'id', o.image_id)
-                   ELSE jsonb_build_object('kind', 'observation', 'id', o.id) END AS witness,
-         nullif(concat_ws('; ', nullif(btrim(o.sd->>'limitation'), ''),
-           'uncertain characters: ' || nullif(btrim(o.sd->>'uncertain_characters'), '')), '') AS limitation
-  FROM obs o
-),
--- A VIN decode of the vehicle's current VIN.
-decode AS (
-  SELECT o.*, src.label AS src_label
-  FROM obs o CROSS JOIN v
-  LEFT JOIN LATERAL (SELECT public.observation_source_label(o.source_id) AS label) src ON true
-  WHERE o.method LIKE 'vin\_decode\_%' AND o.sd ? 'decode_rule'
-    AND upper(btrim(o.sd->>'vin')) = upper(btrim(v.vin))
-),
 -- Photo readings keyed by a closed claim role: (role, field read, item, comparison kind, decoded detail carried along).
 -- A field the role does not state is skipped; the image's reader is the reader family.
 roles (role, field, key, nk, detail) AS (VALUES
@@ -284,6 +254,38 @@ roles (role, field, key, nk, detail) AS (VALUES
   ('engine_code_stamp', 'engine_code', 'engine.current.engine_code_stamp', 'text',
     ARRAY['engine_code_application', 'engine_production_number_partial']),
   ('engine_code_stamp', 'engine_size', 'engine.current.displacement', 'displacement', NULL)
+),
+-- Observations in the viewer's row policies that can speak to a token.
+obs AS MATERIALIZED (
+  SELECT o.id, o.kind::text AS kind, o.extraction_method AS method, o.source_url, o.observed_at, o.structured_data AS sd,
+         o.source_observation_id, o.property_id, o.source_id, o.structured_data->>'claim_role' AS role,
+         coalesce(p.property_key, o.structured_data->>'property_key') AS pk,
+         CASE WHEN o.structured_data->>'image_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              THEN (o.structured_data->>'image_id')::uuid END AS image_id
+  FROM v JOIN public.vehicle_observations o ON o.vehicle_id = v.id
+  LEFT JOIN public.observation_properties p ON p.id = o.property_id
+  WHERE o.is_superseded IS NOT TRUE
+    AND (o.property_id IS NOT NULL OR o.structured_data ? 'property_key'
+         -- Only the claim roles this reader maps; other roled readings (photo-map harvest notes) are never scanned.
+         OR o.structured_data->>'claim_role' IN (SELECT role FROM roles UNION ALL SELECT 'cowl_tag_option_codes')
+         OR (o.extraction_method LIKE 'vin\_decode\_%' AND o.structured_data ? 'decode_rule'))
+),
+-- An image witness only when the viewer can see the image; else the observation itself.
+obs_w AS MATERIALIZED (
+  SELECT o.*, CASE WHEN o.image_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.vehicle_images i WHERE i.id = o.image_id)
+                   THEN jsonb_build_object('kind', 'image', 'id', o.image_id)
+                   ELSE jsonb_build_object('kind', 'observation', 'id', o.id) END AS witness,
+         nullif(concat_ws('; ', nullif(btrim(o.sd->>'limitation'), ''),
+           'uncertain characters: ' || nullif(btrim(o.sd->>'uncertain_characters'), '')), '') AS limitation
+  FROM obs o
+),
+-- A VIN decode of the vehicle's current VIN.
+decode AS (
+  SELECT o.*, src.label AS src_label
+  FROM obs o CROSS JOIN v
+  LEFT JOIN LATERAL (SELECT public.observation_source_label(o.source_id) AS label) src ON true
+  WHERE o.method LIKE 'vin\_decode\_%' AND o.sd ? 'decode_rule'
+    AND upper(btrim(o.sd->>'vin')) = upper(btrim(v.vin))
 ),
 -- Every testimony row: item key, raw value, comparison kind, class, source key (one per independent source),
 -- reader family (independence of readers), clock and the source as returned.
@@ -464,7 +466,9 @@ td AS (
   SELECT DISTINCT ON (key, indep, norm) *
   FROM (SELECT t.*, public.vehicle_facet_norm(t.nk, t.val) AS norm FROM t) x
   WHERE norm IS NOT NULL
-  ORDER BY key, indep, norm, pref, observed_at DESC NULLS LAST
+  -- Ties (two roles read off one photo at one clock) keep the row that carries decoded detail, then a fixed order.
+  ORDER BY key, indep, norm, pref, observed_at DESC NULLS LAST,
+           coalesce(src->'decoded', 'null'::jsonb) <> 'null'::jsonb DESC, src::text
 ),
 ranked AS (
   SELECT td.*, CASE cls WHEN 'decode' THEN 0 WHEN 'receipt' THEN 1 WHEN 'reading' THEN 2 WHEN 'claim' THEN 3 ELSE 4 END AS crank
@@ -578,9 +582,14 @@ not_original AS (
            'value', o.sd->>'factory_configuration_status', 'class', 'reading', 'limitation', o.limitation)
            ORDER BY o.observed_at DESC, o.id) AS sources,
          count(DISTINCT o.image_id) AS images
-  FROM obs_w o
-  WHERE o.image_id IS NOT NULL AND (o.role LIKE 'engine%' OR o.role LIKE 'transmission%')
-    AND o.sd->>'factory_configuration_status' IN ('not_original_engine', 'not_original_unit', 'not_original')
+  FROM (
+    -- One witness per photo, however many roles read it.
+    SELECT DISTINCT ON (CASE WHEN x.role LIKE 'engine%' THEN 'engine' ELSE 'transmission' END, x.image_id) x.*
+    FROM obs_w x
+    WHERE x.image_id IS NOT NULL AND (x.role LIKE 'engine%' OR x.role LIKE 'transmission%')
+      AND x.sd->>'factory_configuration_status' IN ('not_original_engine', 'not_original_unit', 'not_original')
+    ORDER BY CASE WHEN x.role LIKE 'engine%' THEN 'engine' ELSE 'transmission' END, x.image_id, x.observed_at DESC, x.id
+  ) o
   GROUP BY 1
 ),
 -- Derived numbers: computed here from the items they read, never landed.

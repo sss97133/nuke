@@ -244,6 +244,11 @@ INSERT INTO public.vehicle_observations (id, vehicle_id, kind, source_url, extra
   '2026-10-29T22:19:13Z', '{"image_id":"50000000-0000-0000-0000-00000000000a","claim_role":"engine_block_casting","engine_block_casting":"9990002","engine_size":"455","engine_type":"Pontiac V8","block_casting_year":1970,"factory_configuration_status":"not_original_engine"}', NULL, NULL),
  ('60000000-0000-0000-0000-00000000001b', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'engine_block_decode_v1',
   '2026-10-29T22:15:30Z', '{"image_id":"50000000-0000-0000-0000-000000000010","claim_role":"engine_code_stamp","engine_code":"ZZ","engine_size":"455","factory_configuration_status":"not_original_engine"}', NULL, NULL),
+ -- A second role read from the block photo (one witness, not two), and a roled note this reader does not map.
+ ('60000000-0000-0000-0000-00000000001c', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'engine_block_decode_v1',
+  '2026-10-29T22:19:13Z', '{"image_id":"50000000-0000-0000-0000-00000000000a","claim_role":"engine_block_casting_dossier_fields","engine_block_casting":"9990002","engine_displacement_l":7.46,"engine_configuration":"V8","factory_configuration_status":"not_original_engine"}', NULL, NULL),
+ ('60000000-0000-0000-0000-00000000001d', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'photo_map_harvest_v1',
+  '2026-10-28T17:18:06Z', '{"image_id":"50000000-0000-0000-0000-00000000000b","claim_role":"inferred","engine_size":"350","transmission":"automatic"}', NULL, NULL),
  -- v2: a listing claim that the transmission is automatic.
  ('60000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000002', 'specification',
   'https://fixture-auction.example/lot/1', 'fixture_listing_property_v1', '2026-10-01T00:00:00Z',
