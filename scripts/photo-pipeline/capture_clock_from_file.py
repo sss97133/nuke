@@ -151,9 +151,9 @@ def main():
         if a.correct_naive_utc:
             rec['writable']=src in ('file_exif','zone_fallback_la') and bool(dto) and change
         else:
-            # only a camera original is written: file EXIF clock + camera Make. XMP dates (screenshots, edited graphics) are
+            # only a camera original is written: file EXIF DateTimeOriginal (Make is optional). XMP dates (screenshots, edited graphics) are
             # reported in the replay but never written.
-            rec['writable']=src=='file_exif' and bool(keys.get('Make'))
+            rec['writable']=src=='file_exif' and bool(keys.get('DateTimeOriginal'))
         rec['taken_at_change']=change; summary['taken_at_changes']+=change; summary['writable']+=rec['writable']
         summary['writable_changes']+=rec['writable'] and change
         out.write(json.dumps(rec)+'\n')
