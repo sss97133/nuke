@@ -978,7 +978,7 @@ BEGIN
   PERFORM public.t_assert(NOT (i ? 'availability') AND i->'rule' = 'null', 'no decode: no availability, no rule');
 END $$;
 RESET ROLE;
--- 6. 20261116053000: plain labels for the codes items carry. Every viewer's items are byte-identical apart from
+-- 6. 20261116053700: plain labels for the codes items carry. Every viewer's items are byte-identical apart from
 -- rule.label on a labelled rule key, value_label on a source whose value is a labelled reading value, and the examined
 -- result reading the label of its code. A code with no label stays as it is.
 CREATE TABLE public.t_label_snap (vid uuid, dim text, doc jsonb);
@@ -1001,8 +1001,8 @@ FROM unnest(ARRAY['10000000-0000-0000-0000-000000000001', '10000000-0000-0000-00
                   '10000000-0000-0000-0000-000000000003']::uuid[]) v,
      unnest(ARRAY['year', 'make', 'model', 'body_style', 'trim', 'engine', 'transmission', 'drivetrain']) d;
 RESET ROLE;
-\ir ../migrations/20261116053000_vocabulary_labels.sql
-\ir ../migrations/20261116053000_vocabulary_labels.sql
+\ir ../migrations/20261116053700_vocabulary_labels.sql
+\ir ../migrations/20261116053700_vocabulary_labels.sql
 DO $$ BEGIN
   PERFORM public.t_assert((length(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure))
       - length(replace(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure), 'vocabulary_labels_v1', '')))
