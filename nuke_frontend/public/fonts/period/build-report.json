@@ -26,5 +26,12 @@
   "cmap": 70,
   "missing": [],
   "emptyOutlines": []
+ },
+ "nuke_frontend/public/fonts/period/firebird-1971-script/Firebird1971Script-Regular.otf": {
+  "file": "Firebird1971Script-Regular.otf",
+  "glyphs": 39,
+  "cmap": 38,
+  "missing": [],
+  "emptyOutlines": []
  }
 }
