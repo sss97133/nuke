@@ -9,7 +9,8 @@
 -- 20261116012000 (both functions in PL/pgSQL) changes none of it; every assertion below runs against it.
 -- 20261116026000 (the fold tests the photo's point, marker photo_gps_cover_v1) changes none of these answers either, a
 -- photo that loses its point stops counting, and with 20261116025000's partial covering index the photos lookup is an
--- index-only scan on it.
+-- index-only scan on it. 20261116035000 (one lateral probe per photo, marker photo_gps_cover_v2) changes none of the
+-- answers either; every assertion below runs against it.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
  IF current_database() NOT LIKE 'dm_refinement_%' OR to_regclass('public.vehicles') IS NOT NULL
@@ -87,12 +88,20 @@ GRANT SELECT ON public.base_location TO anon, authenticated;
 \ir ../migrations/20261116026000_vehicle_location_fold_gps_cover_predicate.sql
 \ir ../migrations/20261116026000_vehicle_location_fold_gps_cover_predicate.sql
 DO $$ BEGIN
+ ASSERT md5(pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) = '1055b8fed97e6c1cbcfb36a32479d07b',
+   '20261116035000 guard: the 026000 fold here has the md5 production has';
+END $$;
+\ir ../migrations/20261116035000_vehicle_location_fold_probe_per_photo.sql
+\ir ../migrations/20261116035000_vehicle_location_fold_probe_per_photo.sql
+DO $$ BEGIN
  ASSERT position('photo_gps_cover_v1' in pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) > 0,
    '026000: marker';
  ASSERT (SELECT l.lanname FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
          WHERE p.oid = 'public.vehicle_location_fold(uuid)'::regprocedure) = 'plpgsql', '026000: still plpgsql';
  ASSERT NOT has_function_privilege('anon','public.vehicle_location_fold(uuid)','execute')
    AND NOT has_function_privilege('authenticated','public.vehicle_location_fold(uuid)','execute'), '026000: grants kept';
+ ASSERT position('photo_gps_cover_v2' in pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) > 0,
+   '035000: marker';
 END $$;
 DO $$ BEGIN
  ASSERT (SELECT array_agg(l.lanname::text ORDER BY p.proname) FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
