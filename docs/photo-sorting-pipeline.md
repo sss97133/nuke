@@ -1293,6 +1293,52 @@ Just before apply, official `GROUP BY` (same query, taken during this work) was 
 Official `GROUP BY` at **09:40 AST** after apply (plan_cache_mode `force_custom_plan`): on_vehicle **14,348**, held 9,143, pulled 2,126, unverified **1,615**, private 1,255, duplicate 852, **no_file 275** (all reason `empty_url_relay`), non_vehicle 132, junk 3, **unsorted 0**, n 29,749. The 32 unverified → on_vehicle filings happened during the PR/CI window and are normal filings, not this definition. The definition move is unsorted 275 → no_file 275. The one already-filed empty-url relay row stayed on_vehicle. `capture_activity_blocks_v1` still reports 276 `clock_only` photos (every clocked empty-url row, including the filed one). No rows were written.
 
 
+## 18.19 visual_identity_recheck_v1: full visual re-check of the filed photos (10:46–11:32 AST, 12 Nov)
+
+Owner ask (12 Nov): "Can you muscle through the 14k". Producer: [#3453](https://github.com/sss97133/nuke/pull/3453), `scripts/photo-pipeline/visual_identity_recheck_v1.py` plus the operator stage scripts in `scripts/photo-pipeline/visual_identity_recheck_v1_stages/`. Work dir: `/workspace/sortrun/recheck14k`.
+
+**Universe.** This used the official `capture_ledger_states` snapshot at 10:50 AST: on_vehicle 14,348 and unverified 1,615. The fetch excluded 87 `is_sensitive` on_vehicle rows, any redacted row, empty or non-storage URLs, and the 452-id privacy-backup union. **Viewed: 14,257 on_vehicle + 1,614 unverified = 15,871 frames**, as 914 contact sheets on 135 vehicles.
+
+**Method.**
+1. Render thumbnails (width 360).
+2. Run local CLIP (local_image_analysis_v1 reader, ViT-B/32). It records each frame's same-vehicle 5th-nearest-neighbour isolation as context only.
+3. First look: one `claude -p --allowedTools Read` call per sheet (6 references + ≤20 candidates), prompt `vir1-sheet-20261112a`. References are capture-set-linked exteriors when the vehicle has ≥4 (379 sheets). Otherwise they are the most typical CLIP exteriors (526 sheets); 9 sheets had no reference. A flag requires a hard visible clue. Technician context (engine bays, parts, rust, shop, paperwork, repaint) is explicitly "belongs".
+4. Second look: each `wrong_vehicle` / `unrelated` flag is re-asked alone at width 900 next to the references, without the first clue (prompt `vir1-single-20261112a`).
+5. A third look by hand on a review sheet of every two-look candidate before any write.
+6. Holds go only through `hold_vehicle_images_for_review`. Each run covers one vehicle, at most 50 frames. `granted_by` is `skylar-williams:t288u`. The full pre-hold rows are backed up to `recheck14k/apply1/backups/<run>.json` first. `p_method` is `visual_identity_gate:visual_identity_recheck_v1`, and the signals carry both clues, the references, the reference basis, the prompt ids and the CLIP isolation.
+
+**Precision (held out, frozen before any verdict was read).** There are effectively no owner labels for this class: 1 `user_confirmed_vehicle` row in the universe. `capture_set_review` has no resolver column. Owner labels were in any case never inputs. Calibration was built instead from 10 vehicles with ≥20 capture-set links, as 20 sheets × 2 reference modes (capture-link refs and CLIP-medoid refs) = 40 sheets / 792 items:
+- belongs: 316 capture-set-linked frames per mode.
+- not: 79 per mode, made of 72 other-vehicle linked frames (same year/make/model excluded, so duplicate vehicle records are not counted as mismatches) and 8 earlier reasoned misattribution pulls still carrying this vehicle_id.
+
+Results:
+- First look: 112/113 flags correct, recall 0.71.
+- Both looks: **112/112 (precision 1.00, Wilson 95% low bound 0.967)**, recall 0.71. The one first-look false flag (a black car's engine bay with a silver panel) was rejected by the second look.
+
+**Real-set result.**
+- First-look flags: on_vehicle 165 wrong/unrelated + 15 personal; unverified 162 + 34 personal.
+- The second look agreed on 79 on_vehicle frames (it rejected 86).
+- The hand third look agreed on **56** and skipped 23 as not hard enough. The skips were: K2500 dealer-lot frames where the subject could be this truck; 3D renders of a K5 Blazer (same model); tan Bronco frames that may be this Bronco before paint; a shipping label and a map screenshot that may be trip/parts evidence; a shop wall; white/cream trucks in poor light.
+- So the two-look gate's precision on the real set is about 71% clear-cut. That is below the 95% bar, so **do not auto-apply two-look candidates; a third look stays required.** The calibration overstates real precision because planted other-vehicle exteriors are easier than real-world renders, lot photos and same-model look-alikes.
+
+**Applied (11:29 AST), all verified `review_needed`.** Rollback for each run: `select revert_vehicle_image_review_hold('<run>', null, true);`
+
+| Run | Vehicle | Held | What |
+|---|---|---:|---|
+| `visual_identity_recheck_v1-e08bf694-20261112a` | 1977 Blazer | 20 | 3D renders of a two-tone squarebody pickup (bed, chassis, interior); a phone screenshot of a white truck |
+| `visual_identity_recheck_v1-b5a24e45-20261112a` | 1987 V3500 Dually | 13 | other crew-cab / dually listings and social screenshots (blue, red/white, black, grey) |
+| `visual_identity_recheck_v1-a90c008a-20261112a` | 1983 K2500 | 12 | hot-rod roadster, modern silver SUV body/grille/seat, tan squarebody single-cabs, an aircraft and a propeller |
+| `visual_identity_recheck_v1-043c6d8b-20261112a` | 1973 Charger 318 | 8 | web search-result screenshots of other Chargers |
+| `visual_identity_recheck_v1-83f6f033-20261112a` | 1966 Mustang 10A | 1 | orange International Scout |
+| `visual_identity_recheck_v1-b1edd5c1-20261112a` | 1989 R3500 | 1 | white truck at sunset (the record is red) |
+| `visual_identity_recheck_v1-cf566074-20261112a` | 1967 GTO | 1 | red crew-cab pickup |
+
+**Unverified second pass (information only, no write).** 139 of the 1,614 frames already in review were judged not-this-vehicle by both looks. They stay in review; this producer does not pull (`rejected_misattributed`). Their list is `recheck14k/first_flags.json` joined with `second_w*.jsonl`.
+
+**Personal (log only).** 52 frames (15 on_vehicle, 37 unverified) were judged personal. They were not held, promoted or hidden by this path; the list is `recheck14k/personal_log.json`. They are a candidate input for the existing `set_image_sensitivity` → `privacy_promote_v1` path under the Nov 12 activity-evidence rule (keep the row and its timestamps).
+
+**Ledger after apply (official, 11:31 AST):** on_vehicle **14,292** (−56), unverified **1,671** (+56), held 9,143, pulled 2,126, private 1,255, duplicate 852, no_file 275, non_vehicle 132, junk 3, **unsorted 0**, n 29,749.
+
 ## 19. Known gaps and next work
 
 
@@ -1355,6 +1401,7 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3442](https://github.com/sss97133/nuke/pull/3442) | review jp overrides and no-clock left-outs | Open, **applied live** ~08:47 AST 12 Nov; signed run `a2440000-…000002` routed 29 / 8 reviews | jp override + no-clock review |
 | [#3444](https://github.com/sss97133/nuke/pull/3444) | privacy_from_document_ocr_v1 | Open, **applied live** ~09:13 AST 12 Nov; signed run `a2450000-…000002` (4 private, 2 non_vehicle) | OCR identity → private; invitations → non_vehicle |
 | [#3446](https://github.com/sss97133/nuke/pull/3446) | no_file ledger state for empty-url relay | Open, **applied live** ~09:40 AST 12 Nov (definition only; states md5 `058bf0ef`, frames `a557fbd3`) | empty_url relay → no_file; auto-flip if a URL arrives |
+| [#3453](https://github.com/sss97133/nuke/pull/3453) | visual_identity_recheck_v1 | Open; script only (no migration). First run **applied live** 11:29 AST 12 Nov: 7 runs, 56 holds | full two-look visual re-check of filed photos; capped signed revertible holds |
 
 ## 21. Unverified or out of scope in this writing
 
@@ -1362,7 +1409,7 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Visual confirmation of the 18 `20261110b` holds was not repeated here; runs, backups, and the ledger delta were verified.
 - `#3212` and the full set of open draft PRs were not re-surveyed.
 - Capture-set joins for ssd_blast / drop-folder / image_intake / cascade in the pollution audit were not finished (timeout / UNION type mismatch into the outage).
-- `visual_identity_recheck_v1` is still a design, not a shipped producer. Stamp-DTO-without-Make (#3298) is now live for the 4 rows.
+- `visual_identity_recheck_v1` shipped as #3453 (open; first run applied 12 Nov, 56 holds). Its CI step is not in the PR because the push token lacks workflow scope. Stamp-DTO-without-Make (#3298) is now live for the 4 rows.
 - Whether every remaining-vehicle cover with `zone=null` is still the same exterior checked at 09:56 was not re-opened.
 - Mac online/offline state and reader/drain pids were not re-checked at 10:11 AST; last known healthy pids are in the 09:58 progress note.
 - The exact Postgres `granted_by` column constraint was not re-read in this writing; keeping it non-null is a standing operating rule, and the ownership rederive producer keeps the existing value.
