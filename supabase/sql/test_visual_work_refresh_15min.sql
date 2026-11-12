@@ -1,5 +1,5 @@
 -- Disposable synthetic contract for 20261116030000: the input digest is byte-identical after its receipts lookup
--- changes, the refresh rebuilds a row within 20 minutes of valid_until, and the partial index exists and is valid.
+-- changes, the refresh rebuilds a row within 20 minutes of valid_until, and the cron runs every 15 minutes.
 \set ON_ERROR_STOP on
 \ir test_visual_work_ledger_image_map.sql
 
@@ -12,14 +12,11 @@ DO $$ BEGIN
  PERFORM public.visual_work_build_log_refresh();
 END $$;
 
-\ir ../migrations/20261116030000_visual_work_refresh_15min_index.sql
+\ir ../migrations/20261116030000_visual_work_refresh_15min.sql
 
 DO $$
 DECLARE v uuid:='10000000-0000-0000-0000-000000000001'; r jsonb;
 BEGIN
- ASSERT (SELECT indisvalid FROM pg_index WHERE indexrelid=to_regclass('public.idx_vobs_visual_work')),'index valid';
- ASSERT (SELECT pg_get_expr(indpred,indrelid) FROM pg_index WHERE indexrelid=to_regclass('public.idx_vobs_visual_work'))
-  LIKE '%work_record%visual_work_v1%','index predicate';
  -- The digest hashes the same rows: every vehicle's value is unchanged.
  ASSERT NOT EXISTS (SELECT 1 FROM fifteen_before_digest b WHERE b.d IS DISTINCT FROM public.visual_work_build_log_inputs_digest(b.id)),
   'digest values unchanged';
@@ -40,4 +37,4 @@ BEGIN
   ASSERT (SELECT schedule FROM cron.job WHERE jobname='visual-work-build-log-refresh')='11-59/15 * * * *';
  END IF;
 END $$;
-SELECT 'visual work refresh 15 min index contract passed' AS result;
+SELECT 'visual work refresh 15 min contract passed' AS result;
