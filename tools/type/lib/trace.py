@@ -12,6 +12,7 @@ no micro segments) and `fidelity` scores the shipped outline against the source 
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import re
 import subprocess
@@ -64,6 +65,7 @@ class Source:
     k: int = 8           # upsample factor
     blur: float = 0.55   # Gaussian sigma in source pixels
     shear: float = 0.0   # x shift per unit height removed (for photographed perspective), source px per px
+    shear_pivot_px: float | None = None   # row the shear turns about (default: the baseline)
     _arr: np.ndarray | None = field(default=None, repr=False)
 
     @property
@@ -76,6 +78,13 @@ class Source:
             a = np.clip((a - self.lo) / (self.hi - self.lo), 0, 1)
             if self.tilt_deg:
                 a = ndimage.rotate(a, self.tilt_deg, reshape=False, order=1, mode='constant', cval=0)
+            if self.shear:
+                # remove a photographed lean: a point h px above the baseline sits shear*h px to the left in the
+                # photo; move it back right. The image grows on the right so nothing is cut.
+                pv = self.baseline_px if self.shear_pivot_px is None else self.shear_pivot_px
+                pad = int(math.ceil(abs(self.shear) * pv)) + 2
+                a = np.pad(a, ((0, 0), (0, pad)))
+                a = ndimage.affine_transform(a, [[1, 0], [self.shear, 1]], offset=[0, -self.shear * pv], order=1)
             self._arr = a
         return self._arr
 

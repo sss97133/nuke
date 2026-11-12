@@ -352,3 +352,69 @@ def fidelity(contours, target: np.ndarray, to_px):
     else:
         dev = mean = float('inf')
     return {'iou': round(float(iou), 4), 'maxDevPx': round(float(dev), 2), 'meanDevPx': round(float(mean), 3)}
+
+
+def straighten(contours, tol=12.0, snap_deg=2.0, min_len=60.0):
+    """Redraw the straight runs of a traced outline the way a hand redraw would: a run of lines and flat curves
+    whose nodes all sit within `tol` of the chord becomes one line, and a long line within `snap_deg` of vertical
+    or horizontal is set exactly upright or level (its neighbours' joining handles move with it)."""
+    out = []
+    for con in contours:
+        segs = list(con)
+        n = len(segs)
+        # 1. merge runs
+        def flat_enough(run):
+            a, b = run[0][1], run[-1][-1]
+            L = math.dist(a, b)
+            if L < 1e-6:
+                return False
+            for s in run:
+                for q in s[1:]:
+                    d = abs((b[0] - a[0]) * (a[1] - q[1]) - (a[0] - q[0]) * (b[1] - a[1])) / L
+                    if d > tol:
+                        return False
+            return True
+        # start at a node that is a corner of a curve (so a run is never split by the contour start)
+        start = next((i for i, s in enumerate(segs) if s[0] == 'curve'), 0)
+        segs = segs[start:] + segs[:start]
+        res = []
+        i = 0
+        while i < len(segs):
+            j = i + 1
+            if segs[i][0] == 'line' or _is_flat(segs[i], tol / 3):
+                while j < len(segs) and flat_enough(segs[i:j + 1]):
+                    j += 1
+            run = segs[i:j]
+            if len(run) > 1 or (run[0][0] == 'curve' and flat_enough(run) and _is_flat(run[0], tol / 3)):
+                res.append(('line', run[0][1], run[-1][-1]))
+            else:
+                res.append(run[0])
+            i = j
+        segs = res
+        # 2. snap long lines upright / level by moving their two nodes to the shared coordinate
+        nodes = [s[1] for s in segs]
+        m = len(segs)
+        for k, s in enumerate(segs):
+            if s[0] != 'line':
+                continue
+            a, b = s[1], s[2]
+            L = math.dist(a, b)
+            if L < min_len:
+                continue
+            ang = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])) % 180
+            if min(abs(ang - 90), 180) < snap_deg or abs(ang - 90) < snap_deg:
+                x = (a[0] + b[0]) / 2
+                nodes[k] = (x, nodes[k][1]); nodes[(k + 1) % m] = (x, nodes[(k + 1) % m][1])
+            elif ang < snap_deg or ang > 180 - snap_deg:
+                y = (a[1] + b[1]) / 2
+                nodes[k] = (nodes[k][0], y); nodes[(k + 1) % m] = (nodes[(k + 1) % m][0], y)
+        new = []
+        for k, s in enumerate(segs):
+            p0, p1 = nodes[k], nodes[(k + 1) % m]
+            if s[0] == 'line':
+                new.append(('line', p0, p1))
+            else:
+                d0 = (p0[0] - s[1][0], p0[1] - s[1][1]); d1 = (p1[0] - s[4][0], p1[1] - s[4][1])
+                new.append(('curve', p0, (s[2][0] + d0[0], s[2][1] + d0[1]), (s[3][0] + d1[0], s[3][1] + d1[1]), p1))
+        out.append(new)
+    return clean(out)

@@ -4,7 +4,8 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 font, out, *lines = sys.argv[1:]
-sizes = [120, 48, 18]
+import os
+sizes = [int(s) for s in os.environ.get("SIZES", "120,48,18").split(",")]
 rows = []
 for size in sizes:
     f = ImageFont.truetype(font, size, layout_engine=ImageFont.Layout.RAQM if ImageFont.core.HAVE_RAQM else ImageFont.Layout.BASIC)
