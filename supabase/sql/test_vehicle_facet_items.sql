@@ -1,8 +1,11 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_facet_items -f this-file.sql
 -- Proves the header facet items reader (vehicle_facet_items) and its place in vehicle_profile_read: VIN-decoded
--- identity items, engine as built vs current with a change, transmission reading / claim / conflict, derived gearing
--- from a cited rule row, missing items with needed evidence, location at area grain with no points for anyone, and a
--- private or deleted vehicle returning nothing to a logged-out viewer. Every fixture is synthetic.
+-- identity items, engine as built vs current with a change, claim-role photo readings (body tag, transmission stamp and
+-- castings, engine block) with uncertain characters as limitations, transmission reading / claim / conflict, derived
+-- gearing from a cited rule row and candidate ratio sets left uncomputed, missing items with needed evidence, location
+-- from the photo GPS fold recounted at read time (the same fixture and numbers as
+-- test_field_provenance_photo_location.sql) at area grain with no points for anyone, and a private or deleted vehicle
+-- returning nothing to a logged-out viewer. Every fixture is synthetic.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -32,7 +35,7 @@ CREATE TABLE public.vehicles (
   transmission text, transmission_model text, transmission_code text, mileage integer, mileage_source text,
   canonical_body_style text, body_style text, engine_size text, engine_type text, engine_code text,
   cam_type text, intake_type text, carburetor_type text, drivetrain text, rear_axle_ratio numeric, rear_axle_type text,
-  tire_spec_rear text, is_replica boolean,
+  tire_spec_rear text, is_replica boolean, bore_mm numeric, stroke_mm numeric,
   city text, state text, location text, listing_location text, bat_location text, discovery_url text, listing_title text);
 CREATE TABLE public.field_evidence (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, field_name text, proposed_value text,
@@ -54,7 +57,9 @@ CREATE TABLE public.vehicle_observations (
   extraction_method text, observed_at timestamptz, is_superseded boolean DEFAULT false, structured_data jsonb,
   confidence_score numeric, ingested_at timestamptz DEFAULT now(), source_id uuid, property_id uuid,
   source_observation_id uuid);
-CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid, is_sensitive boolean DEFAULT false);
+CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid, image_url text DEFAULT 'https://x.invalid/i.jpg',
+  is_sensitive boolean DEFAULT false, is_superseded boolean DEFAULT false, is_duplicate boolean DEFAULT false,
+  vision_gate_status text, image_vehicle_match_status text, taken_at timestamptz, latitude numeric, longitude numeric);
 CREATE TABLE public.vehicle_location_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source_type text, source_platform text,
   source_url text, observed_at timestamptz, location_text_raw text, location_text_clean text, country_code text,
@@ -132,8 +137,8 @@ REVOKE SELECT ON public.vehicles FROM anon, authenticated;
 GRANT SELECT (id, user_id, owner_id, uploaded_by, entry_type, is_public, deleted_at, vin, year, make, model,
   normalized_model, series, trim, transmission, transmission_model, transmission_code, mileage, mileage_source,
   canonical_body_style, body_style, engine_size, engine_type, engine_code, cam_type, intake_type, carburetor_type,
-  drivetrain, rear_axle_ratio, rear_axle_type, tire_spec_rear, city, state, location, listing_location, bat_location,
-  discovery_url, listing_title) ON public.vehicles TO anon, authenticated;
+  drivetrain, rear_axle_ratio, rear_axle_type, tire_spec_rear, bore_mm, stroke_mm, city, state, location, listing_location,
+  bat_location, discovery_url, listing_title) ON public.vehicles TO anon, authenticated;
 
 \ir ../migrations/20261013143000_vehicle_profile_read.sql
 \ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
@@ -152,8 +157,8 @@ GRANT SELECT (id, user_id, owner_id, uploaded_by, entry_type, is_public, deleted
 \ir ../migrations/20261110093000_vehicles_is_replica_column_grant.sql
 \ir ../migrations/20261110100000_listing_submission_state.sql
 -- Applied twice: the second run must be a no-op.
-\ir ../migrations/20261116100000_vehicle_facet_items.sql
-\ir ../migrations/20261116100000_vehicle_facet_items.sql
+\ir ../migrations/20261116005000_vehicle_facet_items.sql
+\ir ../migrations/20261116005000_vehicle_facet_items.sql
 
 -- Seeds. v1 a documented VIN-decoded car; v2 listing-sourced with a transmission conflict and cited gearing;
 -- v3 thin evidence; v4 private; v5 deleted.
@@ -167,8 +172,9 @@ INSERT INTO public.vehicles (id, user_id, vin, year, make, model, series, trim, 
  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'ZZ87D3Q000001', 1973, 'Pontiac',
   'Firebird', 'Firebird', 'Trans Am', true, 'COUPE', '455 V8', 'manual', 'Boulder City', 'NV');
 INSERT INTO public.vehicles (id, year, make, model, transmission, transmission_model, rear_axle_ratio, tire_spec_rear,
-  listing_location) VALUES
- ('10000000-0000-0000-0000-000000000002', 1970, 'Synthetic', 'Roadster', 'Automatic', 'TH400', 3.42, 'P225/70R15', 'Austin, TX');
+  listing_location, engine_type, bore_mm, stroke_mm) VALUES
+ ('10000000-0000-0000-0000-000000000002', 1970, 'Synthetic', 'Roadster', 'Automatic', 'TH400', 3.42, 'P225/70R15', 'Austin, TX',
+  'V8', 101.6, 76.2);
 INSERT INTO public.vehicles (id, year, make, model) VALUES ('10000000-0000-0000-0000-000000000003', 1990, 'Acme', 'Thing');
 INSERT INTO public.vehicles (id, user_id, is_public, year, make, model, transmission) VALUES
  ('10000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000004', false, 1988, 'Chevrolet', 'Blazer', 'automatic');
@@ -177,7 +183,19 @@ INSERT INTO public.vehicles (id, user_id, deleted_at, year, make, model) VALUES
 INSERT INTO public.vehicle_images (id, vehicle_id) VALUES
  ('50000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-000000000001'),
  ('50000000-0000-0000-0000-00000000000b', '10000000-0000-0000-0000-000000000001'),
- ('50000000-0000-0000-0000-00000000000c', '10000000-0000-0000-0000-000000000001');
+ ('50000000-0000-0000-0000-00000000000c', '10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-00000000000d', '10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-00000000000e', '10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-00000000000f', '10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001');
+-- GPS photos of v1, as in test_field_provenance_photo_location.sql: two on day 1, one on day 2, and a sensitive one
+-- listed on day 2 that no reader may count.
+INSERT INTO public.vehicle_images (id, vehicle_id, taken_at, latitude, longitude, is_sensitive) VALUES
+ ('55555555-5555-5555-5555-000000000001', '10000000-0000-0000-0000-000000000001', '2026-10-06T15:00Z', 35.97261, -114.85575, false),
+ ('55555555-5555-5555-5555-000000000002', '10000000-0000-0000-0000-000000000001', '2026-10-06T18:00Z', 35.97301, -114.85601, false),
+ ('55555555-5555-5555-5555-000000000003', '10000000-0000-0000-0000-000000000001', '2026-10-07T01:00Z', 35.97261, -114.85575, false),
+ ('55555555-5555-5555-5555-000000000004', '10000000-0000-0000-0000-000000000001', '2026-10-07T02:00Z', 35.97261, -114.85575, true);
 
 INSERT INTO public.vehicle_observations (id, vehicle_id, kind, source_url, extraction_method, observed_at, structured_data,
   source_id, property_id) VALUES
@@ -200,6 +218,32 @@ INSERT INTO public.vehicle_observations (id, vehicle_id, kind, source_url, extra
   'https://example.org/gm-vin-chart', 'vin_decode_gm_chart_v1', '2026-11-10T17:00:00Z',
   '{"vin":"ZZ37X4Q000009","make":"Pontiac","year":1974,"model":"Firebird","decode_rule":"gm_1972_1980_car_vin_v1"}',
   '30000000-0000-0000-0000-000000000001', NULL),
+ -- Claim-role photo readings (synthetic codes). Body tag on image d, read again on image e by the same reader.
+ ('60000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","claim_role":"cowl_tag_style","fisher_style_number":"ZFS00","body_style":"Hardtop coupe","reviewed_url":"https://x.invalid/users/private/path.jpg"}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","claim_role":"cowl_tag_body_number","fisher_body_number":"100001","uncertain_characters":"fourth digit 0 or 8"}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000013', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","claim_role":"cowl_tag_trim","interior_trim_code":"999","seat_code":"Z00"}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000014', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","claim_role":"original_transmission_evidence","original_transmission":"unknown","proof_needed":["fixture build sheet","fixture billing history"]}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000015', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","claim_role":"cowl_tag_option_codes","transmission_on_tag":"not_recorded"}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000016', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:24:01Z', '{"image_id":"50000000-0000-0000-0000-00000000000e","claim_role":"cowl_tag_transcription","fisher_style_number":"ZFS00","interior_trim_code":"999","seat_code":"Z00"}', NULL, NULL),
+ -- Transmission: ID stamp on image f, case casting on image c (the image the interactive reader also read).
+ ('60000000-0000-0000-0000-000000000017', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'trans_id_stamp_decode_v1',
+  '2026-10-28T17:09:34Z', '{"image_id":"50000000-0000-0000-0000-00000000000f","claim_role":"transmission_id_stamp","transmission_code":"Z0101","transmission_assembly_date":"January 1 (fixture)","transmission":"Muncie 4-speed manual","factory_configuration_status":"not_original_unit"}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000018', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'trans_id_stamp_decode_v1',
+  '2026-10-28T17:09:31Z', '{"image_id":"50000000-0000-0000-0000-00000000000c","claim_role":"transmission_case_model","case_casting":"9990001","transmission_model":"Fixture M20 or M21 (case)","transmission":"Muncie 4-speed manual","excluded_models":["M22"],"factory_configuration_status":"not_original_unit"}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000019', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'physical_transcription_v1',
+  '2026-10-28T17:11:29Z', '{"image_id":"50000000-0000-0000-0000-000000000011","claim_role":"transmission_bellhousing","bellhousing_casting":"999003","uncertain_characters":"first digit 5 or 6"}', NULL, NULL),
+ -- Engine: the block casting on image a (read before the interactive reading of the same photo), the code stamp on
+ -- image 10.
+ ('60000000-0000-0000-0000-00000000001a', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'engine_block_decode_v1',
+  '2026-10-29T22:19:13Z', '{"image_id":"50000000-0000-0000-0000-00000000000a","claim_role":"engine_block_casting","engine_block_casting":"9990002","engine_size":"455","engine_type":"Pontiac V8","block_casting_year":1970,"factory_configuration_status":"not_original_engine"}', NULL, NULL),
+ ('60000000-0000-0000-0000-00000000001b', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'engine_block_decode_v1',
+  '2026-10-29T22:15:30Z', '{"image_id":"50000000-0000-0000-0000-000000000010","claim_role":"engine_code_stamp","engine_code":"ZZ","engine_size":"455","factory_configuration_status":"not_original_engine"}', NULL, NULL),
  -- v2: a listing claim that the transmission is automatic.
  ('60000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000002', 'specification',
   'https://fixture-auction.example/lot/1', 'fixture_listing_property_v1', '2026-10-01T00:00:00Z',
@@ -226,21 +270,48 @@ INSERT INTO public.field_evidence (vehicle_id, field_name, proposed_value, sourc
  -- v2: a seller says manual.
  ('10000000-0000-0000-0000-000000000002', 'transmission', 'Manual', 'fixture_dealer', 70, '2026-09-01T00:00:00Z', 'accepted', NULL, NULL);
 
-INSERT INTO public.vehicle_location_observations (vehicle_id, source_type, source_platform, observed_at, location_text_raw,
-  location_text_clean, country_code, region_code, city, postal_code, latitude, longitude, precision, confidence, zcta,
-  county_fips, county_name) VALUES
- ('10000000-0000-0000-0000-000000000001', 'photo_gps', 'vehicle_images', '2026-11-08T12:00:00Z', '123 Fixture Lane',
-  NULL, 'US', 'NV', 'Boulder City', '89005', 35.9712345, -114.8345678, 'gps', 0.9, '89005', '32003', 'Clark County'),
- ('10000000-0000-0000-0000-000000000001', 'photo_gps', 'vehicle_images', '2026-11-09T12:00:00Z', '123 Fixture Lane',
-  NULL, 'US', 'NV', 'Boulder City', '89005', 35.9712399, -114.8345611, 'gps', 0.9, '89005', '32003', 'Clark County'),
- ('10000000-0000-0000-0000-000000000001', 'listing', 'fixture_auction', '2026-06-01T00:00:00Z', 'Boulder City, Nevada',
-  'Boulder City, NV', 'US', 'NV', 'Boulder City', NULL, 35.97, -114.83, 'city', 0.8, '89005', '32003', 'Clark County'),
- ('10000000-0000-0000-0000-000000000004', 'photo_gps', 'vehicle_images', '2026-11-08T12:00:00Z', NULL,
-  NULL, 'US', 'NV', 'Henderson', '89012', 36.01, -115.01, 'gps', 0.9, '89012', '32003', 'Clark County');
+-- The photo GPS fold's admitted rows for v1 (as test_field_provenance_photo_location.sql seeds them), a withdrawn row,
+-- a legacy point row and a sighting the reader never reads, and listings.
+INSERT INTO public.vehicle_location_observations (id, vehicle_id, source_type, source_platform, observed_at,
+  location_text_raw, location_text_clean, country_code, region_code, city, postal_code, latitude, longitude, precision,
+  confidence, zcta, county_fips, county_name, metadata) VALUES
+ ('66666666-6666-6666-6666-000000000001', '10000000-0000-0000-0000-000000000001', 'exif', 'photo_exif', '2026-10-06T18:00Z',
+  NULL, 'Boulder City, NV', 'US', 'NV', 'Boulder City', NULL, NULL, NULL, 'city', 0.7, NULL, '32003', 'Clark',
+  '{"method":"photo_gps_fold_v1","utc_day":"2026-10-06","photos":2,"image_ids":["55555555-5555-5555-5555-000000000001","55555555-5555-5555-5555-000000000002"]}'),
+ ('66666666-6666-6666-6666-000000000002', '10000000-0000-0000-0000-000000000001', 'exif', 'photo_exif', '2026-10-07T01:00Z',
+  NULL, 'Boulder City, NV', 'US', 'NV', 'Boulder City', NULL, NULL, NULL, 'city', 0.7, NULL, '32003', 'Clark',
+  '{"method":"photo_gps_fold_v1","utc_day":"2026-10-07","photos":1,"image_ids":["55555555-5555-5555-5555-000000000003","55555555-5555-5555-5555-000000000004"]}'),
+ ('66666666-6666-6666-6666-000000000003', '10000000-0000-0000-0000-000000000001', 'exif', 'photo_exif', '2026-10-08T01:00Z',
+  NULL, 'Henderson, NV', 'US', 'NV', 'Henderson', NULL, NULL, NULL, 'city', 0, NULL, '32003', 'Clark',
+  '{"method":"photo_gps_fold_v1","utc_day":"2026-10-08","image_ids":["55555555-5555-5555-5555-000000000001"],"withdrawn_at":"2026-11-11"}'),
+ ('66666666-6666-6666-6666-000000000005', '10000000-0000-0000-0000-000000000001', 'photo_gps', 'vehicle_images', '2026-11-08T12:00:00Z',
+  '123 Fixture Lane', NULL, 'US', 'NV', 'Pahrump', '89048', 36.2091234, -115.9834567, 'gps', 0.9, '89048', '32023', 'Nye', '{}'),
+ ('66666666-6666-6666-6666-000000000006', '10000000-0000-0000-0000-000000000001', 'sighting', 'photo_exif', '2026-11-08T12:00:00Z',
+  NULL, NULL, 'US', 'NV', NULL, NULL, 36.2091234, -115.9834567, 'gps', 0.9, NULL, NULL, NULL, '{}'),
+ ('66666666-6666-6666-6666-000000000007', '10000000-0000-0000-0000-000000000001', 'listing', 'fixture_auction', '2026-06-01T00:00:00Z',
+  'Boulder City, Nevada', 'Boulder City, NV', 'US', 'NV', 'Boulder City', NULL, 35.97, -114.83, 'city', 0.8, '89005', '32003', 'Clark', '{}'),
+ ('66666666-6666-6666-6666-000000000008', '10000000-0000-0000-0000-000000000001', 'listing', 'bat', '2026-05-01T00:00:00Z',
+  'Reno, Nevada', 'Reno, NV', 'US', 'NV', 'Reno', NULL, NULL, NULL, 'city', 0.8, NULL, NULL, NULL, '{}'),
+ ('66666666-6666-6666-6666-000000000009', '10000000-0000-0000-0000-000000000004', 'listing', 'fixture_auction', '2026-11-08T12:00:00Z',
+  NULL, 'Henderson, NV', 'US', 'NV', 'Henderson', '89012', 36.01, -115.01, 'city', 0.9, '89012', '32003', 'Clark', '{}');
 
 INSERT INTO public.vehicle_decode_rules (rule_key, make, code, year_min, year_max, value, citation_url, citation_title) VALUES
  ('transmission_gear_ratios', NULL, 'TH400', 1964, 1990, '{"gears":[2.48,1.48,1.00],"reverse":2.08}',
-  'https://example.org/th400-ratios', 'Fixture ratio table');
+  'https://example.org/th400-ratios', 'Fixture ratio table'),
+ -- Two ratio sets the v1 case reading could be: shown as candidates, never computed over.
+ ('transmission_gear_ratios', NULL, 'M20', 1963, 1965, '{"gears":[2.56,1.91,1.48,1.00]}',
+  'https://example.org/muncie-ratios', 'Fixture Muncie table'),
+ ('transmission_gear_ratios', NULL, 'M21', 1963, 1965, '{"gears":[2.20,1.64,1.28,1.00]}',
+  'https://example.org/muncie-ratios', 'Fixture Muncie table');
+-- One current row per rule, scope and citation.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO public.vehicle_decode_rules (rule_key, code, year_min, year_max, value, citation_url) VALUES
+      ('transmission_gear_ratios', 'M20', 1963, 1965, '{"gears":[1]}', 'https://example.org/muncie-ratios');
+    RAISE EXCEPTION 'FAIL: a duplicate current rule row was admitted';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+END $$;
 
 CREATE FUNCTION public.t_assert(p_ok boolean, p_what text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF NOT coalesce(p_ok, false) THEN RAISE EXCEPTION 'FAIL: %', p_what; END IF; END $$;
@@ -299,37 +370,76 @@ BEGIN
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'body_style', 'body_style.recorded');
   PERFORM public.t_assert(i->>'status' = 'established' AND i->>'value' = 'Coupe', 'COUPE record and Coupe decode agree; decode leads');
 
+  -- Body tag readings: as-built items with their image witness; the same reader on two photos stays a reading.
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'body_style', 'body_style.body_tag');
+  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = 'ZFS00' AND i->>'facet' = 'as_built'
+    AND jsonb_array_length(i->'sources') = 2, 'body tag style number, one reader on two photos');
+  PERFORM public.t_assert(i::text NOT LIKE '%x.invalid/users%', 'a reading''s stored URLs never reach the item');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'body_style', 'body_style.body_number');
+  PERFORM public.t_assert(i->>'value' = '100001' AND i#>>'{sources,0,limitation}' = 'uncertain characters: fourth digit 0 or 8',
+    'uncertain characters travel as a limitation');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'trim', 'trim.as_built.interior');
+  PERFORM public.t_assert(i->>'value' = '999' AND i#>>'{sources,0,decoded,seat_code}' = 'Z00', 'trim code with its seat code');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'body_style', 'body_style.build_date');
+  PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' IS NOT NULL, 'unread build date is missing');
+
   -- Engine: as built vs current, with the change derived.
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'engine', 'engine.as_built.engine');
-  PERFORM public.t_assert(i->>'status' = 'established' AND i->>'value' = '250' AND i->>'normalized' = '4.1'
-    AND i#>>'{rule,code}' = 'D', 'as-built engine from the VIN engine code');
+  PERFORM public.t_assert(i->>'status' = 'established' AND i->>'value' = '4.1' AND i->>'stated' = '250' AND i->>'unit' = 'L'
+    AND i#>>'{rule,code}' = 'D', 'as-built engine from the VIN engine code, in liters');
   PERFORM public.t_assert(jsonb_array_length(i->'sources') = 1, 'factory_engine mirror counts once');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'engine', 'engine.current.displacement');
-  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'normalized' = '7.5', 'one photo of the block is a reading');
-  PERFORM public.t_assert(i->>'needed' IS NOT NULL, 'a reading names what would establish it');
+  PERFORM public.t_assert(i->>'status' = 'established' AND i->>'value' = '7.5' AND i->>'unit' = 'L',
+    'two photos read by two readers establish 7.5 L');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(i->'sources') s WHERE s->>'value' = '232'),
     'superseded testimony is not read');
   PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(i->'sources') s
     WHERE s#>>'{witness,kind}' = 'image' AND s#>>'{witness,id}' = '50000000-0000-0000-0000-00000000000a'), 'photo witness attached');
+  PERFORM public.t_assert((SELECT count(*) FROM jsonb_array_elements(i->'sources') s
+    WHERE s#>>'{witness,id}' = '50000000-0000-0000-0000-00000000000a') = 1, 'one photo is one witness however many readers');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'engine', 'engine.derived.changed');
-  PERFORM public.t_assert(i->>'value' = 'true' AND i->>'status' = 'reading' AND i->>'facet' = 'derived'
-    AND i#>>'{equation,as_built_l}' = '4.1' AND i#>>'{equation,current_l}' = '7.5', 'engine change derived with its equation');
+  PERFORM public.t_assert(i->>'value' = 'true' AND i->>'status' = 'established' AND i->>'facet' = 'derived'
+    AND i#>>'{equation,as_built_l}' = '4.1' AND i#>>'{equation,current_l}' = '7.5' AND i->'needed' = 'null'
+    AND jsonb_array_length(i->'sources') = 2, 'engine change derived, with the not-original readings as sources');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'engine', 'engine.current.family');
-  PERFORM public.t_assert(i->>'normalized' = 'V8' AND i->>'status' = 'claim', 'record-only family is a claim');
+  PERFORM public.t_assert(i->>'normalized' = 'V8' AND i->>'status' = 'reading', 'block reading and record agree on V8');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'engine', 'engine.current.block_casting');
-  PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' = 'photo of the block casting number', 'missing casting');
+  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = '9990002'
+    AND i#>>'{sources,0,decoded,block_casting_year}' = '1970', 'block casting with its decoded year');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'engine', 'engine.current.engine_code_stamp');
+  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = 'ZZ', 'engine code stamp');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'engine', 'engine.derived.displacement_ci');
+  PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' = 'the current bore, stroke and cylinder count',
+    'no bore or stroke: no computed displacement');
+  i := public.t_item('10000000-0000-0000-0000-000000000002', 'engine', 'engine.derived.displacement_ci');
+  PERFORM public.t_assert(i->>'value' = '301.6' AND i->>'unit' = 'ci' AND i->>'status' = 'claim' AND (i#>>'{equation,cylinders}')::int = 8,
+    'displacement from bore, stroke and the family''s cylinder count');
 
-  -- Transmission: two readers on two photos establish the type; the case reading is the model.
+  -- Transmission: readers on several photos establish the type; the case reading is the model.
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.type');
-  PERFORM public.t_assert(i->>'status' = 'established' AND i->>'normalized' = 'manual', 'two independent readings establish manual');
+  PERFORM public.t_assert(i->>'status' = 'established' AND i->>'normalized' = 'manual', 'independent readings establish manual');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(i->'sources') s WHERE s->>'slug' = 'system_update'),
     'the record echo is not a source');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.model');
-  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = 'Muncie four-speed manual', 'case reading is the model');
+  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = 'Fixture M20 or M21 (case)'
+    AND i#>'{sources,0,decoded,excluded_models}' = '["M22"]'::jsonb, 'case reading is the model, as a candidate set');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.id_stamp');
-  PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' = 'photo of the transmission ID stamp', 'missing ID stamp');
+  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = 'Z0101', 'ID stamp reading');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.bellhousing_casting');
+  PERFORM public.t_assert(i->>'value' = '999003' AND i#>>'{sources,0,limitation}' LIKE '%first digit 5 or 6%', 'bellhousing, uncertain digit');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.tailhousing_casting');
+  PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' = 'photo of the tail housing casting number', 'missing tail housing');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.as_built.type');
+  PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' = 'fixture billing history; fixture build sheet'
+    AND jsonb_array_length(i->'examined') = 2, 'as-built transmission: examined, not stated, with the proof the reader names');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.derived.changed');
+  PERFORM public.t_assert(i->>'value' = 'true' AND i->>'status' = 'reading' AND jsonb_array_length(i->'sources') = 2,
+    'readers say the unit is not original: a reading of a change');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.gear_ratios');
-  PERFORM public.t_assert(i->>'status' = 'missing' AND i->'value' = 'null', 'no cited table for an unidentified model');
+  PERFORM public.t_assert(i->>'status' = 'missing' AND i->'value' = 'null' AND jsonb_array_length(i->'candidates') = 2
+    AND i->>'needed' = 'unit year or ratio-set identification', 'two candidate ratio sets: shown, not chosen');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.derived.final_drive');
+  PERFORM public.t_assert(i->>'status' = 'missing' AND i->'value' = 'null', 'nothing computed over candidates');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.derived.rpm_at_60');
   PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' IS NOT NULL AND i#>>'{equation,expression}' IS NOT NULL,
     'derived number missing with its equation and needed inputs');
@@ -341,7 +451,8 @@ BEGIN
     'every side carries its sources');
   i := public.t_item('10000000-0000-0000-0000-000000000002', 'transmission', 'transmission.current.gear_ratios');
   PERFORM public.t_assert(i->>'status' = 'claim' AND i->'value' = '[2.48, 1.48, 1.00]'::jsonb
-    AND i#>>'{rule,citation_url}' = 'https://example.org/th400-ratios', 'ratios from the cited table for the claimed model');
+    AND i#>>'{rule,rows,0,citation_url}' = 'https://example.org/th400-ratios'
+    AND NOT (i ? 'candidates'), 'ratios from the cited table for the claimed model');
   i := public.t_item('10000000-0000-0000-0000-000000000002', 'transmission', 'transmission.derived.final_drive');
   PERFORM public.t_assert(i->'value' = '[8.48, 5.06, 3.42]'::jsonb AND i->>'status' = 'claim', 'final drive per gear');
   i := public.t_item('10000000-0000-0000-0000-000000000002', 'transmission', 'transmission.derived.rpm_at_60');
@@ -350,22 +461,36 @@ BEGIN
 
   -- Thin evidence: every item is present, almost all missing, each with what would establish it.
   all_items := public.vehicle_facet_items('10000000-0000-0000-0000-000000000003');
-  PERFORM public.t_assert((SELECT count(*) FROM jsonb_each(all_items) e, jsonb_array_elements(e.value) x) = 46, 'fixed item list');
+  PERFORM public.t_assert((SELECT count(*) FROM jsonb_each(all_items) e, jsonb_array_elements(e.value) x) = 58, 'fixed item list');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_each(all_items) e, jsonb_array_elements(e.value) x
     WHERE x->>'status' = 'missing' AND nullif(x->>'needed', '') IS NULL), 'every missing item names its evidence');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_each(all_items) e, jsonb_array_elements(e.value) x
+    WHERE NOT (x ?& ARRAY['key', 'facet', 'value', 'unit', 'status', 'sources', 'rule', 'equation', 'needed'])),
+    'every item carries the spec shape');
 
-  -- Location: area grain only, no points, no raw text.
+  -- Location: the photo GPS fold recounted from visible photos, the same numbers get_field_provenance('location')
+  -- returns for this fixture (test_field_provenance_photo_location.sql); area grain only, no points, no raw text.
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'location', 'location.current.area');
-  PERFORM public.t_assert(i#>>'{value,zcta}' = '89005' AND i#>>'{value,city}' = 'Boulder City' AND i->>'status' = 'established',
+  PERFORM public.t_assert(i#>>'{value,label}' = 'Boulder City, NV' AND i#>>'{value,level}' = 'city'
+    AND i#>>'{value,county_fips}' = '32003' AND i#>'{value,zcta}' = 'null' AND i->>'status' = 'established',
     'photo GPS and a listing agree on the area');
+  PERFORM public.t_assert((SELECT count(*) FROM jsonb_array_elements(i->'sources') s WHERE s->>'kind' = 'record') = 1,
+    'the record agrees and is listed, not counted');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(i->'sources') s WHERE s->>'value' LIKE 'Reno%'),
+    'a listing elsewhere is not a source for this area');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'location', 'location.sources.photo_gps');
-  PERFORM public.t_assert((i#>>'{value,photos}')::int = 2 AND i#>>'{value,first_at}' IS NOT NULL, 'photo count and date range');
+  PERFORM public.t_assert(jsonb_array_length(i#>'{value,areas}') = 1, 'one area: withdrawn, legacy and sighting rows are not read');
+  PERFORM public.t_assert((i#>>'{value,areas,0,photos}')::int = 3 AND (i#>>'{value,areas,0,days}')::int = 2
+    AND (i#>>'{value,areas,0,first_taken_at}')::timestamptz = '2026-10-06T15:00Z'
+    AND (i#>>'{value,areas,0,last_taken_at}')::timestamptz = '2026-10-07T01:00Z'
+    AND i#>>'{value,areas,0,latest_observation_id}' = '66666666-6666-6666-6666-000000000002',
+    'fold parity: 3 photos (the sensitive one not counted), 2 days, the dates and latest row');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'location', 'location.map');
-  PERFORM public.t_assert(i#>>'{value,zcta}' = '89005' AND i#>'{value,bounds}' = 'null' AND i->>'needed' IS NOT NULL,
-    'map at ZCTA; bounds missing, never drawn from points');
-  txt := public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'location')::text;
-  PERFORM public.t_assert(txt NOT LIKE '%35.97%' AND txt NOT LIKE '%114.83%' AND txt NOT LIKE '%latitude%'
-    AND txt NOT LIKE '%Fixture Lane%', 'no coordinate or raw address reaches the item');
+  PERFORM public.t_assert(i#>>'{value,county_fips}' = '32003' AND i#>'{value,bounds}' = 'null' AND i->>'needed' LIKE 'the ZCTA%',
+    'map at county grain; ZCTA and bounds named as needed, never drawn from points');
+  txt := public.vehicle_facet_items('10000000-0000-0000-0000-000000000001')::text;
+  PERFORM public.t_assert(txt !~ '35\.97|114\.8|36\.209|115\.98' AND txt NOT LIKE '%latitude%'
+    AND txt NOT LIKE '%Fixture Lane%' AND txt NOT LIKE '%Pahrump%', 'no coordinate or raw address reaches any item');
 
   -- Private and deleted vehicles return nothing.
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000004') IS NULL, 'private vehicle: nothing');
@@ -376,10 +501,10 @@ BEGIN
   p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
   PERFORM public.t_assert((SELECT count(*) FROM jsonb_object_keys(p#>'{sections,0,token_items}')) = 9, 'masthead carries every token');
   PERFORM public.t_assert(p#>'{sections,0,token_items,drivetrain}' IS NOT NULL, 'a token with no strip facet still has items');
-  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p#>'{sections,1,facets}') f
-    WHERE jsonb_typeof(f->'items') <> 'array'), 'every strip facet carries its items');
-  PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(p#>'{sections,1,facets}') f
-    WHERE f->>'dimension' = 'transmission' AND f->'items' = p#>'{sections,0,token_items,transmission}'), 'strip items are the token items');
+  PERFORM public.t_assert(p#>'{sections,0,token_items,transmission}' = public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'transmission'),
+    'masthead items are the reader''s items');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p#>'{sections,1,facets}') f WHERE f ? 'items'),
+    'strip facets are unchanged: the masthead is the single home for items');
   p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000003');
   PERFORM public.t_assert(p#>'{sections,0,token_items,engine}' IS NOT NULL, 'thin car: items without a strip');
 END $$;
@@ -399,6 +524,23 @@ BEGIN
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000005') IS NULL, 'deleted: nothing even to a party');
 END $$;
 RESET ROLE;
+
+-- 3. A photo withdrawn after the fold ran drops out at once, before the hourly writer runs.
+BEGIN;
+UPDATE public.vehicle_images SET is_sensitive = true WHERE id = '55555555-5555-5555-5555-000000000003';
+SET LOCAL ROLE anon;
+SET LOCAL test.auth_role = 'anon';
+SET LOCAL test.auth_uid = '';
+DO $$
+DECLARE i jsonb;
+BEGIN
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'location', 'location.sources.photo_gps');
+  PERFORM public.t_assert((i#>>'{value,areas,0,photos}')::int = 2 AND (i#>>'{value,areas,0,days}')::int = 1
+    AND (i#>>'{value,areas,0,last_taken_at}')::timestamptz = '2026-10-06T18:00Z'
+    AND i#>>'{value,areas,0,latest_observation_id}' = '66666666-6666-6666-6666-000000000001',
+    'withdrawn photo: its day leaves the area at read time');
+END $$;
+ROLLBACK;
 -- The documented fixture car as a logged-out viewer sees it (printed for review).
 SET ROLE anon;
 SET test.auth_role = 'anon';

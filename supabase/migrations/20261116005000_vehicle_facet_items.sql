@@ -3,17 +3,20 @@
 -- testimony establishes. Missing items come back with the evidence that would establish them.
 --
 -- 1. vehicle_decode_rules: one cited rule table (gear ratios by transmission model, axle codes, engine codes, casting
---    numbers, body-tag codes, VIN chart positions), keyed by rule_key + make/model/code + year range. Empty here; cited
---    rows land later. Reference data, not testimony.
+--    numbers, body-tag codes, VIN chart positions), keyed by rule_key + make/model/code + year range + qualifiers.
+--    Empty here; cited rows land later. Reference data, not testimony.
 -- 2. observation_source_label(uuid): the public slug and display name of an observation source. observation_sources has
 --    a SELECT policy for authenticated only, so an invoker reader could not name a listing source for a logged-out viewer.
 -- 3. vehicle_facet_norm(kind, value): the comparison key two testimonies must share to agree (displacement in liters,
---    transmission type, drive layout, engine configuration, ratio, tire diameter, year, text).
+--    transmission type, drive layout, engine configuration, ratio, tire diameter, year, number, text).
 -- 4. vehicle_facet_items(vehicle, dimension): STABLE security invoker, so every source is bounded by the viewer's own
 --    row policies, plus the vehicle visibility test stated here. Dimension NULL returns every token's items as one object.
--- 5. vehicle_profile_read: each strip facet carries `items`, and the masthead carries `token_items` for every token
---    (the strip omits a facet with no recorded value and is absent when nothing is shown, so its items live there too).
---    Patched at anchors; refuses drift; skipped when already present.
+--    Photo readings keyed by a closed claim role (cowl tag, transmission ID stamp and castings, engine block and code
+--    stamp) land on their items with their image as witness and their uncertain characters as a limitation.
+--    Location reads the photo GPS fold's admitted rows (admit_photo_gps_locations, 20261116001000) with the same row
+--    filter and read-time photo recount as get_field_provenance('location') (20261116003000), at area grain only.
+-- 5. vehicle_profile_read: the masthead carries `token_items`, every token's items, read once. It is the single home
+--    for items; strip facets are unchanged. Patched at anchors; refuses drift; skipped when already present.
 BEGIN;
 SET LOCAL statement_timeout = '20s';
 SET LOCAL lock_timeout = '3s';
@@ -27,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_decode_rules (
   code text,
   year_min integer,
   year_max integer,
+  qualifiers jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(qualifiers) = 'object'),
   value jsonb NOT NULL CHECK (jsonb_typeof(value) = 'object'),
   citation_url text NOT NULL CHECK (citation_url ~ '^https?://'),
   citation_title text,
@@ -40,6 +44,10 @@ CREATE TABLE IF NOT EXISTS public.vehicle_decode_rules (
 );
 CREATE INDEX IF NOT EXISTS vehicle_decode_rules_lookup
   ON public.vehicle_decode_rules (rule_key, upper(code)) WHERE superseded_at IS NULL;
+-- One current row per rule, scope and citation: a second reading of the same table supersedes, never duplicates.
+CREATE UNIQUE INDEX IF NOT EXISTS vehicle_decode_rules_current_unique
+  ON public.vehicle_decode_rules (rule_key, coalesce(make, ''), coalesce(model, ''), coalesce(code, ''),
+    coalesce(year_min, 0), coalesce(year_max, 0), citation_url) WHERE superseded_at IS NULL;
 ALTER TABLE public.vehicle_decode_rules ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS vehicle_decode_rules_public_read ON public.vehicle_decode_rules;
 CREATE POLICY vehicle_decode_rules_public_read ON public.vehicle_decode_rules FOR SELECT TO anon, authenticated USING (true);
@@ -47,12 +55,14 @@ REVOKE ALL ON public.vehicle_decode_rules FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.vehicle_decode_rules TO anon, authenticated;
 GRANT ALL ON public.vehicle_decode_rules TO service_role;
 COMMENT ON TABLE public.vehicle_decode_rules IS
-  'Cited decode rules (grain: one rule row for one key, optionally narrowed by make, model and year range). rule_key names '
-  'the table: transmission_gear_ratios (code = transmission model, value.gears = numeric array first..top, value.reverse), '
-  'axle_code (value.ratio, value.limited_slip), engine_code (code = VIN engine character, value.displacement_ci, value.family), '
-  'block_casting, body_tag_code, vin_chart (code = decode rule key, value.positions = {field: "position"}). Every row carries '
-  'citation_url; a newer row supersedes an older one (superseded_by, superseded_at), never an update in place. Read by '
-  'vehicle_facet_items. Created empty by 20261116100000.';
+  'Cited decode rules (grain: one rule row for one key, optionally narrowed by make, model, year range and qualifiers). '
+  'rule_key names the table: transmission_gear_ratios (code = transmission model, value.gears = numeric array '
+  'first..top, value.reverse), axle_code (value.ratio, value.limited_slip), engine_code (code = VIN engine character, '
+  'value.displacement_ci, value.family), block_casting, body_tag_code, vin_chart (code = decode rule key, '
+  'value.positions = {field: "position"}). qualifiers narrows a row further (unit year, ratio-set name). Every row '
+  'carries citation_url; a newer row supersedes an older one (superseded_by, superseded_at), never an update in place. '
+  'Gear ratios are looked up by code only: when several current rows for the identified model disagree, the reader '
+  'reports the candidates and computes nothing. Read by vehicle_facet_items. Created empty by 20261116005000.';
 
 -- 2. Public source label ----------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.observation_source_label(p_source_id uuid)
@@ -78,6 +88,7 @@ AS $$
     WHEN s IS NULL OR s = '' THEN NULL
     WHEN p_kind = 'text' THEN s
     WHEN p_kind = 'year' THEN substring(s FROM '(?:^|[^0-9])((?:18|19|20)[0-9]{2})(?:$|[^0-9])')
+    WHEN p_kind = 'number' THEN to_char(round(substring(s FROM '([0-9]+(?:\.[0-9]+)?)')::numeric, 2), 'FM9999990.00')
     WHEN p_kind = 'displacement' THEN (
       SELECT to_char(round(l, 1), 'FM990.0')
       FROM (SELECT CASE
@@ -118,9 +129,9 @@ AS $$
   FROM (SELECT lower(regexp_replace(btrim(p_value), '\s+', ' ', 'g'))) AS t(s)
 $$;
 COMMENT ON FUNCTION public.vehicle_facet_norm(text, text) IS
-  'Comparison key for header facet testimony: two sources agree when their keys are equal. Kinds: text, year, displacement '
-  '(liters, 1 decimal, from L/cc/ci text), transmission_type, layout, configuration, ratio, tire_diameter_in. NULL when '
-  'the value does not state the quantity.';
+  'Comparison key for header facet testimony: two sources agree when their keys are equal. Kinds: text, year, number '
+  '(2 decimals), displacement (liters, 1 decimal, from L/cc/ci text), transmission_type, layout, configuration, ratio, '
+  'tire_diameter_in. NULL when the value does not state the quantity.';
 REVOKE ALL ON FUNCTION public.vehicle_facet_norm(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_facet_norm(text, text) TO anon, authenticated, service_role;
 
@@ -137,7 +148,7 @@ v AS MATERIALIZED (
   SELECT v.id, v.vin, v.year, v.make, v.model, v.trim, v.is_replica, v.listing_title,
          v.canonical_body_style, v.body_style, v.engine_type, v.engine_size, v.engine_code, v.cam_type, v.intake_type,
          v.carburetor_type, v.transmission, v.transmission_model, v.transmission_code, v.drivetrain, v.rear_axle_ratio,
-         v.rear_axle_type, v.tire_spec_rear, v.city, v.state,
+         v.rear_axle_type, v.tire_spec_rear, v.bore_mm, v.stroke_mm, v.city, v.state,
          (who.uid IS NOT NULL AND (who.uid IN (v.user_id, v.owner_id, v.uploaded_by)
            OR public.vehicle_user_has_access(v.id, who.uid))) AS party
   FROM public.vehicles v CROSS JOIN who
@@ -159,33 +170,45 @@ defs (dim, ord, key, facet, unit, needed) AS (VALUES
   ('body_style', 0, 'body_style.decode', 'decode', NULL, 'VIN body code decoded under a cited chart, or the body tag'),
   ('body_style', 1, 'body_style.recorded', 'current', NULL, 'a dated source for the body style: listing, body tag or photos of the roofline'),
   ('body_style', 2, 'body_style.title', 'current', NULL, 'photo of the title or registration'),
+  ('body_style', 3, 'body_style.body_tag', 'as_built', NULL, 'photo of the body (cowl) tag showing the style number'),
+  ('body_style', 4, 'body_style.body_number', 'as_built', NULL, 'photo of the body (cowl) tag showing the body number'),
+  ('body_style', 5, 'body_style.build_date', 'as_built', NULL, 'photo of the body (cowl) tag showing the build date code'),
   ('trim', 0, 'trim.recorded', 'current', NULL, 'a dated source for the trim: listing, badge photos or build documents'),
   ('trim', 1, 'trim.tribute', 'current', NULL, 'build documents (PHS, build sheet, body tag) establishing factory trim or tribute'),
   ('trim', 2, 'trim.decode', 'decode', NULL, 'VIN series code decoded under a cited chart, or the trim tag'),
-  ('engine', 0, 'engine.as_built.engine', 'as_built', NULL, 'VIN engine code decoded under a cited chart, or the build sheet'),
+  ('trim', 3, 'trim.as_built.interior', 'as_built', NULL, 'photo of the body (cowl) tag trim code, decoded under a cited trim-code table'),
+  ('engine', 0, 'engine.as_built.engine', 'as_built', 'L', 'VIN engine code decoded under a cited chart, or the build sheet'),
   ('engine', 1, 'engine.current.family', 'current', NULL, 'photo of the engine showing its configuration, or a receipt'),
   ('engine', 2, 'engine.current.displacement', 'current', 'L', 'photo of the block casting or a machine-shop work order stating displacement'),
-  ('engine', 3, 'engine.current.block_casting', 'current', NULL, 'photo of the block casting number'),
-  ('engine', 4, 'engine.current.block_date', 'current', NULL, 'photo of the block casting date code'),
-  ('engine', 5, 'engine.current.engine_code_stamp', 'current', NULL, 'photo of the engine code stamp on the block pad'),
-  ('engine', 6, 'engine.current.heads', 'current', NULL, 'photo of the cylinder-head casting numbers, or a receipt'),
-  ('engine', 7, 'engine.current.induction', 'current', NULL, 'photo of the carburetor or intake ID tag, or a receipt'),
-  ('engine', 8, 'engine.current.cam', 'current', NULL, 'cam card or receipt naming the camshaft'),
-  ('engine', 9, 'engine.current.machine_work', 'current', NULL, 'machine-shop work order lines keyed to this engine'),
-  ('engine', 10, 'engine.derived.changed', 'derived', NULL, 'the as-built engine and the current displacement, and a dated change claim citing the swap'),
+  ('engine', 3, 'engine.current.bore', 'current', 'mm', 'machine-shop work order or measurement stating the bore'),
+  ('engine', 4, 'engine.current.stroke', 'current', 'mm', 'crankshaft casting or forging number, or a work order stating the stroke'),
+  ('engine', 5, 'engine.derived.displacement_ci', 'derived', 'ci', 'the current bore, stroke and cylinder count'),
+  ('engine', 6, 'engine.current.block_casting', 'current', NULL, 'photo of the block casting number'),
+  ('engine', 7, 'engine.current.block_date', 'current', NULL, 'photo of the block casting date code'),
+  ('engine', 8, 'engine.current.engine_code_stamp', 'current', NULL, 'photo of the engine code stamp on the block pad'),
+  ('engine', 9, 'engine.current.heads', 'current', NULL, 'photo of the cylinder-head casting numbers, or a receipt'),
+  ('engine', 10, 'engine.current.induction', 'current', NULL, 'photo of the carburetor or intake ID tag, or a receipt'),
+  ('engine', 11, 'engine.current.cam', 'current', NULL, 'cam card or receipt naming the camshaft'),
+  ('engine', 12, 'engine.current.machine_work', 'current', NULL, 'machine-shop work order lines keyed to this engine'),
+  ('engine', 13, 'engine.derived.changed', 'derived', NULL, 'the as-built engine (VIN engine code or build sheet) and the current displacement'),
   ('transmission', 0, 'transmission.as_built.type', 'as_built', NULL, 'body tag or SPID option code, build sheet, or owner statement'),
   ('transmission', 1, 'transmission.as_built.model', 'as_built', NULL, 'body tag or SPID option code, build sheet, or owner statement'),
   ('transmission', 2, 'transmission.current.type', 'current', NULL, 'photo of the shifter or transmission, or a receipt'),
   ('transmission', 3, 'transmission.current.model', 'current', NULL, 'photo of the transmission ID stamp or case casting, or a receipt'),
   ('transmission', 4, 'transmission.current.id_stamp', 'current', NULL, 'photo of the transmission ID stamp'),
   ('transmission', 5, 'transmission.current.date_code', 'current', NULL, 'photo of the transmission date code'),
-  ('transmission', 6, 'transmission.current.gear_ratios', 'decode', NULL, 'transmission model identified by its ID stamp, and a cited ratio table for that model'),
-  ('transmission', 7, 'transmission.current.shifter', 'current', NULL, 'photo of the shifter assembly, or a receipt'),
-  ('transmission', 8, 'transmission.axle.as_built.ratio', 'as_built', NULL, 'axle code from the body tag or SPID, decoded under a cited axle-code table'),
-  ('transmission', 9, 'transmission.axle.current.ratio', 'current', NULL, 'axle tag or ring-gear stamp photo, or a receipt stating the ratio'),
-  ('transmission', 10, 'transmission.current.tire_size', 'current', NULL, 'photo of a rear tire sidewall'),
-  ('transmission', 11, 'transmission.derived.final_drive', 'derived', NULL, 'gear ratios and the current axle ratio'),
-  ('transmission', 12, 'transmission.derived.rpm_at_60', 'derived', 'rpm', 'top-gear ratio, the current axle ratio and the rear tire size'),
+  ('transmission', 6, 'transmission.current.case_casting', 'current', NULL, 'photo of the transmission case casting number'),
+  ('transmission', 7, 'transmission.current.tailhousing_casting', 'current', NULL, 'photo of the tail housing casting number'),
+  ('transmission', 8, 'transmission.current.side_cover_casting', 'current', NULL, 'photo of the side cover casting number'),
+  ('transmission', 9, 'transmission.current.bellhousing_casting', 'current', NULL, 'photo of the bellhousing casting number'),
+  ('transmission', 10, 'transmission.current.shifter', 'current', NULL, 'photo of the shifter assembly, or a receipt'),
+  ('transmission', 11, 'transmission.current.gear_ratios', 'decode', NULL, 'transmission model identified by its ID stamp, and a cited ratio table for that model'),
+  ('transmission', 12, 'transmission.axle.as_built.ratio', 'as_built', NULL, 'axle code from the body tag or SPID, decoded under a cited axle-code table'),
+  ('transmission', 13, 'transmission.axle.current.ratio', 'current', NULL, 'axle tag or ring-gear stamp photo, or a receipt stating the ratio'),
+  ('transmission', 14, 'transmission.current.tire_size', 'current', NULL, 'photo of a rear tire sidewall'),
+  ('transmission', 15, 'transmission.derived.final_drive', 'derived', NULL, 'gear ratios and the current axle ratio'),
+  ('transmission', 16, 'transmission.derived.rpm_at_60', 'derived', 'rpm', 'top-gear ratio, the current axle ratio and the rear tire size'),
+  ('transmission', 17, 'transmission.derived.changed', 'derived', NULL, 'the as-built transmission (build sheet, PHS billing history or invoice) and the current one'),
   ('drivetrain', 0, 'drivetrain.as_built.layout', 'as_built', NULL, 'VIN chart or build documents stating the factory drive layout'),
   ('drivetrain', 1, 'drivetrain.current.layout', 'current', NULL, 'photo of the underside showing driveshafts and axles'),
   ('drivetrain', 2, 'drivetrain.axle.current.type', 'current', NULL, 'axle tag or limited-slip ID, or a receipt'),
@@ -197,7 +220,7 @@ defs (dim, ord, key, facet, unit, needed) AS (VALUES
 -- Observations in the viewer's row policies that can speak to a token.
 obs AS MATERIALIZED (
   SELECT o.id, o.kind::text AS kind, o.extraction_method AS method, o.source_url, o.observed_at, o.structured_data AS sd,
-         o.source_observation_id, o.property_id, o.source_id,
+         o.source_observation_id, o.property_id, o.source_id, o.structured_data->>'claim_role' AS role,
          coalesce(p.property_key, o.structured_data->>'property_key') AS pk,
          CASE WHEN o.structured_data->>'image_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
               THEN (o.structured_data->>'image_id')::uuid END AS image_id
@@ -207,6 +230,15 @@ obs AS MATERIALIZED (
     AND (o.property_id IS NOT NULL OR o.structured_data ? 'property_key' OR o.structured_data ? 'claim_role'
          OR (o.extraction_method LIKE 'vin\_decode\_%' AND o.structured_data ? 'decode_rule'))
 ),
+-- An image witness only when the viewer can see the image; else the observation itself.
+obs_w AS MATERIALIZED (
+  SELECT o.*, CASE WHEN o.image_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.vehicle_images i WHERE i.id = o.image_id)
+                   THEN jsonb_build_object('kind', 'image', 'id', o.image_id)
+                   ELSE jsonb_build_object('kind', 'observation', 'id', o.id) END AS witness,
+         nullif(concat_ws('; ', nullif(btrim(o.sd->>'limitation'), ''),
+           'uncertain characters: ' || nullif(btrim(o.sd->>'uncertain_characters'), '')), '') AS limitation
+  FROM obs o
+),
 -- A VIN decode of the vehicle's current VIN.
 decode AS (
   SELECT o.*, src.label AS src_label
@@ -214,6 +246,44 @@ decode AS (
   LEFT JOIN LATERAL (SELECT public.observation_source_label(o.source_id) AS label) src ON true
   WHERE o.method LIKE 'vin\_decode\_%' AND o.sd ? 'decode_rule'
     AND upper(btrim(o.sd->>'vin')) = upper(btrim(v.vin))
+),
+-- Photo readings keyed by a closed claim role: (role, field read, item, comparison kind, decoded detail carried along).
+-- A field the role does not state is skipped; the image's reader is the reader family.
+roles (role, field, key, nk, detail) AS (VALUES
+  ('nominal_engine_displacement', 'engine_size', 'engine.current.displacement', 'displacement', NULL::text[]),
+  ('identified_transmission_housing', 'transmission', 'transmission.current.type', 'transmission_type', NULL),
+  ('visible_drivetrain_layout', 'drivetrain', 'drivetrain.current.layout', 'layout', NULL),
+  ('cowl_tag_style', 'fisher_style_number', 'body_style.body_tag', 'text', ARRAY['body_style', 'tag_model_year']),
+  ('cowl_tag_transcription', 'fisher_style_number', 'body_style.body_tag', 'text', ARRAY['body_style']),
+  ('cowl_tag_body_number', 'fisher_body_number', 'body_style.body_number', 'text', ARRAY['assembly_plant', 'assembly_plant_code']),
+  ('cowl_tag_transcription', 'fisher_body_number', 'body_style.body_number', 'text', NULL),
+  ('cowl_tag_build_date', 'body_build_date_code', 'body_style.build_date', 'text', ARRAY['body_build_month', 'body_build_week_of_month']),
+  ('cowl_tag_transcription', 'body_build_date_code', 'body_style.build_date', 'text', NULL),
+  ('cowl_tag_trim', 'interior_trim_code', 'trim.as_built.interior', 'text', ARRAY['seat_code', 'factory_interior']),
+  ('cowl_tag_transcription', 'interior_trim_code', 'trim.as_built.interior', 'text', ARRAY['seat_code']),
+  ('original_transmission_evidence', 'original_transmission', 'transmission.as_built.type', 'transmission_type', NULL),
+  ('transmission_id_stamp', 'transmission_code', 'transmission.current.id_stamp', 'text', ARRAY['vin_derivative_present']),
+  ('transmission_id_stamp', 'transmission_assembly_date', 'transmission.current.date_code', 'text', NULL),
+  ('transmission_id_stamp', 'transmission', 'transmission.current.type', 'transmission_type', NULL),
+  ('transmission_case_model', 'case_casting', 'transmission.current.case_casting', 'text', NULL),
+  ('transmission_case_model', 'transmission_model', 'transmission.current.model', 'text', ARRAY['transmission_speeds', 'excluded_models']),
+  ('transmission_case_model', 'transmission', 'transmission.current.type', 'transmission_type', NULL),
+  ('transmission_tailhousing', 'transmission_tailhousing', 'transmission.current.tailhousing_casting', 'text',
+    ARRAY['output_spline_count', 'speedometer_output_side']),
+  ('transmission_tailhousing', 'transmission', 'transmission.current.type', 'transmission_type', NULL),
+  ('transmission_side_cover', 'transmission_side_cover_casting', 'transmission.current.side_cover_casting', 'text', NULL),
+  ('transmission_bellhousing', 'bellhousing_casting', 'transmission.current.bellhousing_casting', 'text',
+    ARRAY['bellhousing_material', 'clutch_actuation']),
+  ('transmission_shifter', 'shifter_bracket_marking', 'transmission.current.shifter', 'text', ARRAY['shifter_linkage']),
+  ('engine_block_casting', 'engine_block_casting', 'engine.current.block_casting', 'text', ARRAY['block_casting_year']),
+  ('engine_block_casting', 'engine_size', 'engine.current.displacement', 'displacement', NULL),
+  ('engine_block_casting', 'engine_type', 'engine.current.family', 'configuration', NULL),
+  ('engine_block_casting_dossier_fields', 'engine_block_casting', 'engine.current.block_casting', 'text', NULL),
+  ('engine_block_casting_dossier_fields', 'engine_displacement_l', 'engine.current.displacement', 'displacement', NULL),
+  ('engine_block_casting_dossier_fields', 'engine_configuration', 'engine.current.family', 'configuration', NULL),
+  ('engine_code_stamp', 'engine_code', 'engine.current.engine_code_stamp', 'text',
+    ARRAY['engine_code_application', 'engine_production_number_partial']),
+  ('engine_code_stamp', 'engine_size', 'engine.current.displacement', 'displacement', NULL)
 ),
 -- Every testimony row: item key, raw value, comparison kind, class, source key (one per independent source),
 -- reader family (independence of readers), clock and the source as returned.
@@ -253,15 +323,13 @@ t AS (
          o.observed_at, 1,
          jsonb_build_object('slug', sl.label->>'slug',
            'label', coalesce(sl.label->>'label', substring(o.source_url FROM '^https?://(?:www\.)?([^/]+)'), o.method),
-           'kind', CASE WHEN o.image_id IS NOT NULL THEN 'image' WHEN o.sd->>'claim_role' = 'record_label' THEN 'record_label'
-                        WHEN o.kind = 'listing' OR o.sd->>'claim_role' = 'listing_claim' THEN 'listing' ELSE o.kind END,
+           'kind', CASE WHEN o.image_id IS NOT NULL THEN 'image' WHEN o.role = 'record_label' THEN 'record_label'
+                        WHEN o.kind = 'listing' OR o.role = 'listing_claim' THEN 'listing' ELSE o.kind END,
            'url', CASE WHEN o.image_id IS NULL THEN o.source_url END, 'method', o.method, 'observed_at', o.observed_at,
-           'witness', CASE WHEN o.image_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.vehicle_images i WHERE i.id = o.image_id)
-                           THEN jsonb_build_object('kind', 'image', 'id', o.image_id)
-                           ELSE jsonb_build_object('kind', 'observation', 'id', o.id) END,
-           'value', o.sd->>o.pk, 'class', CASE WHEN o.image_id IS NOT NULL THEN 'reading' ELSE 'claim' END),
+           'witness', o.witness, 'value', o.sd->>o.pk,
+           'class', CASE WHEN o.image_id IS NOT NULL THEN 'reading' ELSE 'claim' END),
          NULL::jsonb
-  FROM obs o CROSS JOIN v
+  FROM obs_w o CROSS JOIN v
   JOIN (VALUES
     ('year', 'year.recorded', 'year'), ('make', 'make.recorded', 'text'), ('model', 'model.recorded', 'text'),
     ('body_style', 'body_style.recorded', 'text'), ('trim', 'trim.recorded', 'text'),
@@ -278,25 +346,18 @@ t AS (
          OR public.retained_listing_property_result_matches(o.source_observation_id, o.property_id, o.id))
     AND (o.method IS DISTINCT FROM 'vehicle_title_facet_projection_v1' OR o.sd->>'source_value' = v.listing_title)
   UNION ALL
-  -- Photo readings keyed by a closed claim role.
+  -- Photo readings keyed by a closed claim role. Never the observation's stored URLs: only fields named here.
   SELECT m.key, o.sd->>m.field, m.nk,
          CASE WHEN o.image_id IS NOT NULL THEN 'reading' ELSE 'claim' END,
          coalesce('img:' || o.image_id, 'obs:' || o.id), 'reader:' || o.method, o.observed_at, 1,
          jsonb_build_object('slug', NULL, 'label', 'photo reading', 'kind', 'image', 'url', NULL, 'method', o.method,
-           'observed_at', o.observed_at,
-           'witness', CASE WHEN o.image_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.vehicle_images i WHERE i.id = o.image_id)
-                           THEN jsonb_build_object('kind', 'image', 'id', o.image_id)
-                           ELSE jsonb_build_object('kind', 'observation', 'id', o.id) END,
-           'value', o.sd->>m.field, 'class', CASE WHEN o.image_id IS NOT NULL THEN 'reading' ELSE 'claim' END,
-           'limitation', o.sd->>'limitation'),
+           'observed_at', o.observed_at, 'witness', o.witness, 'value', o.sd->>m.field,
+           'class', CASE WHEN o.image_id IS NOT NULL THEN 'reading' ELSE 'claim' END,
+           'limitation', o.limitation,
+           'decoded', (SELECT jsonb_object_agg(k, o.sd->k) FROM unnest(m.detail) k
+                       WHERE o.sd ? k AND jsonb_typeof(o.sd->k) <> 'null')),
          NULL::jsonb
-  FROM obs o
-  JOIN (VALUES
-    ('nominal_engine_displacement', 'engine_size', 'engine.current.displacement', 'displacement'),
-    ('identified_transmission_housing', 'transmission', 'transmission.current.model', 'text'),
-    ('identified_transmission_housing', 'transmission', 'transmission.current.type', 'transmission_type'),
-    ('visible_drivetrain_layout', 'drivetrain', 'drivetrain.current.layout', 'layout')
-  ) m(role, field, key, nk) ON m.role = o.sd->>'claim_role'
+  FROM obs_w o JOIN roles m ON m.role = o.role
   WHERE o.pk IS NULL AND nullif(btrim(o.sd->>m.field), '') IS NOT NULL
   UNION ALL
   -- field_evidence. A row the observation writer mirrored from a visible decode is that decode, counted once;
@@ -382,6 +443,8 @@ t AS (
     ('engine.current.displacement', coalesce(nullif(btrim(v.engine_size), ''), v.engine_type), 'displacement',
       CASE WHEN nullif(btrim(v.engine_size), '') IS NOT NULL THEN 'engine_size' ELSE 'engine_type' END),
     ('engine.current.family', concat_ws(' ', v.engine_type, v.engine_size), 'configuration', 'engine_type'),
+    ('engine.current.bore', v.bore_mm::text, 'number', 'bore_mm'),
+    ('engine.current.stroke', v.stroke_mm::text, 'number', 'stroke_mm'),
     ('engine.current.engine_code_stamp', v.engine_code, 'text', 'engine_code'),
     ('engine.current.cam', v.cam_type, 'text', 'cam_type'),
     ('engine.current.induction', coalesce(nullif(btrim(v.carburetor_type), ''), v.intake_type), 'text',
@@ -420,14 +483,33 @@ agg AS (
          count(DISTINCT r.indep) FILTER (WHERE r.cls <> 'record') AS nind,
          count(DISTINCT r.family) FILTER (WHERE r.cls <> 'record') AS nfam,
          bool_or(r.cls = 'reading') AS has_reading,
+         (array_agg(r.nk ORDER BY r.crank, r.observed_at DESC NULLS LAST))[1] AS lead_nk,
          (array_agg(r.val ORDER BY r.crank, r.observed_at DESC NULLS LAST))[1] AS lead_val,
          (array_agg(r.norm ORDER BY r.crank, r.observed_at DESC NULLS LAST))[1] AS lead_norm,
          (array_agg(r.rule ORDER BY r.crank, r.observed_at DESC NULLS LAST) FILTER (WHERE r.rule IS NOT NULL))[1] AS rule,
          jsonb_agg(r.src ORDER BY r.crank, r.observed_at DESC NULLS LAST) AS sources
   FROM ranked r GROUP BY r.key
 ),
+-- Readings that looked for an as-built fact and found it not stated: shown as examined, with the proof they name.
+examined AS (
+  SELECT k.key,
+         jsonb_agg(DISTINCT jsonb_build_object('label', 'photo reading', 'kind', 'image', 'method', o.method,
+           'observed_at', o.observed_at, 'witness', o.witness,
+           'result', coalesce('transmission on tag: ' || (o.sd->>'transmission_on_tag'),
+                              'original transmission: ' || (o.sd->>'original_transmission')))) AS checked,
+         string_agg(DISTINCT p.need, '; ' ORDER BY p.need) AS needed
+  FROM obs_w o
+  CROSS JOIN (VALUES ('transmission.as_built.type'), ('transmission.as_built.model')) k(key)
+  LEFT JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(o.sd->'proof_needed') = 'array'
+    THEN o.sd->'proof_needed' END) p(need) ON true
+  WHERE (o.role = 'original_transmission_evidence'
+         AND public.vehicle_facet_norm('transmission_type', o.sd->>'original_transmission') IS NULL)
+     OR (o.role = 'cowl_tag_option_codes' AND nullif(btrim(o.sd->>'transmission_on_tag'), '') IS NOT NULL)
+  GROUP BY k.key
+),
 base AS (
-  SELECT d.dim, d.ord, d.key, d.facet, d.unit, d.needed, a.lead_val, a.lead_norm, a.rule, a.sources,
+  SELECT d.dim, d.ord, d.key, d.facet, d.unit, coalesce(ex.needed, d.needed) AS needed, ex.checked,
+         a.lead_val, a.lead_norm, a.lead_nk, a.rule, a.sources,
          CASE WHEN a.key IS NULL THEN 'missing'
               WHEN a.nvals > 1 THEN 'conflict'
               WHEN a.strong THEN 'established'
@@ -436,45 +518,70 @@ base AS (
               ELSE 'claim' END AS status,
          CASE WHEN a.nvals > 1 THEN (SELECT jsonb_agg(jsonb_build_object('value', s.val, 'normalized', s.norm,
                 'sources', s.sources) ORDER BY s.best, s.norm) FROM sides s WHERE s.key = d.key) END AS conflict_sides
-  FROM defs d LEFT JOIN agg a ON a.key = d.key
-  WHERE d.dim NOT IN ('location')
-    AND d.key NOT IN ('transmission.current.gear_ratios', 'transmission.derived.final_drive',
-                      'transmission.derived.rpm_at_60', 'engine.derived.changed', 'trim.tribute')
+  FROM defs d LEFT JOIN agg a ON a.key = d.key LEFT JOIN examined ex ON ex.key = d.key
+  WHERE d.dim <> 'location' AND d.facet <> 'derived'
+    AND d.key NOT IN ('transmission.current.gear_ratios', 'trim.tribute')
 ),
 item AS (
-  SELECT dim, ord, key, jsonb_build_object(
-    'key', key, 'facet', facet, 'value', lead_val, 'normalized', lead_norm, 'unit', unit, 'status', status,
+  SELECT key, jsonb_build_object(
+    'key', key, 'facet', facet,
+    -- A quantity with a unit is shown in that unit; the stated words stay on each source and in `stated`.
+    'value', CASE WHEN lead_nk IN ('displacement', 'number') THEN lead_norm ELSE lead_val END,
+    'stated', CASE WHEN lead_nk IN ('displacement', 'number') THEN lead_val END,
+    'normalized', lead_norm, 'unit', unit, 'status', status,
     'sources', coalesce(sources, '[]'::jsonb), 'rule', rule, 'equation', NULL,
     'needed', CASE WHEN status <> 'established' THEN needed END)
-    || CASE WHEN conflict_sides IS NOT NULL THEN jsonb_build_object('sides', conflict_sides) ELSE '{}'::jsonb END AS doc,
+    || CASE WHEN conflict_sides IS NOT NULL THEN jsonb_build_object('sides', conflict_sides) ELSE '{}'::jsonb END
+    || CASE WHEN checked IS NOT NULL AND status = 'missing' THEN jsonb_build_object('examined', checked) ELSE '{}'::jsonb END
+    AS doc,
     status, lead_norm
   FROM base
 ),
--- Ratios for the identified transmission model, from the cited rule table.
-gear AS (
-  SELECT r.id, r.value, r.citation_url, r.citation_title, i.status
-  FROM item i CROSS JOIN v
-  JOIN public.vehicle_decode_rules r ON r.rule_key = 'transmission_gear_ratios' AND r.superseded_at IS NULL
-    AND upper(regexp_replace(r.code, '\s+', '', 'g')) = upper(regexp_replace(i.doc->>'value', '\s+', '', 'g'))
-    AND (r.make IS NULL OR lower(r.make) = lower(v.make))
-    AND (r.year_min IS NULL OR v.year >= r.year_min) AND (r.year_max IS NULL OR v.year <= r.year_max)
+-- Ratios for the identified transmission model, from the cited rule table, by code only (no year filter). A model
+-- reading that names several codes ("M20 or M21") matches each; candidates that disagree are shown, never computed over.
+gear_cand AS (
+  SELECT r.id, r.code, r.value->'gears' AS gears, r.citation_url, r.citation_title, r.qualifiers, i.status
+  FROM item i JOIN public.vehicle_decode_rules r ON r.rule_key = 'transmission_gear_ratios' AND r.superseded_at IS NULL
+    AND jsonb_typeof(r.value->'gears') = 'array' AND nullif(btrim(r.code), '') IS NOT NULL
+    AND (upper(regexp_replace(r.code, '\s+', '', 'g')) = upper(regexp_replace(i.doc->>'value', '\s+', '', 'g'))
+         OR i.doc->>'value' ~* ('(^|[^A-Za-z0-9])' || regexp_replace(btrim(r.code), '([^A-Za-z0-9])', '\\\1', 'g')
+                                || '($|[^A-Za-z0-9])'))
   WHERE i.key = 'transmission.current.model' AND i.status NOT IN ('missing', 'conflict')
-    AND jsonb_typeof(r.value->'gears') = 'array'
-  ORDER BY r.created_at DESC LIMIT 1
+),
+gear_sum AS (
+  SELECT count(DISTINCT gears) AS nsets, (array_agg(gears))[1] AS gears, min(status) AS status,
+         jsonb_agg(jsonb_build_object('code', code, 'gears', gears, 'rule_id', id, 'citation_url', citation_url,
+           'citation_title', citation_title, 'qualifiers', qualifiers) ORDER BY code, id) AS rules
+  FROM gear_cand
 ),
 gear_item AS (
   SELECT jsonb_build_object('key', 'transmission.current.gear_ratios', 'facet', 'decode',
-    'value', g.value->'gears', 'normalized', NULL, 'unit', NULL,
-    'status', coalesce(g.status, 'missing'),
+    'value', CASE WHEN g.nsets = 1 THEN g.gears END, 'normalized', NULL, 'unit', NULL,
+    'status', CASE WHEN g.nsets = 1 THEN g.status ELSE 'missing' END,
     'sources', '[]'::jsonb,
-    'rule', CASE WHEN g.id IS NOT NULL THEN jsonb_build_object('key', 'transmission_gear_ratios', 'id', g.id,
-      'citation_url', g.citation_url, 'citation_title', g.citation_title,
-      'applies_to', 'transmission.current.model') END,
+    'rule', CASE WHEN g.nsets = 1 THEN jsonb_build_object('key', 'transmission_gear_ratios',
+      'applies_to', 'transmission.current.model', 'rows', g.rules) END,
     'equation', NULL,
-    'needed', CASE WHEN g.status IS DISTINCT FROM 'established' THEN
-      'transmission model identified by its ID stamp, and a cited ratio table for that model' END) AS doc,
-    g.value->'gears' AS gears, coalesce(g.status, 'missing') AS status
-  FROM (SELECT 1) one LEFT JOIN gear g ON true
+    'needed', CASE WHEN g.nsets > 1 THEN 'unit year or ratio-set identification'
+                   WHEN g.nsets = 1 AND g.status = 'established' THEN NULL
+                   ELSE 'transmission model identified by its ID stamp, and a cited ratio table for that model' END)
+    || CASE WHEN g.nsets > 1 THEN jsonb_build_object('candidates', g.rules) ELSE '{}'::jsonb END AS doc,
+    CASE WHEN g.nsets = 1 THEN g.gears END AS gears,
+    CASE WHEN g.nsets = 1 THEN g.status ELSE 'missing' END AS status
+  FROM gear_sum g
+),
+-- Readers that state a unit is not the one the car was built with (engine block date, transmission case vintage).
+not_original AS (
+  SELECT CASE WHEN o.role LIKE 'engine%' THEN 'engine' ELSE 'transmission' END AS tok,
+         jsonb_agg(jsonb_build_object('slug', NULL, 'label', 'photo reading', 'kind', 'image', 'url', NULL,
+           'method', o.method, 'observed_at', o.observed_at, 'witness', o.witness,
+           'value', o.sd->>'factory_configuration_status', 'class', 'reading', 'limitation', o.limitation)
+           ORDER BY o.observed_at DESC, o.id) AS sources,
+         count(DISTINCT o.image_id) AS images
+  FROM obs_w o
+  WHERE o.image_id IS NOT NULL AND (o.role LIKE 'engine%' OR o.role LIKE 'transmission%')
+    AND o.sd->>'factory_configuration_status' IN ('not_original_engine', 'not_original_unit', 'not_original')
+  GROUP BY 1
 ),
 -- Derived numbers: computed here from the items they read, never landed.
 deriv_in AS (
@@ -487,10 +594,24 @@ deriv_in AS (
          (SELECT lead_norm FROM item WHERE key = 'engine.as_built.engine' AND status <> 'conflict') AS built_l,
          (SELECT status FROM item WHERE key = 'engine.as_built.engine') AS built_status,
          (SELECT lead_norm FROM item WHERE key = 'engine.current.displacement' AND status <> 'conflict') AS cur_l,
-         (SELECT status FROM item WHERE key = 'engine.current.displacement') AS cur_status
+         (SELECT status FROM item WHERE key = 'engine.current.displacement') AS cur_status,
+         (SELECT lead_norm FROM item WHERE key = 'engine.current.bore' AND status <> 'conflict')::numeric AS bore,
+         (SELECT status FROM item WHERE key = 'engine.current.bore') AS bore_status,
+         (SELECT lead_norm FROM item WHERE key = 'engine.current.stroke' AND status <> 'conflict')::numeric AS stroke,
+         (SELECT status FROM item WHERE key = 'engine.current.stroke') AS stroke_status,
+         (SELECT substring(lead_norm FROM '[0-9]+')::int FROM item
+           WHERE key = 'engine.current.family' AND status <> 'conflict' AND lead_norm ~ '^[VHI][0-9]+$') AS cyl,
+         (SELECT status FROM item WHERE key = 'engine.current.family') AS cyl_status,
+         (SELECT lead_norm FROM item WHERE key = 'transmission.as_built.type' AND status <> 'conflict') AS tb_type,
+         (SELECT status FROM item WHERE key = 'transmission.as_built.type') AS tb_type_status,
+         (SELECT lead_norm FROM item WHERE key = 'transmission.current.type' AND status <> 'conflict') AS tc_type,
+         (SELECT status FROM item WHERE key = 'transmission.current.type') AS tc_type_status,
+         (SELECT sources FROM not_original WHERE tok = 'engine') AS eng_flags,
+         (SELECT sources FROM not_original WHERE tok = 'transmission') AS trans_flags
 ),
+-- The weakest input status: missing when any input is missing or in conflict.
 weakest AS (
-  SELECT x.*, s.final_status, s.rpm_status, s.changed_status FROM deriv_in x CROSS JOIN LATERAL (SELECT
+  SELECT x.*, s.* FROM deriv_in x CROSS JOIN LATERAL (SELECT
     (SELECT CASE WHEN bool_or(st IN ('missing', 'conflict')) OR x.gears IS NULL OR x.axle IS NULL THEN 'missing'
                  WHEN bool_and(st = 'established') THEN 'established' WHEN bool_or(st = 'claim') THEN 'claim' ELSE 'reading' END
        FROM unnest(ARRAY[x.gear_status, x.axle_status]) st) AS final_status,
@@ -499,43 +620,78 @@ weakest AS (
        FROM unnest(ARRAY[x.gear_status, x.axle_status, x.tire_status]) st) AS rpm_status,
     (SELECT CASE WHEN bool_or(st IN ('missing', 'conflict')) OR x.built_l IS NULL OR x.cur_l IS NULL THEN 'missing'
                  WHEN bool_and(st = 'established') THEN 'established' WHEN bool_or(st = 'claim') THEN 'claim' ELSE 'reading' END
-       FROM unnest(ARRAY[x.built_status, x.cur_status]) st) AS changed_status) s
+       FROM unnest(ARRAY[x.built_status, x.cur_status]) st) AS eng_cmp_status,
+    (SELECT CASE WHEN bool_or(st IN ('missing', 'conflict')) OR x.tb_type IS NULL OR x.tc_type IS NULL THEN 'missing'
+                 WHEN bool_and(st = 'established') THEN 'established' WHEN bool_or(st = 'claim') THEN 'claim' ELSE 'reading' END
+       FROM unnest(ARRAY[x.tb_type_status, x.tc_type_status]) st) AS trans_cmp_status,
+    (SELECT CASE WHEN bool_or(st IN ('missing', 'conflict')) OR x.bore IS NULL OR x.stroke IS NULL OR x.cyl IS NULL THEN 'missing'
+                 WHEN bool_and(st = 'established') THEN 'established' WHEN bool_or(st = 'claim') THEN 'claim' ELSE 'reading' END
+       FROM unnest(ARRAY[x.bore_status, x.stroke_status, x.cyl_status]) st) AS ci_status) s
+),
+-- A change: the as-built and current items compared when both are known; otherwise readers stating the unit is not
+-- original are a reading of a change. A comparison that disagrees with those readers is a conflict.
+changed AS (
+  SELECT w.*,
+    CASE WHEN w.eng_cmp_status <> 'missing' THEN
+           CASE WHEN w.eng_flags IS NOT NULL AND w.built_l = w.cur_l THEN 'conflict' ELSE w.eng_cmp_status END
+         WHEN w.eng_flags IS NOT NULL THEN 'reading' ELSE 'missing' END AS eng_status,
+    CASE WHEN w.eng_cmp_status <> 'missing' THEN w.built_l IS DISTINCT FROM w.cur_l
+         WHEN w.eng_flags IS NOT NULL THEN true END AS eng_value,
+    CASE WHEN w.trans_cmp_status <> 'missing' THEN
+           CASE WHEN w.trans_flags IS NOT NULL AND w.tb_type = w.tc_type THEN 'reading' ELSE w.trans_cmp_status END
+         WHEN w.trans_flags IS NOT NULL THEN 'reading' ELSE 'missing' END AS trans_status,
+    CASE WHEN w.trans_cmp_status <> 'missing' AND w.tb_type IS DISTINCT FROM w.tc_type THEN true
+         WHEN w.trans_flags IS NOT NULL THEN true
+         WHEN w.trans_cmp_status <> 'missing' THEN false END AS trans_value
+  FROM weakest w
 ),
 derived AS (
-  SELECT 'transmission' AS dim, 11 AS ord, jsonb_build_object('key', 'transmission.derived.final_drive', 'facet', 'derived',
+  SELECT 'transmission.derived.final_drive' AS key, jsonb_build_object('facet', 'derived',
     'value', CASE WHEN w.final_status <> 'missing' THEN (SELECT jsonb_agg(round(g::numeric * w.axle, 2) ORDER BY n)
       FROM jsonb_array_elements_text(w.gears) WITH ORDINALITY e(g, n)) END,
-    'normalized', NULL, 'unit', NULL, 'status', w.final_status, 'sources', '[]'::jsonb, 'rule', NULL,
+    'normalized', NULL, 'status', w.final_status, 'sources', '[]'::jsonb, 'rule', NULL,
     'equation', jsonb_build_object('expression', 'gear_ratio[n] * axle_ratio',
-      'reads', jsonb_build_array('transmission.current.gear_ratios', 'transmission.axle.current.ratio')),
-    'needed', CASE WHEN w.final_status <> 'established' THEN 'gear ratios and the current axle ratio' END) AS doc
-  FROM weakest w
+      'reads', jsonb_build_array('transmission.current.gear_ratios', 'transmission.axle.current.ratio'))) AS doc
+  FROM changed w
   UNION ALL
-  SELECT 'transmission', 12, jsonb_build_object('key', 'transmission.derived.rpm_at_60', 'facet', 'derived',
+  SELECT 'transmission.derived.rpm_at_60', jsonb_build_object('facet', 'derived',
     'value', CASE WHEN w.rpm_status <> 'missing' THEN round(60 * (w.gears->>(jsonb_array_length(w.gears) - 1))::numeric
       * w.axle * 336.13 / w.tire_in) END,
-    'normalized', NULL, 'unit', 'rpm', 'status', w.rpm_status, 'sources', '[]'::jsonb, 'rule', NULL,
+    'normalized', NULL, 'status', w.rpm_status, 'sources', '[]'::jsonb, 'rule', NULL,
     'equation', jsonb_build_object('expression', 'mph * top_gear_ratio * axle_ratio * 336.13 / tire_diameter_in, mph = 60',
       'reads', jsonb_build_array('transmission.current.gear_ratios', 'transmission.axle.current.ratio',
-        'transmission.current.tire_size'), 'tire_diameter_in', w.tire_in),
-    'needed', CASE WHEN w.rpm_status <> 'established' THEN 'top-gear ratio, the current axle ratio and the rear tire size' END)
-  FROM weakest w
+        'transmission.current.tire_size'), 'tire_diameter_in', w.tire_in))
+  FROM changed w
   UNION ALL
-  SELECT 'engine', 10, jsonb_build_object('key', 'engine.derived.changed', 'facet', 'derived',
-    'value', CASE WHEN w.changed_status <> 'missing' THEN w.built_l IS DISTINCT FROM w.cur_l END,
-    'normalized', NULL, 'unit', NULL, 'status', w.changed_status, 'sources', '[]'::jsonb, 'rule', NULL,
+  SELECT 'engine.derived.displacement_ci', jsonb_build_object('facet', 'derived',
+    'value', CASE WHEN w.ci_status <> 'missing' THEN round(pi()::numeric / 4 * w.bore ^ 2 * w.stroke * w.cyl / 16387.064, 1) END,
+    'normalized', NULL, 'status', w.ci_status, 'sources', '[]'::jsonb, 'rule', NULL,
+    'equation', jsonb_build_object('expression', 'pi / 4 * bore_mm^2 * stroke_mm * cylinders / 16387.064',
+      'reads', jsonb_build_array('engine.current.bore', 'engine.current.stroke', 'engine.current.family'),
+      'cylinders', w.cyl))
+  FROM changed w
+  UNION ALL
+  SELECT 'engine.derived.changed', jsonb_build_object('facet', 'derived',
+    'value', w.eng_value, 'normalized', NULL, 'status', w.eng_status, 'sources', coalesce(w.eng_flags, '[]'::jsonb),
+    'rule', NULL,
     'equation', jsonb_build_object('expression', 'as_built.engine liters <> current.displacement liters (1 decimal)',
       'reads', jsonb_build_array('engine.as_built.engine', 'engine.current.displacement'),
-      'as_built_l', w.built_l, 'current_l', w.cur_l, 'change_claim', NULL),
-    'needed', 'a dated change claim citing the engine swap (receipt or work order)'
-      || CASE WHEN w.changed_status = 'missing' THEN '; the as-built engine and the current displacement' ELSE '' END)
-  FROM weakest w
+      'as_built_l', w.built_l, 'current_l', w.cur_l))
+  FROM changed w
   UNION ALL
-  SELECT 'transmission', 6, doc FROM gear_item
+  SELECT 'transmission.derived.changed', jsonb_build_object('facet', 'derived',
+    'value', w.trans_value, 'normalized', NULL, 'status', w.trans_status, 'sources', coalesce(w.trans_flags, '[]'::jsonb),
+    'rule', NULL,
+    'equation', jsonb_build_object('expression', 'as_built.type <> current.type, or readers stating the unit is not original',
+      'reads', jsonb_build_array('transmission.as_built.type', 'transmission.current.type'),
+      'as_built', w.tb_type, 'current', w.tc_type))
+  FROM changed w
+  UNION ALL
+  SELECT 'transmission.current.gear_ratios', doc - 'key' FROM gear_item
   UNION ALL
   -- tribute_badge_rule_v1: a tribute (vehicles.is_replica) earns no factory series or trim badge.
-  SELECT 'trim', 1, jsonb_build_object('key', 'trim.tribute', 'facet', 'current',
-    'value', CASE WHEN v.is_replica THEN 'tribute' END, 'normalized', NULL, 'unit', NULL,
+  SELECT 'trim.tribute', jsonb_build_object('facet', 'current',
+    'value', CASE WHEN v.is_replica THEN 'tribute' END, 'normalized', NULL,
     'status', CASE WHEN v.is_replica THEN 'claim' ELSE 'missing' END,
     'sources', CASE WHEN v.is_replica THEN jsonb_build_array(jsonb_build_object('slug', NULL, 'label', 'vehicle record',
       'kind', 'record', 'url', NULL, 'method', 'vehicles.is_replica', 'observed_at', NULL, 'witness', NULL,
@@ -543,98 +699,161 @@ derived AS (
     'rule', jsonb_build_object('key', 'tribute_badge_rule_v1', 'citation_url', NULL,
       'migration', '20261110090000_tribute_badges_and_engine_correction.sql',
       'effect', 'a tribute earns no factory series or trim badge'),
-    'equation', NULL,
-    'needed', 'build documents (PHS, build sheet, body tag) establishing factory trim or tribute')
+    'equation', NULL)
   FROM v
 ),
--- Location at public area grain only: city, region, ZCTA, county. Never a coordinate, a raw text or a photo.
-loc AS (
-  SELECT l.id, l.source_type, l.source_platform, l.observed_at, l.precision, l.city, l.region_code, l.zcta,
-         l.county_fips, l.county_name, l.country_code,
-         (l.source_type IN ('photo', 'photo_gps', 'photo_exif', 'image_gps', 'exif')
-           OR coalesce(l.source_platform, '') IN ('photo_gps', 'photo_exif', 'vehicle_images', 'exif')) AS is_photo,
-         lower(concat_ws(',', nullif(btrim(l.city), ''), nullif(btrim(l.region_code), ''))) AS area_norm
+derived_items AS (
+  SELECT x.key, jsonb_build_object('key', x.key, 'unit', f.unit) || x.doc
+    || jsonb_build_object('needed', CASE WHEN x.doc ? 'needed' THEN x.doc->'needed'
+         WHEN x.doc->>'status' <> 'established' THEN to_jsonb(f.needed) END) AS doc
+  FROM derived x JOIN defs f ON f.key = x.key
+),
+-- Location at public area grain only. Photo GPS is the fold's admitted rows (source_type exif, photo_gps_fold_v1,
+-- confidence >= 0.5) recounted from the photos the viewer can still see, as get_field_provenance('location') does;
+-- never a coordinate, a raw text or a photo. Listings are dated listing rows at area grain.
+loc_rows AS MATERIALIZED (
+  SELECT l.id, l.observed_at, l.confidence, l."precision" AS level, l.city, l.county_fips, l.county_name, l.region_code,
+         l.country_code, l.zcta, l.location_text_clean AS label, l.metadata->'image_ids' AS image_ids
   FROM v JOIN public.vehicle_location_observations l ON l.vehicle_id = v.id
-  WHERE nullif(btrim(coalesce(l.city, l.zcta, l.county_fips, l.region_code, '')), '') IS NOT NULL
+  WHERE l.source_type = 'exif' AND l.metadata->>'method' = 'photo_gps_fold_v1' AND l.confidence >= 0.5
+  ORDER BY l.observed_at DESC, l.id
+  LIMIT 1000
 ),
-loc_lead AS (
-  SELECT * FROM loc WHERE area_norm <> '' ORDER BY observed_at DESC NULLS LAST, id LIMIT 1
+loc_ids AS MATERIALIZED (
+  SELECT r.id AS row_id, x.image_id::uuid AS image_id
+  FROM loc_rows r
+  CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(r.image_ids) = 'array' THEN r.image_ids
+    ELSE '[]'::jsonb END) x(image_id)
+  WHERE x.image_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 ),
-loc_area_sources AS (
-  SELECT DISTINCT ON (fam) fam, src, observed_at, is_photo FROM (
-    SELECT CASE WHEN l.is_photo THEN 'photo_gps' ELSE 'listing:' || coalesce(l.source_platform, l.source_type) END AS fam,
-           l.is_photo, l.observed_at,
-           jsonb_build_object('slug', l.source_platform, 'label', CASE WHEN l.is_photo THEN 'photo GPS'
-               ELSE coalesce(l.source_platform, l.source_type) END,
-             'kind', CASE WHEN l.is_photo THEN 'image' ELSE 'listing' END, 'url', NULL,
-             'method', 'vehicle_location_observations.' || l.source_type, 'observed_at', l.observed_at,
-             'witness', jsonb_build_object('kind', 'location_observation', 'id', l.id),
-             'value', concat_ws(', ', l.city, l.region_code), 'class', CASE WHEN l.is_photo THEN 'reading' ELSE 'claim' END) AS src
-    FROM loc l JOIN loc_lead ll ON ll.area_norm = l.area_norm) s
-  ORDER BY fam, observed_at DESC NULLS LAST
+loc_photo AS MATERIALIZED (
+  SELECT li.row_id, count(*) AS photos, min(i.taken_at) AS first_taken_at, max(i.taken_at) AS last_taken_at
+  FROM loc_ids li CROSS JOIN v
+  JOIN public.vehicle_images i ON i.id = li.image_id AND i.vehicle_id = v.id
+  WHERE nullif(btrim(i.image_url), '') IS NOT NULL
+    AND i.is_sensitive IS NOT TRUE AND i.is_superseded IS NOT TRUE AND i.is_duplicate IS NOT TRUE
+    AND (i.vision_gate_status IS NULL OR i.vision_gate_status::text = 'approved')
+    AND coalesce(i.image_vehicle_match_status, '') NOT IN ('mismatch', 'unrelated')
+  GROUP BY li.row_id
 ),
+loc_areas AS (
+  SELECT r.level, r.label, r.city, r.county_fips, r.county_name, r.region_code, r.country_code, r.zcta,
+         sum(p.photos) AS photos, count(*) AS days, min(p.first_taken_at) AS first_taken_at,
+         max(p.last_taken_at) AS last_taken_at, max(r.confidence) AS confidence,
+         (array_agg(r.id ORDER BY r.observed_at DESC, r.id))[1] AS latest_observation_id,
+         lower(concat_ws(',', nullif(btrim(r.city), ''), nullif(btrim(r.region_code), ''))) AS area_norm
+  FROM loc_rows r JOIN loc_photo p ON p.row_id = r.id
+  GROUP BY r.level, r.label, r.city, r.county_fips, r.county_name, r.region_code, r.country_code, r.zcta
+),
+loc_top AS (SELECT * FROM loc_areas ORDER BY photos DESC, last_taken_at DESC LIMIT 1),
+loc_list AS (
+  SELECT l.id, l.source_platform, l.observed_at, l.city, l.region_code, l.zcta, l.county_fips, l.county_name,
+         l.country_code, lower(concat_ws(',', nullif(btrim(l.city), ''), nullif(btrim(l.region_code), ''))) AS area_norm
+  FROM v JOIN public.vehicle_location_observations l ON l.vehicle_id = v.id
+  WHERE l.source_type = 'listing' AND l.confidence >= 0.5
+    AND nullif(btrim(coalesce(l.city, l.zcta, l.county_fips, l.region_code, '')), '') IS NOT NULL
+),
+loc_list_lead AS (SELECT * FROM loc_list WHERE area_norm <> '' ORDER BY observed_at DESC NULLS LAST, id LIMIT 1),
 loc_record AS (
   SELECT nullif(concat_ws(', ', nullif(btrim(v.city), ''), nullif(btrim(v.state), '')), '') AS val,
-         lower(concat_ws(',', nullif(btrim(v.city), ''), nullif(btrim(v.state), ''))) AS norm FROM v
+         lower(concat_ws(',', nullif(btrim(v.city), ''), nullif(btrim(v.state), ''))) AS norm,
+         nullif(btrim(v.city), '') AS city, nullif(btrim(v.state), '') AS state FROM v
+),
+-- The lead area: the photos' largest area, else the latest listing, else the record.
+loc_lead AS (
+  SELECT CASE WHEN t.area_norm IS NOT NULL THEN 'photo' WHEN l.area_norm IS NOT NULL THEN 'listing'
+              WHEN r.val IS NOT NULL THEN 'record' END AS basis,
+         coalesce(t.area_norm, l.area_norm, r.norm) AS area_norm,
+         CASE WHEN t.area_norm IS NOT NULL THEN jsonb_build_object('label', t.label, 'level', t.level, 'city', t.city,
+                'region', t.region_code, 'zcta', t.zcta, 'county_fips', t.county_fips, 'county', t.county_name,
+                'country', t.country_code)
+              WHEN l.area_norm IS NOT NULL THEN jsonb_build_object('label', concat_ws(', ', l.city, l.region_code),
+                'level', CASE WHEN l.zcta IS NOT NULL THEN 'zcta' WHEN l.city IS NOT NULL THEN 'city' ELSE 'region' END,
+                'city', l.city, 'region', l.region_code, 'zcta', l.zcta, 'county_fips', l.county_fips,
+                'county', l.county_name, 'country', l.country_code)
+              WHEN r.val IS NOT NULL THEN jsonb_build_object('label', r.val, 'level', 'city', 'city', r.city,
+                'region', r.state, 'zcta', NULL, 'county_fips', NULL, 'county', NULL, 'country', NULL) END AS area
+  FROM loc_record r LEFT JOIN loc_top t ON true LEFT JOIN loc_list_lead l ON true
+),
+loc_area_sources AS (
+  SELECT 'photo_gps' AS fam, t.last_taken_at AS observed_at,
+         jsonb_build_object('slug', 'photo_exif', 'label', 'photo GPS', 'kind', 'image', 'url', NULL,
+           'method', 'photo_gps_fold_v1', 'observed_at', t.last_taken_at,
+           'witness', jsonb_build_object('kind', 'location_observation', 'id', t.latest_observation_id),
+           'value', t.label, 'class', 'reading', 'photos', t.photos, 'days', t.days,
+           'first_taken_at', t.first_taken_at, 'last_taken_at', t.last_taken_at) AS src
+  FROM loc_top t JOIN loc_lead ll ON ll.area_norm = t.area_norm
+  UNION ALL
+  -- The latest row per listing platform that agrees with the lead area.
+  SELECT * FROM (
+    SELECT DISTINCT ON (l.source_platform) 'listing:' || coalesce(l.source_platform, 'listing'), l.observed_at,
+           jsonb_build_object('slug', l.source_platform, 'label', coalesce(l.source_platform, 'listing'), 'kind', 'listing',
+             'url', NULL, 'method', 'vehicle_location_observations.listing', 'observed_at', l.observed_at,
+             'witness', jsonb_build_object('kind', 'location_observation', 'id', l.id),
+             'value', concat_ws(', ', l.city, l.region_code), 'class', 'claim')
+    FROM loc_list l JOIN loc_lead ll ON ll.area_norm = l.area_norm
+    ORDER BY l.source_platform, l.observed_at DESC NULLS LAST, l.id) s
 ),
 loc_area AS (
-  SELECT ll.id IS NOT NULL AS observed,
-    CASE WHEN ll.id IS NULL AND lr.val IS NULL THEN 'missing'
-         WHEN ll.id IS NULL THEN 'claim'
+  SELECT ll.area, ll.basis,
+    CASE WHEN ll.basis IS NULL THEN 'missing'
          WHEN (SELECT count(*) FROM loc_area_sources) >= 2 THEN 'established'
-         WHEN ll.is_photo THEN 'reading' ELSE 'claim' END AS status,
-    CASE WHEN ll.id IS NOT NULL THEN jsonb_build_object('city', ll.city, 'region', ll.region_code, 'zcta', ll.zcta,
-           'county_fips', ll.county_fips, 'county', ll.county_name, 'country', ll.country_code,
-           'grain', CASE WHEN ll.zcta IS NOT NULL THEN 'zcta' WHEN ll.city IS NOT NULL THEN 'city' ELSE 'region' END)
-         WHEN lr.val IS NOT NULL THEN jsonb_build_object('city', (SELECT nullif(btrim(city), '') FROM v),
-           'region', (SELECT nullif(btrim(state), '') FROM v), 'zcta', NULL, 'county_fips', NULL, 'county', NULL,
-           'country', NULL, 'grain', 'city') END AS area,
+         WHEN ll.basis = 'photo' THEN 'reading' ELSE 'claim' END AS status,
     (SELECT coalesce(jsonb_agg(src ORDER BY observed_at DESC NULLS LAST), '[]'::jsonb) FROM loc_area_sources)
-      || CASE WHEN lr.val IS NOT NULL AND (ll.id IS NULL OR lr.norm = ll.area_norm)
+      || CASE WHEN lr.val IS NOT NULL AND lr.norm = ll.area_norm
          THEN jsonb_build_array(jsonb_build_object('slug', NULL, 'label', 'vehicle record', 'kind', 'record', 'url', NULL,
            'method', 'vehicles.city,state', 'observed_at', NULL, 'witness', NULL, 'value', lr.val, 'class', 'record'))
          ELSE '[]'::jsonb END AS sources
-  FROM loc_record lr LEFT JOIN loc_lead ll ON true
+  FROM loc_lead ll CROSS JOIN loc_record lr
 ),
 loc_items AS (
-  SELECT 0 AS ord, jsonb_build_object('key', 'location.current.area', 'facet', 'current', 'value', a.area,
-    'normalized', NULL, 'unit', NULL, 'status', a.status, 'sources', a.sources, 'rule', NULL, 'equation', NULL,
+  SELECT 'location.current.area' AS key, jsonb_build_object('value', a.area, 'status', a.status, 'sources', a.sources,
     'needed', CASE WHEN a.status <> 'established' THEN 'photos with camera GPS, or a dated listing location' END) AS doc
   FROM loc_area a
   UNION ALL
-  SELECT 1, jsonb_build_object('key', 'location.sources.photo_gps', 'facet', 'current',
-    'value', CASE WHEN count(*) > 0 THEN jsonb_build_object('photos', count(*), 'first_at', min(observed_at),
-      'last_at', max(observed_at), 'areas', count(DISTINCT coalesce(zcta, area_norm))) END,
-    'normalized', NULL, 'unit', NULL, 'status', CASE WHEN count(*) > 0 THEN 'reading' ELSE 'missing' END,
-    'sources', '[]'::jsonb, 'rule', NULL, 'equation', NULL,
+  SELECT 'location.sources.photo_gps', jsonb_build_object(
+    'value', CASE WHEN count(*) > 0 THEN jsonb_build_object('photos', sum(photos), 'days', sum(days),
+      'first_taken_at', min(first_taken_at), 'last_taken_at', max(last_taken_at),
+      'areas', jsonb_agg(jsonb_build_object('label', label, 'level', level, 'county_fips', county_fips, 'zcta', zcta,
+        'photos', photos, 'days', days, 'first_taken_at', first_taken_at, 'last_taken_at', last_taken_at,
+        'confidence', confidence, 'latest_observation_id', latest_observation_id) ORDER BY photos DESC, last_taken_at DESC)) END,
+    'status', CASE WHEN count(*) > 0 THEN 'reading' ELSE 'missing' END,
+    'sources', CASE WHEN count(*) > 0 THEN jsonb_build_array(jsonb_build_object('slug', 'photo_exif', 'label', 'photo GPS',
+      'kind', 'image', 'url', NULL, 'method', 'photo_gps_fold_v1', 'observed_at', max(last_taken_at),
+      'witness', NULL, 'value', NULL, 'class', 'reading')) ELSE '[]'::jsonb END,
     'needed', CASE WHEN count(*) = 0 THEN 'photos with camera GPS' END)
-  FROM loc WHERE is_photo
+  FROM loc_areas
   UNION ALL
-  SELECT 2, jsonb_build_object('key', 'location.sources.listing', 'facet', 'current',
+  SELECT 'location.sources.listing', jsonb_build_object(
     'value', CASE WHEN count(*) > 0 THEN jsonb_build_object('observations', count(*), 'first_at', min(observed_at),
-      'last_at', max(observed_at), 'platforms', count(DISTINCT coalesce(source_platform, source_type))) END,
-    'normalized', NULL, 'unit', NULL, 'status', CASE WHEN count(*) > 0 THEN 'claim' ELSE 'missing' END,
-    'sources', '[]'::jsonb, 'rule', NULL, 'equation', NULL,
+      'last_at', max(observed_at), 'platforms', count(DISTINCT coalesce(source_platform, 'listing'))) END,
+    'status', CASE WHEN count(*) > 0 THEN 'claim' ELSE 'missing' END, 'sources', '[]'::jsonb,
     'needed', CASE WHEN count(*) = 0 THEN 'a dated listing location' END)
-  FROM loc WHERE NOT is_photo
+  FROM loc_list
   UNION ALL
-  SELECT 3, jsonb_build_object('key', 'location.map', 'facet', 'current',
-    'value', CASE WHEN a.area IS NOT NULL THEN a.area || jsonb_build_object('bounds', NULL) END,
-    'normalized', NULL, 'unit', NULL,
-    'status', CASE WHEN a.area->>'zcta' IS NULL THEN 'missing' ELSE a.status END,
-    'sources', '[]'::jsonb, 'rule', NULL, 'equation', NULL,
-    'needed', CASE WHEN a.area->>'zcta' IS NULL THEN 'an established area at ZCTA grain' ELSE
-      'ZCTA boundary geometry for bounds (us_zctas holds codes only)' END)
+  SELECT 'location.map', jsonb_build_object(
+    'value', CASE WHEN a.area IS NOT NULL THEN jsonb_build_object('label', a.area->'label', 'level', a.area->'level',
+      'county_fips', a.area->'county_fips', 'zcta', a.area->'zcta', 'bounds', NULL) END,
+    'status', CASE WHEN a.area IS NULL THEN 'missing' ELSE a.status END, 'sources', '[]'::jsonb,
+    'needed', CASE WHEN a.area IS NULL THEN 'an established area at ZCTA grain'
+                   WHEN a.area->>'zcta' IS NULL THEN 'the ZCTA for this area (photo areas carry none until a ZIP keyer exists) and its boundary geometry (us_zctas holds codes only)'
+                   ELSE 'ZCTA boundary geometry for bounds (us_zctas holds codes only)' END)
   FROM loc_area a
 ),
+loc_docs AS (
+  SELECT l.key, jsonb_build_object('key', l.key, 'facet', f.facet, 'normalized', NULL, 'unit', f.unit, 'rule', NULL,
+    'equation', NULL) || l.doc AS doc
+  FROM loc_items l JOIN defs f ON f.key = l.key
+),
 everything AS (
-  SELECT dim, ord, doc FROM item
-  UNION ALL SELECT dim, ord, doc FROM derived
-  UNION ALL SELECT 'location', ord, doc FROM loc_items
+  SELECT d.dim, d.ord, e.doc
+  FROM (SELECT key, doc FROM item UNION ALL SELECT key, doc FROM derived_items UNION ALL SELECT key, doc FROM loc_docs) e
+  JOIN defs d ON d.key = e.key
 ),
 -- Identity lead: VIN decode precedence when the decode is established, else the recorded item.
 led AS (
-  SELECT e.dim, e.ord, e.doc || CASE WHEN e.dim IN ('year', 'make', 'model', 'body_style') THEN
+  SELECT e.dim, e.ord, e.doc || CASE WHEN e.dim IN ('year', 'make', 'model', 'body_style')
+      AND e.doc->>'key' IN (e.dim || '.decode', e.dim || '.recorded', e.dim || '.title') THEN
       jsonb_build_object('lead', e.doc->>'key' = CASE WHEN EXISTS (SELECT 1 FROM everything d
         WHERE d.doc->>'key' = e.dim || '.decode' AND d.doc->>'status' = 'established')
         THEN e.dim || '.decode' ELSE e.dim || '.recorded' END)
@@ -654,7 +873,8 @@ COMMENT ON FUNCTION public.vehicle_facet_items(uuid, text) IS
   'transmission, drivetrain, location), the fixed item list with each item''s value, status (established, reading, '
   'claim, conflict, missing), deduplicated sources with witness and clock, rule, equation and needed evidence. '
   'Dimension NULL returns every token as one object. Security invoker: the viewer''s row policies bound every source; '
-  'location is area grain only. Spec: docs/market/VEHICLE_HEADER_FORM_RULES.md "Facet items".';
+  'location is area grain only, from the photo GPS fold recounted at read time. '
+  'Spec: docs/market/VEHICLE_HEADER_FORM_RULES.md "Facet items".';
 
 DO $grants$
 DECLARE a record;
@@ -671,7 +891,7 @@ BEGIN
   END LOOP;
 END $grants$;
 
--- 5. Profile reader: items on each strip facet and every token's items on the masthead ------------------------------
+-- 5. Profile reader: every token's items on the masthead, read once ------------------------------------------------
 CREATE OR REPLACE FUNCTION pg_temp.patch_once(p_text text, p_anchor text, p_replacement text, p_what text) RETURNS text
 LANGUAGE plpgsql AS $f$
 DECLARE n integer := (length(p_text) - length(replace(p_text, p_anchor, ''))) / greatest(length(p_anchor), 1);
@@ -689,11 +909,6 @@ BEGIN
       E'\n-- facet_items_v1: every token''s line items (vehicle_facet_items), read once.\n'
       || E'token_items AS (SELECT public.vehicle_facet_items(p_vehicle_id) AS doc),\nstrip AS (',
       'vehicle_profile_read strip CTE');
-    d := pg_temp.patch_once(d,
-      $a$jsonb_build_object('dimension', dimension, 'label', label, 'member', member)$a$,
-      $b$jsonb_build_object('dimension', dimension, 'label', label, 'member', member,
-            'items', (SELECT ti.doc->dimension FROM token_items ti))$b$,
-      'vehicle_profile_read strip facets');
     d := pg_temp.patch_once(d,
       $a$'price', (SELECT claim FROM price_claim),$a$,
       $b$'token_items', (SELECT doc FROM token_items),
