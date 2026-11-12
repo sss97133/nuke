@@ -56,7 +56,7 @@ CREATE TABLE public.vehicle_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, kind text, content_text text, source_url text,
   extraction_method text, observed_at timestamptz, is_superseded boolean DEFAULT false, structured_data jsonb,
   confidence_score numeric, ingested_at timestamptz DEFAULT now(), source_id uuid, property_id uuid,
-  source_observation_id uuid);
+  source_observation_id uuid, submitted_by_user_id uuid);
 CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY, vehicle_id uuid, image_url text DEFAULT 'https://x.invalid/i.jpg',
   thumbnail_url text DEFAULT 'https://x.invalid/t.jpg', medium_url text,
   is_sensitive boolean DEFAULT false, is_superseded boolean DEFAULT false, is_duplicate boolean DEFAULT false,
@@ -452,6 +452,115 @@ DO $$ BEGIN
       AND a.grantee <> p.proowner
       AND NOT has_function_privilege(pg_get_userbyid(a.grantee), 'public.vehicle_facet_items(uuid,text)', 'EXECUTE')),
     'helper: EXECUTE only for roles that run the reader');
+END $$;
+
+-- 20261116034000: vehicle_profile_read reads its description captures by id, and no longer embeds the evidence summary.
+-- The live public policy calls observation_is_public(kind, structured_data); here it does too, with a stand-in that hides
+-- a listing row naming a seller. The live reader carries `'evidence', public.vehicle_profile_evidence(p_vehicle_id),`
+-- (added outside the migrations); the fixture adds it the same way so its removal is exercised.
+CREATE FUNCTION public.observation_is_public(p_kind text, p_data jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS
+$$ SELECT p_kind IN ('listing', 'specification') AND NOT coalesce(p_data ? 'seller_name', false) $$;
+CREATE FUNCTION public.vehicle_profile_evidence(p_vehicle_id uuid) RETURNS jsonb LANGUAGE sql STABLE AS
+$$ SELECT jsonb_build_object('version', 1, 'vehicle', p_vehicle_id) $$;
+GRANT EXECUTE ON FUNCTION public.observation_is_public(text, jsonb), public.vehicle_profile_evidence(uuid) TO anon, authenticated;
+DROP POLICY public_obs ON public.vehicle_observations;
+CREATE POLICY public_obs ON public.vehicle_observations FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_observations.vehicle_id AND v.is_public = true
+    AND public.observation_is_public(vehicle_observations.kind, vehicle_observations.structured_data)));
+DO $$ DECLARE d text := pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure); BEGIN
+  PERFORM public.t_assert(position(E'  ''identity_marks'', (SELECT marks FROM identity_marks),\n  ''sections'',' in d) > 0,
+    'fixture: the reader''s top-level keys');
+  EXECUTE replace(d, E'  ''identity_marks'', (SELECT marks FROM identity_marks),\n  ''sections'',',
+    E'  ''identity_marks'', (SELECT marks FROM identity_marks),\n  ''evidence'', public.vehicle_profile_evidence(p_vehicle_id),\n  ''sections'',');
+END $$;
+-- Description captures: v1 (public) has a readable one, a newer one naming its seller (hidden by the policy), a superseded
+-- one and a native dealer listing; v4 (private) has its owner's; v5 (deleted) has one.
+INSERT INTO public.vehicle_observations (id, vehicle_id, kind, content_text, source_url, extraction_method, observed_at,
+  is_superseded, structured_data) VALUES
+ ('61000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'listing', 'Readable fixture prose.',
+  'https://example.org/lot', 'html_description_capture', '2026-10-01T00:00:00Z', false, '{"description_capture": true}'),
+ ('61000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'listing', 'Prose naming its seller.',
+  'https://example.org/lot', 'html_description_capture', '2026-10-02T00:00:00Z', false,
+  '{"description_capture": true, "seller_name": "Fixture Seller"}'),
+ ('61000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'listing', 'Superseded prose.',
+  'https://example.org/lot', 'html_description_capture', '2026-10-03T00:00:00Z', true, '{"description_capture": true}'),
+ ('61000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'listing', 'Dealer prose.',
+  'https://example.org/dealer', 'dealer_microdata_v2', '2026-09-01T00:00:00Z', false, '{"source_claims_only": true}'),
+ ('61000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000004', 'listing', 'Private prose.',
+  'https://example.org/private', 'html_description_capture', '2026-10-01T00:00:00Z', false, '{"description_capture": true}'),
+ ('61000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000005', 'listing', 'Deleted prose.',
+  'https://example.org/deleted', 'html_description_capture', '2026-10-01T00:00:00Z', false, '{"description_capture": true}');
+CREATE TABLE public.t_profile_snap (phase text, who text, vid uuid, doc jsonb, helper uuid[], policy uuid[]);
+CREATE FUNCTION public.t_profile_snapshot(p_phase text) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE w record; c record; d jsonb; h uuid[]; p uuid[];
+BEGIN
+  FOR w IN SELECT * FROM (VALUES
+      ('anon', 'anon', ''),
+      ('untied', 'authenticated', '20000000-0000-0000-0000-000000000099'),
+      ('owner_v1', 'authenticated', '20000000-0000-0000-0000-000000000001'),
+      ('owner_v4', 'authenticated', '20000000-0000-0000-0000-000000000004')) x(who, role, uid) LOOP
+    FOR c IN SELECT * FROM (VALUES
+        ('10000000-0000-0000-0000-000000000001'::uuid), ('10000000-0000-0000-0000-000000000002'::uuid),
+        ('10000000-0000-0000-0000-000000000004'::uuid), ('10000000-0000-0000-0000-000000000005'::uuid)) v(vid) LOOP
+      PERFORM set_config('test.auth_role', w.role, true);
+      PERFORM set_config('test.auth_uid', w.uid, true);
+      EXECUTE format('SET LOCAL ROLE %I', w.role);
+      d := public.vehicle_profile_read(c.vid) - 'read_at';
+      h := NULL;
+      IF to_regprocedure('public.vehicle_profile_observation_ids(uuid)') IS NOT NULL THEN
+        EXECUTE 'SELECT array(SELECT unnest(public.vehicle_profile_observation_ids($1)) ORDER BY 1)' INTO h USING c.vid;
+      END IF;
+      -- The candidate rows the row policies show this viewer.
+      p := array(SELECT o.id FROM public.vehicle_observations o WHERE o.vehicle_id = c.vid AND o.kind = 'listing'
+        AND (o.structured_data->>'description_capture' = 'true'
+             OR o.extraction_method IN ('gateway_jsonld_v1', 'dealer_microdata_v1', 'dealer_microdata_v2')) ORDER BY 1);
+      RESET ROLE;
+      INSERT INTO public.t_profile_snap VALUES (p_phase, w.who, c.vid, d, h, p);
+    END LOOP;
+  END LOOP;
+  PERFORM set_config('test.auth_role', '', true);
+  PERFORM set_config('test.auth_uid', '', true);
+END $$;
+SELECT public.t_profile_snapshot('before');
+\ir ../migrations/20261116034000_vehicle_profile_read_observation_ids.sql
+\ir ../migrations/20261116034000_vehicle_profile_read_observation_ids.sql
+SELECT public.t_profile_snapshot('after');
+DO $$ BEGIN
+  PERFORM public.t_assert((SELECT count(*) FROM public.t_profile_snap WHERE phase = 'before') = 16, 'profile snapshot taken');
+  PERFORM public.t_assert(NOT EXISTS (
+    SELECT 1 FROM public.t_profile_snap b JOIN public.t_profile_snap a
+      ON a.phase = 'after' AND a.who = b.who AND a.vid = b.vid
+    WHERE b.phase = 'before' AND a.doc IS DISTINCT FROM (b.doc - 'evidence')),
+    'every viewer, every vehicle: the same profile document, without the evidence summary');
+  PERFORM public.t_assert((SELECT count(*) FROM public.t_profile_snap WHERE phase = 'before' AND doc ? 'evidence') > 0
+    AND NOT EXISTS (SELECT 1 FROM public.t_profile_snap WHERE phase = 'after' AND doc ? 'evidence'), 'evidence key removed');
+  PERFORM public.t_assert((SELECT bool_and(doc->'description'->>'text' = 'Readable fixture prose.') FROM public.t_profile_snap
+    WHERE phase = 'after' AND vid = '10000000-0000-0000-0000-000000000001' AND who <> 'owner_v1'),
+    'a stranger reads the readable description, not the newer one naming its seller');
+  PERFORM public.t_assert((SELECT doc->'description'->>'text' FROM public.t_profile_snap
+    WHERE phase = 'after' AND vid = '10000000-0000-0000-0000-000000000001' AND who = 'owner_v1') = 'Prose naming its seller.',
+    'the owner reads the newest capture');
+  PERFORM public.t_assert((SELECT doc->'description'->>'text' FROM public.t_profile_snap
+    WHERE phase = 'after' AND vid = '10000000-0000-0000-0000-000000000004' AND who = 'owner_v4') = 'Private prose.',
+    'a private vehicle''s owner reads its description');
+  -- The helper names exactly the candidate rows the policies show the caller on a vehicle it may see, and nothing on a
+  -- vehicle it may not (a deleted vehicle's rows stay readable through the table policy; the helper names none).
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_profile_snap WHERE phase = 'after'
+    AND vid <> '10000000-0000-0000-0000-000000000005' AND helper IS DISTINCT FROM policy), 'helper = row policies');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_profile_snap WHERE phase = 'after'
+    AND NOT (helper <@ policy)), 'helper names no row its caller cannot read');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_profile_snap WHERE phase = 'after'
+    AND who = 'anon' AND '61000000-0000-0000-0000-000000000002' = ANY (helper)), 'helper: hidden row not named to anon');
+  PERFORM public.t_assert((SELECT bool_and(cardinality(helper) = 0) FROM public.t_profile_snap
+    WHERE phase = 'after' AND vid IN ('10000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000005')
+      AND who IN ('anon', 'untied', 'owner_v1')), 'helper: nothing on a private or deleted vehicle to a stranger');
+  PERFORM public.t_assert((SELECT prosecdef AND prorettype = 'uuid[]'::regtype FROM pg_proc
+    WHERE oid = 'public.vehicle_profile_observation_ids(uuid)'::regprocedure), 'profile helper returns ids only');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
+    WHERE p.oid = 'public.vehicle_profile_observation_ids(uuid)'::regprocedure AND a.grantee = 0), 'profile helper: no PUBLIC execute');
+  PERFORM public.t_assert((length(pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure))
+    - length(replace(pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure), 'vehicle_profile_observation_ids', '')))
+    / length('vehicle_profile_observation_ids') = 1, 'profile patch applied once');
 END $$;
 
 -- 0. Shape of the machine: invoker, stable, the profile reader's grants, no PUBLIC execute.
