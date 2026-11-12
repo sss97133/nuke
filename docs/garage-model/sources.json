@@ -33,7 +33,7 @@
    "readers_extra": "",
    "trust": "Owner-confirmed (confirmed_at set) but one radius 1.77 km is too coarse to prove presence.",
    "maps_to": "garage_sites (source=user_site; confirmed_by/at carried over). One row per user means a tech with their own site would not align to the garage without a mapping.",
-   "gaps": "Only 2 users have rows. Shops moving over time (2017-) have no earlier sites. No shared/org-level site.",
+   "gaps": "Only 3 users have rows (verified live 11:45 AM AST). Shops moving over time (2017-) have no earlier sites. No shared/org-level site.",
    "in_model_md": true,
    "status": "live",
    "ios_refs": [
