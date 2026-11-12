@@ -695,6 +695,17 @@ found broken and what is still unproven:
     vehicle now carries `keyed_claim_ids`, at least one, and every id listed must be such a claim witnessed by that
     photo. The caption stays because `visual_work_build_log` requires it. This is the first write that makes a keyed
     row *connected* in rule 7's sense (a job cites it); no reader counts that yet.
+  - *The third refusal, live* (#3405, read 2026-11-12 02:27 UTC): of the 31 current records 23 fail it (21 distinct
+    photos) and 2 pass all three checks. Still no write on the vehicle since 2026-11-11 16:43.
+  - *The fourth refusal* (`20261116020000`, contract `test_visual_work_sourced_number_guard.sql`), for gap 3, enforcing
+    ruling (1) below. Read 02:27 UTC: 21 material lines priced as `analyst_range`, each with a supplier URL in free
+    text and none of those pages retained (0 in `listing_page_snapshots`, 0 as a `catalog_parts.supplier_url`); 24
+    labor lines with `analyst_range` hours; 26 records with a typed hourly rate, while `resolve_labor_rate()` answers
+    from stored rows and reports its own sample size. A material `analyst_range` price now cites
+    `pricing.catalog_part_id` (same price and currency) or `pricing.source_snapshot_id`; a labor line cites a
+    `labor_operation` or a `stage_row` or is unpriced; `rate_basis` is not `explicit_assumption`. Kinds the check does
+    not name are left to the cost fold. The stored totals do not move until a record is rewritten; when one is, labor
+    that rested on typed hours becomes unresolved, which is the true state.
   - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on
     reason and logic." They are the agent's reasoning, not his word, and he can overturn them. (1) A researched or
     analyst number (price, hours, rate) is not stored as a number in a record. Invariant 5 says a number is cited from
