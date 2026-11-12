@@ -340,6 +340,9 @@ async function processVehicle(
       body: JSON.stringify({
         model: run.model,
         max_tokens: 6000,
+        // Output tokens include the model's thinking. At default effort Haiku spent all 6,000 before closing the
+        // JSON on 5 of 5 lots (2026-11-12); low effort leaves the budget for the answer.
+        output_config: { effort: "low" },
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -365,7 +368,7 @@ async function processVehicle(
     try {
       discovered = JSON.parse(jsonMatch[0]);
     } catch {
-      return { success: false, error: "Failed to parse discovery JSON" };
+      return { success: false, error: `Failed to parse discovery JSON (stop_reason ${result.stop_reason}, ${result.usage?.output_tokens} output tokens)` };
     }
 
     // Extract top-level fields for quick access
