@@ -74,8 +74,8 @@ BEGIN
     d := pg_temp.patch_once(d,
       E'  FROM public.vehicle_observations o\n  WHERE o.vehicle_id = p_vehicle_id AND o.kind = ''listing''\n',
       E'  FROM public.vehicle_observations o\n'
-      E'  WHERE o.id = ANY ((SELECT public.vehicle_profile_observation_ids(p_vehicle_id)))\n'
-      E'    AND o.vehicle_id = p_vehicle_id AND o.kind = ''listing''\n',
+      || E'  WHERE o.id = ANY ((SELECT public.vehicle_profile_observation_ids(p_vehicle_id)))\n'
+      || E'    AND o.vehicle_id = p_vehicle_id AND o.kind = ''listing''\n',
       'vehicle_profile_read descr');
   END IF;
   IF position(E'  ''evidence'', public.vehicle_profile_evidence(p_vehicle_id),\n' in d) > 0 THEN
