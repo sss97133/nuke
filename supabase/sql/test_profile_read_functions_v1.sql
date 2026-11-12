@@ -62,7 +62,6 @@ CREATE TABLE public.payment_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(
   paid_at timestamptz, counterparty_name text, counterparty_org_id uuid, scope_type text, scope_id uuid, description text,
   source_observation_id uuid, source_url text, is_superseded boolean);
 CREATE TABLE public.deal_jackets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, created_by uuid, organization_id uuid,
-  visibility text NOT NULL DEFAULT 'org',
   entity_owner text, deal_type text, acquisition_date date, sold_date date, initial_cost numeric, total_initial_cost numeric,
   sale_price_inc_doc numeric, total_selling_price numeric, net_auction_proceeds numeric, gross_profit numeric,
   created_at timestamptz DEFAULT '2026-01-04', visibility text DEFAULT 'org');
