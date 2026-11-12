@@ -204,7 +204,10 @@ INSERT INTO public.vehicle_images (id, vehicle_id) VALUES
  ('50000000-0000-0000-0000-00000000000e', '10000000-0000-0000-0000-000000000001'),
  ('50000000-0000-0000-0000-00000000000f', '10000000-0000-0000-0000-000000000001'),
  ('50000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000001'),
- ('50000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001');
+ ('50000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-000000000013', '10000000-0000-0000-0000-000000000001'),
+ ('50000000-0000-0000-0000-000000000014', '10000000-0000-0000-0000-000000000001');
 -- GPS photos of v1, as in test_field_provenance_photo_location.sql: two on day 1, one on day 2, and a sensitive one
 -- listed on day 2 that no reader may count.
 INSERT INTO public.vehicle_images (id, vehicle_id, taken_at, latitude, longitude, is_sensitive) VALUES
@@ -254,6 +257,13 @@ INSERT INTO public.vehicle_observations (id, vehicle_id, kind, source_url, extra
   '2026-10-28T17:09:31Z', '{"image_id":"50000000-0000-0000-0000-00000000000c","claim_role":"transmission_case_model","case_casting":"9990001","transmission_model":"Fixture M20 or M21 (case)","transmission":"Muncie 4-speed manual","excluded_models":["M22"],"factory_configuration_status":"not_original_unit"}', NULL, NULL),
  ('60000000-0000-0000-0000-000000000019', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'physical_transcription_v1',
   '2026-10-28T17:11:29Z', '{"image_id":"50000000-0000-0000-0000-000000000011","claim_role":"transmission_bellhousing","bellhousing_casting":"999003","uncertain_characters":"first digit 5 or 6"}', NULL, NULL),
+ -- Tail housing, side cover and shifter, each on its own photo, in the shapes the transmission reader writes.
+ ('60000000-0000-0000-0000-00000000001e', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'physical_transcription_v1',
+  '2026-10-28T17:12:00Z', '{"image_id":"50000000-0000-0000-0000-000000000012","claim_role":"transmission_tailhousing","transmission_tailhousing":"999004","transmission":"Muncie four-speed","output_spline_count":27,"speedometer_output_side":"left","limitation":"Fixture: spline count read from a side view."}', NULL, NULL),
+ ('60000000-0000-0000-0000-00000000001f', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'physical_transcription_v1',
+  '2026-10-28T17:12:30Z', '{"image_id":"50000000-0000-0000-0000-000000000013","claim_role":"transmission_side_cover","transmission_side_cover_casting":"999005","uncertain_characters":"last digit 5 or 6"}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000020', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'physical_transcription_v1',
+  '2026-10-28T17:13:00Z', '{"image_id":"50000000-0000-0000-0000-000000000014","claim_role":"transmission_shifter","shifter_bracket_marking":"ZZ-01","shifter_linkage":"fixture floor linkage"}', NULL, NULL),
  -- Engine: the block casting on image a (read before the interactive reading of the same photo), the code stamp on
  -- image 10.
  ('60000000-0000-0000-0000-00000000001a', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'engine_block_decode_v1',
@@ -448,6 +458,8 @@ BEGIN
   -- Transmission: readers on several photos establish the type; the case reading is the model.
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.type');
   PERFORM public.t_assert(i->>'status' = 'established' AND i->>'normalized' = 'manual', 'independent readings establish manual');
+  PERFORM public.t_assert(i->>'value' = 'manual' AND i->>'stated' IS NOT NULL AND i->>'stated' <> 'manual',
+    'established on what the readings share; the most specific words stay in stated, not as the value');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(i->'sources') s WHERE s->>'slug' = 'system_update'),
     'the record echo is not a source');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.model');
@@ -458,6 +470,16 @@ BEGIN
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.bellhousing_casting');
   PERFORM public.t_assert(i->>'value' = '999003' AND i#>>'{sources,0,limitation}' LIKE '%first digit 5 or 6%', 'bellhousing, uncertain digit');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.tailhousing_casting');
+  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = '999004'
+    AND i#>>'{sources,0,decoded,output_spline_count}' = '27' AND i#>>'{sources,0,witness,id}' = '50000000-0000-0000-0000-000000000012'
+    AND i#>>'{sources,0,limitation}' LIKE '%side view%', 'tail housing casting, with its decoded spline count and limitation');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.side_cover_casting');
+  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = '999005'
+    AND i#>>'{sources,0,limitation}' LIKE '%last digit 5 or 6%', 'side cover casting, uncertain digit');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.shifter');
+  PERFORM public.t_assert(i->>'status' = 'reading' AND i->>'value' = 'ZZ-01'
+    AND i#>>'{sources,0,decoded,shifter_linkage}' = 'fixture floor linkage', 'shifter marking with its linkage');
+  i := public.t_item('10000000-0000-0000-0000-000000000003', 'transmission', 'transmission.current.tailhousing_casting');
   PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' = 'photo of the tail housing casting number', 'missing tail housing');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.as_built.type');
   PERFORM public.t_assert(i->>'status' = 'missing' AND i->>'needed' = 'fixture billing history; fixture build sheet'

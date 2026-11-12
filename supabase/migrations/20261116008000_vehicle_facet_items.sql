@@ -505,6 +505,7 @@ sides AS (
 agg AS (
   SELECT r.key,
          count(DISTINCT r.norm) AS nvals,
+         count(DISTINCT r.val) AS nraw,
          bool_or(r.cls IN ('decode', 'receipt')) AS strong,
          count(DISTINCT r.indep) FILTER (WHERE r.cls <> 'record') AS nind,
          count(DISTINCT r.family) FILTER (WHERE r.cls <> 'record') AS nfam,
@@ -535,7 +536,7 @@ examined AS (
 ),
 base AS (
   SELECT d.dim, d.ord, d.key, d.facet, d.unit, coalesce(ex.needed, d.needed) AS needed, ex.checked,
-         a.lead_val, a.lead_norm, a.lead_nk, a.rule, a.sources,
+         a.lead_val, a.lead_norm, a.lead_nk, a.rule, a.sources, a.strong, a.nraw,
          CASE WHEN a.key IS NULL THEN 'missing'
               WHEN a.nvals > 1 THEN 'conflict'
               WHEN a.strong THEN 'established'
@@ -552,8 +553,10 @@ item AS (
   SELECT key, jsonb_build_object(
     'key', key, 'facet', facet,
     -- A quantity with a unit is shown in that unit; the stated words stay on each source and in `stated`.
-    'value', CASE WHEN lead_nk IN ('displacement', 'number') THEN lead_norm ELSE lead_val END,
-    'stated', CASE WHEN lead_nk IN ('displacement', 'number') THEN lead_val END,
+    -- A class established by independent sources that word it differently ("manual", "Muncie four-speed manual")
+    -- shows the class they share: the more specific words are one source's, so they stay in `stated`.
+    'value', CASE WHEN lead_nk IN ('displacement', 'number') OR shared_class THEN lead_norm ELSE lead_val END,
+    'stated', CASE WHEN lead_nk IN ('displacement', 'number') OR shared_class THEN lead_val END,
     'normalized', lead_norm, 'unit', unit, 'status', status,
     'sources', coalesce(sources, '[]'::jsonb), 'rule', rule, 'equation', NULL,
     'needed', CASE WHEN status <> 'established' THEN needed END)
@@ -561,7 +564,8 @@ item AS (
     || CASE WHEN checked IS NOT NULL AND status = 'missing' THEN jsonb_build_object('examined', checked) ELSE '{}'::jsonb END
     AS doc,
     status, lead_norm
-  FROM base
+  FROM (SELECT base.*, (status = 'established' AND NOT coalesce(strong, false) AND nraw > 1
+          AND lead_nk IN ('transmission_type', 'layout', 'configuration', 'year')) AS shared_class FROM base) b
 ),
 -- Ratios for the identified transmission model, from the cited rule table, by code only (no year filter). A model
 -- reading that names several codes ("M20 or M21") matches each; candidates that disagree are shown, never computed over.
