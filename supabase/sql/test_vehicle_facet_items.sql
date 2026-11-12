@@ -350,7 +350,7 @@ BEGIN
 
   -- Thin evidence: every item is present, almost all missing, each with what would establish it.
   all_items := public.vehicle_facet_items('10000000-0000-0000-0000-000000000003');
-  PERFORM public.t_assert((SELECT count(*) FROM jsonb_each(all_items) e, jsonb_array_elements(e.value) x) = 45, 'fixed item list');
+  PERFORM public.t_assert((SELECT count(*) FROM jsonb_each(all_items) e, jsonb_array_elements(e.value) x) = 46, 'fixed item list');
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_each(all_items) e, jsonb_array_elements(e.value) x
     WHERE x->>'status' = 'missing' AND nullif(x->>'needed', '') IS NULL), 'every missing item names its evidence');
 
@@ -398,5 +398,12 @@ BEGIN
   PERFORM public.t_assert(i#>>'{value,zcta}' = '89012' AND i::text NOT LIKE '%36.01%', 'owner: area grain, no point');
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-000000000005') IS NULL, 'deleted: nothing even to a party');
 END $$;
+RESET ROLE;
+-- The documented fixture car as a logged-out viewer sees it (printed for review).
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+SELECT d AS dimension, jsonb_pretty(public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', d)) AS items
+FROM unnest(ARRAY['year', 'engine', 'transmission', 'location']) d;
 RESET ROLE;
 SELECT 'vehicle facet items: PASS' AS result;
