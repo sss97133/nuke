@@ -21,6 +21,8 @@ CREATE TABLE public.vehicle_location_observations(id uuid PRIMARY KEY, vehicle_i
 CREATE TEMP TABLE before_engine AS SELECT public.get_field_provenance('11111111-1111-1111-1111-111111111111','engine_type') AS p;
 \ir ../migrations/20261116003000_field_provenance_photo_location.sql
 \ir ../migrations/20261116003000_field_provenance_photo_location.sql
+\ir ../migrations/20261116004000_field_provenance_photo_location_ids.sql
+\ir ../migrations/20261116004000_field_provenance_photo_location_ids.sql
 DO $$ BEGIN
  ASSERT public.get_field_provenance('11111111-1111-1111-1111-111111111111','engine_type')
    = (SELECT p FROM before_engine), 'other fields unchanged';
