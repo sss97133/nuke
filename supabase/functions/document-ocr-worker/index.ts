@@ -410,7 +410,7 @@ async function classifyWithGPT4o(imageUrl: string): Promise<any> {
 }
 
 async function classifyWithClaude(base64Image: string, mediaType: string): Promise<any> {
-  const apiKey = Deno.env.get("NUKE_CLAUDE_API") || Deno.env.get("ANTHROPIC_API_KEY");
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY") || Deno.env.get("NUKE_CLAUDE_API");
   if (!apiKey) throw new Error("No Anthropic API key");
 
   const mType = mediaType.includes("png") ? "image/png" : mediaType.includes("webp") ? "image/webp" : "image/jpeg";
@@ -442,7 +442,7 @@ async function classifyWithClaude(base64Image: string, mediaType: string): Promi
   }
 
   const data = await response.json();
-  const content = data.content?.[0]?.text;
+  const content = (data.content ?? []).find((b: { type?: string }) => b?.type === "text")?.text;
   if (!content) throw new Error("Empty Anthropic response");
 
   const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -533,7 +533,7 @@ async function extractWithGemini(base64Image: string, mediaType: string, docType
 }
 
 async function extractWithClaude(base64Image: string, mediaType: string, docType: string): Promise<any> {
-  const apiKey = Deno.env.get("NUKE_CLAUDE_API") || Deno.env.get("ANTHROPIC_API_KEY");
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY") || Deno.env.get("NUKE_CLAUDE_API");
   if (!apiKey) throw new Error("No Anthropic API key");
 
   const mType = mediaType.includes("png") ? "image/png" : mediaType.includes("webp") ? "image/webp" : "image/jpeg";
@@ -546,7 +546,7 @@ async function extractWithClaude(base64Image: string, mediaType: string, docType
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       max_tokens: 4000,
       messages: [{
         role: "user",
@@ -565,7 +565,7 @@ async function extractWithClaude(base64Image: string, mediaType: string, docType
   }
 
   const data = await response.json();
-  const content = data.content?.[0]?.text;
+  const content = (data.content ?? []).find((b: { type?: string }) => b?.type === "text")?.text;
   if (!content) throw new Error("Empty Anthropic response");
 
   const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -575,7 +575,7 @@ async function extractWithClaude(base64Image: string, mediaType: string, docType
   return {
     result: parsed,
     provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-5-5",
     tokens_input: usage.input_tokens || 0,
     tokens_output: usage.output_tokens || 0,
     cost_usd: ((usage.input_tokens || 0) * 3 / 1_000_000) + ((usage.output_tokens || 0) * 15 / 1_000_000),
