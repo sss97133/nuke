@@ -159,7 +159,7 @@ If you see a receipt, read it to find clues about which vehicle it's for (part n
     const mediaType = image.image_url.includes('.png') ? 'image/png' : 'image/jpeg';
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-5-5",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
       messages: [
         {
@@ -237,7 +237,7 @@ async function processReceipt(imageId: string, imageUrl: string, vehicleId: stri
 
     // Extract receipt details
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-5-5",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
       messages: [{
         role: "user",

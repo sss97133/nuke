@@ -401,7 +401,7 @@ async function extractWithClaude(imageUrl: string, apiKey: string): Promise<any>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-5-5",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 8000,
         messages: [{
           role: "user",

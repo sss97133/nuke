@@ -546,7 +546,7 @@ async function extractWithClaude(base64Image: string, mediaType: string, docType
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-5-5",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 4000,
       messages: [{
         role: "user",
@@ -575,7 +575,7 @@ async function extractWithClaude(base64Image: string, mediaType: string, docType
   return {
     result: parsed,
     provider: "anthropic",
-    model: "claude-sonnet-5-5",
+    model: "claude-sonnet-4-20250514",
     tokens_input: usage.input_tokens || 0,
     tokens_output: usage.output_tokens || 0,
     cost_usd: ((usage.input_tokens || 0) * 3 / 1_000_000) + ((usage.output_tokens || 0) * 15 / 1_000_000),

@@ -147,7 +147,7 @@ Only set vehicleId if you're confident it matches a known vehicle.`;
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-5-5",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 2000,
         messages: [{
           role: "user",
