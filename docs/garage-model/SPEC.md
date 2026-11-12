@@ -401,6 +401,8 @@ know the car is here, not see its media or money".
 
 ## 9. RLS and visibility: role × relationship
 
+See also [`VISIBILITY.md`](VISIBILITY.md): the full matrix, the live re-verification of H1–H6 (plus H8–H12), the drafted policy fixes and the rollout order.
+
 ### 9.1 What the draft DDL already enforces (tested)
 
 * RLS **enabled** on all 8 garage tables. **No INSERT/UPDATE/DELETE policy and no write grant** for `anon`/`authenticated`; every write is a SECURITY DEFINER function (or the service role, which bypasses RLS).
