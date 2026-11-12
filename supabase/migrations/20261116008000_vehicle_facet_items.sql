@@ -13,8 +13,8 @@
 --    row policies, plus the vehicle visibility test stated here. Dimension NULL returns every token's items as one object.
 --    Photo readings keyed by a closed claim role (cowl tag, transmission ID stamp and castings, engine block and code
 --    stamp) land on their items with their image as witness and their uncertain characters as a limitation.
---    Location reads the photo GPS fold's admitted rows (admit_photo_gps_locations, 20261116001000) with the same row
---    filter and read-time photo recount as get_field_provenance('location') (20261116003000), at area grain only.
+--    Location reads photo GPS areas from vehicle_location_areas (20261116007000), the one fold that
+--    get_field_provenance('location') also reads, at area grain only; it is called only for the location token.
 -- 5. vehicle_profile_read: the masthead carries `token_items`, every token's items, read once. It is the single home
 --    for items; strip facets are unchanged. Patched at anchors; refuses drift; skipped when already present.
 BEGIN;
@@ -56,13 +56,15 @@ GRANT SELECT ON public.vehicle_decode_rules TO anon, authenticated;
 GRANT ALL ON public.vehicle_decode_rules TO service_role;
 COMMENT ON TABLE public.vehicle_decode_rules IS
   'Cited decode rules (grain: one rule row for one key, optionally narrowed by make, model, year range and qualifiers). '
-  'rule_key names the table: transmission_gear_ratios (code = the bare model code as stamped or cast, e.g. M20, TH400, '
-  'with no maker prefix; value.gears = numeric array first..top, value.reverse), axle_code (value.ratio, value.limited_slip), engine_code (code = VIN engine character, '
-  'value.displacement_ci, value.family), block_casting, body_tag_code, vin_chart (code = decode rule key, '
-  'value.positions = {field: "position"}). qualifiers narrows a row further (unit year, ratio-set name). Every row '
-  'carries citation_url; a newer row supersedes an older one (superseded_by, superseded_at), never an update in place. '
-  'Gear ratios are looked up by code only: when several current rows for the identified model disagree, the reader '
-  'reports the candidates and computes nothing. Read by vehicle_facet_items. Created empty by 20261116011000.';
+  'rule_key names the table. Read by vehicle_facet_items: transmission_gear_ratios (code = the bare model code as '
+  'stamped or cast, e.g. M20, with no maker prefix; value.gears = numeric array first..top, value.reverse, '
+  'value.countershaft_in), transmission_case_casting (code = case casting number, value.countershaft_in), vin_chart '
+  '(code = decode rule key, value.positions = {field: "position"}). Seeded alongside: axle_code (value.ratio, '
+  'value.limited_slip), engine_stamp_code, vin_engine_char, block_casting, head_code and the body_tag_* keys. '
+  'qualifiers holds scope (oem_group, lookup_by, variants), never the value. Every row carries citation_url; a newer '
+  'row supersedes an older one (superseded_by, superseded_at), never an update in place. Gear ratios are looked up by '
+  'code, never by the car''s year, narrowed by the countershaft of the case casting read off the unit; when sets still '
+  'disagree the reader reports the candidates and computes nothing. Created empty by 20261116008000.';
 
 -- 2. Public source label ----------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.observation_source_label(p_source_id uuid)
@@ -316,7 +318,9 @@ t AS (
   UNION ALL
   -- Registry-keyed observations (observation_properties). A retained listing projection must still match its parent,
   -- and a record-title label must still quote the vehicle's title, as vehicle_profile_read requires.
-  SELECT m.key, o.sd->>o.pk, m.nk,
+  -- A multi-valued key with a facet discriminator (structured_data.facet = 'as_built') lands on its as-built item.
+  SELECT CASE WHEN o.sd->>'facet' = 'as_built' AND m.as_built_key IS NOT NULL THEN m.as_built_key ELSE m.key END,
+         o.sd->>o.pk, m.nk,
          CASE WHEN o.image_id IS NOT NULL THEN 'reading' ELSE 'claim' END,
          CASE WHEN o.image_id IS NOT NULL THEN 'img:' || o.image_id
               ELSE 'src:' || coalesce(sl.label->>'slug', o.method) END,
@@ -329,18 +333,36 @@ t AS (
                         WHEN o.kind = 'listing' OR o.role = 'listing_claim' THEN 'listing' ELSE o.kind END,
            'url', CASE WHEN o.image_id IS NULL THEN o.source_url END, 'method', o.method, 'observed_at', o.observed_at,
            'witness', o.witness, 'value', o.sd->>o.pk,
-           'class', CASE WHEN o.image_id IS NOT NULL THEN 'reading' ELSE 'claim' END),
+           'class', CASE WHEN o.image_id IS NOT NULL THEN 'reading' ELSE 'claim' END, 'limitation', o.limitation),
          NULL::jsonb
   FROM obs_w o CROSS JOIN v
   JOIN (VALUES
-    ('year', 'year.recorded', 'year'), ('make', 'make.recorded', 'text'), ('model', 'model.recorded', 'text'),
-    ('body_style', 'body_style.recorded', 'text'), ('trim', 'trim.recorded', 'text'),
-    ('transmission_type', 'transmission.current.type', 'transmission_type'),
-    ('engine_displacement_l', 'engine.current.displacement', 'displacement'),
-    ('engine_configuration', 'engine.current.family', 'configuration'),
-    ('engine_code', 'engine.current.engine_code_stamp', 'text'),
-    ('drivetrain_layout', 'drivetrain.current.layout', 'layout')
-  ) m(pk, key, nk) ON m.pk = o.pk
+    ('year', 'year.recorded', 'year', NULL), ('make', 'make.recorded', 'text', NULL),
+    ('model', 'model.recorded', 'text', NULL), ('body_style', 'body_style.recorded', 'text', NULL),
+    ('trim', 'trim.recorded', 'text', NULL),
+    ('transmission_type', 'transmission.current.type', 'transmission_type', NULL),
+    ('engine_displacement_l', 'engine.current.displacement', 'displacement', NULL),
+    ('engine_configuration', 'engine.current.family', 'configuration', NULL),
+    ('engine_code', 'engine.current.engine_code_stamp', 'text', NULL),
+    ('drivetrain_layout', 'drivetrain.current.layout', 'layout', NULL),
+    -- Registry keys proposed for the body tag, transmission and engine readings (schema_proposals set
+    -- drivetrain-bodytag-keys-v3-20261111): once accepted, the claim-role readings are superseded onto them.
+    ('body_tag_style', 'body_style.body_tag', 'text', NULL),
+    ('body_tag_body_number', 'body_style.body_number', 'text', NULL),
+    ('body_tag_build_date', 'body_style.build_date', 'text', NULL),
+    ('body_tag_trim_code', 'trim.as_built.interior', 'text', NULL),
+    ('transmission_model', 'transmission.current.model', 'text', 'transmission.as_built.model'),
+    ('transmission_id_stamp', 'transmission.current.id_stamp', 'text', NULL),
+    ('transmission_case_casting', 'transmission.current.case_casting', 'text', NULL),
+    ('transmission_tailhousing_casting', 'transmission.current.tailhousing_casting', 'text', NULL),
+    ('transmission_side_cover_casting', 'transmission.current.side_cover_casting', 'text', NULL),
+    ('bellhousing_casting', 'transmission.current.bellhousing_casting', 'text', NULL),
+    ('shifter_bracket_marking', 'transmission.current.shifter', 'text', NULL),
+    ('engine_block_casting', 'engine.current.block_casting', 'text', NULL),
+    ('engine_code_stamp', 'engine.current.engine_code_stamp', 'text', NULL),
+    ('rear_axle_ratio', 'transmission.axle.current.ratio', 'ratio', 'transmission.axle.as_built.ratio'),
+    ('tire_size', 'transmission.current.tire_size', 'text', NULL)
+  ) m(pk, key, nk, as_built_key) ON m.pk = o.pk
   LEFT JOIN LATERAL (SELECT public.observation_source_label(o.source_id) AS label) sl ON true
   WHERE NOT (o.method LIKE 'vin\_decode\_%' AND o.sd ? 'decode_rule')
     AND nullif(btrim(o.sd->>o.pk), '') IS NOT NULL
@@ -544,7 +566,8 @@ item AS (
 -- Ratios for the identified transmission model, from the cited rule table, by code only (no year filter). A model
 -- reading that names several codes ("M20 or M21") matches each; candidates that disagree are shown, never computed over.
 gear_cand AS (
-  SELECT r.id, r.code, r.value->'gears' AS gears, r.citation_url, r.citation_title, r.qualifiers, i.status
+  SELECT r.id, r.code, r.value->'gears' AS gears, r.value->'reverse' AS reverse, r.value->>'countershaft_in' AS countershaft_in,
+         r.citation_url, r.citation_title, r.qualifiers, i.status
   FROM item i JOIN public.vehicle_decode_rules r ON r.rule_key = 'transmission_gear_ratios' AND r.superseded_at IS NULL
     AND jsonb_typeof(r.value->'gears') = 'array' AND nullif(btrim(r.code), '') IS NOT NULL
     AND (upper(regexp_replace(r.code, '\s+', '', 'g')) = upper(regexp_replace(i.doc->>'value', '\s+', '', 'g'))
@@ -552,21 +575,49 @@ gear_cand AS (
                                 || '($|[^A-Za-z0-9])'))
   WHERE i.key = 'transmission.current.model' AND i.status NOT IN ('missing', 'conflict')
 ),
+-- A swapped unit is dated by its own parts, not the car's year: the case casting read off it names its countershaft
+-- (a cited transmission_case_casting row), and only ratio sets for that countershaft remain.
+gear_case AS (
+  SELECT r.id, r.code, r.value->>'countershaft_in' AS countershaft_in, r.citation_url
+  FROM item i JOIN public.vehicle_decode_rules r ON r.rule_key = 'transmission_case_casting' AND r.superseded_at IS NULL
+    AND upper(btrim(r.code)) = upper(btrim(i.doc->>'value')) AND nullif(btrim(r.value->>'countershaft_in'), '') IS NOT NULL
+  WHERE i.key = 'transmission.current.case_casting' AND i.status NOT IN ('missing', 'conflict')
+),
+gear_narrow AS (
+  SELECT CASE WHEN count(DISTINCT countershaft_in) = 1 THEN min(countershaft_in) END AS countershaft_in,
+         CASE WHEN count(DISTINCT countershaft_in) = 1 THEN jsonb_build_object('key', 'transmission_case_casting',
+           'code', min(code), 'countershaft_in', min(countershaft_in), 'rule_ids', jsonb_agg(id ORDER BY id),
+           'citation_url', min(citation_url), 'reads', 'transmission.current.case_casting') END AS by_case
+  FROM gear_case
+),
+gear_kept AS (
+  SELECT c.* FROM gear_cand c CROSS JOIN gear_narrow n
+  WHERE n.countershaft_in IS NULL OR c.countershaft_in IS NULL OR c.countershaft_in = n.countershaft_in
+),
+gear_sets AS (
+  SELECT code, gears, reverse, countershaft_in, min(status) AS status,
+         jsonb_build_object('code', code, 'gears', gears, 'reverse', reverse, 'countershaft_in', countershaft_in,
+           'rule_ids', jsonb_agg(id ORDER BY id), 'citation_url', min(citation_url), 'citation_title', min(citation_title),
+           'qualifiers', (array_agg(qualifiers ORDER BY id))[1]) AS doc
+  FROM gear_kept GROUP BY code, gears, reverse, countershaft_in
+),
 gear_sum AS (
-  SELECT count(DISTINCT gears) AS nsets, (array_agg(gears))[1] AS gears, min(status) AS status,
-         jsonb_agg(jsonb_build_object('code', code, 'gears', gears, 'rule_id', id, 'citation_url', citation_url,
-           'citation_title', citation_title, 'qualifiers', qualifiers) ORDER BY code, id) AS rules
-  FROM gear_cand
+  SELECT count(DISTINCT s.gears) AS nsets, (array_agg(s.gears))[1] AS gears, min(s.status) AS status,
+         jsonb_agg(s.doc ORDER BY s.code, s.countershaft_in) AS rules, (SELECT by_case FROM gear_narrow) AS by_case
+  FROM gear_sets s
 ),
 gear_item AS (
   SELECT jsonb_build_object('key', 'transmission.current.gear_ratios', 'facet', 'decode',
     'value', CASE WHEN g.nsets = 1 THEN g.gears END, 'normalized', NULL, 'unit', NULL,
     'status', CASE WHEN g.nsets = 1 THEN g.status ELSE 'missing' END,
     'sources', '[]'::jsonb,
-    'rule', CASE WHEN g.nsets = 1 THEN jsonb_build_object('key', 'transmission_gear_ratios',
-      'applies_to', 'transmission.current.model', 'rows', g.rules) END,
+    'rule', CASE WHEN g.nsets >= 1 THEN jsonb_build_object('key', 'transmission_gear_ratios',
+      'applies_to', 'transmission.current.model', 'narrowed_by', g.by_case,
+      'rows', CASE WHEN g.nsets = 1 THEN g.rules END) END,
     'equation', NULL,
-    'needed', CASE WHEN g.nsets > 1 THEN 'unit year or ratio-set identification'
+    'needed', CASE WHEN g.nsets > 1 AND g.by_case IS NULL
+                     THEN 'countershaft size from the case casting (a cited transmission_case_casting row), then ratio-set identification'
+                   WHEN g.nsets > 1 THEN 'unit year or ratio-set identification'
                    WHEN g.nsets = 1 AND g.status = 'established' THEN NULL
                    ELSE 'transmission model identified by its ID stamp, and a cited ratio table for that model' END)
     || CASE WHEN g.nsets > 1 THEN jsonb_build_object('candidates', g.rules) ELSE '{}'::jsonb END AS doc,
@@ -665,9 +716,9 @@ derived AS (
   UNION ALL
   SELECT 'transmission.derived.rpm_at_60', jsonb_build_object('facet', 'derived',
     'value', CASE WHEN w.rpm_status <> 'missing' THEN round(60 * (w.gears->>(jsonb_array_length(w.gears) - 1))::numeric
-      * w.axle * 336.13 / w.tire_in) END,
+      * w.axle * 63360 / (60 * pi()::numeric * w.tire_in)) END,
     'normalized', NULL, 'status', w.rpm_status, 'sources', '[]'::jsonb, 'rule', NULL,
-    'equation', jsonb_build_object('expression', 'mph * top_gear_ratio * axle_ratio * 336.13 / tire_diameter_in, mph = 60',
+    'equation', jsonb_build_object('expression', 'mph * top_gear_ratio * axle_ratio * 63360 / (60 * pi() * tire_diameter_in), mph = 60',
       'reads', jsonb_build_array('transmission.current.gear_ratios', 'transmission.axle.current.ratio',
         'transmission.current.tire_size'), 'tire_diameter_in', w.tire_in))
   FROM changed w
@@ -717,44 +768,24 @@ derived_items AS (
          WHEN x.doc->>'status' <> 'established' THEN to_jsonb(f.needed) END) AS doc
   FROM derived x JOIN defs f ON f.key = x.key
 ),
--- Location at public area grain only. Photo GPS is the fold's admitted rows (source_type exif, photo_gps_fold_v1,
--- confidence >= 0.5) recounted from the photos the viewer can still see, as get_field_provenance('location') does;
--- never a coordinate, a raw text or a photo. Listings are dated listing rows at area grain.
-loc_rows AS MATERIALIZED (
-  SELECT l.id, l.observed_at, l.confidence, l."precision" AS level, l.city, l.county_fips, l.county_name, l.region_code,
-         l.country_code, l.zcta, l.location_text_clean AS label, l.metadata->'image_ids' AS image_ids
-  FROM v JOIN public.vehicle_location_observations l ON l.vehicle_id = v.id
-  WHERE l.source_type = 'exif' AND l.metadata->>'method' = 'photo_gps_fold_v1' AND l.confidence >= 0.5
-  ORDER BY l.observed_at DESC, l.id
-  LIMIT 1000
+-- Location at public area grain only. Photo GPS areas come from the one photo GPS fold, vehicle_location_areas
+-- (20261116007000), the same fold get_field_provenance('location') reads: rows recounted from the photos still visible,
+-- largest first, never a point. Listings are dated listing rows at area grain. Never a coordinate, a raw text or a photo.
+loc_areas AS MATERIALIZED (
+  SELECT a.ord, a.e->>'level' AS level, a.e->>'label' AS label, a.e->>'city' AS city, a.e->>'county_fips' AS county_fips,
+         a.e->>'county_name' AS county_name, a.e->>'region_code' AS region_code, a.e->>'country_code' AS country_code,
+         a.e->>'zcta' AS zcta, (a.e->>'photos')::bigint AS photos, (a.e->>'days')::bigint AS days,
+         (a.e->>'first_taken_at')::timestamptz AS first_taken_at, (a.e->>'last_taken_at')::timestamptz AS last_taken_at,
+         (a.e->>'confidence')::numeric AS confidence, a.e->>'latest_observation_id' AS latest_observation_id,
+         a.e->>'method' AS method,
+         CASE WHEN jsonb_typeof(a.e->'centroid') = 'object' THEN a.e->'centroid' - 'point' END AS centroid,
+         lower(concat_ws(',', nullif(btrim(a.e->>'city'), ''), nullif(btrim(a.e->>'region_code'), ''))) AS area_norm
+  FROM v CROSS JOIN LATERAL jsonb_array_elements(
+    CASE WHEN p_dimension IS NULL OR p_dimension = 'location' THEN
+      (SELECT CASE WHEN jsonb_typeof(x) = 'array' THEN x END FROM (SELECT public.vehicle_location_areas(v.id) AS x) z)
+    END) WITH ORDINALITY AS a(e, ord)
 ),
-loc_ids AS MATERIALIZED (
-  SELECT r.id AS row_id, x.image_id::uuid AS image_id
-  FROM loc_rows r
-  CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(r.image_ids) = 'array' THEN r.image_ids
-    ELSE '[]'::jsonb END) x(image_id)
-  WHERE x.image_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-),
-loc_photo AS MATERIALIZED (
-  SELECT li.row_id, count(*) AS photos, min(i.taken_at) AS first_taken_at, max(i.taken_at) AS last_taken_at
-  FROM loc_ids li CROSS JOIN v
-  JOIN public.vehicle_images i ON i.id = li.image_id AND i.vehicle_id = v.id
-  WHERE nullif(btrim(i.image_url), '') IS NOT NULL
-    AND i.is_sensitive IS NOT TRUE AND i.is_superseded IS NOT TRUE AND i.is_duplicate IS NOT TRUE
-    AND (i.vision_gate_status IS NULL OR i.vision_gate_status::text = 'approved')
-    AND coalesce(i.image_vehicle_match_status, '') NOT IN ('mismatch', 'unrelated')
-  GROUP BY li.row_id
-),
-loc_areas AS (
-  SELECT r.level, r.label, r.city, r.county_fips, r.county_name, r.region_code, r.country_code, r.zcta,
-         sum(p.photos) AS photos, count(*) AS days, min(p.first_taken_at) AS first_taken_at,
-         max(p.last_taken_at) AS last_taken_at, max(r.confidence) AS confidence,
-         (array_agg(r.id ORDER BY r.observed_at DESC, r.id))[1] AS latest_observation_id,
-         lower(concat_ws(',', nullif(btrim(r.city), ''), nullif(btrim(r.region_code), ''))) AS area_norm
-  FROM loc_rows r JOIN loc_photo p ON p.row_id = r.id
-  GROUP BY r.level, r.label, r.city, r.county_fips, r.county_name, r.region_code, r.country_code, r.zcta
-),
-loc_top AS (SELECT * FROM loc_areas ORDER BY photos DESC, last_taken_at DESC LIMIT 1),
+loc_top AS (SELECT * FROM loc_areas ORDER BY ord LIMIT 1),
 loc_list AS (
   SELECT l.id, l.source_platform, l.observed_at, l.city, l.region_code, l.zcta, l.county_fips, l.county_name,
          l.country_code, lower(concat_ws(',', nullif(btrim(l.city), ''), nullif(btrim(l.region_code), ''))) AS area_norm
@@ -787,7 +818,7 @@ loc_lead AS (
 loc_area_sources AS (
   SELECT 'photo_gps' AS fam, t.last_taken_at AS observed_at,
          jsonb_build_object('slug', 'photo_exif', 'label', 'photo GPS', 'kind', 'image', 'url', NULL,
-           'method', 'photo_gps_fold_v1', 'observed_at', t.last_taken_at,
+           'method', coalesce(t.method, 'photo_gps_fold_v1'), 'observed_at', t.last_taken_at,
            'witness', jsonb_build_object('kind', 'location_observation', 'id', t.latest_observation_id),
            'value', t.label, 'class', 'reading', 'photos', t.photos, 'days', t.days,
            'first_taken_at', t.first_taken_at, 'last_taken_at', t.last_taken_at) AS src
@@ -825,7 +856,7 @@ loc_items AS (
       'first_taken_at', min(first_taken_at), 'last_taken_at', max(last_taken_at),
       'areas', jsonb_agg(jsonb_build_object('label', label, 'level', level, 'county_fips', county_fips, 'zcta', zcta,
         'photos', photos, 'days', days, 'first_taken_at', first_taken_at, 'last_taken_at', last_taken_at,
-        'confidence', confidence, 'latest_observation_id', latest_observation_id) ORDER BY photos DESC, last_taken_at DESC)) END,
+        'confidence', confidence, 'latest_observation_id', latest_observation_id, 'centroid', centroid) ORDER BY ord)) END,
     'status', CASE WHEN count(*) > 0 THEN 'reading' ELSE 'missing' END,
     'sources', CASE WHEN count(*) > 0 THEN jsonb_build_array(jsonb_build_object('slug', 'photo_exif', 'label', 'photo GPS',
       'kind', 'image', 'url', NULL, 'method', 'photo_gps_fold_v1', 'observed_at', max(last_taken_at),
@@ -842,7 +873,9 @@ loc_items AS (
   UNION ALL
   SELECT 'location.map', jsonb_build_object(
     'value', CASE WHEN a.area IS NOT NULL THEN jsonb_build_object('label', a.area->'label', 'level', a.area->'level',
-      'county_fips', a.area->'county_fips', 'zcta', a.area->'zcta', 'bounds', NULL) END,
+      'county_fips', a.area->'county_fips', 'zcta', a.area->'zcta', 'bounds', NULL,
+      -- The city's public centre (city_geocode_lookup via the fold), the same for every viewer; never the photos' point.
+      'centroid', CASE WHEN a.basis = 'photo' THEN (SELECT centroid FROM loc_top) END) END,
     'status', CASE WHEN a.area IS NULL THEN 'missing' ELSE a.status END, 'sources', '[]'::jsonb,
     'needed', CASE WHEN a.area IS NULL THEN 'an established area at ZCTA grain'
                    WHEN a.area->>'zcta' IS NULL THEN 'the ZCTA for this area (photo areas carry none until a ZIP keyer exists) and its boundary geometry (us_zctas holds codes only)'
@@ -882,7 +915,7 @@ COMMENT ON FUNCTION public.vehicle_facet_items(uuid, text) IS
   'transmission, drivetrain, location), the fixed item list with each item''s value, status (established, reading, '
   'claim, conflict, missing), deduplicated sources with witness and clock, rule, equation and needed evidence. '
   'Dimension NULL returns every token as one object. Security invoker: the viewer''s row policies bound every source; '
-  'location is area grain only, from the photo GPS fold recounted at read time. '
+  'location is area grain only, from vehicle_location_areas. '
   'Spec: docs/market/VEHICLE_HEADER_FORM_RULES.md "Facet items".';
 
 DO $grants$

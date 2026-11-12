@@ -64,7 +64,10 @@ CREATE TABLE public.vehicle_location_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source_type text, source_platform text,
   source_url text, observed_at timestamptz, location_text_raw text, location_text_clean text, country_code text,
   region_code text, city text, postal_code text, latitude double precision, longitude double precision,
-  precision text, confidence real, metadata jsonb, county_fips text, county_name text, zcta text);
+  precision text, confidence real, metadata jsonb, county_fips text, county_name text, zcta text,
+  created_at timestamptz NOT NULL DEFAULT '2026-11-11T00:00Z');
+-- The published city centres the shared photo GPS fold reads for a city-level area (anon cannot read it directly).
+CREATE TABLE public.city_geocode_lookup (city text, state text, latitude numeric, longitude numeric, sample_size integer);
 CREATE TABLE public.listing_exports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid NOT NULL, user_id uuid NOT NULL, platform text NOT NULL,
   export_format text NOT NULL, title text NOT NULL, description text, status text DEFAULT 'prepared',
@@ -156,9 +159,22 @@ GRANT SELECT (id, user_id, owner_id, uploaded_by, entry_type, is_public, deleted
 \ir ../migrations/20261110090000_tribute_badges_and_engine_correction.sql
 \ir ../migrations/20261110093000_vehicles_is_replica_column_grant.sql
 \ir ../migrations/20261110100000_listing_submission_state.sql
+-- Live: anon cannot read city centres directly; only the fold (SECURITY DEFINER) can.
+REVOKE SELECT ON public.city_geocode_lookup FROM anon, authenticated;
+-- The shared photo GPS fold exactly as 20261116007000 defines it (vehicle_location_fold and vehicle_location_areas).
+-- That migration also replaces get_field_provenance, which this fixture lacks, so only its two fold functions are
+-- applied, cut from the file itself. test_field_provenance_photo_location.sql proves the fold equals
+-- get_field_provenance's location_areas; this contract proves the header items carry the fold's areas unchanged.
+\set location_fold `awk '/^CREATE OR REPLACE FUNCTION public.vehicle_location_fold/{p=1} /^CREATE OR REPLACE FUNCTION public.get_field_provenance/{p=0} p' supabase/migrations/20261116007000_vehicle_location_areas.sql`
+:location_fold
+DO $$ BEGIN
+  IF to_regprocedure('public.vehicle_location_areas(uuid)') IS NULL THEN
+    RAISE EXCEPTION 'the shared fold from 20261116007000 was not applied';
+  END IF;
+END $$;
 -- Applied twice: the second run must be a no-op.
-\ir ../migrations/20261116011000_vehicle_facet_items.sql
-\ir ../migrations/20261116011000_vehicle_facet_items.sql
+\ir ../migrations/20261116008000_vehicle_facet_items.sql
+\ir ../migrations/20261116008000_vehicle_facet_items.sql
 
 -- Seeds. v1 a documented VIN-decoded car; v2 listing-sourced with a transmission conflict and cited gearing;
 -- v3 thin evidence; v4 private; v5 deleted.
@@ -303,11 +319,20 @@ INSERT INTO public.vehicle_location_observations (id, vehicle_id, source_type, s
 INSERT INTO public.vehicle_decode_rules (rule_key, make, code, year_min, year_max, value, citation_url, citation_title) VALUES
  ('transmission_gear_ratios', NULL, 'TH400', 1964, 1990, '{"gears":[2.48,1.48,1.00],"reverse":2.08}',
   'https://example.org/th400-ratios', 'Fixture ratio table'),
- -- Two ratio sets the v1 case reading could be: shown as candidates, never computed over.
- ('transmission_gear_ratios', NULL, 'M20', 1963, 1965, '{"gears":[2.56,1.91,1.48,1.00]}',
+ -- The v1 case reading names M20 or M21; each comes in two countershaft sizes. The case casting read off the unit
+ -- (9990001, 7/8 in) leaves one set per model: shown as candidates, never computed over. The 1-inch M20 set, the one
+ -- the car's own model year would pick, is excluded.
+ ('transmission_gear_ratios', NULL, 'M20', 1963, 1965, '{"gears":[2.56,1.91,1.48,1.00],"reverse":3.16,"countershaft_in":"7/8"}',
   'https://example.org/muncie-ratios', 'Fixture Muncie table'),
- ('transmission_gear_ratios', NULL, 'M21', 1963, 1965, '{"gears":[2.20,1.64,1.28,1.00]}',
-  'https://example.org/muncie-ratios', 'Fixture Muncie table');
+ ('transmission_gear_ratios', NULL, 'M20', 1965, 1974, '{"gears":[2.52,1.88,1.46,1.00],"reverse":3.11,"countershaft_in":"1"}',
+  'https://example.org/muncie-ratios', 'Fixture Muncie table'),
+ ('transmission_gear_ratios', NULL, 'M21', 1963, 1965, '{"gears":[2.20,1.64,1.28,1.00],"reverse":2.27,"countershaft_in":"7/8"}',
+  'https://example.org/muncie-ratios', 'Fixture Muncie table'),
+ ('transmission_gear_ratios', NULL, 'M21', 1965, 1974, '{"gears":[2.20,1.64,1.28,1.00],"reverse":2.27,"countershaft_in":"1"}',
+  'https://example.org/muncie-ratios', 'Fixture Muncie table'),
+ ('transmission_case_casting', NULL, '9990001', 1963, 1965, '{"countershaft_in":"7/8"}',
+  'https://example.org/muncie-cases', 'Fixture case table');
+INSERT INTO public.city_geocode_lookup VALUES ('Boulder City', 'NV', 35.97864, -114.83245, 40), ('Boulder City', 'NV', 35.9, -114.9, 2);
 -- One current row per rule, scope and citation.
 DO $$ BEGIN
   BEGIN
@@ -443,6 +468,10 @@ BEGIN
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.current.gear_ratios');
   PERFORM public.t_assert(i->>'status' = 'missing' AND i->'value' = 'null' AND jsonb_array_length(i->'candidates') = 2
     AND i->>'needed' = 'unit year or ratio-set identification', 'two candidate ratio sets: shown, not chosen');
+  PERFORM public.t_assert(i#>>'{rule,narrowed_by,countershaft_in}' = '7/8'
+    AND (SELECT array_agg(c->>'code' ORDER BY c->>'code') FROM jsonb_array_elements(i->'candidates') c) = ARRAY['M20', 'M21']
+    AND (SELECT bool_and(c->>'countershaft_in' = '7/8') FROM jsonb_array_elements(i->'candidates') c)
+    AND i::text NOT LIKE '%2.52%', 'the case casting''s countershaft narrows the sets; the car''s year never picks one');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.derived.final_drive');
   PERFORM public.t_assert(i->>'status' = 'missing' AND i->'value' = 'null', 'nothing computed over candidates');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.derived.rpm_at_60');
@@ -490,11 +519,19 @@ BEGIN
     AND (i#>>'{value,areas,0,last_taken_at}')::timestamptz = '2026-10-07T01:00Z'
     AND i#>>'{value,areas,0,latest_observation_id}' = '66666666-6666-6666-6666-000000000002',
     'fold parity: 3 photos (the sensitive one not counted), 2 days, the dates and latest row');
+  -- Parity with the shared fold: the header's photo area is vehicle_location_areas()[0], field for field.
+  p := public.vehicle_location_areas('10000000-0000-0000-0000-000000000001')->0;
+  PERFORM public.t_assert(i#>>'{value,areas,0,label}' = p->>'label' AND i#>'{value,areas,0,photos}' = p->'photos'
+    AND i#>'{value,areas,0,days}' = p->'days' AND (i#>>'{value,areas,0,first_taken_at}')::timestamptz = (p->>'first_taken_at')::timestamptz
+    AND (i#>>'{value,areas,0,last_taken_at}')::timestamptz = (p->>'last_taken_at')::timestamptz
+    AND i#>>'{value,areas,0,latest_observation_id}' = p->>'latest_observation_id' AND NOT (p ? 'point'),
+    'the header carries the shared fold''s area unchanged');
   i := public.t_item('10000000-0000-0000-0000-000000000001', 'location', 'location.map');
-  PERFORM public.t_assert(i#>>'{value,county_fips}' = '32003' AND i#>'{value,bounds}' = 'null' AND i->>'needed' LIKE 'the ZCTA%',
-    'map at county grain; ZCTA and bounds named as needed, never drawn from points');
+  PERFORM public.t_assert(i#>>'{value,county_fips}' = '32003' AND i#>'{value,bounds}' = 'null' AND i->>'needed' LIKE 'the ZCTA%'
+    AND i#>>'{value,centroid,lat}' = '35.9786' AND i#>>'{value,centroid,basis}' = 'city_centroid',
+    'map at city grain, centred on the city''s published centre; ZCTA and bounds named as needed');
   txt := public.vehicle_facet_items('10000000-0000-0000-0000-000000000001')::text;
-  PERFORM public.t_assert(txt !~ '35\.97|114\.8|36\.209|115\.98' AND txt NOT LIKE '%latitude%'
+  PERFORM public.t_assert(txt !~ '35\.972|35\.973|114\.855|114\.856|36\.209|115\.98|35\.97[^0-9]' AND txt NOT LIKE '%latitude%'
     AND txt NOT LIKE '%Fixture Lane%' AND txt NOT LIKE '%Pahrump%', 'no coordinate or raw address reaches any item');
 
   -- Private and deleted vehicles return nothing.
