@@ -157,3 +157,21 @@ Rollback for each is the commented block at the bottom of its file. Policy chang
 * **Q-V5** May an owner **delete** a customer's or technician's photo, or only supersede it? 360 chooses supersede.
 * **Q-V6** Legacy permission rows with no grantor (59 live) grant nothing through the garage. Backfill `granted_by` after review, or leave?
 * Problems found in SPEC.md (not edited): its H3/H4 describe fewer policies than exist (3 permissive INSERT policies of 6 total, 11 UPDATE/DELETE policies); its 9.2 matrix and 9.2 "Consignment" row disagree on the consigning customer; and SPEC says `my_visibility` is "VISIBILITY's call": the full / summary / none rule is section 2.1 here.
+
+## Orchestrator review notes (2026-11-12, ~11:30 AM AST)
+
+- **H12 checked live (read-only).** `capture_relay_default_vehicle_fn` only fills `vehicle_id` when it is null and the
+  uploader has their *own* enabled `capture_relay_default_vehicle` row, and only onto a live, unmerged vehicle. RLS
+  `WITH CHECK` sees the row after BEFORE triggers, so migration 310 judges the filled-in vehicle. It is not an
+  escalation unless that config row can point at someone else's car; the config table's write policy should be checked
+  before 310 ships.
+- **The photo bytes are public whatever these policies say.** Live `storage.buckets`: `vehicle-images`, `vehicles`,
+  `vehicle-uploads`, `vehicle-photos`, `vehicle-data` are all `public = true` (only `vehicle-models` is private).
+  These drafts close the *rows* (who can list and read `vehicle_images` metadata), not the *files*: anyone holding a
+  file URL can fetch it. Consignment and pre-auction media are private only once the private-bucket work (draft
+  PR #3212) lands as well.
+- **Wiring gap with PRESENCE.** `garage_now` (PRESENCE migration 120) fills `my_visibility` with `'full'` and filters
+  with the boolean `can_see_vehicle_via_garage`, so the `summary` level defined here (a technician knowing a
+  consignment car is in the place without seeing its media) is never returned. The fix is a short follow-up that
+  points `garage_now` at `garage_vehicle_visibility()`, once both drafts are accepted. All four garage contracts
+  pass together on a merged check branch (core, presence, join and visibility: 4 passed, 0 failed).
