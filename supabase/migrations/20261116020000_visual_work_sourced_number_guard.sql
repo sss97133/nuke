@@ -9,7 +9,7 @@
 -- seeded into a table. From this migration on:
 --   a material analyst_range price cites a stored row: pricing.catalog_part_id (a catalog_parts
 --     row whose price_current and currency equal the line's unit price), or
---     pricing.source_snapshot_id (a retained page in listing_page_snapshots);
+--     pricing.source_snapshot_id (a successful, hashed capture in listing_page_snapshots);
 --   a labor line does not use reference.type analyst_range: it cites a labor_operation or a
 --     stage_row, or it is unpriced and says so;
 --   rate_basis is not explicit_assumption: resolved_default takes the rate owner's answer.
@@ -24,7 +24,9 @@ DO $guard$ BEGIN
   OR to_regprocedure('public.visual_work_uncited_keyed_photos(uuid,jsonb)') IS NULL
   OR NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.vehicle_observations'::regclass
        AND tgname='guard_visual_work_keys_insert' AND NOT tgisinternal)
-  OR to_regclass('public.catalog_parts') IS NULL OR to_regclass('public.listing_page_snapshots') IS NULL THEN
+  OR to_regclass('public.catalog_parts') IS NULL
+  OR (SELECT count(*) FROM information_schema.columns WHERE table_schema='public'
+       AND table_name='listing_page_snapshots' AND column_name IN ('success','html_sha256'))<>2 THEN
   RAISE EXCEPTION 'visual work key guard owner drifted; inspect current definitions';
  END IF;
 END $guard$;
@@ -48,7 +50,9 @@ AS $fn$
        AND (m.p#>>'{unit_price,min}')::numeric=c.price_current AND (m.p#>>'{unit_price,typical}')::numeric=c.price_current
        AND (m.p#>>'{unit_price,max}')::numeric=c.price_current))
    AND NOT (coalesce(m.p->>'source_snapshot_id','') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-     AND EXISTS(SELECT 1 FROM public.listing_page_snapshots s WHERE s.id=(m.p->>'source_snapshot_id')::uuid))),
+     -- A failed or blocked capture also has a row; only a successful one with a stored hash is a source.
+     AND EXISTS(SELECT 1 FROM public.listing_page_snapshots s WHERE s.id=(m.p->>'source_snapshot_id')::uuid
+       AND s.success IS TRUE AND s.html_sha256 IS NOT NULL))),
  hours AS (
   SELECT count(*) AS n FROM jsonb_array_elements(
     CASE WHEN jsonb_typeof(p_doc->'operations')='array' THEN p_doc->'operations' ELSE '[]'::jsonb END) l(line)
@@ -61,7 +65,7 @@ $fn$;
 REVOKE ALL ON FUNCTION public.visual_work_unsourced_numbers(jsonb) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.visual_work_unsourced_numbers(jsonb) TO service_role;
 COMMENT ON FUNCTION public.visual_work_unsourced_numbers(jsonb) IS
-'Numbers a visual_work_v1 record states without a stored row behind them: material analyst_range prices that cite neither a catalog_parts row with the same price and currency (pricing.catalog_part_id) nor a retained page (pricing.source_snapshot_id in listing_page_snapshots); labor lines with reference.type analyst_range; and rate_basis explicit_assumption. Empty means every number this check knows about is cited.';
+'Numbers a visual_work_v1 record states without a stored row behind them: material analyst_range prices that cite neither a catalog_parts row with the same price and currency (pricing.catalog_part_id) nor a successful, hashed capture (pricing.source_snapshot_id in listing_page_snapshots); labor lines with reference.type analyst_range; and rate_basis explicit_assumption. Empty means every number this check knows about is cited.';
 
 CREATE OR REPLACE FUNCTION public.guard_visual_work_keys()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
@@ -86,7 +90,7 @@ BEGIN
  END IF;
  missing:=public.visual_work_unsourced_numbers(NEW.structured_data);
  IF cardinality(missing)>0 THEN
-  RAISE EXCEPTION 'unsourced_number: %. A number in a work record is cited from a stored row, not typed. Material price: keep pricing.kind analyst_range only with pricing.catalog_part_id (a catalog_parts row whose price_current and currency equal unit_price min, typical and max) or pricing.source_snapshot_id (the retained page in listing_page_snapshots); otherwise pricing.kind unpriced. Labor hours: reference.type labor_operation or stage_row, or unpriced. Rate: rate_basis.kind resolved_default with a currency and derivation.',
+  RAISE EXCEPTION 'unsourced_number: %. A number in a work record is cited from a stored row, not typed. Material price: keep pricing.kind analyst_range only with pricing.catalog_part_id (a catalog_parts row whose price_current and currency equal unit_price min, typical and max) or pricing.source_snapshot_id (a successful capture in listing_page_snapshots); otherwise pricing.kind unpriced. Labor hours: reference.type labor_operation or stage_row, or unpriced. Rate: rate_basis.kind resolved_default with a currency and derivation.',
    array_to_string(missing,'; ') USING ERRCODE='23514';
  END IF;
  RETURN NEW;

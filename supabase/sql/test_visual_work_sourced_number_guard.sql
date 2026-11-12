@@ -14,10 +14,13 @@ CREATE TABLE vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  structured_data jsonb,is_superseded boolean DEFAULT false,descriptor_id uuid,property_id uuid);
 CREATE TABLE observation_witnesses(observation_id uuid REFERENCES vehicle_observations(id),image_id uuid,witness_role text);
 CREATE TABLE catalog_parts(id uuid PRIMARY KEY,part_number text,price_current numeric,currency text,supplier_url text);
-CREATE TABLE listing_page_snapshots(id uuid PRIMARY KEY,listing_url text);
+CREATE TABLE listing_page_snapshots(id uuid PRIMARY KEY,listing_url text,success boolean NOT NULL DEFAULT false,html_sha256 text);
 INSERT INTO catalog_parts VALUES ('d1000000-0000-0000-0000-000000000001','14-4164',309.99,'USD','https://supplier.example/14-4164'),
  ('d1000000-0000-0000-0000-000000000002','NOPRICE',NULL,'USD',NULL);
-INSERT INTO listing_page_snapshots VALUES ('e1000000-0000-0000-0000-000000000001','https://supplier.example/kit');
+INSERT INTO listing_page_snapshots VALUES ('e1000000-0000-0000-0000-000000000001','https://supplier.example/kit',true,repeat('a',64)),
+ ('e2000000-0000-0000-0000-000000000002','https://supplier.example/blocked',false,repeat('b',64)),
+ ('e3000000-0000-0000-0000-000000000003','https://supplier.example/empty',false,NULL),
+ ('e4000000-0000-0000-0000-000000000004','https://supplier.example/unhashed',true,NULL);
 \ir ../migrations/20261113170000_visual_work_system_key_guard.sql
 \ir ../migrations/20261114101000_visual_work_part_key_guard.sql
 \ir ../migrations/20261116011000_visual_work_keyed_claim_citation_guard.sql
@@ -55,6 +58,10 @@ DO $$ DECLARE r text; BEGIN
  ASSERT pg_temp.try(pg_temp.mat('{"kind":"analyst_range","currency":"USD","unit_price":{"min":1,"typical":1,"max":1},"derivation":"d","source_snapshot_id":"e9000000-0000-0000-0000-000000000009"}')) LIKE 'unsourced_number: 1 material%';
  ASSERT pg_temp.try(pg_temp.mat('{"kind":"analyst_range","currency":"USD","unit_price":{"min":"309.99","typical":"309.99","max":"309.99"},"derivation":"d","catalog_part_id":"d1000000-0000-0000-0000-000000000001"}')) LIKE 'unsourced_number: 1 material%';
  ASSERT pg_temp.try(pg_temp.mat('{"kind":"analyst_range","currency":"USD","unit_price":{"min":1,"typical":1,"max":1},"derivation":"https://supplier.example/kit","catalog_part_id":"not-an-id"}')) LIKE 'unsourced_number: 1 material%';
+ -- A capture that failed, was blocked, or kept no hash has a row but is not a source.
+ ASSERT pg_temp.try(pg_temp.mat('{"kind":"analyst_range","currency":"USD","unit_price":{"min":1,"typical":1,"max":1},"derivation":"d","source_snapshot_id":"e2000000-0000-0000-0000-000000000002"}')) LIKE 'unsourced_number: 1 material%';
+ ASSERT pg_temp.try(pg_temp.mat('{"kind":"analyst_range","currency":"USD","unit_price":{"min":1,"typical":1,"max":1},"derivation":"d","source_snapshot_id":"e3000000-0000-0000-0000-000000000003"}')) LIKE 'unsourced_number: 1 material%';
+ ASSERT pg_temp.try(pg_temp.mat('{"kind":"analyst_range","currency":"USD","unit_price":{"min":1,"typical":1,"max":1},"derivation":"d","source_snapshot_id":"e4000000-0000-0000-0000-000000000004"}')) LIKE 'unsourced_number: 1 material%';
  -- Kinds the check does not name are the cost fold's business: catalog, unpriced, and one not yet defined.
  ASSERT pg_temp.try(pg_temp.mat('{"kind":"catalog","receipt_item_id":"f1000000-0000-0000-0000-000000000001"}'))='admitted';
  ASSERT pg_temp.try(pg_temp.mat('{"kind":"unpriced"}'))='admitted';
