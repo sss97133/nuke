@@ -232,4 +232,24 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 ROLLBACK;
+-- 035000: the fold's photo lookup is one index probe per photo on (vehicle_id, id), even when the vehicle has many
+-- photos with a point and the planner thinks ids has one row. The 026000 form rescanned the vehicle's cover entries
+-- for every photo, with id as a join filter (043c6d8b: 2.2 s). The plan is read from the live function body.
+INSERT INTO public.vehicle_images(id,vehicle_id,image_url,source,vision_gate_status,taken_at,latitude,longitude)
+SELECT gen_random_uuid(),'11111111-1111-1111-1111-111111111111','https://x.invalid/n'||g||'.jpg','user_upload',NULL,
+       '2026-10-01T00:00Z',35.9,-114.8
+FROM generate_series(1,3000) g;
+-- Production's estimate for one vehicle is a few dozen rows (it is not among the most common values of 63.8M rows);
+-- without column statistics the fixture estimates the same way.
+ALTER TABLE public.vehicle_images ALTER COLUMN vehicle_id SET STATISTICS 0;
+VACUUM (ANALYZE) public.vehicle_images;
+DO $$ DECLARE body text; plan text := ''; r record; BEGIN
+ SELECT p.prosrc INTO body FROM pg_proc p WHERE p.oid = 'public.vehicle_location_fold(uuid)'::regprocedure;
+ body := substring(body from 'RETURN \((.*)\);\s*END');
+ ASSERT body IS NOT NULL, 'fold body: RETURN (...) not found';
+ body := replace(body, 'p_vehicle_id', '''11111111-1111-1111-1111-111111111111''::uuid');
+ FOR r IN EXECUTE 'EXPLAIN (COSTS OFF) SELECT (' || body || ')' LOOP plan := plan || r."QUERY PLAN" || E'\n'; END LOOP;
+ ASSERT plan ~ 'on vehicle_images i\s+Index Cond: \(\(vehicle_id = [^\n]*\) AND \(id = p\.image_id\)\)', '035000: probe per photo' || E'\n' || plan;
+ ASSERT plan !~ 'Join Filter: \(p\.image_id = i\.id\)', '035000: no rescan per photo' || E'\n' || plan;
+END $$;
 SELECT 'PASS: photo-GPS location areas, area grain for anonymous callers, point only for the tied viewer; vehicle_location_areas matches' AS result;
