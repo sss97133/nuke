@@ -10,7 +10,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { rpc } }));
 vi.mock('../../components/map/OneMap', () => ({ default: ({ focus }: any) =>
   <div data-testid="one-map-focus" data-fips={focus.countyFips} data-geojson={focus.geojsonPath} data-lat={focus.centroid?.lat} /> }));
 import HeaderTokenItems from './HeaderTokenItems';
-import { codeText, itemLabel, ratioText, valueText } from '../../kit';
+import { codeText, equationText, itemLabel, ratioText, valueText } from '../../kit';
 
 // Synthetic items in the shape vehicle_facet_items returns (no real vehicle, image or source).
 const transmission: FacetItem[] = [
@@ -74,7 +74,7 @@ it('renders every item of a carried token as a row with status, sources, rule, e
   expect(host.textContent).toContain('Model A');
   expect(host.textContent).toContain('Model B');
   expect(host.textContent).toContain('2,450 rpm');
-  expect(host.textContent).toContain('Computed: mph * top_gear_ratio');
+  expect(host.textContent).toContain('Computed: mph * top gear ratio * axle ratio * 63360 / (60 * π * tire diameter in), mph = 60');
   expect(host.textContent).not.toMatch(/[{}]|\[object/);
   expect(host.querySelector('[style]')).toBeNull();
   expect(rpc).not.toHaveBeenCalled();
@@ -82,6 +82,8 @@ it('renders every item of a carried token as a row with status, sources, rule, e
 
 it('prints the reader\'s labels for codes, ratios to two places, and every cited availability row', async () => {
   expect(codeText('not_original_unit')).toBe('not original unit');
+  expect(equationText('gear_ratio[n] * axle_ratio')).toBe('gear ratio[n] * axle ratio');
+  expect(equationText('as_built.type <> current.type')).toBe('as built type ≠ current type');
   expect(codeText('Muncie four-speed')).toBe('Muncie four-speed');
   expect(ratioText([2.56, 1.91, 1.48, 1])).toBe('2.56 / 1.91 / 1.48 / 1.00');
   const items: FacetItem[] = [
