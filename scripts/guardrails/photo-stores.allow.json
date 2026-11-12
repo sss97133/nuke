@@ -36,6 +36,30 @@
     "capture_typ_from_local_observation_log": {
       "reason": "Revert log of the run that writes typ from a local CLIP view: the prior typ of each photo. Holds no reading of its own. Already in production (created by hand 2026-11-10).",
       "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: asked whether he approves the existing capture log tables and reader, he answered \"Of course I approve\". No schema_proposals row was filed."
+    },
+    "photo_filing_audit": {
+      "reason": "Audit sample of automatic photo filings (2026-11-04). In production. Recorded as history; the migration that creates it is not run.",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: told that recording the already-applied 2026-11-03/04 migrations adds these six photo-keyed tables, he answered \"I approve\". No schema_proposals row was filed."
+    },
+    "auto_filing_audit_queue": {
+      "reason": "Queue of automatic filings waiting for that audit (2026-11-04). In production. Recorded as history; the migration that creates it is not run.",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: told that recording the already-applied 2026-11-03/04 migrations adds these six photo-keyed tables, he answered \"I approve\". No schema_proposals row was filed."
+    },
+    "backup_20261103_merge_repoint": {
+      "reason": "Backup of rows repointed by a vehicle merge on 2026-11-03. In production. Recorded as history; the migration that creates it is not run.",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: told that recording the already-applied 2026-11-03/04 migrations adds these six photo-keyed tables, he answered \"I approve\". No schema_proposals row was filed."
+    },
+    "garage_org_image_backup": {
+      "reason": "Backup table of the garage organizer; created 2026-11-04 and dropped the same day by garage_organizer_remove. Not in production. Recorded as history; the migration that creates it is not run.",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: told that recording the already-applied 2026-11-03/04 migrations adds these six photo-keyed tables, he answered \"I approve\". No schema_proposals row was filed."
+    },
+    "garage_org_photo": {
+      "reason": "Per-photo working table of the garage organizer; created and dropped 2026-11-04. Not in production. Recorded as history; the migration that creates it is not run.",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: told that recording the already-applied 2026-11-03/04 migrations adds these six photo-keyed tables, he answered \"I approve\". No schema_proposals row was filed."
+    },
+    "garage_org_score": {
+      "reason": "Score table of the garage organizer; created and dropped 2026-11-04. Not in production. Recorded as history; the migration that creates it is not run.",
+      "approved": "Owner (Skylar), 2026-11-12, in the Claude Code session that opened this pull request: told that recording the already-applied 2026-11-03/04 migrations adds these six photo-keyed tables, he answered \"I approve\". No schema_proposals row was filed."
     }
   },
   "functions": {},

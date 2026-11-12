@@ -175,7 +175,7 @@ jobs:
                 relation=*) [[ "${proof#relation=}" =~ ^[a-z0-9_.]+$ ]] || { echo "❌ bad proof for $f: $proof"; exit 1; }
                             q="select to_regclass('${proof#relation=}') is not null" ;;
                 routine=*)  [[ "${proof#routine=}" =~ ^[a-z0-9_.]+$ ]] || { echo "❌ bad proof for $f: $proof"; exit 1; }
-                            q="select to_regproc('${proof#routine=}') is not null" ;;
+                            q="select exists(select 1 from pg_proc where oid::regproc::text in ('${proof#routine=}','${proof#routine=public.}'))" ;;
                 *) echo "❌ bad proof for $f: $proof"; exit 1 ;;
               esac
               if [ "$(psql "$SUPABASE_DB_URL" -X -qAt -c "$q")" = t ]; then
