@@ -16,9 +16,9 @@
    "provenance": "traced",
    "method": "potrace of the de-slanted fender script, refit",
    "fidelity": {
-    "iou": 0.0,
-    "maxDevPx": Infinity,
-    "meanDevPx": Infinity
+    "iou": 0.9784,
+    "maxDevPx": 3.61,
+    "meanDevPx": 0.767
    },
    "sourceBoxPx": [
     [
@@ -59,9 +59,9 @@
    "provenance": "traced",
    "method": "potrace of the de-slanted fender script, refit",
    "fidelity": {
-    "iou": 0.0,
-    "maxDevPx": Infinity,
-    "meanDevPx": Infinity
+    "iou": 0.9076,
+    "maxDevPx": 98.43,
+    "meanDevPx": 5.661
    },
    "sourceBoxPx": [
     [
@@ -90,9 +90,9 @@
    "provenance": "traced",
    "method": "potrace of the de-slanted fender script, refit",
    "fidelity": {
-    "iou": 0.0,
-    "maxDevPx": Infinity,
-    "meanDevPx": Infinity
+    "iou": 0.9791,
+    "maxDevPx": 2.83,
+    "meanDevPx": 0.682
    },
    "sourceBoxPx": [
     [
@@ -127,9 +127,9 @@
    "provenance": "traced",
    "method": "potrace of the de-slanted fender script, refit",
    "fidelity": {
-    "iou": 0.0,
-    "maxDevPx": Infinity,
-    "meanDevPx": Infinity
+    "iou": 0.9772,
+    "maxDevPx": 2.83,
+    "meanDevPx": 0.773
    },
    "sourceBoxPx": [
     [
@@ -170,9 +170,9 @@
    "provenance": "traced",
    "method": "potrace of the de-slanted fender script, refit",
    "fidelity": {
-    "iou": 0.0,
-    "maxDevPx": Infinity,
-    "meanDevPx": Infinity
+    "iou": 0.9762,
+    "maxDevPx": 3.16,
+    "meanDevPx": 0.74
    },
    "sourceBoxPx": [
     [
@@ -615,11 +615,11 @@
   "G": {
    "unicode": "U+0047",
    "advance": 795,
-   "provenance": "derived",
+   "provenance": "designed",
    "from": [
     "b"
    ],
-   "method": "the b's bowl made symmetric and scaled to the capital, opened with a bar and spur",
+   "method": "designed on the b's bowl made symmetric and scaled to the capital; bar and spur designed",
    "slant": 0.24,
    "lint": {
     "nodes": 30,
@@ -631,12 +631,12 @@
   "P": {
    "unicode": "U+0050",
    "advance": 637,
-   "provenance": "derived",
+   "provenance": "designed",
    "from": [
     "F",
     "b"
    ],
-   "method": "the F's stem and swash with the b-derived bowl",
+   "method": "designed: the F's stem and swash carry a bowl drawn from the b's",
    "slant": 0.24,
    "lint": {
     "nodes": 45,
@@ -648,11 +648,11 @@
   "M": {
    "unicode": "U+004D",
    "advance": 1060,
-   "provenance": "derived",
+   "provenance": "designed",
    "from": [
     "F"
    ],
-   "method": "two F stems with a heavy falling and a light rising diagonal",
+   "method": "designed: two F stems with a heavy falling and a light rising diagonal",
    "slant": 0.24,
    "lint": {
     "nodes": 55,
