@@ -83,7 +83,12 @@ for (const fn of fns) {
   const callees = new Set();
   for (const m of src.matchAll(/functions\/v1\/([a-zA-Z0-9_-]+)/g)) if (m[1] !== fn) callees.add(m[1]);
   for (const m of src.matchAll(/functions\.invoke\(\s*['"`]([a-zA-Z0-9_-]+)/g)) if (m[1] !== fn) callees.add(m[1]);
-  info.set(fn, { reasons, callees, guarded: /requireWriteAuth\(/.test(src) });
+  // writeGuard returns null for OPTIONS so the function's own CORS preflight can answer it. A guarded
+  // function with no OPTIONS branch therefore runs its whole body for an anonymous preflight (2026-11-12:
+  // firecrawl-balance-log wrote a row from an anonymous OPTIONS probe).
+  const fnFiles = readdirSync(path.join(FN_DIR, fn)).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
+  const answersOptions = fnFiles.some((f) => /["']OPTIONS["']/.test(readFileSync(path.join(FN_DIR, fn, f), "utf8")));
+  info.set(fn, { reasons, callees, guarded: /requireWriteAuth\(/.test(src), usesGuard: /_shared\/writeGuard\.ts/.test(src), answersOptions });
 }
 
 // Fan-out closes over writers: calling a writer with the service key is writing.
@@ -99,6 +104,7 @@ while (changed) {
 
 const writers = [...info].filter(([, i]) => i.reasons.length);
 const unguarded = writers.filter(([fn, i]) => !i.guarded && !(fn in ALLOWLIST));
+const preflightRuns = [...info].filter(([, i]) => i.usesGuard && !i.answersOptions);
 const stale = Object.keys(ALLOWLIST).filter((fn) => !info.has(fn));
 const idle = Object.keys(ALLOWLIST).filter((fn) => info.has(fn) && !info.get(fn).reasons.length);
 
@@ -117,10 +123,15 @@ console.log(
 );
 for (const fn of stale) console.log(`  note: allowlist entry '${fn}' has no function directory (stale)`);
 for (const fn of idle) console.log(`  note: allowlist entry '${fn}' no longer writes (drop it)`);
+if (preflightRuns.length) {
+  console.error(`\n✗ ${preflightRuns.length} guarded function(s) run their handler for an anonymous OPTIONS request:`);
+  for (const [fn] of preflightRuns) console.error(`  ${fn}`);
+  console.error("\nwriteGuard never judges OPTIONS. Answer it right after the guard: `if (req.method === \"OPTIONS\") return new Response(null, { status: 204 });`");
+}
 if (unguarded.length) {
   console.error(`\n✗ ${unguarded.length} writing function(s) accept anonymous callers:`);
   for (const [fn, i] of unguarded) console.error(`  ${fn}  (${i.reasons.join("; ")})`);
   console.error("\nAdd `const denied = await requireWriteAuth(req); if (denied) return denied;` as the first statement of the handler\n(import from ../_shared/writeGuard.ts), or allowlist it in scripts/guardrails/check-write-guard.mjs with the auth that refuses anonymous callers.");
-  process.exit(1);
 }
+if (unguarded.length || preflightRuns.length) process.exit(1);
 console.log("✓ every writing function refuses anonymous callers");
