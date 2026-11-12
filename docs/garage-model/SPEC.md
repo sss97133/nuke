@@ -5,6 +5,8 @@ Status: **DRAFT SPEC, nothing applied.** Companion files: `supabase/drafts/garag
 Written 2026-11-12 by the SPEC lane against `origin/main` `69db0229a` and the live project `qkgaybvrernstplzjaam`
 (read-only; catalog snapshot 2026-11-12 ~10:50 AM AST, row reads the same day, AST = UTC-4).
 
+See also: [`PRESENCE.md`](PRESENCE.md), the stay derivation (signals, fold, now/timeline readers), its backfill plan and the problems it found in this spec (its section 6).
+
 **How to read the labels.** `[live]` = I read it from production on 2026-11-12. `[catalog]` = from the catalog snapshot (policy
 text, column lists; row counts there are planner estimates, marked est). `[study]` = taken from the prior photo-truth study
 (`MODEL.md`, `presence.json`, same day), not re-run by me. `[repo]` = repo file only, not checked live. `[inferred]` = my reading.

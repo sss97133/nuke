@@ -19,6 +19,13 @@ Real bodies: `garage_role_rank`, `garage_member_rank`, `create_garage`, `garage_
 `garage_inbound_feed` (PRESENCE lane) and `can_see_vehicle_via_garage` (VISIBILITY lane). Join-link functions belong to the JOIN lane.
 Timestamp lanes: SPEC `20261112100000-099`, PRESENCE `…100100-199`, JOIN `…100200-299`, VISIBILITY `…100300-399`.
 
+**PRESENCE lane** (apply in this order, after the core): `migrations/20261112100100_garage_presence_signals.sql` (read-only signal layer, derivation
+versions, three additive citation columns), `…100110_garage_stays_fold.sql` (`garage_stays_dry_run`, `garage_fold_stays`),
+`…100120_garage_now_timeline.sql` (real bodies for `garage_now`, `garage_timeline`, `garage_stay_evidence_read`; they replace the core stubs).
+`garage_inbound_feed` is still a stub. Contract: `supabase/sql/test_garage_presence.sql`
+(`PG_BINDIR=/workspace/claude-swarm/pgbin bash scripts/ci/run-db-contracts.sh test_garage_presence.sql`). Backfill plan, undercount reasons and
+problems found in the spec: `docs/garage-model/PRESENCE.md`.
+
 Design, reasons and open questions: `docs/garage-model/SPEC.md`.
 
 ## How to test
