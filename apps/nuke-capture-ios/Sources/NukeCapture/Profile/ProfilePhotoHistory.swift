@@ -57,8 +57,8 @@ struct PhotoHistory: Equatable {
     var activeMonths: Int { months.filter { $0.photos > 0 }.count }
     var peakMonth: Month? { months.max { $0.photos < $1.photos } }
     var bestYear: Year? { years.max { $0.photos < $1.photos } }
-    /// Whole years from the tenure start to now ("9 yrs" for 2017 → 2026).
-    var spanYears: Int { months.last.map { $0.at.year - since.year } ?? 0 }
+    /// Whole years elapsed from the tenure start month to the last month ("9 yrs" for Apr 2017 → Nov 2026).
+    var spanYears: Int { max(months.count - 1, 0) / 12 }
 
     /// The 1st-percentile rule, shared with the vehicle timeline: the first key whose cumulative count
     /// exceeds 1% of the total. Keys must be ascending.
