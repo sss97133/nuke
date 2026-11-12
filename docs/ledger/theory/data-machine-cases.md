@@ -706,6 +706,15 @@ found broken and what is still unproven:
     `labor_operation` or a `stage_row` or is unpriced; `rate_basis` is not `explicit_assumption`. Kinds the check does
     not name are left to the cost fold. The stored totals do not move until a record is rewritten; when one is, labor
     that rested on typed hours becomes unresolved, which is the true state.
+  - *The fourth refusal, live* (#3410, read 2026-11-12 10:14 UTC): all four checks are in the one trigger. Of the 31
+    current records 18 fail system keys, 26 part keys, 23 citations and 26 numbers; 2 pass all four. No work record
+    has been written on the vehicle since 2026-11-11 16:43, so no check has yet refused a real write.
+  - *The scoreboard for work records* (`20261116040000`, `visual_work_gate_report(vehicle)`, contract
+    `test_visual_work_gate_report.sql`): for a vehicle's current records, how many the gate would admit today, how
+    many it would refuse per check, the drafts declared, and for each failing record the keys, photos and numbers at
+    fault. It calls the trigger's own four functions, so the two cannot disagree. Whether this vehicle's work log is
+    done is this query's `failing` reaching zero, not an agent's statement. Service role only. It is not rule 7's
+    measure for photo readings (keyed, connected, proven over the library); that reader is still not built.
   - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on
     reason and logic." They are the agent's reasoning, not his word, and he can overturn them. (1) A researched or
     analyst number (price, hours, rate) is not stored as a number in a record. Invariant 5 says a number is cited from
