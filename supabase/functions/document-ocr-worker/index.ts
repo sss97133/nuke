@@ -442,7 +442,7 @@ async function classifyWithClaude(base64Image: string, mediaType: string): Promi
   }
 
   const data = await response.json();
-  const content = data.content?.[0]?.text;
+  const content = (data.content ?? []).find((b: { type?: string }) => b?.type === "text")?.text;
   if (!content) throw new Error("Empty Anthropic response");
 
   const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -565,7 +565,7 @@ async function extractWithClaude(base64Image: string, mediaType: string, docType
   }
 
   const data = await response.json();
-  const content = data.content?.[0]?.text;
+  const content = (data.content ?? []).find((b: { type?: string }) => b?.type === "text")?.text;
   if (!content) throw new Error("Empty Anthropic response");
 
   const jsonMatch = content.match(/\{[\s\S]*\}/);
