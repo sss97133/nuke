@@ -31,7 +31,7 @@ SIDE = {k: json.load(open(os.path.join(PERIOD, v[1][:-4] + '.provenance.json')))
 
 SETTINGS = [
     [('1973', 'numerals'), (' ', None), ('PONTIAC', 'block'), (' ', None), ('Firebird', 'script'), (' ', None),
-     ('TRANS AM-Style', 'decal')],
+     ('TRANS AM', 'decal'), ('-Style', 'ui')]   # the tribute qualifier is Nuke's statement: UI face, never period,
     [('1974', 'numerals'), (' ', None), ('PONTIAC', 'block'), (' ', None), ('Firebird Formula', 'script')],
     [('1970', 'numerals'), (' ', None), ('PONTIAC', 'block'), (' ', None), ('Firebird Esprit', 'script')],
     [('1981', 'numerals'), (' ', None), ('TRANS AM', 'decal')],
@@ -54,6 +54,8 @@ def check(text, fam):
 def run(text, fam, size=None):
     if fam is None:
         return '<span class="gap"></span>'
+    if fam == 'ui':
+        return f'<span class="ui-qualifier">{html.escape(text)}</span>'
     check(text, fam)
     cls = FAM[fam][2] + (' plain' if size and size < 24 and fam in ('block', 'script') else '')
     st = f' style="font-size:{size}px"' if size else ''
@@ -126,6 +128,7 @@ h3 {{ font-size:12px; color:var(--muted); font-weight:500; margin:20px 0 6px; te
 .meta, .sz {{ color:var(--muted); font-size:12px; }} .sz {{ display:inline-block; width:36px; }}
 .row {{ margin:6px 0; overflow-wrap:anywhere; }} .setting {{ margin:14px 0; line-height:1.1; }}
 .gap {{ display:inline-block; width:22px; }}
+.ui-qualifier {{ font:500 28px/1 -apple-system, system-ui, sans-serif; color:var(--muted); }}
 .plain, .plain::after {{ color:var(--fg) !important; background:none !important; -webkit-text-stroke:0 !important; filter:none !important; }}
 .plain::after {{ display:none; }}
 .ov img {{ height:240px; margin:0 8px 8px 0; border:1px solid var(--rule); background:#fff; }}
