@@ -11,6 +11,8 @@ function expect(actual: any) { return {
  },
 }; }
 import { financialActor, ingestFinancialEvidence } from "./financialEvidence.ts";
+import { privateProjection } from "./privateProjection.ts";
+import { delegatedFinancialEvidence } from "./financialDelegation.ts";
 const actor = "11111111-1111-4111-8111-111111111111";
 const hash = helloHash;
 function fixture() {
@@ -121,4 +123,76 @@ Deno.test("source review verifies actual bytes and ownership before attributed a
  source.verification.reviewer=actor;
  source.storage_path=`other/redacted/${hash}/${digest}.png`;
  assert.equal((await ingestFinancialEvidence(db,actor,{action:"review_source",document_id:actor,source},async()=>true)).status,400);
+});
+
+// ---- owner-private work projections (account scope, no owner from the caller)
+const projItem = { kind: "image_timeline_event", projection_key: "a".repeat(32), source_privacy_hold: false, holds: [],
+  evidence_refs: [{ kind: "image", sha256: "b".repeat(64) }], payload: {} };
+function projFixture(error: unknown = null) {
+  const calls: { name: string; args: Record<string, unknown> }[] = [];
+  const db = { rpc: async (name: string, args: Record<string, unknown>) => { calls.push({ name, args }); return { data: { ok: true }, error }; } };
+  return { db, calls };
+}
+const projYes = async () => true;
+const projCtx = { kind: "user" };
+
+Deno.test("projection actions need the caller's own account and the matching scope", () => {
+  assert.equal(financialActor({ kind: "api_key", userId: actor, scopes: ["read"] }, "projection_submit"), null);
+  assert.equal(financialActor({ kind: "api_key", userId: actor, scopes: ["write"] }, "projection_read"), null);
+  assert.equal(financialActor({ kind: "api_key", userId: actor, scopes: ["write"] }, "projection_submit"), actor);
+  assert.equal(financialActor({ kind: "api_key", userId: actor, scopes: ["read"] }, "projection_read"), actor);
+  assert.equal(financialActor({ kind: "service_role", userId: actor }, "projection_submit"), null);
+  assert.equal(financialActor({ kind: "anonymous", userId: actor }, "projection_read"), null);
+});
+
+Deno.test("submit sends only the server-derived account and refuses any caller-supplied owner", async () => {
+  const { db, calls } = projFixture();
+  const revision = { idempotency_key: "k", projections: [projItem] };
+  const ok = await ingestFinancialEvidence(db as never, actor, { mode: "financial_evidence_v1", action: "projection_submit", revision }, projYes, projCtx);
+  assert.equal(ok.status, 200);
+  assert.equal((ok.body as Record<string, unknown>).public_timeline_written, false);
+  assert.deepEqual(calls.map(c => [c.name, c.args.p_owner_id]), [["ingest_private_work_projection", actor]]);
+  for (const evil of [{ owner_id: "x" }, { owner_user_id: "x" }, { p_owner_id: "x" }, { user_id: "x" }]) {
+    const r = await ingestFinancialEvidence(db as never, actor, { mode: "financial_evidence_v1", action: "projection_submit", revision, ...evil }, projYes, projCtx);
+    assert.equal(r.status, 400);
+  }
+  const nested = await privateProjection(db, actor, { action: "projection_submit", revision: { projections: [{ ...projItem, owner_id: "x" }] } }, projYes, projCtx);
+  assert.equal(nested.status, 400);
+  assert.equal(calls.length, 1);
+});
+
+Deno.test("submit refuses a revoked account, extra keys and malformed revisions before any write", async () => {
+  const { db, calls } = projFixture();
+  const revision = { projections: [projItem] };
+  assert.equal((await privateProjection(db, actor, { action: "projection_submit", revision }, async () => false, projCtx)).status, 403);
+  assert.equal((await privateProjection(db, actor, { action: "projection_submit", revision, extra: 1 }, projYes, projCtx)).status, 400);
+  assert.equal((await privateProjection(db, actor, { action: "projection_submit", revision: { projections: [] } }, projYes, projCtx)).status, 400);
+  assert.equal((await privateProjection(db, actor, { action: "projection_submit", revision: [] }, projYes, projCtx)).status, 400);
+  assert.equal(calls.length, 0);
+});
+
+Deno.test("a database refusal is generic and never echoes the reason", async () => {
+  const { db } = projFixture({ message: "financial document revision is not in this account scope" });
+  const r = await privateProjection(db, actor, { action: "projection_submit", revision: { projections: [projItem] } }, projYes, projCtx);
+  assert.equal(r.status, 409);
+  assert.equal(JSON.stringify(r.body).includes("account scope"), false);
+});
+
+Deno.test("read is bounded and derives the account", async () => {
+  const { db, calls } = projFixture();
+  const r = await privateProjection(db, actor, { action: "projection_read", keys: ["a".repeat(32)], limit: 10 }, projYes, projCtx);
+  assert.equal(r.status, 200);
+  assert.equal(calls[0].args.p_owner_id, actor);
+  for (const bad of [{ owner_id: actor }, { keys: ["nothex"] }, { limit: 501 }, { kind: "x" }, { after: "no" }, { stray: 1 }]) {
+    assert.equal((await privateProjection(db, actor, { action: "projection_read", ...bad }, projYes, projCtx)).status, 400);
+  }
+  assert.equal(calls.length, 1);
+});
+
+Deno.test("delegated accounting access cannot reach projections", async () => {
+  const { db, calls } = projFixture();
+  const r = await delegatedFinancialEvidence(db as never, { kind: "user", userId: actor } as never,
+    { mode: "financial_evidence_v1", action: "projection_read", owner_user_id: "22222222-2222-4222-8222-222222222222" } as never, projYes as never);
+  assert.notEqual(r.status, 200);
+  assert.equal(calls.length, 0);
 });

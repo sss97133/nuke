@@ -40,6 +40,7 @@ const env: Record<string, string> = {
   SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: PUBLISHABLE_KEY }),
   SUPABASE_JWKS: JWKS,
   RESEND_API_KEY: "re_test_key_01",
+  OUTBOUND_MODE: "live",
 };
 
 interface Call { method: string; url: string; body: string | null }
@@ -64,6 +65,9 @@ function world(opts: { admins: string[]; adminLookupStatus?: number }, calls: Ca
     }
     if (url.includes("/rest/v1/contact_inbox") && method === "PATCH") {
       return new Response(null, { status: 204 });
+    }
+    if (url.includes("/rest/v1/outbound_messages") && method === "POST") {
+      return new Response(JSON.stringify([{ id: "outbox_01" }]), { status: 201 });
     }
     if (url.startsWith("https://api.resend.com/")) {
       return new Response(JSON.stringify({ id: "re_sent_01" }), { status: 200 });
@@ -139,4 +143,17 @@ Deno.test("the publishable key alone → 403, nothing sent", async () => {
   const res = await handleReplyEmail(reply(PUBLISHABLE_KEY), deps(world({ admins: [ADMIN] }, calls)));
   assertEquals(res.status, 403);
   assertEquals(sentMail(calls).length, 0);
+});
+
+Deno.test("default mode (OUTBOUND_MODE unset) holds a reply to a non-allowlisted sender: nothing sent, inbox not marked replied", async () => {
+  const calls: Call[] = [];
+  const { OUTBOUND_MODE: _drop, ...heldEnv } = env;
+  const res = await handleReplyEmail(reply(DEFAULT_KEY), {
+    env: (n: string) => heldEnv[n], fetch: world({ admins: [] }, calls), now: () => NOW,
+  });
+  assertEquals(res.status, 202);
+  assertEquals((await res.json()).held, true);
+  assertEquals(sentMail(calls).length, 0);
+  assertEquals(touchedInbox(calls).filter((c) => c.method === "PATCH").length, 0);
+  assertEquals(calls.filter((c) => c.url.includes("/rest/v1/outbound_messages")).length, 1);
 });

@@ -159,6 +159,38 @@ export type CaptureAcknowledgement =
   | { status: "retained" | "existing"; snapshot_id: string; html_sha256: string; fetched_at: string }
   | { status: "unavailable" | "failed"; reason: string };
 
+/** Read and verify a retained body; a new network check never rewrites its original clock. */
+async function readRetainedCapture(supabase: any, input: {
+  platform: string; url: string; hash: string; fetchedAt: string; id?: string;
+}): Promise<CaptureAcknowledgement> {
+  const unavailable = (reason: string): CaptureAcknowledgement => ({ status: "unavailable", reason });
+  const { platform, url, hash, fetchedAt, id } = input;
+  let query = supabase.from("listing_page_snapshots").select("id,platform,listing_url,success,http_status,html,html_sha256,html_storage_path,fetched_at");
+  query = id ? query.eq("id", id).eq("fetched_at", fetchedAt)
+    : query.eq("platform", platform).eq("listing_url", url).eq("html_sha256", hash).lte("fetched_at", fetchedAt);
+  const read = await query.limit(2);
+  if (read.error || !Array.isArray(read.data) || read.data.length !== 1) return unavailable("capture_readback_unavailable");
+  const row = read.data[0];
+  if (typeof row.id !== "string" || !row.id || (id && row.id !== id)
+    || row.platform !== platform || row.listing_url !== url || row.success !== true || row.http_status !== 200
+    || row.html_sha256 !== hash || !Number.isFinite(Date.parse(row.fetched_at))
+    || Date.parse(row.fetched_at) > Date.parse(fetchedAt)) return unavailable("capture_attribution_mismatch");
+  if (id && Date.parse(row.fetched_at) !== Date.parse(fetchedAt)) return unavailable("capture_clock_mismatch");
+  let body = row.html;
+  if (!body && row.html_storage_path) {
+    const path = row.html_storage_path;
+    if (typeof path !== "string" || path.startsWith("/") || /[:\\\x00-\x1f]/.test(path)
+      || path.split("/").some((part: string) => part === "." || part === "..")) return unavailable("storage_locator_invalid");
+    const stored = await supabase.storage.from("listing-snapshots").download(path);
+    if (stored.error || !stored.data || stored.data.size > 2_097_152) return unavailable("storage_body_unavailable");
+    body = await stored.data.text();
+  }
+  if (typeof body !== "string" || !body) return unavailable("body_unavailable");
+  if (new TextEncoder().encode(body).byteLength > 2_097_152 || await sha256(body) !== hash)
+    return unavailable("stored_body_hash_mismatch");
+  return { status: id ? "retained" : "existing", snapshot_id: row.id, html_sha256: hash, fetched_at: row.fetched_at };
+}
+
 /** Retain an already fetched response. No source request, historical repair or testimony admission.
  * A uniqueness collision is acknowledged only after reading and hashing its actual retained body.
  * Hashes describe UTF-8 text; NUL removal is explicit and never presented as original wire bytes.
@@ -175,7 +207,6 @@ export async function retainFetchedCapture(supabase: any, input: {
   if (!/^https:\/\//.test(url) || isGarbageHtml(html, input.platform)) return unavailable("invalid_source_body");
   const hash = await sha256(html);
   const originalHash = await sha256(input.html);
-  const columns = "id,platform,listing_url,success,http_status,html,html_sha256,html_storage_path,fetched_at";
   try {
     const { data, error } = await supabase.from("listing_page_snapshots").insert({
       platform: input.platform, listing_url: url, fetched_at: input.fetchedAt, fetch_method: "direct",
@@ -185,31 +216,8 @@ export async function retainFetchedCapture(supabase: any, input: {
     }).select("id").maybeSingle();
     if (error && String(error.code) !== "23505") return { status: "failed", reason: "capture_insert_failed" };
     if (!error && (typeof data?.id !== "string" || !data.id)) return { status: "failed", reason: "capture_id_missing" };
-    let query = supabase.from("listing_page_snapshots").select(columns);
-    query = error ? query.eq("platform", input.platform).eq("listing_url", url).eq("html_sha256", hash).lte("fetched_at", input.fetchedAt)
-      : query.eq("id", data.id).eq("fetched_at", input.fetchedAt); // Native timestamp equality preserves PostgreSQL microseconds.
-    const read = await query.limit(2);
-    if (read.error || !Array.isArray(read.data) || read.data.length !== 1) return unavailable("capture_readback_unavailable");
-    const row = read.data[0];
-    if (typeof row.id !== "string" || !row.id || (!error && row.id !== data.id)
-      || row.platform !== input.platform || row.listing_url !== url || row.success !== true || row.http_status !== 200
-      || row.html_sha256 !== hash || !Number.isFinite(Date.parse(row.fetched_at))
-      || Date.parse(row.fetched_at) > Date.parse(input.fetchedAt)) return unavailable("capture_attribution_mismatch");
-    // A newly inserted row must keep its capture clock. A duplicate keeps its earlier original clock.
-    if (!error && Date.parse(row.fetched_at) !== Date.parse(input.fetchedAt)) return unavailable("capture_clock_mismatch");
-    let body = row.html;
-    if (!body && row.html_storage_path) {
-      const path = row.html_storage_path;
-      if (typeof path !== "string" || path.startsWith("/") || /[:\\\x00-\x1f]/.test(path)
-        || path.split("/").some((part: string) => part === "." || part === "..")) return unavailable("storage_locator_invalid");
-      const stored = await supabase.storage.from("listing-snapshots").download(path);
-      if (stored.error || !stored.data || stored.data.size > 2_097_152) return unavailable("storage_body_unavailable");
-      body = await stored.data.text();
-    }
-    if (typeof body !== "string" || !body) return unavailable("body_unavailable");
-    if (new TextEncoder().encode(body).byteLength > 2_097_152 || await sha256(body) !== hash)
-      return unavailable("stored_body_hash_mismatch");
-    return { status: error ? "existing" : "retained", snapshot_id: row.id, html_sha256: hash, fetched_at: row.fetched_at };
+    return await readRetainedCapture(supabase, { platform: input.platform, url, hash, fetchedAt: input.fetchedAt,
+      ...(!error ? { id: data.id as string } : {}) });
   } catch {
     return { status: "failed", reason: "capture_persistence_exception" };
   }
@@ -474,7 +482,7 @@ export async function archiveFetch(
       },
     };
 
-    const { data: inserted, error: insertErr } = await supabase
+    const { data: inserted, error: insertErr, status: insertStatus } = await supabase
       .from("listing_page_snapshots")
       .insert(payload)
       .select("id")
@@ -483,19 +491,34 @@ export async function archiveFetch(
     if (insertErr) {
       // 23505 = duplicate (same platform+url+sha256) — that's fine, content hasn't changed
       if (String((insertErr as any).code || "") === "23505") {
-        console.log(`[archiveFetch] Duplicate snapshot for ${url} (content unchanged)`);
+        if (htmlHash && payload.success === true && result.statusCode === 200) {
+          const retained = await readRetainedCapture(supabase, { platform, url: normalized, hash: htmlHash,
+            fetchedAt: payload.fetched_at as string });
+          if ("snapshot_id" in retained) result.snapshotId = retained.snapshot_id;
+          else result.archiveError = `listing_page_snapshots duplicate acknowledgment failed: ${retained.reason}`;
+        } else result.archiveError = "listing_page_snapshots duplicate cannot acknowledge an unsuccessful capture";
       } else {
         // A retention that fails must be visible: the fetch itself is still returned, the failure is logged by softWrite and
         // carried on the result (archiveError) so callers and counters see it instead of it vanishing.
-        result.archiveError = `listing_page_snapshots insert failed: ${insertErr.message}${(insertErr as { code?: string }).code ? ` (${(insertErr as { code?: string }).code})` : ""}`;
+        // Gateways can return problem+json without PostgREST's message field.
+        // Keep safe protocol diagnostics, never a response body or request data.
+        const status = Number.isInteger(insertStatus) && insertStatus >= 100 && insertStatus <= 599
+          ? `HTTP ${insertStatus}` : "HTTP status unavailable";
+        const code = typeof insertErr.code === "string" && /^(?:[0-9A-Z]{5}|PGRST[0-9]{3})$/.test(insertErr.code)
+          ? `; code ${insertErr.code}` : "";
+        result.archiveError = `listing_page_snapshots insert failed: ${status}${code}`;
         console.error(`[archiveFetch] ${result.archiveError}`);
       }
-    } else if (inserted) {
+    } else if (typeof inserted?.id === "string" && inserted.id.length > 0) {
       result.snapshotId = inserted.id;
       console.log(`[archiveFetch] Archived ${platform} snapshot ${inserted.id} (${html?.length ?? 0} bytes)`);
+    } else {
+      result.archiveError = "listing_page_snapshots insert returned no acknowledgment";
+      console.error(`[archiveFetch] ${result.archiveError}`);
     }
-  } catch (e: any) {
-    console.warn(`[archiveFetch] Archive failed (non-fatal): ${e?.message}`);
+  } catch (_e: unknown) {
+    result.archiveError = "listing_page_snapshots retention failed before acknowledgment";
+    console.warn(`[archiveFetch] ${result.archiveError}`);
   }
 
   return result;

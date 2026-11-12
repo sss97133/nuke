@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useAuthContext } from '../../contexts/AuthContext';
-import { useBuildLedger, useVehicleReceiptRecords } from './hooks/useBuildLedger';
+import { useBuildLedger, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
+import { Row, Rows } from '../../kit';
 const WorkOrderFinancialRecords = React.lazy(() => import('./FinancialReceiptRecords').then(module => ({ default: module.WorkOrderFinancialRecords })));
 import FinancialLedger from './FinancialLedger';
 import { moneyLabel } from './hooks/useVehicleFinancials';
@@ -11,16 +12,62 @@ function recordedDate(value: string | null) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
 
+const cents = (value: number) => Math.round(value * 100);
+const centsLabel = (value: number, currency: string) => moneyLabel((value / 100).toFixed(2), currency);
+
+/**
+ * Receipts filed to the vehicle, folded per vendor in place: count, readable total, and the receipts each total
+ * stands on. The itemized receipt pages stay with their one owner (#build-receipts). Receipts are evidence of a
+ * payment, not booked costs, so this never merges into the allocation ledger.
+ */
+function ReceiptTotals({ rows, total, complete, onOpenItems }: { rows: VehicleReceiptRecord[]; total: number | null; complete: boolean; onOpenItems: () => void }) {
+  if (!rows.length) return null;
+  const currencies = [...new Set(rows.flatMap(row => row.amount != null && !row.amountsHidden && row.currency ? [row.currency] : []))];
+  const currency = currencies.length === 1 ? currencies[0] : null;
+  const vendors = new Map<string, { receipts: number; counted: number; cents: number; hidden: number }>();
+  for (const row of rows) {
+    const vendor = row.vendor || 'Vendor not read';
+    const entry = vendors.get(vendor) ?? { receipts: 0, counted: 0, cents: 0, hidden: 0 };
+    if (row.amountsHidden) entry.hidden += 1;
+    entry.receipts += 1;
+    if (currency && row.currency === currency && row.amount != null && !row.amountsHidden) { entry.counted += 1; entry.cents += cents(row.amount); }
+    vendors.set(vendor, entry);
+  }
+  const counted = [...vendors.values()].reduce((sum, v) => sum + v.counted, 0);
+  const sum = [...vendors.values()].reduce((s, v) => s + v.cents, 0);
+  const hidden = rows.filter(row => row.amountsHidden).length;
+  // Value per dollar: the largest vendors lead.
+  const ordered = [...vendors].sort((a, b) => b[1].cents - a[1].cents || b[1].receipts - a[1].receipts);
+  return <section className="vp-financial-receipts">
+    <Rows title="Receipts filed to this vehicle" count={total ?? rows.length}>
+      {currency && counted > 0 && <Row label="Total on receipts" role="measure">{centsLabel(sum, currency)}</Row>}
+      {currency && counted > 0 && <Row label="Counted" role="caption">{counted} of {complete ? rows.length : `${rows.length}+`} receipts{rows.length - counted - hidden > 0 ? ` · ${rows.length - counted - hidden} without a readable amount` : ''}{hidden ? ` · ${hidden} amount withheld from this viewer` : ''}</Row>}
+      {!currency && hidden === rows.length && <Row label="Amounts" role="caption">Withheld from this viewer</Row>}
+      <Row label="Source" role="caption">receipts filed to this vehicle</Row>
+    </Rows>
+    <Rows title="By vendor">
+      {ordered.map(([vendor, v]) => <Row key={vendor} label={vendor} role="measure">
+        {currency && v.counted > 0 ? centsLabel(v.cents, currency) : v.hidden === v.receipts ? 'Amount withheld' : 'Amount not read'} · {v.receipts} {v.receipts === 1 ? 'receipt' : 'receipts'}
+      </Row>)}
+    </Rows>
+    <button type="button" className="vp-financial-action" onClick={onOpenItems}>Show each receipt and its items</button>
+  </section>;
+}
+
 function FinancialDetails({ vehicleId, market, onClose }: { vehicleId: string; market: React.ReactNode; onClose: () => void }) {
   const { user } = useAuthContext();
   const ledger = useBuildLedger(vehicleId, false);
   const receipts = useVehicleReceiptRecords(vehicleId);
+  // Booked allocations lead; filed receipts are payment evidence, folded in place after them.
+  const receiptTotals = <ReceiptTotals rows={receipts.rows} total={receipts.total} complete={!receipts.hasNextPage}
+    onOpenItems={() => { onClose(); document.getElementById('build-receipts')?.scrollIntoView({ block: 'start' }); }} />;
   return <div className="vp-financial-panel">
     {market && <section><h3>Market</h3>{market}</section>}
-    {!user ? <p>Sign in to read the financial records available to you.</p> : <>
+    {!user ? <><p>Sign in to read the financial records available to you.</p>{receiptTotals}</> : <>
       {ledger.loading && <p role="status">Reading vehicle financial records…</p>}
       {ledger.error && <div role="status"><p>Some financial records could not load. Available records remain shown; missing reads do not establish a zero balance.</p><button className="vp-financial-action" type="button" onClick={() => void ledger.retry()}>Retry financial records</button></div>}
       <FinancialLedger vehicleId={vehicleId} />
+      {receiptTotals}
       <details className="vp-financial-sources"><summary>Work orders and historical build records</summary>
       <React.Suspense fallback={null}><WorkOrderFinancialRecords vehicleId={vehicleId} /></React.Suspense>
       {ledger.data.hasAudit && <section><h3>Build records and reported obligations</h3>
@@ -45,7 +92,7 @@ function FinancialDetails({ vehicleId, market, onClose }: { vehicleId: string; m
       </section>}
       </details>
     </>}
-    {receipts.rows.length > 0 && <a href="#build-receipts" onClick={onClose}>View work & parts receipts</a>}
+
   </div>;
 }
 

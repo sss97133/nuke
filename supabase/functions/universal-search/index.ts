@@ -375,15 +375,16 @@ Deno.serve(async (req) => {
     if (queryType === 'vin') {
       const vin = trimmedQuery.toUpperCase();
 
-      // Try exact match first (case-insensitive via ilike)
-      const { data: exactVehicles, error: exactError } = await publicVehicleFilter(supabase
-        .from('vehicles')
-        .select(VEHICLE_SELECT))
-        .ilike('vin', vin)
-        .limit(10);
-      if (exactError) throw new PublicVehicleReadError('Vehicle VIN search failed');
-
-      let vehicles = exactVehicles || [];
+      // Reuse the existing normalized public VIN locator and its upper(trim(vin))
+      // index. Re-read bounded IDs through current search eligibility; never
+      // expose the locator's possibly stale parent or price payload directly.
+      const { data: exactCandidates, error: exactError } = await supabase.rpc('vehicle_by_vin_public', { p_vin: vin });
+      if (exactError || !Array.isArray(exactCandidates) || exactCandidates.length > 5
+        || exactCandidates.some(v => typeof v?.id !== 'string')) throw new PublicVehicleReadError('Vehicle VIN search failed');
+      const exactIds = [...new Set(exactCandidates.map(v => v.id))];
+      const current = new Map<string, any>((await publicVehiclesByIds(exactIds)).map((v: any): [string, any] => [v.id, v]));
+      let vehicles = exactIds.map(id => current.get(id)).filter((v): v is any =>
+        !!v && typeof v.vin === 'string' && v.vin.trim().toUpperCase() === vin);
 
       // If no exact match, try partial match (last 6-8 digits, or substring)
       if (!vehicles.length && vin.length >= 5) {
@@ -402,7 +403,7 @@ Deno.serve(async (req) => {
         for (const v of vehicles) {
           if (isNonAutomobile(v)) continue;
           const price = v.sale_price || v.current_value || v.asking_price;
-          const isExact = (v.vin || '').toUpperCase() === vin;
+          const isExact = (v.vin || '').trim().toUpperCase() === vin;
           results.push({
             id: v.id,
             type: 'vin_match',

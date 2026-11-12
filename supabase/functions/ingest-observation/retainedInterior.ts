@@ -1,3 +1,4 @@
+import { mccormickTarget, MCCORMICK_PARSER } from "../_shared/mccormickParser.ts";
 import { RETAINED_POWERTRAIN_FIELDS, retainedPowertrainValue } from "./retainedPowertrain.ts";
 import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 import { DESCRIPTION_POWERTRAIN_VERSION, DESCRIPTION_ENGINE_FAMILY_LABEL_VERSION, ENGINE_FAMILY_LABEL_VERSION, proposedRetainedEngineFamilyLabelWitness, retainedDescriptionCaptureQualified, retainedDescriptionWitness } from "./retainedDescriptionPowertrain.ts";
@@ -34,6 +35,26 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
   if(odometer && registeredSource?.slug==="craigslist")return deriveRetainedCraigslistOdometer(source,vehicle,registeredSource);
   if(propertyKey==="year" && registeredSource?.slug==="craigslist")return deriveRetainedCraigslistYear(source,vehicle,registeredSource);
   const identity = RETAINED_IDENTITY_KEYS.includes(propertyKey);
+  // Native McCormick identity labels reuse the retained-property owner.
+  // PostgreSQL independently proves current row, capture hash/clock and parent
+  // eligibility at admission and read time. No price or raw-field projection.
+  const mccormickTargetRow = registeredSource?.slug === "mccormicks" ? mccormickTarget(source?.source_url ?? "") : null;
+  const mccormickNative = Boolean(identity && mccormickTargetRow
+    && source?.source_url === mccormickTargetRow.url
+    && source?.extraction_method === MCCORMICK_PARSER
+    && source.structured_data?.parser === MCCORMICK_PARSER
+    && source.structured_data?.source_id === mccormickTargetRow.id
+    && source.structured_data?.source_claims_only === true
+    && source.structured_data?.source_event_at === null
+    && source.structured_data?.evidence_scope == null
+    && source.extraction_metadata?.parser === MCCORMICK_PARSER
+    && /^[0-9a-f]{64}$/.test(source.extraction_metadata?.html_sha256 ?? "")
+    && source.raw_source_ref === `listing_page_snapshots:${source.extraction_metadata?.snapshot_id}`
+    && UUID.test(source.extraction_metadata?.snapshot_id ?? "")
+    && source.source_identifier === `auctionid:${mccormickTargetRow.id}:${source.extraction_metadata.html_sha256}`
+    && observationClockMicroseconds(source.observed_at) !== null
+    && observationClockMicroseconds(source.observed_at) === observationClockMicroseconds(source.structured_data?.source_captured_at));
+  if (registeredSource?.slug === "mccormicks" && !mccormickNative) return null;
   // Mecum's retained public index supplies literal identity labels, not a VIN
   // witness, page-description capture or specification inference.
   const mecumIndex = ["year", "make", "model"].includes(propertyKey) &&
@@ -69,25 +90,25 @@ export function deriveRetainedInterior(source: Record<string, any>, vehicle: Rec
   const value = description ? witness?.value : identity ? retainedListingIdentityValue(propertyKey, rawValue) : powertrain ? retainedPowertrainValue(propertyKey, rawValue) : rawValue;
   let url: URL;
   try { url = new URL(source?.source_url); } catch { return null; }
-  const sourceUrlMatches = registeredSource?.slug === "barrett-jackson" && nativeFields
+  const sourceUrlMatches = mccormickNative ? true : registeredSource?.slug === "barrett-jackson" && nativeFields
     ? ["barrett-jackson.com", "www.barrett-jackson.com"].includes(url.hostname) && /^\/[^/]+\/docket\/vehicle\/[^/]+\/?$/.test(url.pathname)
     : mecumRetained || nativeFields
     ? ["mecum.com", "www.mecum.com"].includes(url.hostname) && /^\/lots\/[0-9]+\/[^/]+\/?$/.test(url.pathname)
     : url.hostname === "bringatrailer.com" && /^\/listing\/[^/]+\/?$/.test(url.pathname);
   if (!UUID.test(source?.id ?? "") || !UUID.test(source?.vehicle_id ?? "") ||
       (source.kind !== "listing" && !batSaleResult && !(mecumRetained && source.kind === "sale_result")) || source.is_superseded !== false ||
-      (!description && !mecumRetained && !nativeFields && source.extraction_method !== "html_match") || source.property_id != null ||
+      (!description && !mecumRetained && !nativeFields && !mccormickNative && source.extraction_method !== "html_match") || source.property_id != null ||
       source.subject_type !== "vehicle" || source.subject_id != null ||
       !vehicle || vehicle.id !== source.vehicle_id || vehicle.is_public !== true ||
       vehicle.deleted_at != null || vehicle.listing_kind === "non_vehicle_item" ||
-      !registeredSource || registeredSource.id !== source.source_id || (registeredSource.slug !== "bat" && !mecumRetained && !nativeFields) ||
-      url.protocol !== "https:" || !sourceUrlMatches || url.search || url.hash || url.username || url.password ||
+      !registeredSource || registeredSource.id !== source.source_id || (registeredSource.slug !== "bat" && !mecumRetained && !nativeFields && !mccormickNative) ||
+      url.protocol !== "https:" || !sourceUrlMatches || (!mccormickNative && url.search) || url.hash || url.username || url.password ||
       observationClockMicroseconds(source.ingested_at) === null ||
       (source.observed_at !== null && observationClockMicroseconds(source.observed_at) === null) ||
       (!identity && (typeof rawValue !== "string" || !rawValue.trim() || rawValue.length > 500 || /^(unknown|n\/a|unspecified)$/i.test(rawValue.trim()))) || value == null ||
       !Number.isFinite(source.confidence_score) || source.confidence_score < 0.6 || source.confidence_score > 1) return null;
   return {
-    source_slug: nativeFields ? registeredSource.slug : mecumRetained ? "mecum" : "bat", kind: odometer ? "condition" : "specification", vehicle_id: source.vehicle_id,
+    source_slug: mccormickNative ? "mccormicks" : nativeFields ? registeredSource.slug : mecumRetained ? "mecum" : "bat", kind: odometer ? "condition" : "specification", vehicle_id: source.vehicle_id,
     property_key: propertyKey, source_url: source.source_url,
     source_identifier: `${mode}:${source.id}`,
     observed_at: source.ingested_at, extraction_method: RETAINED_INTERIOR_METHOD,

@@ -67,3 +67,23 @@ it('late evidence review cannot render on another vehicle and loading never inve
   await act(async () => finish({ data: { action: 'assessment', read_only: true, assessment: fixture().assessment }, error: null }));
   expect(host.querySelector('section[aria-label="Vehicle evidence assessment"]')).toBeNull();
 });
+it('evidence review shows cited archive results separately from qualified monetary sales', async () => {
+  const source = 'https://www.classic-carauction.com/auction-results?auctionnbr=58&auctionid=7309';
+  const witness = { observation_id: '40000000-0000-4000-8000-000000000001', source_url: source,
+    literal: 'High Bid: $4,200', source_date_interval_text: 'February 20 - 22, 2015',
+    source_captured_at: '2026-01-01T00:00:00Z', outcome: 'no_sale', currency: null, fee_basis: 'unknown' };
+  const assessment = { ...fixture().assessment, retained_auction_appearances: {
+    status: 'retained_publisher_claims', source_scope: 'mccormicks_archived_listing_claims_only', page: { has_more: true },
+    records: [{ native_appearance_key: '58:7309', evidence_state: 'disputed', witnesses: [witness] }],
+  } };
+  state.invoke.mockResolvedValue({ data: { action: 'assessment', read_only: true, assessment }, error: null });
+  await panel(); await click('Review evidence');
+  expect(host.textContent).toContain('Publisher-reported archive results');
+  expect(host.textContent).toContain('High Bid: $4,200');
+  expect(host.textContent).toContain('Currency and fee treatment remain unestablished');
+  expect(host.textContent).toContain('Conflicting source claims remain unresolved');
+  expect(host.textContent).toContain('More retained source readings remain beyond this page');
+  expect([...host.querySelectorAll('a')].map(a => a.getAttribute('href'))).toContain(source);
+  expect(host.querySelector('a[href="/vehicle/' + VEHICLE + '/observation/' + witness.observation_id + '"]')).not.toBeNull();
+  expect(host.textContent).not.toContain('USD 4,200');
+});

@@ -282,17 +282,14 @@ struct ClaimDrill: Identifiable {
     var id: String { title + claim.value.text }
 }
 
-/// The header block: headline price (unless a live auction owns it) and the strip.
+/// The header block: identity marks, the recorded configuration and the description. The headline
+/// price is not here: it leads the page's first screen (`VehiclePriceHeadline`), stated once.
 struct ProfileHeaderBlock: View {
     let vehicleId: String
     let read: ProfileRead
-    /// True while a live auction banner shows the current bid: then the masthead price stays off,
-    /// the same rule as the web's priceOwnedByLiveStack.
-    let priceOwnedByLiveStack: Bool
 
     @State private var drill: ClaimDrill?
     @State private var descriptionExpanded = false
-    @State private var lotProvenance: LotProvenance?
     @State private var identityMarks: [VehicleIdentityMark] = []
     @State private var selectedIdentityMark: VehicleIdentityMark?
 
@@ -348,9 +345,6 @@ struct ProfileHeaderBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let m = read.masthead, let price = m.price, !priceOwnedByLiveStack {
-                priceRow(enrichedPriceClaim(price, masthead: m), label: m.priceLabel ?? "Recorded price")
-            }
             if !headerHUDChips.isEmpty {
                 vehicleBadgeStrip
             }
@@ -361,118 +355,10 @@ struct ProfileHeaderBlock: View {
                 descriptionCard(desc)
             }
         }
-        .task(id: vehicleId) {
-            async let lpTask: Void = loadLotProvenance()
-            async let marksTask: Void = loadIdentityMarks()
-            _ = await (lpTask, marksTask)
-        }
+        .task(id: vehicleId) { await loadIdentityMarks() }
         // The sheet rides this subview, not the page: the page already hosts provenance + comments.
         .sheet(item: $drill) { d in ClaimSourceSheet(vehicleId: vehicleId, drill: d) }
         .sheet(item: $selectedIdentityMark) { mark in IdentityMarkSheet(mark: mark) }
-    }
-
-    private func enrichedPriceClaim(_ base: Claim, masthead: ProfileSection.Masthead) -> Claim {
-        guard let lp = lotProvenance else { return base }
-        var c = base
-        if c.observed_at == nil || c.observed_at?.isEmpty == true {
-            c.observed_at = lp.observedAt
-        }
-        if c.source.url == nil || c.source.url?.isEmpty == true {
-            c.source.url = lp.sourceUrl
-        }
-        if c.source.lotNumber == nil || c.source.lotNumber?.isEmpty == true {
-            c.source.lotNumber = lp.lotNumber
-        }
-        if c.source.auctionName == nil || c.source.auctionName?.isEmpty == true {
-            c.source.auctionName = lp.auctionName
-        }
-        if c.source.video == nil {
-            let vTitle = [
-                masthead.year.map { String($0) },
-                masthead.make,
-                masthead.model
-            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
-            let sourceLabel = c.source.label ?? "Auction"
-            let lotNum = c.source.effectiveLotNumber
-            let aucName = c.source.effectiveAuctionName
-            let sq = [
-                sourceLabel,
-                aucName,
-                lotNum.map { "Lot \($0)" },
-                vTitle.isEmpty ? nil : vTitle
-            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
-            c.source.video = SaleVideoMoment(
-                url: lp.videoUrl,
-                startSeconds: lp.startSeconds,
-                endSeconds: lp.endSeconds,
-                lotNumber: lotNum,
-                auctionName: aucName,
-                searchQuery: sq,
-                lotUrl: c.source.url,
-                title: vTitle.isEmpty ? nil : vTitle,
-                priceText: Self.money(c)
-            )
-        }
-        return c
-    }
-
-    private struct AuctionLotRow: Decodable {
-        let lot_number: String?
-        let source_url: String?
-        let auction_end_date: String?
-        let auction_start_date: String?
-        let broadcast_video_url: String?
-        let broadcast_video_id: String?
-        let broadcast_timestamp_start: Int?
-        let broadcast_timestamp_end: Int?
-    }
-
-    private struct VehicleEventLotRow: Decodable {
-        struct Meta: Decodable {
-            let lot_number: String?
-            let auction_name: String?
-            let event_name: String?
-            let video_url: String?
-        }
-        let source_url: String?
-        let sold_at: String?
-        let ended_at: String?
-        let extracted_at: String?
-        let metadata: Meta?
-    }
-
-    /// Additive provenance enrichment from `auction_events` and `vehicle_events` (`ProfileHeader.tsx` #1823).
-    private func loadLotProvenance() async {
-        async let auctionTask: [AuctionLotRow]? = try? SupabaseService.client
-            .from("auction_events")
-            .select("lot_number, source_url, auction_end_date, auction_start_date, broadcast_video_url, broadcast_video_id, broadcast_timestamp_start, broadcast_timestamp_end")
-            .eq("vehicle_id", value: vehicleId)
-            .order("auction_end_date", ascending: false, nullsFirst: false)
-            .limit(1)
-            .execute()
-            .value
-        async let eventTask: [VehicleEventLotRow]? = try? SupabaseService.client
-            .from("vehicle_events")
-            .select("source_url, sold_at, ended_at, extracted_at, metadata")
-            .eq("vehicle_id", value: vehicleId)
-            .order("extracted_at", ascending: false, nullsFirst: false)
-            .limit(1)
-            .execute()
-            .value
-        let (auctionRows, eventRows) = await (auctionTask, eventTask)
-        let a = auctionRows?.first
-        let e = eventRows?.first
-        let m = e?.metadata
-        if a == nil && e == nil { return }
-        lotProvenance = LotProvenance(
-            sourceUrl: a?.source_url ?? e?.source_url,
-            lotNumber: a?.lot_number ?? m?.lot_number,
-            auctionName: m?.auction_name ?? m?.event_name,
-            observedAt: a?.auction_end_date ?? a?.auction_start_date ?? e?.sold_at ?? e?.ended_at ?? e?.extracted_at,
-            videoUrl: a?.broadcast_video_url ?? a?.broadcast_video_id ?? m?.video_url,
-            startSeconds: a?.broadcast_timestamp_start,
-            endSeconds: a?.broadcast_timestamp_end
-        )
     }
 
     /// Seeds decoded `identityMarks` from `vehicle_profile_read` when present, and otherwise
@@ -600,20 +486,6 @@ struct ProfileHeaderBlock: View {
             Text(attrParts.joined(separator: " · "))
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
-        }
-        .nukeCard()
-    }
-
-    // The one headline result: what kind of price, from which platform, as of when.
-    @ViewBuilder private func priceRow(_ price: Claim, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            RootedValueView(
-                label: label,
-                value: Self.money(price),
-                status: price.rootStatus,
-                decay: price.decayLine,
-                onDrill: { drill = ClaimDrill(title: label, claim: price, spec: nil) }
-            )
         }
         .nukeCard()
     }

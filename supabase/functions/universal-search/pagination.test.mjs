@@ -53,7 +53,7 @@ const applyPredicates = (values, q) => {
   }) && (!orExpression || splitClauses(orExpression).some(clause => matchesExpression(v, clause))));
 };
 
-function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], vin = [], deep = [], fuzzy = [], parents = [], missingIds = [], tags = [], owned = [],
+function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], vin = [], vinLookup = null, vinLookupError = false, deep = [], fuzzy = [], parents = [], missingIds = [], tags = [], owned = [],
   rankedError = () => false, enrichmentError = () => false, directError = false, ilikeError = false,
   verifiedUser = null, authThrows = false, eligibilityError = () => false, expand = {}, expandError = false } = {}) {
   const calls = [], allVehicles = new Map([...ranked, ...direct, ...ilike, ...year, ...vin, ...owned,
@@ -95,6 +95,9 @@ function edgeFixture({ ranked = rows(305), direct = [], ilike = [], year = [], v
       calls.push({ rpc: name, args });
       if (name === 'search_vehicles_fts') return rankedError(args) ? { data: null, error: { message: 'ranked timeout' } }
         : { data: ranked.slice(args.offset_count || 0, (args.offset_count || 0) + args.limit_count) };
+      if (name === 'vehicle_by_vin_public') return vinLookupError ? { data: null, error: { message: 'locator unavailable' } }
+        : { data: vinLookup ?? vin.filter(v => v.is_public === true && !v.deleted_at
+          && String(v.vin).trim().toUpperCase() === args.p_vin.trim().toUpperCase()).slice(0, 5).map(v => ({ id: v.id })) };
       if (name === 'search_vehicles_deep') return { data: deep };
       if (name === 'search_vehicles_fuzzy') return { data: fuzzy };
       if (name === 'expand_search_query') {
@@ -415,5 +418,33 @@ test('single-character model terms reach ranked search on every page', async () 
     const first = await f.search({ query });
     await f.search({ query, offset: first.meta.next_offset, vehicle_source: first.meta.vehicle_source });
     assert.deepEqual(f.calls.filter(c => c.rpc === 'search_vehicles_fts').map(c => c.args.query_text), [expected, expected]);
+  }
+});
+
+
+test('VIN search reuses indexed locator and current rows without an exact ILIKE scan', async () => {
+  const vin = '1HGCM82633A004352', vehicle = { ...row(7), vin: ' 1hgcm82633a004352 ' };
+  const f = edgeFixture({ vin: [vehicle], vinLookup: [{ id: vehicle.id, sale_price: 999999, model: 'stale locator value' }] });
+  const r = await f.search({ query: vin });
+  assert.equal(r.status, 200);assert.equal(r.query_type, 'vin');
+  assert.deepEqual(r.results.map(v => v.id), [vehicle.id]);
+  assert.equal(r.results[0].title, '2020 Porsche GT3');
+  assert.notEqual(r.results[0].metadata.sale_price, 999999);
+  assert.deepEqual(f.calls.find(c => c.rpc === 'vehicle_by_vin_public').args, { p_vin: vin });
+  assert.equal(f.calls.filter(c => c.table === 'vehicles' && c.ops.some(op => op[0] === 'ilike' && op[1] === 'vin')).length, 0);
+});
+test('VIN locator cannot leak private, deleted, missing, non-vehicle or changed-VIN parents', async () => {
+  const vin = '1HGCM82633A004352', candidates = rows(5).map(v => ({ ...v, vin }));
+  candidates[0].is_public = false;candidates[1].deleted_at = '2026-10-01';
+  candidates[2].listing_kind = 'non_vehicle_item';candidates[3].vin = '1HGCM82633A004353';
+  const f = edgeFixture({ parents: candidates, vinLookup: candidates.map(v => ({ id: v.id })), missingIds: [candidates[4].id] });
+  const r = await f.search({ query: vin });
+  assert.equal(r.status, 200);assert.deepEqual(r.results, []);
+});
+test('failed, malformed or over-bound VIN locators are unavailable, never guessed absence or raw fallback', async () => {
+  for (const config of [{ vinLookupError: true }, { vinLookup: {} }, { vinLookup: [{ id: null }] }, { vinLookup: rows(6) }]) {
+    const f = edgeFixture(config), r = await f.search({ query: '1HGCM82633A004352' });
+    assert.equal(r.status, 500);assert.equal(r.success, false);assert.deepEqual(r.results, []);
+    assert.equal(f.calls.filter(c => c.table === 'vehicles').length, 0);
   }
 });

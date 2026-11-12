@@ -27,6 +27,58 @@ final class NavigationUITests: XCTestCase {
         XCTAssertEqual(log.label, "no writes", "Inspecting a source must not assert identity or file a photo")
     }
 
+    func testSessionReviewKeepsConflictingLocalReadingsByteUnbound() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "source-inspection", "NUKE_FIXTURE_NATIVE_REVIEW": "conflict"]
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let organize = app.buttons["Organize photos"].firstMatch
+        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        let day = app.staticTexts["2026-10-31"].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
+        let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(inspect.waitForExistence(timeout: 10)); inspect.tap()
+        let local = app.staticTexts["Local native reading"]
+        XCTAssertTrue(local.waitForExistence(timeout: 10))
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Multiple identifier-shaped readings remain; none is selected."].exists)
+        XCTAssertTrue(app.staticTexts["2S87R3N100001"].exists)
+        XCTAssertTrue(app.staticTexts["2S87R3N100009"].exists)
+        XCTAssertTrue(app.staticTexts["Earlier native reading"].exists)
+        XCTAssertTrue(app.staticTexts["Native reading pass"].exists)
+        XCTAssertTrue(app.staticTexts["This reading matches the current Photos source. Uploaded byte identity is not bound because its source hash is unavailable."].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "local-native-reading-conflict"; shot.lifetime = .keepAlways; add(shot)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testSessionReviewShowsReadyBoundCloseupAsTextOnly() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "source-inspection", "NUKE_FIXTURE_NATIVE_REVIEW": "nonvehicle"]
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let organize = app.buttons["Organize photos"].firstMatch
+        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        let day = app.staticTexts["2026-10-31"].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
+        let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(inspect.waitForExistence(timeout: 10)); inspect.tap()
+        let local = app.staticTexts["Local native reading"]
+        XCTAssertTrue(local.waitForExistence(timeout: 10))
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Multiple identifier-shaped readings remain; none is selected."].exists)
+        XCTAssertTrue(app.staticTexts["2S87R3N100001"].exists)
+        XCTAssertTrue(app.staticTexts["2S87R3N100009"].exists)
+        XCTAssertTrue(app.staticTexts["Earlier native reading"].exists)
+        XCTAssertTrue(app.staticTexts["Native reading pass"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Classification unresolved · text only.")).firstMatch.exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "local-native-reading-closeup"; shot.lifetime = .keepAlways; add(shot)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
     func testGarageTabFindsAZeroPhotoRecordAndOpensTheActualProfile() {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]

@@ -1075,7 +1075,7 @@ Deno.serve(async (req) => {
       if (subject.error || !subject.data) return new Response(JSON.stringify({ error: 'vehicle reader unavailable' }),
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       const assessment = await readVehicleAssessment(supabase, subject.data, { claimAfter: body.claim_after,
-        commentAfter: body.comment_after, photoAfter: body.photo_after });
+        commentAfter: body.comment_after, photoAfter: body.photo_after, appearanceAfter: body.appearance_after });
       return new Response(JSON.stringify({ action: 'assessment', read_only: true, assessment }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     // Every legacy computation/write remains service-only. The new assessment
