@@ -21,7 +21,8 @@ import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { classifyImageRouted, classificationFromReader, loadManifest, renderPromptV2 } from "./classifierProvider.ts";
 import { qualifyVinRead, vinCitation, type VinAdmission } from "./vinAdmission.ts";
-import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
+import { persistPipelineState, rowVinQualifies, type PipelineReceipt, type PipelineSource } from "./persistence.ts";
+import { recordSuppliedClassification, SuppliedClassificationError, CLASSIFICATION_SELECT } from "./suppliedClassification.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
 import { recordReviewedAnalysis, ReviewedAnalysisError, REVIEW_SELECT } from "./reviewedAnalysis.ts";
 import { admitPhotoFields, type FieldSourceAdmission } from "./fieldSourceAdmission.ts";
@@ -35,7 +36,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 async function persistImageState(
   imageId: string, receipt: PipelineReceipt, state: Record<string, unknown>,
   metadata: Record<string, unknown> = {},
-  source?: { image_url: string; vehicle_id: string | null },
+  source?: PipelineSource,
 ): Promise<void> {
   await persistPipelineState({
     async read() {
@@ -47,8 +48,12 @@ async function persistImageState(
     },
     async compareAndSwap(snapshot, patch) {
       const { data, error } = await supabase.from("vehicle_images")
-        .update(patch).eq("id", imageId).eq("updated_at", snapshot.updated_at).select("id");
+        .update(patch).eq("id", imageId).eq("updated_at", snapshot.updated_at).select("id,image_url,vehicle_id");
       if (error) throw new Error("photo_pipeline_metadata_write_failed");
+      // A BEFORE guard may withdraw the image despite a successful UPDATE.
+      if (data?.length === 1 && source && (data[0].image_url !== source.image_url || data[0].vehicle_id !== source.vehicle_id)) {
+        throw new Error("photo_pipeline_source_changed");
+      }
       return data?.length === 1;
     },
   }, receipt, state, metadata, source);
@@ -231,6 +236,34 @@ Deno.serve(async (req) => {
 
   try {
     const input = await req.json();
+
+    if (input?.processing_mode === "classification_only") {
+      // Supplied coarse reading: validate and retain its before-image before
+      // any metadata receipt can trigger the existing contradiction guard.
+      // No provider fallback, paid type route, filing, field intake or deep queue.
+      try {
+        const result = await recordSuppliedClassification(input, {
+          async authorize() { const writer = await authenticateWriter(req); return writer.ok && writer.caller.kind === "service_role"; },
+          async readImage(id) {
+            const { data, error } = await supabase.from("vehicle_images").select(CLASSIFICATION_SELECT).eq("id", id).maybeSingle();
+            if (error) throw new SuppliedClassificationError("classification_source_unavailable", 503);
+            return data;
+          },
+          async ingest(observation) {
+            const { data, error } = await supabase.functions.invoke("ingest-observation", { body: observation });
+            if (error) throw new SuppliedClassificationError("classification_history_not_persisted", 502);
+            return data;
+          },
+          persist: (id, classificationReceipt, state, metadata, source) => persistImageState(id, classificationReceipt, state, metadata, source),
+        }, receipt(input.image_id, "completed"));
+        return Response.json(result, { headers: corsHeaders });
+      } catch (error) {
+        const sourceChanged = error instanceof Error && error.message === "photo_pipeline_source_changed";
+        const staleAttempt = error instanceof Error && error.message === "photo_pipeline_stale_attempt";
+        return Response.json({ success: false, error: error instanceof SuppliedClassificationError ? error.code : sourceChanged ? "classification_source_changed" : staleAttempt ? "classification_stale_attempt" : "classification_persistence_failed", model_calls: 0 },
+          { status: error instanceof SuppliedClassificationError ? error.status : sourceChanged || staleAttempt ? 409 : 500, headers: corsHeaders });
+      }
+    }
 
     if (input?.action === "record_reviewed_analysis") {
       // Supplied review only. This returns before processing status, classification,

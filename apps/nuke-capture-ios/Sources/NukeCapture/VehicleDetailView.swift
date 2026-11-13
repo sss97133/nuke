@@ -647,13 +647,19 @@ struct VehicleDetailView: View {
                     } else {
                         heroLayer
                         loadState
+                        // The first screen: photos, then the number (the live banner while an
+                        // auction runs, else the recorded price with its age and source), then
+                        // the quiet Follow / Comment row.
                         liveAuctionBanner
+                        priceHeadline
+                        heroActionRow
                         profileHeaderBlock
                         // The organizations behind the vehicle (seller, owner, consigner, shop), each a door to its measures.
                         VehicleActorLinks(vehicleId: vehicleId).id("actors")
                         buildInstrument
                         if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
-                        heroActionRow
+                        // Where it's been: the photo-GPS areas (vehicle_location_areas), the web header popup's read.
+                        VehicleLocationSection(vehicleId: vehicleId).id("location")
                         valuationSection.id("worth")
                         saleHistorySection.id("sales")
                         beforeAfterSection
@@ -737,13 +743,13 @@ struct VehicleDetailView: View {
     // stacked guarantees against ghosting: it fades out, and its drawable window
     // CLIPS from 300→0 (past that edge there's no hero pixel to show through), while
     // a slow parallax dissolves it into the bar plane. BuildStoryHero is unchanged —
-    // we only transform its rendered output.
+    // we only transform its rendered output (it pages through the photos itself).
     // The hero's last resort is the vehicle row's primary_image_url, which is what the web's
     // A bare vehicle cover URL has no per-image qualification. Only a viewer-permitted
     // gallery cover or a classified photographic fallback may lead.
     @ViewBuilder private var heroLayer: some View {
         BuildStoryHero(
-            imageURL: heroImage?.image_url,
+            pages: heroPages.compactMap { img in img.image_url.map { BuildStoryHero.Page(id: img.id.uuidString, url: $0) } },
             year: vehicle?.year, make: vehicle?.make,
             model: vehicle?.model, trim: vehicle?.trim,
             // The title from the document's identity tokens (normalized model, series, trim, a high-signal
@@ -751,12 +757,12 @@ struct VehicleDetailView: View {
             identityTokens: profile?.masthead.map { VehicleIdentity.tokens($0.identity_source).all },
             takenAt: heroImage?.isImported == true ? nil : heroImage?.taken_at,
             loaded: loaded,
-            onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } },
+            onOpenPhoto: { i in openHeroPhoto(i) },
             onDrillCohort: cohortDrillAction()
         )
         .offset(y: collapse * -60)                              // parallax: dissolve into the bar, don't race past
         .opacity(Double(1 - collapse))                         // hero (+ its chips) gone before the bar reads
-        .frame(height: 300 * (1 - collapse), alignment: .top)  // HARD guarantee: window shrinks to 0
+        .frame(height: BuildStoryHero.height * (1 - collapse), alignment: .top)  // HARD guarantee: window shrinks to 0
         .clipped()
         .allowsHitTesting(collapse < 0.5)                      // taps go to the bar once it leads
     }
@@ -780,6 +786,31 @@ struct VehicleDetailView: View {
     /// build's current face); recency falls back to created_at so sparse EXIF can't skew it.
     private var heroImage: VehicleGalleryImage? {
         VehicleGalleryImage.chooseHero(cover: coverRow, candidates: heroCandidates, gallery: images)
+    }
+
+    /// The hero's pages: the lead photo, then the rest of the first gallery page, so the title
+    /// card swipes straight through the photos. Capped so the pager stays light.
+    private var heroPages: [VehicleGalleryImage] {
+        var out: [VehicleGalleryImage] = []
+        let lead = heroImage
+        if let lead, NukeDisplay.text(lead.image_url) != nil { out.append(lead) }
+        for img in images where out.count < 12 {
+            if img.id == lead?.id || NukeDisplay.text(img.image_url) == nil { continue }
+            out.append(img)
+        }
+        return out
+    }
+
+    /// A hero tap opens the gallery at that photo (the gallery's own "Analysis" action is the way
+    /// to the analysis). A lead that is not in the loaded gallery opens the plain viewer.
+    private func openHeroPhoto(_ i: Int) {
+        let pages = heroPages
+        guard pages.indices.contains(i) else { galleryOpen = true; return }
+        if let at = images.firstIndex(where: { $0.id == pages[i].id }) {
+            viewerStart = GalleryStart(index: at)
+        } else {
+            galleryOpen = true
+        }
     }
 
     /// Dedicated lead-image candidates: the gallery is paged taken_at-DESC, and the
@@ -917,15 +948,22 @@ struct VehicleDetailView: View {
     }
 
     // ─── The header document — vehicle_profile_read rendered through the kit's shapes
-    // (ProfileDocument.swift / ProfileStripView.swift). The one headline price as a Claim
-    // (off while a live auction's banner owns the number, as on the web) and the strip of
-    // recorded facts, each with its source and clock, closed by its coverage sentence.
+    // (ProfileDocument.swift / ProfileStripView.swift): the strip of recorded facts, each with
+    // its source and clock, closed by its coverage sentence. The headline price leads the first
+    // screen instead (priceHeadline), so it is stated once.
     @ViewBuilder private var profileHeaderBlock: some View {
         if let read = profile {
-            ProfileHeaderBlock(vehicleId: vehicleId, read: read,
-                               priceOwnedByLiveStack: pulse?.is_live == true)
+            ProfileHeaderBlock(vehicleId: vehicleId, read: read)
         } else if profileError {
             sectionError("the record header") { Task { await loadProfileRead() } }
+        }
+    }
+
+    /// The headline price on the first screen, off while a live auction's banner owns the number
+    /// (the web's priceOwnedByLiveStack).
+    @ViewBuilder private var priceHeadline: some View {
+        if let m = profile?.masthead, let price = m.price, pulse?.is_live != true {
+            VehiclePriceHeadline(vehicleId: vehicleId, masthead: m, price: price)
         }
     }
 
@@ -1223,26 +1261,23 @@ struct VehicleDetailView: View {
     // LIVE AUCTION — the BaT-style living instrument, driven by the server-arbitrated
     // vehicle_pulse. Shows ONLY when the arbiter reports a live auction (never faked); a
     // pulsing LIVE dot, the current bid, and a countdown derived client-side from ends_at
-    // (TimelineView ticks it smoothly; turns red under 30s). A real new bid chimes (applyPulse).
+    // (TimelineView ticks it each second, always red, d/h/m/s). A real new bid chimes (applyPulse).
     @ViewBuilder private var liveAuctionBanner: some View {
         if let p = pulse, p.is_live {
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                let secs = p.endsAtDate.map { Int(max(0, $0.timeIntervalSince(ctx.date))) }
                 HStack(spacing: 8) {
                     Circle().fill(.red).frame(width: 8, height: 8)
                         .opacity(Int(ctx.date.timeIntervalSinceReferenceDate) % 2 == 0 ? 1 : 0.35)
                     Text("LIVE").font(.caption2.weight(.heavy)).foregroundStyle(.red)
                     Text(p.headline_label ?? "Current Bid").font(.caption2).foregroundStyle(.secondary)
-                    Text(p.headline_amount.map { money0($0) } ?? "—")
+                    Text(VehicleLiveBanner.bid(p.headline_amount))
                         .font(.title3.weight(.bold)).monospacedDigit()
+                        .foregroundStyle(NukeDisplay.money(p.headline_amount) == nil ? Color.secondary : Color.primary)
                     Spacer(minLength: 8)
-                    if let s = secs {
-                        HStack(spacing: 4) {
-                            Image(systemName: "timer")
-                            Text("\(s / 60):\(String(format: "%02d", s % 60))").monospacedDigit()
-                        }
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(s <= 30 ? .red : .primary)
+                    if let ends = p.endsAtDate {
+                        // Red always, the same pill as the Explore card's clock (d/h/m/s, never "2880:00").
+                        NukePill(text: VehicleLiveBanner.countdown(ends, now: ctx.date), icon: "clock",
+                                 textColor: Color.red)
                     }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
@@ -1487,7 +1522,9 @@ struct VehicleDetailView: View {
                 out.append(.init(kind: .contributions, text: "\(e.contribution_count)"))
             }
         }
-        if let val = valuation, let mid = val.value, mid > 0 {
+        // Same gate as the body's estimate (marketDefendsEstimate): an unlisted, unpriced car
+        // shows no estimate in the header either.
+        if marketDefendsEstimate, let val = valuation, let mid = val.value, mid > 0 {
             out.append(.init(kind: .estimate, text: PulseSignal.shortMoney(mid)))
         }
         // STORM — auction now ROUTED via the server-arbitrated vehicle_pulse. Lights ONLY
@@ -1629,23 +1666,23 @@ struct VehicleDetailView: View {
                         Label(e.is_following ? "Following" : "Follow",
                               systemImage: e.is_following ? "checkmark" : "plus")
                     }
-                    .buttonStyle(NukePrimaryButtonStyle())
+                    .buttonStyle(NukeQuietButtonStyle())
                     .disabled(followBusy)
 
                     Button { showComments = true } label: {
                         Label(e.comment_count > 0 ? "\(e.comment_count) comments" : "Comment",
                               systemImage: "bubble.left")
                     }
-                    .buttonStyle(NukeSecondaryButtonStyle())
+                    .buttonStyle(NukeQuietButtonStyle())
 
                     Spacer(minLength: 0)
                 } else if engagementError {
                     Button("Try again") { Task { await loadEngagement() } }
-                        .buttonStyle(NukeSecondaryButtonStyle())
+                        .buttonStyle(NukeQuietButtonStyle())
                     Spacer()
                 } else {
-                    NukeSkeletonBlock(height: NukeSize.minTap + 4, radius: 26).frame(width: 120)
-                    NukeSkeletonBlock(height: NukeSize.minTap + 4, radius: 26).frame(width: 130)
+                    NukeSkeletonBlock(height: NukeSize.minTap, radius: NukeSize.minTap / 2).frame(width: 110)
+                    NukeSkeletonBlock(height: NukeSize.minTap, radius: NukeSize.minTap / 2).frame(width: 120)
                     Spacer()
                 }
             }
@@ -1663,16 +1700,17 @@ struct VehicleDetailView: View {
             }
         }
         .padding(.horizontal, NukeSpace.lg)
-        .padding(.top, NukeSpace.md)
+        .padding(.top, NukeSpace.sm)
         .padding(.bottom, NukeSpace.md)
     }
 
+    /// The quiet line under the buttons. The comment count is not here: the Comment button says it.
     private func engagementCounts(_ e: VehicleEngagement) -> String {
         var parts: [String] = []
         if e.following_count > 0 { parts.append("\(e.following_count) following") }
-        if e.comment_count > 0 { parts.append(NukeDisplay.count(e.comment_count, "comment")) }
         if e.contribution_count > 0 { parts.append(NukeDisplay.count(e.contribution_count, "contribution")) }
-        return parts.isEmpty ? "Be the first to comment" : parts.joined(separator: " · ")
+        if parts.isEmpty { return e.comment_count > 0 ? "" : "Be the first to comment" }
+        return parts.joined(separator: " · ")
     }
 
     private func loadEngagement() async {

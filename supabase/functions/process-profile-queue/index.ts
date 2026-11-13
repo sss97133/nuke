@@ -271,6 +271,7 @@ async function notifyUser(
 
     if (profile?.email) {
       await sendEmail({
+        caller: "process-profile-queue",
         to: profile.email,
         subject: `Your ${platformLabel} profile is ready to claim`,
         html: `

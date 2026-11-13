@@ -1,10 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import React from 'react';
 import { formatCurrencyAmount } from '../../utils/currency';
 import { DEAL_SCORE_CONFIG, type DealScoreLabel } from '../../constants/dealScore';
 import { useNukeEstimate } from '../../hooks/useNukeEstimate';
-import { assertVehicleAssessment, type ListingAssessment } from '../../services/listingPackageEvidence';
-import VehicleEvidenceAssessment from './VehicleEvidenceAssessment';
+import VehicleEvidenceAssessment, { useVehicleEvidenceReview } from './VehicleEvidenceAssessment';
 
 interface NukeEstimatePanelProps {
   vehicleId: string;
@@ -43,38 +41,10 @@ const SIGNAL_LABELS: Record<string, string> = {
 
 const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicle, canCompute = true }) => {
   const { data, isLoading: loading } = useNukeEstimate(vehicleId, vehicle);
-  const [review, setReview] = useState<{ id: string; loading: boolean; error?: string; assessment?: ListingAssessment }>({ id: vehicleId, loading: false });
-  const requestGeneration = useRef(0);
-  const currentVehicle = useRef(vehicleId);
-  currentVehicle.current = vehicleId;
-  useEffect(() => () => { requestGeneration.current++; }, [vehicleId]);
-  const computing = review.id === vehicleId && review.loading;
-  const assessment = review.id === vehicleId ? review.assessment : undefined;
-  const reviewError = review.id === vehicleId ? review.error : undefined;
-
+  const { loading: computing, assessment, error: reviewError, read: handleCompute } = useVehicleEvidenceReview(vehicleId);
   const estimate = data?.estimate ?? null;
   const record = data?.record ?? null;
   const survival = data?.survival ?? null;
-
-  const handleCompute = async () => {
-    const generation = ++requestGeneration.current;
-    const subject = vehicleId;
-    setReview(previous => ({ id: subject, loading: true, assessment: previous.id === subject ? previous.assessment : undefined }));
-    try {
-      const { data: result, error } = await supabase.functions.invoke('compute-vehicle-valuation', {
-        body: { action: 'assessment', vehicle_id: subject },
-      });
-      if (error || result?.action !== 'assessment' || result?.read_only !== true) throw new Error('Vehicle evidence could not be read.');
-      assertVehicleAssessment(result.assessment, subject);
-      if (requestGeneration.current === generation && currentVehicle.current === subject) {
-        setReview({ id: subject, loading: false, assessment: result.assessment });
-      }
-    } catch (error) {
-      if (requestGeneration.current === generation && currentVehicle.current === subject) setReview(previous => ({
-        ...previous, id: subject, loading: false, error: error instanceof Error ? error.message : 'Vehicle evidence could not be read.',
-      }));
-    }
-  };
 
   // No Empty Shells: if done loading/computing and no estimate, hide for non-owners
   if (!loading && !computing && !estimate && !canCompute) return null;

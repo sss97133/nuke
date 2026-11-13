@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createHash, webcrypto } from 'node:crypto';
 const fixture = vi.hoisted(() => ({ from: vi.fn(), eq: vi.fn(), sign: vi.fn(), privatePath: vi.fn(), rpc: vi.fn(), user: null as { id: string } | null, loading: false }));
 vi.mock('pdfjs-dist/build/pdf.worker.min.mjs?url', () => ({ default: '/synthetic-pdf-worker.mjs' }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from, rpc: (...args: unknown[]) => { const result = fixture.rpc(...args); return typeof result?.abortSignal === 'function' ? result : Object.assign(result, { abortSignal: () => result }); } } }));
@@ -41,6 +42,47 @@ const click = async (label: string, until: () => boolean = () => true) => {
   for (let i = 0; i < 200 && !(i >= 3 && until()); i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 };
 
+const renderCitedWork = async (hash = createHash('sha256').update('https://example.test/receipt.png').digest('hex')) => {
+  vi.stubGlobal('crypto', webcrypto);
+  const read = { rows: [], isLoading: false, isError: false, total: 0, hasNextPage: false } as any;
+  const work = { rows: [{ observation_id: 'work-a', title: 'Seat covers', summary: 'Black seat covers visible.', gaps: [],
+    images: [{ image_id: 'photo-a', image_url: 'https://example.test/car.jpg', role: 'after', caption: 'Covered seats', taken_at: '2026-05-05T21:00:00Z' }],
+    receipts: [{ item_id: 'item-a', receipt_id: 'receipt-a', relation: 'candidate_material', source_table: 'vehicle_documents', source_id: 'source-a',
+      source_url_sha256: hash, vendor: 'Synthetic upholstery', page_date: '2025-09-08', description: 'Seat covers', part_number: 'EXAMPLE-1',
+      quantity: 1, hours: null, amount: null, currency: 'USD', amounts_visible: false }], receipt_links_unavailable: 0, effort_reference: null,
+    market_value: { status: 'not_established_by_cited_sources' }, paid_labor: { status: 'unreconciled' } }], isError: false, limited: false } as any;
+  await act(async () => root.render(wrapper(<ReceiptRecords vehicleId="vehicle-a" read={read} work={work} />)));
+};
+
+it('mounts cited work in one Work & parts section and opens its exact retained source', async () => {
+  await renderCitedWork();
+  expect([...host.querySelectorAll('h3')].filter(node => node.textContent === 'Work & parts')).toHaveLength(1);
+  await click('Read original source', () => !![...host.querySelectorAll('button')].find(button => button.textContent === 'Close original'));
+  expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+  expect(fixture.sign).toHaveBeenCalledWith('https://example.test/receipt.png');
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(host.textContent).toContain('Close original');
+});
+
+it('refuses a receipt URL replacement between the qualified work read and its original-source click', async () => {
+  await renderCitedWork();
+  const query = { select: () => query, eq: vi.fn(() => query), maybeSingle: async () => ({ data: { file_url: 'https://example.test/replacement.pdf' }, error: null }) };
+  fixture.from.mockImplementation(() => query);
+  await click('Read original source', () => host.textContent!.includes('Source unavailable'));
+  expect(query.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+  expect(fixture.sign).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('Source unavailable');
+  expect(host.textContent).not.toContain('Close original');
+});
+
+it('withholds a work-card original action if its source binding is missing', async () => {
+  await renderCitedWork('');
+  expect(host.textContent).toContain('Original source unavailable in this read');
+  expect(host.textContent).not.toContain('Read original source');
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 it('binds the original to the same vehicle and source and returns to the selected receipt in place', async () => {
   await render(); await click('Read original source', () => !!host.querySelector('img') || host.textContent!.includes('unavailable'));
   expect(fixture.from).toHaveBeenCalledWith('vehicle_documents');
@@ -59,6 +101,67 @@ it('does not fetch a private object when signing fails', async () => {
   expect(fetch).not.toHaveBeenCalled();
   expect(host.textContent).toContain('Source unavailable or not visible');
   expect(host.querySelector('img')).toBeNull();
+});
+
+it('renders a private HEIC receipt from the same signed object while preserving its original download', async () => {
+  const raw = 'https://synthetic.supabase.co/storage/v1/object/authenticated/user-documents/owner/receipt.heic';
+  const query = { select: () => query, eq: fixture.eq.mockImplementation(() => query), maybeSingle: async () => ({ data: { file_url: raw }, error: null }) };
+  fixture.from.mockImplementation(() => query);
+  fixture.privatePath.mockReturnValue({ bucket: 'user-documents', path: 'owner/receipt.heic' });
+  fixture.sign.mockImplementation((_raw, ttl) => Promise.resolve(ttl === 60 ? 'https://synthetic.test/preview-signed' : 'https://synthetic.test/original-signed'));
+  const original = new Blob(['original heic'], { type: 'image/heic' });
+  const preview = new Blob(['derived preview'], { type: 'image/webp' });
+  vi.mocked(fetch).mockImplementation(async url => ({ ok: true, blob: async () => String(url).includes('preview-') ? preview : original }) as Response);
+  vi.mocked(URL.createObjectURL).mockImplementation(blob => blob === preview ? 'blob:preview' : 'blob:original');
+  await renderCitedWork(createHash('sha256').update(raw).digest('hex'));
+  await click('Read original source', () => !!host.querySelector('img[alt^="Preview of original:"]'));
+  expect(fixture.sign.mock.calls).toEqual([[raw], [raw, 60, { width: 1800, height: 1800, resize: 'contain', quality: 90 }]]);
+  expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+  expect(host.querySelector<HTMLImageElement>('img[alt^="Preview of original:"]')?.src).toBe('blob:preview');
+  expect(host.querySelector<HTMLAnchorElement>('a[download]')?.href).toBe('blob:original');
+  expect(host.querySelector<HTMLAnchorElement>('a[download]')?.download).toBe('receipt.heic');
+  expect(fetch).toHaveBeenCalledTimes(2);
+  await click('Close original');
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview');
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:original');
+});
+
+it.each(['signing denied', 'transform denied', 'non-image response'])('retains the HEIC original without a public fallback when preview is unavailable: %s', async failure => {
+  const raw = 'https://synthetic.supabase.co/storage/v1/object/authenticated/user-documents/owner/receipt.heic';
+  const query = { select: () => query, eq: vi.fn(() => query), maybeSingle: async () => ({ data: { file_url: raw }, error: null }) };
+  fixture.from.mockImplementation(() => query);
+  fixture.privatePath.mockReturnValue({ bucket: 'user-documents', path: 'owner/receipt.heic' });
+  fixture.sign.mockImplementation((_raw, ttl) => Promise.resolve(ttl === 60 ? (failure === 'signing denied' ? raw : 'https://synthetic.test/preview-signed') : 'https://synthetic.test/original-signed'));
+  vi.mocked(fetch).mockImplementation(async url => ({ ok: !String(url).includes('preview-') || failure !== 'transform denied',
+    blob: async () => new Blob(['source'], { type: String(url).includes('preview-') ? 'text/html' : 'image/heic' }) }) as Response);
+  await render();
+  await click('Read original source', () => !!host.querySelector('a[download]'));
+  expect(host.querySelector('img')).toBeNull();
+  expect(host.querySelector('iframe, object, script')).toBeNull();
+  expect(host.querySelector<HTMLAnchorElement>('a[download]')?.download).toBe('receipt.heic');
+  expect(host.textContent).toContain('Image preview unavailable');
+  expect(fetch).toHaveBeenCalledTimes(failure === 'signing denied' ? 1 : 2);
+  expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/public/'))).toBe(false);
+});
+
+it.each(['viewer change', 'source withdrawal'])('drops an in-flight private HEIC preview after %s', async change => {
+  const raw = 'https://synthetic.supabase.co/storage/v1/object/authenticated/user-documents/owner/receipt.heic';
+  const query = { select: () => query, eq: vi.fn(() => query), maybeSingle: async () => ({ data: { file_url: raw }, error: null }) };
+  fixture.from.mockImplementation(() => query);
+  fixture.privatePath.mockReturnValue({ bucket: 'user-documents', path: 'owner/receipt.heic' });
+  fixture.sign.mockImplementation((_raw, ttl) => Promise.resolve(ttl === 60 ? 'https://synthetic.test/preview-signed' : 'https://synthetic.test/original-signed'));
+  let resolvePreview!: (value: Response) => void;
+  vi.mocked(fetch).mockImplementation(async url => String(url).includes('preview-') ? new Promise<Response>(resolve => { resolvePreview = resolve; })
+    : { ok: true, blob: async () => new Blob(['original'], { type: 'image/heic' }) } as Response);
+  const hash = createHash('sha256').update(raw).digest('hex');
+  await renderCitedWork(hash);
+  await click('Read original source', () => !!resolvePreview);
+  if (change === 'viewer change') { fixture.user = { id: 'next-viewer' }; await renderCitedWork(hash); }
+  else await render();
+  await act(async () => resolvePreview({ ok: true, blob: async () => new Blob(['preview'], { type: 'image/webp' }) } as Response));
+  expect(host.querySelector('img[alt^="Preview of original:"]')).toBeNull();
+  expect(host.querySelector('a[download]')).toBeNull();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
 });
 
 it('names who may see a masked amount instead of calling it unrecorded', async () => {
@@ -87,7 +190,27 @@ const renderRows = async (rows: ReturnType<typeof dated>[], error = false) => {
   for (let i = 0; i < 4; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 };
 const line = { line_number: 1, description: 'Machine existing block', quantity: 1, amount: 100, line_date: '2025-03-20', hours: 2, performer: 'Shop', part_number: null };
-const page = (lines = [line]) => ({ receipt_id: 'receipt-a', document_number: 'A-100', document_type: 'invoice', subtotal: 100, tax: 25, shipping: null, discount: null, lines });
+const page = (lines: Record<string, unknown>[] = [line]) => ({ receipt_id: 'receipt-a', document_number: 'A-100', document_type: 'invoice', subtotal: 100, tax: 25, shipping: null, discount: null, lines });
+
+it('keeps seller filters and source records while omitting person annotations from visible and accessible labels', async () => {
+  const rows = [
+    dated({ id: 'seller-a', receipt_date: null, vendor_name: 'eBay seller classicspares42 (Jamie Example)', source_document_id: 'source-a' }),
+    dated({ id: 'seller-b', receipt_date: null, vendor_name: 'eBay seller classicspares42 (Taylor Example)', source_document_id: 'source-b' }),
+    dated({ id: 'supplier-c', receipt_date: null, vendor_name: 'eBay seller Example Auto Supply (examplesupplycom); message signed Morgan Example' }),
+    dated({ id: 'business-d', receipt_date: null, vendor_name: 'eBay seller rpmperformance (RPM Performance)' }),
+  ];
+  await renderRows(rows);
+  for (const name of ['Jamie Example', 'Taylor Example', 'Morgan Example']) expect(host.innerHTML).not.toContain(name);
+  expect(host.textContent).toContain('Example Auto Supply (examplesupplycom)');
+  expect(host.textContent).toContain('rpmperformance (RPM Performance)');
+  const select = host.querySelector('select')!;
+  expect([...select.options].map(option => option.value)).toContain('eBay seller classicspares42');
+  await act(async () => { select.value = 'eBay seller classicspares42'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(host.querySelectorAll('.vp-receipt-page')).toHaveLength(2);
+  expect(rows[0].vendor).toContain('Jamie Example'); // Retained evidence was not rewritten.
+  await click('Read original source', () => !!host.querySelector('img'));
+  expect(fixture.eq.mock.calls).toEqual([['id', 'source-a'], ['vehicle_id', 'vehicle-a']]);
+});
 
 it('shows the exact receipt work date and quantity zero without turning nearby photos into installation proof', async () => {
   fixture.rpc.mockResolvedValue({ data: { tied: false, documents: [{ ...page([{ ...line, description: 'Rear foam — backordered, shipped 0', quantity: 0 }]),
@@ -113,6 +236,49 @@ it('withholds a previous viewer’s line amounts immediately during an auth tran
   fixture.loading = false; fixture.user = null; await renderRows([dated({ amounts_visible: false, total: null })]);
   expect(host.textContent).not.toContain('$100');
   await renderRows([dated()], true); expect(host.querySelector('article')).toBeNull();
+});
+
+it('opens receipt lines with a source-linked supplier quote even when its stock image is absent', async () => {
+  const product = { catalog_part_id: 'synthetic-catalog', name: 'Supplier seat cover', part_number: 'SYNTHETIC-1', manufacturer: 'Example',
+    image_url: null, page_url: 'https://www.classicindustries.com/product/synthetic-1.html', captured_at: '2026-11-11T12:00:00Z',
+    source_role: 'original_receipt_supplier', quote_price: 49.95, currency: 'USD', price_stale: false };
+  const catalogLine = { ...line, amount: null, unit_price: null, product };
+  fixture.rpc.mockResolvedValue({ data: { tied: false, documents: [page([catalogLine])] }, error: null });
+  await renderRows([dated({ total: null, amounts_visible: false })]);
+  await click('Read lines', () => !!host.querySelector('.vp-catalog-product'));
+  expect(host.querySelector<HTMLAnchorElement>('.vp-catalog-product')?.href).toBe(product.page_url);
+  expect(host.textContent).toContain('$49.95 supplier quote · Nov 11, 2026');
+  expect(host.querySelector('.vp-catalog-product img')).toBeNull();
+  expect(host.textContent).not.toContain('$100');
+  expect(host.textContent).not.toContain('Supplier stock image');
+});
+
+it('separates a printed payment from the document total and retains concurrent person-hour entries', async () => {
+  fixture.user = { id: 'owner-a' };
+  fixture.rpc.mockResolvedValue({ data: { tied: true, documents: [{ ...page(),
+    recorded_payment: { amount: 130, date: '2025-04-03' }, recorded_hours: 16, hour_entries: 2 }] }, error: null });
+  await renderRows([dated()]); await click('Read lines', () => host.textContent!.includes('Recorded payment'));
+  const totals = [...host.querySelectorAll('.vp-receipt-total')].map(node => node.textContent);
+  expect(totals).toEqual(['Document total$125.00', 'Recorded payment · Apr 3, 2025$130.00']);
+  expect(host.textContent).toContain('16 recorded person-hours');
+  expect(host.textContent).toContain('2 entries on this receipt');
+  expect(host.textContent).not.toContain('$255');
+  fixture.loading = true; await renderRows([dated()]);
+  expect(host.textContent).not.toContain('$130');
+  expect(host.textContent).not.toContain('Recorded payment');
+});
+
+it('withholds payment data for an untied viewer and preserves a literal zero payment for a tied viewer', async () => {
+  fixture.rpc.mockResolvedValue({ data: { tied: false, documents: [{ ...page(),
+    recorded_payment: { amount: 130, date: '2025-04-03' } }] }, error: null });
+  await renderRows([dated({ total: null, amounts_visible: false })]);
+  await click('Read lines', () => host.textContent!.includes('A-100'));
+  expect(host.textContent).not.toContain('Recorded payment');
+  expect(host.textContent).not.toContain('$130');
+  fixture.user = { id: 'owner-a' };
+  fixture.rpc.mockResolvedValue({ data: { tied: true, documents: [{ ...page(), recorded_payment: { amount: 0, date: null } }] }, error: null });
+  await renderRows([dated()]); await click('Read lines', () => host.textContent!.includes('Recorded payment'));
+  expect(host.textContent).toContain('Recorded payment$0.00');
 });
 
 it('removes a receipt whose current day reader no longer returns it, without showing a different receipt’s lines', async () => {

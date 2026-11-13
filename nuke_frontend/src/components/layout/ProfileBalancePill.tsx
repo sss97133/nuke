@@ -189,12 +189,11 @@ export const ProfileBalancePill: React.FC<Props> = ({
             {[
               { label: 'Appearance', action: '/capsule' },
               { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
-              { label: 'Inbox', action: '/inbox' },
               { label: 'Vehicles', action: '/vehicle/list' },
               { label: 'Auctions', action: '/auctions' },
               { label: 'Organizations', action: '/org' },
               { label: 'Market', action: '/market' },
-              { label: 'Photos', action: '/capsule?tab=photos' },
+              { label: 'Photos', action: '/capture/ledger' },
               { label: 'Settings', action: '/capsule?tab=settings' },
               ...(isAdmin ? [{ label: 'Admin', action: '/admin' }] : [])
             ].map((item, i) => (

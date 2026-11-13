@@ -1,0 +1,14 @@
+.organization-source-inventory { margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); }
+/* Keep the heading and last-check time below both sticky headers. */
+.organization-source-inventory { scroll-margin-block-start: calc(var(--header-height, 42px) + 96px); }
+.organization-source-inventory a { color: var(--accent); }
+.organization-source-inventory__sales { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; list-style: none; padding: 0; }
+.organization-source-inventory__sales li { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+.organization-source-inventory__sales p { margin: 8px 0; }
+.organization-source-inventory__controls { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 12px 0; }
+.organization-source-inventory__controls label { display: grid; gap: 4px; }
+.organization-source-inventory__controls input, .organization-source-inventory__controls select, .organization-source-inventory button { padding: 8px; font: inherit; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); }
+.organization-source-inventory__scroll { overflow-x: auto; }
+.organization-source-inventory table { width: 100%; border-collapse: collapse; }
+.organization-source-inventory th, .organization-source-inventory td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.organization-source-inventory th { font-size: 12px; color: var(--text-secondary); }

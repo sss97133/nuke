@@ -76,21 +76,26 @@ function PdfOriginal({ blob }: { blob: Blob }) {
 }
 
 /** An original stays inside its selected financial record; blob URLs die with the preview. */
-export function OriginalDocumentPreview({ blob, filename, onClose }: { blob: Blob; filename: string; onClose: () => void }) {
-  const [source, setSource] = useState<{ blob: Blob; url: string } | null>(null);
+export function OriginalDocumentPreview({ blob, filename, previewBlob, onClose }: {
+  blob: Blob; filename: string; previewBlob?: Blob | null; onClose: () => void;
+}) {
+  const [source, setSource] = useState<{ blob: Blob; url: string; previewBlob?: Blob | null; previewUrl?: string } | null>(null);
   useEffect(() => {
     const url = URL.createObjectURL(blob);
-    setSource({ blob, url });
-    return () => URL.revokeObjectURL(url);
-  }, [blob]);
+    const previewUrl = previewBlob && /^image\/(jpeg|png|webp|gif|avif)$/.test(previewBlob.type) ? URL.createObjectURL(previewBlob) : undefined;
+    setSource({ blob, url, previewBlob, previewUrl });
+    return () => { URL.revokeObjectURL(url); if (previewUrl) URL.revokeObjectURL(previewUrl); };
+  }, [blob, previewBlob]);
   const url = source?.blob === blob ? source.url : null;
+  const previewUrl = source?.blob === blob && source.previewBlob === previewBlob ? source.previewUrl : null;
   const image = /^image\/(jpeg|png|webp|gif|avif)$/.test(blob.type);
   const text = /^(text\/(plain|csv|tab-separated-values)|application\/json)(;|$)/.test(blob.type) || /\.(csv|txt|tsv|json)$/i.test(filename);
   return <section className="accounting-original-preview" aria-label="Original document">
     <div className="accounting-original-toolbar"><button type="button" onClick={onClose}>Close original</button><span>{filename}</span></div>
-    {blob.type === 'application/pdf' ? <PdfOriginal blob={blob} /> : image && url
+    {previewUrl ? <img src={previewUrl} width={1000} height={1400} alt={`Preview of original: ${filename}`} />
+      : blob.type === 'application/pdf' ? <PdfOriginal blob={blob} /> : image && url
       ? <img src={url} width={1000} height={1400} alt={`Original: ${filename}`} />
-      : text ? <TextOriginal blob={blob} /> : <p>This file does not support an inline preview.</p>}
+      : text ? <TextOriginal blob={blob} /> : <p>{previewBlob === null ? 'Image preview unavailable. The original can still be downloaded below.' : 'This file does not support an inline preview.'}</p>}
     {url && <a href={url} download={filename}>Download original</a>}
   </section>;
 }

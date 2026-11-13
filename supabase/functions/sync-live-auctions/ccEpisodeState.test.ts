@@ -2,6 +2,12 @@ import { assertEquals, assertRejects } from "jsr:@std/assert@1";
 import { ccBidObservation } from "./boards.ts";
 import { ccEpisodeRow, projectCcEpisodes } from "./ccEpisodeState.ts";
 const now = Date.parse("2026-11-09T01:10:00Z"), readAt = "2026-11-09T01:06:03.523Z";
+// projectCcEpisodes reads the wall clock; the fixture auction ends 2026-11-12T06:05Z, so its tests run at `now`.
+async function atFixtureClock<T>(run: () => Promise<T>): Promise<T> {
+  const realNow = Date.now;
+  Date.now = () => now;
+  try { return await run(); } finally { Date.now = realNow; }
+}
 const url = "https://collectingcars.com/for-sale/1980-porsche-928-2";
 async function fixture(n = 0) {
   const fixtureUrl = n ? `${url}-${n}` : url;
@@ -34,7 +40,7 @@ Deno.test("CC old end/currency, wrong owner, corrupted capture and future clock 
   await assertRejects(() => ccEpisodeRow(f.p, f.native, f.o, { ...f.s, html: f.s.html + " " }, now));
   await assertRejects(() => ccEpisodeRow(f.p, { ...f.native, document: { ...f.native.document, currencyCode: "usd" } }, f.o, f.s, now));
 });
-Deno.test("CC held canonical testimony retries a failed episode write without another admission", async () => {
+Deno.test("CC held canonical testimony retries a failed episode write without another admission", async () => { await atFixtureClock(async () => {
   const f = await fixture(); let episode: any = null; let writes = 0; let fail = true;
   const db: any = { from: (table: string) => {
     const q: any = new Proxy({}, { get: (_t, k) => k === "then" ? (resolve: any) => resolve({ error: null, data:
@@ -55,8 +61,9 @@ Deno.test("CC held canonical testimony retries a failed episode write without an
   const third = await projectCcEpisodes(db, [f.p], native, Date.now() + 5000, writer);
   assertEquals([third.unchanged, writes], [1, 2]);
 });
+});
 
-Deno.test("CC projection cap converges held eligible episodes and leaves legacy raw gaps explicit", async () => {
+Deno.test("CC projection cap converges held eligible episodes and leaves legacy raw gaps explicit", async () => { await atFixtureClock(async () => {
   const fixtures = await Promise.all(Array.from({ length: 26 }, (_, n) => fixture(n)));
   const observations = fixtures.map(f => f.o);
   observations[25] = { ...observations[25], raw_source_ref: "" };
@@ -77,6 +84,7 @@ Deno.test("CC projection cap converges held eligible episodes and leaves legacy 
   assertEquals([second.projected, second.unchanged, second.deferred], [5, 20, 1]);
   const expired = await projectCcEpisodes({ from: () => { throw Error("deadline must stop reads"); } }, posts, natives, Date.now(), writer);
   assertEquals(expired.deferred, 26);
+});
 });
 
 Deno.test("CC v2 preserves a genuine new read clock over an identical older raw artifact; v1 remains compatible", async () => {

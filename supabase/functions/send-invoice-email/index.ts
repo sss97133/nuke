@@ -202,8 +202,17 @@ Deno.serve(async (req) => {
     // Build HTML email from structured data
     const html = buildInvoiceHtml(payload);
 
-    // Send via Resend
-    const result = await sendEmail({ to, subject, html, replyTo: "skylar@nuke.ag" });
+    // Send through the outbound gate
+    const result = await sendEmail({ to, subject, html, replyTo: "skylar@nuke.ag", caller: "send-invoice-email" });
+
+    // Held by the outbound gate (recipient not allowlisted, or mode off): nothing was sent, so the invoice is not
+    // marked sent.
+    if (result.held) {
+      return new Response(
+        JSON.stringify({ success: false, held: true, outbox_id: result.outboxId ?? null, error: result.error }),
+        { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!result.success) {
       console.error("[send-invoice-email] Resend failed:", result.error);

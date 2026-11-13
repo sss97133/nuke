@@ -8,6 +8,7 @@ export interface CollectingCarsExtracted {
   url: string;
   title: string | null;
   year: number | null;
+  year_source: "modelYear" | "title" | null;
   make: string | null;
   model: string | null;
   trim: string | null;
@@ -21,6 +22,7 @@ export interface CollectingCarsExtracted {
   /** What the page says happened: sold, unsold, sealed_unsold (sealed-bid lot, no sale), live, or null. */
   sale_outcome: "sold" | "unsold" | "sealed_unsold" | "live" | null;
   sold_at: string | null;
+  sale_format: string | null;
   mileage: number | null;
   mileage_unit: "mi" | "km" | null;
   mileage_raw: string | null;
@@ -39,6 +41,8 @@ export interface CollectingCarsExtracted {
   image_urls: string[];
   posted_at: string | null;
   auction_end_at: string | null;
+  /** Native dtAuctionEndedUTC; retained separately from scheduled end, qualified by sale_format. */
+  auction_ended_at: string | null;
 }
 
 export function flightText(html: string): string {
@@ -113,12 +117,17 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   // mid-auction kept as the price, an unsold or sealed-bid lot called sold, and a native-currency amount stored as dollars.
   // A sale is the page's stage "sold" with priceSold; an ended lot without it is a high bid, never a price.
   const stage = clean(L.stage)?.toLowerCase() ?? null;
-  const sold = (stage === null || stage === "sold") && L.priceSold != null && Number(L.priceSold) > 0;
-  const ended = stage !== null && stage !== "live" && stage !== "comingsoon" && !sold;
-  const amount = sold ? Number(L.priceSold) : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
-  const sealed = clean(L.saleFormat)?.toLowerCase() === "sealed";
+  const soldAmount = L.priceSold != null && Number.isFinite(Number(L.priceSold)) && Number(L.priceSold) > 0 ? Number(L.priceSold) : null;
+  const sold = stage === "sold" || (stage === null && soldAmount !== null);
+  // Only source-verified terminal stages establish an unsold outcome.
+  // Withdrawn or newly introduced stages are not evidence of an auction result.
+  const saleFormat = clean(L.saleFormat)?.toLowerCase() ?? null;
+  const ended = stage === "unsold" || (stage === "ended" && (saleFormat === "auction" || saleFormat === "sealed"));
+  const amount = sold ? soldAmount : Number(L.currentBid) > 0 ? Number(L.currentBid) : null;
+  const sealed = saleFormat === "sealed";
   const outcome: CollectingCarsExtracted["sale_outcome"] = sold ? "sold" : ended ? (sealed ? "sealed_unsold" : "unsold") : stage === "live" ? "live" : null;
-  const kind: CollectingCarsExtracted["price_kind"] = amount === null ? null : sold ? "sold" : ended ? "high_bid" : "current_bid";
+  const open = stage === "live" || stage === "comingsoon" || stage === "upcoming";
+  const kind: CollectingCarsExtracted["price_kind"] = amount === null ? null : sold ? "sold" : ended ? "high_bid" : open ? "current_bid" : null;
   const currency = clean(L.currencyCode)?.toUpperCase() ?? null;
 
   const images: string[] = [];
@@ -129,22 +138,29 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
   const slug = url.match(/\/for-sale\/([^/?#]+)/)?.[1];
   const place = [clean(L.areaName), clean(L.countryName)].filter(Boolean).join(", ") || null;
   const bodyStyle = (L.productAttributes ?? []).find((a: any) => a?.attributeName === "bodyStyle")?.attributeValue;
+  // Early lots can omit modelYear while explicitly stating the year in their
+  // own title. Retain which source field supplied it; never use the URL slug.
+  const modelYear = int(L.modelYear);
+  const titleYear = clean(L.title)?.match(/^(?:(?:NO RESERVE:|CHARITY AUCTION -|PROJECT CAR -)\s+)?((?:18|19|20)\d{2})\s+/i)?.[1];
+  const year = modelYear ?? (titleYear ? Number(titleYear) : null);
 
   return {
     listing_id: String(L.auctionId),
     url: slug ? `https://collectingcars.com/for-sale/${slug}` : url,
     title: clean(L.title),
-    year: int(L.modelYear),
+    year,
+    year_source: modelYear !== null ? "modelYear" : titleYear ? "title" : null,
     make: clean(L.makeName) ?? clean(L.productMake),
     model: clean(L.modelName),
     trim: clean(L.variantName),
     vin: clean(L.vin),
-    price: currency === "USD" && kind !== "high_bid" ? amount : null,
+    price: currency === "USD" && (kind === "sold" || kind === "current_bid") ? amount : null,
     price_amount: amount,
     currency,
     price_kind: kind,
     sale_outcome: outcome,
     sold_at: sold ? iso(L.dtSoldUTC) : null,
+    sale_format: saleFormat,
     mileage: mileageNum && unit === "mi" ? mileageNum : mileageNum && unit === "km" ? Math.round(mileageNum * 0.621371) : null,
     mileage_unit: unit,
     mileage_raw: mileageRaw,
@@ -163,5 +179,6 @@ export function extractFromHtml(html: string, url: string): CollectingCarsExtrac
     image_urls: images,
     posted_at: iso(L.dtPublishedUTC),
     auction_end_at: iso(L.dtAuctionEndUTC),
+    auction_ended_at: iso(L.dtAuctionEndedUTC),
   };
 }

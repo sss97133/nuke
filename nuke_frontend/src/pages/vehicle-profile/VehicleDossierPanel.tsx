@@ -18,7 +18,11 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import { readProfileSourcePage, sourceValueText, physicalRecordedValue, PHYSICAL_READING_ROLES,
   type PhysicalReadingField, type StructuredClaim } from './profileSourceClaims';
 import { currentBidEvidenceAmount } from './auctionEvidenceDisplay';
+import { useProfileRead } from './profileDocument';
+import { ItemList } from '../../kit';
+import type { FacetItem, TokenItems } from '../../kit/types';
 
+const VehicleEvidenceReview = React.lazy(() => import('../../components/vehicle/VehicleEvidenceAssessment').then(m => ({ default: m.VehicleEvidenceReview })));
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
 
 const RECORD_FIELDS = ['year', 'make', 'model', 'vin', 'trim', 'body_style', 'engine_type', 'engine_size',
@@ -35,6 +39,18 @@ const STRUCTURED_RECORD_LABELS: Record<RecordField, string> = { year: 'Year', ma
   body_style: 'Body style', engine_type: 'Engine type', engine_size: 'Engine size', transmission: 'Transmission',
   drivetrain: 'Drivetrain', color: 'Exterior color', interior_color: 'Interior color', mileage: 'Odometer' };
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+/** The header token whose line items state a record field (vehicle_profile_read masthead.token_items). Engine type
+ * and size are both stated by the engine token, so its items render once, on the engine type row. */
+const FIELD_TOKEN: Partial<Record<RecordField, string>> = { year: 'year', make: 'make', model: 'model', trim: 'trim',
+  body_style: 'body_style', engine_type: 'engine', engine_size: 'engine', transmission: 'transmission', drivetrain: 'drivetrain',
+  color: 'paint' };
+
+/** The masthead's token items from the page's one profile read (shared with the header; no new request). */
+function useTokenItems(vehicleId: string): TokenItems | null {
+  const { data } = useProfileRead(vehicleId);
+  const masthead = data?.sections.find(section => section.kind === 'masthead') as { token_items?: TokenItems | null } | undefined;
+  return masthead?.token_items ?? null;
+}
 
 /** Reuse the same source query as the value's first-click evidence surface. */
 function PhysicalRecordedValue({ vehicleId, field, label, fallback, fallbackNote, onInspect, optional = false }: {
@@ -60,8 +76,10 @@ function PhysicalRecordedValue({ vehicleId, field, label, fallback, fallbackNote
 
 /** Read every stored field first, then admitted claims from the same owner.
  * A slow or failed source read must not hide the structured stored record. */
-export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: boolean | null;
-  onInspect?: (field: string, label: string, value: string) => void }> = ({ vehicleId, isReplica, onInspect }) => {
+export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: boolean | null; canReview?: boolean;
+  onInspect?: (field: string, label: string, value: string) => void;
+  /** The header's token line items (masthead.token_items), passed from the page's one profile read. */
+  tokenItems?: TokenItems | null }> = ({ vehicleId, isReplica, onInspect, canReview = false, tokenItems = null }) => {
   const [read, setRead] = useState<StructuredRead>(
     { id: vehicleId, status: 'loading', claims: [] });
   const generation = React.useRef(0);
@@ -137,6 +155,11 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: bo
   };
   if (!UUID.test(vehicleId)) return null;
   const current: StructuredRead = read.id === vehicleId ? read : { id: vehicleId, status: 'loading', claims: [] };
+  const itemsFor = (key: RecordField): FacetItem[] | null => {
+    const token = FIELD_TOKEN[key];
+    const items = token ? tokenItems?.[token] : null;
+    return items && items.length ? items : null;
+  };
   return <>
     <section aria-label="Structured vehicle data" className="vp-structured-claims">
       {current.status === 'loading' ? <p role="status">Reading vehicle data…</p>
@@ -146,9 +169,19 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: bo
           <thead><tr><th scope="col">Field</th><th scope="col">Recorded value</th></tr></thead>
           <tbody>{RECORD_FIELDS.map(key => {
             const a = current.attributes![key];
-            // A replica's retained trim can name the car it resembles. It cannot
-            // establish factory identity, even after the old claim is retired.
-            if (key === 'trim' && isReplica === true) return null;
+            // A field a header token states renders that token's line items, as built and current with their sources,
+            // rules and gaps: the same items the token's popover shows (kit ItemList), read once with the header.
+            const items = itemsFor(key);
+            // A replica's retained trim can name the car it resembles. It cannot establish factory identity, even after
+            // the old claim is retired, so the bare value stays hidden; the trim items (tribute rule, as-built interior
+            // code, each with its status) can render.
+            if (key === 'trim' && isReplica === true && !items) return null;
+            if (items && key === 'engine_size') return null;
+            // Full width: an item list in the 65% value column broke names letter by letter at desktop width.
+            if (items) return <tr key={key} data-record-field={key} data-token-items={FIELD_TOKEN[key]} className="vp-structured-record__items">
+              <td colSpan={2}><div className="vp-structured-record__items-label">{key === 'engine_type' ? 'Engine' : STRUCTURED_RECORD_LABELS[key]}</div>
+                <ItemList items={items} /></td>
+            </tr>;
             const derived = current.bindings?.filter(b => b.origin_column === key && (b.value !== a.value || b.unit !== a.unit || b.record_columns_disagree));
             return <tr key={key} data-record-field={key}>
               <th scope="row">{STRUCTURED_RECORD_LABELS[key]}</th>
@@ -212,7 +245,9 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: bo
       onClick={() => { void loadSourcePage(current.nextAfter ?? null); }}>
       {current.pageStatus === 'loading' ? 'Reading evidence…' : current.pageStatus === 'failed' || current.claimStatus === 'failed' ? 'Retry evidence' : 'Read more evidence'}
     </button>}
-  </section></>;
+  </section>
+    {canReview && <React.Suspense fallback={null}><VehicleEvidenceReview key={vehicleId} vehicleId={vehicleId} /></React.Suspense>}
+  </>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -579,10 +614,11 @@ const FieldRow: React.FC<{
 /* ------------------------------------------------------------------ */
 
 const VehicleDossierPanel: React.FC = () => {
-  const { vehicle, vehicleId, canEdit, isVerifiedOwner, isMobile, setGalleryFilter, auctionPulse } = useVehicleProfile();
+  const { vehicle, vehicleId, session, canEdit, isVerifiedOwner, isMobile, setGalleryFilter, auctionPulse } = useVehicleProfile();
   const navigate = useNavigate();
   const { openPopup } = usePopup();
   const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
+  const tokenItems = useTokenItems(vehicle?.id || '');
   const configuration = useFieldProvenance(vehicle?.id || '', 'engine_configuration');
   const displacement = useFieldProvenance(vehicle?.id || '', 'engine_displacement_l');
   const vinRead = useFieldProvenance(vehicle?.id || '', 'vin');
@@ -744,7 +780,7 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Info Panel */}
       <div className="vp-dossier-panel">
-        <StructuredProfileData vehicleId={vehicle.id} isReplica={vehicle.is_replica} onInspect={(field, label, value) => openPopup(
+        <StructuredProfileData vehicleId={vehicle.id} canReview={!!session?.user} isReplica={vehicle.is_replica} tokenItems={tokenItems} onInspect={(field, label, value) => openPopup(
           <React.Suspense fallback={<p role="status">Reading source…</p>}>
             <FieldEvidencePopup vehicleId={vehicle.id} field={field} label={label} value={value} presentation="citations" />
           </React.Suspense>, label, Math.min(720, window.innerWidth - 24), false,
