@@ -18,6 +18,7 @@ rules take precedence over old command recipes.
 | Small edits, bounded extraction or triage with clear criteria | Luna, low effort, when a separate session is actually useful |
 | Implementation, integration and ordinary debugging | Sol, medium effort |
 | Gist, conflicting evidence, product structure, difficult diagnosis | Astra, medium effort; raise effort for a concrete unresolved question |
+| Bringing photo readings that already exist to the data model's keys | Any of the above, given `skills/image-keys/SKILL.md` as its whole brief, the live registry snapshot and the decisions made so far; the stored decisions carry the consistency, not the model |
 
 These are the owner's starting preferences, not measured guarantees of cost or
 accuracy. Use the available account model; never silently fall back to a paid API.

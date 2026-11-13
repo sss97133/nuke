@@ -186,84 +186,8 @@ test('a recovered retry still reports the failed attempt honestly', () => {
   assert.equal(r.status, 1); assert.equal(r.attempts, 3);
   assert.match(r.output, /outcome=failed batches=1 failures=1 attempts=3 remaining=0/);
 });
-test('empty prepared work is still the batch drained exit', () => {
-  const r = run('byok-image-batch.sh', { FAKE_EMPTY: '1' });
-  assert.equal(r.status, 3); assert.equal(r.ingested, false);
-});
-test('structured authentication failure survives as sanitized receipt, never raw payload', () => {
-  const secret = 'SENTINEL';
-  const r = run('byok-image-batch.sh', {
-    FAKE_CLAUDE_EXIT: '1', FAKE_STDERR: secret,
-    FAKE_RESULT: JSON.stringify({ is_error: true, error: { status: 401, message: `authentication_error ${secret}` } }),
-  });
-  assert.equal(r.status, 1, r.output); assert.equal(r.ingested, false);
-  assert.match(r.log, /category=authentication code=401 verdicts=0 expected=1/);
-  assert.doesNotMatch(r.output + r.log, new RegExp(secret));
-});
-test('CLI exit zero with structured failure cannot pass even when a verdict persisted', () => {
-  const r = run('byok-image-batch.sh', {
-    FAKE_VERDICTS: '1', FAKE_RESULT: JSON.stringify({ is_error: true, errors: ['rate_limit_error'], status_code: 429 }),
-  });
-  assert.equal(r.status, 1); assert.equal(r.ingested, true);
-  assert.match(r.log, /category=rate_limit code=429/);
-});
-for (const [label, result] of [
-  ['subscription quota', 'You have hit your limit. SENTINEL'],
-  ['empty API balance', JSON.stringify({type:'error',message:'API Error: 400 Your credit balance is too low. SENTINEL'})],
-]) {
-  test(`${label} defers without ingest or exposing provider text`, () => {
-    const r = run('byok-image-batch.sh', {FAKE_CLAUDE_EXIT:'1',FAKE_RESULT:result});
-    assert.equal(r.status, 4); assert.equal(r.ingested, false);
-    assert.match(r.log, /category=quota_exhausted/);
-    assert.doesNotMatch(r.output + r.log, /SENTINEL/);
-  });
-}
-test('non-error receipt metadata cannot change the failure category', () => {
-  const r = run('byok-image-batch.sh', {FAKE_CLAUDE_EXIT:'1',FAKE_RESULT:JSON.stringify({
-    type:'result',is_error:true,permission_denials:[],result:'The selected model may not exist.'})});
-  assert.equal(r.status, 1); assert.match(r.log, /category=model_unavailable/);
-});
-for (const [name, result, category, code] of [
-  ['plaintext authentication error', 'API Error: 401 authentication_error SENTINEL', 'authentication', 401],
-  ['top-level JSON message', JSON.stringify({type:'error',message:'API Error: 429 rate_limit_error SENTINEL'}), 'rate_limit', 429],
-  ['selected model unavailable', 'There is an issue with the selected model. It may not exist or you may not have access to it. SENTINEL', 'model_unavailable', 0],
-  ['missing required scopes', 'Token is missing required scope SENTINEL', 'permission', 0],
-  ['missing native executable', 'timeout: failed to run command claude: No such file or directory SENTINEL', 'cli_configuration', 0],
-]) {
-  test(`${name} survives private parsing without leaking the error body`, () => {
-    const r = run('byok-image-batch.sh', {FAKE_CLAUDE_EXIT:'1',FAKE_RESULT:result});
-    assert.equal(r.status, 1); assert.equal(r.ingested, false);
-    assert.match(r.log, new RegExp(`category=${category} code=${code} verdicts=0`));
-    assert.doesNotMatch(r.output + r.log, /SENTINEL/);
-  });
-}
-test('timeout is classified without logging stderr', () => {
-  const r = run('byok-image-batch.sh', { FAKE_CLAUDE_EXIT: '124', FAKE_RESULT: '' });
-  assert.equal(r.status, 1); assert.match(r.log, /category=timeout/);
-});
-test('malformed structured result cannot certify an otherwise persisted verdict', () => {
-  const r = run('byok-image-batch.sh', { FAKE_VERDICTS: '1', FAKE_RESULT: 'PRIVATE-MALFORMED-RESULT' });
-  assert.equal(r.status, 1); assert.equal(r.ingested, true);
-  assert.match(r.log, /category=malformed_result/);
-  assert.doesNotMatch(r.output + r.log, /PRIVATE-MALFORMED-RESULT/);
-});
-test('success without verdicts fails before ingest', () => {
+test('legacy batch invocation stops before model or persistence', () => {
   const r = run('byok-image-batch.sh');
-  assert.equal(r.status, 1, r.output); assert.equal(r.ingested, false);
+  assert.equal(r.status, 2); assert.equal(r.ingested, false);
+  assert.match(r.output, /Legacy raw batch retired; no model or writes started/);
 });
-test('current full persisted batch succeeds', () => {
-  const r = run('byok-image-batch.sh', { FAKE_VERDICTS: '1' });
-  assert.equal(r.status, 0); assert.equal(r.ingested, true);
-  assert.match(r.log, /ingest receipt: exit=0 wrote=1 failed=0 expected=1/);
-});
-for (const [label, overrides] of [
-  ['missing receipt', { FAKE_MISSING_RECEIPT: '1' }],
-  ['ingest command error', { FAKE_INGEST_EXIT: '1' }],
-  ['failed writes', { FAKE_WROTE: '0', FAKE_FAILED: '1' }],
-  ['partial output', { FAKE_PREP_TWO: '1' }],
-]) {
-  test(`${label} cannot report batch success`, () => {
-    const r = run('byok-image-batch.sh', { FAKE_VERDICTS: '1', ...overrides });
-    assert.equal(r.status, 1); assert.equal(r.ingested, true);
-  });
-}

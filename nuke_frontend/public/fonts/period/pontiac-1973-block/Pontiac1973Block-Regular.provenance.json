@@ -1,0 +1,631 @@
+{
+ "family": "Pontiac 1973 Block",
+ "style": "Regular",
+ "version": "0.100",
+ "unitsPerEm": 1000,
+ "capHeight": 700,
+ "xHeight": 700,
+ "ascender": 900,
+ "descender": -250,
+ "license": "Drawn for Nuke (nuke.ag) from the cited period sources listed in the provenance sidecar. Descriptive family name; not an official General Motors or Pontiac typeface and not endorsed by General Motors. Pontiac, Firebird and Trans Am are trademarks of General Motors. Font software: SIL Open Font License 1.1.",
+ "glyphCount": 45,
+ "glyphs": {
+  "O": {
+   "unicode": "U+004F",
+   "advance": 1313,
+   "provenance": "traced",
+   "method": "superellipse n 2.05, 1213 x 716; counter n 3.2, 613 x 298; fitted to the part photograph",
+   "source": "pontiac-firebird-tail-letters-1970-1973-cut.png",
+   "sourceSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk=",
+   "counterSource": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "fidelity": {
+    "iou": 0.9338,
+    "maxDevPx": 15.52,
+    "meanDevPx": 3.547
+   },
+   "pxPerUnit": 0.11743,
+   "page": "OER K1049 \"PONTIAC\" rear panel letters, Firebird 1970-73 (catalogue photograph)",
+   "url": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
+   "photo": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "P": {
+   "unicode": "U+0050",
+   "advance": 1366,
+   "provenance": "traced",
+   "method": "stem 330; bowl 176-700 with superellipse right side (rx 600); slot counter 545 x 145",
+   "source": "pontiac-firebird-tail-letters-1970-1973-cut.png",
+   "sourceSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk=",
+   "counterSource": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "fidelity": {
+    "iou": 0.9576,
+    "maxDevPx": 13.93,
+    "meanDevPx": 2.268
+   },
+   "pxPerUnit": 0.11743,
+   "page": "OER K1049 \"PONTIAC\" rear panel letters, Firebird 1970-73 (catalogue photograph)",
+   "url": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
+   "photo": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "lint": {
+    "nodes": 18,
+    "missingExtrema": 0,
+    "microSegments": 1,
+    "nearKinks": 0
+   }
+  },
+  "N": {
+   "unicode": "U+004E",
+   "advance": 1278,
+   "provenance": "traced",
+   "method": "verticals 217; diagonal from the top-left corner to the bottom-right corner, 330 perpendicular, slope 18.5 degrees",
+   "source": "pontiac-firebird-tail-letters-1970-1973-cut.png",
+   "sourceSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk=",
+   "counterSource": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "fidelity": {
+    "iou": 0.948,
+    "maxDevPx": 9.22,
+    "meanDevPx": 2.857
+   },
+   "pxPerUnit": 0.11743,
+   "page": "OER K1049 \"PONTIAC\" rear panel letters, Firebird 1970-73 (catalogue photograph)",
+   "url": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
+   "photo": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "lint": {
+    "nodes": 18,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 5
+   }
+  },
+  "T": {
+   "unicode": "U+0054",
+   "advance": 1261,
+   "provenance": "traced",
+   "method": "bar 1211 x 210; stem 285",
+   "source": "pontiac-firebird-tail-letters-1970-1973-cut.png",
+   "sourceSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk=",
+   "counterSource": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "fidelity": {
+    "iou": 0.9749,
+    "maxDevPx": 6.4,
+    "meanDevPx": 1.217
+   },
+   "pxPerUnit": 0.11743,
+   "page": "OER K1049 \"PONTIAC\" rear panel letters, Firebird 1970-73 (catalogue photograph)",
+   "url": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
+   "photo": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "lint": {
+    "nodes": 16,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "I": {
+   "unicode": "U+0049",
+   "advance": 460,
+   "provenance": "traced",
+   "method": "stem 320",
+   "source": "pontiac-firebird-tail-letters-1970-1973-cut.png",
+   "sourceSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk=",
+   "counterSource": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "fidelity": {
+    "iou": 0.954,
+    "maxDevPx": 11.18,
+    "meanDevPx": 2.403
+   },
+   "pxPerUnit": 0.11743,
+   "page": "OER K1049 \"PONTIAC\" rear panel letters, Firebird 1970-73 (catalogue photograph)",
+   "url": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
+   "photo": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "A": {
+   "unicode": "U+0041",
+   "advance": 1353,
+   "provenance": "traced",
+   "method": "triangle 1340 x 700, apex at 0.485 W; light left leg 155, heavy right leg 200; doorway with 45-degree jambs under a 115 crossbar; triangular counter",
+   "source": "pontiac-firebird-tail-letters-1970-1973-cut.png",
+   "sourceSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk=",
+   "counterSource": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "fidelity": {
+    "iou": 0.8569,
+    "maxDevPx": 20.52,
+    "meanDevPx": 5.9
+   },
+   "pxPerUnit": 0.11743,
+   "page": "OER K1049 \"PONTIAC\" rear panel letters, Firebird 1970-73 (catalogue photograph)",
+   "url": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
+   "photo": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "lint": {
+    "nodes": 26,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 5
+   }
+  },
+  "C": {
+   "unicode": "U+0043",
+   "advance": 1182,
+   "provenance": "traced",
+   "method": "O outer; counter 261-490 (top arm 210, bottom arm 261); mouth 304-457; terminals cut square at the photograph edge (1102, a lower bound)",
+   "source": "pontiac-firebird-tail-letters-1970-1973-cut.png",
+   "sourceSha256Base64": "7oLCoew3F9BB3iLJ8gsKI46/WRh44gCPVsbP2DY6gZk=",
+   "counterSource": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "fidelity": {
+    "iou": 0.9171,
+    "maxDevPx": 29.53,
+    "meanDevPx": 4.248
+   },
+   "pxPerUnit": 0.11743,
+   "page": "OER K1049 \"PONTIAC\" rear panel letters, Firebird 1970-73 (catalogue photograph)",
+   "url": "https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html",
+   "photo": "pontiac-firebird-tail-letters-1970-1973.jpg",
+   "lint": {
+    "nodes": 12,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "B": {
+   "unicode": "U+0042",
+   "advance": 1295,
+   "provenance": "designed",
+   "method": "stem; two bowls of the P construction with three-storey horizontals 150, lower bowl 100 wider",
+   "lint": {
+    "nodes": 21,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "D": {
+   "unicode": "U+0044",
+   "advance": 1333,
+   "provenance": "designed",
+   "method": "P stem with the O right half: superellipse right side over the full height",
+   "lint": {
+    "nodes": 13,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "E": {
+   "unicode": "U+0045",
+   "advance": 1105,
+   "provenance": "designed",
+   "method": "stem; three horizontals 150; middle arm 120 shorter",
+   "lint": {
+    "nodes": 24,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "F": {
+   "unicode": "U+0046",
+   "advance": 1080,
+   "provenance": "designed",
+   "method": "E without the bottom arm; middle arm lowered 20 for balance",
+   "lint": {
+    "nodes": 20,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "G": {
+   "unicode": "U+0047",
+   "advance": 1312,
+   "provenance": "designed",
+   "method": "O with the C mouth above a bar (150) reaching into the counter; the jaw is the O side below",
+   "lint": {
+    "nodes": 14,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "H": {
+   "unicode": "U+0048",
+   "advance": 1290,
+   "provenance": "designed",
+   "method": "two stems; crossbar 205 centred 10 above the middle",
+   "lint": {
+    "nodes": 24,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "J": {
+   "unicode": "U+004A",
+   "advance": 1100,
+   "provenance": "designed",
+   "method": "stem on the right; hook = lower half of a ring (sides 310, bottom 205), cut square at its middle",
+   "lint": {
+    "nodes": 11,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "K": {
+   "unicode": "U+004B",
+   "advance": 1267,
+   "provenance": "designed",
+   "method": "stem; light arm rising to the top right (200); heavy leg falling to the bottom right (300)",
+   "lint": {
+    "nodes": 30,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "L": {
+   "unicode": "U+004C",
+   "advance": 1075,
+   "provenance": "designed",
+   "method": "stem; foot bar 205",
+   "lint": {
+    "nodes": 12,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "M": {
+   "unicode": "U+004D",
+   "advance": 1700,
+   "provenance": "designed",
+   "method": "N rule: thin left vertical, heavy diagonal to a vertex at the baseline, light diagonal rising to a full stem on the right",
+   "lint": {
+    "nodes": 29,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 6
+   }
+  },
+  "Q": {
+   "unicode": "U+0051",
+   "advance": 1334,
+   "provenance": "designed",
+   "method": "O with a heavy tail falling through the lower right",
+   "lint": {
+    "nodes": 15,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "R": {
+   "unicode": "U+0052",
+   "advance": 1351,
+   "provenance": "designed",
+   "method": "the traced P with a heavy leg (340 wide) falling from the bowl to the bottom right",
+   "lint": {
+    "nodes": 25,
+    "missingExtrema": 0,
+    "microSegments": 1,
+    "nearKinks": 0
+   }
+  },
+  "S": {
+   "unicode": "U+0053",
+   "advance": 1240,
+   "provenance": "designed",
+   "method": "two rings of the B (horizontals 150) sharing the middle bar; upper right and lower left sides removed; terminals cut square 70 below and above the arms",
+   "lint": {
+    "nodes": 29,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "U": {
+   "unicode": "U+0055",
+   "advance": 1280,
+   "provenance": "designed",
+   "method": "lower half of a ring (sides 320, bottom 205) carried up to the cap height",
+   "lint": {
+    "nodes": 11,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "V": {
+   "unicode": "U+0056",
+   "advance": 1336,
+   "provenance": "designed",
+   "method": "heavy stroke falling to the baseline vertex (300), light stroke rising to the top right (165)",
+   "lint": {
+    "nodes": 17,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 5
+   }
+  },
+  "W": {
+   "unicode": "U+0057",
+   "advance": 1926,
+   "provenance": "designed",
+   "method": "two V constructions sharing a pointed middle apex",
+   "lint": {
+    "nodes": 31,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 10
+   }
+  },
+  "X": {
+   "unicode": "U+0058",
+   "advance": 1264,
+   "provenance": "designed",
+   "method": "heavy stroke falling, light stroke rising, crossing at the middle",
+   "lint": {
+    "nodes": 32,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "Y": {
+   "unicode": "U+0059",
+   "advance": 1248,
+   "provenance": "designed",
+   "method": "V arms meeting at 330 on a stem 320",
+   "lint": {
+    "nodes": 23,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 6
+   }
+  },
+  "Z": {
+   "unicode": "U+005A",
+   "advance": 1180,
+   "provenance": "designed",
+   "method": "bars 205; diagonal 250 rising (an exception to rule 3, as in a roman Z)",
+   "lint": {
+    "nodes": 26,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "zero": {
+   "unicode": "U+0030",
+   "advance": 1100,
+   "provenance": "designed",
+   "method": "O construction at 1000 wide",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "one": {
+   "unicode": "U+0031",
+   "advance": 690,
+   "provenance": "designed",
+   "method": "stem with a light flag falling to the left",
+   "lint": {
+    "nodes": 15,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "two": {
+   "unicode": "U+0032",
+   "advance": 1090,
+   "provenance": "designed",
+   "method": "S upper ring with its left side removed; heavy diagonal to the bottom left; base bar 150",
+   "lint": {
+    "nodes": 33,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "three": {
+   "unicode": "U+0033",
+   "advance": 1090,
+   "provenance": "designed",
+   "method": "the S rings with both left sides removed; middle bar starts at 0.35 W",
+   "lint": {
+    "nodes": 31,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "four": {
+   "unicode": "U+0034",
+   "advance": 1170,
+   "provenance": "designed",
+   "method": "stem; crossbar 170; light diagonal rising from the crossbar to the stem top",
+   "lint": {
+    "nodes": 32,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 3
+   }
+  },
+  "five": {
+   "unicode": "U+0035",
+   "advance": 1105,
+   "provenance": "designed",
+   "method": "top bar 150 and left stem on a lower ring of 430 whose upper left side is removed; bottom terminal cut square",
+   "lint": {
+    "nodes": 29,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "six": {
+   "unicode": "U+0036",
+   "advance": 1095,
+   "provenance": "designed",
+   "method": "a closed lower ring of 440 inside a full ring kept for its left side and top arm; top terminal cut square",
+   "lint": {
+    "nodes": 20,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "nine": {
+   "unicode": "U+0039",
+   "advance": 1095,
+   "provenance": "derived",
+   "from": [
+    "six"
+   ],
+   "method": "the 6 turned 180 degrees",
+   "lint": {
+    "nodes": 20,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "seven": {
+   "unicode": "U+0037",
+   "advance": 1035,
+   "provenance": "designed",
+   "method": "bar 205; diagonal 250 to the baseline (an exception to rule 3)",
+   "lint": {
+    "nodes": 18,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "eight": {
+   "unicode": "U+0038",
+   "advance": 1100,
+   "provenance": "designed",
+   "method": "two closed rings of the B, the upper one 100 narrower",
+   "lint": {
+    "nodes": 20,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "period": {
+   "unicode": "U+002E",
+   "advance": 420,
+   "provenance": "designed",
+   "method": "square dot: stem width by horizontal weight",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "comma": {
+   "unicode": "U+002C",
+   "advance": 420,
+   "provenance": "designed",
+   "method": "the dot with a tail falling left",
+   "lint": {
+    "nodes": 16,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "hyphen": {
+   "unicode": "U+002D",
+   "advance": 600,
+   "provenance": "designed",
+   "method": "bar 180 at mid cap height",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "slash": {
+   "unicode": "U+002F",
+   "advance": 1044,
+   "provenance": "designed",
+   "method": "light diagonal 220",
+   "lint": {
+    "nodes": 10,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "quotesingle": {
+   "unicode": "U+0027",
+   "advance": 356,
+   "provenance": "designed",
+   "method": "tapered stem 240 to 140",
+   "lint": {
+    "nodes": 10,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "quotedbl": {
+   "unicode": "U+0022",
+   "advance": 716,
+   "provenance": "designed",
+   "method": "two single quotes 120 apart",
+   "lint": {
+    "nodes": 20,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 8
+   }
+  },
+  "ampersand": {
+   "unicode": "U+0026",
+   "advance": 1178,
+   "provenance": "designed",
+   "method": "small upper loop over a larger lower loop opened at the right, crossed by a heavy diagonal tail",
+   "lint": {
+    "nodes": 32,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "space": {
+   "unicode": "U+0020",
+   "advance": 320,
+   "provenance": "designed",
+   "method": "about half an I",
+   "lint": {
+    "nodes": 0,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  }
+ },
+ "rules": "Pontiac 1973 Block: the chrome block capitals of the 1970-73 Firebird tail panel letters (OER K1049,\n\"P O N T I A C\"), drawn as one constructive system and extended to A-Z, 0-9 and punctuation.\n\nSource (committed in nuke_frontend/public/stacks/makes): pontiac-firebird-tail-letters-1970-1973.jpg (OER catalogue\nphotograph, 1000 px, letters 82 px tall) and its silhouette cutout pontiac-firebird-tail-letters-1970-1973-cut.png.\nThe letters are loose parts photographed in a row, so their gaps are not spacing evidence; the C touches the right\nedge of the photograph, so its terminal cut is placed at the edge (traced width is a lower bound).\n\nDesign rules, measured on the source (8.5 font units per source pixel, cap height 700):\n  1. Extended proportions: O is 1.73 H wide, P 1.79 H, N 1.63 H, T 1.73 H, A 1.91 H; I is a single 0.46 H stem.\n  2. Vertical contrast: stems 285-330 (I 320, P 330, T 285 under its bar), round sides 300-320; horizontals 200-210.\n     Letters with three horizontals (E F B S 3 5 6 8 9 2) take 150 so their counters stay open. The source has\n     no such letter: this is the system's rule, not a measurement.\n  3. Diagonals follow broad-pen logic although the parts are die-cut: strokes falling left to right are heavy\n     (N diagonal 330 perpendicular, A right leg 200), strokes rising left to right are light (A left leg 155), and a\n     vertical that carries a heavy diagonal thins to 215 (N). Z and 7 break the rule for colour, as in a roman.\n  4. Rounds are superellipses: outer n = 2.05 (close to an ellipse), counters n = 3.2, flat-topped and slot-like\n     (O counter 613 x 298, P counter a 545 x 145 slot).\n  5. Terminals are cut square (C, G, S, J, digits) and every corner carries the die radius (14, inner 7).\n  6. The chrome part is a rim around a flat face: the face is the same construction inset by 30 units (3.5 px).\n",
+ "faceInset": 0
+}

@@ -55,7 +55,7 @@ async function filter(value: string) {
 describe('vehicle table public build-log reader', () => {
   it('searches permitted work with original ID/date, masked detail and zero labor', async () => {
     await renderPage();
-    expect(fixture.rpc).toHaveBeenCalledWith('vehicle_build_log_public', { p_vehicle_id: 'synthetic-vehicle', p_include_reported: true });
+    expect(fixture.rpc).toHaveBeenCalledWith('vehicle_build_log_public', { p_vehicle_id: 'synthetic-vehicle', p_include_reported: true, p_include_visual: false });
     const row = container.querySelector('[data-observation-id="synthetic-work"]')!;
     expect(row.tagName).toBe('DIV');
     expect(row.querySelector('a')).toBeNull();
@@ -305,7 +305,7 @@ describe('publisher-reported work in the existing table', () => {
   it('falls back only for a missing opt-in overload and marks reported work unavailable', async () => {
     fixture.publicError = { code: 'PGRST202', message: 'Synthetic missing function overload' };
     await renderPage();
-    expect(fixture.rpc).toHaveBeenNthCalledWith(1, 'vehicle_build_log_public', { p_vehicle_id: 'synthetic-vehicle', p_include_reported: true });
+    expect(fixture.rpc).toHaveBeenNthCalledWith(1, 'vehicle_build_log_public', { p_vehicle_id: 'synthetic-vehicle', p_include_reported: true, p_include_visual: false });
     expect(fixture.rpc).toHaveBeenNthCalledWith(2, 'vehicle_build_log_public', { p_vehicle_id: 'synthetic-vehicle' });
     expect(container.querySelector('[data-observation-id="synthetic-work"]')?.textContent).toContain('Installed bracket');
     expect(container.querySelector('[role="status"]')?.textContent).toContain('Publisher-reported work unavailable');

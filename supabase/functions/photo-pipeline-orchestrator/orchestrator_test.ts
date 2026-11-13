@@ -68,7 +68,7 @@ globalThis.fetch = (async (input, init) => {
     if (rejectWrite) return Response.json({ message: "synthetic write rejection", code: "42501" }, { status: 400 });
     if (url.searchParams.get("updated_at") !== `eq.${row.updated_at}`) return Response.json([]);
     patches++; row = { ...row, ...body, updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
-    return Response.json([{ id: row.id }]);
+    return Response.json([{ id: row.id, image_url: row.image_url, vehicle_id: row.vehicle_id }]);
   }
   // An upload-clock read ("this user's most recently created filed photo") finds a different, recently filed vehicle.
   if (url.searchParams.has("created_at")) { uploadClockReads++; return Response.json([{ vehicle_id: "recent-upload-vehicle" }]); }

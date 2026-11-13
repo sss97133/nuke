@@ -12,11 +12,13 @@ export function privateStoragePath(url: string): { bucket: string; path: string 
   return { bucket: m[1], path: decodeURIComponent(m[2]) };
 }
 
-export async function signPrivateStorageUrl(url: string, ttlSeconds = 3600): Promise<string> {
+export async function signPrivateStorageUrl(url: string, ttlSeconds = 3600,
+  transform?: { width: number; height: number; resize: 'contain'; quality: number }): Promise<string> {
   const target = privateStoragePath(url);
   if (!target) return url;
   try {
-    const { data, error } = await supabase.storage.from(target.bucket).createSignedUrl(target.path, ttlSeconds);
+    const { data, error } = await supabase.storage.from(target.bucket).createSignedUrl(target.path, ttlSeconds,
+      transform ? { transform } : undefined);
     return !error && data?.signedUrl ? data.signedUrl : url;
   } catch {
     return url;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import type { VehicleIdentityToken } from '../../utils/vehicleIdentity';
 import artwork from '../../../public/stacks/makes/wordmarks.json';
 import vehicleArtwork from '../../../public/stacks/makes/vehicle-identities.json';
@@ -54,6 +54,8 @@ export function MakeIdentity({ make, inverse = false, compact = false }: { make:
 
 export type ModelIdentityArtwork = { path: string; width: number; height: number; description: string };
 type VehicleIdentityProps = { make: string; model: string; year?: number | string | null; variants?: VehicleIdentityToken[]; compact?: boolean; onExplore?: (field: string, value: string) => void;
+  /** The profile's vehicle: lettering cut from this car's own photographs (catalogue vehicleIds) applies to it alone. */
+  vehicleId?: string;
   /** What pressing a part does, when it is not the profile's explore dialog (the live board re-scopes in place). */
   exploreLabel?: (field: string, value: string) => string; modelArtwork?: ModelIdentityArtwork | null;
   /** False keeps text where the catalogue's headline-scale lettering would be illegible. */
@@ -64,20 +66,57 @@ type VehicleIdentityProps = { make: string; model: string; year?: number | strin
 type VehicleArtwork = (typeof vehicleArtwork)[number];
 
 /** Match structured identity only. Unknown years/models never inherit another era's badge. */
-export function resolveVehicleArtwork({ make, model, year, variants = [] }: VehicleIdentityProps) {
+export function resolveVehicleArtwork({ make, model, year, variants = [], vehicleId }: VehicleIdentityProps) {
   const numericYear = /^\d{4}$/.test(String(year)) ? Number(year) : null;
   if (numericYear === null) return [];
   // Match the complete recorded designation: Turbo + S must never inherit Turbo artwork.
   const variant = variants.filter(token => token.kind === 'series' || token.kind === 'trim').map(token => token.value).join(' ');
   return vehicleArtwork.filter(asset => keyFor(asset.make) === keyFor(make)
+    // Lettering from one car's own photograph never stands for another car.
+    && (!asset.vehicleIds?.length || (!!vehicleId && asset.vehicleIds.includes(vehicleId)))
     && numericYear >= asset.years[0] && numericYear <= asset.years[1]
     && (!asset.models.length || asset.models.some(value => keyFor(value) === keyFor(model)))
-    && (!asset.variants?.length || asset.variants.some(value => keyFor(value) === keyFor(variant))));
+    && (!asset.variants?.length || asset.variants.some(value => keyFor(value) === keyFor(variant)))
+    // A badge documented "except <trim>" (the 1970-73 fender bird is not a Trans Am part) stays off that trim.
+    && !asset.exceptVariants?.some(value => keyFor(value) === keyFor(variant)));
 }
 
-function VehicleArtworkImage({ asset, fallback, text = false }: { asset: VehicleArtwork; fallback?: string; text?: boolean }) {
+/** What the recorded designation adds to the lettering it shows: a tribute's "Trans Am-Style" keeps "-Style". */
+function variantQualifier(asset: VehicleArtwork, name: string) {
+  const label = asset.label?.trim();
+  if (!label || !name.toLowerCase().startsWith(label.toLowerCase())) return '';
+  return name.slice(label.length).trim();
+}
+
+// Period fonts drawn from the same sources as the cutouts (public/fonts/period/README.md). A catalogue entry's `font`
+// names its family in the font build's manifest. The loader is its own chunk, fetched only when an identity with a font
+// matches, so no other vehicle's route carries it; the raster stands until the faces load.
+const PeriodLettering = lazy(() => import('./PeriodLettering'));
+
+function VehicleArtworkImage({ asset, fallback, text = false, lettering }: { asset: VehicleArtwork; fallback?: string; text?: boolean;
+  /** The words the catalogue's period font sets in place of the raster (the recorded make, model, year or label). */
+  lettering?: string }) {
   const [failed, setFailed] = useState(false);
+  if (asset.font && lettering && !text && !failed) {
+    const raster = <VehicleArtworkImage asset={asset} fallback={fallback} />;
+    return <Suspense fallback={raster}><PeriodLettering family={asset.font} role={asset.role} tone={asset.tone} lettering={lettering} fallback={raster} /></Suspense>;
+  }
   if (failed) return fallback ? <span>{fallback}</span> : null;
+  // A cutout (no background) sits on the page surface: a single-colour print is a mask in the text colour; photographed
+  // chrome and the car's own decal keep their colour. Its catalogue capMetrics (where its capitals sit in the file) let
+  // every mark share one cap height and baseline.
+  if (asset.cutout && !text) {
+    const src = `/stacks/makes/${asset.file}`;
+    const style = { '--art-ratio': asset.sourceWidth / asset.sourceHeight, '--art-src': `url("${src}")`,
+      ...(asset.capMetrics ? { '--art-cap': asset.capMetrics.capHeight, '--art-base': asset.capMetrics.baseline } : {}) } as React.CSSProperties;
+    return asset.tone === 'monochrome'
+      ? <span className="vehicle-identity__art vehicle-identity__art--cutout vehicle-identity__art--mask" data-role={asset.role} style={style}>
+        <img src={src} alt="" hidden onError={() => setFailed(true)} />
+      </span>
+      : <span className="vehicle-identity__art vehicle-identity__art--cutout" data-role={asset.role} style={style}>
+        <img src={src} alt="" width={asset.width} height={asset.height} onError={() => setFailed(true)} />
+      </span>;
+  }
   // In a line of text the lettering's capitals take the text's cap height and its baseline sits on the text's.
   const [, , vw, vh] = asset.viewport.split(' ').map(Number);
   const fit = text && asset.textScale ? { '--art-cap': asset.textScale.capHeight, '--art-base': asset.textScale.baseline, '--art-ratio': vw / vh } as React.CSSProperties : undefined;
@@ -98,29 +137,38 @@ function VehicleArtworkImage({ asset, fallback, text = false }: { asset: Vehicle
 }
 
 /** The vehicle's own nameplate, selected by year/make/model, with a readable fallback. */
-export function VehicleIdentity({ make, model, year, variants = [], compact = false, onExplore, exploreLabel, modelArtwork, artwork = true, scale = 'headline' }: VehicleIdentityProps) {
+export function VehicleIdentity({ make, model, year, variants = [], compact = false, onExplore, exploreLabel, modelArtwork, artwork = true, scale = 'headline', vehicleId }: VehicleIdentityProps) {
   const [failedArtwork, setFailedArtwork] = useState<string | null>(null);
   const text = scale === 'text';
   const sourcedModel = artwork && !text && modelArtwork && failedArtwork !== modelArtwork.path ? modelArtwork : null;
-  // Photographed badges, emblems and variant scripts are headline art; a line of text takes lettering only.
-  const assets = artwork ? resolveVehicleArtwork({ make, model, year, variants })
-    .filter(asset => !text || (asset.textScale && (asset.role === 'make' || asset.role === 'model'))) : [];
+  // Photographed badges, emblems and variant scripts are headline art; a line of text takes vector lettering only.
+  // Library-only entries (boxed or shadowed crops) are kept for reference and never set a headline.
+  const assets = artwork ? resolveVehicleArtwork({ make, model, year, variants, vehicleId })
+    .filter(asset => asset.headline !== 'library')
+    .filter(asset => !text || (asset.textScale && asset.file.endsWith('.svg') && (asset.role === 'make' || asset.role === 'model'))) : [];
   const maker = assets.find(asset => asset.role === 'make');
   const script = assets.find(asset => asset.role === 'model');
   const emblem = assets.find(asset => asset.role === 'emblem');
   const variantScript = assets.find(asset => asset.role === 'variant');
+  // Printed period years only (catalogue role "year"); there is no numeral set, so other years stay text.
+  const yearArt = assets.find(asset => asset.role === 'year');
   const variantName = variants.filter(token => token.kind === 'series' || token.kind === 'trim').map(token => token.value).join(' ');
+  const qualifier = variantScript ? variantQualifier(variantScript, variantName) : '';
+  // Every mark shown is a cutout: no nameplate panel, the lettering sits on the page surface.
+  const shown = [maker, emblem, variantScript, yearArt, (!variantScript || compact) && !sourcedModel ? script : undefined].filter(Boolean);
+  const inline = shown.length > 0 && !sourcedModel && shown.every(asset => asset?.cutout);
+  const yearContent = yearArt && year ? <VehicleArtworkImage key={yearArt.file + yearArt.viewport} asset={yearArt} fallback={String(year)} lettering={String(year)} /> : year;
   const part = (field: string, value: string, content: React.ReactNode) => onExplore
     ? <button type="button" className="vehicle-identity__explore" aria-haspopup={exploreLabel ? undefined : 'dialog'}
       aria-label={exploreLabel ? exploreLabel(field, value) : `Explore ${value} in this profile`} title={exploreLabel?.(field, value)}
       onClick={() => onExplore(field, value)}>{content}</button>
     : content;
-  return <span className={`vehicle-identity${compact ? ' vehicle-identity--compact' : ''}${text ? ' vehicle-identity--text' : ''}`} data-period-artwork={assets.length > 0 || !!sourcedModel} data-variant-artwork={!!variantScript}>
-    {compact && year && <span className="vehicle-identity__year" aria-hidden={onExplore ? undefined : true}>{part('year', String(year), year)}</span>}
+  return <span className={`vehicle-identity${compact ? ' vehicle-identity--compact' : ''}${text ? ' vehicle-identity--text' : ''}`} data-period-artwork={assets.length > 0 || !!sourcedModel} data-variant-artwork={!!variantScript} data-inline-artwork={inline || undefined}>
+    {compact && year && <span className="vehicle-identity__year" aria-hidden={onExplore ? undefined : true}>{part('year', String(year), yearContent)}</span>}
     <span className="vehicle-identity__maker" aria-hidden={onExplore ? undefined : true}>
       {part('make', make, <>
-      {maker ? <VehicleArtworkImage key={maker.file} asset={maker} fallback={make} text={text} /> : <span>{make}</span>}
-      {!compact && <span className="vehicle-identity__year">{year}{variantScript && <>{year ? ' · ' : ''}<span className="vehicle-identity__model">{model}</span></>}</span>}
+      {maker ? <VehicleArtworkImage key={maker.file} asset={maker} fallback={make} text={text} lettering={make} /> : <span>{make}</span>}
+      {!compact && <span className="vehicle-identity__year">{yearContent}{variantScript && <>{year ? ' · ' : ''}<span className="vehicle-identity__model">{model}</span></>}</span>}
       </>)}
     </span>
     {emblem && <VehicleArtworkImage key={emblem.file} asset={emblem} />}
@@ -129,9 +177,12 @@ export function VehicleIdentity({ make, model, year, variants = [], compact = fa
         {sourcedModel ? <span className="vehicle-identity__art vehicle-identity__art--model"><img src={sourcedModel.path}
           width={sourcedModel.width} height={sourcedModel.height} alt="" title={sourcedModel.description}
           onError={() => setFailedArtwork(sourcedModel.path)} /></span>
-          : script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} text={text} /> : model}
+          : script ? <VehicleArtworkImage key={script.file} asset={script} fallback={model} text={text} lettering={model} /> : model}
       </>)}</span>}
-      {variantScript && <span className="vehicle-identity__variant" aria-hidden={onExplore ? undefined : true}>{part('trim', variantName, <VehicleArtworkImage key={variantScript.file} asset={variantScript} fallback={variantName} />)}</span>}
+      {variantScript && <span className="vehicle-identity__variant" aria-hidden={onExplore ? undefined : true}>{part('trim', variantName, <>
+        <VehicleArtworkImage key={variantScript.file + variantScript.viewport} asset={variantScript} fallback={qualifier ? variantName.slice(0, -qualifier.length).trim() : variantName} lettering={variantScript.label} />
+        {qualifier && <span className="vehicle-identity__qualifier">{qualifier}</span>}
+      </>)}</span>}
       {variants.filter(token => !variantScript || (token.kind !== 'series' && token.kind !== 'trim')).map(token =>
         <span key={token.kind} className="vehicle-identity__variant" aria-hidden={onExplore ? undefined : true}>{part(token.kind, token.value, token.value)}</span>)}
     </span>

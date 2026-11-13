@@ -9,7 +9,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ client: null as any }));
+const fixture = vi.hoisted(() => ({ client: null as any, user: null as { id: string } | null, loading: false }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.user, loading: fixture.loading }) }));
 vi.mock('../../lib/supabase', () => ({ get supabase() { return fixture.client; } }));
 vi.mock('../../hooks/useVehiclePermissions', () => ({ useVehiclePermissions: () => ({
   isOwner: false, hasContributorAccess: false, contributorRole: null, canEdit: false,
@@ -22,7 +23,7 @@ import BarcodeTimeline from './BarcodeTimeline';
 
 const paperDay = '2024-10-07', photoDay = '2026-10-02';
 let root: Root, host: HTMLDivElement, queryClient: QueryClient, current: ReturnType<typeof useVehicleProfile>;
-let vehicleId: string, serial = 0, tied: boolean, documentDays: number;
+let vehicleId: string, serial = 0, tied: boolean, documentDays: number, supplier: string;
 let requests: { method: string; url: URL; body: any }[];
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const photo = () => ({ id: 'synthetic-photo', image_url: 'https://photos.test/synthetic.jpg', vehicle_id: vehicleId,
@@ -31,12 +32,13 @@ const vehicle = () => ({ id: vehicleId, is_public: true, year: 1973, make: 'Pont
 const pagePath = '00000000-0000-0000-0000-000000000099/financial/' + 'a'.repeat(64) + '.heic';
 // What get_vehicle_day_documents returns: the same shape for every viewer, money, payer and the page null unless tied.
 const dayDocuments = () => ({ date: paperDay, tied, documents: [{
-  receipt_id: 'synthetic-receipt', document_id: 'synthetic-document', vendor: 'Synthetic Machine Shop', vendor_address: tied ? '1 Shop St' : null,
-  vendor_org: { name: 'Synthetic Machine Shop', logo_url: 'https://nuke.ag/source-logos/synthetic.png', website: 'https://shop.test' },
+  receipt_id: 'synthetic-receipt', document_id: 'synthetic-document', vendor: supplier, vendor_address: tied ? '1 Shop St' : null,
+  vendor_org: { name: supplier, logo_url: 'https://nuke.ag/source-logos/synthetic.png', website: 'https://shop.test' },
   page: tied ? { bucket: 'user-documents', path: pagePath, bytes: 1234567, page_no: 1 } : null, page_paths: tied ? [pagePath] : null,
   document_type: 'work_order', document_kind: 'parts_service', document_number: '9810', date: paperDay, date_source: 'data_v2.transaction_date',
   date_basis: 'printed_document_date', pages: 2, payer_as_named: tied ? 'Synthetic Builder' : null, payment_method: tied ? 'Visa' : null,
   subtotal: tied ? 650 : null, discount: null, shipping: null, tax: tied ? 54.76 : null, total: tied ? 2190 : null, currency: 'USD',
+  recorded_payment: tied ? { amount: 0, date: '2024-10-08' } : null, recorded_hours: 2.75, hour_entries: 1,
   link_basis: 'cited_document', link_confidence: 0.9,
   lines: [
     { line_number: 1, description: 'Bore cylinders .060', part_number: null, quantity: null, unit_price: null, amount: null, line_date: '2024-11-13', hours: 2.75, performer: 'Frank',
@@ -54,6 +56,7 @@ function Probe() {
   return <BarcodeTimeline />;
 }
 beforeEach(() => {
+  fixture.user = { id: 'owner-a' }; fixture.loading = false;
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   window.history.replaceState({}, '', '/');
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -67,7 +70,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: (key: string) => cache.get(key) ?? null,
     setItem: (key: string, value: string) => cache.set(key, value), removeItem: (key: string) => cache.delete(key) });
   vehicleId = `00000000-0000-0000-0000-${String(++serial).padStart(12, '0')}`;
-  requests = []; tied = false; documentDays = 1;
+  requests = []; tied = false; documentDays = 1; supplier = 'Synthetic Machine Shop';
   fixture.client = createClient('https://timeline-paper.test', 'synthetic-anon', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `synthetic-paper-${serial}` },
     global: { fetch: async (input, init) => {
@@ -126,6 +129,17 @@ async function showDay(day: string) {
 const paperReads = () => requests.filter(r => r.url.pathname.endsWith('/rpc/get_vehicle_day_documents'));
 const signRequests = () => requests.filter(r => r.url.pathname.startsWith('/storage/v1/object/sign/'));
 
+it('retains the supplier handle without person annotations in day-document headings or logo alt text', async () => {
+  supplier = 'eBay seller examplespares (Jamie Example)';
+  await showDay(paperDay);
+  const document = host.querySelector('.day-drawer__document')!;
+  expect(document.innerHTML).not.toContain('Jamie Example');
+  expect(document.textContent).toContain('eBay seller examplespares');
+  expect(document.querySelector('img')?.alt).toBe('eBay seller examplespares');
+  expect(document.querySelector('a[href="https://shop.test"]')).not.toBeNull();
+  expect(document.textContent).toContain('Bore cylinders .060');
+});
+
 it('puts a document day on the calendar and opens it with one paper read, money and payer withheld as returned', async () => {
   const text = await showDay(paperDay);
   expect(paperReads()).toHaveLength(1);
@@ -146,6 +160,23 @@ it('prints the money and the payer when the reader returns them to a tied viewer
   expect(text).toContain('2,190 USD');
   expect(text).toContain('billed to Synthetic Builder');
   expect(text).toContain('650 USD');
+  expect(text).toContain('Recorded payment 0 USD');
+  expect(text).toContain('2.75 recorded person-hours');
+});
+it('withdraws an open receipt during a viewer transition and rereads it for the new viewer', async () => {
+  tied = true; await showDay(paperDay);
+  const rerender = async () => act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[`/vehicle/${vehicleId}`]}>
+    <Routes><Route path="/vehicle/:vehicleId" element={<VehicleProfileProvider><Probe /></VehicleProfileProvider>} /></Routes>
+  </MemoryRouter></QueryClientProvider>));
+  fixture.loading = true; await rerender();
+  expect(host.textContent).not.toContain('Recorded payment');
+  expect(host.textContent).not.toContain('Synthetic Builder');
+  fixture.user = null; fixture.loading = false; tied = false; await rerender();
+  await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+  expect(paperReads()).toHaveLength(2);
+  expect(host.textContent).toContain('Bore cylinders');
+  expect(host.textContent).not.toContain('Recorded payment');
+  expect(host.textContent).not.toContain('2,190');
 });
 it('never reads paper for a day the timeline leg did not count', async () => {
   const text = await showDay(photoDay);

@@ -339,3 +339,163 @@ BEGIN
   END IF;
   RAISE NOTICE 'PASS: one house key joins lots and listed counts across spellings; roster opens under either; others unchanged';
 END $$;
+
+-- Synthetic rows only, in the disposable database required at the top of this file.
+ALTER TABLE public.observation_sources ADD COLUMN species text DEFAULT 'block_house';
+ALTER TABLE public.source_census ADD COLUMN id uuid DEFAULT gen_random_uuid();
+ALTER TABLE public.source_census
+  ADD COLUMN universe_total integer, ADD COLUMN universe_active integer, ADD COLUMN universe_historical integer,
+  ADD COLUMN census_confidence numeric, ADD COLUMN census_url text, ADD COLUMN by_year jsonb, ADD COLUMN by_make jsonb,
+  ADD COLUMN next_census_at timestamptz;
+CREATE TABLE public.organizations(id uuid PRIMARY KEY,business_name text,is_public boolean,is_active boolean);
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY public_organizations ON public.organizations FOR SELECT TO anon USING(is_public AND is_active);
+GRANT SELECT ON public.organizations TO anon;
+CREATE TABLE public.listing_feeds(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),source_slug text,display_name text,
+  feed_url text UNIQUE,feed_type text,search_criteria jsonb,enabled boolean,poll_interval_minutes integer,
+  last_polled_at timestamptz,last_error text);
+CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid,source_id uuid,source_url text,
+  kind text,is_superseded boolean DEFAULT false,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now());
+ALTER TABLE public.vehicle_observations ADD COLUMN source_vehicle_event_id uuid;
+CREATE INDEX idx_vehicle_observations_source_vehicle_event ON public.vehicle_observations(source_vehicle_event_id);
+ALTER TABLE public.vehicle_events ADD COLUMN source_listing_id text;
+CREATE TABLE public.superseded_rows(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),source_table text,row_id uuid,
+  row_data jsonb,asserted_by text,source jsonb,reason text,superseded_at timestamptz DEFAULT now(),restored_at timestamptz);
+CREATE TABLE public.bat_bids(id uuid PRIMARY KEY,bat_listing_id uuid);
+CREATE TABLE public.hammer_predictions(id uuid PRIMARY KEY,external_listing_id uuid);
+CREATE TABLE public.auction_events(id uuid PRIMARY KEY,vehicle_id uuid,source_url text);
+CREATE TABLE public.listing_page_snapshots(id uuid PRIMARY KEY,listing_url text,http_status integer);
+\ir ../migrations/20261025141000_supersede_repoint.sql
+INSERT INTO public.organizations VALUES ('07fbc081-986c-43bc-ab9d-df24c24e513b','McCormick''s Auto Auctions',true,true);
+INSERT INTO public.observation_sources VALUES ('006f01c3-e5fb-44f5-ab40-e55b0654de1c','mccormicks','block_house');
+\ir ../migrations/20261110170440_mccormick_live_inventory.sql
+\ir ../migrations/20261110170440_mccormick_live_inventory.sql
+INSERT INTO public.source_census(source_id,census_at,census_method,by_category,raw_response)
+SELECT '006f01c3-e5fb-44f5-ab40-e55b0654de1c',now(),'house_roster_facet','{"mccormicks-91":4,"mccormicks-92":null,"mccormicks-90":1}',
+  jsonb_build_object('method','mccormick_live_v1','organization_id','07fbc081-986c-43bc-ab9d-df24c24e513b',
+    'private_extra','must not escape','sales',jsonb_build_object(
+      'mccormicks-91',jsonb_build_object('sale_key','mccormicks-91','name','Synthetic current sale',
+        'starts_on',current_date+10,'ends_on',current_date+12,'location','Synthetic venue',
+        'source_url','https://www.classic-carauction.com/Auction-91','lots_listed',4),
+      'mccormicks-92',jsonb_build_object('sale_key','mccormicks-92','name','Synthetic future sale',
+        'starts_on',current_date+90,'ends_on',current_date+92,'location','Synthetic venue',
+        'source_url','https://www.classic-carauction.com/news_stories.cfm?newsid=1','lots_listed',NULL),
+      'mccormicks-90',jsonb_build_object('sale_key','mccormicks-90','name','Ended sale',
+        'starts_on',current_date-4,'ends_on',current_date-2,'source_url','https://www.classic-carauction.com/Auction-90','lots_listed',1)),
+    'inventory',(SELECT jsonb_agg(jsonb_build_object('native_id',n::text,'source_url','https://www.classic-carauction.com/auction-cars?auctionid='||n,
+      'inventory_kind','auction','sale_key','mccormicks-91','title','1970 Synthetic Dated','year',1970,'make','Synthetic','model','Dated',
+      'source_status','scheduled','lot_number',n::text)) FROM generate_series(1,4) n));
+INSERT INTO public.vehicle_observations(id,vehicle_id,source_id,source_url,kind,structured_data,observed_at)
+SELECT md5('mcc-native-'||n)::uuid,md5(CASE n WHEN 1 THEN 'dated' WHEN 2 THEN 'private' WHEN 3 THEN 'deleted' ELSE 'road-art' END)::uuid,
+  '006f01c3-e5fb-44f5-ab40-e55b0654de1c',CASE WHEN n=1 THEN 'https://www.classic-carauction.com/auction-cars'
+    ELSE 'https://www.classic-carauction.com/auction-cars?auctionid='||n END,
+  'listing',jsonb_build_object('source_id',n::text,'title','1970 Synthetic Dated')
+    ||CASE WHEN n=1 THEN '{"evidence_scope":"catalog_row","parser":"mccormick_catalog_v1"}'::jsonb ELSE '{}'::jsonb END,
+  now() FROM generate_series(1,4) n;
+SET ROLE anon;
+CREATE TEMP TABLE mccormick_public AS SELECT public.organization_source_inventory_read('07fbc081-986c-43bc-ab9d-df24c24e513b') body;
+CREATE TEMP TABLE mccormick_calendar AS SELECT public.auction_calendar_read(200) body;
+RESET ROLE;
+DO $$ DECLARE r jsonb; c jsonb; BEGIN
+  SELECT body INTO r FROM mccormick_public; SELECT body INTO c FROM mccormick_calendar;
+  IF jsonb_array_length(r->'sales')<>2 OR jsonb_array_length(r->'inventory')<>4 THEN RAISE EXCEPTION 'Schedule/current catalog missing: %',r; END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(r->'inventory') a WHERE a->>'vehicle_id' IS NOT NULL)<>1
+    OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(r->'inventory') a WHERE a->>'native_id'='1' AND a->>'vehicle_id'=md5('dated')::uuid::text)
+    THEN RAISE EXCEPTION 'Private/deleted/nonvehicle parent exposed or public link lost: %',r; END IF;
+  IF r::text LIKE '%must not escape%' OR has_table_privilege('anon','public.source_census','SELECT')
+    OR has_table_privilege('anon','public.vehicle_observations','SELECT') THEN RAISE EXCEPTION 'Protected source data escaped'; END IF;
+  IF (SELECT a->'lots_listed' FROM jsonb_array_elements(c->'sales') a WHERE a->>'sale_key'='mccormicks-92') IS DISTINCT FROM 'null'::jsonb
+    OR EXISTS (SELECT 1 FROM jsonb_array_elements(c->'sales') a WHERE a->>'sale_key'='mccormicks-90')
+    OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(c->'sales') a WHERE a->>'sale_key'='mccormicks-91' AND a->>'location'='Synthetic venue'
+      AND a->>'source_url'='https://www.classic-carauction.com/Auction-91') THEN RAISE EXCEPTION 'Calendar future/ended/source semantics wrong: %',c; END IF;
+END $$;
+-- A newer unbound witness must remove the old public parent link; no reassignment.
+INSERT INTO public.vehicle_observations(id,source_id,source_url,kind,structured_data,observed_at)
+VALUES (md5('mcc-unbound')::uuid,'006f01c3-e5fb-44f5-ab40-e55b0654de1c','https://www.classic-carauction.com/auction-cars?auctionid=1',
+  'listing','{"source_id":"1","title":"1970 Synthetic Dated"}',now()+interval '1 second');
+UPDATE public.listing_feeds SET last_error='private diagnostic must not escape',last_polled_at=now();
+SET ROLE anon;
+DO $$ DECLARE r jsonb; BEGIN
+  r:=public.organization_source_inventory_read('07fbc081-986c-43bc-ab9d-df24c24e513b');
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(r->'inventory') a WHERE a->>'vehicle_id' IS NOT NULL)
+    OR (r->>'refresh_failed')::boolean IS NOT TRUE OR r::text LIKE '%private diagnostic%'
+    OR jsonb_array_length(r->'inventory')<>4 THEN RAISE EXCEPTION 'Unbound/failure preservation failed: %',r; END IF;
+END $$;
+RESET ROLE;
+UPDATE public.organizations SET is_public=false;
+SET ROLE anon;
+DO $$ BEGIN IF public.organization_source_inventory_read('07fbc081-986c-43bc-ab9d-df24c24e513b') IS NOT NULL THEN
+  RAISE EXCEPTION 'Private organization exposed'; END IF; END $$;
+RESET ROLE;
+
+-- The complete native roster is admitted by the existing census writer, not
+-- by the poller issuing raw measurement inserts. Anonymous callers cannot use it.
+GRANT SELECT ON public.observation_sources,public.source_census TO service_role;
+GRANT INSERT ON public.source_census TO service_role;
+DO $$ BEGIN
+  IF has_function_privilege('anon','public.record_census(text,integer,integer,text,numeric,text,jsonb,jsonb,jsonb,jsonb,timestamptz)','EXECUTE')
+    THEN RAISE EXCEPTION 'Anonymous census writes allowed'; END IF;
+END $$;
+SET ROLE service_role;
+SELECT public.record_census('mccormicks',1,1,'house_roster_facet',1,
+  'https://www.classic-carauction.com/Home','{}','{}',
+  '{"method":"mccormick_live_v1","inventory":[{"native_id":"synthetic"}]}',
+  '{"mccormicks-91":1,"mccormicks-92":null}',now());
+RESET ROLE;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.source_census WHERE universe_total=1 AND universe_active=1
+    AND by_category='{"mccormicks-91":1,"mccormicks-92":null}'::jsonb
+    AND next_census_at=census_at+interval '15 minutes') THEN
+    RAISE EXCEPTION 'Native census writer dropped coverage, unknown count or revisit clock';
+  END IF;
+END $$;
+
+-- A changed future run day uses the actual supersession owner and keeps its
+-- before-image. Missing census/capture/binding proof still refuses future dates.
+UPDATE public.organizations SET is_public=true;
+UPDATE public.vehicle_observations SET is_superseded=true WHERE id=md5('mcc-unbound')::uuid;
+INSERT INTO public.listing_page_snapshots VALUES
+  (md5('mcc-catalog')::uuid,'https://www.classic-carauction.com/auction-cars',200);
+INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_listing_id,source_url,event_status,ended_at,metadata)
+VALUES(md5('mcc-reschedule')::uuid,md5('dated')::uuid,'mccormicks','mccormicks-91:1',
+  'https://www.classic-carauction.com/auction-cars?auctionid=1','upcoming',
+  (current_date+10)::timestamp AT TIME ZONE 'UTC'+interval '12 hours',
+  '{"native_id":"1","sale_key":"mccormicks-91","projection_method":"mccormick_live_v1"}');
+SET statement_timeout='8s';
+DO $$ DECLARE payload jsonb; cid uuid; result jsonb; proof jsonb; old_clock timestamptz; new_clock timestamptz; BEGIN
+  SELECT raw_response INTO payload FROM public.source_census WHERE jsonb_array_length(raw_response->'inventory')=4 LIMIT 1;
+  payload:=jsonb_set(payload,'{inventory,0,run_on}',to_jsonb((current_date+11)::text));
+  payload:=payload||jsonb_build_object('captures',jsonb_build_array(jsonb_build_object(
+    'snapshot_id',md5('mcc-catalog')::uuid,'url','https://www.classic-carauction.com/auction-cars')));
+  cid:=public.record_census('mccormicks',4,4,'house_roster_facet',1,'https://www.classic-carauction.com/Home',
+    '{}','{}',payload,'{"mccormicks-91":4,"mccormicks-92":null}',now());
+  old_clock:=(current_date+10)::timestamp AT TIME ZONE 'UTC'+interval '12 hours';
+  new_clock:=(current_date+11)::timestamp AT TIME ZONE 'UTC'+interval '12 hours';
+  proof:=jsonb_build_object('type','mccormick_scheduled_catalog_day','ref','https://www.classic-carauction.com/auction-cars?auctionid=1',
+    'snapshot_id',md5('mcc-catalog')::uuid,'census_id',cid,'basis','scheduled_run_day');
+  BEGIN
+    PERFORM public.supersede_vehicle_event_episode(md5('mcc-reschedule')::uuid,
+      jsonb_build_object('ended_at',jsonb_build_object('expected',old_clock,'value',new_clock,'precision','day')),
+      proof-'census_id','A publisher moved the scheduled lot to a different day.');
+    RAISE EXCEPTION 'missing census proof accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%must be a finite instant, not in the future%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    PERFORM public.supersede_vehicle_event_episode(md5('mcc-reschedule')::uuid,
+      jsonb_build_object('ended_at',jsonb_build_object('expected',old_clock,'value',new_clock)),
+      proof,'A scheduled correction without day precision must not be accepted.');
+    RAISE EXCEPTION 'missing day precision accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%must be a finite instant, not in the future%' THEN RAISE; END IF;
+  END;
+  result:=public.supersede_vehicle_event_episode(md5('mcc-reschedule')::uuid,
+    jsonb_build_object('ended_at',jsonb_build_object('expected',old_clock,'value',new_clock,'precision','day')),
+    proof,'The complete publisher catalog and schedule agree on the changed run day.');
+  IF result->>'status'<>'superseded' OR NOT EXISTS (SELECT 1 FROM public.vehicle_events
+      WHERE id=(result->>'replacement_event_id')::uuid AND ended_at=new_clock)
+    OR NOT EXISTS (SELECT 1 FROM public.superseded_rows WHERE row_id=md5('mcc-reschedule')::uuid
+      AND (row_data->>'ended_at')::timestamptz=old_clock) THEN
+    RAISE EXCEPTION 'Changed run day not corrected with retained before-image: %',result;
+  END IF;
+END $$;
