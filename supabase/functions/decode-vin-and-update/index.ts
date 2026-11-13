@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { writeObservation } from "../_shared/observationWriter.ts"
+import { decodeVin } from "../_shared/vin-decoder.ts"
 import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -43,6 +44,35 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Decoding VIN ${vin} for vehicle ${vehicle_id}`)
+
+    // NHTSA's VPIC does not decode pre-1981 VINs. Those decode by the cited GM chart and land as one
+    // specification observation (source gm_vin_chart); the vehicles row is never written here.
+    const local = decodeVin(String(vin))
+    if (local.is_pre_1981) {
+      if (!local.rule_source || local.year == null) {
+        return new Response(JSON.stringify({ success: false, vin, reason: 'pre-1981 VIN outside the cited chart' }),
+          { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const fields: Record<string, unknown> = {
+        vin, year: local.year, make: local.make, model: local.model, series: local.series, series_code: local.series_code,
+        body_style: local.body_style, factory_engine_code: local.engine_code, factory_engine: local.engine_size,
+        factory_engine_rule_source: local.engine_rule_source,
+        assembly_plant_code: local.plant, assembly_plant: local.plant_name, serial_number: local.serial_number,
+        decode_rule: 'gm_1972_1980_car_vin_v1',
+      }
+      for (const key of Object.keys(fields)) if (fields[key] == null) delete fields[key]
+      const writer = createClient(Deno.env.get('SUPABASE_URL') ?? '', projectSecretKey() ?? '', { auth: { persistSession: false } })
+      const written = await writeObservation(writer, {
+        vehicleId: vehicle_id,
+        source: { platform: 'gm_vin_chart', url: local.rule_source, trustScore: 0.9 },
+        fields,
+        observationKind: 'specification',
+        extractionMethod: 'vin_decode_gm_chart_v1',
+      })
+      return new Response(JSON.stringify({ success: written.errors.length === 0, vin, decoder: 'gm_vin_chart', observation_id: written.observationId ?? null,
+        duplicate: written.duplicate ?? false, errors: written.errors, fields }),
+        { status: written.errors.length ? 500 : 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     // Call NHTSA VPIC API
     const nhtsaResponse = await fetch(

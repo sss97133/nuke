@@ -22,7 +22,10 @@ export function projectImageProperties(observation, image) {
       image?.id !== data.image_id || image?.vehicle_id !== observation.vehicle_id) {
     return deferred('image_vehicle_mismatch');
   }
-  if (image.is_sensitive === true || image.is_superseded === true || image.is_duplicate === true ||
+  // is_document and the receipt scene are refused by the batch intake too (20261004064216): a photographed paper
+  // is not the vehicle, whatever the reading's three fields say.
+  if (data.scene_type === 'receipt_document') return deferred('receipt_document');
+  if (image.is_sensitive === true || image.is_superseded === true || image.is_duplicate === true || image.is_document === true ||
       ![null, undefined, 'approved'].includes(image.vision_gate_status) ||
       ['mismatch', 'unrelated'].includes(image.image_vehicle_match_status)) {
     return deferred('image_not_eligible');
@@ -227,4 +230,110 @@ async function applyImagePropertyClaimsLegacy(sb, claims, { runMs = 60000 } = {}
     }
   }
   return receipt;
+}
+
+export const SINGLE_SLICE = 20;   // claims per call on the one-at-a-time route: each call has its own 60 s budget
+const SOURCE_COLUMNS = 'id,vehicle_id,kind,is_superseded,observed_at,ingested_at,agent_model,agent_tier,extraction_method,confidence,confidence_score,structured_data';
+const IMAGE_COLUMNS = 'id,vehicle_id,is_sensitive,is_superseded,is_duplicate,is_document,vision_gate_status,image_vehicle_match_status';
+
+/**
+ * project-cached: walk one vehicle's stored deep readings, newest first, and project their three values (dry run)
+ * or land them. Returns { receipt, exitCode }; the receipt holds counts and fixed reason words only.
+ *
+ * single: the batch intake takes a public vehicle's listing photos only. This route sends one claim at a time through
+ * ingest-observation and reads each row and its witness back, so it serves an owner's own photos. It keeps what the
+ * batch intake checks beside that rule: the reading must pass the database's observation_is_public, and a claim
+ * that a row already holds (current or superseded) is not sent again.
+ */
+export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, before, apply = false, single = false }) {
+  const counts = { sampled_condition_rows: 0, source_rows: 0, eligible_claims: 0 };
+  const landed = { inserted: 0, duplicates: 0, verified: 0, failed: 0, unattempted: 0 };
+  const held = { already_projected: 0, already_projected_superseded: 0 };
+  const deferred = {};
+  const defer = why => { deferred[why] = (deferred[why] || 0) + 1; };
+  const signal = () => AbortSignal.timeout(10000);
+  let cursor = null, walked = 0, reachedOldest = false, last = {}, reason;
+  // Before anything has landed a failed read is an error, as it always was. After, the receipt must still say what landed.
+  const stop = why => {
+    if (!landed.inserted && !landed.duplicates && walked <= 1) throw new Error(`project-cached: ${why.replaceAll('_', ' ')}`);
+    landed.failed++; reason = why;
+  };
+  while (walked < pages) {
+    let query = sb.from('vehicle_observations').select(SOURCE_COLUMNS)
+      .eq('vehicle_id', vehicleId).eq('kind', 'condition').eq('structured_data->>analysis_kind', 'image_deep_byok');
+    // Keyset on (ingested_at, id): readings that share one instant across a window's edge are not skipped.
+    query = cursor ? query.or(`ingested_at.lt."${cursor.at}",and(ingested_at.eq."${cursor.at}",id.lt.${cursor.id})`)
+      : query.lt('ingested_at', before);
+    const result = await query.order('ingested_at', { ascending: false }).order('id', { ascending: false })
+      .limit(limit).abortSignal(signal());
+    walked++;
+    if (result.error || !Array.isArray(result.data)) { stop('source_query_failed'); break; }
+    const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok');
+    const ids = [...new Set(sources.map(row => row.structured_data?.image_id).filter(id => UUID.test(id ?? '')))];
+    const images = ids.length ? await sb.from('vehicle_images').select(IMAGE_COLUMNS).in('id', ids).abortSignal(signal())
+      : { data: [], error: null };
+    if (images.error || !Array.isArray(images.data)) { stop('image_query_failed'); break; }
+    const byId = new Map(images.data.map(row => [row.id, row]));
+    let claims = [];
+    for (const source of sources) {
+      const projected = projectImageProperties(source, byId.get(source.structured_data.image_id));
+      if (projected.deferred) { defer(projected.deferred); continue; }
+      if (single) {   // the batch intake asks the database whether the reading may be shown; so does this route
+        let open;
+        try { open = await sb.rpc('observation_is_public', { p_kind: source.kind, p_data: source.structured_data }).abortSignal(signal()); }
+        catch { open = { error: true }; }
+        if (!open || open.error) { defer('privacy_check_unavailable'); continue; }
+        if (open.data !== true) { defer('source_not_public'); continue; }
+      }
+      claims.push(...projected.claims);
+    }
+    if (single && claims.length) {
+      const parents = [...new Set(claims.map(claim => claim.structured_data.source_observation_id))];
+      const have = new Map();
+      let failed = false;
+      for (let i = 0; i < parents.length && !failed; i += 100) {
+        const prior = await sb.from('vehicle_observations')
+          .select('is_superseded,source_observation_id:structured_data->>source_observation_id,property_key:structured_data->>property_key')
+          .eq('vehicle_id', vehicleId).eq('extraction_method', 'cached_byok_property_projection_v1')
+          .in('structured_data->>source_observation_id', parents.slice(i, i + 100)).limit(1000).abortSignal(signal());
+        if (prior.error || !Array.isArray(prior.data)) { failed = true; break; }
+        for (const row of prior.data) {
+          const key = `${row.source_observation_id}:${row.property_key}`;
+          have.set(key, have.get(key) === true || row.is_superseded === true);
+        }
+      }
+      if (failed) { stop('prior_rows_unavailable'); break; }
+      claims = claims.filter(claim => {
+        const key = `${claim.structured_data.source_observation_id}:${claim.property_key}`;
+        if (!have.has(key)) return true;
+        held.already_projected++;
+        if (have.get(key)) held.already_projected_superseded++;
+        return false;
+      });
+    }
+    counts.sampled_condition_rows += result.data.length; counts.source_rows += sources.length; counts.eligible_claims += claims.length;
+    if (apply && (claims.length || (pages === 1 && !single))) {
+      const slices = single ? Array.from({ length: Math.ceil(claims.length / SINGLE_SLICE) }, (_, i) => claims.slice(i * SINGLE_SLICE, (i + 1) * SINGLE_SLICE)) : [claims];
+      let sent = 0;
+      for (const slice of slices) {
+        last = await applyImagePropertyClaims(sb, slice, single ? { mode: 'legacy' } : {});
+        for (const key of Object.keys(landed)) landed[key] += last[key] || 0;
+        sent += slice.length;
+        if (last.failed > 0) break;
+      }
+      if (last.failed > 0) { landed.unattempted += claims.length - sent; reason = last.reason || 'ingest_failed'; break; }
+    }
+    if (result.data.length < limit) { reachedOldest = true; break; }
+    const tail = result.data[result.data.length - 1];
+    cursor = { at: tail.ingested_at, id: tail.id };
+  }
+  const summed = single || pages > 1;
+  const receipt = { mode: apply ? 'apply' : 'dry_run', route: single ? 'single' : 'batch', vehicle_id: vehicleId,
+    ...counts, window_limit: limit, window_before: before, pages_walked: walked, reached_oldest_row: reachedOldest,
+    full_history_verified: false, model_calls: 0, deferred, ...(single ? held : {}),
+    ...(apply && !summed ? last : {}),
+    ...(apply && summed ? { ...landed, ...(reason ? { reason } : {}) } : {}),
+    ...(!apply && reason ? { failed: landed.failed, reason } : {}) };
+  const nothing = apply && counts.eligible_claims === 0 && held.already_projected === 0;
+  return { receipt, exitCode: receipt.failed > 0 || nothing ? 1 : 0 };
 }

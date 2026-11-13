@@ -5,9 +5,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getUserApiKey } from '../_shared/getUserApiKey.ts'
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { enrichReceiptProducts } from './receiptProducts.ts';
+import { isServiceCaller, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from '../_shared/geminiGuard.ts';
+import { recordSuppliedReference, ReferenceError, sha256 } from './suppliedReference.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,7 +30,57 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { document_id, pdf_url, user_id, mode, page_start, page_end } = await req.json()
+    const body = await req.json();
+    if (body.mode === 'supplied_reference') {
+      try {
+        const result = await recordSuppliedReference(body, {
+          authorize: () => isServiceCaller(req),
+          async retain(bytes, hash) {
+            const storage = supabase.storage.from('reference-docs');
+            const path = `supplied/${hash}.pdf`;
+            const saved = await storage.upload(path, bytes, { contentType: 'application/pdf', upsert: false,
+              metadata: { sha256: hash, source_role: 'public_reference' } });
+            if (!saved.error) return;
+            if (!['409', '400'].includes(String(saved.error.statusCode)) || !/already exists|duplicate/i.test(saved.error.message)) {
+              throw new ReferenceError('reference_bytes_not_retained', 502);
+            }
+            const retained = await storage.download(path);
+            if (retained.error || !retained.data || retained.data.size !== bytes.length
+              || await sha256(new Uint8Array(await retained.data.arrayBuffer())) !== hash) {
+              throw new ReferenceError('reference_existing_bytes_mismatch', 409);
+            }
+          },
+          async record(document, pages, reader, reviewedAt) {
+            const { data, error } = await supabase.rpc('record_supplied_reference_document', {
+              p_document: document, p_pages: pages, p_reader: reader, p_reviewed_at: reviewedAt,
+            });
+            if (error) throw new ReferenceError('reference_source_not_recorded', 409);
+            return data;
+          },
+          async ingest(observation) {
+            const { data, error } = await supabase.functions.invoke('ingest-observation', {
+              body: observation, headers: { apikey: projectSecretKey() ?? '' },
+            });
+            if (error) throw new ReferenceError('reference_observation_not_persisted', 502);
+            return data;
+          },
+          async project(observationId) {
+            const { data, error } = await supabase.rpc('project_reference_assembly', { p_observation_id: observationId });
+            if (error) throw new ReferenceError('reference_projection_refused', 409);
+            return data;
+          },
+        });
+        return Response.json(result, { headers: corsHeaders });
+      } catch (error) {
+        return Response.json({ success: false, error: error instanceof ReferenceError ? error.code : 'reference_persistence_failed', model_calls: 0 },
+          { status: error instanceof ReferenceError ? error.status : 500, headers: corsHeaders });
+      }
+    }
+    if (body.mode === 'receipt_products') {
+      if (!(await isServiceCaller(req))) return new Response(JSON.stringify({ error: 'service_role required' }), { status: 403, headers: corsHeaders });
+      return new Response(JSON.stringify(await enrichReceiptProducts(supabase, body)), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const { document_id, pdf_url, user_id, mode, page_start, page_end } = body
     if (!pdf_url) throw new Error('Missing pdf_url')
 
     const processingMode = mode || 'structure' // 'structure' | 'extract_parts'
@@ -128,7 +180,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'reference_document_index_failed' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

@@ -181,7 +181,7 @@ const railLink: React.CSSProperties = {
  * Two paths per image (founder requirement):
  *   → VEHICLE:  /vehicle/:id when attributed.
  *   → ANALYSIS: attributed → /vehicle/:id?photo=<id> (full analysis lightbox);
- *               unfiled (owner) → /photo-library (review/assign). Real
+ *               unfiled (owner) → /capture/ledger (why it was held). Real
  *               classification/atoms shown inline; honest "NOT ANALYZED YET"
  *               when the record carries none (C0 — never fabricated).
  */
@@ -249,7 +249,7 @@ const RecentPhotoLightbox: React.FC<{
   const vehiclePath = vehicle ? `/vehicle/${vehicle.id}` : null;
   const analysisPath = vehicle
     ? `/vehicle/${vehicle.id}?photo=${img.id}`   // full analysis lightbox on the vehicle
-    : (isOwnProfile ? '/photo-library' : null);  // owner reviews/assigns the unfiled image
+    : (isOwnProfile ? '/capture/ledger' : null);  // owner sees why the unfiled image was held
 
   // Has the image genuinely been analyzed? completed+0 atoms+rate-limited
   // classification = not really. Be honest (C0).

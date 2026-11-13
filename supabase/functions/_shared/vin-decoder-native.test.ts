@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { decodeVin } from "./vin-decoder.ts";
+import { decodeVin, GM_PONTIAC_F_BODY_1973_ENGINE_SOURCE, GM_PONTIAC_F_BODY_SOURCE } from "./vin-decoder.ts";
 // Synthetic VIN-shaped strings exercise WMI interpretation only, not a real car.
 const vin = (wmi: string) => wmi + "ZZZZZ0X0000000";
 Deno.test("Nissan manufacture preserves Infiniti and historical Datsun marque uncertainty", () => {
@@ -70,4 +70,29 @@ Deno.test("1C4 preserves manufacturer compatibility without assigning Jeep or Ch
   assertEquals(decoded.make, null);
   assertEquals(decoded.manufacturer, "FCA US LLC");
   assertEquals(decoded.manufacturer_make_candidates, ['Dodge', 'Chrysler', 'Volkswagen', 'Jeep', 'Fiat', 'RAM', 'Lancia']);
+});
+
+Deno.test('1972-80 GM car layout: engine letter at 5, year at 6, plant at 7; Pontiac F-body series', () => {
+  const r = decodeVin('2S87D3N100001');
+  assertEquals([r.make, r.model, r.series, r.series_code, r.body_style], ['Pontiac', 'Firebird', 'Firebird', 'S', 'Coupe']);
+  assertEquals([r.year, r.engine_code, r.engine_size, r.plant, r.plant_name, r.serial_number], [1973, 'D', '250', 'N', 'Norwood, Ohio', '100001']);
+  const ta = decodeVin('2V87Y3N100002');
+  assertEquals([ta.year, ta.series, ta.engine_size], [1973, 'Trans Am', '455 D-port']);
+  // A 1970 Chevrolet (no engine letter) keeps the pre-1972 positions.
+  assertEquals(decodeVin('136807Z130419').year, 1970);
+});
+
+Deno.test('1973 Firebird engine letters decode by the 1973 HPP chart; S is not a 1973 letter', () => {
+  const expected: Record<string, string | null> = {
+    D: '250', M: '350 single exhaust', N: '350 dual exhaust', R: '400 2bbl single exhaust',
+    P: '400 2bbl dual exhaust', T: '400 4bbl dual exhaust', Y: '455 D-port', X: '455 SD', S: null,
+  };
+  for (const [letter, engine] of Object.entries(expected)) {
+    const r = decodeVin(`2U87${letter}3N100001`);
+    assertEquals([r.year, r.engine_code, r.engine_size], [1973, letter, engine], `letter ${letter}`);
+    assertEquals(r.engine_rule_source, GM_PONTIAC_F_BODY_1973_ENGINE_SOURCE);
+  }
+  // Other years keep the Classic Industries chart: S is a 1974 400 4bbl.
+  const s74 = decodeVin('2U87S4N100001');
+  assertEquals([s74.year, s74.engine_size, s74.engine_rule_source], [1974, '400 4bbl', GM_PONTIAC_F_BODY_SOURCE]);
 });

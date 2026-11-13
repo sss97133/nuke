@@ -31,8 +31,8 @@ function ContextualHero({ vehicleId, field, label, onClear }: { vehicleId: strin
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const { leadImageUrl, heroMeta, vehicleId, galleryFilter, setGalleryFilter } = useVehicleProfile();
-  // Fill the profile frame; Fit and the photo viewer retain the complete image.
-  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('cover');
+  // Show the complete selected photograph before any optional viewer crop.
+  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
 

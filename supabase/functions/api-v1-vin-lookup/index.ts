@@ -11,11 +11,12 @@ import { decodeOneVin } from "../_shared/nhtsa-vin.ts";
 import { decodeVin as decodeVinLocally } from "../_shared/vin-decoder.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { maskOwnerMoney } from "../_shared/ownerMoney.ts";
+import { requestedVin } from "./vinRequest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 function jsonResponse(data: any, status = 200) {
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
@@ -47,13 +48,13 @@ Deno.serve(async (req) => {
     const userId = auth.userId;
     const isServiceRole = auth.isServiceRole;
 
-    // Extract VIN from URL path
+    // The VIN: GET path segment, or POST body {"vin"} (the MCP decode_vin tool's shape).
     const url = new URL(req.url);
-    const pathParts = url.pathname.split('/').filter(Boolean);
-    const vin = pathParts[pathParts.length - 1];
+    const body = req.method === "POST" ? await req.json().catch(() => null) : null;
+    const vin = requestedVin(req.method, url.pathname, body);
 
-    if (!vin || vin === 'api-v1-vin-lookup' || vin.length < 5) {
-      return jsonResponse({ error: "VIN is required. Use GET /api-v1-vin-lookup/{vin}" }, 400);
+    if (!vin || vin.length < 5) {
+      return jsonResponse({ error: "VIN is required. Use GET /api-v1-vin-lookup/{vin} or POST {\"vin\": \"...\"}" }, 400);
     }
 
     // Resolve VIN → id through find_vehicle_by_vin (SQL, STABLE), which

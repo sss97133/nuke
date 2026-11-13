@@ -1,16 +1,18 @@
 // Redeployed for the allowance_deferred wording (PR 1695).
 // Redeployed 2026-10-15 for the archiveFetch login-heuristic and cache fix (PR 1616).
 // Redeployed 2026-11-09: full-page cache is isolated from collecting-cars board JSON.
+// Redeployed 2026-11-10: archive retention failures retain safe HTTP diagnostics.
 // Collecting Cars lot extractor - no LLM. The page comes through Firecrawl rawHtml when the site refuses the server;
 // the parsing lives in ./extract.ts (pure, tested against a stored page). Every fetch is archived to listing_page_snapshots by archiveFetch before it is parsed.
 // Returns { success, extracted }; `ingest` reads that shape and does the vehicle write.
 
 import { archiveFetch } from '../_shared/archiveFetch.ts';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { requireWriteAuth, authenticateWriter } from '../_shared/writeGuard.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { projectSecretKey } from '../_shared/supabaseKeys.ts';
 import { ALLOWANCE_EXHAUSTED, firecrawlGate } from '../_shared/firecrawlGate.ts';
 import { extractFromHtml } from './extract.ts';
+import { replayClosedCollectingCars } from './historicalReplay.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,11 +27,16 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { url: requestedUrl } = await req.json();
+    const { url: requestedUrl, cc_snapshot } = await req.json();
     if (typeof requestedUrl !== 'string' || !/^https:\/\/collectingcars\.com\/for-sale\/[a-zA-Z0-9+-]+\/?$/.test(requestedUrl)) {
       return json({ error: 'Invalid Collecting Cars lot URL' }, 400);
     }
     const url = requestedUrl.replace(/\/$/, '');
+    if (cc_snapshot !== undefined) {
+      const auth = await authenticateWriter(req);
+      if (!auth.ok || auth.caller.kind !== 'service_role') return json({ error: 'Historical replay requires a service writer' }, 403);
+      return json(await replayClosedCollectingCars(createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!), url, cc_snapshot));
+    }
     // Ask first, record after: a paid scrape needs a credit in today's allowance and is written to the spend log.
     const gate = firecrawlGate(createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!), 'collecting-cars');
     const fetched = await archiveFetch(url, {
@@ -55,9 +62,6 @@ Deno.serve(async (req) => {
       throw e;
     }
     if (fetched.source === 'firecrawl') await gate.record(1, 1, 'extract-collecting-cars', url);
-    if (extracted.lot_type && extracted.lot_type !== 'car') {
-      return json({ success: false, skipped: true, skip_reason: `Collecting Cars lot type ${extracted.lot_type}`, url });
-    }
     // A parsed page is usable only with its durable source bytes and original clock.
     if (fetched.archiveError) throw Error("Collecting Cars capture was not retained");
     const db = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!);
@@ -70,6 +74,11 @@ Deno.serve(async (req) => {
     const row = saved.data?.length === 1 ? saved.data[0] : null;
     if (saved.error || !row?.success || row.listing_url !== url || row.platform !== 'collectingcars'
       || row.html_sha256 !== hash || !Number.isFinite(Date.parse(row.fetched_at)) || Date.parse(row.fetched_at) > Date.now()) throw Error('Collecting Cars capture mismatch');
+    if (extracted.lot_type && extracted.lot_type !== 'car') {
+      return json({ success: false, skipped: true, skip_reason: `Collecting Cars lot type ${extracted.lot_type}`, url,
+        extracted: { listing_id: extracted.listing_id, lot_type: extracted.lot_type, url },
+        source_capture: { snapshot_id: row.id, sha256: hash, observed_at: row.fetched_at, source_url: url } });
+    }
     return json({ success: true, extracted: { ...extracted, listing_url: extracted.url },
       source_capture: { snapshot_id: row.id, sha256: hash, observed_at: row.fetched_at, source_url: url } });
   } catch (error: any) {

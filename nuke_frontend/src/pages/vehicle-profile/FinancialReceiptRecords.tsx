@@ -1,3 +1,4 @@
+import { CatalogProductReference, type ReceiptCatalogProduct } from './CatalogProductReference';
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useQuery } from '@tanstack/react-query';
@@ -11,6 +12,7 @@ import type { DayDocument } from './VehicleDayDrawer';
 import { useVehicleWorkOrderFinancials, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
 import { useVisualWork } from './hooks/useVisualWork';
 import { VisualWorkCards } from './VisualWorkCards';
+import { receiptSupplierLabel } from './receiptSupplierLabel';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
 function amountText(amount: number | null, currency: string | null): string {
@@ -23,7 +25,7 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
   receipt: Pick<VehicleReceiptRecord, 'sourceId' | 'sourceTable'>; vehicleId: string; expectedSourceHash?: string;
 }) {
   const [state, setState] = useState('');
-  const [original, setOriginal] = useState<{ blob: Blob; filename: string } | null>(null);
+  const [original, setOriginal] = useState<{ blob: Blob; filename: string; previewBlob?: Blob | null } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -51,12 +53,30 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
           return response.blob();
         });
         if (!alive.current) return;
-        setOriginal({ blob, filename: new URL(raw).pathname.split('/').pop() || 'Original receipt' });
+        const filename = new URL(raw).pathname.split('/').pop() || 'Original receipt';
+        let previewBlob: Blob | null | undefined;
+        if (privateStoragePath(raw) && (/^image\/(heic|heif)(;|$)/i.test(blob.type) || /\.(heic|heif)$/i.test(filename))) {
+          previewBlob = null;
+          // The same viewer must qualify for the same private object again. Never turn a failed signing into a public URL.
+          try {
+            const previewUrl = await signPrivateStorageUrl(raw, 60, { width: 1800, height: 1800, resize: 'contain', quality: 90 });
+            if (previewUrl === raw) throw new Error('Preview unavailable');
+            previewBlob = await bounded(async signal => {
+              const response = await fetch(previewUrl, { signal, headers: { Accept: 'image/webp,image/*;q=0.8' } });
+              if (!response.ok) throw new Error('Preview unavailable');
+              const preview = await response.blob();
+              if (!/^image\/(jpeg|png|webp|gif|avif)$/.test(preview.type)) throw new Error('Preview unavailable');
+              return preview;
+            });
+          } catch { /* Preserve the already-authorized original download if transformation is unavailable. */ }
+        }
+        if (!alive.current) return;
+        setOriginal({ blob, filename, previewBlob });
         setState('');
       } catch { if (alive.current) setState('Source unavailable or not visible to this viewer.'); }
     }}>{state === 'Reading source…' ? state : 'Read original source'}</button>
     {original && <React.Suspense fallback={<p role="status">Loading original viewer…</p>}>
-      <OriginalDocumentPreview blob={original.blob} filename={original.filename}
+      <OriginalDocumentPreview blob={original.blob} filename={original.filename} previewBlob={original.previewBlob}
         onClose={() => { setOriginal(null); trigger.current?.focus(); }} />
     </React.Suspense>}
     {state && state !== 'Reading source…' && <p role="status">{state}</p>}
@@ -64,6 +84,7 @@ function ReceiptSource({ receipt, vehicleId, expectedSourceHash }: {
 }
 
 interface PrintedLine {
+  product?: ReceiptCatalogProduct | null;
   line_number: number | null; description: string | null; part_number: string | null;
   quantity: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null;
 }
@@ -71,6 +92,8 @@ interface ReceiptPage {
   receipt_id: string; document_number: string | null; document_type: string | null;
   vendor_org?: { logo_url?: string | null; website?: string | null } | null;
   subtotal: number | null; tax: number | null; shipping: number | null; discount: number | null;
+  recorded_payment?: { amount: number | null; date: string | null } | null;
+  recorded_hours?: number | null; hour_entries?: number;
   lines: PrintedLine[];
 }
 
@@ -108,17 +131,19 @@ export function CorrectionReceipt({ vehicleId, citation }: {
       <button type="button" disabled={read.isFetching} onClick={() => void read.refetch()}>Retry receipt</button>
     </p>}
     {doc && <>
-      <header><h3>{doc.vendor || doc.vendor_org?.name || 'Receipt'}{doc.document_number ? ` #${doc.document_number}` : ''}</h3>
+      <header><h3>{receiptSupplierLabel(doc.vendor || doc.vendor_org?.name) || 'Receipt'}{doc.document_number ? ` #${doc.document_number}` : ''}</h3>
         <p>{doc.document_type?.replace(/_/g, ' ') || 'Document'} · {citation.page_date}</p>
       </header>
       {doc.lines.length > 0 && <table><thead><tr><th scope="col">Recorded item or work</th><th scope="col">Qty</th>{showAmounts && <th scope="col">Amount</th>}</tr></thead>
         <tbody>{doc.lines.map((line, i) => <tr key={`${line.line_number ?? i}:${i}`}>
-          <td>{line.description || line.part_number || 'Line item'}{line.part_number && line.description && <small>{line.part_number}</small>}</td>
+          <td>{line.description || line.part_number || 'Line item'}{line.part_number && line.description && <small>{line.part_number}</small>}<CatalogProductReference product={line.product} /></td>
           <td>{line.quantity ?? '—'}</td>
           {showAmounts && <td>{line.amount == null ? '—' : amountText(line.amount, doc.currency)}</td>}
         </tr>)}</tbody>
       </table>}
       {doc.total != null && <p className="field-correction-receipt__total">Document total <strong>{amountText(doc.total, doc.currency)}</strong></p>}
+      {doc.recorded_payment && <p>Recorded payment <strong>{amountText(doc.recorded_payment.amount, doc.currency)}</strong>{doc.recorded_payment.date ? ` · ${printedDate(doc.recorded_payment.date)}` : ''}</p>}
+      {doc.recorded_hours != null && <p>{doc.recorded_hours} recorded person-hours · {doc.hour_entries} entries on this receipt</p>}
       <ReceiptSource key={`${viewer}:${vehicleId}:${citation.source_table}:${citation.document_id}`} vehicleId={vehicleId}
         receipt={{ sourceId: citation.document_id, sourceTable: citation.source_table }} />
     </>}
@@ -167,6 +192,7 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
         <td>{line.line_date && <time dateTime={line.line_date}>{printedDate(line.line_date)} · Work recorded</time>}
           <span>{line.description || 'Description not recorded'}</span>
           {(line.part_number || line.hours != null || line.performer) && <small>{[line.part_number, line.hours != null ? `${line.hours} ${line.hours === 1 ? 'hour' : 'hours'}` : null, line.performer].filter(Boolean).join(' · ')}</small>}
+          <CatalogProductReference product={line.product} />
         </td><td>{line.quantity ?? '—'}</td>{moneyVisible && <td>{line.amount == null ? '—' : amountText(line.amount, receipt.currency)}</td>}
       </tr>)}</tbody></table>}
     {lines.length > 4 && <button type="button" className="vp-receipt-expand" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Show fewer lines' : `Show all ${lines.length} lines`}</button>}
@@ -177,6 +203,9 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
       {moneyVisible && page && <dl>{([['Subtotal', page.subtotal], ['Shipping', page.shipping], ['Discount', page.discount], ['Tax', page.tax]] as const)
         .filter(([, value]) => value != null && value !== 0).map(([label, value]) => <React.Fragment key={label}><dt>{label}</dt><dd>{amountText(value, receipt.currency)}</dd></React.Fragment>)}</dl>}
       <div className="vp-receipt-total"><span>Document total</span><strong>{receipt.amountsHidden ? 'Visible to owner & contributors' : receipt.amountConflict ? 'Readings differ' : amountText(receipt.amount, receipt.currency)}</strong></div>
+      {moneyVisible && page?.recorded_payment && <div className="vp-receipt-total"><span>Recorded payment{page.recorded_payment.date ? ` · ${printedDate(page.recorded_payment.date)}` : ''}</span><strong>{amountText(page.recorded_payment.amount, receipt.currency)}</strong></div>}
+      {moneyVisible && page?.recorded_payment && <p className="vp-receipt-note">Payment and document total are separate readings of this receipt; they are not added together.</p>}
+      {page?.recorded_hours != null && <p className="vp-receipt-note"><strong>{page.recorded_hours} recorded person-hours</strong> · {page.hour_entries} entries on this receipt. Concurrent entries count separately.</p>}
       {receipt.amountConflict && <p className="vp-receipt-note">{amountText(receipt.total, receipt.currency)} / {amountText(receipt.totalAmount, receipt.currency)} · check original</p>}
       {receipt.amount === 0 && <p className="vp-receipt-note">No charge shown in this reading; check the original.</p>}
       <ReceiptSource key={`${vehicleId}:${receipt.sourceTable}:${receipt.sourceId}`} receipt={receipt} vehicleId={vehicleId} />
@@ -188,7 +217,9 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   const { user, loading } = useAuthContext();
   const [vendor, setVendor] = useState('');
   const [showAll, setShowAll] = useState(false);
-  const rows = [...(loading || read.isError ? [] : read.rows)].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.id.localeCompare(b.id));
+  const rows = (loading || read.isError ? [] : read.rows)
+    .map(receipt => ({ ...receipt, vendor: receiptSupplierLabel(receipt.vendor) }))
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.id.localeCompare(b.id));
   const vendors = [...new Set(rows.map(receipt => receipt.vendor).filter((name): name is string => !!name))].sort();
   const selectedVendor = vendors.includes(vendor) ? vendor : '';
   const matching = selectedVendor ? rows.filter(receipt => receipt.vendor === selectedVendor) : rows;
@@ -196,7 +227,8 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   return <section id="build-receipts" aria-label="Work and parts receipts" className="vp-receipt-section">
     <div className="vp-receipt-heading"><h3>Work & parts</h3><span>Receipt collection</span></div>
     <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
-    {work && <VisualWorkCards rows={loading ? [] : work.rows} renderSource={line => line.source_url_sha256 ? <ReceiptSource
+    {work && <VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger}
+      components={loading ? null : work.components} renderSource={line => line.source_url_sha256 ? <ReceiptSource
       key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}
       expectedSourceHash={line.source_url_sha256} receipt={{ sourceTable: line.source_table, sourceId: line.source_id }} />
       : <p>Original source unavailable in this read.</p>} />}

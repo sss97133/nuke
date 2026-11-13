@@ -101,3 +101,14 @@ Deno.test("read failure cannot become persistence success", async () => {
   let rejected = false; try { await persistPipelineState(f.store, base, {}); } catch { rejected = true; }
   assert(rejected && f.writes === 0);
 });
+
+Deno.test("supplied snapshot never refreshes its source version after a concurrent change", async () => {
+  const f = fixture(); const read = f.store.read;
+  f.store.read = async () => ({ ...await read(), image_url: "source", vehicle_id: null });
+  const cas = f.store.compareAndSwap; let calls = 0;
+  f.store.compareAndSwap = async (snapshot, patch) => { calls++; f.concurrentUpdate(); return cas(snapshot, patch); };
+  let refused = false;
+  try { await persistPipelineState(f.store, base, {}, {}, { image_url: "source", vehicle_id: null, expected_updated_at: "initial" }); }
+  catch (e) { refused = (e as Error).message === "photo_pipeline_source_changed"; }
+  assert(refused && calls === 1 && f.writes === 0);
+});

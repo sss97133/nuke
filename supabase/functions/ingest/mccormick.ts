@@ -25,11 +25,13 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
   if (!source.data || source.data.species !== "block_house"
     || !source.data.supported_observations?.includes("listing")) throw new Error("mccormicks_source_not_registered");
   const capture = async (sourceUrl: string) => {
+    const refresh = !mccormickTarget(sourceUrl)?.archive;
     const page = await deps.archiveFetch(sourceUrl, {
+      forceRefresh: refresh,
       platform: "mccormicks", callerName: "ingest:mccormicks", useFirecrawl: false, firecrawlOnBlock: false,
       directFetchOptions: { publicOnly: true, timeout: 20_000 },
     });
-    if (page.error || page.archiveError || !page.html || !page.snapshotId) throw new Error("mccormicks_capture_not_retained");
+    if (page.error || page.archiveError || !page.html || !page.snapshotId || (refresh && page.cached)) throw new Error("mccormicks_capture_not_retained");
     const read = await deps.supabase.from("listing_page_snapshots")
       .select("id,platform,listing_url,fetched_at,html_sha256,success").eq("id", page.snapshotId).maybeSingle();
     const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(page.html)))]
@@ -42,7 +44,7 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
       || !Number.isFinite(Date.parse(snapshot.fetched_at)) || Date.parse(snapshot.fetched_at) > Date.now()) {
       throw new Error("mccormicks_capture_readback_failed");
     }
-    return { html: page.html, snapshot, hash, url: sourceUrl };
+    return { html: page.html, snapshot, hash, url: sourceUrl, checked_at: refresh ? new Date().toISOString() : null };
   };
   const captureLot = async (sourceUrl: string, parse: (html: string, url: string) => McCormickLot = parseMcCormickLot) => {
     const page = await capture(sourceUrl);
@@ -110,10 +112,17 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
     if (prior.error) throw new Error("mccormicks_identity_lookup_unavailable");
     let resolutionIssue = prior.data?.length > 1 ? "mccormicks_ambiguous_listing_identity" : null;
     if (gate.cleaned.vin) {
-      const exact = await deps.supabase.from("vehicles").select("id,year,make").eq("vin", gate.cleaned.vin).limit(2);
+      // Historical aliases can name another live owner even when that target has
+      // no VIN. Inspect redirects before discarding aliases as duplicate history.
+      const exact = await deps.supabase.from("vehicles").select("id,year,make,status,deleted_at,merged_into_vehicle_id")
+        .eq("vin", gate.cleaned.vin).limit(51);
       if (exact.error) throw new Error("mccormicks_vin_lookup_unavailable");
-      if (exact.data?.length > 1) resolutionIssue = "mccormicks_ambiguous_vin_identity";
-      const existing = exact.data?.[0];
+      const rows = exact.data ?? [];
+      const live = rows.filter((v: any) => !v.deleted_at && !v.merged_into_vehicle_id && v.status !== "merged");
+      const owners = new Set([...live.map((v: any) => v.id), ...rows.map((v: any) => v.merged_into_vehicle_id).filter(Boolean)]);
+      if (rows.length >= 51 || owners.size > 1) resolutionIssue = "mccormicks_ambiguous_vin_identity";
+      else if (rows.length && !live.length) resolutionIssue = "mccormicks_inactive_vin_identity";
+      const existing = live[0];
       if (existing && ((existing.year && Number(existing.year) !== Number(gate.cleaned.year))
         || (existing.make && normalizeMake(existing.make) !== gate.cleaned.make))) resolutionIssue = "mccormicks_vin_identity_conflict";
     }
@@ -134,7 +143,7 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
       source_url: doc.url, source_identifier: `auctionid:${id}:${doc.hash}`,
       ...(vehicleId ? { vehicle_id: vehicleId } : {}),
       content_text: [doc.lot.title, doc.lot.description].filter(Boolean).join("\n\n"),
-      structured_data: { ...doc.lot, kind_detail: "auction_listing", parser,
+      structured_data: { ...doc.lot, kind_detail: doc.lot.presentation === "showroom" ? "dealer_listing" : "auction_listing", parser,
         source_claims_only: true, observed_at_basis: "page_capture", observation_time_basis: "source_capture",
         source_captured_at: doc.snapshot.fetched_at, source_event_at: null },
       extraction_method: parser, raw_source_ref: `listing_page_snapshots:${doc.snapshot.id}`,
@@ -169,7 +178,7 @@ export async function ingestMcCormick(url: string, deps: Dependencies) {
   return {
     ...gate.cleaned, vehicle_id: vehicleId, listing_url: canonical,
     image_url: lot.image_urls[0] ?? null, image_urls: imageUrls,
-    mccormick_receipt: { ...observations[0], observations, source_id: id, images: imageCount,
+    mccormick_receipt: { ...observations[0], observations, source_checked_at: primary.checked_at, source_id: id, images: imageCount,
       unresolved: !vehicleId, presentation: primary.lot.presentation, source_capture_gaps: gaps,
       ...(catalogOnly ? { evidence_scope: "catalog_only", detail_route_status: "publisher_reports_unavailable", catalog_checks: catalogChecks } : {}) },
   };

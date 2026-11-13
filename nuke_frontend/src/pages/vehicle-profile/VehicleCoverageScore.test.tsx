@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ vehicle: {} as any, evidence: {} as any, loading: false, error: null as string | null,
   priceFacts: null as any, priceSettled: true, priceFailed: false, engineReads: {} as Record<string, any> }));
+vi.mock('./profileDocument', () => ({ useProfileRead: () => ({ data: null }) }));
 vi.mock('./hooks/useFieldProvenance', async importOriginal => ({
   ...await importOriginal<typeof import('./hooks/useFieldProvenance')>(),
   useFieldProvenance: (_vehicleId: string, field: string) => fixture.engineReads[field] || { data: null, isLoading: false },

@@ -10,9 +10,15 @@ await import("./index.ts");Deno.serve = serve;
 async function run(scenario = "new", token = "test-key") {
   const previous = [Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")];
   Deno.env.set("SUPABASE_URL", "https://db.test");Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-key");
-  const rows = Array.from({ length: 30 }, (_, i) => [INTERIOR, EXTERIOR].map(property_id => ({
+  const mc = scenario === "mccormick";
+  const sourceId = mc ? "006f01c3-e5fb-44f5-ab40-e55b0654de1c" : SID;
+  const properties:Record<string,string> = mc ? {
+    "ece619f7-c49a-44f7-999f-a41acf5d4dc3":"year", "8d274b73-a8a6-43bf-9036-5864d0152725":"make",
+    "a79b528f-7d9d-46ca-96f9-96d899e81d10":"model", "9fc93dd3-3639-439a-8eed-3e9a0f846334":"vin"
+  } : {[INTERIOR]:"interior_color",[EXTERIOR]:"exterior_color"};
+  const rows = Array.from({ length: mc ? 2 : 30 }, (_, i) => Object.keys(properties).map(property_id => ({
     source_observation_id: `11111111-1111-4111-8111-${String(i).padStart(12,"0")}`,property_id,
-    mode: property_id === INTERIOR ? "retained_listing_interior_color_v1" : "retained_listing_exterior_color_v1",
+    mode: `retained_listing_${properties[property_id]}_v1`,
   }))).flat();
   const persisted = new Map<string, any>(), calls: { path: string; method: string; parentRead: boolean }[] = [];
   let writes = 0;
@@ -32,16 +38,16 @@ async function run(scenario = "new", token = "test-key") {
       if (payload.p_status !== "done") return respond(true);
       const o = [...persisted.values()].find(o => o.id === payload.p_result);
       assert(o && o.source_observation_id === payload.p_source && o.property_id === payload.p_property);
-      assert(o.vehicle_id === VID && o.source_id === SID && o.observed_at === "2026-09-01T00:00:00.123456Z");
+      assert(o.vehicle_id === VID && o.source_id === sourceId && o.observed_at === "2026-09-01T00:00:00.123456Z");
       assert(o.structured_data.factory_configuration_status === "unknown" && o.structured_data.independent_source === false);
       assert(o.agent_cost_cents === 0 && o.agent_model === null && o.confidence_score <= .6);
       return respond(true);
     }
-    if (url.pathname.endsWith("observation_sources")) return respond([{id:SID,slug:"bat",base_trust_score:.85,supported_observations:["specification","listing"]}]);
+    if (url.pathname.endsWith("observation_sources")) return respond([{id:sourceId,slug:mc?"mccormicks":"bat",base_trust_score:.85,supported_observations:["specification","listing"]}]);
     if (url.pathname.endsWith("vehicles")) return respond([{id:VID,is_public:scenario !== "private",deleted_at:null,listing_kind:"vehicle"}]);
     if (url.pathname.endsWith("observation_properties")) {
       const key = url.searchParams.get("property_key")?.slice(3);
-      return respond([{id:key === "interior_color" ? INTERIOR : EXTERIOR,namespace:"core",deprecated_at:null,applies_to_kinds:["specification"]}]);
+      return respond([{id:Object.entries(properties).find(([,value])=>value===key)?.[0],namespace:"core",deprecated_at:null,applies_to_kinds:["specification"]}]);
     }
     if (url.pathname.endsWith("vehicle_observations")) {
       if (method === "POST") {
@@ -49,10 +55,17 @@ async function run(scenario = "new", token = "test-key") {
         persisted.set(payload.content_hash,row);return respond(row,201);
       }
       const id = url.searchParams.get("id")?.slice(3);
-      if (id) return respond([{id,vehicle_id:VID,source_id:SID,source_url:"https://bringatrailer.com/listing/retained-fixture",
+      if (id) return respond([{id,vehicle_id:VID,source_id:sourceId,source_url:mc?"https://www.classic-carauction.com/auction-cars?auctionid=7309":"https://bringatrailer.com/listing/retained-fixture",
         kind:scenario === "sale_result" ? "sale_result" : "listing",is_superseded:false,property_id:null,subject_type:"vehicle",subject_id:null,
-        confidence_score:.7,extraction_method:"html_match",observed_at:null,ingested_at:"2026-09-01T00:00:00.123456Z",
-        structured_data:{interior_color:"Exact Black Vinyl",color:scenario === "unknown" ? "unknown" : "Exact Signal Red"}}]);
+        confidence_score:.7,extraction_method:mc?"mccormick_html_v1":"html_match",observed_at:mc?"2026-08-31T00:00:00.123456Z":null,ingested_at:"2026-09-01T00:00:00.123456Z",
+        ...(mc ? {
+         source_identifier:"auctionid:7309:"+"a".repeat(64),
+         raw_source_ref:"listing_page_snapshots:44444444-4444-4444-8444-444444444444",
+         extraction_metadata:{parser:"mccormick_html_v1",snapshot_id:"44444444-4444-4444-8444-444444444444",html_sha256:"a".repeat(64)}
+        }:{}),
+        structured_data:mc?{year:1978,make:"Example Manufacturer",model:"Prototype GT",vin:"1FAFP45X0YF123456",
+         parser:"mccormick_html_v1",source_id:"7309",source_claims_only:true,source_event_at:null,source_captured_at:"2026-08-31T00:00:00.123456Z"
+        }:{interior_color:"Exact Black Vinyl",color:scenario === "unknown" ? "unknown" : "Exact Signal Red"}}]);
       const hash = url.searchParams.get("content_hash")?.slice(3);
       return respond(hash && persisted.has(hash) ? [persisted.get(hash)] : []);
     }
@@ -63,7 +76,7 @@ async function run(scenario = "new", token = "test-key") {
       headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
       body:JSON.stringify({mode:RETAINED_LISTING_DRAIN_MODE,batch_size:60})});
     const response = await handler(request()),body = await response.json();
-    const replay = ["new","sale_result"].includes(scenario) ? await (await handler(request())).json() : null;
+    const replay = ["new","sale_result","mccormick"].includes(scenario) ? await (await handler(request())).json() : null;
     return {status:response.status,body,replay,writes,calls,persisted};
   } finally {
     globalThis.fetch = original;
@@ -123,3 +136,18 @@ Deno.test("signed-in caller cannot claim scheduled work", async () => {
 for (const [i,key] of ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY"].entries()) {
   if (saved[i] === undefined) Deno.env.delete(key);else Deno.env.set(key,saved[i]!);
 }
+
+Deno.test("McCormick labels traverse real scheduled selector, property writer and replay",async()=>{
+ const r=await run("mccormick");
+ assert(r.status===200&&r.body.stored===8&&r.body.writes===8);
+ assert(r.replay.stored===8&&r.replay.duplicates===8&&r.replay.writes===0&&r.writes===8);
+ assert(r.body.completion_failures===0&&r.body.model_calls===0&&r.body.provider_calls===0);
+ for(const o of r.persisted.values()){
+  assert(o.source_id==="006f01c3-e5fb-44f5-ab40-e55b0654de1c");
+  assert(["year","make","model","vin"].includes(o.structured_data.property_key));
+  assert(o.structured_data.identity_resolution_status==="unverified");
+  assert(o.structured_data.source_extraction_method==="mccormick_html_v1");
+  assert(o.structured_data.source_observed_at==="2026-08-31T00:00:00.123456Z");
+  assert(!o.structured_data.source_sale_receipt);
+ }
+});

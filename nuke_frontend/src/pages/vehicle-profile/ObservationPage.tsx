@@ -17,7 +17,9 @@ import { Button } from '../../components/ui/button';
 import './vehicle-evidence-detail.css';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import { withTimeout } from '../../lib/withTimeout';
 import { publicObservationData, publicObservationArtifact, OBSERVATION_PRIVACY_NOTICE } from './observationPrivacy';
+import { readNativeListingHistory, nativeListingObservationData } from './auctionEvidenceDisplay';
 
 interface ObservationRow {
   id: string;
@@ -36,6 +38,7 @@ interface ObservationRow {
   superseded_by: string | null;
   source_slug: string | null;
   source_name: string | null;
+  public_source_url?: string;
 }
 
 interface RelatedObservation {
@@ -79,7 +82,7 @@ const labelCase = (key: string): string =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-const ObservationPageContent: React.FC = () => {
+const ObservationPageContent: React.FC<{ publicViewer: boolean }> = ({ publicViewer }) => {
   const { vehicleId, obsId } = useParams<{ vehicleId: string; obsId: string }>();
   const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
   const [observation, setObs] = useState<ObservationRow | null>(null);
@@ -114,41 +117,81 @@ const ObservationPageContent: React.FC = () => {
 
     (async () => {
       try {
-        // The URL supplies two IDs; both must describe the same visible entity.
-        const vehRes = await supabase
-          .from('vehicles')
-          .select('id, year, make, model, trim')
-          .eq('id', vehicleId)
-          .abortSignal(controller.signal)
-          .maybeSingle();
+        const readPublicClaim = async () => {
+          // Raw CC listings may contain a seller name. Preserve that policy and
+          // use only the existing server-side sanitized source-history fields.
+          let history;
+          const claimController = publicViewer ? new AbortController() : controller;
+          const abortClaim = () => claimController.abort();
+          if (publicViewer) controller.signal.addEventListener('abort', abortClaim, { once: true });
+          try {
+            const request = supabase.rpc('get_vehicle_specs', {
+              p_vehicle_ids: [vehicleId], p_include_typed_claims: true, p_claim_cursor: {},
+            }).abortSignal(claimController.signal);
+            // Reserve seven seconds of the existing overall deadline for the
+            // ordinary reader if the optional public-source RPC stalls.
+            history = publicViewer ? await withTimeout(request, 3_000, 'Public source history') : await request;
+          } catch (failure) {
+            if (!publicViewer || controller.signal.aborted) throw failure;
+            return null; // The original RLS-bound reader remains available.
+          } finally {
+            if (publicViewer) {
+              claimController.abort();
+              controller.signal.removeEventListener('abort', abortClaim);
+            }
+          }
+          if (cancelled) return null;
+          if (history.error) {
+            if (!publicViewer || controller.signal.aborted) throw new Error('Source history unavailable.');
+            return null;
+          }
+          if (Array.isArray(history.data) && history.data.length === 0) return null;
+          const claim = readNativeListingHistory(history.data, vehicleId).entries.find(r => r.observation_id === obsId);
+          return claim ? { id: claim.observation_id, vehicle_id: vehicleId, kind: 'listing',
+            observed_at: claim.source_captured_at, ingested_at: claim.ingested_at,
+            structured_data: nativeListingObservationData(claim), public_source_url: claim.source_url, property_id: null, is_superseded: false,
+            superseded_by: null, observation_sources: { slug: 'collecting-cars', display_name: 'Collecting Cars publisher report (unverified)' } } : null;
+        };
+        // Visitors can inspect an exact public source claim without waiting on
+        // raw-row/header reads. The RPC checks the public, undeleted parent;
+        // its exact vehicle/observation binding is validated above. Use the
+        // generic Vehicle breadcrumb rather than inventing header fields.
+        // Signed-in viewers retain the
+        // existing raw-first path so their accessible evidence is not replaced.
+        let rawObs: any = publicViewer ? await readPublicClaim() : null;
         if (cancelled) return;
-        if (vehRes.error) throw new Error('Unable to load this vehicle. Try again.');
-        if (!vehRes.data || vehRes.data.id !== vehicleId) {
-          throw new Error('Vehicle unavailable.');
-        }
-        setVehicle(vehRes.data as VehicleSummary);
-
-        const obsRes = await supabase
-          .from('vehicle_observations')
-          .select(`
+        if (!rawObs) {
+          // Raw evidence still requires both URL IDs to describe the same
+          // visible entity. This is also the original signed-in reader path.
+          const vehRes = await supabase
+            .from('vehicles')
+            .select('id, year, make, model, trim')
+            .eq('id', vehicleId)
+            .abortSignal(controller.signal)
+            .maybeSingle();
+          if (cancelled) return;
+          if (vehRes.error) throw new Error('Unable to load this vehicle. Try again.');
+          if (!vehRes.data || vehRes.data.id !== vehicleId) throw new Error('Vehicle unavailable.');
+          setVehicle(vehRes.data as VehicleSummary);
+          const obsRes = await supabase
+            .from('vehicle_observations')
+            .select(`
               id, vehicle_id, kind, observed_at, ingested_at, source_id,
               confidence, confidence_score, structured_data, property_id,
               is_superseded, superseded_by,
               observation_sources!left(display_name, slug)
             `)
-          .eq('id', obsId)
-          .eq('vehicle_id', vehicleId)
-          .abortSignal(controller.signal)
-          .maybeSingle();
-
-        if (cancelled) return;
-
-        if (obsRes.error) throw new Error('Unable to load this observation. Try again.');
-        if (!obsRes.data || obsRes.data.id !== obsId || obsRes.data.vehicle_id !== vehicleId) {
-          throw new Error('Observation unavailable for this vehicle.');
+            .eq('id', obsId)
+            .eq('vehicle_id', vehicleId)
+            .abortSignal(controller.signal)
+            .maybeSingle();
+          if (cancelled) return;
+          if (obsRes.error) throw new Error('Unable to load this observation. Try again.');
+          rawObs = obsRes.data;
+          if (!rawObs && !publicViewer) rawObs = await readPublicClaim();
         }
-
-        const rawObs = obsRes.data as any;
+        if (cancelled) return;
+        if (!rawObs || rawObs.id !== obsId || rawObs.vehicle_id !== vehicleId) throw new Error('Observation unavailable for this vehicle.');
         const observation: ObservationRow = {
           ...rawObs,
           source_slug: rawObs.observation_sources?.slug ?? null,
@@ -253,7 +296,7 @@ const ObservationPageContent: React.FC = () => {
       controller.abort();
       window.clearTimeout(deadline);
     };
-  }, [vehicleId, obsId, readAttempt]);
+  }, [vehicleId, obsId, readAttempt, publicViewer]);
 
   // Original documents and OCR labels have no verified name-publication consent.
   const sourceArtifact = publicObservationArtifact();
@@ -371,6 +414,9 @@ const ObservationPageContent: React.FC = () => {
           </h1>
 
           <p style={{ color: 'var(--text-secondary)' }}>{OBSERVATION_PRIVACY_NOTICE}</p>
+          {obs.public_source_url && <p>Publisher report (unverified). Aggregate bid counts do not establish individual bid history.{' '}
+            <a href={obs.public_source_url} target="_blank" rel="noopener noreferrer">View on Collecting Cars</a>
+          </p>}
 
           <div className="evidence-metadata"
             style={{
@@ -781,7 +827,7 @@ const ObservationPage: React.FC = () => {
   const { user, loading } = useAuth();
   const { vehicleId, obsId } = useParams();
   if (loading) return <main className="evidence-detail"><p role="status">Checking access…</p></main>;
-  return <ObservationPageContent key={`${user?.id || 'public'}:${vehicleId}:${obsId}`} />;
+  return <ObservationPageContent key={`${user?.id || 'public'}:${vehicleId}:${obsId}`} publicViewer={!user} />;
 };
 
 export default ObservationPage;

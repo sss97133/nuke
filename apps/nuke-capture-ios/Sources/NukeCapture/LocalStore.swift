@@ -202,6 +202,11 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
         switch relationship {
         case "owner": return "Owned"
         case "previously_owned": return "Previously owned"
+        case "contributor": return "Contributed"
+        case "documenting": return "Documenting"
+        case "owner_reported": return "Reported owner"
+        case "previously_documented": return "Previously documented"
+        case "imported_by_user": return "Imported by you"
         case "profile_record": return "Profiles you added"
         case "consignment": return "Consignment"
         case "business_handling": return "Business handling"
@@ -221,9 +226,18 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
             r.title_status == "not_in_name" ? "Title not in your name" : nil,
             r.title_status == "transfer_pending" ? "Title transfer pending" : nil]
             .compactMap { $0 }
-        let roles = r.roles.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: ", ")
-        return ([pieces.isEmpty ? "Account stated" : pieces.joined(separator: " · "),
-            roles.isEmpty ? nil : roles].compactMap { $0 }).joined(separator: " · ")
+        // The account's statement is its own fact, beside the record's relationship — never the relationship.
+        let roles = r.roles.map(Self.statedRole).joined(separator: ", ")
+        let parts = [pieces.isEmpty ? nil : pieces.joined(separator: " · "),
+            roles.isEmpty ? nil : "You stated: \(roles)"].compactMap { $0 }
+        return parts.isEmpty ? "Account stated" : parts.joined(separator: " · ")
+    }
+    static func statedRole(_ role: String) -> String {
+        switch role {
+        case "owner_current": return "owner"
+        case "owner_past": return "past owner"
+        default: return role.replacingOccurrences(of: "_", with: " ")
+        }
     }
     var relationshipPeriod: String? {
         guard let r = relationshipStatement else { return nil }
@@ -260,7 +274,9 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
                 let roles = r.roles.filter { ["owner_current", "owner_past", "shared_interest", "claimed_interest",
                     "consignment", "business_handling", "sales_representative", "transfer_pending"].contains($0) }
                 switch roles.first {
-                case "owner_current": result.relationship = "owner"
+                // "I own this" is testimony, not title: the server's relationship stands (a contributor
+                // stays a contributor) and the statement shows beside it as its own fact.
+                case "owner_current": result.relationship = vehicle.relationship
                 case "owner_past": result.relationship = "previously_owned"
                 case let role?: result.relationship = role
                 default: result.relationship = "relationship_review"
@@ -923,6 +939,17 @@ final class LocalStore {
 
     func recordAlbumImageReview(_ review: LocalAlbumImageReview) throws {
         try dbQueue.write { db in try review.insert(db, onConflict: .ignore) }
+    }
+
+    /// Diagnostic fallback only. Consumers must qualify source version, method
+    /// and byte custody before displaying any retained observation as current.
+    func latestAlbumImageReview(localIdentifier: String) throws -> LocalAlbumImageReview? {
+        try dbQueue.read { db in
+            try LocalAlbumImageReview.fetchOne(db, sql: """
+                SELECT * FROM photo_album_image_review WHERE localIdentifier = ?
+                ORDER BY rowid DESC LIMIT 1
+                """, arguments: [localIdentifier])
+        }
     }
 
     /// Unknown source versions must be reread; a previous result cannot establish
