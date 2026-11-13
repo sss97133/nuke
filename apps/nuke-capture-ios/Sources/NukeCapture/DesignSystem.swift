@@ -271,6 +271,24 @@ struct NukeSecondaryButtonStyle: ButtonStyle {
     }
 }
 
+/// The quietest button: a small grey capsule with accent text, still a full 44-pt target, with a
+/// slight press-in so it feels tactile. For actions under content (Follow, Comment) that should not
+/// outshout the photos and the price.
+struct NukeQuietButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+            .foregroundStyle(Color.accentColor)
+            .padding(.horizontal, NukeSpace.lg)
+            .frame(minHeight: NukeSize.minTap)
+            .background(Color(.tertiarySystemFill), in: Capsule())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.8 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .contentShape(Capsule())
+    }
+}
+
 // MARK: Pills
 
 /// A small rounded label ("Bring a Trailer", "No reserve").

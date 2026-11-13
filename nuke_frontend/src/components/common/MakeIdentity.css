@@ -72,11 +72,21 @@
 /* Compact headlines size each lettering from its catalogue width/height at every width; long maker lettering is
    not squeezed to a crest's width (after the media block, which has the same specificity). */
 .vehicle-identity--compact[data-variant-artwork="true"] .vehicle-identity__art--make { width:auto; }
-/* A cutout mark at the headline's height (about 1.1 of the identity's font size: 22px in the profile masthead), its width
-   from its own proportions. A single-colour print is a mask filled with the text colour, so it follows the theme. */
-@property --identity-art-h { syntax:'<length>'; inherits:true; initial-value:22px; }
-.vehicle-identity { --identity-art-h:1.1em; }
-.vehicle-identity .vehicle-identity__art.vehicle-identity__art--cutout { display:block; flex-shrink:1; height:var(--identity-art-h); width:calc(var(--identity-art-h) * var(--art-ratio)); max-width:100%; }
+/* Cutout marks share one cap height and one baseline. Each file is set at the shared cap height divided by its capitals'
+   share of the file (catalogue capMetrics: capHeight, and baseline above the file's bottom), and negative block margins
+   leave only its cap band in the layout, so the centred rows put every mark's capitals on the same band whatever the
+   container. The cap is 0.9 of the identity's font size (18px in the profile masthead), computed once at the identity
+   root. Marks never shrink: a squeezed box would keep its height while its lettering shrank; rows wrap instead.
+   A single-colour print is a mask filled with the text colour, so it follows the theme. */
+@property --identity-cap { syntax:'<length>'; inherits:true; initial-value:18px; }
+.vehicle-identity { --identity-cap:0.9em; }
+.vehicle-identity .vehicle-identity__art.vehicle-identity__art--cutout { --art-h:calc(var(--identity-cap) / var(--art-cap, 1)); display:block; flex-shrink:0; height:var(--art-h); width:calc(var(--art-h) * var(--art-ratio)); max-width:100%;
+  margin-block:calc(var(--art-h) * (var(--art-cap, 1) + var(--art-base, 0) - 1)) calc(var(--art-h) * var(--art-base, 0) * -1); }
 .vehicle-identity .vehicle-identity__art.vehicle-identity__art--cutout img { display:block; width:100%; height:100%; max-width:none; object-fit:contain; object-position:left center; }
 .vehicle-identity .vehicle-identity__art--mask { background:currentColor; -webkit-mask:var(--art-src) left center / contain no-repeat; mask:var(--art-src) left center / contain no-repeat; }
 .vehicle-identity .vehicle-identity__art.vehicle-identity__art--mask img { display:none; }
+/* Lettering is one ink: a printed year takes the identity's colour, not a secondary text tone set for a text year. */
+.vehicle-identity[data-inline-artwork="true"] .vehicle-identity__year:has(.vehicle-identity__art--cutout) { color:inherit; }
+/* What the record adds beside the lettering ("-Style") is text at the same cap height (0.71em in the system and Arial
+   faces); line-height 1 centres its capitals on the shared band. */
+.vehicle-identity[data-inline-artwork="true"] .vehicle-identity__qualifier { font-size:calc(var(--identity-cap) / 0.71); line-height:1; }

@@ -124,26 +124,6 @@ struct VehiclePrivatePhotosSection: View {
     }
 }
 
-struct SourceInboxSection: View {
-    let userId: String
-    @EnvironmentObject private var session: SessionStore
-    var body: some View {
-        if session.isSignedIn && ObservedCarRead.ownAccount(userId, activeUserId: SupabaseService.currentUserId) != nil {
-            Section("Your photos") {
-                NavigationLink { SourceInboxView(userId: userId) } label: {
-                    Label {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Uploaded photos")
-                            Text("Every photo you have uploaded, even ones not matched to a vehicle yet")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    } icon: { Image(systemName: "photo.on.rectangle") }
-                }
-            }
-        }
-    }
-}
-
 struct SourceInboxView: View {
     let userId: String
     @EnvironmentObject private var session: SessionStore

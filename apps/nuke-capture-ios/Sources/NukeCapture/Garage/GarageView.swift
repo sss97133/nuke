@@ -123,6 +123,15 @@ struct GarageView: View {
                 Text(GarageCopy.contributedFooter)
             }
         }
+        if !s.documenting.isEmpty {
+            Section {
+                ForEach(s.documenting) { v in vehicleLink(v) }
+            } header: {
+                Text("Documenting · \(s.documenting.count)")
+            } footer: {
+                Text(GarageCopy.documentingFooter)
+            }
+        }
         if !unresolved.isEmpty {
             Section {
                 ForEach(unresolved) { source in
@@ -236,34 +245,6 @@ struct UnorganizedPhotosRow: View {
             JobRefusalRow(refusal: refusal)
         case .loaded(let photos):
             RootedValueView(label: "Photos with no vehicle", value: photos.value, status: .recorded, decay: photos.coverage)
-        }
-    }
-}
-
-/// The own profile's door to the garage: the photo count and the way into each vehicle's jobs.
-struct GarageDoorSection: View {
-    let userId: String
-
-    @State private var photos: JobLoad<UnorganizedPhotos> = .loading
-
-    var body: some View {
-        if SupabaseService.currentUserId == userId.lowercased() {
-            Section {
-                NavigationLink { GarageView(userId: userId) } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label("Open garage", systemImage: "car.2")
-                        Text("Each vehicle's jobs, and post a job for one you own")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                UnorganizedPhotosRow(load: photos)
-                NavigationLink { SessionConfirmView() } label: {
-                    Label("Organize photos", systemImage: "checklist")
-                }
-            } header: {
-                Text("Garage")
-            }
-            .task(id: userId) { photos = await GarageReaders.unorganizedPhotos() }
         }
     }
 }

@@ -56,6 +56,7 @@ Deno.serve(async (req) => {
       const fields: Record<string, unknown> = {
         vin, year: local.year, make: local.make, model: local.model, series: local.series, series_code: local.series_code,
         body_style: local.body_style, factory_engine_code: local.engine_code, factory_engine: local.engine_size,
+        factory_engine_rule_source: local.engine_rule_source,
         assembly_plant_code: local.plant, assembly_plant: local.plant_name, serial_number: local.serial_number,
         decode_rule: 'gm_1972_1980_car_vin_v1',
       }

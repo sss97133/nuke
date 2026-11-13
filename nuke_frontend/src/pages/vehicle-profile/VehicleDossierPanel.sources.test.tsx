@@ -193,3 +193,38 @@ it('anonymous structured profiles keep their source data without an authenticate
   expect([...host.querySelectorAll('button')].some(b => b.textContent === 'Review evidence')).toBe(false);
   expect(state.invoke).not.toHaveBeenCalled();
 });
+it('renders a field a header token states as that token\'s line items, once, with no field provenance read', async () => {
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page([]) : record())) }));
+  const item = (key: string, facet: 'as_built' | 'current' | 'decode', value: unknown, status: 'established' | 'reading' | 'missing', needed: string | null = null) =>
+    ({ key, facet, value, unit: null, status, sources: [], rule: null, equation: null, needed });
+  const tokenItems = {
+    transmission: [item('transmission.as_built.model', 'as_built', null, 'missing', 'build sheet'),
+      item('transmission.current.case_casting', 'current', 'C-0001', 'reading')],
+    engine: [item('engine.current.block_casting', 'current', 'B-0001', 'reading')],
+  };
+  await act(async () => { root.render(<MemoryRouter><StructuredProfileData vehicleId={VEHICLE} tokenItems={tokenItems as any} /></MemoryRouter>); });
+  const trans = host.querySelector('tr[data-token-items="transmission"]');
+  expect(trans?.querySelector('.vp-structured-record__items-label')?.textContent).toBe('Transmission');
+  expect(trans?.textContent).toContain('As built'); expect(trans?.textContent).toContain('Needed: build sheet');
+  expect(trans?.textContent).toContain('C-0001');
+  expect(host.querySelectorAll('tr[data-token-items="engine"]').length).toBe(1);
+  expect(host.querySelector('tr[data-token-items="engine"] .vp-structured-record__items-label')?.textContent).toBe('Engine');
+  expect(host.querySelector('tr[data-record-field="engine_size"]')).toBeNull();
+  // Fields no token states keep their recorded row.
+  expect(host.querySelector('tr[data-record-field="vin"]')).not.toBeNull();
+  expect(host.querySelector('tr[data-record-field="make"]')?.getAttribute('data-token-items')).toBeNull();
+});
+it('on a replica renders trim only as its items, and the exterior color row as the paint items', async () => {
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page([]) : record())) }));
+  const item = (key: string, value: unknown, status: 'established' | 'reading' | 'claim') =>
+    ({ key, facet: 'as_built', value, unit: null, status, sources: [], rule: null, equation: null, needed: null });
+  await act(async () => { root.render(<MemoryRouter><StructuredProfileData vehicleId={VEHICLE} isReplica /></MemoryRouter>); });
+  expect(host.querySelector('tr[data-record-field="trim"]')).toBeNull();
+  const tokenItems = { trim: [item('trim.as_built.interior', 'T-0001', 'reading')], paint: [item('paint.as_built.code', 'P-01/P-01', 'reading')] };
+  await act(async () => { root.render(<MemoryRouter><StructuredProfileData vehicleId={VEHICLE} isReplica tokenItems={tokenItems as any} /></MemoryRouter>); });
+  expect(host.querySelector('tr[data-token-items="trim"]')?.textContent).toContain('T-0001');
+  const paint = host.querySelector('tr[data-record-field="color"]');
+  expect(paint?.getAttribute('data-token-items')).toBe('paint');
+  expect(paint?.querySelector('.vp-structured-record__items-label')?.textContent).toBe('Exterior color');
+  expect(paint?.textContent).toContain('P-01/P-01');
+});
