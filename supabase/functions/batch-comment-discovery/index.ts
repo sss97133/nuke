@@ -19,8 +19,13 @@
  *   "since_hours"?: number (default 48, max 168): only lots that ended inside this window,
  *   "vehicle_ids"?: string[] (run exactly these, skipping the candidate search),
  *   "model"?: one of DISCOVERY_MODELS (default the first),
- *   "dry_run"?: boolean (run the model, return its output and token usage, store nothing)
+ *   "dry_run"?: boolean (run the model, return its output and token usage, store nothing),
+ *   "step"?: "prepare" | "store" (the subscription path, for when the API credit is spent; see below)
  * }
+ * The subscription path splits one summary in two so the model call can run elsewhere (the owner's Claude
+ * subscription, driven by scripts/comment-summary-subscription.sh). "prepare" returns the owed lots' prompts and
+ * calls no model. "store" takes {vehicle_ids: [one id], model, text}: the model's answer for that lot. It rebuilds
+ * the same comment set, applies the same quote check and writes the same row, marked written_via "subscription".
  * A call never chains another call: a schedule decides how often a bounded batch runs.
  */
 
@@ -162,6 +167,19 @@ Deno.serve(async (req) => {
     const sinceHours = Math.max(1, Math.min(Number(body.since_hours ?? 48) || 48, 168));
     const model = DISCOVERY_MODELS.includes(body.model) ? body.model : DISCOVERY_MODELS[0];
     const dryRun = body.dry_run === true;
+    const prepareOnly = body.step === "prepare";
+    if (body.step === "prepare" || body.step === "store") {
+      // A stored summary is shown as a model's reading, so only a job holding the service key may hand one in.
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return jsonResponse({ error: "service_role required" }, 403);
+    }
+    const suppliedText = body.step === "store" ? String(body.text ?? "") : null;
+    if (suppliedText !== null) {
+      if (!Array.isArray(body.vehicle_ids) || body.vehicle_ids.length !== 1 || !suppliedText.trim()) {
+        return jsonResponse({ error: "store needs vehicle_ids with exactly one id and the model's text" }, 400);
+      }
+      if (!DISCOVERY_MODELS.includes(body.model)) return jsonResponse({ error: "store needs a model from DISCOVERY_MODELS" }, 400);
+    }
     const usage = { input_tokens: 0, output_tokens: 0, calls: 0 };
 
     // Candidates: lots that ended inside the window (settled at least 30 minutes ago) and whose vehicle has no
@@ -232,14 +250,14 @@ Deno.serve(async (req) => {
 
       const chunk = vehiclesToProcess.slice(i, i + PARALLEL);
       if (creditExhausted) break;
-      const promises = chunk.map(v => processVehicle(supabase, v, anthropicKey, maxCommentChars, { model, dryRun, usage }));
+      const promises = chunk.map(v => processVehicle(supabase, v, anthropicKey, maxCommentChars, { model, dryRun, usage, prepareOnly, suppliedText }));
       const settled = await Promise.allSettled(promises);
 
       for (let j = 0; j < settled.length; j++) {
         const result = settled[j];
         if (result.status === "fulfilled" && result.value.success) {
           results.discovered++;
-          if (dryRun || results.samples.length < 3) {
+          if (dryRun || prepareOnly || results.samples.length < 3) {
             results.samples.push(result.value.sample);
           }
         } else {
@@ -271,7 +289,8 @@ async function processVehicle(
   vehicle: any,
   anthropicKey: string,
   maxChars: number,
-  run: { model: string; dryRun: boolean; usage: { input_tokens: number; output_tokens: number; calls: number } },
+  run: { model: string; dryRun: boolean; usage: { input_tokens: number; output_tokens: number; calls: number };
+    prepareOnly?: boolean; suppliedText?: string | null },
 ): Promise<{ success: boolean; sample?: any; error?: string }> {
   try {
     // Get comments for this vehicle — try auction_comments first (BaT), then vehicle_observations (Hagerty)
@@ -331,7 +350,14 @@ async function processVehicle(
       .replace("{comment_count}", String(comments.length))
       .replace("{comments}", formatted);
 
-    // Call Claude Haiku
+    if (run.prepareOnly) {
+      return { success: true, sample: { vehicle_id: vehicle.vehicle_id, comments: comments.length, comments_analyzed: count, prompt } };
+    }
+
+    // The answer: supplied by the caller (subscription path), else from the API.
+    let result: any = { stop_reason: "supplied", usage: null };
+    let content = run.suppliedText ?? "";
+    if (run.suppliedText == null) {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -354,11 +380,12 @@ async function processVehicle(
       return { success: false, error: `Anthropic ${response.status}: ${errText.slice(0, 200)}` };
     }
 
-    const result = await response.json();
+    result = await response.json();
     run.usage.input_tokens += result.usage?.input_tokens ?? 0;
     run.usage.output_tokens += result.usage?.output_tokens ?? 0;
     run.usage.calls++;
-    const content = (result.content ?? []).find((b: any) => b.type === "text")?.text || "";
+    content = (result.content ?? []).find((b: any) => b.type === "text")?.text || "";
+    }
 
     // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -405,6 +432,7 @@ async function processVehicle(
     }
 
     discovered.comments_analyzed = count;
+    if (run.suppliedText != null) discovered.written_via = "subscription";
 
     // Extract top-level fields for quick access
     const sentiment = discovered.sentiment?.overall || null;
