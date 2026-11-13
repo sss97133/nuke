@@ -41,7 +41,7 @@ tools/type/build.sh --only trans-am-1973-decal
 | Family | Files | Glyphs (with .notdef) | cmap | traced | derived | designed | Traced fidelity (IoU) |
 |---|---|---|---|---|---|---|---|
 | Pontiac 1973 Block | Regular, Face | 45 | 70 | 7 | 1 | 35 | P .958 T .975 I .954 N .948 O .934 C .917 A .857 |
-| Firebird 1971 Script | Regular | 39 | 38 | 6 | 17 | 14 | b .919 i .915 e .907 F .899 d .897 r .841 (flag trimmed), against the chrome face |
+| Firebird 1971 Script | Regular | 39 | 38 | 6 | 17 | 14 | b .919 e .907 F .899 d .897 r .841 (flag trimmed) i .759 (ball drawn), against the chrome face |
 | Trans Am 1973 Decal | Regular | 45 | 70 | 6 | 1 | 36 | S .946 N .930 T .921 A .921 M .920 R .910 |
 | Pontiac 1973 Brochure Numerals | Regular | 30 | 28 | 15 | 9 | 4 | cover .974-.981, spread F r e b d .929-.955 |
 
@@ -69,6 +69,11 @@ Counts exclude `.notdef` and `space`. Block and Decal map lowercase to the capit
   bevels: a 3x3 luminance range over 100 or L under 120 marks the bevel lines, the region between them is closed,
   hole-filled under 150 px and smoothed, and the mounting studs below the baseline are clipped. Stems are now 64
   units (about 8 px in the photograph) against about 14 px for the cutout.
+- **i ball:** the face mask cannot hold the i's ball (one bright highlight in a dark ring that does not close), so the
+  trace kept only a spike and the neck and the i set dotless. The stem is traced to the x-height and the ball is an
+  ellipse at its measured place and size (`I_BALL` in `families/script.py`); the i's IoU against the mask is .759.
+- **Vertical metrics:** every period font has ascent 900, descent 250 and caps 700. Browsers round ascent and descent
+  to whole pixels, so a font with another descent (the script had 280) sits up to a pixel off the shared baseline.
 - **Fidelity:** the IoUs are measured against that face mask. They are lower than v0.1's cutout IoUs because the
   face edge is set by reflections, which the mask follows and the outline smooths.
 - **Coverage:** a-z, the capitals of the model names (E F G L M P T), and `. , - '`.

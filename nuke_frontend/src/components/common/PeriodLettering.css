@@ -1,14 +1,17 @@
 /* Loaded with the PeriodLettering chunk, only when a vehicle identity with a period font matches. */
 /* Period lettering set in type (catalogue `font`; public/fonts/period/README.md). It takes the cutout's box: its font
    size is the cutout height, so its capitals fill the shared cap band. --art-cap is the font's cap height and
-   --art-base its baseline above the 1em line box (line-height 1; hhea ascent 900, descent 250 or 280 per 1000). */
+   --art-base its baseline above the 1em line box (line-height 1). Every period font has the same vertical metrics
+   (ascent 900, descent 250, caps 700) and is set at the same size: browsers round ascent and descent to whole pixels,
+   so a different descent or size moves a baseline by up to a pixel (the script's 280 sat 0.6 px high, 2026-11-12). */
 .vehicle-identity .vehicle-identity__art.vehicle-identity__art--type { width:auto; max-width:none; font-size:var(--art-h); line-height:1; white-space:nowrap; letter-spacing:0; font-weight:400; font-style:normal; }
 .vehicle-identity__type { position:relative; display:block; }
 .vehicle-identity__art--type[data-font^="Pontiac1973Block"] { --art-cap:0.7; --art-base:0.175; font-family:"Pontiac1973Block-Regular"; }
-.vehicle-identity__art--type[data-font^="Firebird1971Script"] { --art-cap:0.7; --art-base:0.19; font-family:"Firebird1971Script-Regular"; }
+.vehicle-identity__art--type[data-font^="Firebird1971Script"] { --art-cap:0.7; --art-base:0.175; font-family:"Firebird1971Script-Regular"; }
 .vehicle-identity__art--type[data-font^="TransAm1973Decal"] { --art-cap:0.7; --art-base:0.175; font-family:"TransAm1973Decal-Regular"; }
-/* Lining figures stand 720 against capitals of 700. */
-.vehicle-identity__art--type[data-font^="Pontiac1973BrochureNumerals"] { --art-cap:0.72; --art-base:0.175; font-family:"Pontiac1973BrochureNumerals-Regular"; }
+/* Lining figures stand 720 against capitals of 700: at the shared size they rise half a pixel over the cap band, as
+   they do in the brochure. */
+.vehicle-identity__art--type[data-font^="Pontiac1973BrochureNumerals"] { --art-cap:0.7; --art-base:0.175; font-family:"Pontiac1973BrochureNumerals-Regular"; }
 /* Materials. Chrome is lit, not recoloured: a rim (the Regular silhouette), a face (the Face font, the same advances
    inset 30 units) and a horizon line, lit for the surface it sits on. The decal keeps its orange ink. Under 24 px
    (data-material="plain") every material is the text colour. */
