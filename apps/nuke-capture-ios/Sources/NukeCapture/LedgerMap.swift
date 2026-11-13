@@ -1536,16 +1536,38 @@ enum VehicleFacetClassifier {
             else if matches(m, #"\b(f-?150)\b"#) { series = "F-150 (1/2-Ton)" }
             else if matches(m, #"\b(f-?250|f-?2)\b"#) { series = "F-2 / F-250 (3/4-Ton)" }
             else if matches(m, #"\b(f-?350|f-?3|f-?450)\b"#) { series = "F-350+ (1-Ton+)" }
-            else if matches(m, #"\b(w100|w150|w200|w250|w300|power\s*wagon)\b"#) { series = "Power Wagon / W-Series (4x4)" }
-            else if matches(m, #"\b(d100|d150|d200|d250|d300)\b"#) { series = "D-Series (2WD)" }
+            else if matches(m, #"\b(w100|w150|w200|w250|w300|w350|power\s*wagon)\b"#) { series = "Power Wagon / W-Series (4x4)" }
+            else if matches(m, #"\b(d100|d150|d200|d250|d300|d350)\b"#) { series = "D-Series (2WD)" }
             else if let y = year {
-                if y >= 1947 && y <= 1955 { series = "Advance-Design ('47–'55)" }
-                else if y >= 1955 && y <= 1959 { series = "Task Force ('55–'59)" }
-                else if y >= 1960 && y <= 1966 { series = "1st Gen C/K ('60–'66)" }
-                else if y >= 1967 && y <= 1972 { series = "Action Line ('67–'72)" }
-                else if y >= 1973 && y <= 1987 { series = "Squarebody ('73–'87)" }
-                else if y >= 1988 && y <= 1998 { series = "GMT400 ('88–'98)" }
-                else if y >= 1999 { series = "Modern Truck ('99+)" }
+                // Year-based fallback series - only for GM trucks (Chevy/GMC)
+                let isGM = mk == "chevrolet" || mk == "chevy" || mk == "gmc"
+                let isDodge = mk == "dodge" || mk == "ram"
+                let isFord = mk == "ford"
+                if isGM {
+                    if y >= 1947 && y <= 1955 { series = "Advance-Design ('47–'55)" }
+                    else if y >= 1955 && y <= 1959 { series = "Task Force ('55–'59)" }
+                    else if y >= 1960 && y <= 1966 { series = "1st Gen C/K ('60–'66)" }
+                    else if y >= 1967 && y <= 1972 { series = "Action Line ('67–'72)" }
+                    else if y >= 1973 && y <= 1987 { series = "Squarebody ('73–'87)" }
+                    else if y >= 1988 && y <= 1998 { series = "GMT400 ('88–'98)" }
+                    else if y >= 1999 { series = "Modern Truck ('99+)" }
+                } else if isDodge {
+                    if y >= 1972 && y <= 1993 { series = "D/W-Series ('72–'93)" }
+                    else if y >= 1994 && y <= 2001 { series = "2nd Gen Ram ('94–'01)" }
+                    else if y >= 2002 && y <= 2008 { series = "3rd Gen Ram ('02–'08)" }
+                    else if y >= 2009 { series = "4th Gen+ Ram ('09+)" }
+                } else if isFord {
+                    if y >= 1948 && y <= 1952 { series = "F-Series 1st Gen ('48–'52)" }
+                    else if y >= 1953 && y <= 1956 { series = "F-Series 2nd Gen ('53–'56)" }
+                    else if y >= 1957 && y <= 1960 { series = "F-Series 3rd Gen ('57–'60)" }
+                    else if y >= 1961 && y <= 1966 { series = "F-Series 4th Gen ('61–'66)" }
+                    else if y >= 1967 && y <= 1972 { series = "Bumpside ('67–'72)" }
+                    else if y >= 1973 && y <= 1979 { series = "Dentside ('73–'79)" }
+                    else if y >= 1980 && y <= 1986 { series = "Bullnose ('80–'86)" }
+                    else if y >= 1987 && y <= 1991 { series = "Brick Nose ('87–'91)" }
+                    else if y >= 1992 && y <= 1996 { series = "9th Gen F-Series ('92–'96)" }
+                    else if y >= 1997 { series = "Modern F-Series ('97+)" }
+                }
             }
             if series == nil { series = raw.isEmpty ? "Standard Pickup" : raw }
 
