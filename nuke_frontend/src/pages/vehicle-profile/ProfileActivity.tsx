@@ -3,9 +3,18 @@ import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import type { AuctionPulse } from './types';
 import type { TimelineReadState } from './loadVehicleData';
 import { isAuctionPresentation, hasFreshAuctionFeed, AUCTION_FEED_FRESH_MS } from './buildAuctionPulse';
+import type { ContributionDay } from './useContributionDays';
 
 type ActivityEvent = { id?: string; vehicle_id?: string; event_date?: string; event_type?: string; title?: string; is_superseded?: boolean; metadata?: { status?: string } };
-const MEANINGFUL = /^(work|maintenance|repair|restoration|photo|image|sale|auction|bid|comment|purchase|ownership|transfer|inspection|mileage|service|communication)/;
+const MEANINGFUL = /^(work|maintenance|repair|restoration|photo|image|document|sale|auction|bid|comment|purchase|ownership|transfer|inspection|mileage|service|communication)/;
+
+/** The contribution days the timeline bar shows (photos filed, work, paper) as activity: a day of photos is activity
+ *  whether or not an event row was written for it (the Firebird read "Active 395d ago" with 448 photos filed that week). */
+export function contributionActivity(vehicleId: string, days: ContributionDay[]): ActivityEvent[] {
+  return days.filter(d => ['photo', 'work', 'document'].includes(d.kind) && Number.isFinite(d.n) && d.n > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d.day))
+    .map(d => ({ vehicle_id: vehicleId, event_date: d.day, event_type: d.kind,
+      title: d.kind === 'photo' ? `${d.n} photo${d.n === 1 ? '' : 's'} filed` : d.kind === 'document' ? `${d.n} receipt${d.n === 1 ? '' : 's'} on file` : 'Work recorded' }));
+}
 
 export function elapsedActivity(iso: string, now: number): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
@@ -20,7 +29,7 @@ export function elapsedActivity(iso: string, now: number): string {
   return `${Math.floor(minutes / 1440)}d ago`;
 }
 
-export function selectProfileActivity(vehicleId: string, events: ActivityEvent[], pulse: AuctionPulse | null, now: number) {
+export function selectProfileActivity(vehicleId: string, events: ActivityEvent[], pulse: AuctionPulse | null, now: number, days: ContributionDay[] = []) {
   const sourceAt = pulse?.source_observed_at;
   const sourceTime = sourceAt ? Date.parse(sourceAt) : NaN;
   const live = !!pulse && isAuctionPresentation(pulse) && hasFreshAuctionFeed(pulse.listing_status, pulse.end_date, sourceAt, now);
@@ -28,15 +37,15 @@ export function selectProfileActivity(vehicleId: string, events: ActivityEvent[]
     { event_date: pulse.last_bid_at ?? undefined, event_type: 'bid', title: 'Recorded auction bid' },
     { event_date: pulse.last_comment_at ?? undefined, event_type: 'comment', title: 'Recorded auction comment' },
   ] : [];
-  const latest = [...events, ...auctionEvents].filter(event => (!event.vehicle_id || event.vehicle_id === vehicleId) && !event.is_superseded
+  const latest = [...events, ...auctionEvents, ...contributionActivity(vehicleId, days)].filter(event => (!event.vehicle_id || event.vehicle_id === vehicleId) && !event.is_superseded
     && MEANINGFUL.test(event.event_type ?? '') && !['planned', 'cancelled', 'failed'].includes(event.metadata?.status ?? '')
     && event.event_date && Number.isFinite(Date.parse(event.event_date)) && Date.parse(event.event_date) <= now)
     .sort((a, b) => Date.parse(b.event_date!) - Date.parse(a.event_date!))[0];
   return { live, latest, sourceAt: Number.isFinite(sourceTime) ? sourceAt : null };
 }
 
-export default function ProfileActivity({ vehicleId, events, pulse, readState, open, onToggle, onClose, boundaryRef }: {
-  vehicleId: string; events: ActivityEvent[]; pulse: AuctionPulse | null; readState?: TimelineReadState;
+export default function ProfileActivity({ vehicleId, events, pulse, days, readState, open, onToggle, onClose, boundaryRef }: {
+  vehicleId: string; events: ActivityEvent[]; pulse: AuctionPulse | null; days?: ContributionDay[]; readState?: TimelineReadState;
   open: boolean; onToggle: () => void; onClose: () => void; boundaryRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [now, setNow] = useState(Date.now);
@@ -56,7 +65,7 @@ export default function ProfileActivity({ vehicleId, events, pulse, readState, o
     document.addEventListener('visibilitychange', update);
     return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', update); };
   }, [pulse?.end_date, pulse?.source_observed_at]);
-  const activity = useMemo(() => selectProfileActivity(vehicleId, events, pulse, now), [vehicleId, events, pulse, now]);
+  const activity = useMemo(() => selectProfileActivity(vehicleId, events, pulse, now, days ?? []), [vehicleId, events, pulse, now, days]);
   const at = activity.latest?.event_date;
   const incomplete = readState && Object.values(readState).some(state => state !== 'ready');
   const label = activity.live ? 'Live' : at ? `Active ${elapsedActivity(at, now)}` : incomplete ? 'Activity unavailable' : 'Activity undated';

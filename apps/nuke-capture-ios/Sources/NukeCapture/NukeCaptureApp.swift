@@ -12,10 +12,9 @@
 //   4. Route: signed out on a fresh install → WelcomeView (once; its "Look around
 //      first" flips exploreMode), signed out otherwise → SignInView (the
 //      constellation; its "Look around first" path flips exploreMode),
-//      exploring → MainTabView (read-only Map + sample profile), signed in + ignition pending → IgnitionView (first-run
+//      exploring → MainTabView (read-only Map + profile search), signed in + ignition pending → IgnitionView (first-run
 //      full-library scan), signed in + ignition complete → MainTabView
-//      (MAP · PROFILE · TODAY). Right after a first sign-in, or after "Look around first",
-//      PersonaOnboardingView asks "What brings you here?" once (see PersonaGate), before the scan.
+//      (MAP · PROFILE · TODAY).
 
 import SwiftUI
 import BackgroundTasks
@@ -43,13 +42,10 @@ struct NukeCaptureApp: App {
     /// Flipped by IgnitionEngine when the first-run sequence completes.
     @AppStorage(IgnitionEngine.completeKey) private var ignitionComplete = false
     /// The constellation's Explore path — the app without auth (read-only
-    /// Map + sample profile). Cleared by the Profile tab's Sign In door.
+    /// Map + profile search). Cleared by the Profile tab's Sign In door.
     @AppStorage("exploreMode") private var exploreMode = false
     /// The first-launch welcome has been seen (or the user signed in). See WelcomeGate.
     @AppStorage(WelcomeGate.seenKey) private var welcomeSeen = false
-    /// The saved "What brings you here?" answers (keyed to the user). Observed so the question
-    /// disappears the moment it is answered.
-    @ObservedObject private var personas = PersonaStore.shared
 
     init() {
         // Must happen during launch: registering after didFinishLaunching
@@ -57,6 +53,8 @@ struct NukeCaptureApp: App {
         Self.registerBackgroundRefresh()
         Self.registerBackgroundBackfill()
         Self.registerRecentUploads()
+        // The removed "What brings you here?" screen left its answers on the phone: clear them once.
+        LegacyPersonaCleanup.run()
         // Existing installs ran the pre-ignition app: they keep the
         // hardcoded shop gate and skip ignition entirely.
         if SyncEngine.hasExistingWatermark,
@@ -90,12 +88,12 @@ struct NukeCaptureApp: App {
                 } else if let org = ProcessInfo.processInfo.environment["NUKE_DEBUG_ACTOR_ORG"], !org.isEmpty {
                     // NUKE_DEBUG_ACTOR_ORG=<uuid> roots on that organization's actor document (DEBUG only).
                     NavigationStack { ActorProfileView(route: ActorRoute(kind: "organization", id: org, name: nil)) }
-                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty {
-                    // NUKE_DEBUG_DAY=yyyy-MM-dd roots on that day's receipt for the sample
-                    // profile (or NUKE_DEBUG_DAY_USER=<uuid>) as the current session: anon
-                    // unless one was injected. Verifies the viewer-dependent money rule.
-                    DayReceiptView(userId: ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"] ?? Config.sampleProfileUserId,
-                                   date: dbgDay)
+                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty,
+                          let dbgDayUser = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"], !dbgDayUser.isEmpty {
+                    // NUKE_DEBUG_DAY=yyyy-MM-dd + NUKE_DEBUG_DAY_USER=<uuid> roots on that day's receipt
+                    // for that profile as the current session: anon unless one was injected. Verifies the
+                    // viewer-dependent money rule. No default account: name the profile under test.
+                    DayReceiptView(userId: dbgDayUser, date: dbgDay)
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
@@ -211,6 +209,14 @@ struct NukeCaptureApp: App {
                 // Foreground sync — only once ignition is done. During the
                 // scan NOTHING may upload (the UPLOADED 0 gauge is real).
                 guard session.isSignedIn, ignitionComplete else { return }
+                // A "Re-scan my library" asked for on the website: claim it, re-arm ignition the way
+                // the Account button does, and let the next pass close it with its summary.
+                Task {
+                    if await CaptureLedgerReporter.shared.claimRescan() != nil {
+                        SyncEngine.shared.resetForReignition()
+                        ignitionComplete = false
+                    }
+                }
                 // BUG #1 defect (c): book the processing-task drain the moment
                 // we learn work exists — not only on .background. If on-site
                 // photos are owed (backfill queue or fresh captures), the drain
@@ -279,10 +285,7 @@ struct NukeCaptureApp: App {
     @ViewBuilder private var rootView: some View {
         Group {
             if session.isSignedIn {
-                    if needsPersona {
-                        // Right after a first sign-in: one question, before the first-run scan.
-                        PersonaOnboardingView(scope: personaScope)
-                    } else if ignitionComplete {
+                    if ignitionComplete {
                         MainTabView()
                     } else if ignition.phase == .denied {
                         // Photos denied is NOT a dead end: capture is one
@@ -295,14 +298,9 @@ struct NukeCaptureApp: App {
                         IgnitionView()
                     }
                 } else if exploreMode {
-                    if needsPersona {
-                        // "Look around first": the same one question, then the world.
-                        PersonaOnboardingView(scope: personaScope)
-                    } else {
-                        // Explore: the populated world, read-only. No Today tab
-                        // (no grant), Sign In one tap away in Profile.
-                        MainTabView()
-                    }
+                    // Explore: the populated world, read-only. No Today tab
+                    // (no grant), Sign In one tap away in Profile.
+                    MainTabView()
                 } else if WelcomeGate.shouldShow(seen: welcomeSeen, signedIn: false, exploring: false, skip: Self.skipsWelcome) {
                     // Fresh install: say what the app is before asking for anything.
                     WelcomeView()
@@ -315,16 +313,6 @@ struct NukeCaptureApp: App {
         .onChange(of: session.isSignedIn, initial: true) { _, signedIn in
             if signedIn { welcomeSeen = true }
         }
-    }
-
-    /// Who the saved answer belongs to: the signed-in user, or "visitor" while looking around.
-    private var personaScope: String {
-        PersonaStorage.scope(userId: SupabaseService.currentUserId, signedIn: session.isSignedIn)
-    }
-
-    /// True until this person has answered "What brings you here?". Fixture launches skip it.
-    private var needsPersona: Bool {
-        PersonaGate.shouldShow(hasChoice: personas.choice(for: personaScope) != nil, skip: Self.skipsWelcome)
     }
 
     /// UI-test / fixture launches never see the welcome.

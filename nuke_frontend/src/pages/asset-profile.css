@@ -1,0 +1,53 @@
+/* The artwork profile: identity and headline result on top, the house's photograph, then grouped surfaces in the order the
+   owner named them (creation, presentation, every statement landed). Touch first, kit roles only, 1px separators. */
+.ap-page { max-width: 860px; margin: auto; padding: 16px max(16px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); min-width: 0; color: var(--text); }
+.ap-notice { padding: 24px 16px; color: var(--text-secondary); }
+.ap-notice h1 { margin: 0 0 8px; }
+
+.ap-masthead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; padding: 8px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.ap-masthead__identity { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ap-masthead__identity h1 { margin: 0; }
+.ap-masthead__name { margin: 0; color: var(--text-secondary); }
+.ap-masthead__result { flex: 0 1 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.ap-masthead__result .k-caption, .ap-masthead__identity .k-caption { color: var(--text-secondary); }
+
+.ap-figure { margin: 0 0 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+.ap-figure img { display: block; width: 100%; height: auto; max-height: 70vh; aspect-ratio: 4 / 3; object-fit: contain; background: var(--surface-hover); }
+.ap-figure figcaption { padding: 8px 12px; color: var(--text-secondary); }
+
+.ap-page .k-section { margin-bottom: 16px; }
+.ap-result { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 12px; }
+.ap-result .k-caption { color: var(--text-secondary); }
+
+.ap-party { padding: 8px 0 4px; }
+.ap-party + .ap-party { border-top: 1px solid var(--border); margin-top: 8px; }
+.ap-party__name { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.ap-party__name h3 { margin: 0; }
+.ap-party__name .k-caption { color: var(--text-secondary); }
+
+.ap-printed { padding: 12px 0 4px; border-top: 1px solid var(--border); }
+.ap-printed h3 { margin: 0 0 6px; }
+.ap-prose { margin: 0; white-space: pre-wrap; }
+.ap-chain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.ap-more { margin-top: 8px; min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); cursor: pointer; }
+.ap-link { color: var(--accent); text-decoration: none; }
+.ap-link:hover, .ap-link:focus-visible { text-decoration: underline; }
+
+.ap-history { list-style: none; margin: 0; padding: 0; }
+.ap-history__row { display: grid; grid-template-columns: 7em 1fr; column-gap: 12px; row-gap: 2px; padding: 10px 0; border-top: 1px solid var(--border); align-items: baseline; }
+.ap-history__row:first-child { border-top: 0; }
+.ap-history__row > :nth-child(3) { grid-column: 2; color: var(--text-secondary); }
+.ap-history__row--superseded .k-body { color: var(--text-secondary); text-decoration: line-through; text-decoration-color: var(--border); }
+
+.ap-footer { display: flex; flex-direction: column; gap: 6px; padding: 16px 0 0; border-top: 1px solid var(--border); color: var(--text-secondary); }
+.ap-page :is(button, a):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+
+@media (max-width: 600px) {
+  .ap-masthead__result { align-items: flex-start; text-align: left; }
+  .ap-history__row { grid-template-columns: 1fr; }
+  .ap-history__row > :nth-child(3) { grid-column: 1; }
+}
+
+.ap-verbs { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--border); }
+.ap-sign { min-height: 48px; padding: 0 22px; border-radius: 999px; background: var(--action); color: var(--on-action); display: inline-flex; align-items: center; text-decoration: none; }
+.ap-sign .k-label { color: inherit; }

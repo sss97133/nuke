@@ -61,6 +61,7 @@ const sources = new Map([
   ['financialEvidence',compile('../supabase/functions/ingest-observation/financialEvidence.ts')],
   ['financialDelegation',compile('../supabase/functions/ingest-observation/financialDelegation.ts')],
   ['financialProcessing',compile('../supabase/functions/ingest-observation/financialProcessing.ts')],
+  ['privateProjection',compile('../supabase/functions/ingest-observation/privateProjection.ts')],
   ['financialCandidateContext',compile('../supabase/functions/ingest-observation/financialCandidateContext.ts')],
   ['financialCandidates',compile('../supabase/functions/ingest-observation/financialCandidates.ts')],
   ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
@@ -70,6 +71,9 @@ const sources = new Map([
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
   ['property',compile('../supabase/functions/ingest-observation/imageProperties.ts')],
+  ['componentEvidence',compile('../supabase/functions/ingest-observation/componentEvidence.ts')],
+  ['mccormickParser',compile('../supabase/functions/_shared/mccormickParser.ts')],
+  ['htmlToText',compile('../supabase/functions/_shared/htmlToText.ts')],
   ['retainedInterior',compile('../supabase/functions/ingest-observation/retainedInterior.ts')],
   ['retainedCraigslistOdometer',compile('../supabase/functions/ingest-observation/retainedCraigslistOdometer.ts')],
   ['retainedCraigslistCapture',compile('../supabase/functions/ingest-observation/retainedCraigslistCapture.ts')],
@@ -272,6 +276,9 @@ function fixture(options = {}) {
         if(specifier==='../_shared/urlNormalization.ts')return {normalizeListingUrl:value=>value,normalizeVin:value=>value};
         if(specifier==='../_shared/rateLimit.ts')return {checkRateLimit:()=>assert.fail('No anonymous intake'),getClientIp:()=>assert.fail('No anonymous intake')};
         if(specifier==='./imageProperties.ts')return load('property');
+        if(specifier==='./componentEvidence.ts')return load('componentEvidence');
+        if(specifier==='../_shared/mccormickParser.ts')return load('mccormickParser');
+        if(specifier==='./htmlToText.ts')return load('htmlToText');
         if(specifier==='./retainedInterior.ts')return load('retainedInterior');
         if(specifier==='./retainedCraigslistOdometer.ts')return load('retainedCraigslistOdometer');
         if(specifier==='./retainedCraigslistCapture.ts')return load('retainedCraigslistCapture');
@@ -295,6 +302,7 @@ function fixture(options = {}) {
         if(specifier==='./financialEvidence.ts')return load('financialEvidence');
         if(specifier==='./financialDelegation.ts')return load('financialDelegation');
         if(specifier==='./financialProcessing.ts')return load('financialProcessing');
+        if(specifier==='./privateProjection.ts')return load('privateProjection');
         if(specifier==='./financialCandidateContext.ts')return load('financialCandidateContext');
         if(specifier==='./financialCandidates.ts')return load('financialCandidates');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');

@@ -30,12 +30,18 @@ export type VehicleEventWriteResult =
 
 // The minimal PostgREST surface this needs; tests pass a stub.
 type Client = { from: (table: string) => any };
-type LiveRow = { id: string; metadata: Record<string, unknown> | null; sold_at?: string | null; ended_at?: string | null };
+type LiveRow = { id: string; metadata: Record<string, unknown> | null; sold_at?: string | null; ended_at?: string | null; event_status?: string; event_type?: string; source_url?: string; identity_check?: string | null; source_suspect?: string[] | null; vehicle_event_metadata_digest?: string };
 
 /** Opt-in retained-listing policy. Existing auction landers keep their current behavior. */
 export interface VehicleEventWritePolicy {
   preserveEventStatus?: boolean;
+  /** Opt-in native active-auction projection; scheduled ends may advance under exact row guards. */
+  activeAuction?: { sourceUrl: string; now: string };
+  /** Existing service-only digest retains full metadata CAS without placing galleries in request URLs. */
+  compactMetadataCas?: boolean;
   sourceObservedAt?: string;
+  /** CC snapshot transitions must not arbitrate two different receipts at the same source clock. */
+  rejectEqualClockDifferentObservation?: boolean;
   /** Writer name stored as extraction_method on insert (e.g. 'extract-mecum'). Never overwrites a row-supplied value. */
   writer?: string;
   /** Run id stored as extraction_run_id on insert; defaults to one id per isolate. */
@@ -86,10 +92,10 @@ export function patchForLiveRow(live: LiveRow, row: VehicleEventRow): { patch: R
   return { patch, locked };
 }
 
-async function readByKey(supabase: Client, row: VehicleEventRow) {
+async function readByKey(supabase: Client, row: VehicleEventRow, policy: VehicleEventWritePolicy) {
   return await supabase
     .from('vehicle_events')
-    .select('id, metadata, sold_at, ended_at')
+    .select('id, metadata, sold_at, ended_at' + (policy.activeAuction ? ',event_status,event_type,source_url,identity_check,source_suspect' : '') + (policy.compactMetadataCas ? ',vehicle_event_metadata_digest' : ''))
     .eq('vehicle_id', row.vehicle_id)
     .eq('source_platform', row.source_platform)
     .eq('source_listing_id', row.source_listing_id)
@@ -103,17 +109,41 @@ function err(e: { message?: string; code?: string } | string): VehicleEventWrite
 }
 
 async function updateLive(supabase: Client, live: LiveRow, row: VehicleEventRow, policy: VehicleEventWritePolicy): Promise<VehicleEventWriteResult> {
+  if (policy.activeAuction) {
+    const clock = Date.parse(policy.activeAuction.now);
+    if (!Number.isFinite(clock) || live.event_type !== 'auction' || !['active', 'live'].includes(live.event_status ?? '')
+      || live.source_url !== policy.activeAuction.sourceUrl || live.sold_at != null
+      || live.identity_check === 'mismatch' || (live.source_suspect?.length ?? 0) > 0 || clocksLocked(live.metadata))
+      return { action: 'skipped', reason: 'active auction ownership, terminal or clock guard' };
+  }
+  if (policy.compactMetadataCas && !/^[0-9a-f]{64}$/.test(live.vehicle_event_metadata_digest ?? ''))
+    return { action: 'skipped', reason: 'metadata digest unavailable' };
   const prior = Date.parse(String(live.metadata?.source_observed_at ?? ''));
   const incoming = Date.parse(policy.sourceObservedAt ?? '');
   if (Number.isFinite(prior) && Number.isFinite(incoming) && incoming < prior) {
     return { action: 'skipped', reason: 'older source observation' };
   }
+  if (policy.activeAuction && live.ended_at != null && Date.parse(String(row.ended_at)) !== Date.parse(live.ended_at)
+    && Number.isFinite(prior) && !(incoming > prior)) return { action: 'skipped', reason: 'scheduled end requires a newer source observation' };
+  if (policy.rejectEqualClockDifferentObservation && Number.isFinite(prior) && incoming === prior
+    && (typeof row.metadata?.auction_observation_id !== 'string' || !row.metadata.auction_observation_id
+      || live.metadata?.auction_observation_id !== row.metadata.auction_observation_id))
+    return { action: 'skipped', reason: 'different auction observations at the same source clock' };
   const { patch, locked } = patchForLiveRow(live, row);
   if (policy.preserveEventStatus) delete patch.event_status;
+  if (policy.activeAuction && row.ended_at != null && Date.parse(String(row.ended_at)) > Date.parse(policy.activeAuction.now))
+    patch.ended_at = row.ended_at; // This guarded active row owns a scheduled end, never a terminal outcome.
   let update = supabase.from('vehicle_events').update(patch).eq('id', live.id);
   if (policy.sourceObservedAt) {
     // Compare the metadata version we merged, including supersession locks: a concurrent writer must win.
-    update = live.metadata == null ? update.is('metadata', null) : update.eq('metadata', JSON.stringify(live.metadata));
+    update = policy.compactMetadataCas ? update.eq('vehicle_event_metadata_digest', live.vehicle_event_metadata_digest)
+      : live.metadata == null ? update.is('metadata', null) : update.eq('metadata', JSON.stringify(live.metadata));
+  }
+  if (policy.activeAuction) {
+    update = update.eq('event_status', live.event_status).eq('event_type', 'auction').eq('source_url', live.source_url).is('sold_at', null);
+    update = live.ended_at == null ? update.is('ended_at', null) : update.eq('ended_at', live.ended_at);
+    update = live.identity_check == null ? update.is('identity_check', null) : update.eq('identity_check', live.identity_check);
+    update = live.source_suspect == null ? update.is('source_suspect', null) : update.eq('source_suspect', '{}');
   }
   const upd = await update.select('id').limit(1);
   if (upd.error) return err(upd.error);
@@ -129,7 +159,12 @@ export async function writeVehicleEventByKey(supabase: Client, row: VehicleEvent
   if (!row.source_listing_id) return { action: 'skipped', reason: 'no source_listing_id' };
   if (policy.sourceObservedAt && !Number.isFinite(Date.parse(policy.sourceObservedAt))) return { action: 'skipped', reason: 'invalid source observation clock' };
 
-  const sel = await readByKey(supabase, row);
+  if ((policy.compactMetadataCas || policy.rejectEqualClockDifferentObservation) && !policy.sourceObservedAt) return { action: 'skipped', reason: 'compact CAS requires source observation clock' };
+  if (policy.activeAuction && (!policy.sourceObservedAt || !Number.isFinite(Date.parse(policy.sourceObservedAt)) || row.event_type !== 'auction' || row.source_url !== policy.activeAuction.sourceUrl
+    || !['active', 'live'].includes(String(row.event_status)) || !Number.isFinite(Date.parse(policy.activeAuction.now))
+    || !Number.isFinite(Date.parse(String(row.ended_at))) || Date.parse(String(row.ended_at)) <= Date.parse(policy.activeAuction.now)))
+    return { action: 'skipped', reason: 'invalid active auction projection' };
+  const sel = await readByKey(supabase, row, policy);
   if (sel.error) return err(sel.error);
   if (Array.isArray(sel.data) && sel.data.length > 0) return await updateLive(supabase, sel.data[0] as LiveRow, row, policy);
 
@@ -139,7 +174,7 @@ export async function writeVehicleEventByKey(supabase: Client, row: VehicleEvent
     return { action: 'inserted', id };
   }
   if (String(ins.error.code ?? '') === '23505') {
-    const again = await readByKey(supabase, row);
+    const again = await readByKey(supabase, row, policy);
     if (again.error) return err(again.error);
     if (Array.isArray(again.data) && again.data.length > 0) return await updateLive(supabase, again.data[0] as LiveRow, row, policy);
   }

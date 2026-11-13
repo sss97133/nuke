@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
     const photos = availablePhotos.slice(0, 600);
     const assessment = await readVehicleAssessment(db, v, {
       photos, photoHasMore: availablePhotos.length > 600, contributorEvidence: intake,
-      claimAfter: body.claim_after, commentAfter: body.comment_after,
+      claimAfter: body.claim_after, commentAfter: body.comment_after, appearanceAfter: body.appearance_after,
     });
     const identity = {
       year: assessment.listing.supported.year ?? null, make: assessment.listing.supported.make ?? null,

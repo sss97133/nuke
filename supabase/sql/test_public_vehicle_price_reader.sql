@@ -5,7 +5,7 @@
 ALTER TABLE public.vehicles ADD COLUMN entry_type text;
 \ir ../migrations/20261019021500_profile_reader_contributor_role.sql
 SET statement_timeout = '15s';
-SELECT public.t_assert(md5(pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure))='3a52d01c3441d1bdb4423ffb68c3329a', -- gitleaks:allow (verified MD5 of a SQL function definition, not a credential)
+SELECT public.t_assert(md5(pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure))='fb446745057e9a0493f259ef24433617', -- gitleaks:allow (verified MD5 of a SQL function definition, not a credential)
   'profile is the measured live definition');
 
 ALTER TABLE public.vehicles

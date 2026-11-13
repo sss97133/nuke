@@ -8,6 +8,8 @@ export type VehicleIdentitySource = {
   transmission?: string | null;
   transmission_model?: string | null;
   mileage?: number | null;
+  /** The record says the car is built as a tribute (vehicles.is_replica): its trim is a style, not a factory trim. */
+  is_replica?: boolean | null;
 };
 
 export type VehicleIdentityOptions = {
@@ -31,6 +33,21 @@ export type VehicleIdentityToken = {
 };
 
 const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * A tribute's trim, the way an auction title says it: "Trans Am-Style". An all-capitals trim is title-cased word by
+ * word (a word with a digit or a sign, such as WS6 or RS/SS, keeps its spelling; a single short word such as SS too).
+ */
+export function tributeTrimLabel(trim: string): string {
+  const t = trim.trim();
+  if (!t) return t;
+  const words = t.split(/\s+/);
+  const allCaps = t === t.toUpperCase();
+  const cased = !allCaps || (words.length === 1 && t.length <= 2)
+    ? words
+    : words.map(w => (/[^A-Z]/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase()));
+  return `${cased.join(' ')}-Style`;
+}
 
 /**
  * DISPLAY-ONLY cleanup: strips common listing boilerplate from a field when the DB is contaminated.
@@ -181,7 +198,8 @@ export function getVehicleIdentityTokens(
   const modelRaw = v.normalized_model || v.model || '';
   const model = sanitizeIdentityToken(modelRaw, ctx);
   const series = sanitizeIdentityToken(v.series, ctx);
-  const trim = sanitizeIdentityToken(v.trim, ctx);
+  const trimRecorded = sanitizeIdentityToken(v.trim, ctx);
+  const trim = trimRecorded && v.is_replica ? tributeTrimLabel(trimRecorded) : trimRecorded;
   const transmissionDisplay = getTransmissionDisplay(v);
   const rawTransmission = String(v.transmission_model || v.transmission || '').trim();
   const isManual = rawTransmission ? isManualTransmission(rawTransmission) : false;

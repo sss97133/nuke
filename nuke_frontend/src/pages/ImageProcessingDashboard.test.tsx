@@ -112,31 +112,23 @@ it('suppresses overlapping manual refreshes', async () => {
   expect(button('Refresh data').disabled).toBe(false);
 });
 
-it('makes event refresh opt-in, bounded and feed-only, and exposes subscription failure', async () => {
+it('makes feed refresh opt-in, once a minute and feed-only, with no Realtime channel', async () => {
   vi.useFakeTimers(); await render(); expect(fixture.channel).not.toHaveBeenCalled();
   await click('Feed updates off');
-  await act(async () => fixture.status!('SUBSCRIBED'));
-  expect(text()).toContain('at most once a minute');
-  await act(async () => {
-    fixture.event!({ new: { kind: 'condition', structured_data: { analysis_kind: 'unrelated' } } });
-    fixture.event!({ new: { kind: 'condition', structured_data: { analysis_kind: 'image_deep_byok' } } });
-    fixture.event!({ new: { kind: 'condition', structured_data: { analysis_kind: 'image_deep_byok' } } });
-    await vi.advanceTimersByTimeAsync(60_000);
-  });
+  expect(text()).toContain('updates once a minute');
+  await act(async () => vi.advanceTimersByTimeAsync(60_000));
   expect(fixture.feed).toHaveBeenCalledTimes(2); expect(fixture.rpc).toHaveBeenCalledTimes(1);
-  await act(async () => fixture.status!('CHANNEL_ERROR'));
-  expect(text()).toContain('Live updates are unavailable');
-  await click('Feed updates on'); expect(fixture.removeChannel).toHaveBeenCalledTimes(1);
+  await act(async () => vi.advanceTimersByTimeAsync(60_000));
+  expect(fixture.feed).toHaveBeenCalledTimes(3); expect(fixture.rpc).toHaveBeenCalledTimes(1);
+  expect(fixture.channel).not.toHaveBeenCalled();
 });
 
 it('does not run scheduled feed reads while hidden or after updates are switched off', async () => {
   vi.useFakeTimers(); await render(); await click('Feed updates off');
-  await act(async () => fixture.event!({ new: { kind: 'condition', structured_data: { analysis_kind: 'image_deep_byok' } } }));
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
   await act(async () => vi.advanceTimersByTimeAsync(60_000));
   expect(fixture.feed).toHaveBeenCalledTimes(1);
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
-  await act(async () => fixture.event!({ new: { kind: 'condition', structured_data: { analysis_kind: 'image_deep_byok' } } }));
   await click('Feed updates on');
   await act(async () => vi.advanceTimersByTimeAsync(60_000));
   expect(fixture.feed).toHaveBeenCalledTimes(1);

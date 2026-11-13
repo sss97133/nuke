@@ -48,7 +48,8 @@ CREATE OR REPLACE TEMP MACRO title_trans(t) AS CASE
 -- Model words: the first 1-4 words after the make ("360 challenge stradale ..."), compared position by position.
 CREATE OR REPLACE TEMP MACRO pfx(m, k) AS CASE WHEN len(string_split(m, ' ')) >= k THEN array_to_string(string_split(m, ' ')[1:k], ' ') END;
 
--- Live lots (live-bands.mjs fills in __LIVE_TSV__ and __BANDS_CSV__) -> model page -> CompBase band as of now.
+-- Live lots (live-bands.mjs fills in __LIVE_TSV__, __BANDS_CSV__ and __NOW__, the board's synced_at) -> model page ->
+-- CompBase band as of that read.
 CREATE OR REPLACE TEMP TABLE live AS
   SELECT vid AS key, title, try_cast(bid AS DOUBLE) AS bid, nr = 'true' AS no_reserve
   FROM read_csv('__LIVE_TSV__', delim = '\t', header = false, quote = '',
@@ -74,10 +75,10 @@ COPY (
                     title_trans(l.title) AS ttr, w.t1, w.t2, w.t3, w.t4
              FROM live l JOIN live_map m USING (key) LEFT JOIN live_words w USING (key) WHERE m.share >= 0.6),
   pairs AS (SELECT t.key, c.price,
-                   comp_weight(epoch(now()) - epoch(c.end_ts), t.td, c.drive, t.ty, c.year, t.tmi, c.miles, t.ttr, c.trans,
+                   comp_weight(epoch(TIMESTAMPTZ '__NOW__') - epoch(c.end_ts), t.td, c.drive, t.ty, c.year, t.tmi, c.miles, t.ttr, c.trans,
                                NULL, c.build, t.no_reserve, c.no_reserve, NULL, c.photos, NULL, c.desc_len) AS w,
                    CASE WHEN cw.m4 = t.t4 THEN 4 WHEN cw.m3 = t.t3 THEN 3 WHEN cw.m2 = t.t2 THEN 2 WHEN cw.m1 = t.t1 THEN 1 ELSE 0 END AS lw
-            FROM t JOIN comp_base c ON c.cohort = t.cohort AND c.end_ts >= now() - INTERVAL 10 YEAR
+            FROM t JOIN comp_base c ON c.cohort = t.cohort AND c.end_ts >= TIMESTAMPTZ '__NOW__' - INTERVAL 10 YEAR
                                     AND (t.td IS NULL OR c.drive IS NULL OR c.drive = t.td)
                    LEFT JOIN comp_words cw ON cw.slug = c.slug),
   levels AS (SELECT p.key, L.L, power(sum(p.w), 2) / sum(p.w * p.w) AS n_eff

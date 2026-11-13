@@ -34,8 +34,17 @@ export interface MarketRowDetails {
   currentBid: number | null;
 }
 
+// The board stores makes in capitals (FERRARI, MERCEDES-BENZ); a headline reads them as the maker writes them.
+// Short words stay capitals (BMW, MG, AMC); a make already in mixed case is left alone.
+const MAKE_SPELLINGS: Record<string, string> = { MCLAREN: 'McLaren', DE: 'De', VON: 'von', DELOREAN: 'DeLorean', 'AM GENERAL': 'AM General', MINI: 'MINI' };
+export function displayMake(make: string): string {
+  if (!make || make !== make.toUpperCase()) return make;
+  if (MAKE_SPELLINGS[make]) return MAKE_SPELLINGS[make];
+  return make.replace(/[A-Z][A-Z0-9']*/g, w => MAKE_SPELLINGS[w] ?? (w.length <= 3 ? w : w[0] + w.slice(1).toLowerCase()));
+}
+
 export function vehicleIdentity(a: Pick<LiveAuction, 'year' | 'make' | 'model'>): string {
-  return [a.year, a.make === 'NO MAKE' ? null : a.make, a.model].filter(Boolean).join(' ') || 'Vehicle identity unrecorded';
+  return [a.year, a.make === 'NO MAKE' ? null : displayMake(a.make), a.model].filter(Boolean).join(' ') || 'Vehicle identity unrecorded';
 }
 
 const text = (value: unknown): string | null => {

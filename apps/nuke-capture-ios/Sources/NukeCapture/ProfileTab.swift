@@ -8,8 +8,8 @@
 //   get_user_contribution_days(uuid)  → the work-day record (one row per
 //                                       day·kind; grouped here into day rows)
 //   get_user_day_receipt(uuid, date)  → tap a day, get the receipt
-//   v_user_connections                → own profile only (auth-scoped view):
-//                                       the user's grants as kind+count rows
+//   get_user_producer_signals(uuid)   → the header's activity line and chips
+//                                       (work hours are LOGGED, not confirmed)
 //
 // v1 entry to other profiles = search by handle (.searchable over
 // profiles.username).
@@ -30,9 +30,11 @@ struct ProfileRow: Decodable, Identifiable {
     let role: String?
 }
 
-/// get_user_producer_signals → the profile's live + lifetime PROOF-OF-WORK read.
+/// get_user_producer_signals → the profile's live + lifetime work read.
 /// A signal is a function over the user's atomic data (a live feed), not a vanity
-/// count. We never surface confirmed-$ (all sessions unconfirmed → would lie).
+/// count. hours_* and work_days_* sum work_sessions of EVERY status (completed,
+/// derived, auto-inferred); almost none are owner-confirmed, so the header says
+/// "logged, unconfirmed", never "proven". We never surface confirmed-$ either.
 struct ProducerSignals: Decodable {
     let last_worked: String?
     let worked_today: Bool?
@@ -63,8 +65,8 @@ struct CalendarDay: Decodable {
     let day: String          // "yyyy-MM-dd"
     let photos: Int
     let events: Int
-    let work: Int            // confirmed work SESSIONS that day
-    let work_minutes: Int    // confirmed labor minutes — the real value signal
+    let work: Int            // work sessions logged that day, any status (not owner-confirmed)
+    let work_minutes: Int    // logged labor minutes, any status — unconfirmed
     /// Job dollars on confirmed work. Null for everyone but the record's own user since
     /// #1048 (money_masked true), so a non-owner's calendar must decode, not throw.
     let work_cost: Int?
@@ -145,7 +147,8 @@ struct DayReceipt: Decodable {
 // ─── Tab root: own profile (or the sample) + handle search ──────────────────
 
 struct ProfileTab: View {
-    /// Signed-in user id, or nil (explore mode → the sample profile).
+    /// Signed-in user id, or nil (explore mode: handle search and the Sign In door, no profile of anyone's
+    /// standing in as a sample). A visitor sees the public view of whichever profile they open.
     let ownUserId: String?
     /// Explore mode: the door back to sign-in (toolbar). nil when signed in.
     var onSignIn: (() -> Void)? = nil
@@ -157,15 +160,31 @@ struct ProfileTab: View {
     @State private var searchRequests = ReadRequestGuard()
     @State private var showAccount = false
 
-    private var rootUserId: String {
-        ownUserId ?? Config.sampleProfileUserId
+    /// The profile the tab opens on: your own, or none when signed out. Never someone else's account as a sample.
+    static func rootUserId(signedInAs ownUserId: String?) -> String? {
+        guard let id = ownUserId?.trimmingCharacters(in: .whitespaces), !id.isEmpty else { return nil }
+        return id
     }
 
     var body: some View {
         NavigationStack {
             Group {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    ProfileView(userId: rootUserId, isOwn: ownUserId != nil, onSignIn: onSignIn)
+                    if let root = Self.rootUserId(signedInAs: ownUserId) {
+                        ProfileView(userId: root, isOwn: true, onSignIn: onSignIn)
+                    } else {
+                        // Signed out: no stand-in profile. Search opens anyone's public view.
+                        ContentUnavailableView {
+                            Label("Find a profile", systemImage: "person.crop.circle")
+                        } description: {
+                            Text("Search a handle to open the public view of that profile. Sign in to see your own.")
+                        } actions: {
+                            if let onSignIn {
+                                Button("Sign in", action: onSignIn)
+                                    .buttonStyle(.borderedProminent)
+                            }
+                        }
+                    }
                 } else if searching {
                     ProgressView("Searching profiles…")
                 } else if searchError && results.isEmpty {
@@ -301,27 +320,20 @@ struct ProfileView: View {
     @State private var garageIsCached = false
     @State private var garageCachedAt: Date?
     @State private var openVehicle: GarageVehicle?
-    /// Today's garage activity (own profile only) and the recency order it gives the fleet.
-    @StateObject private var garageActivity = GarageActivityStore()
-    @State private var showPast = false           // "Past & contributions" stays collapsed
     @State private var photoEvidence: LocalProfileEvidence?
     @State private var photoEvidenceError: String?
-    @State private var showAlbums = false
+    @State private var showPhotoRecord = false
+    @State private var showGarage = false
+    @Environment(\.openGarageTab) private var openGarageTab
     @ObservedObject private var libraryIngest = LibraryIngest.shared
 
-    // Stewardship and contribution are separate current relationships. A newly
-    // photographed vehicle remains visible without implying that the photographer owns it.
-    // Only previous ownership belongs in collapsed history.
-    // Intake placeholders (e.g. "UNRESOLVED / Intake Quarantine") are holding areas, not vehicles:
-    // kept out of the fleet lists and shown apart (PhotoPresentation.isPlaceholderVehicle).
-    private var realGarage: [GarageVehicle] { garageActivity.sorted(garage.filter { !$0.isPlaceholder }) }
+    // Each fact once: your own profile carries one line of relationship counts that opens the Garage
+    // tab (the list lives there); a visitor sees the public owned vehicles. Intake placeholders
+    // (e.g. "UNRESOLVED / Intake Quarantine") are holding areas, not vehicles: kept out of the counts
+    // and shown under the photo record (PhotoPresentation.isPlaceholderVehicle).
+    private var realGarage: [GarageVehicle] { garage.filter { !$0.isPlaceholder } }
     private var heldGarage: [GarageVehicle] { garage.filter(\.isPlaceholder) }
     private var currentGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "owner" } }
-    private var contributedGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "contributor" } }
-    private var pastGarage: [GarageVehicle] { realGarage.filter { $0.relationship == "previously_owned" } }
-    private var otherRelationships: [String] {
-        Array(Set(realGarage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor"].contains($0) }.sorted()
-    }
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
     // server-side truth (the RPC); `engine` is this device's local truth.
@@ -343,35 +355,34 @@ struct ProfileView: View {
     @State private var producer: ProducerSignals?
     @State private var affiliations: [OrgAffiliationsSection.Row] = []
     @State private var affiliationsFailure: String?
+    // The hero's model, rebuilt whenever the calendar lands (PhotoHistory over `days`).
+    @State private var photoHistory: PhotoHistory?
+    // Owner only: the newest frames on the record (get_user_profile_photos).
+    @State private var recentPhotos: [ProfilePhoto] = []
 
     var body: some View {
         List {
-            // IDENTITY — a builder's profile, not a settings form. Face, name,
-            // handle, where they are, and their numbers. This is the showcase head.
-            Section { identityHeader }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-
-            // "What brings you here?": the one door to change the onboarding answer. Own profile, or
-            // the sample while exploring signed out (the visitor's answer).
-            if isOwn {
-                PersonaProfileSection(scope: PersonaStorage.scope(userId: userId, signedIn: true))
-            } else if onSignIn != nil, userId == Config.sampleProfileUserId {
-                PersonaProfileSection(scope: PersonaStorage.visitorScope)
-            }
-
-            if isOwn { photoEvidenceSection }
-
-            // BARCODE — the proof-of-work graph, directly under the identity (the
-            // labor story IS the headline; it belongs with the producer signals,
-            // not buried below sync).
-            if !days.isEmpty {
-                Section {
-                    BarcodeTimeline(days: days) { day in receiptDay = day }
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+            // THE PHOTO RECORD — the headline (owner, 2026-11-12: "Good to see the 82k images. Bad
+            // everything else"). The count on the record, how long it has been kept, photos per month
+            // across every year and the newest frames. No placeholder face, no "Your profile" title, no
+            // stats strip or summary line repeating the same record. A tap goes deeper: year → day → receipt.
+            Section {
+                Button { showPhotoRecord = true } label: {
+                    ProfilePhotoRecordHero(
+                        history: photoHistory, settled: profileSettled,
+                        fallbackTotal: producer?.images_total,
+                        libraryCount: isOwn ? photoEvidence?.catalog.photos?.count : nil,
+                        name: displayName, handle: profile?.username.flatMap { $0.isEmpty ? nil : $0 },
+                        recent: recentPhotos,
+                        avatarURL: NukeImage.thumb(profile?.avatar_url, width: 120),
+                        bio: profile?.bio)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens the photo record by year")
             }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
 
             // The user readers refused this viewer: one card with the door, in place of the
             // garage, calendar and latest-work sections it would have filled.
@@ -393,7 +404,19 @@ struct ProfileView: View {
                 }
             }
 
-            ClientFaceSection(isOwn: isOwn)
+            // BUILDER HISTORY — vehicles by first evidence, work (inferred apart from confirmed) and, for
+            // the account itself, money. One row each from the versioned read functions; each drills into
+            // the reader's own breakdown. The vehicle row opens the Garage tab, which owns the list.
+            BuilderHistorySection(userId: userId, isOwn: isOwn, openGarage: openGarageAction)
+
+            // A visitor: the public vehicles the person owns (the Garage tab is the owner's own list).
+            if !isOwn {
+                if !garage.isEmpty { garageSection } else if garageError { garageErrorSection }
+            } else if garageLoaded && garage.isEmpty && unresolvedGarageSources.isEmpty && !garageError {
+                // Cold start: say how cars arrive, never a dead profile.
+                emptyGarageSection
+            }
+
             ProviderFaceSection(userId: userId, isOwn: isOwn)
 
             // ORGANIZATIONS — the person's memberships with each relation's weight (user_org_relations), on their
@@ -401,26 +424,7 @@ struct ProfileView: View {
             // showing up"; UserWorkspaceContent.tsx), and the web shows them only on the signed-in capsule.
             if isOwn { OrgAffiliationsSection(rows: affiliations, failureText: affiliationsFailure) }
 
-            // GARAGE — the user's vehicles, the way into the whole drill chain.
-            // Empty + own profile → a LIVING state that says what's coming, not a
-            // hidden section that reads as a dead profile (the cold-start gravestone).
-            if isOwn { GarageDoorSection(userId: userId) }
-            if !garage.isEmpty || !unresolvedGarageSources.isEmpty {
-                garageSection
-            } else if garageError {
-                // A failed load is NOT an empty garage — say so, with a way back.
-                // (This is the 29.5s-timeout incident: the owner's full garage
-                // had read as "No vehicles yet".)
-                garageErrorSection
-            } else if isOwn && garageLoaded {
-                emptyGarageSection
-            }
-
             if isOwn { ObservedCarsSection(userId: userId) }
-            if isOwn { SourceInboxSection(userId: userId) }
-
-            // SYNC — owner-only ledger that proves the phone↔record link.
-            if isOwn { syncSection }
 
             if let loadError {
                 Section {
@@ -435,9 +439,7 @@ struct ProfileView: View {
                 }
             }
 
-            // LATEST WORK — the most recent UNDERSTOOD days as STORIES, capped.
-            // NOT the old 1,740-row photo-count ledger (a count is not the work;
-            // the barcode is the full navigator). Each row → its day receipt.
+            // LATEST WORK — the most recent UNDERSTOOD days as STORIES, capped. Each row → its day receipt.
             if !latest.isEmpty {
                 Section("Latest work") {
                     ForEach(latest.prefix(6)) { day in
@@ -462,7 +464,19 @@ struct ProfileView: View {
             DayReceiptView(userId: userId, date: day.day)
                 .presentationDetents([.medium, .large])
         }
-        .sheet(isPresented: $showAlbums) { LibraryAlbumsView(userId: userId) }
+        .navigationDestination(isPresented: $showPhotoRecord) {
+            // The drill: by year → day → receipt. The pipeline's own counts (uploads, filing, on-device
+            // reads, album sync) and the sync ledger live here, one level down, for the account itself.
+            ProfilePhotoHistoryView(
+                userId: userId, history: photoHistory, days: days, isOwn: isOwn,
+                record: isOwn ? AnyView(ProfilePhotoRecordView(
+                    userId: userId, sync: sync, evidence: photoEvidence, vehicles: garage, held: heldGarage,
+                    evidenceError: photoEvidenceError, albumSyncSummary: libraryIngest.albumSyncSummary)) : nil
+            ) {
+                if isOwn { syncSection }
+            }
+        }
+        .navigationDestination(isPresented: $showGarage) { GarageView(userId: userId) }
         // (openVehicle sheet moved onto garageSection — avoids two .sheet on one view)
         .onReceive(NotificationCenter.default.publisher(for: SubjectResolutionEngine.didChange)) { _ in
             Task { await loadGarage() }
@@ -486,31 +500,6 @@ struct ProfileView: View {
         }
     }
 
-    @ViewBuilder private var photoEvidenceSection: some View {
-        Section("Photo record") {
-            Button { showAlbums = true } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let evidence = photoEvidence {
-                        if let visible = evidence.catalog.photos?.count {
-                            Text("\(visible) accessible photos · \(evidence.reviewed) read on-device")
-                                .monospacedDigit()
-                        }
-                        if evidence.catalog.accessScope == "full" {
-                            Text("\(evidence.catalog.albums.count) albums · \(evidence.matched) serial matches")
-                                .font(.caption).foregroundStyle(.secondary)
-                        } else { Text("Album coverage unknown").font(.caption).foregroundStyle(.secondary) }
-                        if evidence.unresolved > 0 {
-                            Text("\(evidence.unresolved) vehicle frames awaiting identity")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    } else { Label("Albums & source photos", systemImage: "photo.on.rectangle") }
-                }
-            }
-            if let photoEvidenceError { Text(photoEvidenceError).font(.caption).foregroundStyle(.secondary) }
-            if let summary = libraryIngest.albumSyncSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
-        }
-    }
-
     private func loadOnAppear() async {
         async let profileRead: Void = load()
         async let syncRead: Void = loadSync()   // owner-only inside loadSync
@@ -519,7 +508,22 @@ struct ProfileView: View {
         async let producerRead: Void = loadProducer()
         async let affiliationsRead: Void = loadAffiliations()
         async let photoRead: Void = runPhotoPipeline()
-        _ = await (profileRead, syncRead, garageRead, latestRead, producerRead, affiliationsRead, photoRead)
+        async let recentRead: Void = loadRecentPhotos()
+        _ = await (profileRead, syncRead, garageRead, latestRead, producerRead, affiliationsRead, photoRead, recentRead)
+    }
+
+    /// Own profile: the vehicle row opens the Garage tab (or pushes the Garage screen off-tab). Nil for a visitor.
+    private var openGarageAction: (() -> Void)? {
+        guard isOwn else { return nil }
+        let openTab = openGarageTab
+        let show = $showGarage
+        return { if let openTab { openTab() } else { show.wrappedValue = true } }
+    }
+
+    private func loadRecentPhotos() async {
+        guard isOwn else { return }
+        do { recentPhotos = try await RecentPhotoReader.load(userId: userId) }
+        catch { NSLog("NukeCapture recent photos failed: %@", String(describing: error)) }
     }
 
     private func loadAffiliations() async {
@@ -676,270 +680,22 @@ struct ProfileView: View {
             savedName: isOwn ? ProfileDisplayName().saved(for: userId) : nil)
     }
 
-    // ─── Identity header — the builder, front and center ─────────────────────
-    @ViewBuilder private var identityHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 14) {
-                // Face. avatar_url when present; a clean monogram-less placeholder
-                // otherwise — never a broken image.
-                CachedAsyncImage(url: NukeImage.thumb(profile?.avatar_url, width: 200)) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Image(systemName: "person.crop.circle.fill")
-                        .resizable().scaledToFit()
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(width: 84, height: 84)
-                .clipShape(Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    if let name = displayName {
-                        Text(name)
-                            .font(.system(.title, design: .rounded).weight(.bold))
-                            .foregroundStyle(Color.primary)
-                            .lineLimit(1)
-                    } else if profileSettled {
-                        Text(isOwn ? "Your profile" : "Nuke member")
-                            .font(.system(.title, design: .rounded).weight(.bold))
-                            .foregroundStyle(Color.primary)
-                            .lineLimit(1)
-                    } else {
-                        NukeSkeletonBlock(height: 24).frame(maxWidth: 180)
-                    }
-                    if let h = profile?.username, !h.isEmpty {
-                        Text("@\(h)").font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    if let place = [profile?.city, profile?.location].compactMap({ $0 })
-                        .first(where: { !$0.isEmpty }) {
-                        Label(place, systemImage: "mappin.and.ellipse")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-
-            if let bio = profile?.bio, !bio.isEmpty {
-                Text(bio).font(.callout).foregroundStyle(Color.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            // profiles.role is a self-claim, never a decided context: dim, at the record rung.
-            if let role = profile?.role, !role.isEmpty {
-                NukePill(text: role.replacingOccurrences(of: "_", with: " ").capitalized)
-            }
-
-            // LIVE STATE — is this node producing NOW? The first "worth-connecting-to"
-            // read. Capture-or-work based (uploading today counts), honest when idle.
-            if let p = producer {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(p.active_today == true ? Color.green : Color.secondary)
-                        .frame(width: 7, height: 7)
-                    Text(activityLine(p))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-
-            // PRODUCER SIGNALS — functions over the work record, not vanity counts.
-            // ("8 vehicles" was a dead count; this is "did they do the work".)
-            if let p = producer {
-                HStack(spacing: 22) {
-                    if let hy = p.hours_year, hy > 0 { stat("\(hy)h", "this year") }
-                    if let wy = p.work_days_year, wy > 0 { stat("\(wy)", "work-days") }
-                    if let ls = p.longest_streak, ls > 0 { stat("\(ls)", "best streak") }
-                    // A count with its population: analyzed frames out of the record's frames.
-                    if let an = p.images_analyzed, an > 0 {
-                        if let total = p.images_total, total > 0 {
-                            stat("\(an.formatted()) of \(total.formatted())", "analyzed")
-                        } else {
-                            stat(an.formatted(), "analyzed · total unknown")
-                        }
-                    }
-                }
-            }
-
-            // THE FLEET — the maker headline the VEHICLE profile earns, lifted to the
-            // whole body of work: proven LABOR (worth-hiring, Tenet 9) across the
-            // fleet, and the fleet's defensible WORTH in the SAME est/block grammar a
-            // single vehicle uses — never a firm price, "Not priced yet" at zero. The
-            // per-car evidence drills one section down (the garage rows). Own profile.
-            if isOwn, let p = producer, !currentGarage.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
-                    Divider().padding(.vertical, 2)
-                    Text(fleetLaborLine(p))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    // Shown only when a price is on record; an unpriced fleet says nothing, never a guess.
-                    if fleetPricedCount > 0 {
-                        Text(fleetWorthLine)
-                            .font(.footnote).monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-    }
-
-    /// "Active today · 220 photos" when producing now; "Last worked 24 days ago"
-    /// when idle — honest either way, never a fake streak.
-    private func activityLine(_ p: ProducerSignals) -> String {
-        if p.worked_today == true { return "Worked today" }
-        if p.active_today == true {
-            let n = p.images_today ?? 0
-            return n > 0 ? "Active today · \(NukeDisplay.count(n, "photo"))" : "Active today"
-        }
-        if let last = p.last_worked {
-            return "Last worked \(last)"
-        }
-        return "No work logged yet"
-    }
-
-    @ViewBuilder private func stat(_ value: String, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(value).font(.system(.title3, design: .rounded).weight(.bold)).monospacedDigit().foregroundStyle(Color.primary)
-            Text(label).font(.caption).foregroundStyle(.secondary)
-        }
-    }
-
-    // ─── Fleet headline — the maker's whole body of work, mirroring the VEHICLE
-    //     profile's worth read. Summed in-view from already-fetched data
-    //     (get_user_garage est values + get_user_producer_signals); no new fetch,
-    //     no new RPC, no drill sheet (the per-car evidence is the garage section
-    //     one row down — each car drills to its own WorthBracketView, C10).
-    /// Defensible fleet worth = sum of the class-stratified "est" values already on
-    /// the garage rows (get_user_garage only emits defensible estimates).
-    /// Zero until the garage reader carries a defense verdict per vehicle: the same rule that hides
-    /// an undefended estimate on the vehicle page (#1065) hides its sum here.
-    private var fleetWorth: Double { 0 }
-    private var fleetPricedCount: Int { 0 }
-
-    /// The Tenet-9 worth-hiring sentence — proven LABOR across the fleet, not a
-    /// vanity count. Lifetime totals, distinct from the "this year" producer chips
-    /// above (no fact stated twice).
-    private func fleetLaborLine(_ p: ProducerSignals) -> String {
-        var parts = ["\(currentGarage.count) vehicle\(currentGarage.count == 1 ? "" : "s")"]
-        if let h = p.hours_total, h > 0 { parts.append("\(h)h proven") }
-        if let d = p.work_days_total, d > 0 { parts.append("\(d) logged days") }
-        return parts.joined(separator: " · ")
-    }
-
-    /// The fleet's worth in the SAME est/tilde/block grammar a single vehicle uses:
-    /// "~est $210,000 · 3 of 8 priced" when thin, "Not priced yet" when none of the
-    /// fleet is defensibly priced — never a firm fleet number (the valuation law).
-    private var fleetWorthLine: String {
-        guard fleetPricedCount > 0 else {
-            return "Not priced by the reader — a body of work, not a comp average"
-        }
-        let money = fleetWorth.formatted(.currency(code: "USD").precision(.fractionLength(0)))
-        let thin = fleetPricedCount < currentGarage.count
-        return "\(thin ? "~" : "")est \(money) · \(fleetPricedCount) of \(currentGarage.count) priced"
-    }
-
-    // ─── Garage ──────────────────────────────────────────────────────────────
+    // ─── Garage (a visitor's view) ───────────────────────────────────────────
+    /// A visitor's view: the public vehicles the person owns (loadPublicGarage).
     @ViewBuilder private var garageSection: some View {
-      Group {
-        if isOwn {
-            GarageActivitySections(
-                store: garageActivity,
-                retry: { Task { await garageActivity.refresh(vehicles: realGarage) } },
-                open: { id in openVehicle = garage.first { $0.vehicle_id.lowercased() == id.lowercased() } })
-        }
         if !currentGarage.isEmpty {
             Section {
-                // Offline mirror notice — never let cached rows silently pass as
-                // live. Shown once per section, not per row.
-                if garageIsCached {
-                    Label {
-                        Text("Showing saved data" + (garageCachedAt.map { " from \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date()))" } ?? "") + " — may be out of date")
-                    } icon: {
-                        Image(systemName: "wifi.slash")
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
                 ForEach(currentGarage) { v in garageRow(v) }
             } header: {
-                // "The fleet" (was "Garage") — the worth/labor headline lives up in
-                // the identity head now; this just labels the list (Tenet 2: the
-                // fleet figure is stated once, in the headline, not restated here).
                 Text("The fleet · \(currentGarage.count)")
             }
             // Vehicle sheet lives HERE (on the garage section), NOT stacked as a second
             // .sheet on the same List as the day-receipt sheet — two .sheet(item:) on one
             // view is the SwiftUI pitfall where the second silently fails to present.
-        }
-        ForEach(otherRelationships, id: \.self) { role in
-            let rows = realGarage.filter { $0.relationship == role }
-            Section(rows.first?.relationshipLabel ?? role) {
-                ForEach(rows) { v in garageRow(v) }
+            .sheet(item: $openVehicle) { v in
+                VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
             }
         }
-        if !contributedGarage.isEmpty {
-            Section("Your contributions · \(contributedGarage.count)") {
-                ForEach(contributedGarage) { v in garageRow(v) }
-            }
-        }
-        // Former ownership remains available as history.
-        if !pastGarage.isEmpty {
-            Section {
-                if showPast { ForEach(pastGarage) { v in garageRow(v) } }
-            } header: {
-                Button { withAnimation(.snappy(duration: 0.2)) { showPast.toggle() } } label: {
-                    HStack {
-                        Text("History · \(pastGarage.count)")
-                        Spacer()
-                        Image(systemName: showPast ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        if isOwn {
-            Section {
-                NavigationLink {
-                    ProfilePhotosView(userId: userId, vehicles: garage)
-                } label: {
-                    Label("Your photos", systemImage: "photo.on.rectangle.angled")
-                }
-                ForEach(heldGarage) { v in
-                    LabeledContent("Intake holding area") {
-                        Text("\(v.image_count.formatted()) photos · not a vehicle").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Photos")
-            } footer: {
-                if !heldGarage.isEmpty {
-                    Text("Photos waiting to be re-homed appear under Your photos → Needs sorting, not as a vehicle.")
-                }
-            }
-        }
-        if isOwn && SupabaseService.currentUserId == userId.lowercased() && !unresolvedGarageSources.isEmpty {
-            Section("Identity pending") {
-                if garageIsCached { Text("Showing saved source statements — may be out of date").font(.caption).foregroundStyle(.secondary) }
-                ForEach(unresolvedGarageSources) { source in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(source.label).font(.subheadline.weight(.medium))
-                        Text(source.statedRoles.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: " · ") + " · account stated")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text("Photo evidence still needs to identify this vehicle.").font(.caption).foregroundStyle(.secondary)
-                        if let quote = source.sourceExcerpt {
-                            DisclosureGroup("Source statement") {
-                                Text(quote).font(.caption)
-                                Text("Recorded \(source.observedAt.prefix(10))").font(.caption2).foregroundStyle(.secondary)
-                            }.font(.caption)
-                        }
-                    }
-                }
-            }
-        }
-      }
-      .sheet(item: $openVehicle) { v in
-          VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
-      }
     }
 
     @ViewBuilder private func garageRow(_ v: GarageVehicle) -> some View {
@@ -966,9 +722,6 @@ struct ProfileView: View {
                     }
                     if let period = v.relationshipPeriod {
                         Text(period).font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let line = GarageActivityFeed.lastActivity(garageActivity.latestByVehicle[v.vehicle_id.lowercased()], now: Date()) {
-                        Text(line).font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
                     }
                 }
                 Spacer()
@@ -1035,8 +788,6 @@ struct ProfileView: View {
             if isOwn && SupabaseService.currentUserId == userId.lowercased() {
                 try LocalStore.shared.cacheUnresolvedGarageSources(userId: userId, sources: unresolved)
             }
-            // The activity feed reads on its own clock; it never holds up the garage rows.
-            Task { await garageActivity.refresh(vehicles: rows.filter { !$0.isPlaceholder }) }
             if isOwn { await loadPhotoEvidence() }
         } catch {
             if Self.isPermissionDenied(error) { signInNeeded = true; garageError = false; return }
@@ -1133,35 +884,12 @@ struct ProfileView: View {
             }
 
             if let sync {
-                LabeledContent("Synced") {
-                    Text("\(sync.synced_total)").monospacedDigit()
-                }
-
-                // ANALYZED → drill into the understood photos (only when any).
-                if sync.analyzed_total > 0 {
-                    NavigationLink {
-                        AnalyzedPhotosView(userId: userId)
-                    } label: {
-                        LabeledContent("Analyzed") {
-                            Text("\(sync.analyzed_total)").monospacedDigit()
-                        }
-                    }
-                } else {
-                    LabeledContent("Analyzed") {
-                        Text("\(sync.analyzed_total)").monospacedDigit()
-                    }
-                }
-
+                // Synced, filed and analyzed are said once, on the header's photo line.
                 if sync.pending_total > 0 {
                     LabeledContent("Pending") {
                         Text("\(sync.pending_total)")
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
-                    }
-                }
-                if sync.filed_total > 0 {
-                    LabeledContent("Filed") {
-                        Text("\(sync.filed_total)").monospacedDigit()
                     }
                 }
                 if let last = sync.last_synced_at {
@@ -1247,7 +975,7 @@ struct ProfileView: View {
         do {
             let rows: [ProfileRow] = try await SupabaseService.client
                 .from("profiles")
-                .select("id,username,full_name,avatar_url,bio,location,city,role")
+                .select("id,username,full_name,avatar_url,bio,location,city")
                 .eq("id", value: userId)
                 .limit(1)
                 .execute()
@@ -1273,6 +1001,7 @@ struct ProfileView: View {
             } catch let e as PostgrestError where e.code == "PGRST202" {
                 days = try await loadContributionDays()
             }
+            photoHistory = PhotoHistory(days: days)
             loadError = nil
         } catch {
             if Self.isPermissionDenied(error) { signInNeeded = true; loadError = nil; profileSettled = true; return }
@@ -1797,6 +1526,40 @@ private struct PhotoFullScreenView: View {
     }
 }
 
+// ─── Header copy: the identity header's strings, as pure functions ────────────
+//
+// get_user_producer_signals sums work_sessions of every status — completed, derived and
+// auto-inferred — and only a handful are owner-confirmed. So hours read "logged,
+// unconfirmed", never "proven" or "confirmed", until a labor reader splits them by status.
+enum ProfileHeaderCopy {
+    struct Stat: Equatable { let value: String; let label: String }
+
+    /// "151h" / "logged this year · unconfirmed"; nil when no hours are on record.
+    static func hoursYearStat(_ p: ProducerSignals) -> Stat? {
+        guard let h = p.hours_year, h > 0 else { return nil }
+        return Stat(value: "\(h.formatted())h", label: "logged this year · unconfirmed")
+    }
+
+    /// "2 owned · 1,446h logged, unconfirmed · 810 logged days".
+    static func fleetLine(owned: Int, _ p: ProducerSignals) -> String {
+        var parts = ["\(owned.formatted()) owned"]
+        if let h = p.hours_total, h > 0 { parts.append("\(h.formatted())h logged, unconfirmed") }
+        if let d = p.work_days_total, d > 0 { parts.append("\(d.formatted()) logged day\(d == 1 ? "" : "s")") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// "Active today · 220 photos" when producing now; "Last worked 2026-06-20" when idle.
+    static func activityLine(_ p: ProducerSignals) -> String {
+        if p.worked_today == true { return "Worked today" }
+        if p.active_today == true {
+            let n = p.images_today ?? 0
+            return n > 0 ? "Active today · \(NukeDisplay.count(n, "photo"))" : "Active today"
+        }
+        if let last = p.last_worked { return "Last worked \(last)" }
+        return "No work logged yet"
+    }
+}
+
 // ─── Organizations: memberships with each relation's weight ────────────────────
 //
 // One read, `user_org_relations`: the person's memberships (organization_contributors) with the relation's weight at
@@ -1832,7 +1595,7 @@ struct OrgAffiliationsSection: View {
                 } header: {
                     Text("Organizations · \(rows.count)")
                 } footer: {
-                    Text("Active relations only. Each is kept warm by contributions, such as photos taken at the business, and goes dormant a day after the last one.")
+                    Text(Self.footer(rows))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             } else if let failureText {
@@ -1856,11 +1619,25 @@ struct OrgAffiliationsSection: View {
                     Circle().fill(RelationWeight.color(r.relation)).frame(width: 6, height: 6)
                     Text(RelationWeight.word(r.relation)).font(.caption.weight(.semibold))
                 }
-                Text(RelationWeight.ago(r.relation.last_contribution_at) ?? "nothing in 2 days")
+                Text(Self.lastContribution(r.relation))
                     .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
             }
         }
         .contentShape(Rectangle())
+    }
+
+    /// The footer says what the list is: warm relations only, or the dormant fallback.
+    static func footer(_ rows: [Row]) -> String {
+        let warmth = "A relation is kept warm by contributions, such as photos taken at the business, and goes dormant a day after the last one."
+        if !rows.isEmpty && rows.allSatisfy({ $0.relation.state == "live" || $0.relation.state == "stalling" }) {
+            return "Live and stalling relations, warmest first. " + warmth
+        }
+        return "None is live or stalling now; these are dormant, most recent contribution first. " + warmth
+    }
+
+    /// The reader looks back 48 h: a missing date is unknown, not "nothing".
+    static func lastContribution(_ r: OrgPage.Relation) -> String {
+        RelationWeight.ago(r.last_contribution_at) ?? "last contribution unknown"
     }
 
     private static func words(_ s: String) -> String {

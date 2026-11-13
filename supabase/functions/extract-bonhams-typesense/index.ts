@@ -43,6 +43,8 @@ import { extractBonhamsHighlights, isBonhamsNonVehicleLot, parseSellerAssessment
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { ART_DEPARTMENTS, ART_LOT_METHOD, artDepartmentFilter, artLotFromDoc, assetTypeForDepartment } from "./artLot.ts";
+import { advance, landedAnything, startFrom, type WalkCursor } from "./landCursor.ts";
 
 // ─── Typesense API config ─────────────────────────────────────────────────────
 
@@ -50,6 +52,8 @@ const TYPESENSE_HOST = "https://api01.bonhams.com";
 const TYPESENSE_COLLECTION = "lots";
 const TYPESENSE_API_KEY = "7YZqOyG0twgst4ACc2VuCyZxpGAYzM0weFTLCC20FQY";
 const DEPARTMENT_FILTER = "department.code:MOT-CAR";
+/** The car walk's row in source_walk_cursors (source_slug bonhams). */
+const LAND_WALK = "typesense_land";
 
 const EXTRACTOR_VERSION = "bonhams-typesense-v1";
 const MAX_PER_PAGE = 250; // Typesense max
@@ -61,6 +65,12 @@ function okJson(body: unknown, status = 200): Response {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+/** One read of the Bonhams search index (a JSON search API with the site's public search key, not a page: archiveFetch does not apply). */
+function typesenseSearch(params: Record<string, string>): Promise<Response> {
+  const url = `${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams(params)}`;
+  return fetch(url, { headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" } }); // guardrail-allow: raw-fetch
 }
 
 function stripHtml(html: string): string {
@@ -393,6 +403,133 @@ Deno.serve(async (req) => {
       return okJson({ success: true, mode: "departments", total: j.found, facets: Object.fromEntries((j.facet_counts ?? []).map((f) => [f.field_name, f.counts])) });
     }
 
+    // ─── MODE: art_census ───────────────────────────────────────────────
+    // The house's own department facet, written as the denominator for asset lots (asset_lot_coverage reads the latest row):
+    // two facet reads (all lots; lots with a published hammer), one source_census row with census_method house_department_facet.
+    //   POST { "mode": "art_census" }
+    if (mode === "art_census") {
+      const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "");
+      const facet = async (filter?: string) => {
+        const params: Record<string, string> = { q: "*", query_by: "title", per_page: "0", facet_by: "department.code,department.name", max_facet_values: "250" };
+        if (filter) params.filter_by = filter;
+        const res = await typesenseSearch(params);
+        if (!res.ok) throw new Error(`Typesense HTTP ${res.status}`);
+        return await res.json() as { found: number; facet_counts?: Array<{ field_name: string; counts: Array<{ value: string; count: number }> }> };
+      };
+      const all = await facet();
+      await new Promise((r) => setTimeout(r, 1000));
+      const priced = await facet("flags.isResultPublished:true && price.hammerPrice:>0");
+      const counts = (j: typeof all, field: string) => Object.fromEntries((j.facet_counts ?? []).find((f) => f.field_name === field)?.counts.map((c) => [c.value, c.count]) ?? []);
+      const byCode = counts(all, "department.code") as Record<string, number>;
+      const pricedByCode = counts(priced, "department.code") as Record<string, number>;
+      // Department names come from a second facet (names are per department, not per code, so a code with two names keeps the first).
+      const names: Record<string, string> = {};
+      const nameCounts = (all.facet_counts ?? []).find((f) => f.field_name === "department.name")?.counts ?? [];
+      for (const [code, n] of Object.entries(byCode)) {
+        const match = nameCounts.find((c) => c.count === n);
+        if (match) names[code] = match.value;
+      }
+      const observedAt = new Date().toISOString();
+      const { data: src } = await supabase.from("observation_sources").select("id").eq("slug", "bonhams").maybeSingle();
+      if (!src?.id) return okJson({ success: false, error: "observation_sources.bonhams missing" }, 500);
+      const cen = await supabase.from("source_census").insert({
+        source_id: src.id, universe_total: all.found, universe_active: null, universe_historical: priced.found,
+        census_method: "house_department_facet", census_confidence: 0.9, census_at: observedAt,
+        census_url: `${TYPESENSE_HOST}/search-proxy/collections/lots/documents/search`,
+        census_notes: "Bonhams search index: every lot by department.code (by_category); raw_response.priced = lots with a published hammer price per code; raw_response.names = department names. Read for asset lots (artwork, automobilia).",
+        by_category: byCode, raw_response: { priced: pricedByCode, names, slice: ART_DEPARTMENTS },
+      });
+      if (cen.error) return okJson({ success: false, error: `census not written: ${cen.error.message}` }, 500);
+      const slice = Object.fromEntries(ART_DEPARTMENTS.filter((c) => byCode[c]).map((c) => [c, { lots: byCode[c], priced: pricedByCode[c] ?? 0, type: assetTypeForDepartment(c) }]));
+      return okJson({ success: true, mode: "art_census", total: all.found, priced_total: priced.found, departments: Object.keys(byCode).length, slice, census_at: observedAt });
+    }
+
+    // ─── MODE: art_land ─────────────────────────────────────────────────
+    // Walk one art or automobilia department of the index (published results, newest hammer first) and land each lot as an asset
+    // through record_asset_lots. Bounded: at most `pages` pages of 250 a run (default 1, max 4), 2 s between reads, 403/429 backs off.
+    // The cursor is the furthest page already landed for the department (asset_lot_walk_cursor); past the last page the walk wraps
+    // to page 1 as a new pass (a revisit, so published hammers supersede upcoming rows).
+    //   POST { "mode": "art_land", "department": "PIC-GEN", "pages": 2 }        -> resume the department's walk
+    //   POST { "mode": "art_land", "department": "PIC-GEN", "page": 7 }         -> one named page (a repair)
+    //   POST { "mode": "art_land", "pages": 2 }                                 -> the cron: the slice department furthest behind
+    if (mode === "art_land") {
+      const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "");
+      let department = String(body.department ?? "").toUpperCase();
+      if (!department) {
+        // No department named (the cron): the slice department furthest behind the house's own count.
+        const { data: nxt, error: nxtErr } = await supabase.rpc("asset_lot_next_department", { p_source_slug: "bonhams", p_departments: [...ART_DEPARTMENTS] });
+        if (nxtErr) return okJson({ success: false, error: `next department read failed: ${nxtErr.message}` }, 503);
+        department = typeof nxt === "string" && nxt ? nxt : ART_DEPARTMENTS[0];
+      }
+      if (!assetTypeForDepartment(department)) return okJson({ success: false, error: `department ${department} is outside the art/automobilia slice` }, 400);
+      const pages = Math.min(Math.max(Number(body.pages) || 1, 1), 4);
+      const size = 250;
+      const SORT = "hammerTime.timestamp:desc";
+      let pass = 0;
+      let pageNo = Number(body.page) > 0 ? Number(body.page) : 0;
+      if (!pageNo) {
+        const { data: cur, error: curErr } = await supabase.rpc("asset_lot_walk_cursor", { p_source_slug: "bonhams", p_department_code: department, p_method: ART_LOT_METHOD });
+        if (curErr) return okJson({ success: false, error: `cursor read failed: ${curErr.message}` }, 503);
+        const c = (cur ?? {}) as { last_page?: number; pass?: number };
+        pass = Number(c.pass) || 0;
+        pageNo = (Number(c.last_page) || 0) + 1;
+      }
+      const fetchPage = (n: number) => typesenseSearch({
+        q: "*", query_by: "title", per_page: String(size), page: String(n), filter_by: artDepartmentFilter(department), sort_by: SORT,
+      });
+
+      const receipts: Record<string, unknown>[] = [];
+      let pagesRead = 0; let found = 0; let totalPages = 0; let mapped = 0; let outside = 0;
+      for (let i = 0; i < pages; i++) {
+        if (i > 0) await new Promise((r) => setTimeout(r, 2000));
+        let res = await fetchPage(pageNo);
+        if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status, department, page: pageNo, pages_read: pagesRead, receipts });
+        if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, department, page: pageNo, receipts }, 502);
+        let data = await res.json() as TypesenseResponse;
+        found = data.found; totalPages = Math.max(1, Math.ceil(found / size));
+        if (!data.hits?.length && pageNo > 1) {
+          // Past the last page: wrap to page 1 as a new pass.
+          await new Promise((r) => setTimeout(r, 2000));
+          pageNo = 1; pass += 1;
+          res = await fetchPage(pageNo);
+          if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status, department, page: pageNo, pages_read: pagesRead, receipts });
+          if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, department, page: pageNo, receipts }, 502);
+          data = await res.json() as TypesenseResponse;
+        }
+        pagesRead += 1;
+        if (!data.hits?.length) break;
+        const readAt = new Date().toISOString();
+        const lots = [];
+        for (const h of data.hits) {
+          const rec = artLotFromDoc(h.document as unknown as Parameters<typeof artLotFromDoc>[0], { readAt, page: pageNo, pass });
+          if (rec) lots.push(rec); else outside += 1;
+        }
+        mapped += lots.length;
+        if (lots.length) {
+          const { data: receipt, error: wErr } = await supabase.rpc("record_asset_lots", { p_source_slug: "bonhams", p_lots: lots });
+          if (wErr) return okJson({ success: false, error: `record_asset_lots failed: ${wErr.message}`, department, page: pageNo, pages_read: pagesRead, receipts }, 500);
+          receipts.push({ page: pageNo, pass, ...(receipt as Record<string, unknown>) });
+        }
+        if (pageNo >= totalPages) break;
+        pageNo += 1;
+      }
+      const sum = (k: string) => receipts.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+      // The creation fold follows the landing: the house's first two catalogue lines become the party and its claim
+      // (fold_asset_creation_claims, bounded to this run's lots plus a small backlog). Its failure is reported, never swallowed.
+      let creation: Record<string, unknown> | null = null;
+      if (assetTypeForDepartment(department) === "artwork" && sum("observations_new") > 0) {
+        const { data: fold, error: foldErr } = await supabase.rpc("fold_asset_creation_claims", { p_source_slug: "bonhams", p_limit: Math.min(sum("observations_new") + 100, 1000) });
+        creation = foldErr ? { error: foldErr.message } : (fold as Record<string, unknown>);
+        if (foldErr) console.error(`[bonhams-typesense] creation fold failed: ${foldErr.message}`);
+      }
+      return okJson({
+        success: true, mode: "art_land", department, asset_type: assetTypeForDepartment(department), found, total_pages: totalPages,
+        pages_read: pagesRead, last_page: pageNo, pass, mapped, outside_slice: outside,
+        assets_new: sum("assets_new"), assets_existing: sum("assets_existing"), observations_new: sum("observations_new"),
+        observations_same: sum("observations_same"), observations_superseded: sum("observations_superseded"), refused: sum("refused"), creation, receipts,
+      });
+    }
+
     // ─── MODE: stats ────────────────────────────────────────────────────
     if (mode === "stats") {
       const supabase = createClient(
@@ -449,7 +586,18 @@ Deno.serve(async (req) => {
 
       let pageNo = Number(page) > 1 ? Number(page) : 0;
       let pass = 0;
+      // The walk's place is its row in source_walk_cursors (primary-key read). Only a run that starts from the cursor moves it.
+      const fromCursor = !pageNo;
+      let stored: WalkCursor | null = null;
+      let haveRow = false;
+      if (fromCursor) {
+        const { data: row, error: rowErr } = await supabase.from("source_walk_cursors").select("pass, last_page")
+          .eq("source_slug", "bonhams").eq("walk", LAND_WALK).maybeSingle();
+        if (!rowErr && row) { stored = row as WalkCursor; haveRow = true; ({ pass, page: pageNo } = startFrom(stored)); }
+      }
       if (!pageNo) {
+        // No cursor row yet (or it could not be read): derive it once from the landed lots' stamps, as before 2026-11-09.
+        // That read scans every Bonhams typesense episode (13.5 s, ~32k blocks a run on 2026-11-09), so it is only a fallback.
         // The cursor is the furthest page of the newest pass (metadata.ts_pass, absent = pass 0), not the latest row written:
         // a stray page-1 landing, or a failed read read as "nothing landed", used to send the walk back to page 1 (10:42Z
         // 2026-10-15: 150 lots per 20 minutes became re-landing pages 1-4). A failed read now stops the run.
@@ -468,6 +616,7 @@ Deno.serve(async (req) => {
         const lastPage = Number(m.ts_page);
         pass = Number.isFinite(Number(m.ts_pass)) ? Number(m.ts_pass) : 0;
         pageNo = Number.isFinite(lastPage) && lastPage > 0 ? lastPage + 1 : 1;
+        if (Number.isFinite(lastPage) && lastPage > 0) stored = { pass, last_page: lastPage };
       }
 
       const fetchPage = (n: number) => {
@@ -536,10 +685,22 @@ Deno.serve(async (req) => {
         landed.push(await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })));
       }
 
-      // The cursor is metadata.ts_page on each landed vehicle_events row (set by the lander).
+      // Each landed lot keeps its page stamp (metadata.ts_page/ts_pass, set by the lander); the walk's row moves forward
+      // once a page has landed something. A failed cursor write is reported and the next run derives or retries.
+      let cursorWrite: string | null = null;
+      if (fromCursor) {
+        const moved = advance(stored, pass, pageNo, pagesRead, landedAnything(landed));
+        if (moved) {
+          const { error: wErr } = await supabase.from("source_walk_cursors").upsert({
+            source_slug: "bonhams", walk: LAND_WALK, pass: moved.pass, last_page: moved.last_page, total_pages: totalPages,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "source_slug,walk" });
+          cursorWrite = wErr ? `failed: ${wErr.message}` : (haveRow ? "advanced" : "seeded");
+        } else cursorWrite = "unchanged";
+      }
       return okJson({
-        success: landOk, mode: "land", page: pageNo, pages_read: pagesRead, total_pages: totalPages, found: data.found,
-        next_page: pageNo + pagesRead > totalPages ? 1 : pageNo + pagesRead, lander: landed,
+        success: landOk, mode: "land", page: pageNo, pass, pages_read: pagesRead, total_pages: totalPages, found: data.found,
+        next_page: pageNo + pagesRead > totalPages ? 1 : pageNo + pagesRead, cursor: cursorWrite, lander: landed,
       });
     }
 

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect, useContext } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
-import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
+import { VEHICLE_DAY_OPEN_EVENT, VEHICLE_DAYS_HIGHLIGHT_EVENT } from './VehiclePhotoLightbox';
 import { useAuctionSequence } from './useAuctionSequence';
 import { auctionMomentDayTitle, auctionOpenDayTitle, momentDay } from './auctionSequence';
 import { PopupStackContext } from '../../components/popups/PopupStack';
@@ -158,6 +158,12 @@ function formatEventLabel(ev: any): string {
 
   // System-ingested / extracted data: prefix with "Discovered on"
   const isSystemIngested = sourceType === 'system' || dataSource.startsWith('extract');
+
+  // Paper: receipts, invoices and work orders dated by the page
+  if (eventType === 'document') {
+    const count = Number(ev.metadata?.document_count) || 0;
+    return count > 0 ? `Paper (${count} receipt${count === 1 ? '' : 's'})` : 'Paper';
+  }
 
   // Work session: show work type from metadata
   if (eventType === 'work_session') {
@@ -422,6 +428,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
         synthetic.push({ event_date: r.day, event_type: 'photo_session', title: `${r.n} photos`, metadata: { image_count: r.n, synthetic_day: true } });
       } else if (r.kind === 'work' && !coveredWorkDays.has(r.day)) {
         synthetic.push({ event_date: r.day, event_type: 'work_session', title: 'work session', metadata: { synthetic_day: true } });
+      } else if (r.kind === 'document' && Number.isFinite(r.n) && r.n > 0) {
+        // Paper linked to the car on the date printed on it (receipt_vehicle_links.page_date); the drawer reads the lines.
+        synthetic.push({ event_date: r.day, event_type: 'document', title: `${r.n} receipt${r.n === 1 ? '' : 's'}`, metadata: { synthetic_day: true, document_count: r.n } });
       }
     }
     return synthetic.length ? [...timelineEvents, ...synthetic] : timelineEvents;
@@ -639,7 +648,17 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       if (date) openDay(String(date));
     };
     window.addEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
-    return () => window.removeEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
+    // A set of days to illuminate (a receipt's install proofs): "days:a,b" beside the area and group highlights.
+    const onHighlightDays = (e: Event) => {
+      const days = (e as CustomEvent).detail?.days;
+      const list = Array.isArray(days) ? days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d))) : [];
+      setHighlightGroup(list.length > 0 ? `days:${list.join(',')}` : null);
+    };
+    window.addEventListener(VEHICLE_DAYS_HIGHLIGHT_EVENT, onHighlightDays);
+    return () => {
+      window.removeEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
+      window.removeEventListener(VEHICLE_DAYS_HIGHLIGHT_EVENT, onHighlightDays);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -849,7 +868,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
                           // Area-based highlight: "area:exhaust" matches any day with "exhaust" in areas
                           (highlightGroup.startsWith('area:') && ev?.areas?.includes(highlightGroup.slice(5))) ||
                           // Group-based highlight (multi-day sessions)
-                          ev?.group === highlightGroup
+                          ev?.group === highlightGroup ||
+                          // Named days ("days:2026-10-28,2026-10-29"): a receipt's install proofs
+                          (highlightGroup.startsWith('days:') && highlightGroup.slice(5).split(',').includes(day.s))
                         );
                         return (
                           <div
@@ -921,6 +942,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
             date={receiptDate}
             auctions={auctions}
             hasWorkSummary={dayRows.some(row => row.day === receiptDate && row.kind === 'work' && Number.isFinite(row.n) && row.n > 0)}
+            documentCount={dayRows.filter(row => row.day === receiptDate && row.kind === 'document' && Number.isFinite(row.n)).reduce((sum, row) => sum + row.n, 0)}
             onClose={closeDay}
             onPrev={() => navigateReceipt(-1)}
             onNext={() => navigateReceipt(1)}

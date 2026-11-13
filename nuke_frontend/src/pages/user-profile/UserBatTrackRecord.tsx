@@ -184,7 +184,7 @@ const UserBatTrackRecord: React.FC<UserBatTrackRecordProps> = ({ userId, usernam
         const commentsPromise = resolvedIds.length > 0
           ? supabase
               .from('auction_comments')
-              .select('id, comment_text, posted_at, vehicle_id', { count: 'exact' })
+              .select('id, comment_text, posted_at, vehicle_id,canonical:auction_events_canonical(id)', { count: 'exact' }).or('auction_event_id.is.null,canonical.not.is.null')
               .in('external_identity_id', resolvedIds)
               .is('bid_amount', null)
               .order('posted_at', { ascending: false })

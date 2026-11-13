@@ -41,9 +41,31 @@ function expectCanonicalAdmission(url: URL) {
   expect(url.searchParams.get('image_url')).toBe('not.is.null');
 }
 
-beforeEach(() => transport.fetch.mockReset());
+beforeEach(() => { transport.fetch.mockReset(); });
 
 describe('gallery database admission', () => {
+  it('reports identical coverage to every coalesced caller', async () => {
+    transport.fetch.mockResolvedValueOnce(response([photo(0)], 10));
+    const first = vi.fn(), second = vi.fn();
+    const [a, b] = await Promise.all([
+      fetchVehicleImages(vehicleId, 'id,image_url', { maxRows: 1, onLoadCoverage: first }),
+      fetchVehicleImages(vehicleId, 'id,image_url', { maxRows: 1, onLoadCoverage: second }),
+    ]);
+    expect(a).toEqual(b); expect(transport.fetch).toHaveBeenCalledOnce();
+    expect(first).toHaveBeenCalledWith({ loaded: 1, total: 10 });
+    expect(second).toHaveBeenCalledWith({ loaded: 1, total: 10 });
+  });
+
+  it('refuses a first-page timeout instead of reporting a successful empty inventory', async () => {
+    vi.useFakeTimers();
+    try {
+      transport.fetch.mockReturnValue(new Promise(() => {}));
+      const pending = fetchVehicleImages(vehicleId, 'id,image_url', { timeoutMs: 1000 });
+      const rejected = expect(pending).rejects.toThrow('timed out before its first page');
+      await vi.advanceTimersByTimeAsync(1100);
+      await rejected;
+    } finally { vi.useRealTimers(); }
+  });
   it('requests all 399 admitted public listing photos without manufacturing analysis', async () => {
     const rows = Array.from({ length: 399 }, (_, index) => photo(index));
     transport.fetch.mockResolvedValueOnce(response(rows));
