@@ -39,7 +39,7 @@ final class DecodeTests: XCTestCase {
         if case .unknown(let kind) = read.sections[3] { XCTAssertEqual(kind, "hologram") } else { XCTFail("unknown section must decode as .unknown") }
         let legacy = try XCTUnwrap(read.strip?.facets[1].member)
         XCTAssertEqual(legacy.rootStatus, .recorded)
-        XCTAssertEqual(legacy.decayLine, "vehicle record · trust 30%")
+        XCTAssertEqual(legacy.decayLine, "vehicle record · unverified")
     }
 
     func testClaimWithAnUnknownSourceKindOrViewerDecodes() throws {
