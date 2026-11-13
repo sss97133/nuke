@@ -1050,6 +1050,295 @@ Same exclusive why as §18.11 / §18.12. `source_not_admitted` is now 0. Sum 275
 
 empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks. Never re-arm refused days. The 19:17 sweep had not yet run when this apply landed; #3329 is still the live sweep body.
 
+## 18.14 Junk state, activity-evidence blocks, and the Nov 12 health re-check (07:51–08:14 AST)
+
+Skylar's 12 Nov direction: resolve remaining unsorted photos programmatically from image analysis plus preset conditions, and never discard filtered-out, private, or irrelevant photos — they are activity evidence (two hours of engine-work photos followed immediately by four hours at a family event means the technician was not working). Hold metadata on unused images so labor and time attribution and receipt reassembly can be bounded. Do not ask him.
+
+### Health re-check after the 11 Nov Postgres restarts
+
+Landing is still halted by design: `enabled=true`, `halted=true`, `halt_reason` = visual gate failed on chunk `6748ad5b-d56b-4c1c-82df-3b7a849502d7` (error rate 1.000 > 0.05) for the forward window `2026-11-03 10:00:00+00 .. 2026-11-04 10:00:00+00`, `updated_at` **08:13 AST on 11 Nov**. `forward_cursor` is unchanged at `2026-11-03 10:00:00+00`. Do not unhalt and do not call `capture_landing_gate_check` as a dry-run. Job 717 `capture-sets-landing-tick` (`*/10`) is `active=false` (last successful tick was 08:10 AST on 11 Nov, immediately before the halt); that deactivation is consistent with halt-by-design. Do not re-enable 717 until the halt is cleared. Jobs 718 `capture-sets-drain` (`1-59/5`), 720 `capture-review-sweep` (`52 * * * *`), and 729 `capture-documents-land-by-vin` (`2-59/10`) are active. Official `n` is still 29,749. Between the §18.13 close (on_vehicle 13,977 / unverified 1,986) and this morning's #3322 apply, 223 frames filed unverified → on_vehicle with every other official state unchanged; between that apply and the junk migration, another 40 filed the same way (on_vehicle 14,200 → 14,240, unverified 1,763 → 1,723). Those are normal filings, not a ledger regression. Do not touch `9cf5b7a4`.
+
+### The 2 typ=`other` #3302 vehicle looks — #3322 run `a3322000-…000011`
+
+`1b5b23e4` (headliner, 2018-08-28) and `fa469bc3` (instrument cluster, 2026-02-10) were still official unsorted after the 10 Nov enqueue/rescore (`done_at` 18:59 AST, last plan still `applied`, only old resolved `no_clear_lead` reviews). They were not in any open review and had no set link or document page. Existing `capture_non_vehicle_vehicle_to_review_v1` (#3322) is the sanctioned path. Dry `a3322000-…000010`: eligible 2, would_route 2. Signed apply `a3322000-0000-4000-8000-000000000011` at **07:51 AST** on 12 Nov (America/St_Barthelemy), granted_by `0b9f107a-…`, routed 2 photos into 2 open reviews (`nv_vehicle_review:2018-08-28` and `nv_vehicle_review:2026-02-10`, reason `typ_other_vehicle`). Official `GROUP BY` immediately after: held 9,112 → **9,114** (+2), unsorted 315 → **313** (−2); duplicate 852, on_vehicle 14,200, unverified 1,763, private 1,251, pulled 2,126, non_vehicle 130, n 29,749. No extra copies followed. Both reviews remain open.
+
+### empty_url clocks and no-clock rows (read-only)
+
+All **275** official unsorted `empty_url` rows have a `taken_at` (0 without a clock). Source is `capture_relay_ios`. They were not touched and their content was not analyzed. They may contribute a content-free `clock_only` time marker through `capture_activity_blocks_v1` (read-only).
+
+No-clock rows never received an invented clock. After the junk apply, four real-file official-unsorted rows still have no `taken_at`:
+
+- `30a2cd43` `iphoto` typ `vehicle_exterior`, planned_but_left_out, created-at day 2026-06-11, real `supabase.co/storage/` URL
+- `64bf51a0`, `6d7a482b`, `6f6c400e` `photo_auto_sync` typ-empty, exclusive `no_date`, never planned, created-at day 2026-02-12, real vehicle-data URLs
+
+`522651ec` (placeholder URL, no clock, created-at day 2026-03-19) is now official `junk` and still has no clock, so it does not appear in activity blocks.
+
+### `capture_junk_placeholder_v1` and `capture_activity_blocks_v1` — PR #3439
+
+PR [#3439](https://github.com/sss97133/nuke/pull/3439) (`feat/capture-junk-and-activity`, `68214675`) adds:
+
+1. A terminal ledger state **`junk`** for placeholder / test URLs (kept, never deleted). Eligibility: unfiled, non-empty URL that matches `example.com` or `test-trigger` or does not match `supabase.co/storage/`. It skips empty_url / the 276 class, `is_sensitive`, `rejected_personal` / `rejected_misattributed`, the privacy-exclude set, active set links, active document pages, and already-logged junk. The producer `capture_junk_placeholder_v1` is signed, dry-default, cap 50, granted_by required, revert-by-run. It never files, never invents clocks, never deletes rows, and does not create a `capture_set_review` (log-only terminal). The official `capture_ledger_states` / `capture_ledger_frames` CASE places `junk` after `non_vehicle` and before `duplicate`; dupmap walks to a junk root as `copy_of_junk`. The #3316 timeout fix (`SET plan_cache_mode TO 'force_custom_plan'` and MATERIALIZE of held/waiting/failed) is kept. Live bodies after apply: states md5 `c0c9ce009df4ba6eb6b991306008186b`, frames `1726cacaced4e3209b692b402178dd3d`. Producer md5 `8561a69deba36b118ff4b17d12b2e082`; revert helper `47430cf6d8555556729753d147410719`. The revert script refuses while unreverted junk log rows exist, then restores the live #3316 parent bodies (helper `supabase/sql/helpers/capture_ledger_live_parent_20261116242000.sql`, md5s `ba4646ae` / `52d8f857`).
+
+2. **`capture_activity_blocks_v1(p_user, p_tz default America/Los_Angeles, p_from, p_to, p_gap_minutes default 60)`** — per user and LA day, time blocks from every clocked photo, including private, non_vehicle, junk, and clocked empty_url frames. It returns only `user_id`, `day`, `block_start`, `block_end`, `category` (`work` | `non_work` | `clock_only` | `unknown`), and `n_photos`. It never returns image content, urls, or image ids. Categories: empty_url → `clock_only`; `rejected_personal` or `is_sensitive` or an unreverted junk or non_vehicle log row → `non_work`; an unreverted #3302 `verdict=vehicle` or `vehicle_id IS NOT NULL` or typ in (`vehicle_exterior`, `vehicle_interior`, `engine_bay`, `part_closeup`, `progress_shot`) → `work`; typ in (`other`, `receipt_document`) → `non_work`; else `unknown`. Adjacent same-day photos stay in one block until the category changes or the gap exceeds `p_gap_minutes`. `REVOKE` from `PUBLIC` / `anon` / `authenticated`; `GRANT` `service_role` only. It is a function, not a multi-user view in `public` (a view would leak).
+
+`receipt_work_lines` and the writers into `garage_derivation_evidence` (`receipt_work_correlation`) and `evidence_judgment_requests` (`receipt_part_visible`) currently bound time with a UTC date clock and an eligibility predicate that **excludes** private / non_vehicle / junk / empty_url frames (`receipt_work_frame_eligible` requires `vision_gate_status` approved, not sensitive, and a work-like scene). Do not change `receipt_work_lines`'s signature. Consumers should join `capture_activity_blocks_v1` on user and overlapping timestamptz, treat the start of the first `non_work` block after a `work` block as the end of the work window, never pull image ids from `non_work` / `junk` / `private` / `clock_only` into citation lists, and compare `block_start` / `block_end` (timestamptz), not the UTC date `receipt_work_lines` uses.
+
+Contract test `supabase/sql/test_capture_junk_and_activity.sql` (local `TEST_EXIT:0`). Validate [43213391008](https://github.com/sss97133/nuke/actions/runs/43213391008) and Frontend Tests [43213390670](https://github.com/sss97133/nuke/actions/runs/43213390670) (db-contracts job 131166412197) were green. Applied live after that (migration `20261116242000_capture_junk_and_activity`). Official `GROUP BY` after the migration, before the signed junk run, was unchanged except for the 40 unverified → on_vehicle filings noted above (junk 0, unsorted still 313, n 29,749).
+
+Dry `a3331000-…000001`: eligible 3, would_mark 3 — `2a90a8df` (`https://example.com/final_test.jpg`, clocked), `c50d0713` (`https://test.example.com/test.jpg`, clocked), `522651ec` (`https://test-trigger-check.jpg`, no clock). Signed apply `a3331000-0000-4000-8000-000000000002` at **08:13:53 AST** on 12 Nov (America/St_Barthelemy), granted_by `0b9f107a-…`, marked 3, 0 deleted (all three `vehicle_images` rows remain). A further dry (`…000003`) took 0. No copies followed.
+
+Official `GROUP BY` immediately after the junk apply:
+
+| State | After #3322 (07:51 AST) | After junk apply (08:13 AST) | Δ |
+|---| ---:| ---:| ---:|
+| on_vehicle | 14,200 | **14,240** | **+40** (normal filings before the junk run) |
+| held | 9,114 | 9,114 | 0 |
+| pulled | 2,126 | 2,126 | 0 |
+| unverified | 1,763 | **1,723** | **−40** |
+| private | 1,251 | 1,251 | 0 |
+| duplicate | 852 | 852 | 0 |
+| **unsorted** | **313** | **310** | **−3** |
+| non_vehicle | 130 | 130 | 0 |
+| **junk** | — | **3** | **+3** |
+| waiting | 0 | 0 | 0 |
+| **n** | **29,749** | **29,749** | **0** |
+
+The pre-junk official read after the migration (same morning, after the 40 filings) was already on_vehicle 14,240 / unverified 1,723 / unsorted 313 / junk 0; the signed junk run itself moved only unsorted −3 / junk +3.
+
+### VisionDecision on the 13 new 2026-02-10 typ=`other` selfies
+
+The earlier 18 `judgment_personal` frames (13 leftover + 3 refused + 2 exclusive) had already been through `VisionDecision.decide` on 10 Nov (work / no_junk_signal) and were not re-run. The 13 new 2026-02-10 close-up face selfies logged by #3302 run `a3302000-…000011` were classified on the connected Mac with the same on-device rule (`VisionDecision.decide`; not `vision-gate-classify.mjs`). All 13 classified in about 3.6 s: **12 `work_with_people`** (`people_no_redaction`, `isVehicle=true`, prominent face) and **1 `work`** (`a49176d3`, `face=false`, reason `vehicle`). **None were `category=sensitive`** (no document / id_document / personal_face). `set_image_sensitivity` and `privacy_promote_v1` were therefore not called. A personal judgment that is only the reviewer's is still not promoted. All 13 stay unsorted and logged. They remain typ=`other`, so `capture_activity_blocks_v1` still labels their clocks `non_work` — the labor window can end there even though the frames are not a private terminal. Verdicts: `/workspace/sortrun/jp_vision/verdicts_13_20261112.jsonl`.
+
+### Official unsorted 310 after junk — exclusive buckets
+
+Same exclusive why as §18.11–§18.13. Sum 275+27+3+3+2=310.
+
+| Why | Count | Why it remains, and what it needs |
+|---| ---:|---|
+| empty_url | 275 | Leave the 276 class untouched. All 275 have `taken_at` and may appear as read-only `clock_only` markers in `capture_activity_blocks_v1`. Needs the iOS retry / a later privacy-hold decision from Skylar; no sanctioned producer writes these |
+| planned_but_left_out | 27 | typ=`other` 26 leftover `judgment_personal` (13 earlier VisionDecision work / no_junk_signal + 13 new 2026-02-10, now 12 `work_with_people` + 1 `work`; stay logged, not promoted) + 1 no-clock `iphoto` typ `vehicle_exterior` (`30a2cd43`). The 3 placeholder URLs are now `junk`. The 2 typ=`other` vehicle looks are now held in open #3322 reviews |
+| plan_refused | 3 | All `judgment_personal` typ=`other` (2 `iphoto` 2026-07-22, 1 `photo_auto_sync` 2020-09-10). Already classified work / no_junk_signal on 10 Nov. The refused-day producer correctly skips them. Do not re-arm as a class. Do not promote from reviewer judgment alone |
+| no_date | 3 | `photo_auto_sync`, typ empty, no `taken_at`, never planned (created-at day 2026-02-12): `64bf51a0`, `6d7a482b`, `6f6c400e`. Never invent a clock |
+| judgment_personal | 2 | `direct_pull_2026_05_23` typ=`other` (`087422b4`, `10a376ec`), logged under the #3302 log, never planned. Official classifier did not set `is_sensitive` (work / no_junk_signal on 10 Nov). Do not promote from reviewer judgment alone. 31 `judgment_personal` remain unofficially unsorted in total (26 inside leftover, 3 inside plan_refused, 2 here); all 31 have now been through `VisionDecision.decide` and were not flagged |
+
+empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks. Never re-arm refused days. The landing halt is diagnosed and cleared in §18.15; the 31 `judgment_personal` frames and the 4 no-clock real files are routed there too.
+
+## 18.15 Landing halt root cause, resume, jp-to-held, and no-clock review (08:37–08:47 AST)
+
+### The 1.000 error rate on chunk `6748ad5b` was a content failure, not infrastructure
+
+An error rate of 1.000 on forward chunk `6748ad5b-d56b-4c1c-82df-3b7a849502d7` (window `2026-11-03 10:00:00+00 .. 2026-11-04 10:00:00+00`, halted **08:13 AST on 11 Nov**) looked like the visual gate erroring on every sample. It was not. `required_n` was 1: the chunk planned one clear set containing a single photo, `afc898a9` (typ=`part_closeup`, scored to the 1966 Chevelle, visual=0). The frame is a Lynch Chevrolet (Waukesha) key tag on a thread spool — a handwritten 1964 Corvette card, not the Chevelle. Skylar marked that pair wrong on 7 Nov; later readers marked it wrong or unclear; the photo has been in an open `no_clear_lead` review since 4 Nov. `plan_step` still put it in a new clear set, the gate failed 0 correct / 1 wrong, and landing halted.
+
+The 11 Nov Postgres restarts, later HTTP 525/522 lines (starting 14:25 AST, hours after the halt, with `chunks:0`), a classifier outage, and a usage limit were not the cause. typ is honestly `part_closeup` and was not invented into `other`. `capture_landing_supersede_v1` cannot retire a `gate_failed` chunk. The failed chunk was left `gate_failed`; `forward_cursor` was not moved by hand.
+
+### Planner fix — PR #3441
+
+PR [#3441](https://github.com/sss97133/nuke/pull/3441) (`feat/capture-no-clear-held-or-wrong`, `7232f9db`) surgically patches live `capture_landing_plan_step` (parent def md5 `e3a381f54c89c1e389beb0dd13ed3fc9`, typ + identity body):
+
+- A photo already in an **open** `capture_set_review` is not clearable.
+- A photo with a **verified** `pre_gate` `wrong` in `auto_filing_audit_queue` for the **same** vehicle is not clearable.
+- typ=`other` / `receipt_document` still becomes `review` / `non_vehicle_type`.
+- When `clearable_ids` is empty because of a hold or prior wrong (and not only typ), the reason is `already_held_or_prior_wrong`.
+- A mixed set still clears with only the remaining fresh frames.
+
+Does not bump an epoch, call `capture_landing_gate_check`, re-arm days, move typ or `taken_at`, file, or move `forward_cursor`. Contract `supabase/sql/test_capture_no_clear_held_or_wrong.sql` (local `TEST_EXIT:0`). Validate and db-contracts were green. Applied live (migration `20261116243000_capture_no_clear_held_or_wrong`). Live body after apply: prosrc md5 `5695e2f8306f012fa5dacb0b34a35140`, def md5 `a5bb8598b97117dcdb8a859c43cc5356`. Revert restores the 12 Nov parent.
+
+### Documented resume and the next ticks
+
+Config was backed up, then the documented resume was used: `halted=false`, `halt_reason=null`, `enabled=true`; `cron.alter_job(717, active := true)`. `forward_cursor` was not moved. `capture_landing_gate_check` was not called.
+
+First sanctioned tick at **08:37:54 AST** on 12 Nov (`SET statement_timeout = '120s'; SELECT public.capture_landing_tick()`): opened forward chunk `f37c8c75-1867-4f45-9662-b501853558cb` (pass 1, `t_from=2026-11-03 10:00:00+00`, `t_to=2026-11-05 10:00:00+00`) and planned it as one review set, reason `already_held_or_prior_wrong`, 0 clear / 1 review photo (`afc898a9`). Landing did not re-halt. `6748ad5b` stayed `gate_failed`.
+
+Second tick at **08:38:30 AST**: `f37c8c75` state `applied`, `clear_sets=0`, note "no set passed the score threshold; all held as proposals (`capture_set_review`)". The pipeline — not a hand edit — advanced `forward_cursor` to `2026-11-05 10:00:00+00`. `afc898a9` `vehicle_id` is still null and it remains in an open review. typ is still `part_closeup`. Job 717 stays `active`. `enabled=true`, `halted=false`, `halt_reason=null`. Cron 718 / 720 / 729 stayed active. Do not touch `9cf5b7a4`. `land_by_vin` remains dry-only.
+
+Official `GROUP BY` after resume, before the jp/no-clock run (plan_cache_mode `force_custom_plan`): on_vehicle **14,279** / unverified **1,684** (39 more normal unverified → on_vehicle filings since the 08:13 junk apply; held 9,114 and unsorted 310 unchanged), pulled 2,126, private 1,251, duplicate 852, non_vehicle 130, junk 3, n 29,749.
+
+### Classifier jp override and no-clock left-out — PR #3442
+
+Skylar: the classifier ruled all 31 `judgment_personal` frames work or work_with_people, not sensitive, so stop holding them as operator-judgment personal. Route them into review (held) with the existing producer; the classifier verdict overrides the operator jp log, and that reason is logged.
+
+PR [#3442](https://github.com/sss97133/nuke/pull/3442) (`feat/capture-left-out-jp-and-noclock`, `6f195e84`) extends `capture_left_out_to_review_v1` (#3330):
+
+- Optional `p_classifier_items jsonb` (`[{image_id, category, reason}]`). Existing 5-argument calls still work.
+- A category of `work` or `work_with_people` overrides an unreverted operator `judgment_personal` log and, for those frames only, the typ=`other` / `receipt_document` skip. typ=`other` without a classifier override stays on the #3302 path. The operator jp log is not deleted.
+- Review evidence and `capture_left_out_to_review_log.classifier_items` record `classifier_overrides_jp`, category, and reason. No new photo store was added (the first #3442 head was rejected by `no-new-photo-reader` for a new `image_id` table; the follow-up commit keeps the verdicts on the existing log).
+- Real no-clock files are grouped by `(created_at AT TIME ZONE 'America/Los_Angeles')::date`, with `left_out_kind=no_clock` and `evidence.clock_missing=true`. The producer never writes `taken_at`.
+- empty_url, placeholders, sensitive, privacy-hold, already-open-review, already-filed, already-documented (`capture_document_pages`), and `non_vehicle` rows stay skipped.
+- Still signed, dry-default, cap 50, revert-by-run.
+
+Validate and db-contracts were green after the guardrail fix. Applied live (migration `20261116244000_capture_left_out_jp_and_noclock`).
+
+Dry `a2440000-…000001` (120 s): eligible 29, would_route 29, 8 days, 0 log rows, 0 reviews, no `taken_at` invented. Signed apply `a2440000-0000-4000-8000-000000000002` at **08:47:05 AST** on 12 Nov (America/St_Barthelemy), granted_by `0b9f107a-…`, routed **29** photos into **8** open `left_out` reviews (23 planned + 2 unadmitted + 4 no-clock; 25 classifier overrides: 13 `work` + 12 `work_with_people`; 2 reviews flagged `clock_missing`). Revert: `select capture_left_out_to_review_revert_v1('0b9f107a-…','a2440000-…000002')`. 0 filed, 0 clocks written, landing still not halted, `forward_cursor` still `2026-11-05 10:00:00+00`.
+
+Six of the 31 classifier-overridden jp frames were correctly left out: `07c0814d`, `12a95ba1`, `293ba8a6`, `b6662ba2`, `cf3d2528`, `ef4a4a83` already have an unreverted `capture_document_pages` row. #3330 has always skipped document pages; the classifier override does not pull a VIN/document page into a general left-out review. They remain typ=`other` `judgment_personal` and exclusive `planned_but_left_out`.
+
+The four no-clock real files (`30a2cd43` on 2026-06-11; `64bf51a0`, `6d7a482b`, `6f6c400e` on 2026-02-12) are now held. `taken_at` is still null on all four.
+
+### Official unsorted 281 after jp-to-held and no-clock review — exclusive buckets
+
+Official `GROUP BY` immediately after the signed run (plan_cache_mode `force_custom_plan`):
+
+| State | After junk (08:13 AST) | After resume (08:38 AST) | After signed left-out (08:47 AST) | Δ vs resume |
+|---| ---:| ---:| ---:| ---:|
+| on_vehicle | 14,240 | **14,279** | 14,279 | 0 (the +39 vs junk were normal filings before the signed run) |
+| held | 9,114 | 9,114 | **9,143** | **+29** |
+| pulled | 2,126 | 2,126 | 2,126 | 0 |
+| unverified | 1,723 | **1,684** | 1,684 | 0 |
+| private | 1,251 | 1,251 | 1,251 | 0 |
+| duplicate | 852 | 852 | 852 | 0 |
+| **unsorted** | **310** | **310** | **281** | **−29** |
+| non_vehicle | 130 | 130 | 130 | 0 |
+| junk | 3 | 3 | 3 | 0 |
+| waiting | 0 | 0 | 0 | 0 |
+| **n** | **29,749** | **29,749** | **29,749** | **0** |
+
+Same exclusive why as §18.11–§18.14. Sum 275+6=281.
+
+| Why | Count | Why it remains, and what it needs |
+|---| ---:|---|
+| empty_url | 275 | Leave the 276 class untouched. All 275 have `taken_at` and may appear as read-only `clock_only` markers in `capture_activity_blocks_v1`. Needs the iOS retry / a later privacy-hold decision from Skylar; no sanctioned producer writes these |
+| planned_but_left_out | 6 | typ=`other` `judgment_personal` frames that already have an active `capture_document_pages` row (`07c0814d`, `12a95ba1`, `293ba8a6`, `b6662ba2`, `cf3d2528`, `ef4a4a83`). Classifier verdict was `work` / `no_junk_signal`; they were not promoted and were not pulled into left-out review. OCR extraction records, not VIN/receipt landings; see §18.16. They stay unsorted |
+
+empty_url / the 276 class was not touched. No leftover cap-50 was started. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`. Never invent clocks. Never re-arm refused days. Landing is running (`enabled=true`, `halted=false`, job 717 active, `forward_cursor=2026-11-05 10:00:00+00`).
+
+
+## 18.16 Why the last 6 document-page frames stay unsorted (08:49–08:52 AST)
+
+The official ledger does not look at `capture_document_pages`. After private / pulled, "filed" is only `vehicle_images.vehicle_id IS NOT NULL` (`on_vehicle` if `vision_gate_status=approved`, else `unverified`). Then `non_vehicle`, `junk`, `duplicate`, `failed`, `waiting`, `held`, else unsorted. An unreverted document-page row is not a ledger state.
+
+That is the correct definition for these six frames, because an active `capture_document_pages` row is an OCR extraction, not a sanctioned landing. All six were written by `document-ocr-worker` on 8–9 Nov (00:57–01:25 UTC) with `doc_type=other`, `batch_id` null, `landing_vehicle_id` null, `landing_basis` null, `landing_run_id` null, `revoked_at` null. The worker's own notes say they are not receipts, invoices, or vehicle documents:
+
+- `07c0814d` and `ef4a4a83` — baby shower invitations (same 2014-08-06 clock, monster-truck theme)
+- `12a95ba1` — US passport photo page
+- `293ba8a6` — Nevada Class C driver license
+- `b6662ba2` — US permanent resident card and a Florida driver license
+- `cf3d2528` — French national identity card
+
+`#3330` skips them so a document-page photo is not also put into a general left-out review. That skip is not the same thing as "already filed." A ledger change that treated every unreverted `capture_document_pages` row as `document` or filed would close these six by hiding personal identity paper, and would also resolve a few hundred other unfiled OCR pages (`doc_type` other 248 unfiled, plus unlanded title / receipt / invoice / manual / sale_sheet pages) that have no `landing_vehicle_id`. No ledger-definition PR was opened.
+
+The sanctioned document landing is narrower: `landing_vehicle_id` set, `landing_basis=vin:document_page` (`capture_documents_land_by_vin`). Eleven live pages are in that state (4 title, 3 sale_sheet, 4 other; run `0e29735d`). All eleven already have `vision_gate_status` `rejected_personal` (8) or `rejected_misattributed` (3), so the official CASE already counts them as `private` or `pulled`. A new `document` arm must not be placed before those. None of the six jp frames is in that eleven.
+
+VisionDecision.decide had labelled all six `work` / `no_junk_signal` and not sensitive, which is why they were not privacy-promoted. The OCR notes disagree. They were not promoted from the OCR text, and they were not marked private from this path.
+
+### Landing health after resume
+
+Job 717 stayed `active` and succeeded at **08:40:00** and **08:50:00 AST** (160 ms and 611 ms, `return_message=1 row`). A health tick at **08:51:46 AST** returned `advanced: []`. Landing is not halted (`enabled=true`, `halt_reason=null`). `forward_cursor` is still `2026-11-05 10:00:00+00`, which equals today's forward ceiling (`date_trunc('day', now() - 7 days - 10 hours) + 10 hours`, `recent_days=7`). There are 0 unfiled `capture_relay_ios` photos in the current recent window. Ticks are idle at the recent/forward split, waiting for new unfiled iOS photos or for the ceiling to move, not stuck and not re-halting. `6748ad5b` is still `gate_failed`. Cron 718 / 720 / 729 stayed active. `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`.
+
+Official `GROUP BY` at **08:52 AST** (plan_cache_mode `force_custom_plan`): on_vehicle **14,292**, unverified **1,671** (13 more normal unverified → on_vehicle filings since the 08:47 signed run), held 9,143, pulled 2,126, private 1,251, duplicate 852, **unsorted 281**, non_vehicle 130, junk 3, n 29,749. Exclusive remainder is unchanged: empty_url 275 + the same 6 typ=`other` jp OCR pages. Those six were then resolved programmatically in §18.17.
+
+
+## 18.17 privacy_from_document_ocr_v1: identity papers private, invitations non_vehicle (09:13 AST)
+
+Skylar's rule is that preset conditions should make personal identity paper private programmatically, and that the OCR worker's structured output is analysis, not operator judgment. [#3444](https://github.com/sss97133/nuke/pull/3444) (`feat/capture-privacy-from-document-ocr`, `fa74867c`) adds `capture_privacy_from_document_ocr_v1` (`privacy_from_document_ocr_v1`). Local contract `test_capture_privacy_from_document_ocr.sql` (LIKE guard `dm_refinement_capture_privacy_from_document_ocr%`) was `TEST_EXIT:0`. CI `validate`, `db-contracts`, and `vitest` were green. Migration `20261116245000_capture_privacy_from_document_ocr.sql` is **applied live**. Revert script: `supabase/sql/revert_20261116245000_capture_privacy_from_document_ocr.sql`. A signed run is reverted with `select capture_privacy_from_document_ocr_revert_v1('<user>', '<run>')` before dropping the function.
+
+The only matcher is a fixed preset list, documented in the PR and in `capture_privacy_from_document_ocr_match_v1`. Haystack is `lower(concat_ws(' ', doc_type, extraction.document_type, extraction.landed_type, date_text, extraction.notes))`. Vendor, customer, line items, paths, and other extraction values are not read. The matcher returns only a `rule_id` or null and never echoes notes or identifiers. First match wins:
+
+- `identity_passport` — `\y(passport|passeport)\y` → private
+- `identity_driver_license` — driver's / driving licence/license, `permis de conduire`, `class [a-d] driver` → private
+- `identity_residence_card` — permanent resident card, residence/resident card, green card, carte de séjour → private
+- `identity_ssn` — social security, ssn card, social-security, `\yitin card\y` → private
+- `identity_id_card` — national/identity/identification card, carte (nationale) d'identité, or `\yid cards?\y` excluding credit/gift/debit/sd/sim/title/label/warranty/insurance/library/punch/score/greeting card → private
+- `identity_similar` — birth certificate, naturalization, citizenship certificate, military id, common access card → private
+- `personal_invitation` — `\yinvitation\y`, baby shower, wedding invite, birthday invitation, `\yrsvp\y` → non_vehicle
+
+Identity matches go through `set_image_sensitivity(..., true, 'document', signature, granted_by)` and the same `vision_gate_status = rejected_personal` write as `capture_privacy_promote_v1`. The producer does not call `capture_privacy_promote_v1`, which would also promote every other already-`is_sensitive` unfiled row and would skip open reviews. Invitation matches are written to the existing #3302 `capture_non_vehicle_log` (`verdict=non_vehicle`, `reason=rule_id`). `taken_at`, `image_url`, file bytes, and `capture_document_pages` rows are never written or deleted. Eligibility skips empty_url / the 276 privacy-hold class, `capture_privacy_promote_exclude`, already-private, already-pulled, already-filed, failed uploads, and awaiting_gate clear sets. Open reviews / held frames that match an identity rule are included (official CASE already counts `rejected_personal` ahead of held); the review row is left in place. Invitations already on an unreverted non_vehicle log, or already `is_sensitive`, are skipped. Private backups use added nullable columns on `capture_privacy_promote_log` (`rule_id` and prior sensitivity fields); no new photo-key table.
+
+### Site-wide preset scan (counts only)
+
+Live unreverted `capture_document_pages` for the owner, first-match counts:
+
+- `identity_driver_license`: 11 pages, all unfiled with a real URL; 7 already private, 2 already pulled, 2 actionable
+- `identity_id_card`: 6 pages (4 unfiled, 2 filed); 3 already private, 1 privacy-exclude, 1 actionable
+- `identity_passport`: 9 pages, all unfiled real; 8 already private, 1 actionable
+- `identity_residence_card`: 3 pages, all already private
+- `identity_ssn`: 3 pages, all already private
+- `identity_similar`: 0
+- `personal_invitation`: 27 pages, all unfiled real; 2 already private, 23 already on an unreverted non_vehicle log, 2 actionable
+
+Actionable new rows were exactly the six leftover typ=`other` OCR pages from §18.16: four identity (one combined resident-card + driver-license page first-matched as `identity_driver_license`) and two invitations. Official `capture_ledger_states` (America/Los_Angeles, full window) at the same time: **held** 9,143 (0 empty_url, 2 have an active OCR page, **0 preset matches**); **unsorted** 281 = 275 empty_url + 6 real, and all 6 real matched. Empty_url / 276 were excluded. A single cap-50 run covers the six.
+
+### Dry-run and signed run
+
+Just before the run, official `GROUP BY` was already on_vehicle **14,316** / unverified **1,647** (24 more normal unverified → on_vehicle filings since 08:52 AST); held 9,143, pulled 2,126, private 1,251, duplicate 852, unsorted 281, non_vehicle 130, junk 3, n 29,749. Dry run `a2450000-0000-4000-8000-000000000001` (`p_dry=true`, cap 50): eligible 6, would_apply 6, would_private 4, would_non_vehicle 2, remaining_after 0; no log or flag writes. Signed run `a2450000-0000-4000-8000-000000000002` at **09:13:56 AST** (granted_by the owner, cap 50): applied 6, promoted_private 4, routed_non_vehicle 2, remaining_after 0. All six kept their `taken_at` day, real `image_url`, and live document-page row. The four identity frames are `is_sensitive` / `sensitive_type=document` / `rejected_personal`. The two invitations are on this run's unreverted non_vehicle log and were not marked sensitive. `capture_activity_blocks_v1` already maps `rejected_personal` / `is_sensitive` and unreverted `non_vehicle` to `non_work`; keeping `taken_at` is what lets those clocks still appear as non-work blocks.
+
+Revert (not executed): `select capture_privacy_from_document_ocr_revert_v1('0b9f107a-d124-49de-9ded-94698f63c1c4', 'a2450000-0000-4000-8000-000000000002')`.
+
+### Landing health
+
+Job 717 stayed `active` and succeeded at **09:10:00 AST** (410 ms, `return_message=1 row`). 718 succeeded at **09:11:00 AST**. Landing is not halted (`enabled=true`, `halt_reason=null`). `forward_cursor` is still `2026-11-05 10:00:00+00`, `updated_at` still **08:38:30 AST** (idle ticks do not bump it). `land_by_vin` remains dry-only. Do not touch `9cf5b7a4`.
+
+Official `GROUP BY` at **09:14 AST** (plan_cache_mode `force_custom_plan`): on_vehicle 14,316, held 9,143, pulled 2,126, unverified 1,647, **private 1,255** (+4), duplicate 852, **unsorted 275** (−6), **non_vehicle 132** (+2), junk 3, n 29,749. Exclusive remainder is now the 275 empty_url rows (0 real-URL unsorted). Those 275 were not written. They received a terminal ledger state in §18.18.
+
+
+## 18.18 no_file ledger state for the empty-url relay class (09:40 AST)
+
+Skylar's direction is to resolve remaining decisions programmatically from preset conditions. The last official unsorted bucket was the 275 empty-url relay rows. [#3446](https://github.com/sss97133/nuke/pull/3446) (`feat/capture-ledger-empty-url-no-file`, `b82774d6`) is a **ledger-definition-only** change: no row writes, no reads of image content, no analysis or sharing of those rows.
+
+Unfiled `capture_relay_ios` photos whose `image_url` is null or blank now count as official state **`no_file`** (reason `empty_url_relay`). The preset is `nullif(btrim(image_url), '') IS NULL AND source = 'capture_relay_ios'`, evaluated on current columns only. Official CASE order is unchanged through held, then this arm: private, pulled, filed (on_vehicle / unverified), non_vehicle, junk, duplicate, failed, waiting, held, **no_file**, else unsorted. If a file later arrives and `image_url` is set, the arm no longer matches and the row follows normal flow. There is no flip job. One live empty-url relay row is already `on_vehicle` and stays there because filed precedes this arm. None of the live class is a duplicate, so no `copy_of_no_file` walk was added.
+
+`capture_activity_blocks_v1` was not replaced. It already classifies clocked empty `image_url` rows as `clock_only` first, and leaves `clock_only` when a URL appears. Live activity prosrc md5 is still `a79add36d9d24ef96c6ccfcccfc88137`. The #3316 / #3439 timeout fix is intact (`MATERIALIZED` CTEs, `plan_cache_mode=force_custom_plan`). Parent live md5s (#3439) were states `c0c9ce009df4ba6eb6b991306008186b`, frames `1726cacaced4e3209b692b402178dd3d`. After apply: states prosrc `058bf0ef879c0457c4b927b24d659f8d` (def `bdbc800dd40ba8073f4354b8b6f26cc3`), frames prosrc `a557fbd352643dee67fa1e6611afab6b` (def `a8ca22e11d9611b0e2f8eaa0fce57d08`). Revert: `supabase/sql/revert_20261116246000_capture_ledger_empty_url_no_file.sql` (restores the #3439 bodies).
+
+Local contract `test_capture_ledger_empty_url.sql` (LIKE guard `dm_refinement_capture_ledger_empty_url%`) was `TEST_EXIT:0`, including the automatic flip when a fixture URL appears. CI `validate`, `db-contracts`, and `vitest` were green. Migration `20261116246000_capture_ledger_empty_url_no_file.sql` is **applied live**. This PR stacks on #3439 (already live) and was retargeted to main so CI would run.
+
+### Read-only arrival check (aggregates only)
+
+Live empty-url class: 276 rows, all `source=capture_relay_ios`, all clocked, 0 duplicates. Official ledger before the definition change: 275 unsorted, 1 already on_vehicle. 273 have no `capture_upload_status` row; 3 have `stage=uploaded`; 0 failed and 0 pending-like stages. Site-wide upload stages are only `classified`, `uploaded`, and `attached`.
+
+No empty-url row was created after 4 Nov 2026 (latest created_at **29 Oct 2026, 15:47 AST**). Latest taken_at in the class is **28 Oct 2026, 18:46 AST**. Latest real-URL `capture_relay_ios` / `photo_auto_sync` created_at is still **4 Nov 2026, 02:20:46 AST** — the iOS stall has not cleared. Some empty-url `updated_at` values moved after 4 Nov (max **7 Nov 2026, 04:15 AST**) but those rows still have no URL and no in-flight upload status. A device-side retry could still write a URL later; the definition then falls through to normal flow. Nothing in this class was touched, opened, or listed.
+
+### Official ledger
+
+Just before apply, official `GROUP BY` (same query, taken during this work) was on_vehicle 14,316, held 9,143, pulled 2,126, unverified 1,647, private 1,255, duplicate 852, unsorted 275, non_vehicle 132, junk 3, n 29,749.
+
+Official `GROUP BY` at **09:40 AST** after apply (plan_cache_mode `force_custom_plan`): on_vehicle **14,348**, held 9,143, pulled 2,126, unverified **1,615**, private 1,255, duplicate 852, **no_file 275** (all reason `empty_url_relay`), non_vehicle 132, junk 3, **unsorted 0**, n 29,749. The 32 unverified → on_vehicle filings happened during the PR/CI window and are normal filings, not this definition. The definition move is unsorted 275 → no_file 275. The one already-filed empty-url relay row stayed on_vehicle. `capture_activity_blocks_v1` still reports 276 `clock_only` photos (every clocked empty-url row, including the filed one). No rows were written.
+
+
+## 18.19 visual_identity_recheck_v1: full visual re-check of the filed photos (10:46–11:32 AST, 12 Nov)
+
+Owner ask (12 Nov): "Can you muscle through the 14k". Producer: [#3453](https://github.com/sss97133/nuke/pull/3453), `scripts/photo-pipeline/visual_identity_recheck_v1.py` plus the operator stage scripts in `scripts/photo-pipeline/visual_identity_recheck_v1_stages/`. Work dir: `/workspace/sortrun/recheck14k`.
+
+**Universe.** This used the official `capture_ledger_states` snapshot at 10:50 AST: on_vehicle 14,348 and unverified 1,615. The fetch excluded 87 `is_sensitive` on_vehicle rows, any redacted row, empty or non-storage URLs, and the 452-id privacy-backup union. **Viewed: 14,257 on_vehicle + 1,614 unverified = 15,871 frames**, as 914 contact sheets on 135 vehicles.
+
+**Method.**
+1. Render thumbnails (width 360).
+2. Run local CLIP (local_image_analysis_v1 reader, ViT-B/32). It records each frame's same-vehicle 5th-nearest-neighbour isolation as context only.
+3. First look: one `claude -p --allowedTools Read` call per sheet (6 references + ≤20 candidates), prompt `vir1-sheet-20261112a`. References are capture-set-linked exteriors when the vehicle has ≥4 (379 sheets). Otherwise they are the most typical CLIP exteriors (526 sheets); 9 sheets had no reference. A flag requires a hard visible clue. Technician context (engine bays, parts, rust, shop, paperwork, repaint) is explicitly "belongs".
+4. Second look: each `wrong_vehicle` / `unrelated` flag is re-asked alone at width 900 next to the references, without the first clue (prompt `vir1-single-20261112a`).
+5. A third look by hand on a review sheet of every two-look candidate before any write.
+6. Holds go only through `hold_vehicle_images_for_review`. Each run covers one vehicle, at most 50 frames. `granted_by` is `skylar-williams:t288u`. The full pre-hold rows are backed up to `recheck14k/apply1/backups/<run>.json` first. `p_method` is `visual_identity_gate:visual_identity_recheck_v1`, and the signals carry both clues, the references, the reference basis, the prompt ids and the CLIP isolation.
+
+**Precision (held out, frozen before any verdict was read).** There are effectively no owner labels for this class: 1 `user_confirmed_vehicle` row in the universe. `capture_set_review` has no resolver column. Owner labels were in any case never inputs. Calibration was built instead from 10 vehicles with ≥20 capture-set links, as 20 sheets × 2 reference modes (capture-link refs and CLIP-medoid refs) = 40 sheets / 792 items:
+- belongs: 316 capture-set-linked frames per mode.
+- not: 79 per mode, made of 72 other-vehicle linked frames (same year/make/model excluded, so duplicate vehicle records are not counted as mismatches) and 8 earlier reasoned misattribution pulls still carrying this vehicle_id.
+
+Results:
+- First look: 112/113 flags correct, recall 0.71.
+- Both looks: **112/112 (precision 1.00, Wilson 95% low bound 0.967)**, recall 0.71. The one first-look false flag (a black car's engine bay with a silver panel) was rejected by the second look.
+
+**Real-set result.**
+- First-look flags: on_vehicle 165 wrong/unrelated + 15 personal; unverified 162 + 34 personal.
+- The second look agreed on 79 on_vehicle frames (it rejected 86).
+- The hand third look agreed on **56** and skipped 23 as not hard enough. The skips were: K2500 dealer-lot frames where the subject could be this truck; 3D renders of a K5 Blazer (same model); tan Bronco frames that may be this Bronco before paint; a shipping label and a map screenshot that may be trip/parts evidence; a shop wall; white/cream trucks in poor light.
+- So the two-look gate's precision on the real set is about 71% clear-cut. That is below the 95% bar, so **do not auto-apply two-look candidates; a third look stays required.** The calibration overstates real precision because planted other-vehicle exteriors are easier than real-world renders, lot photos and same-model look-alikes.
+
+**Applied (11:29 AST), all verified `review_needed`.** Rollback for each run: `select revert_vehicle_image_review_hold('<run>', null, true);`
+
+| Run | Vehicle | Held | What |
+|---|---|---:|---|
+| `visual_identity_recheck_v1-e08bf694-20261112a` | 1977 Blazer | 20 | 3D renders of a two-tone squarebody pickup (bed, chassis, interior); a phone screenshot of a white truck |
+| `visual_identity_recheck_v1-b5a24e45-20261112a` | 1987 V3500 Dually | 13 | other crew-cab / dually listings and social screenshots (blue, red/white, black, grey) |
+| `visual_identity_recheck_v1-a90c008a-20261112a` | 1983 K2500 | 12 | hot-rod roadster, modern silver SUV body/grille/seat, tan squarebody single-cabs, an aircraft and a propeller |
+| `visual_identity_recheck_v1-043c6d8b-20261112a` | 1973 Charger 318 | 8 | web search-result screenshots of other Chargers |
+| `visual_identity_recheck_v1-83f6f033-20261112a` | 1966 Mustang 10A | 1 | orange International Scout |
+| `visual_identity_recheck_v1-b1edd5c1-20261112a` | 1989 R3500 | 1 | white truck at sunset (the record is red) |
+| `visual_identity_recheck_v1-cf566074-20261112a` | 1967 GTO | 1 | red crew-cab pickup |
+
+**Unverified second pass (information only, no write).** 139 of the 1,614 frames already in review were judged not-this-vehicle by both looks. They stay in review; this producer does not pull (`rejected_misattributed`). Their list is `recheck14k/first_flags.json` joined with `second_w*.jsonl`.
+
+**Personal (log only).** 52 frames (15 on_vehicle, 37 unverified) were judged personal. They were not held, promoted or hidden by this path; the list is `recheck14k/personal_log.json`. They are a candidate input for the existing `set_image_sensitivity` → `privacy_promote_v1` path under the Nov 12 activity-evidence rule (keep the row and its timestamps).
+
+**Ledger after apply (official, 11:31 AST):** on_vehicle **14,292** (−56), unverified **1,671** (+56), held 9,143, pulled 2,126, private 1,255, duplicate 852, no_file 275, non_vehicle 132, junk 3, **unsorted 0**, n 29,749.
+
 ## 19. Known gaps and next work
 
 
@@ -1060,8 +1349,8 @@ Filing work (the path that can move unsorted):
 3. **plan_refused / planned_but_left_out vehicle-typed frames** — typ coverage and identity_conflict are already live in `capture_landing_plan_step`; typ-aware `capture_landing_supersede_v1` is already live. #3304 (`capture_replan_vehicle_leftovers_v1`) is **applied live**, and the #3311 idempotent body is **applied live** (~15:37 AST, md5 `a90186df`). Canonical first run `9a9407c8` (50 / 19 days) plus this pass `90848ff6` + `c5a7280c` (81 photos / 4 days, signed once; third run `76cc8213` took 0). The four days drained at 15:48 AST: two review-only (0 clear, 0 filed; already-held frames), two 0-set applies. 79 of the 81 leftovers were already official ledger `duplicate`; 2 stayed unsorted (no `taken_at` / superseded). Five gate_failed days (23 photos) remain skipped `refused_no_new_evidence` until new evidence arrives. Do not start another leftover cap-50 unless new unlogged, unrefused leftovers appear. #3314 (no-clock leftover skip) is **applied live** ~16:20 AST (md5 `659c5709`). Do not back-door file. typ `other` / `receipt_document` belong to #3302, not this producer.
 4. **`capture_documents_land_by_vin`** — dry-run 10 Nov (`d0c00000-...000000000001`) returned 0 candidates. Every VIN page was skipped (`no_unique_vehicle`, `vehicle_not_held_by_user`, or `check_digit_failed`). Do not apply a signed run until a unique vehicle the user holds is actually found. The 10-minute tick is already scheduled and will no-op on the same skips.
 
-5. **typ `other` / `receipt_document` (180 + 17 non-sensitive)** — #3302 (`capture_non_vehicle_review_v1`) is **applied live**. Second looks (operator-viewed; Mac was offline) then signed cap-50 runs: 127 `non_vehicle`, 26 vehicle photos enqueued, 41 `judgment_personal` logged, 3 unreadable skipped. typ alone is not a terminal. The 41 were then run through the sanctioned `VisionDecision.decide` path (the on-device rule that sets `is_sensitive`; not `vision-gate-classify.mjs`). 23 were flagged (21 document, 2 personal_face) and promoted by `privacy_promote_v1` run `fe1622c6` (private +23, unsorted −23). The remaining 18 work / no_junk_signal frames stay unsorted and logged under `00aa930c`. A later leftover typ=`other` look pass (18 unlogged real files, run `a3302000-…000011` at 18:49 AST; see §18.13) added 3 `non_vehicle`, 13 `judgment_personal`, and 2 vehicle enqueues. 31 `judgment_personal` remain unofficially unsorted. A personal judgment that is only the reviewer's is still not promoted.
-6. **empty_url (275 unsorted / 276 live)** — leave alone. iOS `SyncEngine` retries failed uploads locally (`failed(retry:)` stays queued on the device; `BackgroundUploader`). The server has almost no retry signal: 3 of 276 have `capture_upload_status.stage=uploaded`, 0 failed. 42 carry `on_device_vision.is_personal` (intentional metadata-only alibi rows). **0 are newer than 4 Nov 2026**; created 19 Jun-29 Oct 2026, latest `taken_at` 28 Oct. This class does not explain a post-Nov-4 upload stall.
+5. **typ `other` / `receipt_document` (180 + 17 non-sensitive)** — #3302 (`capture_non_vehicle_review_v1`) is **applied live**. Second looks (operator-viewed; Mac was offline) then signed cap-50 runs: 127 `non_vehicle`, 26 vehicle photos enqueued, 41 `judgment_personal` logged, 3 unreadable skipped. typ alone is not a terminal. The 41 were then run through the sanctioned `VisionDecision.decide` path (the on-device rule that sets `is_sensitive`; not `vision-gate-classify.mjs`). 23 were flagged (21 document, 2 personal_face) and promoted by `privacy_promote_v1` run `fe1622c6` (private +23, unsorted −23). The remaining 18 work / no_junk_signal frames stay unsorted and logged under `00aa930c`. A later leftover typ=`other` look pass (18 unlogged real files, run `a3302000-…000011` at 18:49 AST; see §18.13) added 3 `non_vehicle`, 13 `judgment_personal`, and 2 vehicle enqueues. The 2 vehicle looks were put into open #3322 reviews on 12 Nov (run `a3322000-…000011`; see §18.14). The 13 new selfies were then run through `VisionDecision.decide` (12 `work_with_people`, 1 `work`, 0 sensitive) and were not promoted. On 12 Nov the classifier verdict was used to override the operator jp log: 25 of the 31 went into open #3330 / #3442 left-out reviews (run `a2440000-…000002`; see §18.15). The remaining 6 already had an active `capture_document_pages` row and were not put into a left-out review (§18.16). They were then resolved by #3444 `privacy_from_document_ocr_v1` at 09:13:56 AST (run `a2450000-…000002`): 4 identity papers to private, 2 invitations to non_vehicle, `taken_at` kept, nothing deleted (§18.17). Those 275 empty_url rows then became official `no_file` under #3446 (§18.18). Official unsorted is now 0. A personal judgment that is only the reviewer's is still not promoted.
+6. **empty_url / no_file (275 `no_file`, 276 live)** — #3446 is **applied live** (~09:40 AST 12 Nov). The 275 formerly unsorted empty-url `capture_relay_ios` rows now count as official `no_file` (reason `empty_url_relay`). They were not written. They still appear as read-only `clock_only` markers in `capture_activity_blocks_v1`. The one already-filed empty-url relay row stayed on_vehicle. If a URL later appears, the row leaves `no_file` automatically and follows normal flow. Server upload status is still 3 `uploaded`, 0 failed, 0 pending; last real-URL iOS/relay arrival remains 4 Nov 2026, 02:20:46 AST (§18.18).
 7. **`capture_ledger_states` timeout (13:31 AST)** — EXPLAIN: the held CTE is 19 ms; the timeout is a generic plan plus I/O (wrong index on the date window, 4.0 s; dupmap scan of unorganized rows, 4.8 s). The held join from #3299 is not the expensive part. #3301 is **applied live** (INCLUDE-less index `idx_capture_set_review_open_user`; `plan_cache_mode=force_custom_plan`; materialized held/waiting/failed). Official `capture_ledger_states` completed in 59.9 s at 14:20 AST, then ~50–73 s on later reads. No row writes. Live ledger bodies were then replaced by #3302 (same timeout fix plus the `non_vehicle` state).
 8. **Gate reader** — #3246 is draft. Do not re-arm the 2019-09-24 reader cursor (`9cf5b7a4` stays in `done_chunks`).
 9. **Drop-folder / other dormant stampers** are not scheduled, but `iphoto-intake.mjs` is still able to stamp `vehicle_id` until #3280 lands.
@@ -1101,19 +1390,26 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 | [#3314](https://github.com/sss97133/nuke/pull/3314) | skip no-clock leftovers the scorer cannot use | Draft, **applied live** ~16:20 AST | Leftovers / scorer match |
 | [#3316](https://github.com/sss97133/nuke/pull/3316) | walk dup chains and count non_vehicle copies | Draft, **applied live** ~16:35 AST | Ledger definition only |
 | [#3318](https://github.com/sss97133/nuke/pull/3318) | keep unique photos when a newer review supersedes | Draft, **applied live** ~16:56 AST (sweep) and ~17:10 AST (fast reopen) | Sweep fix + signed reopen |
-| [#3322](https://github.com/sss97133/nuke/pull/3322) | route typ-other vehicle looks to held review | Open, **applied live** ~17:42 AST; reviews dropped 17:52 and restored 18:43 AST (26 photos / 3 new open reviews) | typ other into held |
+| [#3322](https://github.com/sss97133/nuke/pull/3322) | route typ-other vehicle looks to held review | Open, **applied live** ~17:42 AST; reviews dropped 17:52 and restored 18:43 AST (26 photos / 3 new open reviews); leftover 2 typ-other vehicle looks applied 07:51 AST 12 Nov (run `a3322000-…000011`, 2 open reviews) | typ other into held |
 | [#3323](https://github.com/sss97133/nuke/pull/3323) | write typ from high-confidence local CLIP views | Open, **applied live** (DDL only); typ writes refused (agreement 63.2% < 90%) | typ from CLIP |
 | [#3327](https://github.com/sss97133/nuke/pull/3327) | route refused days' unfiled photos to held review | Open, **applied live** ~18:20 AST (function) and 18:22–18:43 AST (107 photos / 21 reviews) | refused-day review |
 | [#3329](https://github.com/sss97133/nuke/pull/3329) | keep flagged unfiled photos in open reviews | Open, **applied live** ~18:42 AST | Sweep nothing_left_unfiled |
 | [#3330](https://github.com/sss97133/nuke/pull/3330) | route left-out and unadmitted photos to held review | Open, **applied live** ~19:07 AST | Left-out / unadmitted review |
+| [#3439](https://github.com/sss97133/nuke/pull/3439) | junk state and activity-evidence blocks | Open, **applied live** ~08:13 AST 12 Nov (function + signed 3-placeholder run `a3331000-…000002`) | Junk terminal + activity blocks |
+| [#3440](https://github.com/sss97133/nuke/pull/3440) | docs: photo-sorting pipeline follow-up (this document) | Open, docs only | Pipeline ledger |
+| [#3441](https://github.com/sss97133/nuke/pull/3441) | keep held or prior-wrong photos out of clear sets | Open, **applied live** ~08:37 AST 12 Nov; landing resumed; ticks planned/applied `f37c8c75` as review-only | Planner + resume |
+| [#3442](https://github.com/sss97133/nuke/pull/3442) | review jp overrides and no-clock left-outs | Open, **applied live** ~08:47 AST 12 Nov; signed run `a2440000-…000002` routed 29 / 8 reviews | jp override + no-clock review |
+| [#3444](https://github.com/sss97133/nuke/pull/3444) | privacy_from_document_ocr_v1 | Open, **applied live** ~09:13 AST 12 Nov; signed run `a2450000-…000002` (4 private, 2 non_vehicle) | OCR identity → private; invitations → non_vehicle |
+| [#3446](https://github.com/sss97133/nuke/pull/3446) | no_file ledger state for empty-url relay | Open, **applied live** ~09:40 AST 12 Nov (definition only; states md5 `058bf0ef`, frames `a557fbd3`) | empty_url relay → no_file; auto-flip if a URL arrives |
+| [#3453](https://github.com/sss97133/nuke/pull/3453) | visual_identity_recheck_v1 | Open; script only (no migration). First run **applied live** 11:29 AST 12 Nov: 7 runs, 56 holds | full two-look visual re-check of filed photos; capped signed revertible holds |
 
 ## 21. Unverified or out of scope in this writing
 
-- The live `capture_ledger_states` body was re-read after the #3316 apply on 10 Nov afternoon; `duplicate` is defined as of #3316 (filed / held / private / pulled / `non_vehicle` originals, including through other unfiled copies, depth cap 16). A missing original, a cycle, or an unresolved chain still does not count. Live md5s: states `ba4646ae`, frames `52d8f857`.
+- The live `capture_ledger_states` body was re-read after the #3446 apply on 12 Nov; official CASE order is private, pulled, filed (on_vehicle/unverified), non_vehicle, **junk**, duplicate, failed, waiting, held, **no_file**, else unsorted. `duplicate` is defined as of #3316 plus `copy_of_junk` (filed / held / private / pulled / `non_vehicle` / `junk` originals, including through other unfiled copies, depth cap 16). A missing original, a cycle, or an unresolved chain still does not count. Live md5s as of #3446: states `058bf0ef`, frames `a557fbd3`. The #3439 parent bodies (states `c0c9ce00`, frames `1726caca`) are what the #3446 revert script restores. The #3316 parent bodies (states `ba4646ae`, frames `52d8f857`) are what the #3439 revert script restores.
 - Visual confirmation of the 18 `20261110b` holds was not repeated here; runs, backups, and the ledger delta were verified.
 - `#3212` and the full set of open draft PRs were not re-surveyed.
 - Capture-set joins for ssd_blast / drop-folder / image_intake / cascade in the pollution audit were not finished (timeout / UNION type mismatch into the outage).
-- `visual_identity_recheck_v1` is still a design, not a shipped producer. Stamp-DTO-without-Make (#3298) is now live for the 4 rows.
+- `visual_identity_recheck_v1` shipped as #3453 (open; first run applied 12 Nov, 56 holds). Its CI step is not in the PR because the push token lacks workflow scope. Stamp-DTO-without-Make (#3298) is now live for the 4 rows.
 - Whether every remaining-vehicle cover with `zone=null` is still the same exterior checked at 09:56 was not re-opened.
 - Mac online/offline state and reader/drain pids were not re-checked at 10:11 AST; last known healthy pids are in the 09:58 progress note.
 - The exact Postgres `granted_by` column constraint was not re-read in this writing; keeping it non-null is a standing operating rule, and the ownership rederive producer keeps the existing value.
