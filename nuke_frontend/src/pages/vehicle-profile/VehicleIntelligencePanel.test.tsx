@@ -40,23 +40,24 @@ it('qualifies stored interpretations without certifying experts, excerpts or mar
   expect(host.textContent).toContain('73 COMMENTS REPORTED');
   expect(host.textContent).toContain('input sample, method and analysis time unavailable');
   expect(host.textContent).toContain('Market performance remains unverified');
-  for (const label of ['REPORTED EXCERPTS', 'EXTRACTED INSIGHTS', 'REPORTED CONCERNS',
-    'DEMAND LABEL: high', 'RARITY LABEL: rare', 'PRICE TREND LABEL: rising',
+  for (const label of ['REPORTED EXCERPTS', "MODEL'S READING OF THE COMMENTS · NOT VERIFIED", 'REPORTED CONCERNS',
     'Reported wording', 'Extracted observation', 'Reported concern']) expect(host.textContent).toContain(label);
+  // A model's market labels are never rendered as statuses.
+  for (const chip of ['DEMAND LABEL', 'RARITY LABEL', 'PRICE TREND LABEL']) expect(host.textContent).not.toContain(chip);
   for (const claim of ['Community Intelligence', 'EXPERT INSIGHTS', 'KEY QUOTES']) expect(host.textContent).not.toContain(claim);
   expect(host.querySelector('[style*="vp-brg"], [style*="vp-danger"]')).toBeNull();
 });
 
-it('names the model, date and input count when the summary carries them, and drops unknown labels', async () => {
+it('names the model, date and input count when the summary carries them, and shows no market labels', async () => {
   const insight = 'An extracted observation long enough that the old card would have cut it off before the reader reached the part that matters to a buyer deciding on the car.';
   await mount({ overall_sentiment: 'mixed', comment_count: 84, comments_analyzed: 84, model_used: 'claude-haiku-5-5',
-    analyzed_at: '2026-11-12T22:15:24.689+00:00', expert_insights: [insight],
+    analyzed_at: '2026-11-12T12:15:24.689+00:00', expert_insights: [insight],
     market_signals: { demand_level: 'high', rarity_assessment: 'unknown', price_trend: 'unknown' } });
   expect(host.textContent).toContain('Stored model interpretation · claude-haiku-5-5 · written Nov 12, 2026 · read 84 of 84 comments.');
   expect(host.textContent).not.toContain('analysis time unavailable');
   expect(host.textContent).toContain('Market performance remains unverified');
   expect(host.textContent).toContain(insight);
-  expect(host.textContent).toContain('DEMAND LABEL: high');
+  expect(host.textContent).not.toContain('DEMAND LABEL');
   expect(host.textContent).not.toContain('RARITY LABEL');
   expect(host.textContent).not.toContain('PRICE TREND LABEL');
 });
