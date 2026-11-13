@@ -987,16 +987,25 @@ struct CapturedListingsView: View {
     }
 
     @ViewBuilder private func line(_ row: CapturedListing) -> some View {
+        let isUS = Self.isUSPlatform(row.source_platform)
+        let amount: String? = row.current_price.flatMap { p in
+            guard p.isFinite else { return nil }
+            return isUS
+                ? p.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+                : Int(p.rounded()).formatted()
+        }
         VStack(alignment: .leading, spacing: 8) {
-            ListingHeroPhoto(raw: row.vehicle?.primary_image_url, amountLabel: "RECORDED AMOUNT",
-                             amount: row.current_price.flatMap { $0.isFinite ? Int($0.rounded()).formatted() : nil })
+            ListingHeroPhoto(raw: row.vehicle?.primary_image_url, amountLabel: isUS ? "ASKING" : "RECORDED AMOUNT",
+                             amount: amount)
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.headline).font(.headline).lineLimit(2)
                 HStack(spacing: 8) {
                     Text(CapturedListings.sourceName(row.source_platform).uppercased())
                         .font(.system(.caption2, design: .monospaced, weight: .semibold)).foregroundStyle(.secondary)
-                    Text(row.current_price == nil ? "amount unrecorded" : "currency unrecorded")
-                        .font(.caption).foregroundStyle(.secondary)
+                    if row.current_price == nil {
+                        Text("amount unrecorded")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Spacer(minLength: 0)
                     Text(ProfileClock.day(row.clock).map { (row.source_observed_at != nil ? "seen " : "captured ") + $0 } ?? "clock missing")
                         .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
@@ -1005,6 +1014,11 @@ struct CapturedListingsView: View {
             .padding(.horizontal, 14)
         }
         .padding(.bottom, 14)
+    }
+
+    /// True if the platform is a US-based marketplace where prices are assumed USD.
+    private static func isUSPlatform(_ platform: String) -> Bool {
+        ["facebook_marketplace", "craigslist", "ksl", "autotrader", "cargurus", "cars_com", "carfax"].contains(platform)
     }
 }
 

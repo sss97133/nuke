@@ -183,6 +183,78 @@ struct ExploreView: View {
         }.joined(separator: " ")
     }
 
+    /// Detects whether a query looks like a vehicle search (make, model, body style, year)
+    /// rather than a person/organization name. Used to hide actor results when searching
+    /// for vehicles — "Mustang" wants cars, not BaT usernames like "MustangEd69".
+    private static func looksLikeVehicleQuery(_ query: String) -> Bool {
+        let q = query.lowercased().trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return false }
+
+        // Year patterns: 4-digit year or 'XX (decade shorthand)
+        if q.range(of: #"^(19|20)\d{2}$"#, options: .regularExpression) != nil { return true }
+        if q.range(of: #"'\d{2}"#, options: .regularExpression) != nil { return true }
+
+        // Common makes (case-insensitive)
+        let makes: Set<String> = [
+            "ford", "chevy", "chevrolet", "dodge", "chrysler", "plymouth", "pontiac", "buick",
+            "oldsmobile", "olds", "cadillac", "lincoln", "mercury", "gmc", "jeep", "amc",
+            "porsche", "ferrari", "lamborghini", "maserati", "alfa", "fiat", "lancia",
+            "bmw", "mercedes", "benz", "audi", "volkswagen", "vw", "volvo", "saab",
+            "jaguar", "aston", "bentley", "rolls", "lotus", "triumph", "mg", "austin", "rover",
+            "toyota", "honda", "nissan", "datsun", "mazda", "subaru", "mitsubishi", "lexus", "acura",
+            "tesla", "rivian", "lucid", "hyundai", "kia", "genesis"
+        ]
+
+        // Iconic models that double as names or common words
+        let models: Set<String> = [
+            "mustang", "camaro", "corvette", "firebird", "challenger", "charger", "cuda", "barracuda",
+            "impala", "chevelle", "nova", "malibu", "el camino", "monte carlo", "c10", "k5",
+            "bronco", "f100", "f150", "f250", "f350", "ranger", "raptor", "lightning", "thunderbird",
+            "911", "356", "944", "928", "cayenne", "boxster", "cayman", "panamera", "taycan",
+            "gtr", "gt40", "gt350", "gt500", "boss", "shelby", "cobra", "mach 1", "bullitt",
+            "supra", "nsx", "rx7", "skyline", "miata", "mx5", "240z", "280z", "300zx", "370z",
+            "m3", "m5", "m6", "e30", "e36", "e46", "e92", "f80", "s2000", "type r", "sti", "wrx",
+            "gallardo", "huracan", "aventador", "countach", "diablo", "murcielago",
+            "f40", "f50", "enzo", "laferrari", "testarossa", "308", "328", "458", "488", "812",
+            "ghibli", "quattroporte", "mc12", "granturismo",
+            "db5", "db9", "vantage", "vanquish", "dbs",
+            "continental", "phantom", "ghost", "wraith", "cullinan",
+            "elise", "exige", "evora", "esprit",
+            "tr6", "spitfire", "herald", "gt6",
+            "model s", "model 3", "model x", "model y", "roadster", "cybertruck",
+            "wrangler", "cj5", "cj7", "willys", "scrambler", "gladiator", "cherokee", "grand cherokee"
+        ]
+
+        // Body styles and vehicle terms
+        let vehicleTerms: Set<String> = [
+            "coupe", "sedan", "convertible", "roadster", "wagon", "hatchback", "fastback",
+            "pickup", "truck", "suv", "crossover", "van", "minivan", "bus",
+            "hardtop", "softtop", "targa", "spyder", "spider", "cabriolet", "drophead",
+            "4x4", "4wd", "awd", "rwd", "fwd",
+            "v8", "v6", "v10", "v12", "inline", "flat", "boxer", "turbo", "supercharged",
+            "manual", "stick", "auto", "automatic", "cvt", "dct", "pdk",
+            "restomod", "resto", "patina", "barn find", "survivor", "numbers matching",
+            "classic", "vintage", "antique", "muscle", "pony", "sports car", "supercar", "hypercar"
+        ]
+
+        // Check for any matching token
+        let tokens = q.split(whereSeparator: { $0.isWhitespace || $0 == "-" }).map(String.init)
+        for token in tokens {
+            if makes.contains(token) { return true }
+            if models.contains(token) { return true }
+            if vehicleTerms.contains(token) { return true }
+        }
+
+        // Also check multi-word matches
+        if models.contains(q) { return true }
+        if vehicleTerms.contains(q) { return true }
+
+        // Numeric model names (911, 944, 356, etc.)
+        if let num = Int(q), num >= 100 && num < 1000 { return true }
+
+        return false
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -520,9 +592,13 @@ struct ExploreView: View {
             let res = try await UniversalSearch.vehicles(query: term, types: UniversalSearch.firstPageTypes)
             guard res.success else { throw URLError(.badServerResponse) }
             guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == term else { return }
-            // Actors the door matched by name lead the results: an organization opens its measures,
-            // a person their profile. Vehicles follow in the grid.
-            actorHits = res.results.filter { $0.type == "organization" || $0.type == "external_identity" || ($0.type == "user" && UUID(uuidString: $0.id) != nil) }
+            // Actors only when the query doesn't look like a vehicle (make/model/year).
+            // When someone searches "Mustang" or "911" they want cars, not BaT usernames like "MustangEd69".
+            // Include actors only for queries that look like names (space-separated words without numbers
+            // that don't match common vehicle terms).
+            let vehicleRows = res.results.compactMap(\.headerRow)
+            let looksLikeVehicle = !vehicleRows.isEmpty || Self.looksLikeVehicleQuery(term)
+            actorHits = looksLikeVehicle ? [] : res.results.filter { $0.type == "organization" || $0.type == "external_identity" || ($0.type == "user" && UUID(uuidString: $0.id) != nil) }
             let rows = Self.photosFirst(res.results.compactMap(\.headerRow))
             results = rows
             loadMoreError = nil

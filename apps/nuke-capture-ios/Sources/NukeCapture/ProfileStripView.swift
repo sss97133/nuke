@@ -622,13 +622,23 @@ struct ProfileHeaderBlock: View {
         )
     }
 
-    /// USD gets a dollar sign; a classified's unrecorded currency prints the bare number, as on the web.
+    /// USD gets a dollar sign. US-based platforms (Facebook Marketplace, Craigslist, KSL)
+    /// default to USD when currency is unrecorded. Other sources show the bare number.
     static func money(_ claim: Claim) -> String {
         guard let n = claim.value.number else { return claim.value.text }
-        if claim.unit == "USD" {
+        if claim.unit == "USD" || Self.isUSPlatform(claim.source) {
             return n.formatted(.currency(code: "USD").precision(.fractionLength(0)))
         }
         return Int(n.rounded()).formatted()
+    }
+
+    /// True if the source is a US-based classified platform where prices are assumed USD.
+    private static func isUSPlatform(_ source: ClaimSource) -> Bool {
+        let label = (source.label ?? "").lowercased()
+        let url = (source.url ?? "").lowercased()
+        let combined = label + " " + url
+        let usMarkets = ["facebook marketplace", "craigslist", "ksl", "facebook.com/marketplace", "autotrader", "cargurus", "cars.com", "carfax"]
+        return usMarkets.contains { combined.contains($0) }
     }
 
     static func odometer(_ claim: Claim) -> String {

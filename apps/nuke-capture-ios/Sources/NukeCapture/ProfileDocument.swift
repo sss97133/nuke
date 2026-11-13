@@ -306,11 +306,12 @@ struct Claim: Decodable {
     }
 
     /// The line under a value: the observed day when the claim carries a clock, and for a legacy
-    /// value the record it is and its trust, since no observation stands beneath it.
+    /// value the record it is and its verification status, since no observation stands beneath it.
     var decayLine: String? {
         let day = ProfileClock.day(observed_at)
         if source.kind == .legacy {
-            return [source.label ?? "legacy record", day, "trust \(trustPercent)%"].compactMap { $0 }.joined(separator: " · ")
+            let trustLabel = trustPercent >= 80 ? "verified" : (trustPercent >= 50 ? "partial" : "unverified")
+            return [source.label ?? "vehicle record", day, trustLabel].compactMap { $0 }.joined(separator: " · ")
         }
         return day
     }
