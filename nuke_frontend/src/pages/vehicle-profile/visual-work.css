@@ -20,6 +20,21 @@
 .vp-component-coverage { padding: 14px 20px; border-top: 1px solid var(--border, #d6d6dc); }
 @media (max-width: 900px) { .vp-component-evidence { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .vp-component-evidence { grid-template-columns: minmax(0, 1fr); } }
+.vp-expected-assemblies { margin: 20px 0 28px; padding: 18px 20px; border: 1px solid var(--border, #d6d6dc); border-radius: var(--radius-lg, 12px); background: var(--surface, white); }
+.vp-expected-assemblies h4 { margin: 0 0 6px; font-size: 22px; }
+.vp-expected-assemblies header p, .vp-expected-assemblies article > p { margin: 6px 0 12px; font-size: 14px; line-height: 1.5; }
+.vp-expected-assemblies article { border-top: 1px solid var(--border, #d6d6dc); margin-top: 18px; padding-top: 16px; }
+.vp-expected-heading { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.vp-expected-heading h5 { margin: 0; font-size: 18px; text-transform: capitalize; }
+.vp-expected-heading > span, .vp-expected-positions small, .vp-expected-limit, .vp-expected-coverage { color: var(--text-secondary, #666); font-size: 12px; line-height: 1.5; }
+.vp-expected-positions { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); border: 1px solid var(--border, #d6d6dc); border-radius: var(--radius, 6px); overflow: hidden; }
+.vp-expected-positions > a { display: flex; flex-direction: column; gap: 6px; padding: 12px; text-decoration: none; color: inherit; min-width: 0; overflow-wrap: anywhere; font-size: 13px; border-inline-end: 1px solid var(--border, #d6d6dc); }
+.vp-expected-positions > a:hover, .vp-expected-positions > a:focus-visible { background: var(--surface-hover, #eef0f3); outline: 2px solid var(--accent, #006aca); outline-offset: -2px; }
+.vp-expected-positions > a strong { font-size: 14px; }
+.vp-expected-positions > a small:last-child { margin-top: auto; padding-top: 4px; color: var(--accent, #006aca); }
+.vp-expected-source { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: baseline; }
+.vp-expected-inspection { color: var(--text-secondary, #666); }
+.vp-expected-coverage { margin: 14px 0 0; }
 .vp-visual-work article { background: var(--surface, white); border: 1px solid var(--border, #d6d6dc); border-radius: 12px; overflow: hidden; }
 .vp-visual-work header { padding: 18px 20px 14px; }
 .vp-visual-work header > span, .vp-work-materials > div > span { color: var(--text-secondary, #666); font-size: 11px; }
