@@ -39,7 +39,7 @@ BEGIN
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_engine_snap s
     WHERE s.vid NOT IN ('10000000-0000-0000-0000-0000000000c1', '10000000-0000-0000-0000-0000000000c2')
       AND (s.items IS DISTINCT FROM public.vehicle_facet_items(s.vid, 'engine')
-        OR s.profile IS DISTINCT FROM public.vehicle_profile_read(s.vid))), 'other vehicles unchanged');
+        OR s.profile - 'read_at' IS DISTINCT FROM public.vehicle_profile_read(s.vid) - 'read_at')), 'other vehicles unchanged');
   PERFORM public.t_assert(public.vehicle_facet_items('10000000-0000-0000-0000-0000000000c3', 'engine')::text LIKE '%V8 (chassis: tube frame)%',
     'an engine value that only mentions a chassis is kept');
 END $$;
