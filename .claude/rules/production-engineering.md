@@ -87,6 +87,17 @@ Noted drift:
   (`docs/api/openapi.yaml`, `nuke_frontend/public/v1/openapi.json`,
   `nuke_frontend/api/v1/openapi.json`) still list it. It is deployed without
   source: restore the source, or retire the deployment and the spec entries.
+- 2026-11-13: 115 of the 341 deployed edge functions have no folder on main
+  (`supabase functions list` compared with `git ls-tree origin/main
+  supabase/functions/`). 89 were removed from the repo and never undeployed
+  (77 in 2026-03, 10 in 2026-04, one each in 2025-11 and 2026-07); 26 were
+  never on main. Three active cron jobs call one of them: `concierge-notify`,
+  `concierge-partner-sync` (calls `concierge-partner`) and
+  `instagram-feed-sync` (calls `instagram-connect`). No cron job calls a
+  function that is not deployed. `docs/ledger/facts.json` holds both lists
+  (`deployed`, `fn_dirs`); refresh it with `npm run ledger:facts`. Do not
+  sweep them: `docs/ledger/CAPABILITY_MAP.md` marks the ones whose source
+  must be recovered from git history before anything is touched.
 
 ## Fleet Rules (workflows / crons / daemons)
 
