@@ -21,7 +21,7 @@ export interface CompScope {
 export interface CommentIntel {
   sentiment: { score: number; overall: string; mood_keywords?: string[]; emotional_themes?: string[] } | null;
   key_quotes: (string | { quote: string; significance?: string; comment_id?: string | null; author?: string | null;
-    is_seller?: boolean; posted_at?: string | null; url?: string | null })[] | null;
+    is_seller?: boolean; posted_at?: string | null; url?: string | null; comment_text?: string | null })[] | null;
   expert_insights: (string | { insight: string; expertise_level?: string })[] | null;
   community_concerns: (string | { concern: string })[] | null;
   price_sentiment: { community_view?: string; reasoning?: string; overall?: string; comments?: string } | null;

@@ -391,6 +391,8 @@ async function processVehicle(
           author: hit.c.author_username,
           is_seller: hit.c.is_seller === true,
           posted_at: hit.c.posted_at ?? null,
+          // The comment as stored, so the page can show the source in place (same 1,200-character bound the reader uses).
+          comment_text: String(hit.c.comment_text ?? "").slice(0, 1200),
           url: base ? (hit.c.bat_comment_id ? `${base}/#comment-${hit.c.bat_comment_id}` : base) : null,
         }];
       });
