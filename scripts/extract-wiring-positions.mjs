@@ -307,8 +307,9 @@ Use standard automotive terminology (e.g., "Alternator" not "generator", "MAP Se
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5-5',
       max_tokens: 4096,
+      output_config: { effort: 'low' },
       messages: [{
         role: 'user',
         content: [
@@ -326,7 +327,7 @@ Use standard automotive terminology (e.g., "Alternator" not "generator", "MAP Se
   }
 
   const data = await response.json();
-  const text = data.content?.[0]?.text || '';
+  const text = data.content?.find((b) => b.type === 'text')?.text || '';
 
   // Parse JSON from response (handle code blocks)
   let cleaned = text.trim();

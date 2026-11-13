@@ -161,8 +161,9 @@ def classify_with_claude(image_path):
     media_type = "image/jpeg"
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=512,
+        model="claude-sonnet-5-5",
+        max_tokens=4000,
+        output_config={"effort": "low"},
         messages=[{
             "role": "user",
             "content": [
@@ -192,7 +193,7 @@ Return JSON only:
         }]
     )
 
-    text = response.content[0].text
+    text = next((b.text for b in response.content if getattr(b, "type", None) == "text"), "")
     match = text[text.find("{"):text.rfind("}")+1]
     if match:
         return json.loads(match)
