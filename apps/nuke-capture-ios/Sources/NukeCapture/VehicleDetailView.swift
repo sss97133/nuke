@@ -658,6 +658,8 @@ struct VehicleDetailView: View {
                         VehicleActorLinks(vehicleId: vehicleId).id("actors")
                         buildInstrument
                         if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
+                        // Where it's been: the photo-GPS areas (vehicle_location_areas), the web header popup's read.
+                        VehicleLocationSection(vehicleId: vehicleId).id("location")
                         valuationSection.id("worth")
                         saleHistorySection.id("sales")
                         beforeAfterSection
