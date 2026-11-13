@@ -167,13 +167,15 @@ function seedGarage() {
   fixture.rows.garage_covers = ['car', 'old'].map(vehicle_id => ({ vehicle_id, image_url: 'photo' }));
 }
 
-it('reuses the evidence fold for Owned consumers without unrelated membership or secondary reads', async () => {
+it('reuses the evidence fold for Owned consumers when work relationships fail', async () => {
+  // Work relationships (documenting, consigned) are now fetched even in ownership scope,
+  // but failure is non-fatal — evidence-based ownership still works.
   seedGarage(); fixture.fail = 'get_user_garage';
   await act(async () => root.render(<Harness scope="ownership" />));
   expect(state.error).toBeNull();
   expect(state.vehicles.find(v => v.id === 'car')?.relationship_type).toBe('VERIFIED OWNER');
   expect(fixture.calls.filter(call => call[0] === 'rpc').map(call => call[1]))
-    .toEqual(['get_my_garage_owner_corrections']);
+    .toEqual(['get_my_garage_owner_corrections', 'get_user_garage']);
 });
 
 it('finds created zero-photo profiles and contributed records without promoting either to ownership', async () => {
