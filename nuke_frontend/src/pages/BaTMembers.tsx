@@ -60,7 +60,7 @@ export default function BaTMembers() {
             // Get comment count
             const { count: commentCount } = await supabase
               .from('auction_comments')
-              .select('*', { count: 'exact', head: true })
+              .select('*,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null')
               .eq('external_identity_id', member.id)
               .eq('platform', 'bat');
 

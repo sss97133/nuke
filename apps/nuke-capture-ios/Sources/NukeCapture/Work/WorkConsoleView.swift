@@ -20,7 +20,7 @@ struct WorkConsoleView: View {
     var body: some View {
         NavigationStack {
             WorkConsoleContent(signatures: reader.signatures, jobs: reader.jobs, identity: reader.identity, showCapture: showCapture,
-                               inbox: reader.inbox, open: reader.open, notifications: reader.notifications,
+                               inbox: reader.inbox, open: reader.open, notifications: reader.notifications, listings: reader.listings,
                                onInboxChanged: { Task { await reader.loadInbox() } },
                                onNotificationsChanged: { Task { await reader.loadNotifications() } },
                                loadingMore: reader.loadingMore || reader.loadingJobs,
@@ -77,6 +77,7 @@ final class WorkConsoleReader: ObservableObject {
         var inbox: () async -> JobLoad<ContactInbox> = { await ContactReaders.inbox() }
         var open: () async -> JobLoad<OpenRequirements> = { await OfferReaders.openRequirements() }
         var notifications: () async -> JobLoad<NotificationPage> = { await NotificationReaders.page() }
+        var listings: () async -> JobLoad<ListingSubmissionPage> = { await ListingSubmissionReaders.load() }
     }
 
     @Published private(set) var signatures: JobLoad<SignatureQueue> = .loading
@@ -85,11 +86,12 @@ final class WorkConsoleReader: ObservableObject {
     @Published private(set) var inbox: JobLoad<ContactInbox> = .loading
     @Published private(set) var open: JobLoad<OpenRequirements> = .loading
     @Published private(set) var notifications: JobLoad<NotificationPage> = .loading
+    @Published private(set) var listings: JobLoad<ListingSubmissionPage> = .loading
     @Published private(set) var loadingMore = false
     @Published private(set) var loadingJobs = false
     @Published private(set) var jobsPageFailure: JobRefusal?
 
-    private enum Part: Hashable { case signatures, jobs, identity, inbox, open, notifications }
+    private enum Part: Hashable { case signatures, jobs, identity, inbox, open, notifications, listings }
     private var requests: [Part: ReadRequestGuard] = [:]
     private let reads: Reads
     private let account: () -> String?
@@ -114,7 +116,13 @@ final class WorkConsoleReader: ObservableObject {
         async let m: Void = loadInbox()
         async let r: Void = loadOpen()
         async let n: Void = loadNotifications()
-        _ = await (s, j, i, m, r, n)
+        async let l: Void = loadListings()
+        _ = await (s, j, i, m, r, n, l)
+    }
+
+    func loadListings() async {
+        listings = .loading
+        await read(.listings, operation: reads.listings) { self.listings = $0 }
     }
 
     func loadSignatures() async {
@@ -175,6 +183,7 @@ struct WorkConsoleContent: View {
     var inbox: JobLoad<ContactInbox> = .loading
     var open: JobLoad<OpenRequirements> = .loading
     var notifications: JobLoad<NotificationPage> = .loading
+    var listings: JobLoad<ListingSubmissionPage> = .loading
     var onInboxChanged: (() -> Void)? = nil
     var onNotificationsChanged: (() -> Void)? = nil
     var loadingMore = false
@@ -187,6 +196,7 @@ struct WorkConsoleContent: View {
 
     var body: some View {
         List {
+            ListingSubmissionsSection(page: listings)
             PrioritiesSection()
             signatureSection
             ContactInboxSection(inbox: inbox, onChanged: onInboxChanged)

@@ -1310,6 +1310,25 @@ async function saveVehicle(
   // Resolve existing vehicle
   let targetId = vehicleId || null;
 
+  // Fast path: a lot the walk landed before is found by its own episode's source_url (btree idx_vehicle_events_source_url),
+  // one live vehicle or none. The resolver below misses every re-landed lot (episodes are keyed by the lot id, and
+  // vehicles.discovery_url drops "www."), so each fell through to a discovery_url ILIKE: 5,191 lookups, 647 s of database
+  // time between the 2026-11-08 21:06Z restart and 01:25Z, plus 306 s in the un-indexed (platform, listing id) step.
+  if (!targetId && opts.fast && extracted.url) {
+    try {
+      const { data: evs, error: evErr } = await supabase.from("vehicle_events").select("vehicle_id")
+        .eq("source_url", extracted.url).eq("source_platform", "bonhams").not("vehicle_id", "is", null).limit(10);
+      const ids = [...new Set((evs ?? []).map((e: { vehicle_id: string }) => e.vehicle_id))];
+      if (!evErr && ids.length) {
+        const { data: vs, error: vErr } = await supabase.from("vehicles").select("id,status,deleted_at").in("id", ids);
+        const live = (vs ?? []).filter((v: { status?: string | null; deleted_at?: string | null }) => v.status !== "merged" && !v.deleted_at);
+        if (!vErr && live.length === 1) targetId = (live[0] as { id: string }).id;
+      }
+    } catch (e: any) {
+      console.warn(`[Bonhams] episode url lookup failed (non-fatal): ${e.message}`);
+    }
+  }
+
   if (!targetId) {
     try {
       const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
@@ -1454,9 +1473,10 @@ async function saveVehicle(
   try {
     const listingUrlKey = normalizeListingUrlKey(extracted.url);
     // roster_first_seen_at is the first read of the lot on the house's roster: keep the earlier one.
+    // The episode written below is keyed (vehicle_id, platform, listing id): read that one through idx_vehicle_events_dedup.
     if (extracted.extra_metadata?.roster_first_seen_at && extracted.event_key) {
-      const { data: prior } = await supabase.from("vehicle_events").select("metadata").eq("source_platform", "bonhams")
-        .eq("source_listing_id", extracted.event_key).limit(1);
+      const { data: prior } = await supabase.from("vehicle_events").select("metadata").eq("vehicle_id", targetId)
+        .eq("source_platform", "bonhams").eq("source_listing_id", extracted.event_key).limit(1);
       const first = prior?.[0]?.metadata?.roster_first_seen_at;
       if (first) extracted.extra_metadata = { ...extracted.extra_metadata, roster_first_seen_at: first };
     }

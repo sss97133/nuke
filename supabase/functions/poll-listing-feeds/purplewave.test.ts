@@ -1,9 +1,28 @@
-import { purplewaveLot, purplewaveObservation, purplewavePageUrl, purplewaveProjection, landPurplewaveLot, pollPurplewave } from "./purplewave.ts";
+import { purplewaveLot, purplewaveObservation, purplewavePageUrl, purplewaveProjection, purplewaveImages, landPurplewaveLot, pollPurplewave } from "./purplewave.ts";
 const equal = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 const clock = "2026-11-08T19:00:00.000Z";
 const raw = { auction: "261111", item: "EX2391", year: 2012, make: "Dodge", model: "Ram 2500", industry_category_id: 277,
   current_bid: 8300, bid_count: 29, endtime: 1794412800, winning_bid_time: 1794110000, auction_closed: 0, closed: 0, halted: 0,
   new_description: "Source description", extension: 1, vin: "source claim", arbitrary_context: { retained: true } };
+
+Deno.test("publisher gallery reaches sanctioned identity intake in source order without changing raw evidence", async () => {
+  const base = "https://d323w7klwy72q3.cloudfront.net/i/a/2026/20261111example";
+  const source = { ...raw, image_url: base, image: "EX2391.JPG", image_files: ["EX2391.JPG", "EX2391A.JPG", "EX2391ZA.JPG"] };
+  const lot = purplewaveLot(source, clock), f = fixture();
+  await landPurplewaveLot(f.db, lot);
+  equal(f.calls[0].body.image_url, `${base}/EX2391.JPG`);
+  equal(f.calls[0].body.image_urls, source.image_files.map(name => `${base}/${name}`));
+  equal(f.calls[1].body.structured_data.source_payload, source);
+  equal(purplewaveImages({ securebaseurl: base + "/", images: "EX2391.JPG EX2391A.JPG" }, "EX2391"), lot.images.slice(0, 2));
+});
+Deno.test("gallery rejects foreign lots, traversal and nonpublisher destinations", () => {
+  const base = "https://d323w7klwy72q3.cloudfront.net/i/a/2026/20261111example";
+  equal(purplewaveImages({ image_url: base, image_files: ["../EX2391.JPG", "OTHER.JPG", "EX2391.JPG?x", "https://evil.test/x", "EX2391.JPG"] }, "EX2391"), [`${base}/EX2391.JPG`]);
+  for (const invalid of ["http://d323w7klwy72q3.cloudfront.net/i/a/2026/x", "https://evil.test/i/a/2026/x", base + "?x", base + "#x", "https://user@d323w7klwy72q3.cloudfront.net/i/a/2026/x"]) {
+    equal(purplewaveImages({ image_url: invalid, image: "EX2391.JPG" }, "EX2391"), []);
+  }
+  equal(purplewaveImages({}, "EX2391"), []);
+});
 
 Deno.test("PurpleWave snapshots retain native context and distinct read/bid clocks without asserting individual bids", () => {
   const lot = purplewaveLot(raw, clock), post = purplewaveObservation(lot, "vehicle");
@@ -24,6 +43,8 @@ Deno.test("PurpleWave rejects wrong taxonomy, malformed identity and invalid bid
 
 function fixture(failAdmission = false) {
   const calls: { name: string; body: any }[] = [], writes: { table: string; body: any }[] = [];
+  const snapshots = new Map<string, any>();
+  const controls = { progressConflict: false, newerEpisode: false };
   let saved: any;
   const db = { functions: { invoke: async (name: string, { body }: any) => {
     calls.push({ name, body });
@@ -32,18 +53,24 @@ function fixture(failAdmission = false) {
     return failAdmission ? { error: { message: "refused" } } : { data: { success: true, observation_id: "observation" } };
   } }, from(table: string) {
     let action = "read";
-    const result = () => ({ data: table === "observation_sources" ? { species: "timed_auction", supported_observations: ["listing"] }
+    let selectedId: string | undefined, insertedId: string | undefined;
+    const result = () => ({ data: table === "listing_page_snapshots" ? (action === "insert" ? { id: insertedId } : [...snapshots.values()].filter(r => !selectedId || r.id === selectedId))
+      : table === "listing_feeds" ? (controls.progressConflict ? [] : [{ id: "feed" }])
+      : table === "observation_sources" ? { species: "timed_auction", supported_observations: ["listing"] }
       : table === "vehicle_observations" ? { id: "observation", ...saved }
-      : table === "vehicle_events" ? (action === "insert" ? [{ id: "episode" }] : [])
+      : table === "vehicle_events" ? (action === "insert" ? [{ id: "episode" }] : controls.newerEpisode ? [{ id: "episode", metadata: { source_observed_at: "2026-11-09T00:00:00Z" } }] : [])
       : table === "vehicles" ? (action === "update" ? [{ id: "vehicle" }] : { id: "vehicle", platform_source: "purplewave", listing_url: `https://www.purplewave.com/auction/${raw.auction}/item/${raw.item}`, origin_metadata: null, deleted_at: null })
       : null, error: null });
-    const q: any = { select: () => q, eq: () => q, is: () => q, limit: () => q, maybeSingle: async () => result(), single: async () => result(),
+    const q: any = { select: () => q, eq: (key: string, value: string) => { if (key === "id") selectedId = value; return q; }, is: () => q, limit: () => q,
+      maybeSingle: async () => { const r = result(); return table === "listing_page_snapshots" && action === "read" ? { ...r, data: (r.data as any[])[0] } : r; }, single: async () => result(),
       update: (body: any) => { action = "update"; writes.push({ table, body }); return q; },
-      insert: (body: any) => { action = "insert"; writes.push({ table, body }); return q; },
+      insert: (body: any) => { action = "insert"; writes.push({ table, body });
+        if (table === "listing_page_snapshots") { insertedId = `00000000-0000-4000-8000-${String(snapshots.size + 1).padStart(12, "0")}`; snapshots.set(insertedId, { ...body, id: insertedId }); }
+        return q; },
       then: (resolve: any) => Promise.resolve(result()).then(resolve) };
     return q;
   } };
-  return { db, calls, writes };
+  return { db, calls, writes, snapshots, controls };
 }
 Deno.test("PurpleWave lands identity -> attributed snapshot -> episode -> high bid, never asking/sale price", async () => {
   const f = fixture(), result = await landPurplewaveLot(f.db, purplewaveLot(raw, clock));
@@ -74,7 +101,7 @@ Deno.test("feed advances only admitted bounded slots and preserves controls", as
   const feed = { id: "feed", enabled: true, display_name: "PurpleWave", search_criteria: { native_page: 1, native_offset: 0, kept: true } };
   const result = await pollPurplewave(f.db, feed, budget, 1, async () => new Response(JSON.stringify([raw, { ...raw, item: "EX2392" }])));
   equal(result.snapshots_admitted, 1); equal(result.error, null);
-  const progress = f.writes.find(w => w.table === "listing_feeds")!.body;
+  const progress = f.writes.filter(w => w.table === "listing_feeds").at(-1)!.body;
   equal(progress.search_criteria.native_offset, 1); equal(progress.search_criteria.kept, true);
   equal("poll_interval_minutes" in progress, false); equal("enabled" in progress, false);
 });
@@ -123,4 +150,50 @@ Deno.test("explicit native VIN reaches intake and raw source HTML remains attrib
   const owned = { platform_source: "purplewave", listing_url: lot.url, description: source.new_description };
   equal(purplewaveProjection(lot, owned, "obs")?.description, lot.description);
   equal(purplewaveProjection(lot, { ...owned, description: "Owner's separate description" }, "obs")?.description, undefined);
+});
+
+Deno.test("resumed page keeps all 25 original members and source clock even if publisher reorders", async () => {
+  const f = fixture(), budget = { refusal: () => null, reserve: () => ({ timeout_ms: 5000 }), record: () => {} } as any;
+  const rows = Array.from({ length: 25 }, (_, i) => ({ ...raw, item: `EX${String(i).padStart(4, "0")}` }));
+  let reads = 0, config: any = { native_page: 1, native_offset: 0, kept: true };
+  const fetcher = async () => { reads++; return new Response(JSON.stringify(reads === 1 ? rows : rows.toReversed())); };
+  for (const expected of [8, 8, 8, 1]) {
+    const result = await pollPurplewave(f.db, { id: "feed", enabled: true, search_criteria: config }, budget, 40, fetcher);
+    equal(result.error, null); equal(result.snapshots_admitted, expected);
+    config = f.writes.filter(w => w.table === "listing_feeds").at(-1)!.body.search_criteria;
+  }
+  const observations = f.calls.filter(c => c.name === "ingest-observation").map(c => c.body);
+  equal(reads, 1); equal(observations.length, 25); equal(new Set(observations.map(o => o.structured_data.native_item_id)).size, 25);
+  equal(new Set(observations.map(o => o.observed_at)).size, 1);
+  equal(new Set(observations.map(o => o.raw_source_ref)).size, 1);
+  equal(config.native_page, 2); equal(config.native_offset, 0); equal(config.native_capture, null); equal(config.kept, true);
+});
+
+Deno.test("legacy partial offset restarts a retained page; corrupt custody refuses fresh-page fallback", async () => {
+  const f = fixture(), budget = { refusal: () => null, reserve: () => ({ timeout_ms: 5000 }), record: () => {} } as any;
+  const rows = Array.from({ length: 25 }, (_, i) => ({ ...raw, item: `EX${String(i).padStart(4, "0")}` }));
+  const feed = { id: "feed", enabled: true, search_criteria: { native_page: 2, native_offset: 16 } };
+  const first = await pollPurplewave(f.db, feed, budget, 1, async () => new Response(JSON.stringify(rows)));
+  equal(first.error, null); equal(f.calls[0].body.url.endsWith("EX0000"), true);
+  const config = f.writes.filter(w => w.table === "listing_feeds").at(-1)!.body.search_criteria;
+  equal(config.native_offset, 1);
+  f.snapshots.get(config.native_capture.id).html += " ";
+  const second = await pollPurplewave(f.db, { ...feed, search_criteria: config }, budget, 8, async () => { throw Error("must not refetch"); });
+  equal(second.error, "PurpleWave retained page verification failed"); equal(second.snapshots_admitted, 0);
+  equal(f.calls.length, 2);
+});
+
+Deno.test("conflicting checkpoint cannot admit lots from an unclaimed page", async () => {
+  const f = fixture(); f.controls.progressConflict = true;
+  const result = await pollPurplewave(f.db, { id: "feed", enabled: true, search_criteria: {} },
+    { refusal: () => null, reserve: () => ({ timeout_ms: 5000 }), record: () => {} } as any, 8,
+    async () => new Response(JSON.stringify([raw])));
+  equal(result.error, "PurpleWave progress changed concurrently or could not be saved"); equal(f.calls, []);
+});
+
+Deno.test("a resumed older snapshot is retained without regressing a newer episode or blocking the cursor", async () => {
+  const f = fixture(); f.controls.newerEpisode = true;
+  const result = await landPurplewaveLot(f.db, purplewaveLot(raw, clock));
+  equal(result.observation_id, "observation"); equal("newer_state_preserved" in result && result.newer_state_preserved, true);
+  equal(f.writes, []); equal(f.calls.map(c => c.name), ["ingest", "ingest-observation"]);
 });

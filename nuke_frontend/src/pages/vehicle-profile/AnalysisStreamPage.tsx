@@ -47,6 +47,7 @@ const AnalysisStreamPage: React.FC = () => {
   const [streaming, setStreaming] = useState(false);
   const [newCount, setNewCount] = useState(0);
   const justArrivedRef = useRef<Set<string>>(new Set());
+  const seenRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!vehicleId) return;
@@ -73,41 +74,40 @@ const AnalysisStreamPage: React.FC = () => {
         return;
       }
       const rows = (data || []) as StreamAtom[];
+      seenRef.current = new Set(rows.map((r) => r.id));
+      setStreaming(true);
       setAtoms(rows);
       await loadImagesFor(rows);
       setLoading(false);
     })();
 
-    const channel = supabase
-      .channel(`analysis-stream-${vehicleId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'vehicle_observations',
-          filter: `vehicle_id=eq.${vehicleId}`,
-        },
-        async (payload) => {
-          const row = payload.new as StreamAtom & { kind?: string; vehicle_id?: string };
-          if (row.kind !== 'condition') return;
-          if (row.structured_data?.analysis_kind !== 'image_deep_byok') return;
-          justArrivedRef.current.add(row.id);
-          setNewCount((c) => c + 1);
-          setAtoms((prev) => [row, ...prev].slice(0, PAGE_SIZE * 3));
-          await loadImagesFor([row]);
-          setTimeout(() => {
-            justArrivedRef.current.delete(row.id);
-          }, 4000);
-        },
-      )
-      .subscribe((status) => {
-        setStreaming(status === 'SUBSCRIBED');
-      });
+    // New interpretations arrive by a 30 s read while the page is visible (vehicle_observations left the
+    // supabase_realtime publication on 2026-11-09: decoding every observation write cost ~460 s/h of database time).
+    const poll = window.setInterval(async () => {
+      if (cancelled || document.visibilityState !== 'visible') return;
+      const { data, error } = await supabase
+        .from('vehicle_observations')
+        .select('id, observed_at, ingested_at, confidence, confidence_score, content_text, structured_data')
+        .eq('vehicle_id', vehicleId)
+        .eq('kind', 'condition')
+        .contains('structured_data', { analysis_kind: 'image_deep_byok' })
+        .order('ingested_at', { ascending: false })
+        .limit(PAGE_SIZE);
+      if (cancelled) return;
+      setStreaming(!error);
+      if (error || !data) return;
+      const fresh = (data as StreamAtom[]).filter((row) => !seenRef.current.has(row.id));
+      if (fresh.length === 0) return;
+      for (const row of fresh) { seenRef.current.add(row.id); justArrivedRef.current.add(row.id); }
+      setNewCount((c) => c + fresh.length);
+      setAtoms((prev) => [...fresh, ...prev].slice(0, PAGE_SIZE * 3));
+      await loadImagesFor(fresh);
+      setTimeout(() => { for (const row of fresh) justArrivedRef.current.delete(row.id); }, 4000);
+    }, 30_000);
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      window.clearInterval(poll);
     };
   }, [vehicleId]);
 
@@ -182,7 +182,7 @@ const AnalysisStreamPage: React.FC = () => {
             color: streaming ? 'var(--bg)' : 'var(--ink-primary)',
             whiteSpace: 'nowrap',
           }}
-          title={streaming ? 'Subscribed to postgres_changes' : 'Connecting…'}
+          title={streaming ? 'Checks for new interpretations every 30 seconds' : 'Connecting…'}
         >
           {streaming ? '● live' : '○ connecting'}
         </div>

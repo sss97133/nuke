@@ -54,6 +54,30 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    pattern and alone hold the set as `priors_only` (ledger word: "only the day's pattern pointed to it, nothing in the photo").
    Measured 2026-11-08 over the 103 cleared sets: priors-only winners were wrong on 26 of 49 viewed frames, evidence-backed on
    52 of 217. Contract `test_capture_landing_priors_only.sql`.
+9. **The document route exists** (`supabase/functions/receipt-photo-ocr`): the orchestrator's `receipt_document` route called a
+   function that was never deployed, so every photographed document failed with 404 (owner: 299 frames, 2026-11-03 onward) and
+   the classifier's fields went nowhere. The function reads the page with `document-ocr-worker` (classify, extract), copies the
+   bytes into the private `user-documents` bucket under the owner, records one `capture_document_pages` row (type, confidence,
+   date, sanitized extraction: no card numbers, e-mails or OCR dumps), and when the frame has a vehicle and the document is a
+   money record lands it through `land_document_pages` (the binder's writer) and bridges it with `ingest-receipts-as-observations`.
+   A frame with no vehicle keeps its page and waits. Backfill: `scripts/photo-pipeline/reroute-document-frames.mjs`.
+   Tests: `receipt-photo-ocr/core.test.ts` (mocked deps).
+   Owner decision 2026-11-08 ("ai read should be fueled by my subscription"; no platform vision key answers: Gemini 402 depleted
+   since 10-15, Anthropic 401, OpenAI insufficient_quota, xAI 403): the read runs on the owner's Mac as `claude -p` under his
+   Claude Code login, `scripts/photo-pipeline/subscription-document-reader.mjs`, which posts `{image_id, extraction, reader}` to
+   `receipt-photo-ocr`; the function lands a provided extraction without calling any provider. Measured: one sale sheet read in
+   47 s on the default model; the reader uses sonnet by default.
+   Photos too: `photo-pipeline-orchestrator` hands out its checklist (`action: classifier_prompt`, the v98 prompt) and accepts
+   `classification_raw` + `reader`; `scripts/photo-pipeline/subscription-frame-classifier.mjs` runs it. Unattended:
+   `scripts/photo-pipeline/subscription-reader-batch.sh` (launchd `scripts/com.nuke.subscription-reader.plist`, every 10 min,
+   bounded batches, a checkout of origin/main at `~/.worktrees/nuke-main`) writes a `job_assay_readings` heartbeat per reader.
+   Visual gate on the subscription too: `scripts/photo-pipeline/subscription_gate_reader.py` views each awaiting_gate chunk's
+   pre_gate sample as a reference/sample sheet with `claude -p` and records the verdicts, then calls `capture_landing_gate_check`
+   and `capture_landing_apply_chunk`. Before any live write it must pass a self-agreement gate against hand-viewed verdicts
+   (>= 85% agreement, <= 2% of hand-wrong samples accepted; tests `test_subscription_gate_reader.py`). Kept alive by
+   `subscription-gate-supervise.sh STATE_DIR`; state and cursor in STATE_DIR. `landing_drain_loop.py` drives `capture_sets_drain`
+   for queued days (proposals only); network errors and timeouts back off and retry (`test_landing_drain_loop.py`), an
+   empty queue idles and re-polls, and the same supervisor restarts it if it exits.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.

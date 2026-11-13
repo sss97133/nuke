@@ -7,7 +7,7 @@ const fixture=vi.hoisted(()=>({ rpc:vi.fn(),from:vi.fn(),invoke:vi.fn(),single:v
 vi.mock('../../lib/supabase',()=>({supabase:{rpc:fixture.rpc,from:fixture.from,functions:{invoke:fixture.invoke}}}));
 vi.mock('../ui/CollapsibleWidget',()=>({CollapsibleWidget:({children,title,action}:any)=><section><h2>{title}</h2>{action}{children}</section>}));
 import VehicleDescriptionCard from './VehicleDescriptionCard';
-import { listingDescriptionsFromSpecs } from './listingDescriptions';
+import { listingDescriptionsFromSpecs, listingDescriptionText } from './listingDescriptions';
 const id='00000000-0000-4000-8000-000000000001';
 const sourceId='00000000-0000-4000-8000-000000000002';
 const text='Preserved full seller text. '.repeat(90)+'The trunk floor needs replacement. Literal <script>text</script>.';
@@ -65,4 +65,22 @@ describe('existing public profile description card',()=>{
    expect(listingDescriptionsFromSpecs(specs({...entry,...changed}))).toEqual([]);
   expect(listingDescriptionsFromSpecs(null)).toEqual([]);
  });
+});
+
+it.each([false,true])('renders retained HTML safely and deduplicates a matching raw/plain summary (raw=%s)', async(raw)=>{
+ const html='<b>Pickup truck</b><br/><ul><li>Miles: 107,180 on odometer</li><li>VIN: 1GT19LE74NF216181</li></ul><b>Engine</b><ul><li>Displacement: 6.6L</li><li>Gas &amp; oil</li></ul><img src="https://untrusted.invalid/x" onerror="alert(1)"><script>alert(1)</script><em>Texas title</em>';
+ const retained={...entry,text:html};
+ fixture.rpc.mockResolvedValue({data:specs(retained),error:null});
+ fixture.single.mockResolvedValue({data:{description:raw ? html : listingDescriptionText(html),description_source:'external_import'},error:null});
+ await render();
+ expect(container.textContent).toContain('Engine\nDisplacement: 6.6L');
+ expect(container.textContent).toContain('Gas & oil');
+ expect(container.textContent).toContain('Texas title');
+ expect(container.textContent).not.toContain('<li>');
+ expect(container.querySelector('script,img')).toBeNull();
+ expect(container.textContent?.split('VIN: 1GT19LE74NF216181')).toHaveLength(2);
+ expect(container.querySelector(`a[href="/vehicle/${id}/observation/${sourceId}"]`)).not.toBeNull();
+ expect(retained.text).toBe(html);
+ expect(fixture.update).not.toHaveBeenCalled();
+ expect(listingDescriptionText('Odometer < 5000; literal <script>text</script>.')).toBe('Odometer < 5000; literal <script>text</script>.');
 });

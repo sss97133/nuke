@@ -5,6 +5,7 @@
 // text: the house's lines, headings and figures arrive from the reader as it typed them.
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { PrefetchLink } from '../components/PrefetchLink';
 import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { ClaimView, Row, Rows, Section, Text, day } from '../kit';
@@ -24,13 +25,21 @@ type Lot = {
 type Statement = { statement_id: string; source: string | null; observed_at: string; observed_at_basis: string | null; result: string | null;
   hammer_price: number | null; high_bid: number | null; estimate_low: number | null; estimate_high: number | null; currency: string | null;
   landed_at: string; superseded: boolean };
-type Party = { id: string; display_name: string | null; qualifier_as_printed: string | null; claimed: boolean; lots_direct: number; priced_lots: number };
+type Party = { id: string; kind?: 'catalogue' | 'user'; display_name: string | null; qualifier_as_printed?: string | null; claimed: boolean; lots_direct: number; priced_lots: number };
 type Executor = { role: string; name_as_printed: string | null; qualifier_as_printed: string | null; party_identity_id: string | null };
 type Creation = { claim_id: string; attribution: string; layout: string | null; name_as_printed: string | null; qualifier_as_printed: string | null;
   party: Party | null; executor: Executor | null; source: string | null; observed_at: string; confidence: number | null };
+type Declared = { medium?: string; year?: string; dimensions?: string; edition?: string; notes?: string };
+type Sighting = { taken_at: string; filename?: string | null; labels?: string[] | null; library?: string | null; place?: string | null; camera?: string | null; caption?: string | null };
+type Proposal = { key?: string; kind?: string | null; labels?: string[] | null; labeller?: string | null; method?: string | null; photos?: number; sittings?: number;
+  span_from?: string | null; span_to?: string | null; filenames?: string[] | null; captions?: string[] | null; places?: Array<[string, number]> | null; status?: string; photo_sightings?: Sighting[] };
 export type AssetProfile = {
   asset: { id: string; asset_type: string; title: string | null; house_category: string | null; house_category_code: string | null;
-    source: string | null; identity_basis: string | null; first_seen_at: string | null; created_at: string };
+    source: string | null; identity_basis: string | null; first_seen_at: string | null; created_at: string; visibility?: string };
+  viewer?: { is_holder: boolean };
+  declared?: Declared | null;
+  proposal?: Proposal | null;
+  market?: 'recorded' | 'none_public';
   image_url: string | null;
   lots: Lot[];
   history: Statement[];
@@ -45,7 +54,52 @@ const ATTRIBUTION_WORDS: Record<string, string> = {
 const RESULT_WORDS: Record<string, string> = {
   sold: 'Sold', not_sold: 'Not sold', upcoming: 'Upcoming', 'bid-goes-on': 'Bid goes on', bid_goes_on: 'Bid goes on', unknown: 'Result unknown',
 };
-const TYPE_WORDS: Record<string, string> = { artwork: 'Artwork', automobilia: 'Automobilia', memorabilia: 'Memorabilia' };
+const TYPE_WORDS: Record<string, string> = { artwork: 'Artwork', automobilia: 'Automobilia', memorabilia: 'Memorabilia', publication: 'Publication' };
+const IDENTITY_WORDS: Record<string, string> = {
+  lot_presentation: 'one presentation at one house. The same object seen again at another sale is joined by supersession, never by overwriting.',
+  holder_declaration: 'declared by its holder in their own words. Presentations, publications and sales attach to it as they are recorded.',
+  photo_proposal: "found in the holder's own photographs, grouped by visual identity across time; the holder confirms or dismisses, the machine never assumes.",
+};
+const KIND_WORDS: Record<string, string> = { painting: 'painting', drawing: 'drawing', sketch: 'sketch', billboard: 'billboard', mural: 'mural', sculpture: 'sculpture', street_art: 'street art', gallery: 'gallery sitting', artwork: 'work' };
+
+/** The photographs as the record's history: one row per day photographed, with place and the labeller's caption. */
+export function sittingsOf(photos: Sighting[]): Array<{ day: string; n: number; place: string | null; caption: string | null }> {
+  const by = new Map<string, { day: string; n: number; place: string | null; caption: string | null }>();
+  for (const p of photos) {
+    const k = p.taken_at.slice(0, 10);
+    const cur = by.get(k) ?? { day: p.taken_at, n: 0, place: null, caption: null };
+    cur.n += 1; cur.place = cur.place ?? p.place ?? null; cur.caption = cur.caption ?? p.caption ?? null;
+    by.set(k, cur);
+  }
+  return [...by.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+function FoundBlock({ proposal, isHolder, assetId }: { proposal: Proposal; isHolder: boolean; assetId: string }) {
+  const sightings = proposal.photo_sightings ?? [];
+  const sittings = sittingsOf(sightings);
+  const coverage: Coverage = { n: sightings.length, of: proposal.photos ?? sightings.length, grain: 'photograph', as_of: proposal.span_to ?? null };
+  return <Section title="Found in the holder's photographs" coverage={coverage}>
+    <Rows title="What the analysis saw">
+      <Row label="Kind">{KIND_WORDS[proposal.kind ?? ''] ?? proposal.kind ?? 'work'}</Row>
+      {proposal.labels && proposal.labels.length > 0 && <Row label="Labels, as the device printed them" role="caption">{proposal.labels.join(', ')}</Row>}
+      {proposal.span_from && <Row label="First photographed">{day(proposal.span_from)}</Row>}
+      {proposal.span_to && proposal.span_to.slice(0, 10) !== (proposal.span_from ?? '').slice(0, 10) && <Row label="Last photographed">{day(proposal.span_to)}</Row>}
+      <Row label="Days photographed" role="measure">{String(proposal.sittings ?? sittings.length)}</Row>
+      {proposal.places && proposal.places.length > 0 && <Row label="Where" role="caption">{proposal.places.map(([p, n]) => `${p} (${n})`).join(' · ')}</Row>}
+      <Row label="Method" role="caption">{`${proposal.labeller ?? 'on-device labels'}${proposal.method ? ` · ${proposal.method}` : ''} · nothing left the machine`}</Row>
+      {proposal.status === 'pending' && <Row label="Standing" role="caption">{isHolder ? 'Awaiting you: this is your work, or it is not' : 'Not yet confirmed by its holder'}</Row>}
+    </Rows>
+    {sittings.length > 0 && <ol className="ap-history">{sittings.map(s => <li key={s.day} className="ap-history__row">
+      <Text role="caption">{day(s.day)}</Text>
+      <Text role="body">{`${s.n} photograph${s.n === 1 ? '' : 's'}${s.place ? ` · ${s.place}` : ''}`}</Text>
+      {s.caption && <Text role="caption">{`the device's caption: ${s.caption}`}</Text>}
+    </li>)}</ol>}
+    {isHolder && proposal.status === 'pending' && <div className="ap-verbs">
+      <PrefetchLink to={`/assets/new?confirm=${assetId}`} className="ap-sign"><Text role="label">This is my work</Text></PrefetchLink>
+      <PrefetchLink to="/assets/mine" className="ap-link"><Text role="label">Back to your works</Text></PrefetchLink>
+    </div>}
+  </Section>;
+}
 const BASIS_WORDS: Record<string, string> = {
   hammer: 'hammer, premium not included', highest_bid_or_price: "the house's highest bid or price", hammer_time: 'the hammer clock',
   sale_end: "the sale's end", index_read: 'when Nuke read the index',
@@ -95,7 +149,7 @@ function Presentation({ lot, single }: { lot: Lot; single: boolean }) {
     <Rows title="As stated by the house">
       {lot.house_category && <Row label="Department">{lot.house_category}</Row>}
       {lot.house_group && <Row label="House group">{lot.house_group}</Row>}
-      {(lot.sale_name || lot.sale_key) && <Row label="Sale">{lot.sale_name ?? lot.sale_key}</Row>}
+      {(lot.sale_name || lot.sale_key) && <Row label={lot.sale_name ? 'Sale' : "Sale (the house's key)"}>{lot.sale_name ?? lot.sale_key}</Row>}
       {lot.lot_number && <Row label="Lot">{lot.lot_number}</Row>}
       {lot.sale_ends_at && <Row label="Sale ends">{day(lot.sale_ends_at)}</Row>}
       {(lot.estimate_low || lot.estimate_high) && <Row label="Estimate" role="measure">{[lot.estimate_low, lot.estimate_high].filter((v): v is number => v != null).map(v => money(v, lot.currency)).join(' to ')}</Row>}
@@ -108,8 +162,19 @@ function Presentation({ lot, single }: { lot: Lot; single: boolean }) {
       {lot.url && <Row label="Source" role="caption"><a className="ap-link" href={lot.url} target="_blank" rel="noopener noreferrer">{lot.source.name ?? lot.source.slug ?? 'the lot'}</a></Row>}
     </Rows>
     {lot.catalog_text && <div className="ap-printed"><Text role="label" as="h3">Catalogue entry</Text><Text role="body" as="p" className="ap-prose">{lot.catalog_text}</Text></div>}
-    {(lot.printed_sections ?? []).map((section, i) => <PrintedBlock key={`${lot.statement_id}-${i}`} section={section} />)}
+    {foldNotes(lot.printed_sections ?? []).map((section, i) => <PrintedBlock key={`${lot.statement_id}-${i}`} section={section} />)}
   </Section>;
+}
+
+/** The house separates paragraphs of one note with blank lines; consecutive unheaded blocks are one note, headed blocks stand alone. */
+export function foldNotes(sections: PrintedSection[]): PrintedSection[] {
+  const out: PrintedSection[] = [];
+  for (const section of sections) {
+    const last = out[out.length - 1];
+    if (!section.heading && last && !last.heading) last.lines = [...last.lines, ...section.lines];
+    else out.push({ heading: section.heading ?? null, lines: [...section.lines] });
+  }
+  return out;
 }
 
 function PrintedBlock({ section }: { section: PrintedSection }) {
@@ -140,9 +205,9 @@ function CreationBlock({ claims, lots }: { claims: Creation[]; lots: number }) {
       <Rows title="This party across Nuke">
         <Row label="Lots attributed directly" role="measure">{(c.party?.lots_direct ?? 0).toLocaleString('en-US')}</Row>
         <Row label="With a published hammer" role="measure">{(c.party?.priced_lots ?? 0).toLocaleString('en-US')}</Row>
-        <Row label="Claimed by the artist or estate" role="caption">{c.party?.claimed ? 'Yes' : 'Not yet: the row is theirs to claim'}</Row>
+        <Row label={c.party?.kind === 'user' ? 'The party' : 'Claimed by the artist or estate'} role="caption">{c.party?.kind === 'user' ? 'A Nuke user, declaring their own work' : c.party?.claimed ? 'Yes' : 'Not yet: the row is theirs to claim'}</Row>
         {c.executor?.name_as_printed && <Row label={`Executed by (${c.executor.role})`}>{`${c.executor.name_as_printed}${c.executor.qualifier_as_printed ? ` (${c.executor.qualifier_as_printed})` : ''}`}</Row>}
-        <Row label="Claim source" role="caption">{`${c.source ?? 'the house'} · ${day(c.observed_at)} · ${c.layout === 'name_colon_description' ? 'the name before the colon' : 'the first catalogue line'}`}</Row>
+        <Row label="Claim source" role="caption">{`${c.source ?? 'the house'} · ${day(c.observed_at)} · ${c.layout === 'holder_declaration' ? "the holder's own declaration" : c.layout === 'name_colon_description' ? 'the name before the colon' : 'the first catalogue line'}`}</Row>
       </Rows>
     </div>)}
   </Section>;
@@ -200,7 +265,23 @@ export default function AssetProfilePage() {
         {current.hammer_price ? <ClaimView claim={lotClaim(current, current.hammer_price)} role="figure" format={v => money(Number(v), current.currency)} /> : <Text role="figure">{head.value}</Text>}
         <Text role="caption">{day(current.observed_at)}</Text>
       </div>}
+      {!current && <div className="ap-masthead__result">
+        <Text role="label">Market</Text>
+        <Text role="measure">No public sale recorded</Text>
+        <Text role="caption">{profile.proposal?.span_from ? `first photographed ${day(profile.proposal.span_from)}` : 'a figure appears only when a house publishes one'}</Text>
+      </div>}
     </header>
+    {profile.proposal && <FoundBlock proposal={profile.proposal} isHolder={!!profile.viewer?.is_holder} assetId={profile.asset.id} />}
+    {profile.declared && Object.keys(profile.declared).length > 0 && <Section title="As declared by the holder" coverage={{ n: 1, of: 1, grain: 'declaration', as_of: profile.asset.created_at }}>
+      <Rows title="In the holder's words">
+        {profile.declared.medium && <Row label="Medium">{profile.declared.medium}</Row>}
+        {profile.declared.year && <Row label="Year">{profile.declared.year}</Row>}
+        {profile.declared.dimensions && <Row label="Dimensions">{profile.declared.dimensions}</Row>}
+        {profile.declared.edition && <Row label="Edition">{profile.declared.edition}</Row>}
+        {profile.asset.visibility && <Row label="Visibility" role="caption">{profile.asset.visibility}</Row>}
+      </Rows>
+      {profile.declared.notes && <div className="ap-printed"><Text role="label" as="h3">Notes</Text><Text role="body" as="p" className="ap-prose">{profile.declared.notes}</Text></div>}
+    </Section>}
     {profile.image_url && <figure className="ap-figure">
       <img src={profile.image_url} alt={profile.asset.title ?? 'The lot as photographed by the house'} width={1200} height={900} loading="eager" decoding="async" />
       <figcaption><Text role="caption">{`The house's photograph${current?.source.name ? ` · ${current.source.name}` : ''}`}</Text></figcaption>
@@ -210,7 +291,7 @@ export default function AssetProfilePage() {
     <HistoryBlock statements={profile.history} />
     <footer className="ap-footer">
       <Text role="caption">{`Nuke holds ${profile.coverage.presentations.toLocaleString('en-US')} presentation${profile.coverage.presentations === 1 ? '' : 's'}, ${profile.coverage.statements.toLocaleString('en-US')} statement${profile.coverage.statements === 1 ? '' : 's'} and ${profile.coverage.claims.toLocaleString('en-US')} creation claim${profile.coverage.claims === 1 ? '' : 's'} for this asset${sources.length ? ` from ${sources.join(', ')}` : ''} · as of ${day(profile.coverage.as_of)}.`}</Text>
-      <Text role="caption">{`Identity: ${profile.asset.identity_basis === 'lot_presentation' ? 'one presentation at one house. The same object seen again at another sale is joined by supersession, never by overwriting.' : profile.asset.identity_basis ?? 'as recorded'}`}</Text>
+      <Text role="caption">{`Identity: ${IDENTITY_WORDS[profile.asset.identity_basis ?? ''] ?? profile.asset.identity_basis ?? 'as recorded'}`}</Text>
     </footer>
   </main>;
 }

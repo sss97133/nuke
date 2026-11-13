@@ -564,6 +564,9 @@ export interface ObservationPost {
   structured_data: Record<string, unknown>;
   vehicle_id: string;
   extraction_method: string;
+  raw_source_ref?: string;
+  extraction_metadata?: Record<string, unknown>;
+  defer_analysis?: boolean;
 }
 
 /** A Collecting Cars lot as the live board read it (Typesense production_listings, every five minutes). */
@@ -587,17 +590,19 @@ const money = (n: number, cur: string | null) => `${(cur ?? "").toUpperCase() ||
 export function ccBidObservation(lot: CcBoardLot, vehicleId: string, readAt: string): ObservationPost | null {
   if (!lot.external_id || lot.current_bid == null || !(lot.current_bid > 0)) return null;
   const cur = lot.currency ? lot.currency.toUpperCase() : null;
+  const endClock = Date.parse(lot.ends ?? "");
+  const ends = Number.isFinite(endClock) ? new Date(endClock).toISOString() : null;
   return {
     source_slug: "collecting-cars",
     kind: "bid",
     observed_at: readAt,
     source_url: lot.url,
-    source_identifier: `collecting-cars-bid:${lot.external_id}:${lot.bid_count ?? "?"}:${lot.current_bid}`,
-    content_text: `Bid ${money(lot.current_bid, cur)} (${lot.bid_count ?? "?"} bids) on the board`,
+    source_identifier: `collecting-cars-snapshot:v2:${lot.external_id}:${lot.current_bid}:${lot.bid_count ?? "?"}:${cur ?? "?"}:${ends ?? "?"}`,
+    content_text: `Auction snapshot ${money(lot.current_bid, cur)} (${lot.bid_count ?? "?"} bids reported) on the board`,
     structured_data: { amount: lot.current_bid, currency: cur, bid_count: lot.bid_count, auction_id: lot.external_id,
-      ends: lot.ends, clock: "board_read", basis: "the live board (Typesense production_listings) as sync-live-auctions read it" },
+      ends, clock: "board_read", capture_kind: "auction_bid_snapshot", basis: "aggregate live board state (Typesense production_listings), not an individual bid event" },
     vehicle_id: vehicleId,
-    extraction_method: "cc_typesense_board_bid_v1",
+    extraction_method: "cc_typesense_board_snapshot_v2",
   };
 }
 

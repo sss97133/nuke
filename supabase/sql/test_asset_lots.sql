@@ -43,8 +43,10 @@ CREATE TABLE public.external_identities(id uuid PRIMARY KEY DEFAULT gen_random_u
 ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.asset_observations ENABLE ROW LEVEL SECURITY;
 
+CREATE TABLE public.profiles(id uuid PRIMARY KEY, username text, full_name text, is_public boolean DEFAULT true);
+INSERT INTO public.profiles (id, username, full_name) VALUES ('0b9f107a-0000-4000-8000-000000000001', 'holder', 'A Working Photographer');
 INSERT INTO public.observation_sources (id, slug, display_name, base_trust_score)
-VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
+VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90), ('ad7104a3-48aa-486e-afff-f9f8af614800', 'owner-input', 'Owner input', 0.95);
 
 \ir ../migrations/20261108170000_asset_lots.sql
 \ir ../migrations/20261108200000_asset_lot_walk.sql
@@ -53,6 +55,8 @@ VALUES ('ad7104a3-48aa-486e-afff-f9f8af614883', 'bonhams', 'Bonhams', 0.90);
 \ir ../migrations/20261108234500_asset_creators_current_lot.sql
 \ir ../migrations/20261108235500_asset_creators_materialized.sql
 \ir ../migrations/20261109000000_asset_profile_read.sql
+\ir ../migrations/20261109013000_held_assets.sql
+\ir ../migrations/20261109020000_held_asset_proposals.sql
 
 -- 1. Anon cannot write.
 DO $$ BEGIN
@@ -281,6 +285,105 @@ DO $$ DECLARE p jsonb; sec jsonb; BEGIN
     RAISE EXCEPTION 'history must keep the superseded statement: %', p->'history'; END IF;
   IF public.asset_profile_read('00000000-0000-0000-0000-000000000000') IS NOT NULL THEN RAISE EXCEPTION 'unknown id must be null'; END IF;
 END $$;
+
+-- 6g. A holder declares a work: private, theirs, no market figure; the profile reads for them and not for anon.
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000001"}', false);
+DO $$ DECLARE r jsonb; r2 jsonb; p jsonb; mine jsonb; aid uuid; BEGIN
+  r := public.declare_held_asset('artwork', '  Danger   End of Road ', 'oil and enamel on canvas', 'c. 2024', '48 x 60 in', NULL, 'Painted at the shop.', 'private');
+  aid := (r->>'asset_id')::uuid;
+  IF aid IS NULL OR (r->>'duplicate')::boolean THEN RAISE EXCEPTION 'first declaration must create: %', r; END IF;
+  IF (SELECT title FROM public.assets WHERE id = aid) <> 'Danger End of Road' THEN RAISE EXCEPTION 'title must be space-normalised'; END IF;
+  IF (SELECT owner_id::text || creator_id::text FROM public.assets WHERE id = aid) <> repeat('0b9f107a-0000-4000-8000-000000000001', 2) THEN RAISE EXCEPTION 'the signer is creator and holder'; END IF;
+  IF (SELECT visibility FROM public.assets WHERE id = aid) <> 'private' THEN RAISE EXCEPTION 'private by default'; END IF;
+  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'holder_declaration') <> 1 THEN RAISE EXCEPTION 'one declaration observation'; END IF;
+  IF (SELECT structured_data->>'name_as_printed' FROM public.asset_observations WHERE asset_id = aid AND kind = 'creation_claim') <> 'A Working Photographer' THEN
+    RAISE EXCEPTION 'creation claim names the signer from profiles'; END IF;
+  r2 := public.declare_held_asset('artwork', 'Danger End of Road', 'Oil and Enamel on Canvas', 'c. 2024', '48 x 60 in', NULL, 'different notes', 'private');
+  IF NOT (r2->>'duplicate')::boolean OR (r2->>'asset_id')::uuid <> aid THEN RAISE EXCEPTION 'the same declaration twice is one row: %', r2; END IF;
+  p := public.asset_profile_read(aid);
+  IF p IS NULL THEN RAISE EXCEPTION 'the holder reads their private work'; END IF;
+  IF p->>'market' <> 'none_public' OR jsonb_array_length(p->'lots') <> 0 THEN RAISE EXCEPTION 'no market figure for a declared work: %', p->'market'; END IF;
+  IF NOT (p->'viewer'->>'is_holder')::boolean OR p->'declared'->>'year' <> 'c. 2024' OR p->'declared'->>'medium' <> 'oil and enamel on canvas' THEN RAISE EXCEPTION 'declared block wrong: %', p->'declared'; END IF;
+  IF p->'creation'->0->'party'->>'kind' <> 'user' OR p->'creation'->0->'party'->>'display_name' <> 'A Working Photographer' OR (p->'creation'->0->'party'->>'lots_direct')::int <> 1 THEN
+    RAISE EXCEPTION 'user party wrong: %', p->'creation'; END IF;
+  mine := public.held_assets_read(50);
+  IF (mine->>'total')::int <> 1 OR (mine->'by_type'->>'artwork')::int <> 1 OR (mine->'assets'->0->>'public_sale_recorded')::boolean THEN RAISE EXCEPTION 'held assets wrong: %', mine; END IF;
+  BEGIN
+    PERFORM public.declare_held_asset('artwork', 'Bad year', NULL, 'nineteen sixty', NULL, NULL, NULL, 'private');
+    RAISE EXCEPTION 'a year that is not a year must be refused';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  BEGIN
+    PERFORM public.declare_held_asset('vehicle', 'A car', NULL, NULL, NULL, NULL, NULL, 'private');
+    RAISE EXCEPTION 'a vehicle is not declared here';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+  IF public.asset_profile_read(aid) IS NOT NULL THEN RAISE EXCEPTION 'anon must not read a private work'; END IF;
+  IF public.held_assets_read(50) IS NOT NULL THEN RAISE EXCEPTION 'anon has no held assets'; END IF;
+  BEGIN
+    PERFORM public.declare_held_asset('artwork', 'x', NULL, NULL, NULL, NULL, NULL, 'private');
+    RAISE EXCEPTION 'anon must not declare';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  -- Another signed-in user is not the holder.
+  PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000002"}', true);
+  IF public.asset_profile_read(aid) IS NOT NULL THEN RAISE EXCEPTION 'another user must not read a private work'; END IF;
+END $$;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+
+-- 6h. Works derived from the holder's photos: proposed by the machine, confirmed or dismissed by the holder, read back with evidence.
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+DO $$ DECLARE r jsonb; p jsonb; mine jsonb; aid uuid; c jsonb; BEGIN
+  r := public.propose_held_assets('0b9f107a-0000-4000-8000-000000000001', $j$[
+    {"proposal_key":"fp:abcd1234:2","kind":"painting","labels":["Painting","Modern Art"],"labeller":"apple_photos_on_device_v1","method":"apple_vision_featureprint_cos0.90","confidence":0.6,
+     "sittings":2,"captions":["a painting of a red car with a white brick wall in the background"],"places":[["Boulder City, United States",2]],
+     "photos":[{"uuid":"AAAA-1","taken_at":"2024-07-03T18:00:00Z","filename":"IMG_1.HEIC","labels":["Painting"],"width":4032,"height":3024,"camera":"Apple iPhone 15 Pro","caption":"a painting of a red car","place":"Boulder City, United States"},
+               {"uuid":"AAAA-2","taken_at":"2026-09-13T20:00:00Z","filename":"IMG_2.HEIC","labels":["Painting","Modern Art"],"width":4032,"height":3024,"camera":"Apple iPhone 15 Pro","caption":"a red painting on a black wall","place":"Boulder City, United States"}]},
+    {"proposal_key":"fp:eeee5678:1","kind":"drawing","labels":["Drawing"],"labeller":"apple_photos_on_device_v1","photos":[{"uuid":"BBBB-1","taken_at":"2020-03-09T14:52:00Z","filename":"IMG_3.HEIC"}]},
+    {"proposal_key":"bad","kind":"painting","labeller":"x","photos":[]}
+  ]$j$::jsonb);
+  IF (r->>'proposals_new')::int <> 2 OR (r->>'photo_sightings_new')::int <> 3 OR (r->>'refused')::int <> 1 THEN RAISE EXCEPTION 'proposal receipt wrong: %', r; END IF;
+  r := public.propose_held_assets('0b9f107a-0000-4000-8000-000000000001', $j$[{"proposal_key":"fp:abcd1234:2","kind":"painting","labels":["Painting"],"labeller":"apple_photos_on_device_v1",
+    "photos":[{"uuid":"AAAA-1","taken_at":"2024-07-03T18:00:00Z"}]}]$j$::jsonb);
+  IF (r->>'proposals_new')::int <> 0 OR (r->>'proposals_existing')::int <> 1 OR (r->>'photo_sightings_new')::int <> 0 THEN RAISE EXCEPTION 'proposals are idempotent: %', r; END IF;
+  SELECT id INTO aid FROM public.assets WHERE attributes->>'identity_key' = 'proposal:0b9f107a-0000-4000-8000-000000000001:fp:abcd1234:2';
+  IF (SELECT status || '/' || visibility || '/' || coalesce(owner_id::text, 'none') FROM public.assets WHERE id = aid) <> 'pending/private/none' THEN RAISE EXCEPTION 'a proposal is pending, private, unowned'; END IF;
+  -- Another user cannot see it; anon cannot; the holder can, with the photo evidence and no market figure.
+  PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+  IF public.asset_profile_read(aid) IS NOT NULL THEN RAISE EXCEPTION 'anon must not read a proposal'; END IF;
+  PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000001"}', true);
+  p := public.asset_profile_read(aid);
+  IF p IS NULL OR p->>'market' <> 'none_public' OR p->'proposal'->>'kind' <> 'painting' OR (p->'proposal'->>'photos')::int <> 2 OR (p->'proposal'->>'sittings')::int <> 2
+     OR jsonb_array_length(p->'proposal'->'photo_sightings') <> 2 OR p->'proposal'->'photo_sightings'->1->>'caption' <> 'a red painting on a black wall' OR (p->'coverage'->>'photos')::int <> 2 THEN
+    RAISE EXCEPTION 'proposal profile wrong: %', p->'proposal'; END IF;
+  mine := public.held_assets_read(50);
+  IF (mine->>'proposed_total')::int <> 2 OR mine->'proposed'->0->>'kind' <> 'painting' OR (mine->'proposed'->0->>'photos')::int <> 2 THEN RAISE EXCEPTION 'held proposals wrong: %', mine->'proposed'; END IF;
+  -- Confirm: the holder names it; it becomes theirs, active, with a claim; twice is a no-op.
+  c := public.confirm_held_asset(aid, 'Red Car', 'oil and enamel on canvas', '2024', '48 x 60 in', NULL, NULL, 'private');
+  IF (c->>'duplicate')::boolean THEN RAISE EXCEPTION 'first confirm is not a duplicate: %', c; END IF;
+  IF (SELECT status || '/' || owner_id::text || '/' || title FROM public.assets WHERE id = aid) <> 'active/0b9f107a-0000-4000-8000-000000000001/Red Car' THEN RAISE EXCEPTION 'confirm must make it theirs'; END IF;
+  IF (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid AND kind = 'creation_claim') <> 1 THEN RAISE EXCEPTION 'one creation claim after confirm'; END IF;
+  c := public.confirm_held_asset(aid, 'Red Car', NULL, NULL, NULL, NULL, NULL, 'private');
+  IF NOT (c->>'duplicate')::boolean THEN RAISE EXCEPTION 'second confirm is a no-op: %', c; END IF;
+  mine := public.held_assets_read(50);
+  IF (mine->>'proposed_total')::int <> 1 OR (mine->>'total')::int <> 2 OR (mine->'assets'->0->>'photos')::int <> 2 THEN RAISE EXCEPTION 'after confirm: one proposal left, two works: %', mine; END IF;
+  -- Dismiss the drawing: archived, nothing deleted, gone from both lists and from the profile read.
+  SELECT id INTO aid FROM public.assets WHERE attributes->>'identity_key' = 'proposal:0b9f107a-0000-4000-8000-000000000001:fp:eeee5678:1';
+  c := public.dismiss_held_asset(aid, 'a sketchbook page, not a work');
+  IF (SELECT status FROM public.assets WHERE id = aid) <> 'archived' OR (SELECT count(*) FROM public.asset_observations WHERE asset_id = aid) <> 2 THEN RAISE EXCEPTION 'dismiss archives and keeps testimony'; END IF;
+  IF public.asset_profile_read(aid) IS NOT NULL THEN RAISE EXCEPTION 'a dismissed proposal is not read'; END IF;
+  IF ((public.held_assets_read(50))->>'proposed_total')::int <> 0 THEN RAISE EXCEPTION 'dismissed proposal must leave the list'; END IF;
+  -- Another user may neither confirm nor dismiss.
+  PERFORM set_config('request.jwt.claims', '{"role":"authenticated","sub":"0b9f107a-0000-4000-8000-000000000002"}', true);
+  BEGIN
+    PERFORM public.confirm_held_asset(aid, 'x', NULL, NULL, NULL, NULL, NULL, 'private');
+    RAISE EXCEPTION 'another user must not confirm';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('request.jwt.claims', '{"role":"anon"}', true);
+  BEGIN
+    PERFORM public.propose_held_assets('0b9f107a-0000-4000-8000-000000000001', '[]'::jsonb);
+    RAISE EXCEPTION 'anon must not propose';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
 
 -- 7. The type list admits the three new types and still refuses an unknown one.
 DO $$ BEGIN

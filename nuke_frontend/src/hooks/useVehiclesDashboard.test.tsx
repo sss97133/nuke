@@ -61,7 +61,8 @@ const period = (changes: Record<string, unknown> = {}) => ({
   ...changes,
 });
 const proof = (changes: Record<string, unknown> = {}) => ({
-  id: 'proof', vehicle_id: 'car', status: 'approved', expires_at: '2027-01-01T00:00:00Z', ...changes,
+  id: 'proof', vehicle_id: 'car', status: 'approved', expires_at: '2027-01-01T00:00:00Z',
+  verification_category: 'title_document', title_document_url: 'https://example.test/title', ...changes,
 });
 
 it('keeps ended ownership despite an approval and uses the acquisition clock', () => {
@@ -80,12 +81,26 @@ it('selects reacquisition over earlier periods independently of row order', () =
 });
 
 it('does not promote expired, mismatched, unverified or unknown roles to verified ownership', () => {
-  expect(resolveGarageRelationships([period()], [proof({ expires_at: '2025-01-01' })], [], now).get('car')?.type).toBe('OWNER');
-  expect(resolveGarageRelationships([period()], [proof({ vehicle_id: 'other' })], [], now).get('car')?.type).toBe('OWNER');
+  expect(resolveGarageRelationships([period()], [proof({ expires_at: '2025-01-01' })], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
+  expect(resolveGarageRelationships([period()], [proof({ vehicle_id: 'other' })], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
   for (const role of ['unverified_claim', 'photographer', null]) {
-    expect(resolveGarageRelationships([period({ role })], [proof()], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
+    expect(resolveGarageRelationships([period({ role })], [], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
   }
   expect(resolveGarageRelationships([], [proof({ expires_at: '2025-01-01' })], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
+});
+
+it('retains a current title when another period row only records photography', () => {
+  expect(resolveGarageRelationships([period({ role: 'photographer' })], [proof()], [], now).get('car'))
+    .toMatchObject({ type: 'VERIFIED OWNER', source: 'verification', id: 'proof' });
+});
+
+it('keeps a recorded disposal authoritative when a later row only records photography', () => {
+  const rows = [period({ id: 'ended', is_current: false, end_date: '2023-01-01' }),
+    period({ id: 'photo', role: 'photographer', start_date: '2025-01-01' })];
+  for (const input of [rows, [...rows].reverse()]) {
+    expect(resolveGarageRelationships(input, [proof()], [], now).get('car'))
+      .toMatchObject({ type: 'PREVIOUSLY OWNED', id: 'ended' });
+  }
 });
 
 it('retains a declared prior relationship without inventing its dates or an acquisition', () => {
@@ -94,10 +109,40 @@ it('retains a declared prior relationship without inventing its dates or an acqu
   expect(resolveGarageRelationships([period({ start_date: '2027-01-01' })], [], [], now).get('car')?.type).toBe('OWNERSHIP CLAIM');
 });
 
+it('requires current title proof for either ownership role, preserving unsupported claims', () => {
+  for (const role of ['owner', 'verified_owner', 'co_owner', 'co-owner']) {
+    for (const changes of [{ verification_category: 'custody_evidence' },
+      { verification_category: null }, { title_document_url: null },
+      { title_document_url: 'iphoto://local' }, { expires_at: 'malformed' }]) {
+      expect(resolveGarageRelationships([period({ role })], [proof(changes)], [], now).get('car')?.type)
+        .toBe('OWNERSHIP CLAIM');
+    }
+    expect(resolveGarageRelationships([period({ role, verification_id: null })], [], [], now).get('car')?.type)
+      .toBe('OWNERSHIP CLAIM');
+  }
+  expect(resolveGarageRelationships([period({ role: 'co_owner' })], [proof()], [], now).get('car')?.type)
+    .toBe('CO-OWNER');
+  expect(resolveGarageRelationships([period({ verification_id: null })], [proof()], [], now).get('car')?.type)
+    .toBe('VERIFIED OWNER');
+});
+
+it('keeps a photo-backed co-owner account record findable outside owned and asset totals', async () => {
+  seedGarage();
+  fixture.rows.vehicle_ownerships = [period({ owner_profile_id: 'user', role: 'co_owner', verification_id: null })];
+  fixture.rows.ownership_verifications = [];
+  fixture.rows.garage_records = [{ vehicle_id: 'car', relationship: 'owner' }];
+  await act(async () => root.render(<Harness />));
+  expect(state.vehicles.find(v => v.id === 'car')?.relationship_type).toBe('OWNERSHIP CLAIM');
+  expect(state.totalEstimatedValue).toBe(0);
+  expect(state.data?.my_vehicles).toEqual([]);
+  await act(async () => root.render(<MemoryRouter><GarageTab dashboard={state} /></MemoryRouter>));
+  expect(container.querySelector('a[href="/vehicle/car"]')).not.toBeNull();
+});
+
 let state: ReturnType<typeof useVehiclesDashboard>, root: Root, container: HTMLDivElement;
 const snapshots: { viewer: string | null; ids: string[]; loading: boolean; dataIds: string[]; sources: string[]; warnings: string[]; error: string | null }[] = [];
-function Harness({ viewer = 'user' }: { viewer?: string | null }) {
-  state = useVehiclesDashboard(viewer);
+function Harness({ viewer = 'user', scope = 'all' }: { viewer?: string | null; scope?: 'all' | 'ownership' }) {
+  state = useVehiclesDashboard(viewer, scope);
   snapshots.push({viewer, ids: state.vehicles.map(v => v.id), loading: state.isLoading,
     dataIds: state.data?.my_vehicles.map(v => v.vehicle_id) ?? [], sources: state.unresolvedSources?.map(s => s.id) ?? [],
     warnings: state.warnings ?? [], error: state.error});
@@ -111,7 +156,8 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 function seedGarage() {
-  fixture.rows.vehicle_ownerships = [period({ owner_profile_id: 'user', role: 'owner', verification_id: null }),
+  fixture.rows.ownership_verifications = [proof({ user_id: 'user', expires_at: null })];
+  fixture.rows.vehicle_ownerships = [period({ owner_profile_id: 'user', role: 'owner' }),
     period({ id: 'ended', vehicle_id: 'old', owner_profile_id: 'user', is_current: false, end_date: '2023-01-01' })];
   fixture.rows.vehicles = ['car', 'old'].map(id => ({ id, year: 1970, make: 'Example', model: 'Car', status: 'active',
     current_value: 999999, purchase_price: 5000, image_count: 4, primary_image_url: 'photo',
@@ -120,6 +166,17 @@ function seedGarage() {
     calculated_at: '2026-10-06T00:00:00Z', comp_method: 'class_stratified', is_stale: false, is_circular: false }));
   fixture.rows.garage_covers = ['car', 'old'].map(vehicle_id => ({ vehicle_id, image_url: 'photo' }));
 }
+
+it('reuses the evidence fold for Owned consumers when work relationships fail', async () => {
+  // Work relationships (documenting, consigned) are now fetched even in ownership scope,
+  // but failure is non-fatal — evidence-based ownership still works.
+  seedGarage(); fixture.fail = 'get_user_garage';
+  await act(async () => root.render(<Harness scope="ownership" />));
+  expect(state.error).toBeNull();
+  expect(state.vehicles.find(v => v.id === 'car')?.relationship_type).toBe('VERIFIED OWNER');
+  expect(fixture.calls.filter(call => call[0] === 'rpc').map(call => call[1]))
+    .toEqual(['get_my_garage_owner_corrections', 'get_user_garage']);
+});
 
 it('finds created zero-photo profiles and contributed records without promoting either to ownership', async () => {
   seedGarage();
@@ -139,7 +196,7 @@ it('finds created zero-photo profiles and contributed records without promoting 
     ownership_start_date: null, ownership_end_date: null,
   });
   expect(state.vehicles.find(v => v.id === 'contributed-record')?.relationship_type).toBe('CONTRIBUTOR');
-  expect(state.vehicles.find(v => v.id === 'car')?.relationship_type).toBe('OWNER');
+  expect(state.vehicles.find(v => v.id === 'car')?.relationship_type).toBe('VERIFIED OWNER');
   expect(state.totalEstimatedValue).toBe(12000);
   expect(state.data?.my_vehicles.map(v => v.vehicle_id).sort()).toEqual(['car', 'old']);
   await act(async () => root.render(<MemoryRouter><GarageTab dashboard={state} /></MemoryRouter>));

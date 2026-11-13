@@ -6,7 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('../hooks/usePageTitle', () => ({ usePageTitle: () => undefined }));
-import AssetProfilePage, { headline, money, type AssetProfile } from './AssetProfile';
+vi.mock('../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => <a href={to} className={className}>{children}</a> }));
+import AssetProfilePage, { foldNotes, headline, money, sittingsOf, type AssetProfile } from './AssetProfile';
 
 // The shape asset_profile_read returns for a sold print with a creation claim (synthetic values, the live shape of 2026-11-08).
 const riley: AssetProfile = {
@@ -18,7 +19,8 @@ const riley: AssetProfile = {
     high_bid: null, estimate_low: 550000, estimate_high: 750000, currency: 'GBP', observed_at: '2026-10-15T22:59:59Z', observed_at_basis: 'hammer_time',
     url: 'https://www.bonhams.com/auction/32184/lot/7/x', lines: ['BRIDGET RILEY', '(B. 1931)', 'Ka 4'], catalog_text: 'oil on linen\n76.2 x 67.3cm',
     printed_sections: [{ heading: 'Provenance', lines: ['Juda Rowan Gallery, London', 'Private Collection, London'] }, { heading: 'Literature', lines: ['The Complete Paintings, no. BR207'] },
-      { heading: null, lines: ['With the Ka paintings of 1980, Riley gave the stripe a new chromatic intensity.'] }],
+      { heading: null, lines: ['With the Ka paintings of 1980, Riley gave the stripe a new chromatic intensity.'] },
+      { heading: null, lines: ['In the winter of 1979 to 80 Riley spent several weeks in Egypt.'] }],
     symbols: ['AR'], image_url: 'https://images1.bonhams.com/image?src=x.jpg', country: 'United Kingdom', landed_at: '2026-11-08T16:07:00Z' }],
   history: [{ statement_id: 's0', source: 'bonhams', observed_at: '2026-09-01T12:00:00Z', observed_at_basis: 'index_read', result: 'upcoming', hammer_price: null, high_bid: null,
     estimate_low: 550000, estimate_high: 750000, currency: 'GBP', landed_at: '2026-09-01T12:00:00Z', superseded: true },
@@ -60,6 +62,13 @@ it('renders the artwork from the one typed read: identity, hammer as a claim, cr
   expect(img?.getAttribute('height')).toBe('900');
   expect(node.textContent).toContain('Nuke holds 1 presentation, 2 statements and 1 creation claim');
   expect(node.querySelector('[style]')).toBeNull();
+  expect(Array.from(node.querySelectorAll('h3')).filter(h => h.textContent === "The house's note").length).toBe(1);
+  expect(node.textContent).toContain("Sale (the house's key)");
+});
+
+it('folds consecutive unheaded blocks into one note and leaves headed sections alone', () => {
+  const folded = foldNotes([{ heading: 'Provenance', lines: ['a'] }, { heading: null, lines: ['p1'] }, { heading: null, lines: ['p2'] }, { heading: 'Literature', lines: ['b'] }, { heading: null, lines: ['p3'] }]);
+  expect(folded).toEqual([{ heading: 'Provenance', lines: ['a'] }, { heading: null, lines: ['p1', 'p2'] }, { heading: 'Literature', lines: ['b'] }, { heading: null, lines: ['p3'] }]);
 });
 
 it('says so when nothing public is recorded, and never calls the reader for a malformed id', async () => {
@@ -72,6 +81,45 @@ it('says so when nothing public is recorded, and never calls the reader for a ma
   await act(async () => render('/assets/not-an-id'));
   expect(fixture.rpc).not.toHaveBeenCalled();
   expect(node.textContent).toContain('No such asset');
+});
+
+it('a declared work shows no public sale, the holder\'s words and a user party', async () => {
+  const declared: AssetProfile = { ...riley, asset: { ...riley.asset, id: '22222222-2222-4222-8222-222222222222', title: 'Danger End of Road', house_category: null, identity_basis: 'holder_declaration', visibility: 'private' },
+    viewer: { is_holder: true }, declared: { medium: 'oil and enamel on canvas', year: 'c. 2024', dimensions: '48 x 60 in', notes: 'Painted at the shop.' }, market: 'none_public',
+    image_url: null, lots: [], history: [],
+    creation: [{ claim_id: 'c9', attribution: 'direct', layout: 'holder_declaration', name_as_printed: 'A Working Photographer', qualifier_as_printed: null,
+      party: { id: 'u1', kind: 'user', display_name: 'A Working Photographer', claimed: true, lots_direct: 1, priced_lots: 0 }, executor: null, source: 'owner-input', observed_at: '2026-11-08T21:00:00Z', confidence: 0.95 }],
+    coverage: { presentations: 0, statements: 0, claims: 1, sources: [], as_of: '2026-11-08T22:00:00Z' } };
+  fixture.rpc.mockResolvedValue({ data: declared, error: null });
+  await act(async () => render('/assets/22222222-2222-4222-8222-222222222222'));
+  expect(node.textContent).toContain('No public sale recorded');
+  expect(node.textContent).toContain('As declared by the holder');
+  expect(node.textContent).toContain('oil and enamel on canvas');
+  expect(node.textContent).toContain('Painted at the shop.');
+  expect(node.textContent).toContain('A Nuke user, declaring their own work');
+  expect(node.textContent).toContain("the holder's own declaration");
+  expect(node.textContent).toContain('declared by its holder in their own words');
+  expect(node.querySelector('img')).toBeNull();
+});
+
+it('a work found in the photos shows what the analysis saw, the days photographed, and the holder\'s verbs', async () => {
+  const found: AssetProfile = { ...riley, asset: { ...riley.asset, id: '33333333-3333-4333-8333-333333333333', title: 'Proposed painting, Jul 2024', house_category: null, identity_basis: 'photo_proposal', visibility: 'private' },
+    viewer: { is_holder: true }, declared: null, market: 'none_public', image_url: null, lots: [], history: [], creation: [],
+    proposal: { kind: 'painting', labels: ['Painting', 'Modern Art'], labeller: 'apple_photos_on_device_v1', method: 'apple_vision_featureprint_cos0.90', photos: 2, sittings: 2,
+      span_from: '2024-07-03T18:00:00Z', span_to: '2026-09-13T20:00:00Z', places: [['Boulder City, United States', 2]], status: 'pending',
+      photo_sightings: [{ taken_at: '2024-07-03T18:00:00Z', filename: 'IMG_1.HEIC', place: 'Boulder City, United States', caption: 'a painting of a red car' },
+        { taken_at: '2026-09-13T20:00:00Z', filename: 'IMG_2.HEIC', place: 'Boulder City, United States', caption: 'a red painting on a black wall' }] },
+    coverage: { presentations: 0, statements: 0, claims: 0, sources: [], as_of: '2026-11-09T01:00:00Z' } };
+  fixture.rpc.mockResolvedValue({ data: found, error: null });
+  await act(async () => render('/assets/33333333-3333-4333-8333-333333333333'));
+  expect(node.textContent).toContain("Found in the holder's photographs");
+  expect(node.textContent).toContain('First photographed');
+  expect(node.textContent).toContain('Days photographed');
+  expect(node.textContent).toContain("the device's caption: a painting of a red car");
+  expect(node.textContent).toContain('nothing left the machine');
+  expect(node.querySelector('a[href="/assets/new?confirm=33333333-3333-4333-8333-333333333333"]')).not.toBeNull();
+  expect(node.textContent).toContain('No public sale recorded');
+  expect(sittingsOf(found.proposal!.photo_sightings!).length).toBe(2);
 });
 
 it('formats money by the house\'s currency and headlines the hammer, then the high bid, then the estimate', () => {

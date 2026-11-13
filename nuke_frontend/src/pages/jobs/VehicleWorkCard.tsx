@@ -16,7 +16,7 @@ import './jobs.css';
 const WorkPlanPanel = React.lazy(() => import('./WorkPlanPanel'));
 const PostJobSheet = React.lazy(() => import('./PostJobSheet'));
 
-type Props = { vehicleId: string; vehicleTitle: string; signedIn: boolean; showVehicleTitle?: boolean };
+type Props = { vehicleId: string; vehicleTitle: string; signedIn: boolean; showVehicleTitle?: boolean; hideWhenEmpty?: boolean };
 
 export default function VehicleWorkCard(props: Props) {
   const { user, loading } = useAuth();
@@ -24,7 +24,7 @@ export default function VehicleWorkCard(props: Props) {
   return <ViewerVehicleWorkCard key={`${user?.id ?? 'anonymous'}:${props.vehicleId}`} {...props} />;
 }
 
-function ViewerVehicleWorkCard({ vehicleId, vehicleTitle, signedIn, showVehicleTitle = false }: Props) {
+function ViewerVehicleWorkCard({ vehicleId, vehicleTitle, signedIn, showVehicleTitle = false, hideWhenEmpty = false }: Props) {
   const [read, setRead] = useState<VehicleWorkOrdersRead | null>(null);
   const [planOpen, setPlanOpen] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -67,6 +67,8 @@ function ViewerVehicleWorkCard({ vehicleId, vehicleTitle, signedIn, showVehicleT
     {loading ? <p role="status">Reading the work orders…</p> : <div role="alert"><Text role="body">{error || 'Work orders are unavailable.'}</Text>
       <button type="button" className="btn-base btn-sm btn-secondary" onClick={() => void load(null)}>Retry work orders</button></div>}
   </section></div>;
+  if (hideWhenEmpty && !loading && !error && !publication.loading && !publication.error
+      && read.rows.length === 0 && !read.next_after) return null;
   const access = read.viewer.vehicle_access;
   const postAction = access?.can_post_work_request ? (read.viewer.actions ?? []).find(a => a.action === 'post_work_request') ?? null : null;
 

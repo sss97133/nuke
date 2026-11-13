@@ -1,6 +1,7 @@
 /** Reuse the existing, access-gated spec drill RPC; never render its image URLs unchecked. */
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
+import { useAuthContext } from '../../../contexts/AuthContext';
 import type { EvidenceImage } from './useVehicleImageEvidence';
 
 export interface ProvenanceCitation {
@@ -16,6 +17,8 @@ export interface ImageObservation {
   observation_id: string;
   image_id: string;
   image_url: string;
+  /** Original observation URL, when supplied by the current witness reader. */
+  source_url?: string | null;
   value: string | null;
   source_slug: string | null;
   observed_at: string | null;
@@ -34,6 +37,10 @@ export interface FieldProvenance {
   field: string;
   vehicle_id?: string;
   value: string | null;
+  current_correction?: {
+    correction_id: string; value: string; receipt_id: string; document_id: string;
+    source_table: 'vehicle_documents' | 'vehicle_images'; page_date: string; recorded_at: string;
+  } | null;
   /** Existing canonical owner, qualified against the access-gated report collection. */
   canonical?: { status: 'resolved' | 'unknown' | 'unavailable'; value?: string; observation_id?: string };
   inline_source: string | null;
@@ -91,6 +98,17 @@ export function provenanceCoverageUnavailable(provenance: FieldProvenance | null
   return !!provenance?.coverage && provenance.coverage.status !== 'complete_current_reader';
 }
 
+/** A retained image ID cannot transfer an old reading onto replacement bytes. */
+export function currentImageObservations(provenance: FieldProvenance | null | undefined, images: EvidenceImage[]) {
+  if (!provenance || provenanceCoverageUnavailable(provenance)) return [];
+  const current = new Map(images.map(image => [image.id, image.image_url]));
+  return (provenance.image_observations || []).filter(observation => {
+    const url = current.get(observation.image_id);
+    return !!url && observation.image_url === url
+      && (observation.source_url == null || observation.source_url === url);
+  });
+}
+
 export function citedFieldImages(provenance: FieldProvenance | null | undefined, images: EvidenceImage[]) {
   if (!provenance || provenanceCoverageUnavailable(provenance)) return [];
   // Recheck returned citations against this vehicle's independently filtered
@@ -98,9 +116,10 @@ export function citedFieldImages(provenance: FieldProvenance | null | undefined,
   const ids = new Set(provenance.evidence
     .filter(e => e.source !== 'field_evidence' || e.verified === true)
     .map(e => e.image_id).filter(Boolean));
-  for (const observation of provenance.image_observations || []) ids.add(observation.image_id);
+  const currentObservations = currentImageObservations(provenance, images);
+  for (const observation of currentObservations) ids.add(observation.image_id);
   return images.filter(image => ids.has(image.id)).sort((a, b) => {
-    const priority = (id: string) => Math.min(3, ...(provenance.image_observations || []).filter(o => o.image_id === id).map(o => evidenceOrder(o.visual_relation)));
+    const priority = (id: string) => Math.min(3, ...currentObservations.filter(o => o.image_id === id).map(o => evidenceOrder(o.visual_relation)));
     return priority(a.id) - priority(b.id);
   });
 }
@@ -138,9 +157,10 @@ export function formatProvenanceValue(field: string, value: string): string {
 }
 
 export function useFieldProvenance(vehicleId: string, field: string) {
-  return useQuery({
-    queryKey: ['field-provenance', vehicleId, field],
-    enabled: !!vehicleId && !!field,
+  const { user, loading: authLoading } = useAuthContext();
+  const read = useQuery({
+    queryKey: ['field-provenance', vehicleId, field, user?.id ?? 'anonymous'],
+    enabled: !!vehicleId && !!field && !authLoading,
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
       const controller = new AbortController();
@@ -167,4 +187,5 @@ export function useFieldProvenance(vehicleId: string, field: string) {
       }
     },
   });
+  return { ...read, data: authLoading || read.isError ? undefined : read.data, isLoading: authLoading || read.isLoading };
 }

@@ -489,7 +489,19 @@ export function parseTape(data: unknown): TapeBid[] {
   });
 }
 
-export interface SourceReceiptStatus { house: string; readAt: number | null; lots: number | null; state: string | null; hasError: boolean }
+export interface DeliveryQueueStatus { state: 'recorded' | 'invalid' | 'unrecorded'; count?: number; measuredAt: number | null; updatedAt?: number; oldestReadAt?: number | null }
+export function parseDeliveryQueue(raw: any, now = Date.now()): DeliveryQueueStatus | undefined {
+  if (!raw || !['recorded','invalid','unrecorded'].includes(raw.state)) return undefined;
+  const measured = Date.parse(raw.measured_at), updated = Date.parse(raw.state_updated_at), oldest = Date.parse(raw.oldest_source_read_at);
+  const measuredAt = Number.isFinite(measured) && measured <= now ? measured : null;
+  if (raw.state !== 'recorded') return { state: raw.state, measuredAt };
+  if (measuredAt == null || !Number.isFinite(updated) || updated > measuredAt
+    || !Number.isInteger(raw.queued_receipts) || raw.queued_receipts < 0 || raw.queued_receipts > 1000
+    || (raw.queued_receipts > 0 && (!Number.isFinite(oldest) || oldest > updated))
+    || (raw.queued_receipts === 0 && raw.oldest_source_read_at != null)) return { state: 'invalid', measuredAt };
+  return { state: 'recorded', count: raw.queued_receipts, measuredAt, updatedAt: updated, oldestReadAt: raw.queued_receipts ? oldest : null };
+}
+export interface SourceReceiptStatus { house: string; readAt: number | null; lots: number | null; state: string | null; hasError: boolean; discoveryState?: string; discoveryAttemptAt?: number | null; collectionState?: string; deliveryQueue?: DeliveryQueueStatus; nativePollMinutes?: number }
 async function fetchTape(): Promise<{ bids: TapeBid[]; sources: string[]; status: SourceReceiptStatus[] }> {
   const { data, error } = await supabase.rpc('live_bid_tape', { p_minutes: 5 });
   if (error) throw error;
@@ -498,7 +510,13 @@ async function fetchTape(): Promise<{ bids: TapeBid[]; sources: string[]; status
     if (typeof s.house !== 'string') return [];
     if (typeof s.label === 'string') SENT_LABELS.set(s.house, s.label);
     const readAt = Date.parse(s.read_at);
-    return [{ house:s.house, readAt:Number.isFinite(readAt) ? readAt : null, lots:typeof s.lots === 'number' ? s.lots : null, state:typeof s.state === 'string' ? s.state : null, hasError:s.has_error === true }];
+    const discoveryAttemptAt = Date.parse(s.discovery_attempt_at);
+    return [{ house:s.house, readAt:Number.isFinite(readAt) ? readAt : null, lots:typeof s.lots === 'number' ? s.lots : null, state:typeof s.state === 'string' ? s.state : null, hasError:s.has_error === true,
+      discoveryState: ['unrecorded','disabled','no_listings_parsed','blocked','error','unverified'].includes(s.discovery_state) ? s.discovery_state : undefined,
+      discoveryAttemptAt: Number.isFinite(discoveryAttemptAt) ? discoveryAttemptAt : null,
+      collectionState: ['paused','scheduled'].includes(s.collection_state) ? s.collection_state : undefined,
+      deliveryQueue: s.house === 'ebay-motors' ? parseDeliveryQueue(s.delivery_queue) : undefined,
+      nativePollMinutes: s.house === 'purplewave' && Number.isInteger(s.native_poll_minutes) && s.native_poll_minutes > 0 && s.native_poll_minutes <= 10080 ? s.native_poll_minutes : undefined }];
   });
   return { status, bids: parseTape(data), sources: Array.isArray(data?.sources) ? data.sources.filter((s: unknown): s is string => typeof s === 'string') : [] };
 }
