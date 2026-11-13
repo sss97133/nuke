@@ -3059,6 +3059,7 @@ struct FieldProvenanceSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var prov: FieldProvenance?
+    @State private var context: SpecContext?
     @State private var loaded = false
     @State private var loadFailed = false   // a failed trace ≠ "no source exists"
     @State private var zoomURL: String?
@@ -3071,6 +3072,8 @@ struct FieldProvenanceSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     valueHeader
                     Divider()
+                    // Context section: what this value means + how it compares
+                    if let ctx = context { contextSection(ctx) }
                     if let p = prov {
                         sourceLine(p)
                         if let img = p.source_image_url, !img.isEmpty { sourceImage(img) }
@@ -3434,6 +3437,22 @@ struct FieldProvenanceSheet: View {
 
     private func load() async {
         loadFailed = false
+        // Load context and provenance in parallel
+        async let contextTask: SpecContext? = {
+            do {
+                return try await SupabaseService.client
+                    .rpc("get_spec_context", params: [
+                        "p_vehicle_id": vehicleId,
+                        "p_field": drill.field,
+                        "p_value": drill.value
+                    ])
+                    .execute()
+                    .value
+            } catch {
+                NSLog("NukeCapture spec context failed: %@", String(describing: error))
+                return nil
+            }
+        }()
         do {
             prov = try await SupabaseService.client
                 .rpc("get_field_provenance",
@@ -3445,7 +3464,143 @@ struct FieldProvenanceSheet: View {
             loadFailed = true
             NSLog("NukeCapture field provenance failed: %@", String(describing: error))
         }
+        context = await contextTask
         loaded = true
+    }
+
+    // ─── Context section: what this value means + how it compares ─────────────
+    @ViewBuilder private func contextSection(_ ctx: SpecContext) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // OEM context for engines
+            if let oem = ctx.oem, drill.field == "engine_type" || drill.field == "engine_size" {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ENGINE SPECIFICATIONS")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    HStack(spacing: 16) {
+                        if let cid = oem.displacement_cid {
+                            specPill(label: "CID", value: "\(cid)")
+                        }
+                        if let liters = oem.displacement_liters {
+                            specPill(label: "Liters", value: String(format: "%.1f", liters))
+                        }
+                        if let config = oem.engine_config {
+                            specPill(label: "Config", value: config)
+                        }
+                    }
+                    if let hp = oem.horsepower {
+                        HStack(spacing: 16) {
+                            specPill(label: "HP", value: "\(hp)")
+                            if let torque = oem.torque_ft_lbs {
+                                specPill(label: "Torque", value: "\(torque) ft-lb")
+                            }
+                        }
+                    }
+                    if let range = oem.year_range {
+                        Text("Production: \(range)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let src = oem.source {
+                        Text("Source: \(src)")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(16)
+                Divider()
+            }
+
+            // Similar vehicles count
+            if ctx.similar_count > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("ON NUKE")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    HStack {
+                        Text("\(ctx.similar_count) other vehicles")
+                            .font(.footnote.weight(.medium))
+                        Text("with this \(drill.label.lowercased())")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption).foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(16)
+                Divider()
+            }
+
+            // Sales data if available
+            if let sales = ctx.sales, sales.count > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("MARKET")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(sales.count) sales")
+                                .font(.footnote.weight(.medium))
+                            Text("with this spec")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if let avg = sales.avg_price {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("$\(avg.formatted())")
+                                    .font(.footnote.weight(.medium))
+                                Text("avg price")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if let min = sales.min_price, let max = sales.max_price, min != max {
+                        Text("Range: $\(min.formatted()) – $\(max.formatted())")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(16)
+                Divider()
+            }
+        }
+    }
+
+    private func specPill(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(.footnote, design: .monospaced).weight(.semibold))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+// ─── SpecContext model ────────────────────────────────────────────────────────
+struct SpecContext: Codable {
+    let field: String
+    let value: String
+    let oem: OEMContext?
+    let similar_count: Int
+    let sales: SalesData?
+
+    struct OEMContext: Codable {
+        let engine_size: String?
+        let displacement_liters: Double?
+        let displacement_cid: Int?
+        let engine_config: String?
+        let horsepower: Int?
+        let torque_ft_lbs: Int?
+        let transmission: String?
+        let drivetrain: String?
+        let fuel_type: String?
+        let year_range: String?
+        let source: String?
+    }
+
+    struct SalesData: Codable {
+        let count: Int
+        let avg_price: Int?
+        let min_price: Int?
+        let max_price: Int?
     }
 }
 
