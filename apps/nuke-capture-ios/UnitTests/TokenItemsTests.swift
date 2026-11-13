@@ -256,3 +256,28 @@ final class TokenItemsTests: XCTestCase {
         ])
     }
 }
+
+// A strip gap carries the reader's lead item (#3500): the header shows it in place of the dash, the gap stays a gap.
+final class StripGapLeadTests: XCTestCase {
+    private func gap(_ json: String) throws -> ProfileSection.Gap {
+        try JSONDecoder().decode(ProfileSection.Gap.self, from: Data(json.utf8))
+    }
+
+    func testLeadReadingShowsValueAndStatus() throws {
+        let g = try gap(#"{"dimension":"drivetrain","label":"Drivetrain","lead":{"key":"drivetrain.current.layout","value":"RWD","status":"reading"}}"#)
+        XCTAssertEqual(g.leadText, "RWD · reading")
+        XCTAssertEqual(ItemText.rootStatus(g.lead?.status ?? ""), .attributed)
+    }
+
+    func testEstablishedLeadShowsValueAlone() throws {
+        let g = try gap(#"{"dimension":"engine","label":"Engine","lead":{"key":"engine.current.cid","value":455,"status":"established"}}"#)
+        XCTAssertEqual(g.leadText, "455")
+    }
+
+    func testNoOrMalformedLeadKeepsTheGap() throws {
+        XCTAssertNil(try gap(#"{"dimension":"drivetrain","label":"Drivetrain"}"#).leadText)
+        let bad = try gap(#"{"dimension":"drivetrain","label":"Drivetrain","lead":"RWD"}"#)
+        XCTAssertNil(bad.lead)
+        XCTAssertNil(try gap(#"{"dimension":"drivetrain","label":"Drivetrain","lead":{"key":"k","value":null,"status":"reading"}}"#).leadText)
+    }
+}
