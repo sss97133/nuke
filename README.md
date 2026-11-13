@@ -107,7 +107,7 @@ A rule holds only where something enforces it. These do today:
 |---|---|
 | An observation without a source is refused | the trigger `trg_citation_required_vehicle_observations` on the observation log |
 | New code cannot insert into the observation log around its writers | [`no-raw-testimony-insert.mjs`](scripts/guardrails/no-raw-testimony-insert.mjs), a ratchet in the pull-request gate ([`pre-deploy-check.yml`](.github/workflows/pre-deploy-check.yml)) |
-| An edge function that writes must authenticate its caller | [`check-write-guard.mjs`](scripts/guardrails/check-write-guard.mjs), which blocks the deploy |
+| An edge function deployed from this repository that writes must authenticate its caller, or be named in the guard's allowlist with the reason | [`check-write-guard.mjs`](scripts/guardrails/check-write-guard.mjs), which blocks the deploy. It reads the source in this repository, so it does not cover a function deployed without source here. [`production-engineering.md`](.claude/rules/production-engineering.md) counts those under "Noted drift" |
 | No view lets a visitor write past row-level security | the `view_write_guard` event trigger, which fails the statement |
 | No migration opens a personal column to the public | [`no-pii-exposure.mjs`](scripts/guardrails/no-pii-exposure.mjs) in the pull-request gate |
 | No secret reaches the repository or the browser bundle | [`no-committed-secrets.sh`](scripts/guardrails/no-committed-secrets.sh) and the build's `check-client-secrets` step |

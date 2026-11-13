@@ -286,7 +286,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Monitor extraction health | `extraction-watchdog` | Alerts on failures |
 | **Data quality report (all sources)** | `data-quality-monitor` (**not deployed**; source removed 2026-03-09) with `{"action":"report"}` | Per-source YMM%, VIN%, price%, grade A-F |
 | **Data quality alerts only** | `data-quality-monitor` (**not deployed**; source removed 2026-03-09) with `{"action":"alerts"}` | Only sources with issues |
-| **Snapshot quality metrics to DB** | `data-quality-monitor` (**not deployed**; source removed 2026-03-09) with `{"action":"snapshot"}` | Writes to source_quality_snapshots (cron runs at 2am UTC) |
+| **Snapshot quality metrics to DB** | `data-quality-monitor` (**not deployed**; source removed 2026-03-09) with `{"action":"snapshot"}` | Wrote to source_quality_snapshots from a 2am UTC cron job. No scheduled job names it now (2026-11-13) |
 | **Query live quality view** | `SELECT * FROM source_quality_current` | Live per-source stats (slow on full table) |
 | Process queued imports | `continuous-queue-processor` | **Don't call directly** — runs on cron |
 
@@ -510,8 +510,8 @@ Lets a Nuke user run analysis on **their own Claude plan**: subscription token a
 | Analyze condition/zone/damage | `yono-analyze` | Florence-2 vision analysis. Writes to vehicle_images if image_id provided |
 | Batch classify images | `api-v1-vision/batch` or `yono-batch-process` (**not deployed**; source removed 2026-03-13) | Bulk version, max 100 images |
 | Condition read of a listing's photos, on request | `api-v1-vision/listing` | POST `{vehicle_id, max_photos?}` (admins or the service key). Reads up to 16 photos with YONO, then the caller's own connected provider (BYOK), and writes one `kind=condition` observation (source `nuke-vision`, `analysis_kind=listing_photo_condition_v1`) through `ingest-observation`. At most `LISTING_ANALYSES_PER_DAY` (default 40) a day |
-| Background vision processing | `yono-vision-worker` (**not deployed**; source removed 2026-03-13) | Cron worker, claims batches, writes to vehicle_images |
-| Keep sidecar warm | `yono-keepalive` (**not deployed**; source removed 2026-03-13) | Pings Modal every 5 min (cron job 249) |
+| Background vision processing | `yono-vision-worker` (**not deployed**; source removed 2026-03-13) | Was a cron worker that claimed batches and wrote to vehicle_images. No scheduled job names it now (2026-11-13) |
+| Keep sidecar warm | `yono-keepalive` (**not deployed**; source removed 2026-03-13) | Pinged Modal every 5 min from cron job 249, which no longer exists (2026-11-13) |
 | Export training data | `export-training-batch` (**not deployed**; source removed 2026-03-31) | Prepares training dataset |
 | Sidecar URL | `YONO_SIDECAR_URL` env var | Default: `https://sss97133--yono-serve-fastapi-app.modal.run` |
 
