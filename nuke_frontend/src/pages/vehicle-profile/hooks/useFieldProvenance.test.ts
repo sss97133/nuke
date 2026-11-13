@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ query: null as any, rpc: vi.fn(), from: vi.fn() }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: (query: any) => { fixture.query = query; return query; } }));
+const fixture = vi.hoisted(() => ({ query: null as any, rpc: vi.fn(), from: vi.fn(), viewer: null as string | null, authLoading: false, cachedData: null as any, isError: false }));
+vi.mock('../../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.viewer ? { id: fixture.viewer } : null, loading: fixture.authLoading }) }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: (query: any) => { fixture.query = query; return { ...query, data: fixture.cachedData, isError: fixture.isError }; } }));
 vi.mock('../../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
 import { bindEngineCanonical, ENGINE_PROPERTY_IDS, useFieldProvenance, type FieldProvenance } from './useFieldProvenance';
 const vehicleId = 'local-public';
@@ -10,6 +11,16 @@ const provenance = { field, vehicle_id: vehicleId, value: null, evidence: [], ob
 const winner = { vehicle_id: vehicleId, property_id: ENGINE_PROPERTY_IDS[field], observation_id: report.id, structured_data: { [field]: 2.5 }, discriminator_value: '__single__' };
 
 describe('existing canonical owner qualified by readable report', () => {
+  it('isolates viewer caches and withholds stale provenance after a failed refresh', () => {
+    fixture.viewer = 'owner'; fixture.authLoading = true; fixture.cachedData = provenance;
+    expect(useFieldProvenance(vehicleId, field).data).toBeUndefined();
+    expect(fixture.query.enabled).toBe(false);
+    expect(fixture.query.queryKey).toEqual(['field-provenance', vehicleId, field, 'owner']);
+    fixture.viewer = null; fixture.authLoading = false; fixture.isError = true;
+    expect(useFieldProvenance(vehicleId, field).data).toBeUndefined();
+    expect(fixture.query.queryKey).toEqual(['field-provenance', vehicleId, field, 'anonymous']);
+    fixture.isError = false; fixture.cachedData = null;
+  });
   it('binds the existing winner rather than a competing higher confidence report', () => {
     const data = { ...provenance, observations: [...provenance.observations, { id: 'other', value: '3', confidence: 1 }] };
     expect(bindEngineCanonical(vehicleId, field, data, [winner])).toEqual({ status: 'resolved', value: '2.5', observation_id: report.id });

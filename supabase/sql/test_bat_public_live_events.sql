@@ -73,6 +73,7 @@ INSERT INTO cron.job VALUES(510,'bat-live-pull','* * * * *',true,'SELECT bat_liv
 INSERT INTO cron.job_run_details VALUES(510,'succeeded',now(),'ok');
 \ir ../migrations/20261004182500_bat_public_live_event_intake.sql
 \ir ../migrations/20261004205500_bat_clock_retired_recovery.sql
+\ir ../migrations/20261112180000_realtime_drop_events_observations.sql
 GRANT USAGE ON SCHEMA public,net,cron TO service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public,net,cron TO service_role;
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public,net TO service_role;
@@ -129,7 +130,9 @@ DO $$ BEGIN
   ASSERT NOT has_function_privilege('anon','ingest_bat_live_events(jsonb,jsonb)','execute'),'anonymous admission closed';
   ASSERT NOT has_function_privilege('authenticated','ingest_bat_live_events(jsonb,jsonb)','execute'),'ordinary user admission closed';
   ASSERT has_function_privilege('service_role','ingest_bat_live_events(jsonb,jsonb)','execute'),'canonical service admission available';
-  ASSERT EXISTS(SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename='vehicle_events'),'current auction cache delivery is enabled';
+  -- 2026-11-09: open profiles read the current auction cache every 30 s; Realtime decoding of every episode write was the
+  -- database's costliest statement (20261112180000).
+  ASSERT NOT EXISTS(SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename IN ('vehicle_events','vehicle_observations')),'ingest tables are read by poll, not decoded for delivery';
   ASSERT NOT EXISTS(SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename='auction_comments'),'large comment log is not added to delivery';
 END $$;
 

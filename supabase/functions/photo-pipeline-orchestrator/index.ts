@@ -20,8 +20,12 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { classifyImage, type ClassificationResult } from "./classifier.ts";
 import { classifyImageRouted, classificationFromReader, loadManifest, renderPromptV2 } from "./classifierProvider.ts";
-import { persistPipelineState, rowVinQualifies, type PipelineReceipt } from "./persistence.ts";
+import { qualifyVinRead, vinCitation, type VinAdmission } from "./vinAdmission.ts";
+import { persistPipelineState, rowVinQualifies, type PipelineReceipt, type PipelineSource } from "./persistence.ts";
+import { recordSuppliedClassification, SuppliedClassificationError, CLASSIFICATION_SELECT } from "./suppliedClassification.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
+import { recordReviewedAnalysis, ReviewedAnalysisError, REVIEW_SELECT } from "./reviewedAnalysis.ts";
+import { admitPhotoFields, type FieldSourceAdmission } from "./fieldSourceAdmission.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -32,7 +36,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 async function persistImageState(
   imageId: string, receipt: PipelineReceipt, state: Record<string, unknown>,
   metadata: Record<string, unknown> = {},
-  source?: { image_url: string; vehicle_id: string | null },
+  source?: PipelineSource,
 ): Promise<void> {
   await persistPipelineState({
     async read() {
@@ -44,8 +48,12 @@ async function persistImageState(
     },
     async compareAndSwap(snapshot, patch) {
       const { data, error } = await supabase.from("vehicle_images")
-        .update(patch).eq("id", imageId).eq("updated_at", snapshot.updated_at).select("id");
+        .update(patch).eq("id", imageId).eq("updated_at", snapshot.updated_at).select("id,image_url,vehicle_id");
       if (error) throw new Error("photo_pipeline_metadata_write_failed");
+      // A BEFORE guard may withdraw the image despite a successful UPDATE.
+      if (data?.length === 1 && source && (data[0].image_url !== source.image_url || data[0].vehicle_id !== source.vehicle_id)) {
+        throw new Error("photo_pipeline_source_changed");
+      }
       return data?.length === 1;
     },
   }, receipt, state, metadata, source);
@@ -72,10 +80,33 @@ async function noteFailure(imageId: string, errorClass: string, httpStatus: numb
   return { status: "failed", transient: false, attempts: 0, next_attempt_at: null };  // RPC unavailable: pre-v99 behaviour
 }
 
-/** Writes only: is_document/document_category (doc, conf>=0.85), vehicle_vin(+confidence) (checksum-valid, conf>=0.8, never overwrites,
+/** Qualify a short physical VIN using the already-filed vehicle and its existing make/model format rule.
+ * This does not resolve a vehicle, decode its specification, or write a claim. */
+async function resolveVinAdmission(vehicleId: string | null, imageId: string, c: ClassificationResult): Promise<VinAdmission> {
+  const initial = qualifyVinRead(c);
+  if (initial.admitted || initial.reason !== "vehicle_context_required" || !vehicleId) return initial;
+  try {
+    const [image, vehicle] = await Promise.all([
+      supabase.from("vehicle_images").select("vehicle_id").eq("id", imageId).maybeSingle(),
+      supabase.from("vehicles").select("id,year,make,model,vin").eq("id", vehicleId).maybeSingle(),
+    ]);
+    if (image.error || vehicle.error || !vehicle.data) return { admitted: false, reason: "vehicle_context_unavailable" };
+    const context = { vehicleId, sourceVehicleId: image.data?.vehicle_id ?? null,
+      year: vehicle.data.year, vin: vehicle.data.vin, rule: null };
+    const qualified = qualifyVinRead(c, context);
+    if (qualified.admitted || qualified.reason !== "pre1981_vin_rule_unavailable") return qualified;
+    const { data, error } = await supabase.rpc("identifier_rule_for", {
+      p_make: vehicle.data.make, p_model: vehicle.data.model, p_kind: "vin", p_value: c.v2!.vin!.value,
+    });
+    if (error) return { admitted: false, reason: "identifier_rule_read_failed" };
+    return qualifyVinRead(c, { ...context, rule: Array.isArray(data) ? data[0] : data });
+  } catch { return { admitted: false, reason: "vehicle_context_unavailable" }; }
+}
+
+/** Writes only: is_document/document_category (doc, conf>=0.85), vehicle_vin(+confidence) (qualified reading, never overwrites,
  *  AI confidence capped at 0.79 so an AI read cannot trip the >=0.9 auto-filing in resolveVehicle), ai_detected_angle(+confidence).
  *  Never writes image_type or vehicle_id. Separate UPDATE after the CAS persist so a failure here cannot fail classification. */
-async function persistV98Columns(imageId: string, c: ClassificationResult): Promise<Record<string, unknown>> {
+async function persistV98Columns(imageId: string, c: ClassificationResult, vinAdmission: VinAdmission): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
   try {
     const x = c.v2;
@@ -89,9 +120,9 @@ async function persistV98Columns(imageId: string, c: ClassificationResult): Prom
       if (row.is_document !== true) patch.is_document = true;
       if (row.document_category == null) patch.document_category = x.document_category;
     }
-    if (x.vin && x.vin.checksum_ok && (x.vin.confidence ?? 0) >= 0.8 && !row.vehicle_vin) {
-      patch.vehicle_vin = x.vin.value;
-      patch.vehicle_vin_confidence = Math.min(x.vin.confidence ?? 0.8, 0.79);
+    if (vinAdmission.admitted && vinAdmission.basis === "modern_checksum" && !row.vehicle_vin) {
+      patch.vehicle_vin = vinAdmission.read.value;
+      patch.vehicle_vin_confidence = Math.min(vinAdmission.read.confidence ?? 0.8, 0.79);
     }
     if (x.angle && (x.angle.confidence ?? 0) >= 0.6 && !isDoc && !row.ai_detected_angle) {
       patch.ai_detected_angle = x.angle.value;
@@ -110,14 +141,17 @@ async function persistV98Columns(imageId: string, c: ClassificationResult): Prom
  *    only EMPTY vehicle columns, marks disagreements 'conflicted' and records provenance. Nothing here overwrites a vehicle column.
  *  - vehicle_identifiers via land_identifier_claims (source_kind 'photo', quote + source_image_id + confidence): feeds identifier_consensus.
  *  Only when the photo is already filed to a vehicle (no new filing behaviour). Best effort: never fails classification. */
-async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: string, c: ClassificationResult): Promise<Record<string, number>> {
-  const out = { field_evidence: 0, identifiers: 0 };
+async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: string, c: ClassificationResult, vinAdmission: VinAdmission): Promise<{ field_evidence: number; identifiers: number; vin_refusal?: string; field_refusals: FieldSourceAdmission['refusals'] }> {
+  const out: { field_evidence: number; identifiers: number; vin_refusal?: string; field_refusals: FieldSourceAdmission['refusals'] } = { field_evidence: 0, identifiers: 0, field_refusals: [] };
   try {
     const x = c.v2;
     if (!x || !vehicleId) return out;
+    const admission = await admitPhotoFields(x.vehicle_fields ?? [], c.description, (name, args) => supabase.rpc(name, args));
+    out.field_refusals = admission.refusals;
     const rows: Record<string, unknown>[] = [];
-    for (const f of x.vehicle_fields ?? []) {
-      if ((f.confidence ?? 0) < 0.6 || !f.evidence || !f.value) continue;
+    for (const f of admission.fields) {
+      // VINs must use the dedicated source/format admission, never a generic field that bypasses it.
+      if (f.field_name === "vin" || (f.confidence ?? 0) < 0.6 || !f.evidence || !f.value) continue;
       rows.push({
         vehicle_id: vehicleId, field_name: f.field_name, proposed_value: f.value, source_type: "ai_visual",
         source_confidence: Math.round((f.confidence ?? 0) * 100),
@@ -125,12 +159,14 @@ async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: s
         raw_extraction_data: { photo_id: imageId, image_id: imageId, quote: f.evidence, confidence: f.confidence, extractor: "photo-pipeline-orchestrator", prompt_version: x.prompt_version, image_url: imageUrl },
       });
     }
-    if (x.vin && x.vin.checksum_ok && (x.vin.confidence ?? 0) >= 0.8) {
+    if (vinAdmission.admitted && vinAdmission.basis === "modern_checksum") {
+      const vin = vinAdmission.read;
       rows.push({
-        vehicle_id: vehicleId, field_name: "vin", proposed_value: x.vin.value, source_type: "ai_visual",
-        source_confidence: Math.round(Math.min(x.vin.confidence ?? 0.8, 0.79) * 100),
-        extraction_context: `photo-pipeline v99 VIN (checksum ok): ${x.vin.evidence ?? ""}`.slice(0, 400),
-        raw_extraction_data: { photo_id: imageId, image_id: imageId, quote: x.vin.evidence, confidence: x.vin.confidence, checksum_ok: true, extractor: "photo-pipeline-orchestrator", prompt_version: x.prompt_version, image_url: imageUrl },
+        vehicle_id: vehicleId, field_name: "vin", proposed_value: vin.value, source_type: "ai_visual",
+        source_confidence: Math.round(Math.min(vin.confidence ?? 0.8, 0.79) * 100),
+        extraction_context: `photo-pipeline VIN (${vinAdmission.basis}): ${vin.evidence ?? ""}`.slice(0, 400),
+        raw_extraction_data: { photo_id: imageId, image_id: imageId, quote: vin.evidence, confidence: vin.confidence,
+          ...vinCitation(vinAdmission), extractor: "photo-pipeline-orchestrator", prompt_version: x.prompt_version, image_url: imageUrl },
       });
     }
     if (rows.length) {
@@ -139,17 +175,31 @@ async function landCitedEvidence(vehicleId: string, imageId: string, imageUrl: s
       else out.field_evidence = rows.length;
     }
     const ids: Array<Record<string, unknown>> = [];
-    if (x.vin && x.vin.checksum_ok && (x.vin.confidence ?? 0) >= 0.8) {
-      ids.push({ kind: "vin", value: x.vin.value, quote: x.vin.evidence ?? "VIN read from photo", confidence: Math.min(x.vin.confidence ?? 0.8, 0.79) });
+    if (vinAdmission.admitted) {
+      const vin = vinAdmission.read;
+      ids.push({ kind: vinAdmission.kind, value: vin.value, quote: vin.evidence ?? "VIN read from photo", confidence: Math.min(vin.confidence ?? 0.8, 0.79) });
     }
     if (ids.length) {
-      const { error } = await supabase.rpc("land_identifier_claims", {
-        p_vehicle_id: vehicleId, p_read: { identifiers: ids }, p_source_url: imageUrl, p_extractor: "photo-pipeline-orchestrator-v99",
+      const atomic = vinAdmission.admitted && vinAdmission.basis === "pre1981_physical_plate";
+      const { data, error } = await supabase.rpc("land_identifier_claims", {
+        p_vehicle_id: vehicleId, p_read: { identifiers: ids,
+          ...(atomic ? { cited_vin: { ...vinCitation(vinAdmission), confidence: vinAdmission.read.confidence, prompt_version: x.prompt_version } } : {}) },
+        p_source_url: imageUrl, p_extractor: "photo-pipeline-orchestrator-v99",
         p_source_kind: "photo", p_source_image_id: imageId, p_run_id: null });
-      if (error) console.warn("[photo-pipeline] identifier landing failed (classification unaffected)");
-      else out.identifiers = ids.length;
+      if (error) {
+        console.warn("[photo-pipeline] identifier landing failed (classification unaffected)");
+        if (atomic) out.vin_refusal = "vin_writer_unavailable";
+      } else if (atomic && (data?.status !== "ok" || typeof data?.field_evidence !== "number" || typeof data?.identifiers !== "number"))
+        out.vin_refusal = data?.status && data.status !== "ok" ? data.status : "vin_writer_unavailable";
+      else {
+        out.identifiers = typeof data?.identifiers === "number" ? data.identifiers : ids.length;
+        if (atomic) out.field_evidence += data?.field_evidence ?? 0;
+      }
     }
-  } catch { console.warn("[photo-pipeline] cited evidence landing threw (classification unaffected)"); }
+  } catch {
+    console.warn("[photo-pipeline] cited evidence landing threw (classification unaffected)");
+    if (vinAdmission.admitted && vinAdmission.basis === "pre1981_physical_plate") out.vin_refusal = "vin_writer_unavailable";
+  }
   return out;
 }
 
@@ -186,6 +236,66 @@ Deno.serve(async (req) => {
 
   try {
     const input = await req.json();
+
+    if (input?.processing_mode === "classification_only") {
+      // Supplied coarse reading: validate and retain its before-image before
+      // any metadata receipt can trigger the existing contradiction guard.
+      // No provider fallback, paid type route, filing, field intake or deep queue.
+      try {
+        const result = await recordSuppliedClassification(input, {
+          async authorize() { const writer = await authenticateWriter(req); return writer.ok && writer.caller.kind === "service_role"; },
+          async readImage(id) {
+            const { data, error } = await supabase.from("vehicle_images").select(CLASSIFICATION_SELECT).eq("id", id).maybeSingle();
+            if (error) throw new SuppliedClassificationError("classification_source_unavailable", 503);
+            return data;
+          },
+          async ingest(observation) {
+            const { data, error } = await supabase.functions.invoke("ingest-observation", { body: observation });
+            if (error) throw new SuppliedClassificationError("classification_history_not_persisted", 502);
+            return data;
+          },
+          persist: (id, classificationReceipt, state, metadata, source) => persistImageState(id, classificationReceipt, state, metadata, source),
+        }, receipt(input.image_id, "completed"));
+        return Response.json(result, { headers: corsHeaders });
+      } catch (error) {
+        const sourceChanged = error instanceof Error && error.message === "photo_pipeline_source_changed";
+        const staleAttempt = error instanceof Error && error.message === "photo_pipeline_stale_attempt";
+        return Response.json({ success: false, error: error instanceof SuppliedClassificationError ? error.code : sourceChanged ? "classification_source_changed" : staleAttempt ? "classification_stale_attempt" : "classification_persistence_failed", model_calls: 0 },
+          { status: error instanceof SuppliedClassificationError ? error.status : sourceChanged || staleAttempt ? 409 : 500, headers: corsHeaders });
+      }
+    }
+
+    if (input?.action === "record_reviewed_analysis") {
+      // Supplied review only. This returns before processing status, classification,
+      // filing, type routes, paid handlers, field admission and deep queues.
+      try {
+        const result = await recordReviewedAnalysis(input, {
+          async authorize() {
+            const writer = await authenticateWriter(req);
+            return writer.ok && writer.caller.kind === "service_role";
+          },
+          async readImage(id) {
+            const { data, error } = await supabase.from("vehicle_images").select(REVIEW_SELECT).eq("id", id).maybeSingle();
+            if (error) throw new ReviewedAnalysisError("review_source_unavailable", 503);
+            return data;
+          },
+          async ingest(observation) {
+            const { data, error } = await supabase.functions.invoke("ingest-observation", { body: observation });
+            if (error) throw new ReviewedAnalysisError("review_observation_not_persisted", 502);
+            return data;
+          },
+          async project(observationId) {
+            const { data, error } = await supabase.rpc("project_reviewed_image_analysis", { p_observation_id: observationId });
+            if (error) throw new ReviewedAnalysisError("review_projection_refused", 409);
+            return data;
+          },
+        });
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (error) {
+        return new Response(JSON.stringify({ success: false, error: error instanceof ReviewedAnalysisError ? error.code : "review_persistence_failed", model_calls: 0 }),
+          { status: error instanceof ReviewedAnalysisError ? error.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     if (input?.action === "classifier_assay") return await runClassifierAssay(req, input, supabase);
     // The checklist for a reader that runs the classification elsewhere (the owner's subscription worker): the same
@@ -588,11 +698,14 @@ Deno.serve(async (req) => {
 
     supabase.rpc("photo_pipeline_clear_retry", { p_image_id: image_id }).then(() => {}, () => {});
     // v98: persist the new columns (separate best-effort write) and close the capture-step trail.
-    const v98Written = await persistV98Columns(image_id, classification);
-    const cited = resolvedVehicleId ? await landCitedEvidence(resolvedVehicleId, image_id, image_url, classification) : { field_evidence: 0, identifiers: 0 };
+    const vinAdmission = await resolveVinAdmission(resolvedVehicleId, image_id, classification);
+    const v98Written = await persistV98Columns(image_id, classification, vinAdmission);
+    const cited = resolvedVehicleId ? await landCitedEvidence(resolvedVehicleId, image_id, image_url, classification, vinAdmission) : { field_evidence: 0, identifiers: 0, field_refusals: [] };
     await reportStep(image_id, "done", { image_type: classification.image_type, confidence: classification.confidence,
       model: classification.classifier_receipt?.model ?? null, prompt_version: classification.classifier_receipt?.prompt_version ?? "legacy",
-      v98_columns: Object.keys(v98Written), cited_field_evidence: cited.field_evidence, cited_identifiers: cited.identifiers });
+      v98_columns: Object.keys(v98Written), cited_field_evidence: cited.field_evidence, cited_identifiers: cited.identifiers,
+      cited_field_refusals: cited.field_refusals,
+      vin_admission: cited.vin_refusal ?? (vinAdmission.admitted ? vinAdmission.basis : vinAdmission.reason) });
 
     // Late-resolution dedup pass: Step 1.5 could only see this row in the
     // detector's corpus if it was INSERTed with a vehicle_id. When the vehicle

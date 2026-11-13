@@ -30,10 +30,12 @@ export function Strip({ coverage, children, ariaLabel }: { coverage: Coverage; c
   </div>;
 }
 
-/** A dimension member on the strip. Opens whatever the caller passes for its drill. */
-export function Facet({ label, expanded, onClick, ariaLabel }: { label: string; expanded: boolean; onClick: () => void; ariaLabel?: string }) {
-  return <button type="button" className="k-facet" aria-haspopup="dialog" aria-expanded={expanded} aria-label={ariaLabel ?? label} onClick={onClick}>
-    <Text role="label">{label}</Text>
+/** A dimension member on the strip, or (gap) a dimension with no member yet. Opens whatever the caller passes for its drill. */
+/** A header token. `status` marks a value the record does not hold but the token's lead item does (reading, claim ...). */
+export function Facet({ label, expanded, onClick, ariaLabel, gap = false, status }: { label: string; expanded: boolean; onClick: () => void; ariaLabel?: string; gap?: boolean; status?: string }) {
+  return <button type="button" className={gap ? 'k-facet k-facet--gap' : 'k-facet'} aria-haspopup="dialog" aria-expanded={expanded} aria-label={ariaLabel ?? label} onClick={onClick}>
+    <Text role="label">{gap ? `${label} \u2014` : label}</Text>
+    {status && status !== 'established' && <span className="k-status" data-status={status}>{status}</span>}
   </button>;
 }
 

@@ -122,4 +122,38 @@ final class GarageTests: XCTestCase {
         XCTAssertEqual(targets.count, 3)
         XCTAssertEqual(ClientFaceSection.postable(targets).map(\.model), ["Coupe"])
     }
+
+    func testOwnerStatementNeverMakesAContributionOwned() throws {
+        let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(GarageFixtures.ownerStatementOnContribution.utf8))
+        let rows = GarageVehicle.applying(corrections, to: try garage())
+        let k20 = try XCTUnwrap(rows.first { $0.vehicle_id.hasSuffix("0003") })
+        XCTAssertEqual(k20.relationship, "contributor", "the server's relationship stands")
+        XCTAssertFalse(GarageRelation.isOwned(k20))
+        XCTAssertEqual(GarageRelation.postEntry(k20, signedIn: true), .inspect)
+        XCTAssertEqual(k20.relationshipDetail, "You stated: owner", "the statement is shown as its own fact")
+        let s = GarageSections(rows)
+        XCTAssertEqual(s.owned.map(\.model), ["Coupe"])
+        XCTAssertEqual(s.contributed.map(\.model), ["Hot Rod"])
+    }
+
+    func testOwnerStatementOnAServerOwnedCarKeepsItOwned() throws {
+        let statement = GarageFixtures.ownerStatementOnContribution
+            .replacingOccurrences(of: "000000000003", with: "000000000001")
+        let corrections = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(statement.utf8))
+        let owned = try XCTUnwrap(GarageVehicle.applying(corrections, to: try garage()).first { $0.vehicle_id.hasSuffix("0001") })
+        XCTAssertEqual(owned.relationship, "owner")
+    }
+
+    func testDocumentingHasItsOwnLabelBesideContributions() throws {
+        let rows = try JSONDecoder().decode([GarageVehicle].self, from: Data(GarageFixtures.garageWithDocumenting.utf8))
+        let s = GarageSections(rows)
+        XCTAssertEqual(s.documenting.map(\.model), ["356C"])
+        XCTAssertTrue(s.other.isEmpty, "documenting is not an interest")
+        XCTAssertEqual(s.owned.map(\.model), ["Coupe"])
+        XCTAssertEqual(s.parts, "1 owned · 1 contributed · 1 documenting")
+        let car = try XCTUnwrap(s.documenting.first)
+        XCTAssertEqual(car.relationshipLabel, "Documenting")
+        XCTAssertEqual(GarageRelation.line(car), "You're documenting it — not recorded as yours")
+        XCTAssertEqual(GarageRelation.postEntry(car, signedIn: true), .inspect)
+    }
 }

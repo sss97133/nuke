@@ -1,15 +1,17 @@
 import { financialCandidateContext } from "./financialCandidateContext.ts";
 import { processFinancialEvidence } from "./financialProcessing.ts";
+import { PROJECTION_ACTIONS, privateProjection } from "./privateProjection.ts";
 /** Private original custody + attributed financial cells; never an expense posting. */
 export const FINANCIAL_EVIDENCE_MODE = "financial_evidence_v1";
 type Client = { storage: { getBucket(bucket: string): Promise<{ data: { public: boolean } | null; error: unknown }>; from(bucket: string): { download(path: string): Promise<{ data: Blob | null; error: unknown }> } }; rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> };
 export function financialActor(caller: { kind: string; userId?: string | null; scopes?: string[] }, action: string): string | null {
   if (!["user", "api_key"].includes(caller.kind) || !caller.userId) return null;
-  if (caller.kind === "api_key" && !caller.scopes?.includes(["read", "tax_read"].includes(action) ? "read" : "write")) return null;
+  if (caller.kind === "api_key" && !caller.scopes?.includes(["read", "tax_read", "projection_read"].includes(action) ? "read" : "write")) return null;
   return caller.userId;
 }
 export async function ingestFinancialEvidence(db: Client, userId: string, input: unknown, stillAuthorized: () => Promise<boolean>, actorContext: { kind: string; agent_id?: string | null; [key: string]: unknown } = { kind: "user" }): Promise<{ status: number; body: Record<string, unknown> }> {
   const body = input as Record<string, any>;
+  if (PROJECTION_ACTIONS.includes(body?.action)) return privateProjection(db, userId, input, stillAuthorized, actorContext as { kind: string; agent_id?: string | null });
   if (body?.action === "process") {
     const processed = await processFinancialEvidence(db, userId, input, stillAuthorized,
       original => ingestFinancialEvidence(db, userId, original, stillAuthorized, actorContext));

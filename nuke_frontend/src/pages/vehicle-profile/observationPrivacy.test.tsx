@@ -44,7 +44,11 @@ vi.mock('../../lib/supabase', () => ({
       };
       return query;
     },
-    rpc: () => ({ abortSignal: () => Promise.resolve({ data: null, error: null }) }),
+    rpc: (name: string) => ({ abortSignal: () => Promise.resolve({
+      data: name === 'get_vehicle_specs' ? [{ vehicle_id: 'vehicle-example', schema_version: 'vehicle_data_model_v1',
+        native_listing_history: { reader: 'cc_native_profile_history_v1', capture_limit: 50, has_more_captures: false, entries: [] } }] : null,
+      error: null,
+    }) }),
   },
 }));
 vi.mock('react-router-dom', async (original) => ({

@@ -42,15 +42,58 @@ jobs:
           supabase/functions/ingest-observation/financialCandidateContext_test.ts
           supabase/functions/ingest-observation/financialPngPixels.test.ts
       - name: Install native source-processing build dependencies
+        timeout-minutes: 12
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            build-essential pkg-config libcairo2-dev libpango1.0-dev \
-            libjpeg-dev libgif-dev librsvg2-dev
+          set -o pipefail
+          apt_options=(-o Acquire::Retries=0 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+          native_deps=(build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev)
+          missing_deps=()
+          for package in "${native_deps[@]}"; do
+            if ! package_status=$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null) || [[ "$package_status" != 'install ok installed' ]]; then
+              missing_deps+=("$package")
+            fi
+          done
+          if (( ${#missing_deps[@]} == 0 )); then
+            echo 'All seven native build packages are fully installed; using the runner packages.'
+            exit 0
+          fi
+          printf 'Missing native build packages: %s\n' "${missing_deps[*]}"
+          apt_log=$(mktemp)
+          install_native_deps() {
+            sudo timeout --kill-after=15s 120s apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update &&
+            sudo timeout --kill-after=15s 240s apt-get "${apt_options[@]}" install --no-install-recommends -y "${native_deps[@]}"
+          }
+          if install_native_deps 2>&1 | tee "$apt_log"; then exit 0; fi
+          if ! grep -Eq "(Temporary failure resolving|Could not resolve) ['\"]?azure\.archive\.ubuntu\.com['\"]?([[:space:]]|$)" "$apt_log"; then exit 1; fi
+          ubuntu_codename=$(. /etc/os-release && printf '%s' "$VERSION_CODENAME")
+          [[ "$ubuntu_codename" =~ ^[a-z]+$ ]] || { echo 'Unknown Ubuntu codename; refusing mirror change.'; exit 1; }
+          echo 'Azure Ubuntu mirror DNS failed; checking the Linux Kernel Archives Ubuntu mirror.'
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+            --output /dev/null "https://mirrors.edge.kernel.org/ubuntu/dists/$ubuntu_codename/InRelease"
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          import re
+          # The runner uses apt-mirrors.txt; retain support for Ubuntu's direct source formats.
+          paths = [Path('/etc/apt/apt-mirrors.txt'), Path('/etc/apt/sources.list'), Path('/etc/apt/sources.list.d/ubuntu.sources')]
+          changed = 0
+          for path in paths:
+              if not path.is_file():
+                  continue
+              before = path.read_text()
+              after, count = re.subn(r'(?<!\S)https?://azure\.archive\.ubuntu\.com(/ubuntu/?)(?=\s|$)', r'https://mirrors.edge.kernel.org\1', before)
+              if count:
+                  path.write_text(after)
+                  changed += count
+          if not changed:
+              raise SystemExit('No matching Azure Ubuntu source URI; refusing an unrelated source rewrite.')
+          PY
+          install_native_deps
       - name: Install locked source-processing dependencies
         run: npm ci
       - name: Verify actual BaT extractor canonical identity and stream fencing
         run: node --test scripts/test-bat-vehicle-identity.mjs scripts/test-bat-inventory-price-custody.mjs
+      - name: Verify receipt product identity and catalog parsing
+        run: node --test supabase/functions/_shared/receiptProductCapture.test.mjs
       - name: Verify deterministic source masking and metadata removal
         run: node --test scripts/receipts/redacted-source.test.mjs
 
@@ -65,6 +108,20 @@ jobs:
           node-version: '25'
       - name: Verify immutable assets, retry receipts and revision discovery
         run: node --test scripts/ingest-autotrader-history.test.mjs
+
+  subscription-reader-heartbeat-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js for the subscription reader heartbeat
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify the reader heartbeat, the readers' stage-queue receipts and the stage ledger's static rules
+        run: node --test scripts/photo-pipeline/reader-heartbeat.test.mjs scripts/photo-pipeline/stage-queue.test.mjs scripts/photo-pipeline/subscription-frame-classifier.test.mjs scripts/photo-pipeline/subscription-document-reader.test.mjs scripts/ci/image-stage-receipts-migration.test.mjs
+      - name: Verify subscription reading admission and conflicting retries
+        run: python3 -m unittest discover -s scripts/photo-pipeline -p 'test_codex_image_analysis_ingest.py'
 
   broadcast-overlay-contract:
     runs-on: ubuntu-latest
@@ -116,6 +173,17 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_public_live_events.sql
           psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_live_relisted_lot_fold.sql
           deno test --node-modules-dir=none --allow-env --allow-read --allow-run=psql --filter PostgreSQL supabase/functions/ingest-observation/batLiveCollector.test.ts
+      - name: Verify component intake through PostgreSQL and the existing build-log consumer
+        env:
+          RUN_COMPONENT_PG: '1'
+          PGDATABASE: dm_refinement_component_ci
+          PGPORT: '5432'
+        run: |
+          set -euo pipefail
+          trap 'dropdb --if-exists dm_refinement_component_ci; psql -X -v ON_ERROR_STOP=1 -d postgres -c "DROP ROLE IF EXISTS anon, authenticated, service_role"' EXIT
+          createdb dm_refinement_component_ci
+          psql -X -v ON_ERROR_STOP=1 -f supabase/sql/test_component_evidence.sql
+          PSQL_BIN="$(command -v psql)" deno test --node-modules-dir=none --allow-env --allow-run=psql supabase/functions/ingest-observation/componentEvidencePostgres.test.ts
       - name: Run each database contract in its own fresh database
         run: scripts/ci/run-db-contracts.sh --ci-service
 
@@ -166,6 +234,10 @@ jobs:
         run: createdb dm_pulse_bounded_ci
       - name: Verify exact capped and unavailable pulse readings
         run: psql -X -v ON_ERROR_STOP=1 -d dm_pulse_bounded_ci -f supabase/sql/test_bounded_pipeline_pulse.sql
+      - name: Create disposable visual claim admission database
+        run: createdb dm_refinement_visual_claims_ci
+      - name: Verify visual claims remain pending without canonical promotion
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_visual_claims_ci -f supabase/sql/test_visual_claim_auto_accept.sql
       - name: Setup Node.js for operator monitor contracts
         uses: actions/setup-node@v4
         with:
@@ -515,6 +587,11 @@ jobs:
           node-version: '22'
       - name: Verify cached image projection receipts (offline)
         run: node --test scripts/deep-image-analysis-byok.test.mjs scripts/lib/image-property-projection.test.mjs scripts/lib/cached-image-worker.test.mjs scripts/daily-receipt/byok-drain.test.mjs
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify bounded subscription review and guarded admission (offline)
+        run: deno test --node-modules-dir=none --allow-read --allow-write --allow-env --allow-run scripts/daily-receipt/reviewed-image-batch_test.ts
       - name: Create disposable cached-image ancestry database
         run: createdb dm_refinement_image_ancestry
       - name: Verify actual cached-image migration, intake and public reader ancestry
@@ -591,7 +668,9 @@ jobs:
       - name: Verify the one map's areas and area reads come from map_facts only, bounded and shaped whole
         run: deno test --node-modules-dir=none supabase/functions/map-vehicles/facts.test.ts
       - name: Verify archiveFetch cache hits any successful snapshot and does not archive large lot pages as login walls
-        run: deno test --no-check --node-modules-dir=none --allow-env --allow-net --allow-read supabase/functions/_shared/archiveFetch.cache.test.ts supabase/functions/_shared/archiveFetch.nul.test.ts supabase/functions/_shared/archiveFetch.retention.test.ts supabase/functions/_shared/firecrawlGate.test.ts supabase/functions/_shared/batFetcher.test.ts
+        run: deno test --no-check --node-modules-dir=none --allow-env --allow-net --allow-read supabase/functions/_shared/archiveFetch.cache.test.ts supabase/functions/_shared/archiveFetch.nul.test.ts supabase/functions/_shared/archiveFetch.retention.test.ts supabase/functions/_shared/firecrawlGate.test.ts supabase/functions/_shared/firecrawlMeter.test.ts supabase/functions/index-reference-document/catalogStockImage.test.ts supabase/functions/_shared/batFetcher.test.ts
+      - name: Verify maximum stock image within a bounded heap
+        run: deno test --node-modules-dir=none --allow-env --v8-flags=--max-old-space-size=128 --filter 'maximum allowed remote image' supabase/functions/index-reference-document/catalogStockImage.test.ts
       - name: Verify the live board readers for PCarMarket and Bonhams
         run: deno test --node-modules-dir=none --allow-read --allow-env supabase/functions/sync-live-auctions/boards.test.ts supabase/functions/sync-live-auctions/batEpisodeState.test.ts supabase/functions/sync-live-auctions/pcarBidCapture.test.ts supabase/functions/sync-live-auctions/ccBidCapture.test.ts supabase/functions/sync-live-auctions/ccEpisodeState.test.ts supabase/functions/sync-live-auctions/ccSnapshotTransition.test.ts supabase/functions/_shared/vehicleEventWrite.test.ts
 
@@ -631,7 +710,7 @@ jobs:
       - name: Verify registered contributor review uses retained sources and fenced leases
         run: |
           deno check --node-modules-dir=none supabase/functions/contributor-intake/index.ts supabase/functions/derive-dispatch/index.ts
-          deno test --node-modules-dir=none --allow-env supabase/functions/contributor-intake/reviewWork.test.ts supabase/functions/derive-dispatch/handler.test.ts
+          deno test --node-modules-dir=none --allow-env supabase/functions/contributor-intake/reviewWork.test.ts supabase/functions/derive-dispatch/handler.test.ts supabase/functions/index-reference-document/receiptProducts.test.ts
       - name: Verify listing packages preserve contributor sources, supersession and private evidence boundaries
         run: |
           deno check --node-modules-dir=none supabase/functions/generate-listing-package/index.ts supabase/functions/compute-vehicle-valuation/index.ts
@@ -652,7 +731,7 @@ jobs:
           deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/api-v1-vehicles/sourceProfile.test.ts
           node --test scripts/ecr-retained-replay.test.mjs
       - name: Verify native dealer microdata, source qualification and canonical replay
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/_shared/vin-decoder-native.test.ts supabase/functions/ingest/dealer.test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/_shared/vin-decoder-native.test.ts supabase/functions/api-v1-vin-lookup/vinRequest.test.ts supabase/functions/ingest/dealer.test.ts
       - name: Verify native Gateway browser evidence, admission and replay
         run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/gatewayParser.test.ts supabase/functions/ingest/gateway.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched
@@ -771,9 +850,11 @@ jobs:
       - name: Verify batch-extract-snapshots never calls the model under no_ai, ends queue rows with no vehicle, and does not fail a row on a price or VIN the database refuses
         run: deno test --allow-read=supabase/functions/batch-extract-snapshots supabase/functions/batch-extract-snapshots/aiGate.test.ts supabase/functions/batch-extract-snapshots/writeRules.test.ts
       - name: Verify photo-pipeline-orchestrator files a photo only through attribute_testimony and writes no upload-clock suggestion
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/orchestrator_test.ts supabase/functions/photo-pipeline-orchestrator/persistence_test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/orchestrator_test.ts supabase/functions/photo-pipeline-orchestrator/persistence_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedAnalysisHandler_test.ts supabase/functions/photo-pipeline-orchestrator/reviewedIntakeChain_test.ts
       - name: Verify a reader's classification is validated like a provider answer and never throws
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/readerClassification_test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/readerClassification_test.ts supabase/functions/photo-pipeline-orchestrator/suppliedClassificationHandler_test.ts supabase/functions/photo-pipeline-orchestrator/suppliedClassificationIntakeChain_test.ts
+      - name: Verify physical VIN admission keeps source, era, checksum and photo-filing boundaries
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/vinAdmission_test.ts supabase/functions/photo-pipeline-orchestrator/v101_orchestrator_contract_test.ts supabase/functions/photo-pipeline-orchestrator/v101_router_contract_test.ts
       - name: Verify image comparisons retain per-photo evidence without forced identity or eligibility changes
         run: deno test --no-config --no-remote --no-npm --no-lock supabase/functions/check-image-vehicle-match/decision_test.ts
       - name: Verify private subject custody, admission projections, replay and current-source readers
@@ -1063,6 +1144,12 @@ jobs:
           deno-version: v2.x
       - name: Verify reply-email sends for the service key or an active admin only, before any provider call
         run: deno test --node-modules-dir=none --allow-env --allow-net supabase/functions/_shared/writeGuard.test.ts supabase/functions/reply-email/handler.test.ts
+      - name: Verify the outbound gate holds every message to a recipient off the allowlist (off, internal_only, live)
+        run: deno test --no-check --node-modules-dir=none --allow-env --allow-net supabase/functions/_shared/outbound.test.ts supabase/functions/_shared/email.test.ts
+      - name: No edge function reaches a message provider except through the outbound gate
+        run: |
+          node --test scripts/guardrails/check-outbound-gate.test.mjs
+          node scripts/guardrails/check-outbound-gate.mjs
 
   vision-listing-read:
     runs-on: ubuntu-latest

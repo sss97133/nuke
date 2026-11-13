@@ -20,6 +20,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireOwnerOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { resendAuthProbe, twilioAccountRead } from "../_shared/outbound.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = projectSecretKey()!;
@@ -36,36 +37,26 @@ interface VendorResult {
 // Twilio
 // ---------------------------------------------------------------------------
 async function checkTwilio(): Promise<VendorResult> {
-  const sid = Deno.env.get('TWILIO_ACCOUNT_SID');
-  const token = Deno.env.get('TWILIO_AUTH_TOKEN');
-
-  if (!sid || !token || sid.startsWith('your-')) {
-    return { vendor: 'Twilio', status: 'unknown', balance: null, note: 'Credentials not configured' };
-  }
-
   try {
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Balance.json`,
-      { headers: { Authorization: 'Basic ' + btoa(`${sid}:${token}`) } },
-    );
+    const bal = await twilioAccountRead('Balance.json');
+    if (!bal.configured) {
+      return { vendor: 'Twilio', status: 'unknown', balance: null, note: 'Credentials not configured' };
+    }
 
-    if (res.status === 401) {
-      // Could be suspended or wrong creds — check account status
-      const acctRes = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${sid}.json`,
-        { headers: { Authorization: 'Basic ' + btoa(`${sid}:${token}`) } },
-      );
-      const note = acctRes.status === 401
+    if (bal.status === 401) {
+      // Could be suspended or wrong creds: check account status
+      const acct = await twilioAccountRead('.json');
+      const note = acct.status === 401
         ? 'Auth failed — credentials may be wrong or account suspended'
-        : `HTTP ${res.status}`;
+        : `HTTP ${bal.status}`;
       return { vendor: 'Twilio', status: 'suspended', balance: null, note, error: note };
     }
 
-    if (!res.ok) {
-      return { vendor: 'Twilio', status: 'unknown', balance: null, note: `HTTP ${res.status}`, error: `HTTP ${res.status}` };
+    if (bal.status === undefined || bal.status < 200 || bal.status > 299) {
+      return { vendor: 'Twilio', status: 'unknown', balance: null, note: `HTTP ${bal.status}`, error: `HTTP ${bal.status}` };
     }
 
-    const data = await res.json();
+    const data = (bal.data ?? {}) as { balance?: string; currency?: string };
     const balance = parseFloat(data.balance ?? '0');
     const currency = data.currency ?? 'USD';
     const status = balance < 0 ? 'suspended' : balance < 10 ? 'degraded' : 'active';
@@ -118,37 +109,15 @@ async function checkOpenAI(): Promise<VendorResult> {
 // Resend
 // ---------------------------------------------------------------------------
 async function checkResend(): Promise<VendorResult> {
-  const key = Deno.env.get('RESEND_API_KEY');
-
-  if (!key || key.startsWith('your-') || key.startsWith('re_placeholder')) {
-    return { vendor: 'Resend', status: 'unknown', balance: null, note: 'API key not configured' };
-  }
-
   try {
-    // Resend send-only keys return 401 on all GET endpoints (not just 403).
-    // Validate by attempting a send with a known-invalid address — auth errors
-    // return "Unauthorized" (code: missing_api_key/invalid_api_key), while
-    // a valid key returns a validation error about the address/domain.
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: 'health-check@nuke.ag',
-        to: ['health-check-probe@nuke.ag'],
-        subject: 'health check probe',
-        html: '<p>probe</p>',
-      }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    // 401 / 403 = auth failure
-    if (res.status === 401 || res.status === 403) {
-      return { vendor: 'Resend', status: 'suspended', balance: null, note: 'Invalid API key', error: `HTTP ${res.status}` };
+    // Read-only: list domains. This used to send a real probe email; no email is sent now. A send-only key
+    // answers 401 "restricted_api_key", which still proves the key is valid.
+    const probe = await resendAuthProbe();
+    if (!probe) return { vendor: 'Resend', status: 'unknown', balance: null, note: 'API key not configured' };
+    const authFailed = (probe.status === 401 && probe.errorName !== 'restricted_api_key') || probe.status === 403;
+    if (authFailed) {
+      return { vendor: 'Resend', status: 'suspended', balance: null, note: 'Invalid API key', error: `HTTP ${probe.status}` };
     }
-
-    // 422 / 400 = auth OK, just a domain/address validation error — key is valid
-    // 200 / 201 = actually sent (unexpected but fine)
     return { vendor: 'Resend', status: 'active', balance: null, note: 'Auth OK — usage-based, no balance endpoint' };
   } catch (err) {
     return { vendor: 'Resend', status: 'unknown', balance: null, note: String(err), error: String(err) };
