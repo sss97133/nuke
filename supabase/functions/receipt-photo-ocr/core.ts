@@ -56,6 +56,7 @@ export interface Deps {
   classify: (url: string) => Promise<Classification>;
   extract: (url: string, docType: string) => Promise<Extraction>;
   fetchBytes: (url: string) => Promise<{ bytes: Uint8Array; contentType: string }>;
+  fetchStoredBytes: (path: string) => Promise<Uint8Array>;
   upload: (path: string, bytes: Uint8Array, contentType: string) => Promise<{ error: string | null }>;
   upsertPage: (row: CapturePageRow) => Promise<{ error: string | null }>;
   land: (owner: string, vehicle: string, run: string, docs: LandEnvelope) => Promise<LandDocumentResult>;
@@ -327,7 +328,6 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
   if (!userId) return { status: 422, image_id: imageId, page: false, landed: false, line_items_count: 0, parts_found: 0, error: "frame has no owner" };
   const vehicleId = frame.vehicle_id ?? (isUuid(body.vehicle_id) ? body.vehicle_id : null);
   const url = frame.image_url || body.image_url || null;
-  if (!url) return { status: 422, image_id: imageId, page: false, landed: false, line_items_count: 0, parts_found: 0, error: "frame has no image url" };
   const base = deps.env("SUPABASE_URL") || "";
 
   // Already recorded and nothing new to do: a page with no vehicle waits for one.
@@ -340,6 +340,22 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
       run_id: existing.run_id ?? undefined,
     };
   }
+
+  // A retained page is the original byte witness. Replay must not silently replace it with a later public object.
+  const retained = existing?.extraction ?? {};
+  const hasRetained = !!existing;
+  if (hasRetained && (
+    typeof retained.storage_path !== "string" ||
+    !["heic", "jpg", "png", "webp", "gif"].some((ext) => retained.storage_path === pagePath(userId, imageId, ext)) ||
+    typeof retained.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(retained.sha256) ||
+    !Number.isSafeInteger(retained.byte_size) || Number(retained.byte_size) < 1 || Number(retained.byte_size) > 52_428_800
+  )) {
+    return { status: 409, image_id: imageId, page: true, landed: false, line_items_count: 0, parts_found: 0, error: "retained page metadata does not match this owner and image" };
+  }
+  if (existing && !hasProvided && !existing.doc_type) {
+    return { status: 409, image_id: imageId, page: true, landed: false, line_items_count: 0, parts_found: 0, error: "retained document type missing; a reader result is required" };
+  }
+  if (!hasRetained && !url) return { status: 422, image_id: imageId, page: false, landed: false, line_items_count: 0, parts_found: 0, error: "frame has no image url" };
 
   // 1. Read the document.
   let docType: string;
@@ -365,6 +381,7 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
   } else {
     const hinted = typeof body.document_type_hint === "string" && body.document_type_hint ? body.document_type_hint
       : typeof frame.doc_type_hint === "string" && frame.doc_type_hint && frame.doc_type_hint !== "other" ? frame.doc_type_hint : null;
+    if (!url) return { status: 422, image_id: imageId, page: !!existing, landed: false, line_items_count: 0, parts_found: 0, error: "frame has no image url for document read" };
     const cls = hinted ? { document_type: hinted, confidence: 1 } : await deps.classify(url);
     docType = (cls.document_type || "other").toLowerCase();
     confidence = normaliseConfidence(cls.confidence);
@@ -374,13 +391,29 @@ export async function handle(body: RouteBody, deps: Deps): Promise<RouteResult> 
     data = sanitizeExtraction(raw) as Extraction;
   }
 
-  // 2. The page's bytes, into the private bucket under the owner.
-  const { bytes, contentType } = await deps.fetchBytes(url);
-  const ext = extFor(contentType, frame.file_name);
-  const storagePath = pagePath(userId, imageId, ext);
-  const up = await deps.upload(storagePath, bytes, mimeFor(ext));
-  if (up.error) return { status: 502, image_id: imageId, page: false, landed: false, line_items_count: 0, parts_found: 0, error: `upload failed: ${up.error}` };
-  const sha256 = await deps.sha256(bytes);
+  // 2. Verify the retained private bytes on replay; copy the source only on first admission.
+  let bytes: Uint8Array;
+  let storagePath: string;
+  let sha256: string;
+  if (hasRetained) {
+    storagePath = retained.storage_path as string;
+    try { bytes = await deps.fetchStoredBytes(storagePath); }
+    catch (_e) {
+      return { status: 502, image_id: imageId, page: true, landed: false, line_items_count: 0, parts_found: 0, error: "retained private page unavailable; retry without replacing the original" };
+    }
+    sha256 = await deps.sha256(bytes);
+    if (bytes.byteLength !== retained.byte_size || sha256 !== retained.sha256) {
+      return { status: 409, image_id: imageId, page: true, landed: false, line_items_count: 0, parts_found: 0, error: "retained private page integrity mismatch" };
+    }
+  } else {
+    const source = await deps.fetchBytes(url!);
+    bytes = source.bytes;
+    const ext = extFor(source.contentType, frame.file_name);
+    storagePath = pagePath(userId, imageId, ext);
+    const up = await deps.upload(storagePath, bytes, mimeFor(ext));
+    if (up.error) return { status: 502, image_id: imageId, page: false, landed: false, line_items_count: 0, parts_found: 0, error: `upload failed: ${up.error}` };
+    sha256 = await deps.sha256(bytes);
+  }
 
   // 3. The page row.
   const runId = existing?.run_id ?? deps.runId();

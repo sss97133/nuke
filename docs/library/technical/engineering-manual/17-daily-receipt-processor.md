@@ -128,3 +128,22 @@ dotenvx run -- node scripts/daily-receipt/build-day.mjs \
 - `docs/library/prompts/P10-day-card-seven-level-analysis.md` — narrative composer spec
 - `docs/library/reference/encyclopedia/03-timeline-architecture.md` — how the per-day data composes into a vehicle's timeline
 - `TOOLS.md` — existing tools (do not duplicate)
+
+## Photographed document replay: retained bytes (2026-11-09)
+
+The current photographed-document route is `receipt-photo-ocr`, with
+`capture_document_pages` retaining the sanitized reading and private page reference.
+Previously, associating an already-read page with a vehicle fetched the original photo
+again and uploaded over its private copy. A missing or changed original could prevent
+replay or replace the byte witness even though a private copy already existed.
+
+The prepared repair verifies the retained copy's exact owner/image path, recorded size
+and SHA-256 before using the existing `land_document_pages` writer. It does not fetch
+the original or upload on replay. Missing bytes are a retryable failure; mismatched or
+incomplete metadata is a refusal, with the existing page preserved. Legacy pages need
+their evidence recovered explicitly rather than an automatic replacement from a URL.
+
+Validation uses local fixtures, including writer refusal and duplicate admission; no
+real photo downloads, relanding or runtime verification are established by these tests.
+Non-money pages marked as vehicle documents still need their existing writer/reader
+integration; this replay repair does not make them visible on a vehicle profile.
