@@ -727,6 +727,8 @@ struct VehicleDetailView: View {
                         valuationSection.id("worth")
                         saleHistorySection.id("sales")
                         beforeAfterSection
+                        // What the listing's commenters wrote: the stored summary the web profile's card reads.
+                        VehicleCommentSummarySection(vehicleId: vehicleId).id("comments")
                         // Money is never anonymous (owner rule; web #1001/#1007, source gate #1037:
                         // owner, uploader or contributor read it). The viewer is the database's
                         // verdict from vehicle_profile_read, never a client guess, and a missing
