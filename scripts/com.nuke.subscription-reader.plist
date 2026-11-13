@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.subscription-reader</string>
+
+    <!-- The owner's subscription readers (2026-11-08, owner decision: "ai read should be fueled by my subscription").
+         Each fire: a bounded batch of photographed documents through receipt-photo-ocr and a bounded batch of
+         unclassified photos through photo-pipeline-orchestrator, both read with `claude -p` under the owner's Claude
+         Code login on this Mac. Runs in the login shell (full network, outside Claude Code's sandbox). The wrapper
+         refreshes ~/.worktrees/nuke-main from origin/main each fire and writes a heartbeat row per reader to
+         job_assay_readings. Install: cp scripts/com.nuke.subscription-reader.plist ~/Library/LaunchAgents/ &&
+         launchctl load ~/Library/LaunchAgents/com.nuke.subscription-reader.plist -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/.worktrees/nuke-main/scripts/photo-pipeline/subscription-reader-batch.sh</string>
+        <string>20</string>
+        <string>20</string>
+    </array>
+
+    <!-- 10 min between fires: 40 reads a fire at ~10-40 s each keeps each fire under the interval; the wrapper skips a
+         fire while a reader is still running. -->
+    <key>StartInterval</key>
+    <integer>600</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/subscription-reader.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/subscription-reader.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>

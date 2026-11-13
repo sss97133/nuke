@@ -4,6 +4,8 @@
 .garage-page h3 { margin: 0 0 8px; font-size: 16px; }
 .garage-heading, .garage-toolbar-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .garage-heading { margin-bottom: 20px; }
+.garage-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.garage-heading-actions .btn-base { min-height: 44px; display: inline-flex; align-items: center; }
 .garage-heading p { margin: 4px 0 0; color: var(--text-secondary); }
 .garage-toolbar, .garage-notice, .garage-empty, .garage-unresolved { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); margin-bottom: 20px; }
 .garage-toolbar-heading { margin-bottom: 16px; }
@@ -23,6 +25,7 @@
 .garage-sections { display: flex; flex-direction: column; gap: 24px; }
 .garage-section-heading { display: flex; align-items: baseline; gap: 8px; }
 .garage-section-heading span, .garage-unresolved h2 span { color: var(--text-secondary); font-size: var(--text-callout); font-variant-numeric: tabular-nums; }
+.garage-section-note { margin: 0 0 8px; color: var(--text-secondary); font-size: var(--text-callout); }
 .garage-vehicles { display: grid; gap: 12px; min-width: 0; }
 .garage-view-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
 .garage-vehicle-card { min-width: 0; border-radius: var(--radius-lg); overflow: hidden; }

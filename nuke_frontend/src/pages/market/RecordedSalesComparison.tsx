@@ -33,10 +33,12 @@ function CountBucket({ point, name, max, refused, active, onClick }: {
 }
 
 /** The cohort select and the view pair for the market strip. Driven by the URL through its props; no state of its own. */
-export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onViewChange, children }: {
+export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onViewChange, children, makeSelect = true }: {
   make: string | null; scopeKey: string | null; view: 'inventory' | 'sales';
   onMakeChange: (make: string | null, scopeKey?: string | null) => void; onViewChange: (view: 'inventory' | 'sales') => void;
   children?: React.ReactNode;
+  /** False when the host offers the make another way (the live board's rows and map). */
+  makeSelect?: boolean;
 }) {
   const catalog = useSalesScopes();
   const options = catalog.data ?? [];
@@ -54,7 +56,7 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
       </button>)}
       {children}
     </div>
-    <label className="market-scope__cohort"><Text role="label">Make</Text>
+    {makeSelect && <label className="market-scope__cohort"><Text role="label">Make</Text>
       <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
         onChange={e => onMakeChange(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null)}>
         <option value="">{view === 'inventory' ? 'All makes' : 'Choose a make or grouping'}</option>
@@ -62,7 +64,7 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
         <optgroup label="Make populations">{options.filter(o => o.scope.kind === 'canonical_make').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>
         {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
       </select>
-    </label>
+    </label>}
   </>;
 }
 

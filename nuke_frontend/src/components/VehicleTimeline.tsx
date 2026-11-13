@@ -437,7 +437,7 @@ const VehicleTimeline: React.FC<{
       // Load auction activity dates (comments and events)
       const { data: auctionDataRaw, error: auctionErr } = await supabase
         .from('auction_comments')
-        .select('posted_at, comment_type, bid_amount, is_leading_bid')
+        .select('posted_at, comment_type, bid_amount, is_leading_bid,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
         .eq('vehicle_id', vehicleId)
         .order('posted_at', { ascending: false })
         .limit(5000);
@@ -448,7 +448,7 @@ const VehicleTimeline: React.FC<{
       let auctionTimelineEvents: any[] = [];
       try {
         const { data: aeRows, error: aeErr } = await supabase
-          .from('auction_events')
+          .from('auction_events_canonical')
           .select('id, source, source_url, outcome, auction_start_date, auction_end_date, high_bid, winning_bid, total_bids, comments_count, seller_name, winning_bidder, lot_number')
           .eq('vehicle_id', vehicleId)
           .order('auction_end_date', { ascending: false, nullsFirst: false })
@@ -1215,7 +1215,7 @@ const VehicleTimeline: React.FC<{
                                                     source_url,
                                                     outcome
                                                   )
-                                                `)
+                                                ,canonical:auction_events_canonical(id)`).or('auction_event_id.is.null,canonical.not.is.null')
                                                 .eq('vehicle_id', vehicleId)
                                                 .gte('posted_at', dayStart)
                                                 .lt('posted_at', dayEnd);

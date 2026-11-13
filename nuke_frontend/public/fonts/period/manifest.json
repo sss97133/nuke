@@ -1,0 +1,27 @@
+{
+ "pontiac-1973-brochure-numerals": {
+  "files": [
+   "pontiac-1973-brochure-numerals/Pontiac1973BrochureNumerals-Regular.woff2"
+  ],
+  "chars": " ',-./0123456789FPabcdeinort"
+ },
+ "pontiac-1973-block": {
+  "files": [
+   "pontiac-1973-block/Pontiac1973Block-Regular.woff2",
+   "pontiac-1973-block/Pontiac1973Block-Face.woff2"
+  ],
+  "chars": " \"&',-./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+ },
+ "trans-am-1973-decal": {
+  "files": [
+   "trans-am-1973-decal/TransAm1973Decal-Regular.woff2"
+  ],
+  "chars": " \"&',-./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+ },
+ "firebird-1971-script": {
+  "files": [
+   "firebird-1971-script/Firebird1971Script-Regular.woff2"
+  ],
+  "chars": " ',-.EFGLMPTabcdefghijklmnopqrstuvwxyz"
+ }
+}

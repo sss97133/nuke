@@ -166,7 +166,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             bidCount === null
               ? supabase
                   .from('auction_comments')
-                  .select('id', { count: 'exact', head: true })
+                  .select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleId)
                   .not('bid_amount', 'is', null)
               : Promise.resolve({ count: bidCount } as any),
@@ -174,13 +174,13 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             commentCount === null
               ? supabase
                   .from('auction_comments')
-                  .select('id', { count: 'exact', head: true })
+                  .select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleId)
                   .or('bid_amount.is.null,comment_type.neq.bid')
               : Promise.resolve({ count: commentCount } as any),
             supabase
               .from('auction_comments')
-              .select('posted_at')
+              .select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
               .eq('vehicle_id', vehicleId)
               .not('bid_amount', 'is', null)
               .order('posted_at', { ascending: false })
@@ -188,7 +188,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
               .maybeSingle(),
             supabase
               .from('auction_comments')
-              .select('posted_at')
+              .select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
               .eq('vehicle_id', vehicleId)
               .or('bid_amount.is.null,comment_type.neq.bid')
               .order('posted_at', { ascending: false })

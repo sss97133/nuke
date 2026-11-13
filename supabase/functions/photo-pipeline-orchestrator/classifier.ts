@@ -1,81 +1,16 @@
-import { geminiFetch } from '../_shared/geminiGuard.ts';
-/** Existing classifier, isolated for failure/receipt assays without hosted calls. */
-export interface ClassifierReceipt {
-  model: string | null;
-  attempts: number;
-  failure_phase?: string;
-  error_class?: string;
-  http_status?: number;
-  image_bytes?: number;
-  image_sha256?: string;
-  input_sha256?: string;
-  counted_input_tokens?: number;
-  usage?: { prompt_tokens: number; output_tokens: number; thinking_tokens: number; total_tokens: number };
-  estimated_cost_usd?: number;
-  reserved_cost_usd?: number;
-  model_version?: string;
-  token_count_attempts?: number;
-  quota?: { violations: Array<{ quota_metric: string | null; quota_id: string | null; quota_value: number | null; model: string | null; location: string | null }>; retry_delay_seconds: number | null };
-  timing_ms?: { image_download: number; token_count: number; generation: number; total: number };
-}
-
-// Image type classification categories
-export type ImageType =
-  | "vehicle_exterior"
-  | "vehicle_interior"
-  | "engine_bay"
-  | "undercarriage"
-  | "detail_closeup"
-  | "vin_plate"
-  | "part_closeup"
-  | "receipt_document"
-  | "progress_shot"
-  | "other";
-
-export type ImageMedium = 'photograph' | 'render' | 'drawing' | 'screenshot';
-
-export interface ClassificationResult {
-  image_type: ImageType;
-  confidence: number;
-  is_automotive: boolean;
-  description: string;
-  detected_text?: string[];
-  vin_detected?: string;
-  image_medium?: ImageMedium;
-  medium_context?: string;
-  vehicle_hints?: {
-    make?: string;
-    model?: string;
-    year_range?: string;
-    color?: string;
-  };
-  /**
-   * false = this is NOT a real Gemini verdict — it's a stand-in produced because
-   * the classifier was rate-limited, errored, or unconfigured. Root-cause fix
-   * (2026-07-06, the 429/hollow-completion incident): this flag is what lets
-   * Step 7 stop lying with ai_processing_status='completed'. Absent/true = a
-   * real classification (or no classifier condition applies).
-   */
-  classifier_ok?: boolean;
-  classifier_receipt?: ClassifierReceipt;
-}
-
-function UNCLASSIFIED_FALLBACK(receipt: ClassifierReceipt): ClassificationResult {
-  return {
-    image_type: "other",
-    confidence: 0.2,
-    is_automotive: true,
-    description: "Unclassified — classifier unavailable; retained for review",
-    classifier_ok: false,
-    classifier_receipt: receipt,
-  };
-}
+// Gemini classifier (core). Re-exports the names it exported before the split; classifyImageRouted lives in classifierProvider.ts.
+import { type ClassificationResult, type ClassifierReceipt } from "./classifierTypes.ts";
+import { CLASSIFIER_BUDGET, ClassifierError, UNCLASSIFIED_FALLBACK, readBounded } from "./classifierBase.ts";
+import { fetchClassifierImage } from "./classifierImage.ts";
+import { geminiFetch } from "../_shared/geminiGuard.ts";
+export { type ClassificationResult, type ClassifierReceipt, type ImageMedium, type ImageType, type V2Extras } from "./classifierTypes.ts";
+export { CLASSIFIER_BUDGET, UNCLASSIFIED_FALLBACK } from "./classifierBase.ts";
+export { type FetchedImage, fetchClassifierImage, jpegRenderUrl } from "./classifierImage.ts";
 
 export const CLASSIFIER_MODEL = "gemini-flash-latest";
+
 export const CANDIDATE_CLASSIFIER_MODEL = "gemini-flash-lite-latest";
-export const CLASSIFIER_BUDGET = Object.freeze({ image_bytes: 4 * 1024 * 1024,
-  response_bytes: 65536, input_tokens: 16384, output_tokens: 768,
-  image_ms: 10000, request_ms: 20000, attempts: 1 });
+
 // 2026-10-15: gemini-2.5-flash and -flash-lite answer 404 for this key; the -latest aliases are what it lists. The rates below
 // are the 2.5-flash / 2.5-flash-lite rate cards carried over (estimates for the cost receipt); they are NOT re-verified for the
 // aliases' current targets.
@@ -86,29 +21,7 @@ export const CLASSIFIER_PRICES = Object.freeze({
 
 const sha256 = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes))))
   .map(value => value.toString(16).padStart(2, "0")).join("");
-class ClassifierError extends Error { constructor(public code: string) { super(code); } }
-async function readBounded(response: Response, maximum: number): Promise<Uint8Array> {
-  const declared = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > maximum) {
-    await response.body?.cancel(); throw new ClassifierError("payload_too_large");
-  }
-  if (!response.body) throw new ClassifierError("payload_empty");
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = []; let size = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > maximum) { await reader.cancel(); throw new ClassifierError("payload_too_large"); }
-      chunks.push(value);
-    }
-  } finally { reader.releaseLock(); }
-  if (!size) throw new ClassifierError("payload_empty");
-  const bytes = new Uint8Array(size); let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  return bytes;
-}
+
 /** Quota metadata only. Never retain provider prose, project IDs or credentials. */
 async function quotaDiagnostics(response: Response): Promise<ClassifierReceipt["quota"]> {
   if (response.status !== 429) return undefined;
@@ -139,9 +52,12 @@ async function quotaDiagnostics(response: Response): Promise<ClassifierReceipt["
     return { violations, retry_delay_seconds };
   } catch { return undefined; }
 }
+
 const integer = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
+
 const boundedText = (value: unknown, max: number): value is string => typeof value === "string" && value.length <= max;
-const PROMPT = `Classify this automotive image. Respond in JSON only:
+
+export const PROMPT = `Classify this automotive image. Respond in JSON only:
 {
   "image_type": one of ["vehicle_exterior", "vehicle_interior", "engine_bay", "undercarriage", "detail_closeup", "vin_plate", "part_closeup", "receipt_document", "progress_shot", "other"],
   "image_medium": one of ["photograph", "render", "drawing", "screenshot"],
@@ -180,14 +96,9 @@ export async function classifyImage(
   }
   let phase = "image_download";
   try {
-    const imageResponse = await fetch(imageUrl, { redirect: "error", signal: AbortSignal.timeout(CLASSIFIER_BUDGET.image_ms) });
-    if (!imageResponse.ok) return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase, error_class: "image_http_error", http_status: imageResponse.status });
-    const mimeType = (imageResponse.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    if (!["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"].includes(mimeType)) {
-      await imageResponse.body?.cancel();
-      return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase, error_class: "image_mime_invalid" });
-    }
-    const bytes = await readBounded(imageResponse, CLASSIFIER_BUDGET.image_bytes);
+    const img = await fetchClassifierImage(imageUrl, fetch, true);
+    const bytes = img.bytes; const mimeType = img.mimeType;
+    if (img.resized) receipt.image_resized = img.resized;
     receipt.image_bytes = bytes.length;
     receipt.image_sha256 = await sha256(bytes);
     let binary = "";
@@ -260,6 +171,7 @@ export async function classifyImage(
       vehicle_hints: hints == null ? undefined : Object.fromEntries(Object.entries(hints).filter(([, value]) => value != null)),
       classifier_ok: true, classifier_receipt: receipt };
   } catch (error) {
+    if (error instanceof ClassifierError && error.status != null) return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase, error_class: error.code, http_status: error.status });
     const code = error instanceof ClassifierError ? error.code : error instanceof SyntaxError ? "classifier_response_invalid"
       : error instanceof DOMException && ["TimeoutError", "AbortError"].includes(error.name)
         ? (phase === "image_download" ? "image_download_timeout" : "classifier_timeout")

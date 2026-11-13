@@ -516,6 +516,24 @@ and how confident it is. Built from a backtest run offline against the local BaT
   key (titles map at 92.7-96.4%); bidder and comment counts improve the 24 h miss from 17.4% to 16.7% and come with a
   bounded engagement read later; grade C and reserve-not-met are the weakest cells.
 
+### The other houses' lots (model 32 moved by each house's own replay), November 8
+
+The board lists Collecting Cars, PCarMarket and eBay Motors lots beside BaT's (market_pulse_live_houses). A house's lots
+get a finish only after model 32's BaT read has been replayed on that house's closed lots and held there
+(scripts/market/live-finish-houses.py; its result is the "houses" block of scripts/market/live-finish-coverage.json,
+which the writer reads; live_finish_estimates() reads every board house's lots, migration 20261111220000).
+- **Replay.** Each closed lot read at 120 h … 10 min before its scheduled close with the bid as it stood then; model 32
+  runs unchanged on those reads (analogs and comparables closed before each read). Per horizon the house's shift
+  (median ln final / estimate) and range correction are fitted on the 60% of lots that closed first and measured on the
+  rest; the stored and shown in-range share and miss are the held-out ones, per horizon and grade.
+- **The bar, per horizon:** 75-85% of held-out finals inside the range and a median miss of 20% or less. A house's lots
+  are estimated up to the longest horizon below which every horizon passes; later hours say nothing.
+- **PCarMarket (shown, last 3 h).** Its stored results pages carry every bid. 932 lots closed 2025-07-01..2026-09-25;
+  held out 373 closed 2026-04-20..09-25: 76.1% / 77.2% / 77.7% inside, median miss 14.0 / 17.8 / 19.7% at 10 min / 1 h /
+  3 h; at 6 h 72.2% and 21.2%, and 23.6-29.9% from 12 h out, so nothing is shown earlier. Model 32 unadjusted held 67%.
+- **Collecting Cars (not shown).** Nuke keeps only each lot's latest bid, no bid path, so the read cannot be replayed.
+- **eBay Motors (not shown).** The Browse API never reports an ended auction's price; Nuke holds no eBay final to score.
+
 
 ### The finish equation is never complete, owner direction, October 15 evening
 
@@ -540,6 +558,16 @@ What that commits the estimate to:
   one until it wins on the same lots.
 - **Acceptance case:** the Camaro above; model 33 must state what it would have said at 1 h and 10 min, with its
   contributions.
+
+### The track record beside each estimate, November 8
+
+`finish_track_record()` (migration 20261108213000, anon-executable, aggregates only) grades the live estimates the lot
+grader keyed: per model and per window of hours before the close (under 1 h, 1-6 h, 6-24 h, 1-3 days, over 3 days),
+each lot once by its last estimate in the window, against the final bid (the hammer, or the high bid when the reserve
+was not met). The board row's hover and the drawer's line under the range read the window the shown estimate was made
+in: "So far, estimated 1-3 days out: 448 of 555 finished inside the range, half within 17% (lots closed Oct 17-Oct 20)."
+Rows stamped by a writer whose clock was wrong are held out by their stamp window and named in the payload's
+`held_out` (2026-11-07 21:24Z, 2,355 rows, clock 3 h 35 min slow). The record grows only as the grader runs.
 
 
 ## One scope drives the market page, and search sets it — owner direction, October 16

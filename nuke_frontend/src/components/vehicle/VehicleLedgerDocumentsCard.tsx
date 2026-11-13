@@ -23,6 +23,7 @@ type ReceiptRow = {
   total: number | null;
   currency: string | null;
   created_at: string | null;
+  amounts_visible?: boolean | null;
 };
 
 function formatUsd(n: number | null | undefined): string {
@@ -88,7 +89,7 @@ export function VehicleLedgerDocumentsCard(props: {
       if (receiptRows.length === 0) {
         const publicReceiptsRes = await supabase
           .from('receipts_public_summary')
-          .select('id,source_document_id,source_document_table,processing_status,vendor_name,total,currency,created_at')
+          .select('id,source_document_id,source_document_table,processing_status,vendor_name,total,currency,created_at,amounts_visible')
           .eq('source_document_table', 'vehicle_documents')
           .eq('scope_type', 'vehicle')
           .eq('scope_id', vehicleId)
@@ -136,6 +137,7 @@ export function VehicleLedgerDocumentsCard(props: {
     let processing = 0;
     let failed = 0;
     let spent = 0;
+    let spentHidden = false;
     for (const d of docs) {
       const r = receiptByDocId.get(String(d.id));
       const st = String(r?.processing_status || '').toLowerCase();
@@ -150,11 +152,12 @@ export function VehicleLedgerDocumentsCard(props: {
       }
       // Treat any other status as "parsed enough to use"
       parsed++;
-      if (typeof r?.total === 'number') spent += r.total;
+      if (r?.amounts_visible === false) spentHidden = true;
+      else if (typeof r?.total === 'number') spent += r.total;
     }
     const pending = Math.max(0, totalDocs - (parsed + processing + failed));
     const remaining = pending + processing; // things that still need a successful parse
-    return { totalDocs, parsed, processing, failed, spent, pending, remaining };
+    return { totalDocs, parsed, processing, failed, spent, spentHidden, pending, remaining };
   }, [docs, receiptByDocId]);
 
   const runAll = async () => {
@@ -245,7 +248,7 @@ export function VehicleLedgerDocumentsCard(props: {
               <div><strong>Processing:</strong> {totals.processing}</div>
               <div><strong>Failed:</strong> {totals.failed}</div>
               <div><strong>Remaining:</strong> {totals.remaining}</div>
-              <div><strong>Total spend (from extracted receipts):</strong> {formatUsd(totals.spent)}</div>
+              <div><strong>Total spend (from extracted receipts):</strong> {totals.spentHidden ? 'visible to the vehicle\'s people' : formatUsd(totals.spent)}</div>
             </div>
 
             {progress && (

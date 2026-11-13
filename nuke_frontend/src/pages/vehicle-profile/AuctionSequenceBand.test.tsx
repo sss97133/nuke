@@ -6,7 +6,7 @@ const fixture = vi.hoisted(() => ({ auction: null as any, otherAuction: null as 
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: { id: 'synthetic-vehicle', year: 2025 }, vehicleId: 'synthetic-vehicle', timelineEvents: fixture.timelineEvents, setGalleryFilter: fixture.setGalleryFilter }) }));
 vi.mock('./useAuctionSequence', () => ({ useAuctionSequence: () => ({ auctions: [fixture.auction,fixture.otherAuction].filter(Boolean), importStampedDays: [], loading: false, activityUnavailable: fixture.activityUnavailable, hasUnpositionedActivity: fixture.hasUnpositionedActivity }) }));
-vi.mock('./VehiclePhotoLightbox', () => ({ VEHICLE_DAY_OPEN_EVENT: 'synthetic-day-open' }));
+vi.mock('./VehiclePhotoLightbox', () => ({ VEHICLE_DAY_OPEN_EVENT: 'synthetic-day-open', VEHICLE_DAYS_HIGHLIGHT_EVENT: 'synthetic-days-highlight' }));
 import AuctionSequenceBand from './AuctionSequenceBand';
 import BarcodeTimeline from './BarcodeTimeline';
 import { buildAuctionSequence, type AuctionSequence } from './auctionSequence';

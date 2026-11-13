@@ -47,6 +47,19 @@ describe('profileDocumentFrom', () => {
     }
     expect(doc.sections[1]).toBe(strip);
   });
+  it('says a tribute trim as a style, the way the record and the auction title say it', () => {
+    const tribute = profileDocumentFrom({ ...read, sections: [{ ...read.sections[0],
+      identity_source: { year: 1973, make: 'Pontiac', model: 'Firebird', normalized_model: null, series: null, trim: 'TRANS AM', transmission: 'manual', transmission_model: null, is_replica: true },
+      year: 1973, make: 'Pontiac', model: 'Firebird' } as ProfileRead['sections'][number]] }, false).sections[0];
+    if (tribute.kind === 'masthead') {
+      expect(tribute.identity.primary.map(t => t.value)).toEqual(['1973', 'Pontiac', 'Firebird']);
+      expect(tribute.identity.differentiators.map(t => t.value)).toEqual(['Trans Am-Style']);
+    }
+    const factory = profileDocumentFrom({ ...read, sections: [{ ...read.sections[0],
+      identity_source: { year: 1979, make: 'Pontiac', model: 'Firebird', normalized_model: null, series: null, trim: 'Trans Am WS6', transmission: null, transmission_model: null, is_replica: false },
+      year: 1979, make: 'Pontiac', model: 'Firebird' } as ProfileRead['sections'][number]] }, false).sections[0];
+    if (factory.kind === 'masthead') expect(factory.identity.differentiators.map(t => t.value)).toEqual(['Trans Am WS6']);
+  });
   it('leaves the price to the live stack when an auction is live', () => {
     const masthead = profileDocumentFrom(read, true).sections[0];
     if (masthead.kind === 'masthead') {

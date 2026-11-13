@@ -105,3 +105,20 @@ it('preserves search within a viewer and resets it when the account changes',asy
   expect((host.querySelector('input[type="search"]') as HTMLInputElement).value).toBe('');
   expect(host.querySelector('a[href="/vehicle/synthetic-car"]')).toBeNull();
 });
+
+it('shows recently worked cars first and groups org-held cars together', async()=>{
+  const ernie={id:'ernie',name:"Ernie's Upholstery",relationship_type:'work_location'};
+  const recent=new Date(Date.now()-24*60*60*1000).toISOString();
+  const rows=[
+    {id:'own',relationship_type:'OWNER'},
+    {id:'blue',relationship_type:'CONTRIBUTOR',custody_org:ernie},
+    {id:'green',relationship_type:'CONTRIBUTOR',custody_org:ernie},
+    {id:'ghia',relationship_type:'CONTRIBUTOR',custody_org:ernie,recent_work_at:recent},
+  ] as GarageVehicle[];
+  state={...state,vehicles:rows};await mount();
+  const sections=[...host.querySelectorAll('.garage-sections section[aria-label]')];
+  expect(sections.map(el=>el.getAttribute('aria-label'))).toEqual(['Worked on this week',"At Ernie's Upholstery",'Current vehicles']);
+  expect([...sections[0].querySelectorAll('a')].map(a=>a.textContent)).toEqual(['ghia']);
+  expect([...sections[1].querySelectorAll('a')].map(a=>a.textContent)).toEqual(['blue','green']);
+  expect([...sections[2].querySelectorAll('a')].map(a=>a.textContent)).toEqual(['own']);
+});

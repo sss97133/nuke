@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
-import { assertPulseColumns, bidBucket, fetchBoard, houseName, fetchPulse, moneyIn, parseTape, usdBid, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse, withTapeBids } from './useMarketPulse';
+import { assertPulseColumns, bidBucket, fetchBoard, fxNote, fxSourceName, houseName, fetchPulse, lotBidBucket, moneyIn, parseTape, recordedUsdBid, usdBid, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse, withTapeBids } from './useMarketPulse';
 
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
@@ -49,24 +49,39 @@ describe('live bids from the stream', () => {
   });
 
   it('lifts a lot only while a tape bid is newer than its recorded bid', () => {
-    const lot = { id: 'v', currentBid: 100, endsAt: 1000, updatedAt: 10 } as any;
-    const best = new Map([['v', { id: '1', vehicleId: 'v', amount: 150, bidAt: 20, endAt: 2000 }]]);
+    const lot = { id: 'v', house: 'bringatrailer', currency: 'USD', listingUrl: 'https://bringatrailer.com/listing/v', currentBid: 100, endsAt: 1000, updatedAt: 10 } as any;
+    const best = new Map([['v', { id: '1', vehicleId: 'v', house: 'bringatrailer', currency: 'USD', sourceUrl: 'https://bringatrailer.com/listing/v', amount: 150, bidAt: 20, endAt: 2000 }]]);
     expect(withTapeBids([lot], best)[0]).toMatchObject({ currentBid: 150, endsAt: 2000, updatedAt: 20 });
-    expect(withTapeBids([{ ...lot, currentBid: 200 }], best)[0]).toMatchObject({ currentBid: 200, endsAt: 1000 });
+    expect(withTapeBids([{ ...lot, currentBid: 200, updatedAt: 30 }], best)[0]).toMatchObject({ currentBid: 200, endsAt: 1000 });
     expect(withTapeBids([lot], new Map())[0]).toBe(lot);
+    expect(withTapeBids([{...lot,currentBid:200}],best)[0].currentBid).toBe(150);
+    expect(withTapeBids([{...lot,currentBid:90,updatedAt:30}],best)[0].currentBid).toBe(90);
+    expect(withTapeBids([lot], new Map([['quote',{...best.get('v')!,eventKind:'price_snapshot'}]]))[0]).toBe(lot);
+    expect(withTapeBids([{ ...lot, listingUrl: 'https://bringatrailer.com/listing/other' }], best)[0].currentBid).toBe(100);
+    expect(withTapeBids([{ ...lot, currency: 'EUR' }], best)[0].currentBid).toBe(100);
+    expect(withTapeBids([{ ...lot, house: 'ebay-motors' }], best)[0].currentBid).toBe(100);
+  });
+
+  it('uses clocks for corrected bids and withholds historical recovery over newer board state', () => {
+    const lot = { id:'v',house:'bringatrailer',currency:'USD',listingUrl:'https://bringatrailer.com/listing/v',currentBid:90,updatedAt:30,endsAt:1000 } as any;
+    const receipt = { id:'r',vehicleId:'v',house:'bringatrailer',currency:'USD',sourceUrl:lot.listingUrl,amount:100,bidAt:20,endAt:null,recovered:true };
+    expect(withTapeBids([lot],new Map([['r',receipt]]))[0].currentBid).toBe(90);
+    expect(withTapeBids([{...lot,currentBid:100,updatedAt:10}],new Map([['r',{...receipt,amount:90,recovered:false}]]))[0].currentBid).toBe(90);
+    expect(withTapeBids([{...lot,updatedAt:0}],new Map([['r',receipt]]))[0]).toMatchObject({currentBid:90});
   });
 
   it('pulses a lot once when a new bid lands, and hands the bid back when the board catches up', async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(Date.parse('2026-10-15T19:00:00Z'));
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const container = document.createElement('div'); document.body.appendChild(container);
     const root = createRoot(container);
-    const row = (bid: number) => ['fixture', 1995, 'Ford', 'Mustang', bid, '2026-10-20T00:00:00Z', '2026-10-10T00:00:00Z', '2026-10-09T00:00:00Z', null, false, 'https://bringatrailer.com/listing/fixture/'];
+    const row = (bid: number) => ['fixture', 1995, 'Ford', 'Mustang', bid, '2026-10-20T00:00:00Z', bid === 200 ? '2026-10-15T19:00:30Z' : '2026-10-10T00:00:00Z', '2026-10-09T00:00:00Z', null, false, 'https://bringatrailer.com/listing/fixture/'];
     let board = 100;
     let tape: any[] = [];
     fixture.rpc.mockImplementation(async (name: string) => (name === 'live_bid_tape'
-      ? { data: { bids: tape }, error: null } : { data: { auctions: [row(board)] }, error: null }));
+      ? { data: { receipt_version: 2, bids: tape }, error: null } : { data: { auctions: [row(board)] }, error: null }));
     let latest: ReturnType<typeof useMarketPulse>;
     function Probe() {
       latest = useMarketPulse();
@@ -76,7 +91,7 @@ describe('live bids from the stream', () => {
       await act(async () => { root.render(<QueryClientProvider client={client}><Probe /></QueryClientProvider>); });
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(container.textContent).toBe('100||0');
-      tape = [{ id: 'b1', vehicle_id: 'fixture', amount: 150, bid_at: '2026-10-15T19:00:00Z', end_at: '2026-10-21T00:00:00Z' }];
+      tape = [{ id: 'b1', vehicle_id: 'fixture', house: 'bringatrailer', currency: 'USD', source_url: 'https://bringatrailer.com/listing/fixture/', amount: 150, bid_at: '2026-10-15T19:00:00Z', end_at: '2026-10-21T00:00:00Z' }];
       await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
       expect(container.textContent).toBe('150|fixture|1');
       expect(latest!.data?.auctions[0].endsAt).toBe(Date.parse('2026-10-21T00:00:00Z'));
@@ -91,8 +106,8 @@ describe('live bids from the stream', () => {
   });
 });
 
-describe('tape bids play back at their own moments', () => {
-  it('spaces two bids read together as far apart as they were placed, and the board does not flash them again', async () => {
+describe('tape bids display at actual arrival', () => {
+  it('shows the whole received batch immediately without simulated timing, and does not flash it again', async () => {
     vi.useFakeTimers();
     const t0 = Date.parse('2026-10-18T04:00:00Z');
     vi.setSystemTime(t0);
@@ -104,7 +119,7 @@ describe('tape bids play back at their own moments', () => {
     let board = [row('a', 100), row('b', 100)];
     let tape: any[] = [];
     fixture.rpc.mockImplementation(async (name: string) => (name === 'live_bid_tape'
-      ? { data: { bids: tape }, error: null } : { data: { auctions: board }, error: null }));
+      ? { data: { receipt_version: 2, bids: tape }, error: null } : { data: { auctions: board }, error: null }));
     let latest: ReturnType<typeof useMarketPulse>;
     const played: string[] = [];
     function Probe() {
@@ -116,11 +131,11 @@ describe('tape bids play back at their own moments', () => {
     try {
       await act(async () => { root.render(<QueryClientProvider client={client}><Probe /></QueryClientProvider>); });
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-      // Placed at +2 s and +8 s; the stream records them about a minute late, so the 15 s read at +75 s sees both.
-      tape = [{ id: 'x', vehicle_id: 'a', amount: 150, bid_at: at(2) }, { id: 'y', vehicle_id: 'b', amount: 160, bid_at: at(8) }];
+      // Two recent source events arrive in the same read at +75 s; both display immediately.
+      tape = [{ id: 'x', vehicle_id: 'a', house: 'bringatrailer', currency: 'USD', source_url: 'https://bringatrailer.com/listing/a/', amount: 150, bid_at: at(62) }, { id: 'y', vehicle_id: 'b', house: 'bringatrailer', currency: 'USD', source_url: 'https://bringatrailer.com/listing/b/', amount: 160, bid_at: at(68) }];
       await act(async () => { await vi.advanceTimersByTimeAsync(74_999); });
       for (let s = 0; s < 10; s++) await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-      expect(played).toEqual(['a@75', 'b@81']);
+      expect(played).toEqual(['a@75', 'b@75']);
       board = [row('a', 150), row('b', 160)];
       await act(async () => { await latest!.refetch(); await vi.advanceTimersByTimeAsync(1); });
       expect(container.textContent).toBe('');
@@ -229,7 +244,7 @@ describe('every house on one board', () => {
     expect(b.housesFailed).toBe(true);
     expect(b.houses).toEqual([]);
   });
-  it('adds only dollars: a foreign bid is never a dollar amount, and is its own range', () => {
+  it('adds only dollars without a rate: a foreign bid with no published rate is never a dollar amount, and is its own range', () => {
     expect(usdBid({ currentBid: 100, currency: 'USD' })).toBe(100);
     expect(usdBid({ currentBid: 100, currency: 'GBP' })).toBeNull();
     expect(usdBid({ currentBid: null, currency: 'USD' })).toBeNull();
@@ -237,9 +252,46 @@ describe('every house on one board', () => {
     expect(bidBucket(null, 'GBP')).toBe('unknown');
     expect(bidBucket(44694)).toBe('25k50k');
   });
+  const gbpRate = { currency: 'GBP', rate: 1.338488281, rateDate: '2026-11-06', source: 'ECB euro foreign exchange reference rates 2026-11-06',
+    sourceUrl: 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml' };
+  it('converts a foreign bid at its own rate, and never at a rate for another currency', () => {
+    expect(usdBid({ currentBid: 44694, currency: 'GBP', fx: gbpRate })).toBe(59822);
+    expect(usdBid({ currentBid: 44694, currency: 'EUR', fx: gbpRate })).toBeNull();
+    expect(usdBid({ currentBid: null, currency: 'GBP', fx: gbpRate })).toBeNull();
+    expect(recordedUsdBid({ currentBid: 44694, currency: 'GBP' })).toBeNull();
+    expect(lotBidBucket({ currentBid: 44694, currency: 'GBP', fx: gbpRate })).toBe('50k100k');
+    expect(lotBidBucket({ currentBid: 44694, currency: 'GBP' })).toBe('otherCurrency');
+    expect(fxNote({ currentBid: 44694, currency: 'GBP', fx: gbpRate })).toBe('≈ $59,822 at 1.3385 USD per GBP (ECB reference rate, 2026-11-06)');
+    expect(fxNote({ currentBid: 100, currency: 'USD' })).toBeNull();
+    expect(fxSourceName({ source: 'Bank of England database series XUDLUSS', sourceUrl: 'https://www.bankofengland.co.uk/x' })).toBe('Bank of England');
+    expect(fxSourceName({ source: 'some table', sourceUrl: null })).toBe('some table');
+  });
+  it("reads one rate per foreign currency at the board's read date and attaches it to that currency's lots only", async () => {
+    const asked: unknown[] = [];
+    fixture.rpc.mockImplementation(async (name: string, args: { p_currency?: string; p_on?: string }) => {
+      if (name === 'market_pulse_live_houses') return { data: { auctions: [cc, [...cc.slice(0, 13), 'nzd'].map((v, i) => i === 0 ? 'cc-2' : v)], houses: [] }, error: null };
+      if (name === 'fx_usd_rate') {
+        asked.push(args);
+        return args.p_currency === 'GBP'
+          ? { data: [{ rate: 1.338488281, rate_date: '2026-11-06', source: gbpRate.source, source_url: gbpRate.sourceUrl }], error: null }
+          : { data: [], error: null };
+      }
+      return { data: { synced_at: '2026-11-08T16:00:00Z', auctions: [bat] }, error: null };
+    });
+    const b = await fetchBoard();
+    expect(asked).toEqual([{ p_currency: 'GBP', p_on: '2026-11-08' }, { p_currency: 'NZD', p_on: '2026-11-08' }]);
+    const byId = Object.fromEntries(b.auctions.map(a => [a.id, a]));
+    expect(byId['cc-1'].fx).toEqual(gbpRate);
+    expect(usdBid(byId['cc-1'])).toBe(59822);
+    expect(byId['cc-2'].fx).toBeUndefined();
+    expect(usdBid(byId['cc-2'])).toBeNull();
+    expect(byId['bat-1'].fx).toBeUndefined();
+  });
   it('writes a bid in its own currency', () => {
     expect(moneyIn(65000, 'USD')).toBe('$65,000');
-    expect(moneyIn(44694, 'GBP').replace(/\s/g, ' ')).toBe('GBP 44,694');
+    expect(moneyIn(44694, 'GBP')).toBe('£44,694');
+    expect(moneyIn(292500, 'EUR')).toBe('€292,500');
+    expect(moneyIn(50000, 'AUD')).toBe('A$50,000');
     expect(moneyIn(null, 'EUR')).toBe('—');
     expect(moneyIn(1_200_000, 'USD', true)).toBe('$1.2M');
   });

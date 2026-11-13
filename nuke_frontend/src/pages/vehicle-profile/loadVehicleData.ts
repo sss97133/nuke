@@ -6,7 +6,7 @@
  * This function has side effects (state setters, supabase calls, navigation) but no React hooks.
  */
 import type React from 'react';
-import { buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
+import { auctionSourceUrlVariants, buildAuctionPulseForVehicle, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
 import { vehicleImageColumnsForViewer } from '../../lib/vehicleImageColumns';
 import { createViewerScopedInflight, ViewerReadInvalidatedError } from '../../lib/viewerScopedInflight';
@@ -474,7 +474,7 @@ export async function loadVehicleImpl({
       try {
         const { data, error } = await supabase
           .from('vehicles')
-          .select('id,merged_into_vehicle_id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,import_metadata,provenance_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
+          .select('id,merged_into_vehicle_id,year,make,model,normalized_model,series,trim,is_replica,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,import_metadata,provenance_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
           .eq('id', vehicleId)
           .single();
 
@@ -644,7 +644,8 @@ export async function loadVehicleImpl({
       try {
         const { data } = await supabase
           .from('vehicle_events')
-          .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, currency_code, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .is('duplicate_of_event_id', null)
           .eq('vehicle_id', vehicleData.id)
           .order('updated_at', { ascending: false })
           .limit(10);
@@ -652,19 +653,11 @@ export async function loadVehicleImpl({
       } catch {
         // ignore
       }
-      // Filter out stale active listings if vehicle is sold
+      // Keep historical asset outcome separate from a qualified current episode.
       const vOutcome = String((vehicleData as any)?.auction_outcome || '').toLowerCase();
       const vSaleStatus = String((vehicleData as any)?.sale_status || '').toLowerCase();
       // IMPORTANT: sale_price alone is not a "sold" signal (it can be a high bid for RNM/no-sale auctions).
-      const vehicleIsSold = vSaleStatus === 'sold' || vOutcome === 'sold';
-      if (vehicleIsSold) {
-        arr = arr.filter((r: any) => {
-          const status = String(r.event_status || r.listing_status || '').toLowerCase();
-          return status !== 'active' && status !== 'live';
-        });
-      }
-
-      const best = buildAuctionPulseFromExternalListings(arr, vehicleData.id);
+      const best = buildAuctionPulseForVehicle(arr, vehicleData);
 
       // Fallback: if we can't access vehicle_events due to RLS, still treat BaT-discovered vehicles as "auction mode"
       // so we hide Claim/Set-price and show a link to the listing.
@@ -746,26 +739,26 @@ export async function loadVehicleImpl({
             (shouldLoadComments && bidCount === null)
               ? supabase
                   .from('auction_comments')
-                  .select('id', { count: 'exact', head: true })
+                  .select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
-                  .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
+                  .in('source_url', auctionSourceUrlVariants(effective.listing_url)) // CRITICAL: Only comments from this listing (using source_url field)
                   .not('bid_amount', 'is', null)
               : Promise.resolve({ count: bidCount || 0 } as any),
             // Count only non-bid comments (where bid_amount is null or comment_type != 'bid')
             shouldLoadComments
               ? supabase
                   .from('auction_comments')
-                  .select('id', { count: 'exact', head: true })
+                  .select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
-                  .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
+                  .in('source_url', auctionSourceUrlVariants(effective.listing_url)) // CRITICAL: Only comments from this listing (using source_url field)
                   .or('bid_amount.is.null,comment_type.neq.bid')
               : Promise.resolve({ count: 0 } as any),
             shouldLoadComments
               ? supabase
                   .from('auction_comments')
-                  .select('posted_at, author_username')
+                  .select('posted_at, author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
-                  .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
+                  .in('source_url', auctionSourceUrlVariants(effective.listing_url)) // CRITICAL: Only comments from this listing (using source_url field)
                   .not('bid_amount', 'is', null)
                   .order('posted_at', { ascending: false })
                   .limit(1)
@@ -774,9 +767,9 @@ export async function loadVehicleImpl({
             shouldLoadComments
               ? supabase
                   .from('auction_comments')
-                  .select('posted_at')
+                  .select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
-                  .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
+                  .in('source_url', auctionSourceUrlVariants(effective.listing_url)) // CRITICAL: Only comments from this listing (using source_url field)
                   .or('bid_amount.is.null,comment_type.neq.bid')
                   .order('posted_at', { ascending: false })
                   .limit(1)
@@ -785,9 +778,9 @@ export async function loadVehicleImpl({
             shouldLoadComments
               ? supabase
                   .from('auction_comments')
-                  .select('author_username')
+                  .select('author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
                   .eq('vehicle_id', vehicleData.id)
-                  .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
+                  .in('source_url', auctionSourceUrlVariants(effective.listing_url)) // CRITICAL: Only comments from this listing (using source_url field)
                   .eq('is_seller', true)
                   .order('posted_at', { ascending: false })
                   .limit(1)
@@ -829,6 +822,8 @@ export async function loadVehicleImpl({
           last_bid_at: lastBidAt,
           last_comment_at: lastCommentAt,
           updated_at: (effective as any).updated_at || null,
+          currency_code: (effective as any)?.currency_code ?? null,
+          source_observed_at: (effective as any)?.source_observed_at ?? null,
           metadata: (effective as any).metadata ?? null,
           winner_name: (effective as any).winner_name ?? null,
           seller_username: (effective as any).seller_username ?? null,
@@ -852,7 +847,8 @@ export async function loadVehicleImpl({
                 // Refresh latest listing rows and re-derive pulse.
                 const result = await supabase
                   .from('vehicle_events')
-                  .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+                  .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, currency_code, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+                  .is('duplicate_of_event_id', null)
                   .eq('vehicle_id', vehicleData.id)
                   .order('updated_at', { ascending: false })
                   .limit(10);
