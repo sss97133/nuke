@@ -41,6 +41,16 @@ Two rules outrank taste:
    Swift twin; `RootedValueView` (`RootedValue.swift`) is the one primitive that renders a value, with its
    trust rung, its clock and its drill (or its honest refusal to drill). A bare value is a bug.
 
+**Book allocations use the existing accounting readers.** `AllocationEvidence.swift` opens
+`accounting_vehicle_financials` independently of the legacy investment fold. Its pages preserve
+book, vehicle, currency, phase and qualification; loaded records are not a complete financial
+picture. Each allocation opens its exact current book or bank record through
+`accounting_record_evidence`, with an allocation recheck before and after the source read.
+An account change, withdrawal, ambiguous identity or changed source reference clears the result.
+Amounts remain decimal text; a bank source supplies its own currency and date. Witness references
+do not become costs, payment proof, work completion or filing actions. This path adds no financial
+totals, original-file access, SQL, grants or writes.
+
 **The header is on the read.** `vehicle_profile_read(uuid)` (migration `20261013143000`, SECURITY
 INVOKER, callable by anon and authenticated) returns the vehicle page's header as one ProfileDocument: a
 `masthead` (identity columns, the one headline price as a Claim with its kind, platform and clock), a
@@ -53,7 +63,13 @@ listing, image, agent → `.attributed`; model → `.projected`; legacy → `.fa
 drill: the web says the same in words in its popover, the phone says it by grammar). A live auction
 banner owns the headline price; the masthead price stays off while `vehicle_pulse.is_live`. When the read
 grows a section, add its case to `ProfileSection` and render it through the same primitives; never add a
-new client-side query to the header.
+new client-side query to the header. **Header tokens open their line items**, as the web's `HeaderTokenItems`:
+the masthead's `token_items` (one array per token, as `vehicle_facet_items` returns them) and the strip's `gaps`
+decode tolerantly in `ProfileDocument.swift`; `TokenItemsSheet.swift` renders them grouped by facet with status,
+sources (photo witness through `NukeImage.thumb`), rule, candidates, availability, equation and what is needed,
+in words ported from `kit/Items.tsx` (`ItemText`). Strip rows and gaps open their token; tokens no strip row
+covers (year, make, model, trim) get rows of their own. Location alone is read on open
+(`vehicle_facet_items(p_dimension: 'location')`), as on the web; its county map is not drawn on the phone yet.
 
 Standing rules the code carries:
 
@@ -273,6 +289,27 @@ Standing rules the code carries:
   receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
   not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as
   recorded; nothing masks plate-shaped text yet, so do not claim it.
+- **Receipt depth follows the current source.** Investment Parts audit rows open the exact receipt through
+  its currently visible `receipt_vehicle_links.page_date` and `get_vehicle_day_documents`. The phone requires
+  exact receipt/day membership and the reader's `tied` verdict, then rechecks the link and current account.
+  Unknown dates, withheld links, retired/duplicate records and failed reads stay explicit; no guessed date
+  or older extraction fallback. Detail adds returned lines and source/date qualifications without another
+  total panel, payment/allocation/work inference, original-page download, or local financial sum. A read
+  timestamp is a snapshot, not a promise that the record cannot change. Older investment-fold clock,
+  labor and overlap qualifications remain separate unresolved work.
+- **Legacy financial inputs stay evidence.** The legacy proof's `confirmed_labor` is a sum of session
+  `total_job_cost`, which can include parts and tools; confirmation records testimony, not payment.
+  Its widget keeps receipt, payment/contribution and session record doors, without presenting mixed
+  totals, projected photo labor, party totals or ROI as reconciled investment/cash. Session and receipt
+  readings omit an invented currency; audit values are explicitly rounded and session dates carry
+  no invented timezone. Payment reports retain their declared USD unit and attributed
+  status. A missing confirmation is unknown, not an action grant. Existing confirmation/contribution
+  writers keep their effects. Session confirmation is displayed only after an explicit successful
+  acknowledgement for that session; an HTTP200 refusal, absent/malformed receipt or transport error
+  remains unconfirmed with retry. This establishes no vehicle holding or work/payment role.
+  The legacy receipt curve is withheld pending a qualified money/clock
+  contract; its first receipt is not an acquisition. The canonical valuation/price section is unchanged. This does
+  not repair the server folds or replace the canonical book/vehicle accounting service.
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.
@@ -323,7 +360,7 @@ Standing rules the code carries:
   results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
   the first hot or cold lot's reading on the board, `NUKE_DEBUG_LEDGER_MAKE=Chevrolet` opens that brand's models on the
   ledger map, `NUKE_DEBUG_ACTOR_ORG=<uuid>` roots on an organization's actor document, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
-  (+ `NUKE_DEBUG_DAY_USER`) opens a day receipt. A session injected once persists in the simulator Keychain;
+  with `NUKE_DEBUG_DAY_USER=<uuid>` (required; there is no default account) opens a day receipt. A session injected once persists in the simulator Keychain;
   terminate and relaunch, or use an explicit screen hook. `simctl install` the fresh product before a
   capture: a launch hook on a stale install looks like a code bug (2026-10-13).
 

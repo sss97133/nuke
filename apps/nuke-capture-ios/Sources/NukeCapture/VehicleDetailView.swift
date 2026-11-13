@@ -647,13 +647,19 @@ struct VehicleDetailView: View {
                     } else {
                         heroLayer
                         loadState
+                        // The first screen: photos, then the number (the live banner while an
+                        // auction runs, else the recorded price with its age and source), then
+                        // the quiet Follow / Comment row.
                         liveAuctionBanner
+                        priceHeadline
+                        heroActionRow
                         profileHeaderBlock
                         // The organizations behind the vehicle (seller, owner, consigner, shop), each a door to its measures.
                         VehicleActorLinks(vehicleId: vehicleId).id("actors")
                         buildInstrument
                         if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
-                        heroActionRow
+                        // Where it's been: the photo-GPS areas (vehicle_location_areas), the web header popup's read.
+                        VehicleLocationSection(vehicleId: vehicleId).id("location")
                         valuationSection.id("worth")
                         saleHistorySection.id("sales")
                         beforeAfterSection
@@ -662,7 +668,10 @@ struct VehicleDetailView: View {
                         // verdict from vehicle_profile_read, never a client guess, and a missing
                         // read fails closed: no document, no ledger.
                         if let viewer = profile?.viewer, viewer != .anon {
-                            ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")
+                            // The legacy receipt curve conflates source totals with invested
+                            // cash and can anchor an unknown acquisition date to a receipt.
+                            // Keep record doors below; restore a curve only with a qualified
+                            // money/clock contract. The valuation and sales readers stay above.
                             InvestmentProofView(vehicleId: vehicleId).id("proof")
                         }
                         if let viewer = profile?.viewer, viewer != .anon {
@@ -734,13 +743,13 @@ struct VehicleDetailView: View {
     // stacked guarantees against ghosting: it fades out, and its drawable window
     // CLIPS from 300→0 (past that edge there's no hero pixel to show through), while
     // a slow parallax dissolves it into the bar plane. BuildStoryHero is unchanged —
-    // we only transform its rendered output.
+    // we only transform its rendered output (it pages through the photos itself).
     // The hero's last resort is the vehicle row's primary_image_url, which is what the web's
     // A bare vehicle cover URL has no per-image qualification. Only a viewer-permitted
     // gallery cover or a classified photographic fallback may lead.
     @ViewBuilder private var heroLayer: some View {
         BuildStoryHero(
-            imageURL: heroImage?.image_url,
+            pages: heroPages.compactMap { img in img.image_url.map { BuildStoryHero.Page(id: img.id.uuidString, url: $0) } },
             year: vehicle?.year, make: vehicle?.make,
             model: vehicle?.model, trim: vehicle?.trim,
             // The title from the document's identity tokens (normalized model, series, trim, a high-signal
@@ -748,12 +757,12 @@ struct VehicleDetailView: View {
             identityTokens: profile?.masthead.map { VehicleIdentity.tokens($0.identity_source).all },
             takenAt: heroImage?.isImported == true ? nil : heroImage?.taken_at,
             loaded: loaded,
-            onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } },
+            onOpenPhoto: { i in openHeroPhoto(i) },
             onDrillCohort: cohortDrillAction()
         )
         .offset(y: collapse * -60)                              // parallax: dissolve into the bar, don't race past
         .opacity(Double(1 - collapse))                         // hero (+ its chips) gone before the bar reads
-        .frame(height: 300 * (1 - collapse), alignment: .top)  // HARD guarantee: window shrinks to 0
+        .frame(height: BuildStoryHero.height * (1 - collapse), alignment: .top)  // HARD guarantee: window shrinks to 0
         .clipped()
         .allowsHitTesting(collapse < 0.5)                      // taps go to the bar once it leads
     }
@@ -777,6 +786,31 @@ struct VehicleDetailView: View {
     /// build's current face); recency falls back to created_at so sparse EXIF can't skew it.
     private var heroImage: VehicleGalleryImage? {
         VehicleGalleryImage.chooseHero(cover: coverRow, candidates: heroCandidates, gallery: images)
+    }
+
+    /// The hero's pages: the lead photo, then the rest of the first gallery page, so the title
+    /// card swipes straight through the photos. Capped so the pager stays light.
+    private var heroPages: [VehicleGalleryImage] {
+        var out: [VehicleGalleryImage] = []
+        let lead = heroImage
+        if let lead, NukeDisplay.text(lead.image_url) != nil { out.append(lead) }
+        for img in images where out.count < 12 {
+            if img.id == lead?.id || NukeDisplay.text(img.image_url) == nil { continue }
+            out.append(img)
+        }
+        return out
+    }
+
+    /// A hero tap opens the gallery at that photo (the gallery's own "Analysis" action is the way
+    /// to the analysis). A lead that is not in the loaded gallery opens the plain viewer.
+    private func openHeroPhoto(_ i: Int) {
+        let pages = heroPages
+        guard pages.indices.contains(i) else { galleryOpen = true; return }
+        if let at = images.firstIndex(where: { $0.id == pages[i].id }) {
+            viewerStart = GalleryStart(index: at)
+        } else {
+            galleryOpen = true
+        }
     }
 
     /// Dedicated lead-image candidates: the gallery is paged taken_at-DESC, and the
@@ -914,15 +948,22 @@ struct VehicleDetailView: View {
     }
 
     // ─── The header document — vehicle_profile_read rendered through the kit's shapes
-    // (ProfileDocument.swift / ProfileStripView.swift). The one headline price as a Claim
-    // (off while a live auction's banner owns the number, as on the web) and the strip of
-    // recorded facts, each with its source and clock, closed by its coverage sentence.
+    // (ProfileDocument.swift / ProfileStripView.swift): the strip of recorded facts, each with
+    // its source and clock, closed by its coverage sentence. The headline price leads the first
+    // screen instead (priceHeadline), so it is stated once.
     @ViewBuilder private var profileHeaderBlock: some View {
         if let read = profile {
-            ProfileHeaderBlock(vehicleId: vehicleId, read: read,
-                               priceOwnedByLiveStack: pulse?.is_live == true)
+            ProfileHeaderBlock(vehicleId: vehicleId, read: read)
         } else if profileError {
             sectionError("the record header") { Task { await loadProfileRead() } }
+        }
+    }
+
+    /// The headline price on the first screen, off while a live auction's banner owns the number
+    /// (the web's priceOwnedByLiveStack).
+    @ViewBuilder private var priceHeadline: some View {
+        if let m = profile?.masthead, let price = m.price, pulse?.is_live != true {
+            VehiclePriceHeadline(vehicleId: vehicleId, masthead: m, price: price)
         }
     }
 
@@ -1220,26 +1261,23 @@ struct VehicleDetailView: View {
     // LIVE AUCTION — the BaT-style living instrument, driven by the server-arbitrated
     // vehicle_pulse. Shows ONLY when the arbiter reports a live auction (never faked); a
     // pulsing LIVE dot, the current bid, and a countdown derived client-side from ends_at
-    // (TimelineView ticks it smoothly; turns red under 30s). A real new bid chimes (applyPulse).
+    // (TimelineView ticks it each second, always red, d/h/m/s). A real new bid chimes (applyPulse).
     @ViewBuilder private var liveAuctionBanner: some View {
         if let p = pulse, p.is_live {
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                let secs = p.endsAtDate.map { Int(max(0, $0.timeIntervalSince(ctx.date))) }
                 HStack(spacing: 8) {
                     Circle().fill(.red).frame(width: 8, height: 8)
                         .opacity(Int(ctx.date.timeIntervalSinceReferenceDate) % 2 == 0 ? 1 : 0.35)
                     Text("LIVE").font(.caption2.weight(.heavy)).foregroundStyle(.red)
                     Text(p.headline_label ?? "Current Bid").font(.caption2).foregroundStyle(.secondary)
-                    Text(p.headline_amount.map { money0($0) } ?? "—")
+                    Text(VehicleLiveBanner.bid(p.headline_amount))
                         .font(.title3.weight(.bold)).monospacedDigit()
+                        .foregroundStyle(NukeDisplay.money(p.headline_amount) == nil ? Color.secondary : Color.primary)
                     Spacer(minLength: 8)
-                    if let s = secs {
-                        HStack(spacing: 4) {
-                            Image(systemName: "timer")
-                            Text("\(s / 60):\(String(format: "%02d", s % 60))").monospacedDigit()
-                        }
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(s <= 30 ? .red : .primary)
+                    if let ends = p.endsAtDate {
+                        // Red always, the same pill as the Explore card's clock (d/h/m/s, never "2880:00").
+                        NukePill(text: VehicleLiveBanner.countdown(ends, now: ctx.date), icon: "clock",
+                                 textColor: Color.red)
                     }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
@@ -1484,7 +1522,9 @@ struct VehicleDetailView: View {
                 out.append(.init(kind: .contributions, text: "\(e.contribution_count)"))
             }
         }
-        if let val = valuation, let mid = val.value, mid > 0 {
+        // Same gate as the body's estimate (marketDefendsEstimate): an unlisted, unpriced car
+        // shows no estimate in the header either.
+        if marketDefendsEstimate, let val = valuation, let mid = val.value, mid > 0 {
             out.append(.init(kind: .estimate, text: PulseSignal.shortMoney(mid)))
         }
         // STORM — auction now ROUTED via the server-arbitrated vehicle_pulse. Lights ONLY
@@ -1626,23 +1666,23 @@ struct VehicleDetailView: View {
                         Label(e.is_following ? "Following" : "Follow",
                               systemImage: e.is_following ? "checkmark" : "plus")
                     }
-                    .buttonStyle(NukePrimaryButtonStyle())
+                    .buttonStyle(NukeQuietButtonStyle())
                     .disabled(followBusy)
 
                     Button { showComments = true } label: {
                         Label(e.comment_count > 0 ? "\(e.comment_count) comments" : "Comment",
                               systemImage: "bubble.left")
                     }
-                    .buttonStyle(NukeSecondaryButtonStyle())
+                    .buttonStyle(NukeQuietButtonStyle())
 
                     Spacer(minLength: 0)
                 } else if engagementError {
                     Button("Try again") { Task { await loadEngagement() } }
-                        .buttonStyle(NukeSecondaryButtonStyle())
+                        .buttonStyle(NukeQuietButtonStyle())
                     Spacer()
                 } else {
-                    NukeSkeletonBlock(height: NukeSize.minTap + 4, radius: 26).frame(width: 120)
-                    NukeSkeletonBlock(height: NukeSize.minTap + 4, radius: 26).frame(width: 130)
+                    NukeSkeletonBlock(height: NukeSize.minTap, radius: NukeSize.minTap / 2).frame(width: 110)
+                    NukeSkeletonBlock(height: NukeSize.minTap, radius: NukeSize.minTap / 2).frame(width: 120)
                     Spacer()
                 }
             }
@@ -1660,16 +1700,17 @@ struct VehicleDetailView: View {
             }
         }
         .padding(.horizontal, NukeSpace.lg)
-        .padding(.top, NukeSpace.md)
+        .padding(.top, NukeSpace.sm)
         .padding(.bottom, NukeSpace.md)
     }
 
+    /// The quiet line under the buttons. The comment count is not here: the Comment button says it.
     private func engagementCounts(_ e: VehicleEngagement) -> String {
         var parts: [String] = []
         if e.following_count > 0 { parts.append("\(e.following_count) following") }
-        if e.comment_count > 0 { parts.append(NukeDisplay.count(e.comment_count, "comment")) }
         if e.contribution_count > 0 { parts.append(NukeDisplay.count(e.contribution_count, "contribution")) }
-        return parts.isEmpty ? "Be the first to comment" : parts.joined(separator: " · ")
+        if parts.isEmpty { return e.comment_count > 0 ? "" : "Be the first to comment" }
+        return parts.joined(separator: " · ")
     }
 
     private func loadEngagement() async {
@@ -2257,10 +2298,8 @@ private struct DayDrillSheet: View {
     }
 }
 
-// ─── Investment proof: proven vs projected — the asset-provenance file ───────
-// Renders compute_vehicle_investment_proof as a traditional ledger: proven
-// (receipts/payments/confirmed labor) above the line, projected below, every
-// cell labeled with its source + confidence. The value an auditor can verify.
+// ─── Legacy financial evidence — source records without a reconciled total ──
+// Preserve the existing reader's transport names, not their implied proof claims.
 
 struct InvestmentProof: Decodable {
     struct Cell: Decodable {
@@ -2305,10 +2344,8 @@ struct InvestmentProof: Decodable {
     let market: Cell
     let totals: Totals
     let by_party: [Party]?
-    /// The drill behind each ledger cell — owner-only. The actual receipts,
-    /// payments, and work_sessions the totals are summed from. This is the
-    /// three-shelf law applied to the proudest number in the app: every figure
-    /// opens to the rows that made it.
+    /// Backing records from the legacy reader, when returned for this viewer.
+    /// Their mixed units are not a reconciled investment or cash balance.
     let audit: Audit?
 
     struct Audit: Decodable {
@@ -2348,199 +2385,31 @@ struct LedgerDrill: Identifiable {
     var id: String { title }
 }
 
+/// The existing writer can refuse within an HTTP 200 response.
+struct SessionConfirmationReceipt: Decodable {
+    let ok: Bool
+    let session_id: UUID?
+    let confirmed: Bool?
+    func acknowledges(_ id: UUID) -> Bool { ok && session_id == id && confirmed == true }
+}
+
 struct InvestmentProofView: View {
     let vehicleId: String
     @State private var proof: InvestmentProof?
     @State private var loadFailed = false
+    @State private var readFailure: String?
+    @State private var readAt: Date?
     @State private var showAttest = false
-    @State private var ledgerDrill: LedgerDrill?   // a cell tapped for its rows
-
-    private func money(_ v: Double?) -> String {
-        guard let v else { return "—" }
-        return v.formatted(.currency(code: "USD").precision(.fractionLength(0)))
-    }
-
-    /// WHERE IT STANDS — the asset's independent value veins side by side, ahead
-    /// of the ledger. PROVEN (receipts + confirmed labor) is hard fact; MARKET
-    /// (the modeled comp estimate) is its own vein. Neither is derived from the
-    /// other, and neither is a verdict on the build — comps don't price a build,
-    /// and the proven floor is simply what's documented into it. Honest dark
-    /// states: "—" when nothing is proven yet, "not priced" when comps can't.
-    @ViewBuilder private func standHeader(_ p: InvestmentProof) -> some View {
-        let proven = p.totals.invested_proven ?? 0
-        let market = p.market.value ?? 0
-        if proven > 0 || market > 0 {
-            HStack(alignment: .top, spacing: 12) {
-                standCell("PROVEN IN",
-                          proven > 0 ? money(proven) : "—",
-                          "receipts · hard", emphasized: true)
-                Divider().frame(height: 38)
-                // Honest: the comp model is stock/cohort comps, NOT this build's
-                // defensible price — the app blocks it as a build valuation (isThin)
-                // until comps are class-stratified. Shown as dim reference, never a
-                // co-equal verdict to the documented PROVEN figure.
-                standCell("MARKET (COMPS)",
-                          market > 0 ? money(market) : "not priced",
-                          market > 0 ? "stock comps · not build-priced" : "needs comps",
-                          emphasized: false)
-            }
-            .padding(.top, 8).padding(.bottom, 10)
-            Divider().overlay(Color.primary.opacity(0.3))
-        }
-    }
-
-    @ViewBuilder private func standCell(_ title: String, _ value: String, _ sub: String,
-                                        emphasized: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(Color.secondary)
-            Text(value)
-                .font(.system(.title3, design: .monospaced))
-                .fontWeight(.semibold)
-                .foregroundStyle(emphasized ? Color.primary : Color.secondary)
-                .lineLimit(1).minimumScaleFactor(0.7)
-            Text(sub)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(Color.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    @State private var ledgerDrill: LedgerDrill?
 
     var body: some View {
-        Group {
-            if let p = proof {
-                VStack(alignment: .leading, spacing: 0) {
-                    // WHERE IT STANDS — lead with the independent veins at a glance
-                    // (proven floor vs modeled market), then the detail beneath.
-                    standHeader(p)
-
-                    // NEEDS YOU — the confirmable queue, made discoverable. Owner
-                    // only. The owner's signature turns projected into proven, so
-                    // surface it as the section's call-to-action instead of
-                    // burying it in one dim ledger line. Tap → the confirm sheet.
-                    if p.is_owner_view {
-                        let unconfirmed = (p.audit?.work_sessions ?? []).filter { !($0.confirmed ?? false) }
-                        if !unconfirmed.isEmpty {
-                            Button {
-                                ledgerDrill = LedgerDrill(title: "Labor", kind: .labor,
-                                                          rows: p.audit?.work_sessions ?? [])
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "checkmark.circle").foregroundStyle(.blue)
-                                    Text("\(unconfirmed.count) work sessions need your confirmation")
-                                        .foregroundStyle(.primary)
-                                    Spacer(minLength: 8)
-                                    Image(systemName: "chevron.right.circle")
-                                        .font(.caption2).foregroundStyle(.blue)
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.vertical, 8)
-                            Divider()
-                        }
-                    }
-
-                    Text("INVESTMENT")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(Color.secondary)
-                        .padding(.top, 8).padding(.bottom, 4)
-
-                    line("Parts", p.proven.parts.value, sub: "\(p.proven.parts.count ?? 0) receipts · proven",
-                         onTap: drill("Parts", .receipts, p.audit?.receipts))
-                    if (p.proven.confirmed_labor.value ?? 0) > 0 {
-                        line("Labor (confirmed)", p.proven.confirmed_labor.value, sub: "proven",
-                             onTap: drill("Labor", .labor, p.audit?.work_sessions))
-                    }
-                    if (p.proven.money_in.value ?? 0) > 0 {
-                        line("Income", p.proven.money_in.value,
-                             sub: "\(p.proven.money_in.count ?? 0) payments · proven", positive: true,
-                             onTap: drill("Payments", .payments, p.audit?.payments))
-                    }
-
-                    // ATTRIBUTED — owner-stated (paid-by-other / gifted). A rung
-                    // below proven, above projected: real value, owner's word.
-                    if let attr = p.attributed,
-                       (attr.cost.value ?? 0) > 0 || (attr.income.value ?? 0) > 0 {
-                        Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
-                        if (attr.cost.value ?? 0) > 0 {
-                            line("Cost (owner-stated)", attr.cost.value,
-                                 sub: "\(attr.cost.count ?? 0) attributed · paid by others")
-                        }
-                        if (attr.income.value ?? 0) > 0 {
-                            line("Income (owner-stated)", attr.income.value,
-                                 sub: "attributed", positive: true)
-                        }
-                    }
-
-                    Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
-
-                    line("Labor (projected)", p.projected.labor.value,
-                         sub: "photo-documented activity · \(p.projected.labor.confidence ?? "projection")", dim: true,
-                         onTap: drill("Labor", .labor, p.audit?.work_sessions))
-                    line("Market est.", p.market.value, sub: p.market.confidence ?? "", dim: true)
-
-                    Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
-
-                    line("Invested (proven)", p.totals.invested_proven,
-                         sub: "+ projected: \(money(p.totals.invested_with_projected))", bold: true)
-                    if let attr = p.attributed, (attr.cost.value ?? 0) > 0 {
-                        line("Invested (+ owner-stated)", p.totals.invested_with_attributed,
-                             sub: "proven + attributed", bold: true)
-                    }
-                    if let roi = p.totals.roi_proven_pct {
-                        line("ROI (proven)", nil, sub: "on proven spend", bold: true, rawValue: "\(Int(roi))%")
-                    }
-
-                    // BY PARTY — who the money moved with. Each counterparty's
-                    // net to the asset (owner-only; from payment_events).
-                    if let parties = p.by_party, !parties.isEmpty {
-                        Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
-                        Text("BY PARTY")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(Color.secondary)
-                            .padding(.bottom, 2)
-                        ForEach(parties) { party in
-                            line(party.party, party.total,
-                                 sub: "\(party.count ?? 0) \(party.direction == "in" ? "received" : "paid") · \(party.trust ?? "proven")",
-                                 positive: party.direction == "in",
-                                 dim: party.trust == "attributed")
-                        }
-                    }
-
-                    // Owner attests a contribution → record_owner_contribution
-                    // writes an owner-stated payment_event; the proof re-rolls.
-                    if p.is_owner_view {
-                        Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
-                        Button { showAttest = true } label: {
-                            Label("Add a contribution", systemImage: "plus.circle")
-                                .font(.system(.footnote, design: .monospaced))
-                                .foregroundStyle(.blue)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.vertical, 2)
-                    }
-                }
-                .font(.system(.footnote, design: .monospaced))
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-                // Ledger drill sheet — attached to the VStack (a DIFFERENT view
-                // than the showAttest sheet below) so both present reliably;
-                // two .sheet modifiers on one view suppress the second.
-                .sheet(item: $ledgerDrill) { drill in
-                    LedgerEvidenceSheet(drill: drill) { Task { await load() } }
-                }
-            } else if loadFailed {
-                // Don't vanish silently after the retries failed — say so + offer retry.
-                HStack(spacing: 8) {
-                    Text("INVESTMENT")
-                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Retry") { Task { await load() } }.font(.caption)
-                }
-                .padding(.horizontal, 16).padding(.vertical, 10)
+        VStack(alignment: .leading, spacing: 0) {
+            if let vehicle = UUID(uuidString: vehicleId) {
+                NavigationLink("Book allocation records") { VehicleAllocationRecordsView(vehicleId: vehicle) }
+                    .accessibilityIdentifier("vehicle-book-allocations")
+                    .padding(.horizontal, 16).padding(.vertical, 12)
             }
+            legacyEvidence
         }
         .task(id: vehicleId) { await load() }
         .sheet(isPresented: $showAttest) {
@@ -2548,57 +2417,105 @@ struct InvestmentProofView: View {
         }
     }
 
-    @ViewBuilder private func line(_ label: String, _ value: Double?, sub: String,
-                                   positive: Bool = false, dim: Bool = false,
-                                   bold: Bool = false, rawValue: String? = nil,
-                                   onTap: (() -> Void)? = nil) -> some View {
-        let row = HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label).foregroundStyle(dim ? Color.secondary : Color.primary)
-                if !sub.isEmpty {
-                    Text(sub).font(.system(.caption2, design: .monospaced)).foregroundStyle(Color.secondary)
+    // Independent of the legacy fold's success or owner flag: the canonical reader
+    // decides allocation visibility using its existing book AND vehicle permissions.
+    private var legacyEvidence: some View {
+        Group {
+            if let p = proof {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("FINANCIAL EVIDENCE")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    Text("These source records are not a reconciled investment or cash balance.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let readFailure {
+                        NukeLoadFailed(message: readFailure) { Task { await load() } }
+                    }
+                    recordsDoor("Receipt sources", title: "Receipt sources", kind: .receipts,
+                                rows: p.audit?.receipts, identifier: "investment-parts")
+                    recordsDoor("Payment reports", title: "Payment reports", kind: .payments,
+                                rows: p.audit?.payments, identifier: "investment-payments")
+                    recordsDoor("Session records", title: "Session records", kind: .labor,
+                                rows: p.audit?.work_sessions, identifier: "investment-sessions")
+                    if p.audit?.receipts?.isEmpty != false && p.audit?.payments?.isEmpty != false && p.audit?.work_sessions?.isEmpty != false {
+                        Text("No backing rows returned. This does not establish zero spending or no work.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let readAt {
+                        Text("Records read \(readAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if p.is_owner_view {
+                        Divider()
+                        Button { showAttest = true } label: {
+                            Label("Add a contribution statement", systemImage: "plus.circle")
+                        }.buttonStyle(.plain).foregroundStyle(.blue)
+                    }
                 }
+                .font(.footnote)
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .sheet(item: $ledgerDrill) { drill in
+                    LedgerEvidenceSheet(drill: LedgerDrill(title: drill.title, kind: drill.kind,
+                        rows: rows(for: drill.kind) ?? []), vehicleId: UUID(uuidString: vehicleId)) {
+                        Task { await load() }
+                    }
+                }
+            } else if loadFailed {
+                NukeLoadFailed(message: readFailure ?? "Financial records could not load.") {
+                    Task { await load() }
+                }.padding(.horizontal, 16).padding(.vertical, 10)
+            } else {
+                // A mounted child gives the initial record-read task a host.
+                ProgressView("Reading financial records…")
+                    .padding(.horizontal, 16).padding(.vertical, 10)
             }
-            Spacer(minLength: 8)
-            Text(rawValue ?? money(value))
-                .fontWeight(bold ? .semibold : .regular)
-                .foregroundStyle(positive ? Color.green : (dim ? Color.secondary : Color.primary))
-            if onTap != nil {
-                Image(systemName: "chevron.right.circle").font(.caption2).foregroundStyle(.blue)
-            }
-        }
-        .padding(.vertical, 3)
-        .contentShape(Rectangle())
-
-        if let onTap {
-            Button(action: onTap) { row }.buttonStyle(.plain)
-        } else {
-            row
         }
     }
 
-    /// Build a drill for a ledger cell IFF the owner audit carries its rows.
-    private func drill(_ title: String, _ kind: LedgerDrill.Kind, _ rows: [InvestmentProof.Audit.Row]?) -> (() -> Void)? {
-        guard let rows, !rows.isEmpty else { return nil }
-        return { ledgerDrill = LedgerDrill(title: title, kind: kind, rows: rows) }
+    private func rows(for kind: LedgerDrill.Kind) -> [InvestmentProof.Audit.Row]? {
+        switch kind {
+        case .receipts: return proof?.audit?.receipts
+        case .payments: return proof?.audit?.payments
+        case .labor: return proof?.audit?.work_sessions
+        }
+    }
+
+    @ViewBuilder private func recordsDoor(_ label: String, title: String, kind: LedgerDrill.Kind,
+                                         rows: [InvestmentProof.Audit.Row]?, identifier: String) -> some View {
+        let content = HStack {
+            Text(label)
+            Spacer()
+            Text(rows.map { $0.isEmpty ? "No rows returned" : "\($0.count) record\($0.count == 1 ? "" : "s")" } ?? "Not returned")
+                .font(.caption).foregroundStyle(.secondary)
+            if rows?.isEmpty == false { Image(systemName: "chevron.right").font(.caption2) }
+        }.padding(.vertical, 6).contentShape(Rectangle())
+        if let rows, !rows.isEmpty {
+            Button { ledgerDrill = LedgerDrill(title: title, kind: kind, rows: rows) } label: { content }
+                .buttonStyle(.plain).accessibilityIdentifier(identifier)
+        } else {
+            content.accessibilityIdentifier(identifier)
+        }
     }
 
     private func load() async {
-        // Retry: a cold app/network start can stall or cancel the first request
-        // (-999 / data_stall), which would silently leave the whole INVESTMENT
-        // section absent. A couple of spaced retries make it reliable on first
-        // launch (device cold-start as well as the sim).
+        // Retain the existing bounded cold-start retries; a failed refresh keeps
+        // its last-read clock and says why, rather than making a zero balance.
         for attempt in 0..<3 {
+            guard !Task.isCancelled else { return }
             do {
-                proof = try await SupabaseService.client
+                let result: InvestmentProof = try await SupabaseService.client
                     .rpc("compute_vehicle_investment_proof", params: ["p_vehicle_id": vehicleId])
-                    .execute()
-                    .value
+                    .execute().value
+                guard !Task.isCancelled else { return }
+                proof = result
+                readAt = Date()
+                readFailure = nil
                 loadFailed = false
                 break
             } catch {
+                guard !Task.isCancelled else { return }
                 NSLog("NukeCapture investment proof attempt %d failed: %@", attempt, String(describing: error))
-                loadFailed = (proof == nil)   // surface only if we still have nothing
+                readFailure = ReadFailure.text(error)
+                loadFailed = (proof == nil)
                 try? await Task.sleep(nanoseconds: 800_000_000)
             }
         }
@@ -2607,7 +2524,7 @@ struct InvestmentProofView: View {
         if ledgerDrill == nil,
            let kind = ProcessInfo.processInfo.environment["NUKE_DEBUG_LEDGER"],
            kind == "labor", let rows = proof?.audit?.work_sessions, !rows.isEmpty {
-            ledgerDrill = LedgerDrill(title: "Labor", kind: .labor, rows: rows)
+            ledgerDrill = LedgerDrill(title: "Session records", kind: .labor, rows: rows)
         }
         #endif
     }
@@ -3439,45 +3356,62 @@ struct FieldProvenanceSheet: View {
     }
 }
 
-// ─── Ledger evidence + the CONFIRM verb ──────────────────────────────────────
-// The rows behind a ledger cell — receipts / payments / work sessions, the same
-// audit the proof already returns (owner-only). For the labor bucket each
-// unconfirmed session carries CONFIRM: tapping it promotes that session from
-// projected → proven (confirm_work_session), the parent proof re-rolls, and the
-// owner watches "Invested (proven)" climb in the same turn. The app finally lets
-// you CLIMB the trust ladder it draws — the owner's signature is the product.
+// ─── Retained financial evidence and session testimony ─────────────────────
+// No row or confirmation here is a reconciled cash/investment measure. The legacy
+// session cost is total_job_cost (labor + parts + tools), without a currency field.
+// Existing confirmation writes testimony only; it does not verify payment.
 
 private struct LedgerEvidenceSheet: View {
     typealias Row = InvestmentProof.Audit.Row
     let drill: LedgerDrill
+    let vehicleId: UUID?
     var onChanged: () -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var confirmed: Set<UUID> = []   // promoted (post-success)
+    @State private var confirmed: Set<UUID> = []   // statements accepted by the existing writer
     @State private var working: UUID?
     @State private var failed: Set<UUID> = []      // RPC failed — surface, don't swallow
+    @State private var unavailableReceipts: Set<UUID> = []
+    @State private var detent: PresentationDetent = .medium
 
-    private func money(_ v: Double?) -> String {
-        guard let v else { return "—" }
-        return v.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+    private func recordedNumber(_ value: Double?) -> String {
+        guard let value, value.isFinite else { return "Not returned" }
+        return value.formatted(.number.precision(.fractionLength(0...2)))
     }
 
     private var unconfirmedCount: Int {
-        drill.rows.filter { !($0.confirmed ?? false) && !confirmed.contains($0.id) }.count
+        drill.rows.filter { $0.confirmed == false && !confirmed.contains($0.id) }.count
     }
 
     var body: some View {
         NavigationStack {
             List {
-                if drill.kind == .labor, unconfirmedCount > 0 {
-                    Section {
-                        Text("\(unconfirmedCount) session\(unconfirmedCount == 1 ? "" : "s") awaiting your confirmation. Confirming promotes labor from projected to proven.")
-                            .font(.caption).foregroundStyle(.secondary)
+                Section {
+                    switch drill.kind {
+                    case .receipts:
+                        Text("Reported totals are rounded; currency is not returned in this record list. Open a source for its current lines and currency. A receipt alone does not establish payment or allocation.")
+                    case .payments:
+                        Text("Payment reports and contribution statements use the records' USD field; amounts in this list are rounded. A method or reference alone does not verify who paid or received funds.")
+                    case .labor:
+                        Text("Rounded session values may include labor, parts and tool depreciation. Currency is not returned. Confirmation records a statement about the session; it does not verify hours, who performed work, or payment.")
+                        if unconfirmedCount > 0 {
+                            Text("\(unconfirmedCount) session\(unconfirmedCount == 1 ? "" : "s") awaiting confirmation.")
+                        }
                     }
-                }
+                }.font(.caption).foregroundStyle(.secondary)
                 ForEach(drill.rows) { row in
                     switch drill.kind {
-                    case .receipts: receiptRow(row)
+                    case .receipts:
+                        if let vehicleId {
+                            NavigationLink {
+                                ReceiptEvidenceView(receiptId: row.id, vehicleId: vehicleId) {
+                                    unavailableReceipts.insert(row.id)
+                                    onChanged()
+                                }
+                                .onAppear { detent = .large }
+                            } label: { receiptRow(row) }
+                            .accessibilityIdentifier("receipt-source-\(row.id.uuidString.lowercased())")
+                        } else { receiptRow(row) }
                     case .payments: paymentRow(row)
                     case .labor:    laborRow(row)
                     }
@@ -3488,58 +3422,72 @@ private struct LedgerEvidenceSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $detent)
+        .onAppear { if drill.kind != .receipts { detent = .large } }
     }
 
-    @ViewBuilder private func receiptRow(_ r: Row) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(r.vendor ?? "Receipt").font(.footnote)
-                if let d = r.date { Text(String(d.prefix(10))).font(.caption2).foregroundStyle(.secondary) }
+    @ViewBuilder private func receiptRow(_ row: Row) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(row.vendor ?? "Receipt source").font(.footnote)
+            if let date = row.date {
+                Text("Recorded date \(String(date.prefix(10)))").font(.caption2).foregroundStyle(.secondary)
             }
-            Spacer()
-            Text(money(r.amount)).font(.system(.footnote, design: .monospaced))
-        }
-    }
-
-    @ViewBuilder private func paymentRow(_ r: Row) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(r.counterparty ?? r.description ?? "Payment").font(.footnote)
-                if let m = r.method { Text(m).font(.caption2).foregroundStyle(.secondary) }
-            }
-            Spacer()
-            Text((r.direction == "in" ? "+" : "") + money(r.amount))
-                .font(.system(.footnote, design: .monospaced))
-                .foregroundStyle(r.direction == "in" ? .green : .primary)
-        }
-    }
-
-    @ViewBuilder private func laborRow(_ r: Row) -> some View {
-        let isConfirmed = (r.confirmed ?? false) || confirmed.contains(r.id)
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(r.date.map { String($0.prefix(10)) } ?? "Work session").font(.footnote)
-                Text(money(r.cost)).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if isConfirmed {
-                Label("Proven", systemImage: "checkmark.seal.fill")
-                    .labelStyle(.titleAndIcon).font(.caption2).foregroundStyle(.green)
-            } else if working == r.id {
-                ProgressView()
-            } else if failed.contains(r.id) {
-                // The RPC failed — say so and let them retry, never silently nothing.
-                Button { Task { await confirm(r.id) } } label: {
-                    Label("Retry", systemImage: "exclamationmark.arrow.circlepath")
-                        .font(.caption2)
-                }
-                .buttonStyle(.bordered).controlSize(.small).tint(.red)
+            if unavailableReceipts.contains(row.id) {
+                Text("Source detail unavailable").font(.caption).foregroundStyle(.secondary)
             } else {
-                Button("Confirm") { Task { await confirm(r.id) } }
-                    .buttonStyle(.borderedProminent).controlSize(.small)
+                RootedValueView(label: "Rounded reported total", value: recordedNumber(row.amount), status: .attributed)
+                    .accessibilityIdentifier("receipt-total-\(row.id.uuidString.lowercased())")
             }
         }
+    }
+
+    @ViewBuilder private func paymentRow(_ row: Row) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(row.counterparty ?? row.description ?? "Payment report").font(.footnote)
+            if let date = row.date {
+                Text("Recorded date \(String(date.prefix(10)))").font(.caption2).foregroundStyle(.secondary)
+            }
+            if let method = row.method {
+                RootedValueView(label: "Method as recorded", value: JobWords.humanize(method), status: .recorded)
+            }
+            if let direction = row.direction {
+                RootedValueView(label: "Direction as recorded", value: JobWords.humanize(direction), status: .recorded)
+            }
+            RootedValueView(label: row.method == "owner_attestation" ? "Stated value (USD)" : "Reported amount (USD)",
+                            value: recordedNumber(row.amount), status: .attributed)
+                .accessibilityIdentifier("payment-value-\(row.id.uuidString.lowercased())")
+            if let reference = row.confirmation, !reference.isEmpty {
+                RootedValueView(label: "Recorded reference", value: reference, status: .attributed)
+            }
+        }.padding(.vertical, 4)
+    }
+
+    @ViewBuilder private func laborRow(_ row: Row) -> some View {
+        let isConfirmed = row.confirmed == true || confirmed.contains(row.id)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(row.date.map { "Recorded day " + String($0.prefix(10)) } ?? "Session day not returned")
+                .font(.footnote)
+            RootedValueView(label: "Rounded session value", value: recordedNumber(row.cost), status: .recorded)
+                .accessibilityIdentifier("session-value-\(row.id.uuidString.lowercased())")
+            if isConfirmed {
+                RootedValueView(label: "Confirmation", value: "Session confirmation recorded", status: .attributed)
+                    .accessibilityIdentifier("session-confirmation-\(row.id.uuidString.lowercased())")
+            } else if working == row.id {
+                ProgressView()
+            } else if failed.contains(row.id) {
+                Text("Confirmation could not be verified.").font(.caption).foregroundStyle(.secondary)
+                Button { Task { await confirm(row.id) } } label: {
+                    Label("Retry confirmation", systemImage: "exclamationmark.arrow.circlepath")
+                }.buttonStyle(.bordered).controlSize(.small).tint(.red)
+                    .accessibilityIdentifier("session-confirm-\(row.id.uuidString.lowercased())")
+            } else if row.confirmed == false {
+                Button("Confirm session record") { Task { await confirm(row.id) } }
+                    .buttonStyle(.bordered).controlSize(.small)
+                    .accessibilityIdentifier("session-confirm-\(row.id.uuidString.lowercased())")
+            } else {
+                Text("Confirmation not returned").font(.caption).foregroundStyle(.secondary)
+            }
+        }.padding(.vertical, 4)
     }
 
     private func confirm(_ id: UUID) async {
@@ -3547,12 +3495,18 @@ private struct LedgerEvidenceSheet: View {
         defer { working = nil }
         struct P: Encodable { let p_session_id: String; let p_confirm: Bool }
         do {
-            _ = try await SupabaseService.client
+            let reply: SessionConfirmationReceipt = try await SupabaseService.client
                 .rpc("confirm_work_session", params: P(p_session_id: id.uuidString, p_confirm: true))
-                .execute()
+                .execute().value
+            // A refusal is HTTP 200 with ok:false. Only the exact successful
+            // acknowledgement records a statement; transport success is not it.
+            guard reply.acknowledges(id) else {
+                failed.insert(id)
+                return
+            }
             failed.remove(id)
-            confirmed.insert(id)   // promote only after the server accepted it
-            onChanged()            // parent re-rolls the proof
+            confirmed.insert(id)   // testimony accepted; not a cash/proven promotion
+            onChanged()            // refresh the existing record read
         } catch {
             failed.insert(id)      // surface it — the row shows Retry, not silence
             NSLog("NukeCapture confirm_work_session failed: %@", String(describing: error))

@@ -29,8 +29,6 @@ import { mustWrite } from '../_shared/writeResult.ts';
 import { dispatchContributorReview } from './contributorReview.ts';
 import { dispatchRetainedAnalysis } from './retainedAnalysis.ts';
 
-const WORKER = `derive-dispatch-${crypto.randomUUID().slice(0, 8)}`;
-
 // Evidence type → the argument name its reader expects. The reader owns its own
 // contract; dispatch only has to know how to name the thing it is handing over.
 const EVIDENCE_ARG: Record<string, string> = {
@@ -57,6 +55,7 @@ Deno.serve(async (req) => {
       return json({ error: "service_role required" }, 403);
     }
 
+    const WORKER = `derive-dispatch-${crypto.randomUUID()}`;
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       projectSecretKey()!,
@@ -92,11 +91,19 @@ Deno.serve(async (req) => {
 
     const results: unknown[] = [];
     let done = 0, failed = 0;
-    let publicComments = 0;
+    let publicComments = 0, productReceipts = 0;
 
     for (const item of claimed) {
+      const receiptProducts = item.extractor_slug === 'receipt-products-v1' && item.evidence_type === 'receipt';
       const publicComment = item.evidence_type === "auction_comment";
       try {
+        if (receiptProducts && productReceipts++ >= 1) {
+          const retry = await admin.rpc('finish_receipt_products', { p_id: item.id, p_worker: WORKER,
+            p_generation: -1, p_result: null, p_complete: false, p_retry: 60 });
+          if (retry.error) throw retry.error;
+          results.push({ id: item.id, status: 'pending', reason: 'invocation_limit' });
+          continue;
+        }
         if (publicComment && (item.extractor_slug !== "comment-refinery-atoms-v1" || item.user_id !== null)) {
           await finish(admin, item.id, "failed", { error: "invalid public comment route" });
           failed++;
@@ -132,7 +139,7 @@ Deno.serve(async (req) => {
 
         const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/${extractor.edge_function_name}`, {
           method: "POST",
-          ...(publicComment ? { signal: AbortSignal.timeout(65000) } : {}),
+          ...((publicComment || receiptProducts) ? { signal: AbortSignal.timeout(receiptProducts ? 120000 : 65000) } : {}),
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${projectSecretKey()}`,
@@ -146,11 +153,25 @@ Deno.serve(async (req) => {
             limit: 1,
             dry_run: false,
             platform_credential: platformCredential,
+            ...(receiptProducts ? { mode: "receipt_products", derivation_queue_id: item.id, worker: WORKER } : {}),
             ...(publicComment ? { mode: "derive_comment", derivation_queue_id: item.id,
               platform_credential: true } : {}),
           }),
         });
         const out = await res.json().catch(() => null);
+
+        if (receiptProducts) {
+          const valid = res.ok && out?.success === true && out.source_receipt_id === item.evidence_id
+            && Number.isSafeInteger(out.generation) && typeof out.product_complete === 'boolean'
+            && out.product_result?.items && typeof out.product_result.items === 'object';
+          const settled = await admin.rpc('finish_receipt_products', { p_id: item.id, p_worker: WORKER,
+            p_generation: valid ? out.generation : -1, p_result: valid ? out.product_result : null,
+            p_complete: valid && out.product_complete, p_retry: valid ? out.retry_after_seconds : 3600 });
+          if (settled.error) throw settled.error;
+          if (settled.data === 'done') done++;
+          results.push({ id: item.id, status: settled.data, product_complete: settled.data === 'done' });
+          continue;
+        }
 
         // A rate-limited subscription is not a failure. Put the work back with a
         // retry time and stop billing anyone for waiting.
@@ -204,7 +225,11 @@ Deno.serve(async (req) => {
         });
       } catch (e) {
         failed++;
-        if (publicComment && item.attempts < item.max_attempts) {
+        if (receiptProducts) {
+          const recovered = await admin.rpc('finish_receipt_products', { p_id: item.id, p_worker: WORKER,
+            p_generation: -1, p_result: null, p_complete: false, p_retry: 3600 });
+          if (recovered.error) console.error('receipt product retry acknowledgement failed', recovered.error.code);
+        } else if (publicComment && item.attempts < item.max_attempts) {
           await requeue(admin, item.id, 60, "comment reader interrupted; retry cached extraction");
         } else {
           await finish(admin, item.id, "failed", { error: "reader_execution_failed" });
@@ -218,7 +243,7 @@ Deno.serve(async (req) => {
     const slugs = [...new Set(claimed.map((c: any) => c.extractor_slug))];
     for (const s of slugs) {
       mustWrite('observation_extractors update', await admin.from("observation_extractors")
-        .update({ last_run_at: new Date().toISOString(), ...(failed === 0 && done > 0 ? { last_success_at: new Date().toISOString(), consecutive_failures: 0 } : {}) })
+        .update({ last_run_at: new Date().toISOString(), ...((s === 'receipt-products-v1' ? results.some((r: any) => r.status === 'done' && claimed.some((c: any) => c.id === r.id && c.extractor_slug === s)) : failed === 0 && done > 0) ? { last_success_at: new Date().toISOString(), consecutive_failures: 0 } : {}) })
         .eq("slug", s));
     }
 

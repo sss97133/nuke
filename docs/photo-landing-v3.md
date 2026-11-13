@@ -71,6 +71,13 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    `classification_raw` + `reader`; `scripts/photo-pipeline/subscription-frame-classifier.mjs` runs it. Unattended:
    `scripts/photo-pipeline/subscription-reader-batch.sh` (launchd `scripts/com.nuke.subscription-reader.plist`, every 10 min,
    bounded batches, a checkout of origin/main at `~/.worktrees/nuke-main`) writes a `job_assay_readings` heartbeat per reader.
+   Visual gate on the subscription too: `scripts/photo-pipeline/subscription_gate_reader.py` views each awaiting_gate chunk's
+   pre_gate sample as a reference/sample sheet with `claude -p` and records the verdicts, then calls `capture_landing_gate_check`
+   and `capture_landing_apply_chunk`. Before any live write it must pass a self-agreement gate against hand-viewed verdicts
+   (>= 85% agreement, <= 2% of hand-wrong samples accepted; tests `test_subscription_gate_reader.py`). Kept alive by
+   `subscription-gate-supervise.sh STATE_DIR`; state and cursor in STATE_DIR. `landing_drain_loop.py` drives `capture_sets_drain`
+   for queued days (proposals only); network errors and timeouts back off and retry (`test_landing_drain_loop.py`), an
+   empty queue idles and re-polls, and the same supervisor restarts it if it exits.
 
 ## Open items
 - Provider credit exhaustion (HTTP 402 from the fallback classifier) needs the account owner; the breaker only stops hammering.

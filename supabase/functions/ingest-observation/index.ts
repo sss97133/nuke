@@ -30,7 +30,9 @@ import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.t
 import { FINANCIAL_EVIDENCE_MODE, financialActor, ingestFinancialEvidence } from "./financialEvidence.ts";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
-import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey } from "./imageProperties.ts";
+import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey, isPhysicalReadingKey } from "./imageProperties.ts";
+import { prepareComponentEvidence, componentReadingSelector, COMPONENT_PRESENCE_PROPERTY, COMPONENT_READING_METHOD,
+  type ComponentEvidenceResult } from "./componentEvidence.ts";
 import { observationContentHash, observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
 import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
@@ -118,6 +120,9 @@ interface ObservationInput {
   descriptor_key?: string;
   /** Registered property represented by structured_data[property_key]. */
   property_key?: string;
+  /** Registered component position and exact retained image-reading selector. */
+  component_key?: string;
+  component_reading?: unknown;
   /** Typed source-comment lineage; PostgreSQL checks quote and same-vehicle identity. */
   source_comment_id?: string;
   /** Deterministic service-side projection may explicitly avoid downstream inference. */
@@ -357,7 +362,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         }) : { status: 401, body: { error: 'Accounting sign-in required' } };
         return new Response(JSON.stringify(result.body), { status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
       }
-      const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [["read", "tax_read"].includes(action) ? "read" : "write"] } };
+      const options = { apiKeys: { endpoint: "ingest-observation", requiredScopes: [["read", "tax_read", "projection_read"].includes(action) ? "read" : "write"] } };
       const identity = await authenticateWriter(req, options);
       const actor = identity.ok ? financialActor(identity.caller, action) : null;
       if (!actor) return new Response(
@@ -923,6 +928,39 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       }
     }
 
+    // Bind a part-scoped reading before hashing. The database repeats the source
+    // and image checks under locks, including current visibility and witness.
+    let component: Extract<ComponentEvidenceResult, { ok: true }> | null = null;
+    if (input.component_key !== undefined || input.component_reading !== undefined ||
+        input.extraction_method === COMPONENT_READING_METHOD || input.property_key === COMPONENT_PRESENCE_PROPERTY) {
+      const selector = componentReadingSelector(input.component_reading);
+      if (!selector || input.source_slug !== "photo_pipeline" || input.subject !== undefined || input.citation !== undefined ||
+          input.source_comment_id !== undefined || input.extractor_id !== undefined || retainedSourceId !== null) {
+        return new Response(JSON.stringify({ error: "Invalid component source scope", writes: 0 }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const [subjectRead, sourceRead, imageRead, witnessRead] = await Promise.all([
+        supabase.from("subject_taxonomy").select("subject_id,subject_key,display_name,is_active,domain,category").eq("subject_key", input.component_key).maybeSingle(),
+        supabase.from("vehicle_observations").select("id,vehicle_id,is_superseded,extraction_method,source_url,observed_at,structured_data")
+          .eq("id", selector.source_observation_id).maybeSingle(),
+        supabase.from("vehicle_images").select("id,vehicle_id,image_url,is_sensitive,is_document,redaction_level")
+          .eq("id", selector.image_id).maybeSingle(),
+        supabase.from("observation_witnesses").select("id").eq("observation_id", selector.source_observation_id)
+          .eq("image_id", selector.image_id).limit(1),
+      ]);
+      if ([subjectRead, sourceRead, imageRead, witnessRead].some(r => r.error)) return new Response(
+        JSON.stringify({ error: "Component source lookup unavailable", writes: 0 }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const qualified = await prepareComponentEvidence(input, subjectRead.data, sourceRead.data, imageRead.data, !!witnessRead.data?.length);
+      if (!qualified.ok) return new Response(JSON.stringify({ error: qualified.reason, writes: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      component = qualified;
+      input = { ...input, structured_data: component.structuredData, source_url: component.sourceUrl,
+        observed_at: component.observedAt, extraction_method: COMPONENT_READING_METHOD,
+        source_identifier: `${COMPONENT_READING_METHOD}:${component.sourceId}:${component.subjectId}:${input.property_key ?? input.descriptor_key}`,
+        raw_source_ref: `vehicle_observations:${component.sourceId}`, content_text: selector.quote };
+    }
+
     // Look up source
     const { data: source, error: sourceError } = (retainedSourceId && batchLookups?.get(`source-slug:${input.source_slug}`)) || await supabase
       .from("observation_sources")
@@ -977,8 +1015,10 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     let propertyRow = null;
     if (input.property_key !== undefined) {
       if (!isSupportedImagePropertyKey(input.property_key) && !isImageReadingKey(input.property_key) &&
+          !isPhysicalReadingKey(input.property_key) &&
           !(titleFacetVerified && (TITLE_FACET_KEYS as readonly string[]).includes(input.property_key)) &&
-          !(retainedSourceId && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
+          !(retainedSourceId && RETAINED_PROPERTY_KEYS.includes(input.property_key)) &&
+          !(component && input.property_key === COMPONENT_PRESENCE_PROPERTY)) {
         return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -991,7 +1031,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       }
       propertyRow = lookup.data;
     }
-    const property = validateObservationProperty(input, propertyRow, retainedSourceId !== null, titleFacetVerified);
+    const property = validateObservationProperty(input, propertyRow, retainedSourceId !== null, titleFacetVerified, component !== null);
     if (!property.ok) {
       return new Response(JSON.stringify({ error: property.error }),
         { status: property.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -1013,17 +1053,33 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     const replayQuery = () => {
       let query = supabase.from("vehicle_observations").select(ecr ? protectedColumns : retainedVin?.ok
         ? protectedColumns + ",source_vin,source_vin_taxonomy_revision_id,content_hash" : archivedSale?.ok
-        ? protectedColumns + (input.source_vehicle_event_id ? ",source_vehicle_event_id,extraction_metadata,content_hash" : "") : "id").eq("content_hash",contentHash);
+        ? protectedColumns + (input.source_vehicle_event_id ? ",source_vehicle_event_id,extraction_metadata,content_hash" : "")
+        : component ? "id,is_superseded,component_subject_id,source_observation_id,content_hash" : "id").eq("content_hash",contentHash);
       if (ecr || archivedSale?.ok || retainedVin?.ok) query = query.eq("source_id",source.id).eq("source_identifier",input.source_identifier!).eq("kind",input.kind);
       return query.maybeSingle().returns<Record<string, unknown> | null>();
     };
     const { data: existing, error: replayError } = await replayQuery();
-    if ((ecr || input.source_vehicle_event_id && archivedSale?.ok || retainedVin?.ok || retainedReportedWork) && replayError) {
+    if ((ecr || input.source_vehicle_event_id && archivedSale?.ok || retainedVin?.ok || retainedReportedWork || component) && replayError) {
       return new Response(JSON.stringify({ error: "Typed sale replay unavailable" }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const componentReply = async (row: Record<string, unknown> | null, duplicate: boolean): Promise<Response | null> => {
+      if (!component) return null;
+      if (!row?.id || row.is_superseded !== false || row.component_subject_id !== component.subjectId || row.source_observation_id !== component.sourceId)
+        return new Response(JSON.stringify({ error: "Component receipt unavailable", observation_id: row?.id ?? null }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const current = await supabase.rpc("component_reading_current", { p_observation: row.id });
+      if (current.error || current.data !== true) return new Response(JSON.stringify({ error: "Component source no longer qualified", observation_id: row.id }),
+        { status: current.error ? 503 : 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ success: true, duplicate, observation_id: row.id, vehicle_id: input.vehicle_id,
+        component_subject_id: component.subjectId, source_observation_id: component.sourceId, source_role: "attributed_retained_image_reading",
+        current_source_verified: true, installation_status: "unestablished", model_calls: 0, writes: duplicate ? 0 : 1 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    };
     if (existing) {
+      const componentResponse = await componentReply(existing, true);
+      if (componentResponse) return componentResponse;
       const protectedResponse = await protectedReply(existing,true);
       if (protectedResponse) return protectedResponse;
       return new Response(JSON.stringify({
@@ -1209,6 +1265,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
           source_vin_taxonomy_revision_id: input.source_vin_taxonomy_revision_id } : {}),
         ...(archivedSale?.ok && input.source_vehicle_event_id ? { source_vehicle_event_id: input.source_vehicle_event_id } : {}),
         ...(retainedSourceId ? { source_observation_id: retainedSourceId } : {}),
+        ...(component ? { component_subject_id: component.subjectId, source_observation_id: component.sourceId,
+          observed_at_basis: "source_analysis_time", source_event_time_precision: "unknown", source_event_at: null } : {}),
         vehicle_match_confidence: vehicleId ? vehicleMatchConfidence : null,
         vehicle_match_signals: Object.keys(vehicleMatchSignals).length > 0 ? vehicleMatchSignals : null,
         // Polymorphic subject (engineering-manual/20). Conditional spread: with no
@@ -1259,6 +1317,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       if (insertError.code === "23505") {
         const { data: winner } = await replayQuery();
         if (winner) {
+          const componentResponse = await componentReply(winner, true);
+          if (componentResponse) return componentResponse;
           const protectedResponse = await protectedReply(winner,true);
           if (protectedResponse) return protectedResponse;
           return new Response(JSON.stringify({ success: true, duplicate: true,
@@ -1273,6 +1333,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const componentResponse = await componentReply(observation, false);
+    if (componentResponse) return componentResponse;
     const protectedResponse = await protectedReply(observation,false);
     if (protectedResponse) return protectedResponse;
 

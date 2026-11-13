@@ -8,7 +8,7 @@
 //                            configured; disabled placeholders risk a 2.1
 //                            App Review rejection)
 //   Continue with email     (same account as nuke.ag)
-//   Look around first       (no auth — read-only Map + sample profile;
+//   Look around first       (no auth — read-only Map + profile search;
 //                            not-signing-in is not a dead end)
 //
 // SIWA nonce dance: a fresh random nonce is SHA-256-hashed into the Apple
@@ -319,7 +319,8 @@ struct AccountView: View {
                 // clear the on-device firewall (affirmative vehicle label AND no
                 // prominent face) before it uploads, so a private photo shot at
                 // the shop never crosses. OFF = owner mode (your own at-site
-                // photos upload ungated). Held photos stay on the phone.
+                // photos upload ungated). A held photo's pixels stay on the
+                // phone; its time and place still land (build 160).
                 Section {
                     Toggle("Contributing to a shop", isOn: Binding(
                         get: { sync.contributorMode },

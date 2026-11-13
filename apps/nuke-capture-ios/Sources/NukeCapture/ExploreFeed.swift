@@ -26,6 +26,8 @@ struct ExploreFeedItem: Identifiable, Equatable {
     let vehicleId: UUID?
     let year: Int?, make: String?, model: String?
     let link: URL?
+    /// When the lot was listed (live lots only); the clock door uses it for the auction's length.
+    var listedAt: Date? = nil
 
     /// Round-robin merge so neither population buries the other; order inside each
     /// population is kept as its read returned it. Rows without a photo are dropped —
@@ -50,6 +52,13 @@ struct ExploreFeedItem: Identifiable, Equatable {
         NukeDisplay.joined([location, facts, seen])
     }
 
+    /// The source's mark as nuke.ag hosts it (the files the web's source board shows), or nil when
+    /// none is known for this source, in which case the card keeps the text pill.
+    /// One table for the app's source marks (VehicleFirstScreen.sourceMarkURL), shared with the vehicle page.
+    var sourceLogoURL: URL? {
+        VehicleFirstScreen.sourceMarkURL(label: source)
+    }
+
     /// "Ends in 3d 4h" for a live lot, nil when there is no end time on record.
     func timeLeft(now: Date) -> String? {
         guard let endsAt else { return nil }
@@ -61,7 +70,7 @@ struct ExploreFeedItem: Identifiable, Equatable {
                         amount: lot.currentBid, amountLabel: "Current bid", endsAt: lot.endsAtDate,
                         source: "Bring a Trailer", location: nil, facts: lot.noReserve ? "No reserve" : nil,
                         seen: nil, vehicleId: lot.vehicleUUID, year: lot.year, make: lot.make, model: lot.model,
-                        link: lot.listingUrl.flatMap { URL(string: $0) })
+                        link: lot.listingUrl.flatMap { URL(string: $0) }, listedAt: lot.listedAtDate)
     }
 
     static func from(_ row: AskRow) -> ExploreFeedItem {
@@ -82,6 +91,9 @@ struct ExploreFeedView: View {
     @State private var loaded = false
     @State private var liveFailed = false
     @State private var askFailed = false
+    /// The open lots behind live cards, by card id: the bid door hands the lot to the bid reading.
+    @State private var lots: [String: LiveAuction] = [:]
+    @State private var drill: ExploreCardDrill?
 
     private var items: [ExploreFeedItem] { ExploreFeedItem.interleave(live: live, classified: classified) }
 
@@ -117,6 +129,7 @@ struct ExploreFeedView: View {
                     .padding(.top, NukeSpace.sm)
                 }
                 .refreshable { await load() }
+                .sheet(item: $drill) { d in ExploreCardDrillSheet(drill: d, lot: lots[d.item.id]) }
             }
         }
         .task { if !loaded { await load() } }
@@ -133,15 +146,18 @@ struct ExploreFeedView: View {
         if let uuid = item.vehicleId {
             NavigationLink(value: VehicleHeaderRow(id: uuid, year: item.year, make: item.make, model: item.model, trim: nil,
                                                    primary_image_url: item.image, city: item.location, state: nil)) {
-                ExploreHeroCard(item: item)
+                ExploreHeroCard(item: item, hasBidReading: lots[item.id] != nil, onDrill: openDrill)
             }
             .buttonStyle(.plain)
         } else if let link = item.link {
-            Link(destination: link) { ExploreHeroCard(item: item) }.buttonStyle(.plain)
+            Link(destination: link) { ExploreHeroCard(item: item, hasBidReading: lots[item.id] != nil, onDrill: openDrill) }
+                .buttonStyle(.plain)
         } else {
-            ExploreHeroCard(item: item)
+            ExploreHeroCard(item: item, hasBidReading: lots[item.id] != nil, onDrill: openDrill)
         }
     }
+
+    private func openDrill(_ d: ExploreCardDrill) { drill = d }
 
     private func prefetch(after idx: Int) {
         let all = items
@@ -158,16 +174,17 @@ struct ExploreFeedView: View {
         let (lr, ar) = await (l, a)
         liveFailed = lr == nil
         askFailed = ar == nil
-        live = lr ?? []
+        lots = Dictionary((lr ?? []).map { ($0.item.id, $0.lot) }, uniquingKeysWith: { first, _ in first })
+        live = lr?.map { $0.item } ?? []
         classified = ar ?? []
         loaded = true
     }
 
-    private static func readLive() async -> [ExploreFeedItem]? {
+    private static func readLive() async -> [(item: ExploreFeedItem, lot: LiveAuction)]? {
         guard let board = try? await LiveBoard.fetch() else { return nil }
         return board.open(at: Date())
             .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
-            .prefix(40).map(ExploreFeedItem.from)
+            .prefix(40).map { (ExploreFeedItem.from($0), $0) }
     }
 
     private static func readClassified() async -> [ExploreFeedItem]? {
@@ -177,33 +194,62 @@ struct ExploreFeedView: View {
 }
 
 /// A large rounded photo with the price on it and the car's name beneath. No scores.
+/// Three doors sit on it, each its own tap: the source's mark, the red countdown and the bid
+/// (live lots with a bid reading). A tap anywhere else opens the car, as before.
 struct ExploreHeroCard: View {
     let item: ExploreFeedItem
+    var hasBidReading = false
+    var onDrill: ((ExploreCardDrill) -> Void)? = nil
 
     var body: some View {
         NukeHeroCard(imageURL: NukeImage.thumb(item.image, width: 1080), title: item.title,
-                     subtitle: item.subtitle, pills: [item.source]) {
+                     subtitle: item.subtitle, pills: item.sourceLogoURL == nil ? [item.source] : [],
+                     sourceLogoURL: item.sourceLogoURL, sourceName: item.source,
+                     sourceDoor: onDrill.map { AnyView(door(.source, onDrill: $0)) }) {
             HStack(alignment: .bottom) {
                 if let amt = item.amount {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(item.amountLabel)
-                            .font(.system(.caption, design: .rounded).weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.85))
-                        Text(LiveBoardView.bidNumber(amt))
-                            .font(.nukeBigNumber)
-                            .foregroundStyle(.white)
+                    if let onDrill, hasBidReading, item.kind == .live {
+                        ExploreDoor(kind: .bid, item: item, open: onDrill) { amount(amt) }
+                    } else {
+                        amount(amt)
                     }
                 }
                 Spacer(minLength: NukeSpace.sm)
                 if item.endsAt != nil {
                     TimelineView(.periodic(from: .now, by: 60)) { ctx in
                         if let left = item.timeLeft(now: ctx.date) {
-                            NukePill(text: left, icon: "clock", onPhoto: true)
+                            if let onDrill {
+                                ExploreDoor(kind: .clock, item: item, alignment: .bottomTrailing, open: onDrill) { clock(left) }
+                            } else {
+                                clock(left)
+                            }
                         }
                     }
                 }
             }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: onDrill == nil ? .combine : .contain)
+    }
+
+    private func amount(_ amt: Double) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(item.amountLabel)
+                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .foregroundStyle(.white.opacity(0.85))
+            Text(LiveBoardView.bidNumber(amt))
+                .font(.nukeBigNumber)
+                .foregroundStyle(.white)
+        }
+    }
+
+    private func clock(_ left: String) -> some View {
+        NukePill(text: left, icon: "clock", onPhoto: true, textColor: Color.red)
+    }
+
+    /// The source door wraps the mark (or the source's text pill when no mark is known).
+    private func door(_ kind: ExploreCardDrill.Kind, onDrill: @escaping (ExploreCardDrill) -> Void) -> some View {
+        ExploreDoor(kind: kind, item: item, open: onDrill) {
+            if let url = item.sourceLogoURL { NukeSourceLogo(url: url, name: item.source) } else { NukePill(text: item.source) }
+        }
     }
 }
