@@ -142,6 +142,64 @@ private struct MapSourceComment: Decodable, Identifiable {
     let comment_type: String?
 }
 
+// COMMENT INTEL — stored analysis from popup_vehicle_intel
+private struct CommentIntelDoc: Decodable {
+    let comment_intel: CommentIntelData?
+
+    struct CommentIntelData: Decodable {
+        let key_quotes: [StringOrQuote]?
+        let expert_insights: [StringOrInsight]?
+        let community_concerns: [StringOrConcern]?
+        let price_sentiment: PriceSentiment?
+        let overall_sentiment: String?
+        let comment_count: Int?
+
+        struct PriceSentiment: Decodable {
+            let community_view: String?
+            let overall: String?
+        }
+    }
+
+    enum StringOrQuote: Decodable {
+        case string(String)
+        case object(QuoteObject)
+        struct QuoteObject: Decodable { let quote: String?; let significance: String? }
+        init(from decoder: Decoder) throws {
+            if let s = try? decoder.singleValueContainer().decode(String.self) { self = .string(s) }
+            else { self = .object(try QuoteObject(from: decoder)) }
+        }
+        var text: String {
+            switch self { case .string(let s): return s; case .object(let o): return o.quote ?? "" }
+        }
+    }
+
+    enum StringOrInsight: Decodable {
+        case string(String)
+        case object(InsightObject)
+        struct InsightObject: Decodable { let insight: String? }
+        init(from decoder: Decoder) throws {
+            if let s = try? decoder.singleValueContainer().decode(String.self) { self = .string(s) }
+            else { self = .object(try InsightObject(from: decoder)) }
+        }
+        var text: String {
+            switch self { case .string(let s): return s; case .object(let o): return o.insight ?? "" }
+        }
+    }
+
+    enum StringOrConcern: Decodable {
+        case string(String)
+        case object(ConcernObject)
+        struct ConcernObject: Decodable { let concern: String? }
+        init(from decoder: Decoder) throws {
+            if let s = try? decoder.singleValueContainer().decode(String.self) { self = .string(s) }
+            else { self = .object(try ConcernObject(from: decoder)) }
+        }
+        var text: String {
+            switch self { case .string(let s): return s; case .object(let o): return o.concern ?? "" }
+        }
+    }
+}
+
 // SALE HISTORY — real sale events from vehicle_timeline_events (same table the build-days
 // RPC reads; no new RPC). Deduped by (date|price|listing) because multiple ingest paths
 // write the SAME sale, which the profile otherwise reads as "sold twice" — a rendering
@@ -347,6 +405,9 @@ struct VehicleDetailView: View {
     @State private var posting = false
     @State private var followBusy = false
     @State private var showComments = false   // the comment thread lives in a summoned sheet
+    // COMMENT INTEL — the stored analysis of auction comments (popup_vehicle_intel)
+    @State private var commentIntel: CommentIntelDoc?
+    @State private var commentIntelError = false
     // CONTRIBUTE — the user's job: fill what the record needs. The unverified (facade)
     // specs ARE the needs (data-driven, no hardcoded "what matters"); a signed-in user
     // contributes a value → record_interaction(kind=specification) → testimony.
@@ -420,6 +481,7 @@ struct VehicleDetailView: View {
         .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadSaleHistory() } }
         .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadBookends() } }
         .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadEngagement() } }
+        .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadCommentIntel() } }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
@@ -656,6 +718,8 @@ struct VehicleDetailView: View {
                         profileHeaderBlock
                         // The organizations behind the vehicle (seller, owner, consigner, shop), each a door to its measures.
                         VehicleActorLinks(vehicleId: vehicleId).id("actors")
+                        // Comment compass — 2D map of auction comment sentiment
+                        commentCompassSection
                         buildInstrument
                         if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
                         valuationSection.id("worth")
@@ -1130,6 +1194,23 @@ struct VehicleDetailView: View {
         let priced = read.masthead?.price != nil
         let listed = pulse?.is_live == true
         return priced || listed
+    }
+
+    @ViewBuilder private var commentCompassSection: some View {
+        if let intel = commentIntel?.comment_intel {
+            let themes = CommentCompass.themesFromIntel(
+                insights: (intel.expert_insights ?? []).map(\.text),
+                concerns: (intel.community_concerns ?? []).map(\.text),
+                quotes: (intel.key_quotes ?? []).map(\.text),
+                priceSentiment: intel.price_sentiment?.overall ?? intel.price_sentiment?.community_view
+            )
+            if !themes.isEmpty {
+                CommentCompass(themes: themes, commentCount: intel.comment_count ?? 0)
+                    .padding(.horizontal, 16)
+            }
+        } else if commentIntelError {
+            sectionError("community analysis") { Task { await loadCommentIntel() } }
+        }
     }
 
     @ViewBuilder private var valuationSection: some View {
@@ -1728,6 +1809,20 @@ struct VehicleDetailView: View {
         } catch {
             engagementError = true
             NSLog("NukeCapture engagement load failed: %@", String(describing: error))
+        }
+    }
+
+    private func loadCommentIntel() async {
+        commentIntelError = false
+        do {
+            let result: CommentIntelDoc = try await SupabaseService.client
+                .rpc("popup_vehicle_intel", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+            commentIntel = result
+        } catch {
+            commentIntelError = true
+            NSLog("NukeCapture comment intel load failed: %@", String(describing: error))
         }
     }
 
