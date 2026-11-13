@@ -24,12 +24,18 @@ export interface CommentIntel {
   expert_insights: (string | { insight: string; expertise_level?: string })[] | null;
   community_concerns: (string | { concern: string })[] | null;
   price_sentiment: { community_view?: string; reasoning?: string; overall?: string; comments?: string } | null;
-  market_signals: { demand?: string; rarity?: string; price_trend?: string; value_factors?: string[] } | null;
+  market_signals: { demand?: string; rarity?: string; demand_level?: string; rarity_assessment?: string; price_trend?: string; value_factors?: string[] } | null;
   seller_disclosures: string[] | null;
   authenticity: { concerns_raised?: boolean | string; details?: string } | null;
   overall_sentiment: string | null;
   sentiment_score: number | null;
   comment_count: number | null;
+  /** Provenance of the stored summary; absent on summaries written before 2026-11-12. */
+  analyzed_at?: string | null;
+  model_used?: string | null;
+  prompt_version?: string | null;
+  comments_analyzed?: number | null;
+  quotes_dropped_not_verbatim?: number | null;
 }
 
 export interface DescriptionIntel {

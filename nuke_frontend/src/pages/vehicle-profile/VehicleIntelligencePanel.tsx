@@ -73,6 +73,21 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
   const insights = (ci.expert_insights || []).slice(0, 3).map(extractText).filter(Boolean);
   const concerns = (ci.community_concerns || []).slice(0, 3).map(extractText).filter(Boolean);
   const ms = ci.market_signals;
+  // A label the model answered "unknown" says nothing; show only the ones it committed to.
+  const known = (v?: string) => (v && v.toLowerCase() !== 'unknown' ? v : null);
+  const demand = known(ms?.demand ?? ms?.demand_level);
+  const rarity = known(ms?.rarity ?? ms?.rarity_assessment);
+  const priceTrend = known(ms?.price_trend);
+  const analyzedOn = ci.analyzed_at ? new Date(ci.analyzed_at) : null;
+  const provenance = ci.model_used && analyzedOn && !Number.isNaN(analyzedOn.getTime())
+    ? [
+        'Stored model interpretation',
+        ci.model_used,
+        `written ${analyzedOn.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`,
+        ci.comments_analyzed != null && ci.comment_count != null
+          ? `read ${ci.comments_analyzed} of ${ci.comment_count} comments` : null,
+      ].filter(Boolean).join(' · ') + '.'
+    : null;
 
   const hasContent = quotes.length > 0 || insights.length > 0 || concerns.length > 0 || ms;
   if (!hasContent && !ci.overall_sentiment) return null;
@@ -93,9 +108,9 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
       }
     >
       <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.5' }}>
-        {/* The current reader supplies outputs but no input membership or analysis provenance. */}
+        {/* Summaries written since 2026-11-12 carry their model, time and input count; older ones do not. */}
         <p style={{ margin: '0 0 8px', color: 'var(--vp-pencil)' }}>
-          Stored interpretation · input sample, method and analysis time unavailable.
+          {provenance ?? 'Stored interpretation · input sample, method and analysis time unavailable.'}
           {' '}Market performance remains unverified.
         </p>
         {/* Key Quotes */}
@@ -109,7 +124,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
                 marginBottom: '4px',
                 color: 'var(--vp-ink)',
               }}>
-                {truncate(q, 120)}
+                {truncate(q, 280)}
               </div>
             ))}
           </div>
@@ -121,7 +136,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
             <div style={{ ...LABEL, marginBottom: '4px' }}>EXTRACTED INSIGHTS</div>
             {insights.map((ins, i) => (
               <div key={i} style={{ marginBottom: '2px' }}>
-                {truncate(ins, 140)}
+                {ins}
               </div>
             ))}
           </div>
@@ -133,7 +148,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
             <div style={{ ...LABEL, marginBottom: '4px' }}>REPORTED CONCERNS</div>
             {concerns.map((c, i) => (
               <div key={i} style={{ marginBottom: '2px' }}>
-                {truncate(c, 120)}
+                {c}
               </div>
             ))}
           </div>
@@ -142,9 +157,9 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
         {/* Stored model labels; no cohort, time window or calibrated market measure supplied. */}
         {ms && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {ms.demand && <span style={BADGE}>DEMAND LABEL: {ms.demand}</span>}
-            {ms.rarity && <span style={BADGE}>RARITY LABEL: {ms.rarity}</span>}
-            {ms.price_trend && <span style={BADGE}>PRICE TREND LABEL: {ms.price_trend}</span>}
+            {demand && <span style={BADGE}>DEMAND LABEL: {demand}</span>}
+            {rarity && <span style={BADGE}>RARITY LABEL: {rarity}</span>}
+            {priceTrend && <span style={BADGE}>PRICE TREND LABEL: {priceTrend}</span>}
           </div>
         )}
       </div>
