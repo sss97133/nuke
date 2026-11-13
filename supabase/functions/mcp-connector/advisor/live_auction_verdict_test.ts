@@ -51,7 +51,7 @@ Deno.test("live BaT 911 Turbo: verdict compares current bid to fair band, no 'as
     const sc = res.structuredContent as unknown as Record<string, unknown>;
     const verdict = String(sc.verdict);
     assert(!/ask (below|above|inside) fair band/.test(verdict), verdict);
-    assert(/auction live, current bid \$120,000 vs fair band/.test(verdict), verdict);
+    assert(/auction live, current bid \$120,000 — below what similar cars sold for so far/.test(verdict), verdict);
     const listing = sc.listing as Record<string, unknown>;
     assert(listing.ask === null && listing.current_bid === 120000, JSON.stringify(listing));
   } finally {
