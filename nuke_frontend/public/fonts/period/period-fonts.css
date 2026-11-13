@@ -1,0 +1,64 @@
+/* Period type for the 1970s Pontiac Firebird header. Drawn for Nuke from cited period sources; see README.md and the
+   provenance sidecars. Not official General Motors typefaces. The app does not load this file: the vehicle identity
+   (MakeIdentity) adds each face when a catalogue entry's `font` matches, with the same materials in MakeIdentity.css.
+   This file serves the specimen and standalone pages. */
+
+@font-face { font-family: 'Pontiac 1973 Block'; src: url('pontiac-1973-block/Pontiac1973Block-Regular.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Pontiac 1973 Block Face'; src: url('pontiac-1973-block/Pontiac1973Block-Face.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Firebird 1971 Script'; src: url('firebird-1971-script/Firebird1971Script-Regular.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Trans Am 1973 Decal'; src: url('trans-am-1973-decal/TransAm1973Decal-Regular.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Pontiac 1973 Brochure Numerals'; src: url('pontiac-1973-brochure-numerals/Pontiac1973BrochureNumerals-Regular.woff2') format('woff2'); font-display: swap; }
+
+/* Material tokens. Chrome is a material, not a colour: a dark rim (the Regular silhouette), a bright face (the Face
+   font, the same advances inset 30 units) and a horizon line across the face. Decal orange is the decal's own ink. */
+:root {
+  --chrome-rim-a: #2b2f35; --chrome-rim-b: #7d8590; --chrome-rim-c: #1d2025;
+  --chrome-face-a: #ffffff; --chrome-face-b: #c9d0d8; --chrome-face-c: #59616b; --chrome-face-d: #e9edf1;
+  --chrome-edge: rgba(0, 0, 0, .35);
+  --decal-ink: #e8741c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chrome-rim-a: #9aa3ad; --chrome-rim-b: #e6eaee; --chrome-rim-c: #6c747e;
+    --chrome-face-a: #f4f6f8; --chrome-face-b: #8d96a1; --chrome-face-c: #3a4048; --chrome-face-d: #c4cbd3;
+    --chrome-edge: rgba(0, 0, 0, .8);
+    --decal-ink: #f08a35;
+  }
+}
+:root[data-theme="dark"] {
+  --chrome-rim-a: #9aa3ad; --chrome-rim-b: #e6eaee; --chrome-rim-c: #6c747e;
+  --chrome-face-a: #f4f6f8; --chrome-face-b: #8d96a1; --chrome-face-c: #3a4048; --chrome-face-d: #c4cbd3;
+  --chrome-edge: rgba(0, 0, 0, .8);
+  --decal-ink: #f08a35;
+}
+
+/* <span class="period-chrome" data-text="PONTIAC">PONTIAC</span> */
+.period-chrome {
+  position: relative; display: inline-block;
+  font-family: 'Pontiac 1973 Block'; letter-spacing: 0; line-height: 1;
+  color: transparent;
+  background: linear-gradient(180deg, var(--chrome-rim-a) 0%, var(--chrome-rim-b) 48%, var(--chrome-rim-c) 52%, var(--chrome-rim-b) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  filter: drop-shadow(0 .03em .02em var(--chrome-edge));
+}
+.period-chrome::after {
+  content: attr(data-text); position: absolute; inset: 0;
+  font-family: 'Pontiac 1973 Block Face';
+  color: transparent;
+  background: linear-gradient(180deg, var(--chrome-face-a) 0%, var(--chrome-face-b) 46%, var(--chrome-face-c) 50%, var(--chrome-face-d) 56%, var(--chrome-face-a) 100%);
+  -webkit-background-clip: text; background-clip: text;
+}
+
+/* script chrome: one layer, the same horizon gradient */
+.period-script-chrome {
+  font-family: 'Firebird 1971 Script'; color: transparent;
+  background: linear-gradient(180deg, var(--chrome-face-a) 0%, var(--chrome-face-b) 40%, var(--chrome-face-c) 50%, var(--chrome-face-d) 62%, var(--chrome-face-b) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  /* the edge is a filter, not -webkit-text-stroke: a stroke draws every glyph's outline and shows a seam at each
+     joined slab */
+  filter: drop-shadow(0 0 .01em var(--chrome-rim-a)) drop-shadow(0 0 .006em var(--chrome-rim-a))
+          drop-shadow(0 .02em .015em var(--chrome-edge));
+}
+
+.period-decal { font-family: 'Trans Am 1973 Decal'; color: var(--decal-ink); }
+.period-brochure { font-family: 'Pontiac 1973 Brochure Numerals'; }

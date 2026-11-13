@@ -1,0 +1,62 @@
+{
+ "nuke_frontend/public/fonts/period/pontiac-1973-brochure-numerals/Pontiac1973BrochureNumerals-Regular.otf": {
+  "file": "Pontiac1973BrochureNumerals-Regular.otf",
+  "glyphs": 30,
+  "cmap": 28,
+  "missing": [],
+  "emptyOutlines": [],
+  "provenance": {
+   "traced": 15,
+   "derived": 9,
+   "designed": 4
+  }
+ },
+ "nuke_frontend/public/fonts/period/pontiac-1973-block/Pontiac1973Block-Regular.otf": {
+  "file": "Pontiac1973Block-Regular.otf",
+  "glyphs": 45,
+  "cmap": 70,
+  "missing": [],
+  "emptyOutlines": [],
+  "provenance": {
+   "traced": 7,
+   "designed": 35,
+   "derived": 1
+  }
+ },
+ "nuke_frontend/public/fonts/period/pontiac-1973-block/Pontiac1973Block-Face.otf": {
+  "file": "Pontiac1973Block-Face.otf",
+  "glyphs": 45,
+  "cmap": 70,
+  "missing": [],
+  "emptyOutlines": [],
+  "provenance": {
+   "traced": 7,
+   "designed": 35,
+   "derived": 1
+  }
+ },
+ "nuke_frontend/public/fonts/period/trans-am-1973-decal/TransAm1973Decal-Regular.otf": {
+  "file": "TransAm1973Decal-Regular.otf",
+  "glyphs": 45,
+  "cmap": 70,
+  "missing": [],
+  "emptyOutlines": [],
+  "provenance": {
+   "traced": 6,
+   "designed": 36,
+   "derived": 1
+  }
+ },
+ "nuke_frontend/public/fonts/period/firebird-1971-script/Firebird1971Script-Regular.otf": {
+  "file": "Firebird1971Script-Regular.otf",
+  "glyphs": 39,
+  "cmap": 38,
+  "missing": [],
+  "emptyOutlines": [],
+  "provenance": {
+   "traced": 6,
+   "derived": 17,
+   "designed": 14
+  }
+ }
+}

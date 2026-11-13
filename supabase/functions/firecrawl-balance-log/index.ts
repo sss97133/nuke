@@ -10,6 +10,8 @@ import { requireWriteAuth } from '../_shared/writeGuard.ts';
 
 Deno.serve(async (req) => {
   const denied = await requireWriteAuth(req); if (denied) return denied;
+  // writeGuard passes OPTIONS through unjudged; answer the preflight here so it never runs the write.
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204 });
   const key = Deno.env.get('FIRECRAWL_API_KEY');
   if (!key) return new Response(JSON.stringify({ ok: false, error: 'no key' }), { status: 500 });
   const res = await fetch('https://api.firecrawl.dev/v1/team/credit-usage', { headers: { Authorization: `Bearer ${key}` } });

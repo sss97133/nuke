@@ -159,8 +159,9 @@ If you see a receipt, read it to find clues about which vehicle it's for (part n
     const mediaType = image.image_url.includes('.png') ? 'image/png' : 'image/jpeg';
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
+      model: "claude-sonnet-5-5",
+      max_tokens: 4000,
+      ...({ output_config: { effort: "low" } } as any),
       messages: [
         {
           role: "user",
@@ -183,7 +184,7 @@ If you see a receipt, read it to find clues about which vehicle it's for (part n
     });
 
     // Parse the response
-    const content = response.content[0];
+    const content: any = response.content.find((b: any) => b.type === "text") ?? response.content[0];
     if (content.type !== "text") {
       throw new Error("Unexpected response type");
     }
@@ -237,8 +238,9 @@ async function processReceipt(imageId: string, imageUrl: string, vehicleId: stri
 
     // Extract receipt details
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
+      model: "claude-sonnet-5-5",
+      max_tokens: 4000,
+      ...({ output_config: { effort: "low" } } as any),
       messages: [{
         role: "user",
         content: [
@@ -259,7 +261,7 @@ async function processReceipt(imageId: string, imageUrl: string, vehicleId: stri
       }]
     });
 
-    const content = response.content[0];
+    const content: any = response.content.find((b: any) => b.type === "text") ?? response.content[0];
     if (content.type !== "text") return;
 
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);

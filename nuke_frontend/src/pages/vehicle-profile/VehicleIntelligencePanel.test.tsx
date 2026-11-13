@@ -18,6 +18,17 @@ async function mount(commentIntel?: any) {
   if (commentIntel) fixture.context.vehicleIntel = { comment_intel: commentIntel };
   await act(async () => root.render(<VehicleIntelligencePanel />));
 }
+it('shows an acceptance milestone as awaiting schedule without an auction date', async () => {
+  fixture.context.vehicleIntel = { apparitions: [
+    { platform: 'bat', event_type: 'auction', event_date: null, price: null, url: null, schedule_status: 'accepted_awaiting_schedule' },
+    { platform: 'owner_import', event_type: 'listing', event_date: null, price: null, url: null },
+  ] };
+  await mount();
+  const heading = [...host.querySelectorAll('button,[role="button"]')].find(element => element.textContent?.includes('Apparition History')) as HTMLElement;
+  await act(async () => heading.click());
+  expect(host.textContent).toContain('Accepted · awaiting schedule');
+  expect(host.textContent).toContain('Date TBD');
+});
 
 it('qualifies stored interpretations without certifying experts, excerpts or market performance', async () => {
   await mount({ overall_sentiment: 'positive', comment_count: 73,
@@ -25,37 +36,71 @@ it('qualifies stored interpretations without certifying experts, excerpts or mar
     community_concerns: [{ concern: 'Reported concern' }],
     market_signals: { demand: 'high', rarity: 'rare', price_trend: 'rising' } });
   expect(host.textContent).toContain('Comment summary');
-  expect(host.textContent).toContain('REPORTED: positive');
-  expect(host.textContent).toContain('73 COMMENTS REPORTED');
+  // The model's sentiment is a sentence under its reading, never a status chip in the head.
+  expect(host.textContent).toContain('Model reads the comments as positive.');
+  expect(host.textContent).not.toContain('REPORTED:');
+  expect(host.textContent).toContain('73 comments');
   expect(host.textContent).toContain('input sample, method and analysis time unavailable');
   expect(host.textContent).toContain('Market performance remains unverified');
-  for (const label of ['REPORTED EXCERPTS', 'EXTRACTED INSIGHTS', 'REPORTED CONCERNS',
-    'DEMAND LABEL: high', 'RARITY LABEL: rare', 'PRICE TREND LABEL: rising',
+  for (const label of ['What commenters wrote', "Model's reading of the comments · not verified", 'Concerns the model read in the comments · not verified',
     'Reported wording', 'Extracted observation', 'Reported concern']) expect(host.textContent).toContain(label);
+  // A model's market labels are never rendered as statuses.
+  for (const chip of ['DEMAND LABEL', 'RARITY LABEL', 'PRICE TREND LABEL']) expect(host.textContent).not.toContain(chip);
   for (const claim of ['Community Intelligence', 'EXPERT INSIGHTS', 'KEY QUOTES']) expect(host.textContent).not.toContain(claim);
   expect(host.querySelector('[style*="vp-brg"], [style*="vp-danger"]')).toBeNull();
 });
 
+it('names the model, date and input count when the summary carries them, and shows no market labels', async () => {
+  const insight = 'An extracted observation long enough that the old card would have cut it off before the reader reached the part that matters to a buyer deciding on the car.';
+  await mount({ overall_sentiment: 'mixed', comment_count: 84, comments_analyzed: 84, model_used: 'claude-haiku-5-5',
+    analyzed_at: '2026-11-12T12:15:24.689+00:00', expert_insights: [insight],
+    market_signals: { demand_level: 'high', rarity_assessment: 'unknown', price_trend: 'unknown' } });
+  expect(host.textContent).toContain('Stored model interpretation · claude-haiku-5-5 · written Nov 12, 2026.');
+  // How much it read is the card's coverage, stated once.
+  expect(host.textContent?.match(/84 of 84 comments read/g)?.length).toBe(1);
+  expect(host.textContent).not.toContain('analysis time unavailable');
+  expect(host.textContent).toContain('Market performance remains unverified');
+  expect(host.textContent).toContain(insight);
+  expect(host.textContent).not.toContain('DEMAND LABEL');
+  expect(host.textContent).not.toContain('RARITY LABEL');
+  expect(host.textContent).not.toContain('PRICE TREND LABEL');
+});
+
+it('opens a quote into its comment in place, with the listing link as the source line', async () => {
+  await mount({ overall_sentiment: 'mixed', comment_count: 2, key_quotes: [
+    { quote: 'Sold my last one too early', author: 'gearhead77', posted_at: '2026-11-11T12:00:00+00:00',
+      url: 'https://bringatrailer.com/listing/example/#comment-123', comment_id: 'c1',
+      comment_text: 'Sold my last one too early and have regretted it since.' },
+    { quote: 'Older text-only quote' }] });
+  const details = host.querySelector('details')!;
+  expect(details.querySelector('summary')?.textContent).toBe('Sold my last one too early');
+  expect(details.textContent).toContain('@gearhead77');
+  expect(details.textContent).toContain('Sold my last one too early and have regretted it since.');
+  const link = details.querySelector('a[href="https://bringatrailer.com/listing/example/#comment-123"]');
+  expect(link?.textContent).toContain('Source: comment on the listing');
+  expect(host.textContent).toContain('Older text-only quote');
+  expect(host.querySelectorAll('details').length).toBe(1);
+});
+
 it.each([0, null, undefined])('keeps reported count %s distinct from absent count', async count => {
-  await mount({ overall_sentiment: 'unknown', comment_count: count });
-  expect(host.textContent?.includes('0 COMMENTS REPORTED')).toBe(count === 0);
-  expect(host.textContent).toContain('REPORTED: unknown');
-  expect(host.textContent).not.toContain('null COMMENTS');
-  expect(host.textContent).not.toContain('undefined COMMENTS');
+  await mount({ overall_sentiment: 'unknown', comment_count: count, key_quotes: [{ quote: 'Reported wording' }] });
+  expect(host.textContent?.includes('0 comments')).toBe(count === 0);
+  expect(host.textContent).not.toContain('null comments');
+  expect(host.textContent).not.toContain('undefined comments');
 });
 
 it('keeps the qualification inside the keyboard-accessible summary', async () => {
-  await mount({ overall_sentiment: 'negative' });
+  await mount({ overall_sentiment: 'negative', key_quotes: [{ quote: 'Reported wording' }] });
   const header = host.querySelector('[role="button"]')!;
   expect(header.getAttribute('tabindex')).toBe('0');
   await act(async () => { header.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
   expect(host.textContent).not.toContain('Stored interpretation');
-  expect(host.textContent).toContain('REPORTED: negative');
+  expect(host.textContent).toContain('Comment summary');
   await act(async () => { header.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); });
   expect(host.textContent).toContain('Stored interpretation');
 });
 
-it.each([null, { comment_intel: null }, { comment_intel: {} }])('leaves absent summary %j empty', async intel => {
+it.each([null, { comment_intel: null }, { comment_intel: {} }, { comment_intel: { overall_sentiment: 'positive' } }])('leaves absent summary %j empty', async intel => {
   fixture.context.vehicleIntel = intel; await mount(); expect(host.textContent).toBe('');
 });
 

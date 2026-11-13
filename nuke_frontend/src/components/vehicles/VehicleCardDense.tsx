@@ -1853,7 +1853,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   marginBottom: '4px',
                 }}
               >
-                {identityMake && identityModel ? <VehicleIdentity compact
+                {identityMake && identityModel ? <VehicleIdentity compact vehicleId={vehicle.id}
                   year={identity.primary.find(token => token.kind === 'year')?.value}
                   make={identityMake} model={identityModel} variants={identity.differentiators} /> : vehicleTitle}
               </div>

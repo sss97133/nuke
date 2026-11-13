@@ -1,11 +1,28 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// The identity catalogue keeps each mark's provenance (notes, attribution, evidence, hashes, cut command) in the
+// public file; the bundle carries only what the renderer reads. Build only: tests read the full record.
+const IDENTITY_PROVENANCE = ['notes', 'attribution', 'evidenceDocuments', 'sourceAsset', 'source', 'evidence',
+  'sourceSha256Base64', 'localSha256Base64', 'retrievedAt'];
+const identityCatalogueProjection = (): Plugin => ({
+  name: 'identity-catalogue-projection', enforce: 'pre', apply: 'build',
+  transform(code, id) {
+    if (!id.endsWith('/stacks/makes/vehicle-identities.json')) return null;
+    const entries = (JSON.parse(code) as Record<string, unknown>[]).map(entry => {
+      const runtime = Object.fromEntries(Object.entries(entry).filter(([key]) => !IDENTITY_PROVENANCE.includes(key)));
+      if (runtime.cutout) runtime.cutout = true;
+      return runtime;
+    });
+    return { code: JSON.stringify(entries), map: null };
+  },
+});
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [identityCatalogueProjection(), react()],
   // Expose both Vite-standard env vars and legacy names used in some deploy setups.
   // This lets production builds read `SUPABASE_URL` / `SUPABASE_ANON_KEY` if those are
   // what the platform provides, while still supporting `VITE_SUPABASE_*`.
