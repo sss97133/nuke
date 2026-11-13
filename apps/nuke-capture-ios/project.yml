@@ -111,8 +111,9 @@ targets:
         # (see apps/APP_STORE_LAUNCH.md) — keep them in sync. Register: report,
         # don't teach (CONSTRAINTS.md C8).
         NSPhotoLibraryUsageDescription: >-
-          Photos taken at your work sites join your record. Everything else
-          stays on this phone.
+          Photos of your work and vehicles join your record. For other photos
+          only the time and rough place are sent; the pictures stay on this
+          phone.
         # ── Camera ── Paperwork scan mode only (VisionKit document camera for receipts,
         # work orders and titles). Nothing else in the app opens the camera.
         NSCameraUsageDescription: >-

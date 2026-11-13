@@ -99,9 +99,6 @@ const SellDashboard = React.lazy(() => import('../pages/SellDashboard'));
 // Team Inbox
 const TeamInbox = React.lazy(() => import('../pages/TeamInbox'));
 
-// Photo / Unified Inbox
-const PersonalPhotoLibrary = React.lazy(() => import('../pages/PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
-
 const SettingsHubPage = React.lazy(() => import('../pages/settings/SettingsHubPage'));
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
 const AIAccessPage = React.lazy(() => import('../pages/settings/AIAccessPage'));
@@ -281,8 +278,9 @@ export const DomainRoutes = () => {
           <Route path="/capsule" element={<Capsule />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/debrief" element={<DailyDebrief />} />
-          <Route path="/inbox" element={<PersonalPhotoLibrary />} />
-          <Route path="/photo-library" element={<PersonalPhotoLibrary />} />
+          {/* The manual photo sorter is retired: photos file themselves; the capture ledger shows where each one landed or why it was held. */}
+          <Route path="/inbox" element={<Navigate to="/capture/ledger" replace />} />
+          <Route path="/photo-library" element={<Navigate to="/capture/ledger" replace />} />
           <Route path="/team-inbox" element={<TeamInbox />} />
 
           {/* Content / data management */}

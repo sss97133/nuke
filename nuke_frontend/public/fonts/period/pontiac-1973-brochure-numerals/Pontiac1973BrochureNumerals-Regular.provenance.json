@@ -1,0 +1,679 @@
+{
+ "family": "Pontiac 1973 Brochure Numerals",
+ "style": "Regular",
+ "version": "0.100",
+ "unitsPerEm": 1000,
+ "capHeight": 700,
+ "xHeight": 472,
+ "ascender": 900,
+ "descender": -250,
+ "license": "Drawn for Nuke (nuke.ag) from the cited period sources listed in the provenance sidecar. Descriptive family name; not an official General Motors or Pontiac typeface and not endorsed by General Motors. Pontiac, Firebird and Trans Am are trademarks of General Motors. Font software: SIL Open Font License 1.1.",
+ "glyphCount": 30,
+ "glyphs": {
+  "space": {
+   "unicode": "U+0020",
+   "advance": 230,
+   "provenance": "designed",
+   "method": "tight word space, as the cover setting",
+   "lint": {
+    "nodes": 0,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "P": {
+   "unicode": "U+0050",
+   "advance": 606,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     323,
+     231
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9757,
+    "maxDevPx": 6.71,
+    "meanDevPx": 1.104
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 39,
+    "missingExtrema": 2,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "o": {
+   "unicode": "U+006F",
+   "advance": 525,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     431,
+     283
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9803,
+    "maxDevPx": 3.0,
+    "meanDevPx": 0.833
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 11,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "n": {
+   "unicode": "U+006E",
+   "advance": 576,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     534,
+     283
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9757,
+    "maxDevPx": 3.0,
+    "meanDevPx": 0.986
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 40,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "t_i": {
+   "unicode": null,
+   "advance": 520,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     643,
+     258
+    ],
+    [
+     708,
+     235
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9761,
+    "maxDevPx": 3.61,
+    "meanDevPx": 0.902
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 58,
+    "missingExtrema": 3,
+    "microSegments": 0,
+    "nearKinks": 14
+   }
+  },
+  "a": {
+   "unicode": "U+0061",
+   "advance": 503,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     749,
+     284
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9775,
+    "maxDevPx": 4.12,
+    "meanDevPx": 0.857
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 44,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 10
+   }
+  },
+  "c": {
+   "unicode": "U+0063",
+   "advance": 424,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     847,
+     282
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9743,
+    "maxDevPx": 3.16,
+    "meanDevPx": 0.92
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 24,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 8
+   }
+  },
+  "one": {
+   "unicode": "U+0031",
+   "advance": 351,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     994,
+     230
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9809,
+    "maxDevPx": 3.61,
+    "meanDevPx": 0.86
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 30,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "nine": {
+   "unicode": "U+0039",
+   "advance": 541,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     1047,
+     228
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9749,
+    "maxDevPx": 3.61,
+    "meanDevPx": 1.061
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 20,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "seven": {
+   "unicode": "U+0037",
+   "advance": 486,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     1153,
+     226
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9793,
+    "maxDevPx": 4.0,
+    "meanDevPx": 0.871
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 32,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 7
+   }
+  },
+  "three": {
+   "unicode": "U+0033",
+   "advance": 476,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-cover.jpg",
+   "sourceSha256Base64": "xZvyuTCWjIRkGRvqR3XUMxEZkr/nDTwNaS4fTKs280E=",
+   "components": [
+    [
+     1238,
+     228
+    ]
+   ],
+   "levelDeg": -0.376,
+   "pxPerUnit": 0.22714,
+   "baselinePx": 389.8,
+   "fidelity": {
+    "iou": 0.9802,
+    "maxDevPx": 4.0,
+    "meanDevPx": 0.817
+   },
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html",
+   "lint": {
+    "nodes": 28,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 4
+   }
+  },
+  "F": {
+   "unicode": "U+0046",
+   "advance": 526,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-firebird-spread.jpg",
+   "sourceSha256Base64": "Qt0tRVPtcivcW7BJhKJVRQcKZalY7dZOlJGPpxR4FXc=",
+   "components": [
+    [
+     71,
+     86
+    ]
+   ],
+   "levelDeg": -0.3,
+   "pxPerUnit": 0.09014,
+   "baselinePx": 148.5,
+   "fidelity": {
+    "iou": 0.9392,
+    "maxDevPx": 4.0,
+    "meanDevPx": 0.877
+   },
+   "page": "1973 Pontiac full-line brochure, pp. 10-11 (Firebird)",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html",
+   "lint": {
+    "nodes": 39,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 3
+   }
+  },
+  "r": {
+   "unicode": "U+0072",
+   "advance": 369,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-firebird-spread.jpg",
+   "sourceSha256Base64": "Qt0tRVPtcivcW7BJhKJVRQcKZalY7dZOlJGPpxR4FXc=",
+   "components": [
+    [
+     113,
+     105
+    ]
+   ],
+   "levelDeg": -0.3,
+   "pxPerUnit": 0.09014,
+   "baselinePx": 148.5,
+   "fidelity": {
+    "iou": 0.9294,
+    "maxDevPx": 4.24,
+    "meanDevPx": 1.064
+   },
+   "page": "1973 Pontiac full-line brochure, pp. 10-11 (Firebird)",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html",
+   "lint": {
+    "nodes": 19,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "e": {
+   "unicode": "U+0065",
+   "advance": 430,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-firebird-spread.jpg",
+   "sourceSha256Base64": "Qt0tRVPtcivcW7BJhKJVRQcKZalY7dZOlJGPpxR4FXc=",
+   "components": [
+    [
+     113,
+     105
+    ]
+   ],
+   "levelDeg": -0.3,
+   "pxPerUnit": 0.09014,
+   "baselinePx": 148.5,
+   "fidelity": {
+    "iou": 0.9458,
+    "maxDevPx": 3.0,
+    "meanDevPx": 0.771
+   },
+   "page": "1973 Pontiac full-line brochure, pp. 10-11 (Firebird)",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html",
+   "lint": {
+    "nodes": 26,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "b": {
+   "unicode": "U+0062",
+   "advance": 548,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-firebird-spread.jpg",
+   "sourceSha256Base64": "Qt0tRVPtcivcW7BJhKJVRQcKZalY7dZOlJGPpxR4FXc=",
+   "components": [
+    [
+     198,
+     82
+    ]
+   ],
+   "levelDeg": -0.3,
+   "pxPerUnit": 0.09014,
+   "baselinePx": 148.5,
+   "fidelity": {
+    "iou": 0.9553,
+    "maxDevPx": 3.0,
+    "meanDevPx": 0.797
+   },
+   "page": "1973 Pontiac full-line brochure, pp. 10-11 (Firebird)",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html",
+   "lint": {
+    "nodes": 28,
+    "missingExtrema": 3,
+    "microSegments": 0,
+    "nearKinks": 3
+   }
+  },
+  "d": {
+   "unicode": "U+0064",
+   "advance": 543,
+   "provenance": "traced",
+   "source": "pontiac-1973-full-line-firebird-spread.jpg",
+   "sourceSha256Base64": "Qt0tRVPtcivcW7BJhKJVRQcKZalY7dZOlJGPpxR4FXc=",
+   "components": [
+    [
+     294,
+     80
+    ]
+   ],
+   "levelDeg": -0.3,
+   "pxPerUnit": 0.09014,
+   "baselinePx": 148.5,
+   "fidelity": {
+    "iou": 0.9524,
+    "maxDevPx": 4.24,
+    "meanDevPx": 0.849
+   },
+   "page": "1973 Pontiac full-line brochure, pp. 10-11 (Firebird)",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html",
+   "lint": {
+    "nodes": 26,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "zero": {
+   "unicode": "U+0030",
+   "advance": 527,
+   "provenance": "derived",
+   "from": [
+    "o"
+   ],
+   "method": "outer contour and counter of the traced o scaled vertically to figure height separately, keeping its top and bottom stroke weights (x 0.97)",
+   "lint": {
+    "nodes": 11,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "six": {
+   "unicode": "U+0036",
+   "advance": 541,
+   "provenance": "derived",
+   "from": [
+    "nine"
+   ],
+   "method": "rotation 180 degrees",
+   "lint": {
+    "nodes": 21,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "eight": {
+   "unicode": "U+0038",
+   "advance": 522,
+   "provenance": "derived",
+   "from": [
+    "nine"
+   ],
+   "method": "bowl of the traced 9, closed by mirroring its left half; two loops sized 1 : 0.86 whose top and bottom strokes coincide in one 72-unit waist",
+   "lint": {
+    "nodes": 30,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 3
+   }
+  },
+  "five": {
+   "unicode": "U+0035",
+   "advance": 480,
+   "provenance": "derived",
+   "from": [
+    "three",
+    "seven"
+   ],
+   "designedParts": [
+    "stem"
+   ],
+   "method": "lower bowl and middle bar of the traced 3, the traced 7's top bar turned end for end, joined by a 110-unit stem",
+   "lint": {
+    "nodes": 30,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 1
+   }
+  },
+  "two": {
+   "unicode": "U+0032",
+   "advance": 478,
+   "provenance": "derived",
+   "from": [
+    "three"
+   ],
+   "designedParts": [
+    "spine",
+    "base"
+   ],
+   "method": "top arch and beak terminal of the traced 3; spine thinning from 125 to 85 units on the oblique stress; flat base 92 units with an up-turned right serif",
+   "lint": {
+    "nodes": 20,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "four": {
+   "unicode": "U+0034",
+   "advance": 459,
+   "provenance": "derived",
+   "from": [
+    "one"
+   ],
+   "designedParts": [
+    "diagonal",
+    "crossbar"
+   ],
+   "method": "stem and foot serif of the traced 1 (cut below its flag); hairline diagonal to a closed apex; crossbar 82 units",
+   "lint": {
+    "nodes": 37,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "t": {
+   "unicode": "U+0074",
+   "advance": 279,
+   "provenance": "derived",
+   "from": [
+    "t_i"
+   ],
+   "method": "left part of the traced ti ligature, cut through its shared crossbar",
+   "lint": {
+    "nodes": 37,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 12
+   }
+  },
+  "i": {
+   "unicode": "U+0069",
+   "advance": 240,
+   "provenance": "derived",
+   "from": [
+    "n",
+    "t_i"
+   ],
+   "method": "left stem and entry serif of the traced n, cut before the shoulder, with the dot of the ti ligature",
+   "lint": {
+    "nodes": 30,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 2
+   }
+  },
+  "period": {
+   "unicode": "U+002E",
+   "advance": 229,
+   "provenance": "derived",
+   "from": [
+    "t_i"
+   ],
+   "method": "the i dot on the baseline",
+   "lint": {
+    "nodes": 4,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "comma": {
+   "unicode": "U+002C",
+   "advance": 256,
+   "provenance": "designed",
+   "from": [
+    "period"
+   ],
+   "method": "the period with a tapered tail, the same beak taper as the 7 and 3 terminals",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "quotesingle": {
+   "unicode": "U+0027",
+   "advance": 256,
+   "provenance": "designed",
+   "from": [
+    "comma"
+   ],
+   "method": "comma raised to figure height",
+   "lint": {
+    "nodes": 8,
+    "missingExtrema": 1,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "hyphen": {
+   "unicode": "U+002D",
+   "advance": 308,
+   "provenance": "designed",
+   "method": "bar 260 x 62 at 250, weight of the 7 top bar",
+   "lint": {
+    "nodes": 4,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  },
+  "slash": {
+   "unicode": "U+002F",
+   "advance": 350,
+   "provenance": "designed",
+   "method": "diagonal 70 units wide, 72 degrees",
+   "lint": {
+    "nodes": 4,
+    "missingExtrema": 0,
+    "microSegments": 0,
+    "nearKinks": 0
+   }
+  }
+ },
+ "sources": {
+  "pontiac-1973-full-line-cover.jpg": {
+   "page": "1973 Pontiac full-line brochure, cover",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html"
+  },
+  "pontiac-1973-full-line-firebird-spread.jpg": {
+   "page": "1973 Pontiac full-line brochure, pp. 10-11 (Firebird)",
+   "url": "https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-10-11.html"
+  }
+ },
+ "figureHeight": 720,
+ "rules": "Pontiac 1973 Brochure Numerals: the heavy serif of the 1973 Pontiac full-line brochure (\"Pontiac 1973\" on the\ncover, \"Firebird\" on pages 10-11), extended to 0-9 with the capitals and lowercase the brochure prints.\n\nSources (committed originals in nuke_frontend/public/stacks/makes):\n  cover  = pontiac-1973-full-line-cover.jpg            \"Pontiac 1973\": P o n t+i (ligature) a c 1 9 7 3; cap 159 px\n  spread = pontiac-1973-full-line-firebird-spread.jpg  \"Firebird\" heading: F r e b d; cap 63 px\nDesign rules (measured on the cover, font units at cap 700):\n  figures are lining and taller than the capitals (720 vs 700, rounds overshoot about 15 below and above);\n  capital stem 125-136, lowercase stem 110-114, bowl maximum 140-155 on the stress, hairline 45-60;\n  stems are slightly waisted (concave) and flare into bracketed, cupped serifs;\n  the stress is oblique (thin at 10-11 o'clock and 4-5 o'clock), terminals are tapered beaks, not balls.\n"
+}

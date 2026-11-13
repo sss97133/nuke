@@ -57,8 +57,14 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { noticeFrom, sweepCraigslistRemovals } from "./removal.ts";
 import { parseKslSearchCards } from "./kslCards.ts";
 import { splitByYear } from "./yearFilter.ts";
+import { selectCollectingCarsReplay } from "./collectingCarsReplay.ts";
+import { prepareCollectingCarsHistory } from "./collectingCarsHistory.ts";
+// Native history preparation also admits bounded, explicitly configured retained discovery manifests.
 import { nextYield } from "./schedule.ts";
 import { pollPurplewave } from "./purplewave.ts";
+import { pollMcCormick } from "./mccormick.ts";
+import { CC_LISTING_METHOD, CC_OBSERVATION_COLUMNS, collectingCarsReceipt, collectingCarsAdmissionMatches,
+  prepareCollectingCarsLedger, planCollectingCarsIngests, collectingCarsCaptureInterval, readCollectingCarsInventory, type CollectingCarsReceipt } from "./collectingCars.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -270,10 +276,12 @@ interface FeedResult {
     ledger?: string; // firecrawl_html path: the import_queue status written for this URL
     ledger_write_status?: 'acknowledged' | 'unavailable';
     ingest_attempted?: boolean;
+    collecting_cars_receipt?: CollectingCarsReceipt;
     dealer_receipt?: { observation_id: string; snapshot_id: string; listing_event_id: string; observed_at: string };
   }>;
   error: string | null;
   deferred_reason?: string | null;
+  retained_inventory?: Record<string, unknown>;
 }
 
 /**
@@ -599,7 +607,8 @@ async function pollFirecrawlHtmlFeed(
     return result;
   };
 
-  // Acquire listing URLs. Two strategies share the ingest/ledger tail below:
+  // Acquire listing URLs. Retained CC inventory and the existing source strategies
+  // share the bounded ingest/ledger tail below (no CC sitemap/source fetch).
   //  - rss_direct_ingest: plain RSS fetch (e.g. BaT /feed/ -- publicly served,
   //    verified 2026-07-02). Item links become listing URLs and go straight
   //    through `ingest`. Bypasses import_queue entirely: nothing drains that
@@ -612,9 +621,40 @@ async function pollFirecrawlHtmlFeed(
   let blockNote = "";
   let confirmedEmptySearch = false;
   const nativeDealer = ["gr_auto_gallery", "streetside_classics"].includes(feed.source_slug);
+  const nativeCc = feed.source_slug === "collecting-cars";
+  const ccHistory = nativeCc && feed.search_criteria?.fetch_strategy === "collecting_cars_history";
+  let historyPage: Awaited<ReturnType<typeof prepareCollectingCarsHistory>> | null = null;
   let nativeSourceId: string | null = null;
+  let ccReplayAvailable = false;
 
-  if (feed.source_slug === "gr_auto_gallery" || feed.source_slug === "streetside_classics") {
+  if (nativeCc) {
+    const [source, capability] = await Promise.all([
+      supabase.from("observation_sources").select("id,supported_observations").eq("slug", "collecting-cars").maybeSingle(),
+      supabase.functions.invoke("ingest", { method: "GET" }),
+    ]);
+    if (source.error || !source.data?.id || !source.data.supported_observations?.includes("listing")) return await failFeed("blocked: Collecting Cars listing source unavailable");
+    if (capability.error || capability.data?.capabilities?.collecting_cars_native_listing !== true) return await failFeed("blocked: Collecting Cars native listing intake not deployed");
+    nativeSourceId = source.data.id;
+    ccReplayAvailable = capability.data?.capabilities?.collecting_cars_pinned_closed_replay === true;
+    try {
+      if (ccHistory) {
+        const preparationSignal = AbortSignal.timeout(Math.max(1, Math.min(15_000, budget.remainingMs() - 10_000)));
+        const historyDb = createClient(Deno.env.get("SUPABASE_URL")!, projectSecretKey()!, { auth: { persistSession: false, autoRefreshToken: false },
+          global: { fetch: (input, init) => fetch(input, { ...init, // guardrail-allow: raw-fetch (internal Supabase SDK transport only)
+            signal: init?.signal ? AbortSignal.any([preparationSignal, init.signal]) : preparationSignal }) } }); // guardrail-allow: raw-fetch (deadline-bound Supabase SDK transport)
+        historyPage = await prepareCollectingCarsHistory(historyDb, feed, preparationSignal, fetch, supabase);
+        urls = historyPage.urls;
+        result.retained_inventory = historyPage.receipt;
+        confirmedEmptySearch = true;
+      } else {
+        const retained = await readCollectingCarsInventory(supabase, Date.now(),
+          AbortSignal.timeout(Math.max(1, Math.min(10_000, budget.remainingMs() - 10_000))));
+        urls = retained.urls;
+        result.retained_inventory = retained.receipt;
+        confirmedEmptySearch = retained.receipt.complete;
+      }
+    } catch (error) { return await failFeed(error instanceof Error ? error.message : String(error)); }
+  } else if (feed.source_slug === "gr_auto_gallery" || feed.source_slug === "streetside_classics") {
     const [source, capability] = await Promise.all([
       supabase.from("observation_sources").select("id,species,supported_observations").eq("slug", feed.source_slug.replaceAll("_", "-")).maybeSingle(),
       supabase.functions.invoke("ingest", { method: "GET" }),
@@ -868,7 +908,7 @@ async function pollFirecrawlHtmlFeed(
         supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
         supabase
           .from("import_queue")
-          .select(nativeDealer ? "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at, raw_data" : "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
+          .select(nativeDealer || nativeCc ? "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, error_message, processed_at, raw_data" : "listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
           .in("listing_url", chunk)
           .in("status", ["complete", "skipped", "failed"]),
       ]);
@@ -878,7 +918,7 @@ async function pollFirecrawlHtmlFeed(
       if (known.error) return await failFeed(`fetch_failed: known-url lookup: ${known.error.message}`);
       if (ledgered.error) return await failFeed(`fetch_failed: ledger lookup: ${ledgered.error.message}`);
       for (const v of known.data || []) onVehicles.add(v.listing_url);
-      for (const q of ledgered.data || []) { ledgerRows.set(q.listing_url, q); if (nativeDealer) nativeLedger.set(q.listing_url, q.raw_data ?? {}); }
+      for (const q of ledgered.data || []) { ledgerRows.set(q.listing_url, q); if (nativeDealer || nativeCc) nativeLedger.set(q.listing_url, q.raw_data ?? {}); }
     }
   }
   if (nativeDealer) {
@@ -907,11 +947,31 @@ async function pollFirecrawlHtmlFeed(
     // backoff and terminal native rejections remain with the ordinary planner.
     urls.sort((a, b) => Number(proved.has(a)) - Number(proved.has(b)) || (proved.get(a) ?? 0) - (proved.get(b) ?? 0));
   }
-  // New URLs first, then failed ones whose retry is due; the cap applies to both.
-  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
+  const ccRefreshes = new Map<string, number>();
+  if (nativeCc) {
+    // Board-created shells do not prove full native listing capture. Validate the
+    // retained admission receipt before skipping a URL; leave failed backoff intact.
+    onVehicles.clear();
+    const ids = [...new Set([...nativeLedger.values()].map(raw => collectingCarsReceipt(raw.collecting_cars_receipt)?.observation_id).filter(Boolean))];
+    const admitted = new Map<string, any>();
+    for (let i = 0; i < ids.length; i += 40) {
+      const read = await supabase.from("vehicle_observations").select(CC_OBSERVATION_COLUMNS).in("id", ids.slice(i, i + 40))
+        .abortSignal(AbortSignal.timeout(Math.max(1, Math.min(5000, budget.remainingMs() - 10_000))));
+      if (read.error || !Array.isArray(read.data)) return await failFeed("retained_listing_admission_lookup_failed");
+      for (const row of read.data) admitted.set(row.id, row);
+    }
+    const proved = prepareCollectingCarsLedger(urls, ledgerRows, nativeLedger, admitted, nativeSourceId!, ccHistory ? Infinity : collectingCarsCaptureInterval(feed.search_criteria), Date.now(), ccRefreshes);
+    result.retained_inventory = { ...result.retained_inventory, eligible_after_year_filter: urls.length, current_full_listing_receipts: proved.size };
+  }
+  // CC reserves the first slot for a due retry and keeps uncaptured lots ahead of refreshes.
+  const plan = nativeCc
+    ? planCollectingCarsIngests(urls, ledgerRows, ccRefreshes, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation))
+    : planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
     feed.source_slug === "craigslist" ? { ...CRAIGSLIST_REVISIT, max: Math.min(CRAIGSLIST_REVISIT.max, budget.revisitAllowance()) } : null);
   budget.spendRevisits(plan.revisits ?? 0);
-  result.matched_existing = plan.settled + plan.backoff;
+  result.matched_existing = nativeCc
+    ? Number(result.retained_inventory?.current_full_listing_receipts ?? 0)
+    : plan.settled + plan.backoff;
   result.retries_due = plan.retries;
   result.backing_off = plan.backoff;
   const toIngest = plan.toIngest;
@@ -938,7 +998,7 @@ async function pollFirecrawlHtmlFeed(
   // read-back failed, is `failed` with the reason (ledger.ts).
   const waiting: Array<{
     url: string;
-    ingest: IngestOutcome & { dealer_receipt?: NonNullable<FeedResult["ingest_outcomes"]>[number]["dealer_receipt"] };
+    ingest: IngestOutcome & { collecting_cars_receipt?: CollectingCarsReceipt; dealer_receipt?: NonNullable<FeedResult["ingest_outcomes"]>[number]["dealer_receipt"] };
     entry: NonNullable<FeedResult["ingest_outcomes"]>[number];
   }> = [];
   let lastFlushAt = Date.now();
@@ -965,6 +1025,16 @@ async function pollFirecrawlHtmlFeed(
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}),
           dealer_native_version: "dealer_microdata_v2", ...(w.ingest.dealer_receipt ? { dealer_receipt: w.ingest.dealer_receipt } : {}) };
       }
+      if (nativeCc) {
+        if (write.status === "skipped" && w.ingest.collecting_cars_noncar) {
+          Object.assign(write.row, { error_message: null, failure_category: null, next_attempt_at: null });
+        }
+        write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}),
+          collecting_cars_native_version: CC_LISTING_METHOD,
+          ...(w.ingest.collecting_cars_noncar ? { collecting_cars_noncar: w.ingest.collecting_cars_noncar } : {}),
+          ...(historyPage?.identities.get(w.url) ? { collecting_cars_history_identity: historyPage.identities.get(w.url) } : {}),
+          ...(w.ingest.collecting_cars_receipt ? { collecting_cars_receipt: w.ingest.collecting_cars_receipt } : {}) };
+      }
       if (Object.keys(captureFields).length > 0) {
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}), ...captureFields };
       }
@@ -988,7 +1058,43 @@ async function pollFirecrawlHtmlFeed(
     lastFlushAt = Date.now();
   };
 
+  let replayPreflightMs = 0, replayPreflightFailures = 0;
   for (const url of toIngest) {
+    let ccPin: { snapshot_id: string; expected_sha256: string } | undefined;
+    if (historyPage?.freshClassificationUrls.has(url)) {
+      const priorIdentity = nativeLedger.get(url)?.collecting_cars_history_identity;
+      if (Number.isSafeInteger(priorIdentity?.auctionId) && priorIdentity.auctionId > 0
+        && ["sold", "unsold", "live", "upcoming", "comingsoon"].includes(priorIdentity.stage)) {
+        historyPage.identities.set(url, priorIdentity);
+        historyPage.freshClassificationUrls.delete(url);
+      } else if (String((ledgerRows.get(url) as { error_message?: string } | undefined)?.error_message ?? "").startsWith("cc_replay_preflight:")) {
+        // Target rediscovery must not erase a prior custody refusal's missing identity.
+        historyPage.freshClassificationUrls.delete(url);
+      }
+    }
+    if (historyPage && !historyPage.freshClassificationUrls.has(url)) {
+      const availableMs = Math.floor(Math.min(10_000, 20_000 - replayPreflightMs, budget.remainingMs() - 10_000));
+      if (availableMs <= 0 || budget.refusal(feed.source_slug)) { result.deferred_reason = "cc_replay_preflight_budget"; break; }
+      const preflightSignal = AbortSignal.timeout(availableMs), preflightStarted = Date.now();
+      // supabase-js 2.45.4 Storage.download ignores per-call fetch parameters.
+      // Bind its actual authenticated transport, as well as metadata reads, to the same deadline.
+      const replayDb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false },
+        global: { fetch: (input, init) => fetch(input, { ...init,
+          signal: init?.signal ? AbortSignal.any([preflightSignal, init.signal]) : preflightSignal }) } }); // guardrail-allow: raw-fetch (deadline-bound Supabase SDK transport)
+      const selection = await selectCollectingCarsReplay(replayDb, url, historyPage.identities.get(url), ccReplayAvailable, preflightSignal);
+      replayPreflightMs += Date.now() - preflightStarted;
+      if (selection.mode === "deferred") { result.deferred_reason = selection.reason; break; }
+      if (selection.mode === "failed") {
+        replayPreflightFailures++;
+        const ingest: IngestOutcome = { status: "error", error: `cc_replay_preflight: ${selection.reason}` };
+        const entry = { url, status: "error", ingest_attempted: false, error: String(ingest.error) };
+        result.ingest_outcomes!.push(entry);
+        waiting.push({ url, ingest, entry });
+        await flushLedger();
+        continue;
+      }
+      if (selection.mode === "pinned") ccPin = selection.pin;
+    }
     const grant = budget.reserve(feed.source_slug);
     if (!grant) { result.deferred_reason = budget.refusal(feed.source_slug); break; }
     const attemptStarted = Date.now();
@@ -1008,7 +1114,7 @@ async function pollFirecrawlHtmlFeed(
           Authorization: `Bearer ${serviceKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, ...(nativeDealer ? { enrich: false } : {}) }),
+        body: JSON.stringify({ url, ...(nativeDealer ? { enrich: false } : {}), ...(ccPin ? { cc_snapshot: ccPin } : {}) }),
         signal: controller.signal,
       });
 
@@ -1017,10 +1123,27 @@ async function pollFirecrawlHtmlFeed(
       const ingest = (await resp.json().catch(() => ({
         status: "error",
         error: `ingest HTTP ${resp.status} (non-JSON body)`,
-      }))) as IngestOutcome & { dealer_receipt?: NonNullable<FeedResult["ingest_outcomes"]>[number]["dealer_receipt"] };
+      }))) as IngestOutcome & { collecting_cars_receipt?: CollectingCarsReceipt; dealer_receipt?: NonNullable<FeedResult["ingest_outcomes"]>[number]["dealer_receipt"] };
       if (nativeDealer && ["created", "matched", "duplicate"].includes(ingest.status ?? "") &&
         (!ingest.vehicle_id || !ingest.dealer_receipt?.observation_id || !ingest.dealer_receipt.snapshot_id || !ingest.dealer_receipt.listing_event_id || !ingest.dealer_receipt.observed_at)) {
         ingest.status = "error"; ingest.error = "dealer canonical admission unacknowledged";
+      }
+      if (nativeCc && !resp.ok) {
+        ingest.status = "error";
+        const detail = typeof ingest.error === "string" ? ingest.error.slice(0, 300) : "";
+        ingest.error = `Collecting Cars ingest HTTP ${resp.status}${detail ? `: ${detail}` : ""}`;
+        delete ingest.collecting_cars_receipt;
+      }
+      if (nativeCc && ["created", "matched", "duplicate"].includes(ingest.status ?? "")) {
+        const receipt = collectingCarsReceipt(ingest.collecting_cars_receipt);
+        const admission = receipt && ingest.vehicle_id ? await supabase.from("vehicle_observations")
+          .select(CC_OBSERVATION_COLUMNS).eq("id", receipt.observation_id)
+          .abortSignal(AbortSignal.timeout(Math.max(1, Math.min(5000, budget.remainingMs() - 10_000)))).maybeSingle() : null;
+        if (!receipt || !ingest.vehicle_id || admission?.error || !collectingCarsAdmissionMatches(receipt,
+          admission?.data, url, ingest.vehicle_id, nativeSourceId!)) {
+          ingest.status = "error"; ingest.error = "Collecting Cars full listing admission unacknowledged";
+          delete ingest.collecting_cars_receipt;
+        } else ingest.collecting_cars_receipt = receipt;
       }
       const status = ingest.status || "error";
       ingest.status = status;
@@ -1030,6 +1153,7 @@ async function pollFirecrawlHtmlFeed(
         status,
         ingest_attempted: true,
         ...(nativeDealer && ingest.dealer_receipt ? { dealer_receipt: ingest.dealer_receipt } : {}),
+        ...(nativeCc && ingest.collecting_cars_receipt ? { collecting_cars_receipt: ingest.collecting_cars_receipt } : {}),
         vehicle_id: ingest.vehicle_id ?? null,
         ...(ingest.error ? { error: String(ingest.error).slice(0, 200) } : {}),
         ...(ingest.reason ? { reason: String(ingest.reason).slice(0, 200) } : {}),
@@ -1068,12 +1192,17 @@ async function pollFirecrawlHtmlFeed(
     await new Promise((r) => setTimeout(r, spacing));
   }
   await flushLedger();
+  if (historyPage) {
+    try {
+      await historyPage.finish(ledgerRows, result.ingest_outcomes ?? []);
+      result.retained_inventory = { ...result.retained_inventory, ...historyPage.receipt, replay_preflight_failures: replayPreflightFailures, replay_preflight_ms: replayPreflightMs };
+    } catch (error) { return await failFeed(error instanceof Error ? error.message : String(error)); }
+  }
 
   // If every attempted ingest errored, that's a failure too -- say so.
-  const ingestErrors = result.ingest_outcomes!.filter(
-    (o) => o.status === "error"
-  ).length;
-  const attempted = result.ingest_outcomes!.length;
+  const actualAttempts = result.ingest_outcomes!.filter(o => o.ingest_attempted !== false);
+  const ingestErrors = actualAttempts.filter(o => o.status === "error").length;
+  const attempted = actualAttempts.length;
   const hold = budget.refusal(feed.source_slug);
   if (["billing", "rate_limited", "blocked", "timeout"].includes(hold || "")) return await failFeed(`intake_backoff: ${hold}`);
   if (attempted > 0 && ingestErrors === attempted) {
@@ -1081,6 +1210,8 @@ async function pollFirecrawlHtmlFeed(
       `ingest_failed: ${ingestErrors}/${attempted} ingest calls errored`
     );
   }
+
+  if (replayPreflightFailures > 0 && attempted === 0) return await failFeed(`replay_preflight_failed: ${replayPreflightFailures} unresolved retained listings; no ingest calls`);
 
   if (nativeDealer && attempted > 0 && !result.ingest_outcomes!.some(o => o.dealer_receipt?.observation_id)) {
     return await failFeed("canonical_admission_failed: no dealer observation acknowledged");
@@ -1313,6 +1444,13 @@ Deno.serve(async (req) => {
       // Curated direct-ingest strategies (Craigslist HTML via Firecrawl, BaT
       // RSS). Both bypass the legacy import_queue path entirely and route
       // through `ingest` with the share-URL ledger.
+      if (feed.source_slug === "mccormicks" && feed.search_criteria?.fetch_strategy === "mccormick_live") {
+        const nativeResult = await pollMcCormick(supabase, feed, budget, allocation);
+        results.push(nativeResult);
+        totalFound += nativeResult.items_found;
+        totalIngested += nativeResult.new_ingested;
+        continue;
+      }
       if (feed.source_slug === "purplewave" && feed.search_criteria?.fetch_strategy === "purplewave_public_json") {
         const nativeResult = await pollPurplewave(supabase, feed, budget, allocation);
         results.push(nativeResult);
@@ -1332,7 +1470,7 @@ Deno.serve(async (req) => {
       if (
         ["firecrawl_html", "rss_direct_ingest", "mecum_public_index"].includes(
           feed.search_criteria?.fetch_strategy
-        )
+        ) || (feed.source_slug === "collecting-cars" && feed.search_criteria?.fetch_strategy === "collecting_cars_history")
       ) {
         const fcResult = await pollFirecrawlHtmlFeed(supabase, feed, budget, allocation);
         results.push(fcResult);

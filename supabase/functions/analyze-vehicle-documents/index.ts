@@ -157,8 +157,9 @@ async function analyzeDocument(
                       contentType.includes("gif") ? "image/gif" : "image/jpeg";
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1500,
+      model: "claude-sonnet-5-5",
+      max_tokens: 4000,
+      ...({ output_config: { effort: "low" } } as any),
       messages: [{
         role: "user",
         content: [
@@ -178,7 +179,7 @@ async function analyzeDocument(
       }]
     });
 
-    const content = response.content[0];
+    const content: any = response.content.find((b: any) => b.type === "text") ?? response.content[0];
     if (content.type === "text") {
       // Extract JSON from response
       const jsonMatch = content.text.match(/\{[\s\S]*\}/);

@@ -12,8 +12,7 @@
 
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
 import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
-
-const RESEND_API_URL = "https://api.resend.com/emails";
+import { sendOutbound } from "../_shared/outbound.ts";
 
 const ROLE_TO_EMAIL: Record<string, string> = {
   coo: "coo@nuke.ag", cto: "cto@nuke.ag", cfo: "cfo@nuke.ag",
@@ -57,7 +56,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const founderEmail = Deno.env.get("FOUNDER_EMAIL") || Deno.env.get("ADMIN_EMAIL");
 
   try {
@@ -78,6 +76,7 @@ Deno.serve(async (req) => {
       const recipients: string[] = to === "all" ? ALL_ROLES.filter(r => r !== from) : [to];
       const inserted: string[] = [];
       let resendId: string | null = null;
+      let held = false;
 
       // Get thread_id from parent if reply
       let threadId: string | null = null;
@@ -102,31 +101,29 @@ Deno.serve(async (req) => {
         const msg = rows[0];
         if (msg) inserted.push(msg.id);
 
-        // Send real email to founder
-        if (recipient === "founder" && founderEmail && resendApiKey) {
-          const res = await fetch(RESEND_API_URL, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: `Nuke ${fromDisplay} <${fromEmail}>`,
-              to: [founderEmail],
-              subject,
-              text: message,
-              html: `<pre style="font-family:monospace;white-space:pre-wrap">${message}</pre>`,
-              reply_to: fromEmail,
-            }),
+        // Send real email to founder, through the outbound gate (held unless the founder is allowlisted)
+        if (recipient === "founder" && founderEmail) {
+          const r = await sendOutbound({
+            channel: "email",
+            to: founderEmail,
+            subject,
+            text: message,
+            html: `<pre style="font-family:monospace;white-space:pre-wrap">${message}</pre>`,
+            from: `Nuke ${fromDisplay} <${fromEmail}>`,
+            replyTo: fromEmail,
+            caller: "agent-email",
           });
-          const rd = await res.json();
-          resendId = rd.id || null;
-          if (msg) {
+          resendId = r.id || null;
+          if (r.held) held = true;
+          if (msg && resendId) {
             await sql`UPDATE agent_messages SET resend_id = ${resendId} WHERE id = ${msg.id}`;
           }
-          console.log(`[agent-email] ${from} → founder via Resend: ${resendId}`);
+          console.log(`[agent-email] ${from} → founder via gate: ${r.status} ${resendId ?? ""}`);
         }
       }
 
       await sql.end();
-      return json({ sent: true, recipients, message_ids: inserted, resend_id: resendId });
+      return json({ sent: true, recipients, message_ids: inserted, resend_id: resendId, email_held: held });
     }
 
     // ── INBOX ─────────────────────────────────────────────────────────────────

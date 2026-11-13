@@ -435,3 +435,161 @@ test('batch source registry mismatch fails even when the returned source ID is a
   const result = await applyBatchClaims(f.sb, f.claims, { registry: f.registry, sourceId: IDS.output });
   assert.equal(result.failed, 1); assert.equal(result.verified, 0); assert.equal(f.calls.length, 1);
 });
+
+// ── project-cached: the walk over one vehicle's stored readings ─────────────────────────────────────────────────────
+// A stand-in for the database client: made-up rows in memory, the same filters the walk sends, and the edge function's
+// rule that the same claim is answered as a duplicate.
+import { projectCachedRun, instantMicros, SINGLE_SLICE } from './image-property-projection.mjs';
+
+const VEHICLE = '77777777-7777-4777-8777-777777777777';
+const PROPERTY_IDS = { image_visible_rust_severity: 'aaaaaaaa-0000-4000-8000-000000000001',
+  image_visible_paint_stage: 'aaaaaaaa-0000-4000-8000-000000000002', image_visible_assembly_state: 'aaaaaaaa-0000-4000-8000-000000000003' };
+function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0 } = {}) {
+  let n = 0;
+  const id = prefix => `${prefix.repeat(8)}-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+  const db = { rows: [], images: new Map(), witnesses: [], calls: { source: 0, invoke: 0, rpc: 0, prior: 0 } };
+  db.reading = (ingestedAt, { image = {}, data = {}, ...over } = {}) => {
+    const imageId = id('c');
+    db.images.set(imageId, { id: imageId, vehicle_id: VEHICLE, is_sensitive: false, is_superseded: false, is_duplicate: false,
+      is_document: false, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...image });
+    const row = { id: id('d'), vehicle_id: VEHICLE, kind: 'condition', is_superseded: false, observed_at: ingestedAt, ingested_at: ingestedAt,
+      agent_model: 'made-up-model', agent_tier: null, extraction_method: 'made_up_reader_v1', confidence: 'medium', confidence_score: 0.8,
+      structured_data: { analysis_kind: 'image_deep_byok', image_id: imageId,
+        state_observations: { rust_severity: 'surface', paint_state: 'aged', completeness: 'assembled' }, ...data }, ...over };
+    db.rows.push(row); return row;
+  };
+  const newestFirst = (a, b) => { const d = instantMicros(b.ingested_at) - instantMicros(a.ingested_at); return d > 0n ? 1 : d < 0n ? -1 : (a.id < b.id ? 1 : -1); };
+  const builder = table => {
+    const f = { eq: {}, in: null, limit: 1e9 };
+    const run = () => {
+      if (table === 'vehicle_images') return { data: f.in[1].map(key => db.images.get(key)).filter(Boolean), error: null };
+      if (table === 'observation_properties') return { data: f.in[1].map(key => ({ id: PROPERTY_IDS[key], property_key: key })), error: null };
+      if (table === 'observation_witnesses') return { data: db.witnesses.filter(w => w.observation_id === f.eq.observation_id && w.image_id === f.eq.image_id), error: null };
+      if (f.eq.id) return { data: db.rows.find(row => row.id === f.eq.id) ?? null, error: null };
+      if (f.eq.extraction_method) {   // which claims a row already holds
+        db.calls.prior++;
+        return { data: db.rows.filter(row => row.extraction_method === f.eq.extraction_method && f.in[1].includes(row.structured_data.source_observation_id))
+          .map(row => ({ is_superseded: row.is_superseded, source_observation_id: row.structured_data.source_observation_id, property_key: row.structured_data.property_key })), error: null };
+      }
+      if (++db.calls.source === failSourceQueryAt) return { data: null, error: { message: 'made-up failure' } };
+      const keep = row => row.vehicle_id === f.eq.vehicle_id && row.kind === f.eq.kind &&
+        row.structured_data.analysis_kind === f.eq['structured_data->>analysis_kind'] &&
+        (f.lt ? instantMicros(row.ingested_at) < instantMicros(f.lt)
+          : instantMicros(row.ingested_at) < instantMicros(f.or.at) || (instantMicros(row.ingested_at) === instantMicros(f.or.at) && row.id < f.or.id));
+      return { data: db.rows.filter(keep).sort(newestFirst).slice(0, f.limit), error: null };
+    };
+    const b = { select: () => b, eq: (k, v) => { f.eq[k] = v; return b; }, lt: (k, v) => { f.lt = v; return b; }, in: (k, v) => { f.in = [k, v]; return b; },
+      or: text => { const m = /^ingested_at\.lt\."([^"]+)",and\(ingested_at\.eq\."([^"]+)",id\.lt\.([0-9a-f-]{36})\)$/.exec(text);
+        assert.ok(m && m[1] === m[2], `the keyset filter is well formed: ${text}`); f.or = { at: m[1], id: m[3] }; return b; },
+      order: () => b, limit: v => { f.limit = v; return b; }, maybeSingle: () => b, abortSignal: () => b,
+      then: (resolve, reject) => Promise.resolve().then(run).then(resolve, reject) };
+    return b;
+  };
+  db.sb = { from: builder,
+    rpc: (name, args) => ({ abortSignal: async () => { db.calls.rpc++; assert.equal(name, 'observation_is_public'); const answer = isPublic(args.p_data); return answer === 'error' ? { data: null, error: { message: 'made-up' } } : { data: answer, error: null }; } }),
+    functions: { invoke: async (name, { body }) => {
+      assert.equal(name, 'ingest-observation', 'the one-at-a-time route never calls the batch intake');
+      if (++db.calls.invoke === failInvokeAt) return { data: null, error: { message: 'made-up 500' } };
+      const prior = db.rows.find(row => row.source_identifier === body.source_identifier);
+      if (prior) return { data: { success: true, observation_id: prior.id, duplicate: true }, error: null };
+      const row = { id: id('f'), vehicle_id: body.vehicle_id, kind: body.kind, is_superseded: false, property_id: PROPERTY_IDS[body.property_key],
+        structured_data: body.structured_data, confidence_score: 0.6, observed_at: body.observed_at, ingested_at: '2026-11-11T12:00:00.000000+00:00',
+        source_identifier: body.source_identifier, extraction_method: body.extraction_method, agent_model: body.agent_model,
+        raw_source_ref: body.raw_source_ref, source: { slug: body.source_slug } };
+      db.rows.push(row); db.witnesses.push({ id: id('9'), observation_id: row.id, image_id: body.structured_data.image_id, witness_role: 'derived' });
+      return { data: { success: true, observation_id: row.id, duplicate: false }, error: null };
+    } } };
+  return db;
+}
+const at = (second, micros = 0) => `2026-11-10T10:00:${String(second).padStart(2, '0')}.${String(micros).padStart(6, '0')}+00:00`;
+const walk = (db, options) => projectCachedRun(db.sb, { vehicleId: VEHICLE, before: '2026-11-11T00:00:00.000Z', ...options });
+
+test('project-cached: readings that share one instant across a window edge are all seen', async () => {
+  const db = standIn();
+  for (const second of [1, 2, 3, 3, 3, 4, 5]) db.reading(at(second));
+  const { receipt, exitCode } = await walk(db, { limit: 3, pages: 9 });
+  assert.deepEqual([receipt.source_rows, receipt.eligible_claims, receipt.pages_walked, receipt.reached_oldest_row, exitCode], [7, 21, 3, true, 0]);
+  const short = await walk(db, { limit: 3, pages: 2 });
+  assert.deepEqual([short.receipt.source_rows, short.receipt.reached_oldest_row], [6, false], 'pages that run out do not claim the oldest row');
+});
+
+test('project-cached: rows that are not deep readings do not fill a window', async () => {
+  const db = standIn();
+  db.reading(at(1));
+  for (let i = 0; i < 5; i++) db.rows.push({ id: `eeeeeeee-0000-4000-8000-00000000000${i}`, vehicle_id: VEHICLE, kind: 'condition', ingested_at: at(9, i), structured_data: { analysis_kind: 'image_property_projection' } });
+  const { receipt } = await walk(db, { limit: 1, pages: 1 });
+  assert.deepEqual([receipt.source_rows, receipt.eligible_claims, receipt.reached_oldest_row], [1, 3, false]);
+});
+
+test('project-cached --single: lands one claim at a time, and a second run sends nothing', async () => {
+  const db = standIn();
+  for (let i = 0; i < 9; i++) db.reading(at(i));
+  const first = await walk(db, { limit: 4, pages: 9, apply: true, single: true });
+  assert.deepEqual([first.receipt.route, first.receipt.inserted, first.receipt.verified, first.receipt.failed, first.receipt.unattempted, first.exitCode], ['single', 27, 27, 0, 0, 0]);
+  assert.equal(db.calls.invoke, 27);
+  assert.ok(!JSON.stringify(first.receipt).includes('dddddddd') && !('observations' in first.receipt), 'the summed receipt holds no row id');
+  const again = await walk(db, { limit: 4, pages: 9, apply: true, single: true });
+  assert.deepEqual([again.receipt.eligible_claims, again.receipt.already_projected, again.receipt.inserted, again.receipt.duplicates, again.exitCode], [0, 27, 0, 0, 0]);
+  assert.equal(db.calls.invoke, 27, 'a claim a row already holds is not sent again');
+});
+
+test('project-cached --single: a superseded projected row is left alone and counted', async () => {
+  const db = standIn();
+  db.reading(at(1));
+  await walk(db, { apply: true, single: true });
+  db.rows.find(row => row.structured_data.property_key === 'image_visible_paint_stage').is_superseded = true;
+  const { receipt, exitCode } = await walk(db, { apply: true, single: true });
+  assert.deepEqual([receipt.already_projected, receipt.already_projected_superseded, receipt.inserted, receipt.failed, exitCode], [3, 1, 0, 0, 0]);
+});
+
+test('project-cached --single: asks the database whether a reading may be shown, and fails closed', async () => {
+  const privateWord = data => !JSON.stringify(data).includes('made-up private');
+  let db = standIn({ isPublic: privateWord });
+  db.reading(at(1)); db.reading(at(2), { data: { agent_notes: 'made-up private note' } });
+  let { receipt } = await walk(db, { apply: true, single: true });
+  assert.deepEqual([receipt.inserted, receipt.deferred], [3, { source_not_public: 1 }]);
+  db = standIn({ isPublic: () => 'error' });
+  db.reading(at(1));
+  ({ receipt } = await walk(db, { single: true }));
+  assert.deepEqual([receipt.eligible_claims, receipt.deferred], [0, { privacy_check_unavailable: 1 }]);
+  db = standIn();
+  db.reading(at(1));
+  await walk(db, {});
+  assert.equal(db.calls.rpc, 0, 'the batch route leaves that check to its intake');
+});
+
+test('project-cached: a photographed paper is deferred on either route', async () => {
+  const db = standIn();
+  db.reading(at(1), { image: { is_document: true } }); db.reading(at(2), { data: { scene_type: 'receipt_document' } }); db.reading(at(3));
+  const { receipt } = await walk(db, { single: true });
+  assert.deepEqual([receipt.eligible_claims, receipt.deferred], [3, { receipt_document: 1, image_not_eligible: 1 }]);
+});
+
+test('project-cached --single: every slice has its own budget, and a failure says what was left', async () => {
+  let db = standIn();
+  for (let i = 0; i < 15; i++) db.reading(at(i));
+  let { receipt, exitCode } = await walk(db, { limit: 99, apply: true, single: true });
+  assert.ok(45 > SINGLE_SLICE);
+  assert.deepEqual([receipt.inserted, receipt.failed, exitCode], [45, 0, 0]);
+  db = standIn({ failInvokeAt: 23 });
+  for (let i = 0; i < 15; i++) db.reading(at(i));
+  ({ receipt, exitCode } = await walk(db, { limit: 99, apply: true, single: true }));
+  assert.deepEqual([receipt.inserted, receipt.failed, receipt.reason, exitCode], [22, 1, 'ingest_failed', 1]);
+  assert.equal(receipt.inserted + receipt.unattempted + 1, receipt.eligible_claims, 'landed, the one that failed and the rest add up');
+});
+
+test('project-cached: a failed read after rows landed still prints what landed; before, it is an error', async () => {
+  const db = standIn({ failSourceQueryAt: 2 });
+  for (let i = 0; i < 6; i++) db.reading(at(i));
+  const { receipt, exitCode } = await walk(db, { limit: 3, pages: 5, apply: true, single: true });
+  assert.deepEqual([receipt.inserted, receipt.failed, receipt.reason, receipt.reached_oldest_row, exitCode], [9, 1, 'source_query_failed', false, 1]);
+  await assert.rejects(walk(standIn({ failSourceQueryAt: 1 }), {}), /project-cached: source query failed/);
+});
+
+test('project-cached: one page on the batch route keeps the receipt it always printed', async () => {
+  const db = standIn();
+  const { receipt, exitCode } = await walk(db, { apply: true });
+  for (const key of ['inserted', 'duplicates', 'verified', 'failed', 'unattempted', 'requests']) assert.equal(receipt[key], 0, key);
+  assert.deepEqual([receipt.route, receipt.eligible_claims, exitCode], ['batch', 0, 1], 'apply with nothing to do is still a failure');
+  assert.equal((await walk(db, {})).exitCode, 0, 'a dry run with nothing stored is not');
+});

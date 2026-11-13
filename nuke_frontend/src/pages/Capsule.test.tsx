@@ -9,7 +9,6 @@ vi.mock('../services/profileService', () => ({ ProfileService: { getProfileRecor
 vi.mock('../utils/cachedSession', () => ({ readCachedSession: () => null }));
 vi.mock('../components/PrefetchLink', () => ({ default: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a> }));
 vi.mock('./ShopFinancials', () => ({ default: () => { fixture.legacy(); return <div>Legacy financials</div>; } }));
-vi.mock('./PersonalPhotoLibrary', () => ({ PersonalPhotoLibrary: () => null }));
 vi.mock('../components/profile/OrganizationAffiliations', () => ({ default: () => null }));
 vi.mock('../components/profile/ProfessionalToolbox', () => ({ default: () => null }));
 vi.mock('../components/ProfileVerification', () => ({ ProfileVerification: () => null }));
