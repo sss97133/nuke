@@ -6,6 +6,7 @@ import staticAdvisorCard from '../public/.well-known/mcp.json';
 const SHELL = '<!doctype html><html><head><title>Nuke</title>' +
   '<meta name="description" content="x" />' +
   '<meta property="og:title" content="x" /><meta property="og:description" content="x" /><meta property="og:url" content="x" />' +
+  '<meta name="twitter:title" content="x" /><meta name="twitter:description" content="x" />' +
   '<link rel="canonical" href="https://nuke.ag" /></head><body><div id="root"></div></body></html>';
 
 const BOARD = {
@@ -49,6 +50,15 @@ describe('public face', () => {
     // an unknown total is said, never filled
     expect(out!.body).toContain('Bring a Trailer: 254,485 lots held (counted 2026-10-16); source total unknown.');
     expect(out!.body).toContain('<div id="root"><main>');
+  });
+
+  it.each(['/', '/market'])('%s gives the social card the same title and description as the page', async (path) => {
+    const out = await call(path);
+    const tag = (attr: string, key: string) => new RegExp(`<meta ${attr}="${key}" content="([^"]*)"`).exec(out!.body)?.[1];
+    expect(tag('name', 'twitter:title')).toBe(tag('property', 'og:title'));
+    expect(tag('name', 'twitter:description')).toBe(tag('property', 'og:description'));
+    expect(tag('name', 'twitter:title')).not.toBe('x');
+    expect(tag('name', 'twitter:description')).not.toBe('x');
   });
 
   it('shows no number when the read fails', async () => {

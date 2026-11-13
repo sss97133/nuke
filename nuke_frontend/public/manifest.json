@@ -1,7 +1,7 @@
 {
   "name": "Nuke",
   "short_name": "Nuke",
-  "description": "Vehicle provenance engine",
+  "description": "A data machine for physical assets",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
