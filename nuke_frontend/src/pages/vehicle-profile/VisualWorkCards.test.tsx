@@ -8,7 +8,7 @@ vi.mock('./VehiclePhotoLightbox', () => ({ openVehiclePhoto: fixture.open }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.user, loading: fixture.loading }) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: (...args: unknown[]) => {
   const result = fixture.rpc(...args); return { abortSignal: () => result };
-} } }));
+}, storage: { from: (bucket: string) => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `https://storage.example/${bucket}/${path}` } }) }) } } }));
 import { VisualWorkCards, photoDate } from './VisualWorkCards';
 import { isComponentEvidence, useVisualWork, type ComponentEvidence, type MasterCostLedger, type VisualWork } from './hooks/useVisualWork';
 import { hasRecordedInstallation } from './PartPage';

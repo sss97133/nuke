@@ -57,10 +57,25 @@ export interface ComponentReading {
   clock_basis: 'source_analysis_time'; source_role: 'attributed_retained_image_reading';
   images: (Omit<VisualWork['images'][number], 'taken_at'> & { taken_at: string | null; bbox: [number, number, number, number] })[];
 }
+export interface ExpectedAssembly {
+  assembly_id: string; assembly_name: string; description: string; expected_scope: string;
+  source_status: 'current_public_reference'; taxonomy_binding: 'unresolved';
+  expected_piece_count: number; whole_vehicle_expected_count: null;
+  applicability: { status: 'matched_year_make_model_body_style' | 'body_style_unverified' };
+  application: { year_start: number; year_end: number; make: string; model: string; body_style: string };
+  positions: { key: string; label: string; subject_id: null; quantity: number; part_numbers: string[];
+    part_number_binding: 'exact_position' | 'unordered_pair';
+    source_refs: { page_number: number; figure: string; callout: string; excerpt: string }[] }[];
+  exclusions: string[]; limitations: string[];
+  source: { observation_id: string; document_id: string; source_url: string; retained_file: string;
+    file_sha256: string; title: string; retrieved_day: string; retrieved_at: string | null;
+    reviewed_at: string; reference_revision: string };
+}
 export interface ComponentEvidence {
   version: 1; as_of: string;
   expected_population: { status: string; reason?: string };
   coverage: { examined_readings: number; qualified_readings: number; truncated: boolean };
+  expected_assemblies?: ExpectedAssembly[];
   components: {
     subject_id: string; component_key: string; label: string; identity_basis: 'position_only';
     presence: { status: string; readings: ComponentReading[] };
@@ -79,6 +94,28 @@ export interface ComponentEvidence {
 /** Malformed or withdrawn evidence must not leave an older component conclusion visible. */
 export function isComponentEvidence(value: unknown): value is ComponentEvidence {
   const object = (v: unknown): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const strings = (v: unknown) => Array.isArray(v) && v.every(x => typeof x === 'string');
+  const assembly = (v: unknown) => object(v) && v.source_status === 'current_public_reference'
+    && typeof v.assembly_id === 'string' && typeof v.assembly_name === 'string' && typeof v.expected_scope === 'string'
+    && v.taxonomy_binding === 'unresolved' && v.whole_vehicle_expected_count === null
+    && object(v.application) && typeof v.application.make === 'string' && typeof v.application.model === 'string'
+    && Number.isInteger(v.application.year_start) && Number.isInteger(v.application.year_end) && typeof v.application.body_style === 'string'
+    && object(v.applicability) && ['matched_year_make_model_body_style', 'body_style_unverified'].includes(v.applicability.status)
+    && strings(v.exclusions) && strings(v.limitations) && object(v.source)
+    && typeof v.source.file_sha256 === 'string' && /^[a-f0-9]{64}$/.test(v.source.file_sha256)
+    && v.source.retained_file === `reference-docs/supplied/${v.source.file_sha256}.pdf`
+    && typeof v.source.observation_id === 'string' && typeof v.source.document_id === 'string'
+    && typeof v.source.title === 'string' && Number.isFinite(Date.parse(v.source.reviewed_at))
+    && Array.isArray(v.positions) && v.positions.length > 0 && v.positions.every((p: unknown) => object(p)
+      && typeof p.key === 'string' && typeof p.label === 'string' && p.subject_id === null
+      && Number.isSafeInteger(p.quantity) && p.quantity > 0 && strings(p.part_numbers)
+      && ['exact_position', 'unordered_pair'].includes(p.part_number_binding)
+      && p.part_numbers.length === (p.part_number_binding === 'exact_position' ? 1 : 2)
+      && Array.isArray(p.source_refs) && p.source_refs.length > 0 && p.source_refs.every((s: unknown) => object(s)
+        && Number.isSafeInteger(s.page_number) && s.page_number > 0 && typeof s.figure === 'string'
+        && typeof s.callout === 'string' && typeof s.excerpt === 'string'))
+    && new Set(v.positions.map((p: ExpectedAssembly['positions'][number]) => p.key)).size === v.positions.length
+    && v.positions.reduce((total: number, p: ExpectedAssembly['positions'][number]) => total + p.quantity, 0) === v.expected_piece_count;
   const source = (r: unknown) => object(r) && typeof r.observation_id === 'string' && typeof r.quote === 'string'
     && typeof r.evidence_time === 'string' && Number.isFinite(Date.parse(r.evidence_time))
     && r.clock_basis === 'source_analysis_time' && r.source_role === 'attributed_retained_image_reading'
@@ -87,6 +124,7 @@ export function isComponentEvidence(value: unknown): value is ComponentEvidence 
       && Array.isArray(i.bbox) && i.bbox.length === 4 && i.bbox.every((n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 999)
       && i.bbox[0] < i.bbox[2] && i.bbox[1] < i.bbox[3]);
   return object(value) && value.version === 1 && object(value.expected_population) && object(value.coverage)
+    && (value.expected_assemblies == null || (Array.isArray(value.expected_assemblies) && value.expected_assemblies.every(assembly)))
     && Array.isArray(value.components) && value.components.every((c: unknown) => object(c)
       && typeof c.subject_id === 'string' && typeof c.component_key === 'string' && typeof c.label === 'string'
       && object(c.presence) && Array.isArray(c.presence.readings) && c.presence.readings.every((r: unknown) => source(r)
