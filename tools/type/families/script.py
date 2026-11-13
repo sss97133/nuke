@@ -27,7 +27,7 @@ from lib import geom
 from lib.fit import refit
 from lib.fontbuild import Glyph as FGlyph, build
 from lib.glyphs import Traced, overlay_png
-from lib.trace import Source, potrace_mask
+from lib.trace import Source, potrace_mask, smooth_outline
 
 FAMILY = 'Firebird 1971 Script'
 FILE = 'pontiac-firebird-fender-script-1971-1981-cut.png'
@@ -89,7 +89,16 @@ def trace_letter(name, tol_px=1.3):
     con = geom.straighten(con, tol=1.1 * FACE.scale, snap_deg=3.0, min_len=40)
     # the emblem's mounting studs hang under the baseline at the i, b and d feet: they are hardware, not letters
     con = geom.clean(geom.intersection(con, geom.rect(-100, -6, 100000, 1000)))
+    if OUTLINE_SIGMA:
+        # the face's edge follows the reflections: smooth it (curvature, not weight) and refit
+        con = geom.clean(smooth_outline(con, sigma_units=OUTLINE_SIGMA))
+        con = geom.clean(refit(con, tol=0.6 * FACE.scale, corner_deg=40, step=max(1.0, 0.25 * FACE.scale)))
+        con = geom.straighten(con, tol=0.8 * FACE.scale, snap_deg=3.0, min_len=40)
+        con = geom.clean(con)
     return Traced(con, FACE, REGIONS[name], mask, origin)
+
+
+OUTLINE_SIGMA = 12.0   # font units
 
 
 # ------------------------------------------------------------------------------------------------ measured
@@ -152,19 +161,30 @@ def ball(cx, cy, r):
 
 
 # The i's ball, measured on the photograph (de-sheared, px): an ellipse 157.5-178.8 wide by 14.4-26.9 tall, its centre
-# 1.6 px right of the stem's. The face mask cannot hold it: the ball is one bright highlight inside a dark ring that
-# does not close, so the trace keeps only a spike of the ring and the neck. The ball is drawn at its measured place.
-I_BALL = dict(dx=1.6, cy_px=20.6, rx_px=10.6, ry_px=6.25)
+# 1.6 px right of the stem's. A neck joins it to the stem: two bevel lines 4 px apart (outer edge to outer edge) at
+# rows 29-34, centred 3.5 px right of the stem, flaring into the stem's top at rows 35-36. The face mask cannot hold
+# either: the ball is one bright highlight inside a dark ring that does not close, so the trace keeps only a spike of
+# the ring and the neck. Both are drawn at their measured place and size.
+I_STEM_TOP = 470   # units; the traced stem runs into the drawn neck uncut
+I_BALL = dict(dx=1.6, cy_px=20.6, rx_px=10.6, ry_px=6.25, neck_dx=3.5, neck_w_px=4.0, neck_flare_px=7.0)
 
 
-def i_with_ball(con):
+def i_parts(con):
+    """(stem, neck, ball) of the i: the traced stem to the x-height, the neck and ball at their measured places."""
     u = FACE.scale
-    stem = clip(con, -1000, -1000, 100000, XH + 20)
+    stem = clip(con, -1000, -1000, 100000, I_STEM_TOP)
     mid = geom.bounds(clip(stem, -1000, 150, 100000, 350))
     cx = (mid[0] + mid[2]) / 2 + I_BALL['dx'] * u
     cy = (FACE.baseline_px - I_BALL['cy_px']) * u
     from lib.shapes import SE
-    return U(stem, SE(cx, cy, I_BALL['rx_px'] * u, I_BALL['ry_px'] * u).contours())
+    ry = I_BALL['ry_px'] * u
+    nx = (mid[0] + mid[2]) / 2 + I_BALL['neck_dx'] * u
+    nw, fw = I_BALL['neck_w_px'] * u / 2, I_BALL['neck_flare_px'] * u / 2
+    # the neck flares from the stem's full width at its top into the measured neck, as the casting does
+    sb = geom.bounds(clip(stem, -1000, I_STEM_TOP - 30, 100000, I_STEM_TOP))
+    neck = geom.poly((sb[0], I_STEM_TOP - 25), (sb[2], I_STEM_TOP - 25), (nx + nw, I_STEM_TOP + 35),
+                     (nx + nw, cy - ry * 0.5), (nx - nw, cy - ry * 0.5), (nx - nw, I_STEM_TOP + 35))
+    return stem, neck, SE(cx, cy, I_BALL['rx_px'] * u, ry).contours()
 
 
 def traced_parts():
@@ -174,7 +194,15 @@ def traced_parts():
         x0 = geom.bounds(t.contours)[0]
         t.dx = -x0
         con = geom.translate(t.contours, -x0, 0)
-        T[n] = (i_with_ball(con) if n == 'i' else con, t)
+        if n == 'i':
+            stem, neck, ball = i_parts(con)
+            con = U(stem, neck, ball)
+            if OUTLINE_SIGMA:
+                # one pass over the joined i, so the cut stem, the neck and the ball meet without steps
+                con = geom.clean(smooth_outline(con, sigma_units=OUTLINE_SIGMA))
+                con = geom.clean(refit(con, tol=0.6 * FACE.scale, corner_deg=40, step=max(1.0, 0.25 * FACE.scale)))
+            T['i.ball'] = (ball, t)
+        T[n] = (con, t)
     return T
 
 
@@ -227,8 +255,8 @@ def lowercase(T):
     hook = move(hook, 582 - hb[2], DESC - hb[1])
     g = U(a, geom.rect(510, DESC + 110, 582, 80), clip(hook, -10, DESC - 10, 900, DESC + 130))
     out['g'] = (g, ('derived', ['d', 'b'], "the a with the d stem carried down into the o's lower half"))
-    idot = clip(i, 0, 470, 600, 800)
-    db = geom.bounds(idot)
+    idot = clip(i, 0, 470, 600, 800)          # ball and neck, for the j
+    db = geom.bounds(T['i.ball'][0])
     rb = (db[2] - db[0]) / 2
     cc = geom.difference(o, geom.poly((ow / 2, XH / 2), (ow + 50, XH / 2 - 40), (ow + 50, XH - 110)))
     cc = U(cc, ball(ow - rb - 4, XH - 110 - rb * 0.2, rb * 0.95))
@@ -349,7 +377,7 @@ def build_family(out_dir, proof_dir=None):
     for n, (con, (prov, frm, method)) in capitals(T).items():
         items[n] = (con, {'provenance': prov, 'from': frm, 'method': method}, 'cap')
     i = T['i'][0]
-    dot = clip(i, 0, 470, 600, 800)
+    dot = T['i.ball'][0]
     db = geom.bounds(dot)
     dot0 = move(dot, -db[0], -db[1])
     items['period'] = (dot0, {'provenance': 'derived', 'from': ['i'], 'method': "the i's ball dot on the baseline"}, 'punct')
