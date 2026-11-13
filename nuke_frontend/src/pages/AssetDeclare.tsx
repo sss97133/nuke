@@ -1,5 +1,6 @@
-// /assets/new: the holder declares a work in their own words. One Sign (declare_held_asset); the signer becomes creator and
-// holder; private by default. No price field exists on purpose: a declared work carries no market figure until a public sale is
+// /assets/new: the holder declares a work in their own words. One Sign (declare_held_asset) records a holding claim, not authorship
+// (PR #3190: authorship is a separate statement on the work's page); private by default. With ?confirm=<id> the person whose photos
+// found a work keeps it as documentation (confirm_held_asset): no role claim, never "yours". No price field exists on purpose: a declared work carries no market figure until a public sale is
 // recorded (case ledger §21.1). Phone first: one column, 44px controls, the kit's roles.
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -50,7 +51,7 @@ export default function AssetDeclarePage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
-  usePageTitle(confirming ? 'Name a work found in your photos' : 'Declare a work');
+  usePageTitle(confirming ? 'Keep a work found in your photos' : 'Declare a work you hold');
   const issues = problems(d);
   const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setD(prev => ({ ...prev, [k]: e.target.value }));
 
@@ -82,10 +83,10 @@ export default function AssetDeclarePage() {
 
   return <main className="ad-page">
     <header className="ad-head">
-      <Text role="entity" as="h1">{confirming ? 'Name a work found in your photos' : 'Declare a work'}</Text>
+      <Text role="entity" as="h1">{confirming ? 'Keep a work found in your photos' : 'Declare a work you hold'}</Text>
       <Text role="body" as="p" className="ad-lede">{confirming
-        ? 'The analysis found this work in your photographs. Give it its name and anything the photos cannot say; it becomes yours and stays private unless you say otherwise.'
-        : 'For a work no photograph shows. In your own words; you become its creator and holder. There is no price here: a work carries no market figure until a public sale is recorded.'}</Text>
+        ? 'The analysis found this work in your photographs. Keeping it records it as documentation of what you photographed; it does not say you made it or hold it. Give it its name and anything the photos cannot say; it stays private unless you say otherwise.'
+        : 'For a work you hold that no photograph shows. In your own words; you are recorded as its holder. Whether you made it is a separate statement on its page. There is no price here: a work carries no market figure until a public sale is recorded.'}</Text>
     </header>
     <form className="ad-form" onSubmit={submit} noValidate>
       {!confirming && <label className="jb-field"><Text role="label">What is it</Text>
@@ -114,11 +115,11 @@ export default function AssetDeclarePage() {
       {touched && issues.length > 0 && <ul className="ad-issues" role="alert">{issues.map(i => <li key={i}><Text role="caption">{i}</Text></li>)}</ul>}
       {error && <p className="ad-issues" role="alert"><Text role="caption">{`The record was not written: ${error}`}</Text></p>}
       <div className="ad-actions">
-        <button type="submit" className="ad-sign" disabled={sending}><Text role="label">{sending ? 'Recording…' : confirming ? 'This is my work' : 'Declare it'}</Text></button>
-        <PrefetchLink to="/assets/mine" className="ad-link">Your works</PrefetchLink>
+        <button type="submit" className="ad-sign" disabled={sending}><Text role="label">{sending ? 'Recording…' : confirming ? 'Keep as documentation' : 'Declare it'}</Text></button>
+        <PrefetchLink to="/assets/mine" className="ad-link">Your records</PrefetchLink>
       </div>
       <Text role="caption" as="p" className="ad-foot">{confirming
-        ? 'Confirming records your words under your account with today\'s clock; the photographs and their dates stay on the record as the evidence that found it.'
+        ? 'Keeping records your words under your account with today\'s clock; the photographs and their dates stay on the record as the documentation that found it.'
         : 'Signing records one declaration under your account with today\'s clock. The same declaration twice opens the same record.'}</Text>
     </form>
   </main>;
