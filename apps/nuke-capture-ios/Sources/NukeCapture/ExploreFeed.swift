@@ -54,16 +54,10 @@ struct ExploreFeedItem: Identifiable, Equatable {
 
     /// The source's mark as nuke.ag hosts it (the files the web's source board shows), or nil when
     /// none is known for this source, in which case the card keeps the text pill.
+    /// One table for the app's source marks (VehicleFirstScreen.sourceMarkURL), shared with the vehicle page.
     var sourceLogoURL: URL? {
-        Self.logoFiles[source].flatMap { URL(string: "https://nuke.ag/source-logos/\($0).png") }
+        VehicleFirstScreen.sourceMarkURL(label: source)
     }
-
-    /// Display name (as `source` holds it) → file in nuke_frontend/public/source-logos.
-    private static let logoFiles: [String: String] = [
-        "Bring a Trailer": "bat", "Cars & Bids": "cars-and-bids", "Craigslist": "craigslist",
-        "Facebook Marketplace": "facebook_marketplace", "KSL": "ksl", "Mecum": "mecum",
-        "Barrett-Jackson": "barrett-jackson",
-    ]
 
     /// "Ends in 3d 4h" for a live lot, nil when there is no end time on record.
     func timeLeft(now: Date) -> String? {

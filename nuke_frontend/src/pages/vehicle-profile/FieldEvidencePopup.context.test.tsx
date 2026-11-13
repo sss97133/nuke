@@ -48,15 +48,16 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); cache.clear(); host.remove(); expect(globalThis.fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); });
-async function render(field = 'transmission', value = '6L90', matchField = 'transmission_model') {
+async function render(field = 'transmission', value = '6L90', matchField = 'transmission_model', extra: Record<string, unknown> = {}) {
   await act(async () => root.render(<QueryClientProvider client={cache}><FieldEvidencePopup vehicleId="subject" field={field} label={field} value={value}
-    context={{ subject: { id: 'subject', year: 1977, make: 'Synthetic', model: 'Specimen', transmission: 'Automatic' }, matchField }} /></QueryClientProvider>));
+    context={{ subject: { id: 'subject', year: 1977, make: 'Synthetic', model: 'Specimen', transmission: 'Automatic', ...extra }, matchField }} /></QueryClientProvider>));
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 }
 
 it('opens the specific component through this vehicle and widens the same label without leaving the page', async () => {
   await render();
-  expect(host.querySelector('.vp-field-context__answer')?.textContent).toContain('6L90 · synthetic source');
+  const answer = host.querySelector('.vp-field-context__answer [role="group"]');
+  expect(answer?.textContent).toContain('Source'); expect(answer?.textContent).toContain('synthetic source');
   const first = requests[0].searchParams;
   expect(Object.fromEntries(first)).toMatchObject({ transmission_model: 'ilike.6L90', year: 'eq.1977', make: 'ilike.Synthetic', model: 'ilike.Specimen', id: 'neq.subject', is_public: 'eq.true', limit: '8' });
   expect(first.has('transmission')).toBe(false);
@@ -114,4 +115,12 @@ it('keeps the model doorway within the observed year and model instead of mixing
   await render('model', 'Specimen', 'model');
   expect(Object.fromEntries(requests[0].searchParams)).toMatchObject({ model: 'ilike.Specimen', make: 'ilike.Synthetic', year: 'eq.1977' });
   expect(host.querySelector('.vp-sold-context')).toBeNull();
+});
+
+it('shows a tribute trim as the recorded trim under the tribute rule, as line items', async () => {
+  await render('trim', 'Specimen-Style', 'trim', { trim: 'SPECIMEN', is_replica: true });
+  const answer = host.querySelector('.vp-field-context__answer [role="group"]');
+  expect(answer?.textContent).toContain('Recorded trimSPECIMEN');
+  expect(answer?.textContent).toContain('tribute_badge_rule_v1');
+  expect(answer?.textContent).toContain('vehicles.is_replica');
 });

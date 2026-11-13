@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
+import { Rows, Row } from '../../kit';
 import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
@@ -92,24 +93,23 @@ function FieldContext({ field, label, value, context, answer, reports, images, r
     || (field === 'drivetrain' && /\bNP\d{3}\b|transfer case|t-case/i.test(report.content || '')));
   return <div className="vp-field-context">
     <div className="vp-field-context__answer" aria-label={`${label} source`}>{answer}</div>
-    {specific.slice(0, 2).map(report => <article key={report.id} className="vp-field-context__report">
+    {specific.filter(report => report.content?.trim()).slice(0, 2).map(report => <article key={report.id} className="vp-field-context__report">
       {report.content && <p>{report.content}</p>}
       <small>{(report.source_slug || 'Retained report').replace(/_/g, ' ')}{report.observed_at && <> · {new Date(report.observed_at).toLocaleDateString('en-US', { timeZone: 'UTC' })}</>}</small>
     </article>)}
     {images.length > 0 && <section aria-label={`${value} related photographs`}>
       <h3>Related photographs</h3>
       <div className="vp-field-context__images" data-image-context="physical">{images.slice(0, 6).map(image => <button key={image.id} type="button" onClick={() => openVehiclePhoto(image.id)} aria-label={`Inspect ${image.vehicle_zone?.replace(/_/g, ' ') || label}`}>
-        <img src={image.thumbnail_url || image.medium_url || image.image_url} alt="" width={160} height={110} loading="lazy" />
+        <img src={tileUrl(image)} alt="" width={160} height={110} loading="lazy" />
       </button>)}</div>
-      <p className="vp-field-context__note">Related views help inspection; they do not establish the specific configuration.</p>
     </section>}
     {references.length > 0 && <section aria-label={`${value} reference material`}>
       <h3>Reference material</h3>
       <div className="vp-field-context__images" data-image-context="reference">{references.slice(0, 6).map(image => <button key={image.id} type="button" onClick={() => openVehiclePhoto(image.id)} aria-label={`Inspect reference: ${image.vehicle_zone?.replace(/_/g, ' ') || label}`}>
-        <img src={image.thumbnail_url || image.medium_url || image.image_url} alt="" width={160} height={110} loading="lazy" />
+        <img src={tileUrl(image)} alt="" width={160} height={110} loading="lazy" />
       </button>)}</div>
     </section>}
-    {filters.length > 0 && <section aria-label={`${value} data segment`}>
+    {filters.length > 0 && field !== 'location' && !(peers.isSuccess && peerTotal === 0) && <section aria-label={`${value} data segment`}>
       <div className="vp-field-context__segment-head">
         <h3>{peers.isSuccess ? (peerTotal === 0 ? `No other public profile is recorded as ${scopeLabel}` : `${peerTotal.toLocaleString('en-US')} other public profile${peerTotal === 1 ? '' : 's'} recorded as ${scopeLabel}`) : `Other profiles recorded as ${scopeLabel}`}</h3>
         {canScope && <button type="button" onClick={() => setSameModel(current => !current)}>{sameModel ? 'Include every make' : `Only ${subject.year || ''} ${subject.make} ${subject.model}`}</button>}
@@ -131,8 +131,13 @@ function FieldContext({ field, label, value, context, answer, reports, images, r
   </div>;
 }
 
+/** Popup tiles use the transcoded derivative: originals may be HEIC, which browsers do not render. */
+const tileUrl = (image: { thumbnail_url?: string | null; medium_url?: string | null; image_url?: string | null }) =>
+  optimizeImageUrl(image.thumbnail_url || image.medium_url || image.image_url, 'thumbnail') || image.thumbnail_url || image.medium_url || image.image_url || '';
+
 const SOURCE_LABELS: Record<string, string> = {
   owner_import_listing: 'Owner listing import',
+  gm_vin_chart: 'GM VIN chart (pre-1981)',
   ai_visual: 'Photo reading',
   system_update: 'System update',
   vin_decode: 'VIN decode (NHTSA)',
@@ -461,14 +466,42 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   // First line of the click: the value, who recorded it and when, or that nothing does.
   const leadClaim = sortedSources[0];
   const leadReport = provenanceCoverageUnavailable(provenance.data) ? undefined : provenance.data?.observations?.[0];
-  const shortDay = (at?: string | null) => at ? ` · ${new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}` : '';
-  const differs = (recorded?: string | null) => !!recorded && recorded.trim().toLowerCase() !== value.trim().toLowerCase() ? ` records “${recorded}”` : '';
-  const answer = imagesLoading || claims.loading ? <p role="status">Reading source…</p>
-    : provenance.data?.current_correction ? <p><strong>{value}</strong> · receipt correction{shortDay(provenance.data.current_correction.page_date)}</p>
-      : leadClaim ? <p><strong>{value}</strong> · {sourceLabel(leadClaim.source_type)}{differs(leadClaim.field_value)}{leadClaim.source_type.startsWith('agent_') ? '' : shortDay(leadClaim.created_at)}
-        {sortedSources.length > 1 && <> · {sortedSources.length - 1} more source{sortedSources.length > 2 ? 's' : ''}</>}</p>
-        : leadReport ? <p><strong>{value}</strong> · {(leadReport.source_slug || 'Source report').replace(/_/g, ' ')}{differs(leadReport.value)}{shortDay(leadReport.observed_at)}</p>
-          : <p><strong>{value}</strong> · no source on record. This value sits on the vehicle record with no claim behind it.</p>;
+  const shortDay = (at?: string | null) => at ? new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+  const subject = context?.subject as (Partial<Vehicle> & { is_replica?: boolean | null }) | undefined;
+  // A tribute's trim is the record's trim under tribute_badge_rule_v1 (migration 20261110090000): no factory badge.
+  const tribute = field === 'trim' && !!subject?.is_replica && !!subject?.trim;
+  const recorded = leadClaim?.field_value ?? leadReport?.value ?? null;
+  // A VIN decode is the registry reading; it leads over listing, photo and system claims.
+  const vinReport = leadReport?.extraction_method?.startsWith('vin_decode') ? leadReport : undefined;
+  // Distinct sources by key: the observation writer mirrors each report into field_evidence, so a report
+  // and its field claim share one source key (e.g. gm_vin_chart) and count once.
+  const sourceCount = new Set([
+    ...(claimGroup?.sources.map(source => source.source_type) ?? []),
+    ...(provenanceCoverageUnavailable(provenance.data) ? [] : provenance.data?.observations ?? []).map(report => report.source_slug || 'report'),
+  ]).size;
+  const methodReport = vinReport ?? (!leadClaim ? leadReport : undefined);
+  const reportSource = (report: NonNullable<typeof leadReport>) => {
+    const name = sourceLabel(report.source_slug || 'Source report');
+    const url = webSourceUrl(report.source_url);
+    return url ? <a href={url} target="_blank" rel="noopener noreferrer">{name} ↗</a> : name;
+  };
+  const answer = imagesLoading || claims.loading ? <p role="status">Reading source…</p> : <Rows title="This vehicle">
+    <Row label={label.replace(/^./, c => c.toUpperCase())}>{value}</Row>
+    {tribute && <Row label="Recorded trim">{subject!.trim}</Row>}
+    {tribute && <Row label="Tribute">Yes · vehicles.is_replica</Row>}
+    {tribute && <Row label="Rule">tribute_badge_rule_v1 · a tribute earns no factory trim badge</Row>}
+    {!tribute && recorded && recorded.trim().toLowerCase() !== value.trim().toLowerCase() && <Row label="Recorded">{recorded}</Row>}
+    <Row label="Source">{provenance.data?.current_correction ? 'Receipt correction'
+      : vinReport ? reportSource(vinReport)
+        : leadClaim ? sourceLabel(leadClaim.source_type)
+          : leadReport ? reportSource(leadReport)
+            : 'None admitted'}</Row>
+    {vinReport && subject?.vin && <Row label="Read from VIN">{subject.vin}</Row>}
+    {methodReport?.extraction_method && <Row label="Method" role="caption">{methodReport.extraction_method}</Row>}
+    {(provenance.data?.current_correction?.page_date || vinReport?.observed_at || (leadClaim && !leadClaim.source_type.startsWith('agent_') && leadClaim.created_at) || leadReport?.observed_at)
+      && <Row label="Recorded on">{shortDay(provenance.data?.current_correction?.page_date || vinReport?.observed_at || (leadClaim && !leadClaim.source_type.startsWith('agent_') ? leadClaim.created_at : null) || leadReport?.observed_at)}</Row>}
+    {sourceCount > 1 && <Row label="Other sources" role="measure">{sourceCount - 1}</Row>}
+  </Rows>;
   return context ? <FieldContext field={field} label={label} value={value} context={context} answer={answer}
     reports={[
       ...(provenanceCoverageUnavailable(provenance.data) ? [] : provenance.data?.observations || []),

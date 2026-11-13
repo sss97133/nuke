@@ -6186,12 +6186,12 @@ Deno.serve(async (req: Request) => {
     if (path.endsWith("/.well-known/oauth-authorization-server") || path.endsWith("/authorize")) {
       return oauthNotHere();
     }
-    // GET on root = SSE stream (required by MCP Streamable HTTP spec)
-    // Return an open SSE connection that sends a keepalive then closes
-    return new Response(
-      "event: message\ndata: {}\n\n",
-      { status: 200, headers: { ...CORS, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } },
-    );
+    // GET on root asks for a server-to-client SSE stream. This server never pushes: every response
+    // rides on its POST. The Streamable HTTP transport lets a server answer 405 here, and a client
+    // then does not listen. The earlier answer, a 200 stream that closed after one event, made each
+    // client reconnect at once, forever: 72,896 GETs in 3 hours on 2026-11-11 (about 20 a second
+    // by that evening) from claude-code clients, every one a function invocation that did nothing.
+    return new Response(null, { status: 405, headers: { ...CORS, Allow: "POST, DELETE, OPTIONS" } });
   }
 
   // OAuth token + registration endpoints (POST)

@@ -31,6 +31,7 @@ CREATE TABLE public.garage_derivation_evidence(id uuid PRIMARY KEY DEFAULT gen_r
   CONSTRAINT garage_derivation_evidence_kind_check CHECK (kind IN ('scene_label')));
 -- (after this point the migration is applied: \i supabase/migrations/20261111210500_receipt_work_reconciliation.sql)
 \ir ../migrations/20261111210500_receipt_work_reconciliation.sql
+\ir ../migrations/20261114120002_evidence_judgment_candidate_set_equality.sql
 DO $$
 DECLARE r record; n int;
   V constant uuid := '00000000-0000-0000-0000-0000000000a1'; U constant uuid := '00000000-0000-0000-0000-0000000000b1';
@@ -354,6 +355,34 @@ BEGIN
   ASSERT EXISTS (SELECT 1 FROM unnest(probs) p WHERE p LIKE 'context_changed:%candidate_image_ids%'), probs::text;
   ASSERT NOT pg_temp.try_answer(q1, 'worker-a', ans), 'frame set change';
   DELETE FROM vehicle_images WHERE id = FN;
+  -- (6b) candidate_image_ids order is not a context change (set equality); membership still is
+  -- Reverse the stored question/context arrays; the live reader order is unchanged.
+  -- Do not answer here: q1 must stay claimed so the later unchanged-context answer still runs.
+  UPDATE evidence_judgment_requests e
+     SET params = jsonb_set(
+           jsonb_set(e.params, '{candidate_image_ids}', (
+             SELECT jsonb_agg(x ORDER BY ord DESC)
+             FROM jsonb_array_elements(e.params -> 'candidate_image_ids') WITH ORDINALITY AS t(x, ord)
+           )),
+           '{context,candidate_image_ids}', (
+             SELECT jsonb_agg(x ORDER BY ord DESC)
+             FROM jsonb_array_elements(e.params #> '{context,candidate_image_ids}') WITH ORDINALITY AS t(x, ord)
+           ))
+   WHERE e.id = q1;
+  ASSERT evidence_judgment_ineligibility(q1) = '{}'::text[], evidence_judgment_ineligibility(q1)::text;
+  -- flip back to the original stored order
+  UPDATE evidence_judgment_requests e
+     SET params = jsonb_set(
+           jsonb_set(e.params, '{candidate_image_ids}', (
+             SELECT jsonb_agg(x ORDER BY ord DESC)
+             FROM jsonb_array_elements(e.params -> 'candidate_image_ids') WITH ORDINALITY AS t(x, ord)
+           )),
+           '{context,candidate_image_ids}', (
+             SELECT jsonb_agg(x ORDER BY ord DESC)
+             FROM jsonb_array_elements(e.params #> '{context,candidate_image_ids}') WITH ORDINALITY AS t(x, ord)
+           ))
+   WHERE e.id = q1;
+  ASSERT evidence_judgment_ineligibility(q1) = '{}'::text[], 'restored order still eligible';
   UPDATE vehicle_images SET is_sensitive = true WHERE id = F1;
   probs := evidence_judgment_ineligibility(q1);
   ASSERT ('frame_ineligible:' || F1) = ANY (probs), probs::text;

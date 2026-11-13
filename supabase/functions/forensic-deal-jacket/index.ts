@@ -337,7 +337,7 @@ async function extractWithVision(imageUrl: string): Promise<any> {
   const errors: string[] = [];
 
   // Try Claude first (better at dense document OCR)
-  const anthropicKey = Deno.env.get("NUKE_CLAUDE_API") || Deno.env.get("VITE_NUKE_CLAUDE_API") || Deno.env.get("ANTHROPIC_API_KEY") || Deno.env.get("CLAUDE_API_KEY");
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") || Deno.env.get("NUKE_CLAUDE_API") || Deno.env.get("VITE_NUKE_CLAUDE_API") || Deno.env.get("CLAUDE_API_KEY");
   if (anthropicKey) {
     try {
       return await extractWithClaude(imageUrl, anthropicKey);
@@ -401,7 +401,7 @@ async function extractWithClaude(imageUrl: string, apiKey: string): Promise<any>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-5-5",
         max_tokens: 8000,
         messages: [{
           role: "user",
@@ -421,7 +421,7 @@ async function extractWithClaude(imageUrl: string, apiKey: string): Promise<any>
     }
 
     const data = await response.json();
-    const content = data.content?.[0]?.text;
+    const content = (data.content ?? []).find((b: { type?: string }) => b?.type === "text")?.text;
     if (!content) throw new Error("Empty Anthropic response");
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
