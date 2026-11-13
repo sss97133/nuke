@@ -669,27 +669,25 @@ struct ProfileTimelineCard: View {
     var body: some View {
         if !timeline.days.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-                Text("RECORD EVENTS")
+                Text("TIMELINE")
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .padding(.bottom, 6)
-                // Kind totals: what the record's events are, by count.
-                Text(kindTotals.map { "\(Self.name($0.kind)) \($0.n.formatted())" }.joined(separator: " · "))
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.primary)
                     .padding(.bottom, 8)
                 VStack(spacing: 0) {
                     ForEach(Array(timeline.days.prefix(shownDays)), id: \.day) { d in
                         LabeledContent {
                             Text(d.kinds.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
-                                    .map { "\(Self.name($0.key)) \($0.value)" }.joined(separator: " · "))
+                                    .map { Self.name($0.key) }.joined(separator: ", "))
                                 .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(.primary)
                                 .multilineTextAlignment(.trailing)
                         } label: {
                             Text(Self.day(d.day)).font(.footnote).foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 5)
-                        Divider()
+                        .padding(.vertical, 6)
+                        if d.day != timeline.days.prefix(shownDays).last?.day {
+                            Divider()
+                        }
                     }
                 }
                 if timeline.days.count > shownDays {
