@@ -18,6 +18,8 @@ type Row = { id: string; listing_url: string; html_storage_path: string | null; 
 
 Deno.serve(async (req) => {
   const denied = await requireWriteAuth(req); if (denied) return denied;
+  // writeGuard passes OPTIONS through unjudged; answer the preflight here so it never runs a batch.
+  if (req.method === "OPTIONS") return new Response(null, { status: 204 });
   const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
   const limit = Math.min(Math.max(Number(body.limit) || 200, 1), 500);
   const runId = String(body.run_id || `bat-loc-${new Date().toISOString().slice(0, 10)}`);

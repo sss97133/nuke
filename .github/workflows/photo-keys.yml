@@ -1,0 +1,205 @@
+name: Photo Keys Lane
+
+# Dispatch-only: no schedule and no push trigger. Nothing here runs unless a person starts it.
+# It keys what readers have ALREADY stored about one vehicle's photos, one photo at a time
+# (scripts/photo-pipeline/keys_lane.py). It reads no photo. With write off it is a dry run and writes nothing.
+# Auth is the Claude subscription (repo secret CLAUDE_CODE_OAUTH_TOKEN), as in byok-analysis-drain.yml.
+# ANTHROPIC_API_KEY is never set here: it takes precedence over the subscription token and bills the API.
+# Required repo secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CLAUDE_CODE_OAUTH_TOKEN.
+# This repository and its logs are public: there are no default ids, the two ids never enter a step's env
+# block (which the log prints), and the lane prints counts only. No artifact is uploaded.
+#
+#   gh workflow run photo-keys.yml -f vehicle_id=<uuid> -f user_id=<uuid> -f photos=1 -f write=false
+#
+# step=properties runs the other thing this vehicle's stored readings can give without a model: the three values a
+# deep reading already holds (rust severity, paint stage, assembly state), copied to their registered properties by
+# the existing projection. It needs the two database secrets only.
+#   gh workflow run photo-keys.yml -f step=properties -f vehicle_id=<uuid> -f user_id=<uuid> -f photos=99 -f pages=10
+
+on:
+  workflow_dispatch:
+    inputs:
+      vehicle_id:
+        description: Vehicle whose stored photo readings are keyed (uuid)
+        required: true
+        type: string
+      user_id:
+        description: Owner of those photos (uuid)
+        required: true
+        type: string
+      photos:
+        description: How many photos to key, one at a time (1 to 99)
+        type: string
+        default: '1'
+      model:
+        description: Claude model
+        type: string
+        default: 'sonnet'
+      after:
+        description: Start after this photo (the 8-character cursor a run printed); empty starts from the first
+        type: string
+        default: ''
+      write:
+        description: Land the keyed claims (false = dry run, nothing is written)
+        type: boolean
+        default: false
+      step:
+        description: "keys = place stored statements on keys (a model call a photo). properties = copy the three values a stored reading already holds (no model call)"
+        type: choice
+        options: [keys, properties]
+        default: keys
+      pages:
+        description: properties only. How many windows of `photos` stored readings to walk, newest first (1 to 99). A reading whose values a row already holds is passed over, so a second run goes on where the first stopped
+        type: string
+        default: '1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: photo-keys
+  cancel-in-progress: false
+
+jobs:
+  keys:
+    runs-on: ubuntu-latest
+    # One model call a photo, each cut off at 240 s. A run the timeout ends keeps what it landed and loses
+    # only its summary; the lane prints one line a photo so the log still says how far it got.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22: the database client used by step=properties needs the WebSocket that Node has from 22 on.
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the claude CLI
+        if: inputs.step != 'properties'
+        # The lane itself is standard-library Python; the CLI is its only dependency.
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Check the subscription sign-in (no model call, no database call)
+        if: inputs.step != 'properties'
+        shell: bash
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          unset ANTHROPIC_API_KEY
+          echo "cred-check | CLAUDE_CODE_OAUTH_TOKEN length: ${#CLAUDE_CODE_OAUTH_TOKEN}"
+          [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || { echo "::error::CLAUDE_CODE_OAUTH_TOKEN (subscription) not set."; exit 4; }
+          claude --version
+          auth_result=$(mktemp); auth_error=$(mktemp); rc=0
+          trap 'rm -f "$auth_result" "$auth_error"' EXIT
+          claude auth status >"$auth_result" 2>"$auth_error" || rc=$?
+          # The drain's diagnostic, with one assertion added: an API-key login is refused, because it bills the API.
+          node - "$auth_result" "$rc" <<'JS'
+          const fs = require('node:fs');
+          let result;
+          try { result = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')); } catch {}
+          const methods = ['none', 'claude.ai', 'oauth_token', 'api_key', 'api_key_helper', 'third_party'];
+          console.log(JSON.stringify({exit: Number(process.argv[3]),
+            parsed: !!result, loggedIn: result?.loggedIn === true,
+            authMethod: methods.includes(result?.authMethod) ? result.authMethod : 'unknown',
+            model_calls: 0, database_calls: 0}));
+          const billsTheApi = ['api_key', 'api_key_helper', 'third_party'].includes(result?.authMethod);
+          process.exit(Number(process.argv[3]) === 0 && result?.loggedIn === true && !billsTheApi ? 0 : 4);
+          JS
+
+      - name: Run keys lane
+        if: inputs.step != 'properties'
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          KEYS_PHOTOS: ${{ inputs.photos }}
+          KEYS_MODEL: ${{ inputs.model }}
+          KEYS_AFTER: ${{ inputs.after }}
+          KEYS_WRITE: ${{ inputs.write }}
+        run: |
+          unset ANTHROPIC_API_KEY
+          # Inputs reach the script as data, never spliced into this script. The two ids come from the event
+          # file and not from env, because a step's env block is printed at the top of its log. They are
+          # checked without being echoed, then masked.
+          KEYS_VEHICLE_ID="$(jq -r '.inputs.vehicle_id // ""' "$GITHUB_EVENT_PATH")"
+          KEYS_USER_ID="$(jq -r '.inputs.user_id // ""' "$GITHUB_EVENT_PATH")"
+          uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          count='^[1-9][0-9]?$'
+          name='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+          cursor='^[0-9a-f]{8}$'
+          [[ "$KEYS_VEHICLE_ID" =~ $uuid ]] || { echo "::error::vehicle_id is not a lowercase uuid"; exit 2; }
+          [[ "$KEYS_USER_ID" =~ $uuid ]] || { echo "::error::user_id is not a lowercase uuid"; exit 2; }
+          echo "::add-mask::$KEYS_VEHICLE_ID"
+          echo "::add-mask::$KEYS_USER_ID"
+          [[ "$KEYS_PHOTOS" =~ $count ]] || { echo "::error::photos must be 1 to 99"; exit 2; }
+          [[ "$KEYS_MODEL" =~ $name ]] || { echo "::error::model is not a plain model name"; exit 2; }
+          [[ -z "$KEYS_AFTER" || "$KEYS_AFTER" =~ $cursor ]] || { echo "::error::after must be the 8-character cursor a run printed"; exit 2; }
+          [ -n "$SUPABASE_URL" ] || { echo "::error::SUPABASE_URL not set."; exit 2; }
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::SUPABASE_SERVICE_ROLE_KEY not set."; exit 2; }
+          args=(--vehicle-id "$KEYS_VEHICLE_ID" --user-id "$KEYS_USER_ID" --photos "$KEYS_PHOTOS" --model "$KEYS_MODEL")
+          if [ -n "$KEYS_AFTER" ]; then args+=(--after "$KEYS_AFTER"); fi
+          if [ "$KEYS_WRITE" = "true" ]; then args+=(--write); fi
+          # The lane's exit code is the step's: 0 work done or nothing left; 1 a read failed, the writer did not
+          # take what was sent, or the model call failed for three photos in a row; 2 bad input; 3 usage limit;
+          # 4 authentication; 5 no photo could be keyed.
+          # -u: one line a photo reaches the log as it happens, so a run the timeout ends still shows how far it got.
+          python3 -u scripts/photo-pipeline/keys_lane.py "${args[@]}"
+
+      # The existing projection (scripts/deep-image-analysis-byok.mjs project-cached, scripts/lib/image-property-projection.mjs):
+      # a stored deep reading already holds rust_severity, paint_state and completeness for its photo, and the registry has
+      # a property for each. No model is called and no key is needed but the database's. An owner's own photos go one
+      # claim at a time through ingest-observation (--single), because the batch intake takes listing photos only.
+      - name: Install the database client for step=properties
+        if: inputs.step == 'properties'
+        # Its own step, with no secret in its environment and install scripts off. One package, at the version this
+        # was run with, installed beside the checkout and linked in: not the repository's whole tree.
+        run: |
+          mkdir -p "$RUNNER_TEMP/sb" node_modules
+          (cd "$RUNNER_TEMP/sb" && npm init -y >/dev/null && npm install --ignore-scripts --no-audit --no-fund '@supabase/supabase-js@2.119.0' >/dev/null)
+          ln -s "$RUNNER_TEMP/sb/node_modules/@supabase" node_modules/@supabase
+
+      - name: Copy the stored readings' three values to their registered properties
+        if: inputs.step == 'properties'
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          KEYS_PHOTOS: ${{ inputs.photos }}
+          KEYS_PAGES: ${{ inputs.pages }}
+          KEYS_WRITE: ${{ inputs.write }}
+        run: |
+          KEYS_VEHICLE_ID="$(jq -r '.inputs.vehicle_id // ""' "$GITHUB_EVENT_PATH")"
+          uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          count='^[1-9][0-9]?$'
+          [[ "$KEYS_VEHICLE_ID" =~ $uuid ]] || { echo "::error::vehicle_id is not a lowercase uuid"; exit 2; }
+          echo "::add-mask::$KEYS_VEHICLE_ID"
+          [[ "$KEYS_PHOTOS" =~ $count ]] || { echo "::error::photos must be 1 to 99"; exit 2; }
+          [[ "$KEYS_PAGES" =~ $count ]] || { echo "::error::pages must be 1 to 99"; exit 2; }
+          [ -n "$SUPABASE_URL" ] || { echo "::error::SUPABASE_URL not set."; exit 2; }
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::SUPABASE_SERVICE_ROLE_KEY not set."; exit 2; }
+          # --single on the dry run too, so its counts are what a write would send (the same refusals, the same skips).
+          args=(project-cached --vehicle-id "$KEYS_VEHICLE_ID" --limit "$KEYS_PHOTOS" --pages "$KEYS_PAGES" --single)
+          if [ "$KEYS_WRITE" = "true" ]; then args+=(--apply); fi
+          rc=0
+          node scripts/deep-image-analysis-byok.mjs "${args[@]}" >"$RUNNER_TEMP/receipt" 2>"$RUNNER_TEMP/said" || rc=$?
+          # This log is public. From the receipt: the named counts, and words made of a to z and "_" only. No vehicle
+          # id, no row id, no list. From stderr: the script's own fixed error line, or only how many lines there were.
+          show='objects | {mode, route, sampled_condition_rows, source_rows, eligible_claims, window_limit, pages_walked,
+            reached_oldest_row, model_calls, already_projected, already_projected_superseded, inserted, duplicates,
+            verified, failed, unattempted, reason,
+            deferred: ((.deferred // {}) | if type == "object" then with_entries(select((.key | test("^[a-z_]{1,40}$")) and (.value | type) == "number")) else {} end)}
+            | with_entries(select((.value | type) as $t | $t == "number" or $t == "boolean" or $t == "object" or ($t == "string" and (.value | test("^[a-z_]{1,40}$")))))'
+          line="$( { [ -s "$RUNNER_TEMP/receipt" ] && tail -n 1 "$RUNNER_TEMP/receipt" | jq -ce "$show" 2>/dev/null; } || true )"
+          if [ -n "$line" ]; then echo "$line"; else echo "no receipt was printed"; fi
+          said="$(grep -m1 -oE '^Error: project-cached: [a-z ]{1,60}$' "$RUNNER_TEMP/said" || true)"
+          if [ -n "$said" ]; then echo "$said"; elif [ -s "$RUNNER_TEMP/said" ]; then echo "stderr: $(wc -l < "$RUNNER_TEMP/said") lines withheld"; fi
+          {
+            echo "### Stored readings to registered properties ($([ "$KEYS_WRITE" = "true" ] && echo write || echo 'dry run'))"
+            if [ -n "$line" ]; then echo "$line" | jq -r 'to_entries[] | "- \(.key): \(.value | tojson)"'; else echo "- no receipt was printed"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"

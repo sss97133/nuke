@@ -44,7 +44,11 @@ vi.mock('../../lib/supabase', () => ({
       };
       return query;
     },
-    rpc: () => ({ abortSignal: () => Promise.resolve({ data: null, error: null }) }),
+    rpc: (name: string) => ({ abortSignal: () => Promise.resolve({
+      data: name === 'get_vehicle_specs' ? [{ vehicle_id: 'vehicle-example', schema_version: 'vehicle_data_model_v1',
+        native_listing_history: { reader: 'cc_native_profile_history_v1', capture_limit: 50, has_more_captures: false, entries: [] } }] : null,
+      error: null,
+    }) }),
   },
 }));
 vi.mock('react-router-dom', async (original) => ({
@@ -85,6 +89,34 @@ describe('observation privacy boundary', () => {
     expect(publicObservationArtifact()).toBeNull();
   });
 
+  it('shows qualified auction quantities without exposing nested source prose or implying a sale for a high bid', () => {
+    const claim = { status: 'no_sale', amount: 4600, currency: null, fee_basis: 'unknown',
+      literal: 'Morgan Example bid $4,600', participants: ['Morgan Example'] };
+    expect(publicObservationData({ kind_detail: 'auction_listing', result_claim: claim })).toEqual({
+      source_reported_outcome: 'no_sale', source_reported_amount_type: 'high_bid',
+      source_reported_amount: 4600, source_reported_currency: 'not_stated', source_reported_fee_basis: 'unknown',
+    });
+    expect(publicObservationData({ kind_detail: 'auction_listing', result_claim: {
+      ...claim, status: 'sold', amount: 16324, currency: 'USD', fee_basis: 'Morgan Example',
+    } })).toEqual({
+      source_reported_outcome: 'sold', source_reported_amount_type: 'sale_price',
+      source_reported_amount: 16324, source_reported_currency: 'USD', source_reported_fee_basis: 'unknown',
+    });
+  });
+
+  it('keeps the auction projection closed to arbitrary strings, invalid quantities and consent flags', () => {
+    const base = { status: 'sold', amount: 16324, currency: 'Morgan Example', literal: 'Morgan Example' };
+    const project = (result_claim: unknown, kind_detail = 'auction_listing') =>
+      publicObservationData({ kind_detail, result_claim, name_publication_consent: true });
+    expect(project(base).source_reported_currency).toBe('not_stated');
+    expect(JSON.stringify(project(base))).not.toContain('Morgan');
+    for (const amount of ['Morgan Example', NaN, Infinity, -1, null]) expect(project({ ...base, amount })).toEqual({});
+    expect(project({ ...base, status: 'Morgan Example' })).toEqual({});
+    expect(project(base, 'payment')).toEqual({});
+    expect(project([base])).toEqual({});
+    expect(project(null)).toEqual({});
+  });
+
   it('does not render raw names in the observation heading, related rows, JSON, OCR or artifact URLs', async () => {
     await mount(<ObservationPage />);
     expect(host.querySelector('h1')?.textContent).toBe('Condition observation');
@@ -95,6 +127,23 @@ describe('observation privacy boundary', () => {
     expect(host.querySelector('img')).toBeNull();
     expect(host.querySelector('a[href*="example.invalid"]')).toBeNull();
     expect(host.querySelector('a[href*="related-example"]')).not.toBeNull();
+  });
+
+  it('renders source-reported auction quantities through the public observation reader while withholding prose', async () => {
+    const original = example.structured_data;
+    Object.assign(example, { structured_data: { kind_detail: 'auction_listing', result_claim: {
+      status: 'no_sale', amount: 4600, currency: null, fee_basis: 'unknown', literal: 'Morgan Example bid $4,600',
+    } } });
+    try {
+      await mount(<ObservationPage />);
+      expect(host.textContent).toContain('Source Reported Amount');
+      expect(host.textContent).toContain('4600');
+      expect(host.textContent).toContain('high_bid');
+      expect(host.textContent).toContain('not_stated');
+      expect(host.textContent).toContain('privacy review');
+      expect(host.innerHTML).not.toContain('Morgan');
+      expect(host.querySelector('img')).toBeNull();
+    } finally { Object.assign(example, { structured_data: original }); }
   });
 
   it('also withholds the same name in collapsed and expanded day observations', async () => {

@@ -60,4 +60,66 @@ SELECT pg_temp.ok('the county_fips comment names the correction and no longer cr
     LIKE '%the coder is not recorded%');
 \ir ../migrations/20261008016000_vlo_sightings_anon_read_and_coder_note.sql
 SELECT pg_temp.ok('re-apply changes nothing', (SELECT count(*) FROM pg_policies WHERE tablename = 'vehicle_location_observations') = 2);
+
+-- 20261116015000: rows follow their vehicle's visibility; sightings only for tied viewers. Owner bbbb…, untied cccc….
+-- vehicle_listing_viewer_tied is the live definition (20261110100000); vehicle_user_has_access is a stub limited to the
+-- vehicle's own people (the live one adds admins, permissions and contributors).
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.auth_uid', true), '')::uuid $$;
+GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
+CREATE TABLE public.vehicles (id uuid PRIMARY KEY, is_public boolean, deleted_at timestamptz, owner_id uuid, user_id uuid,
+  created_by_user_id uuid, uploaded_by uuid);
+ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.vehicles TO anon, authenticated, service_role;
+CREATE FUNCTION public.vehicle_user_has_access(p_vehicle_id uuid, p_user_id uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = p_vehicle_id AND p_user_id IN (v.user_id, v.owner_id, v.uploaded_by)) $$;
+-- The vehicles policies as live (2026-11-12): public rows to everyone, private rows to their people.
+CREATE POLICY vehicles_public_select ON public.vehicles FOR SELECT USING (is_public = true OR auth.role() = 'service_role');
+CREATE POLICY vehicles_private_select ON public.vehicles FOR SELECT USING (is_public = false AND (SELECT auth.uid()) IS NOT NULL
+  AND ((SELECT auth.uid()) IN (user_id, owner_id, uploaded_by) OR public.vehicle_user_has_access(id, (SELECT auth.uid()))));
+CREATE OR REPLACE FUNCTION public.vehicle_listing_viewer_tied(p_vehicle_id uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $f$
+  SELECT (SELECT auth.role()) = 'service_role'
+      OR EXISTS (SELECT 1 FROM public.vehicles v
+                 WHERE v.id = p_vehicle_id AND (SELECT auth.uid()) IS NOT NULL
+                   AND (coalesce((SELECT auth.uid()) IN (v.owner_id, v.user_id, v.created_by_user_id, v.uploaded_by), false)
+                        OR public.vehicle_user_has_access(v.id, (SELECT auth.uid()))))
+$f$;
+GRANT EXECUTE ON FUNCTION public.vehicle_listing_viewer_tied(uuid) TO anon, authenticated, service_role;
+INSERT INTO public.vehicles (id, is_public, deleted_at, owner_id) VALUES
+  ('11111111-1111-1111-1111-111111111111', true,  NULL, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),  -- public, owned
+  ('22222222-2222-2222-2222-222222222222', false, NULL, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),  -- private, owned
+  ('33333333-3333-3333-3333-333333333333', true,  '2026-11-01', NULL);                             -- public but deleted
+-- The three fixture rows belong to the public vehicle; one listing row each for the private and the deleted vehicle,
+-- and a sighting on the private one.
+UPDATE public.vehicle_location_observations SET vehicle_id = '11111111-1111-1111-1111-111111111111';
+INSERT INTO public.vehicle_location_observations (vehicle_id, source_type, precision, confidence) VALUES
+  ('22222222-2222-2222-2222-222222222222', 'listing', 'city', 0.9),
+  ('22222222-2222-2222-2222-222222222222', 'sighting', 'gps', 0.95),
+  ('33333333-3333-3333-3333-333333333333', 'listing', 'city', 0.9);
+
+\ir ../migrations/20261116015000_vlo_read_vehicle_visibility.sql
+\ir ../migrations/20261116015000_vlo_read_vehicle_visibility.sql
+
+SET ROLE anon;
+SELECT pg_temp.ok('015000: anon reads only the public live vehicle''s high-confidence listing row',
+  (SELECT count(*) FROM public.vehicle_location_observations) = 1
+  AND (SELECT count(*) FROM public.vehicle_location_observations WHERE vehicle_id <> '11111111-1111-1111-1111-111111111111') = 0);
+RESET ROLE;
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL test.auth_uid = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+SELECT pg_temp.ok('015000: an untied signed-in reader reads what anon reads: no private, deleted or sighting row',
+  (SELECT count(*) FROM public.vehicle_location_observations) = 1
+  AND (SELECT count(*) FROM public.vehicle_location_observations WHERE source_type = 'sighting') = 0);
+SET LOCAL test.auth_uid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+SELECT pg_temp.ok('015000: the owner reads both their vehicles'' rows and their sightings, not the deleted vehicle''s',
+  (SELECT count(*) FROM public.vehicle_location_observations) = 4
+  AND (SELECT count(*) FROM public.vehicle_location_observations WHERE source_type = 'sighting') = 2
+  AND (SELECT count(*) FROM public.vehicle_location_observations WHERE vehicle_id = '33333333-3333-3333-3333-333333333333') = 0);
+COMMIT;
+RESET ROLE;
+SET ROLE service_role;
+SELECT pg_temp.ok('015000: service_role reads every row (6)', (SELECT count(*) FROM public.vehicle_location_observations) = 6);
+RESET ROLE;
+SELECT pg_temp.ok('015000: re-apply changes nothing', (SELECT count(*) FROM pg_policies WHERE tablename = 'vehicle_location_observations') = 2);
 \echo 'vehicle_location_observations sightings read contract: all checks passed'

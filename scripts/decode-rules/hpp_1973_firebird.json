@@ -1,0 +1,1501 @@
+{
+ "_source": {
+  "url": "https://wwfirebirds.com/wp-content/uploads/2025/09/WWF-September2025WWFirebirdsNewsletter.pdf",
+  "title": "Thomas A. DeMauro, 'Number Crunching: The codes that count on the 1973 Firebird', High Performance Pontiac, June 1994, pp.19-21 (reprinted in the WW Firebirds newsletter, Sept 2025, PDF pages 10-12)",
+  "cited_on": "2026-11-11",
+  "method": "hand transcription from the scanned pages; italic engine codes marked updated_emissions"
+ },
+ "rows": [
+  {
+   "rule_key": "vin_series_char",
+   "code": "S",
+   "value": {
+    "series": "Firebird (base)"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_series_char",
+   "code": "T",
+   "value": {
+    "series": "Esprit"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_series_char",
+   "code": "U",
+   "value": {
+    "series": "Formula"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_series_char",
+   "code": "V",
+   "value": {
+    "series": "Trans Am"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_body_code",
+   "code": "87",
+   "value": {
+    "body": "hardtop coupe",
+    "note": "the only Firebird configuration"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_plant_char",
+   "code": "N",
+   "value": {
+    "plant": "Norwood, Ohio"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_engine_char",
+   "code": "D",
+   "value": {
+    "displacement_ci": 250,
+    "cylinders": 6
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_engine_char",
+   "code": "M",
+   "value": {
+    "displacement_ci": 350,
+    "exhaust": "single"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_engine_char",
+   "code": "N",
+   "value": {
+    "displacement_ci": 350,
+    "exhaust": "dual"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_engine_char",
+   "code": "R",
+   "value": {
+    "displacement_ci": 400,
+    "carb": "2bbl",
+    "exhaust": "single"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_engine_char",
+   "code": "P",
+   "value": {
+    "displacement_ci": 400,
+    "carb": "2bbl",
+    "exhaust": "dual"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_engine_char",
+   "code": "T",
+   "value": {
+    "displacement_ci": 400,
+    "carb": "4bbl",
+    "exhaust": "dual"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_engine_char",
+   "code": "Y",
+   "value": {
+    "displacement_ci": 455,
+    "heads": "D-port"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_engine_char",
+   "code": "X",
+   "value": {
+    "displacement_ci": 455,
+    "application": "Super Duty"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "vin_sequence_start",
+   "code": "100001",
+   "value": {
+    "note": "consecutive sequence number ran 100001 up"
+   },
+   "locator": "p.19 (PDF p.10), Serial Numbers"
+  },
+  {
+   "rule_key": "body_tag_line_format",
+   "code": "1973_cowl",
+   "value": {
+    "location": "top of the cowl, ahead of the windshield, driver side",
+    "lines": {
+     "1": "Body By Fisher",
+     "2": "ST <model year> <style number> <plant> <body number> BDY",
+     "3": "TR <trim> <seat> <paint lower> <paint upper> PNT",
+     "4": "<build date> <option codes>",
+     "5": "code line (700809 in the example) not yet deciphered",
+     "6": "General Motors Corporation"
+    },
+    "example": "ST 73 2FS87 NOR 170011 BDY / TR 242 A51 51 51 PNT / 06B W66 / 700809",
+    "body_number_note": "consecutive body number, no direct correlation to the VIN"
+   },
+   "locator": "pp.19-20 (PDF pp.10-11), Cowl Data Plates"
+  },
+  {
+   "rule_key": "body_tag_style_number",
+   "code": "2FS87",
+   "value": {
+    "body": "hardtop coupe",
+    "series_from_tag": false,
+    "note": "base-model style number on every series; Formula and Trans Am are shown by option codes on line 4"
+   },
+   "locator": "pp.19-20 (PDF pp.10-11), Cowl Data Plates, Line 2"
+  },
+  {
+   "rule_key": "body_tag_plant_code",
+   "code": "NOR",
+   "value": {
+    "plant": "Norwood, Ohio",
+    "note": "some tags show just N"
+   },
+   "locator": "p.20 (PDF p.11), Line 2"
+  },
+  {
+   "rule_key": "body_tag_plant_code",
+   "code": "N",
+   "value": {
+    "plant": "Norwood, Ohio"
+   },
+   "locator": "p.20 (PDF p.11), Line 2"
+  },
+  {
+   "rule_key": "body_tag_option_code",
+   "code": "W66",
+   "value": {
+    "meaning": "Formula"
+   },
+   "locator": "pp.19-20 (PDF pp.10-11), Line 2 and Line 4",
+   "qualifiers": {
+    "also_in": {
+     "table": "gm_rpo_library",
+     "id": "b273cb76-193d-4cb6-bcb2-fc99023f060a",
+     "note": "that row is scoped 1976 and later or undated; this row cites the 1973 meaning"
+    }
+   }
+  },
+  {
+   "rule_key": "body_tag_option_code",
+   "code": "WS4",
+   "value": {
+    "meaning": "Trans Am"
+   },
+   "locator": "p.19 (PDF p.10), Line 2",
+   "qualifiers": {
+    "also_in": {
+     "table": "gm_rpo_library",
+     "id": "a396f98e-8e5b-4964-826a-9b9300c68720",
+     "note": "that row is scoped 1976 and later or undated; this row cites the 1973 meaning"
+    }
+   }
+  },
+  {
+   "rule_key": "body_tag_option_code",
+   "code": "A51",
+   "value": {
+    "meaning": "modular (bucket) seat"
+   },
+   "locator": "p.20 (PDF p.11), Line 3",
+   "qualifiers": {
+    "also_in": {
+     "table": "gm_rpo_library",
+     "id": "dd354fc4-969f-4536-ae90-756e66c62829",
+     "note": "that row is scoped 1976 and later or undated; this row cites the 1973 meaning"
+    },
+    "also_in_2": {
+     "table": "vintage_rpo_codes",
+     "id": "cf965193-eb9e-4f88-9a27-4e1fbf2adf0b"
+    }
+   }
+  },
+  {
+   "rule_key": "body_tag_date_format",
+   "code": "MMW",
+   "value": {
+    "pattern": "^(\\d{2})([A-E])$",
+    "fields": [
+     "month",
+     "week_letter"
+    ],
+    "example": "06B = June, second week"
+   },
+   "locator": "p.20 (PDF p.11), Line 4"
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "repeat_rule",
+   "value": {
+    "rule": "the paint code is written twice; with a Cordova top the second code is replaced by the top color letter"
+   },
+   "locator": "p.20 (PDF p.11), Line 3"
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "11",
+   "value": {
+    "pontiac_code": "C",
+    "ref": {
+     "table": "paint_codes",
+     "id": "3971549b-c8fb-4d5e-94dc-209461b2c717",
+     "key": {
+      "make": "Pontiac",
+      "code": "11",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Cameo White",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "24",
+   "value": {
+    "pontiac_code": "D",
+    "ref": {
+     "table": "paint_codes",
+     "id": "0ee5ae34-053d-429e-a19d-7af0b9b4e7d9",
+     "key": {
+      "make": "Pontiac",
+      "code": "24",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Porcelain Blue",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "29",
+   "value": {
+    "pontiac_code": "E",
+    "ref": {
+     "table": "paint_codes",
+     "id": "fd384fd1-4387-4adf-8881-8362c37689c0",
+     "key": {
+      "make": "Pontiac",
+      "code": "29",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Admiralty Blue",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "26",
+   "value": {
+    "pontiac_code": "F",
+    "ref": {
+     "table": "paint_codes",
+     "id": "d5fff816-f9e4-4672-a694-0a5b04f916d4",
+     "key": {
+      "make": "Pontiac",
+      "code": "26",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Regatta Blue",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "56",
+   "value": {
+    "pontiac_code": "H",
+    "ref": {
+     "table": "paint_codes",
+     "id": "4a79f736-6bf5-4949-9bcd-bfc84555e725",
+     "key": {
+      "make": "Pontiac",
+      "code": "56",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Desert Sand",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "46",
+   "value": {
+    "pontiac_code": "J",
+    "ref": {
+     "table": "paint_codes",
+     "id": "0ccb8ee5-0a3e-4a4e-b71d-c33a58e9d7f4",
+     "key": {
+      "make": "Pontiac",
+      "code": "46",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Golden Olive",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "42",
+   "value": {
+    "pontiac_code": "K",
+    "ref": {
+     "table": "paint_codes",
+     "id": "63ee7f47-8852-4f6b-b91a-e146114ab319",
+     "key": {
+      "make": "Pontiac",
+      "code": "42",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Verdant Green",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "44",
+   "value": {
+    "pontiac_code": "L",
+    "ref": {
+     "table": "paint_codes",
+     "id": "3b9c6807-0065-4ae6-9993-720346a4533f",
+     "key": {
+      "make": "Pontiac",
+      "code": "44",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Slate Green",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "48",
+   "value": {
+    "pontiac_code": "M",
+    "ref": {
+     "table": "paint_codes",
+     "id": "c6cd7333-2b4b-4959-a472-10afb1f9abf3",
+     "key": {
+      "make": "Pontiac",
+      "code": "48",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Brewster Green",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "75",
+   "value": {
+    "pontiac_code": "R",
+    "ref": {
+     "table": "paint_codes",
+     "id": "53bbc791-f54f-43ef-9e95-f98dd1328aac",
+     "key": {
+      "make": "Pontiac",
+      "code": "75",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Buccaneer Red",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "74",
+   "value": {
+    "pontiac_code": "S",
+    "ref": {
+     "table": "paint_codes",
+     "id": "cd96c323-5eb5-4474-b115-c8fd8fbf1e44",
+     "key": {
+      "make": "Pontiac",
+      "code": "74",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Florentine Red",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "51",
+   "value": {
+    "pontiac_code": "T",
+    "ref": {
+     "table": "paint_codes",
+     "id": "2b9f0717-6b5a-438f-9ee9-0c2b1bfbf859",
+     "key": {
+      "make": "Pontiac",
+      "code": "51",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Sunlight Yellow",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "97",
+   "value": {
+    "pontiac_code": "U",
+    "ref": {
+     "table": "paint_codes",
+     "id": "49bf946a-7416-4626-8a2d-62fdb62f5b74",
+     "key": {
+      "make": "Pontiac",
+      "code": "97",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Navajo Orange",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "64",
+   "value": {
+    "pontiac_code": "V",
+    "ref": {
+     "table": "paint_codes",
+     "id": "abe2518a-f011-4534-a588-219e0192c2fe",
+     "key": {
+      "make": "Pontiac",
+      "code": "64",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Ascot Silver",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "60",
+   "value": {
+    "pontiac_code": "Y",
+    "ref": {
+     "table": "paint_codes",
+     "id": "a533de0f-7950-48e4-9f39-eec12ec835a9",
+     "key": {
+      "make": "Pontiac",
+      "code": "60",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Valencia Gold",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_paint_code",
+   "code": "68",
+   "value": {
+    "pontiac_code": "Z",
+    "ref": {
+     "table": "paint_codes",
+     "id": "debcd96a-273e-45d8-86e3-45a20bcccaed",
+     "key": {
+      "make": "Pontiac",
+      "code": "68",
+      "year": 1973
+     }
+    }
+   },
+   "locator": "p.21 (PDF p.12), Exterior Color Codes",
+   "qualifiers": {
+    "chart_name": "Burma Brown",
+    "ref_name_matches": true
+   }
+  },
+  {
+   "rule_key": "body_tag_trim_conversion",
+   "code": "fisher_from_pontiac",
+   "value": {
+    "rule": "Fisher tag code = '2' + Pontiac trim code with its last character dropped (Pontiac 321 -> Fisher 232)",
+    "attributed_to": "Jim Mattison (Pontiac Historic Services)"
+   },
+   "locator": "p.21 (PDF p.12), Interior Color Codes"
+  },
+  {
+   "rule_key": "body_tag_trim_code",
+   "code": "232",
+   "value": {
+    "pontiac_trim": "321",
+    "color": "White",
+    "seat": "standard bucket",
+    "material": "Madrid Morrokide"
+   },
+   "locator": "p.21 (PDF p.12), Interior table; Fisher code by the stated conversion"
+  },
+  {
+   "rule_key": "body_tag_trim_code",
+   "code": "233",
+   "value": {
+    "pontiac_trim": "331",
+    "color": "Saddle",
+    "seat": "standard bucket",
+    "material": "Madrid Morrokide"
+   },
+   "locator": "p.21 (PDF p.12), Interior table; Fisher code by the stated conversion"
+  },
+  {
+   "rule_key": "body_tag_trim_code",
+   "code": "236",
+   "value": {
+    "pontiac_trim": "361",
+    "color": "Black",
+    "seat": "standard bucket",
+    "material": "Madrid Morrokide"
+   },
+   "locator": "p.21 (PDF p.12), Interior table; Fisher code by the stated conversion"
+  },
+  {
+   "rule_key": "body_tag_trim_code",
+   "code": "242",
+   "value": {
+    "pontiac_trim": "421",
+    "color": "White",
+    "seat": "custom bucket"
+   },
+   "locator": "p.21 (PDF p.12), Interior table; Fisher code confirmed by the p.20 example tag (TR 242)"
+  },
+  {
+   "rule_key": "body_tag_trim_code",
+   "code": "243",
+   "value": {
+    "pontiac_trim": "431",
+    "color": "Saddle",
+    "seat": "custom bucket"
+   },
+   "locator": "p.21 (PDF p.12), Interior table; Fisher code by the stated conversion"
+  },
+  {
+   "rule_key": "body_tag_trim_code",
+   "code": "246",
+   "value": {
+    "pontiac_trim": "461",
+    "color": "Black",
+    "seat": "custom bucket"
+   },
+   "locator": "p.21 (PDF p.12), Interior table; Fisher code by the stated conversion"
+  },
+  {
+   "rule_key": "body_tag_trim_code",
+   "code": "247",
+   "value": {
+    "pontiac_trim": "471",
+    "color": "Burgundy",
+    "seat": "custom bucket"
+   },
+   "locator": "p.21 (PDF p.12), Interior table; Fisher code by the stated conversion"
+  },
+  {
+   "rule_key": "body_tag_trim_code",
+   "code": "255",
+   "value": {
+    "pontiac_trim": "551",
+    "color": "Beige",
+    "seat": "cloth"
+   },
+   "locator": "p.21 (PDF p.12), Interior table; Fisher code by the stated conversion"
+  },
+  {
+   "rule_key": "body_tag_top_code",
+   "code": "A",
+   "value": {
+    "color": "White",
+    "pontiac_code": "1"
+   },
+   "locator": "p.21 (PDF p.12), Cordova (Vinyl) Top Colors"
+  },
+  {
+   "rule_key": "body_tag_top_code",
+   "code": "B",
+   "value": {
+    "color": "Black",
+    "pontiac_code": "2"
+   },
+   "locator": "p.21 (PDF p.12), Cordova (Vinyl) Top Colors"
+  },
+  {
+   "rule_key": "body_tag_top_code",
+   "code": "C",
+   "value": {
+    "color": "Beige",
+    "pontiac_code": "3"
+   },
+   "locator": "p.21 (PDF p.12), Cordova (Vinyl) Top Colors"
+  },
+  {
+   "rule_key": "body_tag_top_code",
+   "code": "D",
+   "value": {
+    "color": "Chamois",
+    "pontiac_code": "4"
+   },
+   "locator": "p.21 (PDF p.12), Cordova (Vinyl) Top Colors"
+  },
+  {
+   "rule_key": "body_tag_top_code",
+   "code": "E",
+   "value": {
+    "color": "Green",
+    "pontiac_code": "5"
+   },
+   "locator": "p.21 (PDF p.12), Cordova (Vinyl) Top Colors"
+  },
+  {
+   "rule_key": "body_tag_top_code",
+   "code": "F",
+   "value": {
+    "color": "Dark Burgundy",
+    "pontiac_code": "6"
+   },
+   "locator": "p.21 (PDF p.12), Cordova (Vinyl) Top Colors"
+  },
+  {
+   "rule_key": "body_tag_top_code",
+   "code": "G",
+   "value": {
+    "color": "Blue",
+    "pontiac_code": "7"
+   },
+   "locator": "p.21 (PDF p.12), Cordova (Vinyl) Top Colors"
+  },
+  {
+   "rule_key": "engine_stamp_location",
+   "code": "pontiac_v8_1973",
+   "value": {
+    "code_location": "front passenger side of the V8 block below the cylinder deck",
+    "vin_derivative_location": "passenger side of the block adjacent to the timing cover (last eight VIN digits)",
+    "updated_emissions_note": "italic codes = engines built after March 15, 1973 with the updated fully operational EGR system"
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "XR",
+    "ZB"
+   ],
+   "value": {
+    "displacement_ci": 350,
+    "carb": "2bbl",
+    "net_hp": 175,
+    "transmission": "manual",
+    "updated_emissions": false
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "YR",
+    "ZR",
+    "ZT",
+    "YL"
+   ],
+   "value": {
+    "displacement_ci": 350,
+    "carb": "2bbl",
+    "net_hp": 150,
+    "transmission": "automatic",
+    "updated_emissions": false
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "WD",
+    "WA",
+    "WL"
+   ],
+   "value": {
+    "displacement_ci": 350,
+    "carb": "2bbl",
+    "net_hp": 150,
+    "transmission": "automatic",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "YW"
+   ],
+   "value": {
+    "displacement_ci": 350,
+    "carb": "2bbl",
+    "net_hp": 150,
+    "transmission": "automatic",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "ZK",
+    "ZX",
+    "YZ"
+   ],
+   "value": {
+    "displacement_ci": 400,
+    "carb": "2bbl",
+    "net_hp": 170,
+    "transmission": "automatic",
+    "updated_emissions": false
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "YX"
+   ],
+   "value": {
+    "displacement_ci": 400,
+    "carb": "2bbl",
+    "net_hp": 185,
+    "transmission": "automatic",
+    "updated_emissions": false
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "X4",
+    "X3",
+    "W5"
+   ],
+   "value": {
+    "displacement_ci": 400,
+    "carb": "2bbl",
+    "net_hp": 185,
+    "transmission": "automatic",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "WP",
+    "WS"
+   ],
+   "value": {
+    "displacement_ci": 400,
+    "carb": "4bbl",
+    "net_hp": 230,
+    "transmission": "manual",
+    "updated_emissions": false
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "Y6",
+    "YG"
+   ],
+   "value": {
+    "displacement_ci": 400,
+    "carb": "4bbl",
+    "net_hp": 230,
+    "transmission": "manual",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "Y3",
+    "YS"
+   ],
+   "value": {
+    "displacement_ci": 400,
+    "carb": "4bbl",
+    "net_hp": 230,
+    "transmission": "automatic",
+    "updated_emissions": false
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "XX",
+    "XK",
+    "XN"
+   ],
+   "value": {
+    "displacement_ci": 400,
+    "carb": "4bbl",
+    "net_hp": 230,
+    "transmission": "automatic",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "WW",
+    "WT"
+   ],
+   "value": {
+    "displacement_ci": 455,
+    "carb": "4bbl",
+    "net_hp": 250,
+    "transmission": "manual",
+    "updated_emissions": false
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "ZZ",
+    "ZE"
+   ],
+   "value": {
+    "displacement_ci": 455,
+    "carb": "4bbl",
+    "net_hp": 250,
+    "transmission": "manual",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "YK",
+    "YD",
+    "YC",
+    "YA"
+   ],
+   "value": {
+    "displacement_ci": 455,
+    "carb": "4bbl",
+    "net_hp": 250,
+    "transmission": "automatic",
+    "updated_emissions": false
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "X7",
+    "XM",
+    "XE",
+    "XL"
+   ],
+   "value": {
+    "displacement_ci": 455,
+    "carb": "4bbl",
+    "net_hp": 250,
+    "transmission": "automatic",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "ZJ"
+   ],
+   "value": {
+    "displacement_ci": 455,
+    "application": "Super Duty",
+    "carb": "4bbl",
+    "net_hp": 290,
+    "transmission": "manual",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "engine_stamp_code",
+   "codes": [
+    "XD"
+   ],
+   "value": {
+    "displacement_ci": 455,
+    "application": "Super Duty",
+    "carb": "4bbl",
+    "net_hp": 290,
+    "transmission": "automatic",
+    "updated_emissions": true
+   },
+   "locator": "p.20 (PDF p.11), Engine Block Codes table (italic)"
+  },
+  {
+   "rule_key": "head_code",
+   "code": "46",
+   "value": {
+    "displacement_ci": 350,
+    "net_hp": "150/175",
+    "location": "two-digit number/letter above the center exhaust ports"
+   },
+   "locator": "pp.20-21 (PDF p.11), Cylinder Head Casting Numbers"
+  },
+  {
+   "rule_key": "head_code",
+   "code": "4C",
+   "value": {
+    "displacement_ci": 400,
+    "net_hp": 170
+   },
+   "locator": "p.20 (PDF p.11), Cylinder Head Casting Numbers"
+  },
+  {
+   "rule_key": "head_code",
+   "code": "4X",
+   "value": {
+    "applications": [
+     {
+      "displacement_ci": 400,
+      "net_hp": 185
+     },
+     {
+      "displacement_ci": 400,
+      "net_hp": 230
+     },
+     {
+      "displacement_ci": 455,
+      "net_hp": 250
+     }
+    ]
+   },
+   "locator": "p.20 (PDF p.11), Cylinder Head Casting Numbers"
+  },
+  {
+   "rule_key": "head_code",
+   "code": "16",
+   "value": {
+    "displacement_ci": 455,
+    "application": "Super Duty",
+    "net_hp": 290
+   },
+   "locator": "p.20 (PDF p.11), Cylinder Head Casting Numbers"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043071",
+   "value": {
+    "make": "Rochester",
+    "size": "2bbl",
+    "displacement_ci": 350,
+    "net_hp": 175,
+    "transmission": "manual"
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043062",
+   "value": {
+    "make": "Rochester",
+    "size": "2bbl",
+    "displacement_ci": 350,
+    "net_hp": 150,
+    "transmission": "automatic",
+    "printed": "7043062-63 Ca. 72 A (truncated on scan)"
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043060",
+   "value": {
+    "make": "Rochester",
+    "size": "2bbl",
+    "displacement_ci": 400,
+    "net_hp": "170/185",
+    "transmission": "automatic",
+    "printed": "7043060-61 Ca. 70 A (truncated on scan)"
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043263",
+   "value": {
+    "make": "Rochester",
+    "size": "4bbl",
+    "displacement_ci": 400,
+    "net_hp": 230,
+    "transmission": "manual"
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043264",
+   "value": {
+    "make": "Rochester",
+    "size": "4bbl",
+    "displacement_ci": 400,
+    "net_hp": 230,
+    "transmission": "automatic",
+    "printed": "7043264-74 Alt."
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043262",
+   "value": {
+    "make": "Rochester",
+    "size": "4bbl",
+    "displacement_ci": 455,
+    "net_hp": 250,
+    "transmission": "automatic",
+    "printed": "7043262-72 Alt."
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043265",
+   "value": {
+    "make": "Rochester",
+    "size": "4bbl",
+    "displacement_ci": 455,
+    "net_hp": 250,
+    "transmission": "manual"
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043273",
+   "value": {
+    "make": "Rochester",
+    "size": "4bbl",
+    "displacement_ci": 455,
+    "application": "Super Duty",
+    "net_hp": 290,
+    "transmission": "manual"
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "carburetor_part_number",
+   "code": "7043270",
+   "value": {
+    "make": "Rochester",
+    "size": "4bbl",
+    "displacement_ci": 455,
+    "application": "Super Duty",
+    "net_hp": 290,
+    "transmission": "automatic"
+   },
+   "locator": "p.20 (PDF p.11), Carburetors"
+  },
+  {
+   "rule_key": "intake_casting",
+   "code": "492292",
+   "value": {
+    "carb": "2bbl",
+    "displacement_ci": [
+     350,
+     400
+    ],
+    "material": "cast iron"
+   },
+   "locator": "p.20 (PDF p.11), Intake Manifolds"
+  },
+  {
+   "rule_key": "intake_casting",
+   "code": "491244",
+   "value": {
+    "carb": "4bbl",
+    "displacement_ci": [
+     400,
+     455
+    ],
+    "material": "cast iron"
+   },
+   "locator": "p.20 (PDF p.11), Intake Manifolds"
+  },
+  {
+   "rule_key": "intake_casting",
+   "code": "492744",
+   "value": {
+    "carb": "4bbl",
+    "displacement_ci": [
+     400,
+     455
+    ],
+    "material": "cast iron"
+   },
+   "locator": "p.20 (PDF p.11), Intake Manifolds"
+  },
+  {
+   "rule_key": "intake_casting",
+   "code": "494282",
+   "value": {
+    "carb": "4bbl",
+    "displacement_ci": [
+     400,
+     455
+    ],
+    "material": "cast iron"
+   },
+   "locator": "p.20 (PDF p.11), Intake Manifolds"
+  },
+  {
+   "rule_key": "intake_casting",
+   "code": "494405-19",
+   "value": {
+    "carb": "4bbl",
+    "displacement_ci": 455,
+    "application": "Super Duty",
+    "note": "SD intake also carries an LS2 casting mark near the front"
+   },
+   "locator": "p.20 (PDF p.11), Intake Manifolds"
+  },
+  {
+   "rule_key": "exhaust_manifold_casting",
+   "code": "490802",
+   "value": {
+    "side": "right",
+    "displacement_ci": 455,
+    "application": "Super Duty"
+   },
+   "locator": "p.20 (PDF p.11), Exhaust Manifolds"
+  },
+  {
+   "rule_key": "exhaust_manifold_casting",
+   "code": "490803",
+   "value": {
+    "side": "left",
+    "displacement_ci": 455,
+    "application": "Super Duty"
+   },
+   "locator": "p.20 (PDF p.11), Exhaust Manifolds"
+  },
+  {
+   "rule_key": "transmission_stamp_location",
+   "code": "1973_manual_auto",
+   "value": {
+    "saginaw": "two-letter code stenciled in yellow on the upper passenger side of the case; VIN pad on the passenger side: '2' + last eight VIN digits",
+    "muncie": "two-letter code stenciled in yellow on the case; '2' + last eight VIN digits on a machined pad on the passenger side adjacent to the tailshaft housing mounting surface",
+    "m40": "two-letter code on a plate on the passenger side ahead of the governor",
+    "m38": "code on the 1-2 accumulator cover, lower passenger side, with build date, production year and shift; VIN on the lower driver side",
+    "clutch": "350 and 400 manuals 10.4-inch clutch; 455 D-port and SD 11-inch"
+   },
+   "locator": "pp.20-21 (PDF pp.11-12), Transmission Codes"
+  },
+  {
+   "rule_key": "transmission_order_code",
+   "code": "TA",
+   "value": {
+    "transmission": "Saginaw 3-speed manual",
+    "displacement_ci": 350
+   },
+   "locator": "p.21 (PDF p.12), transmission table"
+  },
+  {
+   "rule_key": "transmission_order_code",
+   "code": "TF",
+   "value": {
+    "transmission": "Saginaw 4-speed manual",
+    "displacement_ci": 350
+   },
+   "locator": "p.21 (PDF p.12), transmission table"
+  },
+  {
+   "rule_key": "transmission_order_code",
+   "code": "MA",
+   "value": {
+    "transmission": "M38 Turbo 350",
+    "displacement_ci": 350
+   },
+   "locator": "p.21 (PDF p.12), transmission table"
+  },
+  {
+   "rule_key": "transmission_order_code",
+   "code": "UA",
+   "value": {
+    "transmission": "Muncie M20 wide ratio",
+    "displacement_ci": 400
+   },
+   "locator": "p.21 (PDF p.12), transmission table"
+  },
+  {
+   "rule_key": "transmission_order_code",
+   "code": "FC",
+   "value": {
+    "transmission": "Muncie M22 close ratio",
+    "displacement_ci": [
+     400,
+     455,
+     "455 SD"
+    ]
+   },
+   "locator": "p.21 (PDF p.12), transmission table"
+  },
+  {
+   "rule_key": "transmission_order_code",
+   "code": "PT",
+   "value": {
+    "transmission": "M40 Turbo 400",
+    "displacement_ci": 400,
+    "carb": "2bbl"
+   },
+   "locator": "p.21 (PDF p.12), transmission table"
+  },
+  {
+   "rule_key": "transmission_order_code",
+   "code": "PG",
+   "value": {
+    "transmission": "M40 Turbo 400",
+    "displacement_ci": 400,
+    "carb": "4bbl"
+   },
+   "locator": "p.21 (PDF p.12), transmission table"
+  },
+  {
+   "rule_key": "transmission_order_code",
+   "code": "PQ",
+   "value": {
+    "transmission": "M40 Turbo 400",
+    "displacement_ci": [
+     455,
+     "455 SD"
+    ]
+   },
+   "locator": "p.21 (PDF p.12), transmission table"
+  },
+  {
+   "rule_key": "axle_code",
+   "code": "GZG",
+   "value": {
+    "ratio": 2.73,
+    "limited_slip": false,
+    "stamp_location": "front of the right axle tube, left of the carrier"
+   },
+   "locator": "p.21 (PDF p.12), Rear Axle Codes"
+  },
+  {
+   "rule_key": "axle_code",
+   "code": "GXG",
+   "value": {
+    "ratio": 3.08,
+    "limited_slip": false,
+    "stamp_location": "front of the right axle tube, left of the carrier"
+   },
+   "locator": "p.21 (PDF p.12), Rear Axle Codes"
+  },
+  {
+   "rule_key": "axle_code",
+   "code": "CLG",
+   "value": {
+    "ratio": 3.42,
+    "limited_slip": false,
+    "stamp_location": "front of the right axle tube, left of the carrier"
+   },
+   "locator": "p.21 (PDF p.12), Rear Axle Codes"
+  },
+  {
+   "rule_key": "axle_code",
+   "code": "CAG",
+   "value": {
+    "ratio": 2.73,
+    "limited_slip": true,
+    "limited_slip_name": "Saf-T-Track",
+    "stamp_location": "front of the right axle tube, left of the carrier"
+   },
+   "locator": "p.21 (PDF p.12), Rear Axle Codes"
+  },
+  {
+   "rule_key": "axle_code",
+   "code": "GYG",
+   "value": {
+    "ratio": 3.08,
+    "limited_slip": true,
+    "limited_slip_name": "Saf-T-Track",
+    "stamp_location": "front of the right axle tube, left of the carrier"
+   },
+   "locator": "p.21 (PDF p.12), Rear Axle Codes"
+  },
+  {
+   "rule_key": "axle_code",
+   "code": "CMG",
+   "value": {
+    "ratio": 3.42,
+    "limited_slip": true,
+    "limited_slip_name": "Saf-T-Track",
+    "stamp_location": "front of the right axle tube, left of the carrier"
+   },
+   "locator": "p.21 (PDF p.12), Rear Axle Codes"
+  },
+  {
+   "rule_key": "model_production",
+   "code": "1973_firebird",
+   "value": {
+    "rows": [
+     [
+      "Firebird base L6",
+      null,
+      null,
+      1370
+     ],
+     [
+      "Firebird base V8",
+      null,
+      null,
+      12726
+     ],
+     [
+      "Esprit 350",
+      null,
+      null,
+      15500
+     ],
+     [
+      "Esprit 400",
+      null,
+      null,
+      1749
+     ],
+     [
+      "Formula 350",
+      null,
+      null,
+      4771
+     ],
+     [
+      "Formula 400",
+      null,
+      null,
+      4622
+     ],
+     [
+      "Formula 455",
+      227,
+      503,
+      730
+     ],
+     [
+      "Formula SD",
+      10,
+      33,
+      43
+     ],
+     [
+      "Trans Am 455",
+      1420,
+      3130,
+      4550
+     ],
+     [
+      "Trans Am SD",
+      72,
+      180,
+      252
+     ]
+    ],
+    "columns": [
+     "model",
+     "manual",
+     "automatic",
+     "total"
+    ],
+    "grand_total": 46313,
+    "note": "the manual/automatic split is not given for base, Esprit, Formula 350 or Formula 400"
+   },
+   "locator": "p.19 (PDF p.10), Total Production"
+  }
+ ]
+}

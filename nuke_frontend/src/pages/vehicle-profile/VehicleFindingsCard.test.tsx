@@ -2,86 +2,95 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({
-  rows: [] as Array<Record<string, unknown>>, owner: false, select: '', rpcName: '', rpcArgs: null as unknown,
-  rpcError: null as null | { code?: string; message?: string }, fromCalls: 0,
-}));
-vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ isRowOwner: fixture.owner, isVerifiedOwner: false, hasContributorAccess: false }) }));
-// vehicle_image_findings answers {total, rows}: every frame read counts in total, a frame with nothing to report is not sent.
-const reported = (rows: Array<Record<string, unknown>>) => rows.filter(r => Object.values(r).some(v => v != null));
-vi.mock('../../lib/supabase', () => ({ supabase: {
-  rpc: (name: string, args: unknown) => {
-    fixture.rpcName = name; fixture.rpcArgs = args;
-    return Promise.resolve(fixture.rpcError ? { data: null, error: fixture.rpcError } : { data: { total: fixture.rows.length, rows: reported(fixture.rows) }, error: null });
-  },
-  from: () => { fixture.fromCalls++; return { select: (s: string) => { fixture.select = s; return { eq: () => ({ limit: () => Promise.resolve({ data: fixture.rows, error: null }) }) }; } }; },
-} }));
-import VehicleFindingsCard from './VehicleFindingsCard';
+import VehicleFindingsCard, { imageAnalysisPopulations } from './VehicleFindingsCard';
+import type { GalleryAnalysisRead } from '../../components/images/ImageGallery';
 
-let root: Root, host: HTMLDivElement;
+let root: Root, host: HTMLDivElement, read: GalleryAnalysisRead;
+const select = vi.fn(), retry = vi.fn();
 beforeEach(() => {
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-  fixture.owner = false; fixture.rpcName = ''; fixture.rpcArgs = null; fixture.rpcError = null; fixture.fromCalls = 0; fixture.select = '';
-  fixture.rows = [
-    { byok_scene_type: 'exterior_front', byok_confidence: 0.9, vision_analyzed_at: '2026-06-23T22:24:03Z', license_plate: 'UT 04AP4', color_visible: 'factory_turquoise', make_guess: 'Ford' },
-    { byok_scene_type: 'document', byok_confidence: 0.7, vision_analyzed_at: '2026-07-01T00:00:00Z', engine: '289ci V8', make_guess: 'Chevrolet', part_number: 'C5ZZ-6584-A' },
-    { classifier: null },
-  ];
+  select.mockReset(); retry.mockReset();
+  read = { vehicleId: 'vehicle', viewerKey: 'anonymous', status: 'ready', partial: false, readAt: '2026-11-09T22:00:00Z', images: [
+    { id: 'both', ai_scan_metadata: { classification: { image_type: 'vehicle_exterior' }, byok_deep_analysis: { scene_type: 'body_exterior', build_phase_guess: 'unknown' } } },
+    { id: 'classification', ai_scan_metadata: { classification: { image_type: 'engine_bay' } } },
+    { id: 'detail', ai_scan_metadata: { byok_deep_analysis: { scene_type: 'body_interior', build_phase_guess: 'interior' }, engine_badge: 'NOT AN ENGINE FACT', license_plate: 'PRIVATE PLATE' } },
+    { id: 'unread', ai_scan_metadata: null },
+  ] };
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
-async function mount() {
-  await act(async () => root.render(<VehicleFindingsCard vehicleId="v-1" />));
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+async function mount(viewerKey = 'anonymous', vehicleId = 'vehicle') {
+  await act(async () => root.render(<VehicleFindingsCard vehicleId={vehicleId} viewerKey={viewerKey} read={read} onSelectImages={select} onRetry={retry} />));
 }
+const button = (label: string) => host.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!;
 
-it('states coverage with the newest analysis clock, masks the plate for a visitor and sets no inline style', async () => {
+it('separates classification from detailed observations over the same gallery denominator', async () => {
   await mount();
-  expect(host.querySelector('section.k-section')).not.toBeNull();
-  expect(host.textContent).toContain('2 of 3 images analyzed · Jul 1, 2026');
-  expect(host.textContent).toContain('••••');
-  expect(host.textContent).not.toContain('04AP4');
-  expect(host.textContent).toContain('factory turquoise');
-  expect(host.textContent).not.toContain('factory_turquoise');
-  expect(host.textContent).toContain('289ci V8');
-  expect(host.textContent).toContain('C5ZZ-6584-A');
-  expect(host.textContent).not.toContain('contamination');
-  expect(host.textContent).not.toContain('Mean reported confidence');
+  expect(host.textContent).toContain('4 of 4 gallery images');
+  expect(button('Show 2 photo classification images').textContent).toBe('2 / 4');
+  expect(button('Show 2 detailed observations images').textContent).toBe('2 / 4');
+  expect(button('Show 1 no analysis record images').textContent).toBe('1 / 4');
+  expect(host.textContent).toContain('same image can have both');
+  expect(host.textContent).not.toContain('images analyzed');
+  expect(host.textContent).not.toContain('PRIVATE PLATE');
+  expect(host.textContent).not.toContain('NOT AN ENGINE FACT');
   expect(host.querySelector('[style]')).toBeNull();
-  // one reader call, no per-key projections
-  expect(fixture.rpcName).toBe('vehicle_image_findings');
-  expect(fixture.rpcArgs).toEqual({ p_vehicle_id: 'v-1' });
-  expect(fixture.fromCalls).toBe(0);
 });
-
-it('shows the plate and the pipeline diagnostics to the owner', async () => {
-  fixture.owner = true;
+it('opens exactly the counted images, including a detailed-only record', async () => {
   await mount();
-  expect(host.textContent).toContain('UT 04AP4');
-  expect(host.textContent).toContain('contamination signal');
-  expect(host.textContent).toContain('Ford 1, Chevrolet 1');
-  expect(host.textContent).toContain('Mean reported confidence');
-  expect(host.textContent).toContain('0.80');
+  await act(async () => button('Show 2 detailed observations images').click());
+  expect(select).toHaveBeenLastCalledWith(['both', 'detail'], 'Detailed observations');
+  await act(async () => button('Show 1 photo subjects: engine bay images').click());
+  expect(select).toHaveBeenLastCalledWith(['classification'], 'Photo subjects: engine bay');
+  await act(async () => button('Show 1 recorded build phases: unknown images').click());
+  expect(select).toHaveBeenLastCalledWith(['both'], 'Recorded build phases: unknown');
 });
-
-it('renders nothing when no image was analyzed', async () => {
-  fixture.rows = [{ classifier: null }];
-  await mount();
+it('updates membership when a source is withdrawn from the gallery inventory', async () => {
+  await mount(); read = { ...read, images: read.images.filter(image => image.id !== 'both') }; await mount();
+  expect(host.textContent).toContain('3 of 3 gallery images');
+  await act(async () => button('Show 1 detailed observations images').click());
+  expect(select).toHaveBeenCalledWith(['detail'], 'Detailed observations');
+});
+it('withholds old counts after a vehicle or viewer change', async () => {
+  await mount(); await mount('owner');
+  expect(host.textContent).toBe('Reading image analysis…');
+  await mount('anonymous', 'other-vehicle');
+  expect(host.querySelector('button')).toBeNull();
+});
+it('distinguishes a failed read from successful empty data and offers retry', async () => {
+  read.status = 'error'; await mount();
+  expect(host.querySelector('[role=alert]')?.textContent).toContain('could not be read');
+  expect(host.textContent).not.toContain('4 of 4');
+  await act(async () => host.querySelector<HTMLButtonElement>('button')!.click());
+  expect(retry).toHaveBeenCalledOnce();
+  read = { ...read, status: 'ready', images: [] }; await mount();
   expect(host.textContent).toBe('');
 });
-
-it('reads the frames the old way only while the reader is not deployed', async () => {
-  fixture.rpcError = { code: 'PGRST202', message: 'Could not find the function public.vehicle_image_findings(p_vehicle_id) in the schema cache' };
-  await mount();
-  expect(fixture.fromCalls).toBe(1);
-  expect(fixture.select).toContain('classifier:ai_scan_metadata->classifier');
-  expect(fixture.select).toContain('vision_analyzed_at');
-  expect(host.textContent).toContain('2 of 3 images analyzed · Jul 1, 2026');
+it('qualifies partial inventory and retains actionable loaded cohorts', async () => {
+  read.partial = true; await mount();
+  expect(host.textContent).toContain('loaded gallery images');
+  expect(host.querySelector('[role=status]')?.textContent).toContain('Only part');
+  await act(async () => button('Show 2 photo classification images').click());
+  expect(select).toHaveBeenCalledWith(['both', 'classification'], 'Photo classification');
 });
-
-it('does not fall back to the heavy read when the reader fails for another reason', async () => {
-  fixture.rpcError = { code: '57014', message: 'canceling statement due to statement timeout' };
+it('retains legacy deep records without counting overlapping fields twice', () => {
+  const images = [{ id: 'old', ai_scan_metadata: { classifier: 'caller-byok-cascade', scene_class: 'body_interior', phase: 'interior', byok_deep_analysis: { scene_type: 'body_interior', build_phase_guess: 'interior' } } }];
+  const result = imageAnalysisPopulations([...images, ...images]);
+  expect(result.total).toBe(1); expect(result.detailed).toEqual(['old']);
+  expect(result.scenes).toEqual([{ label: 'body interior', ids: ['old'] }]);
+  expect(result.phases).toEqual([{ label: 'interior', ids: ['old'] }]);
+});
+it('does not count empty metadata or unrelated completion clocks as analysis', () => {
+  expect(imageAnalysisPopulations([{ id: 'empty', ai_scan_metadata: { classification: {}, byok_deep_analysis: {}, vision_analyzed_at: '2026-11-09' } }]).unread).toEqual(['empty']);
+});
+it('separates source-cited current reviews from legacy and incomplete analysis', async () => {
+  read.images = [
+    { id: 'reviewed', ai_scan_metadata: { byok_deep_analysis: { scene_type: 'body_interior', prompt_version: 'reviewed_image_analysis_v1', observation_id: '11111111-1111-4111-8111-111111111111' } } },
+    { id: 'legacy', ai_scan_metadata: { classifier: 'caller-byok-cascade', scene_class: 'body_exterior' } },
+    { id: 'incomplete', ai_scan_metadata: { byok_deep_analysis: { scene_type: 'unknown', prompt_version: 'reviewed_image_analysis_v1' } } },
+  ];
   await mount();
-  expect(fixture.fromCalls).toBe(0);
-  expect(host.textContent).toBe('');
+  expect(button('Show 3 detailed observations images').textContent).toBe('3 / 3');
+  await act(async () => button('Show 1 reviewed images').click());
+  expect(select).toHaveBeenLastCalledWith(['reviewed'], 'Reviewed');
 });
