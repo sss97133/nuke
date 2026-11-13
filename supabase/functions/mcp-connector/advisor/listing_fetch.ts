@@ -286,12 +286,16 @@ export function batGalleryPhotoUrls(html: string, base: string): string[] {
 }
 
 function detectSource(url: string): string {
-  const h = url.toLowerCase();
-  if (h.includes("craigslist")) return "craigslist";
-  if (h.includes("bringatrailer")) return "bat";
-  if (h.includes("carsandbids")) return "cars_and_bids";
-  if (h.includes("ebay")) return "ebay";
-  if (h.includes("mecum.com")) return "mecum";
+  // Decide by the parsed host, never by a substring of the whole URL: a path or a look-alike
+  // host ("mecum.com.example.org", "example.org/?u=mecum.com") must not match.
+  let h = "";
+  try { h = new URL(url).hostname.toLowerCase(); } catch { return "listing"; }
+  const on = (domain: string) => h === domain || h.endsWith("." + domain);
+  if (on("craigslist.org")) return "craigslist";
+  if (on("bringatrailer.com")) return "bat";
+  if (on("carsandbids.com")) return "cars_and_bids";
+  if (/(^|\.)ebay\.[a-z.]{2,6}$/.test(h)) return "ebay";
+  if (on("mecum.com")) return "mecum";
   return "listing";
 }
 

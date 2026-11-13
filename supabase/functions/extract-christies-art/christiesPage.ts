@@ -59,8 +59,11 @@ export function symbolLabels(symbols: PrintedSymbol[]): string[] {
 }
 
 function text(html: string): string {
-  return html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^<>]*>/g, "")
-    .replace(/&pound;/g, "£").replace(/&euro;/g, "€").replace(/&rsquo;/g, "’").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ");
+  // Strip tags until nothing changes, so a tag rebuilt by a removal ("<scr<b>ipt>") cannot survive.
+  let s = html.replace(/<br\s*\/?>/gi, "\n");
+  for (let prev = ""; prev !== s;) { prev = s; s = s.replace(/<[^<>]*>/g, ""); }
+  // "&amp;" is decoded last, so "&amp;nbsp;" stays the literal text "&nbsp;" and is not unescaped twice.
+  return s.replace(/&pound;/g, "£").replace(/&euro;/g, "€").replace(/&rsquo;/g, "’").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
 }
 
 export interface PrintedScheduleRow { site: string; rates: string[]; thresholds: string[] }

@@ -128,6 +128,7 @@ Deno.serve(async (req) => {
       landed, creation, mapped: dryRun ? mappedRows : undefined,
     });
   } catch (e) {
-    return okJson({ success: false, error: e instanceof Error ? e.message : String(e), landed }, 500);
+    console.error("extract-christies-art failed", e);
+    return okJson({ success: false, error: "extract-christies-art failed; see function logs", landed }, 500);
   }
 });
