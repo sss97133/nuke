@@ -113,10 +113,23 @@ first headline match per role: the car's own decal, then the on-car parts, then 
 `headline: "library"` stay in the library and never set a headline. These are the boxed arrowhead, the fender bird and
 the shadowed Phoenix decal photographs.
 
+Re-cut 2026-11-11 (headline polish). The cutter gained flags, each recorded in the command it applies to:
+`--min-area` drops isolated specks (the crumbs between the PONTIAC letters), `--defringe` pulls the rim in by a source
+pixel, softens it and gives every edge pixel the colour of the mark beside it (no ground or paint fringe on the chrome
+or the decal), and `--ground` marks the counters seen through the Firebird script (F loop, both e counters, b and d
+bowls) as ground. Commands without these flags still reproduce their files byte for byte. The decal is now keyed on
+green 40-90 for fuller strokes. Every cutout carries top-level `capMetrics`: the capitals' share of the file height and
+the baseline's distance from its bottom, measured on a named reference glyph's columns (`glyph`, `columns`: the script's
+F, the numerals' 1, mixed-case Pontiac's P, the decal's centre N and S, whole width for block capitals). Rerun with
+`node nuke_frontend/scripts/cut-identity-lettering.cjs measure <file> <columns>` (or `--cap` on the cut). The headline
+sets every mark at one shared cap height (0.9 of the identity's font size) on one baseline, and "-Style" text at the
+same cap height. The year now leads with the US full-line cover "1973", the heaviest numeral in the library, filled in
+the identity's ink; the hairline Accessorizer "1973" follows it.
+
 | Role | Version | Source | Applicability |
 | --- | --- | --- | --- |
+| year | "1973", US full-line brochure cover (headline default) | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html) | all Pontiac, 1973 |
 | year | "1973", Accessorizer & Selling Facts dealer book cover | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973%20Pontiac%20Accessorizer/slides/1973%20Pontiac%20Accessorizer-01.html) | all Pontiac, 1973 |
-| year | "1973", US full-line brochure cover | [oldcarbrochures.org](https://oldcarbrochures.org/United%20States/Pontiac/1973%20Pontiac/1973-Pontiac-Full-Line-Brochure/slides/1973_Pontiac_Full_Line-01.html) | all Pontiac, 1973 |
 | year | "73", GM of Canada Firebird brochure cover | [oldcarbrochures.org](https://oldcarbrochures.org/Canada/GM-Canada/Pontiac-Firebird-Cdn/1973-Pontiac-Firebird-Brochure/slides/1973_Pontiac_Firebird_Cdn-01.html) (byte-identical at [lov2xlr8.no](https://www.lov2xlr8.no/brochures/pontiac/73fire/73fire.html)) | Firebird, 1973 |
 | variant | "TRANS AM" orange decal on this car, cut from its own photograph (`vehicle_images` 9b8ec6d9-8e27-41f4-9428-5c025a1c46f0) | the vehicle's profile | vehicle 20d21fb0-4651-4469-a0ba-e751309a1e54 only |
 | make | "PONTIAC" tail panel letters, OER K1049 | [oerparts.com](https://www.oerparts.com/product/1973/pontiac/firebird/parts/k1049.html) | Firebird, 1970-73 |

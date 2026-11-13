@@ -686,6 +686,69 @@ found broken and what is still unproven:
     `part`). The vehicle's 446 keyed photo claims carry the same field (364 named, 81 distinct keys, 191 rows on a
     registry key), so a cost line and a photo claim can meet on a part without anyone reading their words. No reader
     performs that join yet.
+  - *Both refusals live, neither tested by a real write* (read 2026-11-12 00:12 UTC): the trigger is enabled; run over
+    the 31 current records, 18 fail the system-key check and all 26 costed ones the part-key check; no record has been
+    written on the vehicle since 2026-11-11 16:43, none declares `key_proposals` and no line carries `part_key`.
+  - *The third refusal* (`20261116011000`, contract `test_visual_work_keyed_claim_citation_guard.sql`), for gap 2.
+    Read 2026-11-12 02:12 UTC: 23 of the 31 records cite a photo that already has a keyed claim (41 citations), each
+    with a fresh caption and no claim named. A `visual_sources` entry whose photo has a current keyed claim on the
+    vehicle now carries `keyed_claim_ids`, at least one, and every id listed must be such a claim witnessed by that
+    photo. The caption stays because `visual_work_build_log` requires it. This is the first write that makes a keyed
+    row *connected* in rule 7's sense (a job cites it); no reader counts that yet.
+  - *The third refusal, live* (#3405, read 2026-11-12 02:27 UTC): of the 31 current records 23 fail it (21 distinct
+    photos) and 2 pass all three checks. Still no write on the vehicle since 2026-11-11 16:43.
+  - *The fourth refusal* (`20261116020000`, contract `test_visual_work_sourced_number_guard.sql`), for gap 3, enforcing
+    ruling (1) below. Read 02:27 UTC: 21 material lines priced as `analyst_range`, each with a supplier URL in free
+    text and none of those pages retained (0 in `listing_page_snapshots`, 0 as a `catalog_parts.supplier_url`); 24
+    labor lines with `analyst_range` hours; 26 records with a typed hourly rate, while `resolve_labor_rate()` answers
+    from stored rows and reports its own sample size. A material `analyst_range` price now cites
+    `pricing.catalog_part_id` (same price and currency) or `pricing.source_snapshot_id`; a labor line cites a
+    `labor_operation` or a `stage_row` or is unpriced; `rate_basis` is not `explicit_assumption`. Kinds the check does
+    not name are left to the cost fold. The stored totals do not move until a record is rewritten; when one is, labor
+    that rested on typed hours becomes unresolved, which is the true state.
+  - *The fourth refusal, live* (#3410, read 2026-11-12 10:14 UTC): all four checks are in the one trigger. Of the 31
+    current records 18 fail system keys, 26 part keys, 23 citations and 26 numbers; 2 pass all four. No work record
+    has been written on the vehicle since 2026-11-11 16:43, so no check has yet refused a real write.
+  - *The scoreboard for work records* (`20261116040000`, `visual_work_gate_report(vehicle)`, contract
+    `test_visual_work_gate_report.sql`): for a vehicle's current records, how many the gate would admit today, how
+    many it would refuse per check, the drafts declared, and for each failing record the keys, photos and numbers at
+    fault. It calls the trigger's own four functions, so the two cannot disagree. Whether this vehicle's work log is
+    done is this query's `failing` reaching zero, not an agent's statement. Service role only. It is not rule 7's
+    measure for photo readings (keyed, connected, proven over the library); that reader is still not built.
+  - *The work-record scoreboard, live* (#3436, read 2026-11-12 10:50 UTC): 31 records, 2 passing, 29 failing; 0
+    drafts declared; newest record still 2026-11-11 16:43.
+  - *A second live test, another lane* (read 10:50 UTC). Between 00:33 and 00:38 UTC a drivetrain-decode lane wrote
+    19 `specification` observations on the proof vehicle under four new methods (`cowl_tag_decode_v1`,
+    `engine_block_decode_v1`, `trans_id_stamp_decode_v1`, `physical_transcription_v1`). Forced, or done right unforced:
+    each row has its photo as witness, a cited reference with a locator, a stated limitation and confidence 0.6; and
+    the lane filed its places as `add_property` proposals (20 open at 01:34, two earlier batches superseded by it).
+    Not forced: all 19 rows landed with no `property_id`, their values under field names the registry does not hold,
+    so they wait unkeyed and nothing counts the wait. The writer gate for photo readings would have counted them; it is
+    still not built. The proposals wait on a human approval.
+  - *The photo-reading scoreboard, one vehicle* (`20261116042000`, `image_stage_coverage(vehicle)`, contract
+    `test_image_stage_coverage_model_gain.sql`): rule 7's counts as an overload of the existing coverage reader.
+    Proof vehicle, read by the same query 2026-11-12 12:45 UTC: 467 photos, 461 with a witnessed reading; 982 witnessed
+    observations, 446 keyed, 536 unkeyed (462 of them `reviewed_image_analysis_v1`); 181 folded claims, 70 carried by
+    two or more rows (the day is the witnessed photo's `taken_at`, not the reading's own clock; 0 keyed rows had no
+    capture day; read again 14:06 UTC with that clock, same counts); 335 connected rows, all by folding, 0 cited by a
+    work record; 0 proven; 17 open proposals citing a
+    witnessed reading. The library form was tried first and measured: cancelled twice by the 10 s statement timeout
+    (39,952 witness rows, each a separate read in a 12 GB table). A library total needs a stored fold and is not built.
+  - *The proof question, asked for the first time* (2026-11-13 03:01 UTC). The owner asked whether the code does what
+    the direction is for. It did not: no function in the repository took a part and a state and returned photos; the
+    only readers of a part key were the writer gate and the keys dry run. Asked by hand on the proof vehicle the rows
+    answer: 446 keyed condition rows with a photo, 364 naming a part, 157 state-and-part pairs (the front bumper's
+    body alignment, 20 photos over two days). Two limits show in the same read. 434 of the 446 rows are flaws
+    (`adjective`) and 12 are states, mostly `structural.component.absent`: no row says replaced, restored or repaired
+    on any part, so the owner's three questions cannot be asked yet. And 8 parts were seen on more than one day (the
+    hood decal: missing, scratched, discoloured, absent) with nothing reading the sequence.
+  - *The reader for it* (`20261116061000`, `keyed_claims_by_part(part, state, vehicle)`, contract
+    `test_keyed_claims_by_part.sql`): vehicles whose keyed, witnessed observations name the part, one claim per
+    state and capture day with every photo behind it, and the part's days in order on each vehicle. It decides no
+    repair and calls nothing proven. Across all vehicles one part resolved through `idx_vobs_structured_data_gin`
+    in 0.7 s (35 rows, measured 03:02 UTC). It reads `structured_data.part_key`; rows that carry only
+    `component_subject_id` are not found yet. What it still cannot return is the thing the acceptance asks for:
+    work states on parts, because no reading lands one.
   - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on
     reason and logic." They are the agent's reasoning, not his word, and he can overturn them. (1) A researched or
     analyst number (price, hours, rate) is not stored as a number in a record. Invariant 5 says a number is cited from

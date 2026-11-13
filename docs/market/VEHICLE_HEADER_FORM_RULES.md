@@ -139,3 +139,56 @@ known rejected approach are retained privately under
 its `PICKUP.json`. Another checkout can discover the contract, executable tests,
 deployed revision and next acceptance case from this repository without that local
 folder. The case remains open under **C27 / §11** until its consumer is delivered.
+
+## Facet items: every header token is a defined set of line items (2026-11-11)
+
+Owner direction, 2026-11-11: "your job is wiring the header not just one off fixing.
+the point of the design is to flush out the data with extreme prudence and accuracy";
+on the transmission, "it should show what it was originally equipped with vs what it
+has now and should discuss gearing etc ... should perfectly define that the heck the
+transmission is"; on location, "we have an awesome map system its a shame we dont use it".
+
+Each strip facet (`trim`, `body_style`, `engine`, `transmission`, `drivetrain`,
+`location`) and each identity token (`year`, `make`, `model`) has its items from one
+reader, `vehicle_facet_items(vehicle, token)`. `vehicle_profile_read` carries the items of
+every token but `location` on the masthead as `token_items`. Location items are read when
+the token is clicked, with `vehicle_facet_items(vehicle, 'location')`, in the same shape:
+the photo GPS fold costs 0.3 to 2 s cold on a large gallery (prod, 2026-11-11), too much
+to put on every profile load. The item list is the definition of the token. It is the same
+for every vehicle; a vehicle differs only in which items are established. A click
+renders these items; the frontend chooses no lead source, ranks no trust and folds no
+sources.
+
+### Item shape
+
+| Field | Meaning |
+| --- | --- |
+| `key` | Stable item key, e.g. `transmission.current.model` |
+| `facet` | `as_built`, `current`, `decode` or `derived` |
+| `value`, `unit` | The value; `null` when missing |
+| `status` | `established` (registry decode, receipt, owner-signed, or two independent agreeing sources), `reading` (one photo reading or transcription, witness attached), `claim` (attributed listing, seller or user statement), `conflict` (sources disagree; every side returned), `missing` |
+| `sources[]` | Each: source slug and label, URL, method, observed_at, witness `{kind, id}` (image, receipt, document, observation) |
+| `rule` | For decodes: rule key and citation URL (e.g. `gm_1972_1980_car_vin_v1`) |
+| `equation` | For `derived`: expression and the item keys it reads; computed by the reader, never landed |
+| `needed` | For `missing` or `reading`: the evidence that would establish it (e.g. "photo of the transmission ID stamp", "axle tag") |
+
+### Item lists
+
+| Token | Items |
+| --- | --- |
+| `year`, `make`, `model`, `body_style` | `decode` from the VIN under its chart (position and rule); recorded value; title/registration claim |
+| `engine` | `as_built.engine` (VIN engine code under the chart); `current.family`, `current.displacement`, `current.block_casting`, `current.block_date`, `current.engine_code_stamp`, `current.heads`, `current.induction`, `current.cam`, `current.machine_work` (receipts, work orders); `derived.changed` (as built vs current, citing the change claim) |
+| `transmission` | `as_built.type`, `as_built.model` (body tag, order code, build documents, owner statement as `claim`); `current.type`, `current.model`, `current.id_stamp`, `current.date_code`, `current.gear_ratios` (rule table for the identified model), `current.shifter`; `axle.as_built.ratio`, `axle.current.ratio` (axle tag or stamp, receipt); `current.tire_size`; `derived.final_drive` per gear and `derived.rpm_at_60` (equation over the ratio, axle and tire items) |
+| `location` | `current.area` (ZCTA or city), sources (photo GPS fold: photo count and date range; listing location), `map` (area label and level, county FIPS, ZCTA when keyed; bounds are the county outline `map-data/geo/v1/county/{county_fips}.geojson`, the file OneMap and the iOS map draw, because no ZCTA geometry exists; centroid is the city's public centre); public area grain only, never photo points |
+| `trim` | Recorded trim; tribute rule (`tribute_badge_rule_v1`); factory trim decode where a chart exists |
+
+Rule tables (gear ratios by transmission model, axle codes, engine codes and casting
+numbers, body-tag codes) live in the database with their citations and are keyed by
+make, model or code and year range, so every vehicle with the same evidence decodes
+the same way. New testimony vocabulary goes through one `schema_proposals` set; a
+missing key is reported as a missing item, never a page-local fact.
+
+**Acceptance:** click every token on at least four vehicles (the 1973 Firebird
+`20d21fb0-4651-4469-a0ba-e751309a1e54`, another 1973 Firebird, a listing-sourced car,
+a thin-evidence car). Each shows only items, each item with its status and sources,
+and each missing item names its evidence. No prose card, no bare count, no off-page jump.

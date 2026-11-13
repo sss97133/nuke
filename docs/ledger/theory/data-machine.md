@@ -164,8 +164,8 @@ definition of done: no piece of the build is finished until its gate exists.
 | Gate | Where | What it refuses | State |
 |---|---|---|---|
 | The pull request | `scripts/guardrails/no-new-photo-reader.mjs` and its test, run by `pre-deploy-check.yml` | a new table keyed by a photo, or a new edge function or script whose name says it reads photos, unless `photo-stores.allow.json` lists it with the owner's approval; and the removal of this direction, the keys and folds section or the "Reading photos" rule | built 2026-11-10; it reads names, CREATE TABLE text and headings, nothing deeper |
-| The writer | `ingest-observation` | a photo reading that carries no registered key and no part: counted first, refused once the readers key what they write | not built for photo readings. For `visual_work_v1` records a database trigger (`guard_visual_work_keys_insert`, 2026-11-11) refuses an unregistered system key and a cost line with no registered part key, unless the record declares the key as a draft |
-| The scoreboard | one database reader over keyed, witnessed observations (the stage ledger's coverage reader is the thing to extend) | a progress number that is not computed from it | not built |
+| The writer | `ingest-observation` | a photo reading that carries no registered key and no part: counted first, refused once the readers key what they write | not built for photo readings. For `visual_work_v1` records a database trigger (`guard_visual_work_keys_insert`, 2026-11-11) refuses an unregistered system key and a cost line with no registered part key (unless the record declares the key as a draft), a cited photo whose keyed claims are not cited, and a price, hour range or rate that cites no stored row |
+| The scoreboard | one database reader over keyed, witnessed observations (the stage ledger's coverage reader is the thing to extend) | a progress number that is not computed from it | one vehicle at a time: `image_stage_coverage(vehicle)` (2026-11-12) returns rule 7's counts; the library total is not built (the read-time form exceeds the statement timeout). For `visual_work_v1` records `visual_work_gate_report(vehicle)` counts the current records the writer gate would admit and refuse, per check. Nothing yet refuses a progress number computed elsewhere |
 | The database | an event trigger in the manner of `view_write_guard` (20261014214500) | a photo-keyed table created without an approved `schema_proposals` row, a hand-applied one included | not built |
 
 **The lane and who works it.** The card's team is lanes, each with a scoreboard, and image analysis had
@@ -258,9 +258,13 @@ first test of rule 5.
   `descriptor_key` resolves against `condition_taxonomy`; (b) the part as the property's
   `discriminator_key`, the way `image_id` is used today, with the key carried in `structured_data`;
   (c) one property per part and state, which multiplies the registry. Recommended, not ruled: (a),
-  because finding vehicles by part is then an indexed column and it mirrors the condition key. Bring
-  the owner one worked example of each on the cohort vehicle. The choice is written here and is not
-  reopened by the next reader.
+  because finding vehicles by part is then an indexed column and it mirrors the condition key.
+  **Owner ruling, 2026-11-11:** use (a), the existing taxonomy FK, with the existing observation
+  intake, source witnesses and build-log fold. “That ghost is the data machine,” and “not a scrap
+  file on local”: the model is the product, not a separate reconstructed BOM artifact. The prepared
+  `component_subject_id` / `component_visible_present` increment follows that choice; its open
+  proposals, curator review and deployment remain distinct stages. It has not established a full
+  vehicle population or an installed-unit register.
 - **There are two registries.** `observation_properties` in the database, and the code registry
   `supabase/functions/_shared/cockpit/attribute-registry.ts`, whose own comment records an earlier
   owner call ("registry code is source of truth, not a DB table") and which already asks for a
@@ -273,6 +277,33 @@ first test of rule 5.
 - **Nothing in the repo answers a question.** The claim and answer functions of
   `evidence_judgment_requests` exist and no script, function or app calls them; the answers in
   production were written from outside the repo.
+
+**First component contract, prepared 2026-11-11 (release held).** The existing
+`ingest-observation` resolves `component_key` against active `subject_taxonomy` and retains the
+original reviewed observation, scalar selector, SHA-256 and canonical image witness. A part-level
+boolean means *visible present* or *explicitly absent in a qualified named view*. `not_visible`
+and `cannot_tell` remain unanswered inspection questions. The analysis clock and photograph's
+separate capture label are exposed; presence then is neither installation time nor current tested
+condition. Re-keying the same retained scalar folds once and retains the derived observation IDs;
+it is not independent agreement. Condition descriptors must match the component's subject domain
+and category, rather than borrowing a whole-image assembly state.
+
+The three initial source cases are a visible 78PRMJ battery with a matching receipt candidate,
+an alternator with acquisition and test status unknown, and a windshield with silver-gray molding
+beside a black-molding stock candidate. A shared SKU and position do not prove unit identity; color
+difference alone does not prove a contradiction. Purchase candidates, reported work, later visible
+condition and actual inspection remain independent dimensions. Current-source withdrawal or
+supersession removes the qualified reading from `vehicle_build_log_public`, preserving testimony.
+The implementation's local contracts cover the real handler, source guard, witness projection,
+reader, concurrent withdrawal and false joins. They are not production or native-UI acceptance.
+
+Expected population stays unknown until a source-attributed applicable template exists. The live
+`component_assembly_map` inspected on this date has three GM-truck templates and none applicable to
+the 1973 Firebird; it also has no reference-document FK. The next concrete input is the retained GM
+1973 FS87/FT87 molding chart (printed “1973 MOULDING CHART PAGE 1”, PDF page 33), which distinguishes
+five windshield-molding pieces. Its page and applicability must enter the existing reference/model
+owners before it can establish expected slots. A manual's expected pieces do not establish parts
+installed on this vehicle, and unknown applicability never becomes a completion percentage.
 
 **Testing this card by acting as the owner.** The owner's test: send a new agent, with no memory, the
 kind of message he would send, and see whether it goes where this card points or where the 2026-11-10

@@ -173,6 +173,17 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_public_live_events.sql
           psql -X -v ON_ERROR_STOP=1 -v bat_fixture_json="$(cat "$fixture_file")" -d nuke_soft_close_test -f supabase/sql/test_bat_live_relisted_lot_fold.sql
           deno test --node-modules-dir=none --allow-env --allow-read --allow-run=psql --filter PostgreSQL supabase/functions/ingest-observation/batLiveCollector.test.ts
+      - name: Verify component intake through PostgreSQL and the existing build-log consumer
+        env:
+          RUN_COMPONENT_PG: '1'
+          PGDATABASE: dm_refinement_component_ci
+          PGPORT: '5432'
+        run: |
+          set -euo pipefail
+          trap 'dropdb --if-exists dm_refinement_component_ci; psql -X -v ON_ERROR_STOP=1 -d postgres -c "DROP ROLE IF EXISTS anon, authenticated, service_role"' EXIT
+          createdb dm_refinement_component_ci
+          psql -X -v ON_ERROR_STOP=1 -f supabase/sql/test_component_evidence.sql
+          PSQL_BIN="$(command -v psql)" deno test --node-modules-dir=none --allow-env --allow-run=psql supabase/functions/ingest-observation/componentEvidencePostgres.test.ts
       - name: Run each database contract in its own fresh database
         run: scripts/ci/run-db-contracts.sh --ci-service
 
@@ -223,6 +234,10 @@ jobs:
         run: createdb dm_pulse_bounded_ci
       - name: Verify exact capped and unavailable pulse readings
         run: psql -X -v ON_ERROR_STOP=1 -d dm_pulse_bounded_ci -f supabase/sql/test_bounded_pipeline_pulse.sql
+      - name: Create disposable visual claim admission database
+        run: createdb dm_refinement_visual_claims_ci
+      - name: Verify visual claims remain pending without canonical promotion
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_visual_claims_ci -f supabase/sql/test_visual_claim_auto_accept.sql
       - name: Setup Node.js for operator monitor contracts
         uses: actions/setup-node@v4
         with:
@@ -716,7 +731,7 @@ jobs:
           deno test --no-check --node-modules-dir=none --allow-env --allow-read supabase/functions/api-v1-vehicles/sourceProfile.test.ts
           node --test scripts/ecr-retained-replay.test.mjs
       - name: Verify native dealer microdata, source qualification and canonical replay
-        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/_shared/vin-decoder-native.test.ts supabase/functions/ingest/dealer.test.ts
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/_shared/dealerParser.test.ts supabase/functions/_shared/vin-decoder-native.test.ts supabase/functions/api-v1-vin-lookup/vinRequest.test.ts supabase/functions/ingest/dealer.test.ts
       - name: Verify native Gateway browser evidence, admission and replay
         run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/_shared/gatewayParser.test.ts supabase/functions/ingest/gateway.test.ts
       - name: Verify the live-lot forecast route resolves a lot, sends the reader typed arguments, refuses anonymous callers and returns the reader's answer untouched

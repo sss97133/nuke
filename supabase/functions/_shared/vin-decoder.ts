@@ -26,6 +26,8 @@ export interface VINDecodeResult {
   series_code?: string | null;
   plant_name?: string | null;
   rule_source?: string | null;
+  /** The chart the engine letter decodes by, when it differs by year from rule_source. */
+  engine_rule_source?: string | null;
 }
 
 /**
@@ -95,7 +97,7 @@ const GM_PONTIAC_F_BODY_SERIES: Record<string, { series: string; years: [number,
   W: { series: 'Trans Am', years: [1976, 1980] },
 };
 
-/** 1972-1976 Firebird engine letters (position 5) listed by GM_PONTIAC_F_BODY_SOURCE for those years. */
+/** 1972-1976 Firebird engine letters (position 5) listed by GM_PONTIAC_F_BODY_SOURCE; 1973 uses the 1973 chart below. */
 const GM_PONTIAC_F_BODY_ENGINES: Record<string, { engine: string; years: [number, number] }> = {
   D: { engine: '250', years: [1972, 1976] },
   N: { engine: '350 2bbl', years: [1972, 1974] },
@@ -105,6 +107,26 @@ const GM_PONTIAC_F_BODY_ENGINES: Record<string, { engine: string; years: [number
   T: { engine: '400 4bbl', years: [1972, 1974] },
   X: { engine: '455 SD 4bbl', years: [1972, 1974] },
   Y: { engine: '455 4bbl', years: [1973, 1974] },
+};
+
+/**
+ * 1973 Firebird engine letters (position 5), from the 1973-specific chart: Thomas A. DeMauro, "Number Crunching: The codes
+ * that count on the 1973 Firebird", High Performance Pontiac, June 1994, p.19, Serial Numbers (reprinted in the WW
+ * Firebirds newsletter, Sept 2025, PDF page 10). Verbatim: "X-455 SD engine (D-250, M-350 single exhaust, N-350 dual
+ * exhaust, R-400 2-bbl. single exhaust, P 400 2-bbl. dual exhaust, T-400 4-bbl. dual exhaust, Y-455 D-port)". It lists
+ * no S for 1973, so a 1973 S decodes to no engine. For 1973 this chart replaces GM_PONTIAC_F_BODY_ENGINES.
+ */
+export const GM_PONTIAC_F_BODY_1973_ENGINE_SOURCE =
+  'https://wwfirebirds.com/wp-content/uploads/2025/09/WWF-September2025WWFirebirdsNewsletter.pdf#page=10';
+const GM_PONTIAC_F_BODY_1973_ENGINES: Record<string, string> = {
+  D: '250',
+  M: '350 single exhaust',
+  N: '350 dual exhaust',
+  R: '400 2bbl single exhaust',
+  P: '400 2bbl dual exhaust',
+  T: '400 4bbl dual exhaust',
+  Y: '455 D-port',
+  X: '455 SD',
 };
 
 const GM_PONTIAC_F_BODY_PLANTS: Record<string, string> = { N: 'Norwood, Ohio', L: 'Van Nuys, California' };
@@ -319,8 +341,14 @@ function decodePre1981Vin(vin: string): VINDecodeResult {
         result.series = series.series;
         result.body_style = 'Coupe';
         result.series_code = vin.charAt(1);
-        const engine = GM_PONTIAC_F_BODY_ENGINES[result.engine_code!];
-        if (engine && result.year >= engine.years[0] && result.year <= engine.years[1]) result.engine_size = engine.engine;
+        if (result.year === 1973) {
+          result.engine_size = GM_PONTIAC_F_BODY_1973_ENGINES[result.engine_code!] ?? null;
+          result.engine_rule_source = GM_PONTIAC_F_BODY_1973_ENGINE_SOURCE;
+        } else {
+          const engine = GM_PONTIAC_F_BODY_ENGINES[result.engine_code!];
+          if (engine && result.year >= engine.years[0] && result.year <= engine.years[1]) result.engine_size = engine.engine;
+          result.engine_rule_source = GM_PONTIAC_F_BODY_SOURCE;
+        }
         result.plant_name = GM_PONTIAC_F_BODY_PLANTS[result.plant] ?? null;
         result.rule_source = GM_PONTIAC_F_BODY_SOURCE;
       }

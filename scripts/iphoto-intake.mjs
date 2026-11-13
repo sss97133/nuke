@@ -8,15 +8,22 @@
  *   node scripts/iphoto-intake.mjs --vehicle-id <uuid> --album "..."
  *   node scripts/iphoto-intake.mjs --all                           # process all unmatched albums
  *
+ * Inserts go through ingest_image_identity_first (same chokepoint as
+ * photo-sync-daemon.mjs). vehicle_id is not stamped at ingest; album
+ * context is recorded only as exif_data.suggested_vehicle_id / album_name
+ * for a later visual-identity or capture-set filer.
+ *
  * Requires: osxphotos, @supabase/supabase-js, dotenvx
  */
 
 import { execSync, spawnSync } from 'child_process';
+import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, rmSync, existsSync } from 'fs';
 import { join, basename } from 'path';
 import os from 'os';
 import dns from 'dns';
+import { buildIdentityFirstPayload, personalLibraryStoragePath } from './lib/ingest-image-identity-payload.mjs';
 
 // ─── DNS fix: bypass broken macOS system resolver using Google DNS ──────────
 const resolver = new dns.Resolver();
@@ -44,6 +51,38 @@ const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABAS
 const BUCKET = 'vehicle-photos';
 const BATCH_SIZE = 1;
 const USER_ID = '0b9f107a-d124-49de-9ded-94698f63c1c4'; // skylar's user_id
+const INTAKE_SLUG = 'iphoto-intake';
+
+async function ingestThroughIdentityFirst({ bytes, filename, filePath, mimeType, meta, albumName, suggestedVehicleId }) {
+  const contentSha256 = createHash('sha256').update(bytes).digest('hex');
+  const storagePath = personalLibraryStoragePath(USER_ID, INTAKE_SLUG, filename);
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET)
+    .upload(storagePath, bytes, { contentType: mimeType, upsert: false });
+  if (uploadError && !String(uploadError.message || '').includes('already exists')) {
+    return { ok: false, err: uploadError.message };
+  }
+  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+  const payload = buildIdentityFirstPayload({
+    contentSha256,
+    publicUrl,
+    storagePath,
+    filename,
+    mimeType,
+    fileSize: bytes.length,
+    userId: USER_ID,
+    meta,
+    albumName,
+    suggestedVehicleId,
+    syncedBy: 'iphoto-intake',
+    sourcePath: filePath,
+  });
+  const { data, error } = await supabase.rpc('ingest_image_identity_first', { p_payload: payload });
+  if (error) return { ok: false, err: String(error.message || error) };
+  if (!data?.ok) return { ok: false, err: `rpc returned ${JSON.stringify(data)}` };
+  return { ok: true, dup: data.reused_leaf === true, id: data.id || data.image_id || null };
+}
+
 
 // ─── CLI args ────────────────────────────────────────────────────────────────
 
@@ -358,7 +397,7 @@ function convertHeicToJpeg(srcDir, destDir) {
 
 // ─── Supabase upload ─────────────────────────────────────────────────────────
 
-async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map()) {
+async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map(), albumName = null) {
   const files = readdirSync(jpegDir).filter(f => /\.(jpg|jpeg|png)$/i.test(f));
   console.log(`  Uploading ${files.length} images for vehicle ${vehicleId}...`);
 
@@ -383,98 +422,36 @@ async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map()) {
       if (aborted) return;
       const filePath = join(jpegDir, filename);
       const fileData = readFileSync(filePath);
-      const fileSize = statSync(filePath).size;
-      const storagePath = `${vehicleId}/iphoto/${filename}`;
       const mimeType = /\.png$/i.test(filename) ? 'image/png' : 'image/jpeg';
+      const meta = metaMap.get(baseName(filename)) || {};
+      if (meta.latitude) gpsCount++;
 
-      // Upload with retry — three attempts with exponential backoff to ride out transient network/DNS blips
-      let uploadError = null;
+      let ingested = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const r = await supabase.storage
-          .from(BUCKET)
-          .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
-        uploadError = r.error;
-        if (!uploadError) break;
+        ingested = await ingestThroughIdentityFirst({
+          bytes: fileData,
+          filename,
+          filePath,
+          mimeType,
+          meta,
+          albumName,
+          suggestedVehicleId: vehicleId,
+        });
+        if (ingested.ok) break;
         if (attempt < 3) await new Promise(res => setTimeout(res, attempt * 2000));
       }
-      if (uploadError) {
+      if (!ingested?.ok) {
         errors++;
         consecutiveErrors++;
-        if (errors <= 10 || errors % 25 === 0) console.error(`  Upload error [${filename}] (${errors} total, ${consecutiveErrors} consec): ${uploadError.message || JSON.stringify(uploadError)}`);
+        if (errors <= 10 || errors % 25 === 0) console.error(`  Ingest error [${filename}] (${errors} total, ${consecutiveErrors} consec): ${ingested?.err}`);
         if (consecutiveErrors >= CONSECUTIVE_ERR_ABORT && !aborted) {
           aborted = true;
-          console.error(`\n  ⛔ ABORT — ${consecutiveErrors} consecutive upload failures. Network/storage appears down. ${uploaded} uploaded so far; remaining ${toUpload.length - (i + batch.length)} skipped. Re-run after network recovers; already-uploaded files will be skipped via dedup.`);
+          console.error(`\n  ⛔ ABORT — ${consecutiveErrors} consecutive ingest failures. Network/storage appears down. ${uploaded} uploaded so far; remaining ${toUpload.length - (i + batch.length)} skipped. Re-run after network recovers; already-uploaded files will be skipped via dedup.`);
         }
         return;
       }
       consecutiveErrors = 0;
-
-      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-
-      // Look up GPS/EXIF metadata from osxphotos
-      const meta = metaMap.get(baseName(filename)) || {};
-      if (meta.latitude) gpsCount++;
-
-      const row = {
-        vehicle_id: vehicleId,
-        image_url: publicUrl,
-        storage_path: storagePath,
-        source: 'iphoto',
-        mime_type: mimeType,
-        file_name: filename,
-        file_size: fileSize,
-        is_external: false,
-        ai_processing_status: 'pending',
-        user_id: USER_ID,
-        documented_by_user_id: USER_ID,
-        // GPS fields
-        ...(meta.latitude != null && { latitude: meta.latitude }),
-        ...(meta.longitude != null && { longitude: meta.longitude }),
-        ...(meta.location_name && { location_name: meta.location_name }),
-        // Temporal
-        ...(meta.taken_at && { taken_at: meta.taken_at }),
-        // EXIF blob
-        ...(meta.exif_data && { exif_data: meta.exif_data }),
-      };
-
-      const { data: inserted, error: insertError } = await supabase
-        .from('vehicle_images').insert(row).select('id').single();
-      if (insertError) {
-        const isDup = /duplicate|unique|already exists/i.test(insertError.message || '');
-        if (isDup) {
-          // benign — row already exists from a prior run
-        } else {
-          errors++;
-          if (errors <= 10 || errors % 25 === 0) console.error(`  Insert error [${filename}] (${errors} total): ${insertError.message || JSON.stringify(insertError)}`);
-        }
-      } else {
-        uploaded++;
-        // Chain-of-custody: write device_attributions row if EXIF identity present
-        const ex = meta.exif_data || {};
-        if (inserted?.id && ex.camera_make) {
-          const fingerprint = `camera:${String(ex.camera_make).toLowerCase().replace(/\s+/g,'-')}:${String(ex.camera_model||'unknown').toLowerCase().replace(/\s+/g,'-')}`;
-          const attrib = {
-            image_id: inserted.id,
-            camera_make: ex.camera_make,
-            camera_model: ex.camera_model || null,
-            device_fingerprint: fingerprint,
-            software: ex.software || null,
-            attribution_source: 'photos_library_iphoto_intake',
-            extraction_method: 'osxphotos_exif_passthrough',
-            confidence_score: 100,
-            actual_contributor_id: USER_ID,
-            uploaded_by_user_id: USER_ID,
-            datetime_original: meta.taken_at || null,
-            latitude: meta.latitude ?? null,
-            longitude: meta.longitude ?? null,
-            raw_exif: ex,
-          };
-          const { error: attribErr } = await supabase.from('device_attributions').insert(attrib);
-          if (attribErr && !/duplicate|unique/i.test(attribErr.message || '')) {
-            console.error(`  device_attribution error [${filename}]: ${attribErr.message}`);
-          }
-        }
-      }
+      if (!ingested.dup) uploaded++;
     }));
     process.stdout.write(`\r  ${i + batch.length}/${toUpload.length} (${uploaded} new, ${gpsCount} GPS, ${errors} err)  `);
   }
@@ -582,7 +559,7 @@ async function processAlbum(albumName, vehicleId = null) {
     const count = convertHeicToJpeg(tmpExport, tmpJpeg);
     console.log(`  Converted: ${count} images`);
 
-    const result = await uploadPhotos(vehicleId, tmpJpeg, metaMap);
+    const result = await uploadPhotos(vehicleId, tmpJpeg, metaMap, albumName);
     console.log(`  Done: ${result.uploaded} uploaded, ${result.errors} errors`);
     return result;
   } finally {
@@ -823,67 +800,61 @@ async function syncAlbum(albumName, vehicleId = null) {
 
         const filePath = join(tmpJpeg, filename);
         const fileData = readFileSync(filePath);
-        const fileSize = statSync(filePath).size;
-        const storagePath = `${vehicleId}/iphoto/${filename}`;
         const mimeType = /\.png$/i.test(filename) ? 'image/png' : 'image/jpeg';
-
-        // Upload to storage (with retry for intermittent network)
-        let uploadError;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          const r = await supabase.storage
-            .from(BUCKET)
-            .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
-          uploadError = r.error;
-          if (!uploadError) break;
-          if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
-        }
-        if (uploadError) {
-          if (errors < 5) { process.stdout.write('\n'); console.error(`  *** UPLOAD ERROR (${filename}): ${uploadError.message || JSON.stringify(uploadError)}`); }
-          errors++;
-          return;
-        }
-
-        const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
         const meta = metaMap.get(baseName(filename)) || {};
 
-        // Check if we have a placeholder to replace
+        // Placeholders already live on a vehicle leaf from an earlier stamp.
+        // Refresh their bytes/URL only — do not re-stamp or insert a new leaf here.
         const placeholderId = placeholderMap.get(baseName(filename));
         if (placeholderId) {
-          // Replace placeholder with real image URL
+          const storagePath = personalLibraryStoragePath(USER_ID, INTAKE_SLUG, filename);
+          let uploadError;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            const r = await supabase.storage
+              .from(BUCKET)
+              .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
+            uploadError = r.error;
+            if (!uploadError) break;
+            if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
+          }
+          if (uploadError) {
+            if (errors < 5) { process.stdout.write('\n'); console.error(`  *** UPLOAD ERROR (${filename}): ${uploadError.message || JSON.stringify(uploadError)}`); }
+            errors++;
+            return;
+          }
+          const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
           const { error: upErr } = await supabase.from('vehicle_images')
             .update({
               image_url: publicUrl,
               storage_path: storagePath,
               mime_type: mimeType,
-              file_size: fileSize,
+              file_size: fileData.length,
             })
             .eq('id', placeholderId);
           if (!upErr) { replaced++; uploaded++; } else { errors++; }
-        } else {
-          // Insert new record
-          const row = {
-            vehicle_id: vehicleId,
-            image_url: publicUrl,
-            storage_path: storagePath,
-            source: 'iphoto',
-            mime_type: mimeType,
-            file_name: filename,
-            file_size: fileSize,
-            is_external: false,
-            ai_processing_status: 'pending',
-            documented_by_user_id: USER_ID,
-            ...(meta.latitude != null && { latitude: meta.latitude }),
-            ...(meta.longitude != null && { longitude: meta.longitude }),
-            ...(meta.location_name && { location_name: meta.location_name }),
-            ...(meta.taken_at && { taken_at: meta.taken_at }),
-            ...(meta.exif_data && { exif_data: meta.exif_data }),
-          };
-          const { error: insErr } = await supabase.from('vehicle_images').insert(row);
-          if (insErr && !insErr.message.includes('duplicate')) {
-            if (errors < 5) { process.stdout.write('\n'); console.error(`  *** INSERT ERROR (${filename}): ${insErr.message || JSON.stringify(insErr)}`); }
-            errors++;
-          } else { uploaded++; }
+          return;
         }
+
+        let ingested = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          ingested = await ingestThroughIdentityFirst({
+            bytes: fileData,
+            filename,
+            filePath,
+            mimeType,
+            meta,
+            albumName,
+            suggestedVehicleId: vehicleId,
+          });
+          if (ingested.ok) break;
+          if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
+        }
+        if (!ingested?.ok) {
+          if (errors < 5) { process.stdout.write('\n'); console.error(`  *** INGEST ERROR (${filename}): ${ingested?.err}`); }
+          errors++;
+          return;
+        }
+        uploaded++;
       }));
       process.stdout.write(`\r  ${i + batch.length}/${files.length} (${uploaded} up, ${replaced} replaced, ${skipped} skip, ${errors} err)  `);
     }

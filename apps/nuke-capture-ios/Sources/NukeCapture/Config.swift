@@ -176,9 +176,4 @@ enum Config {
     /// CFBundleURLTypes; this exact URL must also appear in the Supabase
     /// Auth → URL Configuration redirect allow-list at runtime.
     static let oauthRedirectURL = URL(string: "ag.nuke.capture://login-callback")!
-
-    /// Explore mode's sample profile (the Profile tab with no session) —
-    /// a real prod profile with a deep day record, never a fixture.
-    /// profiles.id for handle "skylar".
-    static let sampleProfileUserId = "0b9f107a-d124-49de-9ded-94698f63c1c4"
 }

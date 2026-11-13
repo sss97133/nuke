@@ -67,6 +67,27 @@ const fns = readdirSync(FN_DIR)
   .filter((d) => !d.startsWith("_") && existsSync(path.join(FN_DIR, d, "index.ts")) && statSync(path.join(FN_DIR, d)).isDirectory())
   .sort();
 
+// An OPTIONS branch that returns: `if (req.method === "OPTIONS") return …` or `… "OPTIONS") { return …`.
+const OPTIONS_RETURN = /\b(req|request)\.method\s*===?\s*["']OPTIONS["']\s*\)?\s*(\{\s*)?return\b/;
+// Where a handler body starts: the last of these before the OPTIONS branch.
+const HANDLER_START = /Deno\.serve\(|\bserve\(\s*async|export\s+(default\s+)?(async\s+)?function\b|async\s*\(\s*(req|request)\b/g;
+// Request-time I/O that must not run for a preflight.
+const HANDLER_IO = /\bfetch\(|createClient\(|\.from\(|\.rpc\(|\.storage\.|\.query\(|\bsql`/;
+function preflightVerdict(fn) {
+  let verdict = "no OPTIONS branch that returns";
+  for (const f of readdirSync(path.join(FN_DIR, fn)).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))) {
+    const src = readFileSync(path.join(FN_DIR, fn, f), "utf8");
+    const m = OPTIONS_RETURN.exec(src);
+    if (!m) continue;
+    let start = 0;
+    for (const s of src.matchAll(HANDLER_START)) if (s.index < m.index) start = s.index;
+    const io = HANDLER_IO.exec(src.slice(start, m.index));
+    if (!io) return null;
+    verdict = `${f}: ${io[0]} runs before the OPTIONS return`;
+  }
+  return verdict;
+}
+
 const info = new Map();
 for (const fn of fns) {
   const src = readFileSync(path.join(FN_DIR, fn, "index.ts"), "utf8");
@@ -83,7 +104,11 @@ for (const fn of fns) {
   const callees = new Set();
   for (const m of src.matchAll(/functions\/v1\/([a-zA-Z0-9_-]+)/g)) if (m[1] !== fn) callees.add(m[1]);
   for (const m of src.matchAll(/functions\.invoke\(\s*['"`]([a-zA-Z0-9_-]+)/g)) if (m[1] !== fn) callees.add(m[1]);
-  info.set(fn, { reasons, callees, guarded: /requireWriteAuth\(/.test(src) });
+  // writeGuard returns null for OPTIONS so the function's own CORS preflight can answer it. A guarded
+  // function with no OPTIONS branch therefore runs its whole body for an anonymous preflight (2026-11-12:
+  // firecrawl-balance-log wrote a row from an anonymous OPTIONS probe).
+  // The branch must return before the handler makes any database, storage or fetch call.
+  info.set(fn, { reasons, callees, guarded: /requireWriteAuth\(/.test(src), usesGuard: /_shared\/writeGuard\.ts/.test(src), preflight: preflightVerdict(fn) });
 }
 
 // Fan-out closes over writers: calling a writer with the service key is writing.
@@ -99,6 +124,7 @@ while (changed) {
 
 const writers = [...info].filter(([, i]) => i.reasons.length);
 const unguarded = writers.filter(([fn, i]) => !i.guarded && !(fn in ALLOWLIST));
+const preflightRuns = [...info].filter(([, i]) => i.usesGuard && i.preflight);
 const stale = Object.keys(ALLOWLIST).filter((fn) => !info.has(fn));
 const idle = Object.keys(ALLOWLIST).filter((fn) => info.has(fn) && !info.get(fn).reasons.length);
 
@@ -117,10 +143,15 @@ console.log(
 );
 for (const fn of stale) console.log(`  note: allowlist entry '${fn}' has no function directory (stale)`);
 for (const fn of idle) console.log(`  note: allowlist entry '${fn}' no longer writes (drop it)`);
+if (preflightRuns.length) {
+  console.error(`\n✗ ${preflightRuns.length} guarded function(s) run their handler for an anonymous OPTIONS request:`);
+  for (const [fn, i] of preflightRuns) console.error(`  ${fn}  (${i.preflight})`);
+  console.error("\nwriteGuard never judges OPTIONS. Answer it right after the guard, before any database or fetch call: `if (req.method === \"OPTIONS\") return new Response(null, { status: 204 });`");
+}
 if (unguarded.length) {
   console.error(`\n✗ ${unguarded.length} writing function(s) accept anonymous callers:`);
   for (const [fn, i] of unguarded) console.error(`  ${fn}  (${i.reasons.join("; ")})`);
   console.error("\nAdd `const denied = await requireWriteAuth(req); if (denied) return denied;` as the first statement of the handler\n(import from ../_shared/writeGuard.ts), or allowlist it in scripts/guardrails/check-write-guard.mjs with the auth that refuses anonymous callers.");
-  process.exit(1);
 }
+if (unguarded.length || preflightRuns.length) process.exit(1);
 console.log("✓ every writing function refuses anonymous callers");
