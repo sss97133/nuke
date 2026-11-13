@@ -1,5 +1,7 @@
 // The readable public face: what a reader without JavaScript gets from /, /market, /journal and /llms.txt.
 // The Gemini audit of 2026-10-15 found these routes returned a 3 KB shell with no body text, so a reader invented the rest.
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import staticAdvisorCard from '../public/.well-known/mcp.json';
 
@@ -59,6 +61,16 @@ describe('public face', () => {
     expect(tag('name', 'twitter:description')).toBe(tag('property', 'og:description'));
     expect(tag('name', 'twitter:title')).not.toBe('x');
     expect(tag('name', 'twitter:description')).not.toBe('x');
+  });
+
+  // 2026-11-13: index.html and the middleware had named /og-image.png since February with no such file in public/.
+  // Vercel answered the request with the app shell (200 text/html), so no shared link showed a card.
+  it('names only link-preview images that are in public/', () => {
+    const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));
+    const named = ['../index.html', '../middleware.ts'].flatMap(f =>
+      [...readFileSync(at(f), 'utf8').matchAll(/https:\/\/nuke\.ag\/([\w./-]+\.(?:png|jpe?g|webp|svg))/g)].map(m => m[1]));
+    expect(named).toContain('og-image.png');
+    expect([...new Set(named)].filter(file => !existsSync(at(`../public/${file}`)))).toEqual([]);
   });
 
   it('shows no number when the read fails', async () => {
