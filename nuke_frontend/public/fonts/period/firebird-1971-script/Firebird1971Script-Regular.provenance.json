@@ -12,13 +12,13 @@
  "glyphs": {
   "i": {
    "unicode": "U+0069",
-   "advance": 324,
+   "advance": 301,
    "provenance": "traced",
    "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit; the stem traced to the x-height, the ball an ellipse at its measured place (I_BALL)",
    "fidelity": {
-    "iou": 0.726,
-    "maxDevPx": 22.8,
-    "meanDevPx": 4.169
+    "iou": 0.7414,
+    "maxDevPx": 22.0,
+    "meanDevPx": 4.627
    },
    "fidelityAgainst": "chrome face mask (v0.2)",
    "sourceBoxPx": [
@@ -48,10 +48,10 @@
    "deslant": 0.24,
    "slant": 0.24,
    "lint": {
-    "nodes": 38,
-    "missingExtrema": 2,
+    "nodes": 34,
+    "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 9
+    "nearKinks": 13
    }
   },
   "r": {
@@ -457,7 +457,7 @@
   },
   "j": {
    "unicode": "U+006A",
-   "advance": 293,
+   "advance": 290,
    "provenance": "derived",
    "from": [
     "i",
@@ -466,10 +466,10 @@
    "method": "the i's stem, ball and serif carried into a descender hook",
    "slant": 0.24,
    "lint": {
-    "nodes": 45,
-    "missingExtrema": 2,
+    "nodes": 49,
+    "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 10
+    "nearKinks": 14
    }
   },
   "k": {
