@@ -54,10 +54,11 @@ beforeEach(() => {
     requests.push({ method, path: url.pathname, query: Object.fromEntries(url.searchParams), body: init?.body ? JSON.parse(String(init.body)) : null });
     const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
     if (url.pathname === '/rest/v1/rpc/vehicle_profile_read' && method === 'POST') return json(profile());
+    if (url.pathname === '/rest/v1/rpc/vehicle_identity_artwork' && method === 'POST') return json({ vehicle_id: vehicleId, marks: [] });
     if (method !== 'GET') throw new Error(`Unexpected mutation: ${method} ${url.pathname}`);
     const table = url.pathname.replace('/rest/v1/', '');
     let rows: any[];
-    if (table === 'auction_events') rows = auctionRows;
+    if (table === 'auction_events_canonical') rows = auctionRows;
     else if (table === 'vehicle_events') rows = eventRows;
     else if (table === 'vehicle_observations') {
       if (observationError) return json({ code: '57014', message: 'synthetic observation read failure' }, 500);
@@ -94,7 +95,10 @@ async function openRecording() {
   expect(read.query).toMatchObject({ vehicle_id: `eq.${vehicleId}`, source_id: `eq.${broadcastSource}`,
     'structured_data->>property': 'eq.broadcast_lot_presentation', is_superseded: 'eq.false', limit: '20' });
   expect(requests.find(r => r.path.endsWith('/rpc/vehicle_profile_read'))?.body).toEqual({ p_vehicle_id: vehicleId });
-  expect(requests).toHaveLength(4);
+  expect(requests.find(r => r.path.endsWith('/rpc/vehicle_identity_artwork'))?.body).toEqual({ p_vehicle_id: vehicleId });
+  // The activity clock's own read of the contribution days (photos, work, paper), once per mount.
+  expect(requests.find(r => r.path.endsWith('/rpc/get_vehicle_contribution_days'))?.body).toEqual({ p_vehicle_id: vehicleId });
+  expect(requests).toHaveLength(6);
   return document.querySelector('iframe')?.getAttribute('src') ?? null;
 }
 const embed = (video: string, start: number) => `https://www.youtube.com/embed/${video}?autoplay=1&rel=0&start=${start}&end=${start + 50}`;

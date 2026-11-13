@@ -13,7 +13,46 @@ export function auctionReaderRevision(row: any): string {
     row.bid_count, row.view_count, row.watcher_count, row.metadata?.comment_count, row.metadata?.live_stream?.last_comment_id]);
 }
 
+/** Only the optional trailing path slash is equivalent; keep host, query and episode identity exact. */
+export function auctionSourceUrlVariants(value: unknown): string[] {
+  if (typeof value !== 'string' || !value) return [];
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port) return [];
+    if (url.search || url.hash || url.pathname === '/' || /\/\/$/.test(url.pathname)) return [value];
+    const bare = value.replace(/\/$/, '');
+    return [bare, `${bare}/`];
+  } catch { return []; }
+}
+
+/** A historical asset sale is not the outcome of a later, distinct auction episode. */
+export function buildAuctionPulseForVehicle(rows: any[], vehicle: any): any | null {
+  rows = rows.filter(row => !row?.duplicate_of_event_id);
+  const sold = String(vehicle?.sale_status || '').toLowerCase() === 'sold'
+    || String(vehicle?.auction_outcome || '').toLowerCase() === 'sold';
+  if (!sold) return buildAuctionPulseFromExternalListings(rows, vehicle.id);
+  const candidate = buildAuctionPulseFromExternalListings(rows, vehicle.id);
+  const currentUrls = auctionSourceUrlVariants(candidate?.listing_url);
+  const historicalUrls = auctionSourceUrlVariants(vehicle?.listing_url || vehicle?.bat_auction_url);
+  const distinctCurrent = currentUrls.length === 2 && historicalUrls.length > 0
+    && !currentUrls.some(url => historicalUrls.includes(url));
+  const typedCurrent = rows.some(row => row.event_type === 'auction' && currentUrls.includes(row.source_url));
+  const terminalCurrent = rows.some(row => currentUrls.includes(row.source_url)
+    && (Number.isFinite(Date.parse(row.sold_at || ''))
+      || ['sold', 'reserve_not_met', 'no_sale', 'unsold', 'ended', 'expired', 'cancelled', 'canceled'].includes(String(row.event_status || '').toLowerCase())));
+  if (distinctCurrent && typedCurrent && !terminalCurrent && ['active', 'live'].includes(candidate?.listing_status)
+    && Date.parse(candidate?.end_date || '') > Date.now()) return candidate;
+  return buildAuctionPulseFromExternalListings(rows.filter(row =>
+    !['active', 'live'].includes(String(row.event_status || row.listing_status || '').toLowerCase())), vehicle.id);
+}
+
 const platformKey = (value: unknown) => String(value ?? '').toLowerCase().replace(/[_\-\s]+/g, '');
+export const AUCTION_FEED_FRESH_MS = 15 * 60 * 1000;
+export function hasFreshAuctionFeed(status: string | null, endDate: string | null, sourceAt: string | null | undefined, now = Date.now()): boolean {
+  const observed = sourceAt ? Date.parse(sourceAt) : NaN;
+  return ['active', 'live'].includes(status ?? '') && Date.parse(endDate ?? '') > now
+    && observed <= now && now - observed <= AUCTION_FEED_FRESH_MS;
+}
 const CLASSIFIED_PLATFORMS = new Set(['craigslist', 'facebookmarketplace', 'ksl', 'kslclassifieds', 'classiccars', 'autotrader', 'carscom', 'dealersite']);
 const AUCTION_PLATFORMS = new Set(['bat', 'bringatrailer', 'carsandbids', 'mecum', 'barrettjackson', 'rmsothebys', 'gooding', 'bonhams', 'pcarmarket', 'collectingcars', 'broadarrow', 'sbx', 'autohunter']);
 
@@ -35,6 +74,8 @@ export function isAuctionPresentation(row: any): boolean {
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port) return false;
     const host = url.hostname.replace(/^www\./, '');
     return (platform === 'hagerty' && host === 'hagerty.com' && /^\/marketplace\/auction\//.test(url.pathname))
+      || (platform === 'purplewave' && type === 'auction' && host === 'purplewave.com'
+        && /^\/auction\/[A-Za-z0-9]+\/item\/[A-Za-z0-9]+\/?$/.test(url.pathname))
       || (platform === 'hemmings' && host === 'hemmings.com' && /^\/auctions?\//.test(url.pathname));
   } catch { return false; }
 }
@@ -48,7 +89,7 @@ export function buildAuctionPulseFromReadResult(result: { data: any[] | null; er
 
 export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForRows: string): any | null {
   // vehicle_events is the canonical reader; its IDs must not enter the legacy listing sync writer.
-  const arr = (Array.isArray(rows) ? rows : []).filter(isAuctionPresentation).map((r) => r?.source_url ? {
+  const arr = (Array.isArray(rows) ? rows : []).filter(r => !r?.duplicate_of_event_id).filter(isAuctionPresentation).map((r) => r?.source_url ? {
     ...r, id: null, platform: r.source_platform, listing_url: r.source_url,
     listing_status: r.event_status, end_date: r.ended_at, current_bid: r.current_price,
   } : r).filter((r) => r && r.listing_url && r.platform);
@@ -238,6 +279,7 @@ export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForR
       listing_status: mergedStatus,
       end_date: mergedEndDate,
       current_bid: mergedCurrentBid,
+      currency_code: best?.currency_code || null,
       bid_count: pickNum('bid_count'),
       watcher_count: pickNum('watcher_count'),
       view_count: pickNum('view_count'),
@@ -246,6 +288,7 @@ export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForR
       sold_at: soldAt,
       last_bid_at: best?.metadata?.live_stream?.last_bid_at || null,
       last_comment_at: best?.metadata?.live_stream?.last_comment_at || null,
+      source_observed_at: best?.metadata?.live_stream?.last_frame_received_at || best?.metadata?.source_observed_at || null,
       updated_at: updatedAt,
       metadata: (best?.metadata && typeof best.metadata === 'object') ? best.metadata : null,
       _vehicle_id: vehicleIdForRows,

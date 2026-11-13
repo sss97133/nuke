@@ -17,8 +17,8 @@ import { SECTIONS } from './useWiringMap';
 import { publicName, type Rel, type SiteFiles, type WsIndex } from './useWorkspaceSelection';
 import {
   HOME_DIR, LAYERS, LAYER_NODES, TRUCK_TWIN, TRUE_PARTS, VIEWS, ZONES, ZONE_HIDES, ZONE_TWIN, fitDistance, nameMatcher, objectLabel, partMatrix, partMatrixOn,
-  twinBox, zoneOfY,
-  type TruePart, type ViewId, type ZoneId,
+  scene3dPatch, twinBox, zoneOfY,
+  type CamId, type Scene3dParams, type TruePart, type ViewId, type ZoneId,
 } from './scene3d';
 
 const TRUCK_BOX = twinBox(TRUCK_TWIN);
@@ -63,13 +63,18 @@ function ownMaterials(scene: THREE.Object3D): THREE.Object3D {
   return c;
 }
 
-export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear }: {
+// `init`: the scene a link names (camera, layers, harness zones; read once). `client`: no engineering chrome (no object
+// list, hover or selection tags, harness switches), only the view picker, FIT and the layer switches. `onScene`: told the
+// URL parameters that describe what is drawn each time a switch changes them. `linkBase`: the path a LINK THIS VIEW copy
+// points at (else the current page).
+export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear, init, client = false, onScene, linkBase }: {
   cw: Colorway; ix: WsIndex; site: SiteFiles; sel: string | null; rel: Rel; onSelect: (id: string) => void; onClear?: () => void;
+  init?: Scene3dParams; client?: boolean; onScene?: (patch: Record<string, string | null>) => void; linkBase?: string;
 }) {
   const reg = useMemo(() => new Registry(), []);
   const [ver, setVer] = useState(0);
   useEffect(() => reg.subscribe(() => setVer(reg.version)), [reg]);
-  const [zones, setZones] = useState<Set<ZoneId>>(() => new Set(['bay']));
+  const [zones, setZones] = useState<Set<ZoneId>>(() => init?.zones ?? new Set<ZoneId>(['bay']));
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
   const [focus, setFocus] = useState<string | null>(null);        // a list row that is not a workspace selection
   const [listOpen, setListOpen] = useState(false);
@@ -82,7 +87,10 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   const homed = useRef(false);
   const layerFiles = useLayerFiles();
   const [layerOn, setLayerOn] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(LAYERS.filter(l => l.off).map(l => [l.id, false])));
+    () => init?.layers ? Object.fromEntries(LAYERS.map(l => [l.id, init.layers!.has(l.id)]))
+      : Object.fromEntries(LAYERS.filter(l => l.off).map(l => [l.id, false])));
+  const [linkNote, setLinkNote] = useState<string | null>(null);
+  const layersKnown = Object.keys(layerFiles).length > 0;   // the HEAD probes have answered
 
   // what the loaded layers and parts replace in the zone GLBs (only once they are drawn)
   const hidePats: string[] = [...ZONE_HIDES], keepPats: string[] = [], layerPats: Record<string, string[]> = {};
@@ -128,19 +136,46 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   useEffect(() => {
     const p = pending.current;
     if (!rig.current) return;
-    // the first view waits for a zone (a part alone is too small to frame) and for the orbit controls
-    if (!homed.current && ZONES.some(z => reg.has('zone:' + z.id)) && rig.current.fit(homeBox(), HOME_DIR)) homed.current = true;
+    // the first view waits for what it frames: an open zone (a part alone is too small to frame), or with the harness
+    // off a layer; a link that names a camera or a pose also waits for every layer it draws (a fit frames them)
+    if (!homed.current && layersKnown) {
+      const wanted = LAYERS.filter(l => layerFiles[l.id] && layerOn[l.id] !== false);
+      const named = !!(init?.cam || init?.pose);
+      const ready = (zones.size ? ZONES.some(z => zones.has(z.id) && reg.has('zone:' + z.id)) : wanted.some(l => reg.has('layer:' + l.id)) || !wanted.length)
+        && (!named || wanted.every(l => reg.has('layer:' + l.id)));
+      if (ready && startView()) homed.current = true;
+    }
     if (!p) return;
     if (p.fitSel) {
       const pr = selPred(); if (!pr) { pending.current = null; return; }
       const b = reg.box(pr); if (b.isEmpty()) return;
       pending.current = null; rig.current.fit(b);
     }
-  }, [ver]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ver, layersKnown, layerFiles]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // the first view: the link's pose or camera, else the open harness zones. It snaps (nothing to fly from).
+  const startView = (): boolean => {
+    const r = rig.current; if (!r) return false;
+    if (init?.pose) { const q = init.pose; return r.place(new THREE.Vector3(q[0], q[1], q[2]), new THREE.Vector3(q[3], q[4], q[5]), true); }
+    if (init?.cam) return camView(init.cam, true);
+    return r.fit(homeBox(), HOME_DIR, true);
+  };
+  // a named view; `snap` skips the flight. The harness zones stay as they are (a link with the harness off keeps it off).
+  const camView = (id: CamId, snap = false): boolean => {
+    const r = rig.current; if (!r) return false;
+    if (id === 'fit') { const b = allBox(); return !b.isEmpty() && r.fit(b, HOME_DIR, snap); }
+    const v = VIEWS.find(x => x.id === id); if (!v) return false;
+    if (v.zone) return r.fit(twinBox(ZONE_TWIN[v.zone]), v.dir, snap);
+    const b = allBox();
+    return !b.isEmpty() && r.fit(b, v.dir, snap);
+  };
 
   const allBox = () => { const b = reg.box(() => true), c = b.clone().intersect(TRUCK_BOX); return c.isEmpty() ? b : c; };
   // the first view and RESET frame the open harness zones (a frame layer runs the truck's whole length)
-  const homeBox = () => { const b = new THREE.Box3(); zones.forEach(z => b.union(twinBox(ZONE_TWIN[z]))); return b; };
+  const homeBox = () => {
+    const b = new THREE.Box3(); zones.forEach(z => b.union(twinBox(ZONE_TWIN[z])));
+    return zones.size ? b : twinBox(ZONE_TWIN.bay);   // harness off: the engine bay's stations still frame the sheet metal
+  };
   const runView = (id: ViewId) => {
     const v = VIEWS.find(x => x.id === id); if (!v || !rig.current) return;
     if (v.zone) {   // a zone view frames the zone's stations and loads its harness if it isn't open
@@ -191,6 +226,31 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   const listed = ql ? rows.filter(r => r.label.toLowerCase().includes(ql)) : rows;
   const KIND_WORD: Record<Kind, string> = { part: 'TRUE-SIZE PARTS', end: 'ENDS', loom: 'LOOM SEGMENTS', other: 'OTHER OBJECTS' };
 
+  const toggleZone = (id: ZoneId) => {
+    const n = new Set(zones);
+    if (n.has(id)) { if (n.size > 1) n.delete(id); } else n.add(id);   // the buttons keep one zone open; only a link sets none
+    setZones(n); onScene?.(scene3dPatch(n, layerOn));
+  };
+  const toggleLayer = (id: string) => {
+    const n = { ...layerOn, [id]: layerOn[id] === false };
+    setLayerOn(n); onScene?.(scene3dPatch(zones, n));
+  };
+  // LINK THIS VIEW: the camera as it is now plus what is drawn, copied as a link (the author orbits, then copies)
+  const linkThisView = () => {
+    const q = rig.current?.pose(); if (!q) return;
+    const patch = { ...scene3dPatch(zones, layerOn), pose: q.map(v => v.toFixed(3)).join(',') };
+    const u = new URL(linkBase ?? window.location.pathname, window.location.origin);
+    if (!linkBase) new URLSearchParams(window.location.search).forEach((v, k) => u.searchParams.set(k, v));
+    Object.entries(patch).forEach(([k, v]) => u.searchParams.set(k, v));
+    if (init?.tone === 'aces') u.searchParams.set('tone', 'aces');
+    if (!linkBase) u.searchParams.delete('cam');
+    u.searchParams.delete('client');   // a shared link opens as the client view
+    onScene?.({ ...patch, cam: null });
+    const done = (m: string) => { setLinkNote(m); window.setTimeout(() => setLinkNote(null), 2500); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(u.toString()).then(() => done('LINK COPIED'), () => done(u.toString()));
+    else done(u.toString());
+  };
+
   const btn = (on = false): React.CSSProperties => ({
     background: on ? cw.ink : cw.surface, color: on ? cw.surface : cw.ink, border: frame(cw), fontFamily: cw.fontBody,
     fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, padding: '3px 7px', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -200,15 +260,15 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
   return (
     <div style={{ position: 'relative', height: '100%', background: cw.surface, overflow: 'hidden' }}>
       <Canvas camera={{ position: [2.4, 1.7, 2.6], fov: 32, near: 0.01, far: 200 }} dpr={[1, 2]} style={{ background: cw.surface }}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}>
-        <Studio />
+        gl={{ antialias: true, toneMapping: init?.tone === 'aces' ? THREE.ACESFilmicToneMapping : THREE.NeutralToneMapping, toneMappingExposure: init?.tone === 'aces' ? 1.05 : 1 }}>
+        <Studio size={narrow ? 512 : 1024} />
         <ambientLight intensity={0.05} />
         <directionalLight position={[3, 5, 4]} intensity={0.7} />
         <directionalLight position={[-4, 3, -3]} intensity={0.25} />
         {ZONES.filter(z => zones.has(z.id)).map(z => (
           <Suspense key={z.id} fallback={null}><ZoneScene zone={z.id} url={z.url} ix={ix} reg={reg} hides={hides} /></Suspense>
         ))}
-        {TRUE_PARTS.filter(p => zones.has(p.zone) && site.ends[p.code]).map(p => (
+        {TRUE_PARTS.filter(p => (zones.has(p.zone) || zones.size === 0) && site.ends[p.code]).map(p => (
           <Suspense key={p.code} fallback={null}>
             <PartScene part={p} spot={site.ends[p.code].xyz} ix={ix} reg={reg}
               mountAt={p.mount && layerOn[p.mount.layer] !== false ? reg.find('layer:' + p.mount.layer, p.mount.node) : null} />
@@ -218,8 +278,8 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
           <Suspense key={l.id} fallback={null}><LayerScene id={l.id} url={l.url} ix={ix} reg={reg} hidden={(layerPats[l.id] ?? []).join('|')} /></Suspense>
         ))}
         <Highlighter reg={reg} ver={ver} sel={sel} rel={rel} hover={hover?.key ?? null} focus={focus} accent={cw.accent} />
-        <Picker reg={reg} onHover={setHover} onPick={key => { setFocus(null); onSelect(key); }} />
-        <SelectionTag reg={reg} ver={ver} pred={selPred()} cw={cw} lines={tagLines()} />
+        {!client && <Picker reg={reg} onHover={setHover} onPick={key => { setFocus(null); onSelect(key); }} />}
+        {!client && <SelectionTag reg={reg} ver={ver} pred={selPred()} cw={cw} lines={tagLines()} />}
         <OrbitControls makeDefault enableDamping dampingFactor={0.08} maxDistance={40} />
         <Rig ref={rig} />
       </Canvas>
@@ -232,37 +292,41 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
             <button key={id} style={{ ...btn(), borderLeftWidth: i ? 0 : 2 }} onClick={() => runView(id)}>{id === 'bay' && narrow ? 'BAY' : VIEW_WORD[id]}</button>
           ))}
         </span>
-        <button style={btn()} title={sel ? 'Fit the selection' : 'Fit everything drawn'} onClick={() => (sel ? fitSelection() : rig.current?.fit(allBox()))}>FIT</button>
-        <button style={btn(moreOpen)} aria-expanded={moreOpen} onClick={() => { setMoreOpen(o => !o); setListOpen(false); }}>MORE {moreOpen ? '▴' : '▾'}</button>
-        <button style={btn(listOpen)} aria-expanded={listOpen} onClick={() => { setListOpen(o => !o); setMoreOpen(false); }}>OBJECTS</button>
+        <button style={btn()} title={sel ? 'Fit the selection' : 'Fit everything drawn'} onClick={() => (sel && !client ? fitSelection() : rig.current?.fit(allBox()))}>FIT</button>
+        <button style={btn(moreOpen)} aria-expanded={moreOpen} onClick={() => { setMoreOpen(o => !o); setListOpen(false); }}>{client ? 'LAYERS' : 'MORE'} {moreOpen ? '▴' : '▾'}</button>
+        {!client && <button style={btn(listOpen)} aria-expanded={listOpen} onClick={() => { setListOpen(o => !o); setMoreOpen(false); }}>OBJECTS</button>}
       </div>
       {moreOpen && (
         <div style={{ position: 'absolute', left: 8, top: 40, zIndex: 11, background: cw.surface, border: frame(cw), padding: '6px 8px', display: 'grid', gap: 6, maxWidth: 'calc(100% - 16px)' }}>
-          <MoreRow cw={cw} label="VIEW">
-            {MORE_VIEWS.map(id => <button key={id} style={btn()} onClick={() => runView(id)}>{VIEW_WORD[id]}</button>)}
-            <button style={btn()} onClick={() => rig.current?.fit(homeBox(), HOME_DIR)}>RESET</button>
-          </MoreRow>
-          <MoreRow cw={cw} label="HARNESS">
-            {ZONES.map(z => (
-              <button key={z.id} style={btn(zones.has(z.id))} aria-pressed={zones.has(z.id)} title={`${zones.has(z.id) ? 'Hide' : 'Load'} the ${z.label.toLowerCase()} harness`}
-                onClick={() => setZones(s => { const n = new Set(s); if (n.has(z.id)) { if (n.size > 1) n.delete(z.id); } else n.add(z.id); return n; })}>
-                {zones.has(z.id) ? '☑' : '☐'} {z.short}
-              </button>
-            ))}
-          </MoreRow>
+          {!client && (
+            <MoreRow cw={cw} label="VIEW">
+              {MORE_VIEWS.map(id => <button key={id} style={btn()} onClick={() => runView(id)}>{VIEW_WORD[id]}</button>)}
+              <button style={btn()} onClick={() => rig.current?.fit(homeBox(), HOME_DIR)}>RESET</button>
+            </MoreRow>
+          )}
+          {!client && (
+            <MoreRow cw={cw} label="HARNESS">
+              {ZONES.map(z => (
+                <button key={z.id} style={btn(zones.has(z.id))} aria-pressed={zones.has(z.id)} title={`${zones.has(z.id) ? 'Hide' : 'Load'} the ${z.label.toLowerCase()} harness`}
+                  onClick={() => toggleZone(z.id)}>
+                  {zones.has(z.id) ? '☑' : '☐'} {z.short}
+                </button>
+              ))}
+            </MoreRow>
+          )}
           {LAYERS.some(l => layerFiles[l.id]) && (
             <MoreRow cw={cw} label="LAYERS">
               {LAYERS.filter(l => layerFiles[l.id]).map(l => (
                 <button key={l.id} style={btn(layerOn[l.id] !== false)} aria-pressed={layerOn[l.id] !== false}
-                  onClick={() => setLayerOn(s => ({ ...s, [l.id]: s[l.id] === false }))}>{layerOn[l.id] !== false ? '☑' : '☐'} {l.label}</button>
+                  onClick={() => toggleLayer(l.id)}>{layerOn[l.id] !== false ? '☑' : '☐'} {l.label}</button>
               ))}
-              {LAYERS.filter(l => l.credit && layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
+              {!client && LAYERS.filter(l => l.credit && layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
                 <a key={l.id + ':credit'} href={l.credit!.href} target="_blank" rel="noreferrer"
                   style={{ color: cw.ink, fontFamily: cw.fontBody, fontSize: 10, opacity: 0.7 }}>{l.credit!.text}</a>
               ))}
             </MoreRow>
           )}
-          <MoreRow cw={cw} label="TURN">
+          {!client && <MoreRow cw={cw} label="TURN">
             <button style={padBtn} title="Turn left" onClick={() => rig.current?.orbit(-0.26, 0)}>◀</button>
             <button style={padBtn} title="Turn right" onClick={() => rig.current?.orbit(0.26, 0)}>▶</button>
             <button style={padBtn} title="Turn up" onClick={() => rig.current?.orbit(0, -0.26)}>▲</button>
@@ -271,19 +335,27 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
             <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6, color: cw.inkMuted }}>ZOOM</span>
             <button style={padBtn} title="Zoom in" onClick={() => rig.current?.zoom(0.75)}>+</button>
             <button style={padBtn} title="Zoom out" onClick={() => rig.current?.zoom(1.33)}>−</button>
-          </MoreRow>
-          <MoreRow cw={cw} label="PAN">
-            <button style={padBtn} title="Pan left" onClick={() => rig.current?.pan(-0.12, 0)}>←</button>
-            <button style={padBtn} title="Pan right" onClick={() => rig.current?.pan(0.12, 0)}>→</button>
-            <button style={padBtn} title="Pan up" onClick={() => rig.current?.pan(0, 0.12)}>↑</button>
-            <button style={padBtn} title="Pan down" onClick={() => rig.current?.pan(0, -0.12)}>↓</button>
-          </MoreRow>
-          <div style={{ fontSize: 10, color: cw.inkMuted, maxWidth: 330 }}>DRAG TO TURN · RIGHT-DRAG TO PAN · SCROLL OR PINCH TO ZOOM · CLICK A PART OR LOOM · ESC CLEARS</div>
+          </MoreRow>}
+          {!client && (
+            <MoreRow cw={cw} label="PAN">
+              <button style={padBtn} title="Pan left" onClick={() => rig.current?.pan(-0.12, 0)}>←</button>
+              <button style={padBtn} title="Pan right" onClick={() => rig.current?.pan(0.12, 0)}>→</button>
+              <button style={padBtn} title="Pan up" onClick={() => rig.current?.pan(0, 0.12)}>↑</button>
+              <button style={padBtn} title="Pan down" onClick={() => rig.current?.pan(0, -0.12)}>↓</button>
+            </MoreRow>
+          )}
+          {!client && (
+            <MoreRow cw={cw} label="LINK">
+              <button style={btn()} title="Copy a link to this camera and these layers" onClick={linkThisView}>LINK THIS VIEW</button>
+              {linkNote && <span style={{ fontSize: 10, color: cw.inkMuted, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }}>{linkNote}</span>}
+            </MoreRow>
+          )}
+          {!client && <div style={{ fontSize: 10, color: cw.inkMuted, maxWidth: 330 }}>DRAG TO TURN · RIGHT-DRAG TO PAN · SCROLL OR PINCH TO ZOOM · CLICK A PART OR LOOM · ESC CLEARS</div>}
         </div>
       )}
 
       {/* the object list: every thing drawn; a row flies there */}
-      {listOpen && (
+      {listOpen && !client && (
         <div style={{ position: 'absolute', left: 8, top: 44, bottom: 8, width: 'min(300px, 70%)', display: 'flex', flexDirection: 'column', background: cw.surface, border: frame(cw), zIndex: 11 }}>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="FIND AN OBJECT" aria-label="Find an object in the 3D view" autoFocus
             style={{ border: 'none', borderBottom: rule(cw), background: cw.surface, color: cw.ink, fontFamily: cw.fontBody, fontSize: 12, padding: '6px 8px' }} />
@@ -306,12 +378,16 @@ export default function ZoneModels3D({ cw, ix, site, sel, rel, onSelect, onClear
         </div>
       )}
 
-      {hover && (
+      {hover && !client && (
         <div style={{ position: 'absolute', left: hover.x + 14, top: hover.y + 12, pointerEvents: 'none', zIndex: 12, background: cw.surface, border: frame(cw),
           padding: '2px 6px', fontSize: 11, fontFamily: cw.fontMono, color: cw.ink, whiteSpace: 'nowrap', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {labelOf(hover.key)}
         </div>
       )}
+      {client && LAYERS.filter(l => l.credit && layerFiles[l.id] && layerOn[l.id] !== false).map(l => (
+        <a key={l.id + ':credit'} href={l.credit!.href} target="_blank" rel="noreferrer"
+          style={{ position: 'absolute', left: 8, bottom: 6, zIndex: 10, color: cw.ink, fontFamily: cw.fontBody, fontSize: 10, opacity: 0.7, maxWidth: 'calc(100% - 16px)' }}>{l.credit!.text}</a>
+      ))}
       {note && (
         <div style={{ position: 'absolute', left: '50%', top: 48, transform: 'translateX(-50%)', zIndex: 12, background: cw.surface, border: frame(cw), padding: '3px 8px', fontSize: 11, fontWeight: 700 }}>{note}</div>
       )}
@@ -372,18 +448,18 @@ function boothScene(): THREE.Scene {
     m.position.set(x, y, z);
     s.add(m);
   };
-  const room = new THREE.Mesh(new THREE.BoxGeometry(W, H, L), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.40, 0.40, 0.42), side: THREE.BackSide }));
+  const room = new THREE.Mesh(new THREE.BoxGeometry(W, H, L), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.10, 0.10, 0.105), side: THREE.BackSide }));
   room.position.set(0, H / 2 - EYE, 0);
   s.add(room);
   box(W - 0.02, 0.01, L - 0.02, 0, H - EYE - 0.02, 0, 0.7);          // white ceiling
-  box(W - 0.02, 0.01, L - 0.02, 0, -EYE + 0.01, 0, 0.34);             // grey concrete floor
+  box(W - 0.02, 0.01, L - 0.02, 0, -EYE + 0.01, 0, 0.12);             // grey concrete floor
   for (let i = 0; i < 6; i++) for (const x of [-W / 2 + 0.03, W / 2 - 0.03])   // the low light row along both walls
     box(0.02, 0.25, 1.2, x, -0.65, -4 + i * 1.6, 7.0, 0.96);             // (0.55 m off the floor: what a vertical panel
   for (const x of [-2.4, -0.8, 0.8, 2.4]) for (const z of [-L / 2 + 0.03, L / 2 - 0.03])   // mirrors from above)
     box(1.2, 0.25, 0.02, x, -0.65, z, 7.0, 0.96);
   for (const x of [-1.6, 0, 1.6]) for (let i = 0; i < 6; i++)          // the ceiling rows mirrored in the sealed floor
     box(0.6, 0.02, 1.2, x, -EYE + 0.03, -4 + i * 1.6, 2.2, 0.96);
-  box(W - 0.1, H - 0.1, 0.02, 0, H / 2 - EYE, -L / 2 + 0.02, 0.30);   // filter wall at the far end
+  box(W - 0.1, H - 0.1, 0.02, 0, H / 2 - EYE, -L / 2 + 0.02, 0.05);   // filter wall at the far end
   for (const x of [-1.6, 0, 1.6]) for (let i = 0; i < 6; i++)          // ceiling panels: three rows of six
     box(0.6, 0.02, 1.2, x, H - EYE - 0.04, -4 + i * 1.6, 8.0, 0.96);
   for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) {               // the slanted ceiling-to-wall rows
@@ -398,15 +474,15 @@ function boothScene(): THREE.Scene {
   return s;
 }
 
-function Studio() {
+function Studio({ size }: { size: number }) {
   const { gl, scene } = useThree();
   useEffect(() => {
     const pm = new THREE.PMREMGenerator(gl);
-    const env = pm.fromScene(boothScene(), 0.02).texture;
+    const env = pm.fromScene(boothScene(), 0.01, 0.1, 100, { size }).texture;
     scene.environment = env;
     scene.environmentIntensity = 1.0;
     return () => { scene.environment = null; env.dispose(); pm.dispose(); };
-  }, [gl, scene]);
+  }, [gl, scene, size]);
   return null;
 }
 
@@ -607,7 +683,10 @@ function SelectionTag({ reg, ver, pred, lines, cw }: { reg: Registry; ver: numbe
 
 // camera flights: every button moves the camera and the orbit target together over a short eased move
 interface RigApi {
-  fit: (box: THREE.Box3, dir?: [number, number, number]) => boolean;
+  fit: (box: THREE.Box3, dir?: [number, number, number], snap?: boolean) => boolean;
+  place: (position: THREE.Vector3, target: THREE.Vector3, snap?: boolean) => boolean;   // the camera and its orbit target, scene metres
+  pose: () => number[] | null;                                                             // px,py,pz,tx,ty,tz
+
   orbit: (dAzimuth: number, dPolar: number) => void;
   pan: (fx: number, fy: number) => void;
   zoom: (factor: number) => void;
@@ -622,18 +701,28 @@ const Rig = forwardRef<RigApi>(function Rig(_props, ref) {
     camera.position.lerpVectors(t.p0, t.p1, k); controls.target.lerpVectors(t.t0, t.t1, k); controls.update();
     if (u >= 1) { tw.current = null; controls.enableDamping = true; }
   });
-  const fly = (p1: THREE.Vector3, t1: THREE.Vector3) => {
+  const fly = (p1: THREE.Vector3, t1: THREE.Vector3, snap = false) => {
     if (!controls) return;
+    if (snap) { tw.current = null; camera.position.copy(p1); controls.target.copy(t1); controls.update(); return; }
     controls.enableDamping = false;
     tw.current = { p0: camera.position.clone(), p1, t0: controls.target.clone(), t1, s: performance.now() };
   };
   useImperativeHandle(ref, () => ({
-    fit(box, dir) {
+    fit(box, dir, snap) {
       if (box.isEmpty() || !controls) return false;
       const d = dir ? new THREE.Vector3(...dir).normalize() : camera.position.clone().sub(controls.target).normalize();
       const c = box.getCenter(new THREE.Vector3());
-      fly(c.clone().addScaledVector(d, fitDistance(box, d, camera)), c);
+      fly(c.clone().addScaledVector(d, fitDistance(box, d, camera)), c, snap);
       return true;
+    },
+    place(p, t, snap) {
+      if (!controls) return false;
+      fly(p.clone(), t.clone(), snap);
+      return true;
+    },
+    pose() {
+      if (!controls) return null;
+      return [camera.position.x, camera.position.y, camera.position.z, controls.target.x, controls.target.y, controls.target.z];
     },
     orbit(dAz, dPol) {
       if (!controls) return;

@@ -194,7 +194,8 @@ const TablePage: React.FC = () => {
           .limit(500),
         // Source slugs for the kinds we'll merge
         supabase.from('observation_sources').select('id, slug'),
-        supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId, p_include_reported: true }),
+        // The table reads work_records and reported_work only; the visual work cards and cost ledger are not sent.
+        supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId, p_include_reported: true, p_include_visual: false }),
       ]);
 
       // A missing opt-in overload during deployment/rollback must not remove

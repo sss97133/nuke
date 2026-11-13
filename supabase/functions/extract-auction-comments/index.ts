@@ -5,7 +5,7 @@
 
 import { isBatSystemSoldComment, parseBatPageResult, plausibleBatSalePrice } from './batResult.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
+import { DOMParser, type Element } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { softWrite } from '../_shared/writeResult.ts';
@@ -447,13 +447,13 @@ Deno.serve(async (req) => {
       }
     
     for (let i = 0; i < commentElements.length; i++) {
-      const el = commentElements[i]
+      const el = commentElements[i] as Element
       
       // Extract fields - try multiple patterns
       let dateText = el.querySelector('.comment-datetime')?.textContent?.trim() || ''
       
       // Try to find author link first (most reliable)
-      const authorLink = el.querySelector('a[href*="/member/"]') as HTMLAnchorElement | null
+      const authorLink = el.querySelector('a[href*="/member/"]')
       let authorRaw = authorLink?.textContent?.trim() || ''
       
       // If no author link, try other selectors
@@ -905,7 +905,7 @@ Deno.serve(async (req) => {
           softWrite('vehicle_events update (counts)', await supabase
             .from('vehicle_events')
             .update({
-              comment_count: batCommentRows.length,
+              comment_count: commentsWithIdentities.length,
               bid_count: bidRows.length,
               current_price: inferredFinalPrice || (maxBid > 0 ? Math.floor(maxBid) : undefined),
               final_price: inferredFinalPrice ?? undefined,
@@ -922,19 +922,8 @@ Deno.serve(async (req) => {
       writeErrors.push(`BaT table upserts: ${e?.message || String(e)}`)
     }
 
-    // Trigger AI analysis on comments (async, don't wait)
-    if (comments.length > 0 && vehicleId) {
-      const serviceKey = projectSecretKey() ?? ''
-      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/discover-from-observations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceKey}`,
-        },
-        body: JSON.stringify({ vehicle_id: vehicleId, kinds: ['comment'], discovery_types: ['sentiment', 'themes'] }),
-        signal: AbortSignal.timeout(30000),
-      }).then(res => res.text().catch(() => {})).catch(e => console.error('Failed to trigger analysis:', e instanceof Error ? e.message : String(e)))
-    }
+    // No model call here. The profile's comment summary is written once per closed lot by the scheduled
+    // batch-comment-discovery run (cron comment-summary-recent-closes), which reads auction_comments.
 
     return new Response(JSON.stringify({
       success: writeErrors.length === 0,

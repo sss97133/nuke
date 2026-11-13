@@ -139,6 +139,42 @@ function assert(condition: boolean, message: string) {
 const OPENAI_NO_CREDITS =
   '{"success":false,"error":"OpenAI API error: 429 - {\\n \\"error\\": {\\n \\"message\\": \\"You have no credits remaining. Add credits to continue using the API';
 
+Deno.test("Vicari preview preserves ahid and performs no extraction or writes", async () => {
+  const r = await ingest({ url: "https://www.vicariauction.com/auction-house/5/?ahid=123", preview: true });
+  equal([r.result.status, r.result.source, r.result.external_id], ["preview", "vicari", "123"]);
+  equal(extractorCalls(), []); equal(writes(), []);
+});
+
+for (const url of ["https://www.grautogallery.com/vehicles/b1234-j/1995-ford-f150?utm_source=x", "https://www.streetsideclassics.com/about-us", "http://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150"]) {
+  Deno.test("invalid native dealer URL cannot reach generic extraction: " + url, async () => {
+    const r = await ingest({ url }); equal(r.result.status, "rejected"); equal(r.result.reason, "dealer_listing_url_invalid");
+    equal(extractorCalls(), []); equal(writes(), []);
+  });
+}
+
+for (const url of ["https://www.grautogallery.com/vehicles/b1234-j/1995-ford-f150", "https://www.streetsideclassics.com/vehicles/42-det/1995-ford-f150"]) {
+  Deno.test("native dealer refuses unregistered source even with caller fields and enrich false: " + url, async () => {
+    const r = await ingest({ url, year: 1995, make: "Ford", model: "F150", description: "caller text", enrich: false });
+    equal(r.result.status, "rejected"); assert(r.result.reason.includes("dealer_source_not_registered"), "registered source required");
+    equal(extractorCalls(), []); equal(writes(), []);
+  });
+}
+
+Deno.test("Gateway requires verified native source capture even with caller fields and enrich false", async () => {
+  const r = await ingest({ url: "https://www.gatewayclassiccars.com/vehicles/det/42/1995-ford-f150",
+    year: 1995, make: "Ford", model: "F150", description: "caller text", enrich: false });
+  equal([r.result.status, r.result.source], ["rejected", "gateway_classics"]);
+  assert(r.result.reason.includes("gateway_source_not_registered"), "native source refusal must survive");
+  equal(extractorCalls(), []); equal(writes(), []);
+});
+
+Deno.test("Vicari refuses an unregistered source instead of falling back to AI or caller fields", async () => {
+  const r = await ingest({ url: "https://www.vicariauction.com/auction-house/?ahid=123",
+    year: 1967, make: "Ford", model: "Mustang", description: "caller text", enrich: false });
+  equal([r.result.status, r.result.error], ["error", "vicari_source_not_registered"]);
+  equal(extractorCalls(), []); equal(writes(), []);
+});
+
 const SLUG_VENUES: Array<{ platform: string; url: string; extractor: string }> = [
   { platform: "classiccars", url: "https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128", extractor: "extract-classiccars" },
   { platform: "mecum", url: "https://www.mecum.com/lots/1177355/2005-hummer-h2", extractor: "extract-mecum" },
@@ -621,5 +657,33 @@ Deno.test({
       equal([receipt.searchParams.get("id"), receipt.searchParams.get("platform"), receipt.searchParams.get("success")],
         [`eq.${cachedArchive.id}`, "eq.craigslist", "eq.true"]);
     } finally { cachedArchive = null; handler = ingestHandler; }
+  },
+});
+
+Deno.test({
+  name: "PurpleWave EX2391 admits the source Dodge and complete VIN through the real quality gate",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    persistedVehicle = null; clWorld = null;
+    const { result } = await ingest({ url: "https://www.purplewave.com/auction/261111/item/EX2391",
+      year: 2012, make: "Dodge", model: "Ram 2500", vin: "3C6LD5AT0CG145618", enrich: false,
+      description: "2012 Dodge Ram 2500 bale bed pickup truck. Miles: 157,236 on odometer. VIN: 3C6LD5AT0CG145618. Engine: 5.7L V8 gas. Automatic transmission. Four wheel drive. Kansas title." });
+    equal(result.status, "created");
+    const row = JSON.parse(vehicleInserts()[0].body!);
+    equal([row.make, row.vin], ["Dodge", "3C6LD5AT0CG145618"]);
+    equal(extractorCalls(), []);
+  },
+});
+Deno.test({
+  name: "PurpleWave incompatible Ford claim with the same VIN is rejected before vehicle writes",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    persistedVehicle = null; clWorld = null;
+    const { result } = await ingest({ url: "https://www.purplewave.com/auction/261111/item/EX2391",
+      year: 2012, make: "Ford", model: "F-250", vin: "3C6LD5AT0CG145618", enrich: false,
+      description: "Claimed Ford pickup truck with explicit VIN 3C6LD5AT0CG145618. Automatic transmission, four wheel drive, Kansas title." });
+    equal(result.status, "rejected");
+    assert(result.reason.includes("vin_make_mismatch"), "genuine manufacturer mismatch remains blocked");
+    equal(vehicleInserts().length, 0);
   },
 });

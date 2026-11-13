@@ -4,21 +4,26 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import type { ProfileRead } from './profileDocument';
 const fixture = vi.hoisted(() => ({ vehicle: {} as Record<string, unknown>, pulse: null as Record<string, unknown> | null, read: null as ProfileRead | null,
-  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn() }));
+  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn(), gallery: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
   let vehicleId: string;
   const query: any = { select: () => query, eq: (_key: string, id: string) => { vehicleId = id; return query; },
     order: () => query, limit: () => fixture.request(table, vehicleId) };
   return query;
 } } }));
-vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, auctionPulse: fixture.pulse }) }));
+vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, auctionPulse: fixture.pulse, setGalleryFilter: fixture.gallery }) }));
 vi.mock('./profileDocument', async (original) => {
   const real = await original<typeof import('./profileDocument')>();
   // The real document mapping over the fixture read, without a QueryClient: the fetch is the only thing mocked.
   return { ...real, useProfileDocument: (vehicleId: string | undefined, priceOwnedByLiveStack: boolean) =>
     vehicleId && fixture.read ? real.profileDocumentFrom(fixture.read, priceOwnedByLiveStack) : null };
 });
-vi.mock('../stacks/VehicleCohort', () => ({ VehiclePerformance: ({ facet }: any) => <div>performance stack for {facet.label}</div> }));
+// A header token opens its line items; the item renderer has its own suite (HeaderTokenItems.test.tsx).
+vi.mock('./HeaderTokenItems', () => ({ default: ({ dimension, items }: any) => <div data-testid="token-items" data-dimension={dimension} data-items={items ? 'carried' : 'none'}>{dimension} line items</div> }));
+// This suite owns price provenance; the financial department has its own reader/interaction tests.
+vi.mock('./ProfileFinancials', () => ({ default: ({ market }: any) => <>{market}<button>$$$</button></> }));
+vi.mock('../../components/auction/ExternalAuctionLiveBanner', () => ({ default: () => null,
+  ExternalAuctionSummary: ({ currentBid }: any) => <button data-live-bid={currentBid}>Live episode</button> }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a href={to}>{children}</a> }));
 import ProfileHeader, { comparableLotKey, extractInlineLotProvenance } from './ProfileHeader';
@@ -58,9 +63,10 @@ beforeEach(() => {
   root = createRoot(host);
   fixture.vehicle = { id: 'v-1', year: 1966, make: 'Ford', model: 'Mustang', listing_kind: 'vehicle' };
   fixture.pulse = null;
+  fixture.gallery.mockReset();
   fixture.read = mustangRead();
   fixture.auctionRows = []; fixture.eventRows = [];
-  fixture.request.mockReset().mockImplementation((table: string) => Promise.resolve({ data: table === 'auction_events' ? fixture.auctionRows : fixture.eventRows, error: null }));
+  fixture.request.mockReset().mockImplementation((table: string) => Promise.resolve({ data: table === 'auction_events_canonical' ? fixture.auctionRows : fixture.eventRows, error: null }));
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
 const render = () => act(async () => root.render(<ProfileHeader priceLotId="lot-1" />));
@@ -76,6 +82,32 @@ function priceSource(vehicleId: string, url: string | null) {
 const auction = (source_url = 'https://bringatrailer.com/listing/x', extra = {}) => ({ vehicle_id: 'v-1', source_url,
   lot_number: 'EXACT-LOT', auction_end_date: '2025-02-03T04:05:06Z', broadcast_video_url: 'https://www.youtube.com/watch?v=exact_video',
   broadcast_timestamp_start: 125, broadcast_timestamp_end: 180, ...extra });
+
+it('says where the car is listed and what the listing waits on, only when the read carries it', async () => {
+  await renderLoaded();
+  expect(host.querySelector('.vp-header-listing')).toBeNull();
+  const read = mustangRead();
+  const masthead = read.sections[0];
+  if (masthead.kind === 'masthead') masthead.listing = { platform: 'bat', status: 'submitted', stage: 'draft_pending_approval', stage_since: '2026-11-03T21:44:33+00:00',
+    submitted_at: '2026-10-29T15:00:03+00:00', url: 'https://bringatrailer.com/listing/1973-pontiac-firebird-26/', visibility: 'tied' };
+  fixture.read = read;
+  await renderLoaded();
+  const line = host.querySelector('.vp-header-listing');
+  expect(line?.getAttribute('aria-label')).toBe("Bring a Trailer: draft pending the seller's approval since Nov 3, 2026");
+  expect(line?.textContent?.trim()).toBe('Pending');
+  expect(line?.querySelector('img')?.getAttribute('src')).toBe('/source-logos/bat.png');
+  expect(line?.querySelector('a')).toBeNull();
+  await act(async () => (line?.querySelector('button') as HTMLButtonElement).click());
+  const panel = document.body.querySelector('[aria-label="Listing"][role="group"]');
+  expect(panel?.textContent).toContain("Seller's approval of the draft");
+  expect(panel?.textContent).toContain('Nov 3, 2026');
+  expect(document.body.querySelector('a[href="https://bringatrailer.com/listing/1973-pontiac-firebird-26/"]')?.textContent).toContain('Open on Bring a Trailer');
+  if (masthead.kind === 'masthead') masthead.listing = { platform: 'bat', status: 'active', activated_at: '2026-11-10T16:00:00+00:00', url: 'https://bringatrailer.com/listing/x', visibility: 'public' };
+  fixture.read = { ...read };
+  await renderLoaded();
+  expect(host.querySelector('.vp-header-listing')?.getAttribute('aria-label')).toBe('Live on Bring a Trailer since Nov 10, 2026');
+  expect(host.querySelector('.vp-header-listing')?.textContent?.trim()).toBe('Live');
+});
 
 it('retains exact lot enrichment without changing the price owner or its source observation clock', async () => {
   fixture.auctionRows = [auction()];
@@ -155,7 +187,7 @@ it('keeps an errored response stale payload out and names the unavailable enrich
 });
 
 it('preserves an exact positive result when the other additive reader fails', async () => {
-  fixture.request.mockImplementation((table: string) => table === 'auction_events'
+  fixture.request.mockImplementation((table: string) => table === 'auction_events_canonical'
     ? Promise.resolve({ data: [auction()], error: null }) : Promise.reject(new Error('PRIVATE REJECTED READ')));
   await renderLoaded(); openPrice();
   expect(document.body.textContent).toContain('Lot EXACT-LOT');
@@ -283,7 +315,7 @@ it.each([
   expect(document.body.textContent).not.toContain('FOREIGN-IDENTITY');
 });
 
-it('renders identity, the typed price and the strip with its coverage, with no inline style', async () => {
+it('keeps one identity, price and contextual controls in the masthead without a coverage strip', async () => {
   await render();
   expect(host.querySelector('h1.k-entity')?.textContent).toContain('Mustang');
   const price = host.querySelector('.k-masthead__result button.k-claim__value') as HTMLButtonElement;
@@ -291,7 +323,9 @@ it('renders identity, the typed price and the strip with its coverage, with no i
   expect(host.textContent).toContain('Last recorded sale');
   expect(host.textContent).toContain('10,000 mi');
   expect(host.querySelectorAll('button.k-facet').length).toBe(5);
-  expect(host.textContent).toContain('1 of 6 facts attributed');
+  expect(host.textContent).not.toContain('facts attributed');
+  expect(host.querySelector('.vp-strip')).toBeNull();
+  expect(host.querySelectorAll('.vehicle-identity')).toHaveLength(1);
   expect(host.querySelector('[style]')).toBeNull();
   expect(host.style.getPropertyValue('--vp-h-masthead')).toMatch(/px$/);
 });
@@ -304,17 +338,68 @@ it('opens the price source with its platform, clock and the stack link', async (
   expect(document.body.querySelector('a[href="/stacks/order-book/v-1?lot=lot-1"]')).not.toBeNull();
 });
 
-it('a facet opens its source and the performance stack', async () => {
+it('a facet opens its line items and coordinates the photo topic without navigation', async () => {
   await render();
-  act(() => (host.querySelectorAll('button.k-facet')[0] as HTMLButtonElement).click());
-  expect(document.body.textContent).toContain('performance stack for Coupe');
-  expect(document.body.textContent).toContain('vehicle record');
+  await act(async () => (host.querySelectorAll('button.k-facet')[0] as HTMLButtonElement).click());
+  expect(document.body.textContent).toContain('body_style line items');
+  expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'body_style', label: 'Coupe' });
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('body_style');
+  expect(host.textContent).not.toContain('Auction performance unavailable');
 });
 
-it('leaves the price to the live banner when an auction is live', async () => {
-  fixture.pulse = { platform: 'bat', listing_url: 'https://bringatrailer.com/listing/x', listing_status: 'active', event_type: 'auction' };
+it('a token the read holds no value for is a muted gap that opens its line items without filtering the photos', async () => {
+  const strip = fixture.read!.sections[1];
+  if (strip.kind === 'strip') {
+    strip.facets = strip.facets.filter(f => f.dimension !== 'drivetrain');
+    strip.gaps = [{ dimension: 'trim', label: 'Trim' }, { dimension: 'drivetrain', label: 'Drivetrain' }];
+  }
   await render();
-  expect(host.querySelector('.k-masthead__result')).toBeNull();
+  expect(host.querySelectorAll('button.k-facet')).toHaveLength(6);
+  const gaps = [...host.querySelectorAll('button.k-facet--gap')] as HTMLButtonElement[];
+  expect(gaps.map(g => g.textContent)).toEqual(['Trim \u2014', 'Drivetrain \u2014']);
+  expect(gaps[1].getAttribute('aria-label')).toBe('Drivetrain: not established. Show what would establish it');
+  await act(async () => gaps[1].click());
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('drivetrain');
+  expect(gaps[1].getAttribute('aria-expanded')).toBe('true');
+  expect(fixture.gallery).toHaveBeenLastCalledWith(null);
+});
+
+it('a gap whose token holds a valued item shows that lead with its status and opens the items', async () => {
+  const strip = fixture.read!.sections[1];
+  if (strip.kind === 'strip') {
+    strip.facets = strip.facets.filter(f => f.dimension !== 'drivetrain');
+    strip.gaps = [{ dimension: 'drivetrain', label: 'Drivetrain', lead: { key: 'drivetrain.current.layout', value: 'Fixture layout', status: 'reading' } }];
+  }
+  await render();
+  expect(host.querySelectorAll('button.k-facet--gap')).toHaveLength(0);
+  const lead = host.querySelector('[aria-label="Drivetrain: Fixture layout, reading. Show its items"]') as HTMLButtonElement;
+  expect(lead).not.toBeNull();
+  expect(lead.textContent).toBe('Fixture layoutreading');
+  expect(lead.querySelector('.k-status')?.getAttribute('data-status')).toBe('reading');
+  await act(async () => lead.click());
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('drivetrain');
+  expect(fixture.gallery).toHaveBeenLastCalledWith(null);
+});
+
+it('retains the specific transmission model and opens the transmission line items', async () => {
+  const masthead = fixture.read!.sections[0];
+  if (masthead.kind === 'masthead') masthead.identity_source.transmission_model = '6L90';
+  await render();
+  const control = host.querySelector('[aria-label="Explore 6L90 in this profile"]') as HTMLButtonElement;
+  expect(control).not.toBeNull();
+  expect(host.querySelector('[aria-label="Explore Automatic in this profile"]')).toBeNull();
+  await act(async () => control.click());
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('transmission');
+  expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'transmission', label: '6L90' });
+});
+
+it('gives the live episode priority over the historical price and puts configuration behind its disclosure', async () => {
+  fixture.pulse = { platform: 'bat', listing_url: 'https://bringatrailer.com/listing/x', listing_status: 'active', event_type: 'auction', current_bid: 12345, end_date: '2099-01-01T00:00:00Z' };
+  await render();
+  expect(host.querySelector('[data-live-bid]')?.getAttribute('data-live-bid')).toBe('12345');
+  expect(host.querySelector('.k-masthead__result')?.textContent).not.toContain('$24,000');
+  expect(host.querySelector('.vp-header-configuration')?.tagName).toBe('DETAILS');
+  expect((host.querySelector('.vp-header-configuration') as HTMLDetailsElement).open).toBe(false);
   expect(host.querySelector('h1.k-entity')?.textContent).toContain('Mustang');
 });
 
@@ -325,7 +410,7 @@ it('shows no odometer when the read carries none', async () => {
   fixture.read = read;
   await render();
   expect(host.textContent).not.toContain(' mi');
-  expect(host.textContent).toContain('0 of 5 facts attributed');
+  expect(host.textContent).not.toContain('facts attributed');
 });
 
 it('renders nothing until the read answers', async () => {
@@ -382,7 +467,7 @@ it('enriches price claim popover with source-bound inline Mecum lot provenance w
 });
 
 it('measures the masthead when its async document arrives and keeps the sticky stack current', async () => {
-  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(112);
+  const height = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 112.625 } as DOMRect);
   const originalObserver = globalThis.ResizeObserver;
   let resize: (() => void) | undefined;
   const disconnect = vi.fn();
@@ -398,10 +483,10 @@ it('measures the masthead when its async document arrives and keeps the sticky s
     expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('');
     fixture.read = mustangRead();
     await render();
-    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('112px');
-    height.mockReturnValue(176);
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('112.625px');
+    height.mockReturnValue({ height: 176.25 } as DOMRect);
     act(() => resize?.());
-    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('176px');
+    expect(host.style.getPropertyValue('--vp-h-masthead')).toBe('176.25px');
     fixture.read = null;
     await render();
     expect(disconnect).toHaveBeenCalledOnce();

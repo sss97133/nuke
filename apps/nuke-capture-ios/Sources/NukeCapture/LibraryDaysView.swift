@@ -176,6 +176,9 @@ private struct DayPhotosView: View {
                     LibraryCell(index: gi)
                         .matchedTransitionSource(id: gi, in: zoomNS)
                         .onTapGesture { detailIndex = gi }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Photo")
+                        .accessibilityAddTraits(.isButton)
                 }
             }
             if loaded && indices.isEmpty {
@@ -252,9 +255,8 @@ private struct DayPhotosView: View {
 /// (absent stays absent — never a fake "0" row):
 ///   measured — EXIF times (span, bursts) + GPS (located count / site). Facts from files.
 ///   sorted   — the T0 on-device classification rollup.
-///   read     — cached cloud BYOK verdicts: intents, the labor-time estimate
-///              (web-formula over shoot intervals — labeled estimated, never signed),
-///              and the agent's vehicle read (a read, NOT a confirmed binding).
+///   read     — cached cloud BYOK labels and vehicle interpretation,
+///              separate from performed work and confirmed vehicle bindings.
 private struct DayReceiptCard: View {
     let receipt: LocalDayReceipt
     let vehicleLabel: String?
@@ -269,7 +271,7 @@ private struct DayReceiptCard: View {
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             if receipt.read > 0 {
-                Text(readLine)
+                Text(receipt.analysisSummary)
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 if let vehicleLabel {
                     // The agent's read from pixels — presented as such, not as ownership.
@@ -306,19 +308,7 @@ private struct DayReceiptCard: View {
         return s
     }
 
-    private var readLine: String {
-        var parts = ["Read by Nuke: \(receipt.read)"]
-        // Top intents, e.g. "14 labor · 3 documentation" — from the cached verdicts only.
-        for (intent, n) in receipt.intents.prefix(2) { parts.append("\(n) \(intent)") }
-        if let mins = receipt.laborMinutes {
-            parts.append("~\(mins / 60 > 0 ? "\(mins / 60) h " : "")\(mins % 60) min worked")
-        }
-        return parts.joined(separator: " · ")
-    }
-
     private var provenanceLine: String {
-        var s = "Times from photo EXIF · built on-device"
-        if receipt.laborMinutes != nil { s = "Work time estimated from shoot intervals · " + s }
-        return s
+        "Photo times from EXIF · performer and work duration unknown"
     }
 }

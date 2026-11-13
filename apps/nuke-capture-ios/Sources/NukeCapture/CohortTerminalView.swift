@@ -382,7 +382,7 @@ struct CohortTerminalView: View {
                         .cornerRadius(3)
                         .annotation(position: .trailing, alignment: .leading) {
                             Text(row.median.map { moneyK($0) } ?? "\(row.events)")
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -489,19 +489,19 @@ struct CohortTerminalView: View {
                     }
                     if let m = comp.miles {
                         Text("· \(int(m)) mi")
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
                 }
                 HStack(spacing: 6) {
                     if let plat = comp.platform {
                         Text(plat.uppercased())
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.tertiary)
                     }
                     if let d = comp.sold_date {
                         Text(String(d.prefix(10)))
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -548,7 +548,7 @@ struct CohortTerminalView: View {
                         .foregroundStyle(.primary)
                     if let sub {
                         Text(sub)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -571,7 +571,7 @@ struct CohortTerminalView: View {
                     .foregroundStyle(.primary)
             } else {
                 Text("not recorded")
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
         } label: {
@@ -628,7 +628,7 @@ struct CohortTerminalView: View {
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.primary)
             Text(label)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
         }
     }
@@ -802,9 +802,9 @@ private struct SalesScatter: View {
                 AxisMarks(values: [0.06, 0.22, 0.98]) { v in
                     AxisValueLabel {
                         if let d = v.as(Double.self) {
-                            if d < 0.16 { Text("no date").font(.system(size: 9, design: .monospaced)) }
-                            else if d < 0.6 { Text(yearRange.0).font(.system(size: 9, design: .monospaced)) }
-                            else { Text(yearRange.1).font(.system(size: 9, design: .monospaced)) }
+                            if d < 0.16 { Text("no date").font(.system(.caption2, design: .monospaced)) }
+                            else if d < 0.6 { Text(yearRange.0).font(.system(.caption2, design: .monospaced)) }
+                            else { Text(yearRange.1).font(.system(.caption2, design: .monospaced)) }
                         }
                     }
                 }
@@ -841,8 +841,8 @@ private struct SalesScatter: View {
                     let on = (focus == s)
                     Button { focus = on ? nil : s } label: {
                         HStack(spacing: 5) {
-                            Text(Self.pretty(s)).font(.system(size: 11, design: .monospaced))
-                            Text("\(count(s))").font(.system(size: 10, design: .monospaced))
+                            Text(Self.pretty(s)).font(.system(.caption2, design: .monospaced))
+                            Text("\(count(s))").font(.system(.caption2, design: .monospaced))
                                 .foregroundStyle(on ? Color.accentColor : .secondary)
                         }
                         .padding(.horizontal, 8).padding(.vertical, 3)
@@ -856,7 +856,7 @@ private struct SalesScatter: View {
 
             Text("\(points.count) sales · \(sources.count) sources · \(nDated) carry a sale date"
                  + (undatedN > 0 ? " · \(undatedN) arrived without one (left of the line)" : ""))
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
         }
     }
@@ -928,6 +928,7 @@ private struct SaleCard: View {
     let onOpenProfile: (String) -> Void
     @State private var v: VehicleSnapshot?
     @State private var loaded = false
+    @State private var loadFailed = false
 
     private var title: String {
         let parts = [v?.year.map(String.init), v?.make, v?.model, v?.trim].compactMap { $0 }.filter { !$0.isEmpty }
@@ -953,6 +954,17 @@ private struct SaleCard: View {
 
                 VStack(alignment: .leading, spacing: 16) {
                     Text(title).font(.title3.weight(.semibold))
+
+                    if loadFailed {
+                        HStack(spacing: 8) {
+                            Text("We couldn't load this car's details.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Try again") { Task { await loadSnapshot() } }
+                                .font(.footnote.weight(.semibold))
+                                .frame(minHeight: NukeSize.minTap)
+                        }
+                    }
 
                     // The snapshot — the factors that matter, read at a glance.
                     HStack(alignment: .top, spacing: 0) {
@@ -993,19 +1005,27 @@ private struct SaleCard: View {
                 .padding(16)
             }
         }
-        .task {
-            defer { loaded = true }
-            guard let vid = sale.vehicleId else { return }
-            let snap: VehicleSnapshot? = try? await SupabaseService.client
+        .task { await loadSnapshot() }
+    }
+
+    private func loadSnapshot() async {
+        loadFailed = false
+        defer { loaded = true }
+        guard let vid = sale.vehicleId else { return }
+        do {
+            let snap: VehicleSnapshot = try await SupabaseService.client
                 .from("vehicles").select("year,make,model,trim,primary_image_url")
                 .eq("id", value: vid).single().execute().value
             v = snap
+        } catch {
+            loadFailed = true
+            NSLog("NukeCapture sale snapshot load failed: %@", String(describing: error))
         }
     }
 
     @ViewBuilder private func factor(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+            Text(label).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
             Text(value).font(.system(.title3, design: .monospaced).weight(.medium))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1071,6 +1091,7 @@ struct ProductionProvenanceSheet: View {
     @State private var census: [CensusBucket] = []
     @State private var loaded = false
     @State private var loadFailed = false
+    @State private var censusFailed = false
 
     // Cited figures, broadest → narrowest (Marti order: year total first).
     private var citedRows: [ProdEstimate] {
@@ -1114,7 +1135,10 @@ struct ProductionProvenanceSheet: View {
             } else if !loaded {
                 HStack(spacing: 8) { ProgressView(); Text("Loading…").font(.footnote).foregroundStyle(.secondary) }
             } else if loadFailed {
-                Label("Couldn't load production records", systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.secondary)
+                NukeLoadFailed(title: "We couldn't load this", message: "The production records didn't come through.") {
+                    Task { await load() }
+                }
+                .frame(minHeight: 200)
             } else {
                 Text("Year total not yet cited. The reverse census below is what Nuke has documented so far.")
                     .font(.footnote).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
@@ -1132,13 +1156,13 @@ struct ProductionProvenanceSheet: View {
                     Spacer()
                     if let rl = r.rarity_level {
                         Text(rl.replacingOccurrences(of: "_", with: " ").capitalized)
-                            .font(.system(size: 10, design: .monospaced).weight(.semibold))
+                            .font(.system(.caption2, design: .monospaced).weight(.semibold))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Capsule().fill(Color(.tertiarySystemFill)))
                     }
                 }
                 if !r.scopeDelta.isEmpty {
-                    Text(r.scopeDelta).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                    Text(r.scopeDelta).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 }
                 citationLink(r)
             }
@@ -1150,7 +1174,7 @@ struct ProductionProvenanceSheet: View {
         if let u = r.source_url, !u.isEmpty, let url = URL(string: u) {
             Link(destination: url) {
                 HStack(spacing: 3) { Text(r.data_source ?? "source"); Image(systemName: "arrow.up.right") }
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
             }
         }
     }
@@ -1172,6 +1196,13 @@ struct ProductionProvenanceSheet: View {
             }
             .padding(.vertical, 2)
 
+            if censusFailed {
+                NukeLoadFailed(title: "We couldn't load this", message: "The trim breakdown didn't come through.") {
+                    Task { await load() }
+                }
+                .frame(minHeight: 200)
+            }
+
             // Observed AMONG the documented (never extrapolated to a total).
             ForEach(census) { b in
                 HStack {
@@ -1187,6 +1218,7 @@ struct ProductionProvenanceSheet: View {
     private struct CohortTrim: Decodable { let trim: String? }
 
     private func load() async {
+        loaded = false; loadFailed = false; censusFailed = false
         defer { loaded = true }
         // Cited figures (denominator side) — quarantined junk excluded.
         do {
@@ -1203,10 +1235,11 @@ struct ProductionProvenanceSheet: View {
         }
         // Reverse census (numerator side) — observed trims among the documented cohort.
         // "not yet recorded" is reconciled to drill.documented (the authoritative count).
-        if let cohort: [CohortTrim] = try? await SupabaseService.client
-            .from("vehicles").select("trim")
-            .ilike("make", value: drill.make).ilike("model", value: "%\(drill.model)%").eq("year", value: drill.year)
-            .limit(2000).execute().value {
+        do {
+            let cohort: [CohortTrim] = try await SupabaseService.client
+                .from("vehicles").select("trim")
+                .ilike("make", value: drill.make).ilike("model", value: "%\(drill.model)%").eq("year", value: drill.year)
+                .limit(2000).execute().value
             var counts: [String: Int] = [:]
             for v in cohort where (v.trim?.isEmpty == false) { counts[v.trim!, default: 0] += 1 }
             var buckets = counts.map { CensusBucket(label: $0.key, count: $0.value) }.sorted { $0.count > $1.count }
@@ -1214,6 +1247,9 @@ struct ProductionProvenanceSheet: View {
             let unrecorded = max(0, drill.documented - knownSum)
             if unrecorded > 0 { buckets.append(CensusBucket(label: "trim not yet recorded", count: unrecorded)) }
             census = buckets
+        } catch {
+            censusFailed = true
+            NSLog("NukeCapture trim census load failed: %@", String(describing: error))
         }
     }
 }
@@ -1255,7 +1291,7 @@ private struct SentimentMap: View {
     }
 
     private func edgeLabel(_ s: String) -> some View {
-        Text(s).font(.system(size: 9, weight: .semibold, design: .monospaced))
+        Text(s).font(.system(.caption2, design: .monospaced, weight: .semibold))
             .foregroundStyle(.tertiary).padding(3)
     }
 
@@ -1295,7 +1331,7 @@ private struct SentimentMap: View {
             }
 
             Text("\(points.count) comments · \(vouch) vouch · \(challenge) challenge · tap a point to read it")
-                .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
         }
         #if DEBUG
         // Screenshot loop: auto-open a real comment (text + stance) to verify CommentPeek renders.
@@ -1344,7 +1380,7 @@ private struct CommentPeek: View {
                             Text(p.author ?? "anon").font(.subheadline.weight(.semibold))
                         }
                         if p.is_seller == true {
-                            Text("SELLER").font(.system(size: 9, design: .monospaced))
+                            Text("SELLER").font(.system(.caption2, design: .monospaced))
                                 .padding(.horizontal, 5).padding(.vertical, 2)
                                 .background(Capsule().fill(Color(.tertiarySystemFill)))
                         }
@@ -1394,7 +1430,7 @@ private struct CommentPeek: View {
     @ViewBuilder private func scoreRow(_ title: String, _ v: Double?, _ meaning: String, _ scale: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title.uppercased()).font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                Text(title.uppercased()).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 Text(v.map { String(format: "%+.2f", $0) } ?? "—")
                     .font(.system(.subheadline, design: .monospaced).weight(.semibold))
                 Text(meaning).font(.subheadline).foregroundStyle(.secondary)

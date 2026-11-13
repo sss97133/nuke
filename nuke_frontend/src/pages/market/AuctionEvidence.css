@@ -60,15 +60,28 @@
   .auction-evidence-links span { margin-left: 0; }
   .auction-evidence-discussion { max-height: none; overflow: visible; padding-right: 0; }
 }
-.market-lot-row { display: grid; grid-template-columns: 88px 168px minmax(0,1fr) 180px; gap: 14px; align-items: center; min-height: 132px; padding: 10px 12px; box-sizing: border-box; border-bottom: 2px solid var(--border); color: var(--text); background: var(--bg); }
+.market-lot-row { display: grid; grid-template-columns: 168px minmax(0,1fr) minmax(170px, auto); gap: 20px; align-items: center; min-height: 132px; padding: 14px 16px; box-sizing: border-box; border-bottom: 1px solid var(--border); color: var(--text); background: var(--bg); }
 .market-lot-row[data-expanded=true] { background: var(--surface); }
 .market-lot-row button { font: inherit; text-align: left; color: inherit; border: 0; border-radius: 0; background: transparent; padding: 0; cursor: pointer; }
 .market-lot-row button:hover { text-decoration: underline; }
-.market-lot-close { display: flex; flex-direction: column; gap: 3px; }
+.market-lot-close { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; }
+.market-lot-ends { display: inline-flex; align-items: baseline; gap: 4px; }
+.market-lot-ends .market-countdown { font-size: 14px; }
 .market-lot-image { display: flex; }
+.market-lot-image .market-thumb { border-radius: var(--radius, 6px); }
 .market-lot-identity { min-width: 0; }
 .market-lot-row .market-lot-name { display: block; overflow-wrap: anywhere; }
-.market-lot-facts { display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; margin-top: 4px; }
+.market-lot-row .market-lot-name .k-entity { font-size: 21px; line-height: 1.2; letter-spacing: -0.015em; }
+/* The title reads as one line of text; its year, make and model underline on hover and each re-scope the board.
+   The rest of the row opens the lot. */
+.market-lot-row .market-lot-identity { cursor: pointer; }
+.market-lot-name .vehicle-identity--text,
+.market-lot-name .vehicle-identity--text > span:not(.sr-only, .vehicle-identity__art),
+.market-lot-name .vehicle-identity--text .vehicle-identity__explore { display: inline; }
+.market-lot-name .vehicle-identity--text :is(.vehicle-identity__year, .vehicle-identity__maker) { margin-right: .28em; }
+.market-lot-row .market-lot-name .vehicle-identity__explore { min-height: 0; text-underline-offset: 3px; }
+.market-lot-row .market-lot-facts .k-body { font-size: 14px; color: var(--text-secondary); }
+.market-lot-facts { display: flex; flex-wrap: wrap; column-gap: 14px; row-gap: 2px; margin-top: 4px; }
 .market-lot-facts:empty { display: none; }
 .market-lot-facts > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .market-lot-row .market-lot-metrics { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; }
@@ -109,12 +122,12 @@
 .market-inspection-facts a { margin-left: 12px; }
 @media (max-width: 760px) {
   /* On a phone a lot is a card: the photo across the screen, the name under it, then time left and the bid. */
-  .market-lot-row { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "image image" "name name" "close metrics"; gap: 8px 12px; padding: 12px 8px; }
+  .market-lot-row { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "image image" "name metrics"; gap: 10px 12px; padding: 14px 8px; align-items: start; }
   .market-lot-image { grid-area: image; }
   .market-lot-image img { width: 100% !important; height: auto !important; aspect-ratio: 3 / 2; }
   .market-lot-identity { grid-area: name; }
-  .market-lot-close { grid-area: close; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
-  .market-lot-row .market-lot-metrics { grid-area: metrics; align-self: end; }
+  .market-lot-row .market-lot-name .k-entity { font-size: 18px; }
+  .market-lot-row .market-lot-metrics { grid-area: metrics; }
   .market-lot-metrics > span:first-child { gap: 6px; }
   .market-lot-inspection { padding: 12px; }
   .market-inspection-header nav { gap: 14px; }
@@ -122,19 +135,28 @@
 @media (pointer: coarse) {
   .market-lot-name, .market-lot-image, .market-lot-metrics, .market-inspection-header button { min-height: 44px; }
   .market-lot-facts button, .market-lot-context button, .market-inspection-more > summary { padding-block: 8px; }
+  .market-lot-row .market-lot-name .vehicle-identity__explore { padding-block: 8px; }
 }
 
 /* The board's pager: one page of lots at a time, the page named in the URL. */
 .market-board { scroll-margin-top: 48px; }
-.market-board-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 8px 12px; }
-.market-board-pager .k-caption { margin-right: auto; }
-.market-board-page { font: inherit; border: 2px solid var(--border); background: var(--bg); color: var(--text); padding: 6px 10px; min-height: 32px; cursor: pointer; }
+.market-board-more { display: flex; justify-content: center; padding: 16px 12px; }
+.market-board-page { font: inherit; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); padding: 6px 14px; min-height: 32px; cursor: pointer; }
 .market-board-page:hover { border-color: var(--text); }
 
 /* The market page frame and the controls outside the rows. Type comes from the kit roles; these set only layout, borders and state. */
-.market-explorer { --vp-stick-market-navigation: var(--header-height, 40px); font-family: Arial, sans-serif; color: var(--text); background: var(--bg); padding: 12px 12px 32px; }
-.market-navigation { position: sticky; top: var(--vp-stick-market-navigation); z-index: 901; background: var(--bg); border-block: 2px solid var(--border); margin-bottom: 12px; }
+.market-explorer { --vp-stick-market-navigation: var(--header-height, 40px); font-family: var(--font-family); color: var(--text); background: var(--bg); padding: 12px 12px 32px; }
+.market-navigation { position: sticky; top: var(--vp-stick-market-navigation); z-index: 901; background: var(--bg); border-block: 1px solid var(--border); margin-bottom: 12px; }
 .market-navigation > summary { cursor: pointer; padding: 10px 8px; }
+/* The views as tab words: no boxes; the one shown is underlined, the rest recede. */
+.market-scope--tabs.k-strip { gap: 0 22px; padding: 0 4px; align-items: stretch; }
+.market-scope--tabs .market-scope__views { gap: 0 22px; }
+.market-scope--tabs .market-control { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 9px 0 7px; }
+.market-scope--tabs .market-control .k-label { font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--text-secondary); }
+.market-scope--tabs .market-control:hover:not(:disabled) .k-label { color: var(--text); }
+.market-scope--tabs .market-control[aria-pressed="true"] { background: none; border-bottom-color: var(--text); }
+.market-scope--tabs .market-control[aria-pressed="true"] .k-label { color: var(--text); }
+.market-scope--tabs .market-scope__cohort { margin-left: auto; }
 .market-navigation__tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; }
 .market-history { border: 2px solid var(--border); padding: 12px; margin-bottom: 12px; }
 .market-history__head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -144,39 +166,59 @@
 .market-history__change:hover { background: var(--surface); }
 .market-history__change > :first-child { flex: 1 1 200px; }
 .market-status { padding: 12px; }
-.market-drill { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.market-drill { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 12px; color: var(--text-secondary); }
+.market-drill .market-control { border-width: 1px; border-radius: var(--radius-sm); padding: 5px 12px; }
 .market-control--make { display: inline-flex; align-items: center; gap: 6px; }
-.market-distribution { margin-bottom: 12px; }
-.market-distribution > summary { cursor: pointer; padding: 4px 0; list-style-position: inside; }
-.market-distribution__body { border: 2px solid var(--border); padding: 8px; margin-top: 6px; }
-.market-distribution__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 6px; }
-.market-distribution__bars { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
-.market-distribution__note { margin-top: 6px; }
-.market-bucket { display: flex; align-items: center; gap: 8px; min-height: 24px; padding: 2px 4px; border: 2px solid transparent; border-radius: 0; text-align: left; background: var(--bg); color: var(--text); cursor: pointer; }
-.market-bucket:disabled { cursor: default; }
-.market-bucket[aria-pressed="true"] { background: var(--text); color: var(--bg); }
-.market-bucket[aria-pressed="true"] .k-body, .market-bucket[aria-pressed="true"] .k-measure { color: inherit; }
-.market-bucket__label { width: 100px; flex-shrink: 0; }
-.market-bucket__track { flex: 1; min-width: 0; height: 8px; display: block; background: var(--surface); }
-.market-bucket__track rect { fill: var(--text-secondary); }
-.market-bucket[aria-pressed="true"] .market-bucket__track rect { fill: var(--bg); }
-.market-bucket__count { width: 76px; text-align: right; flex-shrink: 0; }
-.market-notes { margin-top: 6px; }
-.market-notes summary { cursor: pointer; }
-.market-notes p { margin: 6px 0; }
+.market-notes { padding: 4px 16px 14px; }
+.market-notes summary { cursor: pointer; padding: 6px 0; }
+.market-notes p { margin: 6px 0; max-width: 72ch; color: var(--text-secondary); }
 .market-map { min-width: 0; margin-bottom: 12px; }
-.market-board__frame { border: 2px solid var(--border); }
-.market-board__head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 8px; border-bottom: 2px solid var(--border); }
-.market-sorts { display: flex; flex-wrap: wrap; gap: 2px; }
+.market-board__frame { border: 1px solid var(--border); border-radius: var(--radius-lg, 10px); }
+.market-board__head { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+/* Two controls and a bell. The sort and the filter read as plain words with a count; the panel opens under them. */
+.market-board__sort { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.market-select { font: inherit; font-weight: 600; color: var(--text); background: transparent; border: 0; padding: 6px 2px; cursor: pointer; }
+.market-filter > summary { display: inline-flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; padding: 6px 10px; border-radius: var(--radius-sm); }
+.market-filter > summary .k-label, .market-board__sort .market-select { font-size: 15px; font-weight: 600; color: var(--text); }
+.market-filter > summary::-webkit-details-marker { display: none; }
+.market-filter > summary:hover, .market-filter[open] > summary { background: var(--surface-hover, rgba(127,127,127,.12)); }
+.market-filter__count { min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--text); color: var(--bg); text-align: center; font-size: 12px; }
+.market-filter__panel { position: absolute; z-index: 5; left: 12px; right: 12px; top: calc(100% - 4px); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px 28px;
+  padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+.market-filter__title { margin-bottom: 6px; color: var(--text-secondary); }
+/* A filter is a line in a list: its name, its live count, a check when on. */
+.market-options { display: grid; }
+.market-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.market-option:hover { background: var(--surface-hover, rgba(127,127,127,.1)); }
+.market-option .k-measure { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.market-option[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.market-option[aria-pressed="true"] .k-body, .market-option[aria-pressed="true"] .k-measure { color: inherit; }
+.market-option__name { display: inline-flex; align-items: center; gap: 8px; }
+/* No reserve is yellow: it is what buyers look for. */
+.market-option--nr .k-body::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 2px; background: var(--yellow-200); outline: 1px solid rgba(0,0,0,.15); }
+/* The bids as a histogram: column height is lots, each column a filter. */
+.market-histogram { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; height: 128px; align-items: end; }
+.market-bucket { display: grid; grid-template-rows: auto 1fr auto; justify-items: stretch; align-items: end; height: 100%; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+.market-bucket__n { text-align: center; font-size: 12px; color: var(--text-secondary); }
+.market-bucket__bar { display: block; border-radius: 3px 3px 0 0; background: var(--text-secondary); opacity: .45; }
+.market-bucket:hover .market-bucket__bar { opacity: .7; }
+.market-bucket[aria-pressed="true"] .market-bucket__bar { background: var(--accent); opacity: 1; }
+.market-bucket__label { text-align: center; padding-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.market-bell { margin-left: auto; display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.market-bell:hover { background: var(--surface-hover, rgba(127,127,127,.12)); color: var(--text); }
+.market-bell[aria-pressed="true"] { color: var(--accent); }
+/* Time is the board's structure: one heading per section with its lot count. */
+.market-board-group { display: flex; align-items: baseline; justify-content: space-between; margin: 0; padding: 14px 16px 6px; border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: calc(var(--vp-stick-market-navigation, 40px) + 42px); z-index: 2; }
+.market-board-group .k-label { font-size: 13px; letter-spacing: .02em; text-transform: uppercase; color: var(--text); }
+.market-board-group .k-measure { color: var(--text-secondary); font-size: 12px; }
+.market-board-group--hour .k-label { color: var(--danger, #d7263d); }
+/* The scheduled sales close the board in the calendar's own table, inset like the lot rows. */
+.market-board-scheduled .market-listings__scroll { padding: 0 16px; }
+@media (max-width: 760px) { .market-board-scheduled .market-listings__scroll { padding: 0 8px; } }
+/* The answer is the bid: the row's largest number. */
+.market-lot-row .market-lot-metrics .market-bid { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .market-board__empty { padding: 12px; }
 .market-source { margin: 8px 0 0; }
-/* Edges: a number in its own history (range, a tick per earlier week, a block for now, a counted verdict). */
-.market-range { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.market-range__bar { width: 160px; height: 12px; display: block; }
-.market-range__track { fill: var(--border); }
-.market-range__tick { fill: var(--text-secondary); }
-.market-range__now { fill: var(--text); }
-.market-range__verdict { color: var(--text); }
 /* The row resets every button to a transparent background; the tag's state colour must outrank that reset. */
 .market-countdown { color: var(--text-secondary); }
 .market-countdown--soon { color: var(--text); }
@@ -199,27 +241,28 @@
 .market-venue { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .market-venue__mark { width: 32px; height: 32px; display: block; }
 .market-clock { white-space: nowrap; }
-/* The board's one figure, against the same hour in earlier weeks. It opens into what it is made of. */
-.market-figure { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 14px 40px; padding-block: 14px; }
-.market-figure__item { display: grid; gap: 6px; min-width: 0; }
-.market-figure__value { all: unset; cursor: pointer; display: inline-flex; flex-direction: column; gap: 6px; }
+.market-clock.market-control { border: 0; background: none; padding: 4px 0; }
+.market-clock.market-control:hover .k-label { color: var(--text); }
+/* The board's two figures as tickers: label, number, one change on last week, and the line beside them. Each opens
+   into what it is made of. */
+.market-figure { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px 48px; padding-block: 14px 18px; }
+.market-figure__item { min-width: 0; }
+.market-figure__value { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 24px; row-gap: 2px; align-items: center; }
+.market-figure__value > :not(.market-figure__chart) { grid-column: 1; }
 .market-figure__value:hover .k-figure { text-decoration: underline; text-decoration-thickness: 2px; }
+.market-figure__chg { display: inline-flex; align-items: center; gap: 6px; font: 600 15px/1.4 var(--font-family); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.market-figure__chg.is-up .market-figure__pct { color: var(--success); }
+.market-figure__chg.is-down .market-figure__pct { color: var(--error); }
+.market-figure .market-figure__chart { grid-column: 2; grid-row: 1 / span 3; width: 100%; max-width: 460px; height: 64px; margin-left: auto; }
 .market-figure__value:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
 .market-figure__context { display: grid; gap: 6px; min-width: 0; }
 .market-figure__lots { all: unset; cursor: pointer; text-decoration: underline; color: var(--text); }
 .market-figure__lots:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-/* Filters sit on the lots they change. No reserve is yellow: it is what buyers look for. */
-.market-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.market-chip { display: inline-flex; align-items: baseline; gap: 6px; min-height: 28px; padding: 4px 8px; border: 2px solid var(--border); border-radius: 0; background: var(--bg); color: var(--text); cursor: pointer; }
-.market-chip:hover { border-color: var(--text); }
-.market-chip--nr { background: var(--yellow-200); }
-.market-chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
-.market-chip[aria-pressed="true"] .k-label, .market-chip[aria-pressed="true"] .k-measure { color: inherit; }
-.market-no-reserve { display: inline-block; align-self: flex-start; margin-top: 6px; padding: 2px 5px; background: var(--yellow-200); color: var(--text); }
-.market-chips--houses { padding-right: 8px; border-right: 2px solid var(--border); }
-.market-lot-house { margin-top: 6px; }
-.market-figure__note { flex-basis: 100%; margin: 0; }
-.market-board__scope { padding: 4px 8px; border-bottom: 2px solid var(--border); }
+.market-no-reserve { display: inline-block; padding: 1px 6px; border-radius: 4px; background: var(--yellow-200); color: var(--text); box-shadow: inset 0 0 0 1px rgba(234, 179, 8, .45); }
+.market-lot-house { display: inline-flex; align-items: center; }
+.market-figure__note { grid-column: 1 / -1; margin: 0; }
+.market-board__scope { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.market-board__scope strong { font-weight: 700; color: var(--text); }
 /* The drawer: how the bidding went, what is being asked and said, the rest of the car. */
 .market-inspection-header { flex-wrap: wrap; overflow-wrap: normal; }
 .market-inspection-header > * { white-space: nowrap; }
@@ -228,10 +271,11 @@
 .market-inspection-talk { display: grid; gap: 10px; margin: 14px 0; max-width: 72ch; }
 .market-inspection-talk p { margin: 2px 0 0; white-space: pre-wrap; }
 @media (max-width: 760px) {
-  .market-figure { gap: 8px 16px; }
-  .market-board__head { align-items: flex-start; }
-  .market-chips > button, .market-sorts > button, .market-board-page, .market-bucket, .market-scope .market-scope__cohort > select { min-height: 44px; }
-  .market-distribution > summary, .market-notes > summary { min-height: 44px; padding-block: 15px; }
+  .market-figure { gap: 14px 16px; }
+  .market-figure .market-figure__chart { height: 52px; max-width: 170px; }
+  .market-board-page, .market-option, .market-scope .market-scope__cohort > select, .market-filter > summary, .market-bell { min-height: 44px; }
+  .market-filter__panel { left: 8px; right: 8px; max-height: 70vh; overflow-y: auto; }
+  .market-notes > summary { min-height: 44px; padding-block: 15px; }
 }
 /* Where it should finish: the estimate first in the drawer, then the past lots it rests on. */
 .market-finish { display: grid; gap: 6px; margin: 4px 0 14px; padding: 10px 12px; border: 2px solid var(--border); background: var(--bg); max-width: 72ch; }
@@ -246,7 +290,13 @@
 .market-lot-finish__band { fill: var(--border); }
 .market-lot-finish__likely { stroke: var(--text-secondary); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .market-lot-finish__bid { stroke: var(--text); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
-@media (max-width: 760px) { .market-lot-finish { justify-items: start; } }
+/* On a phone a row with a finish line gives the name the full width and puts the bid and the finish under it, side by
+   side (stacked when narrower): beside the name, the finish caption squeezed it to a word a line. */
+@media (max-width: 760px) {
+  .market-lot-row:has(.market-lot-finish) { grid-template-columns: minmax(0,1fr); grid-template-areas: "image" "name" "metrics"; }
+  .market-lot-row:has(.market-lot-finish) .market-lot-metrics { flex-direction: row; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 4px 12px; text-align: left; }
+  .market-lot-finish { text-align: right; }
+}
 
 /* The houses: each by its own mark (public/source-logos); the name only when no mark is hosted. */
 .market-house-mark { display: inline-block; vertical-align: middle; height: 18px; width: auto; max-width: 96px; object-fit: contain; }
@@ -257,7 +307,6 @@
   :root:not([data-theme="light"]) .market-house-mark--dark { filter: invert(1); }
 }
 .market-venue__marks { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
-.market-chips--houses .market-chip { align-items: center; }
 /* What a clicked figure opens into: the board's total as a price chart, and the houses as a watchlist. */
 .market-stock { display: grid; gap: 8px; padding: 10px 8px; border-bottom: 2px solid var(--border); }
 .market-stock__top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
@@ -265,6 +314,8 @@
 .market-stock__chg { font: 700 14px 'Courier New', monospace; }
 .market-stock .is-up, .market-stock__chg.is-up { color: var(--success); }
 .market-stock .is-down, .market-stock__chg.is-down { color: var(--error); }
+.market-stock__watch :is(.is-up, .is-down) .k-measure { color: inherit; }
+.market-stock__watch td { white-space: nowrap; }
 .market-stock__ranges { display: flex; gap: 4px; }
 .market-stock__chart { width: 100%; height: 260px; display: block; touch-action: pan-y; background: var(--bg); border: 2px solid var(--border); }
 .market-stock__grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; }
@@ -283,6 +334,11 @@
 .market-stock__watch thead th { text-align: right; font: 700 9px Arial, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); border-top: 0; }
 .market-stock__watch th:first-child, .market-stock__watch thead th:first-child { text-align: left; }
 .market-stock__spark { width: 80px; height: 24px; display: block; margin-left: auto; }
-.market-stock__spark polyline { fill: none; stroke-width: 1.5; }
+.market-stock__spark polyline { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.market-stock__spark-base { stroke: var(--text-secondary); stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
 .market-stock__spark--none { text-align: right; color: var(--text-secondary); }
-@media (max-width: 600px) { .market-stock__watch th:nth-child(3), .market-stock__watch td:nth-child(3) { display: none; } }
+@media (max-width: 600px) {
+  .market-stock__watch th:nth-child(3), .market-stock__watch td:nth-child(3) { display: none; }
+  .market-stock__watch th, .market-stock__watch td { padding-inline: 4px; }
+  .market-stock__watch .market-stock__spark { width: 64px; }
+}

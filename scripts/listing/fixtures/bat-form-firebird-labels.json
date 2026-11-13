@@ -1,0 +1,48 @@
+{
+  "_note": "Question labels per step as the worker's readQuestions() returns them, modeled on the 2026-10-28 read of the BaT form (Pontiac Firebird branch). Labels carry BaT's asterisk and helper text so the matcher is exercised. Not a capture of live markup.",
+  "steps": {
+    "make_model": [
+      { "label": "Year*", "name": "input_1" },
+      { "label": "Make*", "name": "input_2" },
+      { "label": "Model*", "name": "input_3" }
+    ],
+    "basic_facts": [
+      { "label": "Country where the vehicle is located*", "name": "input_10" },
+      { "label": "City*", "name": "input_11" },
+      { "label": "Postal code*", "name": "input_12" },
+      { "label": "Country of residence*", "name": "input_13" },
+      { "label": "Has the vehicle been listed for sale elsewhere since you owned it?*", "name": "input_14" },
+      { "label": "Has the vehicle been listed on BaT before?*", "name": "input_16" },
+      { "label": "Are you a dealer?*", "name": "input_18" },
+      { "label": "Is this a consignment?*", "name": "input_19" },
+      { "label": "YouTube links (optional)", "name": "input_20" },
+      { "label": "Photos", "name": "files[]" }
+    ],
+    "details": [
+      { "label": "Street address where the vehicle is located*", "name": "input_30" },
+      { "label": "VIN*", "name": "input_31" },
+      { "label": "Is this a race car?*", "name": "input_32" },
+      { "label": "Engine*", "name": "input_33" },
+      { "label": "Transmission*", "name": "input_34" },
+      { "label": "Exterior color*", "name": "input_35" },
+      { "label": "Interior color*", "name": "input_36" },
+      { "label": "Wheels*", "name": "input_37" },
+      { "label": "Tire brand", "name": "input_39" },
+      { "label": "Tire size", "name": "input_40" },
+      { "label": "How is the vehicle titled?*", "name": "input_41" },
+      { "label": "Title status*", "name": "input_45" },
+      { "label": "Odometer reading*", "name": "input_47" },
+      { "label": "Has the vehicle been refurbished?*", "name": "input_50" },
+      { "label": "Paint and body history*", "name": "input_53" },
+      { "label": "Equipment", "name": "input_56" },
+      { "label": "Has the vehicle been modified from stock?*", "name": "input_59" },
+      { "label": "List the modifications", "name": "input_60" },
+      { "label": "Services performed and when", "name": "input_62" },
+      { "label": "Documents", "name": "input_63" },
+      { "label": "Known issues or problems*", "name": "input_65" },
+      { "label": "Ownership duration in months", "name": "input_99" },
+      { "label": "Do you want a reserve?*", "name": "input_68" },
+      { "label": "I attest that the information provided is accurate*", "name": "input_71" }
+    ]
+  }
+}

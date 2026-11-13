@@ -51,6 +51,18 @@ export function carriedRevision(snapshot: { fields: Json[]; lines: Json[]; conce
   return { fields, records, lines, concerns };
 }
 
+/** The envelope of every correction: the source's own original, the run it supersedes and the complete revision (the fields from carriedRevision plus the
+ *  change). The writer refuses a revision of more than 100 fields, so it is refused here first, before anything is sent. */
+export function correctionRequest(snapshot: { document: Json; runId: string },
+  revision: { idempotencyKey: string; method: string; fields: Json[]; records: Json[]; lines: Json[]; concerns: Json[] }) {
+  if (revision.fields.length > 100) throw new Error('This source has reached its field limit. No evidence has been changed.');
+  const doc = snapshot.document;
+  return { mode: 'financial_evidence_v1', action: 'correct', owner_user_id: doc.owner_id,
+    original: { sha256: doc.content_sha256, storage_path: doc.storage_path, source_filename: doc.source_filename, source_kind: doc.source_kind },
+    revision: { idempotency_key: revision.idempotencyKey, method: revision.method, version: '1', supersedes_run_id: snapshot.runId,
+      fields: revision.fields, accounting_records: revision.records, lines: revision.lines, concerns: revision.concerns } };
+}
+
 export async function readExpenseSnapshot(ownerId: string, documentId: string, sourceKey: string): Promise<ExpenseSnapshot> {
   let current: AccountingSnapshot;
   try { current = await readAccountingSnapshot(ownerId, documentId); }
@@ -65,7 +77,7 @@ export async function readExpenseSnapshot(ownerId: string, documentId: string, s
 
 /** Complete attributed correction through the existing writer and stale-run gate. */
 export function expenseUseCorrection(snapshot: ExpenseSnapshot, use: ExpenseUse, requestId: string) {
-  const { document: doc, record } = snapshot;
+  const { record } = snapshot;
   if (!hash.test(record.source_key) || use.source_key !== record.source_key || !useTypes.includes(use.use_type)) throw new Error('Choose an expense destination.');
   if (use.basis.trim().length < 1 || use.basis.length > 500 || use.destination_label.length > 200) throw new Error('Add a short reason for the assignment.');
   if (use.use_type === 'vehicle' ? !uuid.test(use.vehicle_id || '') : use.vehicle_id !== null) throw new Error('Select the actual recipient vehicle.');
@@ -77,8 +89,5 @@ export function expenseUseCorrection(snapshot: ExpenseSnapshot, use: ExpenseUse,
   const { fields: carriedFields, records, lines, concerns } = carriedRevision(snapshot);
   const fields = carriedFields.filter(f => f.field_key !== key);
   fields.push({ field_key: key, value_raw: `${use.destination_label}; ${use.basis}`, value_type: 'text', value_normalized: value, evidence: { stage: 'expense_use_reconciliation', source_kind: 'authenticated_reviewer_decision', source_key: record.source_key, prior_run_id: snapshot.runId, basis: use.basis } });
-  if (fields.length > 100) throw new Error('This source has reached its field limit. No evidence has been changed.');
-  return { mode: 'financial_evidence_v1', action: 'correct', owner_user_id: doc.owner_id,
-    original: { sha256: doc.content_sha256, storage_path: doc.storage_path, source_filename: doc.source_filename, source_kind: doc.source_kind },
-    revision: { idempotency_key: `expense-use-edit:${requestId}`, method: 'authenticated-expense-use-review', version: '1', supersedes_run_id: snapshot.runId, fields, accounting_records: records, lines, concerns } };
+  return correctionRequest(snapshot, { idempotencyKey: `expense-use-edit:${requestId}`, method: 'authenticated-expense-use-review', fields, records, lines, concerns });
 }

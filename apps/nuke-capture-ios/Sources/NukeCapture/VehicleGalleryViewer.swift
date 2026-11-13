@@ -49,6 +49,7 @@ struct FullScreenGalleryView: View {
                             Image(systemName: "xmark").font(.headline.weight(.semibold))
                                 .foregroundStyle(.white).padding(10).background(.black.opacity(0.4), in: Circle())
                         }
+                        .accessibilityLabel("Close")
                         Spacer()
                         if let c = current, onAnalyze != nil {
                             Button { onAnalyze?(c) } label: {

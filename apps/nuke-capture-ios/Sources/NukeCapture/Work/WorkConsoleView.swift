@@ -13,25 +13,20 @@ import SwiftUI
 struct WorkConsoleView: View {
     let showCapture: Bool
 
-    @State private var signatures: JobLoad<SignatureQueue> = .loading
-    @State private var jobs: JobLoad<MyWorkOrders> = .loading
-    @State private var identity: JobLoad<MyIdentity> = .loading
-    @State private var inbox: JobLoad<ContactInbox> = .loading
-    @State private var open: JobLoad<OpenRequirements> = .loading
-    @State private var notifications: JobLoad<NotificationPage> = .loading
-    @State private var loadingMore = false
+    @StateObject private var reader = WorkConsoleReader()
     @State private var showAccount = false
     @State private var showPaperwork = false
 
     var body: some View {
         NavigationStack {
-            WorkConsoleContent(signatures: signatures, jobs: jobs, identity: identity, showCapture: showCapture,
-                               inbox: inbox, open: open, notifications: notifications,
-                               onInboxChanged: { Task { inbox = await ContactReaders.inbox() } },
-                               onNotificationsChanged: { Task { await loadNotifications() } },
-                               loadingMore: loadingMore,
-                               onLoadMore: { Task { await loadMoreJobs() } },
-                               onSigned: { Task { await loadSignatures() } })
+            WorkConsoleContent(signatures: reader.signatures, jobs: reader.jobs, identity: reader.identity, showCapture: showCapture,
+                               inbox: reader.inbox, open: reader.open, notifications: reader.notifications, listings: reader.listings,
+                               onInboxChanged: { Task { await reader.loadInbox() } },
+                               onNotificationsChanged: { Task { await reader.loadNotifications() } },
+                               loadingMore: reader.loadingMore || reader.loadingJobs,
+                               jobsPageFailure: reader.jobsPageFailure,
+                               onLoadMore: { Task { await reader.loadMoreJobs() } },
+                               onSigned: { Task { await reader.loadSignatures() } })
                 .navigationTitle("Work")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -58,47 +53,123 @@ struct WorkConsoleView: View {
                 .fullScreenCover(isPresented: $showPaperwork) {
                     PaperworkScanView()
                 }
-                .task { PaperworkQueue.shared.kick(); await load() }
+                .task { PaperworkQueue.shared.kick(); await reader.load() }
                 .refreshable {
-                    await load()
+                    await reader.load()
                     if showCapture { await CaptureSections.syncNow() }
+                }
+                .onReceive(reader.$signatures) { InboxBadgeStore.shared.toSign = InboxBadgeStore.toSign($0) }
+                .onReceive(reader.$notifications) {
+                    if case .loaded(let page) = $0 { InboxBadgeStore.shared.unreadNotifications = page.unread }
                 }
         }
     }
+}
 
-    private func load() async {
-        async let s = JobReaders.signatures()
-        async let j = JobReaders.myWorkOrders()
-        async let i = JobReaders.myIdentity()
-        async let m = ContactReaders.inbox()
-        async let r = OfferReaders.openRequirements()
-        async let n = NotificationReaders.page()
-        signatures = await s
-        jobs = await j
-        identity = await i
-        inbox = await m
-        open = await r
-        notifications = await n
-        InboxBadgeStore.shared.toSign = InboxBadgeStore.toSign(signatures)
-        if case .loaded(let p) = notifications { InboxBadgeStore.shared.unreadNotifications = p.unread }
+/// Each console section publishes as soon as its own reader answers. A refresh
+/// supersedes earlier responses, including pages requested before the refresh.
+@MainActor
+final class WorkConsoleReader: ObservableObject {
+    struct Reads {
+        var signatures: () async -> JobLoad<SignatureQueue> = { await JobReaders.signatures() }
+        var jobs: (String?) async -> JobLoad<MyWorkOrders> = { await JobReaders.myWorkOrders(after: $0) }
+        var identity: () async -> JobLoad<MyIdentity> = { await JobReaders.myIdentity() }
+        var inbox: () async -> JobLoad<ContactInbox> = { await ContactReaders.inbox() }
+        var open: () async -> JobLoad<OpenRequirements> = { await OfferReaders.openRequirements() }
+        var notifications: () async -> JobLoad<NotificationPage> = { await NotificationReaders.page() }
+        var listings: () async -> JobLoad<ListingSubmissionPage> = { await ListingSubmissionReaders.load() }
     }
 
-    private func loadSignatures() async {
-        signatures = await JobReaders.signatures()
-        InboxBadgeStore.shared.toSign = InboxBadgeStore.toSign(signatures)
+    @Published private(set) var signatures: JobLoad<SignatureQueue> = .loading
+    @Published private(set) var jobs: JobLoad<MyWorkOrders> = .loading
+    @Published private(set) var identity: JobLoad<MyIdentity> = .loading
+    @Published private(set) var inbox: JobLoad<ContactInbox> = .loading
+    @Published private(set) var open: JobLoad<OpenRequirements> = .loading
+    @Published private(set) var notifications: JobLoad<NotificationPage> = .loading
+    @Published private(set) var listings: JobLoad<ListingSubmissionPage> = .loading
+    @Published private(set) var loadingMore = false
+    @Published private(set) var loadingJobs = false
+    @Published private(set) var jobsPageFailure: JobRefusal?
+
+    private enum Part: Hashable { case signatures, jobs, identity, inbox, open, notifications, listings }
+    private var requests: [Part: ReadRequestGuard] = [:]
+    private let reads: Reads
+    private let account: () -> String?
+
+    init(reads: Reads = Reads(), account: @escaping () -> String? = { SupabaseService.currentUserId }) {
+        self.reads = reads
+        self.account = account
     }
 
-    private func loadNotifications() async {
-        notifications = await NotificationReaders.page()
-        if case .loaded(let p) = notifications { InboxBadgeStore.shared.unreadNotifications = p.unread }
+    private func read<T>(_ part: Part, operation: () async -> JobLoad<T>, apply: (JobLoad<T>) -> Void) async {
+        let request = requests[part, default: ReadRequestGuard()].begin()
+        let owner = account()
+        let result = await operation()
+        guard !Task.isCancelled, requests[part]?.isCurrent(request) == true, account() == owner else { return }
+        apply(result)
     }
 
-    private func loadMoreJobs() async {
-        guard case .loaded(let page) = jobs, let after = page.nextAfter, !loadingMore else { return }
+    func load() async {
+        async let s: Void = loadSignatures()
+        async let j: Void = loadJobs()
+        async let i: Void = loadIdentity()
+        async let m: Void = loadInbox()
+        async let r: Void = loadOpen()
+        async let n: Void = loadNotifications()
+        async let l: Void = loadListings()
+        _ = await (s, j, i, m, r, n, l)
+    }
+
+    func loadListings() async {
+        listings = .loading
+        await read(.listings, operation: reads.listings) { self.listings = $0 }
+    }
+
+    func loadSignatures() async {
+        await read(.signatures, operation: reads.signatures) { self.signatures = $0 }
+    }
+
+    func loadInbox() async {
+        await read(.inbox, operation: reads.inbox) { self.inbox = $0 }
+    }
+
+    private func loadIdentity() async {
+        await read(.identity, operation: reads.identity) { self.identity = $0 }
+    }
+
+    private func loadOpen() async {
+        await read(.open, operation: reads.open) { self.open = $0 }
+    }
+
+    func loadNotifications() async {
+        await read(.notifications, operation: reads.notifications) { self.notifications = $0 }
+    }
+
+    func loadJobs() async {
+        let request = requests[.jobs, default: ReadRequestGuard()].begin()
+        let owner = account()
+        loadingJobs = true
+        loadingMore = false
+        jobsPageFailure = nil
+        defer { if requests[.jobs]?.isCurrent(request) == true { loadingJobs = false } }
+        let result = await reads.jobs(nil)
+        guard !Task.isCancelled, requests[.jobs]?.isCurrent(request) == true, account() == owner else { return }
+        jobs = result
+    }
+
+    func loadMoreJobs() async {
+        guard case .loaded(let page) = jobs, let after = page.nextAfter, !loadingMore, !loadingJobs else { return }
+        let request = requests[.jobs, default: ReadRequestGuard()].begin()
+        let owner = account()
         loadingMore = true
-        defer { loadingMore = false }
-        if case .loaded(let next) = await JobReaders.myWorkOrders(after: after) {
+        jobsPageFailure = nil
+        defer { if requests[.jobs]?.isCurrent(request) == true { loadingMore = false } }
+        let result = await reads.jobs(after)
+        guard !Task.isCancelled, requests[.jobs]?.isCurrent(request) == true, account() == owner else { return }
+        if case .loaded(let next) = result {
             jobs = .loaded(page.appending(next))
+        } else if case .refused(let failure) = result {
+            jobsPageFailure = failure
         }
     }
 }
@@ -112,9 +183,11 @@ struct WorkConsoleContent: View {
     var inbox: JobLoad<ContactInbox> = .loading
     var open: JobLoad<OpenRequirements> = .loading
     var notifications: JobLoad<NotificationPage> = .loading
+    var listings: JobLoad<ListingSubmissionPage> = .loading
     var onInboxChanged: (() -> Void)? = nil
     var onNotificationsChanged: (() -> Void)? = nil
     var loadingMore = false
+    var jobsPageFailure: JobRefusal?
     var onLoadMore: (() -> Void)? = nil
     var onSigned: (() -> Void)? = nil
 
@@ -123,6 +196,7 @@ struct WorkConsoleContent: View {
 
     var body: some View {
         List {
+            ListingSubmissionsSection(page: listings)
             PrioritiesSection()
             signatureSection
             ContactInboxSection(inbox: inbox, onChanged: onInboxChanged)
@@ -176,7 +250,9 @@ struct WorkConsoleContent: View {
                 }
             case .loaded(let q):
                 if q.items.isEmpty {
-                    Text("Nothing to sign right now.").font(.footnote).foregroundStyle(.secondary)
+                    Label("You're all caught up", systemImage: "checkmark.circle")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .frame(minHeight: NukeSize.minTap, alignment: .leading)
                 }
                 ForEach(q.items.prefix(Self.signaturePreview)) { item in
                     signatureRow(item)
@@ -194,9 +270,9 @@ struct WorkConsoleContent: View {
             }
         } header: {
             if case .loaded(let q) = signatures {
-                Text("Awaiting your signature · \(q.coverage?.total ?? q.items.count)")
+                Text("Needs your OK · \(q.coverage?.total ?? q.items.count)")
             } else {
-                Text("Awaiting your signature")
+                Text("Needs your OK")
             }
         } footer: {
             switch signatures {
@@ -243,7 +319,14 @@ struct WorkConsoleContent: View {
                 // works were surfacing as live work).
                 let inMotion = page.rows.filter { $0.stageStates[.completion] != .recorded }
                 if inMotion.isEmpty {
-                    Text("No jobs in motion.").font(.footnote).foregroundStyle(.secondary)
+                    VStack(spacing: NukeSpace.sm) {
+                        Image(systemName: "wrench.and.screwdriver").font(.title).foregroundStyle(.tertiary)
+                        Text("No jobs in progress").font(.nukeCardTitle)
+                        Text("Jobs you're working on will show up here.")
+                            .font(.nukeDetail).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, NukeSpace.lg)
                 }
                 ForEach(inMotion) { row in
                     NavigationLink {
@@ -253,11 +336,13 @@ struct WorkConsoleContent: View {
                     }
                 }
                 if page.nextAfter != nil {
+                    if let jobsPageFailure { JobRefusalRow(refusal: jobsPageFailure) }
                     Button {
                         onLoadMore?()
                     } label: {
                         if loadingMore { ProgressView() } else { Text("Show more jobs") }
                     }
+                    .frame(minHeight: NukeSize.minTap)
                     .disabled(loadingMore)
                 }
                 if page.unreadableRows > 0 {
@@ -265,10 +350,12 @@ struct WorkConsoleContent: View {
                 }
             }
         } header: {
-            Text("Jobs in motion")
+            Text("Jobs in progress")
         } footer: {
-            if case .loaded(let page) = jobs {
-                Text(page.coverage?.sentence ?? "Total not available")
+            // Only a count the server actually sent; no "total not available" filler.
+            if case .loaded(let page) = jobs, let coverage = page.coverage,
+               (coverage.totalForViewer ?? coverage.totalForVehicle) != nil {
+                Text(coverage.sentence)
             }
         }
         if case .loaded(let page) = jobs {
@@ -291,9 +378,9 @@ struct WorkConsoleContent: View {
     }
 
     private var loadingRow: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-            Text("Loading…").font(.footnote).foregroundStyle(.secondary)
+        VStack(spacing: NukeSpace.sm) {
+            NukeRowSkeleton()
+            NukeRowSkeleton()
         }
     }
 }
@@ -328,20 +415,21 @@ struct JobRowView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .font(.caption2)
+            .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(1)
             if row.inconsistencyCount > 0 {
                 Label("Records disagree (\(row.inconsistencyCount))", systemImage: "exclamationmark.circle.fill")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.orange)
             }
             if let updated = JobCopy.updated(row.asOf) {
                 Text(updated)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, NukeSpace.xs)
+        .frame(minHeight: NukeSize.minTap)
     }
 }

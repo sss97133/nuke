@@ -4,6 +4,7 @@
 // listing_work_plan_read, request_inspection, vehicle_work_orders_read, post_work_request,
 // my_signature_queue, my_work_orders. Nothing here computes a number the server can state.
 import { supabase } from '../../lib/supabase';
+import type { WorkContext, WorkDecision, WorkHandoff, WorkProof } from './workEvidenceModel';
 
 export type VehicleLabel = { year?: number | null; make?: string | null; model?: string | null; trim?: string | null; text?: string | null } | null;
 
@@ -82,6 +83,7 @@ export type SignQueueRead = {
 
 export type WorkOrderRow = {
   work_order_id: string;
+  vehicle_id?: string | null;
   title?: string | null;
   display_title?: string | null;
   vehicle_label?: VehicleLabel;
@@ -90,6 +92,38 @@ export type WorkOrderRow = {
   stage_states?: Record<string, string>;
   first_gap?: { stage: string; gap: string | null } | null;
   request_source_label?: string | null;
+  retained_work?: RetainedWorkRead;
+  workload?: {
+    recorded_status: string | null;
+    disposition: 'current' | 'history';
+    completed_at: string | null;
+    updated_at: string | null;
+    schedule: { start: string | null; end: string | null };
+    client: string | null;
+    organization: { id: string; name: string | null } | null;
+    provider: { handle?: string; label?: string } | null;
+    money: { visibility: 'party' | 'withheld'; currency?: string | null; estimate?: number | null;
+      estimate_at?: string | null; received?: number | null; payment_records?: number;
+      last_payment_on?: string | null; balance?: number | null; payment_basis?: string; estimate_basis?: string };
+    time: { estimated_hours: number | null; recorded_hours: number | null; remaining_hours: number | null; basis: string };
+    parts: { records: number; states: Record<string, number>; basis: string };
+    source: { table: string; record_id: string; as_of: string | null };
+  } | null;
+};
+
+export type RetainedWorkRead = {
+  visibility: 'included' | 'withheld';
+  as_of?: string;
+  responsibility_reports?: Array<{ binding_id: string; provider_actor_id: string; provider_label: string;
+    client_label: string; source_observation_id: string; reported_at: string; payment_state: string | null;
+    delivery_state: 'reported_owed'; assurance: string }>;
+  scope_entries?: Array<{ source_observation_id: string; source_id: string; source_pointer: string;
+    item: string; category: string | null; document_label: string; document_row: number;
+    billing_column: string | null; execution_state: string; observed_at: string | null; ingested_at: string | null }>;
+  next_after_source_id?: string | null;
+  coverage?: { returned: number; total_source_entries: number; population: string };
+  physical_completion?: string;
+  money_authorized?: boolean;
 };
 
 export type MyWorkOrdersRead = {
@@ -98,6 +132,16 @@ export type MyWorkOrdersRead = {
   next_after: string | null;
   coverage: { returned: number; total_for_viewer: number };
 };
+
+export type VehicleReceiptLine = {
+  id: string; receipt_id: string; line_number: number | null; description: string | null;
+  part_number: string | null; quantity: number | null; category: string | null;
+  receipt: { id: string; vehicle_id: string; scope_type: string; scope_id: string;
+    vendor_name: string | null; receipt_date: string | null; transaction_date: string | null;
+    purchase_date: string | null; file_url: string | null; is_active: boolean;
+    is_superseded: boolean; duplicate_of: string | null };
+};
+export type VehicleReceiptLinesRead = { rows: VehicleReceiptLine[]; next_after: string | null };
 
 export type VehicleAccess = {
   role: string;
@@ -231,8 +275,90 @@ export const JobReaders = {
   matches: (workOrderId: string) => call<MatchesRead>('work_order_provider_matches_read', { p_work_order_id: workOrderId, p_limit: 25 }),
   vehicleWorkOrders: (vehicleId: string, after: string | null = null) => call<VehicleWorkOrdersRead>('vehicle_work_orders_read', { p_vehicle_id: vehicleId, p_after: after, p_limit: 25 }),
   signatureQueue: () => call<SignQueueRead>('my_signature_queue', {}),
-  myWorkOrders: (after: string | null) => call<MyWorkOrdersRead>('my_work_orders', { p_slot: null, p_after: after, p_limit: 25 }),
+  myWorkOrders: (after: string | null, cohort: 'responsible' | 'accessible' = 'responsible') => call<MyWorkOrdersRead>('my_work_orders', { p_slot: cohort === 'responsible' ? 'responsible' : null, p_after: after, p_limit: 25 }),
+  retainedWorkSources: (workOrderId: string, after: string | null = null) => call<RetainedWorkRead>('work_order_retained_sources_read', { p_work_order_id: workOrderId, p_after_source_id: after, p_limit: 25 }),
+  // Existing vehicle readers/RLS, invoked only after the job reader includes the retained duty.
+  // Vehicle evidence is supporting history, never silently allocated as performed work on this job.
+  workContext: readRetainedWorkContext,
+  vehicleReceiptLines: readVehicleReceiptLines,
 };
+
+/** Existing parent receipt RLS, not job-party or vehicle-access substitution.
+ * These are vehicle-filed source lines, never job allocation or on-hand inventory. */
+async function readVehicleReceiptLines(vehicleId: string, after: string | null = null): Promise<RpcResult<VehicleReceiptLinesRead>> {
+  let query = supabase.from('receipt_items').select('id,receipt_id,line_number,description,part_number,quantity,category,receipt:receipts!inner(id,vehicle_id,scope_type,scope_id,vendor_name,receipt_date,transaction_date,purchase_date,file_url,is_active,is_superseded,duplicate_of)')
+    .eq('receipt.vehicle_id',vehicleId).eq('receipt.scope_type','vehicle').eq('receipt.scope_id',vehicleId)
+    .eq('receipt.is_active',true).eq('receipt.is_superseded',false).is('receipt.duplicate_of',null)
+    .order('id').limit(101);
+  if (after) query=query.gt('id',after);
+  const { data,error }=await query;
+  if (error) return {data:null,refusal:{message:refusalText(error),code:error.code}};
+  const rows=(data ?? []) as unknown as VehicleReceiptLine[];
+  return {data:{rows:rows.slice(0,100),next_after:rows.length>100 ? rows[99].id : null},refusal:null};
+}
+
+async function readRetainedWorkContext(vehicleId: string, reports: NonNullable<RetainedWorkRead['responsibility_reports']>): Promise<WorkContext> {
+  const result: WorkContext = { vehicleId, proofs: [], decisions: [], handoffs: [], errors: [], partial: false };
+  if (!reports.length) return result;
+  const [proofs, decisions, bases] = await Promise.all([
+    supabase.from('vehicle_observations').select('id,vehicle_id,kind,source_id,is_superseded,observed_at,ingested_at,component:structured_data->>plug,component_name:structured_data->>plug_name,description:structured_data->>value,level:structured_data->>proof_level,photo_url:structured_data->photo->>url,photo_at:structured_data->photo->>taken_at,event_date:structured_data->>event_date,replaces:structured_data->>supersedes_original_id,method:structured_data->>method,owner_words:structured_data->>owner_confirmed')
+      .eq('vehicle_id', vehicleId).eq('kind', 'specification').eq('is_superseded', false)
+      .eq('structured_data->>domain', 'wiring').eq('structured_data->>property_key', 'device proof')
+      .order('id').limit(101),
+    supabase.from('wiring_decisions').select('id,subject,status,work_status,chosen,source,decided_on,trust')
+      .eq('vehicle_id', vehicleId).eq('is_superseded', false).not('decision_kind', 'is', null).order('id').limit(101),
+    supabase.from('vehicle_observations').select('id,source_id').eq('vehicle_id', vehicleId)
+      .eq('kind', 'work_record').eq('is_superseded', false).in('id', reports.map(r => r.source_observation_id)),
+  ]);
+  if (proofs.error) result.errors.push('Parts evidence could not be read.');
+  else {
+    result.proofsComplete = (proofs.data?.length ?? 0) <= 100;
+    result.proofs = (proofs.data ?? []).slice(0, 100) as unknown as WorkProof[];
+    result.partial ||= !result.proofsComplete;
+  }
+  if (decisions.error) result.errors.push('Work decisions could not be read.');
+  else { result.decisions = (decisions.data ?? []).slice(0, 100) as unknown as WorkDecision[]; result.partial ||= (decisions.data?.length ?? 0) > 100; }
+  const codes = [...new Set(result.proofs.map(p => p.component).filter((s): s is string => !!s))];
+  if (codes.length) {
+    const names = await supabase.from('harness_endpoints').select('code,name,design:harness_designs!inner(vehicle_id)')
+      .eq('design.vehicle_id', vehicleId).eq('is_superseded', false).in('code', codes).limit(201);
+    if (names.error) result.errors.push('Some component names could not be read.');
+    else {
+      result.partial ||= (names.data?.length ?? 0) > 200;
+      for (const proof of result.proofs) {
+        const labels = [...new Set((names.data ?? []).filter(n => n.code === proof.component).map(n => n.name).filter(Boolean))];
+        // An ambiguous design match does not establish a component identity.
+        if (labels.length === 1) proof.component_name = labels[0];
+      }
+    }
+  }
+  if (bases.error) { result.errors.push('Handoff sources could not be read.'); return result; }
+  const sourceClients = new Map<string, string[]>();
+  for (const basis of bases.data ?? []) {
+    const report = reports.find(r => r.source_observation_id === basis.id);
+    if (basis.source_id && report) sourceClients.set(basis.source_id, [...(sourceClients.get(basis.source_id) ?? []), report.client_label]);
+  }
+  if (!sourceClients.size) return result;
+  const handoffs = await supabase.from('vehicle_observations')
+    .select('id,source_id,observed_at,ingested_at,gate:structured_data->>gate,next_action:structured_data->>next_action,blocked_on:structured_data->blocked_on')
+    .eq('vehicle_id', vehicleId).eq('kind', 'work_record').eq('is_superseded', false)
+    .eq('structured_data->>folder_role', 'current_state').in('source_id', [...sourceClients.keys()])
+    .order('observed_at', { ascending: false, nullsFirst: false }).order('id').limit(21);
+  if (handoffs.error) result.errors.push('Handoff history could not be read.');
+  else {
+    result.partial ||= (handoffs.data?.length ?? 0) > 20;
+    result.handoffs = (handoffs.data ?? []).slice(0, 20).filter(row => {
+      if (typeof row.gate !== 'string') return false;
+      // A same-vehicle match alone cannot attach another client's handoff to this job.
+      const words = row.gate.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
+      return (sourceClients.get(row.source_id) ?? []).some(client => {
+        const name = client.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
+        return name && ` ${words} `.includes(` ${name} `);
+      });
+    }).map(row => ({ ...row, blocked_on: Array.isArray(row.blocked_on) ? row.blocked_on.filter((v: unknown) => typeof v === 'string') : [] })) as WorkHandoff[];
+  }
+  return result;
+}
 
 export const JobSigns = {
   offer: (args: OfferArgs) => call<{ offer_id: string; duplicate: boolean }>('offer_on_requirement', args),

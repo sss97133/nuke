@@ -1,8 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useVehicleProfile } from './VehicleProfileContext';
+import type { GalleryReadCount } from '../../components/images/ImageGallery';
+import type { GalleryAnalysisRead } from '../../components/images/ImageGallery';
+import { useAuthContext } from '../../contexts/AuthContext';
 
 // Lazy-load heavy components
+const ProfileReceiptRecords = React.lazy(() => import('./FinancialReceiptRecords').then(module => ({ default: module.ProfileReceiptRecords })));
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
 const VehicleDossierPanel = React.lazy(() => import('./VehicleDossierPanel'));
 const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
@@ -10,6 +14,7 @@ const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/veh
 // WiringQueryContextBar removed — wiring canvas replaced with data view
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const InvestmentLedger = React.lazy(() => import('./InvestmentLedger'));
+const ContributorIntakeCard = React.lazy(() => import('./ContributorIntakeCard'));
 const BuildLedger = React.lazy(() => import('./BuildLedger'));
 const AgentChat = React.lazy(() => import('../../components/agent/AgentChat'));
 const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
@@ -53,7 +58,10 @@ const ProfileGallery: React.FC<{
   onImagesUpdated: () => void;
   galleryView?: GalleryViewMode;
   galleryFilter?: import('./VehicleProfileContext').GalleryFilter | null;
-}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'GRID', galleryFilter }) => {
+  onReadCount?: (read: GalleryReadCount) => void;
+  onAnalysisRead?: (read: GalleryAnalysisRead) => void;
+  viewerKey: string;
+}> = ({ vehicleId, vehicleImages, fallbackListingImageUrls, leadImageUrl, vehicle, onImagesUpdated, galleryView = 'GRID', galleryFilter, onReadCount, onAnalysisRead, viewerKey }) => {
   // Build fallback chain: context images → listing images → hero URL → primary_image_url
   let fallback = vehicleImages.length > 0 ? vehicleImages : fallbackListingImageUrls;
   if (fallback.length === 0 && leadImageUrl) {
@@ -65,6 +73,7 @@ const ProfileGallery: React.FC<{
   return (
   <React.Suspense fallback={null}>
     <ImageGallery
+      key={vehicleId}
       vehicleId={vehicleId}
       showUpload={false}
       fallbackImageUrls={fallback}
@@ -73,6 +82,9 @@ const ProfileGallery: React.FC<{
       onImagesUpdated={onImagesUpdated}
       galleryView={galleryView}
       galleryFilter={galleryFilter}
+      onReadCount={onReadCount}
+      onAnalysisRead={onAnalysisRead}
+      viewerKey={viewerKey}
     />
   </React.Suspense>
   );
@@ -128,6 +140,17 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   const [galleryCols, setGalleryCols] = useState(3);
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
   const [galleryView, setGalleryView] = useState<GalleryViewMode>('GRID');
+  const [galleryRead, setGalleryRead] = useState<(GalleryReadCount & { viewerKey: string }) | null>(null);
+  const [analysisRead, setAnalysisRead] = useState<GalleryAnalysisRead | null>(null);
+  const [galleryRetry, setGalleryRetry] = useState(0);
+  const { user: viewer, loading: viewerLoading } = useAuthContext();
+  const viewerKey = viewerLoading ? 'resolving' : viewer?.id ?? 'anonymous';
+  const recordGalleryRead = useCallback((read: GalleryReadCount) => setGalleryRead({ ...read, viewerKey }), [viewerKey]);
+  const selectAnalysisImages = useCallback((imageIds: string[], label: string) => {
+    setGalleryFilter({ imageIds, label });
+    setGalleryView('GRID');
+    document.getElementById('vehicle-gallery-heading')?.scrollIntoView({ block: 'start' });
+  }, [setGalleryFilter]);
   const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
   const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
 
@@ -166,6 +189,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   // with ~9000px of content overflowing a ~550px pane (fixed 2026-06-11).
   return (
     <div>
+      <React.Suspense fallback={null}><ProfileReceiptRecords vehicleId={vehicle.id} /></React.Suspense>
       <div className="vp-columns">
         {/* LEFT COLUMN */}
         <div
@@ -202,7 +226,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
 
           {/* Vehicle Dossier — provenance-rich field panel */}
-          <CollapsibleWidget variant="profile" title="Source claims & specifications" defaultCollapsed={false}>
+          <CollapsibleWidget variant="profile" title="Specifications" defaultCollapsed={false}>
             <React.Suspense fallback={null}><VehicleDossierPanel /></React.Suspense>
           </CollapsibleWidget>
 
@@ -258,12 +282,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
 
           {/* Image-Analysis Findings — BYOK identity / powertrain / provenance / evidence rollup */}
           <React.Suspense fallback={null}>
-            <VehicleFindingsCard vehicleId={vehicle.id} />
+            <VehicleFindingsCard vehicleId={vehicle.id} viewerKey={viewerKey}
+              read={viewerLoading ? null : analysisRead} onSelectImages={selectAnalysisImages}
+              onRetry={() => { setAnalysisRead(null); setGalleryRead(null); setGalleryRetry(value => value + 1); }} />
           </React.Suspense>
 
           {/* Work — jobs on this vehicle, Plan the work (listing plan + inspection order), Post a job */}
           <React.Suspense fallback={null}>
-            <VehicleWorkCard vehicleId={vehicle.id} signedIn={!!session?.user?.id}
+            <VehicleWorkCard vehicleId={vehicle.id} signedIn={!!session?.user?.id} hideWhenEmpty
               vehicleTitle={[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')} />
           </React.Suspense>
 
@@ -386,6 +412,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               </CollapsibleWidget>
             </>
           )}
+          {(isRowOwner || isVerifiedOwner) && (
+            <CollapsibleWidget variant="profile" title="Contributors" defaultCollapsed={true}>
+              <React.Suspense fallback={null}><ContributorIntakeCard vehicleId={vehicle.id} vehicle={{ make: vehicle.make, model: vehicle.model, year: vehicle.year, color: vehicle.color }} /></React.Suspense>
+            </CollapsibleWidget>
+          )}
           {(isVerifiedOwner || hasContributorAccess) && (
             <CollapsibleWidget variant="profile" title="Ledger Documents" defaultCollapsed={true}>
               <VehicleLedgerDocumentsCard vehicleId={vehicle.id} canManage={Boolean(isVerifiedOwner || hasContributorAccess)} />
@@ -457,18 +488,19 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           )}
 
           {/* Gallery toolbar */}
-          <div className="widget__header gallery-header">
+          <div className="widget__header gallery-header" id="vehicle-gallery-heading">
             {/* Active gallery filter chip */}
             {galleryFilter && (
               <div className="gallery-filter-chip">
                 <span style={{ color: 'var(--text-secondary)' }}>Filter:</span>
-                <span>{galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
+                <span>{galleryFilter.label || galleryFilter.field || galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
                 <button type="button" onClick={() => setGalleryFilter(null)}>Clear filter</button>
               </div>
             )}
             <div className="widget__header-left">
               <span className="widget__label">Images</span>
-              <span className="widget__count">{vehicleImages.length || '—'}</span>
+              <span className="widget__count">{galleryRead?.vehicleId === vehicle.id && galleryRead.viewerKey === viewerKey && galleryRead.filterKey === JSON.stringify(galleryFilter || null)
+                ? galleryRead.failed ? 'Unavailable' : `${galleryRead.shown}${galleryRead.partial ? ' loaded matches' : ''}` : 'Reading…'}</span>
             </div>
             <div className="widget__controls">
               <div className="gallery-toolbar" role="group" aria-label="Image view">
@@ -480,7 +512,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                     aria-pressed={view === galleryView}
                     onClick={() => {
                       setGalleryView(view);
-                      if (galleryFilter) setGalleryFilter(null);
                     }}
                   >
                     {{ ZONES: 'Zones', GRID: 'Grid', FULL: 'Full size', INFO: 'Details', SESSIONS: 'Sessions', CATEGORY: 'Category', CHRONO: 'Timeline', SOURCE: 'Source' }[view]}
@@ -504,7 +535,8 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           </div>
 
           {/* Image Gallery */}
-          <ProfileGallery
+          {!viewerLoading && <ProfileGallery
+            key={`${vehicle.id}:${viewerKey}:${galleryRetry}`}
             vehicleId={vehicle.id}
             vehicleImages={vehicleImages}
             fallbackListingImageUrls={fallbackListingImageUrls}
@@ -513,7 +545,10 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             onImagesUpdated={() => { reloadVehicle(); reloadTimeline(); reloadImages(); }}
             galleryView={galleryView}
             galleryFilter={galleryFilter}
-          />
+            onReadCount={recordGalleryRead}
+            onAnalysisRead={setAnalysisRead}
+            viewerKey={viewerKey}
+          />}
 
           {/* Vehicle Scores */}
           <React.Suspense fallback={null}>

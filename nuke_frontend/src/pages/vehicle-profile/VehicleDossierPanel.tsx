@@ -2,14 +2,11 @@
  * VehicleDossierPanel.tsx
  *
  * Provenance-rich vehicle profile panel. Replaces VehicleBasicInfo.
- * Each field row shows the primary value with source badges and an
- * expandable provenance drawer showing all evidence sources.
- *
- * Design system: Nuke utilitarian — Arial, 2px solid borders,
- * ALL CAPS labels, 9-10px body, zero radius/shadows/gradients.
+ * Core recorded values have one source action. The first click opens cited
+ * photographs and quotations; additional computations retain their own rows.
  */
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { usePopup } from '../../components/popups/usePopup';
 import { supabase } from '../../lib/supabase';
@@ -17,8 +14,241 @@ import { useFieldEvidence, type FieldEvidenceMap, type FieldEvidenceGroup } from
 import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFacts';
 import { useFieldProvenance, formatProvenanceValue, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
+import { PrefetchLink } from '../../components/PrefetchLink';
+import { readProfileSourcePage, sourceValueText, physicalRecordedValue, PHYSICAL_READING_ROLES,
+  type PhysicalReadingField, type StructuredClaim } from './profileSourceClaims';
+import { currentBidEvidenceAmount } from './auctionEvidenceDisplay';
+import { useProfileRead } from './profileDocument';
+import { ItemList } from '../../kit';
+import type { FacetItem, TokenItems } from '../../kit/types';
 
+const VehicleEvidenceReview = React.lazy(() => import('../../components/vehicle/VehicleEvidenceAssessment').then(m => ({ default: m.VehicleEvidenceReview })));
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
+
+const RECORD_FIELDS = ['year', 'make', 'model', 'vin', 'trim', 'body_style', 'engine_type', 'engine_size',
+  'transmission', 'drivetrain', 'color', 'interior_color', 'mileage'] as const;
+type RecordField = typeof RECORD_FIELDS[number];
+type RecordAttribute = { value: string | number | null; data_type: string; unit: string | null;
+  value_status: 'unrecorded' | 'retained_record_value'; origin_column: string };
+type RecordBinding = { property_key: string; origin_column: string; value: string | number; unit: string | null;
+  record_columns_disagree: boolean };
+type StructuredRead = { id: string; status: 'loading' | 'ready' | 'failed'; claims: StructuredClaim[];
+  claimStatus?: 'loading' | 'ready' | 'failed'; attributes?: Record<RecordField, RecordAttribute>; bindings?: RecordBinding[];
+  nextAfter?: string | null; pageStatus?: 'loading' | 'failed'; unresolved?: Array<{ property_key: string; reason: string }> };
+const STRUCTURED_RECORD_LABELS: Record<RecordField, string> = { year: 'Year', make: 'Make', model: 'Model', vin: 'VIN', trim: 'Trim',
+  body_style: 'Body style', engine_type: 'Engine type', engine_size: 'Engine size', transmission: 'Transmission',
+  drivetrain: 'Drivetrain', color: 'Exterior color', interior_color: 'Interior color', mileage: 'Odometer' };
+const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+/** The header token whose line items state a record field (vehicle_profile_read masthead.token_items). Engine type
+ * and size are both stated by the engine token, so its items render once, on the engine type row. */
+const FIELD_TOKEN: Partial<Record<RecordField, string>> = { year: 'year', make: 'make', model: 'model', trim: 'trim',
+  body_style: 'body_style', engine_type: 'engine', engine_size: 'engine', transmission: 'transmission', drivetrain: 'drivetrain',
+  color: 'paint' };
+
+/** The masthead's token items from the page's one profile read (shared with the header; no new request). */
+function useTokenItems(vehicleId: string): TokenItems | null {
+  const { data } = useProfileRead(vehicleId);
+  const masthead = data?.sections.find(section => section.kind === 'masthead') as { token_items?: TokenItems | null } | undefined;
+  return masthead?.token_items ?? null;
+}
+
+/** Reuse the same source query as the value's first-click evidence surface. */
+function PhysicalRecordedValue({ vehicleId, field, label, fallback, fallbackNote, onInspect, optional = false }: {
+  vehicleId: string; field: PhysicalReadingField; label: string; fallback: string;
+  fallbackNote?: string;
+  onInspect?: (field: string, label: string, value: string) => void; optional?: boolean;
+}) {
+  const read = useFieldProvenance(vehicleId, field);
+  const source = physicalRecordedValue(vehicleId, field, read.isError ? undefined : read.data);
+  if (optional && source.status === 'absent' && !read.isError) return null;
+  const value = source.status === 'resolved' ? source.value : source.status === 'conflict' ? 'Review differing readings' : fallback;
+  const content = <>
+    <button type="button" className="vp-structured-record__value" disabled={!onInspect}
+      onClick={() => onInspect?.(field, label, source.status === 'conflict' ? '' : value)}>
+      {value || 'Inspect evidence'}
+    </button>
+    {source.status === 'resolved' && <div className="vp-structured-record__note">{source.note}</div>}
+    {source.status !== 'resolved' && fallbackNote && <div className="vp-structured-record__note">{fallbackNote}</div>}
+    {(read.isError || source.status === 'unavailable') && <div role="status" className="vp-structured-record__note">Source could not be read.</div>}
+  </>;
+  return optional ? <tr data-record-field={field}><th scope="row">{label}</th><td>{content}</td></tr> : content;
+}
+
+/** Read every stored field first, then admitted claims from the same owner.
+ * A slow or failed source read must not hide the structured stored record. */
+export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: boolean | null; canReview?: boolean;
+  onInspect?: (field: string, label: string, value: string) => void;
+  /** The header's token line items (masthead.token_items), passed from the page's one profile read. */
+  tokenItems?: TokenItems | null }> = ({ vehicleId, isReplica, onInspect, canReview = false, tokenItems = null }) => {
+  const [read, setRead] = useState<StructuredRead>(
+    { id: vehicleId, status: 'loading', claims: [] });
+  const generation = React.useRef(0);
+  const pagingAbort = React.useRef<AbortController | null>(null);
+  React.useEffect(() => {
+    if (!UUID.test(vehicleId)) return;
+    const controller = new AbortController();
+    let active = true;
+    generation.current++;
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    setRead({ id: vehicleId, status: 'loading', claims: [] });
+    void (async () => {
+      try {
+        const { data: records, error: recordError } = await supabase.rpc('get_vehicle_specs', {
+          p_vehicle_ids: [vehicleId], p_include_typed_claims: false,
+        }).abortSignal(controller.signal);
+        const model = Array.isArray(records) && records.length === 1 ? records[0] : null;
+        if (recordError || model?.vehicle_id !== vehicleId || model.schema_version !== 'vehicle_data_model_v1'
+          || model.typed_claims_status !== 'not_requested') throw Error('Unavailable structured record');
+        const record = model.retained_record;
+        const attributes = record?.attributes;
+        if (record?.origin_relation !== 'vehicles' || record.source_attribution_status !== 'unassayed'
+          || !attributes || !RECORD_FIELDS.every(key => {
+            const a = attributes[key];
+            return a && a.origin_column === key && (a.unit === null || typeof a.unit === 'string')
+              && ((a.value_status === 'unrecorded' && a.value === null)
+                || (a.value_status === 'retained_record_value'
+                  && ((a.data_type === 'string' && typeof a.value === 'string')
+                    || (a.data_type === 'integer' && Number.isSafeInteger(a.value)))));
+          }) || !Array.isArray(record.property_bindings)) throw Error('Unavailable structured record');
+        const bindings: RecordBinding[] = record.property_bindings;
+        if (!bindings.every(b => b && RECORD_FIELDS.includes(b.origin_column as RecordField)
+          && /^[a-z][a-z0-9_]*$/.test(b.property_key) && (b.unit === null || typeof b.unit === 'string')
+          && typeof b.record_columns_disagree === 'boolean'
+          && (typeof b.value === 'string' || (typeof b.value === 'number' && Number.isFinite(b.value))))) throw Error('Invalid record bindings');
+        if (active) setRead({ id: vehicleId, status: 'ready', claimStatus: 'loading', claims: [], attributes, bindings });
+        const { data, error } = await supabase.rpc('get_vehicle_specs', {
+          p_vehicle_ids: [vehicleId], p_include_typed_claims: true, p_claim_cursor: {},
+        }).abortSignal(controller.signal);
+        const claimModel = Array.isArray(data) && data.length === 1 ? data[0] : null;
+        if (error) throw Error('Unavailable structured claims');
+        const page = readProfileSourcePage(claimModel, vehicleId);
+        if (active) setRead({ id: vehicleId, status: 'ready', claimStatus: 'ready', claims: page.claims, attributes, bindings,
+          nextAfter: page.nextAfter, unresolved: page.unresolved });
+      } catch {
+        if (active) setRead(previous => previous.id === vehicleId && previous.attributes
+          ? { ...previous, claimStatus: 'failed', claims: [] }
+          : { id: vehicleId, status: 'failed', claimStatus: 'failed', claims: [] });
+      } finally { clearTimeout(timeout); }
+    })();
+    return () => { active = false; generation.current++; clearTimeout(timeout); controller.abort(); pagingAbort.current?.abort(); };
+  }, [vehicleId]);
+  const loadSourcePage = async (after: string | null) => {
+    if (read.id !== vehicleId || !read.attributes || read.pageStatus === 'loading') return;
+    const currentGeneration = generation.current;
+    const controller = new AbortController();
+    pagingAbort.current?.abort(); pagingAbort.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    setRead(previous => ({ ...previous, pageStatus: 'loading' }));
+    try {
+      const { data, error } = await supabase.rpc('get_vehicle_specs', {
+        p_vehicle_ids: [vehicleId], p_include_typed_claims: true, p_claim_cursor: after ? { after } : {},
+      }).abortSignal(controller.signal);
+      if (error || !Array.isArray(data) || data.length !== 1) throw Error('Unavailable source page');
+      const page = readProfileSourcePage(data[0], vehicleId);
+      if (after !== null && (page.nextAfter === after || page.claims.some(c => c.observation_id <= after))) throw Error('Repeated source cursor');
+      if (generation.current === currentGeneration && pagingAbort.current === controller) setRead(previous => ({ ...previous, claimStatus: 'ready',
+        claims: after ? [...new Map([...previous.claims, ...page.claims].map(c => [c.observation_id, c])).values()] : page.claims,
+        nextAfter: page.nextAfter, unresolved: page.unresolved, pageStatus: undefined }));
+    } catch {
+      if (generation.current === currentGeneration && pagingAbort.current === controller) setRead(previous => ({ ...previous, pageStatus: 'failed' }));
+    } finally { clearTimeout(timeout); }
+  };
+  if (!UUID.test(vehicleId)) return null;
+  const current: StructuredRead = read.id === vehicleId ? read : { id: vehicleId, status: 'loading', claims: [] };
+  const itemsFor = (key: RecordField): FacetItem[] | null => {
+    const token = FIELD_TOKEN[key];
+    const items = token ? tokenItems?.[token] : null;
+    return items && items.length ? items : null;
+  };
+  return <>
+    <section aria-label="Structured vehicle data" className="vp-structured-claims">
+      {current.status === 'loading' ? <p role="status">Reading vehicle data…</p>
+        : current.status === 'failed' ? <p role="status">Vehicle data could not be read. Missing information has not been established.</p>
+        : <table className="vp-structured-record">
+          <caption>Select a value to inspect its source.</caption>
+          <thead><tr><th scope="col">Field</th><th scope="col">Recorded value</th></tr></thead>
+          <tbody>{RECORD_FIELDS.map(key => {
+            const a = current.attributes![key];
+            // A field a header token states renders that token's line items, as built and current with their sources,
+            // rules and gaps: the same items the token's popover shows (kit ItemList), read once with the header.
+            const items = itemsFor(key);
+            // A replica's retained trim can name the car it resembles. It cannot establish factory identity, even after
+            // the old claim is retired, so the bare value stays hidden; the trim items (tribute rule, as-built interior
+            // code, each with its status) can render.
+            if (key === 'trim' && isReplica === true && !items) return null;
+            if (items && key === 'engine_size') return null;
+            // Full width: an item list in the 65% value column broke names letter by letter at desktop width.
+            if (items) return <tr key={key} data-record-field={key} data-token-items={FIELD_TOKEN[key]} className="vp-structured-record__items">
+              <td colSpan={2}><div className="vp-structured-record__items-label">{key === 'engine_type' ? 'Engine' : STRUCTURED_RECORD_LABELS[key]}</div>
+                <ItemList items={items} /></td>
+            </tr>;
+            const derived = current.bindings?.filter(b => b.origin_column === key && (b.value !== a.value || b.unit !== a.unit || b.record_columns_disagree));
+            return <tr key={key} data-record-field={key}>
+              <th scope="row">{STRUCTURED_RECORD_LABELS[key]}</th>
+              <td>{key in PHYSICAL_READING_ROLES ? <PhysicalRecordedValue vehicleId={vehicleId}
+                field={key as PhysicalReadingField} label={STRUCTURED_RECORD_LABELS[key]}
+                fallback={a.value === null ? '' : `${String(a.value)}${a.unit ? ` ${a.unit}` : ''}`}
+                fallbackNote={key === 'mileage' && a.value !== null && !a.unit ? 'Unit not established' : undefined} onInspect={onInspect} />
+                : <button type="button" className="vp-structured-record__value" disabled={!onInspect}
+                onClick={() => onInspect?.(key, STRUCTURED_RECORD_LABELS[key], a.value === null ? '' : `${String(a.value)}${a.unit ? ` ${a.unit}` : ''}`)}>
+                {a.value_status === 'unrecorded' ? 'Inspect evidence' : typeof a.value === 'string' && !a.value.trim() ? 'Inspect evidence' : `${String(a.value)}${a.unit ? ` ${a.unit}` : ''}`}
+              </button>}
+                {derived?.map(b => <div key={b.property_key} className="vp-structured-record__note">
+                  {b.property_key.replaceAll('_', ' ')}: {String(b.value)}{b.unit ? ` ${b.unit}` : ''}
+                  {b.record_columns_disagree && ' · Conflicting record values'}
+                </div>)}
+              </td>
+            </tr>;
+          })}<PhysicalRecordedValue vehicleId={vehicleId} field="factory_color" label="Factory paint code"
+            fallback="" onInspect={onInspect} optional />
+            <PhysicalRecordedValue vehicleId={vehicleId} field="appearance" label="Appearance"
+              fallback="" onInspect={onInspect} optional /></tbody>
+        </table>}
+    </section>
+    <section aria-label="Structured source claims" className="vp-structured-claims"
+      hidden={current.claimStatus === 'ready' && current.claims.length === 0 && !current.unresolved?.length}>
+    <h3>Structured source claims</h3>
+    {(current.claimStatus ?? current.status) === 'loading' ? <p role="status">Reading structured evidence…</p>
+      : (current.claimStatus ?? current.status) === 'failed' ? <p role="status">Structured evidence could not be read. Missing information has not been established.</p>
+      : current.claims.length === 0 ? <p>No admitted core claims returned. Retained descriptions and records may still contain unprocessed evidence.</p>
+      : <dl>{current.claims.map(claim => {
+        let external: string | null = null;
+        let imageSource: string | null = null;
+        try { const url = new URL(claim.source_url || ''); if (url.protocol === 'https:' || url.protocol === 'http:') external = url.href; } catch { /* Retain the internal evidence link. */ }
+        try { const url = new URL(claim.image_url || ''); if (url.protocol === 'https:' || url.protocol === 'http:') imageSource = url.href; } catch { /* Keep the observation citation. */ }
+        return <div key={`${claim.property_id}:${claim.observation_id}`} className="vp-structured-claims__row">
+          <dt>{claim.label || claim.property_key.replaceAll('_', ' ')}</dt>
+          <dd>
+            {sourceValueText(claim.value)}{claim.unit ? ` ${claim.unit}` : ''}
+            <div className="vp-structured-claims__source">
+              <PrefetchLink to={`/vehicle/${vehicleId}/observation/${claim.observation_id}`}>Evidence</PrefetchLink>
+              {external && <> · <a href={external} target="_blank" rel="noopener noreferrer">Original source</a></>}
+              {imageSource && imageSource !== external && <> · <a href={imageSource} target="_blank" rel="noopener noreferrer">Image witness</a></>}
+              {' · '}{claim.evidence_state === 'reported' ? 'Reported source claim' : claim.evidence_state === 'disputed' ? 'Disputed image reading' : 'Interpreted image reading'}
+              <div>Recorded: {claim.ingested_at || 'Unknown'} · Observation clock: {claim.observed_at || 'Unknown'}</div>
+              <div>Clock basis: {claim.qualifiers?.observed_at_basis?.replaceAll('_', ' ') || 'Unknown'}</div>
+              <div>Factory configuration: {claim.qualifiers?.factory_configuration_status || 'unknown'} · Current configuration: {claim.qualifiers?.current_configuration_status || 'unknown'}</div>
+              {claim.qualifiers?.limitation && <div>{claim.qualifiers.limitation}</div>}
+              {claim.evidence_state === 'disputed' && claim.alternative_readings?.length ? <details>
+                <summary>Other readings of this image</summary>
+                <ul>{claim.alternative_readings.map(a => <li key={a.observation_id}>
+                  {sourceValueText(a.value)} · <PrefetchLink to={`/vehicle/${vehicleId}/observation/${a.observation_id}`}>Evidence</PrefetchLink>
+                </li>)}</ul>
+              </details> : null}
+            </div>
+          </dd>
+        </div>;
+      })}</dl>}
+    {current.unresolved?.some(p => p.reason === 'source_reader_refused_input_limit') && <p role="status">Some image evidence exceeds the current reader limit and remains unresolved.</p>}
+    {current.pageStatus === 'failed' && <p role="status">More evidence could not be read. The sources already shown are retained.</p>}
+    {(current.nextAfter || current.claimStatus === 'failed') && <button type="button" disabled={current.pageStatus === 'loading'}
+      onClick={() => { void loadSourcePage(current.nextAfter ?? null); }}>
+      {current.pageStatus === 'loading' ? 'Reading evidence…' : current.pageStatus === 'failed' || current.claimStatus === 'failed' ? 'Retry evidence' : 'Read more evidence'}
+    </button>}
+  </section>
+    {canReview && <React.Suspense fallback={null}><VehicleEvidenceReview key={vehicleId} vehicleId={vehicleId} /></React.Suspense>}
+  </>;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -384,10 +614,11 @@ const FieldRow: React.FC<{
 /* ------------------------------------------------------------------ */
 
 const VehicleDossierPanel: React.FC = () => {
-  const { vehicle, vehicleId, canEdit, isVerifiedOwner, isMobile, setGalleryFilter } = useVehicleProfile();
+  const { vehicle, vehicleId, session, canEdit, isVerifiedOwner, isMobile, setGalleryFilter, auctionPulse } = useVehicleProfile();
   const navigate = useNavigate();
   const { openPopup } = usePopup();
   const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
+  const tokenItems = useTokenItems(vehicle?.id || '');
   const configuration = useFieldProvenance(vehicle?.id || '', 'engine_configuration');
   const displacement = useFieldProvenance(vehicle?.id || '', 'engine_displacement_l');
   const vinRead = useFieldProvenance(vehicle?.id || '', 'vin');
@@ -404,28 +635,8 @@ const VehicleDossierPanel: React.FC = () => {
   const { priceFacts, priceSettled, priceFailed } = useVehiclePriceFacts(vehicle?.id);
   const priceKind = priceSettled && !priceFailed ? priceKindLabel(priceFacts) : null;
 
-  // Auto-expand fields with multi-source evidence
-  const autoExpandFields = useMemo(() => {
-    const candidates = ['drivetrain', 'engine_type', 'fuel_system_type'];
-    const set = new Set<string>();
-    for (const f of candidates) {
-      const g = evidence[f];
-      if (g && g.sources.length > 1) set.add(f);
-    }
-    return set;
-  }, [evidence]);
-
   const [openDrawers, setOpenDrawers] = useState<Set<string>>(new Set());
-  const [initialized, setInitialized] = useState(false);
   const [powerplantExpanded, setPowerplantExpanded] = useState(false);
-
-  // Initialize auto-expanded drawers once evidence loads
-  React.useEffect(() => {
-    if (!initialized && autoExpandFields.size > 0) {
-      setOpenDrawers(new Set(autoExpandFields));
-      setInitialized(true);
-    }
-  }, [autoExpandFields, initialized]);
 
   const toggleDrawer = (field: string) => {
     setOpenDrawers(prev => {
@@ -569,11 +780,17 @@ const VehicleDossierPanel: React.FC = () => {
 
       {/* Info Panel */}
       <div className="vp-dossier-panel">
-        <div className="vp-dossier-panel__title">Vehicle information</div>
+        <StructuredProfileData vehicleId={vehicle.id} canReview={!!session?.user} isReplica={vehicle.is_replica} tokenItems={tokenItems} onInspect={(field, label, value) => openPopup(
+          <React.Suspense fallback={<p role="status">Reading source…</p>}>
+            <FieldEvidencePopup vehicleId={vehicle.id} field={field} label={label} value={value} presentation="citations" />
+          </React.Suspense>, label, Math.min(720, window.innerWidth - 24), false,
+        )} />
 
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
           const visibleFields = fg.fields.filter(field => {
+            // The structured table owns these values and their source action.
+            if (RECORD_FIELDS.includes(field as RecordField)) return false;
             if (engineReads[field]) return !!engineValue(field);
             if (field === 'vin') return true; // Unknown canonical identity still has a useful source drill.
             if (field === 'sale_price') return !!priceKind;
@@ -631,7 +848,9 @@ const VehicleDossierPanel: React.FC = () => {
                   const on = priceFacts?.price_as_of
                     ? new Date(priceFacts.price_as_of).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
                     : null;
-                  displayValue = priceKind ? fmtVal(field, priceFacts?.price_amount) + (on ? ` · ${on}` : '') : '';
+                  displayValue = priceKind && priceFacts ? (priceFacts.price_kind === 'bid'
+                    ? currentBidEvidenceAmount(priceFacts, auctionPulse)
+                    : fmtVal(field, priceFacts.price_amount)) + (on ? ` · ${on}` : '') : '';
                   fieldLabel = priceKind === 'Sold' ? 'SALE PRICE' : (priceKind || '').toUpperCase();
                 }
                 // the listing's own qualifier on the reading, e.g. BaT "10k Miles Shown, TMU" -> "10,000 mi · shown, TMU"

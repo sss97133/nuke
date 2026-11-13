@@ -58,6 +58,9 @@ function optimizeImageUrl(url: string): string {
 }
 
 function ownershipPeriod(vehicle: GarageVehicle): string {
+  if (['profile_record', 'account_record', 'contributor'].includes(vehicle.relationship_source)) {
+    return 'OWNERSHIP NOT RECORDED';
+  }
   if (vehicle.relationship_source === 'owner_statement' &&
       !['OWNER', 'VERIFIED OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED'].includes(vehicle.relationship_type)) {
     return vehicle.relationship_detail || 'DATES UNKNOWN';
@@ -80,6 +83,7 @@ function relationshipSource(vehicle: GarageVehicle): string {
     verification: 'Ownership verification', ownership: 'Ownership record',
     owner_statement: 'Account statement', discovered: 'Prior ownership record',
     permission: 'Permission record', contributor: 'Contribution record', uploaded_by: 'Upload record',
+    profile_record: 'Profile you added', account_record: 'Account vehicle record',
   };
   return labels[vehicle.relationship_source] ?? 'Source unavailable';
 }
@@ -542,9 +546,10 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
           }}
         >
           <Link to={`/vehicle/${vehicle.id}`} className="garage-card-image-link" aria-hidden="true" tabIndex={-1} />
-          {(vehicle.resolved_image_url || vehicle.primary_image_url) ? (
+          {vehicle.resolved_image_url ? (
             <img
-              src={optimizeImageUrl(vehicle.resolved_image_url || vehicle.primary_image_url!)}
+              key={vehicle.resolved_image_url}
+              src={optimizeImageUrl(vehicle.resolved_image_url)}
               alt={title}
               width={400}
               height={225}
@@ -823,9 +828,10 @@ function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
           }}
         >
           <Link to={`/vehicle/${vehicle.id}`} className="garage-card-image-link" aria-hidden="true" tabIndex={-1} />
-          {(vehicle.resolved_image_url || vehicle.primary_image_url) ? (
+          {vehicle.resolved_image_url ? (
             <img
-              src={optimizeImageUrl(vehicle.resolved_image_url || vehicle.primary_image_url!)}
+              key={vehicle.resolved_image_url}
+              src={optimizeImageUrl(vehicle.resolved_image_url)}
               alt={title}
               width={120}
               height={90}

@@ -6,6 +6,7 @@
 import { supabase } from '../lib/supabase';
 import type { ChannelDef } from './channelRegistry';
 import { dispatchChannel } from './channelAdapters';
+import { assertListingPackageEvidence, listingEvidenceSnapshot } from './listingPackageEvidence';
 
 export interface ListingExport {
   id: string;
@@ -159,17 +160,11 @@ export class ListingExportService {
       const { channel } = params;
 
       // 1. Prepare the package from the digital twin (existing edge function).
-      let pkg: any = null;
-      try {
-        const { data, error } = await supabase.functions.invoke('generate-listing-package', {
-          body: { vehicle_id: params.vehicle_id, platform: channel.platform },
-        });
-        if (error) throw error;
-        pkg = data;
-      } catch (e) {
-        // Package assembly is best-effort; we still arm the channel with what we have.
-        console.warn(`generate-listing-package failed for ${channel.id}:`, e);
-      }
+      const { data: pkg, error: packageError } = await supabase.functions.invoke('generate-listing-package', {
+        body: { vehicle_id: params.vehicle_id, platform: channel.platform },
+      });
+      if (packageError) throw new Error('Listing evidence could not be read. The channel remains unchanged.');
+      assertListingPackageEvidence(pkg, params.vehicle_id);
 
       const content = (pkg?.listing_content ?? {}) as Record<string, any>;
       const photos = (pkg?.photos?.ordered ?? []) as Array<{ url: string }>;
@@ -224,6 +219,7 @@ export class ListingExportService {
             live: channel.liveStatus === 'live',
             ars_tier: pkg?.tier ?? null,
             ars_score: pkg?.ars_score ?? null,
+            ...listingEvidenceSnapshot(pkg),
           },
         })
         .select()

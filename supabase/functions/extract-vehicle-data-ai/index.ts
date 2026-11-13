@@ -11,7 +11,7 @@ import { getLLMConfig, callLLM, type LLMProvider } from '../_shared/llmProvider.
 import { writeObservation } from "../_shared/observationWriter.ts"
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { writeVehicle } from './vehicleWrite.ts'
-import { normalizeExtractedData } from './normalize.ts'
+import { dedicatedExtractorDeferral, normalizeExtractedData } from './normalize.ts'
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
@@ -139,8 +139,14 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ url, source }),
           signal: AbortSignal.timeout(60000),
         })
-        if (proxyRes.ok) {
-          const proxyData = await proxyRes.json()
+        const proxyData = await proxyRes.json().catch(() => null)
+        const deferred = dedicatedExtractorDeferral(proxyData)
+        if (deferred) {
+          return new Response(JSON.stringify(deferred), {
+            status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        if (proxyRes.ok && proxyData) {
           // Different extractors use different response shapes
           const rawResult = proxyData.data || proxyData.extracted || proxyData.vehicle || proxyData
           // Only accept if the extractor returned meaningful data (at least year or make)

@@ -276,7 +276,8 @@ async function fetchEcrModels(): Promise<Map<string, string[]>> {
     const data = await supabaseQuery('ecr_models', {
       'select': 'ecr_make_slug,model_name',
       'is_active': 'eq.true',
-      'limit': '5000',
+      'order': 'ecr_make_slug,ecr_model_slug',
+      'limit': '500',
       'offset': String(offset),
     });
     if (!data || data.length === 0) break;
@@ -292,8 +293,9 @@ async function fetchEcrModels(): Promise<Map<string, string[]>> {
       makeModels.get(make)!.push(model);
     }
 
-    offset += 5000;
-    if (data.length < 5000) break;
+    // PostgREST may cap a requested page. Advance by rows actually returned and
+    // keep reading until empty, so a short page never discards the catalogue tail.
+    offset += data.length;
   }
 
   let total = 0;

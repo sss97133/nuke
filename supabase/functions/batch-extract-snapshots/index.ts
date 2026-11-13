@@ -33,7 +33,6 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callTier, parseJsonResponse } from "../_shared/agentTiers.ts";
-import { writeObservation } from "../_shared/observationWriter.ts";
 import { vinExcerpt } from "./vinCitation.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { drainBatSaleQueue } from "./batSaleQueue.ts";
@@ -41,7 +40,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { makeAiGate, noAiConflict, readNoAi, terminalQueueStatus } from "./aiGate.ts";
 import { applyLotSlugYear } from "./lotYear.ts";
 import { orphanVehicleIds } from "./queueRows.ts";
-import { isUniqueViolation, salePriceWritable } from "./writeRules.ts";
+import { admitSnapshotObservation, isUniqueViolation, salePriceWritable } from "./writeRules.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { identityConflict } from '../_shared/identityMatch.ts';
 import { judge, pickBjLotPrice, urlVariants, type LotPage } from "./snapshotCompare.ts";
@@ -51,7 +50,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VERSION = "batch-extract-snapshots:2.0.0";
+const VERSION = "batch-extract-snapshots:2.0.1";
 
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
@@ -67,6 +66,14 @@ Deno.serve(async (req) => {
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    if (body.mode === "retained_properties") {
+      const verdict = await authenticateWriter(req);
+      if (!verdict.ok || verdict.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Retained properties require a service writer" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return await replayNativeProperties(supabase, body);
+    }
     // Separate, service-only deterministic source qualification. Explicit-ID calls
     // default to preview; the registered queue requires explicit writes. No AI fallback.
     if (body.mode === "source_sale_qualification") {
@@ -237,6 +244,8 @@ Deno.serve(async (req) => {
     let salePriceWithheld = 0; // parsed prices not written because the vehicle is not marked sold (writeRules.ts)
     let identityRefused = 0; // snapshots whose car is not the vehicle's (identity_match / different_car / relink): nothing written
     let vinConflicts = 0; // parsed VINs not written because another vehicle already holds them (writeRules.ts)
+    let observationsStored = 0;
+    let observationDuplicates = 0;
     const sampleResults: any[] = [];
 
     // Helper: read HTML from Supabase Storage when inline html is null
@@ -264,10 +273,11 @@ Deno.serve(async (req) => {
           if (snapUrl) {
             const { data: snaps } = await supabase
               .from("listing_page_snapshots")
-              .select("id, html, html_storage_path, markdown")
+              .select("id, listing_url, fetched_at, html, html_storage_path, markdown")
               .eq("listing_url", snapUrl)
               .eq("platform", platform)
               .eq("success", true)
+              .order("fetched_at", { ascending: false })
               .limit(1);
             snapshot = snaps?.[0] || null;
             if (snapshot?.html && snapshot.html.length > 500) {
@@ -322,7 +332,7 @@ Deno.serve(async (req) => {
           // First try inline HTML, then fall back to storage
           const { data: snaps } = await supabase
             .from("listing_page_snapshots")
-            .select("id, html, html_storage_path, markdown")
+            .select("id, listing_url, fetched_at, html, html_storage_path, markdown")
             .in("listing_url", [...normalizedUrls])
             .eq("platform", platform)
             .eq("success", true)
@@ -351,6 +361,7 @@ Deno.serve(async (req) => {
         }
 
         // Parse based on platform — try regex first, fall back to AI
+        const aiCallsBefore = gate.counters().ai_calls;
         let parsed: Record<string, any>;
         let regexEmpty = false;
         const useAI = mode === "ai";
@@ -481,6 +492,24 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Preserve every available parsed field, including fields already on the
+        // vehicle. Admission precedes projection, so a retry can recover a reading
+        // even after an earlier attempt updated the vehicle.
+        if (!dryRun) {
+          const sourceFields = Object.fromEntries(Object.entries(parsed)
+            .filter(([_key, value]) => value != null && String(value).trim() !== ""));
+          if (Object.keys(sourceFields).length > 0) {
+            const admitted = await admitSnapshotObservation(supabase, {
+              vehicleId: vehicle.id, platform, snapshot, fields: sourceFields,
+              method: gate.counters().ai_calls > aiCallsBefore ? "snapshot_ai_parse" : "snapshot_regex_parse",
+              version: VERSION,
+              citationExcerpt: parsed.vin ? vinExcerpt(snapshotHtml, String(parsed.vin)) : null,
+            });
+            if (admitted.duplicate) observationDuplicates++;
+            else observationsStored++;
+          }
+        }
+
         if (fieldsUpdated.length === 0) {
           skipped++;
           if (!dryRun) {
@@ -551,28 +580,6 @@ Deno.serve(async (req) => {
         extracted++;
         fieldsTotal += fieldsUpdated.length;
 
-        // Write observation + field_evidence (fire-and-forget, don't block extraction)
-        if (!dryRun && fieldsUpdated.length > 0) {
-          const obsFields: Record<string, any> = {};
-          for (const f of fieldsUpdated) {
-            if (updatePayload[f] !== undefined) obsFields[f] = updatePayload[f];
-          }
-          // A VIN carries its receipt: the snapshot it was read from and the verbatim text around it.
-          const vinExcerptText = obsFields.vin ? vinExcerpt(snapshotHtml, String(obsFields.vin)) : null;
-          writeObservation(supabase, {
-            vehicleId: vehicle.id,
-            ...(snapshot?.id ? { sourceSnapshotId: snapshot.id } : {}),
-            ...(vinExcerptText ? { citationExcerpt: vinExcerptText } : {}),
-            source: {
-              platform,
-              url: vehicleUrl || vehicle.bat_auction_url || vehicle.listing_url || vehicle.discovery_url || "",
-            },
-            fields: obsFields,
-            observationKind: "specification",
-            extractionMethod: "snapshot_regex_parse",
-          }).catch((e: any) => console.warn(`[batch-extract] observationWriter error for ${vehicle.id}: ${e?.message}`));
-        }
-
         if (useQueue && !dryRun) {
           mustWrite('snapshot_extraction_queue update', await supabase.from("snapshot_extraction_queue")
             .update({ status: terminal, completed_at: new Date().toISOString(), fields_filled: fieldsUpdated.length })
@@ -622,6 +629,8 @@ Deno.serve(async (req) => {
       identity_refused: identityRefused,
       errors,
       fields_filled: fieldsTotal,
+      observations_stored: observationsStored,
+      observation_duplicates: observationDuplicates,
       sample_results: sampleResults,
       duration_ms: Date.now() - startTime,
       next_offset: offset + batchSize,
@@ -638,6 +647,136 @@ Deno.serve(async (req) => {
 /** Explicit bounded selection only. The canonical intake derives the raw sale
  * tuple and DB ingestion clock; this producer never writes snapshot metadata.
  */
+async function replayNativeProperties(supabase: any, body: any): Promise<Response> {
+  let writes: number | null = 0;
+  const reply = (data: any, status = 200) => new Response(JSON.stringify(data),
+    { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+  if (Object.keys(body).some(k => !["mode", "vehicle_id", "snapshot_id", "expected_capture_sha256", "dry_run", "no_ai", "platform"].includes(k)) ||
+      !uuid.test(body.vehicle_id ?? "") || !uuid.test(body.snapshot_id ?? "") ||
+      !/^[0-9a-f]{64}$/i.test(body.expected_capture_sha256 ?? "") ||
+      body.no_ai !== true || !["mecum", "barrett-jackson"].includes(body.platform) ||
+      (body.dry_run !== undefined && typeof body.dry_run !== "boolean")) return reply({ error: "Pinned vehicle/snapshot/hash selectors required" }, 400);
+  const key = (raw: string) => {
+    try { const u = new URL(raw); return ["http:", "https:"].includes(u.protocol) && !u.username && !u.password && !u.port
+      ? u.hostname.replace(/^www\./, "").toLowerCase() + u.pathname.replace(/\/+$/, "").toLowerCase() : null; }
+    catch { return null; }
+  };
+  const load = async () => {
+    const parent = await supabase.from("vehicles").select("id,is_public,deleted_at,listing_kind,listing_url,discovery_url,year,make,model")
+      .eq("id", body.vehicle_id).maybeSingle();
+    const snapshot = await supabase.from("listing_page_snapshots")
+      .select("id,platform,listing_url,success,http_status,html,html_storage_path,html_sha256,fetched_at,created_at,metadata")
+      .eq("id", body.snapshot_id).maybeSingle();
+    const v = parent.data, s = snapshot.data;
+    if (parent.error || snapshot.error || !v || v.is_public !== true || v.deleted_at !== null || v.listing_kind === "non_vehicle_item" ||
+        !s || s.platform !== body.platform || !["mecum", "barrett-jackson"].includes(s.platform) || !s.success || s.http_status !== 200 ||
+        (s.metadata?.vehicle_id != null && s.metadata.vehicle_id !== v.id) ||
+        (s.metadata?.vehicle_matched != null && s.metadata.vehicle_matched !== true) ||
+        (s.metadata?.vehicle_matched === true && s.metadata?.vehicle_id !== v.id) ||
+        s.html_sha256?.toLowerCase() !== body.expected_capture_sha256.toLowerCase() ||
+        !key(s.listing_url) || ![v.listing_url, v.discovery_url].some(url => key(url) === key(s.listing_url))) throw Error("Protected same-vehicle source unavailable");
+    const source = new URL(s.listing_url);
+    if (s.platform === "mecum" ? !/^(www\.)?mecum\.com$/.test(source.hostname) || !/^\/lots\/\d+\/[^/]+\/?$/.test(source.pathname)
+      : !/^(www\.)?barrett-jackson\.com$/.test(source.hostname) || !/^\/[^/]+\/docket\/vehicle\/[^/]+\/?$/.test(source.pathname)) throw Error("Unsupported native lot URL");
+    const { observationClockMicroseconds } = await import("../_shared/observationContentHash.ts");
+    const captured = observationClockMicroseconds(s.fetched_at), archived = observationClockMicroseconds(s.created_at);
+    if (captured === null || archived === null || captured > BigInt(Date.now()) * 1000n ||
+        archived > BigInt(Date.now()) * 1000n || archived < captured) throw Error("Capture/archive clocks unavailable");
+    let html = s.html;
+    if (!html && s.html_storage_path) {
+      if (!/^[a-zA-Z0-9_./-]+$/.test(s.html_storage_path) || s.html_storage_path.startsWith("/") || s.html_storage_path.split("/").includes("..")) throw Error("Invalid archive locator");
+      const stored = await supabase.storage.from("listing-snapshots").download(s.html_storage_path);
+      if (stored.error || !stored.data || stored.data.size > 2_097_152) throw Error("Retained body unavailable");
+      html = await stored.data.text();
+    }
+    if (typeof html !== "string" || !html || new TextEncoder().encode(html).length > 2_097_152) throw Error("Retained body unavailable or oversized");
+    const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html)))].map(x => x.toString(16).padStart(2, "0")).join("");
+    if (hash !== s.html_sha256.toLowerCase()) throw Error("Retained capture hash mismatch");
+    const parsed = s.platform === "mecum" ? parseMecumHtml(html, true) : parseBarrettJacksonHtml(html);
+    // A historically mislinked lot must not donate its specifications to this
+    // record. Keep identity disagreement as backlog; no matching or merging here.
+    const label = (x: any) => String(x ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const matched = s.metadata?.vehicle_id === v.id && s.metadata?.vehicle_matched === true;
+    // A protected explicit match may supply an absent legacy field. Known
+    // disagreements still refuse; unstamped captures require all three labels.
+    if (!parsed.year || (v.year == null ? !matched : parsed.year !== v.year) ||
+        !label(parsed.make) || (label(v.make) ? label(parsed.make) !== label(v.make) : !matched) ||
+        !label(parsed.model) || (label(v.model) ? ![parsed.model, [parsed.model, parsed.publisher_style_label].filter(Boolean).join(" ")]
+          .some(model => label(model) === label(v.model)) : !matched)) throw Error("Native lot and retained vehicle labels disagree");
+    const fields: Record<string, unknown> = {};
+    for (const field of ["year", "make", "model", "body_style", "vin", "color", "interior_color", "transmission"]) {
+      if (parsed[field] != null && parsed[field] !== "") fields[field] = parsed[field];
+    }
+    // Barrett-Jackson's named style field describes the publisher's lot label
+    // (for example CUSTOM PICKUP). It does not establish a trim package.
+    if (typeof parsed.publisher_style_label === "string" && parsed.publisher_style_label.trim() &&
+        parsed.publisher_style_label.length <= 500 && !/[\x00-\x1f\x7f]/.test(parsed.publisher_style_label)) {
+      fields.publisher_style_label = parsed.publisher_style_label;
+    }
+    if (typeof parsed.engine_type === "string" && parsed.engine_type.trim()) fields.engine_size = parsed.engine_type;
+    // Existing legacy parsers may infer drive from a title/whole-page match.
+    // This route withholds it until an explicit source witness is established.
+    // Older capture producers saved the exact listing URL and body but never
+    // wrote a vehicle-match stamp. The exact stored record URL plus the native
+    // year/make/model checks above associate the source labels to this record;
+    // they do not resolve physical identity or override an explicit mismatch.
+    const associationBasis = matched
+      ? "snapshot_vehicle_match" : "exact_record_url_and_native_labels";
+    return { v, s, fields, associationBasis };
+  };
+  try {
+    let capture = await load();
+    const dryRun = body.dry_run !== false;
+    if (!dryRun) {
+      const current = await load();
+      if (JSON.stringify(current) !== JSON.stringify(capture)) throw Error("Protected source changed before intake");
+      capture = current;
+    }
+    const { v, s, fields, associationBasis } = capture;
+    if (dryRun) return reply({ success: true, mode: body.mode, native_property_profile: "retained_native_fields_v1", dry_run: true, vehicle_id: v.id, snapshot_id: s.id,
+      field_keys: Object.keys(fields), source_association_basis: associationBasis, writes: 0, model_calls: 0 });
+    const identityVersion = s.platform === "mecum" ? "native-identity-v2" : "publisher-style-v2";
+    const input = { source_slug: s.platform, kind: "listing", vehicle_id: v.id, source_url: s.listing_url,
+      source_identifier: `retained-native-fields:${s.id}:${associationBasis === "snapshot_vehicle_match" ? identityVersion : `record-url-${identityVersion}`}`, raw_source_ref: `listing_page_snapshots:${s.id}`,
+      observed_at: s.fetched_at, extraction_method: "retained_native_fields_v1", defer_analysis: true, agent_cost_cents: 0,
+      structured_data: { ...fields, source_capture_sha256: s.html_sha256, source_captured_at: s.fetched_at,
+        ...(s.platform === "mecum" ? { identity_extractor_version: "mecum_native_graphql_identity_v1" } : {}),
+        ...(s.platform === "barrett-jackson" ? { native_field_semantics_version: "publisher_style_label_v2" } : {}),
+        ...(fields.publisher_style_label !== undefined ? { publisher_style_source_field: "barrett-jackson.native.style" } : {}),
+        ...(associationBasis === "exact_record_url_and_native_labels" ? { source_association_basis: associationBasis } : {}),
+        source_archive_ingested_at: s.created_at, extractor: "batch-extract-snapshots", source_event_time_status: "unknown",
+        source_profile: "retained_native_fields_v1", claim_role: "extractor_claim",
+        factory_configuration_status: "unknown", current_configuration_status: "unknown" },
+      content_text: "Deterministic retained native-field extraction. Source labels and extractor claims only; physical identity, factory/current configuration and source event time remain unverified." };
+    // Once intake starts, a lost response cannot establish zero writes. A
+    // canonical acknowledgement can establish its own append/duplicate count.
+    writes = null;
+    const intake = await supabase.functions.invoke("ingest-observation", { body: input });
+    if (intake.data?.success === true && typeof intake.data.duplicate === "boolean") writes = intake.data.duplicate ? 0 : 1;
+    if (intake.error || intake.data?.success !== true || !uuid.test(intake.data.observation_id ?? "")) throw Error("Native field intake failed");
+    const admitted = await supabase.from("vehicle_observations").select("id,vehicle_id,source_id,source_identifier,source_observation_id,property_id,subject_type,subject_id,observed_at,ingested_at,confidence_score,source_url,raw_source_ref,kind,is_superseded,structured_data,extraction_method")
+      .eq("id", intake.data.observation_id).maybeSingle();
+    const o = admitted.data;
+    const { observationClockMicroseconds } = await import("../_shared/observationContentHash.ts");
+    const ingested = observationClockMicroseconds(o?.ingested_at), archived = observationClockMicroseconds(s.created_at);
+    const sourceId = s.platform === "mecum" ? "fee71d50-c59c-4340-b819-cd9a7d074d7f" : "755185e3-3d21-4373-b806-ddcbf0d5e39c";
+    if (admitted.error || !o || o.vehicle_id !== v.id || o.source_url !== s.listing_url || o.raw_source_ref !== input.raw_source_ref ||
+        o.source_id !== sourceId || o.source_identifier !== input.source_identifier || o.source_observation_id !== null ||
+        o.property_id !== null || o.subject_type !== "vehicle" || o.subject_id !== null ||
+        observationClockMicroseconds(o.observed_at) !== observationClockMicroseconds(s.fetched_at) ||
+        ingested === null || archived === null || ingested < archived || ingested > BigInt(Date.now()) * 1000n ||
+        !Number.isFinite(o.confidence_score) || o.confidence_score < .6 || o.confidence_score > 1 ||
+        o.kind !== "listing" || o.is_superseded !== false || o.extraction_method !== input.extraction_method ||
+        Object.keys(o.structured_data || {}).sort().join() !== Object.keys(input.structured_data).sort().join() ||
+        Object.entries(input.structured_data).some(([k, value]) => o.structured_data[k] !== value)) throw Error("Native receipt withdrawn, relinked or changed");
+    return reply({ success: true, mode: body.mode, native_property_profile: "retained_native_fields_v1", dry_run: false, vehicle_id: v.id, snapshot_id: s.id,
+      observation_id: o.id, duplicate: intake.data.duplicate, field_keys: Object.keys(fields), model_calls: 0,
+      writes: intake.data.duplicate ? 0 : 1, source_association_basis: associationBasis, source_to_reader_verified: false });
+  } catch (error) { return reply({ success: false, error: error instanceof Error ? error.message : "Native replay refused", writes,
+    receipt_verified: false, model_calls: 0 }, 409); }
+}
+
 async function qualifySourceSales(supabase: any, body: any): Promise<Response> {
   const ids = Array.isArray(body.vehicle_ids)
     ? body.vehicle_ids.map((id: unknown) => typeof id === "string" ? id.toLowerCase() : id) : body.vehicle_ids;
@@ -904,7 +1043,7 @@ function parseBarrettJacksonHtml(rawHtml: string): Record<string, any> {
     result.model = titleCase(vinChunkMatch[3]);
     const style = vinChunkMatch[4];
     if (style) {
-      result.trim = titleCase(style);
+      result.publisher_style_label = style;
       const bs = normalizeBodyStyle(style);
       if (bs) result.body_style = bs;
     }
@@ -1068,7 +1207,7 @@ function parseBarrettJacksonHtml(rawHtml: string): Record<string, any> {
 // 2. MECUM PARSER — __NEXT_DATA__ GraphQL extraction
 // ============================================================
 
-function parseMecumHtml(html: string): Record<string, any> {
+function parseMecumHtml(html: string, preferNativeIdentity = false): Record<string, any> {
   const result: Record<string, any> = {};
 
   // Mecum uses __NEXT_DATA__ with GraphQL-shaped data
@@ -1119,6 +1258,26 @@ function parseMecumHtml(html: string): Record<string, any> {
           if (ymm.year) result.year = ymm.year;
           if (ymm.make) result.make = ymm.make;
           if (ymm.model) result.model = ymm.model;
+        }
+        if (preferNativeIdentity) {
+          // These are the publisher's named GraphQL fields. The legacy title
+          // parser includes body words such as "Pickup" in the model, which
+          // makes an otherwise exact C10 source appear to disagree with C10.
+          // Multiple native labels are ambiguous; do not choose one by order.
+          for (const [field, connection] of [["year", lot.lotYears], ["make", lot.makes], ["model", lot.models]] as const) {
+            if (connection == null) continue;
+            if (!Array.isArray(connection.edges)) return {};
+            const names = connection.edges.map((e: any) => e?.node?.name);
+            if (names.some((name: unknown) => typeof name !== "string" || name.trim() !== name || !name.length || name.length > 120 || /[\x00-\x1f\x7f]/.test(name))) return {};
+            const labels = [...new Set(names)];
+            if (labels.length > 1) return {};
+            if (labels.length === 1) {
+              if (field === "year") {
+                if (!/^(18|19|20)\d{2}$/.test(labels[0] as string)) return {};
+                result.year = Number(labels[0]);
+              } else result[field] = labels[0];
+            }
+          }
         }
 
         // VIN / Serial

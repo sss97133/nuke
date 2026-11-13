@@ -16,6 +16,23 @@ Getting this wrong has severe consequences:
 
 The system is deliberately conservative — it is far better to have two separate entities for the same vehicle than to incorrectly merge two different vehicles.
 
+### Inspectable source profiles before physical resolution
+
+A retained source URL can already support a useful profile of its testimony while
+its physical vehicle match remains unresolved. The ECR source view in the existing
+vehicles API and vehicle-profile page folds the original admitted collection/detail
+evidence into source labels, images and dated presentation history. It preserves
+unknown year/VIN and differing labels, without restoring deleted entities or using
+a collection slug as chassis identity.
+
+Profile existence and claim eligibility are separate. A qualified registry witness
+supports its own dated presentation claims; copying it into Nuke supplies no new
+independent witness and establishes no ownership, current availability, sale outcome
+or verified factory specification. Those questions retain their own evidence gates.
+See the engineering manual's “Progressive source profiles” contract and the design
+book's “A source presentation can begin the profile” section for implementation and
+the remaining physical-resolution boundary.
+
 ---
 
 ## The merge_proposals Table

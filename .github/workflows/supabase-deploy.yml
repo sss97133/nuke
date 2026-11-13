@@ -12,7 +12,8 @@
 #   - On push to main touching supabase/: applies ONLY the migration files
 #     added in that push (psql, one by one — sidesteps the repo's known
 #     migration-history drift that breaks `supabase db push`), then deploys
-#     only the edge functions whose directories changed.
+#     the edge functions whose directories changed plus every function that
+#     imports a changed file (scripts/ci/functions-to-deploy.mjs).
 #   - Manual run (Actions → Supabase Deploy → Run workflow): applies all
 #     migrations with timestamp >= migrations_since and deploys the listed
 #     functions. Defaults cover the 2026-06-09/10 batch.
@@ -90,11 +91,16 @@ jobs:
             echo "${{ github.event.inputs.functions }}" | tr ',' '\n' | sed '/^$/d' > /tmp/functions.txt
           else
             git diff --name-only --diff-filter=A HEAD^ HEAD -- 'supabase/migrations/*.sql' > /tmp/migrations.txt || true
-            git diff --name-only HEAD^ HEAD -- 'supabase/functions/' \
-              | awk -F/ '/^supabase\/functions\/[^_]/ {print $3}' | sort -u > /tmp/functions.txt || true
+            # A function bundles every file it imports, so a changed _shared/ file redeploys each function that imports
+            # it, directly or through other files (scripts/ci/functions-to-deploy.mjs). Listing only changed folders left
+            # api-v1-vin-lookup and ingest on the old vin-decoder after 657e90226. A resolver failure fails the run.
+            git diff --name-only HEAD^ HEAD -- 'supabase/functions/' > /tmp/changed-functions-paths.txt || true
+            node scripts/ci/functions-to-deploy.mjs --explain < /tmp/changed-functions-paths.txt > /tmp/functions-explained.txt
+            cut -f1 /tmp/functions-explained.txt > /tmp/functions.txt
           fi
           echo "── migrations to apply:"; cat /tmp/migrations.txt || true
-          echo "── functions to deploy:"; cat /tmp/functions.txt || true
+          echo "── functions to deploy ($(wc -l < /tmp/functions.txt)):"
+          if [ -s /tmp/functions-explained.txt ]; then cat /tmp/functions-explained.txt; else cat /tmp/functions.txt || true; fi
 
       - name: Resolve database URL
         id: db
@@ -159,6 +165,24 @@ jobs:
           if [ ! -s /tmp/migrations.txt ]; then echo "no migrations to apply"; exit 0; fi
           sort /tmp/migrations.txt | while read -r f; do
             [ -f "$f" ] || { echo "skip (not found): $f"; continue; }
+            # A file applied by hand before it reached main is recorded, not re-run: re-running an
+            # older body would replace the newer one that is live. The proof is checked every time.
+            proof=$(awk -F'\t' -v f="$(basename "$f")" '$1==f{print $2}' supabase/recorded-applied-migrations.tsv 2>/dev/null || true)
+            if [ -n "$proof" ]; then
+              case "$proof" in
+                history=*)  [[ "${proof#history=}" =~ ^[a-z0-9_]+$ ]] || { echo "❌ bad proof for $f: $proof"; exit 1; }
+                            q="select exists(select 1 from supabase_migrations.schema_migrations where name='${proof#history=}')" ;;
+                relation=*) [[ "${proof#relation=}" =~ ^[a-z0-9_.]+$ ]] || { echo "❌ bad proof for $f: $proof"; exit 1; }
+                            q="select to_regclass('${proof#relation=}') is not null" ;;
+                routine=*)  [[ "${proof#routine=}" =~ ^[a-z0-9_.]+$ ]] || { echo "❌ bad proof for $f: $proof"; exit 1; }
+                            q="select exists(select 1 from pg_proc where oid::regproc::text in ('${proof#routine=}','${proof#routine=public.}'))" ;;
+                *) echo "❌ bad proof for $f: $proof"; exit 1 ;;
+              esac
+              if [ "$(psql "$SUPABASE_DB_URL" -X -qAt -c "$q")" = t ]; then
+                echo "═══ recorded as already applied ($proof), not re-run: $f"; continue
+              fi
+              echo "❌ $f is listed as already applied but its proof ($proof) is not in the database"; exit 1
+            fi
             echo "═══ applying $f"
             psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
           done
@@ -175,7 +199,9 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if [ ! -s /tmp/functions.txt ]; then echo "no functions to deploy"; exit 0; fi
-          npx -y supabase@latest --version
+          # Pinned to 3.0.0: the version every green deploy on 2026-11-08 ran (six runs, 19:24-20:01Z). 2.79.0 rejects the
+          # v3 config key [local_smtp] ("config.config has invalid keys"), and 3.0.0 only deprecates --project-ref (v4 removes it).
+          npx -y supabase@3.0.0 --version
           FNS=""
           while read -r fn; do
             [ -d "supabase/functions/$fn" ] || { echo "skip (no dir): $fn"; continue; }
@@ -193,7 +219,7 @@ jobs:
           # guardrail step above.
           # No --jobs: the CLI accepts it only with --use-api (server-side bundling), and every deploy so far
           # bundled locally — keep the bundler that is known to work (run 36331008968 died on the flag).
-          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt
+          npx -y supabase@3.0.0 functions deploy $FNS --remote=qkgaybvrernstplzjaam --no-verify-jwt --yes
           echo "✅ functions deployed"
 
       - name: Activate installed retained VIN intake

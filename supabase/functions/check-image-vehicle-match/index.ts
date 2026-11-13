@@ -9,7 +9,7 @@ import { assertComparisonReceiptCapacity, comparisonReceiptPatch, parseReference
   referenceDecisionProjection, scopeComparisonImages, type ReferenceDecision } from './decision.ts';
 import { runPinnedVision, type CustodiedVisionPart, type VisionInputSource,
   type VisionInputReceipt, type UnavailableVisionInput } from './inputCustody.ts';
-import { resolveSubjectBatch, retainDeviceSourceReading, subjectOwnerId, supabaseSubjectStore, type CaptureProfileRequest,
+import { resolveSubjectBatch, retainDeviceSourceReading, admitDeviceCaptureProfile, subjectOwnerId, supabaseSubjectStore, type CaptureProfileRequest,
   type DeviceSourceReadRequest, type SubjectRequest } from './subjectService.ts';
 import { readSubjectProfiles } from './subjectReader.ts';
 import { selectResolutionContext } from './subjectCandidates.ts';
@@ -338,7 +338,7 @@ Deno.serve(async (req: Request) => {
         if (!store.admitCapture) return new Response(JSON.stringify({ error: "capture_profile_writer_unavailable" }), {
           status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-        result = await store.admitCapture(body.profile);
+        result = await admitDeviceCaptureProfile(store, owner, body.profile);
       } else if (mode === "record_device_reading") {
         const identityClient = caller.caller.kind === "user" ? createClient(supabaseUrl,
           Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: req.headers.get("Authorization")! } },

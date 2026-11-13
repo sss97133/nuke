@@ -27,6 +27,11 @@ const OneMap = React.lazy(() => import('./components/map/OneMap'));
 const VehicleShowcase = React.lazy(() => import('./pages/showcase/VehicleShowcase'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
 const ShareWiring = React.lazy(() => import('./pages/ShareWiring'));
+const AssetProfilePage = React.lazy(() => import('./pages/AssetProfile'));
+const AssetDeclarePage = React.lazy(() => import('./pages/AssetDeclare'));
+const HeldAssetsPage = React.lazy(() => import('./pages/HeldAssets'));
+const ContributePage = React.lazy(() => import('./pages/contribute/ContributePage'));
+const ShareTruck3D = React.lazy(() => import('./pages/ShareTruck3D'));
 
 const LazyFallback = <div className="p-6"><LoadingSkeleton variant="card-list" count={6} ariaLabel="Loading page" /></div>;
 
@@ -87,8 +92,15 @@ function RoutedApp() {
           <Route path="/showcase" element={<Suspense fallback={LazyFallback}><VehicleShowcase /></Suspense>} />
           <Route path="/showcase/:vehicleId" element={<Suspense fallback={LazyFallback}><VehicleShowcase /></Suspense>} />
           <Route path="/deck/:deckId" element={<Suspense fallback={LazyFallback}><DeckPage /></Suspense>} />
+          {/* An asset that is not a vehicle (artwork, automobilia, memorabilia): one typed read, asset_profile_read (case ledger §21) */}
+          <Route path="/assets/new" element={<Suspense fallback={LazyFallback}><AssetDeclarePage /></Suspense>} />
+          <Route path="/assets/mine" element={<Suspense fallback={LazyFallback}><HeldAssetsPage /></Suspense>} />
+          <Route path="/assets/:assetId" element={<Suspense fallback={LazyFallback}><AssetProfilePage /></Suspense>} />
           {/* Builder share view — zero-chrome public print package (receipt 2026-06-11_builder-share-view.md) */}
           <Route path="/share/wiring/:vehicleId" element={<Suspense fallback={LazyFallback}><ShareWiring /></Suspense>} />
+          {/* Contributor link: a builder or previous owner answers from their phone, no account (contributor-intake) */}
+          <Route path="/contribute/:token" element={<Suspense fallback={LazyFallback}><ContributePage /></Suspense>} />
+          <Route path="/share/truck/:vehicleId" element={<Suspense fallback={LazyFallback}><ShareTruck3D /></Suspense>} />
 
           {/* ── App shell routes (with AppLayout) ── */}
           <Route path="/*" element={

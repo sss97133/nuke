@@ -187,6 +187,22 @@ function BuildProgress({ vehicleId }) {
 
 ## The Profile as Data Attractor
 
+### A source presentation can begin the profile
+
+An unresolved physical identity does not make the source's vehicle presentation
+uninspectable. A source URL with admitted testimony can render the existing profile
+at its supported density: source label, source images, dated presentations and
+attributed collection context. Unknown year/VIN and an unresolved chassis match
+remain unknown; they do not justify guessed fields or an empty generic profile.
+The source view is a fold over its original observations, not another vehicle table.
+
+Keep profile existence separate from each claim's eligibility for a model. A
+registry's recorded collection presentation can support that dated source history;
+it cannot, by itself, establish ownership, availability, a verified factory model,
+a sale or a physical-car merge. Rendering a third-party claim in Nuke does not make
+the profile a second independent source. Source-to-collection drills retain the
+same evidence and its capture date, and never carry access or ownership authority.
+
 ### Evidence routes must preserve the subject
 
 A route containing a vehicle ID and an observation ID does not establish that

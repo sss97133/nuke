@@ -1,7 +1,8 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { JSDOM } from 'jsdom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('../../components/PrefetchLink', () => ({ default: ({ to, children }: any) => <a href={to}>{children}</a> }));
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
 import type { FieldEvidenceGroup, FieldEvidenceRow } from './hooks/useFieldEvidence';
 
@@ -21,6 +22,18 @@ function render(row = claim()) {
 }
 
 describe('Retained claim score and clock qualification', () => {
+  it('links the original cited record while qualifying the stored accepted decision', () => {
+    const { doc, text } = render(claim({ status: 'accepted', source_image_id: '00000000-0000-4000-8000-000000000001', assigned_at: '2026-01-04T00:00:00Z' }));
+    expect(doc.querySelector('a')?.getAttribute('href')).toBe('/vehicle/offline-vehicle/image/00000000-0000-4000-8000-000000000001');
+    expect(text).toContain('Recorded decision: accepted');
+    expect(text).toContain('Decision recorded: 2026-01-04 00:00:00.000 UTC');
+    expect(text).toContain('does not establish current installation');
+  });
+  it('does not turn malformed image references into navigation', () => {
+    const { doc, text } = render(claim({ source_image_id: '../../foreign-subject' }));
+    expect(doc.querySelector('a')).toBeNull();
+    expect(text).not.toContain('foreign-subject');
+  });
   it('shows the stored score without a calibrated percentage or pass/fail colors, retaining the claim and context', () => {
     const { doc, text } = render();
     expect(text).toContain('Stored score 75/100');

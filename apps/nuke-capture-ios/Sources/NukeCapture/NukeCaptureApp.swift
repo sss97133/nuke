@@ -9,17 +9,32 @@
 //      so foreground + periodic background refresh is the heartbeat. The
 //      common path is the honest one: the owner takes photos at the shop,
 //      opens the app (or iOS wakes it within hours), photos upload.
-//   4. Route: signed out → SignInView (the constellation; its Explore path
-//      flips exploreMode), exploring → MainTabView (read-only Map + sample
-//      profile), signed in + ignition pending → IgnitionView (first-run
+//   4. Route: signed out on a fresh install → WelcomeView (once; its "Look around
+//      first" flips exploreMode), signed out otherwise → SignInView (the
+//      constellation; its "Look around first" path flips exploreMode),
+//      exploring → MainTabView (read-only Map + profile search), signed in + ignition pending → IgnitionView (first-run
 //      full-library scan), signed in + ignition complete → MainTabView
 //      (MAP · PROFILE · TODAY).
 
 import SwiftUI
 import BackgroundTasks
 
+/// UIKit's door for the background upload session: when iOS relaunches the app because transfers
+/// finished with it closed, this hands the completion to the uploader, which inserts the rows first.
+final class CaptureAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+                     completionHandler: @escaping () -> Void) {
+        guard identifier == Config.uploadSessionID else { completionHandler(); return }
+        Task { @MainActor in
+            BackgroundUploader.shared.attachRelaunchCompletion(completionHandler)
+            await BackgroundUploader.shared.resume()
+        }
+    }
+}
+
 @main
 struct NukeCaptureApp: App {
+    @UIApplicationDelegateAdaptor(CaptureAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var session = SessionStore()
     /// Ignition phase drives the denied-grant detour (below).
@@ -27,14 +42,19 @@ struct NukeCaptureApp: App {
     /// Flipped by IgnitionEngine when the first-run sequence completes.
     @AppStorage(IgnitionEngine.completeKey) private var ignitionComplete = false
     /// The constellation's Explore path — the app without auth (read-only
-    /// Map + sample profile). Cleared by the Profile tab's Sign In door.
+    /// Map + profile search). Cleared by the Profile tab's Sign In door.
     @AppStorage("exploreMode") private var exploreMode = false
+    /// The first-launch welcome has been seen (or the user signed in). See WelcomeGate.
+    @AppStorage(WelcomeGate.seenKey) private var welcomeSeen = false
 
     init() {
         // Must happen during launch: registering after didFinishLaunching
         // returns is a runtime error. SwiftUI App.init() runs early enough.
         Self.registerBackgroundRefresh()
         Self.registerBackgroundBackfill()
+        Self.registerRecentUploads()
+        // The removed "What brings you here?" screen left its answers on the phone: clear them once.
+        LegacyPersonaCleanup.run()
         // Existing installs ran the pre-ignition app: they keep the
         // hardcoded shop gate and skip ignition entirely.
         if SyncEngine.hasExistingWatermark,
@@ -56,6 +76,9 @@ struct NukeCaptureApp: App {
                     // NUKE_DEBUG_COHORT="year|make|model" roots on the cohort terminal
                     // so the screenshot loop lands on it without tab/tap navigation.
                     DebugCohortDeepLink(spec: dbgCohort)
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "welcome" {
+                    // The first-launch welcome alone (UI test + screenshot loop). DEBUG only.
+                    WelcomeView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "explore" {
                     // Explore is anon/self-contained (its own NavigationStack) — root
                     // straight on it for the market-pulse screenshot. DEBUG only.
@@ -65,12 +88,12 @@ struct NukeCaptureApp: App {
                 } else if let org = ProcessInfo.processInfo.environment["NUKE_DEBUG_ACTOR_ORG"], !org.isEmpty {
                     // NUKE_DEBUG_ACTOR_ORG=<uuid> roots on that organization's actor document (DEBUG only).
                     NavigationStack { ActorProfileView(route: ActorRoute(kind: "organization", id: org, name: nil)) }
-                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty {
-                    // NUKE_DEBUG_DAY=yyyy-MM-dd roots on that day's receipt for the sample
-                    // profile (or NUKE_DEBUG_DAY_USER=<uuid>) as the current session: anon
-                    // unless one was injected. Verifies the viewer-dependent money rule.
-                    DayReceiptView(userId: ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"] ?? Config.sampleProfileUserId,
-                                   date: dbgDay)
+                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty,
+                          let dbgDayUser = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"], !dbgDayUser.isEmpty {
+                    // NUKE_DEBUG_DAY=yyyy-MM-dd + NUKE_DEBUG_DAY_USER=<uuid> roots on that day's receipt
+                    // for that profile as the current session: anon unless one was injected. Verifies the
+                    // viewer-dependent money rule. No default account: name the profile under test.
+                    DayReceiptView(userId: dbgDayUser, date: dbgDay)
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
@@ -164,6 +187,7 @@ struct NukeCaptureApp: App {
                 #endif
             }
             .environmentObject(session)
+            .onOpenURL(perform: handleOpenURL)
             #if DEBUG
             .overlay(alignment: .topLeading) { if FixtureBackend.isActive { FixtureWriteLogOverlay() } }
             #endif
@@ -185,6 +209,14 @@ struct NukeCaptureApp: App {
                 // Foreground sync — only once ignition is done. During the
                 // scan NOTHING may upload (the UPLOADED 0 gauge is real).
                 guard session.isSignedIn, ignitionComplete else { return }
+                // A "Re-scan my library" asked for on the website: claim it, re-arm ignition the way
+                // the Account button does, and let the next pass close it with its summary.
+                Task {
+                    if await CaptureLedgerReporter.shared.claimRescan() != nil {
+                        SyncEngine.shared.resetForReignition()
+                        ignitionComplete = false
+                    }
+                }
                 // BUG #1 defect (c): book the processing-task drain the moment
                 // we learn work exists — not only on .background. If on-site
                 // photos are owed (backfill queue or fresh captures), the drain
@@ -228,10 +260,25 @@ struct NukeCaptureApp: App {
                 // 15 min out; in practice it learns usage patterns).
                 Self.scheduleBackgroundRefresh()
                 Self.scheduleBackgroundBackfill()
+                // Recent work left behind (a budget stop, transfers in flight) does not wait for a
+                // charger: the recent-window task needs only a network.
+                if SyncEngine.shared.foregroundBudgetReached || BackgroundUploader.shared.queuedCount > 0
+                    || BackgroundUploader.shared.inFlightCount > 0 {
+                    Self.scheduleRecentUploads()
+                }
             default:
                 break
             }
         }
+    }
+
+    /// The Shortcuts door (README, "Land as taken"): `ag.nuke.capture://sync` runs a pass now. A
+    /// personal automation "When Camera is closed → Open Nuke" opens this URL, so a frame uploads
+    /// the moment the shutter is put away, with no tap in the app.
+    private func handleOpenURL(_ url: URL) {
+        guard url.scheme == Config.oauthRedirectURL.scheme, url.host == Config.syncURLHost else { return }
+        guard session.isSignedIn, ignitionComplete else { return }
+        Task { await SyncEngine.shared.start() }
     }
 
     /// The normal root routing (extracted so the DEBUG deep-link can bypass it).
@@ -254,10 +301,27 @@ struct NukeCaptureApp: App {
                     // Explore: the populated world, read-only. No Today tab
                     // (no grant), Sign In one tap away in Profile.
                     MainTabView()
+                } else if WelcomeGate.shouldShow(seen: welcomeSeen, signedIn: false, exploring: false, skip: Self.skipsWelcome) {
+                    // Fresh install: say what the app is before asking for anything.
+                    WelcomeView()
                 } else {
                     SignInView()
                 }
         }
+        // Signed in by any route (Apple, email, a restored session) means the welcome is done;
+        // signing out later lands on SignInView, not the tour.
+        .onChange(of: session.isSignedIn, initial: true) { _, signedIn in
+            if signedIn { welcomeSeen = true }
+        }
+    }
+
+    /// UI-test / fixture launches never see the welcome.
+    private static var skipsWelcome: Bool {
+        #if DEBUG
+        return WelcomeGate.launchSkips(arguments: ProcessInfo.processInfo.arguments, fixtureActive: FixtureBackend.isActive)
+        #else
+        return false
+        #endif
     }
 
     // ─── BGTaskScheduler plumbing ────────────────────────────────────────────
@@ -346,7 +410,10 @@ struct NukeCaptureApp: App {
             // charging-window slot — upload, then send photos to their vehicle.
             // Prioritize this upload backlog. Fresh reads use LibraryIngest's original-byte
             // reader and are retained for later zero-OCR foreground passes.
-            await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
+            if !SyncEngine.deviceTooHotOrLow, !Task.isCancelled,
+               !(await BackgroundUploader.shared.drainIdentityFollowups(ocrBudget: 200, background: true)) {
+                await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
+            }
             // Reschedule when work remains — the upload queue still has assets, the
             // drain bailed early (metered link / paused / cancelled), or the
             // local-store backlog isn't fully indexed yet.
@@ -372,6 +439,44 @@ struct NukeCaptureApp: App {
             try BGTaskScheduler.shared.submit(request)
         } catch {
             NSLog("NukeCapture: BG backfill submit failed: %@", String(describing: error))
+        }
+    }
+
+    // ─── BGProcessingTask: the recent window, no charger ─────────────────────
+    // The backfill task waits for power and Wi-Fi, which is right for 32 K old photos and wrong for
+    // the frame shot an hour ago. This task asks only for a network: one sync pass (the last three
+    // days lead it, newest first) and the upload queue's resume. Booked whenever a pass leaves recent
+    // work behind (SyncEngine.sync) and on every background transition with transfers owed.
+
+    private static func registerRecentUploads() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: Config.recentTaskID, using: nil) { task in
+            guard let processingTask = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            handleRecentUploads(processingTask)
+        }
+    }
+
+    private static func handleRecentUploads(_ task: BGProcessingTask) {
+        let work = Task { @MainActor in
+            let clean = await SyncEngine.shared.sync()
+            await BackgroundUploader.shared.resume()
+            if !clean || BackgroundUploader.shared.queuedCount > 0 { scheduleRecentUploads() }
+            task.setTaskCompleted(success: clean)
+        }
+        task.expirationHandler = { work.cancel() }
+    }
+
+    static func scheduleRecentUploads() {
+        let request = BGProcessingTaskRequest(identifier: Config.recentTaskID)
+        request.requiresExternalPower = false
+        request.requiresNetworkConnectivity = true
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            NSLog("NukeCapture: BG recent submit failed: %@", String(describing: error))
         }
     }
 }

@@ -6,9 +6,10 @@
  * Mobile: fixed bottom sheet
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { PopupStackContext } from '../popups/PopupStack';
 
 interface HeaderPopoverProps {
   open: boolean;
@@ -31,28 +32,33 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const ref = useRef<HTMLDivElement>(null);
+  const popupStack = useContext(PopupStackContext);
+  const stackedAbove = popupStack?.stack.some(entry => !entry.minimized) ?? false;
 
   // Click outside dismissal
   useEffect(() => {
     if (!open) return;
     const handle = (e: MouseEvent) => {
+      if (stackedAbove) return;
+      // A source photo opens above this non-modal context in its own portal.
+      if (e.target instanceof Element && e.target.closest('[role="dialog"][aria-modal="true"]')) return;
       if (ref.current && !ref.current.contains(e.target as Node) && !dismissBoundaryRef?.current?.contains(e.target as Node)) {
         onClose();
       }
     };
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
-  }, [open, onClose, dismissBoundaryRef]);
+  }, [open, onClose, dismissBoundaryRef, stackedAbove]);
 
   // Escape key dismissal
   useEffect(() => {
     if (!open) return;
     const handle = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (!stackedAbove && e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handle);
     return () => document.removeEventListener('keydown', handle);
-  }, [open, onClose]);
+  }, [open, onClose, stackedAbove]);
 
   if (!open) return null;
 

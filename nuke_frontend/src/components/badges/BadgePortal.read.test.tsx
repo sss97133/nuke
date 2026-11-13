@@ -10,7 +10,6 @@ vi.mock('../../lib/supabase', () => ({ get supabase() { return fixture.client; }
 vi.mock('../../pages/vehicle-profile/VehicleProfileContext', () => ({ useVehicleProfile: () => fixture.current }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => true }));
 vi.mock('../image/MobileImageGallery', () => ({ __esModule: true, default: () => null }));
-vi.mock('../../pages/vehicle-profile/VehicleMediaKit', () => ({ __esModule: true, default: () => null }));
 vi.mock('../../pages/vehicle-profile/VehiclePhotoLightbox', () => ({ openVehiclePhoto: () => { throw Error('Unexpected photo open'); }, openVehiclePhotoByUrl: () => { throw Error('Unexpected URL open'); } }));
 vi.mock('../popups/PopupStack', async () => { const { createContext } = await import('react'); return { PopupStackContext: createContext(null) }; });
 vi.mock('../popups/MakePopup', () => ({ MakePopup: () => null }));

@@ -51,6 +51,7 @@ struct TodayView: View {
 struct CaptureSections: View {
     @ObservedObject private var engine = SyncEngine.shared
     @ObservedObject private var attribution = AttributionEngine.shared
+    @ObservedObject private var uploader = BackgroundUploader.shared
 
     var body: some View {
         // ── Errors / permission banner ──
@@ -81,10 +82,41 @@ struct CaptureSections: View {
             NavigationLink("Photo filter decisions") { VisionDecisionCountsView() }
                 .font(.footnote)
         }
+        // ── On the record · the same ledger the website shows at /capture/ledger, in the same words ──
+        Section {
+            CaptureLedgerSummaryRow()
+        } header: {
+            Text("On the record, last 30 days")
+        } footer: {
+            Text("What landed on a vehicle, what is held or waiting, and what this phone skipped. The website's Capture ledger reads the same record.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+        // ── Uploads · what left the phone and what is still landing ──
+        // Every number is the engine's own counter (queued = staged for the background session,
+        // landing = the transfer iOS is carrying, landed = rows inserted today).
+        if uploader.queuedCount > 0 || uploader.inFlightCount > 0 || uploader.landedToday > 0 || uploader.lastError != nil {
+            Section {
+                Text("\(uploader.landedToday) landed today · \(uploader.inFlightCount) landing · \(uploader.queuedCount) queued")
+                    .font(.footnote).foregroundStyle(.secondary)
+                if let error = uploader.lastError {
+                    Text("Last upload problem: \(error)").font(.caption2).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Uploads")
+            } footer: {
+                Text("A queued photo keeps uploading after you leave the app; its record lands when the bytes do.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
         if engine.gaveUpCount > 0 {
             Section {
-                Text("\(engine.gaveUpCount) photos failed three times and are no longer retried on open. The last error: \(engine.lastError ?? "not recorded").")
+                Text("\(engine.gaveUpCount) photos failed three times on their own and stopped retrying. The last error: \(engine.lastError ?? "not recorded").")
                     .font(.footnote).foregroundStyle(.secondary)
+                Button("Retry \(engine.gaveUpCount) photos") { Task { await engine.retryGaveUp() } }
+                    .disabled(engine.isSyncing || engine.isPaused || engine.authorizationDenied)
+            } footer: {
+                Text("Network, server and storage-quota failures no longer count against a photo; only its own failures do.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
         }
         if let error = engine.backfillError, engine.backfillRemaining > 0 {
@@ -212,6 +244,10 @@ struct CaptureSections: View {
                 Text("On-site photos only · \(engine.totalSkippedOffShop) held back")
                 if let s = attribution.lastSummary {
                     Text(s)   // what the last Analyze Today run routed
+                }
+                // A cowl tag read without a VIN/serial read: no profile until the plate is photographed.
+                ForEach(attribution.pendingIdentifiers, id: \.context.imageIDs) { pending in
+                    Text(pending.line)
                 }
             }
             .font(.caption2)
@@ -620,7 +656,7 @@ private struct MetricCell: View {
                 HStack(spacing: 3) {
                     Text(caption)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.system(.caption2, weight: .semibold))
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -665,7 +701,7 @@ private struct LiveT0Strip: View {
                         Text(atom.label.replacingOccurrences(of: "_", with: " "))
                             .font(.caption2).lineLimit(1)
                         Text("\(Int(atom.confidence * 100))%")
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
                     .frame(width: 72)
@@ -730,5 +766,20 @@ private struct AssetThumbnail: View {
                 continuation.resume(returning: image)
             }
         }
+    }
+}
+
+/// One line from `get_capture_ledger`, read once per appearance. Silent when signed out or unreachable.
+struct CaptureLedgerSummaryRow: View {
+    @State private var line: String?
+    @State private var failed = false
+    var body: some View {
+        Text(line ?? (failed ? "The ledger could not be read just now." : "Reading the ledger…"))
+            .font(.footnote).foregroundStyle(.secondary)
+            .task {
+                let read = await CaptureLedgerReporter.shared.summaryLine(days: 30)
+                line = read
+                failed = read == nil
+            }
     }
 }

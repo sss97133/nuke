@@ -3,7 +3,7 @@
  *
  * Every vehicle field write goes through this module:
  * 1. GAP FILL: existing is NULL → write value + extraction_metadata receipt + *_source column
- * 2. CONFIRMATION: existing matches new → add verification receipt (no overwrite)
+ * 2. CONFIRMATION: existing matches new → add verification receipt (no overwrite), at most one a week per source
  * 3. CONFLICT: existing differs from new → quarantine (no overwrite)
  *
  * This prevents data regression and creates full provenance tracking.
@@ -80,22 +80,41 @@ function valuesMatch(existing: any, proposed: any, field: string): boolean {
   return normalizeForComparison(existing) === normalizeForComparison(proposed);
 }
 
-/** Write an extraction_metadata receipt row */
+/**
+ * The values extraction_metadata_validation_status_check accepts
+ * (supabase/migrations/20251202_extraction_provenance_system.sql). A receipt with any other status is refused with
+ * 23514, and the insert below does not throw on that, so the receipt would be lost without a trace.
+ */
+type ReceiptStatus = "unvalidated" | "valid" | "invalid" | "conflicting" | "low_confidence";
+
+/**
+ * A value that is re-read unchanged leaves one confirmation receipt per window for each (vehicle, field, source),
+ * not one per read. Gap fills and conflicts are not on this clock.
+ */
+const CONFIRMATION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Write an extraction_metadata receipt row.
+ *
+ * Deduplicate against the latest row for this (vehicle, field, source_url): the same value is not filed twice. With
+ * refileAfterMs (a confirmation) the same value is filed again once that row is that old; a different value, or no
+ * row, files at once. The lookup is the existence check; extraction_metadata has no unique key on these three columns.
+ */
 async function writeReceipt(
   ctx: TetrisContext,
   field: string,
   value: any,
   metadata: ProvenanceMetadata,
-  validationStatus: string = "unvalidated",
+  validationStatus: ReceiptStatus = "unvalidated",
+  refileAfterMs = 0,
 ): Promise<void> {
   try {
     const v = String(value ?? "").trim();
     if (!v) return;
 
-    // Deduplicate: skip if last row for this (vehicle, field, source_url) matches exactly
     const { data: lastRow } = await ctx.supabase
       .from("extraction_metadata")
-      .select("field_value")
+      .select("field_value, extracted_at")
       .eq("vehicle_id", ctx.vehicleId)
       .eq("field_name", field)
       .eq("source_url", ctx.listingUrl)
@@ -103,7 +122,11 @@ async function writeReceipt(
       .limit(1)
       .maybeSingle();
 
-    if (lastRow && String(lastRow.field_value || "").trim() === v) return;
+    if (lastRow && String(lastRow.field_value || "").trim() === v) {
+      // An unreadable clock counts as recent: skipping is the cheap mistake.
+      const age = Date.now() - Date.parse(String(lastRow.extracted_at ?? ""));
+      if (!(refileAfterMs > 0 && age >= refileAfterMs)) return;
+    }
 
     await ctx.supabase.from("extraction_metadata").insert({
       vehicle_id: ctx.vehicleId,
@@ -155,7 +178,7 @@ async function quarantine(
  *
  * Rules:
  * 1. If existing is NULL → GAP FILL: write value + receipt + source column
- * 2. If existing matches proposed → CONFIRMATION: add verification receipt only
+ * 2. If existing matches proposed → CONFIRMATION: add verification receipt only (throttled, see CONFIRMATION_WINDOW_MS)
  * 3. If existing differs → CONFLICT: quarantine, don't overwrite
  */
 export async function upsertFieldWithProvenance(
@@ -179,8 +202,10 @@ export async function upsertFieldWithProvenance(
   }
 
   if (valuesMatch(existingValue, proposedValue, field)) {
-    // CONFIRMATION — don't overwrite, just add verification receipt
-    await writeReceipt(ctx, field, proposedValue, metadata, "confirmed");
+    // CONFIRMATION — don't overwrite, just add verification receipt, at most one per CONFIRMATION_WINDOW_MS for the
+    // same value. "valid" is the CHECK's word for a confirmed value ("Confirmed correct" in the creating migration).
+    // This sent "confirmed", which the CHECK refuses, so no confirmation receipt ever landed.
+    await writeReceipt(ctx, field, proposedValue, metadata, "valid", CONFIRMATION_WINDOW_MS);
     return { action: "confirmation", field, value: proposedValue, existing_value: existingValue };
   }
 

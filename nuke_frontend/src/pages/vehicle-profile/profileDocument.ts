@@ -64,6 +64,7 @@ export function profileDocumentFrom(read: ProfileRead, priceOwnedByLiveStack: bo
         ...rest,
         identity: { primary: tokens.primary, differentiators: tokens.differentiators },
         model: tokens.primary.find(t => t.kind === 'model')?.value ?? rest.model ?? null,
+        transmissionModel: identity_source.transmission_model?.trim() || null,
         price: priceOwnedByLiveStack ? null : rest.price ?? null,
         priceLabel: priceOwnedByLiveStack ? null : rest.priceLabel ?? null,
       };

@@ -54,7 +54,7 @@ struct WorthBracketView: View {
                     Text("MARKET ESTIMATE")
                         .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, weight: .semibold)).foregroundStyle(.tertiary)
                 }
             }
             Text("Not priced yet")
@@ -82,7 +82,7 @@ struct WorthBracketView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(.caption2, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -188,7 +188,7 @@ private struct ValuationDetailSheet: View {
                                 HStack(spacing: 8) {
                                     signalRow(s)
                                     Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                        .font(.system(.caption2, weight: .semibold))
                                         .foregroundStyle(.tertiary)
                                 }
                             }

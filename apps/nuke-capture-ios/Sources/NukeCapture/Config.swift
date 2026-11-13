@@ -134,6 +134,19 @@ enum Config {
     /// BGProcessingTask identifier for the backfill drain — must match
     /// BGTaskSchedulerPermittedIdentifiers in project.yml.
     static let backfillTaskID = "ag.nuke.capture.backfill"
+    /// BGProcessingTask identifier for the recent window (the last three days of photos): network,
+    /// no charger. Booked whenever a pass leaves recent work behind, so a frame shot today lands with
+    /// the app closed and the phone unplugged. Must match BGTaskSchedulerPermittedIdentifiers.
+    static let recentTaskID = "ag.nuke.capture.recent"
+    /// Background URLSession identifier for the upload queue (UploadQueue.swift).
+    static let uploadSessionID = "ag.nuke.capture.upload"
+    /// Bumped when the rule for counting failed attempts changes; SyncEngine clears the stored
+    /// attempts once when it sees a higher value (the gave-up set is re-tried from zero).
+    ///   1: every failure counted (up to build 33).
+    ///   2: only the photo's own failures count; network, server and quota failures retry free.
+    static let failedAttemptsEpoch = 2
+    /// The Shortcuts door: opening `ag.nuke.capture://sync` runs a pass (README, "Land as taken").
+    static let syncURLHost = "sync"
 
     /// Background backfill drain runs only on un-metered Wi-Fi (BGProcessingTaskRequest has no Wi-Fi-only flag; NetworkMonitor enforces it).
     static let backfillRequiresWiFi = true
@@ -163,9 +176,4 @@ enum Config {
     /// CFBundleURLTypes; this exact URL must also appear in the Supabase
     /// Auth → URL Configuration redirect allow-list at runtime.
     static let oauthRedirectURL = URL(string: "ag.nuke.capture://login-callback")!
-
-    /// Explore mode's sample profile (the Profile tab with no session) —
-    /// a real prod profile with a deep day record, never a fixture.
-    /// profiles.id for handle "skylar".
-    static let sampleProfileUserId = "0b9f107a-d124-49de-9ded-94698f63c1c4"
 }

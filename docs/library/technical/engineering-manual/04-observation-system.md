@@ -483,6 +483,78 @@ The analysis engine coordinator receives observation triggers and queues relevan
 
 ## Target Architecture
 
+### Retained ECR registry replay
+
+The owner requires valid ECR evidence to be admitted correctly rather than discarded
+because the earlier importer was incomplete. `ingest-observation` accepts service-only
+selectors `{mode: "retained_ecr_capture_v1", snapshot_id, dry_run}`. The server reads
+the selected original capture, verifies its hash and clocks, and parses the retained
+page. No caller-supplied claims, source re-fetch, browser session or model call is used.
+
+The source is an aggregator/registry presentation, not a sale. Collection Current and
+Previous card regions remain separate; Similar Cars and filter options are not members.
+Load-more tails are not enumerated. Locked pages are refused; hidden specifications
+stay unknown. A source current-membership claim never establishes present ownership
+or staging permission. Detail headings are retained without inventing a year/VIN.
+
+Admission writes an unresolved `listing` observation through the existing writer
+(organization subject for collections, vehicle subject for individual detail pages),
+with `source_snapshot_id`, capture-time basis, unknown source event time and the full
+qualified source-card receipt. Physical vehicle/organization resolution remains a
+separate evidenced relationship repair; this replay creates no vehicles, makes,
+models, ownership links or permissions and restores no deleted rows. Its source
+assertion confidence is capped and downstream analysis is deferred. A retry qualifies
+the original bytes again and checks the persisted source receipt before acknowledging
+a duplicate. Source loss, tampering or supersession cannot silently return success.
+
+Run `scripts/ecr-retained-replay.mjs --snapshot <uuid>` under the configured server
+environment for dry-run; pass `--apply` for explicitly authorized admission. `--manifest`
+accepts an array of 1–50 UUIDs. The operator verifies the persisted observation on apply;
+it does not mark the old import queue complete. Source labels and aggregate counts in
+historical `ecr_*` rows are not a canonical catalogue or physical-fleet denominator.
+
+Verification: `retainedEcr.test.ts`, `retainedEcrHandler.test.ts` and
+`scripts/ecr-retained-replay.test.mjs` exercise source qualification, unknowns, denied
+callers, dry-run, canonical admission/readback, corrupt replay and duplicate behavior.
+Live source-to-reader acceptance and historical identity repair are separate stages.
+
+#### Progressive source profiles
+
+An admitted registry car reference can be inspected before a physical chassis match,
+year or VIN is established. The existing authenticated vehicles API accepts
+`GET /api-v1-vehicles?source_url=<ECR detail or collection URL>`. Its source view
+re-derives the bounded selected captures and checks the original receipt, hash,
+subject and clocks before returning data. The existing vehicle-profile owner renders
+it at `/vehicle/source?source_url=...`; Search offers that drill for ECR URLs.
+The collection's captured members and a car's attributed collection presentations
+link to each other. Those links carry an optional UUID `capture_id` through the
+profile and API, so an earlier claim cannot silently drill into the newest member
+set. Source URL and selected capture must both agree with the verified response.
+This uses the existing observations, without a parallel entity
+table or inferred vehicle restoration. Deployment and reader verification are separate
+from this implementation contract.
+
+The response distinguishes `source_vehicle` from a resolved physical vehicle and
+carries `model_use` eligibility per question. A dated registry presentation can be
+used as attributed registry testimony. The same evidence does not establish verified
+factory specifications, physical identity, ownership, current availability, a sale
+or independent corroboration. Moving a claim into Nuke adds no independent witness.
+Different labels and Current/Previous assertions survive; capture time never becomes
+the time of ownership or the time a photograph was taken. Hidden fields stay absent.
+
+Access uses the existing authenticated API path. Project service keys in this read
+mode use the canonical verifier, including rotated keys and the `apikey` header;
+normal user/API-key authentication and rate limits remain in place. It changes no
+table grants or RLS and exposes no retained HTML or hidden source fields. A missing,
+withdrawn, altered or unavailable source is unavailable, never a successful empty
+vehicle. Both history queries are bounded; an unexhausted history is labelled partial.
+
+Verification: `api-v1-vehicles/sourceProfile.test.ts` exercises original-to-reader
+custody, retained Current/Previous claims, withdrawal, tampering, authentication,
+rotated/forged credentials, source-only identity and read-only behavior.
+`VehicleSourceProfile.test.tsx` and `Search.test.tsx` cover source navigation, retained
+selection through sign-in, stale-response refusal and explicit source inspection.
+
 The observation system is the foundation for the Digital Twin architecture described in the encyclopedia. The target state:
 
 1. **Every data point is an observation.** No more direct writes to `vehicles` from extractors. All data flows through `ingest-observation`, which becomes the sole write path.

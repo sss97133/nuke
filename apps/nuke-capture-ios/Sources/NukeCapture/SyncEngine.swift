@@ -156,6 +156,7 @@ final class SyncEngine: ObservableObject {
         static let totalHeldPrivate = "totalHeldPrivate" // Int — frames the contributor gate held back
         static let seenAssets = "seenAssetIDs"          // [String] PHAsset ids settled, capped (Config.seenAssetCap)
         static let failedAttempts = "assetFailedAttempts" // [String: Int] attempts per asset that failed
+        static let failedAttemptsEpoch = "assetFailedAttemptsEpoch" // Int — Config.failedAttemptsEpoch when last reset
     }
 
     /// Dedupe set: "filename|size" of everything already uploaded. Ordered
@@ -244,6 +245,15 @@ final class SyncEngine: ObservableObject {
         seenAssetOrder = defaults.stringArray(forKey: Key.seenAssets) ?? []
         seenAssetIDs = Set(seenAssetOrder)
         failedAttempts = (defaults.dictionary(forKey: Key.failedAttempts) as? [String: Int]) ?? [:]
+        // Attempts counted by an older build included server outages (the storage quota hold of
+        // 2026-10-28 put the owner's 46 newest frames, the VIN plate among them, in the gave-up set
+        // for good). A build that stops counting those starts every photo over once.
+        if Self.failedAttemptsAreStale(stored: defaults.integer(forKey: Key.failedAttemptsEpoch),
+                                       current: Config.failedAttemptsEpoch) {
+            failedAttempts = [:]
+            defaults.set(failedAttempts, forKey: Key.failedAttempts)
+            defaults.set(Config.failedAttemptsEpoch, forKey: Key.failedAttemptsEpoch)
+        }
         gaveUpCount = failedAttempts.values.filter { $0 >= Config.maxAttemptsPerAsset }.count
         lastSyncDate = defaults.object(forKey: Key.lastSyncDate) as? Date
         recentUploadIDs = defaults.stringArray(forKey: Key.recentUploads) ?? []
@@ -429,11 +439,19 @@ final class SyncEngine: ObservableObject {
         }
         isSyncing = true
         lastError = nil
+        // Leaving the app no longer ends the pass at once: iOS grants about 30 s more, enough to finish
+        // the original being read and hand it to the background uploader. The remainder waits for the
+        // next pass or the recent-window processing task (watermark unchanged: failures > 0 below).
+        let expired = ExpiryFlag()
+        let bgTask = UIApplication.shared.beginBackgroundTask(withName: "capture-sync-pass") { expired.set() }
         defer {
             isSyncing = false
             lastSyncDate = Date()
             defaults.set(lastSyncDate, forKey: Key.lastSyncDate)
+            if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask) }
         }
+        // Transfers staged by an earlier pass or a killed run go first: they already passed every gate.
+        await BackgroundUploader.shared.resume()
 
         let runStarted = Date()
         let watermark = (defaults.object(forKey: Key.watermark) as? Date)
@@ -484,6 +502,7 @@ final class SyncEngine: ObservableObject {
         var uploaded = 0, skipped = 0, deduped = 0, failed = 0
         var heldPrivate = 0   // contributor-mode firewall holds (face / not-a-vehicle)
         var metadataOnly = 0  // owner-triage: row uploaded WITHOUT pixels (personal/sensitive — alibi metadata only)
+        var queuedForUpload = 0  // originals handed to the background uploader (the row lands when the bytes do)
         var t0Fired = 0   // cap on-device T0 per sync — never thrash the ANE on a bulk catch-up
         var deferred = 0  // originals in iCloud, left for the background job
         // With the app open, a pass reads and uploads at most the foreground budget, paced, and
@@ -503,6 +522,7 @@ final class SyncEngine: ObservableObject {
             // cleanly; un-processed assets retry next pass because the
             // watermark below only advances on failures == 0.
             if Task.isCancelled { failed += 1; break }
+            if expired.isSet { failed += 1; stopReason = "suspended"; break }
             // A seriously hot device stops here; the watermark does not advance past this pass
             // (failures > 0), so the remainder is re-found when it cools.
             if Self.deviceTooHot { refreshThermalHold(); failed += 1; stopReason = "hot"; break }
@@ -522,14 +542,17 @@ final class SyncEngine: ObservableObject {
             }
 
             var stop = false
-            let outcome = await processAsset(asset, userId: userId)
+            let outcome = await processAsset(asset, userId: userId, recent: recentIDs.contains(asset.localIdentifier))
             switch outcome {
-            case .uploaded, .notOwnCamera, .failed:
+            case .uploaded, .queued, .notOwnCamera, .failed:
                 byteWork += 1
                 if foreground { try? await Task.sleep(for: .milliseconds(Config.foregroundBackfillPaceMs)) }
             default: break
             }
             switch outcome {
+            case .queued:
+                uploaded += 1
+                queuedForUpload += 1
             case .uploaded(let pixels):
                 uploaded += 1
                 if !pixels { metadataOnly += 1 }
@@ -550,17 +573,22 @@ final class SyncEngine: ObservableObject {
                 gates[reason, default: 0] += 1
                 VisionDecisionLog.shared.record(.init(assetId: asset.localIdentifier, source: "sync",
                     category: VisionDecisionRecord.gateCategory, reason: reason))
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: reason, takenAt: asset.creationDate)
             case .notOwnCamera:
                 skipped += 1
                 gates["not_own_camera", default: 0] += 1
                 VisionDecisionLog.shared.record(.init(assetId: asset.localIdentifier, source: "sync",
                     category: VisionDecisionRecord.gateCategory, reason: "not_own_camera"))
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "not_own_camera", takenAt: asset.creationDate)
             case .heldPrivate:
                 heldPrivate += 1
+                // the ledger learns that a photo was held (id and clock only; what it showed stays on the phone)
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "personal", takenAt: asset.creationDate)
             case .deduped:
                 deduped += 1
             case .gaveUp:
                 gates["gave_up", default: 0] += 1   // failed Config.maxAttemptsPerAsset times; holds nothing back
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "gave_up", takenAt: asset.creationDate)
             case .deferred:
                 // In iCloud only: the background job downloads it on Wi-Fi. Not an attempt against
                 // the photo, and not a failure that holds the watermark.
@@ -577,27 +605,37 @@ final class SyncEngine: ObservableObject {
             if stop { break }
         }
         report("ios_sync_pass", [
-            "uploaded": uploaded, "metadata_only": metadataOnly, "deduped": deduped, "deferred": deferred,
+            "uploaded": uploaded, "metadata_only": metadataOnly, "queued": queuedForUpload, "deduped": deduped, "deferred": deferred,
             "held_private": heldPrivate, "failed": failed, "recent": recent.count, "window": assets.count,
             "page_full": assets.count >= Config.maxPerRun ? 1 : 0,  // a full page every pass with an unmoved watermark = a stuck cursor
         ], extra: ["gates": gates, "stop": stopReason ?? "end",
                    "watermark": ISO8601DateFormatter().string(from: watermark)])
         lastPassSummary = [
-            "\(uploaded) uploaded", "\(deduped) already up",
+            queuedForUpload > 0 ? "\(uploaded) uploaded (\(queuedForUpload) still landing in the background)" : "\(uploaded) uploaded",
+            "\(deduped) already up",
             gates.isEmpty ? nil : "skipped: " + gates.sorted { $0.key < $1.key }
                 .map { "\($0.value) \($0.key.replacingOccurrences(of: "_", with: " "))" }.joined(separator: ", "),
             stopReason == "low_power_window" ? "Low Power Mode: older photos wait" : nil,
             stopReason == "hot" ? "phone hot: paused" : nil,
+            stopReason == "suspended" ? "app closed mid-pass: the rest continues in the background" : nil,
             deferred > 0 ? "\(deferred) in iCloud, wait for the charging job" : nil,
             heldPrivate > 0 ? "\(heldPrivate) held private" : nil,
             failed > 0 ? "\(failed) failed or left for the next pass" : nil,
         ].compactMap { $0 }.joined(separator: " · ") + " · of \(ordered.count) photos in this pass, newest first"
         enqueueBackfill(deferredIDs)
+        // Work the owner is waiting on (a budget or suspension stop, originals left in iCloud, transfers
+        // still in flight) books the recent-window processing task: network, no charger, no app open.
+        if foregroundBudgetReached || stopReason == "suspended" || deferred > 0 || BackgroundUploader.shared.queuedCount > 0 {
+            NukeCaptureApp.scheduleRecentUploads()
+        }
 
         persistSeenAssets()
         totalSkippedOffShop += skipped
         defaults.set(totalSkippedOffShop, forKey: Key.totalSkipped)
         recordHeldPrivate(heldPrivate)
+        // The ledger: what this pass decided not to upload, and the re-scan request this pass served (if one was claimed).
+        await CaptureLedgerReporter.shared.flush()
+        await CaptureLedgerReporter.shared.finishRescan(uploaded: uploaded, skipped: skipped + heldPrivate, failed: failed)
 
         // Silent-failure law (same as the daemon): advance the watermark ONLY
         // when nothing failed — a failed asset must be retried next pass.
@@ -620,6 +658,8 @@ final class SyncEngine: ObservableObject {
         // earlier pass. Visual analysis availability never changes upload or filing success.
         await SubjectResolutionEngine.shared.runAfterSync(userId: userId)
         await SubjectResolutionEngine.shared.runHistoricalAfterSync(userId: userId)
+        // Videos that belong to a vehicle (OFF by default; a no-op until the flag is on).
+        await VideoSyncEngine.shared.runAfterPhotoPass(userId: userId)
         return failed == 0
     }
 
@@ -831,12 +871,23 @@ final class SyncEngine: ObservableObject {
                     uploaded += 1
                     if !pixels { metadataOnly += 1 }
                     settled.insert(asset.localIdentifier)
-                case .offSite, .notOwnCamera:
+                case .queued:
+                    // Staged for the background session: leaves the queue now; a failed transfer
+                    // returns through the uploader's own retry, never through this queue.
+                    uploaded += 1
+                    settled.insert(asset.localIdentifier)
+                case .offSite(let reason):
                     skipped += 1
                     settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: reason, takenAt: asset.creationDate)
+                case .notOwnCamera:
+                    skipped += 1
+                    settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "not_own_camera", takenAt: asset.creationDate)
                 case .heldPrivate:
                     heldPrivate += 1
                     settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "personal", takenAt: asset.creationDate)
                 case .deduped:
                     deduped += 1
                     settled.insert(asset.localIdentifier)
@@ -863,7 +914,7 @@ final class SyncEngine: ObservableObject {
             if uploaded > 0, mins > 0.05 { uploadsPerMinute = Double(uploaded) / mins }
             await Task.yield()
         }
-
+        await CaptureLedgerReporter.shared.flush()
     }
 
     // ─── Unified background drain (BUG #1: ingest with the screen off) ───────
@@ -944,6 +995,7 @@ final class SyncEngine: ObservableObject {
 
     enum AssetOutcome {
         case uploaded(pixels: Bool)
+        case queued           // original handed to the background uploader; the row lands when the bytes do
         case offSite(reason: String)   // no_location, off_site, not_library or screenshot
         case notOwnCamera     // no Apple camera EXIF (received, edited elsewhere)
         case heldPrivate      // contributor firewall
@@ -963,6 +1015,9 @@ final class SyncEngine: ObservableObject {
         let pixelsEligible: Bool
         let labels: [String]
         var privacyReceipt: DevicePrivacyReceipt? = nil
+        /// Apple Vision found a vehicle in the frame (an affirmative label). Away from a site this
+        /// is what lets the pixels go up.
+        var isVehicle = false
         /// The on-device rule outcome, for the local decision log (ids and labels only).
         var decision: VisionDecision? = nil
         var scoredLabels: [(String, Float)] = []
@@ -978,7 +1033,7 @@ final class SyncEngine: ObservableObject {
         var eligible = false
         var labels: [String] = []
         var privacyReceipt: DevicePrivacyReceipt?
-        var decision: VisionDecision?, scored: [(String, Float)] = [], face = false
+        var decision: VisionDecision?, scored: [(String, Float)] = [], face = false, vehicle = false
         // Owner triage only matters for our own camera's frames; skip the decode otherwise.
         if make == "Apple" {
             guard let cg = decode(data) else { throw VisionEngine.TriageFailure.imageUndecodable }
@@ -986,7 +1041,7 @@ final class SyncEngine: ObservableObject {
             if let failure = t.failure { throw failure }
             labels = t.labels
             eligible = t.pixelsEligible
-            decision = t.decision; scored = t.scoredLabels; face = t.hasFace
+            decision = t.decision; scored = t.scoredLabels; face = t.hasFace; vehicle = t.isVehicle
             if eligible, let evidence = t.privacyEvidence, let userId {
                 privacyReceipt = DevicePrivacyReceipt.make(original: data, image: cg, evidence: evidence, userId: userId)
             }
@@ -994,21 +1049,55 @@ final class SyncEngine: ObservableObject {
         return PreparedOriginal(cameraMake: make, cameraModel: model,
                                 exifCaptureDate: CameraEXIF.captureDate(from: data),
                                 pixelsEligible: eligible, labels: labels, privacyReceipt: privacyReceipt,
-                                decision: decision, scoredLabels: scored, hasFace: face)
+                                isVehicle: vehicle, decision: decision, scoredLabels: scored, hasFace: face)
+    }
+
+    // ─── Where a frame was taken, and what of it goes up ─────────────────────
+    //
+    // Owner, 2026-11-11: every frame is signal. Until build 160 a photo taken away from a confirmed
+    // site (or with no GPS) never left the phone: from 2026-11-04 his phone sent nothing while he was
+    // more than 25 km from all three sites, and a car he shot elsewhere was lost. Now every own-camera
+    // frame lands: pixels when it is work evidence (and, away from a site, shows a vehicle), otherwise
+    // the time and a rough place only (2 decimals, about 1 km), the pixels staying on the phone. The
+    // contributor firewall still keeps pixels out of a shared pool; a held frame now lands as time and
+    // place instead of nothing.
+    enum Placement: Equatable { case atSite, offSite, noLocation }
+
+    struct Landing: Equatable {
+        let pixels: Bool
+        /// Round the coordinates before they leave the phone.
+        let coarsePlace: Bool
+    }
+
+    nonisolated static func landing(placement: Placement, contributorHold: Bool,
+                                    pixelsEligible: Bool, isVehicle: Bool) -> Landing {
+        let pixels = pixelsEligible && !contributorHold && (placement == .atSite || isVehicle)
+        return Landing(pixels: pixels, coarsePlace: !pixels && placement == .offSite)
+    }
+
+    /// About 1.1 km: enough to say where the owner was, not which house.
+    nonisolated static func coarse(_ degrees: Double?) -> Double? {
+        degrees.map { ($0 * 100).rounded() / 100 }
     }
 
     /// Gates first on metadata alone (no bytes read), then the original, then the upload.
-    private func processAsset(_ asset: PHAsset, userId: String) async -> AssetOutcome {
+    private func processAsset(_ asset: PHAsset, userId: String, recent: Bool = false) async -> AssetOutcome {
         let id = asset.localIdentifier
+        // Already staged for the background uploader: its row lands when the bytes do; never re-read.
+        if BackgroundUploader.shared.isPending(assetID: id) { return .queued }
         // ── Gate 1 (privacy, on-device): GPS site-gate + ownership check ──
         // Confirmed ignition sites; falls back to the hardcoded
         // Config.shopLocations when none are confirmed (migration).
         // sourceType + mediaSubtypes filter: only user-originated, non-screenshot images.
         guard asset.sourceType == .typeUserLibrary else { return .offSite(reason: "not_library") }
         guard !asset.mediaSubtypes.contains(.photoScreenshot) else { return .offSite(reason: "screenshot") }
-        guard let loc = asset.location else { return .offSite(reason: "no_location") }
-        guard SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude) else {
-            return .offSite(reason: "off_site")
+        // Away from a site, or with no GPS, the frame still lands (see `landing`); only what goes up changes.
+        let placement: Placement
+        if let loc = asset.location {
+            placement = SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude)
+                ? .atSite : .offSite
+        } else {
+            placement = .noLocation
         }
         // Settled before: skip without reading the original again. The 3-day overlap re-finds
         // every recent photo on each pass, and re-reading those originals was most of a pass.
@@ -1020,10 +1109,11 @@ final class SyncEngine: ObservableObject {
         // paycheck, a person) clears the GPS gate but must NEVER reach the
         // shared pool — hold clutter and personal frames (the triage rule).
         // Owner mode skips this entirely.
+        var contributorHold = false
         if contributorMode {
             switch await contributorGateVerdict(assetID: id) {
             case .allow: break
-            case .hold: return .heldPrivate
+            case .hold: contributorHold = true   // pixels stay on the phone; time and place still land
             case .unavailable(let reason): return noteFailure(id, message: reason)
             }
         }
@@ -1033,11 +1123,11 @@ final class SyncEngine: ObservableObject {
         do {
             // The ORIGINAL bytes. An original that lives only in iCloud downloads in the background
             // job on an unmetered link, never while the app is open: it waits (.deferred) instead.
-            data = try await Self.requestOriginalData(for: asset, allowNetwork: Self.mayDownloadOriginals)
+            data = try await Self.requestOriginalData(for: asset, allowNetwork: Self.mayDownloadOriginal(recent: recent))
         } catch is OriginalInCloud {
             return .deferred
         } catch {
-            return noteFailure(id, message: "\(filename): \(error.localizedDescription)")
+            return noteFailure(id, message: "\(filename): \(error.localizedDescription)", error: error)
         }
 
         let prep: PreparedOriginal
@@ -1060,35 +1150,62 @@ final class SyncEngine: ObservableObject {
         // Clutter and personal frames upload metadata
         // only (EXIF alibi) with the pixels left on the phone. An unavailable
         // privacy read returned above as a retryable failure, never a verdict.
+        let landing = Self.landing(placement: placement, contributorHold: contributorHold,
+                                   pixelsEligible: prep.pixelsEligible, isVehicle: prep.isVehicle)
+        let lat = asset.location?.coordinate.latitude, lon = asset.location?.coordinate.longitude
         let meta = PhotoMeta(
             assetIdentifier: id,
             filename: filename,
             creationDate: asset.creationDate,
             exifCaptureDate: prep.exifCaptureDate,
-            latitude: asset.location?.coordinate.latitude,
-            longitude: asset.location?.coordinate.longitude,
+            latitude: landing.coarsePlace ? Self.coarse(lat) : lat,
+            longitude: landing.coarsePlace ? Self.coarse(lon) : lon,
             cameraMake: prep.cameraMake,
             cameraModel: prep.cameraModel,
             sourceType: Self.sourceTypeLabel(for: asset)
         )
-        do {
-            let acknowledgedHash = try await SupabaseService.uploadPhoto(
-                data: data, meta: meta, userId: userId,
-                uploadPixels: prep.pixelsEligible, appleMLLabels: prep.labels
-            )
-            if let acknowledgedHash {
-                SubjectResolutionEngine.shared.acknowledge(localIdentifier: id, sourceHash: acknowledgedHash, userId: userId,
-                    privacyReceipt: prep.privacyReceipt)
+        if landing.pixels {
+            // The bytes go up through the background session, which outlives this pass and the app.
+            // The row is staged beside them and inserted on completion (uploadLanded settles the asset).
+            let hash = SupabaseService.sha256Hex(data)
+            let row: Data
+            do {
+                row = try JSONEncoder().encode(SupabaseService.buildImageRow(
+                    meta: meta, userId: userId, byteCount: data.count, sha256: hash, appleMLLabels: prep.labels))
+            } catch {
+                return noteFailure(id, message: "\(filename): \(error.localizedDescription)", error: error)
             }
-        } catch {
-            if SupabaseService.isAuthFailure(error) {
-                authProblem = "The server refused this sign-in, so nothing is uploading. Sign out and sign in again."
-                lastError = authProblem
-                return .authFailed
+            let staged = BackgroundUploader.shared.enqueue(
+                assetID: id, data: data, sha256: hash,
+                storagePath: Config.storagePath(userId: userId, sha256: hash, filename: filename),
+                mimeType: SupabaseService.mimeType(forFilename: filename), seenKey: key, userID: userId,
+                row: row, privacyReceipt: prep.privacyReceipt)
+            guard staged else {
+                return noteFailure(id, message: "\(filename): \(BackgroundUploader.shared.lastError ?? "could not stage")")
             }
-            return noteFailure(id, message: "\(filename): \(error.localizedDescription)")
+            return .queued
         }
 
+        do {
+            _ = try await SupabaseService.uploadPhoto(
+                data: data, meta: meta, userId: userId,
+                uploadPixels: false, appleMLLabels: prep.labels
+            )
+        } catch {
+            if SupabaseService.isAuthFailure(error) {
+                noteSessionRefused()
+                return .authFailed
+            }
+            return noteFailure(id, message: "\(filename): \(error.localizedDescription)", error: error)
+        }
+
+        settleUploaded(assetID: id, seenKey: key)
+        return .uploaded(pixels: false)
+    }
+
+    /// The row is in (inline metadata-only insert, or the background uploader's completion): the asset
+    /// is settled, the counters move, and nothing re-reads it.
+    private func settleUploaded(assetID id: String, seenKey key: String) {
         authProblem = nil
         markSeen(key)
         markAssetSeen(id)
@@ -1098,13 +1215,97 @@ final class SyncEngine: ObservableObject {
         recordUpload(assetIdentifier: id)
         totalSynced += 1
         defaults.set(totalSynced, forKey: Key.totalSynced)
-        return .uploaded(pixels: prep.pixelsEligible)
+    }
+
+    /// Background uploader: the bytes and the row landed.
+    func uploadLanded(assetID: String, seenKey: String, sha256: String, userID: String, privacyReceipt: DevicePrivacyReceipt?) {
+        settleUploaded(assetID: assetID, seenKey: seenKey)
+        persistSeenAssets()
+        SubjectResolutionEngine.shared.acknowledge(localIdentifier: assetID, sourceHash: sha256, userId: userID,
+                                                   privacyReceipt: privacyReceipt)
+        BackgroundUploader.shared.requestIdentityFollowup()
+        let t0id = assetID
+        Task { [weak self] in
+            guard let self, let atom = await SyncEngine.analyzeT0(assetID: t0id) else { return }
+            self.addLiveT0(atom)
+        }
+    }
+
+    /// Background uploader: storage or the insert refused this photo's request (a 4xx that is not the
+    /// session). One attempt against the photo, like an inline failure.
+    func uploadRejected(assetID: String, message: String) {
+        if case .failed(retry: true) = noteFailure(assetID, message: message) {
+            enqueueBackfill([assetID])   // another attempt through the queue, until the photo gives up
+        }
+    }
+
+    /// The server refused who we are, not a photo. Every upload stops until a pass succeeds again.
+    func noteSessionRefused() {
+        authProblem = "The server refused this sign-in, so nothing is uploading. Sign out and sign in again."
+        lastError = authProblem
+    }
+
+    /// The Today screen's "retry": photos that gave up get their attempts back and a pass runs.
+    func retryGaveUp() async {
+        failedAttempts = [:]
+        defaults.set(failedAttempts, forKey: Key.failedAttempts)
+        gaveUpCount = 0
+        await sync()
+    }
+
+    /// A build whose attempt counting changed starts every photo over once (see init).
+    nonisolated static func failedAttemptsAreStale(stored: Int, current: Int) -> Bool {
+        stored < current
+    }
+
+    /// Whether a failure is the photo's (undecodable bytes, no data, a rejected request) or the world's
+    /// (no network, a server error, a timeout, a quota hold). Only the photo's own failures count
+    /// toward Config.maxAttemptsPerAsset: on 2026-10-28 a storage quota hold made every upload fail,
+    /// three passes later the 46 newest frames were "gave up" for good, and the owner's VIN plate
+    /// never left the phone.
+    nonisolated static func countsAgainstThePhoto(_ error: Error) -> Bool {
+        if error is CancellationError || error is OriginalInCloud { return false }
+        if let u = error as? URLError {
+            switch u.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff,
+                 .timedOut, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .secureConnectionFailed,
+                 .resourceUnavailable, .backgroundSessionWasDisconnected:
+                return false
+            default:
+                return true
+            }
+        }
+        if let e = error as? HTTPError {
+            return !Self.isTransientStatus(e.response.statusCode, body: String(data: e.data, encoding: .utf8) ?? "")
+        }
+        if let e = error as? StorageError {
+            let code = Int(e.statusCode ?? "") ?? 0
+            return !Self.isTransientStatus(code, body: e.message)
+        }
+        if let e = error as? PostgrestError {
+            if e.code == "57014" { return false }                      // statement timeout
+            let m = e.message.lowercased()
+            return !(m.contains("timeout") || m.contains("too many") || m.contains("unavailable"))
+        }
+        return true
+    }
+
+    nonisolated static func isTransientStatus(_ status: Int, body: String) -> Bool {
+        let lower = body.lowercased()
+        switch status {
+        case 408, 425, 429, 500..<600: return true
+        case 402: return lower.contains("quota") || lower.contains("exceed")
+        case 0: return lower.contains("quota") || lower.contains("exceed") || lower.contains("timeout")
+        default: return false
+        }
     }
 
     /// Counts one failed attempt. The last allowed attempt returns retry == false, so the caller
     /// stops holding the watermark or the queue for this photo.
-    private func noteFailure(_ id: String, message: String) -> AssetOutcome {
+    private func noteFailure(_ id: String, message: String, error: Error? = nil) -> AssetOutcome {
         lastError = message
+        // The world's failure (no network, a server error, a quota hold) is retried without charge.
+        if let error, !Self.countsAgainstThePhoto(error) { return .failed(retry: true) }
         let n = (failedAttempts[id] ?? 0) + 1
         failedAttempts[id] = n
         defaults.set(failedAttempts, forKey: Key.failedAttempts)
@@ -1115,9 +1316,11 @@ final class SyncEngine: ObservableObject {
         return .failed(retry: true)
     }
 
-    /// iCloud downloads of originals: background (the charging job, a refresh wake) on Wi-Fi only.
-    private static var mayDownloadOriginals: Bool {
-        NetworkMonitor.shared.isUnmetered && UIApplication.shared.applicationState == .background
+    /// iCloud downloads of originals: on Wi-Fi only; in the background (the charging job, a wake), or
+    /// in the foreground for the recent window, so a frame shot this week lands on the next open even
+    /// when the phone already evicted its original.
+    private static func mayDownloadOriginal(recent: Bool) -> Bool {
+        NetworkMonitor.shared.isUnmetered && (recent || UIApplication.shared.applicationState == .background)
     }
 
     private func markAssetSeen(_ id: String) {
@@ -1367,6 +1570,14 @@ private final class ImageRequestBox: @unchecked Sendable {
 
 /// The original is only in iCloud and this request may not download it.
 struct OriginalInCloud: Error {}
+
+/// Set by UIKit's background-task expiration handler (any thread); read by the pass loop.
+final class ExpiryFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func set() { lock.lock(); value = true; lock.unlock() }
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+}
 
 /// Tiny NSObject shim — PHPhotoLibraryChangeObserver calls arrive on a
 /// background queue; we just forward a poke and let SyncEngine hop to the

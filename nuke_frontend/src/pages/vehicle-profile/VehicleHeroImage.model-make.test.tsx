@@ -9,7 +9,6 @@ vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => fixture.cur
 vi.mock('../../lib/supabase', () => ({ get supabase() { return fixture.client; } }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => true }));
 vi.mock('../../components/image/MobileImageGallery', () => ({ __esModule: true, default: () => null }));
-vi.mock('./VehicleMediaKit', () => ({ __esModule: true, default: () => null }));
 vi.mock('./VehiclePhotoLightbox', () => ({ openVehiclePhoto: () => { throw Error('Unexpected photo open'); }, openVehiclePhotoByUrl: () => { throw Error('Unexpected URL open'); } }));
 vi.mock('../../components/badges/useBadgeDepth', () => ({ useBadgeDepth: (dimension: string, value: unknown) => {
   fixture.depth.push({ dimension, value }); return { data: null, loading: false, load: fixture.load };

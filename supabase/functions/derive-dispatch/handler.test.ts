@@ -40,6 +40,8 @@ type Scenario = {
   doneWrite?: 'error' | 'missing' | 'wrong_id' | 'wrong_status';
   requeueError?: boolean;
   inactive?: boolean;
+  contributorReview?: boolean;
+  retainedAnalysisFails?: boolean;
   body?: Record<string, unknown>;
   token?: string;
 };
@@ -56,14 +58,21 @@ async function run(scenario: Scenario = {}) {
     const respond = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
       status, headers: { 'content-type': 'application/json' },
     });
+    if (url.pathname === '/rest/v1/rpc/finish_receipt_products') return respond(payload.p_complete ? 'done' : 'pending');
     if (url.pathname === '/rest/v1/rpc/claim_derivation_work') return respond(items);
     if (url.pathname === '/rest/v1/observation_extractors') {
       if (method === 'PATCH') return respond([]);
       const slug = url.searchParams.get('slug')?.replace(/^eq\./, '') ?? EXTRACTOR;
+      if (slug === 'contributor-evidence-review-v1') return respond(scenario.contributorReview ? [{ slug,
+        edge_function_name: 'contributor-intake', is_active: true,
+        extractor_config: { action: 'retained_review', paid_extraction: false } }] : []);
       return respond([{ slug, edge_function_name: slug === EXTRACTOR ? 'batch-comment-discovery' : 'owner-reader',
         extractor_type: 'llm', is_active: !scenario.inactive }]);
     }
     if (url.pathname.startsWith('/functions/v1/')) {
+      if (url.pathname.endsWith('/analysis-engine-coordinator')) return respond(scenario.retainedAnalysisFails ? { error: 'interrupted' }
+        : { method: 'retained_analysis_dispatch_v1', processed: 0, total_failed: 0, results: [] }, scenario.retainedAnalysisFails ? 500 : 200);
+      if (url.pathname.endsWith('/contributor-intake/review')) return respond({ method: 'contributor_evidence_review_v1', claimed: 1, results: [{ status: 'done' }] });
       if (scenario.readerThrows) throw new Error('synthetic reader interruption');
       return respond(scenario.output === undefined ? receipt() : scenario.output, scenario.readerStatus ?? 200);
     }
@@ -88,7 +97,7 @@ async function run(scenario: Scenario = {}) {
     return { status: response.status, data: await response.json(), calls };
   } finally { globalThis.fetch = originalFetch; }
 }
-const readerCalls = (r: Awaited<ReturnType<typeof run>>) => r.calls.filter(c => c.path.startsWith('/functions/v1/'));
+const readerCalls = (r: Awaited<ReturnType<typeof run>>) => r.calls.filter(c => c.path.startsWith('/functions/v1/') && !c.path.endsWith('/analysis-engine-coordinator'));
 const queueWrites = (r: Awaited<ReturnType<typeof run>>, status?: string) => r.calls.filter(c =>
   c.path === '/rest/v1/derivation_queue' && (!status || c.body.status === status));
 
@@ -251,10 +260,52 @@ Deno.test('missing credentials are refused before database or reader access', as
 
 Deno.test('an empty claimed batch makes no reader calls and no completion writes', async () => {
   const r = await run({ items: [] });
-  equal(r.data, { claimed: 0, done: 0, failed: 0, results: [] });
+  equal(r.data, { claimed: 0, done: 0, failed: 0, results: [], contributor_review: null,
+    retained_analysis: { method: 'retained_analysis_dispatch_v1', processed: 0, total_failed: 0, results: [] } });
   equal(readerCalls(r).length, 0); equal(queueWrites(r).length, 0);
+});
+
+Deno.test('registered contributor review runs even without a new extraction and preserves retained-only compute', async () => {
+  const r = await run({ items: [], contributorReview: true, body: { user_id: OWNER_ID, platform_credential: true } });
+  equal(r.status, 200);
+  const invoke = readerCalls(r)[0];
+  equal(invoke.path, '/functions/v1/contributor-intake/review');
+  equal(invoke.body, { action: 'retained_review', batch_size: 2, user_id: OWNER_ID, platform_credential: false });
+  assert(invoke.signal instanceof AbortSignal);
+  equal(r.data.contributor_review.claimed, 1);
+  equal(queueWrites(r).length, 0);
+});
+
+Deno.test('zero dispatcher capacity does not invoke a registered review handler', async () => {
+  const r = await run({ items: [], contributorReview: true, body: { batch_size: 0 } });
+  equal(readerCalls(r).length, 0);
+  equal(r.calls.filter(c => c.path.endsWith('/analysis-engine-coordinator')).length, 0);
+  equal(r.calls.find(c => c.path.endsWith('/claim_derivation_work'))?.body.p_batch_size, 0);
+});
+
+Deno.test('retained wake failure is visible without losing independent admitted extraction', async () => {
+  const r = await run({ retainedAnalysisFails: true });
+  equal(r.status, 502); equal(r.data.done, 1); equal(queueWrites(r, 'done').length, 1);
+  equal(r.data.retained_analysis.status, 'failed');
 });
 
 addEventListener('unload', () => envNames.forEach((name, index) => {
   if (saved[index] === undefined) Deno.env.delete(name); else Deno.env.set(name, saved[index]!);
 }));
+
+Deno.test('receipt catalog cannot turn an empty 200 response into a completed derivation', async () => {
+ const r = await run({ items: [item(1, { evidence_type: 'receipt', extractor_slug: 'receipt-products-v1', user_id: OWNER_ID })], output: {} });
+ equal(r.data.done, 0);
+ const finish = r.calls.find(c => c.path === '/rest/v1/rpc/finish_receipt_products');
+ equal(finish?.body.p_complete, false);
+ assert(finish?.body.p_worker?.startsWith('derive-dispatch-'));
+ equal(queueWrites(r, 'done').length, 0);
+});
+Deno.test('receipt catalog completion uses a fenced source-specific acknowledgement', async () => {
+ const r = await run({ items: [item(1, { evidence_type: 'receipt', extractor_slug: 'receipt-products-v1', user_id: OWNER_ID })],
+ output: { success: true, source_receipt_id: SOURCE_ID, product_complete: true, generation: 3, product_result: { items: {} }, retry_after_seconds: 0 } });
+ equal(r.data.done, 1);
+ const finish = r.calls.find(c => c.path === '/rest/v1/rpc/finish_receipt_products');
+ equal(finish?.body.p_generation, 3);
+ equal(readerCalls(r)[0].body.mode, 'receipt_products');
+});

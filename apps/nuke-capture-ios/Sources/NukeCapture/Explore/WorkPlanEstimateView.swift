@@ -116,7 +116,7 @@ struct WorkPlanEstimateView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(PlanCopy.claimKind(c.kind)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             Text(c.isExactQuote ? "“\(c.quote!)”" : c.text).font(.footnote)
-            Text(PlanCopy.claimSource(c)).font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+            Text(PlanCopy.claimSource(c)).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
         }
         .padding(.vertical, 2)
     }

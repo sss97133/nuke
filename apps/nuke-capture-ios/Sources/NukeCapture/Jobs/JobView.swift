@@ -329,7 +329,7 @@ struct JobPathContent: View {
                 }
                 if JobDebug.showCodes {
                     Text(([stage.state.raw] + stage.gaps + stage.inconsistencies).joined(separator: " · "))
-                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 }
             } else {
                 RootedValueView(label: "Status", value: "Not available", status: .facade)
@@ -538,7 +538,7 @@ struct JobPathContent: View {
 
     @ViewBuilder private var debugId: some View {
         if JobDebug.showCodes {
-            Text(workOrderId).font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+            Text(workOrderId).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
         }
     }
 
@@ -603,7 +603,7 @@ struct JobRefusalRow: View {
                 .foregroundStyle(.secondary)
             if JobDebug.showCodes {
                 Text(refusal.reader)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
         }

@@ -20,6 +20,8 @@ export interface Vehicle {
   model: string | null;
   series: string | null;
   trim: string | null;
+  /** A replica designation does not establish original factory trim. */
+  is_replica?: boolean | null;
   vin: string | null;
   title: string | null;
   generation: string | null;
@@ -614,6 +616,9 @@ export interface LiveSession {
 }
 
 export interface AuctionPulse {
+  currency_code?: string | null;
+  /** Source-feed receipt clock; never the generic database updated_at. */
+  source_observed_at?: string | null;
   platform: string;
   /** Legacy external_listings id when the pulse came from that writer; canonical event pulses carry null. */
   external_listing_id?: string | null;

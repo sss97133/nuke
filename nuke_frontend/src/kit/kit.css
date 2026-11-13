@@ -24,6 +24,11 @@
 
 @media (max-width: 480px) { .k-figure { font-size: 28px; } }
 
+/* A proportion bar: a track and a fill, the same tokens the market boards draw theirs with. */
+.k-share-bar { display: block; width: 100%; max-width: 320px; height: 4px; margin-top: 4px; }
+.k-share-bar__track { fill: var(--border); }
+.k-share-bar__fill { fill: var(--text-secondary); }
+
 /* Grouped content, with a thin separator between sections and rows. */
 .k-section { border-bottom: 1px solid var(--border); padding: 16px; background: var(--surface); }
 .k-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -79,6 +84,8 @@
 .k-facet { all: unset; cursor: pointer; padding: 4px 6px; border-bottom: 2px solid transparent; white-space: nowrap; }
 .k-facet:hover, .k-facet[aria-expanded="true"] { border-bottom-color: var(--text); }
 .k-facet:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.k-facet--gap .k-label { color: var(--text-disabled); font-weight: 400; }
+.k-facet--gap { border-bottom-style: dashed; }
 
 /* Phones: the masthead wraps and the result drops under the entity. */
 @media (max-width: 420px) {
@@ -92,3 +99,23 @@
 .k-rows__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 2px 0; }
 .k-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .k-row__value { text-align: right; overflow-wrap: anywhere; }
+
+/* Items: a header token's line items (Items.tsx). One row per item, its sources and what would establish it. */
+.k-items { display: grid; gap: 4px; }
+.k-item { border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.k-item .k-row { border-bottom: 0; padding-bottom: 2px; flex-wrap: wrap; }
+/* break-word, not anywhere: a name or number breaks only when one word is wider than the row */
+.k-item__value { display: inline-flex; align-items: baseline; gap: 8px; margin-left: auto; text-align: right; overflow-wrap: break-word; }
+.k-item__line { margin: 2px 0 0; }
+.k-item__sources, .k-item__sides { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.k-item__sides > li { display: grid; gap: 2px; padding-left: 8px; border-left: 2px solid var(--border); }
+.k-item__source { display: flex; gap: 8px; align-items: flex-start; }
+.k-item__source-body { display: grid; gap: 1px; min-width: 0; }
+.k-item__source-head { display: inline-flex; gap: 8px; align-items: center; }
+.k-item__thumb { width: 40px; height: 40px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.k-status { font: 600 11px/1.4 var(--font-family); padding: 0 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); white-space: nowrap; }
+.k-status[data-status="established"] { border-color: var(--success); color: var(--success); }
+.k-status[data-status="reading"] { border-color: var(--info); color: var(--info); }
+.k-status[data-status="claim"] { color: var(--text); }
+.k-status[data-status="conflict"] { border-color: var(--danger); color: var(--danger); }
+.k-status[data-status="missing"] { color: var(--text-secondary); border-style: dashed; }

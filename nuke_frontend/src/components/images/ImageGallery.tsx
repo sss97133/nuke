@@ -11,9 +11,20 @@ import ImageZoneSection, { groupImagesByZone } from './ImageZoneSection';
 import { ImageSetService } from '../../services/imageSetService';
 import { OnboardingSlideshow } from '../onboarding/OnboardingSlideshow';
 import type { GalleryFilter } from '../../pages/vehicle-profile/VehicleProfileContext';
+import { isRelatedFieldImage } from '../../pages/vehicle-profile/hooks/useVehicleImageEvidence';
 
 /** Profile toolbar mode: maps to viewMode + groupBySource + chronologicalMode */
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
+
+export type GalleryReadCount = { vehicleId: string; filterKey: string; shown: number; partial: boolean; failed?: boolean };
+export type GalleryAnalysisRead = {
+  vehicleId: string;
+  viewerKey: string;
+  status: 'loading' | 'error' | 'ready';
+  images: Array<{ id: string; ai_scan_metadata?: Record<string, any> | null }>;
+  partial: boolean;
+  readAt: string | null;
+};
 
 interface ImageGalleryProps {
   vehicleId: string;
@@ -38,6 +49,10 @@ interface ImageGalleryProps {
   galleryView?: GalleryViewMode;
   /** Cross-column gallery filter from vehicle profile context. */
   galleryFilter?: GalleryFilter | null;
+  onReadCount?: (read: GalleryReadCount) => void;
+  /** The same eligible, deduplicated inventory used by the gallery, before topic filters. */
+  onAnalysisRead?: (read: GalleryAnalysisRead) => void;
+  viewerKey?: string;
   // NEW: Image Set features (optional - defaults maintain existing behavior)
   selectMode?: boolean;
   selectedImages?: Set<string>;
@@ -76,6 +91,8 @@ const GALLERY_IMAGE_SELECT =
   // key above is legacy and unfed). Project its scalars + the small components_seen array so
   // analyzed tiles can show scene/phase/what's-in-it. See engineering-manual Ch.19.
   'ai_byok_scene:ai_scan_metadata->byok_deep_analysis->>scene_type, ai_byok_phase:ai_scan_metadata->byok_deep_analysis->>build_phase_guess, ai_byok_narrative:ai_scan_metadata->byok_deep_analysis->>narrative_one_line, ai_byok_components:ai_scan_metadata->byok_deep_analysis->components_seen, ' +
+  'ai_review_version:ai_scan_metadata->byok_deep_analysis->>prompt_version, ai_review_observation:ai_scan_metadata->byok_deep_analysis->>observation_id, ' +
+  'ai_legacy_classifier:ai_scan_metadata->>classifier, ai_legacy_scene:ai_scan_metadata->>scene_class, ai_legacy_phase:ai_scan_metadata->>phase, ' +
   'exif_source_url:exif_data->>source_url, exif_discovery_url:exif_data->>discovery_url, exif_original_url:exif_data->>original_url, exif_listing_urls:exif_data->listing_urls, exif_listing_positions:exif_data->listing_positions, exif_auction_start_date:exif_data->>auction_start_date, exif_listed_date:exif_data->>listed_date, exif_start_date:exif_data->>start_date, exif_auction_end_date:exif_data->>auction_end_date, exif_end_date:exif_data->>end_date, exif_camera:exif_data->camera, exif_location:exif_data->location';
 
 const compactObject = (obj: Record<string, any>): Record<string, any> | null => {
@@ -94,6 +111,8 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
     const {
       ai_tier1, ai_classification, ai_deep_condition_score, ai_fabrication_stage,
       ai_byok_scene, ai_byok_phase, ai_byok_narrative, ai_byok_components,
+      ai_review_version, ai_review_observation,
+      ai_legacy_classifier, ai_legacy_scene, ai_legacy_phase,
       exif_source_url, exif_discovery_url, exif_original_url, exif_listing_urls,
       exif_listing_positions, exif_auction_start_date, exif_listed_date,
       exif_start_date, exif_auction_end_date, exif_end_date, exif_camera, exif_location,
@@ -102,6 +121,9 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
     return {
       ...rest,
       ai_scan_metadata: compactObject({
+        classifier: ai_legacy_classifier,
+        scene_class: ai_legacy_scene,
+        phase: ai_legacy_phase,
         tier_1_analysis: ai_tier1,
         classification: ai_classification,
         deep_analysis: compactObject({
@@ -109,6 +131,8 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
           fabrication_stage: ai_fabrication_stage,
         }),
         byok_deep_analysis: compactObject({
+          prompt_version: ai_review_version,
+          observation_id: ai_review_observation,
           scene_type: ai_byok_scene,
           build_phase_guess: ai_byok_phase,
           narrative_one_line: ai_byok_narrative,
@@ -351,6 +375,9 @@ const ImageGallery = ({
   fallbackSourceUrl,
   galleryView,
   galleryFilter,
+  onReadCount,
+  onAnalysisRead,
+  viewerKey = 'anonymous',
   // NEW: Optional image set props
   selectMode = false,
   selectedImages,
@@ -478,6 +505,8 @@ const ImageGallery = ({
     if (allImages.length === 0) return;
     const filtered = galleryFilter
       ? allImages.filter((img: any) => {
+          if (galleryFilter.field && !isRelatedFieldImage(img, galleryFilter.field)) return false;
+          if (galleryFilter.imageIds && !galleryFilter.imageIds.includes(img.id)) return false;
           if (galleryFilter.zone) {
             const zone = String(img.vehicle_zone || '').toLowerCase().trim();
             if (zone !== galleryFilter.zone.toLowerCase().trim()) return false;
@@ -1360,6 +1389,8 @@ const ImageGallery = ({
   const galleryFilteredImages = useMemo(() => {
     if (!galleryFilter) return allImages;
     return allImages.filter((img: any) => {
+      if (galleryFilter.field && !isRelatedFieldImage(img, galleryFilter.field)) return false;
+      if (galleryFilter.imageIds && !galleryFilter.imageIds.includes(img.id)) return false;
       if (galleryFilter.zone) {
         const zone = String(img.vehicle_zone || '').toLowerCase().trim();
         if (zone !== galleryFilter.zone.toLowerCase().trim()) return false;
@@ -1389,6 +1420,28 @@ const ImageGallery = ({
       return true;
     });
   }, [allImages, galleryFilter]);
+
+  const filterKey = JSON.stringify(galleryFilter || null);
+  useEffect(() => {
+    const status = error ? 'error' : loading ? 'loading' : 'ready';
+    onAnalysisRead?.({ vehicleId, viewerKey, status,
+      // URL-only fallback tiles have no admitted image analysis or stable source ID.
+      images: status === 'ready' && !usingFallback ? allImages : [],
+      partial: partialLoad || !loadCoverage,
+      readAt: status === 'ready' ? new Date().toISOString() : null,
+    });
+  }, [onAnalysisRead, vehicleId, viewerKey, allImages, usingFallback, loading, error, partialLoad, loadCoverage]);
+  useEffect(() => {
+    if (!loading) onReadCount?.({ vehicleId, filterKey, shown: galleryFilteredImages.length, partial: partialLoad,
+      ...(error ? { failed: true } : {}) });
+  }, [onReadCount, vehicleId, filterKey, galleryFilteredImages.length, loading, partialLoad, error]);
+  const matchingImageIds = useMemo(() => new Set(galleryFilteredImages.map(image => image.id)), [galleryFilteredImages]);
+  const scopedSessions = galleryFilter ? sessions.map(session => ({ ...session,
+    image_ids: (session.image_ids || []).filter((id: string) => matchingImageIds.has(id)),
+  })).filter(session => session.image_ids.length > 0) : sessions;
+  const scopedBundles = galleryFilter ? sortedLegacyBundles.map(bundle => ({ ...bundle,
+    image_ids: (bundle.image_ids || []).filter((id: string) => matchingImageIds.has(id)),
+  })).filter(bundle => bundle.image_ids.length > 0) : sortedLegacyBundles;
 
   const getSortedImages = () => {
     let sorted = sortRows(galleryFilteredImages, sortBy);
@@ -3296,10 +3349,10 @@ const ImageGallery = ({
       {viewMode === 'zones' && showImages && (
         <div>
           {(() => {
-            const zoneSections = groupImagesByZone(displayedImages);
+            const zoneSections = groupImagesByZone(lightboxImages);
             // Build global index map for lightbox navigation
             const globalIndexMap = new Map<string, number>();
-            displayedImages.forEach((img: any, idx: number) => {
+            lightboxImages.forEach((img: any, idx: number) => {
               globalIndexMap.set(String(img?.id || ''), idx);
             });
 
@@ -3342,9 +3395,7 @@ const ImageGallery = ({
                     defaultOpen={autoExpandKeys.has(zs.section.key)}
                     imagesPerRow={imagesPerRow}
                     vehicleId={vehicleId}
-                    onImageClick={(_image, globalIndex) => {
-                      if (globalIndex >= 0) openLightbox(globalIndex);
-                    }}
+                    onImageClick={(image) => openLightboxById(String(image.id))}
                     globalIndexMap={globalIndexMap}
                     selectMode={selectMode}
                     selectedImages={selectedImages}
@@ -4226,7 +4277,7 @@ const ImageGallery = ({
           )}
 
           {/* Auto-detected sessions (from get_vehicle_sessions), sorted chronologically */}
-          {[...sessions].sort((a, b) => {
+          {[...scopedSessions].sort((a, b) => {
             const ta = a.session_start ? new Date(a.session_start).getTime() : 0;
             const tb = b.session_start ? new Date(b.session_start).getTime() : 0;
             return tb - ta;
@@ -4273,7 +4324,7 @@ const ImageGallery = ({
                         {dateLabel}
                       </span>
                       <span style={{ fontSize: '10px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
-                        {session.image_count} photos
+                        {galleryFilter ? `${session.image_ids.length} matching photos` : `${session.image_count} photos`}
                         {durationMin != null && durationMin > 0 ? ` · ${durationMin < 60 ? `${durationMin}m` : `${Math.round(durationMin / 60)}h`}` : ''}
                         {receiptCount > 0 ? ` · ${receiptCount} receipt${receiptCount === 1 ? '' : 's'}` : ''}
                       </span>
@@ -4304,7 +4355,7 @@ const ImageGallery = ({
           })}
 
           {/* Legacy bundles fallback (when no auto-sessions detected) */}
-          {sessions.length === 0 && sortedLegacyBundles.map(bundle => {
+          {sessions.length === 0 && scopedBundles.map(bundle => {
             const dateStr = String(bundle.bundle_date);
             const isCollapsed = bundleCollapsed[dateStr] ?? false;
             const previewImages = (bundle.image_ids || [])
@@ -4335,7 +4386,7 @@ const ImageGallery = ({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{dateLabel}</p>
                     <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {bundle.image_count} photos
+                      {galleryFilter ? `${bundle.image_ids.length} matching photos` : `${bundle.image_count} photos`}
                       {showDuration ? ` · ${durationMin! < 60 ? `${durationMin}m` : `${Math.round(durationMin! / 60)}h`} session` : ''}
                       {receiptCount > 0 ? ` · ${receiptCount} receipt${receiptCount === 1 ? '' : 's'}` : ''}
                     </p>
@@ -4363,7 +4414,7 @@ const ImageGallery = ({
       )}
 
       {/* One sentinel after every gallery view, including FULL and INFO. */}
-      {showImages && displayedImages.length < galleryFilteredImages.length && (
+      {showImages && viewMode !== 'zones' && displayedImages.length < galleryFilteredImages.length && (
         <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
           {loadingMore && (
             <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '11px' }}>

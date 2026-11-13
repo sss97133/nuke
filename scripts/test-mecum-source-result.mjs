@@ -265,6 +265,7 @@ function previewFixture(options = {}) {
         if (specifier.startsWith('https://esm.sh/@supabase/supabase-js@')) return { createClient: () => supabase };
         if (specifier === 'https://esm.sh/parse5@7.3.0') return { parse: parseHtml };
         if (specifier === '../_shared/archiveFetch.ts') return load('archive');
+        if (specifier === '../_shared/mecumSearch.ts') return { mecumSearch: () => assert.fail('No public index read in the retained-source preview') };
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './supabaseKeys.ts' || specifier === '../_shared/supabaseKeys.ts') return load('keys');
         if (specifier === '../_shared/vehicleEventWrite.ts') return { patchForLiveRow: () => assert.fail('No event write in the preview'), writeVehicleEventByKey: () => assert.fail('No event write in the preview'), vehicleEventWriterFor: () => () => assert.fail('No event write in the preview') };

@@ -79,6 +79,7 @@ struct ExploreView: View {
     @State private var feedFailureText: String?
     @State private var searchFailureText: String?
     @State private var searched = false
+    @State private var searchRequests = ReadRequestGuard()
     @State private var feedRetried = false   // cold-launch first call self-heals once
     // The Worklight: report the stage, never a blank spinner; a stall reads as an
     // honest failure with retry, never "nothing here".
@@ -104,8 +105,8 @@ struct ExploreView: View {
     }()
     enum LandingMode: Hashable { case metros, treemap, map, live, listings, feed }
 
-    // 3-column square grid, 2pt gutters — the SEARCH-results photo grid.
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+    // Two big photos across, 12pt gutters — the SEARCH-results grid. Photos lead; names sit beneath.
+    private let columns = [GridItem(.flexible(), spacing: NukeSpace.md), GridItem(.flexible(), spacing: NukeSpace.md)]
 
     /// Search is active once the user types ≥2 chars: the landing (market pulse)
     /// gives way to the search-into-individuals grid + cohort.
@@ -201,7 +202,7 @@ struct ExploreView: View {
             // The navigation bar stays visible: .searchable lives in it, so hiding it on the
             // landing hid the ONLY search field (the Map's "search a ZIP" prompt and vehicle
             // search were unreachable until something else set the query).
-            .searchable(text: $query, prompt: landingMode == .map ? "ZIP, or vehicle" : "Year, make, or model")
+            .searchable(text: $query, prompt: landingMode == .map ? "ZIP code or car" : "Search cars: year, make or model")
             .navigationDestination(for: VehicleHeaderRow.self) { v in
                 // PUSH (back chevron) — kills the Done-only dead-end.
                 VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
@@ -235,10 +236,11 @@ struct ExploreView: View {
             .task(id: landingMode) { if landingMode == .metros { await loadMetros() } }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
-                guard isSearching else { results = []; searchMeta = nil; actorHits = []; searched = false; return }
+                let request = beginSearch()
+                guard isSearching else { return }
                 try? await Task.sleep(nanoseconds: 300_000_000)   // debounce
-                guard !Task.isCancelled else { return }
-                await search(term)
+                guard !Task.isCancelled, searchRequests.isCurrent(request) else { return }
+                await search(term, request: request)
             }
         }
     }
@@ -264,11 +266,11 @@ struct ExploreView: View {
             // pivotable by make/model/year/metro/day). "Metros" retired — it was just
             // one grouping; it now lives inside the Pulse's Metro dimension.
             Picker("View", selection: $landingMode) {
-                Text("Feed").tag(LandingMode.feed)
+                Text("Browse").tag(LandingMode.feed)
                 Text("Map").tag(LandingMode.map)
-                Text("Pulse").tag(LandingMode.treemap)
-                Text("Live").tag(LandingMode.live)
-                Text("Listings").tag(LandingMode.listings)
+                Text("Trends").tag(LandingMode.treemap)
+                Text("Auctions").tag(LandingMode.live)
+                Text("For sale").tag(LandingMode.listings)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 12).padding(.top, 4).padding(.bottom, 10)
@@ -291,30 +293,14 @@ struct ExploreView: View {
     @ViewBuilder private var metroList: some View {
         if loadingFeed && metros.isEmpty {
             // Worklight: a labeled, live stage — never a dead blank spinner.
-            VStack(spacing: 10) {
-                ProgressView()
-                Text(feedStage)
-                    .font(.system(.footnote, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.opacity)
-                    .animation(.default, value: feedStage)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            NukeFeedSkeleton(message: "Checking what's for sale near you…", cards: 2)
         } else if feedError && metros.isEmpty {
-            ContentUnavailableView {
-                Label("Couldn't load the market", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(feedFailureText ?? "The read failed.")
-            } actions: {
-                Button("Retry") { Task { await loadMetros(force: true) } }
-                    .buttonStyle(.borderedProminent)
-            }
+            NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load the market",
+                           message: "Check your connection, then try again.",
+                           actionTitle: "Try again") { Task { await loadMetros(force: true) } }
         } else if metros.isEmpty {
-            ContentUnavailableView(
-                "No market data",
-                systemImage: "binoculars",
-                description: Text("Pull to refresh.")
-            )
+            NukeEmptyState(icon: "binoculars", title: "No market data yet",
+                           message: "Pull down to refresh.")
         } else {
             List {
                 Section {
@@ -322,9 +308,9 @@ struct ExploreView: View {
                         NavigationLink(value: m) { metroRow(m) }
                     }
                 } header: {
-                    Text("Market pulse · by metro")
+                    Text("Where cars are selling")
                 } footer: {
-                    Text("The live listings market — where vehicles move, what they cost, how fast. Tap a metro for its make breakdown; search a make or model to see similar cars.")
+                    Text("Tap a city to see which makes are for sale there.")
                 }
             }
             .refreshable { await loadMetros(force: true) }
@@ -334,31 +320,17 @@ struct ExploreView: View {
     // ─── SEARCH — individuals + the cohort row (unchanged behavior) ─────────────
     @ViewBuilder private var searchResults: some View {
         if searched && searchError && results.isEmpty {
-            ContentUnavailableView {
-                Label("Couldn't search", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(searchFailureText ?? "The search failed.")
-            } actions: {
-                Button("Retry") {
-                    Task { await search(query.trimmingCharacters(in: .whitespaces)) }
-                }
-                .buttonStyle(.borderedProminent)
+            NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't search",
+                           message: "Check your connection, then try again.",
+                           actionTitle: "Try again") {
+                Task { await search(query.trimmingCharacters(in: .whitespaces)) }
             }
         } else if !searched && results.isEmpty && cohort == nil {
             // Debounce in flight — a labeled stage, never a premature "No matches".
-            VStack(spacing: 10) {
-                ProgressView()
-                Text("Searching…")
-                    .font(.system(.footnote, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if results.isEmpty && cohort == nil {
-            ContentUnavailableView(
-                "No matches",
-                systemImage: "magnifyingglass",
-                description: Text("Try a make, model, or year.")
-            )
+            NukeTileGridSkeleton(message: "Looking for cars…")
+        } else if results.isEmpty && actorHits.isEmpty && cohort == nil {
+            NukeEmptyState(icon: "magnifyingglass", title: "No matches",
+                           message: "Try a different make, model or year.")
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -366,23 +338,24 @@ struct ExploreView: View {
                     if let c = cohort {
                         NavigationLink(value: c) { cohortRow(c) }
                             .buttonStyle(.plain)
-                        Divider()
+                            .padding(.horizontal, NukeSpace.lg).padding(.top, NukeSpace.sm)
                     }
                     if !actorHits.isEmpty { actorRows }
                     // The denominator before the pictures: what this page is a window onto.
                     if let m = searchMeta {
-                        Text(m.sentence)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                        Text(m.plainSentence)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16).padding(.vertical, 6)
+                            .padding(.horizontal, NukeSpace.lg).padding(.vertical, NukeSpace.sm)
                     }
-                    LazyVGrid(columns: columns, spacing: 2) {
+                    LazyVGrid(columns: columns, spacing: NukeSpace.lg) {
                         ForEach(results) { v in
                             NavigationLink(value: v) { cell(v) }
                                 .buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, NukeSpace.lg)
                     // The foot of the walk, as the web's search page ends it: the door's next page
                     // when it says one exists, the refine line when the door capped the walk, and
                     // the web's own failure sentence when a page did not come (never a silent stop;
@@ -393,18 +366,18 @@ struct ExploreView: View {
                                 Button {
                                     Task { await loadMoreResults() }
                                 } label: {
-                                    if loadingMore { ProgressView() } else { Text("More results") }
+                                    if loadingMore { ProgressView() } else { Text("Show more cars") }
                                 }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(NukeSecondaryButtonStyle())
                                 .disabled(loadingMore)
                             } else if m.limited {
-                                Text("Refine your search to see more results.")
-                                    .font(.system(size: 11, design: .monospaced))
+                                Text("Narrow your search to see more cars.")
+                                    .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
                             if let e = loadMoreError {
                                 Text(e)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -426,20 +399,20 @@ struct ExploreView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
-                Text("\(m.total_listings) listings")
-                    .font(.system(.caption2, design: .monospaced))
+                Text(NukeDisplay.count(m.total_listings, "listing"))
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(.secondary)
             }
             HStack(spacing: 14) {
-                if let p = m.avg_price { metroStat("avg", "$\(p.formatted())") }
+                if let p = m.avg_price { metroStat("average price", "$\(p.formatted())") }
                 if let t = m.turnover_pct {
-                    metroStat("turnover", "\(t.formatted(.number.precision(.fractionLength(1))))%")
+                    metroStat("sell through", "\(t.formatted(.number.precision(.fractionLength(1))))%")
                 }
-                metroStat("active", "\(m.active)")
+                metroStat("for sale now", "\(m.active)")
                 // sold is a real count from the view (0 is a fact, not a missing field) —
                 // always render it so the stat columns line up row-to-row.
                 if let s = m.sold { metroStat("sold", "\(s)") }
-                if let y = m.avg_year { metroStat("avg yr", "\(y)") }
+                if let y = m.avg_year { metroStat("average year", "\(y)") }
             }
         }
         .padding(.vertical, 3)
@@ -447,51 +420,43 @@ struct ExploreView: View {
 
     @ViewBuilder private func metroStat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(value).font(.system(.caption, design: .monospaced)).foregroundStyle(.primary)
-            Text(label).font(.system(size: 9)).foregroundStyle(.secondary)
+            Text(value).font(.system(.subheadline, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
+            Text(label).font(.caption2).foregroundStyle(.secondary)
         }
     }
 
-    // ─── The COHORT row — a standard disclosure row, distinct from the photo grid.
+    // ─── The COHORT row — a big, obvious door to how this model is selling.
     @ViewBuilder private func cohortRow(_ c: CohortTarget) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "square.grid.3x3.fill")
+        HStack(spacing: NukeSpace.md) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.title3)
-                .foregroundStyle(.secondary)
-                .frame(width: 28)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 40, height: 40)
+                .background(Color.accentColor.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(c.label)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.nukeCardTitle)
                     .foregroundStyle(.primary)
-                Text("Cohort Terminal")
-                    .font(.system(.caption2, design: .monospaced))
+                Text("See how this model is selling")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(NukeSpace.lg)
+        .frame(minHeight: NukeSize.minTap)
+        .nukeSurface()
         .contentShape(Rectangle())
     }
 
-    // ─── One square thumbnail cell — render-endpoint thumb, never a void.
+    // ─── One vehicle tile — a big photo with the car's name beneath, never a void.
     @ViewBuilder private func cell(_ v: VehicleHeaderRow) -> some View {
-        Color(.secondarySystemFill)
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                CachedAsyncImage(url: NukeImage.thumb(v.primary_image_url, width: 200)) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Image(systemName: "car.side")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .clipped()
-            .contentShape(Rectangle())
+        NukeVehicleTile(imageURL: NukeImage.thumb(v.primary_image_url, width: 600),
+                        name: NukeDisplay.vehicleName(year: v.year, make: v.make, model: v.model),
+                        detail: NukeDisplay.joined([v.city, v.state], separator: ", "))
     }
 
     // ─── Landing load — the market pulse. The 12s timeout races the fetch so a
@@ -535,11 +500,26 @@ struct ExploreView: View {
     // asks it the same question the site does: 100 hits a page, hits without a photo kept
     // and sorted last (useSearchPage.ts), later pages on the door's next_offset with the
     // reader it chose on page one. The door counts no total for a text query, so none is shown.
-    private func search(_ term: String) async {
+    private func beginSearch() -> UUID {
+        let request = searchRequests.begin()
+        results = []
+        actorHits = []
+        searchMeta = nil
+        searched = false
         searchError = false
+        searchFailureText = nil
+        loadMoreError = nil
+        loadingMore = false
+        return request
+    }
+
+    private func search(_ term: String, request: UUID? = nil) async {
+        guard isSearching, query.trimmingCharacters(in: .whitespaces) == term else { return }
+        let request = request ?? beginSearch()
         do {
             let res = try await UniversalSearch.vehicles(query: term, types: UniversalSearch.firstPageTypes)
             guard res.success else { throw URLError(.badServerResponse) }
+            guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == term else { return }
             // Actors the door matched by name lead the results: an organization opens its measures,
             // a person their profile. Vehicles follow in the grid.
             actorHits = res.results.filter { $0.type == "organization" || $0.type == "external_identity" || ($0.type == "user" && UUID(uuidString: $0.id) != nil) }
@@ -557,6 +537,7 @@ struct ExploreView: View {
             }
             #endif
         } catch {
+            guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == term else { return }
             searchError = true
             searchFailureText = ReadFailure.text(error)
             searched = true
@@ -571,22 +552,25 @@ struct ExploreView: View {
     /// button stays as the retry; a page that lands after the query moved on is dropped.
     private func loadMoreResults() async {
         guard let meta = searchMeta, let offset = meta.nextOffset, !loadingMore else { return }
+        guard let request = searchRequests.current, query.trimmingCharacters(in: .whitespaces) == meta.query else { return }
         guard let reader = meta.reader else { loadMoreError = Self.pageFailure; return }
         loadingMore = true
         loadMoreError = nil
-        defer { loadingMore = false }
+        defer { if searchRequests.isCurrent(request) { loadingMore = false } }
         do {
             let res = try await UniversalSearch.vehicles(query: meta.query, offset: offset, source: reader)
             guard res.success, let m = res.meta, m.offset == offset, m.vehicle_source == reader, let more = m.has_more,
                   m.pagination_limited == true ? (more && m.next_offset == nil) : (more ? (m.next_offset ?? 0) > offset : m.next_offset == nil)
             else { throw URLError(.badServerResponse) }
-            guard meta.query == searchMeta?.query else { return }
+            guard !Task.isCancelled, searchRequests.isCurrent(request), meta.query == searchMeta?.query,
+                  query.trimmingCharacters(in: .whitespaces) == meta.query else { return }
             // The web sorts photos first within each page and appends later pages in the door's order
             // (useSearchPage.ts); re-sorting the whole walk had moved page one's photo-less hits to the end.
             let page = Self.photosFirst(res.results.compactMap(\.headerRow).filter { hit in !results.contains { $0.id == hit.id } })
             results = results + page
             searchMeta = SearchCoverage(query: meta.query, rows: results, meta: m, milliseconds: res.search_time_ms)
         } catch {
+            guard !Task.isCancelled, searchRequests.isCurrent(request), query.trimmingCharacters(in: .whitespaces) == meta.query else { return }
             NSLog("NukeCapture explore search page failed: %@", String(describing: error))
             loadMoreError = Self.pageFailure
         }
@@ -621,6 +605,14 @@ struct ExploreView: View {
             nextOffset = (meta?.has_more == true && !limited) ? meta?.next_offset : nil
             reader = meta?.vehicle_source
             self.milliseconds = milliseconds
+        }
+
+        /// What a person needs to know about this page, in plain words. The engineering detail
+        /// (reader, door timing, paging internals) stays in `sentence`, for logs and tests.
+        var plainSentence: String {
+            var line = NukeDisplay.count(returned, "car")
+            if withoutPhoto > 0 { line += " · \(withoutPhoto) without a photo, shown last" }
+            return line
         }
 
         var sentence: String {
@@ -688,40 +680,43 @@ struct MetroDetailView: View {
             Section {
                 HStack(spacing: 18) {
                     stat("listings", "\(metro.total_listings)")
-                    stat("active", "\(metro.active)")
-                    if let p = metro.avg_price { stat("avg price", "$\(p.formatted())") }
+                    stat("for sale now", "\(metro.active)")
+                    if let p = metro.avg_price { stat("average price", "$\(p.formatted())") }
                     if let t = metro.turnover_pct {
-                        stat("turnover", "\(t.formatted(.number.precision(.fractionLength(1))))%")
+                        stat("sell through", "\(t.formatted(.number.precision(.fractionLength(1))))%")
                     }
                 }
             } footer: {
-                Text("Live listings market for \(metro.metro). The make breakdown below is a separate aggregate — its counts won't sum to the metro total.")
+                Text("Cars listed for sale in \(metro.metro). The makes below are counted separately, so they may not add up to the total.")
             }
 
             if loading {
                 Section {
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.7)
-                        Text("Reading the make breakdown…")
-                            .font(.caption2).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: NukeSpace.sm) {
+                        NukeSkeletonBlock(height: 16)
+                        NukeSkeletonBlock(height: 16).frame(maxWidth: 220)
+                        NukeSkeletonBlock(height: 16).frame(maxWidth: 160)
                     }
+                    .accessibilityLabel("Loading makes")
                 }
             } else if loadError {
                 Section {
                     HStack {
-                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
-                            .font(.caption2).foregroundStyle(.secondary)
+                        Label("Couldn't load the makes", systemImage: "wifi.exclamationmark")
+                            .font(.subheadline).foregroundStyle(.secondary)
                         Spacer()
-                        Button("Retry") { Task { await load() } }.font(.caption2)
+                        Button("Try again") { Task { await load() } }
+                            .font(.subheadline.weight(.semibold))
+                            .frame(minHeight: NukeSize.minTap)
                     }
                 }
             } else if makes.isEmpty {
                 Section {
-                    Text("No make data for this metro.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Text("No makes to show for this city yet.")
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }
             } else {
-                Section("By make") {
+                Section("Makes for sale here") {
                     ForEach(makes) { mk in makeRow(mk) }
                 }
             }
@@ -734,17 +729,17 @@ struct MetroDetailView: View {
     @ViewBuilder private func makeRow(_ mk: MarketMake) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(mk.make).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+                Text(mk.make).font(.system(.body, design: .rounded).weight(.semibold)).foregroundStyle(.primary)
                 Spacer(minLength: 0)
-                Text("\(mk.total_listings)")
-                    .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                Text(NukeDisplay.count(mk.total_listings, "listing"))
+                    .font(.footnote).foregroundStyle(.secondary)
             }
             HStack(spacing: 14) {
-                stat("active", "\(mk.active_count)")
+                stat("for sale", "\(mk.active_count)")
                 if let s = mk.sold_count, s > 0 { stat("sold", "\(s)") }
-                if let ap = mk.avg_active_price { stat("ask", "$\(Int(ap).formatted())") }
-                if let sp = mk.avg_sold_price { stat("sold $", "$\(Int(sp).formatted())") }
-                if let h = mk.avg_hours_on_market { stat("hrs on mkt", "\(Int(h))") }
+                if let ap = mk.avg_active_price { stat("avg asking", "$\(Int(ap).formatted())") }
+                if let sp = mk.avg_sold_price { stat("avg sold", "$\(Int(sp).formatted())") }
+                if let h = mk.avg_hours_on_market { stat("hours listed", "\(Int(h))") }
             }
         }
         .padding(.vertical, 2)
@@ -752,8 +747,8 @@ struct MetroDetailView: View {
 
     @ViewBuilder private func stat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(value).font(.system(.caption, design: .monospaced)).foregroundStyle(.primary)
-            Text(label).font(.system(size: 9)).foregroundStyle(.secondary)
+            Text(value).font(.system(.subheadline, design: .rounded).weight(.semibold)).monospacedDigit().foregroundStyle(.primary)
+            Text(label).font(.caption2).foregroundStyle(.secondary)
         }
     }
 

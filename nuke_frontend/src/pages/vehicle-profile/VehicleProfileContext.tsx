@@ -14,7 +14,7 @@ import { readCachedSession } from '../../utils/cachedSession';
 import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useViewHistory } from '../../hooks/useViewHistory';
-import { auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
+import { auctionSourceUrlVariants, auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult, type TimelineReadState } from './loadVehicleData';
 import { resolveVehicleImages } from './resolveVehicleImages';
 import { isVerifiedOwnerOf } from './ownerStatus';
@@ -30,6 +30,11 @@ import type { HeroImageMeta } from './loadVehicleData';
 // ---------------------------------------------------------------------------
 
 export interface GalleryFilter {
+  /** A profile topic uses indexed image areas, never proof of the selected specification. */
+  field?: string;
+  /** Exact image population from a gallery-backed count. Empty means no matches. */
+  imageIds?: string[];
+  label?: string;
   zone?: string;
   category?: string;
   tag?: string;
@@ -177,6 +182,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const [isPublic, setIsPublic] = useState(false);
   const [vehicleHeaderHeight, setVehicleHeaderHeight] = useState(88);
   const [galleryFilter, setGalleryFilter] = useState<GalleryFilter | null>(null);
+  useEffect(() => setGalleryFilter(null), [vehicleId]);
 
   // ── Refs ──
   const ranBatSyncRef = useRef<string | null>(null);
@@ -531,6 +537,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const pulseMeta = (auctionPulse as any)?.metadata;
     return resolveCurrencyCode(
+      (auctionPulse as any)?.currency_code,
       pulseMeta?.currency, pulseMeta?.currency_code, pulseMeta?.currencyCode,
       pulseMeta?.price_currency, pulseMeta?.priceCurrency,
       externalListing?.currency, externalListing?.currency_code, externalListing?.price_currency,
@@ -647,11 +654,21 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 
-  // ── Auction pulse realtime: published current cache ──
+  // ── Auction pulse while live: a 30 s read of this vehicle's episodes ──
+  // vehicle_events left the supabase_realtime publication on 2026-11-09: decoding every ingest write for Realtime was
+  // the database's costliest statement (realtime.list_changes, ~460 s/h). An open profile with a live lot re-reads its
+  // episodes every 30 s while visible and applies them as the subscription did.
+
+  const auctionLiveRef = useRef(false);
+  useEffect(() => {
+    const end = Date.parse(String(auctionPulse?.end_date ?? ''));
+    auctionLiveRef.current = Number.isFinite(end) ? end > Date.now() : ['active', 'live'].includes(String(auctionPulse?.listing_status ?? ''));
+  }, [auctionPulse?.end_date, auctionPulse?.listing_status]);
 
   useEffect(() => {
     if (!vehicle?.id) return;
     const vehicleIdForFilter = vehicle.id;
+    let cancelled = false;
 
     let lastRevision: string | null = null;
     let readerRefresh: ReturnType<typeof setTimeout> | null = null;
@@ -671,35 +688,39 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       }, 1000);
     };
 
-    const channel = supabase
-      .channel(`auction-pulse:${vehicleIdForFilter}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'vehicle_events', filter: `vehicle_id=eq.${vehicleIdForFilter}` },
-        (payload) => {
-          const row = (payload as any)?.new as any;
-          if (!row) return;
-          const currentUrl = currentAuctionUrlRef.current;
-          if (currentUrl && row.source_url && row.source_url.replace(/\/$/, '') !== currentUrl.replace(/\/$/, '')) return;
+    const applyRow = (row: any) => {
+      const currentUrl = currentAuctionUrlRef.current;
+      if (currentUrl && row.source_url && row.source_url.replace(/\/$/, '') !== currentUrl.replace(/\/$/, '')) return;
 
-          const merged = buildAuctionPulseFromExternalListings([row], vehicleIdForFilter);
-          if (merged) setAuctionPulse((prev: any) => {
-            if (prev?.updated_at && merged.updated_at && Date.parse(merged.updated_at) < Date.parse(prev.updated_at)) return prev;
-            return { ...(prev || {}), ...merged };
-          });
-          if (merged) refreshReaders(row);
-        },
-      )
-      .subscribe();
+      const merged = buildAuctionPulseFromExternalListings([row], vehicleIdForFilter);
+      if (merged) setAuctionPulse((prev: any) => {
+        if (prev?.updated_at && merged.updated_at && Date.parse(merged.updated_at) < Date.parse(prev.updated_at)) return prev;
+        return { ...(prev || {}), ...merged };
+      });
+      if (merged) refreshReaders(row);
+    };
+
+    const poll = async () => {
+      if (!auctionLiveRef.current || document.visibilityState !== 'visible') return;
+      const { data } = await supabase
+        .from('vehicle_events')
+        .select('source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+        .is('duplicate_of_event_id', null)
+        .eq('vehicle_id', vehicleIdForFilter)
+        .order('updated_at', { ascending: false })
+        .limit(20);
+      if (cancelled || !data?.length) return;
+      const currentUrl = currentAuctionUrlRef.current?.replace(/\/$/, '');
+      const row = (currentUrl && data.find((r: any) => String(r.source_url ?? '').replace(/\/$/, '') === currentUrl)) || data[0];
+      applyRow(row);
+    };
+    const id = window.setInterval(() => { void poll(); }, 30_000);
 
     return () => {
+      cancelled = true;
+      window.clearInterval(id);
       if (readerRefresh) clearTimeout(readerRefresh);
-      try { supabase.removeChannel(channel); } catch {
-        try { channel.unsubscribe(); } catch { /* ignore */ }
-      }
     };
-  // Keep this channel stable while initial pulse data arrives. Removing and
-  // immediately reusing its topic can leave a joined channel without delivery.
   }, [vehicle?.id, queryClient]);
 
   // ── Auction pulse polling (60s) ──
@@ -714,7 +735,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       try {
         const result = await supabase
           .from('vehicle_events')
-          .select('source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('source_platform, source_url, event_type, event_status, ended_at, current_price, currency_code, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .is('duplicate_of_event_id', null)
           .eq('vehicle_id', vehicle!.id)
           .eq('source_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })
@@ -727,7 +749,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
         const platform = String((merged as any)?.platform || auctionPulse?.platform || '');
-        const listingUrl = String((merged as any)?.listing_url || auctionPulse?.listing_url || '');
+        const listingUrl = String((merged as any)?.listing_url || '');
+        if (!listingUrl) { setAuctionPulse(null); return; }
 
         let commentCount: number | null =
           typeof (merged as any)?.comment_count === 'number'
@@ -739,13 +762,13 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         try {
           const [cCount, lastBid, lastComment, lastSeller] = await Promise.all([
             commentCount === null
-              ? supabase.from('auction_comments').select('id', { count: 'exact', head: true }).eq('vehicle_id', vehicle!.id)
+              ? supabase.from('auction_comments').select('id,canonical:auction_events_canonical(id)', { count: 'exact', head: true }).or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).in('source_url', auctionSourceUrlVariants(listingUrl)).or('bid_amount.is.null,comment_type.neq.bid')
               : Promise.resolve({ count: commentCount } as any),
-            supabase.from('auction_comments').select('posted_at, author_username').eq('vehicle_id', vehicle!.id)
+            supabase.from('auction_comments').select('posted_at, author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).in('source_url', auctionSourceUrlVariants(listingUrl))
               .not('bid_amount', 'is', null).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('posted_at').eq('vehicle_id', vehicle!.id)
-              .order('posted_at', { ascending: false }).limit(1).maybeSingle(),
-            supabase.from('auction_comments').select('author_username').eq('vehicle_id', vehicle!.id)
+            supabase.from('auction_comments').select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).in('source_url', auctionSourceUrlVariants(listingUrl))
+              .or('bid_amount.is.null,comment_type.neq.bid').order('posted_at', { ascending: false }).limit(1).maybeSingle(),
+            supabase.from('auction_comments').select('author_username,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null').eq('vehicle_id', vehicle!.id).in('source_url', auctionSourceUrlVariants(listingUrl))
               .eq('is_seller', true).order('posted_at', { ascending: false }).limit(1).maybeSingle(),
           ]);
 
@@ -779,6 +802,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
             updated_at: (merged as any)?.updated_at ?? auctionPulse?.updated_at ?? null,
+            currency_code: (merged as any)?.currency_code ?? null,
+            source_observed_at: (merged as any)?.source_observed_at ?? null,
             metadata: (merged as any)?.metadata ?? (auctionPulse as any)?.metadata ?? null,
             winner_name: (auctionPulse as any)?.winner_name ?? null,
             seller_username: (auctionPulse as any)?.seller_username ?? null,
@@ -879,6 +904,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             const { data: listings } = await supabase
               .from('vehicle_events')
               .select('metadata')
+              .is('duplicate_of_event_id', null)
               .eq('vehicle_id', vehicle.id)
               .eq('source_url', listingUrl)
               .order('updated_at', { ascending: false })

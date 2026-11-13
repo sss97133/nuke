@@ -204,6 +204,7 @@ describe('shop bookings', () => {
         sign: { rpc: 'confirm_facility_reservation', args_hint: { p_reservation_id: 'res-1', p_hash: 'e'.repeat(64) },
           binds: ['one capacity slot of this asset for the window'], does_not_bind: ['payment'] } }] };
     s = await open('/work', { who: SHOP, readers: { my_signature_queue: queue, my_work_orders: { rows: [], coverage: { returned: 0, total_for_viewer: 0 }, as_of: '2026-10-19T19:00:00Z' } } });
+    await s.page.getByRole('button', { name: 'Review records', exact: true }).click();
     await s.page.getByRole('button', { name: 'Confirm booking' }).click();
     await dialog(s.page).getByRole('button', { name: 'Confirm booking' }).click();
     assert.deepEqual(await waitForWrite(s.writes, 'confirm_facility_reservation'), { p_reservation_id: 'res-1', p_hash: 'e'.repeat(64) });

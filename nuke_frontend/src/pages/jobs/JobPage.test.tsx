@@ -60,6 +60,20 @@ async function render() {
   await act(async () => { await new Promise(r => setTimeout(r, 0)); });
 }
 
+it('opens a retained build on its work context and preserves the source job and stage tools under disclosure', async () => {
+  auth.user = { id: 'synthetic-viewer' };
+  fixture.readers.work_order_job_path_read = { ...path(visitor), retained_work: { visibility: 'included', scope_entries: [],
+    responsibility_reports: [{ binding_id: 'binding', provider_actor_id: 'actor', provider_label: 'Technician', client_label: 'Client',
+      source_observation_id: 'report', reported_at: '2026-07-01', payment_state: 'paid_in_full', delivery_state: 'reported_owed', assurance: 'retained_report' }] } };
+  await render();
+  expect(host.querySelector('h1')?.textContent).toBe('1983 GMC K2500');
+  expect(host.textContent).toContain('Technician owes Client delivery');
+  const administration = host.querySelector('.job-administration')!;
+  expect(administration.hasAttribute('open')).toBe(false);
+  expect(administration.textContent).toContain('Source job: Synthetic exhaust job');
+  expect(administration.querySelectorAll('.job-rail__cell')).toHaveLength(7);
+});
+
 describe('JobPage for a visitor', () => {
   it('renders the header, the seven-stage rail, gaps and conflicts in trade language', async () => {
     fixture.readers.work_order_job_path_read = path(visitor);

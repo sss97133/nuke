@@ -1,0 +1,185 @@
+import { parseMcCormickLot, parseMcCormickCatalogLot, parseMcCormickFeaturedLot, mccormickTarget,
+  MCCORMICK_PARSER, MCCORMICK_CATALOG_PARSER, type McCormickLot } from "../_shared/mccormickParser.ts";
+import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
+import { normalizeMake } from "../_shared/normalizeVehicle.ts";
+import { qualityGate } from "../_shared/extractionQualityGate.ts";
+import { decodeVin } from "../_shared/vin-decoder.ts";
+import { vinMakeConflict } from "./vinGate.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
+import type { ArchiveFetchOptions, ArchiveFetchResult } from "../_shared/archiveFetch.ts";
+
+interface Dependencies {
+  supabase: any;
+  archiveFetch: (url: string, options: ArchiveFetchOptions) => Promise<ArchiveFetchResult>;
+  matchVehicle: (data: any) => Promise<{ vehicleId: string; isNew: boolean }>;
+}
+
+/** One publisher record, separately retained archive result and public detail witnesses. */
+export async function ingestMcCormick(url: string, deps: Dependencies) {
+  const target = mccormickTarget(url);
+  if (!target) throw new Error("invalid_mccormicks_listing_url");
+  const { id, url: canonical } = target;
+  const source = await deps.supabase.from("observation_sources").select("id,species,supported_observations")
+    .eq("slug", "mccormicks").maybeSingle();
+  if (source.error) throw new Error("mccormicks_source_read_unavailable");
+  if (!source.data || source.data.species !== "block_house"
+    || !source.data.supported_observations?.includes("listing")) throw new Error("mccormicks_source_not_registered");
+  const capture = async (sourceUrl: string) => {
+    const refresh = !mccormickTarget(sourceUrl)?.archive;
+    const page = await deps.archiveFetch(sourceUrl, {
+      forceRefresh: refresh,
+      platform: "mccormicks", callerName: "ingest:mccormicks", useFirecrawl: false, firecrawlOnBlock: false,
+      directFetchOptions: { publicOnly: true, timeout: 20_000 },
+    });
+    if (page.error || page.archiveError || !page.html || !page.snapshotId || (refresh && page.cached)) throw new Error("mccormicks_capture_not_retained");
+    const read = await deps.supabase.from("listing_page_snapshots")
+      .select("id,platform,listing_url,fetched_at,html_sha256,success").eq("id", page.snapshotId).maybeSingle();
+    const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(page.html)))]
+      .map(b => b.toString(16).padStart(2, "0")).join("");
+    const snapshot = read.data;
+    if (read.error || !snapshot || snapshot.success !== true || snapshot.platform !== "mccormicks"
+      || !(mccormickTarget(snapshot.listing_url)?.url === sourceUrl ||
+        (["https://www.classic-carauction.com/auction-cars", "https://www.classic-carauction.com/featured-cars"].includes(sourceUrl) && snapshot.listing_url === sourceUrl))
+      || snapshot.html_sha256 !== hash
+      || !Number.isFinite(Date.parse(snapshot.fetched_at)) || Date.parse(snapshot.fetched_at) > Date.now()) {
+      throw new Error("mccormicks_capture_readback_failed");
+    }
+    return { html: page.html, snapshot, hash, url: sourceUrl, checked_at: refresh ? new Date().toISOString() : null };
+  };
+  const captureLot = async (sourceUrl: string, parse: (html: string, url: string) => McCormickLot = parseMcCormickLot) => {
+    const page = await capture(sourceUrl);
+    return { ...page, lot: parse(page.html, sourceUrl) };
+  };
+  const primary = await captureLot(canonical);
+  const documents = [primary];
+  const gaps: string[] = [];
+  const catalogOnly = primary.lot.evidence_scope === "detail_unavailable";
+  const catalogChecks: Array<Record<string, unknown>> = [];
+  if (catalogOnly) {
+    if (target.archive) gaps.push("mccormicks_archive_catalog_claims_not_read");
+    else {
+      try {
+        const catalog = await captureLot("https://www.classic-carauction.com/auction-cars", (html, url) => parseMcCormickCatalogLot(html, url, id));
+        documents.push(catalog);
+        try {
+          const featured = await capture("https://www.classic-carauction.com/featured-cars");
+          const lot = parseMcCormickFeaturedLot(featured.html, featured.url, catalog.lot);
+          catalogChecks.push({ source_url: featured.url, snapshot_id: featured.snapshot.id,
+            html_sha256: featured.hash, source_captured_at: featured.snapshot.fetched_at, native_id_found: Boolean(lot) });
+          if (lot) documents.push({ ...featured, lot });
+        } catch (e) { gaps.push(e instanceof Error ? e.message : "mccormicks_featured_capture_failed"); }
+      } catch (e) { gaps.push(e instanceof Error ? e.message : "mccormicks_catalog_capture_failed"); }
+    }
+  }
+  if (target.archive && !catalogOnly) {
+    // The archive template omits VINs and extra photos. The same *observed* native ID
+    // also has a public detail route; never enumerate IDs or carry its decorative auction header as lot evidence.
+    try {
+      const detail = await captureLot(`https://www.classic-carauction.com/auction-cars?auctionid=${id}`);
+      if (detail.lot.title !== primary.lot.title || detail.lot.lot_number !== primary.lot.lot_number
+        || detail.lot.year !== primary.lot.year || detail.lot.make !== primary.lot.make) {
+        throw new Error("mccormicks_detail_identity_disagreement");
+      }
+      documents.push(detail);
+    } catch (e) {
+      // Keep the result witness and an explicit capture gap. A failed alternate path is not proof of absent VIN/photos.
+      gaps.push(e instanceof Error ? e.message : "mccormicks_detail_capture_failed");
+    }
+  }
+  const identity = catalogOnly ? documents.find(doc => doc.lot.evidence_scope === "catalog_row") ?? primary : documents.at(-1)!;
+  const lot = identity.lot;
+  // The source labels a bare counter as Mileage, without a unit. Canonical mileage
+  // is displayed as miles; preserve unitless and kilometre claims in raw_fields only.
+  const miles = lot.raw_fields.Mileage?.match(/^((?:\d{1,3}(?:,\d{3})+|\d+))\s*(?:mi|miles)$/i);
+  const mileage = miles ? Number(miles[1].replace(/,/g, "")) : null;
+  const known = (v?: string) => v && !/^(?:N\/?A|TBA|TMU)$/i.test(v) ? v : null;
+  const candidate = {
+    year: lot.year, make: lot.make ? normalizeMake(lot.make) : null, model: lot.model,
+    description: lot.description, mileage: mileage !== null && Number.isSafeInteger(mileage) ? mileage : null,
+    // Short chassis numbers stay source claims; the existing resolver's modern-VIN path is not proof for them.
+    vin: lot.vin?.length === 17 ? lot.vin : null,
+    transmission: known(lot.raw_fields.Transmission), color: known(lot.raw_fields["Body Color"]),
+    body_style: known(lot.raw_fields["Body Style"]),
+  };
+  const gate = qualityGate(candidate, { source: "mccormicks", sourceType: "auction" });
+  // Apply the existing make-conflict rule before the native writer, not only
+  // later in the outer ingest gate. Conflicts remain attributed unbound blips.
+  const vinConflict = candidate.vin ? vinMakeConflict(candidate.vin, candidate.make, decodeVin(candidate.vin)) : null;
+  if (vinConflict) gate.issues.push(`vin_make_mismatch: ${vinConflict.basis} indicates ${vinConflict.expected}, claimed ${vinConflict.claimed}`);
+  let vehicleId: string | null = null;
+  if (gate.pass && !vinConflict && gate.cleaned.year && gate.cleaned.make && gate.cleaned.model) {
+    const prior = await deps.supabase.from("vehicles").select("id").eq("listing_url", normalizeListingUrl(canonical)!.normalized).limit(2);
+    if (prior.error) throw new Error("mccormicks_identity_lookup_unavailable");
+    let resolutionIssue = prior.data?.length > 1 ? "mccormicks_ambiguous_listing_identity" : null;
+    if (gate.cleaned.vin) {
+      // Historical aliases can name another live owner even when that target has
+      // no VIN. Inspect redirects before discarding aliases as duplicate history.
+      const exact = await deps.supabase.from("vehicles").select("id,year,make,status,deleted_at,merged_into_vehicle_id")
+        .eq("vin", gate.cleaned.vin).limit(51);
+      if (exact.error) throw new Error("mccormicks_vin_lookup_unavailable");
+      const rows = exact.data ?? [];
+      const live = rows.filter((v: any) => !v.deleted_at && !v.merged_into_vehicle_id && v.status !== "merged");
+      const owners = new Set([...live.map((v: any) => v.id), ...rows.map((v: any) => v.merged_into_vehicle_id).filter(Boolean)]);
+      if (rows.length >= 51 || owners.size > 1) resolutionIssue = "mccormicks_ambiguous_vin_identity";
+      else if (rows.length && !live.length) resolutionIssue = "mccormicks_inactive_vin_identity";
+      const existing = live[0];
+      if (existing && ((existing.year && Number(existing.year) !== Number(gate.cleaned.year))
+        || (existing.make && normalizeMake(existing.make) !== gate.cleaned.make))) resolutionIssue = "mccormicks_vin_identity_conflict";
+    }
+    if (resolutionIssue) gate.issues.push(resolutionIssue);
+    else {
+      // A shared catalog URL must never become a vehicle's identity or a photo's false source.
+      const match = await deps.matchVehicle({ ...gate.cleaned, url: catalogOnly ? canonical : identity.url,
+        imageUrl: catalogOnly ? null : lot.image_urls[0] ?? null,
+        imageUrls: catalogOnly ? [] : lot.image_urls, bodyStyle: gate.cleaned.body_style });
+      vehicleId = match.vehicleId;
+    }
+  }
+  const observations: Array<{ observation_id: string; snapshot_id: string; source_url: string; duplicate: boolean }> = [];
+  for (const doc of documents) {
+    const parser = doc.lot.evidence_scope ? MCCORMICK_CATALOG_PARSER : MCCORMICK_PARSER;
+    const payload = {
+      source_slug: "mccormicks", kind: "listing", observed_at: doc.snapshot.fetched_at,
+      source_url: doc.url, source_identifier: `auctionid:${id}:${doc.hash}`,
+      ...(vehicleId ? { vehicle_id: vehicleId } : {}),
+      content_text: [doc.lot.title, doc.lot.description].filter(Boolean).join("\n\n"),
+      structured_data: { ...doc.lot, kind_detail: doc.lot.presentation === "showroom" ? "dealer_listing" : "auction_listing", parser,
+        source_claims_only: true, observed_at_basis: "page_capture", observation_time_basis: "source_capture",
+        source_captured_at: doc.snapshot.fetched_at, source_event_at: null },
+      extraction_method: parser, raw_source_ref: `listing_page_snapshots:${doc.snapshot.id}`,
+      extraction_metadata: { snapshot_id: doc.snapshot.id, html_sha256: doc.hash, parser,
+        quality_issues: gate.issues, source_capture_gaps: gaps, ...(catalogOnly ? { detail_route_status: "publisher_reports_unavailable", catalog_checks: catalogChecks } : {}) },
+      defer_analysis: true,
+    };
+    const admitted = await deps.supabase.functions.invoke("ingest-observation", { body: payload });
+    if (admitted.error || admitted.data?.success !== true || !admitted.data?.observation_id) throw new Error("mccormicks_observation_admission_failed");
+    const row = await deps.supabase.from("vehicle_observations").select("id,vehicle_id,source_id,source_url,raw_source_ref,observed_at")
+      .eq("id", admitted.data.observation_id).maybeSingle();
+    if (row.error || !row.data || row.data.vehicle_id !== vehicleId || row.data.source_id !== source.data.id
+      || row.data.source_url !== doc.url || row.data.raw_source_ref !== payload.raw_source_ref
+      || Date.parse(row.data.observed_at) !== Date.parse(doc.snapshot.fetched_at)) throw new Error("mccormicks_observation_readback_failed");
+    observations.push({ observation_id: row.data.id, snapshot_id: doc.snapshot.id, source_url: doc.url, duplicate: admitted.data.duplicate === true });
+    if (vehicleId && (catalogOnly || doc !== identity) && doc.lot.image_urls.length) {
+      // Existing image writer, with the page that actually exposes each photo as its source.
+      const write = await insertMissingVehicleImages(deps.supabase, vehicleId, doc.lot.image_urls.map((image_url, i) => ({
+        vehicle_id: vehicleId, image_url, position: i, display_order: i, is_primary: false,
+        source: "mccormicks", is_external: true, ai_processing_status: "skipped", source_url: doc.url,
+      })));
+      if (write.error) throw new Error("mccormicks_images_write_failed");
+    }
+  }
+  const imageUrls = [...new Set(documents.flatMap(doc => doc.lot.image_urls))];
+  let imageCount = 0;
+  if (vehicleId && imageUrls.length) {
+    const images = await deps.supabase.from("vehicle_images").select("image_url").eq("vehicle_id", vehicleId).in("image_url", imageUrls);
+    imageCount = new Set((images.data ?? []).map((v: { image_url: string }) => v.image_url)).size;
+    if (images.error || imageCount !== imageUrls.length) throw new Error("mccormicks_images_readback_failed");
+  }
+  return {
+    ...gate.cleaned, vehicle_id: vehicleId, listing_url: canonical,
+    image_url: lot.image_urls[0] ?? null, image_urls: imageUrls,
+    mccormick_receipt: { ...observations[0], observations, source_checked_at: primary.checked_at, source_id: id, images: imageCount,
+      unresolved: !vehicleId, presentation: primary.lot.presentation, source_capture_gaps: gaps,
+      ...(catalogOnly ? { evidence_scope: "catalog_only", detail_route_status: "publisher_reports_unavailable", catalog_checks: catalogChecks } : {}) },
+  };
+}

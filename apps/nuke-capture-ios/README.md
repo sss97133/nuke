@@ -24,6 +24,12 @@ in place. It is the phone end of the data machine: the one surface that can **ca
 EXIF, location, on-device Vision and OCR, the GPS shop gate), and it **mirrors** the web for everything
 else. The user profile starts at image intake, so it lives here (owner, 2026-10-05).
 
+**Garage is a primary destination.** A signed-in account reaches its vehicle records directly from
+the bottom bar, independent of Photos access or photo-filing progress. Search uses the existing
+garage reader's titles and stored VINs; a primary row opens the actual vehicle profile. Garage
+relationship and work controls remain available under the row's Garage details action. A record
+with no filed photos must stay findable; adding a record does not establish ownership or prove its specifications.
+
 Two rules outrank taste:
 
 1. **The web is the source of truth; the phone mirrors it.** Same RPCs, same numbers, same masks, same
@@ -34,6 +40,16 @@ Two rules outrank taste:
    (`nuke_frontend/src/kit/types.ts`) is the contract; `Sources/NukeCapture/ProfileDocument.swift` is its
    Swift twin; `RootedValueView` (`RootedValue.swift`) is the one primitive that renders a value, with its
    trust rung, its clock and its drill (or its honest refusal to drill). A bare value is a bug.
+
+**Book allocations use the existing accounting readers.** `AllocationEvidence.swift` opens
+`accounting_vehicle_financials` independently of the legacy investment fold. Its pages preserve
+book, vehicle, currency, phase and qualification; loaded records are not a complete financial
+picture. Each allocation opens its exact current book or bank record through
+`accounting_record_evidence`, with an allocation recheck before and after the source read.
+An account change, withdrawal, ambiguous identity or changed source reference clears the result.
+Amounts remain decimal text; a bank source supplies its own currency and date. Witness references
+do not become costs, payment proof, work completion or filing actions. This path adds no financial
+totals, original-file access, SQL, grants or writes.
 
 **The header is on the read.** `vehicle_profile_read(uuid)` (migration `20261013143000`, SECURITY
 INVOKER, callable by anon and authenticated) returns the vehicle page's header as one ProfileDocument: a
@@ -47,7 +63,13 @@ listing, image, agent → `.attributed`; model → `.projected`; legacy → `.fa
 drill: the web says the same in words in its popover, the phone says it by grammar). A live auction
 banner owns the headline price; the masthead price stays off while `vehicle_pulse.is_live`. When the read
 grows a section, add its case to `ProfileSection` and render it through the same primitives; never add a
-new client-side query to the header.
+new client-side query to the header. **Header tokens open their line items**, as the web's `HeaderTokenItems`:
+the masthead's `token_items` (one array per token, as `vehicle_facet_items` returns them) and the strip's `gaps`
+decode tolerantly in `ProfileDocument.swift`; `TokenItemsSheet.swift` renders them grouped by facet with status,
+sources (photo witness through `NukeImage.thumb`), rule, candidates, availability, equation and what is needed,
+in words ported from `kit/Items.tsx` (`ItemText`). Strip rows and gaps open their token; tokens no strip row
+covers (year, make, model, trim) get rows of their own. Location alone is read on open
+(`vehicle_facet_items(p_dimension: 'location')`), as on the web; its county map is not drawn on the phone yet.
 
 Standing rules the code carries:
 
@@ -59,24 +81,61 @@ Standing rules the code carries:
   Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
   the raw original outside the full-screen viewer.
 - **Payments open Stripe, never compose an amount.** A job's `pay_invoice` action comes only from the server (`viewer.actions`, offered to the work order customer while a balance is due). `JobPayment.swift` passes back its `work_order_id` to `create-work-order-invoice-checkout` and opens the returned page only when it is https on stripe.com. Nothing is charged until the customer finishes on Stripe; the payment reaches the job through `stripe-webhook`. Collection only: the app shows no payout or release.
+- **Listing submissions are recorded obligations.** Work reads the account's prepared/submitted `listing_exports`
+  through its existing own-row policy, showing the latest five with the exact eligible total and read clock.
+  Transport status `submitted` is distinct from a recorded `draft_pending_approval` stage; neither proves a live auction.
+  Rows open the vehicle or recorded HTTPS listing; the full submissions page opens on nuke.ag. Reading signs nothing.
 - **Job history is testimony until someone signs.** A stage's `retained_testimony` (counts of claims quoted from retained work messages) renders in `JobTestimony.swift` on the attributed rung as "N messages from the shop say…", never as accepted, done or paid, and never changes the stage. `JobOperationsSection` takes each operation's rung from `work_order_operations_read`'s `requested_by_basis` (signed → proven, quoted from the work order's text → attributed, no source → recorded); a "complete" line status is the record's mark, not a completion Sign. `JobEvidenceSection` shows `work_order_evidence_read` filings, counting photos the viewer may not see, and names an operation for visitors only in the operations reader's redacted words.
 - **Providers are placed by their band, never pinned.** "Choose who does it" (`Jobs/ProviderMatchesView.swift`, from the job while nobody is accepted and from Job posted) renders `work_order_provider_matches_read` in its own order (rank by passed checks, ties shared) with every input in third-person words. Service area and availability are the provider's self-claimed Signs and say so. The readers return no coordinates for people, so the map draws each stated band as a circle around its city's center (MapKit geocoding of the public "City, ST") and the job's public city; no business pin until a reader returns a public business place. Filters cover only the reader's inputs and a stated mobile band. Standing comes from `provider_profile_read` with its basis; Accept offer appears only when `work_order_offers_read` names it. The screen contacts nobody.
 - **A job's who-and-where card shows only what the server placed.** `JobProviderPlaceCard.swift` renders `work_order_provider_place_read`: the work order's organization (rating "Not rated" unless reviews are recorded, hours as written), the people on the job (accepted through Nuke apart from recorded assignment rows), and a tracker whose steps, evidence (Sign, record, status) and clocks come from the server's job path; messages are counted under a step and never fill it. A pin, Directions and Call appear only for a storefront business the server located; a personal collection, an untyped organization or a provider's self-stated band is a city-level circle labelled approximate, never a pin.
 - **A part is a product page, not a purchase.** The checklist lists a job's parts as product rows; each opens `PartProductView` (`PartProduct.swift`) over `work_order_part_read`: the line's recorded status (not a sign-off), its recorded prices as recorded (a total is never multiplied out), the part's product page (`work_order_part_products`: the seller page, the seller's photo and the match basis), the seller link and recorded retailer offers opened in Safari only when http(s) (no in-app ordering or payment), and a catalog listing matched by exact part number. A product page or catalog listing is labelled with its source and clock as a statement about the product, never as the installed part; row thumbnails are the seller's photo from `work_order_operations_read`'s `product` card. Parts have no key to an operation, so the page names only labor lines sharing the part's job code and attributes no photo to a part.
 - **A job opens Live, with Details one tap away.** `JobLiveView.swift` is the order-in-motion screen: map hero, status headline (the latest kind of event in `work_order_activity_read`, not a stage verdict), the server's tracker steps, who is doing it, and the activity feed (`JobActivity.swift`), where each row says how it is known (Signed, Recorded, Card processor, Message · not verified) and never shows a user id, an amount or message text. While open it polls at the server's `poll_after_seconds` with `p_since`, slides new events in and refreshes the detail readers. Actions stay on Details (`JobPathContent`); the fixture backend opens Details so the UI tests drive it.
 - **Notifications mirror the web's NotificationCenter.** The Work tab reads the account's latest 50 `user_notifications` rows under their own-row policy (exact count beside them), the unread count from `get_unread_notification_count`, and marks read only from a tap through `mark_notification_read` / `mark_all_notifications_read` (`Notifications/`). A row opens a job or conversation when its metadata names one (`work_order_id`, `contact_request_id`), else the web's order: `action_url`, `vehicle_id`, `organization_id`; a nuke.ag path with no screen opens on the web, and other sites are not opened. Anything that needs a Sign stays in `my_signature_queue`. The Work badge is the unread count plus the queue's stated total. There is no push (no APNs entitlement or registration).
+- **Land as taken.** Owner direction, 2026-10-29: "they should be landing as soon as the photos are taken." The
+  original bytes no longer go up inside the sync pass (which died with the app's suspension: 80 of 311 frames
+  landed over two opens on 2026-10-29). `SyncEngine.processAsset` stages a gated original for `BackgroundUploader`
+  (`UploadQueue.swift`): a background `URLSession` carries the storage write after the app is suspended or
+  killed, iOS relaunches the app when it finishes (`CaptureAppDelegate`), and the `vehicle_images` row staged
+  beside the bytes is inserted then. The row is never inserted before the bytes: the analysis trigger fires on
+  INSERT only, so a placeholder row would never be analyzed. The pass itself holds a UIKit background task, so
+  leaving the app finishes the original in hand. Three wake-ups: the refresh task, the charging backfill task,
+  and `ag.nuke.capture.recent` (network, no charger) booked whenever a pass leaves recent work behind. Only a
+  photo's own failures count toward its three attempts (`SyncEngine.countsAgainstThePhoto`); a network, server or
+  storage-quota failure retries free, and `Config.failedAttemptsEpoch` clears attempts an older rule counted.
+  The Shortcuts door: opening `ag.nuke.capture://sync` runs a pass. Owner recipe, set up once on the phone:
+  Shortcuts → Automation → New → App → Camera → "Is Closed" → Run Immediately → New Blank Automation → Open URL
+  `ag.nuke.capture://sync`. The Today screen shows landed / landing / queued and a Retry for photos that gave up.
+- **Landed photos owe an identity pass.** `UploadQueueState.complete` saves follow-up work with the account,
+  PhotoKit asset, original SHA-256, identity method revision and upload privacy receipt before deleting staged
+  bytes. Restart resumes that checkpoint; a bounded three-day lookup also recovers recent unfiled captures
+  uploaded by earlier builds. `AttributionEngine.runAcknowledged` looks up those exact sources ahead of its
+  normal page and uses the existing original-byte reader and audited filing/profile writers. Foreground work
+  coalesces arrivals, reads at most two originals per pass while active and cool, and spaces attempts by at
+  least 15 seconds; the existing charging task gets 200. Missing originals, changed hashes and transient
+  writer failures retain their work. Completing a source read is not a filing receipt: ambiguous sources
+  remain unfiled, documents supply context only, and prior album/cloud reads never qualify as identity reads.
 - **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
   (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
   different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the
   camera reuses. A pass reads no original for an asset it already settled (`SyncEngine.processAsset`, by
   `localIdentifier`), gives each asset three attempts before it stops holding the watermark or the queue, and
   stops on a refused session (`SupabaseService.isAuthFailure`) instead of failing every remaining photo.
+- **A capture session is the identity context; an album is not.** Owner direction, 2026-10-28 (case ledger §17): the make
+  and year a classic serial needs come from the session itself, in order of strength: a title or registration document read in
+  the same session, a cowl or trim tag (`BODY BY FISHER` + `ST73 2FS87` decodes model year, make and series), a make badge
+  read on a vehicle-classified frame. These remain retained context. Automatic classic-serial namespace uses the source itself,
+  an exact serial-bearing document, or an existing owner album declaration; nearby text alone is unresolved. Every image
+  automatically filed by its identifier must independently read that identifier. Without a plate, at least two
+  source-bound frames reading the same labelled body number can request a private candidate. Its tag fields must also decode
+  from retained native OCR at confidence0.9 or greater. A nearby car without that reading stays separate; time/GPS only bound
+  the source set. The existing writer retains `needs_identifier` and asks for the missing plate. The day receipt treats a gap
+  of more than an hour between bursts as a question with one tap, whose answer is an owner-testimony work session.
 - **Photos file to the owner's vehicles; strong evidence makes a profile.** Owner direction, 2026-10-15: "the app
   after vision run is supposed to assign the vehicle to a profile under the image owners associated vehicle profiles,
   its supposed to create new profiles if theres enough data to support it." `AttributionEngine.run` files an uploaded
   photo through the server (`device_file_images` → `attribute_testimony`, audited) on a fresh exact VIN or chassis
   serial matching one of the owner's vehicles, or on the owner's album mapped to a vehicle (`album_sync_map`) after a
-  fresh original-byte read classifies the image as a vehicle. Fuzzy reads and photos without a fresh source read stay out
+  fresh original-byte read classifies the image as a vehicle. Fuzzy, ambiguous, repaired and sub0.9 identifier reads stay out
   of automatic filing. A valid 17-character VIN (`VisionEngine.isValidVIN`) that matches nothing, or an unmapped album
   named "year make model" (`AlbumLabel`) with `Config.albumProfileMinPhotos` uploaded photos, goes to
   `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
@@ -84,13 +143,20 @@ Standing rules the code carries:
   Vision OCR/classification and does not accept previous cloud, album, or deep-analysis output as identity evidence.
   A fresh VIN-anchored capture read is retained in the existing protected, reading-only `image_observations` lane.
   It records the source hash, method revision, run, bounded peer inputs, local vehicle/document classifications and
-  check-digit-valid modern VINs and explicitly labelled 8–16 character classic chassis serials. It creates no subject or membership. This keeps pre-identity reads out of
+  check-digit-valid modern VINs and explicitly labelled 8–16 character classic chassis serials. A bare classic plate may
+  match an already-known identifier exactly under the same qualified native OCR rule; it cannot create a new identity.
+  The current identity method bounds input to 4096 pixels and rectifies at most two bare identifier regions before
+  native OCR. It retains changed intermediate readings separately. Conflicting strong identifier reads veto filing;
+  an intermediate reading alone cannot qualify a claim. Album review retains its existing method and image bound.
+  It creates no subject or membership. This keeps pre-identity reads out of
   `image_analysis_records` (whose required `vehicle_id` would invent a relation) and avoids a parallel source-read
   table. Before profile admission, the server folds only reads from the same fresh run and exact source hashes, with
-  the identifier anchor and independently classified vehicle frames within five minutes and 25 m by capture metadata.
-  A classic serial additionally needs one unambiguous owner album label for its year, make and model; unlabeled OCR
-  strings and serials without that context remain unresolved. Invoice/document language in local OCR blocks both VIN
-  and serial anchors, and raw OCR text never leaves the phone.
+  each source's own matching unmodified identifier at native OCR confidence0.9 or greater. Five-minute/25m neighborhoods
+  bound the request and never make an unlabelled nearby car a member. A single modern VIN uses the existing one-source
+  VIN writer and a protected singleton reading with no subjects or memberships.
+  A classic serial additionally needs an unambiguous namespace from its own source, an exact serial-bearing context,
+  or the owner's existing album declaration. Unlabelled OCR strings and serials without that context remain unresolved. Invoice/document language in local OCR blocks both VIN
+  and serial anchors. The existing bounded native observations include OCR on non-document sources; document OCR stays local.
   Documents, sensitive or rejected photos, stale hashes, missing clocks/locations, and nearby conflicting VINs block
   the fold. The existing audited profile writer then resolves a globally held VIN or creates a private profile with
   the photographer relation. For a newly created 17-character VIN profile, the server invokes the existing
@@ -223,6 +289,27 @@ Standing rules the code carries:
   receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
   not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as
   recorded; nothing masks plate-shaped text yet, so do not claim it.
+- **Receipt depth follows the current source.** Investment Parts audit rows open the exact receipt through
+  its currently visible `receipt_vehicle_links.page_date` and `get_vehicle_day_documents`. The phone requires
+  exact receipt/day membership and the reader's `tied` verdict, then rechecks the link and current account.
+  Unknown dates, withheld links, retired/duplicate records and failed reads stay explicit; no guessed date
+  or older extraction fallback. Detail adds returned lines and source/date qualifications without another
+  total panel, payment/allocation/work inference, original-page download, or local financial sum. A read
+  timestamp is a snapshot, not a promise that the record cannot change. Older investment-fold clock,
+  labor and overlap qualifications remain separate unresolved work.
+- **Legacy financial inputs stay evidence.** The legacy proof's `confirmed_labor` is a sum of session
+  `total_job_cost`, which can include parts and tools; confirmation records testimony, not payment.
+  Its widget keeps receipt, payment/contribution and session record doors, without presenting mixed
+  totals, projected photo labor, party totals or ROI as reconciled investment/cash. Session and receipt
+  readings omit an invented currency; audit values are explicitly rounded and session dates carry
+  no invented timezone. Payment reports retain their declared USD unit and attributed
+  status. A missing confirmation is unknown, not an action grant. Existing confirmation/contribution
+  writers keep their effects. Session confirmation is displayed only after an explicit successful
+  acknowledgement for that session; an HTTP200 refusal, absent/malformed receipt or transport error
+  remains unconfirmed with retry. This establishes no vehicle holding or work/payment role.
+  The legacy receipt curve is withheld pending a qualified money/clock
+  contract; its first receipt is not an acquisition. The canonical valuation/price section is unchanged. This does
+  not repair the server folds or replace the canonical book/vehicle accounting service.
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.
@@ -273,7 +360,7 @@ Standing rules the code carries:
   results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
   the first hot or cold lot's reading on the board, `NUKE_DEBUG_LEDGER_MAKE=Chevrolet` opens that brand's models on the
   ledger map, `NUKE_DEBUG_ACTOR_ORG=<uuid>` roots on an organization's actor document, `NUKE_DEBUG_DAY=<yyyy-mm-dd>`
-  (+ `NUKE_DEBUG_DAY_USER`) opens a day receipt. A session injected once persists in the simulator Keychain;
+  with `NUKE_DEBUG_DAY_USER=<uuid>` (required; there is no default account) opens a day receipt. A session injected once persists in the simulator Keychain;
   terminate and relaunch, or use an explicit screen hook. `simctl install` the fresh product before a
   capture: a launch hook on a stale install looks like a code bug (2026-10-13).
 

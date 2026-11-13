@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FaviconIcon } from '../common/FaviconIcon';
-import { listingDescriptionsFromSpecs, type ListingDescription } from './listingDescriptions';
+import { listingDescriptionsFromSpecs, listingDescriptionText, type ListingDescription } from './listingDescriptions';
 import { CollapsibleWidget } from '../ui/CollapsibleWidget';
 
 interface VehicleDescriptionCardProps {
@@ -143,7 +143,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
   };
 
   const isEmpty = !description || description.trim().length === 0;
-  const summaryRepeatsSource = listingDescriptions.some(entry => entry.text.trim() === description.trim());
+  const summaryRepeatsSource = listingDescriptions.some(entry => entry.text.trim() === description.trim() || listingDescriptionText(entry.text).trim() === description.trim());
 
   // Progressive density: hide entirely when no description and user can't edit
   if (isEmpty && !isEditable && listingDescriptions.length === 0) return null;
@@ -247,13 +247,13 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               <details key={entry.source_observation_id} open={listingDescriptions.length === 1}
                 style={{ marginTop: '12px' }}>
                 <summary style={{ cursor: 'pointer', fontSize: '11px' }}>Preserved listing text · {getSourceDomain(entry.source_url)}</summary>
-                <div style={{ fontSize: '11px', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginTop: '8px' }}>{entry.text}</div>
+                <div style={{ fontSize: '11px', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginTop: '8px' }}>{listingDescriptionText(entry.text)}</div>
                 <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '8px' }}>
                   <a href={entry.source_url} target="_blank" rel="noopener noreferrer">Listing source ↗</a>
                   {' · '}<a href={`/vehicle/${vehicleId}/observation/${entry.source_observation_id}`}>Observation ↗</a>
                   <details><summary>Source record</summary>
                   <div>Recorded observation: {formatEntryDate(entry.recorded_observed_at)} · Captured: {formatEntryDate(entry.source_captured_at)} · Received: {formatEntryDate(entry.ingested_at)}</div>
-                  <div>Original listing event date unknown. Original source completeness unknown. Preserved text shown without shortening.</div>
+                  <div>Original listing event date unknown. Original source completeness unknown. Source text shown without shortening; HTML formatting is displayed as plain text. Original evidence remains in the observation.</div>
                   <div>Method: {entry.extraction_method || 'Unknown'} · Model self-score (not corroboration): {entry.confidence ?? 'Unknown'}</div>
                   </details>
                 </div>

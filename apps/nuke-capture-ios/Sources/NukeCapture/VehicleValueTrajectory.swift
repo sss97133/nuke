@@ -32,6 +32,7 @@ struct InvestmentTimeline: Decodable {
 struct ValueTrajectoryView: View {
     let vehicleId: String
     @State private var t: InvestmentTimeline?
+    @State private var loadFailed = false
 
     private func money(_ v: Double) -> String { v.formatted(.currency(code: "USD").precision(.fractionLength(0))) }
     private func moneyK(_ v: Double) -> String {
@@ -55,7 +56,7 @@ struct ValueTrajectoryView: View {
                 .padding(.horizontal, 16)
                 if let b = t.baseline?.delta {
                     Text("incl. \(money(b)) acquisition · the value you build, not wait to sell")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                         .padding(.horizontal, 16)
                 }
 
@@ -71,7 +72,7 @@ struct ValueTrajectoryView: View {
                         PointMark(x: .value("Date", d), y: .value("Invested", first.cumulative!))
                             .foregroundStyle(Color.accentColor).symbolSize(40)
                             .annotation(position: .topLeading) {
-                                Text("bought").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                                Text("bought").font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                             }
                     }
                 }
@@ -85,11 +86,16 @@ struct ValueTrajectoryView: View {
 
                 if let u = t.undated, let ut = u.total, ut > 0 {
                     Text("+ \(money(ut)) from \(u.n ?? 0) undated receipts — real spend, no date to place it on the curve")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                         .padding(.horizontal, 16)
                 }
             }
             .padding(.bottom, 16)
+        } else if loadFailed && t == nil {
+            NukeLoadFailed(message: "The investment timeline didn't come through.") {
+                Task { await fetch() }
+            }
+            .frame(minHeight: 200)
         }
         }
         .task(id: vehicleId) { await fetch() }
@@ -97,8 +103,16 @@ struct ValueTrajectoryView: View {
 
     private func fetch() async {
         struct P: Encodable { let p_vehicle: String }
-        t = try? await SupabaseService.client
-            .rpc("get_vehicle_investment_timeline", params: P(p_vehicle: vehicleId))
-            .execute().value
+        loadFailed = false
+        do {
+            let timeline: InvestmentTimeline = try await SupabaseService.client
+                .rpc("get_vehicle_investment_timeline", params: P(p_vehicle: vehicleId))
+                .execute().value
+            t = timeline
+        } catch {
+            guard !Task.isCancelled else { return }
+            loadFailed = true
+            NSLog("NukeCapture investment timeline load failed: %@", String(describing: error))
+        }
     }
 }

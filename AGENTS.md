@@ -97,7 +97,53 @@ Carry the next observed gap into code and the methodology together, preserving d
 Roles such as artist, buyer and researcher describe evidenced behavior in context; do not turn them
 into permanent identity types or mandatory arrival choices without a separate model decision.
 
+## Reading photos
+
+Owner direction, 2026-11-10. A photo reading is finished when it is keyed in the model's own vocabulary
+with its photo as witness, not when it is stored. The data model asks: the questions for a photo come
+from registry rows (`observation_properties`), chosen by the vehicle, the job in hand and the view.
+Answers are closed (a listed value, not visible, cannot tell). An answer becomes a fact only by
+agreement across photos and readers, by a receipt, or by the owner's word. Where the model has no place
+for what a reading found, look for an existing key and its aliases first, then propose the place
+through `schema_proposals`. Do not add a reader, a prompt vocabulary or a per-reader table for photos.
+Report what the model gained (keyed, connected, proven rows), not photos analysed. When the owner asks
+for faster reading, a reading order, a new detector or a count of photos, answer from this direction:
+tell him what he would get, where the request cuts against it and why, and what you will do instead.
+Do not obey it as worded and do not refuse. Before any photo
+work read "Image analysis is the model asking" at the top of
+[`data-machine.md`](docs/ledger/theory/data-machine.md) and C17's 2026-11-10 entries in
+[`data-machine-cases.md`](docs/ledger/theory/data-machine-cases.md). The acceptance is the owner's three
+questions there. A pull request that adds a photo reader or a table keyed by a photo fails
+`scripts/guardrails/no-new-photo-reader.mjs`. The card lists the other gates and which are not built.
+Keying readings that already exist is a dedicated role: give an agent `skills/image-keys/SKILL.md` as its
+brief, with the registry snapshot and the decisions made so far.
+
 ## Invariants
+### Data-machine-first design — owner rule, 2026-11-11
+
+Every datum must be a planned, functional line item in the existing data machine
+before it reaches the UI. Establish its entity/episode grain, canonical data
+definition and owner, source/admission path, event and knowledge clocks, fold,
+withdrawal/supersession behavior, sanctioned reader, and useful inspection/action.
+Prove that path with representative real records before designing its presentation.
+
+The UI renders those supported line items through shared tools. Do not invent a
+page-local state machine, appraisal, direct source query, fact, or explanatory
+prose card to bypass missing admission, folds, line items or readers. Resolve the
+missing machine relationship with its existing owner first. A compact restyling
+of a bypass is still a bypass. Current owner intent: "every line item is planned
+out and like a functional tool before anything touches the ui"; "the ui is never
+raw text." This is a construction rule, not an additional owner-approval gate.
+
+For functional item planning, use
+[`SOURCE_AWARE_ACQUISITION_CONTRACT.md`](docs/market/SOURCE_AWARE_ACQUISITION_CONTRACT.md).
+For vehicle header work, the **existing header is the banner**: its form comes
+from the qualified reader, not an additional card. Read the executable rules,
+delivery boundary and open pickup in
+[`VEHICLE_HEADER_FORM_RULES.md`](docs/market/VEHICLE_HEADER_FORM_RULES.md)
+and the dated auction-header entry in **C27 / §11** of the case ledger. The
+machine-layer delivery does not close the unfinished renderer or estimate work.
+
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.
 2. **Testimony is never overwritten or deleted.** It is superseded, and the original is kept.
@@ -108,6 +154,12 @@ into permanent identity types or mandatory arrival choices without a separate mo
    - Private data (people's contact details, invoices, amounts) doesn't either. It lives in the database,
      and code and docs refer to it by id.
    - `VITE_*` values ship to browsers, so no secret gets that prefix. `npm run build` fails if one does.
+5. **Numbers are cited from the database or they are not stated.** A price, band, score or count in a reply,
+   a page or a row comes from a reader over the ledger's rows (the reader's name, its population, n, the
+   as-of date and the keys it used), never from a constant an agent typed into a seed, a doc or a markdown
+   table built for the reply. A status such as proven or contradicted exists only with a proof reference.
+   An agent's own judgment is labelled as judgment and never seeded into a table. (Skylar, 2026-10-29:
+   "you can only cite from the db".)
 
 ## Writes and deploys
 - **Schema, cron and SQL functions.** Write a migration file, make one commit, and push it yourself.
@@ -163,7 +215,12 @@ into permanent identity types or mandatory arrival choices without a separate mo
 - A year is trusted only when `books_year_gate(owner, year)` passes every rule (R1-R9: one treatment per movement,
   credits are revenue unless proven, no double count, cash method, evidence on expenses of $75+, depreciation from an
   asset register, monthly mixed-use percentages, SE tax/credits/GILTI computed from stored inputs, no drift). Run
-  `scripts/books/books_year_gate_check.py` and list the failures; never fix them silently.
+  `scripts/books/books_year_gate_check.py` and list the failures; never fix them silently. After the last landing, record
+  the gate (`books_year_gate_check.py --record`, bounded at 120 s a year) so the books docket at `/accounting` can show it:
+  a page never calls the gate, and any landing marks every stored run stale. Land filing state first, record the gate last.
+  The docket's first screen lists the large sums rule R12 flags (`books_large_sum_rows`); a paper the owner adds for a row waits as a
+  `supports_record_*` cell until `scripts/books/pending_attachments.py` and `schedule_c_rulings.py correct` cite it in the decision's `proof_links`.
+  The docket's spec and its owner-only rules are in `docs/books-docket.md`.
 
 ## PR titles and commit messages
 The repo is public, and a squash merge puts the PR title (or a single commit's subject) on `main` as the
@@ -194,6 +251,12 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
   routing or permission to spawn paid work. The [workspace workflow](docs/AGENT_WORKFLOW.md)
   provides installed commands and a compact handoff; load it when routing or resuming
   substantial work, not before every edit.
+
+- On the proof vehicle (the 1973 Firebird named in `data-machine.md`) and the code around it, every lane reads
+  [`proof-vehicle-pickup.md`](docs/ledger/theory/proof-vehicle-pickup.md) first (owner, 2026-11-13: "i need all my
+  agents working on the firebird and adjacent code to start collaborating"). It names the two readers that say
+  whether the vehicle is done, what the writer gate refuses and the legal move for each refusal, the lanes seen
+  and the open collisions. Report both readers before and after your change.
 
 - Work in your own worktree:
   `git worktree add ~/.worktrees/<task> -b <branch> origin/main`, then

@@ -6,7 +6,7 @@ import { EPISODE_READ_LIMIT, useAuctionEpisode, type EpisodeInteraction } from '
 import { useLotMovement } from './useLotMovement';
 import { selectRowFacts, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 import { bidBookReading, useBidBook } from '../stacks/orderBookReader';
-import { useFinishAnalogs } from './useFinishEstimates';
+import { trackFor, trackSentence, useFinishAnalogs, useFinishTrackRecord } from './useFinishEstimates';
 import './AuctionEvidence.css';
 
 function stamp(value: string | null | undefined) {
@@ -124,16 +124,19 @@ function day(value: string | null) {
 }
 // Where it should finish, said once, at the top of the drawer: the estimate, its 80% range, how often that range has
 // held for lots like this, and the past lots it rests on with their bid at this point and their finish.
-function FinishBlock({ vehicleId }: { vehicleId: string }) {
+function FinishBlock({ vehicleId, endsAt }: { vehicleId: string; endsAt?: number | null }) {
   const q = useFinishAnalogs(vehicleId);
   const e = q.data?.board.byId.get(vehicleId);
+  const track = useFinishTrackRecord(!!e).data;
   if (!e) return null;
+  const record = trackFor(track, e, endsAt);
   const analogs = q.data?.analogs ?? [];
   return <section className="market-finish" aria-label="Where it should finish">
     <Text role="label">Likely finish</Text>
     <div className="market-finish__value"><Text role="measure">{money(e.estimate)}</Text>
       <Text role="body">80% range {money(e.low)}–{money(e.high)}</Text></div>
     {e.sentence && <Text role="body" as="p">{e.sentence}</Text>}
+    {record && <Text role="caption" as="p">{trackSentence(record)}</Text>}
     {analogs.length > 0 && <ol className="market-finish__analogs" aria-label="Past lots it rests on">{analogs.map((a, i) =>
       <li key={`${a.url ?? a.title}-${i}`}>
         {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer">{a.title}</a> : <span>{a.title}</span>}
@@ -145,9 +148,9 @@ function FinishBlock({ vehicleId }: { vehicleId: string }) {
   </section>;
 }
 
-export default function AuctionEvidence({ vehicleId, onClose, compact = false, summary, sourceUrl }: {
+export default function AuctionEvidence({ vehicleId, onClose, compact = false, summary, sourceUrl, endsAt }: {
   vehicleId: string; onClose: () => void; compact?: boolean; inspection?: LotInspection; summary?: MarketRowDetails;
-  onInspectionChange?: (view: LotInspection) => void; sourceUrl?: string | null;
+  onInspectionChange?: (view: LotInspection) => void; sourceUrl?: string | null; endsAt?: number | null;
 }) {
   const query = useAuctionEpisode(vehicleId, sourceUrl);
   const book = useBidBook(vehicleId, sourceUrl ?? query.data?.sourceUrl, compact);
@@ -216,7 +219,7 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, s
       {query.isError && <p role="status">This auction could not be read. <button type="button" onClick={() => void query.refetch()}>Retry</button></p>}
       {!query.isPending && !query.isError && !evidence && <p role="status">This listing has changed or is no longer publicly available.</p>}
       {evidence && <>
-        <FinishBlock vehicleId={vehicleId} />
+        <FinishBlock vehicleId={vehicleId} endsAt={endsAt} />
         <BidPath rows={pathRows} selected={selected ?? latestBid?.id ?? null} onSelect={setSelected} />
         {!book.data?.bids?.length && evidence.truncated && <p className="auction-evidence-note">Earlier interactions omitted by the limit.</p>}
         {(question || seller) && <div className="market-inspection-talk">

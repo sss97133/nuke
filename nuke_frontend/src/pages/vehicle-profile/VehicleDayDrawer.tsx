@@ -1,3 +1,4 @@
+import { CatalogProductReference, type ReceiptCatalogProduct } from './CatalogProductReference';
 /**
  * VehicleDayDrawer — the complete day document for one vehicle-day.
  *
@@ -16,8 +17,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuthContext } from '../../contexts/AuthContext';
 import { useVehicleProfile } from './VehicleProfileContext';
-import { openVehiclePhoto } from './VehiclePhotoLightbox';
+import { highlightVehicleDays, openVehicleDay, openVehiclePhoto, openVehiclePhotoByUrl } from './VehiclePhotoLightbox';
+import WorkSessionContext from './WorkSessionContext';
+import { ReceiptLineContext, receiptLineKey, useReceiptWorkContext } from './ReceiptWorkContext';
+import { receiptSupplierLabel } from './receiptSupplierLabel';
 import { auctionMomentDayTitle, auctionOpenDayTitle, fmtClock, fmtMoment, fmtUsd, isBatHosted, listingForPhoto, localDate, momentDay, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
@@ -44,11 +49,53 @@ interface DayEvent {
   } | null;
 }
 
+/** One receipt of the day as get_vehicle_day_documents returns it: money, payer and the page are null unless the viewer is tied. */
+interface DayDocumentInstall {
+  /** the photo zone the line's words name (dashboard, interior, engine, wheel) or null */
+  zone: string | null;
+  /** photographed = that zone has a photo after the page date (a candidate the owner looks at); no_photo = none yet; no_zone = nothing a photo shows */
+  status: 'photographed' | 'no_photo' | 'no_zone';
+  photo_day: string | null;
+  photo_count: number | null;
+  image_id: string | null;
+}
+interface DayDocumentLine { product?: ReceiptCatalogProduct | null; line_number: number | null; description: string | null; part_number: string | null; quantity: number | null; unit_price: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null; install?: DayDocumentInstall | null }
+interface DayDocumentPage { bucket: string; path: string; bytes?: number | null; page_no?: number | null }
+interface DayDocumentVendor { id?: string | null; name?: string | null; logo_url?: string | null; website?: string | null }
+export interface DayDocument { receipt_id: string; vendor: string | null; vendor_org?: DayDocumentVendor | null; document_type: string | null; document_number: string | null; pages: number | null; page?: DayDocumentPage | null; page_paths?: string[] | null; payer_as_named: string | null; subtotal: number | null; tax: number | null; total: number | null; currency: string | null; date_basis: string | null; lines: DayDocumentLine[]; recorded_payment?: { amount: number | null; date: string | null } | null; recorded_hours?: number | null; hour_entries?: number }
+
+/** The install proofs a document's lines point at: the distinct days, oldest first. */
+export function installProofDays(doc: Pick<DayDocument, 'lines'>): string[] {
+  const days = new Set<string>();
+  for (const line of doc.lines) if (line.install?.status === 'photographed' && line.install.photo_day) days.add(line.install.photo_day);
+  return [...days].sort();
+}
+
+/** The words beside a line for its install proof; null when the line names nothing a photo would show. */
+export function describeInstall(install: DayDocumentInstall | null | undefined): string | null {
+  if (!install || install.status === 'no_zone' || !install.zone) return null;
+  if (install.status === 'no_photo') return `no ${install.zone} photo after this date yet`;
+  const day = install.photo_day ? fmtDayShort(install.photo_day) : 'later';
+  return `${install.zone} photographed ${day}${install.photo_count && install.photo_count > 1 ? ` (${install.photo_count} photos)` : ''}`;
+}
+
+/** The page's signed render URL for this viewer (the bucket is private; signing needs the viewer's own storage policy). */
+async function signDocumentPage(page: DayDocumentPage): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage.from(page.bucket).createSignedUrl(page.path, 600, { transform: { width: 1800, height: 1800, resize: 'contain', quality: 80 } });
+    return !error && data?.signedUrl ? data.signedUrl : null;
+  } catch {
+    return null;
+  }
+}
+
 interface VehicleDayDrawerProps {
   date: string; // YYYY-MM-DD
   /** the BaT auction sequences, one per listing, when this vehicle was a lot — bids and comments land on their days */
   auctions?: AuctionSequence[];
   hasWorkSummary?: boolean;
+  /** receipts linked to this vehicle on this page date (get_vehicle_contribution_days kind 'document'); 0 = no read */
+  documentCount?: number;
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
@@ -88,6 +135,19 @@ function fmtMoney(n: number | null | undefined, currency: unknown): string {
   return `${Math.round(v).toLocaleString()} ${code ?? '(currency unknown)'}`;
 }
 
+function fmtReceiptMoney(n: number | null | undefined, currency: unknown): string {
+  if (n == null || !Number.isFinite(Number(n))) return '';
+  const v = Number(n);
+  const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency.trim()) ? currency.trim().toUpperCase() : null;
+  return `${v.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${code ?? '(currency unknown)'}`;
+}
+
+function fmtDayShort(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  if (!Number.isFinite(d.getTime())) return date;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
 function fmtDayHeader(date: string): string {
   const d = new Date(date + 'T12:00:00');
   if (isNaN(d.getTime())) return date;
@@ -99,9 +159,12 @@ const mono: React.CSSProperties = { fontFamily: "var(--vp-font-mono, 'Courier Ne
 // Session-scoped photo cache so re-opening a day never refetches.
 const dayPhotoCache = new Map<string, DayPhoto[]>();
 
-const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], hasWorkSummary = false, onClose, onPrev, onNext }) => {
+const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], hasWorkSummary = false, documentCount = 0, onClose, onPrev, onNext }) => {
   const { vehicleId, timelineEvents, timelineReadState } = useVehicleProfile();
+  const { user, loading: authLoading } = useAuthContext();
   const [photoRead, setPhotoRead] = useState<{ key: string; rows: DayPhoto[]; failed: boolean } | null>(null);
+  const [documentRead, setDocumentRead] = useState<{ key: string; rows: DayDocument[]; failed: boolean } | null>(null);
+  const [pageNote, setPageNote] = useState<string | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
   // The bids and comments that landed on this day, across the car's listings, in time order.
@@ -176,6 +239,29 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoContextKey]);
 
+  // ── The day's paper: one read, only on a day the timeline leg counted a linked receipt ──
+  const documentKey = `${vehicleId}:${date}:${user?.id ?? 'anonymous'}`;
+  const activeDocumentKey = useRef<string | null>(null);
+  activeDocumentKey.current = authLoading ? null : documentKey;
+  const documents = !authLoading && documentRead?.key === documentKey ? documentRead.rows : null;
+  const documentsUnavailable = !authLoading && documentRead?.key === documentKey ? documentRead.failed : false;
+  useEffect(() => {
+    if (authLoading || !vehicleId || !date || documentCount <= 0) return;
+    let cancelled = false;
+    setDocumentRead(null);
+    Promise.resolve(supabase.rpc('get_vehicle_day_documents', { p_vehicle_id: vehicleId, p_date: date }))
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        const rows = !error && data && Array.isArray((data as { documents?: unknown }).documents) ? (data as { documents: DayDocument[] }).documents : null;
+        setDocumentRead({ key: documentKey, rows: rows ?? [], failed: rows === null });
+      })
+      .catch(() => { if (!cancelled) setDocumentRead({ key: documentKey, rows: [], failed: true }); });
+    return () => { cancelled = true; };
+  }, [vehicleId, date, documentCount, documentKey, authLoading]);
+
+  // ── The receipt-to-work context of the day's lines: one read, only once the day's paper has lines ──
+  const receiptWork = useReceiptWorkContext(vehicleId, date, (documents ?? []).some(d => d.lines.length > 0));
+
   // ── Day events from the already-loaded timeline ──
   const dayEvents = useMemo(
     () => ((timelineEvents || []) as DayEvent[]).filter((ev) => String(ev.event_date || '').slice(0, 10) === date),
@@ -186,7 +272,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     [dayEvents],
   );
   const otherEvents = useMemo(
-    () => dayEvents.filter((ev) => !['work_session', 'photo_session'].includes(String(ev.event_type || ''))),
+    () => dayEvents.filter((ev) => !['work_session', 'photo_session', 'document'].includes(String(ev.event_type || ''))),
     [dayEvents],
   );
 
@@ -202,7 +288,18 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   const timelineUnavailable = timelineReadState?.timeline === 'unavailable' || timelineReadState?.work === 'unavailable';
 
   const loading = photos === null;
-  const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0 && auctionMoments.length === 0;
+  const paperPending = documentCount > 0 && documents === null && !documentsUnavailable;
+  // The days the paper's lines point at as install proofs: the date header illuminates them on the timeline.
+  const proofDays = useMemo(() => [...new Set((documents ?? []).flatMap(installProofDays))].sort(), [documents]);
+  const openPage = async (doc: DayDocument) => {
+    if (!doc.page) return;
+    setPageNote(null);
+    const url = await signDocumentPage(doc.page);
+    if (activeDocumentKey.current !== documentKey) return;
+    if (url) openVehiclePhotoByUrl(url);
+    else setPageNote('The page could not be signed for this viewer.');
+  };
+  const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0 && auctionMoments.length === 0 && documentCount <= 0;
 
   return (
     <div
@@ -218,7 +315,16 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     >
       {/* Header: date · span · nav · close */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>{fmtDayHeader(date)}</span>
+        {proofDays.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => highlightVehicleDays(proofDays)}
+            title={`Illuminate the install proofs on the timeline: ${proofDays.join(', ')}`}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textDecoration: 'underline dotted', color: 'inherit' }}
+          >{fmtDayHeader(date)}</button>
+        ) : (
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>{fmtDayHeader(date)}</span>
+        )}
         {photos && photos.length > 0 && (
           <span style={{ ...mono, fontSize: 8, color: 'var(--vp-pencil, #888)' }}>
             {hasImportedPhotos ? 'IMPORTED PHOTO CAPTURE TIMES UNKNOWN' : <>{fmtTime(first)}–{fmtTime(last)}{span ? ` · ${span}` : ''}</>}
@@ -254,8 +360,82 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
           {dayBids > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>BIDS {dayBids}</span>}
           {dayComments > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>COMMENTS {dayComments}</span>}
           {workEvents.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>WORK {workEvents.length}</span>}
+          {documentCount > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>PAPER {documentCount}</span>}
         </div>
       )}
+
+      {/* The day's paper: each receipt with its lines; amounts only when the read returned them (owner-tied viewers) */}
+      {paperPending && <div role="status" style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Reading the day's paper…</div>}
+      {documentsUnavailable && <div role="status" style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Paper unavailable in this read.</div>}
+      {documents?.map((doc) => (
+        <div key={doc.receipt_id} className="day-drawer__document" style={{ marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 9 }}>
+            <span style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              {doc.vendor_org?.logo_url && (
+                <img
+                  src={doc.vendor_org.logo_url}
+                  alt={receiptSupplierLabel(doc.vendor_org.name || doc.vendor) || 'vendor'}
+                  width={14}
+                  height={14}
+                  loading="lazy"
+                  style={{ width: 14, height: 14, objectFit: 'contain', flex: 'none' }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
+              {doc.vendor_org?.website ? (
+                <a href={doc.vendor_org.website} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{receiptSupplierLabel(doc.vendor || doc.vendor_org.name) || 'Receipt'}</a>
+              ) : (receiptSupplierLabel(doc.vendor) || 'Receipt')}
+              <span>{[doc.document_type ? doc.document_type.replace(/_/g, ' ') : null, doc.document_number ? `#${doc.document_number}` : null].filter(Boolean).map((part) => ` · ${part}`).join('')}</span>
+            </span>
+            <span style={{ ...mono, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              {doc.page && (
+                <button
+                  type="button"
+                  onClick={() => { void openPage(doc); }}
+                  style={{ ...mono, background: 'none', border: '1px solid var(--vp-ghost, #ddd)', cursor: 'pointer', fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', padding: '1px 5px', color: 'inherit' }}
+                >OPEN THE PAGE →</button>
+              )}
+              {[doc.pages && doc.pages > 1 ? `${doc.pages} pages` : null, doc.total != null ? `Document total ${fmtReceiptMoney(doc.total, doc.currency)}` : null].filter(Boolean).join(' · ') || `${doc.lines.length} line${doc.lines.length === 1 ? '' : 's'}`}
+            </span>
+          </div>
+          {doc.payer_as_named && <div style={{ fontSize: 8, color: 'var(--vp-pencil, #888)' }}>billed to {doc.payer_as_named}</div>}
+          {doc.recorded_payment && <p>Recorded payment {fmtReceiptMoney(doc.recorded_payment.amount, doc.currency) || 'Amount not recorded'}{doc.recorded_payment.date ? ` · ${doc.recorded_payment.date}` : ''}</p>}
+          {doc.recorded_hours != null && <p>{doc.recorded_hours} recorded person-hours · {doc.hour_entries} entries on this receipt. Concurrent entries count separately.</p>}
+          {pageNote && doc.page && <div role="status" style={{ fontSize: 8, color: 'var(--vp-pencil, #888)' }}>{pageNote}</div>}
+          {doc.lines.length > 0 && (
+            <div style={{ fontSize: 9, color: 'var(--vp-pencil, #888)', marginTop: 2, lineHeight: 1.5 }}>
+              {doc.lines.map((line, i) => (
+                <div key={`${doc.receipt_id}:${line.line_number ?? i}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span>
+                    {[line.line_date && line.line_date !== date ? line.line_date : null, line.performer, line.part_number, line.description].filter(Boolean).join(' · ')}
+                    {describeInstall(line.install) && (
+                      line.install?.status === 'photographed' && line.install.photo_day ? (
+                        <button
+                          type="button"
+                          className="day-drawer__install"
+                          onClick={() => openVehicleDay(line.install!.photo_day!)}
+                          title="Open the day of the first photo of this zone after the invoice"
+                          style={{ ...mono, background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 6px', fontSize: 8, color: 'var(--vp-gulf-blue, #1f5fbf)', textDecoration: 'underline dotted' }}
+                        >{describeInstall(line.install)}</button>
+                      ) : (
+                        <span className="day-drawer__install" style={{ ...mono, fontSize: 8, paddingLeft: 6, color: 'var(--vp-pencil, #888)' }}>{describeInstall(line.install)}</span>
+                      )
+                    )}
+                  </span>
+                  <span style={mono}>{[line.hours != null ? `${line.hours} h` : null, line.quantity != null && line.quantity !== 1 ? `×${line.quantity}` : null, line.amount != null ? fmtReceiptMoney(line.amount, doc.currency) : null].filter(Boolean).join(' · ')}</span>
+                </div>
+                <CatalogProductReference product={line.product} />
+                <ReceiptLineContext
+                  line={receiptWork.byLine.get(receiptLineKey(doc.receipt_id, line.line_number))}
+                  withdrawn={receiptWork.withdrawnByLine.get(receiptLineKey(doc.receipt_id, line.line_number))}
+                />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
 
       {/* Work story */}
       {workEvents.map((ev) => {
@@ -274,6 +454,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
                 {String(meta.work_description)}
               </div>
             )}
+            {vehicleId && ev.id && <WorkSessionContext key={`${vehicleId}:${ev.id}:${date}`} vehicleId={vehicleId} sessionId={ev.id} date={date} />}
           </div>
         );
       })}

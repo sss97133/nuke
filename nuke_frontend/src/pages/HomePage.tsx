@@ -3432,7 +3432,7 @@ export default function HomePage() {
   return (
     <div>
       {showOnboarding && (
-        <OnboardingSlideshow isOpen={showOnboarding} onClose={handleOnboardingClose} />
+        <OnboardingSlideshow isOpen={showOnboarding} onClose={handleOnboardingClose} signedIn={!!user} />
       )}
       <nav className="home-mobile-nav" aria-label="Browse">
         {TABS.map((tab) => (

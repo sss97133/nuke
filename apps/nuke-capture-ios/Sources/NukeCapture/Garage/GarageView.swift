@@ -1,8 +1,11 @@
-// GarageView.swift — the owner's garage: their vehicles as the server states them, the photos still
-// waiting for a vehicle (with the way to file them), and from each vehicle its jobs and "Post a job".
+// GarageView.swift — searchable account vehicles and their profiles, followed by photos
+// waiting for a vehicle. Relationship and work controls remain under Garage details.
 //
 // Reads: get_user_garage + get_my_garage_owner_corrections (GarageReaders.ownGarage, shared with
-// ProfileView) and my_unorganized_photo_count. Each vehicle opens GarageVehicleView.
+// ProfileView) and my_unorganized_photo_count. Each vehicle opens VehicleDetailView.
+//
+// The top of the list is "Today in your garage" (GarageActivityViews), and vehicles are ordered by
+// their most recent activity (GarageActivity.swift). Both reuse reads the app already makes.
 
 import SwiftUI
 
@@ -15,22 +18,31 @@ struct GarageView: View {
     @State private var failure: JobRefusal?
     @State private var photos: JobLoad<UnorganizedPhotos> = .loading
     @State private var showContributed = false
+    @State private var query = ""
+    @State private var manageVehicle: GarageVehicle?
+    @State private var requests = ReadRequestGuard()
+    @State private var openVehicleId: String?
+    @StateObject private var activity = GarageActivityStore()
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
         List {
-            Section {
-                UnorganizedPhotosRow(load: photos)
-                NavigationLink { SessionConfirmView() } label: {
-                    Label("Organize photos", systemImage: "checklist")
-                }
-            } header: {
-                Text("Photos to organize")
-            } footer: {
-                Text(GarageCopy.organizeScope)
+            if !isSearching {
+                GarageActivitySections(store: activity, retry: { refreshActivity() }, open: { openVehicleId = $0 })
             }
-
             if let garage {
-                vehicleSections(GarageSections(garage.vehicles), unresolved: garage.unresolved)
+                let matches = GarageSections.matching(activity.sorted(garage.vehicles), query: query)
+                if isSearching && matches.isEmpty {
+                    ContentUnavailableView.search(text: query)
+                } else {
+                    vehicleSections(GarageSections(matches), unresolved: isSearching ? [] : garage.unresolved)
+                }
+                Section {} footer: {
+                    if isSearching { Text("\(matches.count) matches in the \(garage.vehicles.count) vehicle records loaded for your account.") }
+                    Text(GarageSections(garage.vehicles).coverage(readAt: readAt, cachedAt: cachedAt))
+                }
             } else if let failure {
                 Section {
                     JobRefusalRow(refusal: failure)
@@ -39,20 +51,50 @@ struct GarageView: View {
             } else {
                 Section { ProgressView().frame(maxWidth: .infinity) }
             }
+
+            if !isSearching {
+                Section {
+                    UnorganizedPhotosRow(load: photos)
+                    NavigationLink { SessionConfirmView() } label: {
+                        Label("Organize photos", systemImage: "checklist")
+                    }
+                } header: {
+                    Text("Photos to organize")
+                } footer: {
+                    Text(GarageCopy.organizeScope)
+                }
+            }
         }
         .navigationTitle("Garage")
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Vehicle or VIN")
         .refreshable { await load() }
         .task(id: userId) { await load() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { refreshActivity() }
+        }
+        .navigationDestination(item: $openVehicleId) { id in
+            VehicleDetailView(vehicleId: id, embedInNavigationStack: false)
+                .accessibilityIdentifier("garage.activity.profile.\(id)")
+        }
+        .sheet(item: $manageVehicle) { vehicle in
+            NavigationStack {
+                GarageVehicleView(vehicle: vehicle)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { manageVehicle = nil } } }
+            }
+        }
     }
 
     @ViewBuilder private func vehicleSections(_ s: GarageSections, unresolved: [GarageUnresolvedSource]) -> some View {
-        Section {
-            if s.owned.isEmpty {
-                Text(GarageCopy.noneOwned).font(.footnote).foregroundStyle(.secondary)
+        if !s.owned.isEmpty || s.total == 0 {
+            Section {
+                if s.owned.isEmpty {
+                    Text(GarageCopy.noneOwned).font(.footnote).foregroundStyle(.secondary)
+                }
+                ForEach(s.owned) { v in vehicleLink(v) }
+            } header: {
+                Text("Owned · \(s.owned.count)")
             }
-            ForEach(s.owned) { v in vehicleLink(v) }
-        } header: {
-            Text("Owned · \(s.owned.count)")
         }
         ForEach(s.other) { interest in
             Section("\(interest.label) · \(interest.vehicles.count)") {
@@ -66,7 +108,7 @@ struct GarageView: View {
         }
         if !s.contributed.isEmpty {
             Section {
-                if showContributed { ForEach(s.contributed) { v in vehicleLink(v) } }
+                if showContributed || isSearching { ForEach(s.contributed) { v in vehicleLink(v) } }
             } header: {
                 Button { withAnimation(.snappy(duration: 0.2)) { showContributed.toggle() } } label: {
                     HStack {
@@ -79,6 +121,15 @@ struct GarageView: View {
                 .buttonStyle(.plain)
             } footer: {
                 Text(GarageCopy.contributedFooter)
+            }
+        }
+        if !s.documenting.isEmpty {
+            Section {
+                ForEach(s.documenting) { v in vehicleLink(v) }
+            } header: {
+                Text("Documenting · \(s.documenting.count)")
+            } footer: {
+                Text(GarageCopy.documentingFooter)
             }
         }
         if !unresolved.isEmpty {
@@ -94,32 +145,45 @@ struct GarageView: View {
                 Text("Identity pending · \(unresolved.count)")
             }
         }
-        Section {
-            EmptyView()
-        } footer: {
-            Text(s.coverage(readAt: readAt, cachedAt: cachedAt))
-        }
     }
 
     private func vehicleLink(_ v: GarageVehicle) -> some View {
-        NavigationLink { GarageVehicleView(vehicle: v) } label: { GarageRowLabel(vehicle: v) }
+        NavigationLink {
+            VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: false)
+                .accessibilityIdentifier("garage.vehicle.profile.\(v.vehicle_id)")
+        } label: { GarageRowLabel(vehicle: v, lastActivity: activity.latestByVehicle[v.vehicle_id.lowercased()]) }
+        .accessibilityIdentifier("garage.vehicle.\(v.vehicle_id)")
+        .swipeActions(edge: .trailing) {
+            Button("Garage details") { manageVehicle = v }
+                .tint(.secondary)
+        }
+        .contextMenu { Button("Garage details") { manageVehicle = v } }
     }
 
     private func load() async {
         async let counted = GarageReaders.unorganizedPhotos()
         await loadGarage()
+        if let vehicles = garage?.vehicles { await activity.refresh(vehicles: vehicles) }
         photos = await counted
     }
 
+    private func refreshActivity() {
+        guard let vehicles = garage?.vehicles else { return }
+        Task { await activity.refresh(vehicles: vehicles) }
+    }
+
     private func loadGarage() async {
+        let request = requests.begin()
         do {
             let own = try await GarageReaders.ownGarage(userId: userId)
+            guard !Task.isCancelled, requests.isCurrent(request) else { return }
             garage = own
             readAt = Date()
             cachedAt = nil
             failure = nil
             LocalStore.shared.cacheGarage(userId: userId, vehicles: own.vehicles)
         } catch {
+            guard !Task.isCancelled, requests.isCurrent(request) else { return }
             NSLog("NukeCapture garage screen load failed: %@", String(describing: error))
             if let cached = LocalStore.shared.cachedGarage(userId: userId), !cached.vehicles.isEmpty {
                 let unresolved = (try? LocalStore.shared.cachedUnresolvedGarageSources(userId: userId)) ?? []
@@ -136,6 +200,8 @@ struct GarageView: View {
 /// One garage row: the server's cover thumbnail, the vehicle and what the record says it is to you.
 struct GarageRowLabel: View {
     let vehicle: GarageVehicle
+    /// Newest real activity on this vehicle; nil hides the line.
+    var lastActivity: Date? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -149,6 +215,9 @@ struct GarageRowLabel: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(vehicle.title.isEmpty ? "Unnamed vehicle" : vehicle.title).foregroundStyle(Color.primary)
                 Text(GarageRelation.line(vehicle)).font(.caption2).foregroundStyle(.secondary)
+                if let line = GarageActivityFeed.lastActivity(lastActivity, now: Date()) {
+                    Text(line).font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
+                }
                 if let detail = vehicle.relationshipDetail {
                     Text(detail).font(.caption2).foregroundStyle(.secondary)
                 }
@@ -176,34 +245,6 @@ struct UnorganizedPhotosRow: View {
             JobRefusalRow(refusal: refusal)
         case .loaded(let photos):
             RootedValueView(label: "Photos with no vehicle", value: photos.value, status: .recorded, decay: photos.coverage)
-        }
-    }
-}
-
-/// The own profile's door to the garage: the photo count and the way into each vehicle's jobs.
-struct GarageDoorSection: View {
-    let userId: String
-
-    @State private var photos: JobLoad<UnorganizedPhotos> = .loading
-
-    var body: some View {
-        if SupabaseService.currentUserId == userId.lowercased() {
-            Section {
-                NavigationLink { GarageView(userId: userId) } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label("Open garage", systemImage: "car.2")
-                        Text("Each vehicle's jobs, and post a job for one you own")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                UnorganizedPhotosRow(load: photos)
-                NavigationLink { SessionConfirmView() } label: {
-                    Label("Organize photos", systemImage: "checklist")
-                }
-            } header: {
-                Text("Garage")
-            }
-            .task(id: userId) { photos = await GarageReaders.unorganizedPhotos() }
         }
     }
 }

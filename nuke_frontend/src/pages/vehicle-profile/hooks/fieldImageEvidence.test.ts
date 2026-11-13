@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../lib/supabase', () => ({ supabase: {} }));
-import { hasImageAnalysis, hasImageZone, relatedFieldImages, webSourceUrl, type EvidenceImage } from './useVehicleImageEvidence';
+import { hasImageAnalysis, hasImageZone, isRelatedFieldImage, relatedFieldImages, referenceFieldImages, webSourceUrl, type EvidenceImage } from './useVehicleImageEvidence';
 import { citedFieldImages, evidenceOrder, type FieldProvenance } from './useFieldProvenance';
 const image = (id: string, changes: Partial<EvidenceImage> = {}): EvidenceImage => ({ id, image_url: `https://example.com/${id}.jpg`, thumbnail_url: null, medium_url: null, vehicle_zone: null, angle: null, ai_detected_angle: null, ai_processing_status: 'pending', vision_analyzed_at: null, vision_model_version: null, created_at: null, taken_at: null, source: 'external_import', is_primary: false, is_document: false, category: 'general', ...changes });
 const provenance = (changes: Partial<FieldProvenance> = {}): FieldProvenance => ({ field: 'color', value: 'Silver Pearl', inline_source: 'listing', source_image_url: null, evidence: [], observations: [], ...changes });
@@ -23,13 +23,64 @@ describe('field image evidence boundaries', () => {
   it('does not use the engine bay as evidence of transmission speeds', () => {
     expect(relatedFieldImages([image('engine', { vehicle_zone: 'mech_engine_bay' })], 'transmission')).toEqual([]);
   });
+  it('prioritizes indexed drivetrain views over generic controls without treating either as citations', () => {
+    const dashboard = image('controls', { vehicle_zone: 'int_dashboard' });
+    const drivetrain = image('drivetrain', { vehicle_zone: 'mech_drivetrain' });
+    const underbody = image('underbody', { vehicle_zone: 'ext_undercarriage' });
+    expect(relatedFieldImages([dashboard, underbody, drivetrain], 'transmission')).toEqual([drivetrain, underbody, dashboard]);
+    expect(relatedFieldImages([dashboard, drivetrain], 'drivetrain')).toEqual([drivetrain]);
+    expect(citedFieldImages(provenance(), [drivetrain, underbody])).toEqual([]);
+  });
+  it('recovers a component mention outside the coarse zone and ranks it ahead of generic drivetrain views', () => {
+    const axle = image('axle', { vehicle_zone: 'mech_drivetrain' });
+    const transmission = image('transmission', { vehicle_zone: 'mech_suspension', ai_byok_narrative: 'Automatic transmission staged on the frame.' });
+    expect(relatedFieldImages([axle, transmission], 'transmission')).toEqual([transmission, axle]);
+    expect(citedFieldImages(provenance(), [transmission])).toEqual([]);
+  });
   it('does not return document flags as related vehicle areas', () => {
     expect(relatedFieldImages([image('doc', { vehicle_zone: 'ext_front', is_document: true })], 'color')).toEqual([]);
+  });
+  it('honors the source document reading even when the legacy document flag is false', () => {
+    const receipt = image('receipt', { is_document: false, ai_byok_scene: 'receipt_document',
+      ai_byok_narrative: 'Invoice for a front-axle service tool.', ai_byok_components: [{ label: 'Axle service tool' }] });
+    const physical = image('physical', { vehicle_zone: 'mech_drivetrain', ai_byok_scene: 'undercarriage' });
+    expect(relatedFieldImages([receipt, physical], 'drivetrain')).toEqual([physical]);
+    expect(receipt.ai_byok_narrative).toContain('Invoice');
+  });
+  it.each(['cross_reference', 'product_screenshot', 'spreadsheet', 'hand_drawn_diagram'])('keeps %s context out of related physical-area photographs', scene => {
+    const reference = image('reference', { vehicle_zone: 'mech_drivetrain', ai_byok_scene: scene, ai_byok_narrative: 'Transmission design reference.' });
+    expect(relatedFieldImages([reference], 'transmission')).toEqual([]);
+    expect(referenceFieldImages([reference], 'transmission')).toEqual([reference]);
+  });
+  it('keeps relevant references inspectable in component order without including physical photos, paper or unrelated material', () => {
+    const area = image('area-reference', { vehicle_zone: 'mech_drivetrain', ai_byok_scene: 'cross_reference' });
+    const component = image('component-reference', { ai_byok_scene: 'product_screenshot', ai_byok_components: [{ label: 'Transmission assembly' }] });
+    const unrelated = image('unrelated', { vehicle_zone: 'mech_engine_bay', ai_byok_scene: 'cross_reference' });
+    const receipt = image('receipt', { vehicle_zone: 'mech_drivetrain', ai_byok_scene: 'receipt_document' });
+    const document = image('document', { ...area, id: 'document', is_document: true });
+    const physical = image('physical', { vehicle_zone: 'mech_drivetrain' });
+    const inventory = [area, physical, receipt, unrelated, document, component];
+    expect(referenceFieldImages(inventory, 'transmission')).toEqual([component, area]);
+    expect(relatedFieldImages(inventory, 'transmission')).toEqual([physical]);
+    expect(inventory[0]).toBe(area);
+  });
+  it('accepts nested source context and withholds explicit attribution doubt', () => {
+    const physical = image('physical', { vehicle_zone: 'mech_drivetrain' });
+    expect(isRelatedFieldImage({ ...physical, ai_scan_metadata: { byok_deep_analysis: { scene_type: 'cross_reference' } } }, 'transmission')).toBe(false);
+    expect(isRelatedFieldImage({ ...physical, ai_scan_metadata: { byok_deep_analysis: { attribution_doubt: 'Vehicle association unresolved' } } }, 'transmission')).toBe(false);
+    expect(relatedFieldImages([physical], 'transmission')).toEqual([physical]);
   });
   it('joins direct citations only to the visible inventory for this vehicle', () => {
     const allowed = image('allowed');
     const p = provenance({ evidence: [{ source: 'vehicle_field_sources', value: 'Silver Pearl', source_type: 'vision', confidence: null, verified: false, image_id: 'allowed', at: null }, { source: 'vehicle_field_sources', value: 'Silver Pearl', source_type: 'vision', confidence: null, verified: false, image_id: 'other-vehicle-or-hidden', at: null }] });
     expect(citedFieldImages(p, [allowed])).toEqual([allowed]);
+  });
+  it('retains an explicit accepted citation even when a reference is not an uncited area recommendation', () => {
+    const reference = image('reference', { vehicle_zone: 'mech_engine_bay', ai_byok_scene: 'cross_reference' });
+    const p = provenance({ evidence: [{ source: 'field_evidence', value: 'Recorded source claim', source_type: 'owner',
+      confidence: 80, verified: true, image_id: reference.id, at: null }] });
+    expect(relatedFieldImages([reference], 'engine_type')).toEqual([]);
+    expect(citedFieldImages(p, [reference])).toEqual([reference]);
   });
   it('does not render unfiltered legacy URL references or unaccepted field evidence', () => {
     const allowed = image('allowed');

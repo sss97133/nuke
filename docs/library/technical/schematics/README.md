@@ -13,6 +13,12 @@ section. An account-keyed native derived cache preserves the source offline. No
 canonical asset is minted; named identified supersession retains the raw source.
 See [the garage evidence contract](../../../design/GARAGE_EVIDENCE_MODEL.md).
 
+Garage inventory grouping follows the same private correction writer and reader:
+optional relationship `inventory_status` → account observation →
+`applyGarageOwnerCorrections` → Current vehicles / Previous vehicles. Roles and
+title qualifications remain on each card. Without an explicit inventory statement,
+current/past personal ownership provides a fallback; other roles remain unclassified.
+
 ---
 
 ## Table of Contents
