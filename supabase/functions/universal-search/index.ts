@@ -628,7 +628,14 @@ Deno.serve(async (req) => {
               `and(color.ilike.%${t0}%,make.ilike.%${tRest}%),` +
               `and(model.ilike.%${t0}%,color.ilike.%${tRest}%),` +
               // Broad: make matches any token (e.g. "gt3" alone won't match but "porsche" will)
-              `and(make.ilike.%${t0}%,${tokenClauses.split(',')[1] || tokenClauses})`
+              `and(make.ilike.%${t0}%,${tokenClauses.split(',')[1] || tokenClauses})` +
+              // Two-word make ("aston martin db4 gt zagato", "land rover defender"): the primary clause above looks
+              // for a model containing "martin db4 gt zagato", which no correctly stored row has. Measured 2026-11-13:
+              // that query returned 17 rows without the 1962 DB4 GT Zagato the ranked reader had found.
+              (tokens.length >= 3
+                ? `,and(make.ilike.%${t0} ${escapeIlike(escapePostgrestValue(tokens[1]))}%,` +
+                  `model.ilike.%${escapeIlike(escapePostgrestValue(tokens.slice(2).join(' ')))}%)`
+                : '')
             );
           } else {
             // Single token: search both make, model, and color
