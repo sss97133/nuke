@@ -36,11 +36,13 @@ it('qualifies stored interpretations without certifying experts, excerpts or mar
     community_concerns: [{ concern: 'Reported concern' }],
     market_signals: { demand: 'high', rarity: 'rare', price_trend: 'rising' } });
   expect(host.textContent).toContain('Comment summary');
-  expect(host.textContent).toContain('REPORTED: positive');
-  expect(host.textContent).toContain('73 COMMENTS REPORTED');
+  // The model's sentiment is a sentence under its reading, never a status chip in the head.
+  expect(host.textContent).toContain('Model reads the comments as positive.');
+  expect(host.textContent).not.toContain('REPORTED:');
+  expect(host.textContent).toContain('73 comments');
   expect(host.textContent).toContain('input sample, method and analysis time unavailable');
   expect(host.textContent).toContain('Market performance remains unverified');
-  for (const label of ['REPORTED EXCERPTS', "MODEL'S READING OF THE COMMENTS · NOT VERIFIED", 'REPORTED CONCERNS',
+  for (const label of ['What commenters wrote', "Model's reading of the comments · not verified", 'Concerns the model read in the comments · not verified',
     'Reported wording', 'Extracted observation', 'Reported concern']) expect(host.textContent).toContain(label);
   // A model's market labels are never rendered as statuses.
   for (const chip of ['DEMAND LABEL', 'RARITY LABEL', 'PRICE TREND LABEL']) expect(host.textContent).not.toContain(chip);
@@ -53,7 +55,9 @@ it('names the model, date and input count when the summary carries them, and sho
   await mount({ overall_sentiment: 'mixed', comment_count: 84, comments_analyzed: 84, model_used: 'claude-haiku-5-5',
     analyzed_at: '2026-11-12T12:15:24.689+00:00', expert_insights: [insight],
     market_signals: { demand_level: 'high', rarity_assessment: 'unknown', price_trend: 'unknown' } });
-  expect(host.textContent).toContain('Stored model interpretation · claude-haiku-5-5 · written Nov 12, 2026 · read 84 of 84 comments.');
+  expect(host.textContent).toContain('Stored model interpretation · claude-haiku-5-5 · written Nov 12, 2026.');
+  // How much it read is the card's coverage, stated once.
+  expect(host.textContent?.match(/84 of 84 comments read/g)?.length).toBe(1);
   expect(host.textContent).not.toContain('analysis time unavailable');
   expect(host.textContent).toContain('Market performance remains unverified');
   expect(host.textContent).toContain(insight);
@@ -79,25 +83,24 @@ it('opens a quote into its comment in place, with the listing link as the source
 });
 
 it.each([0, null, undefined])('keeps reported count %s distinct from absent count', async count => {
-  await mount({ overall_sentiment: 'unknown', comment_count: count });
-  expect(host.textContent?.includes('0 COMMENTS REPORTED')).toBe(count === 0);
-  expect(host.textContent).toContain('REPORTED: unknown');
-  expect(host.textContent).not.toContain('null COMMENTS');
-  expect(host.textContent).not.toContain('undefined COMMENTS');
+  await mount({ overall_sentiment: 'unknown', comment_count: count, key_quotes: [{ quote: 'Reported wording' }] });
+  expect(host.textContent?.includes('0 comments')).toBe(count === 0);
+  expect(host.textContent).not.toContain('null comments');
+  expect(host.textContent).not.toContain('undefined comments');
 });
 
 it('keeps the qualification inside the keyboard-accessible summary', async () => {
-  await mount({ overall_sentiment: 'negative' });
+  await mount({ overall_sentiment: 'negative', key_quotes: [{ quote: 'Reported wording' }] });
   const header = host.querySelector('[role="button"]')!;
   expect(header.getAttribute('tabindex')).toBe('0');
   await act(async () => { header.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
   expect(host.textContent).not.toContain('Stored interpretation');
-  expect(host.textContent).toContain('REPORTED: negative');
+  expect(host.textContent).toContain('Comment summary');
   await act(async () => { header.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); });
   expect(host.textContent).toContain('Stored interpretation');
 });
 
-it.each([null, { comment_intel: null }, { comment_intel: {} }])('leaves absent summary %j empty', async intel => {
+it.each([null, { comment_intel: null }, { comment_intel: {} }, { comment_intel: { overall_sentiment: 'positive' } }])('leaves absent summary %j empty', async intel => {
   fixture.context.vehicleIntel = intel; await mount(); expect(host.textContent).toBe('');
 });
 
