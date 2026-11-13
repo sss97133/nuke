@@ -546,7 +546,9 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
             .select('id, vehicle_id, role, is_current, start_date, end_date, verification_id, created_at')
             .eq('owner_profile_id', userId),
           supabase.rpc('get_my_garage_owner_corrections', { p_user_id: userId, p_include_unresolved: true }),
-          scope === 'ownership' ? Promise.resolve([]) : readGarageRecords(userId!, () => cancelled),
+          // Active work (documenting, contributor) is relevant even in ownership scope —
+          // stakes and engagement matter, not just title. Include all garage records.
+          readGarageRecords(userId!, () => cancelled),
         ]);
         if (cancelled) return;
         for (const res of [verifiedRes, prevOwnedRes, ownershipRes, correctionRes]) {
