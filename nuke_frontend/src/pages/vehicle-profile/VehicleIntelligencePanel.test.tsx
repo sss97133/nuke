@@ -62,6 +62,22 @@ it('names the model, date and input count when the summary carries them, and sho
   expect(host.textContent).not.toContain('PRICE TREND LABEL');
 });
 
+it('opens a quote into its comment in place, with the listing link as the source line', async () => {
+  await mount({ overall_sentiment: 'mixed', comment_count: 2, key_quotes: [
+    { quote: 'Sold my last one too early', author: 'gearhead77', posted_at: '2026-11-11T12:00:00+00:00',
+      url: 'https://bringatrailer.com/listing/example/#comment-123', comment_id: 'c1',
+      comment_text: 'Sold my last one too early and have regretted it since.' },
+    { quote: 'Older text-only quote' }] });
+  const details = host.querySelector('details')!;
+  expect(details.querySelector('summary')?.textContent).toBe('Sold my last one too early');
+  expect(details.textContent).toContain('@gearhead77');
+  expect(details.textContent).toContain('Sold my last one too early and have regretted it since.');
+  const link = details.querySelector('a[href="https://bringatrailer.com/listing/example/#comment-123"]');
+  expect(link?.textContent).toContain('Source: comment on the listing');
+  expect(host.textContent).toContain('Older text-only quote');
+  expect(host.querySelectorAll('details').length).toBe(1);
+});
+
 it.each([0, null, undefined])('keeps reported count %s distinct from absent count', async count => {
   await mount({ overall_sentiment: 'unknown', comment_count: count });
   expect(host.textContent?.includes('0 COMMENTS REPORTED')).toBe(count === 0);

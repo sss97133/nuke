@@ -278,7 +278,7 @@ async function processVehicle(
     let comments: any[] | null = null;
     const { data: auctionComments, error: cErr } = await supabase
       .from("auction_comments")
-      .select("comment_text, author_username, is_seller, posted_at, bid_amount")
+      .select("id, comment_text, author_username, is_seller, posted_at, bid_amount, comment_type, bat_comment_id, source_url")
       .eq("vehicle_id", vehicle.vehicle_id)
       .order("posted_at", { ascending: true })
       .limit(200);
@@ -373,14 +373,28 @@ async function processVehicle(
       return { success: false, error: `Failed to parse discovery JSON (stop_reason ${result.stop_reason}, ${result.usage?.output_tokens} output tokens)` };
     }
 
-    // A quote is shown as the commenter's words, so keep only quotes found word for word in the comments sent.
+    // A quote is shown as a commenter's words, so keep only quotes found word for word in one comment that a person
+    // wrote (not a bid line or a house notice), and carry that comment's id, author, time and address with it.
     if (Array.isArray(discovered.key_quotes)) {
       const flat = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const source = flat(formatted);
+      const sent = comments.slice(0, count).map((c: any) => ({ c, text: flat(String(c.comment_text ?? "")) }));
       const before = discovered.key_quotes.length;
-      discovered.key_quotes = discovered.key_quotes.filter((q: any) => {
+      discovered.key_quotes = discovered.key_quotes.flatMap((q: any) => {
         const text = flat(String(q?.quote ?? ""));
-        return text.length > 0 && source.includes(text);
+        if (!text) return [];
+        const hit = sent.find((x: any) => x.text.includes(text) && x.c.comment_type !== "bid" && x.c.author_username);
+        if (!hit) return [];
+        const base = typeof hit.c.source_url === "string" ? hit.c.source_url.replace(/[#?].*$/, "").replace(/\/$/, "") : null;
+        return [{
+          ...q,
+          comment_id: hit.c.id ?? null,
+          author: hit.c.author_username,
+          is_seller: hit.c.is_seller === true,
+          posted_at: hit.c.posted_at ?? null,
+          // The comment as stored, so the page can show the source in place (same 1,200-character bound the reader uses).
+          comment_text: String(hit.c.comment_text ?? "").slice(0, 1200),
+          url: base ? (hit.c.bat_comment_id ? `${base}/#comment-${hit.c.bat_comment_id}` : base) : null,
+        }];
       });
       discovered.key_quotes_dropped_not_verbatim = before - discovered.key_quotes.length;
     }
