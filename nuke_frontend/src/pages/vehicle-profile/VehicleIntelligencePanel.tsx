@@ -69,7 +69,14 @@ const BADGE: React.CSSProperties = {
 // ---------------------------------------------------------------------------
 
 const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
-  const quotes = (ci.key_quotes || []).slice(0, 3).map(extractText).filter(Boolean);
+  // A quote written since 2026-11-13 names the comment it was found in; older ones are text only.
+  const quotes = (ci.key_quotes || []).slice(0, 3).map(q => ({
+    text: extractText(q),
+    author: typeof q === 'object' ? q.author ?? null : null,
+    isSeller: typeof q === 'object' && q.is_seller === true,
+    postedAt: typeof q === 'object' ? q.posted_at ?? null : null,
+    url: typeof q === 'object' && q.url && /^https:\/\//.test(q.url) ? q.url : null,
+  })).filter(q => q.text);
   const insights = (ci.expert_insights || []).slice(0, 3).map(extractText).filter(Boolean);
   const concerns = (ci.community_concerns || []).slice(0, 3).map(extractText).filter(Boolean);
   // The model's demand, rarity and price-trend labels are not shown: a market status comes only from a reader
@@ -120,7 +127,14 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
                 marginBottom: '4px',
                 color: 'var(--vp-ink)',
               }}>
-                {truncate(q, 280)}
+                {truncate(q.text, 280)}
+                {q.author && (
+                  <div>
+                    {q.isSeller ? 'Seller ' : ''}@{q.author}
+                    {q.postedAt ? ` · ${formatDate(q.postedAt)}` : ''}
+                    {q.url && <> · <a href={q.url} target="_blank" rel="noreferrer">Open comment ↗</a></>}
+                  </div>
+                )}
               </div>
             ))}
           </div>
