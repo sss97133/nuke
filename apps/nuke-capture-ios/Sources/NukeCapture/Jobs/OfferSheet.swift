@@ -100,6 +100,7 @@ struct OfferSheet: View {
                     if let failure { Text(failure).font(.footnote).foregroundStyle(.secondary) }
                 }
             }
+            .accessibilityIdentifier("offer.form")
             .navigationTitle("Make an offer")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -256,8 +256,8 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .from('auction_comments')
     .select(`
       *,
-      auction:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))
-    `)
+      auction:auction_events_canonical(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))
+    ,canonical:auction_events_canonical(id)`).or('auction_event_id.is.null,canonical.not.is.null')
     .eq('external_identity_id', externalIdentity.id)
     .is('bid_amount', null)
     .order('posted_at', { ascending: false })
@@ -265,10 +265,10 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
   if (commentsError) throw commentsError;
   const [bidRead, firstActivityRead] = await Promise.all([
     supabase.from('auction_comments')
-      .select(`id, vehicle_id, auction_event_id, bid_amount, posted_at, auction:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))`, { count: 'exact' })
+      .select(`id, vehicle_id, auction_event_id, bid_amount, posted_at, auction:auction_events_canonical(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})),canonical:auction_events_canonical(id)`, { count: 'exact' }).or('auction_event_id.is.null,canonical.not.is.null')
       .eq('external_identity_id', externalIdentity.id).not('bid_amount', 'is', null)
       .order('posted_at', { ascending: false }).limit(100),
-    supabase.from('auction_comments').select('posted_at')
+    supabase.from('auction_comments').select('posted_at,canonical:auction_events_canonical(id)').or('auction_event_id.is.null,canonical.not.is.null')
       .eq('external_identity_id', externalIdentity.id).not('posted_at', 'is', null)
       .order('posted_at', { ascending: true }).limit(1),
   ]);
@@ -369,7 +369,7 @@ export async function getOrganizationProfileData(orgId: string, preloaded?: { id
     const results = await Promise.allSettled(
       chunks.map((ids) =>
         supabase
-          .from('auction_events')
+          .from('auction_events_canonical')
           .select(`
             *,
             vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
@@ -426,7 +426,7 @@ export async function getOrganizationProfileData(orgId: string, preloaded?: { id
         .select(`
           *,
           listing:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))
-        `)
+        ,canonical:auction_events_canonical(id)`).or('auction_event_id.is.null,canonical.not.is.null')
         // Filter the canonical author key, external_identity_id: 99.9% filled
         // after the 2026-10-06 backfill (key_auction_comment_authors) and served
         // by idx_auction_comments_external_identity (#680). The retired twin

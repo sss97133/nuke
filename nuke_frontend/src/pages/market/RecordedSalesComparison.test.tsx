@@ -64,6 +64,11 @@ describe('recorded sales evidence comparison', () => {
     expect(scope.getAttribute('aria-label')).toBe(view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope');
     expect(scope.value).toBe(make.key);
   });
+  it('leaves the make select out when the host offers the make another way, and keeps the view words', async () => {
+    await act(async () => root.render(<MarketScopeControls make="FIXTURE MAKE" scopeKey={null} view="inventory" makeSelect={false} onMakeChange={vi.fn()} onViewChange={vi.fn()} />));
+    expect(container.querySelector('select')).toBeNull();
+    expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Live now', 'Sold']);
+  });
   it.each(['inventory', 'sales'] as const)('names the standalone make control for the %s view', async view => {
     await act(async () => root.render(<RecordedSalesComparison make="FIXTURE MAKE" view={view} />));
     const scope = container.querySelector('select')!;

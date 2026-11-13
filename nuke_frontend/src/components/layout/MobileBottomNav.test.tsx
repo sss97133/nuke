@@ -32,9 +32,9 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); })
 const mount = async (path = '/') => {
   await act(async () => root.render(<MemoryRouter initialEntries={[path]}><MobileBottomNav /></MemoryRouter>));
 };
-const badge = () => host.querySelector('a[aria-label="Inbox"] span')?.textContent ?? null;
+const badge = () => host.querySelector('a[aria-label="Photos"] span')?.textContent ?? null;
 
-it('reads the capped inbox count through the reader, not an exact count of vehicle_images', async () => {
+it('reads the capped unfiled-photo count through the reader, not an exact count of vehicle_images', async () => {
   fixture.count = 7;
   await mount();
   expect(fixture.rpc).toHaveBeenCalledWith('my_unorganized_photo_count');
@@ -48,7 +48,7 @@ it('prints 999+ when the reader stops at its cap of 1,000', async () => {
   expect(badge()).toBe('999+');
 });
 
-it('shows no badge for an empty inbox', async () => {
+it('shows no badge when every photo is filed', async () => {
   fixture.count = 0;
   await mount();
   expect(fixture.rpc).toHaveBeenCalledTimes(1);

@@ -18,20 +18,20 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { flagPlaceholderMileage } from "../_shared/odometer.ts";
-import { normalizeVehicleFields, normalizeMake } from "../_shared/normalizeVehicle.ts";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 import { decodeVin } from "../_shared/vin-decoder.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craigslistImages.ts";
 import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
-import { vinMakeCheckApplies } from "./vinGate.ts";
+import { vinMakeConflict } from "./vinGate.ts";
 import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
 import { findCraigslistRepost } from "./repostMatch.ts";
 import { slugStubRejection } from "./slugStub.ts";
@@ -43,7 +43,11 @@ import { prepareGatewayCapture, landGatewayCapture, type GatewayCapture } from "
 import { gatewayListing } from "../_shared/gatewayParser.ts";
 import { dealerListing, dealerHost } from "../_shared/dealerParser.ts";
 import { prepareDealerCapture, landDealerCapture, dealerIdentityConflict, type DealerCapture } from "./dealer.ts";
+import { mccormickTarget } from "../_shared/mccormickParser.ts";
+import { ingestMcCormick } from "./mccormick.ts";
 import { ingestVicari } from "./vicari.ts";
+import { collectingCarsCapture, collectingCarsOwner, landCollectingCarsCapture, type CollectingCarsCapture } from "./collectingCars.ts";
+import { ccSnapshotPin, type CcSnapshotPin } from "../extract-collecting-cars/historicalReplay.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -251,10 +255,16 @@ function extractTitleFromUrlSlug(url: string): string | null {
 }
 
 function detectSource(url: string): SourceMatch {
+  const cc = url.match(/^https:\/\/collectingcars\.com\/for-sale\/([a-zA-Z0-9+-]+)\/?$/);
+  if (cc) return { platform: "collecting_cars", externalId: cc[1] };
+  const purplewave = url.match(/^https:\/\/(?:www\.)?purplewave\.com\/auction\/(\d{6}[A-Z]?)\/item\/([A-Z]{2}\d{4})\/?$/);
+  if (purplewave) return { platform: "purplewave", externalId: `${purplewave[1]}:${purplewave[2]}` };
   const dealer = dealerListing(url);
   if (dealer) return { platform: dealer.platform, externalId: dealer.stock_id };
   const gateway = gatewayListing(url);
   if (gateway) return { platform: "gateway_classics", externalId: gateway.id };
+  const mccormick = mccormickTarget(url);
+  if (mccormick) return { platform: "mccormicks", externalId: mccormick.id };
   const vicariId = vicariListingId(url);
   if (vicariId) return { platform: "vicari", externalId: vicariId };
   for (const { platform, pattern, extractId } of SOURCE_PATTERNS) {
@@ -350,6 +360,7 @@ interface MatchResult {
 }
 
 interface VehicleEnrichment {
+  ccListingId?: string;
   vin?: string | null;
   url?: string | null;
   price?: number | null;
@@ -449,7 +460,7 @@ async function recordConditionObservation(
 async function matchOrCreateVehicle(
   parsed: ParsedVehicle & VehicleEnrichment,
   platform?: string | null,
-  opts?: { identityUncertain?: boolean; extractorVehicleId?: string },
+  opts?: { identityUncertain?: boolean; extractorVehicleId?: string; ccReplay?: boolean },
 ): Promise<MatchResult> {
   // Only tryAutoEnrich's successful database read-back supplies this id. The
   // source writer has already resolved and written the entity; do not create
@@ -462,13 +473,34 @@ async function matchOrCreateVehicle(
   // not fork into a second row because Tier 2c does an exact string match.
   const canonicalUrl = parsed.url ? (normalizeListingUrl(parsed.url)?.normalized ?? parsed.url) : null;
 
+  if (platform === "collecting_cars" && canonicalUrl) {
+    const owners = await supabaseAdmin.from("vehicles").select("id,listing_url,vin,year,make,status,deleted_at,merged_into_vehicle_id,origin_metadata")
+      .eq("listing_url", canonicalUrl).is("deleted_at", null).limit(2);
+    if (owners.error) throw Error("cc_listing_owner_unavailable");
+    const owner = collectingCarsOwner(owners.data ?? [], { ...parsed, listing_id: parsed.ccListingId, url: canonicalUrl } as any);
+    if (owner) {
+      await enrichVehicle(owner, parsed, platform);
+      return { vehicleId: owner, isNew: false, matchTier: 2, matchConfidence: 0.99 };
+    }
+    if (opts?.ccReplay) throw Error('cc_replay_existing_url_owner_required');
+    if (!parsed.model) throw Error("cc_listing_owner_missing_for_unknown_model");
+  }
+
   // ── Tier 1: VIN match (confidence 0.99) ───────────────────────
   // VIN is definitive identity for post-1981 vehicles.
-  if (parsed.vin) {
-    const { data: vinMatch } = await supabaseAdmin
+  // CC native capture admission requires the exact current URL owner. Generic
+  // aliases (including a deleted VIN match) must not enrich a foreign record
+  // before that admission guard runs. With no owner, use normal creation below.
+  if (parsed.vin && platform !== "collecting_cars") {
+    let vinQuery = supabaseAdmin
       .from("vehicles")
       .select("id")
-      .eq("vin", parsed.vin)
+      .eq("vin", parsed.vin);
+    // Use the same live-owner boundary as McCormick's ambiguity preflight.
+    // Otherwise an arbitrary merged alias can win the later LIMIT 1 lookup.
+    if (platform === "mccormicks") vinQuery = vinQuery
+      .is("deleted_at", null).is("merged_into_vehicle_id", null).or("status.is.null,status.neq.merged");
+    const { data: vinMatch } = await vinQuery
       .limit(1)
       .single();
 
@@ -479,7 +511,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2a: URL match in marketplace_listings ────────────────
-  if (parsed.url) {
+  if (parsed.url && platform !== "collecting_cars") {
     const { data: urlMatch } = await supabaseAdmin
       .from("marketplace_listings")
       .select("vehicle_id")
@@ -495,7 +527,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2b: URL match in vehicle_events.source_url ───────────
-  if (parsed.url) {
+  if (parsed.url && platform !== "collecting_cars") {
     const { data: eventUrlMatch } = await supabaseAdmin
       .from("vehicle_events")
       .select("vehicle_id")
@@ -511,7 +543,7 @@ async function matchOrCreateVehicle(
   }
 
   // ── Tier 2c: URL match in vehicles.listing_url ────────────────
-  if (canonicalUrl) {
+  if (canonicalUrl && platform !== "collecting_cars") {
     const { data: listingUrlMatch } = await supabaseAdmin
       .from("vehicles")
       .select("id")
@@ -648,8 +680,8 @@ async function matchOrCreateVehicle(
     source: platform && platform !== "unknown" ? platform : null,
     platform_source: platformSourceFor(platform), // C7: the platform key
   };
-  // An archived Vicari appearance has no established current sale state. Do not inherit the DB's "available" default.
-  if (platform === "vicari") vehicleData.sale_status = null;
+  // A block-house appearance does not establish current availability. Do not inherit the DB's "available" default.
+  if (["vicari", "mccormicks"].includes(platform ?? "")) vehicleData.sale_status = null;
   // A Craigslist post is a live classified when we read it. The column defaulted to false for every one of them
   // (1,053 of 1,053 created in two days, 2026-10-15) while sale_status said "available".
   if (platform === "craigslist") vehicleData.is_for_sale = true;
@@ -846,8 +878,10 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
 // ── Auto-Enrichment via Existing Extractors ──────────────────────
 
 interface EnrichedData {
+  cc_capture?: CollectingCarsCapture;
   dealer_capture?: DealerCapture;
   gateway_capture?: GatewayCapture;
+  mccormick_receipt?: Record<string, unknown>;
   vicari_receipt?: Record<string, unknown>;
   vehicle_id?: string;
   year?: number | null;
@@ -879,9 +913,9 @@ interface EnrichedData {
 
 type EnrichResult =
   | { ok: true; data: EnrichedData }
-  | { ok: false; skipped?: boolean; error: string };
+  | { ok: false; skipped?: boolean; error: string; cc_noncar?: Record<string, unknown> };
 
-async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResult> {
+async function tryAutoEnrich(url: string, platform: string, ccPin?: CcSnapshotPin): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = projectSecretKey()!;
 
@@ -896,6 +930,14 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     try {
       const capture = await prepareGatewayCapture(supabaseAdmin, url);
       return { ok: true, data: { ...capture.fields, listing_url: capture.fields.url, gateway_capture: capture } };
+    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+  }
+
+  if (platform === "mccormicks") {
+    try {
+      const data = await ingestMcCormick(url, { supabase: supabaseAdmin, archiveFetch,
+        matchVehicle: (fields) => matchOrCreateVehicle(fields, "mccormicks") });
+      return { ok: true, data: { ...data, vehicle_id: data.vehicle_id ?? undefined } };
     } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
   }
 
@@ -1040,7 +1082,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         "Authorization": `Bearer ${serviceKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ url, save_to_db: platform !== "craigslist", ...(extractorName === "extract-rmsothebys" ? { action: "extract" } : {}) }),
+      body: JSON.stringify({ url, save_to_db: platform !== "craigslist", ...(ccPin ? { cc_snapshot: ccPin } : {}), ...(extractorName === "extract-rmsothebys" ? { action: "extract" } : {}) }),
       signal: AbortSignal.timeout(75_000),
     });
 
@@ -1053,6 +1095,16 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
 
     // Editorial gate: extractor looked at the page and said "not a vehicle listing"
     if (result.skipped === true) {
+      if (platform === "collecting_cars") {
+        const c = result.source_capture, f = result.extracted, canonical = url.replace(/\/$/, "");
+        if (ccPin || result.success !== false || result.error || c?.source_url !== canonical || f?.url !== canonical
+          || !["plate", "part", "bike", "boat"].includes(f?.lot_type) || !/^\d+$/.test(f?.listing_id ?? "")
+          || !/^[0-9a-f-]{36}$/.test(c?.snapshot_id ?? "") || !/^[0-9a-f]{64}$/.test(c?.sha256 ?? "")
+          || !Number.isFinite(Date.parse(c?.observed_at)) || Date.parse(c.observed_at) > Date.now())
+          return { ok: false, error: "cc_noncar_capture_invalid" };
+        return { ok: false, skipped: true, error: `quality_gate_reject: Collecting Cars car intake excludes native lot type ${f.lot_type}`,
+          cc_noncar: { ...c, listing_id: f.listing_id, lot_type: f.lot_type } };
+      }
       return { ok: false, skipped: true, error: result.skip_reason || result.reason || `${extractorName} skipped this page` };
     }
     if (result.success === false || result.error) {
@@ -1083,9 +1135,14 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
       return { ok: false, error: `${extractorName} returned no identity fields (year/make/vin)` };
     }
 
+    const ccCapture = platform === 'collecting_cars' ? collectingCarsCapture(result, url.replace(/\/$/, '')) : undefined;
+    if (ccPin && (!ccCapture || ccCapture.snapshot_id !== ccPin.snapshot_id || ccCapture.sha256 !== ccPin.expected_sha256
+      || !['sold', 'unsold'].includes(ccCapture.fields.stage ?? '') || result.replay?.kind !== 'pinned_closed_listing'))
+      throw Error('cc_replay_receipt_mismatch');
     return {
       ok: true,
       data: {
+        cc_capture: ccCapture,
         year: vehicle.year || null,
         make: vehicle.make || null,
         model: vehicle.model || null,
@@ -1120,6 +1177,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
 // ── Single Ingestion ────────────────────────────────────────────
 
 interface IngestInput {
+  cc_snapshot?: CcSnapshotPin;
   url?: string;
   text?: string;
   year?: number;
@@ -1153,6 +1211,7 @@ interface IngestInput {
 interface IngestResult {
   dealer_receipt?: Record<string, unknown>;
   gateway_receipt?: Record<string, unknown>;
+  mccormick_receipt?: Record<string, unknown>;
   vicari_receipt?: Record<string, unknown>;
   status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview" | "unresolved";
   vehicle_id?: string | null;
@@ -1177,6 +1236,7 @@ interface IngestResult {
   // Craigslist only: the post's id, clocks and attribute block (and, once a vehicle exists, how the landing went).
   // The poller copies it onto the import_queue ledger row, so the ledger carries what the page said.
   listing_capture?: Record<string, unknown>;
+  collecting_cars_noncar?: Record<string, unknown>;
   // Craigslist only: the unresolved-listing observation written when the post names no model (status "unresolved").
   blip?: { observation: string; observation_id?: string; errors: string[] };
 }
@@ -1208,6 +1268,10 @@ function normalizeLocation(loc: unknown): string | null {
 
 async function ingestOne(input: IngestInput, userId: string | null): Promise<IngestResult> {
   try {
+    const ccPin = input.cc_snapshot === undefined ? undefined : ccSnapshotPin(input.cc_snapshot);
+    if (ccPin && (Object.keys(input).some(k => !['url', 'cc_snapshot'].includes(k))
+      || !input.url || detectSource(input.url).platform !== 'collecting_cars'))
+      return { status: 'rejected', reason: 'cc_replay_requires_exact_url_and_pin' };
     // Strict boolean: a JSON string "false" must not silently turn a real ingest
     // into a preview (refuter finding, 2026-07-12).
     const isPreview = input.preview === true;
@@ -1332,22 +1396,28 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       capture ? { listing_capture: ledgerFields(capture) } : {};
     let enrichmentSucceeded = false;
     let enrichmentSkipped = false;
+    let ccNonCar: Record<string, unknown> | undefined;
     let enrichmentError: string | null = null;
     let extractorVehicleId: string | undefined;
     let enrichedPostedAt: string | null = null;
     let enrichedSellerType: string | null = null;
+    let mccormickReceipt: Record<string, unknown> | undefined;
     let vicariReceipt: Record<string, unknown> | undefined;
+    let ccCapture: CollectingCarsCapture | undefined;
+    let ccReceipt: Record<string, unknown> | undefined;
     let dealerCapture: DealerCapture | undefined;
     let dealerReceipt: Record<string, unknown> | undefined;
     let gatewayCapture: GatewayCapture | undefined;
     let gatewayReceipt: Record<string, unknown> | undefined;
 
-    if (listingUrl && (platform === "vicari" || (platform === "gr_auto_gallery" || platform === "streetside_classics") || platform === "gateway_classics" || (input.enrich !== false && !input.description))) {
-      const enrichResult = await tryAutoEnrich(listingUrl, platform);
+    if (listingUrl && (["vicari", "mccormicks", "collecting_cars"].includes(platform) || (platform === "gr_auto_gallery" || platform === "streetside_classics") || platform === "gateway_classics" || (input.enrich !== false && !input.description))) {
+      const enrichResult = await tryAutoEnrich(listingUrl, platform, ccPin);
       if (["gr_auto_gallery", "streetside_classics", "gateway_classics"].includes(platform) && !enrichResult.ok) return { status: "rejected", reason: `enrichment_failed: ${enrichResult.error}`, source: platform };
       if (enrichResult.ok) {
         enrichmentSucceeded = true;
         const enriched = enrichResult.data;
+        ccCapture = enriched.cc_capture;
+        mccormickReceipt = enriched.mccormick_receipt;
         vicariReceipt = enriched.vicari_receipt;
         gatewayCapture = enriched.gateway_capture;
         dealerCapture = enriched.dealer_capture;
@@ -1360,6 +1430,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           // disagreements stay unresolved rather than attaching the wrong asset.
           parsed = { year: dealerCapture.fields.year, make: dealerCapture.fields.make, model: dealerCapture.fields.model };
           identityIsSlugGuess = false;
+        }
+        if (platform === "mccormicks" && mccormickReceipt?.unresolved === true) {
+          return { status: "unresolved", vehicle_id: null, source: platform, external_id: externalId, mccormick_receipt: mccormickReceipt };
         }
         if (platform === "vicari" && vicariReceipt?.unresolved === true) {
           return { status: "unresolved", vehicle_id: null, source: platform, external_id: externalId, vicari_receipt: vicariReceipt };
@@ -1412,17 +1485,23 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           parsed = {
             year: input.year || enriched.year,
             make: input.make || enriched.make,
-            model: input.model || enriched.model || parsed.model,
+            model: ccCapture?.fields.model === null ? null : input.model || enriched.model || parsed.model,
           };
         }
       } else {
         enrichmentSkipped = enrichResult.skipped === true;
+        ccNonCar = enrichResult.cc_noncar;
         enrichmentError = enrichResult.error;
         console.error(`Enrichment failed for ${listingUrl} (${platform}): ${enrichmentError}`);
       }
     }
 
-    if (platform === "vicari" && enrichmentError) {
+    if (platform === "collecting_cars" && ccNonCar) {
+      return { status: "rejected", reason: `quality_gate_reject: Collecting Cars car intake excludes native lot type ${ccNonCar.lot_type}`, source: platform,
+        external_id: externalId, collecting_cars_noncar: ccNonCar };
+    }
+
+    if (["vicari", "mccormicks", "collecting_cars"].includes(platform) && enrichmentError) {
       return { status: "error", error: enrichmentError, source: platform, external_id: externalId };
     }
 
@@ -1469,7 +1548,17 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         ...captureAnswer(),
       };
     }
-    if (!parsed.year || !parsed.make || !parsed.model) {
+    // Missing native model is unknown testimony, not permission to infer from
+    // the URL. A verified existing presentation can still receive its full
+    // capture; a new identity must satisfy the ordinary required-field gate.
+    let ccUnknownModelOwner = false;
+    if (ccCapture?.fields.model === null && parsed.year && parsed.make) {
+      const owners = await supabaseAdmin.from("vehicles").select("id,listing_url,vin,year,make,status,deleted_at,merged_into_vehicle_id,origin_metadata")
+        .eq("listing_url", ccCapture.fields.url).is("deleted_at", null).limit(2);
+      if (owners.error) throw Error("cc_listing_owner_unavailable");
+      ccUnknownModelOwner = collectingCarsOwner(owners.data ?? [], ccCapture.fields) !== null;
+    }
+    if (!parsed.year || !parsed.make || (!parsed.model && !ccUnknownModelOwner)) {
       return {
         status: "rejected",
         reason: `insufficient identity: year=${parsed.year ?? "?"} make=${parsed.make ?? "?"} model=${parsed.model ?? "?"} — need all three`,
@@ -1525,7 +1614,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     const candidateData: Record<string, any> = {
       year: parsed.year ?? input.year,
       make: parsed.make ?? input.make,
-      model: parsed.model ?? input.model,
+      model: ccCapture?.fields.model === null ? null : parsed.model ?? input.model,
       vin: input.vin ?? null,
       price: input.price ?? null,
       asking_price: input.price ?? null,
@@ -1549,13 +1638,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length >= 6) {
       const decoded = decodeVin(candidateData.vin);
       // Only a 17-character VIN with a valid check digit is decoded for make (./vinGate.ts); a chassis number is a claim.
-      if (vinMakeCheckApplies(candidateData.vin) && decoded.make && candidateData.make) {
-        const vinMake = normalizeMake(decoded.make);
-        const claimedMake = normalizeMake(candidateData.make);
-        if (vinMake && claimedMake && vinMake !== claimedMake) {
-          vinIssues.push(`vin_make_mismatch: VIN prefix indicates ${vinMake}, claimed ${claimedMake}`);
-          suggestions.make = `VIN indicates ${vinMake}, not ${claimedMake}`;
-        }
+      const makeConflict = vinMakeConflict(candidateData.vin, candidateData.make, decoded);
+      if (makeConflict) {
+        vinIssues.push(`vin_make_mismatch: ${makeConflict.basis} indicates ${makeConflict.expected}, claimed ${makeConflict.claimed}`);
+        suggestions.make = `${makeConflict.basis} is incompatible with ${makeConflict.claimed}`;
       }
       // Pre-1981: if VIN decoded a model, cross-check against claimed model
       if (decoded.is_pre_1981 && decoded.model && candidateData.model) {
@@ -1643,8 +1729,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     const match = await matchOrCreateVehicle({
       ...parsed,
       vin: input.vin,
+      ccListingId: ccCapture?.fields.listing_id,
       url: listingUrl,
-      price: input.price,
+      price: ccCapture ? undefined : input.price,
       location: input.location,
       imageUrl: input.image_url,
       imageUrls: input.image_urls,
@@ -1657,8 +1744,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       bodyStyle: input.body_style,
       titleStatus: input.title_status,
       sellerName: input.seller_name,
-    }, platform, { identityUncertain, extractorVehicleId });
+    }, platform, { identityUncertain, extractorVehicleId, ccReplay: !!ccPin });
 
+    if (ccCapture) ccReceipt = await landCollectingCarsCapture(supabaseAdmin, ccCapture, match.vehicleId);
     if (dealerCapture) dealerReceipt = await landDealerCapture(supabaseAdmin, dealerCapture, match.vehicleId);
     if (gatewayCapture) gatewayReceipt = await landGatewayCapture(supabaseAdmin, gatewayCapture, match.vehicleId);
 
@@ -1921,9 +2009,11 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       quality_score: qualityScore,
       issues: gateResult.issues.length > 0 ? gateResult.issues : undefined,
       needs_review: needsReview || undefined,
+      ...(mccormickReceipt ? { mccormick_receipt: mccormickReceipt } : {}),
       ...(vicariReceipt ? { vicari_receipt: vicariReceipt } : {}),
       ...(gatewayReceipt ? { gateway_receipt: gatewayReceipt } : {}),
       ...(dealerReceipt ? { dealer_receipt: dealerReceipt } : {}),
+      ...(ccReceipt ? { collecting_cars_receipt: ccReceipt } : {}),
       ...(capture ? { listing_capture: ledgerFields(capture, landing) } : {}),
     };
   } catch (err: any) {
@@ -1948,10 +2038,11 @@ Deno.serve(async (req: Request) => {
   if (req.method === "GET") {
     return new Response(JSON.stringify({
       name: "nuke.ingest",
-      capabilities: { gateway_browser_native: true, dealer_microdata_native: true },
+      capabilities: { mccormicks_native_fresh_capture: true, mccormicks_native_listing: true, collecting_cars_pinned_closed_replay: true, collecting_cars_native_listing: true, gateway_browser_native: true, dealer_microdata_native: true },
       description: "Universal vehicle ingestion endpoint. Accepts structured data, URLs, or free text.",
       methods: { POST: "Ingest vehicle(s)", GET: "This schema documentation" },
       fields: {
+        cc_snapshot: { type: 'object', required: false, description: 'Service writers only: {snapshot_id, expected_sha256} with url and no other item fields. Replays verified retained sold/unsold Collecting Cars full HTML for one existing unique URL owner, preserving source clocks; refusal never fetches a replacement page.' },
         url:          { type: "string",   required: false, example: "https://facebook.com/marketplace/item/123456", description: "Source listing URL — auto-detects platform" },
         text:         { type: "string",   required: false, example: "1980 Chevy C10 $27,500 Greeneville TN", description: "Free-text vehicle description — parsed for year/make/model/price/location" },
         year:         { type: "number",   required: false, example: 1978, description: "Model year (1885–current+2)" },
@@ -2034,6 +2125,11 @@ Deno.serve(async (req: Request) => {
   }
 
   // Allow service role to specify user_id explicitly
+  if (body.cc_snapshot !== undefined || (Array.isArray(body.batch) && body.batch.some((item: any) => item?.cc_snapshot !== undefined))) {
+    const auth = await authenticateWriter(req);
+    if (!auth.ok || auth.caller.kind !== 'service_role') return new Response(JSON.stringify({ error: 'Historical replay requires a service writer' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
   if (body.user_id && !userId) {
     userId = body.user_id;
   }

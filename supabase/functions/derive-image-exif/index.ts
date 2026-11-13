@@ -29,6 +29,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { parseExif, exifDateToIso } from "./exif.ts";
 
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const takenAt = exifDateToIso(exif.dateTimeOriginal);
+        const takenAt = exifDateToIso(exif.dateTimeOriginal, exif.offsetTimeOriginal);
         if (!takenAt) { skipped.push({ image_id: img.id, reason: `unparseable date ${exif.dateTimeOriginal}` }); continue; }
 
         if (!dryRun) {
@@ -113,86 +114,6 @@ Deno.serve(async (req) => {
     return json({ error: String(e instanceof Error ? e.message : e) }, 500);
   }
 });
-
-// ── Minimal EXIF reader ───────────────────────────────────────────────────────
-// Walks JPEG markers to APP1, verifies the "Exif\0\0" header, then reads the TIFF
-// IFD0, follows the ExifIFD pointer (0x8769), and pulls the three tags worth having.
-// Deliberately small: this is arithmetic over bytes, not a library.
-
-interface Exif { dateTimeOriginal?: string; make?: string; model?: string; raw: Record<string, unknown>; }
-
-const TAG_MAKE = 0x010f, TAG_MODEL = 0x0110, TAG_EXIF_IFD = 0x8769;
-const TAG_DATETIME_ORIGINAL = 0x9003, TAG_DATETIME_DIGITIZED = 0x9004, TAG_DATETIME = 0x0132;
-
-function parseExif(b: Uint8Array): Exif | null {
-  if (b[0] !== 0xff || b[1] !== 0xd8) return null; // not a JPEG
-  let p = 2;
-  while (p + 4 < b.length) {
-    if (b[p] !== 0xff) { p++; continue; }
-    const marker = b[p + 1];
-    if (marker === 0xda) break;                    // start of scan: pixels from here
-    const len = (b[p + 2] << 8) | b[p + 3];
-    if (marker === 0xe1) {                         // APP1
-      const s = p + 4;
-      if (b[s] === 0x45 && b[s + 1] === 0x78 && b[s + 2] === 0x69 && b[s + 3] === 0x66) {
-        return readTiff(b, s + 6);                 // skip "Exif\0\0"
-      }
-    }
-    p += 2 + len;
-  }
-  return null;
-}
-
-function readTiff(b: Uint8Array, base: number): Exif | null {
-  if (base + 8 > b.length) return null;
-  const le = b[base] === 0x49 && b[base + 1] === 0x49;   // "II" little-endian, "MM" big
-  const u16 = (o: number) => le ? b[o] | (b[o + 1] << 8) : (b[o] << 8) | b[o + 1];
-  const u32 = (o: number) => le
-    ? (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0
-    : ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
-
-  if (u16(base + 2) !== 0x2a) return null;
-  const out: Exif = { raw: {} };
-
-  const readIfd = (off: number) => {
-    const at = base + off;
-    if (at + 2 > b.length) return;
-    const n = u16(at);
-    for (let i = 0; i < n; i++) {
-      const e = at + 2 + i * 12;
-      if (e + 12 > b.length) return;
-      const tag = u16(e), type = u16(e + 2), count = u32(e + 4);
-      const valOff = (type === 2 && count > 4) ? base + u32(e + 8) : e + 8;
-
-      if (type === 2 && valOff + count <= b.length) {                 // ASCII
-        const s = new TextDecoder().decode(b.subarray(valOff, valOff + count)).replace(/\0+$/, "").trim();
-        if (tag === TAG_DATETIME_ORIGINAL) { out.dateTimeOriginal = s; out.raw.DateTimeOriginal = s; }
-        else if (tag === TAG_DATETIME_DIGITIZED) out.raw.CreateDate = s;
-        else if (tag === TAG_DATETIME && !out.dateTimeOriginal) out.raw.ModifyDate = s;
-        else if (tag === TAG_MAKE) { out.make = s; out.raw.Make = s; }
-        else if (tag === TAG_MODEL) { out.model = s; out.raw.Model = s; }
-      } else if (tag === TAG_EXIF_IFD) {
-        readIfd(u32(e + 8));                                          // recurse into ExifIFD
-      }
-    }
-  };
-
-  readIfd(u32(base + 4));
-  // A photo with no DateTimeOriginal may still carry DateTimeDigitized. Prefer the
-  // former; accept the latter rather than inventing one.
-  if (!out.dateTimeOriginal && typeof out.raw.CreateDate === "string") out.dateTimeOriginal = out.raw.CreateDate as string;
-  return out.dateTimeOriginal || out.make ? out : null;
-}
-
-/** EXIF dates are "YYYY:MM:DD HH:MM:SS", local to the camera, with no zone. Treat as UTC. */
-function exifDateToIso(s: string): string | null {
-  const m = s.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
-  if (!m) return null;
-  const [, y, mo, d, h, mi, se] = m;
-  if (y === "0000") return null;
-  const iso = `${y}-${mo}-${d}T${h}:${mi}:${se}Z`;
-  return Number.isNaN(Date.parse(iso)) ? null : iso;
-}
 
 function roleOf(authHeader: string | null): string | null {
   try {

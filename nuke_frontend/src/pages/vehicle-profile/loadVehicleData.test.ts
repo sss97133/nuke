@@ -51,7 +51,7 @@ describe('profile fallback transport', () => {
   }
 
   it.each([false, true])('loads the public record after an unusable RPC (empty=%s)', async empty => {
-    const row = { id, is_public: true, year: 1977, make: 'Chevrolet', model: 'K5 Blazer', observation_count: 12 };
+    const row = { id, is_public: true, year: 1977, make: 'Chevrolet', model: 'K5 Blazer', observation_count: 12, is_replica: true };
     const out = await load(row, empty);
     expect(out.setVehicle).toHaveBeenCalledWith(expect.objectContaining(row));
     expect(out.result.observationCount).toBe(12);

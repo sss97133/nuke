@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult, isAuctionPresentation } from './buildAuctionPulse';
+import { auctionSourceUrlVariants, buildAuctionPulseForVehicle, auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult, isAuctionPresentation } from './buildAuctionPulse';
 
 const listing = {
   id: 'event-1', source_platform: 'bat', source_url: 'https://bringatrailer.com/listing/synthetic-soft-close',
@@ -84,4 +84,67 @@ describe('canonical auction telemetry across a soft close', () => {
     expect(pulse).toMatchObject({ current_bid: 122000, end_date: '2026-10-04T17:40:00Z',
       last_bid_at: '2026-10-04T17:38:00Z', last_comment_at: '2026-10-04T17:38:00Z' });
   });
+});
+
+ it('preserves the CC episode currency, native clock and current quote despite stale high_bid', () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-09T01:10:00Z'));
+  const row = { ...listing, source_platform: 'collecting_cars', event_type: 'auction',
+    source_url: 'https://collectingcars.com/for-sale/1980-porsche-928-2',
+    current_price: 15000, high_bid: 999999, currency_code: 'AUD', bid_count: 31,
+    ended_at: '2026-11-12T06:05:00Z', metadata: { currency: 'USD', source_observed_at: '2026-11-09T01:06:03.523Z' } };
+  expect(buildAuctionPulseFromExternalListings([row], 'cc-vehicle')).toMatchObject({
+    current_bid: 15000, currency_code: 'AUD', bid_count: 31, end_date: row.ended_at,
+    source_observed_at: row.metadata.source_observed_at,
+  });
+});
+
+
+it('qualifies only explicit PurpleWave auction item episodes', () => {
+  const row = { ...listing, source_platform: 'purplewave', event_type: 'auction',
+    source_url: 'https://www.purplewave.com/auction/261111A/item/FN3842' };
+  expect(isAuctionPresentation(row)).toBe(true);
+  for (const source_url of ['https://purplewave.com/', 'https://purplewave.com/auction/261111A',
+    'https://purplewave.example/auction/261111A/item/FN3842',
+    'https://user@purplewave.com/auction/261111A/item/FN3842',
+    'https://purplewave.com:444/auction/261111A/item/FN3842']) {
+    expect(isAuctionPresentation({ ...row, source_url })).toBe(false);
+  }
+  expect(isAuctionPresentation({ ...row, event_type: 'listing' })).toBe(false);
+  expect(isAuctionPresentation({ ...row, event_type: undefined })).toBe(false);
+});
+
+
+describe('historical sale versus current canonical episode', () => {
+  const oldUrl = 'https://bringatrailer.com/listing/1994-mazda-rx-7-us-can-22';
+  const liveUrl = 'https://bringatrailer.com/listing/1994-mazda-rx-7-r2-2';
+  const vehicle = { id: 'rx7', sale_status: 'sold', sale_price: 40750, listing_url: oldUrl };
+  const old = { ...listing, event_type: 'auction', source_url: oldUrl, event_status: 'sold', current_price: 40750, final_price: 40750, sold_at: '2024-05-20T00:00:00Z' };
+  const live = { ...listing, event_type: 'auction', source_url: liveUrl, current_price: 57500, currency_code: 'USD', bid_count: 12, ended_at: '2026-11-10T23:05:00Z' };
+  const setup = () => vi.setSystemTime(new Date('2026-11-09T04:10:00Z'));
+  it('selects the distinct current episode without changing the historical sale', () => {
+    setup(); expect(buildAuctionPulseForVehicle([live, old], vehicle)).toMatchObject({ listing_url: liveUrl, current_bid: 57500, bid_count: 12, currency_code: 'USD', listing_status: 'active' });
+    expect(old.final_price).toBe(40750); expect(vehicle.sale_price).toBe(40750);
+  });
+  it.each([
+    { ended_at: '2026-11-08T00:00:00Z' }, { ended_at: null }, { ended_at: 'invalid' }, { ended_at: '2037-01-01T00:00:00Z' },
+    { source_url: oldUrl + '/' }, { source_url: 'invalid' }, { source_url: liveUrl + '?other=lot' },
+    { event_type: 'listing' }, { source_platform: 'craigslist' }, { duplicate_of_event_id: 'retained-canonical' },
+    { sold_at: '2026-11-08T00:00:00Z' },
+  ])('does not revive stale, unqualified or same-sale active evidence: %j', patch => {
+    setup(); expect(buildAuctionPulseForVehicle([{ ...live, ...patch }, old], vehicle)?.listing_status).toBe('sold');
+  });
+  it.each(['sold', 'ended', 'expired', 'unsold'])('keeps a same-lot %s outcome over an active duplicate including a slash variant', status => {
+    setup(); expect(buildAuctionPulseForVehicle([live, { ...old, source_url: liveUrl + '/', event_status: status }], vehicle)?.listing_status).not.toBe('active');
+  });
+  it('permits a current BaT episode after another venue historical sale', () => {
+    setup(); expect(buildAuctionPulseForVehicle([live, old], { ...vehicle, listing_url: 'https://carsandbids.com/auctions/old-sale' })?.listing_url).toBe(liveUrl);
+  });
+});
+
+describe('exact source URL slash variants', () => {
+  it.each(['https://bringatrailer.com/listing/current', 'https://bringatrailer.com/listing/current/'])('matches only the two path spellings of %s', value => {
+    expect(auctionSourceUrlVariants(value)).toEqual(['https://bringatrailer.com/listing/current', 'https://bringatrailer.com/listing/current/']);
+  });
+  it.each(['https://bringatrailer.com/listing/current?episode=other', 'https://bringatrailer.com/listing/current#other', 'https://bringatrailer.com/listing/current//'])('does not strip source-significant URL text: %s', value => expect(auctionSourceUrlVariants(value)).toEqual([value]));
+  it.each(['invalid', '', 'javascript:alert(1)', 'https://user:pass@bringatrailer.com/listing/current'])('refuses invalid credentials/protocol: %s', value => expect(auctionSourceUrlVariants(value)).toEqual([]));
 });

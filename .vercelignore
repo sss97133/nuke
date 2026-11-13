@@ -1,6 +1,13 @@
 node_modules
 .git
-/supabase
+/package.json
+/package-lock.json
+/supabase/*
+!/supabase/functions
+/supabase/functions/*
+!/supabase/functions/_shared
+/supabase/functions/_shared/*
+!/supabase/functions/_shared/htmlToText.ts
 /nuke_api
 /scripts
 /database

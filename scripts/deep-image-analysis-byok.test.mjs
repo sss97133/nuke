@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { computeSaturation, factFingerprint, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT,
-  attributionDoubt, landEntityPage } from './deep-image-analysis-byok.mjs';
+  attributionDoubt, landEntityPage, frameClock, loadAnalysisImages, receiptRoster, receiptRosterLine, prepare,
+  receiptContextVendor, contextWithoutPersonalFields,
+  groupReceiptRoster, receiptRosterSections } from './deep-image-analysis-byok.mjs';
 import { projectImageProperties } from './lib/image-property-projection.mjs';
 
 const now = '2026-10-30T20:00:00Z';
@@ -201,4 +206,158 @@ test('explicit attribution doubt remains binding even when the scene resembles a
   assert.equal(attributionDoubt(frame.verdict), frame.verdict.attribution_doubt);
   await landEntityPage([frame], roster, { client });
   assert.equal(saved.components[0].status, 'inferred');
+});
+
+
+test('analysis preparation never turns record creation into a capture/work day', () => {
+  assert.deepEqual(frameClock({ created_at: '2026-11-09T00:00:00Z' }), { value: null, basis: 'unknown', day: 'unknown' });
+  assert.equal(frameClock({ taken_at: '2025-10-07T00:00:00Z', created_at: '2026-11-09' }).basis, 'recorded_taken_at');
+  assert.deepEqual(frameClock({ exif_data: { DateTimeOriginal: '2025:10:07 11:00:00' } }),
+    { value: '2025:10:07 11:00:00', basis: 'exif_reported_capture', day: '2025-10-07' });
+  assert.deepEqual(frameClock({ exif_data: { DateTimeOriginal: '2025-10-07T11:00:00Z' } }),
+    { value: '2025-10-07T11:00:00Z', basis: 'exif_reported_capture', day: '2025-10-07' });
+});
+
+test('analysis worklist paginates the canonical eligible, nonsensitive population without writes', async () => {
+  const calls = []; let page = 0;
+  const client = { from(table) {
+    assert.equal(table, 'vehicle_images');
+    const q = new Proxy({}, { get(_, method) { return (...args) => {
+      calls.push([method, ...args]);
+      if (method === 'abortSignal') return Promise.resolve({ data: page++ === 0 ? Array.from({ length: 1000 }, (_, i) => ({ id: i })) : [{ id: 1000 }], error: null });
+      return q;
+    }; } }); return q;
+  } };
+  const result = await loadAnalysisImages(client, 'vehicle');
+  assert.equal(result.length, 1001);
+  assert.equal(calls.filter(c => c[0] === 'eq' && c[1] === 'vehicle_image_gallery_eligible' && c[2] === true).length, 2);
+  assert.equal(calls.filter(c => c[0] === 'or' && c[1] === 'is_sensitive.is.null,is_sensitive.eq.false').length, 2);
+  assert.deepEqual(calls.filter(c => c[0] === 'range'), [['range', 0, 999], ['range', 1000, 1999]]);
+  assert.ok(!calls.some(c => c[0] === 'in'), 'whole-queue selection remains unbounded by explicit IDs');
+  assert.ok(!calls.some(c => ['insert', 'update', 'upsert', 'delete'].includes(c[0])));
+  await assert.rejects(loadAnalysisImages({ from() {
+    const q = new Proxy({}, { get(_, method) { return () => method === 'abortSignal' ? Promise.resolve({ data: null, error: { message: 'unavailable' } }) : q; } }); return q;
+  } }, 'vehicle'), /unavailable/);
+});
+
+test('receipt grounding preserves order, shipment and return lines and exact source citations', () => {
+  const receipt = { is_superseded: false, vendor_name: 'Example supplier', receipt_date: '2025-09-08', source_document_table: 'vehicle_documents', source_document_id: 'doc' };
+  const line = { receipt_id: 'receipt', description: 'Seat foam BACKORDERED, shipped 0', quantity: 1, total_price: 0, part_number: 'FOAM1', receipts: receipt };
+  const rows = receiptRoster([{ ...line, id: 'order' }, { ...line, id: 'return', description: 'Seat foam RETURN', quantity: -1, total_price: -20 },
+    { ...line, id: 'later', description: 'Seat foam', total_price: 20, receipts: { ...receipt, receipt_date: '2025-10-01' } },
+    { ...line, id: 'superseded', receipts: { ...receipt, is_superseded: true } }]);
+  assert.equal(rows.length, 3, 'same PN is not a unique purchase');
+  const output = rows.map(receiptRosterLine).join('\n');
+  assert.match(output, /BACKORDERED, shipped 0/);
+  assert.match(output, /RETURN/);
+  assert.match(output, /line amount 0/);
+  assert.match(output, /item order; source vehicle_documents:doc/);
+  assert.match(output, /receipt_date=2025-10-01/);
+  const transactionOnly = receiptRoster([{ ...line, id: 'transaction-only', receipts: { ...receipt, receipt_date: null, transaction_date: '2025-11-01' } }])[0];
+  assert.match(receiptRosterLine(transactionOnly), /transaction_date=2025-11-01/);
+  assert.doesNotMatch(receiptRosterLine(transactionOnly), /document date|receipt_date=/);
+});
+test('authorized receipt context keeps financial detail and marketplace handle while excluding personal seller name', () => {
+  assert.equal(receiptContextVendor('eBay seller fixture-shop (Example Person)'), 'eBay seller fixture-shop');
+  assert.equal(receiptContextVendor('eBay seller Fixture Supply; message signed Example Person'), 'eBay seller Fixture Supply');
+  const compact = 'Receipt {"vendor":"eBay seller Fixture Supply; message signed Example Person","receipt_id":"kept"}\n  Item {"amount":49.99,"description":"repair work","quantity":1}';
+  assert.equal(contextWithoutPersonalFields(compact), compact.replace('; message signed Example Person', ''));
+  assert.equal(receiptContextVendor("O'Reilly Auto Parts (Store 1)"), "O'Reilly Auto Parts (Store 1)");
+  const original = 'PN123; line amount 49.99; vendor eBay seller fixture-shop (Example Person); receipt receipt-id; item item-id';
+  assert.equal(contextWithoutPersonalFields(original), 'PN123; line amount 49.99; vendor eBay seller fixture-shop; receipt receipt-id; item item-id');
+});
+test('compact receipt context retains every item and exact metadata without summing or deduplicating', () => {
+  const base = { receiptId: 'receipt', vendor: 'Example Parts', dates: { receipt_date: '2025-01-01', purchase_date: null, transaction_date: '2025-01-02' },
+    sourceTable: 'vehicle_documents', sourceId: 'document', itemId: 'order', cat: 'interior', desc: 'Seat foam BACKORDERED, shipped 0; printed quantity ordered', pn: 'FOAM1', quantity: 1, amount: 0, lineDate: null };
+  const rows = [base, { ...base, itemId: 'return', desc: 'RETURN seat foam', quantity: -1, amount: -20 },
+    { ...base, itemId: 'labor', cat: 'labor', desc: 'Inspect and machine. Technician 1.5h.\nSeparate operation.', pn: null, quantity: null, amount: 120, lineDate: '2024-12-28' },
+    { ...base, itemId: 'changed-source', sourceId: 'other-document' }];
+  const groups = groupReceiptRoster(rows); assert.equal(groups.length, 2);
+  const restored = groups.flatMap(g => g.items.map(i => ({ receiptId: g.receipt_id, vendor: g.vendor, dates: g.dates, sourceTable: g.source_table, sourceId: g.source_id,
+    itemId: i.item_id, cat: i.category, desc: i.description, pn: i.part_number, quantity: i.quantity, amount: i.amount, lineDate: i.line_date })));
+  assert.deepEqual(restored, rows);
+  const output = receiptRosterSections(rows);
+  assert.equal(output.split('\n').filter(l => l.startsWith('  Item ')).length, 4);
+  assert.match(output, /"amount":-20/); assert.match(output, /Technician 1\.5h/); assert.match(output, /"source_id":"other-document"/);
+});
+
+
+test('successful empty preparation replaces a stale worklist for image and day selections', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'byok-empty-'));
+  const worklist = join(dir, 'work.jsonl');
+  const client = { from() {
+    const q = new Proxy({}, { get(_, method) { return () => method === 'abortSignal'
+      ? Promise.resolve({ data: [], error: null }) : q; } }); return q;
+  } };
+  try {
+    for (const byDay of [false, true]) {
+      writeFileSync(worklist, '{"image_id":"stale"}\n'); writeFileSync(`${worklist}.date`, '2025-01-01');
+      await prepare(client, { vehicleId: 'vehicle', limit: 3, worklist, byDay });
+      assert.equal(readFileSync(worklist, 'utf8'), '');
+      assert.equal(readFileSync(`${worklist}.date`, 'utf8'), '');
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('exact representative selection preserves IDs across days and refuses already analyzed or missing sources', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'byok-exact-')), worklist = join(dir, 'work.jsonl');
+  const first = '10000000-0000-4000-8000-000000000001', second = '10000000-0000-4000-8000-000000000002';
+  const rows = [{ id: first, taken_at: '2025-01-01T12:00:00Z', image_url: 'https://example.invalid/one.jpeg', updated_at: now },
+    { id: second, taken_at: '2026-01-01T12:00:00Z', image_url: 'https://example.invalid/two.jpeg', updated_at: now }];
+  const client = { from() { const q = new Proxy({}, { get(_, method) { return () => method === 'abortSignal' ? Promise.resolve({ data: rows, error: null }) : q; } }); return q; } };
+  try {
+    await prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, byDay: true, imageIds: [second, first] });
+    const work = readFileSync(worklist, 'utf8').trim().split('\n').map(JSON.parse);
+    assert.deepEqual(work.map(w => w.image_id), [second, first]); assert.deepEqual(work.map(w => w.day), ['2026-01-01', '2025-01-01']);
+    rows[0].ai_scan_metadata = { byok_deep_analysis: { already: 'read' } };
+    await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [first] }), /already analyzed/);
+    assert.equal(readFileSync(worklist, 'utf8'), '');
+    await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [second, second] }), /invalid exact/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('exact preparation queries only requested current eligible sources and preserves their clocks', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'byok-targeted-')), worklist = join(dir, 'work.jsonl');
+  const id = n => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const rows = Array.from({ length: 6 }, (_, i) => ({ id: id(i + 1), vehicle_id: 'vehicle',
+    image_url: `https://example.invalid/${i + 1}.jpeg`, updated_at: now, taken_at: '2025-01-01T12:00:00Z',
+    vehicle_image_gallery_eligible: true, is_sensitive: false, ai_scan_metadata: {} }));
+  rows[2].vehicle_id = 'other-vehicle'; rows[3].vehicle_image_gallery_eligible = false; rows[4].is_sensitive = true;
+  const calls = [], logs = [], oldLog = console.log;
+  const client = { from(table) {
+    assert.equal(table, 'vehicle_images'); let selected = rows;
+    const q = new Proxy({}, { get(_, method) { return (...values) => {
+      calls.push([method, ...values]);
+      if (method === 'eq') selected = selected.filter(r => r[values[0]] === values[1]);
+      if (method === 'or') selected = selected.filter(r => r.is_sensitive == null || r.is_sensitive === false);
+      if (method === 'in') selected = selected.filter(r => values[1].includes(r[values[0]]));
+      if (method === 'abortSignal') return Promise.resolve({ data: selected, error: null });
+      return q;
+    }; } }); return q;
+  } };
+  try {
+    console.log = message => logs.push(message);
+    rows[1].updated_at = '2026-11-10T12:34:56.123456Z';
+    await prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [id(2), id(1)] });
+    assert.deepEqual(calls.filter(c => c[0] === 'in'), [['in', 'id', [id(2), id(1)]]]);
+    assert.ok(calls.some(c => c[0] === 'eq' && c[1] === 'vehicle_id' && c[2] === 'vehicle'));
+    assert.ok(calls.some(c => c[0] === 'eq' && c[1] === 'vehicle_image_gallery_eligible' && c[2] === true));
+    assert.ok(calls.some(c => c[0] === 'or' && c[1] === 'is_sensitive.is.null,is_sensitive.eq.false'));
+    const work = readFileSync(worklist, 'utf8').trim().split('\n').map(JSON.parse);
+    assert.deepEqual(work.map(w => w.image_id), [id(2), id(1)]);
+    assert.equal(work[0].expected_updated_at, rows[1].updated_at);
+    assert.equal(work[0].image_url, rows[1].image_url);
+    assert.equal(work[0].day_basis, 'recorded_taken_at');
+    assert.match(logs.join('\n'), /eligible requested images = 2/);
+    assert.match(logs.join('\n'), /Whole-inventory coverage was not queried/);
+    for (const excluded of [id(3), id(4), id(5), id(99)]) {
+      await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [id(1), excluded] }), /unavailable or already analyzed/);
+      assert.equal(readFileSync(worklist, 'utf8'), '', 'never process an incomplete requested cohort');
+    }
+    rows[0].ai_scan_metadata.byok_deep_analysis = { already: 'read' };
+    await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [id(1)] }), /already analyzed/);
+    const queryCount = calls.length;
+    await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: ['bad-id'] }), /invalid exact/);
+    assert.equal(calls.length, queryCount, 'invalid IDs refuse before database access');
+  } finally { console.log = oldLog; rmSync(dir, { recursive: true, force: true }); }
 });

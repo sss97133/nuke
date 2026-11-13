@@ -575,17 +575,22 @@ final class SyncEngine: ObservableObject {
                 gates[reason, default: 0] += 1
                 VisionDecisionLog.shared.record(.init(assetId: asset.localIdentifier, source: "sync",
                     category: VisionDecisionRecord.gateCategory, reason: reason))
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: reason, takenAt: asset.creationDate)
             case .notOwnCamera:
                 skipped += 1
                 gates["not_own_camera", default: 0] += 1
                 VisionDecisionLog.shared.record(.init(assetId: asset.localIdentifier, source: "sync",
                     category: VisionDecisionRecord.gateCategory, reason: "not_own_camera"))
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "not_own_camera", takenAt: asset.creationDate)
             case .heldPrivate:
                 heldPrivate += 1
+                // the ledger learns that a photo was held (id and clock only; what it showed stays on the phone)
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "personal", takenAt: asset.creationDate)
             case .deduped:
                 deduped += 1
             case .gaveUp:
                 gates["gave_up", default: 0] += 1   // failed Config.maxAttemptsPerAsset times; holds nothing back
+                CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "gave_up", takenAt: asset.creationDate)
             case .deferred:
                 // In iCloud only: the background job downloads it on Wi-Fi. Not an attempt against
                 // the photo, and not a failure that holds the watermark.
@@ -630,6 +635,9 @@ final class SyncEngine: ObservableObject {
         totalSkippedOffShop += skipped
         defaults.set(totalSkippedOffShop, forKey: Key.totalSkipped)
         recordHeldPrivate(heldPrivate)
+        // The ledger: what this pass decided not to upload, and the re-scan request this pass served (if one was claimed).
+        await CaptureLedgerReporter.shared.flush()
+        await CaptureLedgerReporter.shared.finishRescan(uploaded: uploaded, skipped: skipped + heldPrivate, failed: failed)
 
         // Silent-failure law (same as the daemon): advance the watermark ONLY
         // when nothing failed — a failed asset must be retried next pass.
@@ -887,12 +895,18 @@ final class SyncEngine: ObservableObject {
                     // returns through the uploader's own retry, never through this queue.
                     uploaded += 1
                     settled.insert(asset.localIdentifier)
-                case .offSite, .notOwnCamera:
+                case .offSite(let reason):
                     skipped += 1
                     settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: reason, takenAt: asset.creationDate)
+                case .notOwnCamera:
+                    skipped += 1
+                    settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "not_own_camera", takenAt: asset.creationDate)
                 case .heldPrivate:
                     heldPrivate += 1
                     settled.insert(asset.localIdentifier)
+                    CaptureLedgerReporter.shared.record(assetId: asset.localIdentifier, reason: "personal", takenAt: asset.creationDate)
                 case .deduped:
                     deduped += 1
                     settled.insert(asset.localIdentifier)
@@ -919,7 +933,7 @@ final class SyncEngine: ObservableObject {
             if uploaded > 0, mins > 0.05 { uploadsPerMinute = Double(uploaded) / mins }
             await Task.yield()
         }
-
+        await CaptureLedgerReporter.shared.flush()
     }
 
     // ─── Unified background drain (BUG #1: ingest with the screen off) ───────
@@ -1024,6 +1038,9 @@ final class SyncEngine: ObservableObject {
         let pixelsEligible: Bool
         let labels: [String]
         var privacyReceipt: DevicePrivacyReceipt? = nil
+        /// Apple Vision found a vehicle in the frame (an affirmative label). Away from a site this
+        /// is what lets the pixels go up.
+        var isVehicle = false
         /// The on-device rule outcome, for the local decision log (ids and labels only).
         var decision: VisionDecision? = nil
         var scoredLabels: [(String, Float)] = []
@@ -1039,7 +1056,7 @@ final class SyncEngine: ObservableObject {
         var eligible = false
         var labels: [String] = []
         var privacyReceipt: DevicePrivacyReceipt?
-        var decision: VisionDecision?, scored: [(String, Float)] = [], face = false
+        var decision: VisionDecision?, scored: [(String, Float)] = [], face = false, vehicle = false
         // Owner triage only matters for our own camera's frames; skip the decode otherwise.
         if make == "Apple" {
             guard let cg = decode(data) else { throw VisionEngine.TriageFailure.imageUndecodable }
@@ -1047,7 +1064,7 @@ final class SyncEngine: ObservableObject {
             if let failure = t.failure { throw failure }
             labels = t.labels
             eligible = t.pixelsEligible
-            decision = t.decision; scored = t.scoredLabels; face = t.hasFace
+            decision = t.decision; scored = t.scoredLabels; face = t.hasFace; vehicle = t.isVehicle
             if eligible, let evidence = t.privacyEvidence, let userId {
                 privacyReceipt = DevicePrivacyReceipt.make(original: data, image: cg, evidence: evidence, userId: userId)
             }
@@ -1055,7 +1072,35 @@ final class SyncEngine: ObservableObject {
         return PreparedOriginal(cameraMake: make, cameraModel: model,
                                 exifCaptureDate: CameraEXIF.captureDate(from: data),
                                 pixelsEligible: eligible, labels: labels, privacyReceipt: privacyReceipt,
-                                decision: decision, scoredLabels: scored, hasFace: face)
+                                isVehicle: vehicle, decision: decision, scoredLabels: scored, hasFace: face)
+    }
+
+    // ─── Where a frame was taken, and what of it goes up ─────────────────────
+    //
+    // Owner, 2026-11-11: every frame is signal. Until build 160 a photo taken away from a confirmed
+    // site (or with no GPS) never left the phone: from 2026-11-04 his phone sent nothing while he was
+    // more than 25 km from all three sites, and a car he shot elsewhere was lost. Now every own-camera
+    // frame lands: pixels when it is work evidence (and, away from a site, shows a vehicle), otherwise
+    // the time and a rough place only (2 decimals, about 1 km), the pixels staying on the phone. The
+    // contributor firewall still keeps pixels out of a shared pool; a held frame now lands as time and
+    // place instead of nothing.
+    enum Placement: Equatable { case atSite, offSite, noLocation }
+
+    struct Landing: Equatable {
+        let pixels: Bool
+        /// Round the coordinates before they leave the phone.
+        let coarsePlace: Bool
+    }
+
+    nonisolated static func landing(placement: Placement, contributorHold: Bool,
+                                    pixelsEligible: Bool, isVehicle: Bool) -> Landing {
+        let pixels = pixelsEligible && !contributorHold && (placement == .atSite || isVehicle)
+        return Landing(pixels: pixels, coarsePlace: !pixels && placement == .offSite)
+    }
+
+    /// About 1.1 km: enough to say where the owner was, not which house.
+    nonisolated static func coarse(_ degrees: Double?) -> Double? {
+        degrees.map { ($0 * 100).rounded() / 100 }
     }
 
     /// Gates first on metadata alone (no bytes read), then the original, then the upload.
@@ -1069,9 +1114,13 @@ final class SyncEngine: ObservableObject {
         // sourceType + mediaSubtypes filter: only user-originated, non-screenshot images.
         guard asset.sourceType == .typeUserLibrary else { return .offSite(reason: "not_library") }
         guard !asset.mediaSubtypes.contains(.photoScreenshot) else { return .offSite(reason: "screenshot") }
-        guard let loc = asset.location else { return .offSite(reason: "no_location") }
-        guard SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude) else {
-            return .offSite(reason: "off_site")
+        // Away from a site, or with no GPS, the frame still lands (see `landing`); only what goes up changes.
+        let placement: Placement
+        if let loc = asset.location {
+            placement = SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude)
+                ? .atSite : .offSite
+        } else {
+            placement = .noLocation
         }
         // Settled before: skip without reading the original again. The 3-day overlap re-finds
         // every recent photo on each pass, and re-reading those originals was most of a pass.
@@ -1083,10 +1132,11 @@ final class SyncEngine: ObservableObject {
         // paycheck, a person) clears the GPS gate but must NEVER reach the
         // shared pool — hold clutter and personal frames (the triage rule).
         // Owner mode skips this entirely.
+        var contributorHold = false
         if contributorMode {
             switch await contributorGateVerdict(assetID: id) {
             case .allow: break
-            case .hold: return .heldPrivate
+            case .hold: contributorHold = true   // pixels stay on the phone; time and place still land
             case .unavailable(let reason): return noteFailure(id, message: reason)
             }
         }
@@ -1123,18 +1173,21 @@ final class SyncEngine: ObservableObject {
         // Clutter and personal frames upload metadata
         // only (EXIF alibi) with the pixels left on the phone. An unavailable
         // privacy read returned above as a retryable failure, never a verdict.
+        let landing = Self.landing(placement: placement, contributorHold: contributorHold,
+                                   pixelsEligible: prep.pixelsEligible, isVehicle: prep.isVehicle)
+        let lat = asset.location?.coordinate.latitude, lon = asset.location?.coordinate.longitude
         let meta = PhotoMeta(
             assetIdentifier: id,
             filename: filename,
             creationDate: asset.creationDate,
             exifCaptureDate: prep.exifCaptureDate,
-            latitude: asset.location?.coordinate.latitude,
-            longitude: asset.location?.coordinate.longitude,
+            latitude: landing.coarsePlace ? Self.coarse(lat) : lat,
+            longitude: landing.coarsePlace ? Self.coarse(lon) : lon,
             cameraMake: prep.cameraMake,
             cameraModel: prep.cameraModel,
             sourceType: Self.sourceTypeLabel(for: asset)
         )
-        if prep.pixelsEligible {
+        if landing.pixels {
             // The bytes go up through the background session, which outlives this pass and the app.
             // The row is staged beside them and inserted on completion (uploadLanded settles the asset).
             let hash = SupabaseService.sha256Hex(data)

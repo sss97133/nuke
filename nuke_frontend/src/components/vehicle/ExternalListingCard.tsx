@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyAmount } from '../../utils/currency';
+import { recordedAudienceCount, recordedCurrency, readNativeListingHistory, type NativeListingHistory } from '../../pages/vehicle-profile/auctionEvidenceDisplay';
 
 interface VehicleEvent {
   id: string;
   source_platform: string;
   source_url: string;
   event_status: string;
+  currency_code?: string | null;
+  currency_source?: string | null;
   current_price?: number | string | null;
   final_price?: number | string | null;
   bid_count?: number;
@@ -42,9 +45,6 @@ const platformColors: Record<string, string> = {
 };
 
 // Only an explicitly recorded, recognized currency may reach the formatter's USD-defaulting API.
-const supportedCurrencies = new Set((Intl as typeof Intl & {
-  supportedValuesOf?: (key: 'currency') => string[];
-}).supportedValuesOf?.('currency') ?? []);
 function recordedAmount(value: number | string | null | undefined, currency: string | null) {
   const amount = value == null || value === '' ? NaN : Number(value);
   if (!Number.isFinite(amount)) return 'Unrecorded';
@@ -62,6 +62,12 @@ function calendarDay(value: unknown): string | null {
 const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
   const [listings, setListings] = useState<VehicleEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [nativeHistory, setNativeHistory] = useState<NativeListingHistory[]>([]);
+  const [historyUnavailable, setHistoryUnavailable] = useState(false);
+  const [historyCapped, setHistoryCapped] = useState(false);
+  const request = React.useRef(0);
+  const readAbort = React.useRef<AbortController | null>(null);
+  const [loadedVehicle, setLoadedVehicle] = useState<string | null>(null);
 
   const parseTs = (v: any): number => {
     try {
@@ -141,28 +147,43 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
 
   useEffect(() => {
     loadVehicleEvents();
+    return () => { request.current++; readAbort.current?.abort(); };
   }, [vehicleId]);
 
   const loadVehicleEvents = async () => {
+    const generation = ++request.current;
+    readAbort.current?.abort();
+    const controller = new AbortController(); readAbort.current = controller;
+    const deadline = setTimeout(() => controller.abort(), 10000);
+    setListings([]); setNativeHistory([]); setHistoryUnavailable(false); setHistoryCapped(false); setLoading(true);
     try {
-      const { data, error } = await supabase
+      const [events, history] = await Promise.allSettled([supabase
         .from('vehicle_events')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .order('updated_at', { ascending: false })
-        .limit(200);
-
-      if (error) throw error;
-
-      setListings(normalizeAndSortListings(data || []));
+        .abortSignal(controller.signal).limit(200), supabase.rpc('get_vehicle_specs', {
+          p_vehicle_ids: [vehicleId], p_include_typed_claims: true, p_claim_cursor: {},
+        }).abortSignal(controller.signal)]);
+      if (request.current !== generation) return;
+      if (events.status === 'fulfilled' && !events.value.error) setListings(normalizeAndSortListings(events.value.data || []));
+      else setHistoryUnavailable(true);
+      if (history.status === 'fulfilled' && !history.value.error) {
+        try {
+          const read = readNativeListingHistory(history.value.data, vehicleId);
+          setNativeHistory(read.entries); setHistoryCapped(read.hasMore);
+        } catch { setHistoryUnavailable(true); }
+      } else setHistoryUnavailable(true);
     } catch (error) {
       console.error('Error loading vehicle events:', error);
+      if (request.current === generation) setHistoryUnavailable(true);
     } finally {
-      setLoading(false);
+      clearTimeout(deadline);
+      if (request.current === generation) { setLoading(false); setLoadedVehicle(vehicleId); }
     }
   };
 
-  if (loading) {
+  if (loading || loadedVehicle !== vehicleId) {
     return (
       <div style={{ padding: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
         Loading auction history...
@@ -170,7 +191,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
     );
   }
 
-  if (listings.length === 0) {
+  if (listings.length === 0 && nativeHistory.length === 0 && !historyUnavailable) {
     return null;
   }
 
@@ -178,15 +199,43 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
     <div className="card">
       <div className="card-header">Auction history</div>
       <div className="card-body">
+        {historyUnavailable && <p role="status">Some auction source history could not be read.</p>}
+        {historyCapped && <p role="status">Showing qualified results from the latest 50 retained listing captures. Older history may exist.</p>}
+        {nativeHistory.filter(claim => !listings.some(row => normalizeListingUrlKey(row.source_url) === claim.source_url
+          && row.metadata?.source_observation_id === claim.observation_id)).map(claim => (
+          <div key={claim.observation_id} style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
+            <strong>Collecting Cars reports {claim.reported_outcome === 'unknown' ? 'listing ended' : claim.reported_outcome}</strong>
+            <p>{claim.reported_outcome === 'unknown' ? 'Sale outcome unknown. An ended classified listing does not establish a sale or an unsold auction.' : claim.reported_outcome === 'sold'
+              ? claim.reported_amount === null ? 'Sale amount not stated by the source.' : recordedAmount(claim.reported_amount, recordedCurrency(claim.currency))
+              : claim.reported_amount === null ? 'No sale reported; high bid not stated.'
+                : `Reported high bid: ${recordedAmount(claim.reported_amount, recordedCurrency(claim.currency))} · no sale reported`}</p>
+            <p>Publisher report, not independently verified. Fees are unrecorded.</p>
+            {claim.sale_format && <p>Source listing format: {claim.sale_format}</p>}
+            <p>Source-reported {claim.reported_outcome === 'sold' ? 'sale' : 'end'}: {claim.reported_event_at
+              ? <time dateTime={claim.reported_event_at}>{new Date(claim.reported_event_at).toISOString()}</time> : 'Date not stated'}</p>
+            <p>Source captured: <time dateTime={claim.source_captured_at}>{new Date(claim.source_captured_at).toISOString()}</time></p>
+            {claim.mileage !== null && claim.mileage_unit && <p>Source odometer: {claim.mileage.toLocaleString('en-US')} {claim.mileage_unit === 'mi' ? 'miles' : 'km'}</p>}
+            {claim.bid_count !== null && <p>Source bid count: {claim.bid_count} · aggregate count, not retained individual bid history</p>}
+            <a href={`/vehicle/${vehicleId}/observation/${claim.observation_id}`}>Retained source details</a>{' · '}
+            <a href={claim.source_url} target="_blank" rel="noopener noreferrer">View on Collecting Cars</a>
+          </div>
+        ))}
         {listings.map(listing => {
           const platformName = platformNames[listing.source_platform] || listing.source_platform;
           const platformColor = platformColors[listing.source_platform] || 'var(--accent)';
           const statusStr = String(listing.event_status || '').toLowerCase();
+          const watchers = recordedAudienceCount(listing.watcher_count, listing.metadata?.watcher_count);
+          const views = recordedAudienceCount(listing.view_count, listing.metadata?.view_count);
+          const readAt = typeof listing.metadata?.source_observed_at === 'string' ? Date.parse(listing.metadata.source_observed_at) : NaN;
+          const sourceRead = Number.isFinite(readAt) && readAt <= Date.now() ? new Date(readAt).toISOString() : null;
+          const observationId = listing.metadata?.auction_observation_id ?? listing.metadata?.source_observation_id;
+          const hasObservation = typeof observationId === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(observationId);
           const isActive = statusStr === 'active' || statusStr === 'live';
           const isScheduled = ['pending', 'upcoming', 'scheduled'].includes(statusStr);
           const isSold = statusStr === 'sold';
-          const currencyCode = typeof listing.metadata?.currency === 'string' ? listing.metadata.currency.trim().toUpperCase() : '';
-          const currency = supportedCurrencies.has(currencyCode) ? currencyCode : null;
+          // The canonical price currency is nullable (unknown), never a platform-based USD default.
+          const currency = [listing.currency_code, listing.metadata?.currency_code, listing.metadata?.currency]
+            .map(recordedCurrency).find(value => value != null) ?? null;
           const reserveStatus = String(listing.metadata?.reserve_status || '').toLowerCase();
           const reserveNotMet =
             statusStr === 'reserve_not_met' ||
@@ -197,7 +246,11 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
             String(listing.metadata?.seller_username || listing.metadata?.seller || '').trim() || null;
           const buyer =
             String(listing.metadata?.buyer_username || listing.metadata?.buyer || '').trim() || null;
-          const endIso = (listing.sold_at || listing.ended_at || null) as string | null;
+          // Active source snapshots carry a scheduled deadline, not a terminal ended_at.
+          const snapshotEnd = listing.metadata?.auction_end_date;
+          const activeEnd = typeof snapshotEnd === 'string' && Number.isFinite(parseTs(snapshotEnd))
+            ? snapshotEnd : listing.ended_at;
+          const endIso = (isActive ? activeEnd : listing.sold_at || listing.ended_at) || null;
           const endLabel = isScheduled ? 'Scheduled' : isSold ? 'Sold' : (isActive ? 'Ends' : 'Ended');
           const endDate = endIso ? new Date(endIso) : null;
           const endText = isScheduled
@@ -310,7 +363,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                       Watchers
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700 }}>
-                      {listing.watcher_count.toLocaleString()}
+                      {watchers == null ? 'Unrecorded' : watchers.toLocaleString()}
                     </div>
                   </div>
                 )}
@@ -320,7 +373,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                       Views
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700 }}>
-                      {listing.view_count.toLocaleString()}
+                      {views == null ? 'Unrecorded' : views.toLocaleString()}
                     </div>
                   </div>
                 )}
@@ -337,6 +390,13 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
               </div>
 
               {/* End Date */}
+              {isActive && (
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                  Source read: {sourceRead ? <time dateTime={sourceRead}>{sourceRead}</time> : 'Unrecorded'}
+                  {['auction_bid_snapshot', 'auction_state_snapshot'].includes(listing.metadata?.capture_kind) && ' · Auction snapshot, not an individual bid time'}
+                  {hasObservation && <> · <a href={`/vehicle/${vehicleId}/observation/${observationId}`}>Retained observation</a></>}
+                </div>
+              )}
               {endText && (
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
                   {endLabel}: {endText}

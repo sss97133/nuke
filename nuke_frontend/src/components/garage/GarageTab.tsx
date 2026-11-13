@@ -40,7 +40,10 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
 
   return <main className="garage-page">
     <div className="garage-heading"><div><h1>Garage</h1><p>Your vehicle relationships and the evidence recorded for them.</p></div>
-      {signedIn && <Button variant="secondary" type="button" disabled={isLoading} onClick={refresh}>{isLoading ? 'Reading garage…' : 'Refresh garage'}</Button>}
+      {signedIn && <div className="garage-heading-actions">
+        <Link className="btn-base btn-secondary" to="/capture/ledger">Capture ledger</Link>
+        <Button variant="secondary" type="button" disabled={isLoading} onClick={refresh}>{isLoading ? 'Reading garage…' : 'Refresh garage'}</Button>
+      </div>}
     </div>
     {signedIn && !isLoading && !error && <GarageToolbar vehicleCount={visibleVehicles.length} loadedVehicleCount={dashboard.loadedVehicleCount ?? vehicles.length} searchQuery={query} onSearchChange={setQuery} viewMode={viewMode} sortMode={sortMode} filterMode={filterMode} onViewChange={setViewMode} onSortChange={setSortMode} onFilterChange={setFilterMode} />}
     {isLoading ? <div role="status" className="garage-notice">Reading vehicle relationships…</div>

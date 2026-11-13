@@ -9,6 +9,8 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
+import { vehicleImageGallerySource } from '../../../lib/vehicleImageColumns';
+import { useAuthContext } from '../../../contexts/AuthContext';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -250,7 +252,7 @@ async function fetchAgentConsensus(vehicleId: string): Promise<FieldEvidenceRow[
 async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidenceMap> {
   const { data, error: queryError } = await supabase
     .from('field_evidence')
-    .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at, assigned_at, source_image_id:raw_extraction_data->>photo_id')
+    .select('id, vehicle_id, field_name, proposed_value, source_type, source_confidence, extraction_context, extracted_at, status, created_at, assigned_at, source_image_id:raw_extraction_data->>photo_id, fallback_image_id:raw_extraction_data->>image_id, cited_image_url:raw_extraction_data->>image_url')
     .eq('vehicle_id', vehicleId)
     .order('source_confidence', { ascending: false });
 
@@ -259,12 +261,47 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
     throw queryError;
   }
 
-  const rows = data ?? [];
+  const rows = (data ?? []).filter(row => row.vehicle_id === vehicleId);
+  const withdrawnStatus = (status: string | null) => status === 'superseded' || !!status?.startsWith('rejected');
+  const imageRef = (row: any): string | null => {
+    const ref = row.source_image_id ?? row.fallback_image_id;
+    return typeof ref === 'string' ? ref.toLowerCase() : null;
+  };
+  const activePhotos = rows.filter(row => !withdrawnStatus(row.status) && (imageRef(row) != null || row.cited_image_url));
+  const visibleIds = new Map<string, string>(), visibleUrls = new Map<string, string>();
+  if (activePhotos.length) {
+    const ids = [...new Set(activePhotos.map(imageRef).filter((id): id is string => !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)))];
+    const urls = [...new Set(activePhotos.filter(row => imageRef(row) == null).map(row => row.cited_image_url).filter(Boolean))];
+    const source = await vehicleImageGallerySource();
+    for (const [column, refs] of [['id', ids], ['image_url', urls]] as const) {
+      for (let offset = 0; offset < refs.length; offset += 100) {
+        const current = await supabase.from(source)
+          .select('id, image_url, is_sensitive, is_superseded, is_duplicate, vision_gate_status, image_vehicle_match_status')
+          .eq('vehicle_id', vehicleId).in(column, refs.slice(offset, offset + 100));
+        if (current.error || !Array.isArray(current.data)) throw new Error('Cited image sources could not be checked. Retry sources.');
+        for (const image of current.data) {
+          if (!image.image_url?.trim() || image.is_sensitive || image.is_superseded || image.is_duplicate
+            || (image.vision_gate_status != null && image.vision_gate_status !== 'approved')
+            || ['mismatch', 'unrelated'].includes(image.image_vehicle_match_status || '')) continue;
+          visibleIds.set(image.id.toLowerCase(), image.image_url);
+          if (!visibleUrls.has(image.image_url) || image.id.toLowerCase() < visibleUrls.get(image.image_url)!) {
+            visibleUrls.set(image.image_url, image.id.toLowerCase());
+          }
+        }
+      }
+    }
+  }
+  const currentRows = rows.filter(row => withdrawnStatus(row.status)
+    || ((row.source_image_id == null || row.fallback_image_id == null
+        || row.source_image_id.toLowerCase() === row.fallback_image_id.toLowerCase())
+      && (imageRef(row) != null ? visibleIds.has(imageRef(row)!)
+        && (!row.cited_image_url?.trim() || row.cited_image_url === visibleIds.get(imageRef(row)!))
+        : !row.cited_image_url?.trim() || visibleUrls.has(row.cited_image_url))));
   // Sparse evidence stays sparse. Existing agent claims are read below;
   // displaying a profile must not request a testimony backfill.
 
   // Map DB columns to UI interface
-  const mapped: FieldEvidenceRow[] = (rows as any[]).filter(r => r.vehicle_id === vehicleId).map((r) => ({
+  const mapped: FieldEvidenceRow[] = (currentRows as any[]).map((r) => ({
     id: r.id,
     vehicle_id: r.vehicle_id,
     field_name: r.field_name,
@@ -278,7 +315,8 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
     status: r.status ?? null,
     created_at: r.created_at,
     assigned_at: r.assigned_at ?? null,
-    source_image_id: typeof r.source_image_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.source_image_id) ? r.source_image_id : null,
+    source_image_id: imageRef(r) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(imageRef(r)!)
+      ? imageRef(r) : imageRef(r) == null ? visibleUrls.get(r.cited_image_url) ?? null : null,
   }));
 
   // Preserve the withdrawn account separately: it cannot win or manufacture disagreement today.
@@ -343,19 +381,22 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
 }
 
 export function useFieldEvidence(vehicleId: string | undefined) {
+  const { user, loading: authLoading } = useAuthContext();
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['field-evidence', vehicleId],
+    queryKey: ['field-evidence', vehicleId, user?.id ?? 'anonymous'],
     queryFn: async () => {
       if (!vehicleId) return {};
       return fetchAndProcessEvidence(vehicleId);
     },
-    enabled: !!vehicleId,
+    enabled: !!vehicleId && !authLoading,
     staleTime: 5 * 60 * 1000, // 5 min
   });
 
   return {
-    evidence: data ?? {},
-    loading: isLoading,
+    // A failed refresh must not revive a cached image claim whose attachment
+    // or visibility could no longer be checked. The caller exposes retry.
+    evidence: error || authLoading ? {} : data ?? {},
+    loading: authLoading || isLoading,
     error: error?.message ?? null,
     refetch,
   };

@@ -131,3 +131,85 @@ not appear on the vehicle calendar by design.
 6. The Road Art branch in `extract-mecum`.
 
 No table is minted. `asset_observations` stays deprecated unless the owner revives it.
+
+## 2026-11-08: what changed since 10-16, and the art slice
+
+Owner direction, 2026-11-08 (verbatim in `data-machine-cases.md` §21): the artwork is the endpoint and carries its history;
+its production timeframe and its events of presentation and association; many-to-many folds (group, creation, holder); the
+artist has the highest claim to origin and takes the shape of a user; an org (estate, foundation) can hold the rights and the
+furthering use of the works; cars and art are the same shape, physical objects with provenance when it is recorded.
+
+**What the live system says now (read 2026-11-08, catalog + counts).** `assets` holds 1,750 rows: equipment 415, goods 264,
+material 32, part 731, tool 307, shoot 1. The photo work ledger (`20261028203000`, `20261028233000`) widened `asset_type` by
+`equipment, tool, part, material, goods`, revived `asset_observations` (8,855 `photo_sighting` rows; the DEPRECATED comment is
+gone) and writes it from a SQL writer, `record_photo_work_readings`, with its own unique key on the asset. `vehicle_observations`
+holds 14.6M rows (17 GB) and still has no `(subject_type, subject_id)` index; the deploy role's 10 s statement timeout cannot
+build one (`reference_deploy_role_10s_no_concurrent_index`, 2026-10-19: two INVALID indexes). No `assets` row of a non-vehicle
+lot exists; `upsert_asset` and `asset_lot` were CLEAR in `check-capability-before-mint` on 2026-11-08; `artwork` STOPs there only
+because the emblem-vector capability uses the word, so no function carries that name.
+
+**Section 2 revisited.** The 10-16 choice (lots as `vehicle_observations` rows with `subject_type = 'asset'`) stands as the
+keystone the owner approved on 06-17, and it is not the path taken for the first slice, for two measured reasons: the subject
+index it requires cannot be built through supabase-deploy at 14.6M rows, and the 10-28 lane already made `asset_observations` the
+asset's testimony log with a writer in the same shape. The slice writes `asset_observations` (`kind = 'auction_lot'`). The open
+inconsistency is recorded, not fixed: assets have their own log while organizations and users testify in
+`vehicle_observations`. Closing it (a fold of `asset_observations` into the polymorphic log once the index exists, or the reverse)
+is a later, separate decision; nothing is dropped.
+
+**The art slice (shipped as migration `20261108170000_asset_lots.sql`, contract `supabase/sql/test_asset_lots.sql`).**
+- `asset_type` gains `artwork, automobilia, memorabilia`. The house's label stays a claim (`attributes.house_category`).
+- `assets_identity_key_uidx`: one row per presentation, `attributes.identity_key = '<source>:<lot id>'`, `identity_basis =
+  'lot_presentation'`. Recurrence (the same print or sign across sales) resolves later by supersession.
+- `record_asset_lots(source_slug, lots)`: the sanctioned writer (service-only, 500 lots a call, receipted, refuses unknown
+  sources, foreign identity keys, types outside the three, lots without clocks). One `auction_lot` row per asset × lot × method ×
+  content hash; a changed result appends and supersedes; prices are the house's figures with their basis, premium not adjusted.
+- `asset_lot_walk_cursor`: where a department's walk stopped. `asset_lot_coverage(source)`: lots landed against the house's own
+  department facet (latest `source_census` row, `census_method = 'house_department_facet'`), counts and years only, anon-readable.
+- Source 1, Bonhams: its search index (already read by `extract-bonhams-typesense` for cars, public search key) carries every
+  department. Facet read 2026-11-08 ~07:00 PT: 3,482,440 lots, 2,524,687 with a published hammer. Modes `art_census` (writes the
+  facet as the denominator) and `art_land` (one department, ≤ 4 pages of 250 a run, 2 s between reads, backs off on 403/429,
+  cursor-resumed, wraps as a new pass). Department → type: `PIC-*`, `PHO`, `WOA` → artwork; `MOT-AUT`, `COL-AUT` → automobilia.
+  Nothing is parsed into artist, medium or edition columns: the catalogue lines, description and footnotes are retained as the
+  house printed them (discovery-first; the fields crystallise from use). Image URLs only, never bytes.
+- The gate any house passes to be source 2: lot-level category from the house itself and a published result per lot. Mecum
+  passes from the retained index (79,494 Road Art lots, zero fetch) and lands through the same writer as automobilia. RM Sotheby's
+  (numeric category_id, no results on the current rosters), Christie's, Sotheby's and Phillips (no readable index) do not pass
+  today; they rise when their data does, never by name.
+
+**Not in the slice, named so it is not forgotten:** the creation fold (asset × party × role `creator` × as-of, the party a user,
+org or external identity; the artist's claim to origin), group membership (series, edition parent/child, collection,
+exhibition), holder claims, images as `image_identities` rows keyed by sha256 with pHash candidates, the local archive lane
+(the shoot asset and Blur's session clustering). Each needs lots in the log first; the writer above is what they extend.
+
+### 2026-11-08, later the same day: the walk runs, Mecum lands, the creation fold
+
+- **The walk is scheduled** (`20261108200000_asset_lot_walk.sql`): cron `asset-lots-bonhams-walk` every 10 minutes calls `art_land`
+  with two pages of 250; the department is chosen by `asset_lot_next_department` (the slice department furthest behind the
+  house's own count), and `asset_lot_walk_health(source)` is the rows-landed check beside it. The writer keeps an unsold lot's
+  high bid (`structured_data.high_bid`).
+- **Mecum Road Art** lands from the retained 2026-10-14 index through the same writer (`scripts/extractors/land_mecum_road_art.py`,
+  one-off): `department_code = 'Road Art'` (the house's `lot_type`), `house_group` = the house's model label, the result as the
+  house's `sale_result` label, the price as `highest_bid_or_price` (the index does not say hammer vs high bid; recorded as the
+  basis). Type: automobilia; memorabilia when the model label names a guitar, framed art, poster or photograph.
+- **The creation fold** (`20261108230000_asset_creation_claims.sql`) is the first fold of section 3's bridges. The party is an
+  `external_identities` row (`platform = 'art_catalogue'`, handle = printed name + printed dates): the shape a party has before
+  it is a user, claimable through the existing `request_external_identity_claim`, so an artist, estate or foundation takes the
+  row over without touching the claims. The claim is an `asset_observations` row of kind `creation_claim`: role creator, the
+  house's attribution word kept as a word (`direct`, `after`, `attributed_to`, `circle_of`, `school_of`, `follower_of`,
+  `manner_of`, `studio_of`, `workshop_of`, `style_of`: the trade's own ladder of claim strength, never a number), and the
+  executor when the house prints "by <name> (dates)" after the artist (Chagall's lithographs by Charles Sorlier: the
+  technician the owner named). Only the house's laid-out lines are read (first line the artist, second the qualifier); no
+  free text is parsed. Readers: `asset_creators(source)` (lots direct / after / other, priced lots, hammer min, median and max
+  per currency as stated, sale years: the market by party, as the make table is for cars) and `asset_creation_read(asset)`.
+- **Still open from section 3:** holding (asset × party × share × as-of) and membership (edition parent/child, series,
+  collection; Bonhams prints "from the edition of 250" in the title and Mecum prints the collection in `collection_tax`, both
+  retained on the lot row, neither folded yet).
+
+**Known limits after the first live day (2026-11-08, for the next reader):**
+- A layout-B party key is the printed name alone (the Copenhagen sales print no dates), so two artists who share a name
+  become one `external_identities` row until a claim separates them; the reverse (two spellings, two rows) is already noted.
+- The house facet is a snapshot (`art_census` run by hand at 07:22 PT). The walk's department choice divides landed lots by
+  it, and the walk's own universe is the published lots (82,904 prints against 86,450 in the facet), so the ratio never reaches
+  one and revisits begin near 0.96. Re-run `art_census` on each wrap, or weekly; a later reader can carry both denominators.
+- `asset_creators` reads the lot's current statement (`20261108234500`), not the row the claim was folded from, so a hammer
+  published after the fold reaches the artist view.

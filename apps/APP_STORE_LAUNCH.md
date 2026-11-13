@@ -147,8 +147,9 @@ In Xcode:
    (Settings → General → VPN & Device Management).
 3. On-device smoke test (do all of these — this is the review rehearsal):
    - [ ] First launch shows the Photos permission prompt with the exact
-         string from project.yml ("Photos taken at your work sites join
-         your record. Everything else stays on this phone."). Allow Full
+         string from project.yml ("Photos of your work and vehicles join
+         your record. For other photos only the time and rough place are
+         sent; the pictures stay on this phone."). Allow Full
          Access → the ignition scan runs (counter, Uploaded 0 gauge, site
          confirmation, Upload N).
    - [ ] Sign in with a real Nuke account. Kill + relaunch → still signed in
@@ -246,19 +247,17 @@ reviewer's thumbnail strip is empty (it renders only local photos).
 > *(placeholder — create this account before submitting and paste real
 > credentials here; never reuse a personal password).*
 >
-> **What the app does:** Nuke Capture uploads photos a vehicle technician
-> takes at their *registered work locations* to their own account on the
-> Nuke vehicle-documentation platform. It is a native PhotoKit app: it reads
-> the photo library, applies an on-device GPS gate, and uploads only photos
-> geotagged at the user's registered shops.
+> **What the app does:** Nuke Capture adds the photos a vehicle technician
+> takes to their own account on the Nuke vehicle-documentation platform. It
+> is a native PhotoKit app: it reads the photo library and decides on the
+> device what leaves it. Work photos taken at the user's registered shops,
+> and vehicle photos taken anywhere, upload. For every other photo only the
+> time and a rough place (rounded to about 1 km) are sent; the picture stays
+> on the phone.
 >
-> **Why you won't see an upload happen:** the GPS gate is the product's
-> privacy feature. Photos taken anywhere other than a registered work
-> location are deliberately held on-device — the Today screen counts them
-> under "Held back (off-shop)". Since your review location is not a
-> registered shop, photos you take will be (correctly) held back and the
-> held-back counter will increase. The demo account is pre-seeded so the
-> all-time counters reflect real usage.
+> **What you will see:** a photo of a vehicle uploads from any location.
+> Other photos you take add a time-and-place entry with no image. The demo
+> account is pre-seeded so the all-time counters reflect real usage.
 >
 > **Account deletion (5.1.1(v)):** Profile icon (top right) → Delete
 > Account → confirmation → server-side deletion of the account and its data.
