@@ -27,6 +27,27 @@ enum GarageFixtures {
       "observed_at":"2026-10-18T00:00:00+00:00","cover_image_url":null}]
     """#
 
+    /// get_my_garage_owner_corrections: the account states it owns vehicle 3 now, with the title in its name. The server
+    /// relates that vehicle as a contribution (the 1973 K20 case, 2026-11-09): the statement must not make it Owned.
+    static let ownerStatementOnContribution = #"""
+    [{"id":"c3","vehicle_id":"00000000-0000-4000-8000-000000000003",
+      "correction":{"relationship":{"roles":["owner_current"],"ownership_denied":false,"title_status":"in_name",
+                                    "disputed":false,"start_date":"2019-04-01","end_date":null},"cover_image_id":null},
+      "observed_at":"2026-10-18T00:00:00+00:00","cover_image_url":null}]
+    """#
+
+    /// get_user_garage with a vehicle the account documents (dealer inventory it photographs; the Viva trio case).
+    static let garageWithDocumenting = #"""
+    [
+      {"vehicle_id":"00000000-0000-4000-8000-000000000001","year":1966,"make":"Fixture","model":"Coupe","trim_name":null,
+       "image_url":null,"current_value":null,"purchase_price":null,"image_count":1863,"relationship":"owner"},
+      {"vehicle_id":"00000000-0000-4000-8000-000000000006","year":1964,"make":"Fixture","model":"356C","trim_name":null,
+       "image_url":null,"current_value":null,"purchase_price":null,"image_count":40,"relationship":"documenting"},
+      {"vehicle_id":"00000000-0000-4000-8000-000000000003","year":1931,"make":"Fixture","model":"Hot Rod","trim_name":null,
+       "image_url":null,"current_value":null,"purchase_price":null,"image_count":1,"relationship":"contributor"}
+    ]
+    """#
+
     /// vehicle_row_read for an insider: the whole vehicles row (abridged here; the garage ignores the rest).
     static let vehicleRow = #"""
     {"id":"00000000-0000-4000-8000-000000000001","year":1966,"make":"Fixture","model":"Coupe","normalized_model":"Coupe",

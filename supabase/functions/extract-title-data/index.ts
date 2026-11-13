@@ -148,8 +148,9 @@ async function extractWithAnthropic(imageUrl: string): Promise<ExtractionResult>
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
+        model: 'claude-sonnet-5-5',
+        max_tokens: 4000,
+        output_config: { effort: "low" },
         messages: [{
           role: 'user',
           content: [
@@ -169,7 +170,7 @@ async function extractWithAnthropic(imageUrl: string): Promise<ExtractionResult>
     }
 
     const data = await response.json()
-    const content = data.content?.[0]?.text
+    const content = (data.content ?? []).find((b: any) => b.type === "text")?.text
     if (!content) throw new Error('Empty response from Anthropic')
 
     // Extract JSON from response (Claude sometimes wraps in markdown)

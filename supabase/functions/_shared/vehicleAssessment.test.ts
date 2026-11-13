@@ -1,5 +1,5 @@
 import { assertEquals, assert } from 'jsr:@std/assert@1';
-import { qualifyAssessmentClaims, qualifyAssessmentCommentary, qualifyAssessmentMarket, qualifyListingAssertions } from './vehicleAssessment.ts';
+import { qualifyAssessmentClaims, qualifyAssessmentCommentary, qualifyAssessmentMarket, qualifyListingAssertions, qualifyAssessmentAppearances, readVehicleAssessment } from './vehicleAssessment.ts';
 const VEHICLE = '10000000-0000-4000-8000-000000000001';
 const SOURCE = '20000000-0000-4000-8000-000000000001';
 const COMMENT = '30000000-0000-4000-8000-000000000001';
@@ -73,4 +73,92 @@ Deno.test('retained commentary reuses the existing parser and preserves a source
   assertEquals(changed.records.length, 0); assertEquals(changed.exclusions.length, 1);
   const forged = qualifyAssessmentCommentary([{ ...atom, structured_data: { ...atom.structured_data, statement_kind: 'assertion' } }], [source], VEHICLE);
   assertEquals(forged.records.length, 0);
+});
+
+const appearance = (patch: Record<string, unknown> = {}) => ({
+  id: crypto.randomUUID(), vehicle_id: VEHICLE, source_id: '006f01c3-e5fb-44f5-ab40-e55b0654de1c',
+  kind: 'listing', property_id: null, is_superseded: false, retained_native_listing_source: true,
+  source_url: 'https://www.classic-carauction.com/auction-results?auctionnbr=58&auctionid=7309',
+  observed_at: '2026-01-01T00:00:00Z', ingested_at: '2026-01-02T00:00:00Z', extraction_method: 'mccormick_html_v1',
+  structured_data: { parser: 'mccormick_html_v1', presentation: 'archive', source_id: '7309', auction_number: '58',
+    auction_dates_text: 'February 20 - 22, 2015', result_claim: { status: 'sold', amount: 4200,
+      currency_symbol: '$', currency: null, fee_basis: 'unknown', literal: 'Sold for: $4,200' } }, ...patch,
+});
+Deno.test('archive report groups repeated captures and preserves unknown units without monetary promotion', () => {
+  const first = appearance(), second = appearance();
+  const result = qualifyAssessmentAppearances([first, second], VEHICLE);
+  assertEquals(result.records.length, 1);
+  assertEquals(result.records[0].witness_count, 2);
+  assertEquals(result.records[0].reported_result.amount, 4200);
+  assertEquals(result.records[0].reported_result.currency, null);
+  assertEquals(result.records[0].monetary_comparable_eligible, false);
+  assert('verified_sale_count' in result);
+  assertEquals(result.verified_sale_count, null);
+  assertEquals(result.price_statistics, null);
+  assertEquals(result.records[0].witnesses.map((r: any) => r.observation_id), [first.id, second.id]);
+});
+Deno.test('no-sale bid is separate and conflicts preserve witnesses without selecting a realized result', () => {
+  const sold = appearance(), noSale = appearance();
+  noSale.structured_data.result_claim = { ...noSale.structured_data.result_claim, status: 'no_sale', literal: 'High Bid: $4,200' };
+  const high = qualifyAssessmentAppearances([noSale], VEHICLE).records[0];
+  assertEquals(high.reported_result.outcome, 'no_sale');
+  assertEquals(high.monetary_comparable_eligible, false);
+  const conflict = qualifyAssessmentAppearances([sold, noSale], VEHICLE).records[0];
+  assertEquals(conflict.evidence_state, 'disputed');
+  assertEquals(conflict.reported_result, null);
+  assertEquals(conflict.witness_count, 2);
+});
+Deno.test('report refuses custody, parent, current, malformed amounts and unsupported monetary claims', () => {
+  for (const patch of [{ retained_native_listing_source: false }, { vehicle_id: SOURCE }, { is_superseded: true },
+    { source_url: 'https://example.test/' }, { property_id: SOURCE }, { kind: 'specification' },
+    { ingested_at: '2099-01-01' }, { source_id: SOURCE }]) {
+    const r = appearance(patch);
+    const result = qualifyAssessmentAppearances([r], VEHICLE);
+    assertEquals(result.records, []);
+    assert(!JSON.stringify(result).includes(r.id));
+  }
+  for (const patch of [{ amount: 4201 }, { currency: 'USD' }, { fee_basis: 'hammer' }, { amount: -1 },
+    { literal: 'Sold for: $4,200 and other details' }, { status: 'no_sale' }]) {
+    const r = appearance();Object.assign(r.structured_data.result_claim, patch);
+    assertEquals(qualifyAssessmentAppearances([r], VEHICLE).records, []);
+  }
+  const missing = appearance();missing.structured_data.auction_dates_text = '';
+  assertEquals(qualifyAssessmentAppearances([missing], VEHICLE).records, []);
+  assertEquals(qualifyAssessmentAppearances(null, VEHICLE).status, 'unavailable');
+});
+Deno.test('appearance pagination declares page-only groups and keeps a stable source-row cursor', () => {
+  const input = Array.from({ length: 201 }, () => appearance());
+  const result = qualifyAssessmentAppearances(input, VEHICLE);
+  assert('page' in result);
+  assertEquals(result.page?.has_more, true);
+  assertEquals(result.page?.next_after, input[199].id);
+  assertEquals(result.records[0].witness_count, 200);
+  assertEquals(result.group_scope, 'returned_page_only');
+  assertEquals(qualifyAssessmentAppearances([...input, appearance()], VEHICLE).status, 'unavailable');
+});
+
+Deno.test('shared assessment queries custody-qualified roots and returns history beside unchanged monetary context', async () => {
+  const filters: unknown[][] = [], root = appearance();
+  const db = {
+    rpc: async (name: string) => ({ data: name === 'get_vehicle_specs' ? profile([]) : market(), error: null }),
+    from: (table: string) => {
+      assertEquals(table, 'vehicle_observations');
+      let kind = '';
+      const request: any = { select: () => request,
+        eq: (key: string, value: unknown) => { filters.push([key, value]);if (key === 'kind') kind = String(value);return request; },
+        is: (key: string, value: unknown) => { filters.push([key, value]);return request; },
+        not: () => request, gt: (key: string, value: string) => { filters.push(['after', key, value]);return request; },
+        order: () => request, limit: () => request,
+        abortSignal: async () => ({ data: kind === 'listing' ? [root] : [], error: null }) };
+      return request;
+    },
+  };
+  const result = await readVehicleAssessment(db, { id: VEHICLE, ...query }, { photos: [], appearanceAfter: SOURCE });
+  assertEquals(result.retained_auction_appearances.records.length, 1);
+  assertEquals(result.market.status, 'available');
+  assert('statistics' in result.market);
+  assertEquals(result.market.statistics.sold_count, 10);
+  assertEquals(result.market.vehicle_specific_value, null);
+  assert(filters.some(f => f[0] === 'retained_native_listing_source' && f[1] === true));
+  assert(filters.some(f => f[0] === 'after' && f[1] === 'id' && f[2] === SOURCE));
 });

@@ -58,6 +58,7 @@ async function run(scenario: Scenario = {}) {
     const respond = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
       status, headers: { 'content-type': 'application/json' },
     });
+    if (url.pathname === '/rest/v1/rpc/finish_receipt_products') return respond(payload.p_complete ? 'done' : 'pending');
     if (url.pathname === '/rest/v1/rpc/claim_derivation_work') return respond(items);
     if (url.pathname === '/rest/v1/observation_extractors') {
       if (method === 'PATCH') return respond([]);
@@ -291,3 +292,20 @@ Deno.test('retained wake failure is visible without losing independent admitted 
 addEventListener('unload', () => envNames.forEach((name, index) => {
   if (saved[index] === undefined) Deno.env.delete(name); else Deno.env.set(name, saved[index]!);
 }));
+
+Deno.test('receipt catalog cannot turn an empty 200 response into a completed derivation', async () => {
+ const r = await run({ items: [item(1, { evidence_type: 'receipt', extractor_slug: 'receipt-products-v1', user_id: OWNER_ID })], output: {} });
+ equal(r.data.done, 0);
+ const finish = r.calls.find(c => c.path === '/rest/v1/rpc/finish_receipt_products');
+ equal(finish?.body.p_complete, false);
+ assert(finish?.body.p_worker?.startsWith('derive-dispatch-'));
+ equal(queueWrites(r, 'done').length, 0);
+});
+Deno.test('receipt catalog completion uses a fenced source-specific acknowledgement', async () => {
+ const r = await run({ items: [item(1, { evidence_type: 'receipt', extractor_slug: 'receipt-products-v1', user_id: OWNER_ID })],
+ output: { success: true, source_receipt_id: SOURCE_ID, product_complete: true, generation: 3, product_result: { items: {} }, retry_after_seconds: 0 } });
+ equal(r.data.done, 1);
+ const finish = r.calls.find(c => c.path === '/rest/v1/rpc/finish_receipt_products');
+ equal(finish?.body.p_generation, 3);
+ equal(readerCalls(r)[0].body.mode, 'receipt_products');
+});

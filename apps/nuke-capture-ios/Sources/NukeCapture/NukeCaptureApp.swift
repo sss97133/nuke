@@ -12,7 +12,7 @@
 //   4. Route: signed out on a fresh install → WelcomeView (once; its "Look around
 //      first" flips exploreMode), signed out otherwise → SignInView (the
 //      constellation; its "Look around first" path flips exploreMode),
-//      exploring → MainTabView (read-only Map + sample profile), signed in + ignition pending → IgnitionView (first-run
+//      exploring → MainTabView (read-only Map + profile search), signed in + ignition pending → IgnitionView (first-run
 //      full-library scan), signed in + ignition complete → MainTabView
 //      (MAP · PROFILE · TODAY).
 
@@ -42,7 +42,7 @@ struct NukeCaptureApp: App {
     /// Flipped by IgnitionEngine when the first-run sequence completes.
     @AppStorage(IgnitionEngine.completeKey) private var ignitionComplete = false
     /// The constellation's Explore path — the app without auth (read-only
-    /// Map + sample profile). Cleared by the Profile tab's Sign In door.
+    /// Map + profile search). Cleared by the Profile tab's Sign In door.
     @AppStorage("exploreMode") private var exploreMode = false
     /// The first-launch welcome has been seen (or the user signed in). See WelcomeGate.
     @AppStorage(WelcomeGate.seenKey) private var welcomeSeen = false
@@ -88,12 +88,12 @@ struct NukeCaptureApp: App {
                 } else if let org = ProcessInfo.processInfo.environment["NUKE_DEBUG_ACTOR_ORG"], !org.isEmpty {
                     // NUKE_DEBUG_ACTOR_ORG=<uuid> roots on that organization's actor document (DEBUG only).
                     NavigationStack { ActorProfileView(route: ActorRoute(kind: "organization", id: org, name: nil)) }
-                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty {
-                    // NUKE_DEBUG_DAY=yyyy-MM-dd roots on that day's receipt for the sample
-                    // profile (or NUKE_DEBUG_DAY_USER=<uuid>) as the current session: anon
-                    // unless one was injected. Verifies the viewer-dependent money rule.
-                    DayReceiptView(userId: ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"] ?? Config.sampleProfileUserId,
-                                   date: dbgDay)
+                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty,
+                          let dbgDayUser = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"], !dbgDayUser.isEmpty {
+                    // NUKE_DEBUG_DAY=yyyy-MM-dd + NUKE_DEBUG_DAY_USER=<uuid> roots on that day's receipt
+                    // for that profile as the current session: anon unless one was injected. Verifies the
+                    // viewer-dependent money rule. No default account: name the profile under test.
+                    DayReceiptView(userId: dbgDayUser, date: dbgDay)
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {

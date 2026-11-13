@@ -36,6 +36,9 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Include the PR merge parents so the migration comparison has a base.
+          fetch-depth: 2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -58,6 +61,20 @@ jobs:
 
       - name: Raw-fetch guard regression tests
         run: node --test scripts/guardrails/no-raw-fetch.test.mjs
+
+      - name: Edge deploy list includes importers of changed shared files
+        run: node --test scripts/ci/functions-to-deploy.test.mjs
+
+      - name: No new photo reader or photo table
+        # Owner direction 2026-11-10 (docs/ledger/theory/data-machine.md, "Image analysis is the model asking"):
+        # a reading is keyed through the registry and ingest-observation; no reader gets a table of its own.
+        # Compares the merge commit with its first parent, which the fetch-depth above provides.
+        run: |
+          node --test scripts/guardrails/no-new-photo-reader.test.mjs
+          node --test scripts/guardrails/owner-voice-other-model.test.mjs
+          python3 scripts/photo-pipeline/keys-dry-run/test_check_units.py
+          python3 scripts/photo-pipeline/test_keys_lane.py
+          node scripts/guardrails/no-new-photo-reader.mjs
 
       - name: Intake status reader contracts
         run: node --test scripts/test-db-stats-intake.mjs scripts/test-source-intake-progress.mjs scripts/inspect-cab-snapshot.test.mjs

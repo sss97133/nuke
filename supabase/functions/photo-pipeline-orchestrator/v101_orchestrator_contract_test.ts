@@ -26,6 +26,7 @@ let openaiCalls = 0, selfCalls: any[] = [], inflight = 0, maxInflight = 0;
 let selfCall: (body: any) => Promise<Response> = async () => Response.json({ success: true, classification: "other", classifier_ok: true });
 let queueRows: any[] = [];
 let fieldEvidenceStatus = 201;
+let filedVehicle: Record<string, unknown> = {};
 let handler!: (req: Request) => Promise<Response>;
 const originalServe = Deno.serve;
 
@@ -38,13 +39,20 @@ function reset() {
   calls = []; patchBodies = []; openaiCalls = 0; selfCalls = []; inflight = 0; maxInflight = 0; queueRows = []; fieldEvidenceStatus = 201; skew += 11 * 60_000 + 1; // expire the isolate-local OpenAI breaker between tests
   row = { id: "image", image_url: "https://example.invalid/image.jpg", vehicle_id: "vehicle", updated_at: "2026-01-01T00:00:00.000Z",
     ai_scan_metadata: {}, ai_processing_status: "pending", apple_ml_labels: [], vehicle_score: null, is_external: true, taken_at: null };
+  filedVehicle = { id: "vehicle", year: 1973, make: "Pontiac", model: "Firebird", vin: "2S87D3N000001" };
   rpc = {
     claim_photo_pipeline_batch: () => Response.json(queueRows),
     report_capture_step: () => Response.json(null),
     photo_pipeline_clear_retry: () => Response.json(null),
     photo_pipeline_note_failure: () => Response.json({ status: "failed", transient: false, attempts: 12, next_attempt_at: null }),
-    land_identifier_claims: () => Response.json({ ok: true }),
+    photo_field_not_about_vehicle: (body) => Response.json({ status: 'ok', decisions: body.p_fields.map((field: any, index: number) => ({ index,
+      reason: field.field_name === 'engine_type' ? 'appearance_text_not_vehicle_specification' : null })) }),
+    land_identifier_claims: body => Response.json(body.p_read?.cited_vin
+      ? row.vehicle_id !== body.p_vehicle_id ? { status: "source_image_changed" }
+        : { status: "ok", field_evidence: 1, identifiers: 1 }
+      : { status: "ok", identifiers: 1 }),
     classifier_schema_manifest: () => Response.json({ message: "absent" }, { status: 404 }),
+    identifier_rule_for: () => Response.json([{ rule_id: 23, rule_status: "in_range", series: "GM 13-char 1972-80", model_year_from: 1972, model_year_to: 1980 }]),
   };
   openai = () => oaOk(base);
   selfCall = async () => Response.json({ success: true, classification: "other", classifier_ok: true });
@@ -75,6 +83,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return h(body);
   }
   if (u.pathname === "/rest/v1/platform_config") return Response.json({});
+  if (u.pathname === "/rest/v1/vehicles" && method === "GET") return Response.json(u.searchParams.get("id") === "eq.vehicle" ? filedVehicle : []);
   if (u.pathname === "/rest/v1/llm_cost_tracking") return new Response(null, { status: 201 });
   if (u.pathname === "/rest/v1/field_evidence") return fieldEvidenceStatus >= 300 ? Response.json({ message: "synthetic" }, { status: fieldEvidenceStatus }) : new Response(null, { status: 201 });
   if (u.pathname === "/rest/v1/vehicle_observations") return Response.json([]);
@@ -86,7 +95,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       if (rejectWrite) return Response.json({ message: "synthetic write rejection", code: "42501" }, { status: 400 });
       if (u.searchParams.get("updated_at") !== `eq.${row.updated_at}`) return Response.json([]);
       row = { ...row, ...body, updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
-      return Response.json([{ id: row.id }]);
+      return Response.json([{ id: row.id, image_url: row.image_url, vehicle_id: row.vehicle_id }]);
     }
     if (queueMode && u.searchParams.get("ai_processing_status") === "eq.pending") {
       return u.searchParams.has("user_id") ? Response.json(legacyOwner) : Response.json(legacyBacklog);
@@ -232,11 +241,84 @@ Deno.test({ name: "unexpected pipeline exception: catch block calls note_failure
 const citedAnswer = { ...base, vin: { value: GOOD_VIN, confidence: 0.95, evidence: "stamped plate reads " + GOOD_VIN }, is_document: false,
   angle: { value: "exterior_front", confidence: 0.9 },
   vehicle_fields: [
-    { field_name: "make", value: "Porsche", confidence: 0.9, evidence: "PORSCHE script on the deck lid" },
+    { field_name: "color", value: "Red", confidence: 0.9, evidence: "Visible red body paint" },
     { field_name: "model", value: "911", confidence: 0.4, evidence: "looks like a 911" },       // < 0.6 => skipped
     { field_name: "year", value: "1990", confidence: 0.9, evidence: null },                       // no evidence => dropped by applyV2
     { field_name: "not_a_column", value: "x", confidence: 0.9, evidence: "y" },                   // not in manifest => dropped
   ] };
+
+const classicAnswer = { ...base, image_type: "vin_plate", is_document: false,
+  vin: { value: "2S87D3N000001", confidence: .97, evidence: "Dash VIN plate reads 2S87D3N000001", evidence_role: "vehicle_vin_plate" } };
+
+Deno.test({ name: "physical pre1981VIN: source→registered rule→existing identifier and direct photo evidence, with no auto-filing", ...T, fn: async () => {
+  reset(); openai = () => oaOk(classicAnswer);
+  const response = await handler(one()); const result = await response.json();
+  assert(response.status === 200 && result.success === true, JSON.stringify(result));
+  assert(!calls.some(c => c.path === "/rest/v1/field_evidence"), "short VIN evidence must use the atomic writer, never a separate raw upsert");
+  const vin = rpcCalls("land_identifier_claims")[0]?.body.p_read.cited_vin;
+  assert(vin.checksum_ok === null && vin.checksum_status === "not_applicable_pre1981");
+  assert(vin.identifier_rule_id === 23 && vin.model_year_context === 1973 && vin.identifier_rule_series === "GM 13-char 1972-80");
+  const rule = rpcCalls("identifier_rule_for")[0]?.body;
+  assert(rule?.p_make === "Pontiac" && rule.p_kind === "vin" && rule.p_value === classicAnswer.vin.value);
+  const claim = rpcCalls("land_identifier_claims")[0]?.body;
+  assert(claim?.p_read.identifiers[0].kind === "vin" && claim.p_read.identifiers[0].value === classicAnswer.vin.value &&
+    claim.p_source_kind === "photo" && claim.p_source_image_id === "image");
+  assert(rpcCalls("attribute_testimony").length === 0 && rpcCalls("auto_match_image_to_vehicles").length === 0);
+  assert(patchBodies.every(p => !("vehicle_id" in p)));
+  assert(!patchBodies.some(p => "vehicle_vin" in p), "short VIN cannot be written outside the source-locked transaction");
+  assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === "pre1981_physical_plate"));
+}});
+
+Deno.test({ name: "physical pre1981VIN: conflicting/unsupported sources retain their reading with explicit refusal and no field/identifier admission", ...T, fn: async () => {
+  for (const [answer, vehicle, reason] of [
+    [classicAnswer, { vin: "2S87D3N000002" }, "stored_identifier_conflict"],
+    [classicAnswer, { year: null }, "vehicle_year_unknown"],
+    [classicAnswer, { year: 1981 }, "vehicle_year_not_pre1981"],
+    [{ ...classicAnswer, vin: { ...classicAnswer.vin, evidence_role: "body_tag" } }, {}, "physical_vin_source_required"],
+    [{ ...classicAnswer, vin: { ...classicAnswer.vin, evidence_role: "engine_stamp" } }, {}, "physical_vin_source_required"],
+    [{ ...classicAnswer, vin: { ...classicAnswer.vin, evidence_role: "sticker" } }, {}, "physical_vin_source_required"],
+  ] as const) {
+    reset(); Object.assign(filedVehicle, vehicle); openai = () => oaOk(answer);
+    const result = await (await handler(one())).json();
+    assert(result.success === true && rpcCalls("land_identifier_claims").length === 0, reason);
+    assert(!calls.some(c => c.path === "/rest/v1/field_evidence"), reason);
+    assert(!patchBodies.some(p => "vehicle_vin" in p), reason);
+    assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === reason), reason);
+    assert(JSON.stringify(row.ai_scan_metadata).includes(classicAnswer.vin.value), "original reading preserved");
+  }
+}});
+
+Deno.test({ name: "physical VIN is not admitted after its photo is unfiled during the rule read", ...T, fn: async () => {
+  reset(); openai = () => oaOk(classicAnswer);
+  const rule = rpc.identifier_rule_for;
+  rpc.identifier_rule_for = body => {
+    row = { ...row, vehicle_id: null, updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
+    return rule(body);
+  };
+  await handler(one());
+  assert(rpcCalls("land_identifier_claims").length === 1, "the source-locked writer owns final attachment validation");
+  assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === "source_image_changed"), "refusal must be recorded instead of claiming admission");
+  assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.cited_identifiers === 0 && c.body.p_detail?.cited_field_evidence === 0));
+  assert(!calls.some(c => c.path === "/rest/v1/field_evidence"), "stale source must not land field evidence");
+  assert(!patchBodies.some(p => "vehicle_vin" in p), "stale source must not get an admitted VIN column");
+}});
+
+Deno.test({ name: "physical VIN writer refusals and unavailable contracts are reported without claiming admission", ...T, fn: async () => {
+  for (const [body, status, expected] of [[{ status: "vin_context_changed" }, 200, "vin_context_changed"],
+    [{ status: "ok" }, 200, "vin_writer_unavailable"], [{ message: "failed" }, 500, "vin_writer_unavailable"]] as const) {
+    reset(); openai = () => oaOk(classicAnswer);
+    rpc.land_identifier_claims = () => Response.json(body, { status });
+    await handler(one());
+    assert(!calls.some(c => c.path === "/rest/v1/field_evidence") && !patchBodies.some(p => "vehicle_vin" in p));
+    assert(rpcCalls("report_capture_step").some(c => c.body.p_detail?.vin_admission === expected && c.body.p_detail.cited_identifiers === 0));
+  }
+}});
+
+Deno.test({ name: "generic vehicle_fields cannot bypass dedicatedVIN admission", ...T, fn: async () => {
+  reset(); openai = () => oaOk({ ...base, vehicle_fields: [{ field_name: "vin", value: "1HGCM82633A004353", confidence: .99, evidence: "bad-checksum number" }] });
+  const result = await (await handler(one())).json();
+  assert(result.success === true && !calls.some(c => c.path === "/rest/v1/field_evidence") && rpcCalls("land_identifier_claims").length === 0);
+}});
 
 Deno.test({ name: "cited evidence: pending field_evidence rows with quote/photo id; VIN capped at 0.79; identifier claim; clear_retry; no testimony overwrite", ...T, fn: async () => {
   reset(); openai = () => oaOk(citedAnswer);
@@ -246,10 +328,10 @@ Deno.test({ name: "cited evidence: pending field_evidence rows with quote/photo 
   assert(fe.length === 1 && fe[0].method === "POST", "one batched upsert");
   assert(fe[0].search.includes("on_conflict=vehicle_id%2Cfield_name%2Csource_type%2Cproposed_value") && /ignore-duplicates/.test(fe[0].headers.get("prefer") ?? ""), "ignoreDuplicates upsert: " + fe[0].search + " " + fe[0].headers.get("prefer"));
   const rows = fe[0].body as any[];
-  assert(rows.length === 2 && rows.map((r) => r.field_name).sort().join() === "make,vin", JSON.stringify(rows.map((r) => r.field_name)));
-  const vin = rows.find((r) => r.field_name === "vin"), make = rows.find((r) => r.field_name === "make");
+  assert(rows.length === 2 && rows.map((r) => r.field_name).sort().join() === "color,vin", JSON.stringify(rows.map((r) => r.field_name)));
+  const vin = rows.find((r) => r.field_name === "vin"), color = rows.find((r) => r.field_name === "color");
   assert(vin.source_confidence === 79 && vin.proposed_value === GOOD_VIN && vin.source_type === "ai_visual" && vin.vehicle_id === "vehicle", "VIN confidence capped at 0.79 => 79: " + vin.source_confidence);
-  assert(make.source_confidence === 90 && make.raw_extraction_data.photo_id === "image" && make.raw_extraction_data.quote === "PORSCHE script on the deck lid" && make.raw_extraction_data.confidence === 0.9);
+  assert(color.source_confidence === 90 && color.raw_extraction_data.photo_id === "image" && color.raw_extraction_data.quote === "Visible red body paint" && color.raw_extraction_data.confidence === 0.9);
   assert(rows.every((r) => !("status" in r)), "status left to the table default ('pending'); nothing here accepts it");
   const lic = rpcCalls("land_identifier_claims");
   assert(lic.length === 1 && lic[0].body.p_source_kind === "photo" && lic[0].body.p_source_image_id === "image" && lic[0].body.p_vehicle_id === "vehicle"
@@ -288,6 +370,42 @@ Deno.test({ name: "cited evidence: bad checksum VIN, low confidence or write err
   reset(); openai = () => oaOk(citedAnswer); rpc.report_capture_step = () => { throw new Error("rpc down"); }; rpc.photo_pipeline_clear_retry = () => { throw new Error("down"); };
   j = await (await handler(one())).json();
   assert(j.success === true && row.ai_processing_status === "completed", "reportStep / clear_retry are best-effort");
+}});
+
+Deno.test({ name: 'source roles: raw readings survive while a badge-derived engine field is refused', ...T, fn: async () => {
+  reset(); openai = () => oaOk({ ...base, vehicle_fields: [
+    { field_name: 'engine_type', value: 'V8-400', confidence: .95, evidence: 'Text on removable hood scoop' },
+    { field_name: 'color', value: 'Red', confidence: .95, evidence: 'Visible red body paint' },
+  ], text_lines: [{ text: 'V8-400', confidence: .95 }] });
+  const result = await (await handler(one())).json();
+  assert(result.success === true);
+  const fields = calls.filter(c => c.path === '/rest/v1/field_evidence').flatMap(c => c.body);
+  assert(fields.length === 1 && fields[0].field_name === 'color', JSON.stringify(fields));
+  const persisted = (row.ai_scan_metadata as any).classification.v2;
+  assert(persisted.vehicle_fields.length === 2 && persisted.text_lines.length === 1, JSON.stringify(persisted));
+  const done = rpcCalls('report_capture_step').find(c => c.body.p_step === 'done')?.body.p_detail;
+  assert(done.cited_field_refusals[0].reason === 'appearance_text_not_vehicle_specification');
+}});
+Deno.test({ name: 'source roles: guard unavailability is recorded and dedicated valid VIN admission remains independent', ...T, fn: async () => {
+  reset(); openai = () => oaOk(citedAnswer);
+  rpc.photo_field_not_about_vehicle = () => Response.json({ message: 'guard unavailable' }, { status: 503 });
+  const result = await (await handler(one())).json();
+  assert(result.success === true);
+  const fields = calls.filter(c => c.path === '/rest/v1/field_evidence').flatMap(c => c.body);
+  assert(fields.length === 1 && fields[0].field_name === 'vin', JSON.stringify(fields));
+  const done = rpcCalls('report_capture_step').find(c => c.body.p_step === 'done')?.body.p_detail;
+  assert(done.cited_field_refusals.every((f: any) => f.reason === 'source_role_guard_unavailable'));
+}});
+Deno.test({ name: 'source roles: generic guard outage does not block atomic pre1981 physical VIN admission', ...T, fn: async () => {
+  reset(); openai = () => oaOk({ ...classicAnswer, vehicle_fields: [citedAnswer.vehicle_fields[0]] });
+  rpc.photo_field_not_about_vehicle = () => Response.json({ message: 'guard unavailable' }, { status: 503 });
+  const result = await (await handler(one())).json();
+  assert(result.success === true && !calls.some(c => c.path === '/rest/v1/field_evidence'));
+  const claim = rpcCalls('land_identifier_claims')[0]?.body;
+  assert(claim.p_read.cited_vin.identifier_rule_id === 23 && claim.p_source_image_id === 'image');
+  const done = rpcCalls('report_capture_step').find(c => c.body.p_step === 'done')?.body.p_detail;
+  assert(done.vin_admission === 'pre1981_physical_plate' && done.cited_field_evidence === 1 && done.cited_identifiers === 1);
+  assert(done.cited_field_refusals[0].reason === 'source_role_guard_unavailable');
 }});
 
 // ===================== auth =====================

@@ -5,6 +5,7 @@
 import React from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { CoverageView, Rows, Text } from '../../kit';
 import type { CommentIntel, DescriptionIntel, Apparition } from './hooks/useVehicleIntel';
 
 // ---------------------------------------------------------------------------
@@ -69,85 +70,66 @@ const BADGE: React.CSSProperties = {
 // ---------------------------------------------------------------------------
 
 const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
-  const quotes = (ci.key_quotes || []).slice(0, 3).map(extractText).filter(Boolean);
+  // A quote written since 2026-11-13 names the comment it was found in; older ones are text only.
+  const quotes = (ci.key_quotes || []).slice(0, 3).map(q => ({
+    text: extractText(q),
+    author: typeof q === 'object' ? q.author ?? null : null,
+    isSeller: typeof q === 'object' && q.is_seller === true,
+    postedAt: typeof q === 'object' ? q.posted_at ?? null : null,
+    url: typeof q === 'object' && q.url && /^https:\/\//.test(q.url) ? q.url : null,
+    full: typeof q === 'object' ? q.comment_text ?? null : null,
+  })).filter(q => q.text);
   const insights = (ci.expert_insights || []).slice(0, 3).map(extractText).filter(Boolean);
   const concerns = (ci.community_concerns || []).slice(0, 3).map(extractText).filter(Boolean);
-  const ms = ci.market_signals;
+  // The model's demand, rarity and price-trend labels are not shown: a market status comes only from a reader
+  // with its sample and keys (AGENTS.md), never from a model's reading of one comment thread.
+  const analyzedOn = ci.analyzed_at ? new Date(ci.analyzed_at) : null;
+  const provenance = ci.model_used && analyzedOn && !Number.isNaN(analyzedOn.getTime())
+    ? [
+        'Stored model interpretation',
+        ci.model_used,
+        `written ${analyzedOn.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', })}`,
+      ].join(' · ') + '.'  // how many comments it read is the card's coverage, stated once in the head
+    : null;
 
-  const hasContent = quotes.length > 0 || insights.length > 0 || concerns.length > 0 || ms;
-  if (!hasContent && !ci.overall_sentiment) return null;
+  const hasContent = quotes.length > 0 || insights.length > 0 || concerns.length > 0;
+  if (!hasContent) return null;
+  // How much of the thread the model was given: stated only when both counts were stored.
+  const coverage = ci.comments_analyzed != null && ci.comment_count != null
+    ? { n: ci.comments_analyzed, of: ci.comment_count, grain: 'comments read', as_of: null }  // the written date is in the line below, in the viewer's clock
+    : null;
 
   return (
     <CollapsibleWidget variant="profile" title="Comment summary" defaultCollapsed={false}
-      badge={
-        <span className="widget__count" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center' }}>
-          {ci.overall_sentiment && (
-            <span style={BADGE}>
-              REPORTED: {truncate(ci.overall_sentiment, 16)}
-            </span>
-          )}
-          {ci.comment_count != null && (
-            <span style={LABEL}>{ci.comment_count} COMMENTS REPORTED</span>
-          )}
-        </span>
-      }
+      badge={coverage
+        ? <CoverageView c={coverage} className="widget__count" />
+        : ci.comment_count != null ? <Text role="caption" className="widget__count">{ci.comment_count.toLocaleString('en-US')} comments</Text> : undefined}
     >
-      <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.5' }}>
-        {/* The current reader supplies outputs but no input membership or analysis provenance. */}
-        <p style={{ margin: '0 0 8px', color: 'var(--vp-pencil)' }}>
-          Stored interpretation · input sample, method and analysis time unavailable.
-          {' '}Market performance remains unverified.
-        </p>
-        {/* Key Quotes */}
-        {quotes.length > 0 && (
-          <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>REPORTED EXCERPTS</div>
-            {quotes.map((q, i) => (
-              <div key={i} style={{
-                borderLeft: '2px solid var(--vp-ghost, #ddd)',
-                paddingLeft: '8px',
-                marginBottom: '4px',
-                color: 'var(--vp-ink)',
-              }}>
-                {truncate(q, 120)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Extraction labels do not verify contributor expertise. */}
-        {insights.length > 0 && (
-          <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>EXTRACTED INSIGHTS</div>
-            {insights.map((ins, i) => (
-              <div key={i} style={{ marginBottom: '2px' }}>
-                {truncate(ins, 140)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Concerns */}
-        {concerns.length > 0 && (
-          <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>REPORTED CONCERNS</div>
-            {concerns.map((c, i) => (
-              <div key={i} style={{ marginBottom: '2px' }}>
-                {truncate(c, 120)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Stored model labels; no cohort, time window or calibrated market measure supplied. */}
-        {ms && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {ms.demand && <span style={BADGE}>DEMAND LABEL: {ms.demand}</span>}
-            {ms.rarity && <span style={BADGE}>RARITY LABEL: {ms.rarity}</span>}
-            {ms.price_trend && <span style={BADGE}>PRICE TREND LABEL: {ms.price_trend}</span>}
-          </div>
-        )}
-      </div>
+      {/* Summaries written since 2026-11-12 carry their model, time and input count; older ones do not. */}
+      <Text role="caption" as="p">
+        {provenance ?? 'Stored interpretation · input sample, method and analysis time unavailable.'}
+        {' '}Market performance remains unverified.
+      </Text>
+      <Rows title="What commenters wrote" count={quotes.length}>
+        {quotes.map((q, i) => q.author ? (
+          // The quote opens its comment in place: author, date and the stored text. The listing link is the small source line.
+          <details key={i} className="k-item">
+            <summary><Text role="body">{truncate(q.text, 280)}</Text></summary>
+            <Text role="label" as="div">{q.isSeller ? 'Seller ' : ''}@{q.author}{q.postedAt ? ` · ${formatDate(q.postedAt)}` : ''}</Text>
+            {q.full && <Text role="body" as="div">{q.full}</Text>}
+            {q.url && <Text role="caption" as="div"><a href={q.url} target="_blank" rel="noreferrer">Source: comment on the listing ↗</a></Text>}
+          </details>
+        ) : <Text key={i} role="body" as="div" className="k-item">{truncate(q.text, 280)}</Text>)}
+      </Rows>
+      {/* Extraction labels do not verify contributor expertise. */}
+      <Rows title="Model's reading of the comments · not verified">
+        {insights.map((ins, i) => <Text key={i} role="body" as="div" className="k-item">{ins}</Text>)}
+        {ci.overall_sentiment && insights.length > 0
+          ? <Text role="caption" as="div" className="k-item">Model reads the comments as {truncate(ci.overall_sentiment.toLowerCase(), 16)}.</Text> : null}
+      </Rows>
+      <Rows title="Concerns the model read in the comments · not verified">
+        {concerns.map((c, i) => <Text key={i} role="body" as="div" className="k-item">{c}</Text>)}
+      </Rows>
     </CollapsibleWidget>
   );
 };
@@ -269,11 +251,11 @@ const ApparitionSection: React.FC<{ apparitions: Apparition[] }> = ({ apparition
                     </a>
                   ) : truncate(a.platform, 14)}
                 </td>
-                <td style={{ padding: '2px 0' }}>{a.event_type || '\u2014'}</td>
+                <td style={{ padding: '2px 0' }}>{a.schedule_status === 'accepted_awaiting_schedule' ? 'Accepted · awaiting schedule' : a.event_type || '\u2014'}</td>
                 <td style={{ padding: '2px 0', textAlign: 'right', color: a.price ? 'var(--vp-sold)' : 'inherit' }}>
                   {formatPrice(a.price)}
                 </td>
-                <td style={{ padding: '2px 0', textAlign: 'right' }}>{formatDate(a.event_date)}</td>
+                <td style={{ padding: '2px 0', textAlign: 'right' }}>{a.schedule_status === 'accepted_awaiting_schedule' ? 'Date TBD' : formatDate(a.event_date)}</td>
               </tr>
             ))}
           </tbody>
