@@ -27,7 +27,7 @@ from lib import geom
 from lib.fit import refit
 from lib.fontbuild import Glyph as FGlyph, build
 from lib.glyphs import Traced, overlay_png
-from lib.trace import Source, potrace_mask
+from lib.trace import Source, potrace_mask, smooth_outline
 
 FAMILY = 'Firebird 1971 Script'
 FILE = 'pontiac-firebird-fender-script-1971-1981-cut.png'
@@ -89,7 +89,16 @@ def trace_letter(name, tol_px=1.3):
     con = geom.straighten(con, tol=1.1 * FACE.scale, snap_deg=3.0, min_len=40)
     # the emblem's mounting studs hang under the baseline at the i, b and d feet: they are hardware, not letters
     con = geom.clean(geom.intersection(con, geom.rect(-100, -6, 100000, 1000)))
+    if OUTLINE_SIGMA:
+        # the face's edge follows the reflections: smooth it (curvature, not weight) and refit
+        con = geom.clean(smooth_outline(con, sigma_units=OUTLINE_SIGMA))
+        con = geom.clean(refit(con, tol=0.6 * FACE.scale, corner_deg=40, step=max(1.0, 0.25 * FACE.scale)))
+        con = geom.straighten(con, tol=0.8 * FACE.scale, snap_deg=3.0, min_len=40)
+        con = geom.clean(con)
     return Traced(con, FACE, REGIONS[name], mask, origin)
+
+
+OUTLINE_SIGMA = 12.0   # font units
 
 
 # ------------------------------------------------------------------------------------------------ measured

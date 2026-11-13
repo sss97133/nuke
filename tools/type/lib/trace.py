@@ -206,3 +206,32 @@ def mask_to_units_raster(mask: np.ndarray, origin, src: Source, upm_px=0.5):
     s = src.scale
     ox, oy = origin
     return mask > 0.5, (s, ox, oy)
+
+
+def smooth_outline(contours, sigma_units=14.0, grid=4.0, alphamax=1.1, opttol=0.4):
+    """Curvature-smooth an outline in font units: rasterise at `grid` units a pixel, blur by sigma, threshold at 0.5 and
+    potrace. Thresholding the blur at half keeps a straight edge where it was and a member's width wherever it is
+    wider than about three sigma; it removes bumps and dents narrower than that and rounds corners by about sigma.
+    The reflections in a chrome photograph leave exactly such bumps along the traced stems and bowls."""
+    from lib import geom
+    x0, y0, x1, y1 = geom.bounds(contours)
+    pad = int(4 * sigma_units / grid) + 4
+    W = int((x1 - x0) / grid) + 2 * pad
+    H = int((y1 - y0) / grid) + 2 * pad
+    to_px = lambda p: ((p[0] - x0) / grid + pad, (y1 - p[1]) / grid + pad)
+    r = geom.rasterize(contours, to_px, W, H, ss=4).astype(float)
+    bw = ndimage.gaussian_filter(r, sigma_units / grid) >= 0.5
+    with tempfile.TemporaryDirectory() as td:
+        pbm = os.path.join(td, 'g.pbm')
+        Image.fromarray(np.where(bw, 0, 255).astype(np.uint8)).convert('1').save(pbm)
+        svg = os.path.join(td, 'g.svg')
+        subprocess.run(['potrace', pbm, '-s', '-o', svg, '-a', str(alphamax), '-O', str(opttol), '-t', '4', '--flat'],
+                       check=True)
+        text = open(svg).read()
+    rec = RecordingPen()
+    # potrace internal (px, py), 0.1 px, y up from the bottom: X = x0 + (0.1px - pad) * grid, Y = y1 - (H - 0.1py - pad) * grid
+    a = 0.1 * grid
+    pen = TransformPen(rec, (a, 0, 0, a, x0 - pad * grid, y1 - (H - pad) * grid))
+    for d in re.findall(r'<path d="([^"]+)"', text):
+        parse_path(d, pen)
+    return geom.contours_from(rec)

@@ -41,7 +41,7 @@ tools/type/build.sh --only trans-am-1973-decal
 | Family | Files | Glyphs (with .notdef) | cmap | traced | derived | designed | Traced fidelity (IoU) |
 |---|---|---|---|---|---|---|---|
 | Pontiac 1973 Block | Regular, Face | 45 | 70 | 7 | 1 | 35 | P .958 T .975 I .954 N .948 O .934 C .917 A .857 |
-| Firebird 1971 Script | Regular | 39 | 38 | 6 | 17 | 14 | b .919 e .907 F .899 d .897 r .841 (flag trimmed) i .759 (ball drawn), against the chrome face |
+| Firebird 1971 Script | Regular | 39 | 38 | 6 | 17 | 14 | b .902 e .892 d .882 F .877 r .803 (flag trimmed) i .726 (ball drawn), against the chrome face, outlines smoothed |
 | Trans Am 1973 Decal | Regular | 45 | 70 | 6 | 1 | 36 | S .946 N .930 T .921 A .921 M .920 R .910 |
 | Pontiac 1973 Brochure Numerals | Regular | 30 | 28 | 15 | 9 | 4 | cover .974-.981, spread F r e b d .929-.955 |
 
@@ -74,6 +74,11 @@ Counts exclude `.notdef` and `space`. Block and Decal map lowercase to the capit
   ellipse at its measured place and size (`I_BALL` in `families/script.py`); the i's IoU against the mask is .759.
 - **Vertical metrics:** every period font has ascent 900, descent 250 and caps 700. Browsers round ascent and descent
   to whole pixels, so a font with another descent (the script had 280) sits up to a pixel off the shared baseline.
+- **Outline smoothing:** the face's edge follows the chrome's reflections, which left bumps and dents along the stems
+  and bowls (lumpy at 120 px). Each traced letter is rasterised at 4 units a pixel, blurred by sigma 12 units,
+  thresholded at half and retraced (`smooth_outline` in `lib/trace.py`, `OUTLINE_SIGMA` in `families/script.py`).
+  Thresholding a blur at half keeps straight edges and member widths and removes features under about 36 units. It
+  costs 0.01-0.04 IoU against the mask, which keeps the reflections; ink area moves 0.3-3.2 percent per letter.
 - **Fidelity:** the IoUs are measured against that face mask. They are lower than v0.1's cutout IoUs because the
   face edge is set by reflections, which the mask follows and the outline smooths.
 - **Coverage:** a-z, the capitals of the model names (E F G L M P T), and `. , - '`.
