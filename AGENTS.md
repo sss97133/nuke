@@ -252,6 +252,12 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
   provides installed commands and a compact handoff; load it when routing or resuming
   substantial work, not before every edit.
 
+- On the proof vehicle (the 1973 Firebird named in `data-machine.md`) and the code around it, every lane reads
+  [`proof-vehicle-pickup.md`](docs/ledger/theory/proof-vehicle-pickup.md) first (owner, 2026-11-13: "i need all my
+  agents working on the firebird and adjacent code to start collaborating"). It names the two readers that say
+  whether the vehicle is done, what the writer gate refuses and the legal move for each refusal, the lanes seen
+  and the open collisions. Report both readers before and after your change.
+
 - Work in your own worktree:
   `git worktree add ~/.worktrees/<task> -b <branch> origin/main`, then
   `ln -s ~/nuke/nuke_frontend/node_modules ~/.worktrees/<task>/nuke_frontend/node_modules` so the
