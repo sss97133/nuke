@@ -1067,6 +1067,84 @@ BEGIN
 END $$;
 RESET ROLE;
 DELETE FROM public.vocabulary_labels WHERE code = 'not_recorded';
+
+-- 7. 20261116055500: the paint token and the body-tag lines that had no item. The record's color is granted column by
+-- column like the rest; keyed body-tag readings of the paint code, option codes and line 5 on v1's tag photo.
+ALTER TABLE public.vehicles ADD COLUMN color text;
+GRANT SELECT (color) ON public.vehicles TO anon, authenticated;
+UPDATE public.vehicles SET color = 'Red' WHERE id = '10000000-0000-0000-0000-000000000001';
+INSERT INTO public.vehicle_observations (id, vehicle_id, kind, source_url, extraction_method, observed_at, structured_data,
+  source_id, property_id) VALUES
+ ('60000000-0000-0000-0000-000000000071', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","property_key":"body_tag_paint_code","body_tag_paint_code":{"lower":"99","upper":"98"}}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000072', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","property_key":"body_tag_option_codes","body_tag_option_codes":[]}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000073', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","property_key":"body_tag_line5","body_tag_line5":"990001"}', NULL, NULL),
+ ('60000000-0000-0000-0000-000000000074', '10000000-0000-0000-0000-000000000002', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"property_key":"body_tag_option_codes","body_tag_option_codes":["Z1","Y2"]}', NULL, NULL);
+CREATE TABLE public.t_paint_snap (vid uuid, dim text, doc jsonb);
+GRANT SELECT, INSERT ON public.t_paint_snap TO anon;
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+INSERT INTO public.t_paint_snap SELECT v, d, public.vehicle_facet_items(v, d)
+FROM unnest(ARRAY['10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002',
+                  '10000000-0000-0000-0000-000000000003']::uuid[]) v,
+     unnest(ARRAY['year', 'make', 'model', 'body_style', 'trim', 'engine', 'transmission', 'drivetrain']) d;
+RESET ROLE;
+\ir ../migrations/20261116055500_vehicle_facet_items_paint_body_tag.sql
+\ir ../migrations/20261116055500_vehicle_facet_items_paint_body_tag.sql
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE i jsonb; p jsonb;
+BEGIN
+  PERFORM public.t_assert((length(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure))
+      - length(replace(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure), 'facet_paint_body_tag_v1', '')))
+      / length('facet_paint_body_tag_v1') = 1, 'paint and body tag patched once');
+  PERFORM public.t_assert((SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(public.vehicle_facet_items('10000000-0000-0000-0000-000000000001')) k)
+    = ARRAY['body_style','drivetrain','engine','location','make','model','paint','transmission','trim','year'], 'every token, paint among them');
+  -- The record's color, as year's recorded item: a claim from the record until a source agrees.
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'paint', 'paint.current.recorded');
+  PERFORM public.t_assert(i->>'value' = 'Red' AND i->>'status' = 'claim' AND i->>'facet' = 'current'
+    AND i#>>'{sources,0,method}' = 'vehicles.color' AND i#>>'{sources,0,class}' = 'record', 'recorded color from the record');
+  -- The tag's paint code as read, both codes kept on the source; no color name.
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'paint', 'paint.as_built.code');
+  PERFORM public.t_assert(i->>'value' = '99/98' AND i->>'status' = 'reading' AND i->>'facet' = 'as_built'
+    AND i#>'{sources,0,decoded}' = '{"lower":"99","upper":"98"}'::jsonb
+    AND i#>>'{sources,0,witness,kind}' = 'image' AND i->'rule' = 'null'
+    AND i->>'needed' = 'photo of the body (cowl) tag paint line, named under a cited paint-code table', 'paint code as read, unnamed');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'body_style', 'body_style.option_codes');
+  PERFORM public.t_assert(i->>'value' = 'none' AND i->>'status' = 'reading', 'an empty option line reads as none');
+  i := public.t_item('10000000-0000-0000-0000-000000000002', 'body_style', 'body_style.option_codes');
+  PERFORM public.t_assert(i->>'value' = 'Z1 Y2' AND i->>'status' = 'claim', 'option codes in tag order');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'body_style', 'body_style.tag_line5');
+  PERFORM public.t_assert(i->>'value' = '990001' AND i->>'status' = 'reading' AND i->'rule' = 'null', 'line 5 as read, undecoded');
+  -- The thin car: every new item missing, each naming its evidence.
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(
+      public.vehicle_facet_items('10000000-0000-0000-0000-000000000003', 'paint')
+      || (SELECT jsonb_agg(x) FROM jsonb_array_elements(public.vehicle_facet_items('10000000-0000-0000-0000-000000000003', 'body_style')) x
+          WHERE x->>'key' IN ('body_style.option_codes', 'body_style.tag_line5'))) x
+    WHERE x->>'status' <> 'missing' OR x->>'needed' IS NULL), 'thin car: paint and tag lines missing with their evidence');
+  -- Every other item of every car is byte-identical.
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_paint_snap s
+    WHERE s.doc::text IS DISTINCT FROM (SELECT coalesce(jsonb_agg(x ORDER BY o), '[]'::jsonb)
+      FROM jsonb_array_elements(public.vehicle_facet_items(s.vid, s.dim)) WITH ORDINALITY e(x, o)
+      WHERE x->>'key' NOT IN ('body_style.option_codes', 'body_style.tag_line5'))::text),
+    'every other item unchanged');
+  -- The profile carries the token.
+  p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
+  PERFORM public.t_assert(p#>'{sections,0,token_items,paint}' = public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'paint'),
+    'the profile carries the paint token');
+  -- A list of items like every other token (the phone and web render any token's list), never an object by facet.
+  PERFORM public.t_assert(jsonb_typeof(p#>'{sections,0,token_items,paint}') = 'array'
+    AND jsonb_array_length(p#>'{sections,0,token_items,paint}') = 2
+    AND (SELECT array_agg(x->>'facet' ORDER BY o) FROM jsonb_array_elements(p#>'{sections,0,token_items,paint}') WITH ORDINALITY e(x, o))
+        = ARRAY['current', 'as_built'], 'paint token_items is an array of items with their facets');
+END $$;
+RESET ROLE;
 -- The documented fixture car as a logged-out viewer sees it (printed for review).
 SET ROLE anon;
 SET test.auth_role = 'anon';
