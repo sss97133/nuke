@@ -15,7 +15,7 @@
  *   "batch_size"?: number (default 20, max 50),
  *   "min_comments"?: number (default 5),
  *   "offset"?: number (for pagination),
- *   "max_comment_chars"?: number (default 12000),
+ *   "max_comment_chars"?: number (default 60000; comments are read oldest first until this is reached),
  *   "since_hours"?: number (default 48, max 168): only lots that ended inside this window,
  *   "vehicle_ids"?: string[] (run exactly these, skipping the candidate search),
  *   "model"?: one of DISCOVERY_MODELS (default the first),
@@ -156,7 +156,9 @@ Deno.serve(async (req) => {
 
     const batchSize = Math.max(1, Math.min(parseInt(String(body.batch_size ?? 20), 10) || 20, 50));
     const minComments = Math.max(0, parseInt(String(body.min_comments ?? 5), 10) || 5);
-    const maxCommentChars = body.max_comment_chars ?? 12000;
+    // 12,000 cut a 98-comment lot off at comment 53 (2026-11-12), dropping the close of the auction. 60,000 holds
+    // the 200-comment read for all but the longest threads; the count that fit is stored with the summary.
+    const maxCommentChars = body.max_comment_chars ?? 60000;
     const sinceHours = Math.max(1, Math.min(Number(body.since_hours ?? 48) || 48, 168));
     const model = DISCOVERY_MODELS.includes(body.model) ? body.model : DISCOVERY_MODELS[0];
     const dryRun = body.dry_run === true;
@@ -382,6 +384,8 @@ async function processVehicle(
       });
       discovered.key_quotes_dropped_not_verbatim = before - discovered.key_quotes.length;
     }
+
+    discovered.comments_analyzed = count;
 
     // Extract top-level fields for quick access
     const sentiment = discovered.sentiment?.overall || null;
