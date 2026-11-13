@@ -100,8 +100,9 @@ grading machinery exists; the outcome join is the gap, and it is a key repair on
 The evidence is a small fraction of the pool (0.5% of images analyzed, 11% of comments scored, ten of thousands of
 predictions graded), and the pool is a fraction of the market. Both fractions were the honest headline that morning.
 At 08:51Z the same day the join landed (PR #774): every prediction keyed to its lot and graded against the lot's
-outcome, 1,482 distinct sold lots (1,997 model-lot grades). Objective 0 is met at n ≥ 1,000 lots; the bar is now the
-live model's 26.2% median per-lot error with an 80% interval that holds the hammer 78.7% of the time.
+outcome, 1,482 distinct sold lots (1,997 model-lot grades). Objective 0 is met at n ≥ 1,000 lots; the bar that day was
+model 31's 26.2% median per-lot error with an 80% interval that holds the hammer 78.7% of the time. The evidence block
+above carries every later model.
 
 Row counts are cost, not results. Lead with the graded error and the coverage; mention the rows as the size of the
 testbed.
@@ -120,11 +121,11 @@ The unproven parts, each a Phase I objective:
 0. **The outcome join.** Done 2026-10-07 08:51Z (PR #774): every prediction keyed to its lot and graded against the
    lot's outcome at the last prediction before each lot's close (the scheduled close where live frames hold it, 282
    of model 31's lots; the final close otherwise, 469); 1,482 distinct sold lots graded (1,997 model-lot grades, a lot
-   counting once for each model that priced it), up from ten that morning. The bar: the live model's median absolute
+   counting once for each model that priced it), up from ten that morning. The bar set that day: model 31's median absolute
    error of 26.2% per lot, with an 80% interval that holds the hammer 78.7% of the time (751 lots): calibrated, and
    wide.
-1. **Condition and configuration from images and text**, at the accuracy the error demands. Today 0.5% of images are
-   vision-analyzed; condition blindness is the hypothesized cause of the error seen so far.
+1. **Condition and configuration from images and text**, at the accuracy the error demands. On 2026-10-07, 0.5% of images were
+   vision-analyzed (the README's measured block carries the current share); condition blindness is the hypothesized cause of the error seen so far.
 2. **Relation-weighted claim credibility.** A statement about an asset weighted by who made it, their relation to the
    asset at the time, and how their earlier claims resolved. Designed (`data-machine-cases.md` §13.3); no measured
    instance yet.
@@ -182,6 +183,8 @@ To a funder these are the market and the company sections. Lead with the instrum
 best data.
 
 ## How to say it
+
+The numbers in these lines are the 2026-10-07 baseline. Before using a line, replace them from the evidence block above.
 
 **To a reviewer.** "An observational ledger for physical assets. Every fact keeps its source and its clocks, state is
 computed from the log point-in-time, and predictions are graded against outcomes in a public table. Our live price model

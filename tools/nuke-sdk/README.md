@@ -2,8 +2,8 @@
 
 Official TypeScript SDK for the [Nuke Vehicle Data API](https://nuke.ag).
 
-1.29M vehicles. 35M images. Free image classification. Deal scoring. Comp data.
-Zero-setup access to the collector vehicle market.
+Vehicle records, images, comparable sales, deal scoring and free image classification.
+Current counts are measured daily in the [repository README](https://github.com/sss97133/nuke#readme).
 
 [![npm version](https://img.shields.io/npm/v/@nuke1/sdk)](https://www.npmjs.com/package/@nuke1/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

@@ -198,7 +198,7 @@ Updated: 2026-03-27
 - **iPhoto intake**: `scripts/iphoto-intake.mjs`
 - **Work photos**: `scripts/drop-folder-ingest.mjs`, `scripts/work-photos-intake.mjs`
 - **Modal sidecar URL**: `YONO_SIDECAR_URL` env var
-- **Spec**: `docs/YONO_SPEC.md`, `docs/YONO_TRAINING_DATA.md`
+- **Spec**: `yono/README.md`, `docs/ledger/theory/ai-vision-yono.md`, `docs/YONO_TRAINING_DATA.md` (training-data plan, March 2026)
 - **Status**: Sidecar live on Modal (2 warm containers). Pipeline globally PAUSED (`NUKE_ANALYSIS_PAUSED`).
 
 ### Comments & Sentiment
