@@ -410,8 +410,29 @@ private enum ZIPLocationReader {
         return try await SupabaseService.client.rpc("map_zip_activity", params: params).execute().value
     }
 
-    // Nonisolated network/decode work; only page publication returns to the UI.
+    /// One page through public.map_county_observations: the rows a logged-out visitor sees, in the table read's
+    /// shape. Signed in, the table read ran both tables' access policies per row (Clark County, 2026-11-13:
+    /// 4.2 s a 1,000-row page against 42 ms through the reader), so a county took about 85 s on the owner's phone.
+    /// Before the reader is deployed the table read answers.
+    private struct CountyPageParams: Encodable, Sendable { let p_fips: String; let p_after: String?; let p_limit: Int }
+    nonisolated(unsafe) private static var readerMissing = false
+
     static func fetch(fips: String, after: String?, size: Int) async throws -> [CountyLocationRow] {
+        if !readerMissing {
+            do {
+                return try await SupabaseService.client
+                    .rpc("map_county_observations", params: CountyPageParams(p_fips: fips, p_after: after, p_limit: size))
+                    .execute().value
+            } catch where ZIPCountFold.isMissingFunction(error) {
+                readerMissing = true
+                NSLog("NukeCapture map_county_observations unavailable; county pages use the table read")
+            }
+        }
+        return try await fetchTable(fips: fips, after: after, size: size)
+    }
+
+    // Nonisolated network/decode work; only page publication returns to the UI.
+    static func fetchTable(fips: String, after: String?, size: Int) async throws -> [CountyLocationRow] {
         var request = SupabaseService.client.from("vehicle_location_observations")
             .select("id,observed_at,source_type,source_platform,source_url,postal_code,county_fips,city,precision,confidence,vehicles!inner(id,year,make,model,trim,primary_image_url,city,state,status,deleted_at)")
             .eq("county_fips", value: fips).gte("confidence", value: 0.5)
