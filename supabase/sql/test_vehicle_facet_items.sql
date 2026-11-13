@@ -1145,6 +1145,64 @@ BEGIN
         = ARRAY['current', 'as_built'], 'paint token_items is an array of items with their facets');
 END $$;
 RESET ROLE;
+
+-- 8. 20261116056000: wording. A stored limitation naming the decode-rules table reads as words; the tag items' needs
+-- name the cited table first. Values and statuses are unchanged. Fixture row in the throwaway contract database.
+-- ALLOW_RAW_TESTIMONY_WRITE (test fixture, not production)
+INSERT INTO public.vehicle_observations (id, vehicle_id, kind, source_url, extraction_method, observed_at, structured_data,
+  source_id, property_id) VALUES
+ ('60000000-0000-0000-0000-000000000081', '10000000-0000-0000-0000-000000000002', 'specification', NULL, 'cowl_tag_decode_v1',
+  '2026-10-28T17:23:49Z', '{"property_key":"body_tag_line5","body_tag_line5":"990002","limitation":"Fixture limitation. The marking as read; its meaning comes from vehicle_decode_rules."}', NULL, NULL);
+CREATE TABLE public.t_wording_snap (vid uuid, dim text, doc jsonb);
+GRANT SELECT, INSERT ON public.t_wording_snap TO anon;
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+INSERT INTO public.t_wording_snap SELECT v, d, public.vehicle_facet_items(v, d)
+FROM unnest(ARRAY['10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002',
+                  '10000000-0000-0000-0000-000000000003']::uuid[]) v,
+     unnest(ARRAY['year', 'make', 'model', 'body_style', 'trim', 'engine', 'transmission', 'drivetrain', 'paint']) d;
+RESET ROLE;
+\ir ../migrations/20261116056000_vehicle_facet_items_wording.sql
+\ir ../migrations/20261116056000_vehicle_facet_items_wording.sql
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE i jsonb;
+BEGIN
+  PERFORM public.t_assert((length(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure))
+      - length(replace(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure), 'facet_item_wording_v1', '')))
+      / length('facet_item_wording_v1') = 1, 'wording patched once');
+  i := public.t_item('10000000-0000-0000-0000-000000000002', 'body_style', 'body_style.tag_line5');
+  PERFORM public.t_assert(i->>'value' = '990002'
+    AND i#>>'{sources,0,limitation}' = 'Fixture limitation. The marking as read; its meaning comes from the decode rules.',
+    'a stored table name reads as words');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_wording_snap s,
+      jsonb_array_elements(public.vehicle_facet_items(s.vid, s.dim)) x, jsonb_array_elements(coalesce(x->'sources', '[]')) src
+    WHERE src->>'limitation' LIKE '%vehicle_decode_rules%'), 'no source limitation names the table');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'paint', 'paint.as_built.code');
+  PERFORM public.t_assert(i->>'value' = '99/98' AND i->>'status' = 'reading'
+    AND i->>'needed' = 'a cited paint-code table naming the tag''s paint code (and a photo of the body (cowl) tag paint line, if none is on record)',
+    'paint code needs its table first');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'trim', 'trim.as_built.interior');
+  PERFORM public.t_assert(i->>'needed' LIKE 'a cited trim-code table%', 'trim code needs its table first');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'body_style', 'body_style.tag_line5');
+  PERFORM public.t_assert(i->>'needed' LIKE 'a cited body-tag table decoding line 5%', 'line 5 needs its table first');
+  -- Every item's key, value, status, rule and facet are unchanged; only the three tag needs and the worded limitation differ.
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_wording_snap s
+    WHERE (SELECT coalesce(jsonb_agg(x - 'needed' - 'sources' ORDER BY o), '[]'::jsonb)
+           FROM jsonb_array_elements(s.doc) WITH ORDINALITY e(x, o))::text
+      IS DISTINCT FROM (SELECT coalesce(jsonb_agg(x - 'needed' - 'sources' ORDER BY o), '[]'::jsonb)
+           FROM jsonb_array_elements(public.vehicle_facet_items(s.vid, s.dim)) WITH ORDINALITY e(x, o))::text),
+    'values and statuses unchanged');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_wording_snap s,
+      jsonb_array_elements(s.doc) WITH ORDINALITY a(x, o)
+      JOIN LATERAL (SELECT y FROM jsonb_array_elements(public.vehicle_facet_items(s.vid, s.dim)) WITH ORDINALITY b(y, p) WHERE p = o) n ON true
+    WHERE x->>'needed' IS DISTINCT FROM n.y->>'needed'
+      AND x->>'key' NOT IN ('paint.as_built.code', 'trim.as_built.interior', 'body_style.tag_line5')), 'only the three tag needs change');
+END $$;
+RESET ROLE;
 -- The documented fixture car as a logged-out viewer sees it (printed for review).
 SET ROLE anon;
 SET test.auth_role = 'anon';
