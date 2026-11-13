@@ -511,11 +511,15 @@ enum ProfileSection: Decodable {
         let priceLabel: String?
         let identityMarks: [VehicleIdentityMark]?
         let facets: ProfileVehicleFacets?
+        /// Every header token's line items (`vehicle_facet_items`), keyed by token. Location is not
+        /// carried; it is read when its token opens. Missing or malformed decodes to empty.
+        let tokenItems: TokenItems
 
         private enum CodingKeys: String, CodingKey {
             case identity_source, year, make, model, price, priceLabel
             case identityMarks, identity_marks
             case facets, vehicle_facets
+            case token_items
         }
 
         init(from decoder: Decoder) throws {
@@ -530,6 +534,7 @@ enum ProfileSection: Decodable {
                 ?? (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identity_marks))
             self.facets = (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .facets))
                 ?? (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .vehicle_facets))
+            self.tokenItems = TokenItems.decode(from: c, forKey: .token_items)
         }
     }
     struct Facet: Decodable {
@@ -537,10 +542,27 @@ enum ProfileSection: Decodable {
         let label: String
         let member: Claim
     }
+    /// A header token the read has no established member for; it opens what would establish it.
+    struct Gap: Decodable, Equatable {
+        let dimension: String
+        let label: String
+    }
     struct Strip: Decodable {
         let coverage: Coverage
         let facets: [Facet]
         let odometer: Claim?
+        /// Tokens not established (`strip.gaps`); an older read without them decodes to empty.
+        let gaps: [Gap]
+
+        private enum CodingKeys: String, CodingKey { case coverage, facets, odometer, gaps }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.coverage = try c.decode(Coverage.self, forKey: .coverage)
+            self.facets = try c.decode([Facet].self, forKey: .facets)
+            self.odometer = try c.decodeIfPresent(Claim.self, forKey: .odometer)
+            self.gaps = ((try? c.decodeIfPresent(LossyList<Gap>.self, forKey: .gaps)) ?? nil)?.items ?? []
+        }
     }
     struct Measures: Decodable {
         let stack: String
@@ -755,5 +777,190 @@ struct ProfileRead: Decodable {
             trim_facet: resolvedTrim,
             body_facet: resolvedBody
         )
+    }
+}
+
+// ─── Header token line items (`kit/types.ts` FacetItem / TokenItems) ─────────────────────────────
+// `vehicle_facet_items` returns one row per line item of a header token: its facet, value, status,
+// sources (with a photo witness), rule, equation and what would establish it. The profile read
+// carries every token's items in its masthead (`token_items`); location is read when it opens.
+// Decoding is tolerant per item: one malformed item drops only itself, never the header.
+
+/// Any JSON value. Item values are scalars, sequences (gear ratios) or the area shapes location carries.
+indirect enum ItemJSON: Decodable, Equatable {
+    case null
+    case bool(Bool)
+    case number(Double)
+    case string(String)
+    case array([ItemJSON])
+    case object([String: ItemJSON])
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { self = .null; return }
+        if let b = try? c.decode(Bool.self) { self = .bool(b); return }
+        if let n = try? c.decode(Double.self) { self = .number(n); return }
+        if let s = try? c.decode(String.self) { self = .string(s); return }
+        if let a = try? c.decode([ItemJSON].self) { self = .array(a); return }
+        if let o = try? c.decode([String: ItemJSON].self) { self = .object(o); return }
+        throw DecodingError.dataCorruptedError(in: c, debugDescription: "Unreadable JSON value")
+    }
+
+    var string: String? { if case .string(let s) = self { return s } else { return nil } }
+    var number: Double? { if case .number(let n) = self { return n } else { return nil } }
+    var object: [String: ItemJSON]? { if case .object(let o) = self { return o } else { return nil } }
+    var array: [ItemJSON]? { if case .array(let a) = self { return a } else { return nil } }
+    var isNull: Bool { self == .null }
+    subscript(_ key: String) -> ItemJSON? { object?[key] }
+}
+
+/// An array whose unreadable members are skipped instead of failing the whole array.
+struct LossyList<Element: Decodable>: Decodable {
+    let items: [Element]
+    private struct Skip: Decodable {}
+    init(from decoder: Decoder) throws {
+        // Not an array (null, an object): nothing to read, and nothing to fail the parent over.
+        guard var c = try? decoder.unkeyedContainer() else { items = []; return }
+        var out: [Element] = []
+        while !c.isAtEnd {
+            if let e = try? c.decode(Element.self) { out.append(e) }
+            // A failed decode does not advance the container; read the member as plain JSON to step past it.
+            else if (try? c.decode(ItemJSON.self)) == nil { break }
+        }
+        items = out
+    }
+}
+
+/// One source of an item: who said it, when, what they said, and the photo it was read from.
+struct FacetItemSource: Decodable, Equatable {
+    struct Witness: Decodable, Equatable {
+        let kind: String
+        let id: String
+        let thumb: String?
+    }
+    var slug: String? = nil
+    var label: String? = nil
+    var kind: String? = nil
+    var url: String? = nil
+    var method: String? = nil
+    var observed_at: String? = nil
+    var value: ItemJSON? = nil
+    var value_label: String? = nil
+    var limitation: String? = nil
+    var decoded: [String: ItemJSON]? = nil
+    var witness: Witness? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case slug, label, kind, url, method, observed_at, value, value_label, limitation, decoded, witness
+    }
+
+    init(slug: String? = nil, label: String? = nil, kind: String? = nil, url: String? = nil, method: String? = nil,
+         observed_at: String? = nil, value: ItemJSON? = nil, value_label: String? = nil, limitation: String? = nil,
+         decoded: [String: ItemJSON]? = nil, witness: Witness? = nil) {
+        self.slug = slug; self.label = label; self.kind = kind; self.url = url; self.method = method
+        self.observed_at = observed_at; self.value = value; self.value_label = value_label
+        self.limitation = limitation; self.decoded = decoded; self.witness = witness
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slug = try? c.decodeIfPresent(String.self, forKey: .slug)
+        label = try? c.decodeIfPresent(String.self, forKey: .label)
+        kind = try? c.decodeIfPresent(String.self, forKey: .kind)
+        url = try? c.decodeIfPresent(String.self, forKey: .url)
+        method = try? c.decodeIfPresent(String.self, forKey: .method)
+        observed_at = try? c.decodeIfPresent(String.self, forKey: .observed_at)
+        value = try? c.decodeIfPresent(ItemJSON.self, forKey: .value)
+        value_label = try? c.decodeIfPresent(String.self, forKey: .value_label)
+        limitation = try? c.decodeIfPresent(String.self, forKey: .limitation)
+        decoded = try? c.decodeIfPresent([String: ItemJSON].self, forKey: .decoded)
+        witness = try? c.decodeIfPresent(Witness.self, forKey: .witness)
+    }
+}
+
+/// One line item of a header token, exactly as `vehicle_facet_items` returns it. `facet` and `status`
+/// stay the reader's words: a value this app does not know is shown as written, never dropped.
+struct FacetItem: Decodable, Equatable {
+    struct Side: Decodable, Equatable {
+        let value: ItemJSON?
+        let sources: [FacetItemSource]
+        private enum CodingKeys: String, CodingKey { case value, sources }
+        init(value: ItemJSON?, sources: [FacetItemSource]) { self.value = value; self.sources = sources }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            value = try? c.decodeIfPresent(ItemJSON.self, forKey: .value)
+            sources = ((try? c.decodeIfPresent(LossyList<FacetItemSource>.self, forKey: .sources)) ?? nil)?.items ?? []
+        }
+    }
+
+    let key: String
+    /// as_built | current | decode | derived
+    let facet: String
+    var value: ItemJSON? = nil
+    var unit: String? = nil
+    /// established | reading | claim | conflict | missing
+    let status: String
+    var sources: [FacetItemSource] = []
+    var rule: [String: ItemJSON]? = nil
+    var equation: [String: ItemJSON]? = nil
+    var needed: String? = nil
+    var stated: String? = nil
+    var lead: Bool = false
+    var sides: [Side] = []
+    var candidates: [[String: ItemJSON]] = []
+    var examined: [[String: ItemJSON]] = []
+    var availability: [[String: ItemJSON]] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case key, facet, value, unit, status, sources, rule, equation, needed, stated, lead
+        case sides, candidates, examined, availability
+    }
+
+    init(key: String, facet: String, value: ItemJSON? = nil, unit: String? = nil, status: String,
+         sources: [FacetItemSource] = [], rule: [String: ItemJSON]? = nil, equation: [String: ItemJSON]? = nil,
+         needed: String? = nil, stated: String? = nil, lead: Bool = false, sides: [Side] = [],
+         candidates: [[String: ItemJSON]] = [], examined: [[String: ItemJSON]] = [], availability: [[String: ItemJSON]] = []) {
+        self.key = key; self.facet = facet; self.value = value; self.unit = unit; self.status = status
+        self.sources = sources; self.rule = rule; self.equation = equation; self.needed = needed
+        self.stated = stated; self.lead = lead; self.sides = sides; self.candidates = candidates
+        self.examined = examined; self.availability = availability
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // An item without its key, facet or status cannot be placed; it is skipped by the list.
+        key = try c.decode(String.self, forKey: .key)
+        facet = try c.decode(String.self, forKey: .facet)
+        status = try c.decode(String.self, forKey: .status)
+        value = try? c.decodeIfPresent(ItemJSON.self, forKey: .value)
+        unit = try? c.decodeIfPresent(String.self, forKey: .unit)
+        sources = ((try? c.decodeIfPresent(LossyList<FacetItemSource>.self, forKey: .sources)) ?? nil)?.items ?? []
+        rule = try? c.decodeIfPresent([String: ItemJSON].self, forKey: .rule)
+        equation = try? c.decodeIfPresent([String: ItemJSON].self, forKey: .equation)
+        needed = try? c.decodeIfPresent(String.self, forKey: .needed)
+        stated = try? c.decodeIfPresent(String.self, forKey: .stated)
+        lead = ((try? c.decodeIfPresent(Bool.self, forKey: .lead)) ?? nil) ?? false
+        sides = ((try? c.decodeIfPresent(LossyList<Side>.self, forKey: .sides)) ?? nil)?.items ?? []
+        func objects(_ k: CodingKeys) -> [[String: ItemJSON]] {
+            (((try? c.decodeIfPresent(LossyList<ItemJSON>.self, forKey: k)) ?? nil)?.items ?? []).compactMap(\.object)
+        }
+        candidates = objects(.candidates)
+        examined = objects(.examined)
+        availability = objects(.availability)
+    }
+}
+
+/// Every token's items, keyed by token (year, make, model, body_style, trim, engine, transmission,
+/// drivetrain). Location is read on open (`vehicle_facet_items(p_dimension: 'location')`).
+struct TokenItems: Equatable {
+    var byToken: [String: [FacetItem]] = [:]
+
+    subscript(_ token: String) -> [FacetItem] { byToken[token] ?? [] }
+    var tokens: [String] { byToken.keys.sorted() }
+    var isEmpty: Bool { byToken.values.allSatisfy(\.isEmpty) }
+
+    static func decode<K: CodingKey>(from c: KeyedDecodingContainer<K>, forKey key: K) -> TokenItems {
+        guard let raw = (try? c.decodeIfPresent([String: LossyList<FacetItem>].self, forKey: key)) ?? nil else { return TokenItems() }
+        return TokenItems(byToken: raw.mapValues(\.items))
     }
 }

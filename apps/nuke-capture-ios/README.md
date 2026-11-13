@@ -63,7 +63,13 @@ listing, image, agent → `.attributed`; model → `.projected`; legacy → `.fa
 drill: the web says the same in words in its popover, the phone says it by grammar). A live auction
 banner owns the headline price; the masthead price stays off while `vehicle_pulse.is_live`. When the read
 grows a section, add its case to `ProfileSection` and render it through the same primitives; never add a
-new client-side query to the header.
+new client-side query to the header. **Header tokens open their line items**, as the web's `HeaderTokenItems`:
+the masthead's `token_items` (one array per token, as `vehicle_facet_items` returns them) and the strip's `gaps`
+decode tolerantly in `ProfileDocument.swift`; `TokenItemsSheet.swift` renders them grouped by facet with status,
+sources (photo witness through `NukeImage.thumb`), rule, candidates, availability, equation and what is needed,
+in words ported from `kit/Items.tsx` (`ItemText`). Strip rows and gaps open their token; tokens no strip row
+covers (year, make, model, trim) get rows of their own. Location alone is read on open
+(`vehicle_facet_items(p_dimension: 'location')`), as on the web; its county map is not drawn on the phone yet.
 
 Standing rules the code carries:
 

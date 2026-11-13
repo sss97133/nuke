@@ -175,9 +175,10 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: bo
             // rules and gaps: the same items the token's popover shows (kit ItemList), read once with the header.
             const items = itemsFor(key);
             if (items && key === 'engine_size') return null;
-            if (items) return <tr key={key} data-record-field={key} data-token-items={FIELD_TOKEN[key]}>
-              <th scope="row">{key === 'engine_type' ? 'Engine' : STRUCTURED_RECORD_LABELS[key]}</th>
-              <td><ItemList items={items} /></td>
+            // Full width: an item list in the 65% value column broke names letter by letter at desktop width.
+            if (items) return <tr key={key} data-record-field={key} data-token-items={FIELD_TOKEN[key]} className="vp-structured-record__items">
+              <td colSpan={2}><div className="vp-structured-record__items-label">{key === 'engine_type' ? 'Engine' : STRUCTURED_RECORD_LABELS[key]}</div>
+                <ItemList items={items} /></td>
             </tr>;
             const derived = current.bindings?.filter(b => b.origin_column === key && (b.value !== a.value || b.unit !== a.unit || b.record_columns_disagree));
             return <tr key={key} data-record-field={key}>
