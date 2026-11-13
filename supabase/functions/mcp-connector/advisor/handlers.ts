@@ -23,7 +23,10 @@ import {
   canonicalListingUrl,
   cleanListingUrl,
   detectVariant,
+  hardVariantMismatch,
   isLikelyPartsSale,
+  junkCompReason,
+  lowOutlierCut,
   isGenerationMismatch,
   isVariantMismatch,
   recentSaleSanityGuard,
@@ -32,6 +35,7 @@ import {
 } from "./variants.ts";
 
 import { rankBudgetOptions, budgetEnvelope, type SegmentStat, type MarketSignal } from "./budget.ts";
+import { cohortTrend } from "./market_position.ts";
 
 /** Minimal PostgREST-shaped client used by advisor handlers (avoids pulling supabase-js types into Deno tests). */
 // deno-lint-ignore no-explicit-any
@@ -266,7 +270,10 @@ export function createAdvisorHandlers(deps: AdvisorDeps): Record<
     get_comps: (args) => handleGetComps(deps, args),
     value_asset: (args) => handleValueAsset(deps, args),
     evaluate_listing: (args) =>
-      handleEvaluateListing({ ...deps, valueAsset: (id) => handleValueAsset(deps, { asset_id: id }) }, args),
+      handleEvaluateListing(
+        { ...deps, valueAsset: (id, opts) => handleValueAsset(deps, { asset_id: id }, opts) },
+        args,
+      ),
     budget_options: (args) => handleBudgetOptions(deps, args),
   };
 }
@@ -455,6 +462,32 @@ export type CompsLookup = {
 export type CompsPriceBasis = "hammer" | "gross_incl_premium" | "net_to_owner" | "legacy_mixed";
 export const DEFAULT_COMPS_BASIS: Exclude<CompsPriceBasis, "legacy_mixed"> = "hammer";
 
+/**
+ * Page-observed subject facts handed in by evaluate_listing (T2/T3). They beat stored vehicle fields
+ * for this answer only; nothing is written back.
+ */
+export interface SubjectOverride {
+  /** Identity text read from the listing page (title + model + URL): drives variant matching. */
+  subjectText?: string | null;
+  /** Odometer read from the page (miles); used for comp scoring and the mileage adjustment. */
+  subjectMileage?: number | null;
+  /** Listing URLs that are the subject itself: never a comp. */
+  excludeUrls?: string[];
+  /** The asset's recorded sale IS the listing being evaluated: never value it against itself. */
+  ownSaleIsSubject?: boolean;
+  /** Stored subject attributes conflict with the page: do not let the SQL scorer rank on them. */
+  ignoreDbSubjectAttrs?: boolean;
+}
+
+/** Variant text for a row: URL / title / model first; a trim like "GT3, GT3 RS" only when they say nothing. */
+function identityVariant(primary: string, trim: unknown): { variant: VariantKey; text: string } {
+  const v = detectVariant(primary);
+  if (v !== "base" || !trim) return { variant: v, text: primary };
+  const withTrim = `${primary} ${trim}`;
+  return { variant: detectVariant(withTrim), text: withTrim };
+}
+
+
 async function resolveSoldComps(
   deps: AdvisorDeps,
   args: {
@@ -464,7 +497,8 @@ async function resolveSoldComps(
     year?: number | null;
     limit?: number;
   },
-): Promise<{ comps: SoldComp[]; query: Record<string, unknown>; excluded: Record<string, number>; lookup: CompsLookup }> {
+  override: SubjectOverride = {},
+): Promise<{ comps: SoldComp[]; pool: SoldComp[]; query: Record<string, unknown>; excluded: Record<string, number>; lookup: CompsLookup }> {
   const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 25);
   const sb = deps.sb();
   let make = args.make ?? null;
@@ -493,16 +527,29 @@ async function resolveSoldComps(
   if (!make) {
     return {
       comps: [],
+      pool: [],
       query: { make, model, year, limit },
       excluded: { no_make: 1 },
       lookup: { ok: false, degraded: true, attempts: 0, source: "none", error: "no make to search on" },
     };
   }
 
-  const subjectVariant = detectVariant(
-    `${subject?.model || model || ""} ${subject?.trim || ""} ${subject?.listing_title || ""} ${
-      subject?.listing_url || ""
-    } ${subject?.bat_auction_url || ""}`,
+  // Page-observed identity (evaluate_listing) beats stored fields; a stored trim like "GT3, GT3 RS"
+  // is consulted only when the title / model / URL carry no variant.
+  const subjectIdentity = override.subjectText
+    ? { variant: detectVariant(override.subjectText), text: override.subjectText }
+    : identityVariant(
+      `${subject?.model || model || ""} ${subject?.listing_title || ""} ${subject?.listing_url || ""} ${
+        subject?.bat_auction_url || ""
+      }`,
+      subject?.trim,
+    );
+  const subjectVariant = subjectIdentity.variant;
+  const subjectText = subjectIdentity.text;
+  const excludeCanon = new Set(
+    [...(override.excludeUrls ?? []), subject?.listing_url, subject?.bat_auction_url]
+      .filter(Boolean)
+      .map((u) => canonicalListingUrl(String(u))),
   );
 
   const yearRange = 2;
@@ -515,7 +562,9 @@ async function resolveSoldComps(
     p_year_max: year != null ? year + yearRange : null,
     p_min_price: null,
     p_max_price: null,
-    p_exclude_vehicle_id: excludeId,
+    // With conflicting stored attributes (e.g. odometer 5,000 vs page 111k TMU) the SQL scorer would
+    // rank on the stale values, so it gets no subject id; the subject is dropped reader-side instead.
+    p_exclude_vehicle_id: override.ignoreDbSubjectAttrs ? null : excludeId,
     p_limit: fetchLimit,
   };
   // Under load the comps RPC can hit its 10s statement timeout. Retry with backoff; if every
@@ -574,6 +623,14 @@ async function resolveSoldComps(
 
   const ids = rows.map((r) => String(r.vehicle_id || "")).filter(Boolean);
   const facts = await loadPriceFactsMap(sb, ids);
+  // Listing titles carry the variant and junk words ("Camaro-bodied track car") the model field drops.
+  const titles = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 100) {
+    try {
+      const { data: tv } = await sb.from("vehicles").select("id, listing_title").in("id", ids.slice(i, i + 100));
+      for (const r of tv || []) if (r?.listing_title) titles.set(String(r.id), String(r.listing_title));
+    } catch { /* titles are additive */ }
+  }
   if (facts.failedChunks) {
     lookupOk = false;
     lookupError = `vehicle_price_facts failed for ${facts.failedChunks} chunk(s): ${facts.lastError}`;
@@ -583,7 +640,9 @@ async function resolveSoldComps(
   // Optional subject attribute boosts (reader-side; does not invent missing transmission).
   const subTrans = subject?.transmission ? String(subject.transmission).toLowerCase() : null;
   const subBody = subject?.body_style ? String(subject.body_style).toLowerCase() : null;
-  const subMiles = typeof subject?.mileage === "number" ? subject.mileage as number : null;
+  const subMiles = override.subjectMileage != null
+    ? override.subjectMileage
+    : typeof subject?.mileage === "number" ? subject.mileage as number : null;
 
   const excluded: Record<string, number> = {
     not_sold: 0,
@@ -594,6 +653,11 @@ async function resolveSoldComps(
     generation_mismatch: 0,
     duplicate: 0,
     parts: 0,
+    subject_listing: 0,
+    hard_variant_mismatch: 0,
+    junk_title: 0,
+    url_year_mismatch: 0,
+    low_price_outlier: 0,
   };
   const sold: SoldComp[] = [];
   const seenUrl = new Set<string>();
@@ -668,6 +732,10 @@ async function resolveSoldComps(
       (c.listing_url as string) || (fact?.source_url as string) || null,
     );
     const canon = canonicalListingUrl(listingUrl);
+    if ((id && excludeId && id === excludeId) || (canon && excludeCanon.has(canon))) {
+      excluded.subject_listing++;
+      continue;
+    }
     if (canon && seenUrl.has(canon)) {
       excluded.duplicate++;
       continue;
@@ -684,10 +752,29 @@ async function resolveSoldComps(
       continue;
     }
 
-    const candBlob = `${c.model || ""} ${c.trim || ""} ${listingUrl || ""}`;
-    const candVariant = detectVariant(candBlob);
+    const candTitle = id ? titles.get(id) ?? null : null;
+    const candIdentity = identityVariant(`${c.model || ""} ${candTitle || ""} ${listingUrl || ""}`, c.trim);
+    const candBlob = candIdentity.text;
+    const candVariant = candIdentity.variant;
     if (isVariantMismatch(subjectVariant, candVariant)) {
       excluded.variant_mismatch++;
+      continue;
+    }
+    // T3: RS / GT2 / Turbo S / Weissach / Clubsport / Speedster / Cup must match exactly.
+    if (hardVariantMismatch(subjectText, candBlob).length) {
+      excluded.hard_variant_mismatch++;
+      continue;
+    }
+    const junk = junkCompReason({
+      title: candTitle,
+      url: listingUrl,
+      model: String(c.model || ""),
+      rowYear: c.year != null ? Number(c.year) : null,
+      subjectText,
+    });
+    if (junk) {
+      if (junk === "url_year_mismatch") excluded.url_year_mismatch++;
+      else excluded.junk_title++;
       continue;
     }
     // Same variant, different generation (e.g. 964 Turbo 3.6 comps for a 993 Turbo).
@@ -777,6 +864,11 @@ async function resolveSoldComps(
     });
   }
 
+  // T3: a "sale" under 25% of the cohort median is a parts lot or a no-sale mislabeled as sold.
+  const cut = lowOutlierCut(sold, (r) => r.sale_price);
+  excluded.low_price_outlier = cut.dropped.length;
+  sold.length = 0;
+  sold.push(...cut.kept);
   sold.sort((a, b) => Number(b.similarity_score || 0) - Number(a.similarity_score || 0));
   const soldIds = new Set(sold.map((s) => String(s.asset_id ?? "")));
   excluded.sale_truth_candidates = truthHitIds.size;
@@ -785,6 +877,7 @@ async function resolveSoldComps(
   excluded.sale_truth_still_in_comps = [...truthHitIds].filter((i) => soldIds.has(i)).length;
   return {
     comps: sold.slice(0, limit),
+    pool: sold,
     query: {
       make,
       model,
@@ -792,6 +885,8 @@ async function resolveSoldComps(
       limit,
       year_range: yearRange,
       subject_variant: subjectVariant,
+      ...(override.subjectText ? { subject_identity_source: "listing_page" } : {}),
+      ...(override.ignoreDbSubjectAttrs ? { sql_scoring_without_stored_subject_attrs: true } : {}),
       model_matching: "exact, substring, or model_spelling_key (punctuation/spacing/transmission words ignored); trim variants hard-blocked",
       ...(compsQueryError ? { comps_query_error: compsQueryError } : {}),
     },
@@ -1769,6 +1864,7 @@ async function handleExplainField(
 async function handleValueAsset(
   deps: AdvisorDeps,
   args: Record<string, unknown>,
+  override: SubjectOverride = {},
 ): Promise<AdvisorToolResult> {
   const bad = unsupportedAsset(args, "value_asset");
   if (bad) return bad;
@@ -1797,15 +1893,24 @@ async function handleValueAsset(
 
   const est = estimates?.[0] ?? null;
   const price = await priceFacts(sb, vid);
-  const { comps, excluded, lookup: compsLookup } = await resolveSoldComps(deps, {
+  const { comps, pool: compsPool, excluded, lookup: compsLookup } = await resolveSoldComps(deps, {
     asset_id: vid,
     make: vehicle.make as string,
     model: vehicle.model as string,
     year: vehicle.year as number,
     limit: 15,
-  });
+  }, override);
+  const subjectMileage = override.subjectMileage != null
+    ? override.subjectMileage
+    : typeof vehicle.mileage === "number" ? vehicle.mileage as number : null;
 
-  const allIn = await allInCosts(sb, [vid, ...comps.map((c) => String(c.asset_id))]);
+  // Sales of this same cohort in the last 12 months (variant-matched, junk-filtered).
+  const nowMs = Date.now();
+  const recentPool = compsPool.filter((c) => {
+    const t = c.sold_date ? Date.parse(String(c.sold_date)) : NaN;
+    return Number.isFinite(t) && t <= nowMs && nowMs - t <= 365 * 86_400_000 && Number(c.sale_price) > 0;
+  }).sort((a, b) => Date.parse(String(b.sold_date)) - Date.parse(String(a.sold_date)));
+  const allIn = await allInCosts(sb, [vid, ...comps.map((c) => String(c.asset_id)), ...recentPool.map((c) => String(c.asset_id))]);
   const soldPrices = comps
     .map((c) => c.sale_price)
     .filter((n): n is number => typeof n === "number" && n > 0)
@@ -1827,8 +1932,10 @@ async function handleValueAsset(
   let estimateSource = "nuke_estimates";
   const flags: string[] = [];
 
-  // Same-asset sale within 90 days dominates cohort medians.
-  if (price?.sold?.amount != null && price.sold.on) {
+  // Same-asset sale within 90 days dominates cohort medians — unless that sale is the listing being
+  // judged (evaluate_listing): a sale is never evidence for its own fairness.
+  if (override.ownSaleIsSubject) flags.push("subject_sale_excluded_from_own_valuation");
+  if (price?.sold?.amount != null && price.sold.on && !override.ownSaleIsSubject) {
     const days = Math.round((Date.now() - Date.parse(String(price.sold.on))) / 86_400_000);
     if (days >= 0 && days <= 90) {
       const saleAmt = Number(price.sold.amount);
@@ -1915,7 +2022,7 @@ async function handleValueAsset(
     } catch { index = []; }
     const ownHammer = price?.sold?.amount != null ? hammerBasis(Number(price.sold.amount), allIn.get(vid)) : null;
     if (ownHammer?.converted) hammerConversions++;
-    const ownSale = ownHammer && price?.sold?.on
+    const ownSale = ownHammer && price?.sold?.on && !override.ownSaleIsSubject
       ? { amount: ownHammer.amount, on: String(price.sold.on), platform: price.source_url ?? vehicle.canonical_platform }
       : null;
     const compsHammer = comps.map((c) => {
@@ -1929,7 +2036,7 @@ async function handleValueAsset(
       index,
       asOf: new Date().toISOString(),
       subjectPlatform: vehicle.canonical_platform || "bat",
-      subjectMileage: typeof vehicle.mileage === "number" ? vehicle.mileage as number : null,
+      subjectMileage,
       ownSale,
     });
     if (adjusted) {
@@ -1946,9 +2053,37 @@ async function handleValueAsset(
     }
   }
 
+  // Recent same-cohort sales beat an index-adjusted estimate that disagrees with them by >25%: a
+  // make-wide index cannot see a cohort that moved on its own (2011 GT3 RS: $135k in 2019, $501k in 2026).
+  let recentOverride: Record<string, unknown> | null = null;
+  if (compsLookup.ok && recentPool.length >= 3 && valuePoint != null && estimateSource !== "recent_same_asset_sale") {
+    const rp = recentPool.map((c) => Number(c.sale_price)).sort((a, b) => a - b);
+    const rMed = median(rp)!;
+    if (rMed > 0 && Math.abs(valuePoint - rMed) / rMed > 0.25) {
+      recentOverride = {
+        replaced_estimate: valuePoint,
+        replaced_low: valueLow,
+        replaced_high: valueHigh,
+        replaced_source: estimateSource,
+        n: rp.length,
+        median: rMed,
+        window_days: 365,
+      };
+      valuePoint = rMed;
+      valueLow = percentile(rp, 0.25) ?? rMed;
+      valueHigh = percentile(rp, 0.75) ?? rMed;
+      estimateSource = "recent_sold_comps_12m";
+      noEstimateReason = null;
+      flags.push("recent_12m_sales_override_disagreeing_estimate");
+    }
+  }
+  const compsOut = recentOverride
+    ? [...recentPool, ...comps.filter((c) => !recentPool.includes(c))].slice(0, 15)
+    : comps;
+
   const guard = recentSaleSanityGuard({
     estimate: valuePoint,
-    saleAmount: price?.sold?.amount != null ? Number(price.sold.amount) : null,
+    saleAmount: price?.sold?.amount != null && !override.ownSaleIsSubject ? Number(price.sold.amount) : null,
     saleOn: price?.sold?.on ? String(price.sold.on) : null,
   });
   if (guard.triggered && price?.sold?.amount != null) {
@@ -1975,7 +2110,8 @@ async function handleValueAsset(
   const cit = emptyCitation({
     source_name: estimateSource === "recent_same_asset_sale"
       ? "Same-asset sale"
-      : estimateSource === "sold_comps_median" || estimateSource.startsWith("adjusted_")
+      : estimateSource === "sold_comps_median" || estimateSource.startsWith("adjusted_") ||
+          estimateSource === "recent_sold_comps_12m"
       ? "Confirmed sold comps"
       : "Nuke Estimate",
     source_url: sourceUrl,
@@ -1995,6 +2131,13 @@ async function handleValueAsset(
     if (storedDisagrees && estimateSource === "nuke_estimates") confVal = Math.min(confVal, 0.30);
     if (guard.triggered) confVal = Math.min(confVal, 0.25);
     if (estimateSource === "recent_same_asset_sale") confVal = 0.55;
+    if (estimateSource === "recent_sold_comps_12m" && recentOverride) {
+      const rp = recentPool.map((c) => Number(c.sale_price)).sort((a, b) => a - b);
+      const rq1 = percentile(rp, 0.25);
+      const rq3 = percentile(rp, 0.75);
+      const rMed = Number(recentOverride.median);
+      confVal = calibratedConfidence(rp.length, rq1 != null && rq3 != null && rMed > 0 ? (rq3 - rq1) / rMed : null);
+    }
     if (adjusted && (estimateSource === "adjusted_comps" || estimateSource === "adjusted_own_sale")) {
       confVal = estimateSource === "adjusted_own_sale" ? Math.min(adjusted.confidence, 0.55) : adjusted.confidence;
     }
@@ -2067,7 +2210,10 @@ async function handleValueAsset(
       estimated_value: valuePoint,
       estimate_source: estimateSource,
       // adjusted_* estimates are hammer prices (buyer premium excluded); add the venue premium for all-in.
-      price_basis: estimateSource.startsWith("adjusted_") ? "hammer" : "stored_sale_price",
+      price_basis: estimateSource.startsWith("adjusted_") || estimateSource === "recent_sold_comps_12m"
+        ? "hammer"
+        : "stored_sale_price",
+      recent_sales_override: recentOverride,
       degraded: !compsLookup.ok || compsLookup.degraded,
       comps_lookup: compsLookup,
       estimate_stale: estimateStale,
@@ -2083,7 +2229,7 @@ async function handleValueAsset(
       // depending on platform; all_in_cost carries the breakdown with cited fee terms.
       hammer: (allIn.get(vid)?.hammer as number | undefined) ?? null,
       all_in_cost: allIn.get(vid) ?? null,
-      comps_used: comps.map((c) => ({
+      comps_used: compsOut.map((c) => ({
         asset_id: c.asset_id,
         sale_price: c.sale_price,
         all_in: allInSummary(allIn.get(String(c.asset_id))),
@@ -2093,7 +2239,11 @@ async function handleValueAsset(
         year: c.year,
         make: c.make,
         model: c.model,
+        variant: c.variant,
+        mileage: c.mileage ?? null,
       })),
+      // T4: 12-month cohort median vs the prior 12 months (same filtered cohort as the comps).
+      trend: cohortTrend(compsPool),
       comps_summary: {
         count: soldPrices.length,
         median: med,
