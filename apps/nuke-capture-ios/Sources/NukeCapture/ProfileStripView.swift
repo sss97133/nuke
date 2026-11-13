@@ -289,6 +289,7 @@ struct ProfileHeaderBlock: View {
     let read: ProfileRead
 
     @State private var drill: ClaimDrill?
+    @State private var tokenDrill: TokenDrill?
     @State private var descriptionExpanded = false
     @State private var identityMarks: [VehicleIdentityMark] = []
     @State private var selectedIdentityMark: VehicleIdentityMark?
@@ -332,6 +333,9 @@ struct ProfileHeaderBlock: View {
 
     private static func name(for dimension: String) -> String {
         switch dimension {
+        case "year": return "Year"
+        case "make": return "Make"
+        case "model": return "Model"
         case "series", "series_facet": return "Series"
         case "trim", "trim_facet": return "Trim"
         case "body_style", "body_facet": return "Body"
@@ -343,22 +347,83 @@ struct ProfileHeaderBlock: View {
         }
     }
 
+    /// The tokens `vehicle_facet_items` reads (the web's TOKEN_DIMENSIONS). A strip dimension the
+    /// reader has no token for (series, package) is trim; the engine field is the engine token.
+    static let tokenDimensions: [String] = ["year", "make", "model", "trim", "body_style", "engine", "transmission", "drivetrain", "location"]
+
+    static func tokenDimension(for dimension: String) -> String {
+        if dimension == "engine_type" || dimension == "engine_size" { return "engine" }
+        if dimension == "body_facet" || dimension == "body_style_facet" { return "body_style" }
+        return tokenDimensions.contains(dimension) ? dimension : "trim"
+    }
+
+    /// Tokens the read carries items for that no strip row or gap already opens (on the web they are
+    /// the title's year, make, model and identity variants). Each becomes a header row of its own.
+    static func identityTokens(read: ProfileRead) -> [String] {
+        guard let items = read.masthead?.tokenItems, !items.isEmpty else { return [] }
+        let strip = read.strip
+        let covered = Set((strip?.facets.map { tokenDimension(for: $0.dimension) } ?? [])
+            + (strip?.gaps.map { tokenDimension(for: $0.dimension) } ?? []))
+        let known = tokenDimensions.filter { !items[$0].isEmpty && !covered.contains($0) }
+        let others = items.tokens.filter { !tokenDimensions.contains($0) && !items[$0].isEmpty && !covered.contains($0) }
+        return known + others
+    }
+
+    /// The row's value for an identity token: the reader's headline item, else the masthead's own word.
+    static func identityValue(_ token: String, read: ProfileRead) -> (value: String, item: FacetItem?) {
+        let items = read.masthead?.tokenItems[token] ?? []
+        if let head = ItemText.headline(items), let v = ItemText.valueText(head.value, unit: head.unit) {
+            return (v, head)
+        }
+        let m = read.masthead
+        let fallback: String? = switch token {
+        case "year": (m?.year ?? m?.identity_source.year).map(String.init)
+        case "make": m?.make ?? m?.identity_source.make
+        case "model": m?.model ?? m?.identity_source.model
+        default: nil
+        }
+        return (fallback ?? "Not established", nil)
+    }
+
+    private func openToken(_ dimension: String, title: String, claim: Claim? = nil, spec: SpecDrill? = nil) {
+        tokenDrill = TokenDrill(dimension: Self.tokenDimension(for: dimension), title: title, claim: claim, spec: spec)
+    }
+
+    /// True when a strip dimension opens its line items (the read carries them, or location reads them on open).
+    private func opensItems(_ dimension: String) -> Bool {
+        let token = Self.tokenDimension(for: dimension)
+        return token == "location" || !(read.masthead?.tokenItems[token].isEmpty ?? true)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !headerHUDChips.isEmpty {
                 vehicleBadgeStrip
             }
-            if let strip = read.strip, !strip.facets.isEmpty || strip.odometer != nil {
+            if let strip = read.strip, !strip.facets.isEmpty || strip.odometer != nil || !strip.gaps.isEmpty
+                || !Self.identityTokens(read: read).isEmpty {
                 stripCard(strip)
             }
             if let desc = read.description, !desc.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 descriptionCard(desc)
             }
         }
-        .task(id: vehicleId) { await loadIdentityMarks() }
+        .task(id: vehicleId) {
+            #if DEBUG
+            // Screenshot loop: NUKE_DEBUG_TOKEN=<token> opens that token's line items (DEBUG only).
+            if let token = ProcessInfo.processInfo.environment["NUKE_DEBUG_TOKEN"], !token.isEmpty, tokenDrill == nil {
+                let label = read.strip?.facets.first { Self.tokenDimension(for: $0.dimension) == token }?.label ?? Self.name(for: token)
+                openToken(token, title: label)
+            }
+            #endif
+            await loadIdentityMarks()
+        }
         // The sheet rides this subview, not the page: the page already hosts provenance + comments.
         .sheet(item: $drill) { d in ClaimSourceSheet(vehicleId: vehicleId, drill: d) }
         .sheet(item: $selectedIdentityMark) { mark in IdentityMarkSheet(mark: mark) }
+        .sheet(item: $tokenDrill) { d in
+            TokenItemsSheet(vehicleId: vehicleId, drill: d, carried: read.masthead?.tokenItems[d.dimension] ?? [])
+        }
     }
 
     /// Seeds decoded `identityMarks` from `vehicle_profile_read` when present, and otherwise
@@ -497,6 +562,19 @@ struct ProfileHeaderBlock: View {
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 4)
             VStack(spacing: 0) {
+                // Identity tokens (year, make, model, trim): each opens its line items.
+                ForEach(Self.identityTokens(read: read), id: \.self) { token in
+                    let name = Self.name(for: token)
+                    let shown = Self.identityValue(token, read: read)
+                    RootedValueView(
+                        label: name,
+                        value: shown.value,
+                        status: shown.item.map { ItemText.rootStatus($0.status) } ?? .pending,
+                        onDrill: { openToken(token, title: name) }
+                    )
+                    .accessibilityIdentifier("header-token-\(token)")
+                    Divider()
+                }
                 if let odo = strip.odometer {
                     claimRow(label: "Odometer", value: Self.odometer(odo), claim: odo,
                              spec: SpecDrill(label: "Odometer", value: Self.odometer(odo), field: "mileage"))
@@ -504,8 +582,22 @@ struct ProfileHeaderBlock: View {
                 }
                 ForEach(strip.facets, id: \.dimension) { f in
                     let name = Self.name(for: f.dimension)
-                    claimRow(label: name, value: f.label, claim: f.member,
-                             spec: Self.field(for: f.dimension).map { SpecDrill(label: name, value: f.label, field: $0) })
+                    let spec = Self.field(for: f.dimension).map { SpecDrill(label: name, value: f.label, field: $0) }
+                    if opensItems(f.dimension) {
+                        // A header token opens its line items; the strip's claim stays one tap inside.
+                        RootedValueView(label: name, value: f.label, status: f.member.rootStatus, decay: f.member.decayLine,
+                                        onDrill: { openToken(f.dimension, title: f.label, claim: f.member, spec: spec) })
+                            .accessibilityIdentifier("header-token-\(Self.tokenDimension(for: f.dimension))")
+                    } else {
+                        claimRow(label: name, value: f.label, claim: f.member, spec: spec)
+                    }
+                    Divider()
+                }
+                // Gaps: tokens with no established member, muted, opening what would establish them.
+                ForEach(strip.gaps, id: \.dimension) { g in
+                    RootedValueView(label: g.label, value: "Not established", status: .pending,
+                                    onDrill: { openToken(g.dimension, title: g.label) })
+                        .accessibilityIdentifier("header-gap-\(g.dimension)")
                     Divider()
                 }
             }
