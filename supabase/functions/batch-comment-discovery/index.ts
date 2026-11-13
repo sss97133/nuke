@@ -382,7 +382,12 @@ async function processVehicle(
       discovered.key_quotes = discovered.key_quotes.flatMap((q: any) => {
         const text = flat(String(q?.quote ?? ""));
         if (!text) return [];
-        const hit = sent.find((x: any) => x.text.includes(text) && x.c.comment_type !== "bid" && x.c.author_username);
+        // A person wrote it: not a bid line, and not the house's own result line ("Reserve not met on ...",
+        // "Sold on ..."), which is stored with the author "Anonymous".
+        const hit = sent.find((x: any) =>
+          x.text.includes(text) && x.c.comment_type !== "bid" && x.c.author_username &&
+          !/^anonymous$/i.test(String(x.c.author_username).trim())
+        );
         if (!hit) return [];
         const base = typeof hit.c.source_url === "string" ? hit.c.source_url.replace(/[#?].*$/, "").replace(/\/$/, "") : null;
         return [{
