@@ -58,18 +58,20 @@ and moves with it. The figures quoted in prose further down (objective 0, the sc
 2026-10-07 09:00Z and match the block at that date.
 
 <!-- evidence:start -->
-Measured 2026-10-16 06:50 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
+Measured 2026-11-13 04:30 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
 
 | Model | Sold lots graded, of lots ended | Median absolute error | Bias (mean signed error) | Hammer inside its stated band | Close: scheduled / final / predicted |
 |---|---|---|---|---|---|
-| 31 | 751 of 1,343 | 26.2% | +16.2% | 591 of 751 = 78.7% (80% band) | 282 / 469 / 0 |
+| 33 | 1,677 of 2,358 | 15.7% | −2.1% | 1,285 of 1,677 = 76.6% (80% band) | 1,649 / 28 / 0 |
+| 32 | 1,801 of 2,536 | 17.2% | +2.1% | 1,435 of 1,801 = 79.7% (80% band) | 1,755 / 46 / 0 |
+| 31 | 4,202 of 6,084 | 26.3% | +21.4% | 3,274 of 4,202 = 77.9% (80% band) | 3,556 / 646 / 0 |
 | 30 | 489 of 980 | 30.7% | +16.2% | 365 of 489 = 74.6% (80% band) | 30 / 459 / 0 |
-| 24 | 747 of 995 | 24.3% | −13.2% | 193 of 747 = 25.8% (50% band) | 0 / 244 / 503 |
-| 13 | 10 of 13 | 12.0% | −15.4% | 2 of 10 = 20.0% (band width unknown) | 0 / 0 / 10 |
+| 24 | 783 of 1,041 | 24.4% | −13.2% | 204 of 783 = 26.1% (50% band) | 8 / 272 / 503 |
+| 13 | 11 of 14 | 13.1% | −16.9% | 2 of 11 = 18.2% (band width unknown) | 0 / 0 / 11 |
 
-- **Lots predicted:** 2,290 distinct lots, in 46,094 of 60,670 prediction rows; 14,576 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
-- **Lots graded:** 1,482 distinct sold lots, and 1,997 model-lot grades in all, because a lot priced by more than one model is graded once for each (`v_prediction_lot_grades`, horizon `last`, with a hammer; the table is `prediction_accuracy`).
-- **Stacks:** 66 registered, 65 at status measured; 6 at coverage 0.9 or above; mean coverage 0.19 (`v_stacks`). Order book SA v3: coverage 0.50, 9 of 18 needs present, 3 partial, 6 missing; status showable.
+- **Lots predicted:** 7,666 distinct lots, in 89,839 of 127,214 prediction rows; 37,375 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
+- **Lots graded:** 5,363 distinct sold lots, and 8,963 model-lot grades in all, because a lot priced by more than one model is graded once for each (`v_prediction_lot_grades`, horizon `last`, with a hammer; the table is `prediction_accuracy`).
+- **Stacks:** 66 registered, 65 at status measured; 6 at coverage 0.9 or above; mean coverage 0.22 (`v_stacks`). Order book SA v3: coverage 0.50, 9 of 18 needs present, 3 partial, 6 missing; status showable.
 - **Thesis vein V012 v1** (cited by S03; `vein_ledger`, status active): 68,957 distinct buyers, the top 1% took 14% of lots, 39 won 50 or more (discovery run, as of 2026-09-30). Runs that can grade it: 0 of 1 (`vein_runs`).
 - **Live-lot reader replay** (cited from PR #771, 2026-10-07; a replay, not a view, so not recomputed here): 2 minutes before the scheduled close the hammer sat inside its 80% band on 257 of 311 lots the live collector followed (closes 2026-10-05 to 06) = 82.6%. Not out-of-sample: the band's shape was chosen after seeing these lots.
 <!-- evidence:end -->
@@ -98,8 +100,9 @@ grading machinery exists; the outcome join is the gap, and it is a key repair on
 The evidence is a small fraction of the pool (0.5% of images analyzed, 11% of comments scored, ten of thousands of
 predictions graded), and the pool is a fraction of the market. Both fractions were the honest headline that morning.
 At 08:51Z the same day the join landed (PR #774): every prediction keyed to its lot and graded against the lot's
-outcome, 1,482 distinct sold lots (1,997 model-lot grades). Objective 0 is met at n ≥ 1,000 lots; the bar is now the
-live model's 26.2% median per-lot error with an 80% interval that holds the hammer 78.7% of the time.
+outcome, 1,482 distinct sold lots (1,997 model-lot grades). Objective 0 is met at n ≥ 1,000 lots; the bar that day was
+model 31's 26.2% median per-lot error with an 80% interval that holds the hammer 78.7% of the time. The evidence block
+above carries every later model.
 
 Row counts are cost, not results. Lead with the graded error and the coverage; mention the rows as the size of the
 testbed.
@@ -118,11 +121,11 @@ The unproven parts, each a Phase I objective:
 0. **The outcome join.** Done 2026-10-07 08:51Z (PR #774): every prediction keyed to its lot and graded against the
    lot's outcome at the last prediction before each lot's close (the scheduled close where live frames hold it, 282
    of model 31's lots; the final close otherwise, 469); 1,482 distinct sold lots graded (1,997 model-lot grades, a lot
-   counting once for each model that priced it), up from ten that morning. The bar: the live model's median absolute
+   counting once for each model that priced it), up from ten that morning. The bar set that day: model 31's median absolute
    error of 26.2% per lot, with an 80% interval that holds the hammer 78.7% of the time (751 lots): calibrated, and
    wide.
-1. **Condition and configuration from images and text**, at the accuracy the error demands. Today 0.5% of images are
-   vision-analyzed; condition blindness is the hypothesized cause of the error seen so far.
+1. **Condition and configuration from images and text**, at the accuracy the error demands. On 2026-10-07, 0.5% of images were
+   vision-analyzed (the README's measured block carries the current share); condition blindness is the hypothesized cause of the error seen so far.
 2. **Relation-weighted claim credibility.** A statement about an asset weighted by who made it, their relation to the
    asset at the time, and how their earlier claims resolved. Designed (`data-machine-cases.md` §13.3); no measured
    instance yet.
@@ -180,6 +183,8 @@ To a funder these are the market and the company sections. Lead with the instrum
 best data.
 
 ## How to say it
+
+The numbers in these lines are the 2026-10-07 baseline. Before using a line, replace them from the evidence block above.
 
 **To a reviewer.** "An observational ledger for physical assets. Every fact keeps its source and its clocks, state is
 computed from the log point-in-time, and predictions are graded against outcomes in a public table. Our live price model

@@ -449,6 +449,7 @@ final class SyncEngine: ObservableObject {
             lastSyncDate = Date()
             defaults.set(lastSyncDate, forKey: Key.lastSyncDate)
             if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask) }
+            Task { await LibraryInventory.shared.flushOutcomes() }
         }
         // Transfers staged by an earlier pass or a killed run go first: they already passed every gate.
         await BackgroundUploader.shared.resume()
@@ -543,6 +544,7 @@ final class SyncEngine: ObservableObject {
 
             var stop = false
             let outcome = await processAsset(asset, userId: userId, recent: recentIDs.contains(asset.localIdentifier))
+            LibraryInventory.shared.note(asset.localIdentifier, outcome)
             switch outcome {
             case .uploaded, .queued, .notOwnCamera, .failed:
                 byteWork += 1
@@ -784,10 +786,25 @@ final class SyncEngine: ObservableObject {
     /// Foreground resume: budgeted, so an open of the app pushes a bounded slice and
     /// the power + Wi-Fi background job carries the rest.
     func resumeBackfillIfNeeded() async {
+        await LibraryInventory.shared.runIfDue(background: false)
+        await refillBackfillFromInventory()
         let queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
         guard !queue.isEmpty else { return }
         backfillRemaining = queue.count
         await drainBackfill(foregroundBudget: Config.foregroundBackfillBudget)
+    }
+
+    /// The whole-library backlog joins the existing persisted queue one bounded batch at a time, and only
+    /// when the queue is empty: sync() has already taken the new and recent photos by then, so the backlog
+    /// never starves them. Every asset it adds still passes processAsset's gates (nothing is pre-approved).
+    /// Returns whether it added anything.
+    @discardableResult
+    private func refillBackfillFromInventory() async -> Bool {
+        guard !isPaused, !thermalHold, !Self.deviceTooHotOrLow, !authorizationDenied,
+              (defaults.stringArray(forKey: Key.backfillQueue) ?? []).isEmpty else { return false }
+        let ids = await LibraryInventory.shared.nextBatch(limit: Config.backfillBatchSize)
+        enqueueBackfill(ids)
+        return !ids.isEmpty
     }
 
     private func drainBackfill(foregroundBudget: Int? = nil) async {
@@ -811,6 +828,7 @@ final class SyncEngine: ObservableObject {
             isSyncing = false
             lastSyncDate = Date()
             defaults.set(lastSyncDate, forKey: Key.lastSyncDate)
+            Task { await LibraryInventory.shared.flushOutcomes() }
             recordHeldPrivate(heldPrivate)
             NSLog("NukeCapture backfill: %d uploaded (%d metadata-only), %d off-site skipped, %d held(private), %d deduped, %d failed",
                   uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
@@ -865,6 +883,7 @@ final class SyncEngine: ObservableObject {
                 // Same per-photo path and gates as sync(): backfill candidates came from
                 // confirmed clusters, but the gate is the gate.
                 let outcome = await processAsset(asset, userId: userId)
+                LibraryInventory.shared.note(asset.localIdentifier, outcome)
                 if Task.isCancelled || isPaused { return }
                 switch outcome {
                 case .uploaded(let pixels):
@@ -962,6 +981,9 @@ final class SyncEngine: ObservableObject {
             if Task.isCancelled || isPaused { return false }
             if requireWiFi && !NetworkMonitor.shared.isUnmetered { return false }
 
+            // The inventory (metadata, on Wi-Fi here) first, then the next backlog batch if the queue ran dry.
+            await LibraryInventory.shared.runIfDue(background: true)
+            await refillBackfillFromInventory()
             let before = backfillRemaining
 
             // (a) Steady-state pass — new on-site photos since the watermark.
@@ -973,6 +995,7 @@ final class SyncEngine: ObservableObject {
             await drainBackfill()
 
             // Done when the queue is empty.
+            if backfillRemaining == 0, await refillBackfillFromInventory() { continue }
             if backfillRemaining == 0 {
                 // Fully drained only counts as success if the sync pass that ran
                 // alongside it was also clean (no failed uploads to retry).

@@ -79,6 +79,30 @@ Until prod SQL is dumped back into the repo (`supabase db dump` of functions
 unverified. When you discover an applied-but-uncommitted object, commit its
 definition or note it here.
 
+Noted drift:
+
+- 2026-11-13: `api-v1-export` answers 401 in production (a made-up function
+  name answers 404), but its source left the repo in 9871ee4fb (2026-03-31,
+  the dead-function cleanup). `docs/QUICKSTART.md` and the OpenAPI files
+  (`docs/api/openapi.yaml`, `nuke_frontend/public/v1/openapi.json`,
+  `nuke_frontend/api/v1/openapi.json`) still list it. It is deployed without
+  source: restore the source, or retire the deployment and the spec entries.
+- 2026-11-13: 115 of the 341 deployed edge functions have no folder on main
+  (`supabase functions list` compared with `git ls-tree origin/main
+  supabase/functions/`). 89 were removed from the repo and never undeployed
+  (77 in 2026-03, 10 in 2026-04, one each in 2025-11 and 2026-07); 26 were
+  never on main. Three active cron jobs call one of them: `concierge-notify`,
+  `concierge-partner-sync` (calls `concierge-partner`) and
+  `instagram-feed-sync` (calls `instagram-connect`). No cron job calls a
+  function that is not deployed, by a text search of the command and name
+  of all 231 `cron.job` rows; a job that reaches a function through a SQL
+  helper holding the name elsewhere would not show. All 341 report status
+  ACTIVE. The write guard reads source in this repository, so it covers
+  none of the 115. `docs/ledger/facts.json` holds both lists
+  (`deployed`, `fn_dirs`); refresh it with `npm run ledger:facts`. Do not
+  sweep them: `docs/ledger/CAPABILITY_MAP.md` marks the ones whose source
+  must be recovered from git history before anything is touched.
+
 ## Fleet Rules (workflows / crons / daemons)
 
 - **Probe before you schedule.** A workflow may only call endpoints verified

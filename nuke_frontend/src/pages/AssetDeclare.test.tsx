@@ -9,7 +9,7 @@ vi.mock('../hooks/usePageTitle', () => ({ usePageTitle: () => undefined }));
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: fixture.user.current, session: null, loading: false }) }));
 vi.mock('../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => <a href={to} className={className}>{children}</a> }));
 import AssetDeclarePage, { problems, YEAR_RULE } from './AssetDeclare';
-import HeldAssetsPage, { ledgerLine, proposalLine } from './HeldAssets';
+import HeldAssetsPage, { ledgerLine, proposalLine, reasonLine } from './HeldAssets';
 
 let node: HTMLDivElement, root: Root;
 beforeEach(() => {
@@ -67,14 +67,14 @@ it('lists the holder\'s works with the ledger line and no public sale', async ()
   ] }, error: null });
   await act(async () => render('/assets/mine'));
   expect(fixture.rpc).toHaveBeenCalledWith('held_assets_read', { p_limit: 500 });
-  expect(node.textContent).toContain('2 works confirmed: 1 artworks, 1 publications · 0 with a public sale recorded');
+  expect(node.textContent).toContain('2 held: 1 artworks, 1 publications · 0 with a public sale recorded');
   expect(node.querySelectorAll('.ad-item').length).toBe(2);
   expect(node.querySelector('a[href="/assets/a1"]')).not.toBeNull();
   expect(node.textContent).toContain('no public sale recorded');
-  expect(ledgerLine({ total: 0, by_type: {}, as_of: '', assets: [] })).toBe('0 works confirmed · 0 with a public sale recorded');
+  expect(ledgerLine({ total: 0, by_type: {}, as_of: '', assets: [] })).toBe('0 held · 0 with a public sale recorded');
 });
 
-it('shows works found in the photos with Open, Name it and Not mine, and dismisses through the writer', async () => {
+it('shows works found in the photos with Open, Keep as documentation and Not a work, and dismisses through the writer', async () => {
   fixture.user.current = { id: 'u1' };
   const found = { total: 0, by_type: {}, as_of: '2026-11-09T01:00:00Z', assets: [], proposed_total: 2, proposed: [
     { id: '33333333-3333-4333-8333-333333333333', title: 'Proposed painting, Jul 2024', kind: 'painting', labels: ['Painting', 'Modern Art'], photos: 2, span_from: '2024-07-03T18:00:00Z', span_to: '2026-09-13T20:00:00Z', filenames: ['IMG_1.HEIC'], labeller: 'apple_photos_on_device_v1', proposed_at: '2026-11-09T00:50:00Z' },
@@ -88,18 +88,61 @@ it('shows works found in the photos with Open, Name it and Not mine, and dismiss
   expect(proposalLine(found.proposed[0])).toContain('painting · 2 photos · ');
   const notMine = Array.from(node.querySelectorAll('button.ad-verb'))[1] as HTMLButtonElement;
   await act(async () => notMine.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  expect(fixture.rpc).toHaveBeenCalledWith('dismiss_held_asset', { p_asset_id: '44444444-4444-4444-8444-444444444444', p_reason: 'not my work' });
+  expect(fixture.rpc).toHaveBeenCalledWith('dismiss_held_asset', { p_asset_id: '44444444-4444-4444-8444-444444444444', p_reason: 'not a work' });
 });
 
 it('names a found work through confirm_held_asset when the form opens with ?confirm', async () => {
   fixture.user.current = { id: 'u1' };
   fixture.rpc.mockResolvedValue({ data: { asset_id: '33333333-3333-4333-8333-333333333333', duplicate: false, visibility: 'private' }, error: null });
   await act(async () => render('/assets/new?confirm=33333333-3333-4333-8333-333333333333'));
-  expect(node.querySelector('h1')?.textContent).toBe('Name a work found in your photos');
+  expect(node.querySelector('h1')?.textContent).toBe('Keep a work found in your photos');
   expect(node.querySelector('select')).toBeNull();
   const inputs = node.querySelectorAll('input.jb-input');
   await act(async () => { type(inputs[0], 'Red Car'); });
   await act(async () => node.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   expect(fixture.rpc).toHaveBeenCalledWith('confirm_held_asset', expect.objectContaining({ p_asset_id: '33333333-3333-4333-8333-333333333333', p_title: 'Red Car' }));
   expect(node.querySelector('h1')?.textContent).toBe('Profile');
+});
+
+it('a museum photo kept as documentation stays findable under Documented with no role claim (PR #3190 finding 1)', async () => {
+  fixture.user.current = { id: 'u1' };
+  const id = '55555555-5555-4555-8555-555555555555';
+  let kept = false;
+  fixture.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+    if (fn === 'confirm_held_asset') { kept = true; return { data: { asset_id: id, duplicate: false, visibility: 'private' }, error: null }; }
+    if (fn === 'held_assets_read') return { data: { total: 0, by_type: {}, as_of: '2026-11-09T01:00:00Z', assets: [], recorded: [], recorded_total: 0,
+      documented_total: kept ? 1 : 0, documented: kept ? [{ id, asset_type: 'artwork', title: 'Water Lilies at the museum', visibility: 'private', created_at: '2026-11-09T00:00:00Z',
+        declared: { notes: 'Seen at the museum.' }, identity_basis: 'photo_proposal', presentations: 0, photos: 3, public_sale_recorded: false,
+        standing: 'documented', reasons: [], my_roles: [], legacy_compound: false, documentation_records: 1 }] : [],
+      proposed_total: kept ? 0 : 1, proposed: kept ? [] : [{ id, title: 'Proposed painting', kind: 'painting', labels: ['Painting'], photos: 3, span_from: '2025-05-01T12:00:00Z', span_to: '2025-05-01T12:00:00Z', filenames: null, labeller: 'apple_photos_on_device_v1', proposed_at: '2026-11-08T00:00:00Z' }] }, error: null };
+    return { data: null, error: { message: `unexpected ${fn} ${JSON.stringify(args)}` } };
+  });
+  await act(async () => render(`/assets/new?confirm=${id}`));
+  expect(node.textContent).toContain('it does not say you made it or hold it');
+  expect(node.textContent).not.toMatch(/becomes yours|This is my work/);
+  await act(async () => { type(node.querySelectorAll('input.jb-input')[0], 'Water Lilies at the museum'); });
+  await act(async () => node.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(fixture.rpc).toHaveBeenCalledWith('confirm_held_asset', expect.objectContaining({ p_asset_id: id }));
+  expect(fixture.rpc.mock.calls.map(c => c[0])).not.toContain('record_asset_role_claim');
+  expect(node.querySelector('h1')?.textContent).toBe('Profile');
+  await act(async () => root.unmount()); root = createRoot(node);
+  await act(async () => render('/assets/mine'));
+  expect(node.textContent).toContain('Documented from your photos');
+  expect(node.textContent).toContain('1 documented from your photos');
+  expect(node.querySelector(`a[href="/assets/${id}"]`)).not.toBeNull();
+  expect(node.textContent).toContain('documentation · 3 photos');
+  expect(node.textContent).not.toContain('Works you hold');
+});
+
+it('shows legacy and role-claim records under Other records with the reason each is there', async () => {
+  fixture.user.current = { id: 'u1' };
+  const legacy = { id: 'l1', asset_type: 'artwork', title: 'Old confirm', visibility: 'private', created_at: '2026-11-01T00:00:00Z', declared: null, identity_basis: 'photo_proposal', presentations: 0, public_sale_recorded: false,
+    standing: 'recorded' as const, reasons: ['legacy_compound'], legacy_compound: true };
+  const lapsed = { ...legacy, id: 'l2', title: 'Lapsed', reasons: ['holder:acceptance_lapsed', 'creator:stated_unverified'], legacy_compound: false };
+  fixture.rpc.mockResolvedValue({ data: { total: 0, by_type: {}, as_of: '2026-11-09T01:00:00Z', assets: [], documented: [], documented_total: 0, recorded: [legacy, lapsed], recorded_total: 2 }, error: null });
+  await act(async () => render('/assets/mine'));
+  expect(node.textContent).toContain('2 other records');
+  expect(node.textContent).toContain('earlier single confirmation: whether you hold it or made it is unresolved');
+  expect(reasonLine(lapsed)).toBe('you said you hold it (was accepted; a record it cited was withdrawn or replaced) · you said you made it (stated, not verified)');
+  expect((node.textContent ?? '').replace(/not verified/g, '')).not.toContain('verified');
 });

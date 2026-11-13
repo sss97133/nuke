@@ -734,6 +734,21 @@ found broken and what is still unproven:
     work record; 0 proven; 17 open proposals citing a
     witnessed reading. The library form was tried first and measured: cancelled twice by the 10 s statement timeout
     (39,952 witness rows, each a separate read in a 12 GB table). A library total needs a stored fold and is not built.
+  - *The proof question, asked for the first time* (2026-11-13 03:01 UTC). The owner asked whether the code does what
+    the direction is for. It did not: no function in the repository took a part and a state and returned photos; the
+    only readers of a part key were the writer gate and the keys dry run. Asked by hand on the proof vehicle the rows
+    answer: 446 keyed condition rows with a photo, 364 naming a part, 157 state-and-part pairs (the front bumper's
+    body alignment, 20 photos over two days). Two limits show in the same read. 434 of the 446 rows are flaws
+    (`adjective`) and 12 are states, mostly `structural.component.absent`: no row says replaced, restored or repaired
+    on any part, so the owner's three questions cannot be asked yet. And 8 parts were seen on more than one day (the
+    hood decal: missing, scratched, discoloured, absent) with nothing reading the sequence.
+  - *The reader for it* (`20261116061000`, `keyed_claims_by_part(part, state, vehicle)`, contract
+    `test_keyed_claims_by_part.sql`): vehicles whose keyed, witnessed observations name the part, one claim per
+    state and capture day with every photo behind it, and the part's days in order on each vehicle. It decides no
+    repair and calls nothing proven. Across all vehicles one part resolved through `idx_vobs_structured_data_gin`
+    in 0.7 s (35 rows, measured 03:02 UTC). It reads `structured_data.part_key`; rows that carry only
+    `component_subject_id` are not found yet. What it still cannot return is the thing the acceptance asks for:
+    work states on parts, because no reading lands one.
   - *Two rulings, made by the building agent.* The owner, asked for both: "That’s your decisions to be made based on
     reason and logic." They are the agent's reasoning, not his word, and he can overturn them. (1) A researched or
     analyst number (price, hours, rate) is not stored as a number in a record. Invariant 5 says a number is cited from

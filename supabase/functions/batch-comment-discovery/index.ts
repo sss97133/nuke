@@ -15,12 +15,17 @@
  *   "batch_size"?: number (default 20, max 50),
  *   "min_comments"?: number (default 5),
  *   "offset"?: number (for pagination),
- *   "max_comment_chars"?: number (default 12000),
+ *   "max_comment_chars"?: number (default 60000; comments are read oldest first until this is reached),
  *   "since_hours"?: number (default 48, max 168): only lots that ended inside this window,
  *   "vehicle_ids"?: string[] (run exactly these, skipping the candidate search),
  *   "model"?: one of DISCOVERY_MODELS (default the first),
- *   "dry_run"?: boolean (run the model, return its output and token usage, store nothing)
+ *   "dry_run"?: boolean (run the model, return its output and token usage, store nothing),
+ *   "step"?: "prepare" | "store" (the subscription path, for when the API credit is spent; see below)
  * }
+ * The subscription path splits one summary in two so the model call can run elsewhere (the owner's Claude
+ * subscription, driven by scripts/comment-summary-subscription.sh). "prepare" returns the owed lots' prompts and
+ * calls no model. "store" takes {vehicle_ids: [one id], model, text}: the model's answer for that lot. It rebuilds
+ * the same comment set, applies the same quote check and writes the same row, marked written_via "subscription".
  * A call never chains another call: a schedule decides how often a bounded batch runs.
  */
 
@@ -156,10 +161,25 @@ Deno.serve(async (req) => {
 
     const batchSize = Math.max(1, Math.min(parseInt(String(body.batch_size ?? 20), 10) || 20, 50));
     const minComments = Math.max(0, parseInt(String(body.min_comments ?? 5), 10) || 5);
-    const maxCommentChars = body.max_comment_chars ?? 12000;
+    // 12,000 cut a 98-comment lot off at comment 53 (2026-11-12), dropping the close of the auction. 60,000 holds
+    // the 200-comment read for all but the longest threads; the count that fit is stored with the summary.
+    const maxCommentChars = body.max_comment_chars ?? 60000;
     const sinceHours = Math.max(1, Math.min(Number(body.since_hours ?? 48) || 48, 168));
     const model = DISCOVERY_MODELS.includes(body.model) ? body.model : DISCOVERY_MODELS[0];
     const dryRun = body.dry_run === true;
+    const prepareOnly = body.step === "prepare";
+    if (body.step === "prepare" || body.step === "store") {
+      // A stored summary is shown as a model's reading, so only a job holding the service key may hand one in.
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return jsonResponse({ error: "service_role required" }, 403);
+    }
+    const suppliedText = body.step === "store" ? String(body.text ?? "") : null;
+    if (suppliedText !== null) {
+      if (!Array.isArray(body.vehicle_ids) || body.vehicle_ids.length !== 1 || !suppliedText.trim()) {
+        return jsonResponse({ error: "store needs vehicle_ids with exactly one id and the model's text" }, 400);
+      }
+      if (!DISCOVERY_MODELS.includes(body.model)) return jsonResponse({ error: "store needs a model from DISCOVERY_MODELS" }, 400);
+    }
     const usage = { input_tokens: 0, output_tokens: 0, calls: 0 };
 
     // Candidates: lots that ended inside the window (settled at least 30 minutes ago) and whose vehicle has no
@@ -230,14 +250,14 @@ Deno.serve(async (req) => {
 
       const chunk = vehiclesToProcess.slice(i, i + PARALLEL);
       if (creditExhausted) break;
-      const promises = chunk.map(v => processVehicle(supabase, v, anthropicKey, maxCommentChars, { model, dryRun, usage }));
+      const promises = chunk.map(v => processVehicle(supabase, v, anthropicKey, maxCommentChars, { model, dryRun, usage, prepareOnly, suppliedText }));
       const settled = await Promise.allSettled(promises);
 
       for (let j = 0; j < settled.length; j++) {
         const result = settled[j];
         if (result.status === "fulfilled" && result.value.success) {
           results.discovered++;
-          if (dryRun || results.samples.length < 3) {
+          if (dryRun || prepareOnly || results.samples.length < 3) {
             results.samples.push(result.value.sample);
           }
         } else {
@@ -269,14 +289,15 @@ async function processVehicle(
   vehicle: any,
   anthropicKey: string,
   maxChars: number,
-  run: { model: string; dryRun: boolean; usage: { input_tokens: number; output_tokens: number; calls: number } },
+  run: { model: string; dryRun: boolean; usage: { input_tokens: number; output_tokens: number; calls: number };
+    prepareOnly?: boolean; suppliedText?: string | null },
 ): Promise<{ success: boolean; sample?: any; error?: string }> {
   try {
     // Get comments for this vehicle — try auction_comments first (BaT), then vehicle_observations (Hagerty)
     let comments: any[] | null = null;
     const { data: auctionComments, error: cErr } = await supabase
       .from("auction_comments")
-      .select("comment_text, author_username, is_seller, posted_at, bid_amount")
+      .select("id, comment_text, author_username, is_seller, posted_at, bid_amount, comment_type, bat_comment_id, source_url")
       .eq("vehicle_id", vehicle.vehicle_id)
       .order("posted_at", { ascending: true })
       .limit(200);
@@ -329,7 +350,14 @@ async function processVehicle(
       .replace("{comment_count}", String(comments.length))
       .replace("{comments}", formatted);
 
-    // Call Claude Haiku
+    if (run.prepareOnly) {
+      return { success: true, sample: { vehicle_id: vehicle.vehicle_id, comments: comments.length, comments_analyzed: count, prompt } };
+    }
+
+    // The answer: supplied by the caller (subscription path), else from the API.
+    let result: any = { stop_reason: "supplied", usage: null };
+    let content = run.suppliedText ?? "";
+    if (run.suppliedText == null) {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -352,11 +380,12 @@ async function processVehicle(
       return { success: false, error: `Anthropic ${response.status}: ${errText.slice(0, 200)}` };
     }
 
-    const result = await response.json();
+    result = await response.json();
     run.usage.input_tokens += result.usage?.input_tokens ?? 0;
     run.usage.output_tokens += result.usage?.output_tokens ?? 0;
     run.usage.calls++;
-    const content = (result.content ?? []).find((b: any) => b.type === "text")?.text || "";
+    content = (result.content ?? []).find((b: any) => b.type === "text")?.text || "";
+    }
 
     // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -371,17 +400,39 @@ async function processVehicle(
       return { success: false, error: `Failed to parse discovery JSON (stop_reason ${result.stop_reason}, ${result.usage?.output_tokens} output tokens)` };
     }
 
-    // A quote is shown as the commenter's words, so keep only quotes found word for word in the comments sent.
+    // A quote is shown as a commenter's words, so keep only quotes found word for word in one comment that a person
+    // wrote (not a bid line or a house notice), and carry that comment's id, author, time and address with it.
     if (Array.isArray(discovered.key_quotes)) {
       const flat = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const source = flat(formatted);
+      const sent = comments.slice(0, count).map((c: any) => ({ c, text: flat(String(c.comment_text ?? "")) }));
       const before = discovered.key_quotes.length;
-      discovered.key_quotes = discovered.key_quotes.filter((q: any) => {
+      discovered.key_quotes = discovered.key_quotes.flatMap((q: any) => {
         const text = flat(String(q?.quote ?? ""));
-        return text.length > 0 && source.includes(text);
+        if (!text) return [];
+        // A person wrote it: not a bid line, and not the house's own result line ("Reserve not met on ...",
+        // "Sold on ..."), which is stored with the author "Anonymous".
+        const hit = sent.find((x: any) =>
+          x.text.includes(text) && x.c.comment_type !== "bid" && x.c.author_username &&
+          !/^anonymous$/i.test(String(x.c.author_username).trim())
+        );
+        if (!hit) return [];
+        const base = typeof hit.c.source_url === "string" ? hit.c.source_url.replace(/[#?].*$/, "").replace(/\/$/, "") : null;
+        return [{
+          ...q,
+          comment_id: hit.c.id ?? null,
+          author: hit.c.author_username,
+          is_seller: hit.c.is_seller === true,
+          posted_at: hit.c.posted_at ?? null,
+          // The comment as stored, so the page can show the source in place (same 1,200-character bound the reader uses).
+          comment_text: String(hit.c.comment_text ?? "").slice(0, 1200),
+          url: base ? (hit.c.bat_comment_id ? `${base}/#comment-${hit.c.bat_comment_id}` : base) : null,
+        }];
       });
       discovered.key_quotes_dropped_not_verbatim = before - discovered.key_quotes.length;
     }
+
+    discovered.comments_analyzed = count;
+    if (run.suppliedText != null) discovered.written_via = "subscription";
 
     // Extract top-level fields for quick access
     const sentiment = discovered.sentiment?.overall || null;

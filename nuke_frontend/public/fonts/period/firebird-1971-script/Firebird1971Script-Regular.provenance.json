@@ -6,19 +6,19 @@
  "capHeight": 700,
  "xHeight": 440,
  "ascender": 900,
- "descender": -280,
+ "descender": -250,
  "license": "Drawn for Nuke (nuke.ag) from the cited period sources listed in the provenance sidecar. Descriptive family name; not an official General Motors or Pontiac typeface and not endorsed by General Motors. Pontiac, Firebird and Trans Am are trademarks of General Motors. Font software: SIL Open Font License 1.1.",
  "glyphCount": 39,
  "glyphs": {
   "i": {
    "unicode": "U+0069",
-   "advance": 336,
+   "advance": 301,
    "provenance": "traced",
-   "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
+   "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit; the stem traced to the x-height, the ball an ellipse at its measured place (I_BALL)",
    "fidelity": {
-    "iou": 0.9149,
-    "maxDevPx": 5.83,
-    "meanDevPx": 1.329
+    "iou": 0.7414,
+    "maxDevPx": 22.0,
+    "meanDevPx": 4.627
    },
    "fidelityAgainst": "chrome face mask (v0.2)",
    "sourceBoxPx": [
@@ -48,10 +48,10 @@
    "deslant": 0.24,
    "slant": 0.24,
    "lint": {
-    "nodes": 36,
+    "nodes": 34,
     "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 7
+    "nearKinks": 13
    }
   },
   "r": {
@@ -60,9 +60,9 @@
    "provenance": "traced",
    "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
    "fidelity": {
-    "iou": 0.8413,
-    "maxDevPx": 70.84,
-    "meanDevPx": 3.734
+    "iou": 0.803,
+    "maxDevPx": 66.41,
+    "meanDevPx": 4.316
    },
    "fidelityAgainst": "chrome face mask (v0.2)",
    "sourceBoxPx": [
@@ -80,21 +80,21 @@
    "deslant": 0.24,
    "slant": 0.24,
    "lint": {
-    "nodes": 22,
+    "nodes": 27,
     "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 1
+    "nearKinks": 3
    }
   },
   "e": {
    "unicode": "U+0065",
-   "advance": 894,
+   "advance": 892,
    "provenance": "traced",
    "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
    "fidelity": {
-    "iou": 0.9071,
-    "maxDevPx": 6.0,
-    "meanDevPx": 1.623
+    "iou": 0.8916,
+    "maxDevPx": 11.66,
+    "meanDevPx": 1.935
    },
    "fidelityAgainst": "chrome face mask (v0.2)",
    "sourceBoxPx": [
@@ -118,21 +118,21 @@
    "deslant": 0.24,
    "slant": 0.24,
    "lint": {
-    "nodes": 64,
+    "nodes": 57,
     "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 13
+    "nearKinks": 15
    }
   },
   "b": {
    "unicode": "U+0062",
-   "advance": 780,
+   "advance": 772,
    "provenance": "traced",
    "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
    "fidelity": {
-    "iou": 0.9193,
-    "maxDevPx": 10.0,
-    "meanDevPx": 1.76
+    "iou": 0.9018,
+    "maxDevPx": 12.81,
+    "meanDevPx": 2.165
    },
    "fidelityAgainst": "chrome face mask (v0.2)",
    "sourceBoxPx": [
@@ -162,21 +162,21 @@
    "deslant": 0.24,
    "slant": 0.24,
    "lint": {
-    "nodes": 57,
+    "nodes": 52,
     "missingExtrema": 4,
     "microSegments": 0,
-    "nearKinks": 12
+    "nearKinks": 14
    }
   },
   "d": {
    "unicode": "U+0064",
-   "advance": 808,
+   "advance": 804,
    "provenance": "traced",
    "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
    "fidelity": {
-    "iou": 0.8973,
-    "maxDevPx": 15.0,
-    "meanDevPx": 1.964
+    "iou": 0.8819,
+    "maxDevPx": 12.73,
+    "meanDevPx": 2.308
    },
    "fidelityAgainst": "chrome face mask (v0.2)",
    "sourceBoxPx": [
@@ -200,21 +200,21 @@
    "deslant": 0.24,
    "slant": 0.24,
    "lint": {
-    "nodes": 54,
-    "missingExtrema": 2,
+    "nodes": 50,
+    "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 13
+    "nearKinks": 14
    }
   },
   "F": {
    "unicode": "U+0046",
-   "advance": 1149,
+   "advance": 1141,
    "provenance": "traced",
    "method": "potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit",
    "fidelity": {
-    "iou": 0.8992,
-    "maxDevPx": 5.39,
-    "meanDevPx": 1.732
+    "iou": 0.8767,
+    "maxDevPx": 8.54,
+    "meanDevPx": 2.143
    },
    "fidelityAgainst": "chrome face mask (v0.2)",
    "sourceBoxPx": [
@@ -238,10 +238,10 @@
    "deslant": 0.24,
    "slant": 0.24,
    "lint": {
-    "nodes": 88,
-    "missingExtrema": 2,
+    "nodes": 84,
+    "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 19
+    "nearKinks": 15
    }
   },
   "o": {
@@ -254,15 +254,15 @@
    "method": "the b's bowl, its right half mirrored about the counter's centre",
    "slant": 0.24,
    "lint": {
-    "nodes": 37,
+    "nodes": 38,
     "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 5
+    "nearKinks": 8
    }
   },
   "n": {
    "unicode": "U+006E",
-   "advance": 711,
+   "advance": 706,
    "provenance": "derived",
    "from": [
     "r",
@@ -271,15 +271,15 @@
    "method": "the r's stem and entry serif; the o's upper half (0.8 wide) as the arch; right stem carried to the baseline",
    "slant": 0.24,
    "lint": {
-    "nodes": 44,
+    "nodes": 54,
     "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 7
+    "nearKinks": 14
    }
   },
   "m": {
    "unicode": "U+006D",
-   "advance": 905,
+   "advance": 896,
    "provenance": "derived",
    "from": [
     "r",
@@ -288,15 +288,15 @@
    "method": "n with two arches at 0.62 of the o width",
    "slant": 0.24,
    "lint": {
-    "nodes": 61,
-    "missingExtrema": 4,
+    "nodes": 70,
+    "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 12
+    "nearKinks": 20
    }
   },
   "h": {
    "unicode": "U+0068",
-   "advance": 582,
+   "advance": 577,
    "provenance": "derived",
    "from": [
     "b",
@@ -305,15 +305,15 @@
    "method": "the b's ascender stem with the n's arch",
    "slant": 0.24,
    "lint": {
-    "nodes": 52,
-    "missingExtrema": 3,
+    "nodes": 51,
+    "missingExtrema": 4,
     "microSegments": 0,
-    "nearKinks": 13
+    "nearKinks": 16
    }
   },
   "u": {
    "unicode": "U+0075",
-   "advance": 690,
+   "advance": 683,
    "provenance": "derived",
    "from": [
     "r",
@@ -322,10 +322,10 @@
    "method": "the o's lower half (0.8 wide) between the r's stem top and a full r stem",
    "slant": 0.24,
    "lint": {
-    "nodes": 46,
-    "missingExtrema": 0,
+    "nodes": 56,
+    "missingExtrema": 1,
     "microSegments": 0,
-    "nearKinks": 3
+    "nearKinks": 12
    }
   },
   "l": {
@@ -338,15 +338,15 @@
    "method": "the b's ascender stem and foot without the bowl",
    "slant": 0.24,
    "lint": {
-    "nodes": 30,
-    "missingExtrema": 1,
+    "nodes": 21,
+    "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 7
+    "nearKinks": 5
    }
   },
   "a": {
    "unicode": "U+0061",
-   "advance": 808,
+   "advance": 804,
    "provenance": "derived",
    "from": [
     "d"
@@ -354,7 +354,7 @@
    "method": "the d cut down to the x-height (single-storey a)",
    "slant": 0.24,
    "lint": {
-    "nodes": 46,
+    "nodes": 42,
     "missingExtrema": 1,
     "microSegments": 0,
     "nearKinks": 10
@@ -362,7 +362,7 @@
   },
   "q": {
    "unicode": "U+0071",
-   "advance": 808,
+   "advance": 804,
    "provenance": "derived",
    "from": [
     "d"
@@ -370,7 +370,7 @@
    "method": "the a with the d stem carried to the descender and a foot",
    "slant": 0.24,
    "lint": {
-    "nodes": 54,
+    "nodes": 50,
     "missingExtrema": 1,
     "microSegments": 0,
     "nearKinks": 10
@@ -378,7 +378,7 @@
   },
   "p": {
    "unicode": "U+0070",
-   "advance": 884,
+   "advance": 869,
    "provenance": "derived",
    "from": [
     "b",
@@ -387,15 +387,15 @@
    "method": "the b cut to the x-height with the r's entry serif; stem to a foot",
    "slant": 0.24,
    "lint": {
-    "nodes": 52,
-    "missingExtrema": 2,
+    "nodes": 58,
+    "missingExtrema": 1,
     "microSegments": 0,
-    "nearKinks": 4
+    "nearKinks": 12
    }
   },
   "g": {
    "unicode": "U+0067",
-   "advance": 808,
+   "advance": 804,
    "provenance": "derived",
    "from": [
     "d",
@@ -404,10 +404,10 @@
    "method": "the a with the d stem carried down into the o's lower half",
    "slant": 0.24,
    "lint": {
-    "nodes": 65,
-    "missingExtrema": 1,
+    "nodes": 60,
+    "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 13
+    "nearKinks": 12
    }
   },
   "c": {
@@ -421,10 +421,10 @@
    "method": "the o opened at the right, the i's ball as its terminal",
    "slant": 0.24,
    "lint": {
-    "nodes": 42,
-    "missingExtrema": 1,
+    "nodes": 44,
+    "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 7
+    "nearKinks": 10
    }
   },
   "t": {
@@ -443,21 +443,21 @@
   },
   "f": {
    "unicode": "U+0066",
-   "advance": 384,
+   "advance": 379,
    "provenance": "designed",
    "from": [],
    "method": "stem with a hooked top from the o arch, hairline crossbar",
    "slant": 0.24,
    "lint": {
-    "nodes": 30,
-    "missingExtrema": 1,
+    "nodes": 29,
+    "missingExtrema": 0,
     "microSegments": 0,
-    "nearKinks": 5
+    "nearKinks": 1
    }
   },
   "j": {
    "unicode": "U+006A",
-   "advance": 286,
+   "advance": 290,
    "provenance": "derived",
    "from": [
     "i",
@@ -466,10 +466,10 @@
    "method": "the i's stem, ball and serif carried into a descender hook",
    "slant": 0.24,
    "lint": {
-    "nodes": 56,
-    "missingExtrema": 2,
+    "nodes": 49,
+    "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 11
+    "nearKinks": 14
    }
   },
   "k": {
@@ -480,10 +480,10 @@
    "method": "the b's ascender with a hairline arm and a heavy leg",
    "slant": 0.24,
    "lint": {
-    "nodes": 43,
-    "missingExtrema": 1,
+    "nodes": 34,
+    "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 7
+    "nearKinks": 5
    }
   },
   "s": {
@@ -572,7 +572,7 @@
   },
   "E": {
    "unicode": "U+0045",
-   "advance": 1149,
+   "advance": 1141,
    "provenance": "derived",
    "from": [
     "F"
@@ -583,12 +583,12 @@
     "nodes": 99,
     "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 19
+    "nearKinks": 15
    }
   },
   "L": {
    "unicode": "U+004C",
-   "advance": 1124,
+   "advance": 1122,
    "provenance": "derived",
    "from": [
     "F"
@@ -596,15 +596,15 @@
    "method": "the F's stem and swash with the mirrored top arm as its foot",
    "slant": 0.24,
    "lint": {
-    "nodes": 51,
-    "missingExtrema": 0,
+    "nodes": 49,
+    "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 7
+    "nearKinks": 3
    }
   },
   "T": {
    "unicode": "U+0054",
-   "advance": 1772,
+   "advance": 1768,
    "provenance": "derived",
    "from": [
     "F"
@@ -613,9 +613,9 @@
    "slant": 0.24,
    "lint": {
     "nodes": 61,
-    "missingExtrema": 0,
+    "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 8
+    "nearKinks": 5
    }
   },
   "G": {
@@ -628,10 +628,10 @@
    "method": "designed on the b's bowl made symmetric and scaled to the capital; bar and spur designed",
    "slant": 0.24,
    "lint": {
-    "nodes": 41,
+    "nodes": 36,
     "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 3
+    "nearKinks": 1
    }
   },
   "P": {
@@ -645,10 +645,10 @@
    "method": "designed: the F's stem and swash carry a bowl drawn from the b's",
    "slant": 0.24,
    "lint": {
-    "nodes": 57,
-    "missingExtrema": 1,
+    "nodes": 52,
+    "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 13
+    "nearKinks": 7
    }
   },
   "M": {
@@ -661,15 +661,15 @@
    "method": "designed: two F stems with a heavy falling and a light rising diagonal",
    "slant": 0.24,
    "lint": {
-    "nodes": 73,
-    "missingExtrema": 0,
+    "nodes": 72,
+    "missingExtrema": 3,
     "microSegments": 0,
-    "nearKinks": 12
+    "nearKinks": 4
    }
   },
   "period": {
    "unicode": "U+002E",
-   "advance": 200,
+   "advance": 212,
    "provenance": "derived",
    "from": [
     "i"
@@ -677,15 +677,15 @@
    "method": "the i's ball dot on the baseline",
    "slant": 0.24,
    "lint": {
-    "nodes": 9,
+    "nodes": 6,
     "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 0
+    "nearKinks": 1
    }
   },
   "comma": {
    "unicode": "U+002C",
-   "advance": 200,
+   "advance": 212,
    "provenance": "derived",
    "from": [
     "i"
@@ -693,10 +693,10 @@
    "method": "the ball with a falling tail",
    "slant": 0.24,
    "lint": {
-    "nodes": 12,
+    "nodes": 11,
     "missingExtrema": 2,
     "microSegments": 0,
-    "nearKinks": 0
+    "nearKinks": 1
    }
   },
   "hyphen": {

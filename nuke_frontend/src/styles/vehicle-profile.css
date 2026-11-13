@@ -1153,6 +1153,11 @@
 /* Native profile chrome. Existing fact and evidence drills retain their owners. */
 .vehicle-profile-page .vp-header-sticky { background: var(--surface); border-bottom: 1px solid var(--border); }
 .vehicle-profile-page .vp-header-sticky .k-masthead { padding: 4px 12px; gap: 0 16px; flex-wrap: wrap; }
+/* Phone: the specs row sits below the pinned header and scrolls with the page. */
+.vehicle-profile-page .vp-header-specs { padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+/* Outside the sticky layer a dropdown would open under the timeline heatmap; on a phone the chips open in the row. */
+.vehicle-profile-page .vp-header-specs .vp-header-configuration { margin-left: 0; }
+.vehicle-profile-page .vp-header-specs .vp-header-configuration[open] .vp-header-facets { position: static; width: auto; padding: 0 0 8px; background: none; border: 0; }
 .vehicle-profile-page .vp-header-sticky .k-entity { margin: 0; min-width: 0; }
 .vehicle-profile-page .vp-header-sticky .vehicle-identity { font-family: var(--font-family); font-size: 20px; line-height: 1.3; gap: 6px; }
 .vehicle-profile-page .vp-header-sticky .vehicle-identity__year,

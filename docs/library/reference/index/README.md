@@ -93,7 +93,7 @@ Updated: 2026-03-27
 - **Private population assay**: `scripts/discovery/sale-event-candidates.sql` retains explicitly supplied parents' native episode candidates and bounded protected headers; `scripts/assay-sale-population.mjs` audits saved inputs offline. Neither qualifies native prices, admits historical evidence, installs a DB reader or changes `/valuation`.
 - **Column**: `vehicles.nuke_estimate`
 - **Compute**: `supabase/functions/compute-vehicle-valuation/index.ts`
-- **Hammer price**: `supabase/functions/predict-hammer-price/index.ts` (active cron)
+- **Hammer price**: `supabase/functions/predict-hammer-price/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
 - **Score live**: `supabase/functions/score-live-auctions/index.ts` (active cron)
 - **Comps API**: `supabase/functions/api-v1-comps/index.ts`
 - **Market trends**: `supabase/functions/api-v1-market-trends/index.ts`
@@ -102,16 +102,16 @@ Updated: 2026-03-27
 ### Analysis Engine
 - **Coordinator**: `supabase/functions/analysis-engine-coordinator/index.ts` (active cron, 15 min sweep)
 - **Widgets** (10):
-  - `supabase/functions/widget-sell-through-cliff/index.ts`
-  - `supabase/functions/widget-rerun-decay/index.ts`
-  - `supabase/functions/widget-time-kills-deals/index.ts`
-  - `supabase/functions/widget-completion-discount/index.ts`
-  - `supabase/functions/widget-presentation-roi/index.ts`
-  - `supabase/functions/widget-broker-exposure/index.ts`
-  - `supabase/functions/widget-buyer-qualification/index.ts`
-  - `supabase/functions/widget-commission-optimizer/index.ts`
-  - `supabase/functions/widget-deal-readiness/index.ts`
-  - `supabase/functions/widget-geographic-arbitrage/index.ts`
+  - `supabase/functions/widget-sell-through-cliff/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-rerun-decay/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-time-kills-deals/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-completion-discount/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-presentation-roi/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-broker-exposure/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-buyer-qualification/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-commission-optimizer/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-deal-readiness/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+  - `supabase/functions/widget-geographic-arbitrage/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
 - **Tables**: `analysis_widgets`, `analysis_signals`, `analysis_signal_history`, `analysis_queue`
 - **API**: `supabase/functions/api-v1-analysis/index.ts`
 
@@ -124,15 +124,15 @@ Updated: 2026-03-27
 - **Auto fix**: `supabase/functions/auto-fix-vehicle-profile/index.ts`
 - **YMM propagate**: `supabase/functions/batch-ymm-propagate/index.ts` (active cron)
 - **VIN decode**: `supabase/functions/batch-vin-decode/index.ts` (active cron)
-- **VIN from snapshots**: `supabase/functions/backfill-vin-from-snapshots/index.ts` (active cron)
+- **VIN from snapshots**: `supabase/functions/backfill-vin-from-snapshots/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
 - **Profile queue**: `supabase/functions/process-profile-queue/index.ts` (active cron)
 
 ### Description Backfill
 - **CL asking price**: `supabase/functions/backfill-cl-asking-price/index.ts` (active cron)
-- **CL descriptions**: `supabase/functions/backfill-cl-descriptions/index.ts` (active cron)
-- **Gooding descriptions**: `supabase/functions/backfill-gooding-descriptions/index.ts` (active cron)
-- **Mecum descriptions**: `supabase/functions/backfill-mecum-descriptions/index.ts` (active cron)
-- **RM Sotheby's descriptions**: `supabase/functions/backfill-rmsothebys-descriptions/index.ts` (active cron)
+- **CL descriptions**: `supabase/functions/backfill-cl-descriptions/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
+- **Gooding descriptions**: `supabase/functions/backfill-gooding-descriptions/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
+- **Mecum descriptions**: `supabase/functions/backfill-mecum-descriptions/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
+- **RM Sotheby's descriptions**: `supabase/functions/backfill-rmsothebys-descriptions/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
 - **Comments backfill**: `supabase/functions/backfill-comments/index.ts` (active cron)
 
 ### Scoring & Quality
@@ -145,7 +145,7 @@ Updated: 2026-03-27
 - **Design Bible**: `docs/DESIGN_BIBLE.md` (three laws, visual identity, voice)
 - **Design Book**: `docs/library/technical/design-book/` (10 chapters, component specs, interaction model)
 - **Canonical CSS**: `nuke_frontend/src/styles/unified-design-system.css`
-- **Frozen CSS**: `nuke_frontend/src/styles/design-system.css` (do not modify)
+- **Frozen CSS**: `nuke_frontend/src/styles/design-system.css` (do not modify) — **not in the repository** (checked 2026-11-13)
 - **Principles**: ENCYCLOPEDIA Sections 9-11
 
 ### Frontend Components (Badge Portal System)
@@ -189,21 +189,21 @@ Updated: 2026-03-27
 - **Vehicle images table**: `vehicle_images`
 - **YONO classify**: `supabase/functions/yono-classify/index.ts` (make classification, $0/image)
 - **YONO analyze**: `supabase/functions/yono-analyze/index.ts` (condition/zone/damage via Florence-2)
-- **YONO batch**: `supabase/functions/yono-batch-process/index.ts` (bulk classification)
-- **YONO vision worker**: `supabase/functions/yono-vision-worker/index.ts` (background cron worker)
-- **YONO keepalive**: `supabase/functions/yono-keepalive/index.ts` (pings Modal sidecar every 5 min)
+- **YONO batch**: `supabase/functions/yono-batch-process/index.ts` (bulk classification) — **not in the repository** (not deployed, checked 2026-11-13)
+- **YONO vision worker**: `supabase/functions/yono-vision-worker/index.ts` (background cron worker) — **not in the repository** (not deployed, checked 2026-11-13)
+- **YONO keepalive**: `supabase/functions/yono-keepalive/index.ts` (pings Modal sidecar every 5 min) — **not in the repository** (not deployed, checked 2026-11-13)
 - **Vision API**: `supabase/functions/api-v1-vision/index.ts` (public API: classify + analyze)
 - **Image intake**: `supabase/functions/image-intake/index.ts` (upload + queue processing)
 - **Photo pipeline**: `supabase/functions/photo-pipeline-orchestrator/index.ts`
 - **iPhoto intake**: `scripts/iphoto-intake.mjs`
 - **Work photos**: `scripts/drop-folder-ingest.mjs`, `scripts/work-photos-intake.mjs`
 - **Modal sidecar URL**: `YONO_SIDECAR_URL` env var
-- **Spec**: `docs/YONO_SPEC.md`, `docs/YONO_TRAINING_DATA.md`
+- **Spec**: `yono/README.md`, `docs/ledger/theory/ai-vision-yono.md`, `docs/YONO_TRAINING_DATA.md` (training-data plan, March 2026)
 - **Status**: Sidecar live on Modal (2 warm containers). Pipeline globally PAUSED (`NUKE_ANALYSIS_PAUSED`).
 
 ### Comments & Sentiment
 - **Extract comments**: `supabase/functions/extract-auction-comments/index.ts`
-- **Comment discovery**: `supabase/functions/discover-comment-data/index.ts`
+- **Comment discovery**: `supabase/functions/discover-comment-data/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
 - **Fast analysis**: `supabase/functions/analyze-comments-fast/index.ts`
 - **Batch discovery**: `supabase/functions/batch-comment-discovery/index.ts`
 - **Live sentiment**: `supabase/functions/update-live-sentiment/index.ts`
@@ -219,11 +219,11 @@ Updated: 2026-03-27
 ### Discovery / Lead Generation
 - **Observations discovery**: `supabase/functions/discover-from-observations/index.ts` (active cron)
 - **Craigslist squarebodies**: `supabase/functions/discover-cl-squarebodies/index.ts`
-- **Barn finds**: `supabase/functions/barn-finds-discovery/index.ts`
-- **Build threads**: `supabase/functions/discover-build-threads/index.ts`
-- **Snowball**: `supabase/functions/discovery-snowball/index.ts`
+- **Barn finds**: `supabase/functions/barn-finds-discovery/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+- **Build threads**: `supabase/functions/discover-build-threads/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
+- **Snowball**: `supabase/functions/discovery-snowball/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
 - **Listing feeds**: `supabase/functions/poll-listing-feeds/index.ts` (active cron)
-- **Patient zero**: `supabase/functions/patient-zero/index.ts` (active cron)
+- **Patient zero**: `supabase/functions/patient-zero/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
 - **Source onboarding**: `supabase/functions/onboard-source/index.ts` (active cron)
 
 ### Organizations
@@ -256,7 +256,7 @@ Updated: 2026-03-27
 - **API observations**: `supabase/functions/api-v1-observations/index.ts`
 - **API VIN lookup**: `supabase/functions/api-v1-vin-lookup/index.ts`
 - **Feed query**: `supabase/functions/feed-query/index.ts`
-- **Treemap data**: `supabase/functions/treemap-data/index.ts`
+- **Treemap data**: `supabase/functions/treemap-data/index.ts` — **not in the repository** (not deployed, checked 2026-11-13)
 - **GM Truck partitions**: `nuke_frontend/src/pages/market/truckFacets.ts`, `TruckFacetToolbar.tsx`, existing `HomePage.tsx` / `FamilySalesChart.tsx`; public membership overload `treemap_family_models(text,text,boolean,uuid,integer)` in `20261018223739_truck_market_membership.sql`. Contract: `supabase/sql/test_truck_market_membership.sql`; interaction design: Design Book chapter 3. Current configuration is distinct from recorded identity and sale-time configuration.
 
 ### Operations / Monitoring
@@ -272,21 +272,21 @@ Updated: 2026-03-27
 - **Gmail alert poller**: `supabase/functions/gmail-alert-poller/index.ts` (active cron)
 
 ### Snapshot / Storage Management
-- **Migrate to storage**: `supabase/functions/migrate-snapshots-to-storage/index.ts` (active cron)
+- **Migrate to storage**: `supabase/functions/migrate-snapshots-to-storage/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
 - **Table**: `listing_page_snapshots` (79GB)
 - **Shared util**: `supabase/functions/_shared/archiveFetch.ts`
 
 ### Auction System
 - **Sync live auctions**: `supabase/functions/sync-live-auctions/index.ts` (active cron)
 - **Score live auctions**: `supabase/functions/score-live-auctions/index.ts` (active cron)
-- **Predict hammer price**: `supabase/functions/predict-hammer-price/index.ts` (active cron)
+- **Predict hammer price**: `supabase/functions/predict-hammer-price/index.ts` (active cron) — **not in the repository** (still deployed, checked 2026-11-13)
 - **ARS SQL**: `compute_auction_readiness()`, `persist_auction_readiness()`
 - **Tables**: `auction_readiness`, `ars_tier_transitions`
 - **Strategy doc**: `docs/strategy/auction-readiness-strategy.md`
 
 ### User / Persona Intelligence
 - **Stylometric analyzer**: `scripts/user-stylometric-analyzer.mjs` (Layer 0, zero-cost)
-- **Persona prompts**: `supabase/functions/_shared/personaPrompt.ts`
+- **Persona prompts**: `supabase/functions/_shared/personaPrompt.ts` — **not in the repository** (checked 2026-11-13)
 - **Tables**: `bat_user_profiles`, `author_personas`, `comment_persona_signals`
 - **Methodology doc**: `docs/library/intellectual/papers/user-simulation-methodology.md`
 

@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import type { ProfileRead } from './profileDocument';
 const fixture = vi.hoisted(() => ({ vehicle: {} as Record<string, unknown>, pulse: null as Record<string, unknown> | null, read: null as ProfileRead | null,
-  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn(), gallery: vi.fn() }));
+  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn(), gallery: vi.fn(), mobile: false }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
   let vehicleId: string;
   const query: any = { select: () => query, eq: (_key: string, id: string) => { vehicleId = id; return query; },
@@ -24,7 +24,7 @@ vi.mock('./HeaderTokenItems', () => ({ default: ({ dimension, items }: any) => <
 vi.mock('./ProfileFinancials', () => ({ default: ({ market }: any) => <>{market}<button>$$$</button></> }));
 vi.mock('../../components/auction/ExternalAuctionLiveBanner', () => ({ default: () => null,
   ExternalAuctionSummary: ({ currentBid }: any) => <button data-live-bid={currentBid}>Live episode</button> }));
-vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
+vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => fixture.mobile }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a href={to}>{children}</a> }));
 import ProfileHeader, { comparableLotKey, extractInlineLotProvenance } from './ProfileHeader';
 
@@ -57,6 +57,7 @@ function mustangRead(): ProfileRead {
 let root: Root, host: HTMLDivElement;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  fixture.mobile = false;
   host = document.createElement('div');
   host.className = 'vehicle-profile-page';
   document.body.appendChild(host);
@@ -362,6 +363,33 @@ it('a token the read holds no value for is a muted gap that opens its line items
   expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('drivetrain');
   expect(gaps[1].getAttribute('aria-expanded')).toBe('true');
   expect(fixture.gallery).toHaveBeenLastCalledWith(null);
+});
+
+it('a gap whose token holds a valued item shows that lead with its status and opens the items', async () => {
+  const strip = fixture.read!.sections[1];
+  if (strip.kind === 'strip') {
+    strip.facets = strip.facets.filter(f => f.dimension !== 'drivetrain');
+    strip.gaps = [{ dimension: 'drivetrain', label: 'Drivetrain', lead: { key: 'drivetrain.current.layout', value: 'Fixture layout', status: 'reading' } }];
+  }
+  await render();
+  expect(host.querySelectorAll('button.k-facet--gap')).toHaveLength(0);
+  const lead = host.querySelector('[aria-label="Drivetrain: Fixture layout, reading. Show its items"]') as HTMLButtonElement;
+  expect(lead).not.toBeNull();
+  expect(lead.textContent).toBe('Fixture layoutreading');
+  expect(lead.querySelector('.k-status')?.getAttribute('data-status')).toBe('reading');
+  await act(async () => lead.click());
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('drivetrain');
+  expect(fixture.gallery).toHaveBeenLastCalledWith(null);
+});
+
+it('on a phone pins identity and price; the specs row scrolls with the page', async () => {
+  fixture.mobile = true;
+  await render();
+  const pinned = host.querySelector('.vp-header-sticky')!;
+  expect(pinned.querySelector('h1.k-entity')).not.toBeNull();
+  expect(pinned.querySelector('.k-masthead__result')).not.toBeNull();
+  expect(pinned.querySelector('.vp-header-facets')).toBeNull();
+  expect(host.querySelector('.vp-header-specs .vp-header-facets')).not.toBeNull();
 });
 
 it('retains the specific transmission model and opens the transmission line items', async () => {

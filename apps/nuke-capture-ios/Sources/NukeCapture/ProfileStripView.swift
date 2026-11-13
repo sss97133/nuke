@@ -595,7 +595,9 @@ struct ProfileHeaderBlock: View {
                 }
                 // Gaps: tokens with no established member, muted, opening what would establish them.
                 ForEach(strip.gaps, id: \.dimension) { g in
-                    RootedValueView(label: g.label, value: "Not established", status: .pending,
+                    // A gap with a lead shows it ("RWD · reading"); the row still opens the token's items.
+                    RootedValueView(label: g.label, value: g.leadText ?? "Not established",
+                                    status: g.leadText != nil ? ItemText.rootStatus(g.lead?.status ?? "") : .pending,
                                     onDrill: { openToken(g.dimension, title: g.label) })
                         .accessibilityIdentifier("header-gap-\(g.dimension)")
                     Divider()
@@ -620,13 +622,23 @@ struct ProfileHeaderBlock: View {
         )
     }
 
-    /// USD gets a dollar sign; a classified's unrecorded currency prints the bare number, as on the web.
+    /// USD gets a dollar sign. US-based platforms (Facebook Marketplace, Craigslist, KSL)
+    /// default to USD when currency is unrecorded. Other sources show the bare number.
     static func money(_ claim: Claim) -> String {
         guard let n = claim.value.number else { return claim.value.text }
-        if claim.unit == "USD" {
+        if claim.unit == "USD" || Self.isUSPlatform(claim.source) {
             return n.formatted(.currency(code: "USD").precision(.fractionLength(0)))
         }
         return Int(n.rounded()).formatted()
+    }
+
+    /// True if the source is a US-based classified platform where prices are assumed USD.
+    private static func isUSPlatform(_ source: ClaimSource) -> Bool {
+        let label = (source.label ?? "").lowercased()
+        let url = (source.url ?? "").lowercased()
+        let combined = label + " " + url
+        let usMarkets = ["facebook marketplace", "craigslist", "ksl", "facebook.com/marketplace", "autotrader", "cargurus", "cars.com", "carfax"]
+        return usMarkets.contains { combined.contains($0) }
     }
 
     static func odometer(_ claim: Claim) -> String {
@@ -667,27 +679,25 @@ struct ProfileTimelineCard: View {
     var body: some View {
         if !timeline.days.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-                Text("RECORD EVENTS")
+                Text("TIMELINE")
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .padding(.bottom, 6)
-                // Kind totals: what the record's events are, by count.
-                Text(kindTotals.map { "\(Self.name($0.kind)) \($0.n.formatted())" }.joined(separator: " · "))
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.primary)
                     .padding(.bottom, 8)
                 VStack(spacing: 0) {
                     ForEach(Array(timeline.days.prefix(shownDays)), id: \.day) { d in
                         LabeledContent {
                             Text(d.kinds.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
-                                    .map { "\(Self.name($0.key)) \($0.value)" }.joined(separator: " · "))
+                                    .map { Self.name($0.key) }.joined(separator: ", "))
                                 .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(.primary)
                                 .multilineTextAlignment(.trailing)
                         } label: {
                             Text(Self.day(d.day)).font(.footnote).foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 5)
-                        Divider()
+                        .padding(.vertical, 6)
+                        if d.day != timeline.days.prefix(shownDays).last?.day {
+                            Divider()
+                        }
                     }
                 }
                 if timeline.days.count > shownDays {

@@ -85,10 +85,12 @@ struct MainTabView: View {
                     .badge(inboxBadge.badge)
             }
         }
-        // The live ingest status bar: pinned above every tab, hidden when the session has nothing.
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if session.isSignedIn { CaptureIngestBar(store: ingest) }
-        }
+        // The live ingest status bar: pinned above every tab, hidden when nothing to show.
+        // Conditionally apply safeAreaInset only when bar has content — otherwise it reserves
+        // space even when empty, blocking under the Dynamic Island.
+        .modifier(ConditionalTopInset(showBar: session.isSignedIn && !ingest.isHidden) {
+            CaptureIngestBar(store: ingest)
+        })
         .task(id: accountScope) {
             guard session.isSignedIn, let uid = SupabaseService.currentUserId else { return }
             #if DEBUG
@@ -149,5 +151,20 @@ struct MainTabView: View {
     static func currentPhotoGrant() -> Bool {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         return status == .authorized || status == .limited
+    }
+}
+
+/// Conditionally applies safeAreaInset only when content should show.
+/// Avoids reserving top space under the Dynamic Island when the bar is hidden.
+private struct ConditionalTopInset<Bar: View>: ViewModifier {
+    let showBar: Bool
+    @ViewBuilder let bar: () -> Bar
+
+    func body(content: Content) -> some View {
+        if showBar {
+            content.safeAreaInset(edge: .top, spacing: 0) { bar() }
+        } else {
+            content
+        }
     }
 }

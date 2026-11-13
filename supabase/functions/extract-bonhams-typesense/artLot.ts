@@ -37,12 +37,20 @@ export interface ArtIndexDoc {
   country?: { name?: string; code?: string };
   price?: { estimateLow?: number; estimateHigh?: number; hammerPrice?: number; hammerPremium?: number };
   flags?: { isAuctionEnded?: boolean; isResultPublished?: boolean; isWithoutReserve?: boolean };
+  /** The house's lot status code (SOLD, BI, WD, NEW, CS, WR seen in the index on 2026-11-09). */
+  status?: string;
   hammerTime?: { datetime?: string };
   auctionEndDate?: { datetime?: string };
   image?: { url?: string } | string;
   symbols?: Array<{ symbol?: string; shortDescription?: string }>;
   groups?: unknown[];
 }
+
+/**
+ * Outcome as the source proves it. sold and withdrawn are the two codes whose meaning a Bonhams lot page states; every other
+ * house code is kept explicit as unresolved:<CODE> (raw code preserved) until its meaning is proven; unknown = no code at all.
+ */
+export type LotResult = "sold" | "withdrawn" | "upcoming" | "unknown" | `unresolved:${string}`;
 
 export interface ArtLotRecord {
   identity_key: string;
@@ -57,7 +65,7 @@ export interface ArtLotRecord {
   lot_number: string | null;
   sale_key: string | null;
   sale_ends_at: string | null;
-  result: "sold" | "not_sold" | "upcoming";
+  result: LotResult;
   price_basis: "hammer" | null;
   hammer_price: number | null;
   hammer_premium: number | null;
@@ -131,6 +139,17 @@ function isoOrNull(s: string | undefined): string | null {
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 }
 
+/**
+ * True when a printed sale end is a placeholder rather than a date. Bonhams prints 2100-12-31 for sales with no fixed end
+ * (sale 26431). The raw value is still stored as printed in sale_ends_at; only derived readings (status, "ends in",
+ * ending-soon) withhold it. Rule: more than three years past the read.
+ */
+export function isPlaceholderEnd(iso: string | null, readAt: string): boolean {
+  if (!iso) return false;
+  const read = Date.parse(readAt);
+  return Number.isFinite(read) && Date.parse(iso) > read + 3 * 365 * 86_400_000;
+}
+
 function positive(n: number | undefined): number | null {
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }
@@ -146,13 +165,32 @@ export function artLotFromDoc(doc: ArtIndexDoc, ctx: { readAt: string; page: num
   const id = String(doc.id ?? "").trim();
   if (!assetType || !title || title.length < 3 || !/^[0-9]+(-[0-9]+)?$/.test(id)) return null;
 
-  const ended = doc.flags?.isAuctionEnded === true;
   const hammer = positive(doc.price?.hammerPrice);
   const premium = positive(doc.price?.hammerPremium);
-  const hammerAt = isoOrNull(doc.hammerTime?.datetime);
+  const readMs = Date.parse(ctx.readAt);
+  // hammerTime is the scheduled hammer on an upcoming lot, so it only counts as the observation clock once it is in the past.
+  const hammerAtRaw = isoOrNull(doc.hammerTime?.datetime);
+  const hammerAt = hammerAtRaw && Date.parse(hammerAtRaw) <= readMs ? hammerAtRaw : null;
+  // Stored as printed, placeholder or not; derived readings below withhold a placeholder.
   const saleEnds = isoOrNull(doc.auctionEndDate?.datetime);
-  const result: ArtLotRecord["result"] = ended ? (hammer ? "sold" : "not_sold") : "upcoming";
-  const observedAt = ended && hammerAt ? hammerAt : ctx.readAt;
+  const saleEndUsable = saleEnds && !isPlaceholderEnd(saleEnds, ctx.readAt) ? saleEnds : null;
+  // Outcome comes from the house's own lot status, not from flags.isAuctionEnded. Source evidence, read 2026-11-09 (one reader,
+  // unverified): isAuctionEnded is a sale-clock flag: true on sampled SOLD, BI, WD and CS lots, and false on 48 of 100 sampled
+  // SOLD lots (the root of "upcoming with a hammer"), so it is never read as sold or not sold. Lot pages print
+  // "Sold for <price.hammerPremium> inc. premium" for SOLD (lot 10030-65: hammerPrice 290, hammerPremium 340.75, page 340.75)
+  // and "Withdrawn" for WD (lot 11882-747). BI, CS and WR pages print no outcome; CS lots carry a hammer. Those stay
+  // unresolved:<CODE>. NEW reads upcoming only while the sale is still ahead and nothing contradicts it.
+  const houseStatus = (doc.status ?? "").trim().toUpperCase() || null;
+  const ahead = (saleEndUsable !== null && Date.parse(saleEndUsable) > readMs) || (hammerAtRaw !== null && hammerAt === null)
+    || doc.flags?.isAuctionEnded === false;
+  const contradicted = hammer !== null || premium !== null || (saleEndUsable !== null && Date.parse(saleEndUsable) <= readMs)
+    || doc.flags?.isAuctionEnded === true;
+  const result: LotResult = houseStatus === "SOLD" ? "sold"
+    : houseStatus === "WD" ? "withdrawn"
+    : houseStatus === "NEW" && ahead && !contradicted ? "upcoming"
+    : houseStatus && /^[A-Z]{1,8}$/.test(houseStatus) ? `unresolved:${houseStatus}`
+    : "unknown";
+  const observedAt = result === "sold" && hammerAt ? hammerAt : ctx.readAt;
 
   const slug = unquote(doc.slug);
   const lotPath = doc.lotId && doc.lotId !== "0" ? doc.lotId : id;
@@ -163,7 +201,7 @@ export function artLotFromDoc(doc: ArtIndexDoc, ctx: { readAt: string; page: num
     source_identifier: id,
     source_url: `https://www.bonhams.com/auction/${doc.auctionId ?? ""}/lot/${lotPath}/${slug}`.replace(/\/+$/, ""),
     observed_at: observedAt,
-    observed_at_basis: ended && hammerAt ? "hammer_time" : "index_read",
+    observed_at_basis: result === "sold" && hammerAt ? "hammer_time" : "index_read",
     department_code: code,
     department_name: doc.department?.name ?? null,
     lot_number: doc.lotNo?.full && doc.lotNo.full !== "0" ? doc.lotNo.full : null,

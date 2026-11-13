@@ -5,6 +5,10 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 
 ---
 
+## Prepared Work ingest (inactive)
+
+`gmail-books-poller` stages private money/books signals and pending job links; it never records payments or completion. Offline entry: `scripts/work-money-dry-run.ts`. Setup, reader contracts and explicit release holds: `docs/work-money-ingest.md`. This is a prepared sibling, not an additional active function; do not retire or enable the listing poller or SMS stub as part of this change.
+
 ## How to Use This Document
 
 1. Find your intent in the table below → use the listed function
@@ -13,6 +17,12 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
    ```sql
    SELECT * FROM pipeline_registry WHERE table_name = 'vehicles' AND column_name = 'nuke_estimate';
    ```
+
+A function marked **not deployed** answers 404 in production and has no folder in `supabase/functions/` (23 functions,
+checked 2026-11-13 against the live deploy list). Its rows stay so nobody rebuilds one without knowing it existed; where
+a removal date is given, the source is in git history. A function marked "deployed; source not in this repository"
+answers in production but cannot be rebuilt from this repository (5 functions). `docs/ledger/facts.json` holds the
+current deploy list and is refreshed with `npm run ledger:facts`.
 
 ---
 
@@ -45,7 +55,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Extract Mecum | `extract-mecum` | Service-only `action: source_result_preview` with one explicit `snapshot_id` reads/hash-verifies that retained capture and returns private unqualified result/run-day claims and gaps. No source fetching, intake, metadata/profile/queue writes or inference; `dry_run: false` and extraction options refuse. Scheduled run day is not sale/settlement time. Parent custody, currency and fee basis remain unestablished. |
 | Extract Gooding & Co | `extract-gooding` | |
 | Extract Barrett-Jackson | `extract-barrett-jackson` | |
-| Extract Collecting Cars | `extract-collecting-cars-core` | |
+| Extract Collecting Cars | `extract-collecting-cars-core` (**not deployed**; no source in the repository) | |
 | Extract Broad Arrow | `extract-broad-arrow` | |
 | Extract ClassicCars.com listing | `import-classiccars-listing` | |
 | Extract Hagerty bidding platform | `extract-hagerty-listing` | |
@@ -85,7 +95,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 |--------|----------|-----------|
 | Compute Nuke estimate (AI valuation) | `compute-vehicle-valuation` | `vehicles.nuke_estimate`, `vehicles.nuke_estimate_confidence` |
 | Calculate performance/social scores | `calculate-vehicle-scores` | `vehicles.perf_*_score`, `vehicles.social_positioning_score`, `vehicles.investment_quality_score` |
-| Assess market signals (deal/heat score) | `analyze-market-signals` | `vehicles.signal_score`, `vehicles.signal_reasons`, `vehicles.last_signal_assessed_at` |
+| Assess market signals (deal/heat score) | `analyze-market-signals` (**not deployed**; source removed 2026-03-09) | `vehicles.signal_score`, `vehicles.signal_reasons`, `vehicles.last_signal_assessed_at` |
 | Calculate profile completeness | `calculate-profile-completeness` | `vehicles.completion_percentage`, `vehicles.data_quality_score` |
 | Calculate quality scores | `calculate-vehicle-scores` or `calculate-profile-completeness` | `vehicles.quality_grade` |
 | Get comps for a vehicle | `api-v1-comps` | Read-only — returns comparables |
@@ -105,7 +115,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | MCP: Prepare listing | `mcp-connector` → `prepare_listing` | Read-only preview |
 | MCP: Auction briefing | `mcp-connector` → `get_auction_briefing` | One-call composite: identity, auction data, valuation, seller profile, comps, market history, sentiment, condition. Accepts vehicle_id or listing_url. |
 | MCP: Nuke Asset Advisor (read-only) | `mcp-connector` surface `/mcp/advisor` (also `?surface=advisor` / `x-nuke-surface: advisor`) | Five tools: `find_asset`, `get_asset` (history+coverage folded in), `get_comps`, `value_asset`, `evaluate_listing` (hero). Evidence envelope with citations. Confidence capped at 0.6 pending sale backtest. No write/admin/SQL/legacy catalog. Doc: `supabase/functions/mcp-connector/ADVISOR.md`. |
-| HTTP: Auction briefing | `get-auction-briefing` | Standalone edge function — same composite briefing as MCP tool but callable via HTTP POST. Body: `{vehicle_id}` or `{listing_url}`. Returns identity, auction metrics, seller analytics, comps, sentiment, condition. |
+| HTTP: Auction briefing | `get-auction-briefing` (deployed; source not in this repository) | Standalone edge function — same composite briefing as MCP tool but callable via HTTP POST. Body: `{vehicle_id}` or `{listing_url}`. Returns identity, auction metrics, seller analytics, comps, sentiment, condition. |
 | Seller analytics (SQL) | `get_seller_analytics(p_seller_username)` | Returns seller profile from bat_listings: sell-through rate, pricing stats, engagement metrics, reserve behavior, recent sales, primary makes. ~60ms even for 1400-listing sellers. **Case-sensitive exact match on `seller_username`** — misses casing variants (see `get_seller_stats` note). |
 | Seller hammer revenue (SQL) | `get_seller_stats(p_handle, p_since, p_until)` | Dealer-level total hammer revenue for a BaT seller handle. Matches **case-insensitively** on `seller_username` (the `seller_external_identity_id` FK is populated on only 4 of 157,088 `bat_listings` rows platform-wide — don't join on it alone). Dedupes bat_listings by normalized `bat_listing_url` (strips trailing slash / comment fragment) before summing — re-scraped duplicate rows are a platform-wide pattern (23,304 excess rows / 14.8% of the table as of 2026-07-05), not a one-off. Excludes self-purchases (buyer_username = seller_username). Added by the 2026-07-05 VLVA revenue reconciliation (migration `20260705000000_bat_seller_revenue_dedup.sql`). |
 | HTTP: Seller hammer revenue | `api-v1-seller-stats` | Thin wrapper over `get_seller_stats()`. Body/query: `{handle, since?, until?}`. |
@@ -120,12 +130,12 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Process pending vehicle images (AI analysis) | `photo-pipeline-orchestrator` | Sets `ai_processing_status` |
 | Batch process all pending images | `process-all-images-cron` | Cron-driven, calls pipeline orchestrator |
 | Classify image angle/perspective | `yono-classify` | YONO local model, writes `vehicle_images.angle` |
-| Batch YONO classification | `yono-batch-process` | Bulk angle detection |
+| Batch YONO classification | `yono-batch-process` (**not deployed**; source removed 2026-03-13) | Bulk angle detection |
 | Auto-sort photos into categories | `auto-sort-photos` | Uses `vehicle_images.organization_status` |
 | Sync photos from iPhoto library | `scripts/iphoto-intake.mjs` | See MEMORY.md for usage |
 | Sync photos from camera roll | `scripts/photo-sync.mjs` | Scans macOS Photos by date, filters vehicle photos via Apple ML labels, uploads and routes through image-intake |
 | Upload image and trigger analysis | `image-intake` | Handles upload + queues processing |
-| Backfill image angles | `backfill-image-angles` | Retroactively adds angle data |
+| Backfill image angles | `backfill-image-angles` (**not deployed**; source removed 2026-04-06) | Retroactively adds angle data |
 | Identify vehicle from image | `identify-vehicle-from-image` | AI-powered vehicle recognition |
 | Get attribute checklist for a subject (laser-tag harness) | `mcp-connector` tool `get_attribute_checklist` | Returns L1–L5 attribute schedule a caller agent can answer for image / vehicle / person / cluster. Source = `_shared/cockpit/attribute-registry.ts`. Pairs with `submit_attribute_value` for caller-side BYOK extraction. |
 | Submit caller-extracted attribute value (laser-tag write) | `mcp-connector` tool `submit_attribute_value` | Caller agent submits a single answer from the checklist. Auto-registers caller's model in `model_registry` (caller_kind='walkin', base_trust=0.30) on first call. Auto-registers prompt in `prompt_template_registry`. Validates value against expected_shape + enum_values. Writes signed envelope to `projection_event`. Result_kind enforced per registry. |
@@ -139,9 +149,9 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Validate image is a vehicle | `validate-vehicle-image` | Screening step (GPT-4o, quota exhausted) |
 | Check image matches assigned vehicle | `check-image-vehicle-match` | Claude Haiku vision — classifies as confirmed/mismatch/ambiguous/unrelated |
 | Reprocess stale images | `trickle-backfill-images` | Slow drip backfill |
-| Ingest a video frame (GoPro/dashcam/etc.) | `ingest-video-frame` | Inserts vehicle_images row (source='gopro_frame'/etc) + image_observations row (role='subject', vehicle_id=null, confidence_basis carries source_clip/frame_offset/wall_clock/youtube_url/inherited_lat-lon). Idempotent on content_sha256. Per chapter 12 image_observations foundation. |
-| Universal artifact intake (photo / video_frame / receipt / bank_tx / card_tx / work_order / document) | `ingest-artifact` | Single front door — discriminated union by `kind`. Validates source, dedups by content_sha256 via `artifact_dispatch_log`, routes to type-appropriate handler (photo→orchestrator, video_frame→ingest-video-frame, receipt/work_order/document→ingest-observation, bank_tx/card_tx→Phase-2 stub). ALWAYS emits observations through `ingest-observation` — never writes vehicle_observations directly. Contract: `docs/library/technical/engineering-manual/16-artifact-dispatcher.md`. |
-| Map receipt → entity scope (NUKE / Viva / personal / household / vehicle) | `classify-receipt-scope` | Deterministic-first (attribution block → card lookup → merchant regex → line-item category → gpt-4o-mini fallback). Returns `{scope_type, scope_id, method, confidence, reasons[]}`. Used by Jenny-receipt ingest and the 2,034-row backfill. |
+| Ingest a video frame (GoPro/dashcam/etc.) | `ingest-video-frame` (deployed; source not in this repository) | Inserts vehicle_images row (source='gopro_frame'/etc) + image_observations row (role='subject', vehicle_id=null, confidence_basis carries source_clip/frame_offset/wall_clock/youtube_url/inherited_lat-lon). Idempotent on content_sha256. Per chapter 12 image_observations foundation. |
+| Universal artifact intake (photo / video_frame / receipt / bank_tx / card_tx / work_order / document) | `ingest-artifact` (deployed; source not in this repository) | Single front door — discriminated union by `kind`. Validates source, dedups by content_sha256 via `artifact_dispatch_log`, routes to type-appropriate handler (photo→orchestrator, video_frame→ingest-video-frame, receipt/work_order/document→ingest-observation, bank_tx/card_tx→Phase-2 stub). ALWAYS emits observations through `ingest-observation` — never writes vehicle_observations directly. Contract: `docs/library/technical/engineering-manual/16-artifact-dispatcher.md`. |
+| Map receipt → entity scope (NUKE / Viva / personal / household / vehicle) | `classify-receipt-scope` (deployed; source not in this repository) | Deterministic-first (attribution block → card lookup → merchant regex → line-item category → gpt-4o-mini fallback). Returns `{scope_type, scope_id, method, confidence, reasons[]}`. Used by Jenny-receipt ingest and the 2,034-row backfill. |
 
 ---
 
@@ -150,7 +160,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Extract auction comments from BaT | `extract-auction-comments` | Scrapes BaT page, writes to `auction_comments` |
-| Discover/analyze comment data with AI | `discover-comment-data` | Writes to `comment_discoveries` |
+| Discover/analyze comment data with AI | `discover-comment-data` (**not deployed**; source removed 2026-03-09) | Writes to `comment_discoveries` |
 | Fast batch comment analysis | `analyze-comments-fast` | Batch version of discovery |
 | Batch comment discovery | `batch-comment-discovery` | Parallel comment analysis |
 | Update live sentiment | `update-live-sentiment` | Writes to `auction_sentiment_timeline` |
@@ -222,16 +232,16 @@ Provider prices and subscription limits are not established by this dated invent
 | Get analysis dashboard | `analysis-engine-coordinator` with `{"action": "dashboard", "vehicle_id": "..."}` | All signals by severity |
 | Acknowledge signal | `analysis-engine-coordinator` with `{"action": "acknowledge", "signal_id": "..."}` | Mark as seen |
 | Dismiss/snooze signal | `analysis-engine-coordinator` with `{"action": "dismiss", "signal_id": "...", "dismiss_hours": 72}` | Hide for N hours |
-| Sell-through cliff analysis | `widget-sell-through-cliff` with `{"vehicle_id": "..."}` | DOM-based sell-through probability |
-| Rerun decay analysis | `widget-rerun-decay` with `{"vehicle_id": "..."}` | Multi-listing price decay tracking |
-| Deal health composite | `widget-time-kills-deals` with `{"vehicle_id": "..."}` | Master aggregator of 7 sub-signals |
-| Completion discount | `widget-completion-discount` with `{"vehicle_id": "..."}` | Deficiency detection + buyer discount calc |
-| Presentation ROI | `widget-presentation-roi` with `{"vehicle_id": "..."}` | Photo/description quality scoring |
-| Broker exposure | `widget-broker-exposure` with `{"vehicle_id": "..."}` | Multi-platform exclusivity erosion |
-| Buyer qualification | `widget-buyer-qualification` with `{"vehicle_id": "..."}` | Buyer readiness scoring via deal jacket |
-| Commission optimizer | `widget-commission-optimizer` with `{"vehicle_id": "..."}` | Commission structure + margin analysis |
-| Deal readiness | `widget-deal-readiness` with `{"vehicle_id": "..."}` | Checklist-based deal closing readiness |
-| Geographic arbitrage | `widget-geographic-arbitrage` with `{"vehicle_id": "..."}` | Regional price differential analysis |
+| Sell-through cliff analysis | `widget-sell-through-cliff` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | DOM-based sell-through probability |
+| Rerun decay analysis | `widget-rerun-decay` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Multi-listing price decay tracking |
+| Deal health composite | `widget-time-kills-deals` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Master aggregator of 7 sub-signals |
+| Completion discount | `widget-completion-discount` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Deficiency detection + buyer discount calc |
+| Presentation ROI | `widget-presentation-roi` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Photo/description quality scoring |
+| Broker exposure | `widget-broker-exposure` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Multi-platform exclusivity erosion |
+| Buyer qualification | `widget-buyer-qualification` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Buyer readiness scoring via deal jacket |
+| Commission optimizer | `widget-commission-optimizer` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Commission structure + margin analysis |
+| Deal readiness | `widget-deal-readiness` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Checklist-based deal closing readiness |
+| Geographic arbitrage | `widget-geographic-arbitrage` (**not deployed**; source removed 2026-04-06) with `{"vehicle_id": "..."}` | Regional price differential analysis |
 | Map data (choropleth/points/histogram) | `map-vehicles` with `mode=state\|county\|points\|histogram` | Supports bbox, zoom, time_start/end, make, year/price filters. Temporal county uses VLO county_fips index. |
 | County detail (vehicles, makes, platforms) | `get_county_detail(p_fips)` RPC | Returns JSONB: top 20 vehicles, make distribution, platform breakdown |
 | Make geographic density | `get_make_heatmap(p_make)` RPC | Returns county-level density for a specific make from mv_make_geographic_density |
@@ -274,9 +284,9 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Release stale locked records | `SELECT release_stale_locks()` | SQL function — releases locks older than 30 min |
 | Check system health | `system-health-monitor` | |
 | Monitor extraction health | `extraction-watchdog` | Alerts on failures |
-| **Data quality report (all sources)** | `data-quality-monitor` with `{"action":"report"}` | Per-source YMM%, VIN%, price%, grade A-F |
-| **Data quality alerts only** | `data-quality-monitor` with `{"action":"alerts"}` | Only sources with issues |
-| **Snapshot quality metrics to DB** | `data-quality-monitor` with `{"action":"snapshot"}` | Writes to source_quality_snapshots (cron runs at 2am UTC) |
+| **Data quality report (all sources)** | `data-quality-monitor` (**not deployed**; source removed 2026-03-09) with `{"action":"report"}` | Per-source YMM%, VIN%, price%, grade A-F |
+| **Data quality alerts only** | `data-quality-monitor` (**not deployed**; source removed 2026-03-09) with `{"action":"alerts"}` | Only sources with issues |
+| **Snapshot quality metrics to DB** | `data-quality-monitor` (**not deployed**; source removed 2026-03-09) with `{"action":"snapshot"}` | Wrote to source_quality_snapshots from a 2am UTC cron job. No scheduled job names it now (2026-11-13) |
 | **Query live quality view** | `SELECT * FROM source_quality_current` | Live per-source stats (slow on full table) |
 | Process queued imports | `continuous-queue-processor` | **Don't call directly** — runs on cron |
 
@@ -286,7 +296,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 
 | Intent | Use This | Notes |
 |--------|----------|-------|
-| Queue BaT listings for extraction | `crawl-bat-active` | Discovers active auctions |
+| Queue BaT listings for extraction | `crawl-bat-active` (**not deployed**; source removed 2026-03-09) | Discovers active auctions |
 | Process BaT extraction queue | `process-bat-extraction-queue` | Works `bat_extraction_queue` |
 | Admit supported retained BaT sales automatically | `qualify-bat-archived-sales` cron → existing `batch-extract-snapshots` → canonical `ingest-observation` | Service-only protected-v1 route in existing `derivation_queue`;20 captures/5min, finite replay plus metadata arrival,0 model calls. Busy parent rows defer capture work for bounded retry without aborting intake or source pages. Inspect `assay_bat_sale_intake()` (including deferred work) and `read_bat_sale_intake(snapshot_uuid)`. Unknown/conflicting current sold facts remain explicit refusals; native/episode-v2 holds persist. Do not manually drain. |
 | Monitor a BaT seller | `bat-seller-monitors` table | Insert record to start monitoring |
@@ -350,7 +360,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 |--------|----------|-------|
 | Compute wiring overlay (harness spec) | `compute-wiring-overlay` | POST `{ vehicle_id }`. Returns wire list, ECU/PDM/alternator sizing, bulkhead pin assignments, warnings. Upserts to `vehicle_wiring_overlays`. |
 | Generate harness fabrication spec | `generate-harness-spec` | POST `{ vehicle_id, format? }`. Formats: "full" (JSON+text), "text" (plaintext spec), "csv" (wire schedule for Excel), "workstation" (live build progress + blockers), "wire_schedule" (tables only). The document you hand to a fabricator or Fiverr illustrator. |
-| Render wiring visual (DB-driven) | `render-wiring-visual` | POST `{ vehicle_id, visual_type, target?, mode?, format? }`. visual_type: "connector_face" / "cutting_list" / "wire_schedule" / "formboard" / "list". mode: "blank" / "populated". target: "M130_Connector_A", "D38999_J61", "ENGINE", "DASH", etc. Returns SVG + completeness_pct + missing_data[] + warnings[]. Use "list" to discover all available targets. |
+| Render wiring visual (DB-driven) | `render-wiring-visual` (deployed; source not in this repository) | POST `{ vehicle_id, visual_type, target?, mode?, format? }`. visual_type: "connector_face" / "cutting_list" / "wire_schedule" / "formboard" / "list". mode: "blank" / "populated". target: "M130_Connector_A", "D38999_J61", "ENGINE", "DASH", etc. Returns SVG + completeness_pct + missing_data[] + warnings[]. Use "list" to discover all available targets. |
 | Scan wiring enrichment gaps | `npm run wiring:gaps` | Scans all 131 devices, reports P0-P7 gaps (missing pin maps, datasheets, cavity layouts, current ratings, prices, wire lengths, crimp specs). Generates agent prompts for automated gap-filling. |
 | Harness build workstation view | `SELECT * FROM harness_workstation` | Live builder spreadsheet — every device with zone, integration decision (KEEP/REPLACE/NEW/SPLICE), wire progress (not_started→wire_cut→terminated→installed→tested→verified), blockers, and notes. Pull this up every time you work on the harness. |
 | Update wire build progress | `UPDATE vehicle_build_manifest SET wire_status = 'terminated' WHERE device_name = '...'` | Track physical build progress per device. |
@@ -387,9 +397,9 @@ Agent: → UPDATE location_zone = 'dash' in manifest
 |--------|----------|-------|
 | Discover vehicles from a source URL | `discover-from-observations` | Source-agnostic |
 | Discover squarebody Craigslist listings | `discover-cl-squarebodies` | Regional CL scanner |
-| Discover barn finds | `barn-finds-discovery` | Monitors barn find sources |
-| Discover build threads | `discover-build-threads` | Forum build thread finder |
-| Recursive lead discovery | `discovery-snowball` | Follows discovery chains |
+| Discover barn finds | `barn-finds-discovery` (**not deployed**; source removed 2026-04-06) | Monitors barn find sources |
+| Discover build threads | `discover-build-threads` (**not deployed**; source removed 2026-04-06) | Forum build thread finder |
+| Recursive lead discovery | `discovery-snowball` (**not deployed**; source removed 2026-02-01) | Follows discovery chains |
 
 ---
 
@@ -498,11 +508,11 @@ Lets a Nuke user run analysis on **their own Claude plan**: subscription token a
 | Full image intelligence (make + condition + zone + damage) | `api-v1-vision/analyze` | POST `{image_url}` → make, condition_score, vehicle_zone, damage_flags, $0/image |
 | Classify make from image | `api-v1-vision/classify` or `yono-classify` | Hierarchical: tier1 family, tier2 make. $0/image |
 | Analyze condition/zone/damage | `yono-analyze` | Florence-2 vision analysis. Writes to vehicle_images if image_id provided |
-| Batch classify images | `api-v1-vision/batch` or `yono-batch-process` | Bulk version, max 100 images |
+| Batch classify images | `api-v1-vision/batch` or `yono-batch-process` (**not deployed**; source removed 2026-03-13) | Bulk version, max 100 images |
 | Condition read of a listing's photos, on request | `api-v1-vision/listing` | POST `{vehicle_id, max_photos?}` (admins or the service key). Reads up to 16 photos with YONO, then the caller's own connected provider (BYOK), and writes one `kind=condition` observation (source `nuke-vision`, `analysis_kind=listing_photo_condition_v1`) through `ingest-observation`. At most `LISTING_ANALYSES_PER_DAY` (default 40) a day |
-| Background vision processing | `yono-vision-worker` | Cron worker, claims batches, writes to vehicle_images |
-| Keep sidecar warm | `yono-keepalive` | Pings Modal every 5 min (cron job 249) |
-| Export training data | `export-training-batch` | Prepares training dataset |
+| Background vision processing | `yono-vision-worker` (**not deployed**; source removed 2026-03-13) | Was a cron worker that claimed batches and wrote to vehicle_images. No scheduled job names it now (2026-11-13) |
+| Keep sidecar warm | `yono-keepalive` (**not deployed**; source removed 2026-03-13) | Pinged Modal every 5 min from cron job 249, which no longer exists (2026-11-13) |
+| Export training data | `export-training-batch` (**not deployed**; source removed 2026-03-31) | Prepares training dataset |
 | Sidecar URL | `YONO_SIDECAR_URL` env var | Default: `https://sss97133--yono-serve-fastapi-app.modal.run` |
 
 ### Modal GPU Jobs (yono/)
@@ -538,7 +548,7 @@ These are the most common "agent reimplementation" antipatterns. If you find you
 | A "get vehicle data" endpoint | `api-v1-vehicles` |
 | A duplicate detector | `duplicate-detection-jobs` table + `auto-merge-duplicate-orgs` |
 | A vehicle valuation calculator | `compute-vehicle-valuation` |
-| A comment sentiment analyzer | `discover-comment-data` |
+| A comment sentiment analyzer | `discover-comment-data` (**not deployed**; source removed 2026-03-09) |
 | A search endpoint | `universal-search` |
 | A BaT scraper | `extract-bat-core` (+ `extract-auction-comments` for comments) |
 | A Craigslist scraper | `extract-craigslist` or `discover-cl-squarebodies` |

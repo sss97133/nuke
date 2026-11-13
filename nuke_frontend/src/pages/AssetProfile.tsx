@@ -28,7 +28,8 @@ type Statement = { statement_id: string; source: string | null; observed_at: str
 type Party = { id: string; kind?: 'catalogue' | 'user'; display_name: string | null; qualifier_as_printed?: string | null; claimed: boolean; lots_direct: number; priced_lots: number };
 type Executor = { role: string; name_as_printed: string | null; qualifier_as_printed: string | null; party_identity_id: string | null };
 type Creation = { claim_id: string; attribution: string; layout: string | null; name_as_printed: string | null; qualifier_as_printed: string | null;
-  party: Party | null; executor: Executor | null; source: string | null; observed_at: string; confidence: number | null };
+  party: Party | null; executor: Executor | null; source: string | null; observed_at: string; confidence: number | null;
+  role?: string | null; claim_state?: string | null; qualification?: string | null; basis?: string | null };
 type Declared = { medium?: string; year?: string; dimensions?: string; edition?: string; notes?: string };
 type Sighting = { taken_at: string; filename?: string | null; labels?: string[] | null; library?: string | null; place?: string | null; camera?: string | null; caption?: string | null };
 type Proposal = { key?: string; kind?: string | null; labels?: string[] | null; labeller?: string | null; method?: string | null; photos?: number; sittings?: number;
@@ -36,7 +37,8 @@ type Proposal = { key?: string; kind?: string | null; labels?: string[] | null; 
 export type AssetProfile = {
   asset: { id: string; asset_type: string; title: string | null; house_category: string | null; house_category_code: string | null;
     source: string | null; identity_basis: string | null; first_seen_at: string | null; created_at: string; visibility?: string };
-  viewer?: { is_holder: boolean };
+  viewer?: { is_holder: boolean; is_record_origin?: boolean; legacy_compound?: boolean };
+  documentation?: { records: number; kept_at?: string | null; basis?: string | null } | null;
   declared?: Declared | null;
   proposal?: Proposal | null;
   market?: 'recorded' | 'none_public';
@@ -47,6 +49,14 @@ export type AssetProfile = {
   coverage: { presentations: number; statements: number; claims: number; sources: string[]; as_of: string };
 };
 
+// How a person's own statement currently stands. Never "verified": testimony is shown as testimony.
+export const QUALIFICATION_WORDS: Record<string, string> = {
+  legacy_compound_unverified: 'Recorded by the earlier single confirmation; unverified',
+  stated_unverified: 'Stated by the person; not verified',
+  stated_evidence_lapsed: 'Stated by the person; a record it cited has since been withdrawn or replaced',
+  accepted_interim: 'Accepted under the interim rule; not verified',
+  acceptance_lapsed: 'Was accepted; a record it cited has since been withdrawn or replaced',
+};
 const ATTRIBUTION_WORDS: Record<string, string> = {
   direct: 'by', after: 'after', attributed_to: 'attributed to', circle_of: 'circle of', school_of: 'school of', follower_of: 'follower of',
   manner_of: 'manner of', studio_of: 'studio of', workshop_of: 'workshop of', style_of: 'style of', none_printed: 'no maker printed',
@@ -58,7 +68,7 @@ const TYPE_WORDS: Record<string, string> = { artwork: 'Artwork', automobilia: 'A
 const IDENTITY_WORDS: Record<string, string> = {
   lot_presentation: 'one presentation at one house. The same object seen again at another sale is joined by supersession, never by overwriting.',
   holder_declaration: 'declared by its holder in their own words. Presentations, publications and sales attach to it as they are recorded.',
-  photo_proposal: "found in the holder's own photographs, grouped by visual identity across time; the holder confirms or dismisses, the machine never assumes.",
+  photo_proposal: "found in the photographs of the person who recorded it, grouped by visual identity across time; they keep it as documentation or discard it, and keeping it says nothing about who made or holds it. The machine never assumes.",
 };
 const KIND_WORDS: Record<string, string> = { painting: 'painting', drawing: 'drawing', sketch: 'sketch', billboard: 'billboard', mural: 'mural', sculpture: 'sculpture', street_art: 'street art', gallery: 'gallery sitting', artwork: 'work' };
 
@@ -74,11 +84,12 @@ export function sittingsOf(photos: Sighting[]): Array<{ day: string; n: number; 
   return [...by.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
 
-function FoundBlock({ proposal, isHolder, assetId }: { proposal: Proposal; isHolder: boolean; assetId: string }) {
+// Who may keep or discard a proposal: the person whose photos found it (record origin), not a holder or maker.
+function FoundBlock({ proposal, isOrigin, assetId }: { proposal: Proposal; isOrigin: boolean; assetId: string }) {
   const sightings = proposal.photo_sightings ?? [];
   const sittings = sittingsOf(sightings);
   const coverage: Coverage = { n: sightings.length, of: proposal.photos ?? sightings.length, grain: 'photograph', as_of: proposal.span_to ?? null };
-  return <Section title="Found in the holder's photographs" coverage={coverage}>
+  return <Section title={proposal.status === 'pending' ? 'Found in your photographs' : 'Documented in photographs'} coverage={coverage}>
     <Rows title="What the analysis saw">
       <Row label="Kind">{KIND_WORDS[proposal.kind ?? ''] ?? proposal.kind ?? 'work'}</Row>
       {proposal.labels && proposal.labels.length > 0 && <Row label="Labels, as the device printed them" role="caption">{proposal.labels.join(', ')}</Row>}
@@ -87,16 +98,17 @@ function FoundBlock({ proposal, isHolder, assetId }: { proposal: Proposal; isHol
       <Row label="Days photographed" role="measure">{String(proposal.sittings ?? sittings.length)}</Row>
       {proposal.places && proposal.places.length > 0 && <Row label="Where" role="caption">{proposal.places.map(([p, n]) => `${p} (${n})`).join(' · ')}</Row>}
       <Row label="Method" role="caption">{`${proposal.labeller ?? 'on-device labels'}${proposal.method ? ` · ${proposal.method}` : ''} · nothing left the machine`}</Row>
-      {proposal.status === 'pending' && <Row label="Standing" role="caption">{isHolder ? 'Awaiting you: this is your work, or it is not' : 'Not yet confirmed by its holder'}</Row>}
+      {proposal.status === 'active' && <Row label="Standing" role="caption">Kept as documentation. It does not say who made or holds the work.</Row>}
+      {proposal.status === 'pending' && <Row label="Standing" role="caption">{isOrigin ? 'Awaiting you: keep it as documentation, or discard it' : 'Not yet kept by the person whose photos found it'}</Row>}
     </Rows>
     {sittings.length > 0 && <ol className="ap-history">{sittings.map(s => <li key={s.day} className="ap-history__row">
       <Text role="caption">{day(s.day)}</Text>
       <Text role="body">{`${s.n} photograph${s.n === 1 ? '' : 's'}${s.place ? ` · ${s.place}` : ''}`}</Text>
       {s.caption && <Text role="caption">{`the device's caption: ${s.caption}`}</Text>}
     </li>)}</ol>}
-    {isHolder && proposal.status === 'pending' && <div className="ap-verbs">
-      <PrefetchLink to={`/assets/new?confirm=${assetId}`} className="ap-sign"><Text role="label">This is my work</Text></PrefetchLink>
-      <PrefetchLink to="/assets/mine" className="ap-link"><Text role="label">Back to your works</Text></PrefetchLink>
+    {isOrigin && proposal.status === 'pending' && <div className="ap-verbs">
+      <PrefetchLink to={`/assets/new?confirm=${assetId}`} className="ap-sign"><Text role="label">Keep as documentation</Text></PrefetchLink>
+      <PrefetchLink to="/assets/mine" className="ap-link"><Text role="label">Back to your records</Text></PrefetchLink>
     </div>}
   </Section>;
 }
@@ -205,8 +217,9 @@ function CreationBlock({ claims, lots }: { claims: Creation[]; lots: number }) {
       <Rows title="This party across Nuke">
         <Row label="Lots attributed directly" role="measure">{(c.party?.lots_direct ?? 0).toLocaleString('en-US')}</Row>
         <Row label="With a published hammer" role="measure">{(c.party?.priced_lots ?? 0).toLocaleString('en-US')}</Row>
-        <Row label={c.party?.kind === 'user' ? 'The party' : 'Claimed by the artist or estate'} role="caption">{c.party?.kind === 'user' ? 'A Nuke user, declaring their own work' : c.party?.claimed ? 'Yes' : 'Not yet: the row is theirs to claim'}</Row>
+        <Row label={c.party?.kind === 'user' ? 'The party' : 'Claimed by the artist or estate'} role="caption">{c.party?.kind === 'user' ? `A Nuke user, in their own words${c.role && c.role !== 'creator' ? ` (${c.role})` : ''}` : c.party?.claimed ? 'Yes' : 'Not yet: the row is theirs to claim'}</Row>
         {c.executor?.name_as_printed && <Row label={`Executed by (${c.executor.role})`}>{`${c.executor.name_as_printed}${c.executor.qualifier_as_printed ? ` (${c.executor.qualifier_as_printed})` : ''}`}</Row>}
+        {c.qualification && c.qualification !== 'source_statement' && <Row label="Standing" role="caption">{QUALIFICATION_WORDS[c.qualification] ?? c.qualification}</Row>}
         <Row label="Claim source" role="caption">{`${c.source ?? 'the house'} · ${day(c.observed_at)} · ${c.layout === 'holder_declaration' ? "the holder's own declaration" : c.layout === 'name_colon_description' ? 'the name before the colon' : 'the first catalogue line'}`}</Row>
       </Rows>
     </div>)}
@@ -271,8 +284,9 @@ export default function AssetProfilePage() {
         <Text role="caption">{profile.proposal?.span_from ? `first photographed ${day(profile.proposal.span_from)}` : 'a figure appears only when a house publishes one'}</Text>
       </div>}
     </header>
-    {profile.proposal && <FoundBlock proposal={profile.proposal} isHolder={!!profile.viewer?.is_holder} assetId={profile.asset.id} />}
-    {profile.declared && Object.keys(profile.declared).length > 0 && <Section title="As declared by the holder" coverage={{ n: 1, of: 1, grain: 'declaration', as_of: profile.asset.created_at }}>
+    {profile.proposal && <FoundBlock proposal={profile.proposal} isOrigin={!!profile.viewer?.is_record_origin} assetId={profile.asset.id} />}
+    {profile.viewer?.legacy_compound && <p className="ap-prose" role="note"><Text role="caption">Recorded under the earlier single confirmation. Whether you hold it, and whether you made it, are unresolved until you say so.</Text></p>}
+    {profile.declared && Object.keys(profile.declared).length > 0 && <Section title="In the words of the person who recorded it" coverage={{ n: 1, of: 1, grain: 'declaration', as_of: profile.asset.created_at }}>
       <Rows title="In the holder's words">
         {profile.declared.medium && <Row label="Medium">{profile.declared.medium}</Row>}
         {profile.declared.year && <Row label="Year">{profile.declared.year}</Row>}

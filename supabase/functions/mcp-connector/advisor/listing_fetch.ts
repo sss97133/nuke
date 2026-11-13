@@ -31,6 +31,138 @@ export interface FetchedListing {
   current_bid?: number | null;
   /** Auction end time (ISO) when the page states it. */
   auction_end_at?: string | null;
+  /**
+   * What the page price is (T1). sold = winning bid of a closed sale; high_bid_reserve_not_met = the
+   * top bid of an auction that did not sell (never a sale); current_bid = live bid; ask = seller ask.
+   */
+  price_kind?: "sold" | "high_bid_reserve_not_met" | "current_bid" | "ask" | null;
+  /** The page price of `price_kind`, in `currency` (native, never converted). */
+  price?: number | null;
+  /** hammer = before buyer fee (BaT publishes the winning bid); gross_incl_premium; unknown. */
+  price_basis?: "hammer" | "gross_incl_premium" | "unknown" | null;
+  /** Where price_basis came from (page label or fee schedule), and any conflict between them. */
+  price_basis_note?: string | null;
+  sold_price?: number | null;
+  high_bid?: number | null;
+  /** Sale / auction close time read from the page (ISO). */
+  end_at?: string | null;
+  /** Odometer as shown on the page; mileage_tmu = "TMU" (true mileage unknown) printed by the seller. */
+  mileage_tmu?: boolean;
+  mileage_km?: number | null;
+  mileage_text?: string | null;
+  mileage_source?: "page_listing_details" | "page_text" | "page_attr" | null;
+  /** Full model from the page title (e.g. "911 GT3 RS"), before any database fill-in. */
+  model_from_title?: string | null;
+}
+
+const TWO_WORD_MAKES = [
+  "Land Rover",
+  "Alfa Romeo",
+  "Aston Martin",
+  "Rolls-Royce",
+  "Mercedes-Benz",
+  "De Tomaso",
+  "AM General",
+  "Austin-Healey",
+  "Morgan Plus",
+];
+
+/** Year / make / model from a listing title such as "15k-Mile 2011 Porsche 911 GT3 RS 6-Speed". */
+export function identityFromTitle(title: string | null | undefined): {
+  year: number | null;
+  make: string | null;
+  model: string | null;
+} {
+  const t = String(title || "").replace(/\s+/g, " ").trim();
+  const m = t.match(/\b((?:18|19|20)\d{2})\s+(.+)$/);
+  if (!m) return { year: null, make: null, model: null };
+  const year = Number(m[1]);
+  const rest = m[2]!;
+  const two = TWO_WORD_MAKES.find((mk) => rest.toLowerCase().startsWith(mk.toLowerCase() + " "));
+  const make = two ? rest.slice(0, two.length) : rest.split(" ")[0]!;
+  let model: string | null = rest.slice(make.length).trim();
+  // A trailing gearbox count describes the car, it is not part of the model name.
+  model = model.replace(/\s+\d-Speed(?:\s+(?:Manual|Automatic))?$/i, "").trim() || null;
+  return { year, make: make || null, model };
+}
+
+/** Odometer from a BaT "Listing Details" line: "111k Miles Shown, TMU", "37k Kilometers (~23k Miles) Shown". */
+export function parseMileageLine(line: string): { miles: number | null; km: number | null; tmu: boolean } | null {
+  const l = line.replace(/\s+/g, " ").trim();
+  if (!/\b(?:miles?|kilometers?|kilometres?|km)\b/i.test(l)) return null;
+  const num = (raw: string, k: string | undefined) => {
+    const n = Number(raw.replace(/,/g, ""));
+    if (!Number.isFinite(n)) return null;
+    return Math.round(k ? n * 1000 : n);
+  };
+  const tmu = /\bTMU\b|true mileage unknown/i.test(l);
+  const lead = l.match(/^(?:~|approximately\s+)?([\d,]+(?:\.\d+)?)\s*(k)?\s*(miles?|kilometers?|kilometres?|km)\b/i);
+  if (!lead) return null;
+  const leadVal = num(lead[1]!, lead[2]);
+  if (/^mile/i.test(lead[3]!)) return { miles: leadVal, km: null, tmu };
+  const approx = l.match(/~\s*([\d,]+(?:\.\d+)?)\s*(k)?\s*miles?/i);
+  return { miles: approx ? num(approx[1]!, approx[2]) : null, km: leadVal, tmu };
+}
+
+/**
+ * BaT listing page facts read from the page itself (T1/T2): title, the auction result or live bid,
+ * the close time, and the odometer line from "Listing Details". Exported for tests.
+ */
+export function parseBatListing(html: string): {
+  title: string | null;
+  price_kind: FetchedListing["price_kind"];
+  price: number | null;
+  currency: string | null;
+  end_at: string | null;
+  mileage: number | null;
+  mileage_km: number | null;
+  mileage_tmu: boolean;
+  mileage_text: string | null;
+} {
+  const h1 = html.match(/data-testid="listing-post-title"[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ??
+    html.match(/<h1[^>]*class="[^"]*listing-post-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ?? null;
+  const title = h1 ? stripTags(h1) || null : null;
+  const infoRaw = html.match(/class="listing-available-info"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "";
+  const info = stripTags(infoRaw);
+  let price_kind: FetchedListing["price_kind"] = null;
+  let price: number | null = null;
+  let currency: string | null = null;
+  const pick = (re: RegExp) => {
+    const m = info.match(re);
+    if (!m) return false;
+    currency = m[1] ? m[1].toUpperCase() : "USD";
+    price = parseMoney(m[2]);
+    return true;
+  };
+  const CUR = "(USD|EUR|GBP|CAD|AUD|CHF|JPY)?\\s*[$€£]?\\s*([\\d,]+)";
+  if (pick(new RegExp(`Current Bid:?\\s*${CUR}`, "i"))) price_kind = "current_bid";
+  else if (pick(new RegExp(`Sold for\\s*${CUR}`, "i"))) price_kind = "sold";
+  else if (pick(new RegExp(`Bid to\\s*${CUR}`, "i"))) price_kind = "high_bid_reserve_not_met";
+  let end_at: string | null = null;
+  const until = html.match(/listing-available-countdown[^>]*data-until="(\d{9,11})"/i)?.[1];
+  const ts = infoRaw.match(/data-timestamp="(\d{9,11})"/i)?.[1];
+  const endTs = price_kind === "current_bid" ? until : ts ?? until;
+  if (endTs) end_at = new Date(Number(endTs) * 1000).toISOString();
+  let mileage: number | null = null;
+  let mileage_km: number | null = null;
+  let mileage_tmu = false;
+  let mileage_text: string | null = null;
+  const detailsIdx = html.search(/Listing Details<\/strong>/i);
+  if (detailsIdx >= 0) {
+    const ul = html.slice(detailsIdx, detailsIdx + 8000).match(/<ul>([\s\S]*?)<\/ul>/i)?.[1] ?? "";
+    for (const li of ul.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)) {
+      const line = stripTags(li[1] || "");
+      const m = parseMileageLine(line);
+      if (m) {
+        mileage = m.miles;
+        mileage_km = m.km;
+        mileage_tmu = m.tmu;
+        mileage_text = line;
+        break;
+      }
+    }
+  }
+  return { title, price_kind, price, currency, end_at, mileage, mileage_km, mileage_tmu, mileage_text };
 }
 
 /**
@@ -154,11 +286,16 @@ export function batGalleryPhotoUrls(html: string, base: string): string[] {
 }
 
 function detectSource(url: string): string {
-  const h = url.toLowerCase();
-  if (h.includes("craigslist")) return "craigslist";
-  if (h.includes("bringatrailer")) return "bat";
-  if (h.includes("carsandbids")) return "cars_and_bids";
-  if (h.includes("ebay")) return "ebay";
+  // Decide by the parsed host, never by a substring of the whole URL: a path or a look-alike
+  // host ("mecum.com.example.org", "example.org/?u=mecum.com") must not match.
+  let h = "";
+  try { h = new URL(url).hostname.toLowerCase(); } catch { return "listing"; }
+  const on = (domain: string) => h === domain || h.endsWith("." + domain);
+  if (on("craigslist.org")) return "craigslist";
+  if (on("bringatrailer.com")) return "bat";
+  if (on("carsandbids.com")) return "cars_and_bids";
+  if (/(^|\.)ebay\.[a-z.]{2,6}$/.test(h)) return "ebay";
+  if (on("mecum.com")) return "mecum";
   return "listing";
 }
 
@@ -321,6 +458,70 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
     listing_kind = "fixed_price";
   }
 
+  // BaT: read the result / bid, close time and odometer from the page itself (T1/T2).
+  let price_kind: FetchedListing["price_kind"] = null;
+  let price: number | null = null;
+  let price_basis: FetchedListing["price_basis"] = null;
+  let price_basis_note: string | null = null;
+  let sold_price: number | null = null;
+  let high_bid: number | null = null;
+  let end_at: string | null = null;
+  let mileage_tmu = false;
+  let mileage_km: number | null = null;
+  let mileage_text: string | null = null;
+  let mileage_source: FetchedListing["mileage_source"] = mileage != null ? "page_attr" : null;
+  let model_from_title: string | null = null;
+  if (source === "bat") {
+    const bat = parseBatListing(html);
+    if (bat.title) title = bat.title;
+    if (bat.price_kind) {
+      price_kind = bat.price_kind;
+      price = bat.price;
+      if (bat.currency) currency = bat.currency;
+      price_basis = "hammer";
+      price_basis_note = "BaT publishes the winning / high bid; the buyer fee is charged on top (hammer basis)";
+      if (bat.price_kind === "current_bid") {
+        listing_kind = "auction_live";
+        current_bid = bat.price;
+        asking_price = null;
+      } else {
+        listing_kind = "auction_ended";
+        asking_price = null; // a result is never an ask
+        if (bat.price_kind === "sold") sold_price = bat.price;
+        else high_bid = bat.price;
+      }
+    }
+    if (bat.end_at) {
+      end_at = bat.end_at;
+      auction_end_at = bat.end_at;
+    }
+    if (bat.mileage != null || bat.mileage_km != null) {
+      mileage = bat.mileage;
+      mileage_km = bat.mileage_km;
+      mileage_tmu = bat.mileage_tmu;
+      mileage_text = bat.mileage_text;
+      mileage_source = "page_listing_details";
+    }
+  } else if (source === "mecum") {
+    // Mecum lot pages carry the result in embedded JSON ("hammerPrice") plus a sold badge.
+    const t = title?.replace(/\s+For Sale At Auction.*$/i, "").replace(/\s+-\s+Mecum Auctions$/i, "").trim();
+    if (t) title = t;
+    const hp = html.match(/\\?"hammerPrice\\?"\s*:\s*\\?"?(\d+)/)?.[1];
+    const soldBadge = /saleResultBadge[^"]*\bsold\b|alt="sold"/i.test(html);
+    if (hp && Number(hp) > 0 && soldBadge) {
+      price_kind = "sold";
+      price = Number(hp);
+      sold_price = price;
+      listing_kind = "auction_ended";
+      asking_price = null;
+      // Conflict, flagged not resolved: the page field is named hammerPrice, while Nuke's cited fee
+      // schedule (platform_fee_schedule, mecum) says Mecum's published results include the premium.
+      price_basis = "unknown";
+      price_basis_note =
+        "conflict: Mecum page field is 'hammerPrice' but platform_fee_schedule (mecum, published_price_basis=gross_incl_premium) says published results include the buyer premium";
+    }
+  }
+
   // Identity from title / description; when HTML is a JS shell, fall back to URL slug.
   const fromUrl = identityFromListingUrl(url);
   if (fromUrl.auction_id) raw_attrs.auction_id = fromUrl.auction_id;
@@ -354,23 +555,48 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
     }
   }
   if (!title && fromUrl.title) title = fromUrl.title;
+  // BaT / Mecum titles carry the full model ("911 GT3 RS", "Cayenne Turbo S"): the title beats the
+  // keyword guesses above, which collapse every 911 to "911".
+  if ((source === "bat" || source === "mecum") && title) {
+    const ti = identityFromTitle(title);
+    if (ti.year) year = ti.year;
+    if (ti.make) make = /^chevy$/i.test(ti.make) ? "Chevrolet" : /^vw$/i.test(ti.make) ? "Volkswagen" : ti.make;
+    if (ti.model) {
+      model = ti.model;
+      model_from_title = ti.model;
+    }
+  }
   if (/g50/i.test(identity) && !transmission) transmission = "G50 5-speed manual";
   if (!transmission && /5[\s-]?speed|manual/i.test(identity)) transmission = "manual";
 
-  // BaT sold price often in "sold for $X" — still an observed sale, not an ask.
-  const soldFor = identity.match(/sold\s+for\s+\$?([\d,]+)/i);
-  if (soldFor && asking_price == null && listing_kind !== "auction_live") {
-    asking_price = parseMoney(soldFor[1]);
-    raw_attrs.sold_price_from_page = String(asking_price);
+  // "sold for $X" in page text is an observed sale, never an ask (T1).
+  const soldFor = identity.match(/sold\s+for\s+(?:USD\s*)?\$?([\d,]+)/i);
+  if (soldFor && price_kind == null && listing_kind !== "auction_live") {
+    sold_price = parseMoney(soldFor[1]);
+    price = sold_price;
+    price_kind = "sold";
+    price_basis = source === "bat" ? "hammer" : "unknown";
+    if (asking_price === sold_price) asking_price = null;
+    raw_attrs.sold_price_from_page = String(sold_price);
+  }
+  if (price_kind == null) {
+    if (listing_kind === "auction_live" && current_bid != null) {
+      price_kind = "current_bid";
+      price = current_bid;
+    } else if (asking_price != null) {
+      price_kind = "ask";
+      price = asking_price;
+    }
   }
 
   const milesClaim = identity.match(/\b(\d{1,3}(?:,\d{3})+)\s*(?:miles|mi)\b/i) ||
     identity.match(/\b(\d{2,3})k\s*(?:miles|mi)?\b/i);
-  if (!mileage && milesClaim) {
+  if (!mileage && mileage_source == null && milesClaim) {
     const raw = milesClaim[1]!.toLowerCase();
     mileage = raw.endsWith("k") || /k\s*(?:miles)?$/i.test(milesClaim[0]!)
       ? Number(raw.replace(/k$/i, "")) * 1000
       : parseMoney(raw);
+    if (mileage != null) mileage_source = "page_text";
   }
 
   if (!location) {
@@ -404,6 +630,18 @@ export function parseListingHtml(url: string, html: string, httpStatus: number):
     listing_kind,
     current_bid,
     auction_end_at,
+    price_kind,
+    price,
+    price_basis,
+    price_basis_note,
+    sold_price,
+    high_bid,
+    end_at: end_at ?? (listing_kind === "auction_ended" ? auction_end_at : null),
+    mileage_tmu,
+    mileage_km,
+    mileage_text,
+    mileage_source,
+    model_from_title,
   };
 }
 

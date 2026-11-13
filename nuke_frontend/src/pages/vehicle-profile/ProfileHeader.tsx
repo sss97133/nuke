@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { PrefetchLink } from '../../components/PrefetchLink';
 import ProfileIdentity from './ProfileIdentity';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { getVehicleTitle } from '../../hooks/usePageTitle';
 import { Masthead, Facet, ClaimView, Text, Rows, Row, formatMeasure, day } from '../../kit';
 import { resolveSourceLogo } from '../../kit/Claim';
@@ -181,6 +182,8 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
   const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
   const sticky = useRef<HTMLDivElement>(null);
+  // On a phone the specs scroll with the page; only identity and price stay pinned (frontend.md, owner 2026-10-10).
+  const isMobile = useIsMobile();
   const [activeFacet, setActiveFacet] = useState<{ field: string; value: string; dimension: string } | null>(null);
   const [liveOpen, setLiveOpen] = useState(false);
   const [listingOpen, setListingOpen] = useState(false);
@@ -371,10 +374,16 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         ariaLabel={`Explore ${label} in this profile`}
         onClick={() => explore(f.dimension, label)} />;
     })}
-    {(strip.gaps ?? []).map(g => <Facet key={`gap:${g.dimension}`} gap label={g.label}
-      expanded={activeFacet?.field === (g.dimension === 'engine' ? 'engine_type' : g.dimension)}
-      ariaLabel={`${g.label}: not established. Show what would establish it`}
-      onClick={() => explore(g.dimension, g.label, true)} />)}
+    {(strip.gaps ?? []).map(g => g.lead
+      // The record holds nothing, but the token's lead item does: its value, marked with its status.
+      ? <Facet key={`gap:${g.dimension}`} label={g.lead.value} status={g.lead.status}
+        expanded={activeFacet?.field === (g.dimension === 'engine' ? 'engine_type' : g.dimension)}
+        ariaLabel={`${g.label}: ${g.lead.value}, ${g.lead.status}. Show its items`}
+        onClick={() => explore(g.dimension, g.lead!.value, true)} />
+      : <Facet key={`gap:${g.dimension}`} gap label={g.label}
+        expanded={activeFacet?.field === (g.dimension === 'engine' ? 'engine_type' : g.dimension)}
+        ariaLabel={`${g.label}: not established. Show what would establish it`}
+        onClick={() => explore(g.dimension, g.label, true)} />)}
   </div>;
 
   const market = (reduced = false) => priceOwnedByLiveStack && auctionPulse ? <React.Suspense fallback={null}><ExternalAuctionSummary
@@ -392,6 +401,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         </>}
       />;
 
+  const specs = priceOwnedByLiveStack ? <details className="vp-header-configuration"><summary>Configuration</summary>{configuration}</details> : configuration;
   return <>
     <div ref={sticky} className="vp-header-sticky">
       <Masthead result={<div className="vp-header-departments">
@@ -417,7 +427,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
               onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setLiveOpen(false); setListingOpen(current => !current); }}>{mark}</button>
           </Text>;
         })()}
-        {priceOwnedByLiveStack ? <details className="vp-header-configuration"><summary>Configuration</summary>{configuration}</details> : configuration}
+        {!isMobile && specs}
       </Masthead>
       {liveOpen && priceOwnedByLiveStack && auctionPulse && <HeaderPopover open title="Live auction" width={680} onClose={() => setLiveOpen(false)} dismissBoundaryRef={sticky}>
         <HeaderLiveAuction vehicleId={vehicle.id} pulse={auctionPulse} currency={auctionCurrency} />
@@ -440,5 +450,6 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         </React.Suspense>
       </HeaderPopover>}
     </div>
+    {isMobile && specs && <div className="vp-header-specs">{specs}</div>}
   </>;
 }

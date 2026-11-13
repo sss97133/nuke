@@ -93,10 +93,10 @@ it('a declared work shows no public sale, the holder\'s words and a user party',
   fixture.rpc.mockResolvedValue({ data: declared, error: null });
   await act(async () => render('/assets/22222222-2222-4222-8222-222222222222'));
   expect(node.textContent).toContain('No public sale recorded');
-  expect(node.textContent).toContain('As declared by the holder');
+  expect(node.textContent).toContain('In the words of the person who recorded it');
   expect(node.textContent).toContain('oil and enamel on canvas');
   expect(node.textContent).toContain('Painted at the shop.');
-  expect(node.textContent).toContain('A Nuke user, declaring their own work');
+  expect(node.textContent).toContain('A Nuke user, in their own words');
   expect(node.textContent).toContain("the holder's own declaration");
   expect(node.textContent).toContain('declared by its holder in their own words');
   expect(node.querySelector('img')).toBeNull();
@@ -104,7 +104,7 @@ it('a declared work shows no public sale, the holder\'s words and a user party',
 
 it('a work found in the photos shows what the analysis saw, the days photographed, and the holder\'s verbs', async () => {
   const found: AssetProfile = { ...riley, asset: { ...riley.asset, id: '33333333-3333-4333-8333-333333333333', title: 'Proposed painting, Jul 2024', house_category: null, identity_basis: 'photo_proposal', visibility: 'private' },
-    viewer: { is_holder: true }, declared: null, market: 'none_public', image_url: null, lots: [], history: [], creation: [],
+    viewer: { is_holder: false, is_record_origin: true }, declared: null, market: 'none_public', image_url: null, lots: [], history: [], creation: [],
     proposal: { kind: 'painting', labels: ['Painting', 'Modern Art'], labeller: 'apple_photos_on_device_v1', method: 'apple_vision_featureprint_cos0.90', photos: 2, sittings: 2,
       span_from: '2024-07-03T18:00:00Z', span_to: '2026-09-13T20:00:00Z', places: [['Boulder City, United States', 2]], status: 'pending',
       photo_sightings: [{ taken_at: '2024-07-03T18:00:00Z', filename: 'IMG_1.HEIC', place: 'Boulder City, United States', caption: 'a painting of a red car' },
@@ -112,7 +112,10 @@ it('a work found in the photos shows what the analysis saw, the days photographe
     coverage: { presentations: 0, statements: 0, claims: 0, sources: [], as_of: '2026-11-09T01:00:00Z' } };
   fixture.rpc.mockResolvedValue({ data: found, error: null });
   await act(async () => render('/assets/33333333-3333-4333-8333-333333333333'));
-  expect(node.textContent).toContain("Found in the holder's photographs");
+  expect(node.textContent).toContain('Found in your photographs');
+  expect(node.textContent).toContain('Awaiting you: keep it as documentation, or discard it');
+  expect(node.textContent).toContain('Keep as documentation');
+  expect(node.textContent).not.toContain('This is my work');
   expect(node.textContent).toContain('First photographed');
   expect(node.textContent).toContain('Days photographed');
   expect(node.textContent).toContain("the device's caption: a painting of a red car");
@@ -129,4 +132,19 @@ it('formats money by the house\'s currency and headlines the hammer, then the hi
   expect(headline(lot)).toEqual({ label: 'Sold · Bonhams', value: '£720,000' });
   expect(headline({ ...lot, hammer_price: null, high_bid: 300, result: 'not_sold' })).toEqual({ label: 'Not sold · high bid', value: '£300' });
   expect(headline({ ...lot, hammer_price: null, result: 'upcoming' })).toEqual({ label: 'Upcoming · estimate', value: '£550,000 to £750,000' });
+});
+
+it('a holder who is not the record origin gets no keep/discard verbs; a legacy record and a stated claim read as unverified (PR #3190)', async () => {
+  const base: AssetProfile = { ...riley, asset: { ...riley.asset, id: '66666666-6666-4666-8666-666666666666', title: 'Old confirm', house_category: null, identity_basis: 'photo_proposal', visibility: 'private' },
+    viewer: { is_holder: true, is_record_origin: false, legacy_compound: true }, declared: null, market: 'none_public', image_url: null, lots: [], history: [],
+    creation: [{ claim_id: 'c1', attribution: 'by', layout: 'holder_declaration', name_as_printed: null, qualifier_as_printed: null, party: { id: 'u', kind: 'user', display_name: 'A Working Photographer', claimed: true, lots_direct: 0, priced_lots: 0 },
+      executor: null, source: 'owner-input', observed_at: '2026-11-01T00:00:00Z', confidence: null, role: 'creator', claim_state: 'stated', qualification: 'legacy_compound_unverified', basis: 'legacy_compound_sign' }],
+    proposal: { kind: 'painting', photos: 1, status: 'pending', photo_sightings: [] },
+    coverage: { presentations: 0, statements: 0, claims: 1, sources: [], as_of: '2026-11-09T01:00:00Z' } };
+  fixture.rpc.mockResolvedValue({ data: base, error: null });
+  await act(async () => render('/assets/66666666-6666-4666-8666-666666666666'));
+  expect(node.querySelector('a[href="/assets/new?confirm=66666666-6666-4666-8666-666666666666"]')).toBeNull();
+  expect(node.textContent).toContain('Not yet kept by the person whose photos found it');
+  expect(node.textContent).toContain('Recorded under the earlier single confirmation');
+  expect(node.textContent).toContain('Recorded by the earlier single confirmation; unverified');
 });

@@ -142,6 +142,64 @@ private struct MapSourceComment: Decodable, Identifiable {
     let comment_type: String?
 }
 
+// COMMENT INTEL — stored analysis from popup_vehicle_intel
+private struct CommentIntelDoc: Decodable {
+    let comment_intel: CommentIntelData?
+
+    struct CommentIntelData: Decodable {
+        let key_quotes: [StringOrQuote]?
+        let expert_insights: [StringOrInsight]?
+        let community_concerns: [StringOrConcern]?
+        let price_sentiment: PriceSentiment?
+        let overall_sentiment: String?
+        let comment_count: Int?
+
+        struct PriceSentiment: Decodable {
+            let community_view: String?
+            let overall: String?
+        }
+    }
+
+    enum StringOrQuote: Decodable {
+        case string(String)
+        case object(QuoteObject)
+        struct QuoteObject: Decodable { let quote: String?; let significance: String? }
+        init(from decoder: Decoder) throws {
+            if let s = try? decoder.singleValueContainer().decode(String.self) { self = .string(s) }
+            else { self = .object(try QuoteObject(from: decoder)) }
+        }
+        var text: String {
+            switch self { case .string(let s): return s; case .object(let o): return o.quote ?? "" }
+        }
+    }
+
+    enum StringOrInsight: Decodable {
+        case string(String)
+        case object(InsightObject)
+        struct InsightObject: Decodable { let insight: String? }
+        init(from decoder: Decoder) throws {
+            if let s = try? decoder.singleValueContainer().decode(String.self) { self = .string(s) }
+            else { self = .object(try InsightObject(from: decoder)) }
+        }
+        var text: String {
+            switch self { case .string(let s): return s; case .object(let o): return o.insight ?? "" }
+        }
+    }
+
+    enum StringOrConcern: Decodable {
+        case string(String)
+        case object(ConcernObject)
+        struct ConcernObject: Decodable { let concern: String? }
+        init(from decoder: Decoder) throws {
+            if let s = try? decoder.singleValueContainer().decode(String.self) { self = .string(s) }
+            else { self = .object(try ConcernObject(from: decoder)) }
+        }
+        var text: String {
+            switch self { case .string(let s): return s; case .object(let o): return o.concern ?? "" }
+        }
+    }
+}
+
 // SALE HISTORY — real sale events from vehicle_timeline_events (same table the build-days
 // RPC reads; no new RPC). Deduped by (date|price|listing) because multiple ingest paths
 // write the SAME sale, which the profile otherwise reads as "sold twice" — a rendering
@@ -347,6 +405,9 @@ struct VehicleDetailView: View {
     @State private var posting = false
     @State private var followBusy = false
     @State private var showComments = false   // the comment thread lives in a summoned sheet
+    // COMMENT INTEL — the stored analysis of auction comments (popup_vehicle_intel)
+    @State private var commentIntel: CommentIntelDoc?
+    @State private var commentIntelError = false
     // CONTRIBUTE — the user's job: fill what the record needs. The unverified (facade)
     // specs ARE the needs (data-driven, no hardcoded "what matters"); a signed-in user
     // contributes a value → record_interaction(kind=specification) → testimony.
@@ -420,6 +481,7 @@ struct VehicleDetailView: View {
         .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadSaleHistory() } }
         .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadBookends() } }
         .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadEngagement() } }
+        .task(id: belowFoldKey) { if mapContext == nil, loaded { await loadCommentIntel() } }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
@@ -656,11 +718,17 @@ struct VehicleDetailView: View {
                         profileHeaderBlock
                         // The organizations behind the vehicle (seller, owner, consigner, shop), each a door to its measures.
                         VehicleActorLinks(vehicleId: vehicleId).id("actors")
+                        // Comment compass — 2D map of auction comment sentiment
+                        commentCompassSection
                         buildInstrument
                         if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
+                        // Where it's been: the photo-GPS areas (vehicle_location_areas), the web header popup's read.
+                        VehicleLocationSection(vehicleId: vehicleId).id("location")
                         valuationSection.id("worth")
                         saleHistorySection.id("sales")
                         beforeAfterSection
+                        // What the listing's commenters wrote: the stored summary the web profile's card reads.
+                        VehicleCommentSummarySection(vehicleId: vehicleId).id("comments")
                         // Money is never anonymous (owner rule; web #1001/#1007, source gate #1037:
                         // owner, uploader or contributor read it). The viewer is the database's
                         // verdict from vehicle_profile_read, never a client guess, and a missing
@@ -1130,6 +1198,23 @@ struct VehicleDetailView: View {
         let priced = read.masthead?.price != nil
         let listed = pulse?.is_live == true
         return priced || listed
+    }
+
+    @ViewBuilder private var commentCompassSection: some View {
+        if let intel = commentIntel?.comment_intel {
+            let themes = CommentCompass.themesFromIntel(
+                insights: (intel.expert_insights ?? []).map(\.text),
+                concerns: (intel.community_concerns ?? []).map(\.text),
+                quotes: (intel.key_quotes ?? []).map(\.text),
+                priceSentiment: intel.price_sentiment?.overall ?? intel.price_sentiment?.community_view
+            )
+            if !themes.isEmpty {
+                CommentCompass(themes: themes, commentCount: intel.comment_count ?? 0)
+                    .padding(.horizontal, 16)
+            }
+        } else if commentIntelError {
+            sectionError("community analysis") { Task { await loadCommentIntel() } }
+        }
     }
 
     @ViewBuilder private var valuationSection: some View {
@@ -1728,6 +1813,20 @@ struct VehicleDetailView: View {
         } catch {
             engagementError = true
             NSLog("NukeCapture engagement load failed: %@", String(describing: error))
+        }
+    }
+
+    private func loadCommentIntel() async {
+        commentIntelError = false
+        do {
+            let result: CommentIntelDoc = try await SupabaseService.client
+                .rpc("popup_vehicle_intel", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+            commentIntel = result
+        } catch {
+            commentIntelError = true
+            NSLog("NukeCapture comment intel load failed: %@", String(describing: error))
         }
     }
 
@@ -2964,6 +3063,7 @@ struct FieldProvenanceSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var prov: FieldProvenance?
+    @State private var context: SpecContext?
     @State private var loaded = false
     @State private var loadFailed = false   // a failed trace ≠ "no source exists"
     @State private var zoomURL: String?
@@ -2976,6 +3076,8 @@ struct FieldProvenanceSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     valueHeader
                     Divider()
+                    // Context section: what this value means + how it compares
+                    if let ctx = context { contextSection(ctx) }
                     if let p = prov {
                         sourceLine(p)
                         if let img = p.source_image_url, !img.isEmpty { sourceImage(img) }
@@ -3339,6 +3441,22 @@ struct FieldProvenanceSheet: View {
 
     private func load() async {
         loadFailed = false
+        // Load context and provenance in parallel
+        async let contextTask: SpecContext? = {
+            do {
+                return try await SupabaseService.client
+                    .rpc("get_spec_context", params: [
+                        "p_vehicle_id": vehicleId,
+                        "p_field": drill.field,
+                        "p_value": drill.value
+                    ])
+                    .execute()
+                    .value
+            } catch {
+                NSLog("NukeCapture spec context failed: %@", String(describing: error))
+                return nil
+            }
+        }()
         do {
             prov = try await SupabaseService.client
                 .rpc("get_field_provenance",
@@ -3350,7 +3468,143 @@ struct FieldProvenanceSheet: View {
             loadFailed = true
             NSLog("NukeCapture field provenance failed: %@", String(describing: error))
         }
+        context = await contextTask
         loaded = true
+    }
+
+    // ─── Context section: what this value means + how it compares ─────────────
+    @ViewBuilder private func contextSection(_ ctx: SpecContext) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // OEM context for engines
+            if let oem = ctx.oem, drill.field == "engine_type" || drill.field == "engine_size" {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ENGINE SPECIFICATIONS")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    HStack(spacing: 16) {
+                        if let cid = oem.displacement_cid {
+                            specPill(label: "CID", value: "\(cid)")
+                        }
+                        if let liters = oem.displacement_liters {
+                            specPill(label: "Liters", value: String(format: "%.1f", liters))
+                        }
+                        if let config = oem.engine_config {
+                            specPill(label: "Config", value: config)
+                        }
+                    }
+                    if let hp = oem.horsepower {
+                        HStack(spacing: 16) {
+                            specPill(label: "HP", value: "\(hp)")
+                            if let torque = oem.torque_ft_lbs {
+                                specPill(label: "Torque", value: "\(torque) ft-lb")
+                            }
+                        }
+                    }
+                    if let range = oem.year_range {
+                        Text("Production: \(range)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let src = oem.source {
+                        Text("Source: \(src)")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(16)
+                Divider()
+            }
+
+            // Similar vehicles count
+            if ctx.similar_count > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("ON NUKE")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    HStack {
+                        Text("\(ctx.similar_count) other vehicles")
+                            .font(.footnote.weight(.medium))
+                        Text("with this \(drill.label.lowercased())")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption).foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(16)
+                Divider()
+            }
+
+            // Sales data if available
+            if let sales = ctx.sales, sales.count > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("MARKET")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(sales.count) sales")
+                                .font(.footnote.weight(.medium))
+                            Text("with this spec")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if let avg = sales.avg_price {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("$\(avg.formatted())")
+                                    .font(.footnote.weight(.medium))
+                                Text("avg price")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if let min = sales.min_price, let max = sales.max_price, min != max {
+                        Text("Range: $\(min.formatted()) – $\(max.formatted())")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(16)
+                Divider()
+            }
+        }
+    }
+
+    private func specPill(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(.footnote, design: .monospaced).weight(.semibold))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+// ─── SpecContext model ────────────────────────────────────────────────────────
+struct SpecContext: Codable {
+    let field: String
+    let value: String
+    let oem: OEMContext?
+    let similar_count: Int
+    let sales: SalesData?
+
+    struct OEMContext: Codable {
+        let engine_size: String?
+        let displacement_liters: Double?
+        let displacement_cid: Int?
+        let engine_config: String?
+        let horsepower: Int?
+        let torque_ft_lbs: Int?
+        let transmission: String?
+        let drivetrain: String?
+        let fuel_type: String?
+        let year_range: String?
+        let source: String?
+    }
+
+    struct SalesData: Codable {
+        let count: Int
+        let avg_price: Int?
+        let min_price: Int?
+        let max_price: Int?
     }
 }
 

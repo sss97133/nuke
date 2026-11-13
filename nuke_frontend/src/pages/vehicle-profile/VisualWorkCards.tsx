@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { CatalogProductReference } from './CatalogProductReference';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
-import type { ComponentEvidence, ComponentReading, CostRange, CostTotals, MasterCostLedger, MasterCostLine, VisualWork } from './hooks/useVisualWork';
+import type { ComponentEvidence, ComponentReading, CostRange, CostTotals, ExpectedAssembly, MasterCostLedger, MasterCostLine, VisualWork } from './hooks/useVisualWork';
+import { supabase } from '../../lib/supabase';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 import './visual-work.css';
 
@@ -179,9 +180,48 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
   </section>;
 }
 
+function ExpectedAssemblyReferences({ assemblies }: { assemblies?: ExpectedAssembly[] }) {
+  if (!assemblies?.length) return null;
+  return <section className="vp-expected-assemblies" aria-label="Catalog references">
+    <header><h4>Catalog references</h4><p>Factory parts catalog positions for this configuration. These are catalog-specified parts, not necessarily as-built or installed.</p></header>
+    {assemblies.map(assembly => {
+      const file = supabase.storage.from('reference-docs').getPublicUrl(assembly.source.retained_file.slice('reference-docs/'.length)).data.publicUrl;
+      return <article key={assembly.assembly_id} aria-label={assembly.assembly_name.replaceAll('_', ' ')}>
+        <div className="vp-expected-heading"><h5>{assembly.assembly_name.replaceAll('_', ' ')}</h5>
+          <span>{assembly.expected_piece_count} referenced pieces</span></div>
+        <p>{assembly.expected_scope}</p>
+        {assembly.applicability.status === 'body_style_unverified' && <p className="vp-expected-inspection">Conditional reference · body style still needs confirmation.</p>}
+        <div className="vp-expected-positions">{assembly.positions.map(position => {
+          const ref = position.source_refs[0];
+          return <a key={position.key} href={`${file}#page=${ref.page_number}`} target="_blank" rel="noopener noreferrer"
+            title={ref.excerpt} aria-label={`${position.label}: open source page ${ref.page_number}`}>
+            <strong>{position.label}</strong><span>Qty {position.quantity}</span>
+            {(() => {
+              const verified = position.part_numbers.filter(n => position.source_refs.some(r => r.excerpt.includes(n)));
+              return <>{!!verified.length && <span>{position.part_number_binding === 'unordered_pair' ? 'Pair: ' : 'Part '}{verified.join(' / ')}</span>}
+                {verified.length < position.part_numbers.length && <small>Part number not verified against the page</small>}</>;
+            })()}
+            {position.part_number_binding === 'unordered_pair' && <small>Side assignment unresolved</small>}
+            <small>Page {ref.page_number} · {ref.figure} · {ref.callout} ↗</small>
+          </a>;
+        })}</div>
+        <p className="vp-expected-inspection">Individual pieces still need photo identification.</p>
+        <p className="vp-expected-source"><a href={`${file}#page=${assembly.positions[0].source_refs[0].page_number}`} target="_blank" rel="noopener noreferrer">{assembly.source.title} ↗</a>
+          <span>{assembly.application.year_start === assembly.application.year_end
+            ? assembly.application.year_start : `${assembly.application.year_start}–${assembly.application.year_end}`} catalog · {assembly.description.includes('455') || assembly.assembly_name.includes('455')
+            ? '455 configuration' : `${assembly.application.make} ${assembly.application.model} configuration`}</span></p>
+        <p className="vp-expected-limit">Outside this reference: {assembly.exclusions.join(' · ')}.</p>
+        {assembly.limitations.length > 0 && <p className="vp-expected-limit">{assembly.limitations.join(' ')}</p>}
+      </article>;
+    })}
+    <p className="vp-expected-coverage">Whole-car coverage remains unknown; these references cover the assemblies named above.</p>
+  </section>;
+}
+
 function ComponentSources({ evidence, renderSource }: { evidence?: ComponentEvidence | null;
   renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode }) {
-  if (!evidence?.components.length) return null;
+  if (!evidence) return null;
+  if (!evidence.components.length) return <ExpectedAssemblyReferences assemblies={evidence.expected_assemblies} />;
   const reading = (item: ComponentReading, label: string) => item.images.map(image => <button type="button"
     key={`${item.observation_id}:${image.image_id}`} className="vp-component-reading"
     onClick={() => openVehiclePhoto(image.image_id)} aria-label={`Open ${label.toLowerCase()}: ${item.quote}`}>
@@ -195,7 +235,7 @@ function ComponentSources({ evidence, renderSource }: { evidence?: ComponentEvid
       ? 'Photo date unknown' : `Photo · ${photoDate(image)}`}</small>
     <small>Read {date(item.evidence_time)} · attributed image reading</small>
   </button>);
-  return <section className="vp-component-evidence" aria-label="Component evidence">
+  return <><section className="vp-component-evidence" aria-label="Component evidence">
     <header><h4>Parts on the car</h4><p>Open a photo to inspect the outlined part. Related purchases sit beside it.</p></header>
     {evidence.components.map(component => <article key={component.subject_id} aria-label={`${component.label} evidence`}>
       <h5>{component.label}</h5><div className="vp-component-columns">
@@ -223,7 +263,7 @@ function ComponentSources({ evidence, renderSource }: { evidence?: ComponentEvid
     <p className="vp-component-coverage">Photo readings and related purchases are shown separately; a purchase does not yet identify the pictured unit. {evidence.expected_population.status === 'unknown'
       ? 'An applicable build reference is still needed to measure coverage of the whole car.' : ''}
       {evidence.coverage.truncated ? ' More component readings remain beyond this page.' : ''}</p>
-  </section>;
+  </section><ExpectedAssemblyReferences assemblies={evidence.expected_assemblies} /></>;
 }
 
 function WorkPhotos({ images }: { images: VisualWork['images'] }) {

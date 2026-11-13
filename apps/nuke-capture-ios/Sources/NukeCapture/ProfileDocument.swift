@@ -306,11 +306,12 @@ struct Claim: Decodable {
     }
 
     /// The line under a value: the observed day when the claim carries a clock, and for a legacy
-    /// value the record it is and its trust, since no observation stands beneath it.
+    /// value the record it is and its verification status, since no observation stands beneath it.
     var decayLine: String? {
         let day = ProfileClock.day(observed_at)
         if source.kind == .legacy {
-            return [source.label ?? "legacy record", day, "trust \(trustPercent)%"].compactMap { $0 }.joined(separator: " · ")
+            let trustLabel = trustPercent >= 80 ? "verified" : (trustPercent >= 50 ? "partial" : "unverified")
+            return [source.label ?? "vehicle record", day, trustLabel].compactMap { $0 }.joined(separator: " · ")
         }
         return day
     }
@@ -544,8 +545,35 @@ enum ProfileSection: Decodable {
     }
     /// A header token the read has no established member for; it opens what would establish it.
     struct Gap: Decodable, Equatable {
+        /// The reader's best non-established item for the token (`gaps[].lead`, #3500): the first item with a value
+        /// whose status is established, reading, claim or conflict, current facet first. The gap stays a gap.
+        struct Lead: Decodable, Equatable {
+            let key: String?
+            let value: ItemJSON?
+            let status: String?
+        }
         let dimension: String
         let label: String
+        var lead: Lead? = nil
+
+        private enum CodingKeys: String, CodingKey { case dimension, label, lead }
+        init(dimension: String, label: String, lead: Lead? = nil) {
+            self.dimension = dimension; self.label = label; self.lead = lead
+        }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            dimension = try c.decode(String.self, forKey: .dimension)
+            label = try c.decode(String.self, forKey: .label)
+            // Optional and new: a malformed lead must not drop the gap.
+            lead = (try? c.decodeIfPresent(Lead.self, forKey: .lead)) ?? nil
+        }
+
+        /// "RWD · reading": the lead's value, with its status when it is not established. Nil without a usable lead.
+        var leadText: String? {
+            guard let lead, let v = ItemText.valueText(lead.value) else { return nil }
+            guard let st = lead.status, !st.isEmpty, st != "established" else { return v }
+            return "\(v) · \(st)"
+        }
     }
     struct Strip: Decodable {
         let coverage: Coverage

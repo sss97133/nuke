@@ -372,7 +372,7 @@ struct ActorVehiclesView: View {
 /// door to the actor. An auction house is where the vehicle sold, not who sold it: "Sold on".
 struct VehicleActorLinks: View {
     let vehicleId: String
-    struct Link: Hashable { let route: ActorRoute; let line: String; var venue: Bool = false }
+    struct Link: Hashable { let route: ActorRoute; let line: String; var venue: Bool = false; var source: String? = nil }
     @State private var links: [Link] = []
 
     /// A platform is where a vehicle was listed, never its seller, consigner or shop, whatever role the record
@@ -413,7 +413,11 @@ struct VehicleActorLinks: View {
                             ActorProfileView(route: link.route)
                         } label: {
                             HStack(spacing: 6) {
-                                Text(link.line).font(.caption).foregroundStyle(.secondary)
+                                if let source = link.source {
+                                    SourceLogo(source: source)
+                                } else if !link.line.isEmpty {
+                                    Text(link.line).font(.caption).foregroundStyle(.secondary)
+                                }
                                 Text(link.route.name ?? "an organization").font(.subheadline.weight(.semibold)).lineLimit(1)
                                 Spacer()
                                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
@@ -446,7 +450,7 @@ struct VehicleActorLinks: View {
             if let ids: [Identity] = try? await SupabaseService.client.from("external_identities").select("id,handle")
                    .eq("platform", value: "bat").in("handle", values: spellings).limit(2).execute().value,
                let identity = ids.first(where: { $0.handle == handle }) ?? ids.first {
-                sellerLink = Link(route: ActorRoute(kind: "identity", id: identity.id, name: "@" + handle), line: "Listed on Bring a Trailer by")
+                sellerLink = Link(route: ActorRoute(kind: "identity", id: identity.id, name: "@" + handle), line: "", source: "bat")
             }
         }
         defer { if let sellerLink, !links.contains(sellerLink) { links.insert(sellerLink, at: 0) } }
@@ -476,6 +480,52 @@ struct VehicleActorLinks: View {
             .sorted { (rank($0), $0.route.name ?? "") < (rank($1), $1.route.name ?? "") }
         } catch {
             NSLog("NukeCapture vehicle actor links read failed: %@", String(describing: error))
+        }
+    }
+}
+
+/// A source platform's logo badge. Maps platform codes to logos hosted on nuke.ag.
+struct SourceLogo: View {
+    let source: String
+
+    private var logoURL: URL? {
+        let slug: String
+        switch source {
+        case "bat": slug = "bat"
+        case "cars_and_bids", "carsandbids": slug = "cars-and-bids"
+        case "pcarmarket": slug = "pcarmarket"
+        case "ebay", "ebay_motors": slug = "ebay-motors"
+        case "facebook", "facebook_marketplace": slug = "facebook_marketplace"
+        case "craigslist": slug = "craigslist"
+        case "hemmings": slug = "hemmings"
+        case "mecum": slug = "mecum"
+        case "barrett_jackson", "barrett-jackson": slug = "barrett-jackson"
+        case "rm_sothebys", "rm-sothebys": slug = "rm-sothebys"
+        case "gooding": slug = "gooding"
+        case "bonhams": slug = "bonhams"
+        case "collecting_cars", "collecting-cars": slug = "collecting-cars"
+        default: slug = source.replacingOccurrences(of: "_", with: "-")
+        }
+        return URL(string: "https://nuke.ag/source-logos/\(slug).png")
+    }
+
+    var body: some View {
+        if let url = logoURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFit()
+                        .frame(height: 16)
+                case .failure:
+                    Text(source).font(.caption).foregroundStyle(.secondary)
+                case .empty:
+                    ProgressView().controlSize(.mini)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        } else {
+            Text(source).font(.caption).foregroundStyle(.secondary)
         }
     }
 }

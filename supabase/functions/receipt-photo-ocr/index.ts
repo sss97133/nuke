@@ -55,6 +55,11 @@ const deps: Deps = {
     if (!r.ok) throw new Error(`frame fetch failed: ${r.status}`);
     return { bytes: new Uint8Array(await r.arrayBuffer()), contentType: r.headers.get("content-type") ?? "" };
   },
+  fetchStoredBytes: async (path) => {
+    const { data, error } = await supabase.storage.from("user-documents").download(path);
+    if (error || !data) throw new Error("retained private page download failed");
+    return new Uint8Array(await data.arrayBuffer());
+  },
   upload: async (path, bytes, contentType) => {
     const { error } = await supabase.storage.from("user-documents").upload(path, bytes, { contentType, upsert: true });
     return { error: error ? error.message : null };

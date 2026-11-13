@@ -1,11 +1,14 @@
 // The readable public face: what a reader without JavaScript gets from /, /market, /journal and /llms.txt.
 // The Gemini audit of 2026-10-15 found these routes returned a 3 KB shell with no body text, so a reader invented the rest.
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import staticAdvisorCard from '../public/.well-known/mcp.json';
 
 const SHELL = '<!doctype html><html><head><title>Nuke</title>' +
   '<meta name="description" content="x" />' +
   '<meta property="og:title" content="x" /><meta property="og:description" content="x" /><meta property="og:url" content="x" />' +
+  '<meta name="twitter:title" content="x" /><meta name="twitter:description" content="x" />' +
   '<link rel="canonical" href="https://nuke.ag" /></head><body><div id="root"></div></body></html>';
 
 const BOARD = {
@@ -49,6 +52,25 @@ describe('public face', () => {
     // an unknown total is said, never filled
     expect(out!.body).toContain('Bring a Trailer: 254,485 lots held (counted 2026-10-16); source total unknown.');
     expect(out!.body).toContain('<div id="root"><main>');
+  });
+
+  it.each(['/', '/market'])('%s gives the social card the same title and description as the page', async (path) => {
+    const out = await call(path);
+    const tag = (attr: string, key: string) => new RegExp(`<meta ${attr}="${key}" content="([^"]*)"`).exec(out!.body)?.[1];
+    expect(tag('name', 'twitter:title')).toBe(tag('property', 'og:title'));
+    expect(tag('name', 'twitter:description')).toBe(tag('property', 'og:description'));
+    expect(tag('name', 'twitter:title')).not.toBe('x');
+    expect(tag('name', 'twitter:description')).not.toBe('x');
+  });
+
+  // 2026-11-13: index.html and the middleware had named /og-image.png since February with no such file in public/.
+  // Vercel answered the request with the app shell (200 text/html), so no shared link showed a card.
+  it('names only link-preview images that are in public/', () => {
+    const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));
+    const named = ['../index.html', '../middleware.ts'].flatMap(f =>
+      [...readFileSync(at(f), 'utf8').matchAll(/https:\/\/nuke\.ag\/([\w./-]+\.(?:png|jpe?g|webp|svg))/g)].map(m => m[1]));
+    expect(named).toContain('og-image.png');
+    expect([...new Set(named)].filter(file => !existsSync(at(`../public/${file}`)))).toEqual([]);
   });
 
   it('shows no number when the read fails', async () => {

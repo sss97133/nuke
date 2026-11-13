@@ -8,7 +8,7 @@ vi.mock('./VehiclePhotoLightbox', () => ({ openVehiclePhoto: fixture.open }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ user: fixture.user, loading: fixture.loading }) }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: (...args: unknown[]) => {
   const result = fixture.rpc(...args); return { abortSignal: () => result };
-} } }));
+}, storage: { from: () => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `https://files.example/${path}` } }) }) } } }));
 import { VisualWorkCards, photoDate } from './VisualWorkCards';
 import { isComponentEvidence, useVisualWork, type ComponentEvidence, type MasterCostLedger, type VisualWork } from './hooks/useVisualWork';
 import { hasRecordedInstallation } from './PartPage';
@@ -114,6 +114,20 @@ it('opens component pixels and original receipt directly without turning the mat
  expect(parseFloat(box.style.left)).toBeCloseTo(100 / 999 * 100);
  expect(parseFloat(box.style.top)).toBeCloseTo(200 / 999 * 100);
  expect(host.querySelector('details')).toBeNull();
+});
+it('shows a build-reference part number only when the source excerpt contains it', async () => {
+ const ref = (excerpt: string) => [{ page_number: 14, figure: 'Fig 3', callout: '7', excerpt }];
+ const evidence = { ...componentEvidence, components: [], expected_assemblies: [{ assembly_id: 'a1', assembly_name: 'front_sheet_metal', description: 'd',
+   expected_scope: 's', source_status: 'current_public_reference', taxonomy_binding: 'unresolved', expected_piece_count: 2, whole_vehicle_expected_count: null,
+   applicability: { status: 'matched_year_make_model_body_style' }, application: { year_start: 1973, year_end: 1973, make: 'GM', model: 'Truck', body_style: 'pickup' },
+   positions: [{ key: 'p1', label: 'Fender', subject_id: null, quantity: 1, part_numbers: ['1111111'], part_number_binding: 'exact_position', source_refs: ref('Fender 1111111 left') },
+     { key: 'p2', label: 'Panel', subject_id: null, quantity: 1, part_numbers: ['9999999'], part_number_binding: 'exact_position', source_refs: ref('Panel 2222222') }],
+   exclusions: [], limitations: [], source: { observation_id: 'o', document_id: 'd', source_url: 'https://example.com/a.pdf', retained_file: 'reference-docs/a.pdf',
+     file_sha256: 'c'.repeat(64), title: 'Catalog', retrieved_day: '2026-11-10', retrieved_at: null, reviewed_at: '2026-11-10', reference_revision: 'r' } }] } as unknown as ComponentEvidence;
+ await act(async () => root.render(<VisualWorkCards rows={[]} components={evidence} renderSource={() => null} />));
+ expect(host.textContent).toContain('1111111');
+ expect(host.textContent).not.toContain('9999999');
+ expect(host.textContent).toContain('Part number not verified against the page');
 });
 it('keeps disagreeing views and condition readings attributed instead of inventing a resolved state', async () => {
  const evidence = structuredClone(componentEvidence), c = evidence.components[0], first = c.presence.readings[0];

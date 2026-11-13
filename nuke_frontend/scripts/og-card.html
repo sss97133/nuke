@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  Source of nuke_frontend/public/og-image.png: the 1200 x 630 link-preview card that index.html and middleware.ts
+  name as og:image and twitter:image. Render it again after changing this file:
+
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
+      --force-device-scale-factor=1 --window-size=1200,630 \
+      --screenshot=nuke_frontend/public/og-image.png "file://$PWD/nuke_frontend/scripts/og-card.html"
+
+  The colors are the dark-theme tokens in src/styles/unified-design-system.css, the theme a logged-out visitor gets.
+  The wordmark is set as AppLayout.tsx sets it in the site header. The line is the description in
+  public/manifest.json; change both together. The content sits inside the middle 630 px so a square crop keeps it.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nuke link-preview card</title>
+<style>
+  :root { --bg:#111113; --text:#f5f5f7; --text-secondary:#aeaeb8; --border:#3a3a3e;
+          --font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  html, body { margin:0; padding:0; width:1200px; height:630px; background:var(--bg); overflow:hidden; }
+  body { display:flex; flex-direction:column; align-items:center; justify-content:center;
+         font-family:var(--font-family); -webkit-font-smoothing:antialiased; }
+  .mark { color:var(--text); font-size:148px; font-weight:700; letter-spacing:0.09em; line-height:1;
+          margin-right:-0.09em; }
+  .rule { width:96px; height:1px; background:var(--border); margin:44px 0 40px; }
+  .line { color:var(--text-secondary); font-size:44px; font-weight:400; line-height:1.25; text-align:center; }
+</style>
+</head>
+<body>
+  <div class="mark">NUKE</div>
+  <div class="rule"></div>
+  <div class="line">A data machine<br>for physical assets</div>
+</body>
+</html>

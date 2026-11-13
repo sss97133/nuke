@@ -102,6 +102,8 @@ DO $$ BEGIN
    AND NOT has_function_privilege('authenticated','public.vehicle_location_fold(uuid)','execute'), '026000: grants kept';
  ASSERT position('photo_gps_cover_v2' in pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) > 0,
    '035000: marker';
+ ASSERT md5(pg_get_functiondef('public.vehicle_location_fold(uuid)'::regprocedure)) = 'c55690dcc7f158de4fa2203265325f5d',
+   '20261116029000 guard: the 035000 fold here has the md5 production has';
 END $$;
 DO $$ BEGIN
  ASSERT (SELECT array_agg(l.lanname::text ORDER BY p.proname) FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
