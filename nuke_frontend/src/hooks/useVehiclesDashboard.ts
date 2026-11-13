@@ -548,7 +548,11 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
           supabase.rpc('get_my_garage_owner_corrections', { p_user_id: userId, p_include_unresolved: true }),
           // Active work (documenting, contributor) is relevant even in ownership scope —
           // stakes and engagement matter, not just title. Include all garage records.
-          readGarageRecords(userId!, () => cancelled),
+          // In ownership scope, failure is non-fatal: continue without work relationships.
+          // In all scope, work relationships are required, so failure propagates.
+          scope === 'ownership'
+            ? readGarageRecords(userId!, () => cancelled).catch(() => [] as GarageRecord[])
+            : readGarageRecords(userId!, () => cancelled),
         ]);
         if (cancelled) return;
         for (const res of [verifiedRes, prevOwnedRes, ownershipRes, correctionRes]) {
