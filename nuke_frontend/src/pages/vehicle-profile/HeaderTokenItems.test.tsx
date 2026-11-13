@@ -10,7 +10,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { rpc } }));
 vi.mock('../../components/map/OneMap', () => ({ default: ({ focus }: any) =>
   <div data-testid="one-map-focus" data-fips={focus.countyFips} data-geojson={focus.geojsonPath} data-lat={focus.centroid?.lat} /> }));
 import HeaderTokenItems from './HeaderTokenItems';
-import { itemLabel, valueText } from '../../kit';
+import { codeText, equationText, itemLabel, ratioText, valueText } from '../../kit';
 
 // Synthetic items in the shape vehicle_facet_items returns (no real vehicle, image or source).
 const transmission: FacetItem[] = [
@@ -66,7 +66,7 @@ it('renders every item of a carried token as a row with status, sources, rule, e
   expect(Array.from(rows).map(r => r.getAttribute('data-key'))).toEqual(transmission.map(i => i.key));
   expect(Array.from(host.querySelectorAll('.k-status')).map(s => s.textContent)).toEqual(['established', 'reading', 'missing', 'conflict', 'established']);
   expect(host.textContent).toContain('Example VIN chart');
-  expect(host.querySelector('a[href="https://example.org/vin-chart"]')?.textContent).toBe('example_vin_rule_v1');
+  expect(host.querySelector('a[href="https://example.org/vin-chart"]')?.textContent).toBe('example vin rule v1');
   const thumb = host.querySelector('img.k-item__thumb') as HTMLImageElement;
   expect(thumb.getAttribute('src')).toContain('synthetic/t.jpg');
   expect(thumb.getAttribute('width')).toBe('40');
@@ -74,10 +74,48 @@ it('renders every item of a carried token as a row with status, sources, rule, e
   expect(host.textContent).toContain('Model A');
   expect(host.textContent).toContain('Model B');
   expect(host.textContent).toContain('2,450 rpm');
-  expect(host.textContent).toContain('Computed: mph * top_gear_ratio');
+  expect(host.textContent).toContain('Computed: mph * top gear ratio * axle ratio * 63360 / (60 * π * tire diameter in), mph = 60');
   expect(host.textContent).not.toMatch(/[{}]|\[object/);
   expect(host.querySelector('[style]')).toBeNull();
   expect(rpc).not.toHaveBeenCalled();
+});
+
+it('prints the reader\'s labels for codes, ratios to two places, and every cited availability row', async () => {
+  expect(codeText('not_original_unit')).toBe('not original unit');
+  expect(equationText('gear_ratio[n] * axle_ratio')).toBe('gear ratio[n] * axle ratio');
+  expect(equationText('as_built.type <> current.type')).toBe('as built type ≠ current type');
+  expect(codeText('Muncie four-speed')).toBe('Muncie four-speed');
+  expect(ratioText([2.56, 1.91, 1.48, 1])).toBe('2.56 / 1.91 / 1.48 / 1.00');
+  const items: FacetItem[] = [
+    { key: 'transmission.as_built.model', facet: 'as_built', value: null, unit: null, status: 'missing', equation: null, sources: [],
+      needed: 'build sheet', rule: { key: 'model_availability', label: 'Factory availability by series and engine' },
+      examined: [{ result: 'transmission on tag: not_example_code', observed_at: '2026-01-02T00:00:00Z' }],
+      availability: [
+        { rule_id: 'r-1', market: 'US', available: false, transmission: 'Example 4-speed', quoted: 'Example quote',
+          citation_url: 'https://example.org/a', citation_title: 'Example reference A', citation_locator: 'table 1' },
+        { rule_id: 'r-2', market: 'Canada', available: 'implied', transmission: 'Example 4-speed', inference: 'Example inference',
+          conflicts_with: 'Example reference A', citation_url: 'https://example.org/b', citation_title: 'Example catalogue' }] },
+    { key: 'transmission.current.gear_ratios', facet: 'decode', value: null, unit: null, status: 'missing', rule: null, equation: null,
+      sources: [], needed: 'unit year', candidates: [{ code: 'X1', gears: [2.2, 1.64, 1.28, 1], reverse: 2.27 }] },
+    { key: 'transmission.derived.changed', facet: 'derived', value: 'true', unit: null, status: 'reading', rule: null, equation: null,
+      needed: null, sources: [{ kind: 'image', label: 'photo reading', value: 'not_original_unit', observed_at: '2026-01-02T00:00:00Z' },
+        { kind: 'image', label: 'photo reading', value: 'not_original_engine', value_label: 'not the original engine', observed_at: '2026-01-02T00:00:00Z' }] },
+  ];
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="transmission" items={{ transmission: items }} />);
+  const text = host.textContent ?? '';
+  expect(text).toContain('Rule: Factory availability by series and engine');
+  expect(text).toContain('transmission on tag: not example code');
+  expect(text).toContain('US · not available · Example 4-speed');
+  expect(text).toContain('Canada · available by inference · Example 4-speed');
+  expect(text).toContain('Quoted: “Example quote”');
+  expect(text).toContain('Inference: Example inference');
+  expect(text).toContain('Disagrees with: Example reference A');
+  expect(host.querySelector('a[href="https://example.org/a"]')?.textContent).toBe('Example reference A');
+  expect(text).toContain('table 1');
+  expect(text).toContain('X1 · 2.20 / 1.64 / 1.28 / 1.00 · reverse 2.27');
+  expect(text).toContain('not original unit');
+  expect(text).toContain('not the original engine');
+  expect(text).not.toMatch(/[a-z0-9]_[a-z0-9]/);
 });
 
 it('reads location when it opens and draws its county and area centre on the map', async () => {

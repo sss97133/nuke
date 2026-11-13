@@ -978,6 +978,95 @@ BEGIN
   PERFORM public.t_assert(NOT (i ? 'availability') AND i->'rule' = 'null', 'no decode: no availability, no rule');
 END $$;
 RESET ROLE;
+-- 6. 20261116053700: plain labels for the codes items carry. Every viewer's items are byte-identical apart from
+-- rule.label on a labelled rule key, value_label on a source whose value is a labelled reading value, and the examined
+-- result reading the label of its code. A code with no label stays as it is.
+CREATE TABLE public.t_label_snap (vid uuid, dim text, doc jsonb);
+GRANT SELECT, INSERT ON public.t_label_snap TO anon;
+-- Removes exactly what the labels add: rule.label and every source's value_label.
+CREATE FUNCTION public.t_unlabel(p jsonb) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
+  SELECT coalesce(jsonb_agg(
+    (x || CASE WHEN jsonb_typeof(x->'rule') = 'object' THEN jsonb_build_object('rule', (x->'rule') - 'label') ELSE '{}'::jsonb END
+       || CASE WHEN jsonb_typeof(x->'sources') = 'array' AND jsonb_array_length(x->'sources') > 0 THEN jsonb_build_object('sources',
+            (SELECT jsonb_agg(CASE WHEN jsonb_typeof(s) = 'object' THEN s - 'value_label' ELSE s END ORDER BY n)
+             FROM jsonb_array_elements(x->'sources') WITH ORDINALITY e(s, n))) ELSE '{}'::jsonb END)
+    ORDER BY o), '[]'::jsonb)
+  FROM jsonb_array_elements(p) WITH ORDINALITY a(x, o) $$;
+GRANT EXECUTE ON FUNCTION public.t_unlabel(jsonb) TO anon;
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+INSERT INTO public.t_label_snap SELECT v, d, public.vehicle_facet_items(v, d)
+FROM unnest(ARRAY['10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002',
+                  '10000000-0000-0000-0000-000000000003']::uuid[]) v,
+     unnest(ARRAY['year', 'make', 'model', 'body_style', 'trim', 'engine', 'transmission', 'drivetrain']) d;
+RESET ROLE;
+\ir ../migrations/20261116053700_vocabulary_labels.sql
+\ir ../migrations/20261116053700_vocabulary_labels.sql
+DO $$ BEGIN
+  PERFORM public.t_assert((length(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure))
+      - length(replace(pg_get_functiondef('public.vehicle_facet_items(uuid,text)'::regprocedure), 'vocabulary_labels_v1', '')))
+      / length('vocabulary_labels_v1') = 1, 'labels patched once');
+  PERFORM public.t_assert((SELECT count(*) FROM public.vocabulary_labels) = 7, 'seeded with the seven codes only, twice applied');
+  PERFORM public.t_assert((SELECT relrowsecurity FROM pg_class WHERE oid = 'public.vocabulary_labels'::regclass), 'RLS on');
+  PERFORM public.t_assert(has_table_privilege('anon', 'public.vocabulary_labels', 'SELECT')
+    AND has_table_privilege('authenticated', 'public.vocabulary_labels', 'SELECT')
+    AND NOT has_table_privilege('anon', 'public.vocabulary_labels', 'INSERT')
+    AND NOT has_table_privilege('authenticated', 'public.vocabulary_labels', 'UPDATE')
+    AND NOT has_table_privilege('anon', 'public.vocabulary_labels', 'DELETE'), 'read by anyone, written by migrations only');
+END $$;
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE i jsonb;
+BEGIN
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'year', 'year.decode');
+  PERFORM public.t_assert(i#>>'{rule,key}' = 'gm_1972_1980_car_vin_v1' AND i#>>'{rule,label}' = 'VIN chart, GM cars 1972–1980',
+    'a labelled rule key carries its label');
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.as_built.model');
+  PERFORM public.t_assert(i#>>'{rule,label}' = 'Factory availability by series and engine', 'availability rule labelled');
+  PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'engine')) x,
+      jsonb_array_elements(x->'sources') s WHERE s->>'value' = 'not_original_engine')
+    AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'engine')) x,
+      jsonb_array_elements(x->'sources') s WHERE s->>'value' = 'not_original_engine' AND s->>'value_label' IS DISTINCT FROM 'not the original engine'),
+    'every not_original_engine source carries its label; the value stays');
+  -- No label: nothing added.
+  PERFORM public.t_assert(NOT EXISTS (
+    SELECT 1 FROM unnest(ARRAY['10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002',
+                               '10000000-0000-0000-0000-000000000003']::uuid[]) v,
+      jsonb_array_elements(public.vehicle_facet_items(v)->'transmission' || public.vehicle_facet_items(v)->'engine'
+        || public.vehicle_facet_items(v)->'year' || public.vehicle_facet_items(v)->'trim') x
+    WHERE (x->'rule' ? 'label' AND NOT EXISTS (SELECT 1 FROM public.vocabulary_labels l WHERE l.domain = 'rule' AND l.code = x#>>'{rule,key}'))
+       OR EXISTS (SELECT 1 FROM jsonb_array_elements(x->'sources') s WHERE s ? 'value_label'
+         AND NOT EXISTS (SELECT 1 FROM public.vocabulary_labels l WHERE l.domain = 'reading_value' AND l.code = s->>'value'))),
+    'an unlabelled code gains no label field');
+  -- Byte-identical apart from the added fields (the fixture's tag code has no label, so examined is unchanged here).
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM public.t_label_snap s
+    WHERE public.t_unlabel(public.vehicle_facet_items(s.vid, s.dim))::text IS DISTINCT FROM s.doc::text),
+    'every item of every car unchanged but for the labels');
+  PERFORM public.t_assert(EXISTS (SELECT 1 FROM public.t_label_snap s
+    WHERE public.vehicle_facet_items(s.vid, s.dim)::text IS DISTINCT FROM s.doc::text), 'labels were added somewhere');
+  PERFORM public.t_assert((public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')#>'{sections,0,token_items,transmission}')
+    = public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'transmission'), 'the profile carries the same labelled items');
+END $$;
+RESET ROLE;
+-- The examined result reads its code's label once the code has one.
+INSERT INTO public.vocabulary_labels (domain, code, label) VALUES ('reading_value', 'not_recorded', 'fixture: not on the tag');
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE i jsonb;
+BEGIN
+  i := public.t_item('10000000-0000-0000-0000-000000000001', 'transmission', 'transmission.as_built.type');
+  PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(i->'examined') e WHERE e->>'result' = 'transmission on tag: fixture: not on the tag')
+    AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(i->'examined') e WHERE e->>'result' LIKE '%not_recorded%'),
+    'examined result reads the label in place of the code');
+  PERFORM public.t_assert(jsonb_array_length(i->'examined') = 2, 'examined readings stay');
+END $$;
+RESET ROLE;
+DELETE FROM public.vocabulary_labels WHERE code = 'not_recorded';
 -- The documented fixture car as a logged-out viewer sees it (printed for review).
 SET ROLE anon;
 SET test.auth_role = 'anon';

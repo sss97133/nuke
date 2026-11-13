@@ -226,6 +226,15 @@ function ComponentSources({ evidence, renderSource }: { evidence?: ComponentEvid
   </section>;
 }
 
+function WorkPhotos({ images }: { images: VisualWork['images'] }) {
+  return <div className="vp-work-photos">{images.map(image => <button type="button" key={image.image_id}
+    onClick={() => openVehiclePhoto(image.image_id)} aria-label={`Open ${image.role} photo: ${image.caption}`}>
+    <img src={optimizeImageUrl(image.image_url, 'medium') || image.image_url} alt={image.caption} loading="lazy" />
+    <span><strong>{image.role}</strong><time dateTime={image.taken_at} title={image.capture_time_basis || 'Source time shown in UTC; local zone unrecorded'}>{photoDate(image)}</time></span>
+    <small>{image.caption}</small>
+  </button>)}</div>;
+}
+
 export function VisualWorkCards({ rows, ledger, components, renderSource }: {
   rows: VisualWork[]; ledger?: MasterCostLedger | null; components?: ComponentEvidence | null;
   renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode;
@@ -233,7 +242,18 @@ export function VisualWorkCards({ rows, ledger, components, renderSource }: {
   if (ledger?.scenarios.length) {
     const cited = new Set(ledger.scenarios.flatMap(s => s.rows.flatMap(r => r.work_observation_ids)));
     const remaining = rows.filter(work => !cited.has(work.observation_id));
-    return <><ComponentSources evidence={components} renderSource={renderSource} /><MasterLedger ledger={ledger} works={rows} renderSource={renderSource} />
+    // Work the ledger itemizes keeps its photographs on the page: one strip per work title, each photo once.
+    const photographed = new Map<string, VisualWork['images']>();
+    for (const work of rows) if (cited.has(work.observation_id)) {
+      const images = photographed.get(work.title) ?? [];
+      for (const image of work.images) if (!images.some(seen => seen.image_id === image.image_id)) images.push(image);
+      if (images.length) photographed.set(work.title, images);
+    }
+    return <><ComponentSources evidence={components} renderSource={renderSource} />
+      {photographed.size > 0 && <section aria-label="Work photos"><h4>Work photos</h4><div className="vp-visual-work">
+        {[...photographed].map(([title, images]) => <article key={title} aria-label={`${title} photos`}>
+          <header><h4>{title}</h4></header><WorkPhotos images={images} /></article>)}</div></section>}
+      <MasterLedger ledger={ledger} works={rows} renderSource={renderSource} />
       {remaining.length > 0 && <section aria-label="Other photographed work"><h4>Other photographed work</h4>
         <VisualWorkCards rows={remaining} renderSource={renderSource} /></section>}</>;
   }
@@ -244,12 +264,7 @@ export function VisualWorkCards({ rows, ledger, components, renderSource }: {
     return <article key={work.observation_id} aria-label={work.title}>
       <header><span>Photographed work</span><h4>{work.title}</h4><p>{work.summary}</p></header>
       {work.images.length > 1 && <p className="vp-work-swipe">Swipe through the work photos →</p>}
-      <div className="vp-work-photos">{work.images.map(image => <button type="button" key={image.image_id}
-        onClick={() => openVehiclePhoto(image.image_id)} aria-label={`Open ${image.role} photo: ${image.caption}`}>
-        <img src={optimizeImageUrl(image.image_url, 'medium') || image.image_url} alt={image.caption} loading="lazy" />
-        <span><strong>{image.role}</strong><time dateTime={image.taken_at} title={image.capture_time_basis || 'Source time shown in UTC; local zone unrecorded'}>{photoDate(image)}</time></span>
-        <small>{image.caption}</small>
-      </button>)}</div>
+      <WorkPhotos images={work.images} />
       <dl className="vp-work-lenses">
         <div><dt>Recorded time</dt><dd>{documentedHours.length ? `${hours} documented person-hours` : 'No person-hours in the cited operation lines'}</dd><small>{documentedHours.length ? 'Concurrent technician hours add; they are not elapsed time.' : 'The photo interval does not measure working time.'}</small></div>
         <div><dt>Inferred effort</dt><dd>{work.effort_reference ? `${work.effort_reference.hours_min}–${work.effort_reference.hours_max} reference hours` : 'No matched effort reference'}</dd><small>{work.effort_reference ? `${work.effort_reference.description}. Uncalibrated reference; not measured time.` : 'An estimate needs a matching scope and source.'}</small></div>

@@ -25,6 +25,23 @@ export function itemLabel(item: Pick<FacetItem, 'key' | 'facet'>): string {
 
 const numberText = (n: number) => (Number.isInteger(n) ? n.toLocaleString('en-US') : String(n));
 
+/** Machine codes the reader sent without a label (`not_original_unit`), as words. The reader's label wins when present. */
+export const codeText = (s: string) => s.replace(/\b[a-z0-9]+(?:_[a-z0-9]+)+\b/g, code => code.replace(/_/g, ' '));
+
+/** Gear and axle ratios read to two places (1 → "1.00"), the way ratio charts print them. */
+export const ratioText = (v: unknown): string | null => {
+  const list = Array.isArray(v) ? v : [v];
+  const parts = list.map(n => (typeof n === 'number' ? n.toFixed(2) : null)).filter((t): t is string => !!t);
+  return parts.length ? parts.join(' / ') : null;
+};
+
+/** An equation as the reader wrote it, with its variable and item names as words: `top_gear_ratio` → "top gear ratio",
+ * `as_built.type` → "as built type", `<>` → "≠", `pi()` → "π". The arithmetic is unchanged. */
+export const equationText = (s: string) =>
+  codeText(s.replace(/\bpi\(\)/g, 'π').replace(/<>/g, '≠').replace(/([a-z_])\.([a-z_])/g, '$1 $2'));
+
+const AVAILABLE: Record<string, string> = { true: 'available', false: 'not available', implied: 'available by inference' };
+
 /** A value as words. Arrays are sequences (gear ratios), objects are the area shapes the location items carry. */
 export function valueText(value: unknown, unit?: string | null): string | null {
   if (value == null) return null;
@@ -62,7 +79,7 @@ function SourceLine({ source }: { source: FacetItemSource }) {
   const url = source.url && /^https?:\/\//i.test(source.url) ? source.url : null;
   const name = source.label || source.slug || source.kind || 'source';
   const logo = resolveSourceLogo(name, url);
-  const said = valueText(source.value);
+  const said = source.value_label ?? (typeof source.value === 'string' ? codeText(source.value) : valueText(source.value));
   const thumb = source.witness?.kind === 'image' && source.witness.thumb ? optimizeImageUrl(source.witness.thumb, 'thumbnail') : null;
   const decoded = source.decoded ? Object.entries(source.decoded).filter(([, v]) => v != null && v !== '') : [];
   const identity = <span className="k-claim__source-identity">
@@ -89,7 +106,7 @@ function Sources({ sources }: { sources: FacetItemSource[] }) {
 
 function RuleLine({ rule }: { rule: Record<string, unknown> }) {
   const url = typeof rule.citation_url === 'string' && /^https?:\/\//i.test(rule.citation_url) ? rule.citation_url : null;
-  const key = typeof rule.key === 'string' ? rule.key : 'rule';
+  const key = typeof rule.label === 'string' ? rule.label : typeof rule.key === 'string' ? codeText(rule.key) : 'rule';
   return <Text role="caption" as="p" className="k-item__line">
     Rule: {url ? <a href={url} target="_blank" rel="noreferrer">{key}</a> : key}
     {typeof rule.code === 'string' && ` · code ${rule.code}`}
@@ -100,7 +117,7 @@ function RuleLine({ rule }: { rule: Record<string, unknown> }) {
 function EquationLine({ equation }: { equation: Record<string, unknown> }) {
   const expression = typeof equation.expression === 'string' ? equation.expression : null;
   if (!expression) return null;
-  return <Text role="caption" as="p" className="k-item__line">Computed: {expression}</Text>;
+  return <Text role="caption" as="p" className="k-item__line">Computed: {equationText(expression)}</Text>;
 }
 
 /** One item: name, value and status on one row, then its sources, rule or equation, and what would establish it. */
@@ -120,13 +137,22 @@ export function ItemRow({ item, after }: { item: FacetItem; after?: React.ReactN
       <Sources sources={side.sources} />
     </li>)}</ul> : <Sources sources={item.sources} />}
     {item.candidates?.length ? <ul className="k-item__sides">{item.candidates.map((c, i) => <li key={i}>
-      <Text role="body">{[c.code, valueText(c.gears), c.reverse != null ? `R ${valueText(c.reverse)}` : null,
+      <Text role="body">{[c.code, ratioText(c.gears), c.reverse != null ? `reverse ${ratioText(c.reverse)}` : null,
         c.countershaft_in ? `${c.countershaft_in} in countershaft` : null].filter(Boolean).join(' · ')}</Text>
       {typeof c.citation_url === 'string' && /^https?:\/\//i.test(c.citation_url) &&
         <Text role="caption"> <a href={c.citation_url} target="_blank" rel="noreferrer">{String(c.citation_title ?? 'citation')}</a></Text>}
     </li>)}</ul> : null}
     {item.examined?.length ? <ul className="k-item__sides">{item.examined.map((e, i) => <li key={i}>
-      <Text role="caption">Examined: {String(e.result ?? e.method ?? '')} · {day(e.observed_at as string)}</Text>
+      <Text role="caption">Examined: {codeText(String(e.result ?? e.method ?? ''))} · {day(e.observed_at as string)}</Text>
+    </li>)}</ul> : null}
+    {item.availability?.length ? <ul className="k-item__sides">{item.availability.map((a, i) => <li key={String(a.rule_id ?? i)}>
+      <Text role="body">{[a.market, AVAILABLE[String(a.available)] ?? null, a.transmission].filter(Boolean).map(String).join(' · ')}</Text>
+      {typeof a.quoted === 'string' && <Text role="caption" as="p" className="k-item__line">Quoted: “{a.quoted}”</Text>}
+      {typeof a.inference === 'string' && <Text role="caption" as="p" className="k-item__line">Inference: {a.inference}</Text>}
+      {typeof a.conflicts_with === 'string' && <Text role="caption" as="p" className="k-item__line">Disagrees with: {a.conflicts_with}</Text>}
+      {typeof a.citation_url === 'string' && /^https?:\/\//i.test(a.citation_url) &&
+        <Text role="caption" as="p" className="k-item__line"><a href={a.citation_url} target="_blank" rel="noreferrer">{String(a.citation_title ?? 'citation')}</a>
+          {typeof a.citation_locator === 'string' && ` · ${a.citation_locator}`}</Text>}
     </li>)}</ul> : null}
     {item.rule && <RuleLine rule={item.rule} />}
     {item.equation && <EquationLine equation={item.equation} />}

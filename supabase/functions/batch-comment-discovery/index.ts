@@ -16,8 +16,12 @@
  *   "min_comments"?: number (default 5),
  *   "offset"?: number (for pagination),
  *   "max_comment_chars"?: number (default 12000),
- *   "continue"?: boolean (auto-chain next batch)
+ *   "since_hours"?: number (default 48, max 168): only lots that ended inside this window,
+ *   "vehicle_ids"?: string[] (run exactly these, skipping the candidate search),
+ *   "model"?: one of DISCOVERY_MODELS (default the first),
+ *   "dry_run"?: boolean (run the model, return its output and token usage, store nothing)
  * }
+ * A call never chains another call: a schedule decides how often a bounded batch runs.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -30,6 +34,10 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Measured 2026-11-12 on closed BaT lots: the first model is the cheapest that returns the full shape.
+const DISCOVERY_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
+const DISCOVERY_PROMPT_VERSION = "comment_discovery_v2";
 
 const DISCOVERY_PROMPT = `You are analyzing auction comments from a collector vehicle listing. Extract insights for BOTH vehicle-level assessment AND market-level trends.
 
@@ -149,17 +157,52 @@ Deno.serve(async (req) => {
     const batchSize = Math.max(1, Math.min(parseInt(String(body.batch_size ?? 20), 10) || 20, 50));
     const minComments = Math.max(0, parseInt(String(body.min_comments ?? 5), 10) || 5);
     const maxCommentChars = body.max_comment_chars ?? 12000;
-    const shouldContinue = body.continue ?? false;
+    const sinceHours = Math.max(1, Math.min(Number(body.since_hours ?? 48) || 48, 168));
+    const model = DISCOVERY_MODELS.includes(body.model) ? body.model : DISCOVERY_MODELS[0];
+    const dryRun = body.dry_run === true;
+    const usage = { input_tokens: 0, output_tokens: 0, calls: 0 };
 
-    // Phase 1: Use vehicle_events (pre-aggregated comment counts, fast)
-    // Phase 2: Fall back to auction_comments direct scan for non-BaT vehicles
-    const { data: candidates, error: cErr } = await supabase.rpc("execute_sql", {
-      query: `SELECT ve.vehicle_id, ve.comment_count, ve.source_platform, v.year, v.make, v.model, COALESCE(v.sale_price, v.winning_bid, v.high_bid, v.bat_sold_price) AS sale_price FROM vehicle_events ve JOIN vehicles v ON v.id = ve.vehicle_id AND v.deleted_at IS NULL WHERE ve.source_platform IN ('bat', 'hagerty') AND ve.vehicle_id IS NOT NULL AND ve.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id) ORDER BY ve.comment_count DESC LIMIT ${batchSize}`
-    });
-
-    if (cErr) throw new Error(`Candidate query failed: ${JSON.stringify(cErr)}`);
-
-    const vehiclesToProcess = Array.isArray(candidates) ? candidates : [];
+    // Candidates: lots that ended inside the window (settled at least 30 minutes ago) and whose vehicle has no
+    // summary written since that lot ended. Bounded by ended_at so the read stays on idx_vehicle_events_ended.
+    let vehiclesToProcess: any[] = [];
+    let remaining = 0;
+    if (Array.isArray(body.vehicle_ids) && body.vehicle_ids.length) {
+      vehiclesToProcess = body.vehicle_ids.slice(0, batchSize).map((id: string) => ({ vehicle_id: id }));
+    } else {
+      const now = Date.now();
+      const { data: lots, error: lotErr } = await supabase.from("vehicle_events")
+        .select("vehicle_id, comment_count, ended_at")
+        .gte("ended_at", new Date(now - sinceHours * 3600_000).toISOString())
+        .lt("ended_at", new Date(now - 30 * 60_000).toISOString())
+        .not("vehicle_id", "is", null).gte("comment_count", minComments)
+        .order("ended_at", { ascending: false }).limit(1000);
+      if (lotErr) throw new Error(`Candidate query failed: ${lotErr.message}`);
+      const latest = new Map<string, any>();
+      for (const lot of lots ?? []) if (!latest.has(lot.vehicle_id)) latest.set(lot.vehicle_id, lot);
+      const ids = [...latest.keys()];
+      const done = new Map<string, string>();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data: rows, error: dErr } = await supabase.from("comment_discoveries")
+          .select("vehicle_id, discovered_at").in("vehicle_id", ids.slice(i, i + 200));
+        if (dErr) throw new Error(`Summary lookup failed: ${dErr.message}`);
+        for (const r of rows ?? []) done.set(r.vehicle_id, r.discovered_at);
+      }
+      const owed = [...latest.values()].filter((lot) => !done.has(lot.vehicle_id) || done.get(lot.vehicle_id)! < lot.ended_at);
+      vehiclesToProcess = owed.slice(0, batchSize);
+      remaining = owed.length - vehiclesToProcess.length;
+    }
+    if (vehiclesToProcess.length) {
+      const { data: vrows, error: vErr } = await supabase.from("vehicles")
+        .select("id, year, make, model, sale_price, winning_bid, high_bid, bat_sold_price")
+        .in("id", vehiclesToProcess.map((v) => v.vehicle_id));
+      if (vErr) throw new Error(`Vehicle lookup failed: ${vErr.message}`);
+      const byId = new Map((vrows ?? []).map((v: any) => [v.id, v]));
+      vehiclesToProcess = vehiclesToProcess.filter((v) => byId.has(v.vehicle_id)).map((v) => {
+        const r: any = byId.get(v.vehicle_id);
+        return { ...v, year: r.year, make: r.make, model: r.model,
+          sale_price: r.sale_price ?? r.winning_bid ?? r.high_bid ?? r.bat_sold_price ?? null };
+      });
+    }
 
     if (vehiclesToProcess.length === 0) {
       return jsonResponse({
@@ -176,6 +219,7 @@ Deno.serve(async (req) => {
     // Process vehicles in parallel batches of 5
     const PARALLEL = 5;
     const results = { discovered: 0, errors: 0, error_details: [] as string[], samples: [] as any[] };
+    let creditExhausted = false;
 
     for (let i = 0; i < vehiclesToProcess.length; i += PARALLEL) {
       // Check time budget — leave 10s for cleanup
@@ -185,55 +229,33 @@ Deno.serve(async (req) => {
       }
 
       const chunk = vehiclesToProcess.slice(i, i + PARALLEL);
-      const promises = chunk.map(v => processVehicle(supabase, v, anthropicKey, maxCommentChars));
+      if (creditExhausted) break;
+      const promises = chunk.map(v => processVehicle(supabase, v, anthropicKey, maxCommentChars, { model, dryRun, usage }));
       const settled = await Promise.allSettled(promises);
 
       for (let j = 0; j < settled.length; j++) {
         const result = settled[j];
         if (result.status === "fulfilled" && result.value.success) {
           results.discovered++;
-          if (results.samples.length < 3) {
+          if (dryRun || results.samples.length < 3) {
             results.samples.push(result.value.sample);
           }
         } else {
           results.errors++;
           const errMsg = result.status === "rejected" ? result.reason?.message : result.value?.error;
           results.error_details.push(`${chunk[j].vehicle_id}: ${errMsg}`);
+          // Out of API credit: stop the batch; the unsummarized lots stay owed for the next run.
+          if (/credit balance|billing/i.test(String(errMsg))) creditExhausted = true;
         }
       }
-    }
-
-    // Get remaining count (fast — vehicle_events is indexed)
-    const { data: remainingData } = await supabase.rpc("execute_sql", {
-      query: `SELECT count(*) AS remaining FROM vehicle_events ve WHERE ve.source_platform IN ('bat', 'hagerty') AND ve.vehicle_id IS NOT NULL AND ve.comment_count >= ${minComments} AND NOT EXISTS (SELECT 1 FROM comment_discoveries cd WHERE cd.vehicle_id = ve.vehicle_id)`
-    });
-    const remaining = Array.isArray(remainingData) ? Number(remainingData[0]?.remaining || 0) : 0;
-
-    // Self-continue if requested and there's more work
-    if (shouldContinue && remaining > 0 && results.discovered > 0) {
-      // Fire-and-forget next batch
-      const nextUrl = `${supabaseUrl}/functions/v1/batch-comment-discovery`;
-      fetch(nextUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${serviceKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          batch_size: batchSize,
-          min_comments: minComments,
-          max_comment_chars: maxCommentChars,
-          continue: true,
-        }),
-      }).catch(e => console.error("[batch-discover] Continue chain failed:", e));
     }
 
     return jsonResponse({
       success: true,
       ...results,
       remaining,
+      model, dry_run: dryRun, usage, credit_exhausted: creditExhausted,
       elapsed_ms: Date.now() - startTime,
-      continued: shouldContinue && remaining > 0,
     });
 
   } catch (e: any) {
@@ -247,6 +269,7 @@ async function processVehicle(
   vehicle: any,
   anthropicKey: string,
   maxChars: number,
+  run: { model: string; dryRun: boolean; usage: { input_tokens: number; output_tokens: number; calls: number } },
 ): Promise<{ success: boolean; sample?: any; error?: string }> {
   try {
     // Get comments for this vehicle — try auction_comments first (BaT), then vehicle_observations (Hagerty)
@@ -315,9 +338,11 @@ async function processVehicle(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-3-5-haiku-latest",
-        max_tokens: 2048,
-        temperature: 0.1,
+        model: run.model,
+        max_tokens: 6000,
+        // Output tokens include the model's thinking. At default effort Haiku spent all 6,000 before closing the
+        // JSON on 5 of 5 lots (2026-11-12); low effort leaves the budget for the answer.
+        output_config: { effort: "low" },
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -328,7 +353,10 @@ async function processVehicle(
     }
 
     const result = await response.json();
-    const content = result.content?.[0]?.text || "";
+    run.usage.input_tokens += result.usage?.input_tokens ?? 0;
+    run.usage.output_tokens += result.usage?.output_tokens ?? 0;
+    run.usage.calls++;
+    const content = (result.content ?? []).find((b: any) => b.type === "text")?.text || "";
 
     // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -340,7 +368,19 @@ async function processVehicle(
     try {
       discovered = JSON.parse(jsonMatch[0]);
     } catch {
-      return { success: false, error: "Failed to parse discovery JSON" };
+      return { success: false, error: `Failed to parse discovery JSON (stop_reason ${result.stop_reason}, ${result.usage?.output_tokens} output tokens)` };
+    }
+
+    // A quote is shown as the commenter's words, so keep only quotes found word for word in the comments sent.
+    if (Array.isArray(discovered.key_quotes)) {
+      const flat = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const source = flat(formatted);
+      const before = discovered.key_quotes.length;
+      discovered.key_quotes = discovered.key_quotes.filter((q: any) => {
+        const text = flat(String(q?.quote ?? ""));
+        return text.length > 0 && source.includes(text);
+      });
+      discovered.key_quotes_dropped_not_verbatim = before - discovered.key_quotes.length;
     }
 
     // Extract top-level fields for quick access
@@ -348,12 +388,19 @@ async function processVehicle(
     const sentimentScore = discovered.sentiment?.score || null;
     const meta = discovered.meta_analysis || {};
 
+    if (run.dryRun) {
+      return { success: true, sample: { vehicle_id: vehicle.vehicle_id, comments: comments.length, comments_analyzed: count,
+        tokens: result.usage, stop_reason: result.stop_reason, extraction: discovered } };
+    }
+
     // Upsert into comment_discoveries
     const { error: insertError } = await supabase
       .from("comment_discoveries")
       .upsert({
         vehicle_id: vehicle.vehicle_id,
         discovered_at: new Date().toISOString(),
+        model_used: run.model,
+        prompt_version: DISCOVERY_PROMPT_VERSION,
         raw_extraction: discovered,
         comment_count: comments.length,
         total_fields: countFields(discovered),

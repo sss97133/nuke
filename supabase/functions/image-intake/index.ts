@@ -147,8 +147,9 @@ Only set vehicleId if you're confident it matches a known vehicle.`;
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
+        model: "claude-sonnet-5-5",
+        max_tokens: 4000,
+        output_config: { effort: "low" },
         messages: [{
           role: "user",
           content: [...imageContents, { type: "text", text: prompt }],
@@ -157,7 +158,7 @@ Only set vehicleId if you're confident it matches a known vehicle.`;
     });
 
     const result = await response.json();
-    const text = result.content?.[0]?.text || "[]";
+    const text = (result.content ?? []).find((b: any) => b.type === "text")?.text || "[]";
     const jsonMatch = text.match(/\[[\s\S]*\]/);
 
     if (jsonMatch) {
