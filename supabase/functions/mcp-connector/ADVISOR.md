@@ -2,7 +2,7 @@
 
 Read-only, citation-first MCP surface for physical assets (vehicles first). Any MCP client can install it in one step and get answers that carry sources, event dates, and confidence.
 
-**Endpoint (after deploy):** `https://nuke.ag/mcp/advisor`  
+**Endpoint:** `https://nuke.ag/mcp/advisor`  
 **Also:** `https://nuke.ag/mcp?surface=advisor` or header `x-nuke-surface: advisor`  
 **Full connector (unchanged):** `https://nuke.ag/mcp`
 

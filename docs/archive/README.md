@@ -7,4 +7,30 @@ the November 2025 mobile redesign, payments and receipts generation) or about on
 this folder, so `git log --follow` and old links in history still resolve.
 
 Read them as history. For what exists and operates now, start at the repository's `AGENTS.md`, the live `v_schema_atlas`
-and `v_job_health` views, and `docs/ledger/README.md`. Retired features stay retired (`.claude/rules/platform-hygiene.md`).
+and `v_job_health` views, and `docs/ledger/README.md`. The capabilities ruled retired are listed in
+`docs/ledger/CAPABILITY_MAP.md`.
+
+## Added 2026-11-13
+
+Nine files moved here from the top of `docs/`. Each describes a retired capability, or sends the reader to files that are
+gone. Their text is unchanged.
+
+| File | Why it is here |
+|---|---|
+| `AI_AUCTION_AGENT_FRAMEWORK.txt`, `AUCTION_SYSTEM_FRAMEWORK.txt`, `TIERED_AUCTION_SYSTEM_FRAMEWORK.txt` | November 2025 designs for auctions run on Nuke itself. The capability map records bidding, auto-buy and trading as retired in March 2026 |
+| `TELEGRAM_RESTORATION_INTAKE.md` | Photo intake through Telegram. The capability map records the Telegram bots as retired, and no Telegram function remains in `supabase/functions/` |
+| `SOURCES_MASTER_LIST.md` | A readable view of `data/sources/master_sources.yaml`, which is no longer in the repository |
+| `ENV_QUICKREF.md` | January 2026 notes on environment variables. It names browser variables the web app no longer reads, and a function and a file that are gone. The current rules for secrets are in `AGENTS.md` |
+| `EXTRACTION_READ_FIRST.md` | A reading list whose playbook and status files are gone. The current rules are `docs/EXTRACTION_POLICY.md`, `docs/EXTRACTION_TARGETS.md` and `docs/ACCURATE_EXTRACTION.md` |
+| `REPOSITORY_OVERVIEW.md` | A March 2026 overview written under the earlier positioning. The root `README.md` and `docs/architecture/CODEBASE_INVENTORY.md` replace it |
+| `YONO_SPEC.md` | A February 2026 placeholder written before any code. The name went to the image classifier, described in `yono/README.md` |
+
+Eleven more files left the top of `docs/` the same day for the folder that fits their kind. They are dated writing about
+things that still exist, so they are not in this folder:
+
+| Now in | Files |
+|---|---|
+| `docs/strategy/` | `NUKE_API_STRATEGY_REPORT.md` and its `.pdf`, `STRUCTURAL_FOUNDATION.md`. `strategy/CONCEPTUAL_FOUNDATION.md` quotes both |
+| `docs/research/` | `fb-marketplace-api-analysis.md`, `fb-marketplace-scraper-landscape.md`, `live_auction_protocol_analysis.md` |
+| `docs/plans/` | `PLAN_PRIORITIES.md`, `THEME_AUDIT_PAGES.md`, `FUTURE_FEATURES.md` |
+| `docs/design-review/` | `DESIGN_REVIEW.md` and `DESIGN_REVIEW_DEEP_DIVE.md`, the two summaries of the reviews in that folder |
