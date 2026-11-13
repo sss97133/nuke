@@ -108,22 +108,24 @@ Install for Claude Code, Cursor, and Claude Desktop: [`supabase/functions/mcp-co
 <summary>Daily measurements</summary>
 
 <!-- stats:start -->
-Measured 2026-10-16 06:48 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
+Measured 2026-11-13 04:28 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows are planner estimates to three figures; rates are block samples with their n. Read-only. Nothing here is typed by hand.
 
 | | Rows | Coverage (sampled) |
 |---|---|---|
-| Auction comments (the auction log) | 20.1M | 99% author keyed to an identity · 11% sentiment-scored (n=40,548) |
-| Bids | 4.27M |  |
-| Observations (the fact log) | 12.5M |  |
-| Images | 53.8M | 0.8% zone-classified · 0.5% vision-analyzed · 11% AI-processed (n=53,867) |
-| Vehicles | 1.21M | 54% active · 31% with a VIN · 75% public (n=24,763) |
+| Auction comments (the auction log) | 25.0M | 95% author keyed to an identity · 8.9% sentiment-scored (n=49,871) |
+| Bids | 4.99M |  |
+| Observations (the fact log) | 14.6M |  |
+| Images | 58.8M | 0.6% zone-classified · 0.4% vision-analyzed · 9.1% AI-processed (n=63,493) |
+| Vehicles | 1.43M | 53% active · 32% with a VIN · 77% public (n=28,631) |
 | Listings (BaT) | 176K |  |
-| External identities | 699K |  |
-| Organizations | 5.74K |  |
+| External identities | 958K |  |
+| Organizations | 5.76K |  |
 
-The database describing itself (`v_schema_atlas`, `v_job_health`): 984 tables (702 non-empty) · 5,521 of 17,088 columns described (32%) · 202 non-empty tables with no foreign key in or out · 7 tables with an undeclared writer in the last 30 days · 80 scheduled jobs active, 45 with a failure in the last 24 h · Postgres 17.6.
+The database describing itself (`v_schema_atlas`, `v_job_health`): 1,719 tables (1,091 non-empty) · 6,420 of 41,364 columns described (16%) · 520 non-empty tables with no foreign key in or out · 5 tables with an undeclared writer in the last 30 days · 128 scheduled jobs active, 19 with a failure in the last 24 h · Postgres 17.6.
 
-Invalid indexes in `public`: 0.
+The stack registry (`v_stacks`): 66 stacks registered, 65 at status measured · 6 at coverage 0.9 or above · mean coverage 0.22. Coverage is the share of a stack's needs present in the live schema; partial needs do not count.
+
+Invalid indexes in `public`: 1. An interrupted `CREATE INDEX CONCURRENTLY` leaves one that no query reads and, when ready, every write still maintains: `idx_vehicles_stale_listing_clock` on `vehicles` (not ready, 0 bytes).
 
 Owner-run views in `public` that anon or authenticated can write through, past row-level security: 0. Allowed: `geometry_columns` (PostGIS view owned by supabase_admin; its insert, update and delete rules are DO INSTEAD NOTHING).
 <!-- stats:end -->
@@ -134,20 +136,20 @@ Owner-run views in `public` that anon or authenticated can write through, past r
 <summary>Intake and processing rates</summary>
 
 <!-- intake:start -->
-Measured 2026-10-16 06:50 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows landed per complete UTC day at each layer. Landed counts are exact; columns marked ≈ scale up a page sample whose n is in the header. Read-only. Nothing here is typed by hand.
+Measured 2026-11-13 04:29 UTC from the live database by [`scripts/data/readme-stats.mjs`](scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). Rows landed per complete UTC day at each layer. Landed counts are exact; columns marked ≈ scale up a page sample whose n is in the header. Read-only. Nothing here is typed by hand.
 
-| Day (UTC) | Comments landed | Comments sentiment-scored ≈ (1% page sample, n=202,512) | Vehicles landed (BaT / Craigslist) | Images landed | Images vision-analyzed ≈ (0.1% page sample, n=53,195) | BaT lots read by the live pull (latest read per lot, so older days undercount) |
+| Day (UTC) | Comments landed | Comments sentiment-scored ≈ (1% page sample, n=250,962) | Vehicles landed (BaT / Craigslist) | Images landed | Images vision-analyzed ≈ (0.1% page sample, n=65,999) | BaT lots read by the live pull (latest read per lot, so older days undercount) |
 |---|---:|---:|---:|---:|---:|---:|
-| 2026-10-15 | 230,194 | 0 sampled | 171,891 (706 / 791) | 595,483 | 0 sampled | 1,051 |
-| 2026-10-14 | 14,094 | 0 sampled | 1,061 (236 / 564) | 56,035 | 0 sampled | 239 |
-| 2026-10-13 | 20,147 | 0 sampled | 740 (237 / 456) | 77,936 | 0 sampled | 245 |
-| 2026-10-12 | 10,977 | 0 sampled | 766 (195 / 518) | 21,588 | 0 sampled | 226 |
-| 2026-10-11 | 4,890 | 0 sampled | 487 (55 / 387) | 13,888 | 0 sampled | 54 |
-| 2026-10-10 | 12,078 | 0 sampled | 633 (120 / 458) | 32,476 | 0 sampled | 143 |
-| 2026-10-09 | 12,183 | 0 sampled | 847 (199 / 605) | 73,918 | 0 sampled | 189 |
+| 2026-11-12 | 15,340 | 0 sampled | 7,406 (278 / 445) | 307,618 | 0 sampled | 793 |
+| 2026-11-11 | 14,200 | 0 sampled | 8,123 (221 / 397) | 312,538 | 0 sampled | 243 |
+| 2026-11-10 | 14,242 | 0 sampled | 11,726 (317 / 413) | 288,511 | 0 sampled | 274 |
+| 2026-11-09 | 14,407 | 0 sampled | 10,771 (135 / 504) | 243,918 | 0 sampled | 224 |
+| 2026-11-08 | 7,579 | 0 sampled | 2,076 (86 / 451) | 61,677 | 0 sampled | 74 |
+| 2026-11-07 | 10,021 | 0 sampled | 1,172 (130 / 535) | 46,689 | 0 sampled | 136 |
+| 2026-11-06 | 12,701 | 0 sampled | 1,338 (203 / 549) | 60,733 | 0 sampled | 221 |
 
-- **Live pull at measurement:** 0 of 1,290 live BaT lots are more than 2 h past their next scheduled read, and 0 live lots have never been read (`monitored_auctions.next_poll_at`, `last_synced_at`).
-- **Source coverage:** 47,306 of 846,288 known listing targets extracted (5.6%), across 12 sources (`source_target_coverage`).
+- **Live pull at measurement:** 0 of 1,403 live BaT lots are more than 2 h past their next scheduled read, and 0 live lots have never been read (`monitored_auctions.next_poll_at`, `last_synced_at`).
+- **Source coverage:** 155,706 of 970,254 known listing targets extracted (16%), across 18 sources (`source_target_coverage`).
 - **Clocks:** comments `auction_comments.created_at`, sentiment `auction_comments.analyzed_at`, vehicles `vehicles.created_at` split by `canonical_platform`, images `vehicle_images.created_at`, vision `vehicle_images.vision_analyzed_at`, live-pull reads `monitored_auctions.last_synced_at`, which keeps only each lot's latest read.
 - **Sampled zeros:** `tablesample system` keeps whole pages at random, so a day's rows reach the sample 95% of the time only when they span at least 299 comment pages or 2,995 image pages. "0 sampled" rules out steady processing, not a small run.
 <!-- intake:end -->

@@ -157,6 +157,12 @@ async function databaseBlock(invalid, writable) {
                                or author_external_identity_id is not null) as keyed,
            count(sentiment_score) as scored
       from auction_comments tablesample system (0.2)`);
+  // The stack registry, read the way the evidence block reads it. The README's Stacks section cites this line, so the
+  // count and the coverage in the README are never typed.
+  const [reg] = await q(`
+    select count(*) as stacks, count(*) filter (where status = 'measured') as measured,
+           count(*) filter (where coverage >= 0.9) as at_09, round(avg(coverage), 2) as mean_cov
+      from v_stacks`);
 
   const est = Object.fromEntries(ests.map((r) => [r.relname, Number(r.est)]));
   const row = (t, coverage = '') => `| ${TABLES[t]} | ${rows3(est[t])} | ${coverage} |`;
@@ -185,6 +191,12 @@ async function databaseBlock(invalid, writable) {
       `${num(atlas.undeclared)} tables with an undeclared writer in the last 30 days · ` +
       `${num(jobs.active)} scheduled jobs active, ${num(jobs.failing)} with a failure in the last 24 h · ` +
       `Postgres ${pg.pg}.`,
+    '',
+    'The stack registry (`v_stacks`): ' +
+      `${num(reg.stacks)} stacks registered, ${num(reg.measured)} at status measured · ` +
+      `${num(reg.at_09)} at coverage 0.9 or above · ` +
+      `mean coverage ${need(reg.mean_cov, 'mean stack coverage')}. ` +
+      "Coverage is the share of a stack's needs present in the live schema; partial needs do not count.",
     '',
     invalidIndexesLine(invalid),
     '',
@@ -240,10 +252,11 @@ function libraryBlock() {
 // The grading is read where it is kept: hammer_predictions (one row per prediction), v_prediction_lot_grades (one row
 // per model, lot and horizon) and prediction_accuracy (one row per model, over horizon 'last'). The unit is the lot.
 
-// The band each model states, in percent, from the comments on hammer_predictions.predicted_low and on
-// prediction_accuracy: models 30 and 31 state p10 to p90, model 24 p25 to p75. A model not listed here prints
-// "band width unknown", never a guess.
-const BAND = { 24: 50, 30: 80, 31: 80 };
+// The band each model states, in percent. Models 30 and 31 state p10 to p90 and model 24 p25 to p75 (the comments on
+// hammer_predictions.predicted_low and on prediction_accuracy). Models 32 and 33 state an 80% range, the analogs' 10th
+// to 90th percentile (the headers of scripts/market/live-finish.py and scripts/market/live-finish-33.py). A model not
+// listed here prints "band width unknown", never a guess.
+const BAND = { 24: 50, 30: 80, 31: 80, 32: 80, 33: 80 };
 
 // The live-lot reader's replay is a script run (scripts/market/replay-live-lot-reader.sql), not a view, so its line is
 // cited from the body of PR #771 (merged 2026-10-07; table "T-2 min, exact scheduled close") and never recomputed here.
