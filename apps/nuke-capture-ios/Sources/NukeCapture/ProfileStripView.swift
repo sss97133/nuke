@@ -595,7 +595,9 @@ struct ProfileHeaderBlock: View {
                 }
                 // Gaps: tokens with no established member, muted, opening what would establish them.
                 ForEach(strip.gaps, id: \.dimension) { g in
-                    RootedValueView(label: g.label, value: "Not established", status: .pending,
+                    // A gap with a lead shows it ("RWD · reading"); the row still opens the token's items.
+                    RootedValueView(label: g.label, value: g.leadText ?? "Not established",
+                                    status: g.leadText != nil ? ItemText.rootStatus(g.lead?.status ?? "") : .pending,
                                     onDrill: { openToken(g.dimension, title: g.label) })
                         .accessibilityIdentifier("header-gap-\(g.dimension)")
                     Divider()
