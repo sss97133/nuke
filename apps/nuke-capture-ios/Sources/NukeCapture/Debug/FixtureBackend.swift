@@ -60,6 +60,8 @@ enum FixtureBackend {
         "compute_vehicle_investment_proof", "vehicle_testimony_summary", "resolve_vehicle_identity_marks",
         "my_contact_requests", "contact_thread_read", "my_signature_queue", "my_work_orders", "my_identity_read",
         "work_order_statement_read", "facility_read", "my_vouches_read", "user_org_relations",
+        // The vehicle screen's Comment summary section: a stable read-only SQL function, never a write.
+        "popup_vehicle_intel",
     ]
 
     /// Explore's anonymous market reads. Explore is the default tab, so they run in every launch that
