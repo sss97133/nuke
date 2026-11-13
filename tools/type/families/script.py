@@ -151,13 +151,30 @@ def ball(cx, cy, r):
     return SE(cx, cy, r, r).contours()
 
 
+# The i's ball, measured on the photograph (de-sheared, px): an ellipse 157.5-178.8 wide by 14.4-26.9 tall, its centre
+# 1.6 px right of the stem's. The face mask cannot hold it: the ball is one bright highlight inside a dark ring that
+# does not close, so the trace keeps only a spike of the ring and the neck. The ball is drawn at its measured place.
+I_BALL = dict(dx=1.6, cy_px=20.6, rx_px=10.6, ry_px=6.25)
+
+
+def i_with_ball(con):
+    u = FACE.scale
+    stem = clip(con, -1000, -1000, 100000, XH + 20)
+    mid = geom.bounds(clip(stem, -1000, 150, 100000, 350))
+    cx = (mid[0] + mid[2]) / 2 + I_BALL['dx'] * u
+    cy = (FACE.baseline_px - I_BALL['cy_px']) * u
+    from lib.shapes import SE
+    return U(stem, SE(cx, cy, I_BALL['rx_px'] * u, I_BALL['ry_px'] * u).contours())
+
+
 def traced_parts():
     T = {}
     for n in REGIONS:
         t = trace_letter(n)
         x0 = geom.bounds(t.contours)[0]
         t.dx = -x0
-        T[n] = (geom.translate(t.contours, -x0, 0), t)
+        con = geom.translate(t.contours, -x0, 0)
+        T[n] = (i_with_ball(con) if n == 'i' else con, t)
     return T
 
 
@@ -314,7 +331,10 @@ def build_family(out_dir, proof_dir=None):
             # the r's flag runs into the e on the emblem; standing alone it ends upright 60 units short of the join
             con = clip(con, -50, -50, 540, 800)
         fid = t.score(con)
-        items[n] = (con, {'provenance': 'traced', 'method': 'potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit',
+        method = 'potrace of the chrome face (reflection-contrast mask, side wall and shadow excluded), de-slanted, refit'
+        if n == 'i':
+            method += "; the stem traced to the x-height, the ball an ellipse at its measured place (I_BALL)"
+        items[n] = (con, {'provenance': 'traced', 'method': method,
                           'fidelity': fid, 'fidelityAgainst': 'chrome face mask (v0.2)', 'sourceBoxPx': REGIONS[n], **src_meta}, 'lower')
         if proof_dir:
             overlay_png(t, con, os.path.join(proof_dir, 'script', f'{n}.png'), zoom=6, title=f'{n} IoU {fid["iou"]}')
@@ -360,7 +380,7 @@ def build_family(out_dir, proof_dir=None):
     glyphs.append(FGlyph('space', [], 260, 0x20, {'provenance': 'designed', 'method': 'word space'}))
     kern = {('F', 'o'): -120, ('F', 'a'): -100, ('F', 'i'): -80, ('F', 'r'): -60, ('P', 'r'): -40, ('T', 'r'): -80,
             ('T', 'a'): -100, ('T', 'o'): -100, ('L', 'e'): -20}
-    otf = build(out_dir, FAMILY, 'Regular', glyphs, ascender=900, descender=-280, cap_height=CAP, x_height=XH,
+    otf = build(out_dir, FAMILY, 'Regular', glyphs, ascender=900, descender=-250, cap_height=CAP, x_height=XH,
                 kerning=kern, file_stem='Firebird1971Script-Regular',
                 description='Italic slab script of the 1971-1981 Firebird fender emblem, traced and extended to a '
                             'connecting lowercase and the capitals of the Pontiac model names.',
