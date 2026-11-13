@@ -364,6 +364,23 @@ it('a token the read holds no value for is a muted gap that opens its line items
   expect(fixture.gallery).toHaveBeenLastCalledWith(null);
 });
 
+it('a gap whose token holds a valued item shows that lead with its status and opens the items', async () => {
+  const strip = fixture.read!.sections[1];
+  if (strip.kind === 'strip') {
+    strip.facets = strip.facets.filter(f => f.dimension !== 'drivetrain');
+    strip.gaps = [{ dimension: 'drivetrain', label: 'Drivetrain', lead: { key: 'drivetrain.current.layout', value: 'Fixture layout', status: 'reading' } }];
+  }
+  await render();
+  expect(host.querySelectorAll('button.k-facet--gap')).toHaveLength(0);
+  const lead = host.querySelector('[aria-label="Drivetrain: Fixture layout, reading. Show its items"]') as HTMLButtonElement;
+  expect(lead).not.toBeNull();
+  expect(lead.textContent).toBe('Fixture layoutreading');
+  expect(lead.querySelector('.k-status')?.getAttribute('data-status')).toBe('reading');
+  await act(async () => lead.click());
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('drivetrain');
+  expect(fixture.gallery).toHaveBeenLastCalledWith(null);
+});
+
 it('retains the specific transmission model and opens the transmission line items', async () => {
   const masthead = fixture.read!.sections[0];
   if (masthead.kind === 'masthead') masthead.identity_source.transmission_model = '6L90';

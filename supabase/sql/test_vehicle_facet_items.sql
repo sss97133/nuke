@@ -1203,6 +1203,42 @@ BEGIN
       AND x->>'key' NOT IN ('paint.as_built.code', 'trim.as_built.interior', 'body_style.tag_line5')), 'only the three tag needs change');
 END $$;
 RESET ROLE;
+-- 9. 20261116057000: a strip gap carries its token's lead item. v1's drivetrain is a gap (no record value); a photo
+-- reading of the layout becomes its lead. Fixture row in the throwaway contract database.
+SELECT set_config('t.lead_before', public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')::text, false) IS NOT NULL AS read_before;
+-- ALLOW_RAW_TESTIMONY_WRITE (test fixture, not production)
+INSERT INTO public.vehicle_observations (id, vehicle_id, kind, source_url, extraction_method, observed_at, structured_data,
+  source_id, property_id) VALUES
+ ('60000000-0000-0000-0000-000000000091', '10000000-0000-0000-0000-000000000001', 'specification', NULL, 'physical_transcription_v1',
+  '2026-10-28T17:23:49Z', '{"image_id":"50000000-0000-0000-0000-00000000000d","property_key":"drivetrain_layout","drivetrain_layout":"RWD"}', NULL, NULL);
+\ir ../migrations/20261116057000_profile_strip_gap_lead.sql
+\ir ../migrations/20261116057000_profile_strip_gap_lead.sql
+SET ROLE anon;
+SET test.auth_role = 'anon';
+RESET test.auth_uid;
+DO $$
+DECLARE p jsonb; s jsonb; b jsonb; lead jsonb;
+BEGIN
+  PERFORM public.t_assert((length(pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure))
+      - length(replace(pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure), 'strip_gap_lead_v1', '')))
+      / length('strip_gap_lead_v1') = 1, 'gap lead patched once');
+  p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
+  SELECT x INTO s FROM jsonb_array_elements(p->'sections') x WHERE x->>'kind' = 'strip';
+  lead := s->'gaps'->0->'lead';
+  PERFORM public.t_assert(s->'gaps'->0->>'dimension' = 'drivetrain' AND lead->>'key' = 'drivetrain.current.layout'
+    AND lead->>'value' = 'RWD' AND lead->>'status' = 'reading', format('drivetrain gap leads with its reading; got %s', s->'gaps'));
+  PERFORM public.t_assert(lead->>'value' = (SELECT x->>'value' FROM jsonb_array_elements(p#>'{sections,0,token_items,drivetrain}') x
+    WHERE x->>'key' = 'drivetrain.current.layout'), 'the lead is the token item, not a second fold');
+  -- Everything else in the read is unchanged: the strip apart from the gap's lead, and every other section.
+  SELECT x INTO b FROM jsonb_array_elements(current_setting('t.lead_before')::jsonb->'sections') x WHERE x->>'kind' = 'strip';
+  PERFORM public.t_assert(s - 'gaps' = b - 'gaps' AND jsonb_set(s->'gaps', '{0}', (s->'gaps'->0) - 'lead') = b->'gaps',
+    'the strip is unchanged apart from the lead');
+  -- A gap with nothing to lead with has no lead key (the thin car's gaps).
+  p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000003');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p->'sections') x, jsonb_array_elements(coalesce(x->'gaps', '[]')) g
+    WHERE x->>'kind' = 'strip' AND g ? 'lead'), 'no lead without a valued item');
+END $$;
+RESET ROLE;
 -- The documented fixture car as a logged-out viewer sees it (printed for review).
 SET ROLE anon;
 SET test.auth_role = 'anon';

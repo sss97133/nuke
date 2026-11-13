@@ -371,10 +371,16 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         ariaLabel={`Explore ${label} in this profile`}
         onClick={() => explore(f.dimension, label)} />;
     })}
-    {(strip.gaps ?? []).map(g => <Facet key={`gap:${g.dimension}`} gap label={g.label}
-      expanded={activeFacet?.field === (g.dimension === 'engine' ? 'engine_type' : g.dimension)}
-      ariaLabel={`${g.label}: not established. Show what would establish it`}
-      onClick={() => explore(g.dimension, g.label, true)} />)}
+    {(strip.gaps ?? []).map(g => g.lead
+      // The record holds nothing, but the token's lead item does: its value, marked with its status.
+      ? <Facet key={`gap:${g.dimension}`} label={g.lead.value} status={g.lead.status}
+        expanded={activeFacet?.field === (g.dimension === 'engine' ? 'engine_type' : g.dimension)}
+        ariaLabel={`${g.label}: ${g.lead.value}, ${g.lead.status}. Show its items`}
+        onClick={() => explore(g.dimension, g.lead!.value, true)} />
+      : <Facet key={`gap:${g.dimension}`} gap label={g.label}
+        expanded={activeFacet?.field === (g.dimension === 'engine' ? 'engine_type' : g.dimension)}
+        ariaLabel={`${g.label}: not established. Show what would establish it`}
+        onClick={() => explore(g.dimension, g.label, true)} />)}
   </div>;
 
   const market = (reduced = false) => priceOwnedByLiveStack && auctionPulse ? <React.Suspense fallback={null}><ExternalAuctionSummary
