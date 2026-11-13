@@ -196,7 +196,11 @@ function ExpectedAssemblyReferences({ assemblies }: { assemblies?: ExpectedAssem
           return <a key={position.key} href={`${file}#page=${ref.page_number}`} target="_blank" rel="noopener noreferrer"
             title={ref.excerpt} aria-label={`${position.label}: open source page ${ref.page_number}`}>
             <strong>{position.label}</strong><span>Qty {position.quantity}</span>
-            <span>{position.part_number_binding === 'unordered_pair' ? 'Pair: ' : 'Part '}{position.part_numbers.join(' / ')}</span>
+            {(() => {
+              const verified = position.part_numbers.filter(n => position.source_refs.some(r => r.excerpt.includes(n)));
+              return <>{!!verified.length && <span>{position.part_number_binding === 'unordered_pair' ? 'Pair: ' : 'Part '}{verified.join(' / ')}</span>}
+                {verified.length < position.part_numbers.length && <small>Part number not verified against the page</small>}</>;
+            })()}
             {position.part_number_binding === 'unordered_pair' && <small>Side assignment unresolved</small>}
             <small>Page {ref.page_number} · {ref.figure} · {ref.callout} ↗</small>
           </a>;
