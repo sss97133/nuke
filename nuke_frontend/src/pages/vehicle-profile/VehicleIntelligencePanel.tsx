@@ -72,24 +72,20 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
   const quotes = (ci.key_quotes || []).slice(0, 3).map(extractText).filter(Boolean);
   const insights = (ci.expert_insights || []).slice(0, 3).map(extractText).filter(Boolean);
   const concerns = (ci.community_concerns || []).slice(0, 3).map(extractText).filter(Boolean);
-  const ms = ci.market_signals;
-  // A label the model answered "unknown" says nothing; show only the ones it committed to.
-  const known = (v?: string) => (v && v.toLowerCase() !== 'unknown' ? v : null);
-  const demand = known(ms?.demand ?? ms?.demand_level);
-  const rarity = known(ms?.rarity ?? ms?.rarity_assessment);
-  const priceTrend = known(ms?.price_trend);
+  // The model's demand, rarity and price-trend labels are not shown: a market status comes only from a reader
+  // with its sample and keys (AGENTS.md), never from a model's reading of one comment thread.
   const analyzedOn = ci.analyzed_at ? new Date(ci.analyzed_at) : null;
   const provenance = ci.model_used && analyzedOn && !Number.isNaN(analyzedOn.getTime())
     ? [
         'Stored model interpretation',
         ci.model_used,
-        `written ${analyzedOn.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`,
+        `written ${analyzedOn.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', })}`,
         ci.comments_analyzed != null && ci.comment_count != null
           ? `read ${ci.comments_analyzed} of ${ci.comment_count} comments` : null,
       ].filter(Boolean).join(' · ') + '.'
     : null;
 
-  const hasContent = quotes.length > 0 || insights.length > 0 || concerns.length > 0 || ms;
+  const hasContent = quotes.length > 0 || insights.length > 0 || concerns.length > 0;
   if (!hasContent && !ci.overall_sentiment) return null;
 
   return (
@@ -133,7 +129,7 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
         {/* Extraction labels do not verify contributor expertise. */}
         {insights.length > 0 && (
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ ...LABEL, marginBottom: '4px' }}>EXTRACTED INSIGHTS</div>
+            <div style={{ ...LABEL, marginBottom: '4px' }}>MODEL'S READING OF THE COMMENTS · NOT VERIFIED</div>
             {insights.map((ins, i) => (
               <div key={i} style={{ marginBottom: '2px' }}>
                 {ins}
@@ -154,14 +150,6 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
           </div>
         )}
 
-        {/* Stored model labels; no cohort, time window or calibrated market measure supplied. */}
-        {ms && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {demand && <span style={BADGE}>DEMAND LABEL: {demand}</span>}
-            {rarity && <span style={BADGE}>RARITY LABEL: {rarity}</span>}
-            {priceTrend && <span style={BADGE}>PRICE TREND LABEL: {priceTrend}</span>}
-          </div>
-        )}
       </div>
     </CollapsibleWidget>
   );
