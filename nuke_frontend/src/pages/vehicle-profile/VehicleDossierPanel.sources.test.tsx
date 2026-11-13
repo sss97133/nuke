@@ -204,11 +204,11 @@ it('renders a field a header token states as that token\'s line items, once, wit
   };
   await act(async () => { root.render(<MemoryRouter><StructuredProfileData vehicleId={VEHICLE} tokenItems={tokenItems as any} /></MemoryRouter>); });
   const trans = host.querySelector('tr[data-token-items="transmission"]');
-  expect(trans?.querySelector('th')?.textContent).toBe('Transmission');
+  expect(trans?.querySelector('.vp-structured-record__items-label')?.textContent).toBe('Transmission');
   expect(trans?.textContent).toContain('As built'); expect(trans?.textContent).toContain('Needed: build sheet');
   expect(trans?.textContent).toContain('C-0001');
   expect(host.querySelectorAll('tr[data-token-items="engine"]').length).toBe(1);
-  expect(host.querySelector('tr[data-token-items="engine"] th')?.textContent).toBe('Engine');
+  expect(host.querySelector('tr[data-token-items="engine"] .vp-structured-record__items-label')?.textContent).toBe('Engine');
   expect(host.querySelector('tr[data-record-field="engine_size"]')).toBeNull();
   // Fields no token states keep their recorded row.
   expect(host.querySelector('tr[data-record-field="vin"]')).not.toBeNull();
