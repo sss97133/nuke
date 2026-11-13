@@ -1323,6 +1323,8 @@
 .vp-structured-record caption { text-align: left; color: var(--text-secondary); font-size: var(--text-caption); padding: 0 0 12px; }
 .vp-structured-record th, .vp-structured-record td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .vp-structured-record th { width: 35%; font-weight: 500; }
+.vp-structured-record__items > td { overflow-wrap: normal; }
+.vp-structured-record__items-label { font-weight: 500; margin-bottom: 4px; }
 .vp-structured-record__unknown, .vp-structured-record__note { color: var(--text-secondary); }
 .vp-structured-record__note { margin-top: 4px; font-size: var(--text-caption); }
 .vp-structured-record__value { border: 0; background: transparent; color: var(--link); padding: 0; min-height: 44px; font: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

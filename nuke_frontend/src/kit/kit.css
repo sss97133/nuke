@@ -103,8 +103,9 @@
 /* Items: a header token's line items (Items.tsx). One row per item, its sources and what would establish it. */
 .k-items { display: grid; gap: 4px; }
 .k-item { border-bottom: 1px solid var(--border); padding-bottom: 6px; }
-.k-item .k-row { border-bottom: 0; padding-bottom: 2px; }
-.k-item__value { display: inline-flex; align-items: baseline; gap: 8px; text-align: right; overflow-wrap: anywhere; }
+.k-item .k-row { border-bottom: 0; padding-bottom: 2px; flex-wrap: wrap; }
+/* break-word, not anywhere: a name or number breaks only when one word is wider than the row */
+.k-item__value { display: inline-flex; align-items: baseline; gap: 8px; margin-left: auto; text-align: right; overflow-wrap: break-word; }
 .k-item__line { margin: 2px 0 0; }
 .k-item__sources, .k-item__sides { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
 .k-item__sides > li { display: grid; gap: 2px; padding-left: 8px; border-left: 2px solid var(--border); }
