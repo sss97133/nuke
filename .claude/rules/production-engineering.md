@@ -94,7 +94,11 @@ Noted drift:
   never on main. Three active cron jobs call one of them: `concierge-notify`,
   `concierge-partner-sync` (calls `concierge-partner`) and
   `instagram-feed-sync` (calls `instagram-connect`). No cron job calls a
-  function that is not deployed. `docs/ledger/facts.json` holds both lists
+  function that is not deployed, by a text search of the command and name
+  of all 231 `cron.job` rows; a job that reaches a function through a SQL
+  helper holding the name elsewhere would not show. All 341 report status
+  ACTIVE. The write guard reads source in this repository, so it covers
+  none of the 115. `docs/ledger/facts.json` holds both lists
   (`deployed`, `fn_dirs`); refresh it with `npm run ledger:facts`. Do not
   sweep them: `docs/ledger/CAPABILITY_MAP.md` marks the ones whose source
   must be recovered from git history before anything is touched.
