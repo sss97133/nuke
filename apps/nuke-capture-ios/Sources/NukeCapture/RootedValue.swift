@@ -108,7 +108,7 @@ struct RootedValueView: View {
                         .multilineTextAlignment(.trailing)
                     if let sub = decay ?? status.subscriptLabel {
                         Text(sub)
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.tertiary)
                     }
                 }

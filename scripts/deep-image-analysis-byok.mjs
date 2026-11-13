@@ -2,8 +2,8 @@
  * Deep image analysis — BYOK (Claude Code Agent reads via Read tool).
  *
  * Mirror of scripts/vision-gate-l4.mjs in shape: prepare a worklist for an
- * agent to consume, agent reads each image, writes verdict JSONL, ingest
- * writes structured features back as vehicle_observations.
+ * agent to consume. The foreground reviewed wrapper reads each image, validates
+ * source-bound envelopes, and optionally admits them through the photo owner.
  *
  * Companion docs: docs/library/technical/engineering-manual/18-deep-image-analysis.md
  *
@@ -12,9 +12,10 @@
  *              --vehicle-id <uuid> --limit 20 \
  *              --worklist /tmp/dia/<id>/work.jsonl
  *   ingest:  node scripts/deep-image-analysis-byok.mjs ingest \
- *              --sink /tmp/dia/<id>/verdicts.jsonl
+ *              --vehicle-id <uuid> --sink /tmp/dia/<id>/reviewed-envelopes.jsonl --apply
  *
- * Verdict line shape — what the agent writes per image:
+ * Verdict portion of a reviewed envelope (source/provenance are also required;
+ * scripts/daily-receipt/reviewed-image-batch.ts owns the complete contract):
  *   {
  *     "image_id": "<uuid>",
  *     "vehicle_id": "<uuid>",
@@ -40,16 +41,20 @@
  *     "agent_notes": "string"
  *   }
  *
- * Storage: writes into vehicle_images.ai_scan_metadata.deep_analysis (jsonb
- * merge) AND emits a kind='analysis' vehicle_observation per image with
- * observation_witness linking the image.
+ * Intake: photo-pipeline-orchestrator record_reviewed_analysis delegates to
+ * deferred ingest-observation and its guarded source-current T1/T2 projection.
+ * No direct cache writes, automatic identity promotion, work cascade or Sign.
  */
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, openSync, closeSync, fsyncSync, renameSync } from 'fs';
 import { dirname } from 'path';
 import { createHash } from 'crypto';
 import { fileURLToPath } from 'node:url';
-import { projectImageProperties, applyImagePropertyClaims } from './lib/image-property-projection.mjs';
+import { spawnSync } from 'node:child_process';
+import { projectCachedRun } from './lib/image-property-projection.mjs';
+
+import { receiptContextVendor } from './lib/receipt-context-text.mjs';
+export { receiptContextVendor, contextWithoutPersonalFields } from './lib/receipt-context-text.mjs';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -65,53 +70,9 @@ const sb = isMain ? (await import('@supabase/supabase-js')).createClient(SUPABAS
 // Dependency-free validator (mirrors scripts/schemas/byok-image-verdict.schema.json).
 // This is the gate that makes "fill the schema, granular, like a human" structural
 // instead of advisory — a tourist caption fails here and never lands.
-const SCENE_TYPES = new Set(["engine_bay","body_exterior","body_interior","undercarriage","receipt_document","data_plate","hand_drawn_diagram","shop_context","fabrication_in_progress","paint_booth","wheel_assembly","road_test","off_property","cross_reference","product_screenshot","spreadsheet","unknown"]);
-const BUILD_PHASES = new Set(["discovery","teardown","metalwork","paint_prep","paint_application","mechanical_assembly","wiring","interior","final_assembly","drivable","show_finish","unknown"]);
-const RUST = new Set(["none","surface","pitting","perforation","unknown"]);
-const PAINT = new Set(["bare_metal","primer","sealer","base","clear","aged","unknown"]);
-const COMPLETE = new Set(["stripped","partial","assembled","unknown"]);
-const INTENT = new Set(["labor","inspection","parts_sourcing","communication","acquisition","documentation","unknown"]);
-const INTENT_CONFIRM_THRESHOLD = 0.6; // below this, intent must be flagged for the ask-the-technician loop
-const isBbox = (b) => Array.isArray(b) && b.length === 4 && b.every((n) => typeof n === "number" && n >= 0 && n <= 999);
-
-export function validateVerdict(v) {
-  const errs = [];
-  for (const f of ["image_id","vehicle_id","scene_type","build_phase_guess","components_seen","state_observations","workshop_signals","presence","camera_pose","narrative_one_line","confidence"]) {
-    if (v[f] === undefined || v[f] === null) errs.push(`missing ${f}`);
-  }
-  if (v.scene_type && !SCENE_TYPES.has(v.scene_type)) errs.push(`scene_type not in enum: ${v.scene_type}`);
-  if (v.build_phase_guess && !BUILD_PHASES.has(v.build_phase_guess)) errs.push(`build_phase_guess not in enum: ${v.build_phase_guess}`);
-  // intent gate: what the photo is FOR. Only confirmed labor accrues value (the $410 fix).
-  if (!v.intent || !INTENT.has(v.intent)) errs.push(`intent missing/not in enum (labor|inspection|parts_sourcing|communication|acquisition|documentation|unknown): ${v.intent}`);
-  if (typeof v.intent_confidence !== "number" || v.intent_confidence < 0 || v.intent_confidence > 1) errs.push("intent_confidence must be number 0–1");
-  // when intent is unsure, it MUST be flagged for the ask-the-technician loop — never silently assumed
-  if ((v.intent === "unknown" || (typeof v.intent_confidence === "number" && v.intent_confidence < INTENT_CONFIRM_THRESHOLD)) && v.needs_clarification !== true)
-    errs.push("low-confidence/unknown intent requires needs_clarification:true (ask the technician — don't assume)");
-  if (typeof v.confidence !== "number" || v.confidence < 0 || v.confidence > 1) errs.push("confidence must be number 0–1");
-  if (typeof v.narrative_one_line === "string" && v.narrative_one_line.length < 12) errs.push("narrative_one_line too short (lazy)");
-  // Banned phrase — structured camera_pose only, never "3/4"
-  const poseStr = JSON.stringify(v.camera_pose || "");
-  if (/3\s*\/\s*4|three[- ]?quarter/i.test(poseStr)) errs.push('camera_pose contains banned "3/4"/"three-quarter" — use structured azimuth/elevation/distance');
-  if (typeof v.camera_pose !== "object" || Array.isArray(v.camera_pose)) errs.push("camera_pose must be a structured object");
-  // Every localized array element must carry a valid bbox (TWVP 0–999)
-  for (const [arr, name] of [[v.components_seen,"components_seen"],[v.damage_localized,"damage_localized"],[v.text_regions,"text_regions"]]) {
-    if (arr === undefined) continue;
-    if (!Array.isArray(arr)) { errs.push(`${name} must be an array`); continue; }
-    arr.forEach((it, i) => {
-      if (!isBbox(it?.bbox)) errs.push(`${name}[${i}] missing/invalid bbox (need [x1,y1,x2,y2] 0–999)`);
-      if (name === "components_seen" && (typeof it?.confidence !== "number" || it.confidence < 0 || it.confidence > 1)) errs.push(`components_seen[${i}] confidence must be 0–1`);
-      // text_regions carry `text`; components/damage carry `label`
-      const labelField = name === "text_regions" ? "text" : "label";
-      if (typeof it?.[labelField] !== "string" || it[labelField].length < 1) errs.push(`${name}[${i}] missing ${labelField}`);
-    });
-  }
-  const so = v.state_observations || {};
-  if (so.rust_severity && !RUST.has(so.rust_severity)) errs.push(`rust_severity not in enum: ${so.rust_severity}`);
-  if (so.paint_state && !PAINT.has(so.paint_state)) errs.push(`paint_state not in enum: ${so.paint_state}`);
-  if (so.completeness && !COMPLETE.has(so.completeness)) errs.push(`completeness not in enum: ${so.completeness}`);
-  if (v.presence && typeof v.presence.person !== "boolean") errs.push("presence.person must be boolean");
-  return errs;
-}
+export { validateVerdict } from '../supabase/functions/_shared/byokImageVerdict.mjs';
+import { validateVerdict } from '../supabase/functions/_shared/byokImageVerdict.mjs';
+const isBbox = (b) => Array.isArray(b) && b.length === 4 && b.every((n) => typeof n === 'number' && n >= 0 && n <= 999);
 
 const args = process.argv.slice(2);
 const mode = args[0];
@@ -650,44 +611,95 @@ async function entities() {
   console.log(`entities: TOTAL frames ${totals.frames}, components ${totals.components}, receipt-CONFIRMED ${totals.confirmed}, day-CONTEXT ${totals.day_context}, already-landed skipped ${totals.skipped}`);
 }
 
-async function prepare() {
-  const VEHICLE_ID = arg('--vehicle-id');
-  const LIMIT = parseInt(arg('--limit', '20'));
-  const WORKLIST = arg('--worklist');
+// This queue uses the same eligibility predicate as the current gallery. A reported
+// image timestamp groups related records; it never establishes work or installation.
+export function frameClock(row) {
+  const e = row.exif_data || {};
+  const original = e.DateTimeOriginal || e.dateTaken || e.dateTime || e.technical?.dateTaken || null;
+  const value = row.taken_at || original || null;
+  const basis = row.taken_at ? 'recorded_taken_at' : original ? 'exif_reported_capture' : 'unknown';
+  const date = typeof value === 'string' ? value.match(/^(\d{4})[-:](\d{2})[-:](\d{2})(?=[T \t]|$)/) : null;
+  return { value, basis, day: date ? `${date[1]}-${date[2]}-${date[3]}` : 'unknown' };
+}
+
+export async function loadAnalysisImages(client, vehicleId, imageIds = null) {
+  const all = [], page = 1000;
+  for (let offset = 0; ; offset += page) {
+    let query = client.from('vehicle_images')
+      .select('id, user_id, image_url, file_name, taken_at, created_at, updated_at, source, ai_scan_metadata, apple_ml_labels, latitude, longitude, location_name, exif_data, stale, vehicle_image_gallery_eligible, is_sensitive, is_superseded, is_duplicate, image_vehicle_match_status, vision_gate_status')
+      .eq('vehicle_id', vehicleId).eq('vehicle_image_gallery_eligible', true)
+      .or('is_sensitive.is.null,is_sensitive.eq.false');
+    // A bounded explicit batch still uses the current source/eligibility owner,
+    // but need not transfer every other image's classification and EXIF payload.
+    if (imageIds) query = query.in('id', imageIds);
+    const { data, error } = await query
+      .order('created_at', { ascending: true }).order('id', { ascending: true })
+      .range(offset, offset + page - 1).abortSignal(AbortSignal.timeout(20000));
+    if (error || !Array.isArray(data)) throw new Error(`prepare: image query failed: ${error?.message || 'missing result'}`);
+    all.push(...data);
+    if (data.length < page) return all;
+  }
+}
+
+export function receiptRoster(rows) {
+  return rows.filter(row => row.receipts && row.receipts.is_superseded !== true && !row.receipts.superseded_by)
+    .map(row => ({ itemId: row.id, receiptId: row.receipt_id, cat: row.category || 'other',
+      desc: (row.description || '').trim(), pn: (row.part_number || '').trim() || null,
+      quantity: row.quantity, amount: row.total_price, lineDate: row.line_date,
+      vendor: row.receipts.vendor_name, dates: { receipt_date: row.receipts.receipt_date ?? null,
+        transaction_date: row.receipts.transaction_date ?? null, purchase_date: row.receipts.purchase_date ?? null },
+      sourceTable: row.receipts.source_document_table, sourceId: row.receipts.source_document_id }))
+    .sort((a, b) => a.cat.localeCompare(b.cat) || a.desc.localeCompare(b.desc) || String(a.itemId).localeCompare(String(b.itemId)));
+}
+
+export function receiptRosterLine(r) {
+  return `    - ${r.desc} — PN ${r.pn || 'not recorded'}; recorded quantity ${r.quantity ?? '?'}; line amount ${r.amount ?? '?'}; line date ${r.lineDate || '?'}; recorded dates ${Object.entries(r.dates).filter(([, value]) => value).map(([field, value]) => `${field}=${value}`).join(', ') || '?'}; vendor ${receiptContextVendor(r.vendor) || '?'}; receipt ${r.receiptId}; item ${r.itemId}; source ${r.sourceTable || '?'}:${r.sourceId || '?'}`;
+}
+export function groupReceiptRoster(rows) {
+  const groups = new Map();
+  for (const r of rows) {
+    const receipt = { receipt_id: r.receiptId, vendor: receiptContextVendor(r.vendor), dates: r.dates,
+      source_table: r.sourceTable, source_id: r.sourceId };
+    // Different retained metadata for the same receipt must not collapse.
+    const key = JSON.stringify(receipt);
+    if (!groups.has(key)) groups.set(key, { ...receipt, items: [] });
+    groups.get(key).items.push({ item_id: r.itemId, category: r.cat, description: r.desc,
+      part_number: r.pn, quantity: r.quantity, amount: r.amount, line_date: r.lineDate });
+  }
+  return [...groups.values()];
+}
+export function receiptRosterSections(rows) {
+  return groupReceiptRoster(rows).map(({ items, ...receipt }) =>
+    `Receipt ${JSON.stringify(receipt)}\n${items.map(item => `  Item ${JSON.stringify(item)}`).join('\n')}`).join('\n');
+}
+
+const sourceUuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+export async function prepare(client = sb, options = {}) {
+  const VEHICLE_ID = options.vehicleId ?? arg('--vehicle-id');
+  const LIMIT = options.limit ?? parseInt(arg('--limit', '20'));
+  const WORKLIST = options.worklist ?? arg('--worklist');
   if (!VEHICLE_ID || !WORKLIST) {
     console.error('prepare: --vehicle-id and --worklist required');
     process.exit(1);
   }
 
-  // Paginate so the 1000-row postgrest cap doesn't bite.
-  const all = [];
-  const PAGE = 1000;
-  for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await sb
-      .from('vehicle_images')
-      .select('id, user_id, image_url, file_name, taken_at, created_at, source, ai_scan_metadata, apple_ml_labels, latitude, longitude, location_name, exif_data, stale')
-      .eq('vehicle_id', VEHICLE_ID)
-      // Match the GALLERY whitelist (null OR approved), not just approved. The vision gate
-      // stalled and left ~12k frames at null/pending — null-gate frames are SHOWN in the
-      // gallery but were never analyzed (browse → image with no data). Analyze what the
-      // gallery displays. Explicit rejects (rejected_personal/misattributed) stay excluded.
-      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
-      .order('created_at', { ascending: true })
-      .range(offset, offset + PAGE - 1);
-    if (error) {
-      console.error(`prepare: page query failed: ${error.message}`);
-      process.exit(1);
-    }
-    if (!data || data.length === 0) break;
-    all.push(...data);
-    if (data.length < PAGE) break;
-  }
+  // Every successful empty selection is a real empty artifact, never a stale
+  // previous batch or a missing-file failure. Query errors still exit nonzero.
+  mkdirSync(dirname(WORKLIST), { recursive: true });
+  writeFileSync(WORKLIST, '');
+  writeFileSync(`${WORKLIST}.date`, '');
+  const imageIds = options.imageIds ?? (arg('--image-ids') ? arg('--image-ids').split(',') : null);
+  if (imageIds && (!Array.isArray(imageIds) || imageIds.length < 1 || imageIds.length > LIMIT ||
+    imageIds.some(id => !sourceUuid(id)) || new Set(imageIds).size !== imageIds.length)) throw new Error('prepare: invalid exact image selection');
+  // Preparation performs no remote writes; choosing a frame is not analysis.
+  const all = await loadAnalysisImages(client, VEHICLE_ID, imageIds);
 
   const SHARD_COUNT = parseInt(arg('--shard-count', '1'));
   const SHARD_INDEX = parseInt(arg('--shard-index', '0'));
-  const BY_DAY = args.includes('--by-day');
+  const BY_DAY = options.byDay ?? args.includes('--by-day');
   const hash8 = (s) => parseInt(createHash('md5').update(s).digest('hex').slice(0, 8), 16);
-  const dayOf = (r) => (r.taken_at || r.created_at || '').slice(0, 10) || 'unknown';
+  const dayOf = (r) => frameClock(r).day;
 
   // Two queues, saturation-driven (the extraction ledger):
   //   default  → frames with NO verdict yet (first pass).
@@ -712,9 +724,13 @@ async function prepare() {
 
   let pending;
   let chosenDay = null;
-  if (BY_DAY) {
-    // THE DAY IS THE UNIT OF ANALYSIS. A work session lives in a day's photos
-    // read TOGETHER (component lifecycle, before/after, build-phase progression).
+  if (imageIds) {
+    const selected = new Map(pendingAll.map(row => [row.id, row]));
+    if (imageIds.some(id => !selected.has(id))) throw new Error('prepare: requested image is unavailable or already analyzed for this pass');
+    pending = imageIds.map(id => selected.get(id));
+  } else if (BY_DAY) {
+    // Read source-day groups together for component lifecycle and before/after.
+    // A shared recorded day does not itself establish a work session.
     // Parallel workers shard by DAY — a day is NEVER split across workers — and
     // each worker processes its earliest un-drained day, up to LIMIT frames at a
     // time (a 200-photo day takes several passes; build-day rolls them all up).
@@ -738,27 +754,17 @@ async function prepare() {
   }
 
   if (!pending || pending.length === 0) {
-    console.log(`prepare: nothing pending for ${VEHICLE_ID} (already-analyzed = ${all.length - pendingAll.length}/${all.length})`);
+    console.log(`prepare: no matching frames for the requested date/pass/shard selection of ${VEHICLE_ID}; eligible gallery pool ${all.length}. This does not establish whole-inventory analysis coverage.`);
     return;
   }
 
   mkdirSync(dirname(WORKLIST), { recursive: true });
-  // EXIF is invisible in the (Supabase-stripped) pixels the agent reads — extract it
-  // from the row and hand it over: true capture time, GPS, resolved location, camera.
-  //
-  // CRITICAL: the authoritative capture date is the `taken_at` COLUMN (the iOS capture
-  // relay writes asset.creationDate there; see apps/nuke-capture-ios SupabaseService.swift),
-  // NOT exif_data. The relay's exif_data carries no date field and stores the camera as
-  // flat `camera_make`/`camera_model` keys — so the previous code, which read shot_at
-  // from exif_data date fields and the camera from a nested `e.camera.make` object,
-  // returned shot_at=null + camera=null for the ENTIRE iOS-synced library. With no
-  // temporal anchor the detective inferred a date from image content (a 2017 build photo
-  // could land on a 2026 frame). taken_at is primary; exif_data is fallback for
-  // exiftool-backfilled storage images only.
+  // Keep the image clock and its basis explicit. A photograph of an old receipt
+  // or printed restoration photo records a capture, not that depicted event's date.
   const exifOf = (r) => {
     const e = r.exif_data || {};
-    const shotAt = r.taken_at
-      || e.dateTaken || e.dateTime || e.DateTimeOriginal || e.technical?.dateTaken || e.CreateDate || null;
+    const clock = frameClock(r);
+    const shotAt = clock.value;
     const camMake = e.camera_make || e.Make || (e.camera && typeof e.camera === 'object' ? e.camera.make : null) || null;
     const camModel = e.camera_model || e.Model || (e.camera && typeof e.camera === 'object' ? e.camera.model : null) || null;
     const cam = [camMake, camModel].filter(Boolean).join(' ').trim()
@@ -767,7 +773,7 @@ async function prepare() {
     const lon = r.longitude ?? e.gps?.longitude ?? e.location?.longitude ?? null;
     return {
       shot_at: shotAt,
-      shot_at_source: r.taken_at ? 'taken_at' : (shotAt ? 'exif_data' : null),
+      shot_at_source: clock.basis,
       camera: cam,
       gps: (lat != null && lon != null) ? { lat: Number(lat), lon: Number(lon) } : null,
       location_name: r.location_name || null,
@@ -787,11 +793,16 @@ async function prepare() {
       image_id: r.id,
       vehicle_id: VEHICLE_ID,
       image_url: r.image_url,
+      expected_updated_at: r.updated_at,
+      eligibility: { gallery_eligible: r.vehicle_image_gallery_eligible, is_sensitive: r.is_sensitive,
+        is_superseded: r.is_superseded, is_duplicate: r.is_duplicate,
+        image_vehicle_match_status: r.image_vehicle_match_status, vision_gate_status: r.vision_gate_status },
       file_name: safeName(r),
       taken_at: r.taken_at,
       created_at: r.created_at,
       source: r.source,
       day: dayOf(r),
+      day_basis: frameClock(r).basis,
       exif: exifOf(r),
       // T0 prior: the FREE on-device Apple Vision tags already computed at capture. Noisy hints
       // (a truck can read as "airplane"), NEVER truth — the detective uses them to orient/confirm
@@ -800,22 +811,6 @@ async function prepare() {
     }),
   );
   writeFileSync(WORKLIST, lines.join('\n') + '\n');
-  // Live feed: these frames are now in flight — emit an 'analyzing' stage per frame so
-  // the pipeline visualizer (analysis_events → get_pipeline_events) shows the journey as
-  // it happens, not after. Guarded: telemetry must never block the drain.
-  try {
-    const analyzingEvents = pending.map((r) => ({
-      user_id: r.user_id ?? null,
-      vehicle_id: VEHICLE_ID,
-      image_id: r.id,
-      stage: 'analyzing',
-      detail: { day: dayOf(r), source: r.source ?? null },
-    }));
-    if (analyzingEvents.length) {
-      const { error: aerr } = await sb.from('analysis_events').insert(analyzingEvents);
-      if (aerr) console.error(`  (non-fatal) analysis_events analyzing insert: ${aerr.message}`);
-    }
-  } catch (e) { console.error(`  (non-fatal) analyzing emit: ${e.message}`); }
   if (chosenDay) {
     writeFileSync(`${WORKLIST}.date`, chosenDay + '\n');
     const remaining = (pendingAll.filter((r) => dayOf(r) === chosenDay).length) - pending.length;
@@ -823,250 +818,81 @@ async function prepare() {
   } else {
     console.log(`prepare: ${pending.length} rows → ${WORKLIST}`);
   }
-  console.log(`         pool total = ${all.length}, pending = ${all.length - pending.length} not in this batch`);
+  console.log(`         ${imageIds ? 'eligible requested images' : 'eligible gallery pool'} = ${all.length}; pending selection = ${pendingAll.length}; remaining selection = ${pendingAll.length - pending.length}. ${imageIds ? 'Whole-inventory coverage was not queried. ' : ''}Documents use the receipt workflow; duplicate, withdrawn and sensitive frames are excluded.`);
 }
 
+// The existing deep intake delegates to the guarded photo owner. No raw cache,
+// observation, identity, entity, labor or financial writes remain in this mode.
+export function persistReviewedBatchReceipt(path, receipt) {
+  // Replace the existing private receipt only after its next complete version is
+  // flushed. A timeout/termination must not truncate already confirmed results.
+  const pending = `${path}.next`, fd = openSync(pending, 'w', 0o600);
+  try { writeFileSync(fd, JSON.stringify(receipt, null, 2)); fsyncSync(fd); }
+  finally { closeSync(fd); }
+  renameSync(pending, path);
+}
+export async function admitReviewedBatch(envelopes, vehicleId, { validate, invoke, persist = receipt => { void receipt; } }) {
+  await validate(envelopes, vehicleId); // Whole batch validated before the first effect.
+  const uuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  if (!uuid(vehicleId) || envelopes.length < 1 || envelopes.length > 8 ||
+      new Set(envelopes.map(e => e.verdict?.image_id)).size !== envelopes.length ||
+      envelopes.some(e => e.action !== 'record_reviewed_analysis' || e.verdict?.vehicle_id !== vehicleId || !uuid(e.verdict?.image_id))) {
+    throw new Error('review_batch_scope_mismatch');
+  }
+  const receipts = [];
+  const progress = (extra = {}) => ({ vehicle_id: vehicleId,
+    wrote: receipts.filter(r => r.success).length, failed: receipts.filter(r => !r.success).length,
+    remaining: envelopes.length - receipts.length, unknown: 0, in_flight: null,
+    complete: false, receipts, ...extra });
+  persist(progress());
+  for (const envelope of envelopes) {
+    // Persist before invoking: a lost response may still have committed remotely.
+    // It is an unknown result, never evidence of zero writes or permission to retry.
+    persist(progress({ in_flight: envelope.verdict.image_id, unknown: 1,
+      remaining: envelopes.length - receipts.length - 1 }));
+    let data, error;
+    try { ({ data, error } = await invoke(envelope)); }
+    catch { error = true; }
+    if (error || data?.success !== true || data.image_id !== envelope.verdict.image_id ||
+        data.vehicle_id !== vehicleId || !uuid(data.observation_id) || !uuid(data.image_observation_id) || data.model_calls !== 0) {
+      let code = 'review_admission_not_verified';
+      try {
+        const refusal = error?.context instanceof Response ? await error.context.clone().json() : data;
+        if (typeof refusal?.error === 'string' && /^[a-z][a-z0-9_]{1,100}$/.test(refusal.error)) code = refusal.error;
+      } catch { /* Transport failures retain the fixed unknown-admission code. */ }
+      receipts.push({ image_id: envelope.verdict.image_id, success: false, error: code,
+        outcome: 'unverified' });
+      const result = progress({ unknown: 1 });
+      persist(result);
+      return result;
+    }
+    receipts.push({ image_id: data.image_id, success: true, observation_id: data.observation_id,
+      image_observation_id: data.image_observation_id, observation_duplicate: data.observation_duplicate === true,
+      projection_duplicate: data.projection_duplicate === true, cover: data.cover });
+    persist(progress());
+  }
+  const result = progress({ complete: true });
+  persist(result);
+  return result;
+}
 async function ingest() {
-  const SINK = arg('--sink');
-  if (!SINK || !existsSync(SINK)) {
-    console.error('ingest: --sink required and file must exist');
-    process.exit(1);
+  const sink = arg('--sink'), vehicleId = arg('--vehicle-id');
+  if (!sink || !existsSync(sink) || !vehicleId || !args.includes('--apply')) {
+    throw new Error('ingest requires --sink reviewed envelopes, --vehicle-id and explicit --apply');
   }
-
-  const { data: src } = await sb
-    .from('observation_sources')
-    .select('id, slug')
-    .eq('slug', 'shop')
-    .maybeSingle();
-  const shopSourceId = src?.id;
-  if (!shopSourceId) {
-    console.error('ingest: shop source slug not found');
-    process.exit(1);
-  }
-
-  const lines = readFileSync(SINK, 'utf-8').split('\n').filter(Boolean);
-  let wrote = 0, failed = 0;
-  const now = new Date().toISOString();
-  const landedEvents = []; // live pipeline feed (analysis_events) — collected, inserted once, guarded
-
-  for (const line of lines) {
-    let v;
-    try { v = JSON.parse(line); } catch { failed++; continue; }
-    if (!v.image_id || !v.vehicle_id) { failed++; continue; }
-
-    // Schema-as-DNA gate: reject non-conforming verdicts before they can land.
-    const verdictErrs = validateVerdict(v);
-    if (verdictErrs.length) {
-      console.error(`  REJECT ${String(v.image_id).slice(0,8)}: ${verdictErrs.join("; ")}`);
-      failed++;
-      continue;
-    }
-
-    // Merge new analysis into existing ai_scan_metadata.byok_deep_analysis
-    const { data: imgRow } = await sb
-      .from('vehicle_images')
-      .select('ai_scan_metadata, user_id')
-      .eq('id', v.image_id)
-      .maybeSingle();
-    const existingMeta = (imgRow?.ai_scan_metadata) || {};
-    const sat = computeSaturation(v, existingMeta.byok_deep_analysis || null, now);
-    // Doubt gate: a reading that contradicts the attribution forces the clarification
-    // flag (the app's doubt UI reads it) and lands an attribution_doubt event below.
-    const doubt = attributionDoubt(v);
-    if (doubt) v.needs_clarification = true;
-    const updatedMeta = {
-      ...existingMeta,
-      byok_deep_analysis: {
-        scene_type: v.scene_type ?? 'unknown',
-        build_phase_guess: v.build_phase_guess ?? 'unknown',
-        camera_pose: v.camera_pose ?? null,
-        components_seen: v.components_seen ?? [],
-        damage_localized: v.damage_localized ?? [],
-        text_regions: v.text_regions ?? [],
-        state_observations: v.state_observations ?? {},
-        workshop_signals: v.workshop_signals ?? {},
-        presence: v.presence ?? {},
-        narrative_one_line: v.narrative_one_line ?? null,
-        confidence: v.confidence ?? null,
-        intent: v.intent ?? null,
-        intent_confidence: v.intent_confidence ?? null,
-        needs_review: v.needs_review ?? false,
-        needs_clarification: v.needs_clarification ?? false,
-        attribution_doubt: doubt,
-        context_complete: v.context_complete ?? null,
-        open_questions: v.open_questions ?? [],
-        agent_notes: v.agent_notes ?? null,
-        analyzed_at: now,
-        prompt_version: CURRENT_SCHEMA_VERSION,
-        saturation: sat,
-        // Source DNA stamped by the harness (byok-image-batch.sh sanitize stage).
-        // A bare verdict without who/how/cost is a schema failure.
-        agent_model: v.provenance?.agent_model ?? null,
-        agent_tier: v.provenance?.agent_tier ?? null,
-        extraction_method: v.provenance?.extraction_method ?? null,
-        agent_duration_ms: v.provenance?.agent_duration_ms ?? null,
-        agent_cost_cents: v.provenance?.agent_cost_cents ?? null,
-        cost_basis: v.provenance?.cost_basis ?? null,
-        run_id: v.provenance?.run_id ?? null,
-      },
-    };
-
-    // Saturation model (replaces the crude "any open question ⇒ stale" that re-failed the
-    // unreadable on every rehash): re-queue ONLY when there are RESOLVABLE-LATER open facts.
-    // A verdict whose only gaps are CAPPED (illegible/occluded) is saturated → stale=false →
-    // never re-queued. Schema growth re-opens it via the version check in prepare, not via stale.
-    const { error: upErr } = await sb
-      .from('vehicle_images')
-      .update({ ai_scan_metadata: updatedMeta, stale: !sat.saturated, last_rerun_at: now, vision_model_version: v.provenance?.agent_model ?? 'byok_v3_opus48' })
-      .eq('id', v.image_id);
-    if (upErr) {
-      console.error(`  fail update image ${v.image_id}: ${upErr.message}`);
-      failed++;
-      continue;
-    }
-
-    // Accumulation, not replacement: if a prior (non-superseded) verdict already exists
-    // for this image, this new claim SUPERSEDES it (old one preserved per the trust
-    // invariant). The agent never knows the prior id — the harness resolves it.
-    let supersedesId = v.supersedes_original_id || null;
-    if (!supersedesId) {
-      const { data: prior } = await sb
-        .from('vehicle_observations')
-        .select('id')
-        .eq('vehicle_id', v.vehicle_id)
-        .eq('structured_data->>analysis_kind', 'image_deep_byok')
-        .eq('structured_data->>image_id', v.image_id)
-        .eq('is_superseded', false)
-        .order('ingested_at', { ascending: false })
-        .limit(1);
-      supersedesId = prior?.[0]?.id || null;
-    }
-
-    // Emit a kind='condition' vehicle_observation summarizing this image so
-    // it lights up in timelines + observation routes. structured_data.analysis_kind
-    // disambiguates from other condition rows. ('analysis' enum value pending —
-    // migration history out of sync as of 2026-05-23.)
-    const { data: obsRow, error: obsErr } = await sb
-      .from('vehicle_observations')
-      .insert({
-        vehicle_id: v.vehicle_id,
-        kind: 'condition',
-        observed_at: v.taken_at || v.created_at || now,
-        ingested_at: now,
-        source_id: shopSourceId,
-        source_url: null,
-        confidence: v.needs_review ? 'low' : 'medium',
-        confidence_score: v.confidence ?? 0.7,
-        content_text: v.narrative_one_line || null,
-        // Typed provenance columns — the source DNA the PULSE audit found NULL
-        // on 1,074 of 1,074 byok observations. Stamped by the harness.
-        agent_model: v.provenance?.agent_model ?? null,
-        agent_tier: v.provenance?.agent_tier ?? null,
-        extraction_method: v.provenance?.extraction_method ?? null,
-        agent_duration_ms: v.provenance?.agent_duration_ms ?? null,
-        agent_cost_cents: v.provenance?.agent_cost_cents ?? null,
-        structured_data: {
-          analysis_kind: 'image_deep_byok',
-          image_id: v.image_id,
-          scene_type: v.scene_type,
-          build_phase_guess: v.build_phase_guess,
-          camera_pose: v.camera_pose ?? null,
-          components_seen: v.components_seen,
-          damage_localized: v.damage_localized ?? [],
-          text_regions: v.text_regions ?? [],
-          state_observations: v.state_observations,
-          workshop_signals: v.workshop_signals,
-          presence: v.presence,
-          intent: v.intent ?? null,
-          intent_confidence: v.intent_confidence ?? null,
-          context_complete: v.context_complete ?? null,
-          open_questions: v.open_questions ?? [],
-          witness_image_id: v.image_id,
-          ...(supersedesId ? { supersedes_original_id: supersedesId } : {}),
-        },
-        is_superseded: false,
-      })
-      .select('id')
-      .maybeSingle();
-    if (obsErr || !obsRow) {
-      console.error(`  fail obs insert for ${v.image_id}: ${obsErr?.message}`);
-      failed++;
-      continue;
-    }
-
-    await sb.from('observation_witnesses').insert({
-      observation_id: obsRow.id,
-      image_id: v.image_id,
-      witness_role: 'primary',
-      capture_method: 'photo_no_exif',
-      added_by_agent_key: 'byok_deep_image_analysis_2026-05-23',
-      attestation_notes: 'BYOK Claude Code Agent deep analysis; features in vehicle_images.ai_scan_metadata.byok_deep_analysis',
-    });
-
-    // Supersession: if this verdict supersedes a prior observation, mark the
-    // old row is_superseded + point superseded_by at the new row. Per
-    // testimony-immutability invariant we never DELETE — only chain.
-    if (supersedesId) {
-      const { error: supErr } = await sb
-        .from('vehicle_observations')
-        .update({ is_superseded: true, superseded_by: obsRow.id })
-        .eq('id', supersedesId);
-      if (supErr) {
-        console.error(`  fail supersede ${supersedesId}: ${supErr.message}`);
-      } else {
-        console.log(`  superseded ${supersedesId} → ${obsRow.id} (re-hash with fuller context)`);
-      }
-    }
-
-    // ENTITY LANDING — the reciprocal-confirmation seam made queryable: this verdict's
-    // components land as component_identifications rows (receipt-PN matches → 'confirmed').
-    // Non-fatal: an entity-landing failure never blocks the verdict itself.
-    try {
-      if (Array.isArray(v.components_seen) && v.components_seen.length) {
-        const landed = await landEntityPage(
-          [{ image_id: v.image_id, vehicle_id: v.vehicle_id, observation_id: obsRow.id, taken_at: v.taken_at || null, verdict: updatedMeta.byok_deep_analysis }],
-          await getReceiptRoster(v.vehicle_id));
-        if (landed.components) console.log(`  entities: ${landed.components} components landed (${landed.confirmed} receipt-confirmed)`);
-      }
-    } catch (e) { console.error(`  (non-fatal) entity landing ${v.image_id}: ${e.message}`); }
-
-    // Doubt event: the confirm queue's worklist entry, carrying the evidence.
-    if (doubt) {
-      landedEvents.push({
-        user_id: imgRow?.user_id ?? null,
-        vehicle_id: v.vehicle_id,
-        image_id: v.image_id,
-        stage: 'attribution_doubt',
-        detail: { reason: doubt, scene_type: v.scene_type ?? null, intent: v.intent ?? null,
-                  narrative: v.narrative_one_line ?? null },
-      });
-    }
-
-    wrote++;
-    // Live feed: this frame's verdict just landed — the "money hitting the account"
-    // moment. Record it for the pipeline visualizer (analysis_events).
-    landedEvents.push({
-      user_id: imgRow?.user_id ?? null,
-      vehicle_id: v.vehicle_id,
-      image_id: v.image_id,
-      stage: 'verdict_landed',
-      detail: {
-        scene_type: v.scene_type ?? null,
-        build_phase: v.build_phase_guess ?? null,
-        narrative: v.narrative_one_line ?? null,
-        component_count: Array.isArray(v.components_seen) ? v.components_seen.length : 0,
-        ocr_count: Array.isArray(v.text_regions) ? v.text_regions.length : 0,
-        confidence: v.confidence ?? null,
-      },
-    });
-  }
-
-  // One guarded batch insert of the landed events — telemetry, never fatal to ingest.
-  if (landedEvents.length) {
-    const { error: evErr } = await sb.from('analysis_events').insert(landedEvents);
-    if (evErr) console.error(`  (non-fatal) analysis_events insert: ${evErr.message}`);
-  }
-  console.log(`ingest: wrote ${wrote}, failed ${failed} from ${SINK}`);
+  const envelopes = readFileSync(sink, 'utf8').split(/\r?\n/).filter(x => x.trim()).map(x => JSON.parse(x));
+  const result = await admitReviewedBatch(envelopes, vehicleId, {
+    async validate() {
+      const validation = spawnSync('deno', ['run', '--cached-only', '--node-modules-dir=none', '--allow-read',
+        fileURLToPath(new URL('./daily-receipt/reviewed-image-batch.ts', import.meta.url)),
+        '--validate-sink', sink, '--vehicle-id', vehicleId], { encoding: 'utf8', timeout: 30000 });
+      if (validation.status !== 0) throw new Error('reviewed envelope validation failed before admission');
+    },
+    invoke: body => sb.functions.invoke('photo-pipeline-orchestrator', { body }),
+    persist: receipt => persistReviewedBatchReceipt(`${sink}.receipts.json`, receipt),
+  });
+  console.log(`ingest: wrote ${result.wrote}, failed ${result.failed}, remaining ${result.remaining} from ${sink}`);
+  if (result.failed || result.remaining) process.exitCode = 1;
 }
 
 // context — assemble the "what the agent must KNOW before analyzing" briefing for a
@@ -1079,6 +905,8 @@ async function buildContext() {
   const DATE = arg('--date');                 // the day being analyzed (mark it in the arc)
   const OUT = arg('--out');
   if (!VEHICLE_ID || !OUT) { console.error('context: --vehicle-id and --out required'); process.exit(1); }
+
+  if (arg('--audience')) throw new Error('unsupported_context_audience');
 
   let dossier = null;
   // The dossier edge function can cold-start (~30-45s). Be patient: up to 6 tries
@@ -1186,30 +1014,18 @@ async function buildContext() {
     }
   } catch { /* optional */ }
 
-  // ROSTER — the vehicle's KNOWN PARTS from receipts (the CLAIM side). The detective
-  // confirms components against THIS list instead of authoring them open-ended, and
-  // resolves part_number_guess to a real receipt PN when a component matches. This is
-  // the reciprocal-confirmation seam: receipt = claim, image = confirmation. Honesty
-  // guard is in the prompt block below — never force a match, an as-found/old part is
-  // NOT the new rostered part.
+  // Retain each receipt line and its source identity. Duplicate part numbers on
+  // an order, return and later shipment must not collapse into one purchased part.
   let roster = [];
-  try {
-    const { data } = await sb.from('receipt_items')
-      .select('description, part_number, category, receipts!inner(vehicle_id)')
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await sb.from('receipt_items')
+      .select('id, receipt_id, description, part_number, category, quantity, total_price, line_date, receipts!inner(vehicle_id,vendor_name,receipt_date,transaction_date,purchase_date,source_document_table,source_document_id,is_superseded,superseded_by)')
       .eq('receipts.vehicle_id', VEHICLE_ID)
-      .not('part_number', 'is', null)
-      .limit(400);
-    if (data && data.length) {
-      const seen = new Set();
-      for (const r of data) {
-        const pn = (r.part_number || '').trim();
-        if (!pn || pn.toLowerCase() === 'null' || seen.has(pn)) continue;
-        seen.add(pn);
-        roster.push({ cat: r.category || 'other', desc: (r.description || '').trim(), pn });
-      }
-      roster.sort((a, b) => a.cat.localeCompare(b.cat) || a.desc.localeCompare(b.desc));
-    }
-  } catch { /* optional — a vehicle with no receipts just gets no roster */ }
+      .order('id').range(offset, offset + 999).abortSignal(AbortSignal.timeout(20000));
+    if (error || !Array.isArray(data)) throw new Error(`context: receipt query failed: ${error?.message || 'missing result'}`);
+    roster.push(...receiptRoster(data));
+    if (data.length < 1000) break;
+  }
 
   // USER GARAGE — the owner's OWNED builds, via get_user_garage (ownership relations), NOT image
   // authorship. The user photographs the whole shop (Viva lot, shows), so keying off vehicle_images.
@@ -1248,12 +1064,12 @@ async function buildContext() {
   lines.push(`# VEHICLE CONTEXT — know this before you analyze`);
   if (dossier?.vehicle) {
     const v = dossier.vehicle;
-    lines.push(`**Vehicle:** ${v.name} — VIN ${v.vin} — ${v.engine || '?'} / ${v.transmission || '?'} — ${v.color || '?'}`);
+    lines.push(`**Stored profile labels (context, not physical proof):** ${v.name} — VIN ${v.vin} — ${v.engine || '?'} / ${v.transmission || '?'} — ${v.color || '?'}`);
   }
   if (dossier?.build_summary) {
     const b = dossier.build_summary;
     const wt = b.work_type_breakdown ? Object.entries(b.work_type_breakdown).map(([k, n]) => `${k}:${n}`).join(', ') : '';
-    lines.push(`**Build so far:** ${b.work_days ?? '?'} documented work days over ${b.span ?? '?'}, ${b.documented_hours ?? '?'} hrs. Work mix: ${wt}`);
+    lines.push(`**Stored work summary (source interpretations, not measured completion):** ${b.work_days ?? '?'} documented work days over ${b.span ?? '?'}, ${b.documented_hours ?? '?'} hrs. Work mix: ${wt}`);
   }
   if (dossier?.valuation) lines.push(`**Valuation:** ${dossier.valuation.amount} (${dossier.valuation.source})`);
   if (Array.isArray(dossier?.timeline) && dossier.timeline.length) {
@@ -1268,33 +1084,30 @@ async function buildContext() {
   if (knownPlaces.length) {
     lines.push(`\n**RESOLVED LOCATION ENTITIES (known_places — canonical, use these names verbatim):**`);
     for (const p of knownPlaces) {
-      lines.push(`- ${p.lat.toFixed(5)},${p.lon.toFixed(5)} r=${p.radius_m}m → **${p.name}** (${p.type})${p.org ? ` — org: ${p.org}` : ''}${p.address ? ` — ${p.address}` : ''}`);
+      lines.push(`- ${p.lat.toFixed(5)},${p.lon.toFixed(5)} r=${p.radius_m}m → **${p.name}** (${p.type})${p.org ? ` — org: ${p.org}` : ''}`);
     }
-    lines.push(`A frame whose GPS falls within a radius above IS at that place. Set \`presence.place_hint\` to the canonical name EXACTLY as written (no suffixes like "(lot)" or "(workbench)" — put sub-location detail in agent_notes). NEVER emit an open question asking to identify a location this legend resolves; an address is never an answer when the entity is known.`);
+    lines.push(`A frame whose reported GPS falls within a radius above is geographically consistent with that place; this does not identify the performer or prove work occurred. Set \`presence.place_hint\` to the canonical name EXACTLY as written (no suffixes like "(lot)" or "(workbench)" — put sub-location detail in agent_notes). NEVER emit an open question asking to identify a location this legend resolves; an address is never an answer when the entity is known.`);
   }
   if (locLegend.length) {
     lines.push(`\n**Location legend (GPS cluster fallback — for coordinates outside every radius above):**`);
     for (const l of locLegend) lines.push(`- ${l}`);
-    lines.push(`Each frame below carries its GPS — resolve it against the entities first, then this fallback. A frame shot away from the main shop is off_property work (and tells you WHO/WHERE: e.g. upholstery shop, a vendor, the owner's dad's lot).`);
+    lines.push(`Each frame below carries its GPS — resolve it against the entities first, then this fallback. Location alone does not establish work, a performer, or the purpose of the visit.`);
   }
   lines.push(`\n**RESOLVE, DON'T PUNT:** before writing any \`open_questions\` entry, check whether THIS briefing (location entities, parts roster, timeline, the day's other frames) already answers it. A question the briefing answers gets CLOSED — state the answer in the verdict (agent_notes with its citation), don't re-ask it. Only two kinds of question may survive: pixel-capped (illegible/occluded — say so) and genuinely graph-dry (say what you'd need). An owner-signature item (labor value / intent confirmation) is \`needs_clarification\`, not an open question.`);
-  if (lifecycle) lines.push(`\n**Already deep-analyzed (day:phases):** ${lifecycle}`);
+  if (lifecycle) lines.push(`\n**Earlier analysis interpretations (recorded day:phase; revisit against current sources):** ${lifecycle}`);
   if (roster.length) {
-    lines.push(`\n**KNOWN PARTS ON THIS BUILD — ${roster.length} parts bought for it (from receipts, the CLAIM side).**`);
-    lines.push(`This is the roster to CONFIRM against. When a component in the frame matches one of these, set that component's \`part_number_guess\` to the exact PN listed here, and note the confirmation in \`agent_notes\`. Two hard rules: (1) NEVER invent a part number that isn't on this list — a component with no roster match keeps \`part_number_guess: null\`. (2) NEVER force a match — an as-found, rusty, or old part is NOT the new rostered part; lifecycle matters. A rostered part not yet installed in this frame is a future install, not a confirmation. Honest non-confirmation is correct; a false PN is a failure.`);
-    let curCat = '';
-    for (const r of roster) {
-      if (r.cat !== curCat) { curCat = r.cat; lines.push(`  · _${curCat}_`); }
-      lines.push(`    - ${r.desc} — \`${r.pn}\``);
-    }
+    lines.push(`\n**RECEIPT LINE EVIDENCE — ${roster.length} current receipt lines, including orders, returns, labor, fees and backorders.**`);
+    lines.push(`Reconcile the physical vehicle against these records. Record what is visibly present, what changed across cited frames, which receipt lines may relate, and what remains unaccounted for. These lines do NOT prove purchase, delivery, installation or payment by themselves. Preserve printed shipped/backorder/return language; recorded quantity can be ordered quantity. A zero amount is not free work. Keep parts, labor, payments and estimates separate. Set part_number_guess only from a legible identifier on the depicted component/label and cite its text region; visual similarity to a receipt is a candidate relation in agent_notes, never exact part confirmation. Cite receipt and item IDs for every proposed relation. A receipt or later appearance does not establish an installation date or actual labor hours.`);
+    lines.push('Each receipt header supplies the exact vendor, date fields and document source for its indented items. Every item retains its own ID, category, full description, part number, recorded quantity, amount and line date. Repeated receipt metadata is printed once; no line is deduplicated or summed.');
+    lines.push(receiptRosterSections(roster));
   }
   if (garage.length > 1) {
-    lines.push(`\n**THE OWNER'S GARAGE — ${garage.length} vehicles. A frame from this owner's library may show ANY of these, a bench part, or an off-subject car (a friend's, a car at a show) — do NOT assume it is the subject vehicle. ATTRIBUTE the frame to the right vehicle by visual evidence (body style, color, badges, interior, engine family) cross-checked with GPS + the EXIF capture date. Naming WHICH garage vehicle a frame belongs to is the high-value output; negating against the subject ("this is not the Mustang") is a wasted verdict. If a frame is a bench part or off-subject, say so plainly. When unsure between two of the owner's vehicles, name both as candidates with your reasoning — never force one.**`);
+    lines.push(`\n**RELATED VEHICLE RECORDS — ${garage.length} vehicles. A frame from this owner's library may show ANY of these, a bench part, or an off-subject car (a friend's, a car at a show) — do NOT assume it is the subject vehicle. ATTRIBUTE the frame to the right vehicle by visual evidence (body style, color, badges, interior, engine family) cross-checked with GPS + the EXIF capture date. Naming WHICH garage vehicle a frame belongs to is the high-value output; negating against the subject ("this is not the Mustang") is a wasted verdict. If a frame is a bench part or off-subject, say so plainly. When unsure between two of the owner's vehicles, name both as candidates with your reasoning — never force one.**`);
     for (const v of garage) {
       lines.push(`    - ${v.label}${v.color ? ` · ${v.color}` : ''} · ${v.rel}${v.subject ? '  ◀── the subject vehicle this drain is keyed to' : ''}`);
     }
   }
-  lines.push(`\nUse this to ground every verdict: recognize THIS build's known parts (e.g. the engine swap, axle, brakes), place the day in the arc (early teardown vs late assembly), track components across days (a part rusty earlier may be the one being installed here), and use each frame's GPS/timestamp/camera as hard evidence of where, when, and on what device it was shot.`);
+  lines.push(`\nUse this to ground every verdict: recognize THIS build's known parts (e.g. the engine swap, axle, brakes), place the day in the arc (early teardown vs late assembly), track components across days (a part rusty earlier may be the one being installed here), and preserve each reported GPS/timestamp/camera basis. An import time is not a capture time; a capture of a document is not the date of its depicted work. A photo interval is not hands-on labor. Stored labels and earlier analyses are revisable context; physical/source evidence controls.`);
 
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, lines.join('\n') + '\n');
@@ -1426,45 +1239,29 @@ async function resolve() {
  * Dry-run by default. No provider calls, downloads, queue/schedule changes or
  * 52-million-row JSON scan. Latest 500 condition rows is an explicit window,
  * not a claim of complete history. Repeat uses stable content identities.
+ *
+ *   node scripts/deep-image-analysis-byok.mjs project-cached --vehicle-id <uuid> [--limit 1..500] [--pages 1..100]
+ *        [--before <timestamp>] [--apply [--single]]
+ *
+ * It copies three values a stored deep reading already holds (rust_severity, paint_state, completeness) to the
+ * registered image properties. --single is the route for an owner's own photos, which the batch intake refuses.
  */
 async function projectCached() {
   const vehicleId = arg('--vehicle-id');
   const limit = Number(arg('--limit') || 100);
-  const before = arg('--before') || new Date().toISOString();
+  const pages = Number(arg('--pages') || 1);
+  const firstBefore = arg('--before') || new Date().toISOString();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId || '') ||
-      !Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isFinite(Date.parse(before))) {
-    throw new Error('project-cached requires --vehicle-id UUID, --limit 1..500 and optional --before timestamp');
+      !Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isFinite(Date.parse(firstBefore)) ||
+      !Number.isInteger(pages) || pages < 1 || pages > 100) {
+    throw new Error('project-cached requires --vehicle-id UUID, --limit 1..500 and optional --before timestamp, --pages 1..100');
   }
-  const apply = args.includes('--apply');
-  const result = await sb.from('vehicle_observations')
-    .select('id,vehicle_id,kind,is_superseded,observed_at,ingested_at,agent_model,agent_tier,extraction_method,confidence,confidence_score,structured_data')
-    .eq('vehicle_id', vehicleId).eq('kind', 'condition')
-    .lt('ingested_at', before)
-    .order('ingested_at', { ascending: false }).order('id', { ascending: false })
-    .limit(limit).abortSignal(AbortSignal.timeout(10000));
-  if (result.error || !Array.isArray(result.data)) throw new Error('project-cached: source query failed');
-  const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok');
-  const ids = [...new Set(sources.map(row => row.structured_data?.image_id)
-    .filter(id => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)))];
-  const images = ids.length ? await sb.from('vehicle_images')
-    .select('id,vehicle_id,is_sensitive,is_superseded,is_duplicate,vision_gate_status,image_vehicle_match_status')
-    .in('id', ids).abortSignal(AbortSignal.timeout(10000)) : { data: [], error: null };
-  if (images.error || !Array.isArray(images.data)) throw new Error('project-cached: image query failed');
-  const byId = new Map(images.data.map(row => [row.id, row]));
-  const claims = [];
-  const deferred = {};
-  for (const source of sources) {
-    const projected = projectImageProperties(source, byId.get(source.structured_data.image_id));
-    claims.push(...projected.claims);
-    if (projected.deferred) deferred[projected.deferred] = (deferred[projected.deferred] || 0) + 1;
-  }
-  const receipt = { mode: apply ? 'apply' : 'dry_run', vehicle_id: vehicleId,
-    sampled_condition_rows: result.data.length, source_rows: sources.length,
-    window_limit: limit, window_before: before, full_history_verified: false, model_calls: 0,
-    eligible_claims: claims.length, deferred,
-    ...(apply ? await applyImagePropertyClaims(sb, claims) : {}) };
+  // --single: one claim at a time through ingest-observation, the route for an owner's own photos (the batch intake
+  // takes a public vehicle's listing photos only). --pages N walks N windows of --limit readings, newest first.
+  const { receipt, exitCode } = await projectCachedRun(sb, { vehicleId, limit, pages, before: firstBefore,
+    apply: args.includes('--apply'), single: args.includes('--single') });
   console.log(JSON.stringify(receipt));
-  if (receipt.failed > 0 || (apply && claims.length === 0)) process.exitCode = 1;
+  if (exitCode) process.exitCode = exitCode;
 }
 
 // Pure ledger functions exported for unit tests (importing does not run the pipeline — see isMain).

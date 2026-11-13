@@ -11,6 +11,8 @@
 import { meterAllowance, meterRecord, type MeterClient } from './firecrawlMeter.ts';
 
 export const FIRECRAWL_SCRAPE_URL = 'https://api.firecrawl.dev/v1/scrape';
+// Use the current documented v2 original-byte contract. Existing HTML/extract callers stay on v1.
+const FIRECRAWL_BYTES_URL = 'https://api.firecrawl.dev/v2/scrape';
 export const FIRECRAWL_MAP_URL = 'https://api.firecrawl.dev/v1/map';
  
 export type FirecrawlProxyMode = 'stealth' | 'auto' | 'basic' | string;
@@ -96,6 +98,28 @@ function safeJsonParse(text: string): any | null {
     return null;
   }
 }
+
+// A 15MB source image encodes to 20MB. Bound the v2 JSON envelope before parsing,
+// including chunked replies without Content-Length; ordinary HTML callers are unchanged.
+async function boundedOriginalResponse(response: Response): Promise<string> {
+  const limit = 21_000_000;
+  if (Number(response.headers.get('content-length')) > limit) {
+    await response.body?.cancel(); throw new Error('Firecrawl original-byte response too large');
+  }
+  const reader = response.body?.getReader(); if (!reader) return '';
+  const chunks: Uint8Array[] = []; let size = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      size += value.length;
+      if (size > limit) { await reader.cancel(); throw new Error('Firecrawl original-byte response too large'); }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size); let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return new TextDecoder().decode(bytes);
+}
  
 function asString(val: any): string {
   if (val == null) return '';
@@ -177,7 +201,8 @@ async function firecrawlScrapeRaw(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
  
-      const response = await fetch(FIRECRAWL_SCRAPE_URL, {
+      const originalBytes = request.formats.length === 1 && request.formats[0] === 'rawBase64';
+      const response = await fetch(originalBytes ? FIRECRAWL_BYTES_URL : FIRECRAWL_SCRAPE_URL, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -187,9 +212,10 @@ async function firecrawlScrapeRaw(
         signal: controller.signal,
       });
  
-      clearTimeout(timeoutId);
- 
-      const text = await response.text().catch(() => '');
+      if (!originalBytes) clearTimeout(timeoutId);
+      let text: string;
+      try { text = originalBytes ? await boundedOriginalResponse(response) : await response.text().catch(() => ''); }
+      finally { clearTimeout(timeoutId); }
       const parsed = safeJsonParse(text);
       const normalized = parsed ? normalizeScrapePayload(parsed) : null;
       const html = normalized?.html ?? null;

@@ -82,6 +82,15 @@ struct CaptureSections: View {
             NavigationLink("Photo filter decisions") { VisionDecisionCountsView() }
                 .font(.footnote)
         }
+        // ── On the record · the same ledger the website shows at /capture/ledger, in the same words ──
+        Section {
+            CaptureLedgerSummaryRow()
+        } header: {
+            Text("On the record, last 30 days")
+        } footer: {
+            Text("What landed on a vehicle, what is held or waiting, and what this phone skipped. The website's Capture ledger reads the same record.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
         // ── Uploads · what left the phone and what is still landing ──
         // Every number is the engine's own counter (queued = staged for the background session,
         // landing = the transfer iOS is carrying, landed = rows inserted today).
@@ -647,7 +656,7 @@ private struct MetricCell: View {
                 HStack(spacing: 3) {
                     Text(caption)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.system(.caption2, weight: .semibold))
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -692,7 +701,7 @@ private struct LiveT0Strip: View {
                         Text(atom.label.replacingOccurrences(of: "_", with: " "))
                             .font(.caption2).lineLimit(1)
                         Text("\(Int(atom.confidence * 100))%")
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
                     .frame(width: 72)
@@ -757,5 +766,20 @@ private struct AssetThumbnail: View {
                 continuation.resume(returning: image)
             }
         }
+    }
+}
+
+/// One line from `get_capture_ledger`, read once per appearance. Silent when signed out or unreachable.
+struct CaptureLedgerSummaryRow: View {
+    @State private var line: String?
+    @State private var failed = false
+    var body: some View {
+        Text(line ?? (failed ? "The ledger could not be read just now." : "Reading the ledger…"))
+            .font(.footnote).foregroundStyle(.secondary)
+            .task {
+                let read = await CaptureLedgerReporter.shared.summaryLine(days: 30)
+                line = read
+                failed = read == nil
+            }
     }
 }

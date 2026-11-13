@@ -52,13 +52,23 @@ enum FixtureBackend {
 
     /// Readers the app may call: these, plus any *_read, get_* or my_* RPC. Any other RPC is a writer and recorded.
     static let readers: Set<String> = [
+        "accounting_vehicle_financials", "accounting_record_evidence",
         "work_order_job_path_read", "work_order_resources_read", "work_order_quotes_read", "work_order_offers_read",
         "work_order_inspection_read", "work_order_invoices_read", "job_evidence_candidates_read",
         "work_order_facility_reservations_read", "work_order_operations_read", "vehicle_work_orders_read",
         "listing_work_plan_read", "open_requirements_read", "provider_profile_read", "provider_job_record_read",
+        "compute_vehicle_investment_proof", "vehicle_testimony_summary", "resolve_vehicle_identity_marks",
         "my_contact_requests", "contact_thread_read", "my_signature_queue", "my_work_orders", "my_identity_read",
-        "work_order_statement_read", "facility_read", "my_vouches_read",
+        "work_order_statement_read", "facility_read", "my_vouches_read", "user_org_relations",
     ]
+
+    /// Explore's anonymous market reads. Explore is the default tab, so they run in every launch that
+    /// reaches the tab bar; they must never show up as writes.
+    static func isMarketRead(_ name: String) -> Bool {
+        name.hasPrefix("market_") || name.hasPrefix("treemap_") || name.hasPrefix("map_zip_")
+            || ["classified_ask_board", "live_finish_estimates", "price_histogram", "vehicles_by_filters",
+                "bat_listing_cohort", "bat_market_baseline", "bat_seller_profile"].contains(name)
+    }
 
     static func isReader(_ name: String) -> Bool {
         readers.contains(name) || name.hasSuffix("_read") || name.hasPrefix("get_") || name.hasPrefix("my_")
@@ -73,11 +83,29 @@ enum FixtureBackend {
              "meta":{"total_count":0,"returned_count":0,"offset":0,"has_more":false,"vehicle_source":"search_vehicles_fts"}}
             """)
         }
+        if scenario == "source-inspection", path == "/functions/v1/check-image-vehicle-match" {
+            return ok("""
+            {"photos":[{"id":"00000000-0000-4000-8000-00000000e001","grain":"source_photo","identity":null,"grouping_asserted":false,
+              "source_state":"ready","source_reason":null,"image_url":"https://fixture.nuke.invalid/photo.png","source_sha256":"\(String(repeating: "a", count: 64))",
+              "created_at":"2026-10-31T12:00:00Z","taken_at":"2026-10-31T11:00:00Z","attached_vehicle_id_context":null,
+              "subject_analysis_state":"current_readings","membership_state":"unfiled",
+              "reading_context_coverage":{"grain":"terminal_reading_heads","assessed":1,"qualified":1,"withdrawn":0,"unqualified_or_conflicting":0,"complete":true},
+              "readings":[{"id":"00000000-0000-4000-8000-00000000e002","input_key":"fixture","provider":"fixture","model":"source-test",
+                "read_at":"2026-10-31T12:00:00Z","observed_at":"2026-10-31T11:00:00Z",
+                "input":{"source_sha256":"\(String(repeating: "a", count: 64))","input_sha256":"\(String(repeating: "a", count: 64))","representation":"source"},
+                "frame":{"medium":"photograph","primary_subject":"vehicle","view":"detail","bbox":null},
+                "unresolved_reasons":["Vehicle identity remains unresolved."]}]}],
+             "coverage":{"grain":"owner_source_page","assessed":1,"returned":1,"displayable":1,"without_displayable_pixels":0,"ambiguous_source_rows":0,
+               "as_of":"2026-10-31T12:00:00Z","truncated":false,"account_total":null,"accessible_device_library_total":null,"inference_started":false},"next_cursor":null}
+            """)
+        }
         if path.hasPrefix("/rest/v1/rpc/") {
             let name = String(path.dropFirst("/rest/v1/rpc/".count))
             let args = (FixtureURLProtocol.body(of: request)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
             if !isReader(name) {
-                log.record(rpc: name, args: args)
+                // Public market reads (Explore's feed, map and terminal) are not writes: answer as
+                // before but keep them out of the write log the UI tests assert on.
+                if !isMarketRead(name) { log.record(rpc: name, args: args) }
                 return writer(name, args)
             }
             return reader(name, args)
@@ -105,13 +133,45 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
-        case "get_user_garage" where scenario == "navigation-garage":
+        case "accounting_vehicle_financials" where scenario == "financial-qualification" || scenario == "financial-evidence-withheld":
+            return ok("[\(AllocationEvidenceFixtures.row)]")
+        case "accounting_record_evidence" where scenario == "financial-qualification" || scenario == "financial-evidence-withheld":
+            if ProcessInfo.processInfo.environment["NUKE_FIXTURE_ALLOCATION_SOURCE_WITHHELD"] == "1" { return ok("null") }
+            let requestedDocument = (args["p_document_id"] as? String).flatMap(UUID.init(uuidString:))
+            return ok(AllocationEvidenceFixtures.source(bank: requestedDocument == UUID(uuidString: AllocationEvidenceFixtures.bank)))
+        case "get_vehicle_investment_timeline" where scenario.hasPrefix("financial-"):
+            return ok(InvestmentEvidenceFixtures.timeline)
+        case "get_vehicle_valuation" where scenario == "financial-qualification":
+            return ok(InvestmentEvidenceFixtures.valuation)
+        case "compute_vehicle_investment_proof" where scenario == "financial-qualification":
+            return ok(InvestmentEvidenceFixtures.proof)
+        case "compute_vehicle_investment_proof" where scenario == "financial-evidence-withheld":
+            return ok(InvestmentEvidenceFixtures.withheld)
+        case "compute_vehicle_investment_proof" where scenario.hasPrefix("receipt-"):
+            return ok(ReceiptDepthFixtures.proof)
+        case "get_vehicle_day_documents" where scenario.hasPrefix("receipt-") || scenario == "financial-qualification":
+            return ok(scenario == "receipt-withdrawn" ? ReceiptDepthFixtures.withdrawn : ReceiptDepthFixtures.day)
+        case "get_vehicle_receipt_work_context" where scenario.hasPrefix("receipt-"):
+            return ok(ReceiptDepthFixtures.work)
+        case "get_orphan_sessions" where scenario == "source-inspection":
+            return ok("""
+            [{"session_day":"2026-10-31","gps_cell":"fixture","photo_count":1,"image_ids":["00000000-0000-4000-8000-00000000e001"],"sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
+            """)
+        case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
+            return ok("""
+            {"vehicle_id":"\(navigationVehicleId)","viewer":"\((scenario.hasPrefix("receipt-") || scenario.hasPrefix("financial-")) ? "owner" : "anon")","read_at":"2026-10-31T12:00:00Z",
+             "sections":[\(scenario == "financial-qualification" ? InvestmentEvidenceFixtures.mastheadSection : ""){"kind":"strip","coverage":{"n":1,"of":1,"grain":"source claims","as_of":"2026-10-31T12:00:00Z"},
+               "facets":[{"dimension":"engine","label":"350 V8 Crate","member":{"value":"350 V8 Crate",
+                 "source":{"kind":"listing","label":"Dealer seller listing","method":"dealer_microdata_v2","url":"https://example.com/vehicle"},
+                 "trust":0.6,"qualification":{"role":"seller_claim","factory_configuration_status":"unknown","current_configuration_status":"unknown"}}}]}]}
+            """)
+        case "get_user_garage" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             [{"vehicle_id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe",
               "trim_name":null,"image_url":null,"current_value":null,"image_count":0,"relationship":"profile_record"}]
             """)
-        case "get_my_garage_owner_corrections" where scenario == "navigation-garage": return ok("[]")
-        case "my_unorganized_photo_count" where scenario == "navigation-garage": return ok("0")
+        case "get_my_garage_owner_corrections" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("[]")
+        case "my_unorganized_photo_count" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("0")
         case "listing_work_plan_read": return ok(PlanFixtures.plan)
         case "my_suggested_provider_links": return ok(ParityFixtures.suggestions)
         case "work_order_publication_read":
@@ -205,6 +265,13 @@ enum FixtureBackend {
 
     private static func writer(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         switch name {
+        case "confirm_work_session" where scenario == "financial-qualification":
+            let id = (args["p_session_id"] as? String ?? "").lowercased()
+            if id.hasSuffix("f004") { return ok(#"{"ok":false,"error":"not_authorized"}"#) }
+            if id.hasSuffix("f005") { return ok("{}") }
+            if id.hasSuffix("f006") { return ok(#"{"ok":"#) }
+            if id.hasSuffix("f007") { return (-1, Data()) } // finite transport failure below
+            return ok(#"{"ok":true,"session_id":"\#(id)","confirmed":true}"#)
         case "post_work_request": return ok(PostJobFixtures.posted)
         case "accept_work_order_quote": return ok(JobFixtures.acceptReceipt)
         case "offer_on_requirement": return ok(OfferFixtures.offerReceipt)
@@ -228,13 +295,19 @@ enum FixtureBackend {
 
     private static func table(_ name: String) -> (Int, Data) {
         switch name {
-        case "vehicles" where scenario == "navigation-garage":
+        case "vehicle_timeline_events" where scenario == "financial-qualification":
+            return ok(InvestmentEvidenceFixtures.saleEvents)
+        case "receipt_vehicle_links" where scenario.hasPrefix("receipt-") || scenario == "financial-qualification":
+            return ok(ReceiptDepthFixtures.links)
+        case "vehicles" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             [{"id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe","vin":"TEST1234567",
               "trim":null,"primary_image_url":null,"image_count":0}]
             """)
+        case "vehicle_images" where scenario == "source-inspection":
+            return ok(#"[{"id":"00000000-0000-4000-8000-00000000e001","image_url":"https://fixture.nuke.invalid/photo.png","auto_suggested_vehicle_id":null,"auto_suggestion_reasons":null}]"#)
         case "vehicle_images" where scenario == "navigation-garage": return ok("[]")
-        case "vehicle_images_public" where scenario == "navigation-garage": return ok("[]")
+        case "vehicle_images_public" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario): return ok("[]")
         case "vehicle_images": return ok(persona == .client ? PostJobFixtures.photos : "[]")
         case "profiles": return ok(ParityFixtures.ownRow)
         case "tool_requirement_key_map": return ok(ParityFixtures.toolKeys)
@@ -265,6 +338,10 @@ final class FixtureURLProtocol: URLProtocol {
 
     override func startLoading() {
         let (status, data) = FixtureBackend.respond(request)
+        if status == -1 {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
         let response = HTTPURLResponse(url: request.url ?? FixtureBackend.baseURL, statusCode: status, httpVersion: "HTTP/1.1",
                                        headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

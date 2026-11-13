@@ -282,17 +282,15 @@ struct ClaimDrill: Identifiable {
     var id: String { title + claim.value.text }
 }
 
-/// The header block: headline price (unless a live auction owns it) and the strip.
+/// The header block: identity marks, the recorded configuration and the description. The headline
+/// price is not here: it leads the page's first screen (`VehiclePriceHeadline`), stated once.
 struct ProfileHeaderBlock: View {
     let vehicleId: String
     let read: ProfileRead
-    /// True while a live auction banner shows the current bid: then the masthead price stays off,
-    /// the same rule as the web's priceOwnedByLiveStack.
-    let priceOwnedByLiveStack: Bool
 
     @State private var drill: ClaimDrill?
+    @State private var tokenDrill: TokenDrill?
     @State private var descriptionExpanded = false
-    @State private var lotProvenance: LotProvenance?
     @State private var identityMarks: [VehicleIdentityMark] = []
     @State private var selectedIdentityMark: VehicleIdentityMark?
 
@@ -335,6 +333,9 @@ struct ProfileHeaderBlock: View {
 
     private static func name(for dimension: String) -> String {
         switch dimension {
+        case "year": return "Year"
+        case "make": return "Make"
+        case "model": return "Model"
         case "series", "series_facet": return "Series"
         case "trim", "trim_facet": return "Trim"
         case "body_style", "body_facet": return "Body"
@@ -346,15 +347,61 @@ struct ProfileHeaderBlock: View {
         }
     }
 
+    /// The tokens `vehicle_facet_items` reads (the web's TOKEN_DIMENSIONS). A strip dimension the
+    /// reader has no token for (series, package) is trim; the engine field is the engine token.
+    static let tokenDimensions: [String] = ["year", "make", "model", "trim", "body_style", "engine", "transmission", "drivetrain", "location"]
+
+    static func tokenDimension(for dimension: String) -> String {
+        if dimension == "engine_type" || dimension == "engine_size" { return "engine" }
+        if dimension == "body_facet" || dimension == "body_style_facet" { return "body_style" }
+        return tokenDimensions.contains(dimension) ? dimension : "trim"
+    }
+
+    /// Tokens the read carries items for that no strip row or gap already opens (on the web they are
+    /// the title's year, make, model and identity variants). Each becomes a header row of its own.
+    static func identityTokens(read: ProfileRead) -> [String] {
+        guard let items = read.masthead?.tokenItems, !items.isEmpty else { return [] }
+        let strip = read.strip
+        let covered = Set((strip?.facets.map { tokenDimension(for: $0.dimension) } ?? [])
+            + (strip?.gaps.map { tokenDimension(for: $0.dimension) } ?? []))
+        let known = tokenDimensions.filter { !items[$0].isEmpty && !covered.contains($0) }
+        let others = items.tokens.filter { !tokenDimensions.contains($0) && !items[$0].isEmpty && !covered.contains($0) }
+        return known + others
+    }
+
+    /// The row's value for an identity token: the reader's headline item, else the masthead's own word.
+    static func identityValue(_ token: String, read: ProfileRead) -> (value: String, item: FacetItem?) {
+        let items = read.masthead?.tokenItems[token] ?? []
+        if let head = ItemText.headline(items), let v = ItemText.valueText(head.value, unit: head.unit) {
+            return (v, head)
+        }
+        let m = read.masthead
+        let fallback: String? = switch token {
+        case "year": (m?.year ?? m?.identity_source.year).map(String.init)
+        case "make": m?.make ?? m?.identity_source.make
+        case "model": m?.model ?? m?.identity_source.model
+        default: nil
+        }
+        return (fallback ?? "Not established", nil)
+    }
+
+    private func openToken(_ dimension: String, title: String, claim: Claim? = nil, spec: SpecDrill? = nil) {
+        tokenDrill = TokenDrill(dimension: Self.tokenDimension(for: dimension), title: title, claim: claim, spec: spec)
+    }
+
+    /// True when a strip dimension opens its line items (the read carries them, or location reads them on open).
+    private func opensItems(_ dimension: String) -> Bool {
+        let token = Self.tokenDimension(for: dimension)
+        return token == "location" || !(read.masthead?.tokenItems[token].isEmpty ?? true)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let m = read.masthead, let price = m.price, !priceOwnedByLiveStack {
-                priceRow(enrichedPriceClaim(price, masthead: m), label: m.priceLabel ?? "Recorded price")
-            }
             if !headerHUDChips.isEmpty {
                 vehicleBadgeStrip
             }
-            if let strip = read.strip, !strip.facets.isEmpty || strip.odometer != nil {
+            if let strip = read.strip, !strip.facets.isEmpty || strip.odometer != nil || !strip.gaps.isEmpty
+                || !Self.identityTokens(read: read).isEmpty {
                 stripCard(strip)
             }
             if let desc = read.description, !desc.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -362,117 +409,21 @@ struct ProfileHeaderBlock: View {
             }
         }
         .task(id: vehicleId) {
-            async let lpTask: Void = loadLotProvenance()
-            async let marksTask: Void = loadIdentityMarks()
-            _ = await (lpTask, marksTask)
+            #if DEBUG
+            // Screenshot loop: NUKE_DEBUG_TOKEN=<token> opens that token's line items (DEBUG only).
+            if let token = ProcessInfo.processInfo.environment["NUKE_DEBUG_TOKEN"], !token.isEmpty, tokenDrill == nil {
+                let label = read.strip?.facets.first { Self.tokenDimension(for: $0.dimension) == token }?.label ?? Self.name(for: token)
+                openToken(token, title: label)
+            }
+            #endif
+            await loadIdentityMarks()
         }
         // The sheet rides this subview, not the page: the page already hosts provenance + comments.
         .sheet(item: $drill) { d in ClaimSourceSheet(vehicleId: vehicleId, drill: d) }
         .sheet(item: $selectedIdentityMark) { mark in IdentityMarkSheet(mark: mark) }
-    }
-
-    private func enrichedPriceClaim(_ base: Claim, masthead: ProfileSection.Masthead) -> Claim {
-        guard let lp = lotProvenance else { return base }
-        var c = base
-        if c.observed_at == nil || c.observed_at?.isEmpty == true {
-            c.observed_at = lp.observedAt
+        .sheet(item: $tokenDrill) { d in
+            TokenItemsSheet(vehicleId: vehicleId, drill: d, carried: read.masthead?.tokenItems[d.dimension] ?? [])
         }
-        if c.source.url == nil || c.source.url?.isEmpty == true {
-            c.source.url = lp.sourceUrl
-        }
-        if c.source.lotNumber == nil || c.source.lotNumber?.isEmpty == true {
-            c.source.lotNumber = lp.lotNumber
-        }
-        if c.source.auctionName == nil || c.source.auctionName?.isEmpty == true {
-            c.source.auctionName = lp.auctionName
-        }
-        if c.source.video == nil {
-            let vTitle = [
-                masthead.year.map { String($0) },
-                masthead.make,
-                masthead.model
-            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
-            let sourceLabel = c.source.label ?? "Auction"
-            let lotNum = c.source.effectiveLotNumber
-            let aucName = c.source.effectiveAuctionName
-            let sq = [
-                sourceLabel,
-                aucName,
-                lotNum.map { "Lot \($0)" },
-                vTitle.isEmpty ? nil : vTitle
-            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
-            c.source.video = SaleVideoMoment(
-                url: lp.videoUrl,
-                startSeconds: lp.startSeconds,
-                endSeconds: lp.endSeconds,
-                lotNumber: lotNum,
-                auctionName: aucName,
-                searchQuery: sq,
-                lotUrl: c.source.url,
-                title: vTitle.isEmpty ? nil : vTitle,
-                priceText: Self.money(c)
-            )
-        }
-        return c
-    }
-
-    private struct AuctionLotRow: Decodable {
-        let lot_number: String?
-        let source_url: String?
-        let auction_end_date: String?
-        let auction_start_date: String?
-        let broadcast_video_url: String?
-        let broadcast_video_id: String?
-        let broadcast_timestamp_start: Int?
-        let broadcast_timestamp_end: Int?
-    }
-
-    private struct VehicleEventLotRow: Decodable {
-        struct Meta: Decodable {
-            let lot_number: String?
-            let auction_name: String?
-            let event_name: String?
-            let video_url: String?
-        }
-        let source_url: String?
-        let sold_at: String?
-        let ended_at: String?
-        let extracted_at: String?
-        let metadata: Meta?
-    }
-
-    /// Additive provenance enrichment from `auction_events` and `vehicle_events` (`ProfileHeader.tsx` #1823).
-    private func loadLotProvenance() async {
-        async let auctionTask: [AuctionLotRow]? = try? SupabaseService.client
-            .from("auction_events")
-            .select("lot_number, source_url, auction_end_date, auction_start_date, broadcast_video_url, broadcast_video_id, broadcast_timestamp_start, broadcast_timestamp_end")
-            .eq("vehicle_id", value: vehicleId)
-            .order("auction_end_date", ascending: false, nullsFirst: false)
-            .limit(1)
-            .execute()
-            .value
-        async let eventTask: [VehicleEventLotRow]? = try? SupabaseService.client
-            .from("vehicle_events")
-            .select("source_url, sold_at, ended_at, extracted_at, metadata")
-            .eq("vehicle_id", value: vehicleId)
-            .order("extracted_at", ascending: false, nullsFirst: false)
-            .limit(1)
-            .execute()
-            .value
-        let (auctionRows, eventRows) = await (auctionTask, eventTask)
-        let a = auctionRows?.first
-        let e = eventRows?.first
-        let m = e?.metadata
-        if a == nil && e == nil { return }
-        lotProvenance = LotProvenance(
-            sourceUrl: a?.source_url ?? e?.source_url,
-            lotNumber: a?.lot_number ?? m?.lot_number,
-            auctionName: m?.auction_name ?? m?.event_name,
-            observedAt: a?.auction_end_date ?? a?.auction_start_date ?? e?.sold_at ?? e?.ended_at ?? e?.extracted_at,
-            videoUrl: a?.broadcast_video_url ?? a?.broadcast_video_id ?? m?.video_url,
-            startSeconds: a?.broadcast_timestamp_start,
-            endSeconds: a?.broadcast_timestamp_end
-        )
     }
 
     /// Seeds decoded `identityMarks` from `vehicle_profile_read` when present, and otherwise
@@ -516,16 +467,16 @@ struct ProfileHeaderBlock: View {
                             } label: {
                                 HStack(spacing: 5) {
                                     Text(chip.label)
-                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced, weight: .bold))
                                         .foregroundStyle(.primary)
                                     if let sub = chip.subLabel, !sub.isEmpty {
                                         Text(sub)
-                                            .font(.system(size: 9, design: .monospaced))
+                                            .font(.system(.caption2, design: .monospaced))
                                             .foregroundStyle(.secondary)
                                     }
                                     if let rpo = chip.rpoCode, !rpo.isEmpty {
                                         Text(rpo)
-                                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                            .font(.system(.caption2, design: .monospaced, weight: .semibold))
                                             .foregroundStyle(.tertiary)
                                     }
                                 }
@@ -543,11 +494,11 @@ struct ProfileHeaderBlock: View {
                             HStack(spacing: 4) {
                                 if let prefix = chip.prefix, !prefix.isEmpty {
                                     Text("\(prefix) ·")
-                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced, weight: .bold))
                                         .foregroundStyle(.secondary)
                                 }
                                 Text(chip.label)
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced, weight: .bold))
                                     .foregroundStyle(.primary)
                             }
                             .padding(.horizontal, 8)
@@ -579,7 +530,7 @@ struct ProfileHeaderBlock: View {
                 Spacer(minLength: 4)
                 if let url = desc.source.openableURL {
                     Link("Source ↗", destination: url)
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                 }
             }
             Text(trimmed)
@@ -598,22 +549,8 @@ struct ProfileHeaderBlock: View {
                 ProfileClock.day(desc.observed_at).map { "observed \($0)" }
             ].compactMap { $0 }.filter { !$0.isEmpty }
             Text(attrParts.joined(separator: " · "))
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
-        }
-        .nukeCard()
-    }
-
-    // The one headline result: what kind of price, from which platform, as of when.
-    @ViewBuilder private func priceRow(_ price: Claim, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            RootedValueView(
-                label: label,
-                value: Self.money(price),
-                status: price.rootStatus,
-                decay: price.decayLine,
-                onDrill: { drill = ClaimDrill(title: label, claim: price, spec: nil) }
-            )
         }
         .nukeCard()
     }
@@ -625,6 +562,19 @@ struct ProfileHeaderBlock: View {
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 4)
             VStack(spacing: 0) {
+                // Identity tokens (year, make, model, trim): each opens its line items.
+                ForEach(Self.identityTokens(read: read), id: \.self) { token in
+                    let name = Self.name(for: token)
+                    let shown = Self.identityValue(token, read: read)
+                    RootedValueView(
+                        label: name,
+                        value: shown.value,
+                        status: shown.item.map { ItemText.rootStatus($0.status) } ?? .pending,
+                        onDrill: { openToken(token, title: name) }
+                    )
+                    .accessibilityIdentifier("header-token-\(token)")
+                    Divider()
+                }
                 if let odo = strip.odometer {
                     claimRow(label: "Odometer", value: Self.odometer(odo), claim: odo,
                              spec: SpecDrill(label: "Odometer", value: Self.odometer(odo), field: "mileage"))
@@ -632,14 +582,30 @@ struct ProfileHeaderBlock: View {
                 }
                 ForEach(strip.facets, id: \.dimension) { f in
                     let name = Self.name(for: f.dimension)
-                    claimRow(label: name, value: f.label, claim: f.member,
-                             spec: Self.field(for: f.dimension).map { SpecDrill(label: name, value: f.label, field: $0) })
+                    let spec = Self.field(for: f.dimension).map { SpecDrill(label: name, value: f.label, field: $0) }
+                    if opensItems(f.dimension) {
+                        // A header token opens its line items; the strip's claim stays one tap inside.
+                        RootedValueView(label: name, value: f.label, status: f.member.rootStatus, decay: f.member.decayLine,
+                                        onDrill: { openToken(f.dimension, title: f.label, claim: f.member, spec: spec) })
+                            .accessibilityIdentifier("header-token-\(Self.tokenDimension(for: f.dimension))")
+                    } else {
+                        claimRow(label: name, value: f.label, claim: f.member, spec: spec)
+                    }
+                    Divider()
+                }
+                // Gaps: tokens with no established member, muted, opening what would establish them.
+                ForEach(strip.gaps, id: \.dimension) { g in
+                    // A gap with a lead shows it ("RWD · reading"); the row still opens the token's items.
+                    RootedValueView(label: g.label, value: g.leadText ?? "Not established",
+                                    status: g.leadText != nil ? ItemText.rootStatus(g.lead?.status ?? "") : .pending,
+                                    onDrill: { openToken(g.dimension, title: g.label) })
+                        .accessibilityIdentifier("header-gap-\(g.dimension)")
                     Divider()
                 }
             }
             // The denominator, always last and always present: a strip without coverage does not exist.
             Text(strip.coverage.sentence)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .padding(.top, 8)
         }
@@ -728,12 +694,12 @@ struct ProfileTimelineCard: View {
                 }
                 if timeline.days.count > shownDays {
                     Text("\(timeline.days.count - shownDays) earlier days")
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.tertiary)
                         .padding(.top, 6)
                 }
                 Text(timeline.coverage.sentence)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .padding(.top, 8)
             }
@@ -783,6 +749,21 @@ struct ClaimSourceSheet: View {
                     Text(drill.claim.source.kind == .legacy
                          ? "A legacy value comes from the vehicle record itself, with no observation beneath it."
                          : "Trust is the reader's calibration for this evidence class, or the row's own confidence when it carries one.")
+                }
+                if let qualification = drill.claim.qualification, qualification.hasContent {
+                    Section {
+                        ForEach(qualification.rows, id: \.label) { row in
+                            LabeledContent(row.label, value: row.value)
+                                .accessibilityIdentifier("claim.qualification.\(row.label)")
+                        }
+                        if let limitation = qualification.limitation,
+                           !limitation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(limitation)
+                                .font(.footnote)
+                        }
+                    } header: {
+                        Text("What this establishes")
+                    }
                 }
                 if drill.claim.source.openableURL != nil || drill.claim.isAuctionSaleClaim {
                     Section {

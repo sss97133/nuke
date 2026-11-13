@@ -1,3 +1,5 @@
+import { htmlToText } from '../../../../supabase/functions/_shared/htmlToText';
+
 /** Optional source-history contract from the existing get_vehicle_specs reader. */
 export interface ListingDescription {
   source_observation_id: string;
@@ -22,4 +24,10 @@ export function listingDescriptionsFromSpecs(specs: unknown): ListingDescription
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.source_observation_id)) return false;
     try { return ['http:', 'https:'].includes(new URL(entry.source_url).protocol); } catch { return false; }
   });
+}
+
+/** Presentation only: preserve plain testimony verbatim and keep original HTML in its observation. */
+export function listingDescriptionText(text: string): string {
+  if (!/<\/?(?:p|div|ul|ol|li|br|b|strong|em|h[1-6])(?:\s[^>]*)?\/?>/i.test(text)) return text;
+  return htmlToText(text.replace(/<(?:ul|ol)\b[^>]*>/gi, '\n'));
 }

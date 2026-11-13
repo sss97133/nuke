@@ -110,7 +110,34 @@ export async function qualifyEcrCapture(snapshot: any, html: string, now = Date.
   } };
 }
 
-export async function readEcrCapture(db: any, snapshotId: string) {
+// Consumer-only projection of the verified original, outside the immutable v1
+// admission receipt. Similar Cars and placeholder images are not this subject.
+// Fresh unauthenticated visual review on 2026-10-31 found these exact references
+// serve ECR's LOG IN artwork. Exclude only observed URLs, never dimensions; do
+// not try another gallery URL as an access fallback. The source link remains.
+const unavailableDetailImages = new Set([
+  "https://exclusivecarregistry.com/images/gallery/car/full/795824",
+  "https://exclusivecarregistry.com/images/gallery/car/full/357917",
+]);
+async function detailImage(html: string): Promise<string | null> {
+  const { load } = await import("npm:cheerio@1.2.0");
+  const $ = load(html);
+  const galleries = $("main#details > .banner_gallery");
+  if (galleries.length !== 1) return null;
+  for (const element of galleries.find(".thumb > img").toArray()) {
+    const src = $(element).attr("src");
+    if (!src) continue;
+    try {
+      const u = new URL(src, "https://exclusivecarregistry.com");
+      if (u.origin === "https://exclusivecarregistry.com" && !u.username && !u.password && !u.search && !u.hash
+        && /^\/images\/gallery\/car\/(full|thumb)\/[1-9][0-9]*$/.test(u.pathname))
+        return unavailableDetailImages.has(u.href) ? null : u.href;
+    } catch { /* A missing or invalid presentation image does not invent one. */ }
+  }
+  return null;
+}
+
+export async function readEcrCapture(db: any, snapshotId: string, includePresentation = false) {
   const result = await db.from("listing_page_snapshots").select("id,platform,listing_url,fetched_at,created_at,success,http_status,html_sha256,html,html_storage_path")
     .eq("id", snapshotId).maybeSingle();
   if (result.error || !result.data) return refuse("source_capture_unavailable");
@@ -126,5 +153,8 @@ export async function readEcrCapture(db: any, snapshotId: string) {
     try { html = new TextDecoder("utf-8", { fatal: true }).decode(await stored.data.arrayBuffer()); }
     catch { return refuse("source_encoding_invalid"); }
   }
-  return qualifyEcrCapture(s, html);
+  const checked = await qualifyEcrCapture(s, html);
+  if (!checked.ok) return checked;
+  return { ...checked, presentation_image_url: includePresentation && checked.receipt.kind === "vehicle_detail"
+    ? await detailImage(html) : null };
 }

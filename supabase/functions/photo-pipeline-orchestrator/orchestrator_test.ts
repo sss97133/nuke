@@ -68,7 +68,7 @@ globalThis.fetch = (async (input, init) => {
     if (rejectWrite) return Response.json({ message: "synthetic write rejection", code: "42501" }, { status: 400 });
     if (url.searchParams.get("updated_at") !== `eq.${row.updated_at}`) return Response.json([]);
     patches++; row = { ...row, ...body, updated_at: new Date(Date.parse(String(row.updated_at)) + 1).toISOString() };
-    return Response.json([{ id: row.id }]);
+    return Response.json([{ id: row.id, image_url: row.image_url, vehicle_id: row.vehicle_id }]);
   }
   // An upload-clock read ("this user's most recently created filed photo") finds a different, recently filed vehicle.
   if (url.searchParams.has("created_at")) { uploadClockReads++; return Response.json([{ vehicle_id: "recent-upload-vehicle" }]); }
@@ -94,7 +94,11 @@ Deno.test("missing classifier persists failure but emits no claim or fallback", 
   assert(metadata.byok_deep_analysis && metadata.on_device_vision);
   const receipt = (metadata.photo_pipeline as Record<string, Record<string, unknown>>).receipt;
   assert(receipt.error_class === "classifier_key_missing" && receipt.classifier_attempts === 0);
-  assert(calls.every(c => c.endsWith("/rest/v1/vehicle_images")));
+  // v101: besides vehicle_images, the handler reports its step, reads platform_config and notes the failure (v98/v99 RPCs).
+  const allowed = new Set(["/rest/v1/vehicle_images", "/rest/v1/rpc/report_capture_step", "/rest/v1/platform_config", "/rest/v1/rpc/photo_pipeline_note_failure"]);
+  assert(calls.every(c => allowed.has(c.slice(c.indexOf(" ") + 1))));
+  const seen = new Set(calls.map(c => c.slice(c.indexOf(" ") + 1)));
+  assert(seen.has("/rest/v1/vehicle_images") && seen.has("/rest/v1/rpc/photo_pipeline_note_failure") && !seen.has("/functions/v1/ingest-observation"));
 });
 
 Deno.test("database rejection cannot return a successful or completed receipt", async () => {

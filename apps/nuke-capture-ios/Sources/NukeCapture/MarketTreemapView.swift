@@ -366,7 +366,7 @@ struct MarketTreemapView: View {
         VStack(spacing: 3) {
             Rectangle().fill(Color.secondary.opacity(0.35)).frame(height: 0.5)
             Text("equal size below — the number is the true count")
-                .font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 8)
         }
         .frame(width: width)
@@ -755,18 +755,18 @@ struct MarketTreemapView: View {
                     .font(.system(.caption)).foregroundStyle(.secondary)
                 Spacer(minLength: 6)
                 // The live color key — endpoints + the current ramp.
-                Text(lens.lo).font(.system(size: 9, weight: .semibold, design: .monospaced))
+                Text(lens.lo).font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary)
                 LinearGradient(colors: [lensRamp(0), lensRamp(0.5), lensRamp(1)],
                                startPoint: .leading, endPoint: .trailing)
                     .frame(width: 42, height: 6).clipShape(Capsule())
-                Text(lens.hi).font(.system(size: 9, weight: .semibold, design: .monospaced))
+                Text(lens.hi).font(.system(.caption2, design: .monospaced, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
             Text(lens == .era ? "Area: records · color: average year" :
                  lens == .price ? "Area: records · color: recorded median price" :
                  "Area: records · color: venue median difference")
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
             if lens != .era {
                 Text(lens == .gap ? "Different cars and price bases; not an expected return." :
@@ -779,11 +779,11 @@ struct MarketTreemapView: View {
             // nightly at 03:40Z and the RPCs do not return that clock, so the schedule is stated.
             if unresolved > 0 {
                 Text("+\(unresolved.formatted()) records not yet matched to a \(groupBy.label.lowercased()) (not drawn)")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
             Text("public vehicle records, deleted included, by \(groupBy.label.lowercased()) · market views refreshed nightly 03:40Z")
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .lineLimit(2)
         }
@@ -802,7 +802,7 @@ struct MarketTreemapView: View {
                 Circle().fill(lensRamp(0.8)).frame(width: 10, height: 10)
                     .overlay(Circle().stroke(.white.opacity(0.5), lineWidth: 0.5))
                 Text(lens.label).font(.system(.subheadline).weight(.medium))
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                Image(systemName: "chevron.down").font(.system(.caption2, weight: .semibold))
             }
             .foregroundStyle(.primary)
             .padding(.horizontal, 12).padding(.vertical, 7)
@@ -981,7 +981,7 @@ struct FilteredVehicleGrid: View {
     @State private var rows: [VehicleHeaderRow] = []
     @State private var loading = true
     @State private var failed = false
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+    private let columns = [GridItem(.flexible(), spacing: NukeSpace.md), GridItem(.flexible(), spacing: NukeSpace.md)]
 
     private var title: String {
         PulseDim.allCases.compactMap { filters[$0.rawValue] }.joined(separator: " · ")
@@ -990,35 +990,30 @@ struct FilteredVehicleGrid: View {
     var body: some View {
         Group {
             if loading && rows.isEmpty {
-                VStack(spacing: 10) {
-                    ProgressView()
-                    Text("Loading cars…")
-                        .font(.system(.footnote, design: .monospaced)).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                NukeTileGridSkeleton(message: "Finding cars…")
             } else if failed && rows.isEmpty {
-                ContentUnavailableView {
-                    Label("Couldn't load", systemImage: "exclamationmark.triangle")
-                } actions: {
-                    Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
-                }
+                NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load these cars",
+                               message: "Check your connection, then try again.",
+                               actionTitle: "Try again") { Task { await load() } }
             } else if rows.isEmpty {
-                ContentUnavailableView("No photographed cars", systemImage: "car.side")
+                NukeEmptyState(icon: "car.side", title: "No cars with photos here yet",
+                               message: "Try a broader group of cars.")
             } else {
                 ScrollView {
                     // Analyst Toolbox move 1: the cohort's price distribution rides
                     // above its holdings — the shape IS the price (no printed median).
                     CohortDistributionCard(filters: filters)
                         .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 6)
-                    Text("\(rows.count) photographed records shown · up to 60 · source-label matches · auction sources first, then recorded price · availability unverified")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Text(NukeDisplay.count(rows.count, "car") + " with photos · availability isn't confirmed")
+                        .font(.footnote).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12).padding(.bottom, 8)
-                    LazyVGrid(columns: columns, spacing: 2) {
+                        .padding(.horizontal, NukeSpace.lg).padding(.bottom, NukeSpace.sm)
+                    LazyVGrid(columns: columns, spacing: NukeSpace.lg) {
                         ForEach(rows) { v in
                             NavigationLink(value: v) { cell(v) }.buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, NukeSpace.lg).padding(.bottom, NukeSpace.xl)
                 }
             }
         }
@@ -1028,26 +1023,9 @@ struct FilteredVehicleGrid: View {
     }
 
     @ViewBuilder private func cell(_ v: VehicleHeaderRow) -> some View {
-        Color(.secondarySystemFill)
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                CachedAsyncImage(url: NukeImage.thumb(v.primary_image_url, width: 200)) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    Image(systemName: "car.side").font(.title2).foregroundStyle(.secondary)
-                }
-            }
-            .clipped()
-            .overlay(alignment: .bottomLeading) {
-                Text([v.year.map(String.init), v.make, v.model].compactMap { $0 }.joined(separator: " "))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .padding(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.black.opacity(0.7))
-            }
-            .contentShape(Rectangle())
+        NukeVehicleTile(imageURL: NukeImage.thumb(v.primary_image_url, width: 600),
+                        name: NukeDisplay.vehicleName(year: v.year, make: v.make, model: v.model),
+                        detail: NukeDisplay.joined([v.city, v.state], separator: ", "))
     }
 
     private func load() async {
@@ -1206,7 +1184,7 @@ struct CohortDistributionCard: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("reading priced sales…")
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 132)
             case .sparse:
@@ -1216,7 +1194,7 @@ struct CohortDistributionCard: View {
                         .font(.system(size: 13, weight: .semibold))
                     Text("not enough priced sales to draw a distribution"
                          + (primaryN > 0 ? " (\(primaryN) priced)" : ""))
-                        .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 6)
@@ -1245,7 +1223,7 @@ struct CohortDistributionCard: View {
                 .lineLimit(1).minimumScaleFactor(0.7)
             Spacer(minLength: 8)
             Text((listed.map { "\($0.formatted()) listed · " } ?? "") + "\(primaryN) priced")
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
         }
     }
@@ -1260,7 +1238,7 @@ struct CohortDistributionCard: View {
                     .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color.accentColor, lineWidth: 1))
                     .frame(width: 9, height: 9)
                 Text("\(primaryLabel) (n=\(primaryN))")
-                    .font(.system(size: 11, weight: .semibold).smallCaps().monospacedDigit())
+                    .font(.system(.caption2, weight: .semibold).smallCaps().monospacedDigit())
             }
             if showOverlay {
                 HStack(spacing: 5) {
@@ -1269,7 +1247,7 @@ struct CohortDistributionCard: View {
                     Capsule().fill(Color.secondary.opacity(0.7))
                         .frame(width: 12, height: 2)
                     Text("\(parentLabel) (n=\(parentN))")
-                        .font(.system(size: 11).smallCaps().monospacedDigit())
+                        .font(.system(.caption2).smallCaps().monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
@@ -1280,7 +1258,7 @@ struct CohortDistributionCard: View {
                     withAnimation(.easeInOut(duration: 0.2)) { overlayOn.toggle() }
                 } label: {
                     Text("vs")
-                        .font(.system(size: 11, weight: .semibold).smallCaps())
+                        .font(.system(.caption2, weight: .semibold).smallCaps())
                         .padding(.horizontal, 9).padding(.vertical, 3)
                         .background(Capsule().fill(overlayOn ? Color.accentColor.opacity(0.16) : Color(uiColor: .tertiarySystemFill)))
                         .overlay(Capsule().strokeBorder(overlayOn ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 0.5))
@@ -1339,7 +1317,7 @@ struct CohortDistributionCard: View {
             Spacer()
             Text(Self.money(pow(10, domain.upperBound)))
         }
-        .font(.system(size: 10, design: .monospaced))
+        .font(.system(.caption2, design: .monospaced))
         .foregroundStyle(.secondary)
     }
 

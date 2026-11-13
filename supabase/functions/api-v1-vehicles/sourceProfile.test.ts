@@ -3,15 +3,15 @@ import { readSourceProfile } from "./sourceProfile.ts";
 const assert=(v:unknown,message="assertion failed")=>{if(!v)throw Error(message);};
 const car="https://exclusivecarregistry.com/details/pagani/zonda/123";
 const collection="https://exclusivecarregistry.com/collection/fixture";
-async function fixture(previous=false){
+async function fixture(previous=false, detailHtml?:string){
   const card='<div class="car_item"><a class="content" href="'+car+'"><img class="image" src="/images/cars/123.jpg"><p class="title">Pagani Zonda F</p></a></div>';
-  const html='<main><h1>Fixture collection</h1><div class="car_timeline"><div data-box="cars_1">'+card+'</div>'+(previous?'<div data-box="cars_4">'+card+'</div>':'')+'</div></main>';
+  const html=detailHtml??'<main><h1>Fixture collection</h1><div class="car_timeline"><div data-box="cars_1">'+card+'</div>'+(previous?'<div data-box="cars_4">'+card+'</div>':'')+'</div></main>';
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(html))),n=>n.toString(16).padStart(2,"0")).join("");
-  const snapshot={id:"11111111-1111-4111-8111-111111111111",platform:"ecr",listing_url:collection,success:true,http_status:200,html_sha256:hash,html,
+  const snapshot={id:"11111111-1111-4111-8111-111111111111",platform:"ecr",listing_url:detailHtml?car:collection,success:true,http_status:200,html_sha256:hash,html,
     fetched_at:"2026-02-16T03:00:00.123456Z",created_at:"2026-02-16T03:00:01.123456Z"};
   const qualified=await qualifyEcrCapture(snapshot,html);assert(qualified.ok);if(!qualified.ok)throw Error("fixture");
   const row={id:"22222222-2222-4222-8222-222222222222",source_id:"source",source_snapshot_id:snapshot.id,source_identifier:qualified.input.source_identifier,
-    source_url:collection,kind:"listing",extraction_method:ECR_METHOD,is_superseded:false,vehicle_id:null,subject_type:"organization",subject_id:null,
+    source_url:snapshot.listing_url,kind:"listing",extraction_method:ECR_METHOD,is_superseded:false,vehicle_id:null,subject_type:detailHtml?"vehicle":"organization",subject_id:null,
     observed_at:snapshot.fetched_at,ingested_at:"2026-10-31T04:00:00Z",observed_at_basis:"source_capture_time",source_event_time_precision:"unknown",source_event_at:null,
     structured_data:qualified.input.structured_data};
   let species="aggregator",failRead=false,copies=1;const requests:string[]=[];
@@ -103,4 +103,23 @@ Deno.test("actual vehicles API authenticates, reads retained evidence, and refus
     globalThis.fetch=original;
     keys.forEach((k,i)=>prior[i]===undefined?Deno.env.delete(k):Deno.env.set(k,prior[i]!));
   }
+});
+
+Deno.test("retained detail hero reaches the profile with its original capture; hidden and related-car imagery never substitutes",async()=>{
+  const detail=(images:string)=>'<main id="details"><div class="banner_gallery">'+images+'</div><div class="page_title"><h1>Pagani Zonda F</h1></div><h2>Car Timeline</h2><p>Log in</p><div class="similar_cars"><img src="/images/gallery/car/full/999"></div></main>';
+  const img=(src:string)=>'<div class="thumb"><img src="'+src+'"></div>';
+  const f=await fixture(false,detail(img('/images/common/standard-blank-image.jpg')+img('/images/gallery/car/full/123')));
+  const before=JSON.stringify(f.row.structured_data);
+  const answer=await readSourceProfile(f.db,car,f.snapshot.id),data=answer.body.data as any;
+  assert(answer.status===200&&data.image_url==='https://exclusivecarregistry.com/images/gallery/car/full/123');
+  assert(data.image_source_url===car&&data.image_page_captured_at===f.snapshot.fetched_at&&data.image_relationship===null);
+  assert(data.image_observation_id===data.claims[0].observation_id&&data.claims[0].snapshot_id===f.snapshot.id);
+  assert(data.vehicle_id===null&&data.staging_permission_status==='unknown'&&!data.model_use.verified_factory_specification);
+  assert(JSON.stringify(f.row.structured_data)===before,'v1 receipt must stay unchanged');
+  for(const bad of ['',img('/images/common/standard-blank-image.jpg'),img('https://evil.test/images/gallery/car/full/123'),img('/images/gallery/car/full/123?other=1'),
+    img('/images/gallery/car/full/795824')+img('/images/gallery/car/thumb/795825'),img('/images/gallery/car/full/357917')]){
+    const missing=await fixture(false,detail(bad));const r=await readSourceProfile(missing.db,car);
+    assert(r.status===200&&(r.body.data as any).image_url===null,'no placeholder, related car, or unqualified URL');
+  }
+  f.snapshot.html+='tampered';assert((await readSourceProfile(f.db,car)).status===503);
 });

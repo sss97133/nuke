@@ -9,9 +9,10 @@
 //      so foreground + periodic background refresh is the heartbeat. The
 //      common path is the honest one: the owner takes photos at the shop,
 //      opens the app (or iOS wakes it within hours), photos upload.
-//   4. Route: signed out → SignInView (the constellation; its Explore path
-//      flips exploreMode), exploring → MainTabView (read-only Map + sample
-//      profile), signed in + ignition pending → IgnitionView (first-run
+//   4. Route: signed out on a fresh install → WelcomeView (once; its "Look around
+//      first" flips exploreMode), signed out otherwise → SignInView (the
+//      constellation; its "Look around first" path flips exploreMode),
+//      exploring → MainTabView (read-only Map + profile search), signed in + ignition pending → IgnitionView (first-run
 //      full-library scan), signed in + ignition complete → MainTabView
 //      (MAP · PROFILE · TODAY).
 
@@ -41,8 +42,10 @@ struct NukeCaptureApp: App {
     /// Flipped by IgnitionEngine when the first-run sequence completes.
     @AppStorage(IgnitionEngine.completeKey) private var ignitionComplete = false
     /// The constellation's Explore path — the app without auth (read-only
-    /// Map + sample profile). Cleared by the Profile tab's Sign In door.
+    /// Map + profile search). Cleared by the Profile tab's Sign In door.
     @AppStorage("exploreMode") private var exploreMode = false
+    /// The first-launch welcome has been seen (or the user signed in). See WelcomeGate.
+    @AppStorage(WelcomeGate.seenKey) private var welcomeSeen = false
 
     init() {
         // Must happen during launch: registering after didFinishLaunching
@@ -50,6 +53,8 @@ struct NukeCaptureApp: App {
         Self.registerBackgroundRefresh()
         Self.registerBackgroundBackfill()
         Self.registerRecentUploads()
+        // The removed "What brings you here?" screen left its answers on the phone: clear them once.
+        LegacyPersonaCleanup.run()
         // Existing installs ran the pre-ignition app: they keep the
         // hardcoded shop gate and skip ignition entirely.
         if SyncEngine.hasExistingWatermark,
@@ -71,6 +76,9 @@ struct NukeCaptureApp: App {
                     // NUKE_DEBUG_COHORT="year|make|model" roots on the cohort terminal
                     // so the screenshot loop lands on it without tab/tap navigation.
                     DebugCohortDeepLink(spec: dbgCohort)
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "welcome" {
+                    // The first-launch welcome alone (UI test + screenshot loop). DEBUG only.
+                    WelcomeView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "explore" {
                     // Explore is anon/self-contained (its own NavigationStack) — root
                     // straight on it for the market-pulse screenshot. DEBUG only.
@@ -80,12 +88,12 @@ struct NukeCaptureApp: App {
                 } else if let org = ProcessInfo.processInfo.environment["NUKE_DEBUG_ACTOR_ORG"], !org.isEmpty {
                     // NUKE_DEBUG_ACTOR_ORG=<uuid> roots on that organization's actor document (DEBUG only).
                     NavigationStack { ActorProfileView(route: ActorRoute(kind: "organization", id: org, name: nil)) }
-                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty {
-                    // NUKE_DEBUG_DAY=yyyy-MM-dd roots on that day's receipt for the sample
-                    // profile (or NUKE_DEBUG_DAY_USER=<uuid>) as the current session: anon
-                    // unless one was injected. Verifies the viewer-dependent money rule.
-                    DayReceiptView(userId: ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"] ?? Config.sampleProfileUserId,
-                                   date: dbgDay)
+                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty,
+                          let dbgDayUser = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"], !dbgDayUser.isEmpty {
+                    // NUKE_DEBUG_DAY=yyyy-MM-dd + NUKE_DEBUG_DAY_USER=<uuid> roots on that day's receipt
+                    // for that profile as the current session: anon unless one was injected. Verifies the
+                    // viewer-dependent money rule. No default account: name the profile under test.
+                    DayReceiptView(userId: dbgDayUser, date: dbgDay)
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
@@ -201,6 +209,14 @@ struct NukeCaptureApp: App {
                 // Foreground sync — only once ignition is done. During the
                 // scan NOTHING may upload (the UPLOADED 0 gauge is real).
                 guard session.isSignedIn, ignitionComplete else { return }
+                // A "Re-scan my library" asked for on the website: claim it, re-arm ignition the way
+                // the Account button does, and let the next pass close it with its summary.
+                Task {
+                    if await CaptureLedgerReporter.shared.claimRescan() != nil {
+                        SyncEngine.shared.resetForReignition()
+                        ignitionComplete = false
+                    }
+                }
                 // BUG #1 defect (c): book the processing-task drain the moment
                 // we learn work exists — not only on .background. If on-site
                 // photos are owed (backfill queue or fresh captures), the drain
@@ -285,10 +301,27 @@ struct NukeCaptureApp: App {
                     // Explore: the populated world, read-only. No Today tab
                     // (no grant), Sign In one tap away in Profile.
                     MainTabView()
+                } else if WelcomeGate.shouldShow(seen: welcomeSeen, signedIn: false, exploring: false, skip: Self.skipsWelcome) {
+                    // Fresh install: say what the app is before asking for anything.
+                    WelcomeView()
                 } else {
                     SignInView()
                 }
         }
+        // Signed in by any route (Apple, email, a restored session) means the welcome is done;
+        // signing out later lands on SignInView, not the tour.
+        .onChange(of: session.isSignedIn, initial: true) { _, signedIn in
+            if signedIn { welcomeSeen = true }
+        }
+    }
+
+    /// UI-test / fixture launches never see the welcome.
+    private static var skipsWelcome: Bool {
+        #if DEBUG
+        return WelcomeGate.launchSkips(arguments: ProcessInfo.processInfo.arguments, fixtureActive: FixtureBackend.isActive)
+        #else
+        return false
+        #endif
     }
 
     // ─── BGTaskScheduler plumbing ────────────────────────────────────────────

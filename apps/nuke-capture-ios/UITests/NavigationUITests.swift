@@ -4,6 +4,81 @@ import XCTest
 final class NavigationUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
+    func testSessionReviewInspectsSourceWithoutSelectingOrFiling() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment["NUKE_FIXTURE_SCENARIO"] = "source-inspection"
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let organize = app.buttons["Organize photos"].firstMatch
+        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        let day = app.staticTexts["2026-10-31"].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
+        let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(inspect.waitForExistence(timeout: 10)); inspect.tap()
+        XCTAssertTrue(app.staticTexts["This reading remains unresolved."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Retained interpretations · this read does not establish identity"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "session-source-inspection"; shot.lifetime = .keepAlways; add(shot)
+        app.navigationBars.buttons["Which vehicle?"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["0 selected · 1 shown of 1 session photos"].waitForExistence(timeout: 5))
+        let log = app.descendants(matching: .any)["fixture.writes"]
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        XCTAssertEqual(log.label, "no writes", "Inspecting a source must not assert identity or file a photo")
+    }
+
+    func testSessionReviewKeepsConflictingLocalReadingsByteUnbound() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "source-inspection", "NUKE_FIXTURE_NATIVE_REVIEW": "conflict"]
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let organize = app.buttons["Organize photos"].firstMatch
+        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        let day = app.staticTexts["2026-10-31"].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
+        let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(inspect.waitForExistence(timeout: 10)); inspect.tap()
+        let local = app.staticTexts["Local native reading"]
+        XCTAssertTrue(local.waitForExistence(timeout: 10))
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Multiple identifier-shaped readings remain; none is selected."].exists)
+        XCTAssertTrue(app.staticTexts["2S87R3N100001"].exists)
+        XCTAssertTrue(app.staticTexts["2S87R3N100009"].exists)
+        XCTAssertTrue(app.staticTexts["Earlier native reading"].exists)
+        XCTAssertTrue(app.staticTexts["Native reading pass"].exists)
+        XCTAssertTrue(app.staticTexts["This reading matches the current Photos source. Uploaded byte identity is not bound because its source hash is unavailable."].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "local-native-reading-conflict"; shot.lifetime = .keepAlways; add(shot)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testSessionReviewShowsReadyBoundCloseupAsTextOnly() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "source-inspection", "NUKE_FIXTURE_NATIVE_REVIEW": "nonvehicle"]
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let organize = app.buttons["Organize photos"].firstMatch
+        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        let day = app.staticTexts["2026-10-31"].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
+        let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(inspect.waitForExistence(timeout: 10)); inspect.tap()
+        let local = app.staticTexts["Local native reading"]
+        XCTAssertTrue(local.waitForExistence(timeout: 10))
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Multiple identifier-shaped readings remain; none is selected."].exists)
+        XCTAssertTrue(app.staticTexts["2S87R3N100001"].exists)
+        XCTAssertTrue(app.staticTexts["2S87R3N100009"].exists)
+        XCTAssertTrue(app.staticTexts["Earlier native reading"].exists)
+        XCTAssertTrue(app.staticTexts["Native reading pass"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Classification unresolved · text only.")).firstMatch.exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "local-native-reading-closeup"; shot.lifetime = .keepAlways; add(shot)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
     func testGarageTabFindsAZeroPhotoRecordAndOpensTheActualProfile() {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
@@ -33,6 +108,29 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue((search.value as? String)?.contains("1234567") == true, "returning must retain the Garage search")
     }
 
+    func testSellerSourceSheetShowsConfigurationLimits() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor"]
+        app.launchEnvironment["NUKE_FIXTURE_SCENARIO"] = "navigation-garage"
+        app.launchEnvironment["NUKE_DEBUG_VEHICLE_ID"] = "00000000-0000-4000-8000-00000000c001"
+        app.launch()
+        let engine = app.staticTexts["350 V8 Crate"].firstMatch
+        XCTAssertTrue(engine.waitForExistence(timeout: 15))
+        engine.tap()
+        XCTAssertTrue(app.staticTexts["What this establishes"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Source, Dealer seller listing · dealer_microdata_v2"].exists)
+        app.swipeUp()
+        for (label, expected) in [("Claim basis", "Seller Claim"), ("Factory configuration", "Unknown"), ("Current configuration", "Unknown")] {
+            let row = app.descendants(matching: .any).matching(identifier: "claim.qualification.\(label)").firstMatch
+            XCTAssertTrue(row.exists)
+            let accessibleText = row.label + " " + (row.value as? String ?? "")
+            XCTAssertTrue(accessibleText.contains(expected), "\(label) must retain \(expected): \(accessibleText)")
+        }
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testExploreShowsPeopleWithoutRequiringVehicleResults() {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor"]
@@ -48,5 +146,46 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 10), "a person must open within Explore's navigation stack")
         back.tap()
         XCTAssertTrue(person.waitForExistence(timeout: 5), "returning must preserve the search results")
+    }
+
+    /// The first-launch welcome (rooted directly; fixture launches skip it in the real root so
+    /// every other test still opens on what it expects). Four pages, then the way in.
+    func testWelcomeShowsFourPagesThenTheWayIn() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor"]
+        app.launchEnvironment["NUKE_FIXTURE_SCENARIO"] = "navigation-garage"
+        app.launchEnvironment["NUKE_DEBUG_SCREEN"] = "welcome"
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Find work near you."].waitForExistence(timeout: 12))
+        XCTAssertTrue(app.staticTexts["LinkedIn plus Uber for car guys."].exists)
+        XCTAssertFalse(app.buttons["welcome.lookAround"].exists, "the way in comes on the last page")
+        let next = app.buttons["welcome.next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        for (n, headline) in ["Show off your work.", "Hire a tech.", "See what cars really sell for."].enumerated() {
+            // The dots say which page is showing; the headline must be on screen too.
+            let dots = app.descendants(matching: .any)["Page \(n + 2) of 4"]
+            let target = app.staticTexts[headline]
+            next.tap()
+            if !(dots.waitForExistence(timeout: 5) && target.waitForExistence(timeout: 5)) {
+                // Next did not turn the page. Find out whether a second tap or a swipe does,
+                // and put the accessibility tree on ONE line (CI only keeps "error:" lines).
+                let tree = app.debugDescription.replacingOccurrences(of: "\n", with: " | ")
+                next.tap()
+                let retried = target.waitForExistence(timeout: 5)
+                var swiped = false
+                if !retried {
+                    app.swipeLeft()
+                    swiped = target.waitForExistence(timeout: 5)
+                }
+                XCTFail("Next did not advance to \(headline) (second tap \(retried ? "worked" : "failed"), swipe \(swiped ? "worked" : "not needed/failed")). TREE: \(String(tree.prefix(5000)))")
+                return
+            }
+        }
+        XCTAssertTrue(app.buttons["welcome.lookAround"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Get started"].exists, "one clear primary: Get started, via Sign in with Apple")
+        XCTAssertTrue(app.buttons["Look around first"].exists)
+        XCTAssertTrue(app.buttons["welcome.email"].exists)
+        XCTAssertTrue(app.buttons["welcome.apple"].exists || app.buttons["Sign in with Apple"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "welcome-last-page"; shot.lifetime = .keepAlways; add(shot)
     }
 }

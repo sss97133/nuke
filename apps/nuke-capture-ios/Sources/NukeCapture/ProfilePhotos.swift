@@ -261,13 +261,16 @@ struct ProfilePhotosView: View {
         Section {
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(photos) { p in
-                    Color(.secondarySystemFill).aspectRatio(1, contentMode: .fit)
-                        .overlay {
-                            CachedAsyncImage(url: NukeImage.thumb(p.thumb ?? p.url, width: 200)) { $0.resizable().scaledToFill() }
-                                placeholder: { ProgressView().scaleEffect(0.7) }
-                        }
-                        .clipped().contentShape(Rectangle())
-                        .onTapGesture { selected = p }
+                    Button { selected = p } label: {
+                        Color(.secondarySystemFill).aspectRatio(1, contentMode: .fit)
+                            .overlay {
+                                CachedAsyncImage(url: NukeImage.thumb(p.thumb ?? p.url, width: 200)) { $0.resizable().scaledToFill() }
+                                    placeholder: { ProgressView().scaleEffect(0.7) }
+                            }
+                            .clipped().contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open photo")
                 }
             }
             .padding(.horizontal, 2)

@@ -1679,6 +1679,9 @@ struct HeatReadingSheet: View {
     let heat: LiveAuction.Heat?
     var finishEstimate: FinishEstimate? = nil
     let now: Date
+    /// Explore's bid door opens this sheet from a card that already shows the bid and time left; it
+    /// leaves that line out so the sheet only adds what the card could not say.
+    var showsCurrentBid = true
     @State private var analogs: [FinishAnalog] = []
     @State private var loadedAnalogs = false
     @Environment(\.dismiss) private var dismiss
@@ -1687,7 +1690,9 @@ struct HeatReadingSheet: View {
         NavigationStack {
             List {
                 Section("The reading") {
-                    line("Current bid", "\(LiveBoardView.bidNumber(lot.currentBid)) · \(lot.endsAtDate.map { LiveBoardView.remaining($0, now: now) } ?? "close unknown")")
+                    if showsCurrentBid {
+                        line("Current bid", "\(LiveBoardView.bidNumber(lot.currentBid)) · \(lot.endsAtDate.map { LiveBoardView.remaining($0, now: now) } ?? "close unknown")")
+                    }
                     if let est = finishEstimate {
                         line("Expected finish (Model 33)", "\(LiveBoardView.bidNumber(est.estimate)) (80% interval \(LiveBoardView.bidNumber(est.low))–\(LiveBoardView.bidNumber(est.high))\(est.grade.map { " · grade \($0)" } ?? ""))")
                         if let sentence = est.sentence {
@@ -2144,7 +2149,7 @@ struct SourceLandingSheet: View {
     private func metricCell(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced, weight: .semibold))
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.system(.subheadline, design: .monospaced).weight(.semibold))

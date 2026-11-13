@@ -40,6 +40,27 @@ describe('MeasureView', () => {
 });
 
 describe('ClaimView', () => {
+  it('keeps seller qualifications visible when inspecting the source', () => {
+    render(<ClaimView label="Engine" claim={{ value: '5.0L V8', source: { kind: 'listing', label: 'Dealer', url: 'https://example.test/vehicle' }, observed_at: null, trust: 0.6,
+      qualification: { role: 'seller_claim', factory_configuration_status: 'unknown', current_configuration_status: 'unknown', limitation: 'Retained seller wording only.' } }} />);
+    act(() => (host.querySelector('button.k-claim__value') as HTMLButtonElement).click());
+    const qualification = document.body.querySelector('section[aria-label="What this establishes"]');
+    expect(qualification?.textContent).toContain('Claim basisSeller claim');
+    expect(qualification?.textContent).toContain('Factory configurationUnknown');
+    expect(qualification?.textContent).toContain('Current configurationUnknown');
+    expect(qualification?.textContent).toContain('Retained seller wording only.');
+    expect(document.body.querySelector('a.k-claim__link')?.getAttribute('href')).toBe('https://example.test/vehicle');
+  });
+
+  it('does not invent missing configuration qualifications', () => {
+    render(<ClaimView label="Engine" claim={{ value: '5.0L V8', source: { kind: 'document' }, observed_at: null, trust: 0.8,
+      qualification: { role: 'document_claim' } }} />);
+    act(() => (host.querySelector('button.k-claim__value') as HTMLButtonElement).click());
+    expect(document.body.textContent).toContain('Document claim');
+    expect(document.body.textContent).not.toContain('Factory configuration');
+    expect(document.body.textContent).not.toContain('Current configuration');
+  });
+
   it('renders the value as a button and opens its source', () => {
     render(<ClaimView label="Last recorded sale" role="measure" format={v => '$' + Number(v).toLocaleString('en-US')}
       claim={{ value: 24000, unit: 'USD', source: { kind: 'listing', url: 'https://example.test/lot', label: 'BaT' }, observed_at: '2026-09-21', trust: 0.9 }} />);
@@ -50,6 +71,7 @@ describe('ClaimView', () => {
     expect(document.body.textContent).toContain('Sep 21, 2026');
     expect(document.body.textContent).toContain('BaT');
     expect(document.body.textContent).toContain('90%');
+    expect(document.body.querySelector('section[aria-label="What this establishes"]')).toBeNull();
     expect(document.body.querySelector('img.k-claim__logo')?.getAttribute('src')).toBe('/source-logos/bat.png');
   });
 

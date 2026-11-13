@@ -106,8 +106,8 @@ export default function VehicleSourceProfile() {
           <p>Physical vehicle identity and ownership are unverified by this source.</p>
           {profile.label_status === 'source_labels_differ' && <p role="status">The source labels differ. Each recorded label is shown below.</p>}
           {profile.image_url && <figure className="source-profile-image"><img key={profile.image_url} src={profile.image_url}
-            width={720} height={480} alt="Image published with the ECR vehicle presentation" loading="lazy"
-            onError={event => { event.currentTarget.hidden = true; }} /><figcaption className="evidence-metadata">Image published by ECR; photo date unknown.
+            width={720} height={480} alt="Image currently served by ECR from the captured page's image URL" loading="lazy"
+            onError={event => { event.currentTarget.hidden = true; }} /><figcaption className="evidence-metadata">Image currently served by ECR; photo date unknown. ECR may show a sign-in notice instead of the photo.
             {profile.image_observation_id && <> <a href={`#source-capture-${profile.image_observation_id}-${profile.image_relationship ?? 'detail'}`}>Capture evidence</a></>}
           </figcaption></figure>}
           <section aria-label="Source history"><h2>Source history</h2>

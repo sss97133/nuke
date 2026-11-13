@@ -61,7 +61,7 @@ struct JobStageRail: View {
                         .font(compact ? .caption2 : .footnote)
                         .foregroundStyle(Self.color(dot))
                     Text(compact ? dot.key.initial : dot.key.shortTitle)
-                        .font(compact ? .system(size: 8, design: .monospaced) : .system(size: 9))
+                        .font(compact ? .system(.caption2, design: .monospaced) : .system(.caption2))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)

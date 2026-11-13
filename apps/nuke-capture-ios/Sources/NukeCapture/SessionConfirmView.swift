@@ -117,7 +117,7 @@ struct SessionConfirmView: View {
         HStack(spacing: 12) {
             Button { picking = s } label: {
                 HStack(spacing: 12) {
-                    AsyncImage(url: Self.thumb(s.sample_url)) { img in
+                    CachedAsyncImage(url: Self.thumb(s.sample_url), maxPixel: 300) { img in
                         img.resizable().scaledToFill()
                     } placeholder: { Rectangle().fill(Color(.secondarySystemFill)) }
                     .frame(width: 56, height: 56).clipped()
@@ -216,10 +216,11 @@ private struct VehiclePickerSheet: View {
                         .font(.caption.monospacedDigit())
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 3), spacing: 3) {
                         ForEach(reviewPhotos) { photo in
+                          VStack(spacing: 4) {
                             Button {
                                 if !selectedIDs.insert(photo.id).inserted { selectedIDs.remove(photo.id) }
                             } label: {
-                                AsyncImage(url: NukeImage.thumb(photo.image_url, width: 240)) { image in
+                                CachedAsyncImage(url: NukeImage.thumb(photo.image_url, width: 240), maxPixel: 480) { image in
                                     image.resizable().scaledToFill()
                                 } placeholder: { Rectangle().fill(Color(.secondarySystemFill)) }
                                 .frame(height: 90).frame(maxWidth: .infinity).clipped()
@@ -231,6 +232,17 @@ private struct VehiclePickerSheet: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Photo \(photo.id.prefix(8))")
                             .accessibilityValue(selectedIDs.contains(photo.id) ? "Selected" : "Not selected")
+                            if let userId = SupabaseService.currentUserId, let imageId = UUID(uuidString: photo.id) {
+                                NavigationLink {
+                                    SourcePhotoDetail(userId: userId, imageId: imageId)
+                                } label: {
+                                    Label("Inspect source", systemImage: "doc.text.magnifyingglass")
+                                        .font(.caption).frame(minHeight: 44)
+                                }
+                                .accessibilityIdentifier("session.source.inspect.\(photo.id)")
+                                .disabled(isRouting)
+                            }
+                          }
                         }
                     }
                     if !reviewPhotos.isEmpty {
@@ -249,7 +261,7 @@ private struct VehiclePickerSheet: View {
                         Button("Load more photos") { Task { await loadReviewPhotos() } }
                     }
                 } header: { Text("Select photos of one vehicle") }
-                footer: { Text("Choose a vehicle below after reviewing your selection. Other photos stay in this session.") }
+                footer: { Text("Inspect the source and its reading before selecting photos. Choose a vehicle below after reviewing your selection. Other photos stay in this session.") }
                 if let error = routingError {
                     Section {
                         Text(error).font(.footnote).foregroundStyle(.red)
@@ -361,7 +373,7 @@ private struct VehiclePickerSheet: View {
             }
         } label: {
             HStack(spacing: 12) {
-                AsyncImage(url: SessionConfirmView.thumb(v.primary_image_url)) { img in
+                CachedAsyncImage(url: SessionConfirmView.thumb(v.primary_image_url), maxPixel: 300) { img in
                     img.resizable().scaledToFill()
                 } placeholder: { Rectangle().fill(Color(.secondarySystemFill)) }
                 .frame(width: 48, height: 48).clipped()

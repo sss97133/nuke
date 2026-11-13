@@ -83,6 +83,7 @@ struct AgentChatView: View {
                     Button { Task { await send() } } label: {
                         Image(systemName: "arrow.up.circle.fill").font(.title2)
                     }
+                    .accessibilityLabel("Send")
                     .disabled(sending || draft.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 .padding(10)

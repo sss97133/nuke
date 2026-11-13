@@ -16,6 +16,7 @@ import { AdminNotificationService } from '../../services/adminNotificationServic
 import toast from 'react-hot-toast';
 import '../../design-system.css';
 import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
+import { getLightboxImageUrl } from '../../lib/imageOptimizer';
 
 interface ImageLightboxProps {
   imageUrl: string;
@@ -165,6 +166,18 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   } = useAutoTagging();
 
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const [imageSlow, setImageSlow] = useState(false);
+  const [imageAttempt, setImageAttempt] = useState(0);
+  const displayImageUrl = getLightboxImageUrl(imageUrl);
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageFailed(false);
+    setImageSlow(false);
+    if (!isOpen) return;
+    const timeout = window.setTimeout(() => setImageSlow(true), 15000);
+    return () => window.clearTimeout(timeout);
+  }, [imageUrl, imageAttempt, isOpen]);
   const [session, setSession] = useState<any>(null);
   const [rotation, setRotation] = useState(0);
   const [isSensitive, setIsSensitive] = useState(false);
@@ -1726,10 +1739,13 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           onTouchEnd={handleTouchEnd}
         >
           <img
+            key={`${displayImageUrl}:${imageAttempt}`}
             ref={imageRef}
-            src={imageUrl}
+            src={displayImageUrl}
+            loading="eager"
             alt="Vehicle"
             onLoad={() => setImageLoaded(true)}
+            onError={() => setImageFailed(true)}
             className="object-contain select-none"
             style={{ 
               pointerEvents: 'auto',
@@ -1743,6 +1759,14 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               objectFit: 'contain'
             }}
           />
+
+          {!imageLoaded && (imageFailed || imageSlow) && (
+            <div role="alert" style={{ position: 'absolute', padding: 24, textAlign: 'center', color: 'white' }}>
+              <p>{imageFailed ? 'The photograph could not be loaded.' : 'This photograph is taking longer to load.'}</p>
+              <button type="button" onClick={() => setImageAttempt(attempt => attempt + 1)} style={{ minHeight: 44, marginRight: 16 }}>Retry</button>
+              <a href={imageUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'white' }}>Open original</a>
+            </div>
+          )}
 
           {/* Markers - Positioned absolutely over image */}
           {imageLoaded && tags.map(tag => (

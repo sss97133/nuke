@@ -11,10 +11,10 @@
 //            cohort market terminal — reachable signed-out, no wall. An anon
 //            visitor lands here; "not signing in" is never a dead end (Sign In
 //            lives in the Profile toolbar). It remains the leftmost destination
-//            for a visitor; the owner's Library and Garage precede it.
+//            for a visitor; the owner's Library and Garage precede it. Explore
+//            is also the first tab selected after sign-in.
 //   PROFILE  the owner's record (own when signed in, the sample in explore
-//            mode); other profiles via handle search. Receipt-first: a
-//            signed-in owner's FIRST landing is still their own record.
+//            mode); other profiles via handle search.
 //   WORK     every signed-in account: signature queue, jobs in motion (each
 //            opens JobView), open requirements. Its Capture section (the
 //            capture gauge + pause toggle, the consent surface, and the
@@ -36,6 +36,8 @@ struct MainTabView: View {
     @State private var fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
     @State private var tab: Tab = .explore
     @ObservedObject private var inboxBadge = InboxBadgeStore.shared
+    /// Live per-photo progress for this shooting session (the slim bar at the top).
+    @StateObject private var ingest = CaptureIngestStore()
 
     enum Tab: Hashable { case library, garage, profile, explore, today }
 
@@ -83,10 +85,21 @@ struct MainTabView: View {
                     .badge(inboxBadge.badge)
             }
         }
+        // The live ingest status bar: pinned above every tab, hidden when the session has nothing.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if session.isSignedIn { CaptureIngestBar(store: ingest) }
+        }
+        .task(id: accountScope) {
+            guard session.isSignedIn, let uid = SupabaseService.currentUserId else { return }
+            #if DEBUG
+            if FixtureBackend.isActive { return }   // UI tests run on a fake host; no Realtime there
+            #endif
+            await ingest.run(userId: uid)
+        }
         // Discard another account's navigation and private screen state. Merely
         // returning from a sheet or another tab must preserve the user's place.
         .id(accountScope)
-        .onChange(of: accountScope, initial: true) { _, _ in tab = landingTab() }
+        .onChange(of: accountScope, initial: true) { _, _ in tab = Self.defaultTab }
         .onChange(of: fullAccess) { _, _ in
             tab = Self.availableTab(tab, signedIn: session.isSignedIn, fullAccess: fullAccess)
         }
@@ -97,25 +110,33 @@ struct MainTabView: View {
                 photoGrant = Self.currentPhotoGrant()
                 fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
                 Task { await inboxBadge.refresh() }
+                Task { await ingest.refresh() }
             }
         }
     }
 
+    /// The Garage tab exists only for a signed-in account; elsewhere the profile pushes the Garage screen.
+    private var openGarageTab: (() -> Void)? {
+        guard session.isSignedIn else { return nil }
+        return { tab = .garage }
+    }
+
     private var profileTab: some View {
-        // Explore mode passes nil → sample profile + a Sign In door in the
+        // Explore mode passes nil → profile search + a Sign In door in the
         // ProfileTab toolbar (not-signing-in is never a dead end).
         ProfileTab(
             ownUserId: session.isSignedIn ? SupabaseService.currentUserId : nil,
             onSignIn: session.isSignedIn ? nil : { exploreMode = false }
         )
+        // The profile's garage counts open the Garage tab, where the vehicles are listed.
+        .environment(\.openGarageTab, openGarageTab)
     }
 
-    /// Signed-in owners land on their LIBRARY (the foundation) when full access
-    /// exists; otherwise their record; anon visitors land on Explore.
-    private func landingTab() -> Tab {
-        if session.isSignedIn { return fullAccess ? .library : .profile }
-        return .explore
-    }
+    /// Everyone lands on Explore: the populated world is the front door for a visitor, and for a
+    /// signed-in owner it is the answer to "what is this app". Library, Garage, Profile and Work
+    /// are one tap away. The first-run photo scan (IgnitionView) runs BEFORE this view exists,
+    /// so a new account still gets its intro and scan first and lands here when it finishes.
+    static let defaultTab: Tab = .explore
 
     static func availableTab(_ selected: Tab, signedIn: Bool, fullAccess: Bool) -> Tab {
         if selected == .library && !(signedIn && fullAccess) { return signedIn ? .profile : .explore }

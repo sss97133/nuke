@@ -56,6 +56,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
   const recovery = new Set<string>();
   const recoveryQueue = new Map<string, BatLiveTarget>();
   const recoveryErrors = new Map<string,string>();
+  const recoveryGeneration = new Map<string, number>();
   const tasks = new Set<Promise<void>>();
   const expiresAt = Date.now() + durationMs;
   let stopped = false, socket: WebSocket | null = null, lastServerAt = 0, lastPingAt = 0;
@@ -80,6 +81,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
     // Snapshot request-start time prevents a late recovery response overwriting
     // newer live metadata. Native comments retain their own source timestamps.
     const requestedAt = new Date().toISOString();
+    const generation = recoveryGeneration.get(target.id) ?? 0;
     try {
       const data = await io.missed(target);
       if (!Array.isArray(data.comments) || data.comments.length > 5000 || !data.metadata) throw new Error("bat_recovery_invalid_or_capped");
@@ -87,7 +89,8 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
         enqueue(target, "comment-added", { post_id: target.post_id, comment: c }, new Date().toISOString(), "missed_comments");
       }
       enqueue(target, "metadata-updated", data.metadata, requestedAt, "missed_comments");
-      recoveryErrors.delete(target.id);
+      if ((recoveryGeneration.get(target.id) ?? 0) === generation) recoveryErrors.delete(target.id);
+      else if (!stopped) recoveryQueue.set(target.id, target);
     } catch (error) {
       recoveryErrors.set(target.id, `recovery:${String(error)}`.slice(0, 500));
       // Keep rate-deferred work in this bounded queue. It has not become a
@@ -110,9 +113,19 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
       void task.finally(() => { tasks.delete(task); pumpRecovery(); });
     }
   };
-  const scheduleRecovery = (target: BatLiveTarget) => {
-    if (stopped || Date.now() >= expiresAt || recovery.has(target.id) || recoveryQueue.has(target.id)) return;
-    recoveryErrors.set(target.id, "recovery_pending");
+  const scheduleRecovery = (target: BatLiveTarget, continuityRequired = true) => {
+    if (stopped || Date.now() >= expiresAt) return;
+    // Initial subscription, reconnect and control events need reconciliation
+    // before coverage is qualified. A periodic audit on an uninterrupted
+    // subscription does not itself establish a capture gap. Preserve any real
+    // recovery failure until a successful response clears it.
+    if (continuityRequired) {
+      recoveryErrors.set(target.id, "recovery_pending");
+      recoveryGeneration.set(target.id, (recoveryGeneration.get(target.id) ?? 0) + 1);
+    }
+    // A read started before a reconnect/control event cannot qualify its gap.
+    // The in-flight recovery queues a fresh read when its generation changed.
+    if (recovery.has(target.id) || recoveryQueue.has(target.id)) return;
     recoveryQueue.set(target.id, target);
     pumpRecovery();
   };
@@ -175,7 +188,7 @@ export async function collectBatLive(targets: BatLiveTarget[], io: BatStreamIO, 
         .catch(() => {})
         .finally(() => { admissionTask = null; });
       if (Date.now() - lastRecoveryAt > 45000) {
-        for (const target of targets) if (acknowledged.has(`post;single;${target.post_id}`)) scheduleRecovery(target);
+        for (const target of targets) if (acknowledged.has(`post;single;${target.post_id}`)) scheduleRecovery(target, false);
         lastRecoveryAt = Date.now();
       }
       if (!heartbeatTask && Date.now() - lastHeartbeatAt >= 1000) {

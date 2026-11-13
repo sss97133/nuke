@@ -1,119 +1,137 @@
-// BuildStoryHero.swift — the lead image as a cinematic TITLE CARD, not a strip.
+// BuildStoryHero.swift — the vehicle's photos as the page's title card.
 //
-// The hero opens the build story: full-bleed latest/primary view of the asset
-// with the identity on a scrim, its decay date (when this view was true), and the
-// affordance that tapping the photo drills into the data that made the image.
-// Loads the width=1000 render-thumb (never the raw original — that was a measured
-// 2.9MB main-thread decode). Falls back to a flat plate when there's no image.
+// The hero is a directly swipeable pager over the lead photo and the first gallery page (no
+// arrow buttons). Tapping a photo opens the full-screen gallery at that photo; analysis stays
+// one step further, behind the gallery's own "Analysis" action. Each page loads the width=1000
+// render-thumb (never the raw original — that was a measured 2.9MB main-thread decode). Falls
+// back to a flat plate when there's no image.
 //
-// The identity is NOT a dead string — it renders as DRILLABLE entity-chips
-// (IdentityChips). Each word taps into the vehicle's real market cohort
-// (CohortTerminalView), so the design IS the function: the title you read is the
-// door you open. Chips only become tappable when the cohort node is real
-// (make+model+year present); otherwise they render as honest flat identity.
+// The identity sits on the scrim as ONE line and ONE door (VehicleIdentityTitle) into the
+// vehicle's real market cohort (CohortTerminalView), with the make's wordmark in place. It is
+// only tappable when the cohort node is real (make+model+year present).
 
 import SwiftUI
 
 struct BuildStoryHero: View {
-    let imageURL: String?
+    /// The photos to page through, lead first. Each carries its gallery row id so a tap can open
+    /// the gallery at that exact photo.
+    struct Page: Identifiable, Equatable {
+        let id: String
+        let url: String
+    }
+
+    let pages: [Page]
     let year: Int?
     let make: String?
     let model: String?
     let trim: String?
     /// Identity tokens from the document's masthead (the web's rule), nil before the read lands.
     var identityTokens: [String]? = nil
+    /// When the lead photo was taken; shown on the lead page only.
     let takenAt: String?
     let loaded: Bool
-    let onTap: () -> Void
-    /// Non-nil ⇔ the cohort node is real (make+model+year present). Tapping any
-    /// identity chip drills to that one cohort instrument. nil ⇒ flat, no fake
-    /// affordance (a chip may only look tappable when its node exists).
+    /// Opens the full-screen gallery at the tapped page.
+    let onOpenPhoto: (Int) -> Void
+    /// Non-nil ⇔ the cohort node is real (make+model+year present). nil ⇒ flat title, no fake affordance.
     let onDrillCohort: (() -> Void)?
 
+    static let height: CGFloat = 300
+
+    @State private var index = 0
+
+    private var words: [String] {
+        VehicleFirstScreen.titleWords(year: year, make: make, model: model, trim: trim, tokens: identityTokens)
+    }
+
     var body: some View {
-        if let urlStr = imageURL {
-            // Chips as an OVERLAY on the photo button, NOT a ZStack sibling. An overlay
-            // is sized to its source (the photo = screen width), so the identity can
-            // never force the hero wider than the photo. As a ZStack sibling, the
-            // chips' FlowLayout could be proposed an UNBOUNDED width (when the image's
-            // sizing pass defers), lay every chip on one line, blow past the screen and
-            // shove the whole page left (the left-clip bug). Overlay buttons still fire:
-            // they sit ON TOP of the photo button, not inside it, so chip taps win in
-            // their frame and the rest of the hero still drills to the photo.
-            Button(action: onTap) { heroPhoto(urlStr) }
-                .buttonStyle(.plain)
-                .overlay(alignment: .bottomLeading) {
-                    IdentityChips(year: year, make: make, model: model, trim: trim, tokens: identityTokens,
-                                  onScrim: true, onDrill: onDrillCohort)
-                        .padding(16)
-                        .allowsHitTesting(onDrillCohort != nil)
+        if !pages.isEmpty {
+            // The title is an OVERLAY sized to the pager (screen width), so it can never force the
+            // hero wider than the photo (the old left-clip bug). It sits on top of the pager, so a
+            // tap on the title goes to the cohort and a tap anywhere else opens the photo.
+            pager
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.height)
+                .overlay(alignment: .bottom) { heroScrim.allowsHitTesting(false) }
+                .overlay(alignment: .topLeading) {
+                    if index == 0 { decayBadge.allowsHitTesting(false) }
                 }
+                .overlay(alignment: .bottomLeading) {
+                    VehicleIdentityTitle(words: words, make: make, onScrim: true, onDrill: onDrillCohort)
+                        .padding(.horizontal, NukeSpace.lg)
+                        .padding(.bottom, pages.count > 1 ? NukeSpace.xl : NukeSpace.sm)
+                }
+                .onChange(of: pages.count) { _, n in if index >= n { index = 0 } }
         } else if loaded {
             // Loaded, no image — a flat plate, never a broken frame.
             Color(.secondarySystemFill)
                 .frame(maxWidth: .infinity)
                 .frame(height: 160)
                 .overlay {
-                    VStack(spacing: 8) {
+                    VStack(spacing: NukeSpace.sm) {
                         Image(systemName: "car.side").font(.largeTitle).foregroundStyle(.secondary)
-                        IdentityChips(year: year, make: make, model: model, trim: trim, tokens: identityTokens,
-                                      onScrim: false, onDrill: onDrillCohort)
+                        VehicleIdentityTitle(words: words, make: make, onScrim: false, onDrill: onDrillCohort)
+                        Text("No photo yet")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
+                    .padding(.horizontal, NukeSpace.lg)
                 }
+        } else {
+            // Still loading: a shimmering photo-shaped block, never a blank gap.
+            Color(.tertiarySystemFill)
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.height)
+                .nukeShimmer()
+                .accessibilityHidden(true)
         }
     }
 
-    // Extracted so the type-checker handles the image + its overlays as one
-    // small unit (the inline chain timed out). Photo only — identity lives on top.
-    // Each overlay references a named sub-view to keep inference trivial.
-    @ViewBuilder private func heroPhoto(_ urlStr: String) -> some View {
-        // A fixed-size box is the AUTHORITATIVE sizer (full-width × 300); the image is
-        // a non-layout-affecting overlay that fills + clips. Critical: with the image
-        // as the sizer (scaledToFill + frame(maxWidth:.infinity)), a SMALL source
-        // (e.g. a 480×271 photo) lets the scaled image's intrinsic width propagate into
-        // layout and shove the whole page sideways. As an overlay on a fixed box it
-        // can never affect layout, whatever the source dimensions.
+    /// Swipe directly between photos; tap one to open the gallery there. Page dots only when
+    /// there is more than one photo.
+    private var pager: some View {
+        TabView(selection: $index) {
+            ForEach(Array(pages.enumerated()), id: \.element.id) { i, page in
+                Button { onOpenPhoto(i) } label: { photo(page.url) }
+                    .buttonStyle(.plain)
+                    .tag(i)
+                    .accessibilityLabel(Text("Photo \(i + 1) of \(pages.count)"))
+                    .accessibilityHint(Text("Opens the gallery"))
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: pages.count > 1 ? .always : .never))
+    }
+
+    // A fixed-size box is the AUTHORITATIVE sizer (full-width × 300); the image is a
+    // non-layout-affecting overlay that fills + clips, so a small source can never push the page
+    // sideways.
+    private func photo(_ urlStr: String) -> some View {
         Color(.secondarySystemFill)
             .frame(maxWidth: .infinity)
-            .frame(height: 300)
+            .frame(height: Self.height)
             .overlay {
                 CachedAsyncImage(url: NukeImage.thumb(urlStr, width: 1000)) { image in
                     image.resizable().scaledToFill()
-                } placeholder: { ProgressView() }
+                } placeholder: { Color(.tertiarySystemFill).nukeShimmer() }
             }
             .clipped()
             .contentShape(Rectangle())
-            .overlay(alignment: .bottom) { heroScrim }
-            .overlay(alignment: .topLeading) { decayBadge }
-            .overlay(alignment: .topTrailing) { dataAffordance }
     }
 
-    // Cinematic scrim — carries the identity chips' legibility on the photo.
+    // Scrim — carries the title's legibility on the photo.
     private var heroScrim: some View {
-        LinearGradient(colors: [.clear, .black.opacity(0.78)],
+        LinearGradient(colors: [.clear, .black.opacity(0.7)],
                        startPoint: .center, endPoint: .bottom)
     }
 
-    // Decay: when this view of the asset was actually true.
+    // Decay: when the lead view of the asset was actually true.
     @ViewBuilder private var decayBadge: some View {
         if let at = takenAt, !at.isEmpty {
             Text(String(at.prefix(10)))
-                .font(.system(.caption2, design: .monospaced))
+                .font(.nukePill)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 6).padding(.vertical, 3)
+                .padding(.horizontal, NukeSpace.sm).padding(.vertical, 4)
                 .background(.black.opacity(0.4), in: Capsule())
-                .padding(8)
+                .padding(NukeSpace.sm)
         }
-    }
-
-    // Affordance that the lead drills to its data (not just zoom).
-    private var dataAffordance: some View {
-        Image(systemName: "rectangle.and.text.magnifyingglass")
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(6)
-            .background(.black.opacity(0.35), in: Circle())
-            .padding(8)
     }
 }
 

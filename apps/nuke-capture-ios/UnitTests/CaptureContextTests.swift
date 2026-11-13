@@ -126,6 +126,42 @@ final class CaptureContextTests: XCTestCase {
         XCTAssertNil(CaptureContextReader.decodeDocument(["INVOICE", "PONTIAC 1973"], makes: makes))
     }
 
+    func testDocumentBindsStandaloneLabelToImmediateSerialOnly() {
+        let header = ["CERTIFICATE OF TITLE", "YEAR", "1973", "MAKE", "PONT"]
+        for label in ["VIN", "VIN:", "SERIAL NUMBER", "CHASSIS NO.", "VEHICLE IDENTIFICATION NUMBER"] {
+            let d = CaptureContextReader.decodeDocument(header + [label, "2S87R3N100001"], makes: makes)
+            XCTAssertEqual(d?.serial, "2S87R3N100001")
+            XCTAssertEqual(d?.year, 1973)
+        }
+        // A later identifier-looking number cannot replace an unreadable adjacent field.
+        for fields in [["VIN", "", "2S87R3N100001"], ["VIN", "YEAR", "1973", "2S87R3N100001"],
+                       ["VIN", "1234567890"], ["VIN", "2S87R3N100001 extra"], ["VIN"]] {
+            XCTAssertNil(CaptureContextReader.decodeDocument(header + fields, makes: makes))
+        }
+        XCTAssertNil(CaptureContextReader.decodeDocument(header + ["INVOICE NUMBER", "AB12345678"], makes: makes)?.serial)
+    }
+
+    func testDocumentRefusesCompetingPrintedIdentifiers() {
+        let header = ["CERTIFICATE OF TITLE", "YEAR 1973 MAKE PONT"]
+        for fields in [["VIN 2S87R3N100001", "VIN", "2S87R3N100002"],
+                       ["VIN 2S87R3N100001 2S87R3N100002"],
+                       ["VIN", "2S87R3N100001", "SERIAL NUMBER", "2S87R3N100002"]] {
+            XCTAssertNil(CaptureContextReader.decodeDocument(header + fields, makes: makes))
+        }
+        XCTAssertEqual(CaptureContextReader.decodeDocument(header + ["VIN", "2S87R3N100001", "VIN 2S87R3N100001"], makes: makes)?.serial, "2S87R3N100001")
+    }
+
+    func testSplitDocumentIdentifierStillRefusesAnotherAnchor() {
+        let lines = ["CERTIFICATE OF TITLE", "YEAR 1973 MAKE PONT", "VIN", "2S87R3N100001"]
+        let reads = CaptureContextReader.reads(imageID: "document", lines: lines, isVehicle: false, isDocument: true,
+            takenAt: nil, latitude: nil, longitude: nil, makes: makes)
+        XCTAssertEqual(reads.first?.documentSerial, "2S87R3N100001")
+        XCTAssertNil(CaptureContextReader.resolve(reads, serial: "2S87R3N100002"))
+        XCTAssertEqual(CaptureContextReader.resolve(reads, serial: "2S87R3N100001")?.make, "Pontiac")
+        // Physical-photo classic reads keep their existing same-line requirement.
+        XCTAssertTrue(VisionEngine.labelledClassicSerialCandidates(in: ["VIN", "2S87R3N100001"]).isEmpty)
+    }
+
     func testReadsAreGatedByFrameKind() {
         let tag = ["BODY BY FISHER", "ST73 2FS87 BDY", "TR 232"]
         XCTAssertEqual(CaptureContextReader.reads(imageID: "t", lines: tag, isVehicle: false, isDocument: false,

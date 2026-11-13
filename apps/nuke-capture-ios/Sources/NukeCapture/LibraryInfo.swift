@@ -21,6 +21,8 @@ struct LibraryInfoView: View {
     @State private var isAnalyzing = false
     @State private var loadingCloud = false
     @State private var sourceReview: LocalAlbumImageReview?
+    @State private var reviewedSourceVersion: String?
+    @State private var loadGeneration = UUID()
     @ObservedObject private var library = LibraryStore.shared
 
     var body: some View {
@@ -56,7 +58,19 @@ struct LibraryInfoView: View {
                     }
                 }
 
-                if let review = sourceReview {
+                let documentContext = LocalDocumentContext.read(sourceReview, assetId: asset.localIdentifier,
+                    sourceVersion: reviewedSourceVersion, method: LibraryIngest.albumMethodVersion)
+                let showRetainedNarrative = documentContext.showsRetainedNarrative(localOnly: localOnly,
+                    isPersonal: ledger?.isPersonal == true, hasPerson: sourceReview?.hasPerson == true,
+                    labels: ledger?.labels ?? [], isScreenshot: asset.mediaSubtypes.contains(.photoScreenshot))
+                if documentContext.state == .decoded || documentContext.state == .unresolved {
+                    Section("Document context") { LocalDocumentContextRows(context: documentContext) }
+                } else if documentContext.state == .unavailable {
+                    Section("On-device source read") {
+                        Text("No current local reading is available for this source and method. Any earlier retained analysis is labeled separately.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else if let review = sourceReview {
                     Section("On-device source read") {
                         row("Method", review.methodVersion)
                         row("Read", relativeText(review.analyzedAt))
@@ -99,8 +113,10 @@ struct LibraryInfoView: View {
                 // ── Read by Nuke — the prod BYOK verdict, ESCALATED DOWN and cached
                 //    on-device (renders offline once pulled). The rich agent read —
                 //    narrative/intent/scene/phase — over the cheap on-device T0 labels.
-                if let l = ledger, let narrative = l.cloudNarrative {
+                if showRetainedNarrative, let l = ledger, let narrative = l.cloudNarrative {
                     Section("Read by Nuke") {
+                        Text("Retained analysis; this view does not establish a match to the current source bytes.")
+                            .font(.caption).foregroundStyle(.secondary)
                         Text(narrative)
                         if let v = l.cloudIntent { row("Intent", token(v)) }
                         if let v = l.cloudScene { row("Scene", token(v)) }
@@ -109,7 +125,7 @@ struct LibraryInfoView: View {
                         if let a = l.cloudAnalyzedAt { row("Read", relativeText(a)) }
                         if let m = l.cloudAgentModel { row("By", m) }
                     }
-                } else if loadingCloud {
+                } else if showRetainedNarrative && loadingCloud {
                     Section("Read by Nuke") {
                         // Genuinely fetching the verdict right now — honest progress.
                         Label("Reading the record…", systemImage: "sparkles")
@@ -126,24 +142,49 @@ struct LibraryInfoView: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .task {
+        .task(id: asset.localIdentifier) {
+            let request = UUID(); loadGeneration = request
+            sourceReview = nil; reviewedSourceVersion = nil; ledger = nil
+            isAnalyzing = false; loadingCloud = false
             let id = asset.localIdentifier
+            guard let current = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject,
+                  current.localIdentifier == id else { return }
             let photo = LocalAlbumPhoto(localIdentifier: id,
-                sourceVersion: asset.modificationDate.map { String($0.timeIntervalSince1970) })
+                sourceVersion: current.modificationDate.map { String($0.timeIntervalSince1970) })
+            func invalidateCurrentRequest() {
+                // An old task must not erase a newer photo's successfully loaded state.
+                guard loadGeneration == request else { return }
+                sourceReview = nil; reviewedSourceVersion = nil; ledger = nil
+                isAnalyzing = false; loadingCloud = false
+            }
+            func isCurrent() -> Bool {
+                guard !Task.isCancelled, loadGeneration == request, asset.localIdentifier == id,
+                      let latest = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject,
+                      latest.localIdentifier == id else { return false }
+                return latest.modificationDate.map { String($0.timeIntervalSince1970) } == photo.sourceVersion
+            }
             let method = LibraryIngest.albumMethodVersion
-            sourceReview = try? await Task.detached {
+            let retained = try? await Task.detached {
                 try LocalStore.shared.albumImageReview(for: photo, methodVersion: method)
             }.value
+            guard isCurrent() else { invalidateCurrentRequest(); return }
+            reviewedSourceVersion = photo.sourceVersion; sourceReview = retained
+            let context = LocalDocumentContext.read(retained, assetId: id, sourceVersion: photo.sourceVersion, method: method)
             var l = await Task.detached { LocalStore.shared.ledger(for: id) }.value
+            guard isCurrent() else { invalidateCurrentRequest(); return }
             if !localOnly && l?.classified != true {
                 isAnalyzing = true
                 if let v = await VisionEngine.classifyAsset(localIdentifier: id) {
+                    guard isCurrent() else { invalidateCurrentRequest(); return }
                     await Task.detached {
                         LocalStore.shared.classify(localIdentifier: id, isVehicle: v.isVehicle,
                                                    isPersonal: v.isPersonal, hasPerson: v.hasPerson, labels: v.labels)
                     }.value
+                    guard isCurrent() else { invalidateCurrentRequest(); return }
                     l = await Task.detached { LocalStore.shared.ledger(for: id) }.value
+                    guard isCurrent() else { invalidateCurrentRequest(); return }
                 }
+                guard isCurrent() else { invalidateCurrentRequest(); return }
                 isAnalyzing = false
             }
             ledger = l
@@ -151,9 +192,11 @@ struct LibraryInfoView: View {
             // Bring the prod BYOK verdict DOWN if it isn't cached yet. Online-only
             // (offline → [] fast); once cached it renders with no network next open.
             // Joined by the exact uuid bridge (localIdentifier == exif_data.uuid).
-            if !localOnly && l?.cloudNarrative == nil {
+            if !localOnly && context.showsRetainedNarrative(localOnly: localOnly, isPersonal: l?.isPersonal == true,
+                hasPerson: retained?.hasPerson == true, labels: l?.labels ?? [], isScreenshot: asset.mediaSubtypes.contains(.photoScreenshot)) && l?.cloudNarrative == nil {
                 loadingCloud = true
                 let verdicts = await SupabaseService.fetchCloudVerdicts(forLocalIdentifiers: [id])
+                guard isCurrent() else { invalidateCurrentRequest(); return }
                 if let v = verdicts?.first {
                     await Task.detached {
                         LocalStore.shared.cacheCloudVerdict(
@@ -163,7 +206,10 @@ struct LibraryInfoView: View {
                             vehicleId: v.vehicle_id, agentModel: v.agent_model,
                             analyzedAt: SupabaseService.verdictDate(v.analyzed_at))
                     }.value
-                    ledger = await Task.detached { LocalStore.shared.ledger(for: id) }.value
+                    guard isCurrent() else { invalidateCurrentRequest(); return }
+                    let refreshed = await Task.detached { LocalStore.shared.ledger(for: id) }.value
+                    guard isCurrent() else { invalidateCurrentRequest(); return }
+                    ledger = refreshed
                 }
                 loadingCloud = false
             }

@@ -36,7 +36,14 @@ interface DiscoveryInput {
   min_confidence?: number;
   discovery_types?: string[];
   max_observations?: number;
+  /** Bake-off only: one of ALLOWED_MODELS. Anything else uses DEFAULT_MODEL. */
+  model?: string;
+  /** Run the model and return its output and token usage without storing anything. */
+  dry_run?: boolean;
 }
+
+const ALLOWED_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
+const DEFAULT_MODEL = "claude-haiku-5-5";
 
 const SENTIMENT_PROMPT = `Analyze the sentiment and themes in these observations about a vehicle.
 
@@ -165,21 +172,38 @@ Deno.serve(async (req) => {
     }).join("\n\n");
 
     const discoveryTypes = input.discovery_types || ["sentiment"];
+    const model = ALLOWED_MODELS.includes(input.model ?? "") ? input.model! : DEFAULT_MODEL;
+    const dryRun = input.dry_run === true;
+    const usage = { input_tokens: 0, output_tokens: 0, calls: 0 };
+    const skipped: string[] = [];
+    // A stored discovery over the same number of observations is current: no second paid call.
+    const isCurrent = async (type: string) => {
+      if (dryRun) return false;
+      const { data } = await supabase.from("observation_discoveries")
+        .select("observation_count").eq("vehicle_id", input.vehicle_id).eq("discovery_type", type)
+        .order("discovered_at", { ascending: false }).limit(1).maybeSingle();
+      if (data?.observation_count !== observations.length) return false;
+      skipped.push(type);
+      return true;
+    };
     const discoveries: any[] = [];
     const observationIds = observations.map((o: any) => o.id);
     const sourceCategories = [...new Set(observations.map((o: any) => o.source?.category).filter(Boolean))];
 
     // Run sentiment discovery
-    if (discoveryTypes.includes("sentiment")) {
+    if (discoveryTypes.includes("sentiment") && !(await isCurrent("sentiment"))) {
       const prompt = SENTIMENT_PROMPT.replace("{{OBSERVATIONS}}", formattedObs);
 
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
+        model,
+        max_tokens: 4000,
         messages: [{ role: "user", content: prompt }]
       });
+      usage.input_tokens += response.usage.input_tokens;
+      usage.output_tokens += response.usage.output_tokens;
+      usage.calls++;
 
-      const content = response.content[0];
+      const content = response.content.find((b: any) => b.type === "text") ?? response.content[0];
       if (content.type === "text") {
         try {
           // Extract JSON from response
@@ -188,7 +212,7 @@ Deno.serve(async (req) => {
             const sentimentData = JSON.parse(jsonMatch[0]);
 
             // Store discovery
-            const { data: discovery } = await supabase
+            const { data: discovery } = dryRun ? { data: null } : await supabase
               .from("observation_discoveries")
               .insert({
                 vehicle_id: input.vehicle_id,
@@ -200,7 +224,7 @@ Deno.serve(async (req) => {
                 discovery_type: "sentiment",
                 raw_extraction: sentimentData,
                 confidence_score: sentimentData.confidence || 0.7,
-                model_used: "claude-sonnet-4-20250514",
+                model_used: model,
                 prompt_version: "v1"
               })
               .select()
@@ -219,23 +243,26 @@ Deno.serve(async (req) => {
     }
 
     // Run market signals discovery
-    if (discoveryTypes.includes("market_signals")) {
+    if (discoveryTypes.includes("market_signals") && !(await isCurrent("market_signals"))) {
       const prompt = MARKET_SIGNALS_PROMPT.replace("{{OBSERVATIONS}}", formattedObs);
 
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
+        model,
+        max_tokens: 4000,
         messages: [{ role: "user", content: prompt }]
       });
+      usage.input_tokens += response.usage.input_tokens;
+      usage.output_tokens += response.usage.output_tokens;
+      usage.calls++;
 
-      const content = response.content[0];
+      const content = response.content.find((b: any) => b.type === "text") ?? response.content[0];
       if (content.type === "text") {
         try {
           const jsonMatch = content.text.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const marketData = JSON.parse(jsonMatch[0]);
 
-            const { data: discovery } = await supabase
+            const { data: discovery } = dryRun ? { data: null } : await supabase
               .from("observation_discoveries")
               .insert({
                 vehicle_id: input.vehicle_id,
@@ -247,7 +274,7 @@ Deno.serve(async (req) => {
                 discovery_type: "market_signals",
                 raw_extraction: marketData,
                 confidence_score: marketData.confidence || 0.6,
-                model_used: "claude-sonnet-4-20250514",
+                model_used: model,
                 prompt_version: "v1"
               })
               .select()
@@ -266,7 +293,7 @@ Deno.serve(async (req) => {
     }
 
     // Mark observations as processed
-    mustWrite('vehicle_observations update', await supabase
+    if (!dryRun && usage.calls > 0) mustWrite('vehicle_observations update', await supabase
       .from("vehicle_observations")
       .update({ is_processed: true })
       .in("id", observationIds));
@@ -276,11 +303,18 @@ Deno.serve(async (req) => {
       vehicle_id: input.vehicle_id,
       observations_analyzed: observations.length,
       source_categories: sourceCategories,
+      model, dry_run: dryRun, usage, skipped_current: skipped,
       discoveries
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e: any) {
     console.error("Error:", e);
+    // Out of API credit is a known state, not a failure: answer 200 so the caller's logs stay clean.
+    if (/credit balance/i.test(String(e?.message))) {
+      return new Response(JSON.stringify({ success: false, skipped: "api_credit_exhausted" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
     return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }

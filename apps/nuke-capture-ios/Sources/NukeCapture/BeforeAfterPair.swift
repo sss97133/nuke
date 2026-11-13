@@ -41,7 +41,7 @@ struct BeforeAfterPair: View {
                 .clipped()
                 .overlay(alignment: .topLeading) {
                     Text(label)
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6).padding(.vertical, 3)
                         .background(.black.opacity(0.5), in: Capsule())

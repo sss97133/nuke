@@ -38,6 +38,13 @@ export function openVehicleDay(date: string): void {
 
 export const VEHICLE_DAY_OPEN_EVENT = DAY_EVENT;
 
+const DAYS_HIGHLIGHT_EVENT = 'nuke:vehicle-days-highlight';
+/** Ask the barcode timeline to illuminate a set of days (null clears); the open day stays open. */
+export function highlightVehicleDays(days: string[] | null): void {
+  window.dispatchEvent(new CustomEvent(DAYS_HIGHLIGHT_EVENT, { detail: { days } }));
+}
+export const VEHICLE_DAYS_HIGHLIGHT_EVENT = DAYS_HIGHLIGHT_EVENT;
+
 interface PhotoRow {
   id: string;
   image_url: string;
