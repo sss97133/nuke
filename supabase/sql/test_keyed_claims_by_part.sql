@@ -42,6 +42,15 @@ INSERT INTO vehicle_observations VALUES
  ('c8000000-0000-0000-0000-000000000008','a1000000-0000-0000-0000-000000000001','{"part_key":"glass.felt.window"}',true,'d3000000-0000-0000-0000-000000000003',NULL),
  ('c9000000-0000-0000-0000-000000000009','a1000000-0000-0000-0000-000000000001','{"part_key":"glass.felt.window"}',false,NULL,NULL),
  ('ca000000-0000-0000-0000-00000000000a','a1000000-0000-0000-0000-000000000001','{"part_key":"glass.felt.window","image_visible_paint_stage":"primer"}',false,NULL,'e1000000-0000-0000-0000-000000000001');
+-- Driver and passenger felts, both worn, on the 25th: two claims, not one.
+INSERT INTO vehicle_images VALUES
+ ('b7000000-0000-0000-0000-000000000007','a1000000-0000-0000-0000-000000000001','https://img.example/7.jpg','2026-05-25T10:00:00Z',false),
+ ('b8000000-0000-0000-0000-000000000008','a1000000-0000-0000-0000-000000000001','https://img.example/8.jpg','2026-05-25T11:00:00Z',false),
+ ('b9000000-0000-0000-0000-000000000009','a2000000-0000-0000-0000-000000000002','https://img.example/9.jpg',NULL,false);
+INSERT INTO vehicle_observations VALUES
+ ('cb000000-0000-0000-0000-00000000000b','a1000000-0000-0000-0000-000000000001','{"part_key":"glass.felt.window","part_side":"driver"}',false,'d3000000-0000-0000-0000-000000000003',NULL),
+ ('cc000000-0000-0000-0000-00000000000c','a1000000-0000-0000-0000-000000000001','{"part_key":"glass.felt.window","part_side":"passenger"}',false,'d3000000-0000-0000-0000-000000000003',NULL),
+ ('cd000000-0000-0000-0000-00000000000d','a2000000-0000-0000-0000-000000000002','{"part_key":"glass.felt.window"}',false,'d3000000-0000-0000-0000-000000000003',NULL);
 INSERT INTO observation_witnesses VALUES
  ('c1000000-0000-0000-0000-000000000001','b1000000-0000-0000-0000-000000000001','derived'),
  ('c2000000-0000-0000-0000-000000000002','b2000000-0000-0000-0000-000000000002','derived'),
@@ -52,33 +61,48 @@ INSERT INTO observation_witnesses VALUES
  ('c7000000-0000-0000-0000-000000000007','b1000000-0000-0000-0000-000000000001','derived'),
  ('c8000000-0000-0000-0000-000000000008','b1000000-0000-0000-0000-000000000001','derived'),
  ('c9000000-0000-0000-0000-000000000009','b1000000-0000-0000-0000-000000000001','derived'),
- ('ca000000-0000-0000-0000-00000000000a','b3000000-0000-0000-0000-000000000003','derived');
+ ('ca000000-0000-0000-0000-00000000000a','b3000000-0000-0000-0000-000000000003','derived'),
+ ('cb000000-0000-0000-0000-00000000000b','b7000000-0000-0000-0000-000000000007','derived'),
+ ('cc000000-0000-0000-0000-00000000000c','b8000000-0000-0000-0000-000000000008','derived'),
+ ('cd000000-0000-0000-0000-00000000000d','b9000000-0000-0000-0000-000000000009','derived');
 \ir ../migrations/20261116061000_keyed_claims_by_part.sql
 DO $$ DECLARE j jsonb; a jsonb; BEGIN
  j:=public.keyed_claims_by_part('glass.felt.window');
- -- Two live vehicles carry the part; the deleted vehicle is not returned.
- ASSERT (j->>'vehicles')::int=2 AND jsonb_array_length(j->'results')=2 AND (j->>'claims')::int=4,j::text;
+ -- Two live vehicles carry the part; the deleted vehicle is neither returned nor counted.
+ ASSERT (j->>'vehicles')::int=2 AND jsonb_array_length(j->'results')=2 AND (j->>'claims')::int=7,j::text;
  ASSERT (j->>'part_in_registry')::boolean AND j->'state_key'='null'::jsonb AND (j->>'proven')::int=0,j::text;
  a:=j#>'{results,0}';
- ASSERT a->>'vehicle_id'='a1000000-0000-0000-0000-000000000001' AND a->>'make'='Pontiac' AND (a->>'days_seen')::int=2,a::text;
- -- The part's days in order: missing on the 1st, replaced (and a paint value) on the 20th. The reader states the
- -- sequence; it does not call it a repair.
- ASSERT a->'days'='[{"capture_day":"2026-05-01","states":["exterior.trim.missing"]},{"capture_day":"2026-05-20","states":["exterior.trim.replaced","image_visible_paint_stage=primer"]}]'::jsonb,a::text;
- -- One claim per state and day: two photos fold into the claim of the 1st; the duplicate frame, the superseded
- -- row and the unkeyed row add nothing.
- ASSERT jsonb_array_length(a->'claims')=3,a::text;
+ ASSERT a->>'vehicle_id'='a1000000-0000-0000-0000-000000000001' AND a->>'make'='Pontiac' AND (a->>'days_seen')::int=3,a::text;
+ -- The part's days in order: missing on the 1st, replaced (and a paint value) on the 20th, then each side worn
+ -- on the 25th. The reader states the sequence; it does not call it a repair.
+ ASSERT a->'days'='[{"capture_day":"2026-05-01","part_side":null,"states":["exterior.trim.missing"]},
+   {"capture_day":"2026-05-20","part_side":null,"states":["exterior.trim.replaced","image_visible_paint_stage=primer"]},
+   {"capture_day":"2026-05-25","part_side":"driver","states":["exterior.flag.wear"]},
+   {"capture_day":"2026-05-25","part_side":"passenger","states":["exterior.flag.wear"]}]'::jsonb,a::text;
+ -- One claim per state, side and day: two photos fold into the claim of the 1st; the duplicate frame, the
+ -- superseded row and the unkeyed row add nothing; the two sides on the 25th stay two claims.
+ ASSERT jsonb_array_length(a->'claims')=5,a::text;
  ASSERT a#>>'{claims,0,state_key}'='exterior.trim.missing' AND (a#>>'{claims,0,photo_count}')::int=2 AND (a#>>'{claims,0,rows}')::int=2
-  AND a#>>'{claims,0,kind}'='state',a::text;
+  AND a#>>'{claims,0,kind}'='state' AND a#>'{claims,0,part_side}'='null'::jsonb,a::text;
  ASSERT (SELECT array_agg(p->>'image_url' ORDER BY p->>'image_url') FROM jsonb_array_elements(a#>'{claims,0,photos}') p)
   = ARRAY['https://img.example/1.jpg','https://img.example/2.jpg'],a::text;
- -- A photo with no capture time: the claim is returned with a null day and no day entry.
+ ASSERT a#>>'{claims,3,part_side}'='driver' AND a#>>'{claims,4,part_side}'='passenger'
+  AND a#>>'{claims,3,photos,0,image_url}'='https://img.example/7.jpg' AND a#>>'{claims,4,photos,0,image_url}'='https://img.example/8.jpg',a::text;
+ -- Photos with no capture time: two sightings of the same state stay two claims, each with a null day, and
+ -- make no day entry. When they happened relative to each other is unknown.
  a:=j#>'{results,1}';
  ASSERT a->>'vehicle_id'='a2000000-0000-0000-0000-000000000002' AND (a->>'days_seen')::int=0 AND a->'days'='[]'::jsonb
-  AND a#>'{claims,0,capture_day}'='null'::jsonb AND a#>>'{claims,0,state_key}'='exterior.flag.wear',a::text;
+  AND jsonb_array_length(a->'claims')=2 AND a#>'{claims,0,capture_day}'='null'::jsonb AND a#>'{claims,1,capture_day}'='null'::jsonb
+  AND (a#>>'{claims,0,photo_count}')::int=1 AND (a#>>'{claims,1,photo_count}')::int=1 AND a#>>'{claims,0,state_key}'='exterior.flag.wear',a::text;
  -- The proof question itself: which vehicles show this part replaced, with the photos.
  j:=public.keyed_claims_by_part('glass.felt.window','exterior.trim.replaced');
  ASSERT jsonb_array_length(j->'results')=1 AND (j->>'state_in_registry')::boolean AND j#>>'{results,0,vehicle_id}'='a1000000-0000-0000-0000-000000000001'
   AND j#>>'{results,0,claims,0,photos,0,image_url}'='https://img.example/3.jpg' AND j#>>'{results,0,claims,0,capture_day}'='2026-05-20',j::text;
+ -- A property-backed state is asked as property=value, is found, and is reported as registered.
+ j:=public.keyed_claims_by_part('glass.felt.window','image_visible_paint_stage=primer');
+ ASSERT (j->>'state_in_registry')::boolean AND jsonb_array_length(j->'results')=1
+  AND j#>>'{results,0,claims,0,state_key}'='image_visible_paint_stage=primer',j::text;
+ ASSERT NOT (public.keyed_claims_by_part('glass.felt.window','no_such_property=primer')->>'state_in_registry')::boolean;
  -- Scoped to one vehicle; a state the registry does not hold says so; a part nobody carries and an empty part return nothing.
  ASSERT jsonb_array_length(public.keyed_claims_by_part('glass.felt.window',NULL,'a2000000-0000-0000-0000-000000000002')->'results')=1;
  j:=public.keyed_claims_by_part('glass.felt.window','made.up.state');
@@ -89,5 +113,14 @@ DO $$ DECLARE j jsonb; a jsonb; BEGIN
  ASSERT NOT has_function_privilege('anon','public.keyed_claims_by_part(text,text,uuid)','execute')
   AND NOT has_function_privilege('authenticated','public.keyed_claims_by_part(text,text,uuid)','execute')
   AND has_function_privilege('service_role','public.keyed_claims_by_part(text,text,uuid)','execute');
+END $$;
+-- The row cap bounds the requested state, not the part: with 6,000 rows of another state on the part, a
+-- rare state is still found.
+INSERT INTO vehicle_observations(id,vehicle_id,structured_data,is_superseded,descriptor_id)
+ SELECT gen_random_uuid(),'a2000000-0000-0000-0000-000000000002','{"part_key":"glass.felt.window"}',false,'d3000000-0000-0000-0000-000000000003'
+ FROM generate_series(1,6000);
+DO $$ DECLARE j jsonb; BEGIN
+ j:=public.keyed_claims_by_part('glass.felt.window','exterior.trim.replaced');
+ ASSERT jsonb_array_length(j->'results')=1 AND j#>>'{results,0,claims,0,photos,0,image_url}'='https://img.example/3.jpg',j::text;
 END $$;
 \echo keyed claims by part: ok
