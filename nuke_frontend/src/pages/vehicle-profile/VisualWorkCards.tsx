@@ -182,8 +182,8 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
 
 function ExpectedAssemblyReferences({ assemblies }: { assemblies?: ExpectedAssembly[] }) {
   if (!assemblies?.length) return null;
-  return <section className="vp-expected-assemblies" aria-label="Build references">
-    <header><h4>Build references</h4><p>What the factory parts catalog calls for, with each piece linked to its source.</p></header>
+  return <section className="vp-expected-assemblies" aria-label="Catalog references">
+    <header><h4>Catalog references</h4><p>Factory parts catalog positions for this configuration. These are catalog-specified parts, not necessarily as-built or installed.</p></header>
     {assemblies.map(assembly => {
       const file = supabase.storage.from('reference-docs').getPublicUrl(assembly.source.retained_file.slice('reference-docs/'.length)).data.publicUrl;
       return <article key={assembly.assembly_id} aria-label={assembly.assembly_name.replaceAll('_', ' ')}>
@@ -207,8 +207,9 @@ function ExpectedAssemblyReferences({ assemblies }: { assemblies?: ExpectedAssem
         })}</div>
         <p className="vp-expected-inspection">Individual pieces still need photo identification.</p>
         <p className="vp-expected-source"><a href={`${file}#page=${assembly.positions[0].source_refs[0].page_number}`} target="_blank" rel="noopener noreferrer">{assembly.source.title} ↗</a>
-          <span>{assembly.application.make} {assembly.application.model} · {assembly.application.year_start === assembly.application.year_end
-            ? assembly.application.year_start : `${assembly.application.year_start}–${assembly.application.year_end}`} · {assembly.application.body_style}</span></p>
+          <span>{assembly.application.year_start === assembly.application.year_end
+            ? assembly.application.year_start : `${assembly.application.year_start}–${assembly.application.year_end}`} catalog · {assembly.description.includes('455') || assembly.assembly_name.includes('455')
+            ? '455 configuration' : `${assembly.application.make} ${assembly.application.model} configuration`}</span></p>
         <p className="vp-expected-limit">Outside this reference: {assembly.exclusions.join(' · ')}.</p>
         {assembly.limitations.length > 0 && <p className="vp-expected-limit">{assembly.limitations.join(' ')}</p>}
       </article>;
