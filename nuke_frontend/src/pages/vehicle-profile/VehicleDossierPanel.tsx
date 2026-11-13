@@ -42,7 +42,8 @@ const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 /** The header token whose line items state a record field (vehicle_profile_read masthead.token_items). Engine type
  * and size are both stated by the engine token, so its items render once, on the engine type row. */
 const FIELD_TOKEN: Partial<Record<RecordField, string>> = { year: 'year', make: 'make', model: 'model', trim: 'trim',
-  body_style: 'body_style', engine_type: 'engine', engine_size: 'engine', transmission: 'transmission', drivetrain: 'drivetrain' };
+  body_style: 'body_style', engine_type: 'engine', engine_size: 'engine', transmission: 'transmission', drivetrain: 'drivetrain',
+  color: 'paint' };
 
 /** The masthead's token items from the page's one profile read (shared with the header; no new request). */
 function useTokenItems(vehicleId: string): TokenItems | null {
@@ -168,12 +169,13 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: bo
           <thead><tr><th scope="col">Field</th><th scope="col">Recorded value</th></tr></thead>
           <tbody>{RECORD_FIELDS.map(key => {
             const a = current.attributes![key];
-            // A replica's retained trim can name the car it resembles. It cannot
-            // establish factory identity, even after the old claim is retired.
-            if (key === 'trim' && isReplica === true) return null;
             // A field a header token states renders that token's line items, as built and current with their sources,
             // rules and gaps: the same items the token's popover shows (kit ItemList), read once with the header.
             const items = itemsFor(key);
+            // A replica's retained trim can name the car it resembles. It cannot establish factory identity, even after
+            // the old claim is retired, so the bare value stays hidden; the trim items (tribute rule, as-built interior
+            // code, each with its status) can render.
+            if (key === 'trim' && isReplica === true && !items) return null;
             if (items && key === 'engine_size') return null;
             // Full width: an item list in the 65% value column broke names letter by letter at desktop width.
             if (items) return <tr key={key} data-record-field={key} data-token-items={FIELD_TOKEN[key]} className="vp-structured-record__items">
