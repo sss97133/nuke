@@ -1138,6 +1138,11 @@ BEGIN
   p := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
   PERFORM public.t_assert(p#>'{sections,0,token_items,paint}' = public.vehicle_facet_items('10000000-0000-0000-0000-000000000001', 'paint'),
     'the profile carries the paint token');
+  -- A list of items like every other token (the phone and web render any token's list), never an object by facet.
+  PERFORM public.t_assert(jsonb_typeof(p#>'{sections,0,token_items,paint}') = 'array'
+    AND jsonb_array_length(p#>'{sections,0,token_items,paint}') = 2
+    AND (SELECT array_agg(x->>'facet' ORDER BY o) FROM jsonb_array_elements(p#>'{sections,0,token_items,paint}') WITH ORDINALITY e(x, o))
+        = ARRAY['current', 'as_built'], 'paint token_items is an array of items with their facets');
 END $$;
 RESET ROLE;
 -- The documented fixture car as a logged-out viewer sees it (printed for review).
