@@ -276,6 +276,16 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
   stage was reached: implemented, tested, merged, deployed or runtime-verified. Green means every job
   the workflows define ran and passed: "nothing pending" with jobs missing is a broken workflow, not a
   pass (2026-10-13, four PRs merged while `frontend-tests` ran zero jobs).
+- A pull request is yours until it lands, and none waits for the owner (owner, 2026-11-13, standing until
+  he says otherwise: "i refuse to review prs... i never want to review one ever again"; "make it so agents
+  push their prs til i say otherwise"). An open PR hides whether the implementation landed. Land yours in
+  the session that opened it. Do not open one as a draft, title one `NOT APPLIED` or `do not merge`, or ask
+  the owner to read one; show him the live result instead. If it cannot land, write the blocker on the PR
+  in one line, then fix it or close it with the reason (the branch stays). Before a session ends, every PR
+  it opened is merged, closed with a reason, or listed with its blocker in `.claude/LANES.md` or the lane's
+  handoff. This does not widen any authority: the decisions that are the owner's (spending, permanent
+  deletion, messages to other people, credentials, anything signed in his name) and every deployment hold
+  in this file stay as they are. Name such a decision to him once; it is not a review request.
 - Read a file before changing it, and keep changes surgical. A fix is a few lines, not a rewrite.
 
 ## Rules by area
