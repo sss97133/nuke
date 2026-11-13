@@ -4,6 +4,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { intakeThrottle, createIntakeBudget, readLandedBatch, readbackFor } from "../poll-listing-feeds/ledger.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
+import { resolveBatQueueUrl } from './batShortlink.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,7 +27,8 @@ Deno.serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const { batch_size = 10, priority_only = false, source_id, use_intelligence = false } = body;
+    const { batch_size = 10, priority_only = false, source_id, use_intelligence = false, queued_reason } = body;
+    if (queued_reason !== undefined && queued_reason !== 'coverage_miss') throw new Error("queued_reason must be 'coverage_miss' when given");
     if (!Number.isInteger(batch_size) || batch_size < 0 || batch_size > 100) throw new Error('batch_size must be an integer from 0 to 100');
     const { data: control, error: controlError } = await supabase.from('platform_config')
       .select('config_value').eq('config_key', 'source_intake').maybeSingle();
@@ -39,13 +41,21 @@ Deno.serve(async (req) => {
     const workerId = 'process-import-queue:' + Date.now();
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
 
-    const { data: queueItems, error: queueError } = await supabase.rpc('claim_import_queue_batch', {
-      p_batch_size: Math.min(batch_size, throttle.max_ingests),
-      p_max_attempts: 8,
-      p_priority_only: priority_only,
-      p_source_id: source_id || null,
-      p_worker_id: workerId,
-    });
+    // Coverage misses (evaluate_listing pastes that were not in Nuke) are drained on their own: they carry a
+    // platform source_id that no scheduled source drain claims (the Nov 5 2026 BaT miss sat pending for days).
+    const { data: queueItems, error: queueError } = queued_reason === 'coverage_miss'
+      ? await supabase.rpc('claim_import_queue_coverage_misses', {
+        p_batch_size: Math.min(batch_size, throttle.max_ingests),
+        p_max_attempts: 8,
+        p_worker_id: workerId,
+      })
+      : await supabase.rpc('claim_import_queue_batch', {
+        p_batch_size: Math.min(batch_size, throttle.max_ingests),
+        p_max_attempts: 8,
+        p_priority_only: priority_only,
+        p_source_id: source_id || null,
+        p_worker_id: workerId,
+      });
 
     if (queueError) throw queueError;
     if (!queueItems || queueItems.length === 0) {
@@ -78,7 +88,7 @@ Deno.serve(async (req) => {
       }
       const attemptStarted = Date.now();
       try {
-        const url = item.listing_url;
+        let url = item.listing_url;
         // Normalize URL for domain routing (strip protocol, www, trailing slash, query/hash)
         const normalizedUrl = normalizeListingUrlKey(url) || '';
         if (!url) {
@@ -94,6 +104,34 @@ Deno.serve(async (req) => {
           continue;
         }
         let extractorUrl = null;
+
+        // A BaT `?p=<post id>` shortlink is resolved to its lot first (extract-bat-core takes /listing/ URLs only).
+        // A post that answers 404/410 is not public: terminal, never retried. The queued URL is kept as
+        // queued; the resolution is recorded beside it in raw_data.
+        const bat = await resolveBatQueueUrl(url);
+        if (bat?.kind === 'dead') {
+          mustWrite('import_queue update', await supabase.from('import_queue').update({
+            status: 'failed',
+            error_message: `Dead page: BaT answered HTTP ${bat.http_status} for this post (unpublished or removed)`,
+            failure_category: 'dead_page',
+            attempts: item.attempts,
+            next_attempt_at: null,
+            locked_at: null,
+            locked_by: null,
+            raw_data: { ...(item.raw_data ?? {}), resolution: { kind: 'dead', http_status: bat.http_status, checked_at: new Date().toISOString() } },
+          }).eq('id', item.id));
+          results.push({ id: item.id, status: 'failed', url, error: 'dead_page', retry_scheduled: false });
+          continue;
+        }
+        if (bat?.kind === 'unresolved') throw new Error(bat.error);
+        if (bat?.kind === 'lot' && bat.url !== url) {
+          if (bat.resolved_from) {
+            mustWrite('import_queue update', await supabase.from('import_queue').update({
+              raw_data: { ...(item.raw_data ?? {}), resolution: { kind: 'lot', url: bat.url, checked_at: new Date().toISOString() } },
+            }).eq('id', item.id));
+          }
+          url = bat.url;
+        }
 
         // Use normalized URL for domain routing (handles www, mixed case, trailing slashes)
         const isBat = normalizedUrl.includes('bringatrailer.com');
