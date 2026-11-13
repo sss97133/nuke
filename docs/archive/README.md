@@ -12,12 +12,12 @@ and `v_job_health` views, and `docs/ledger/README.md`. The capabilities ruled re
 
 ## Added 2026-11-13
 
-Nine files moved here from the top of `docs/`. Each describes a retired capability, or sends the reader to files that are
-gone. Their text is unchanged.
+Nine files moved here from the top of `docs/`. Each describes a retired capability, sends the reader to files that are
+gone, or was replaced by a current document. Their text is unchanged.
 
 | File | Why it is here |
 |---|---|
-| `AI_AUCTION_AGENT_FRAMEWORK.txt`, `AUCTION_SYSTEM_FRAMEWORK.txt`, `TIERED_AUCTION_SYSTEM_FRAMEWORK.txt` | November 2025 designs for auctions run on Nuke itself. The capability map records bidding, auto-buy and trading as retired in March 2026 |
+| `AI_AUCTION_AGENT_FRAMEWORK.txt`, `AUCTION_SYSTEM_FRAMEWORK.txt`, `TIERED_AUCTION_SYSTEM_FRAMEWORK.txt` | November 2025 designs for auctions run on Nuke itself, with an agent that proposed listings for them. The capability map records bidding, auto-buy and trading as retired in March 2026. The agent's function left the repository on 2026-02-01 and is not deployed |
 | `TELEGRAM_RESTORATION_INTAKE.md` | Photo intake through Telegram. The capability map records the Telegram bots as retired, and no Telegram function remains in `supabase/functions/` |
 | `SOURCES_MASTER_LIST.md` | A readable view of `data/sources/master_sources.yaml`, which is no longer in the repository |
 | `ENV_QUICKREF.md` | January 2026 notes on environment variables. It names browser variables the web app no longer reads, and a function and a file that are gone. The current rules for secrets are in `AGENTS.md` |

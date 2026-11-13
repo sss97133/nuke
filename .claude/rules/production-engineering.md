@@ -79,6 +79,15 @@ Until prod SQL is dumped back into the repo (`supabase db dump` of functions
 unverified. When you discover an applied-but-uncommitted object, commit its
 definition or note it here.
 
+Noted drift:
+
+- 2026-11-13: `api-v1-export` answers 401 in production (a made-up function
+  name answers 404), but its source left the repo in 9871ee4fb (2026-03-31,
+  the dead-function cleanup). `docs/QUICKSTART.md` and the OpenAPI files
+  (`docs/api/openapi.yaml`, `nuke_frontend/public/v1/openapi.json`,
+  `nuke_frontend/api/v1/openapi.json`) still list it. It is deployed without
+  source: restore the source, or retire the deployment and the spec entries.
+
 ## Fleet Rules (workflows / crons / daemons)
 
 - **Probe before you schedule.** A workflow may only call endpoints verified

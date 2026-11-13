@@ -19,13 +19,13 @@ scheduled job. A document is dated testimony about the system: cite it, then che
 | What did earlier audits find? | [`ledger/`](ledger/README.md), the inventories from the 2026-07-12 audit, and [`function-drift-20261107.md`](function-drift-20261107.md) |
 | Which function does X? | [`TOOLS.md`](../TOOLS.md) |
 | How is the market read? | [`features/ask-nuke/THEORY.md`](features/ask-nuke/THEORY.md), the contracts in [`market/`](market/) and [`valuation-backtest-2026-10-22.md`](valuation-backtest-2026-10-22.md) |
-| How do I call the API? | [The API reference](api/README.md), with quickstarts for [reading](QUICKSTART.md) and [writing](api/QUICKSTART.md). The write API's brief is [`external-agent-write-api.md`](external-agent-write-api.md) |
+| How do I call the API? | [The API reference](api/README.md), with quickstarts for [reading](QUICKSTART.md) (February 2026) and [writing](api/QUICKSTART.md) (May 2026). The write API's brief is [`external-agent-write-api.md`](external-agent-write-api.md). The read quickstart's bulk-export section calls `api-v1-export`, whose source left the repository on 2026-03-31 while the deployed copy still answers |
 | How does an agent connect over MCP? | [`ADVISOR.md`](../supabase/functions/mcp-connector/ADVISOR.md) |
 | What are the rules for extraction? | [`EXTRACTION_POLICY.md`](EXTRACTION_POLICY.md), [`EXTRACTION_TARGETS.md`](EXTRACTION_TARGETS.md) and [`ACCURATE_EXTRACTION.md`](ACCURATE_EXTRACTION.md) |
 | How do photos land and get filed? | [`photo-sorting-pipeline.md`](photo-sorting-pipeline.md) and [`photo-landing-v3.md`](photo-landing-v3.md) |
 | How do receipts reach the work record and the books? | [`receipt-work-contract.md`](receipt-work-contract.md), [`receipts-product-enrichment.md`](receipts-product-enrichment.md), [`books-docket.md`](books-docket.md) and [`accounting-shared-access.md`](accounting-shared-access.md) |
 | How does an audit finding become a change? | [`agent-finding-to-main.md`](agent-finding-to-main.md) |
-| How does the iOS capture app work? | [`apps/nuke-capture-ios/README.md`](../apps/nuke-capture-ios/README.md) and [`design/HARD_RULES.md`](design/HARD_RULES.md) |
+| How does the iOS capture app work? | [`apps/nuke-capture-ios/README.md`](../apps/nuke-capture-ios/README.md) |
 | How does the image classifier work? | [`yono/README.md`](../yono/README.md) and [`ledger/theory/ai-vision-yono.md`](ledger/theory/ai-vision-yono.md) |
 | What are the interface rules? | [`library/technical/design-book/`](library/technical/design-book/README.md) |
 | The K5 wiring build | [`wiring/`](wiring/README.md) |
@@ -33,7 +33,9 @@ scheduled job. A document is dated testimony about the system: cite it, then che
 
 ## Single documents at this level
 
-Each is dated by its last change. The older ones stay here because code or another document cites them by path.
+Each is dated by its last change. A file stays at this level when what it describes still exists, when it is
+founder-curated direction, or when code or another document cites it by path. Where a limit is known, the last column
+gives it.
 
 | Document | Last changed | What it is |
 |---|---|---|
@@ -41,14 +43,14 @@ Each is dated by its last change. The older ones stay here because code or anoth
 | [`MESH.md`](MESH.md), [`LAUNCH_DAY_ONE.md`](LAUNCH_DAY_ONE.md) | 2026-06 | Founder-curated doctrine for the query layer and for launch |
 | [`NUKE_ENCYCLOPEDIA.md`](NUKE_ENCYCLOPEDIA.md) | 2026-03 | The long statement of the provenance engine. The theory in `ledger/theory/` is the current form |
 | [`DESIGN_BIBLE.md`](DESIGN_BIBLE.md) | 2026-03 | The design philosophy. For implementation the design book in the library supersedes it |
-| [`FINDER_ARCHITECTURE.md`](FINDER_ARCHITECTURE.md), [`FINDER_UI_RHIZOME_SPEC.md`](FINDER_UI_RHIZOME_SPEC.md) | 2026-03, 2026-10 | The finder interface: working spec and build prompt |
+| [`FINDER_ARCHITECTURE.md`](FINDER_ARCHITECTURE.md), [`FINDER_UI_RHIZOME_SPEC.md`](FINDER_UI_RHIZOME_SPEC.md) | 2026-03, 2026-10 | The finder interface: a working spec and a build prompt. The `nuke_frontend/src/finder/` files the spec names are not in the repository |
 | [`IMAGE_ANALYSIS_100X_PROMPT.md`](IMAGE_ANALYSIS_100X_PROMPT.md) | 2026-10 | The brief for proving and repairing image analysis |
 | [`client-evidence-producers.md`](client-evidence-producers.md) | 2026-11 | Producers of client evidence from mail, timeline and labor. Tested, not run against production |
-| [`MONTHLY_REVIEW.md`](MONTHLY_REVIEW.md) | 2026-06 | SQL for reading one month of activity from the database |
+| [`MONTHLY_REVIEW.md`](MONTHLY_REVIEW.md) | 2026-06 | SQL for reading one month of activity from the database. The three views it uses exist |
 | [`ios-connection-audit-2026-06-23.md`](ios-connection-audit-2026-06-23.md) | 2026-07 | An audit of the iOS app's reads against production |
-| [`imessage-bridge-architecture.md`](imessage-bridge-architecture.md) | 2026-03 | The design of the iMessage bridge |
+| [`imessage-bridge-architecture.md`](imessage-bridge-architecture.md) | 2026-03 | The design of the iMessage bridge. Its code is `scripts/imessage-bridge.mjs` and `supabase/functions/imessage-router/` |
 | [`YONO_TRAINING_DATA.md`](YONO_TRAINING_DATA.md) | 2026-03 | The classifier's training-data plan. Its row counts are from March 2026 |
-| [`forensics-metrics.md`](forensics-metrics.md) | 2026-02 | The fields of `auction_events.forensics_data` |
+| [`forensics-metrics.md`](forensics-metrics.md) | 2026-02 | The fields of `auction_events.forensics_data`, a column that exists |
 | [`VEHICLE_STATE_MODEL.md`](VEHICLE_STATE_MODEL.md), [`VEHICLE_STATES_AND_BADGES.md`](VEHICLE_STATES_AND_BADGES.md) | 2026-01 | Vehicle states and badge rules. The state names are still used in code |
 | [`dead_tables_candidates.txt`](dead_tables_candidates.txt) | 2026-02 | Tables that looked unused in February 2026. A migration and the engineering manual cite it. Verify a table against the live database before acting on this list |
 
