@@ -500,10 +500,13 @@ def reconcile(cands, ruled, current, owner_facts=None):
                 got = sum(r['amount'] for r in receipts)
                 if got < claim * (1 - TOL):
                     anchor = [r['date'] for r in receipts] or [a['date'] for a in agreement if a['date']] or [c['date'] for c in claims if c['date']]
-                    lo, hi = min(anchor), max(anchor)
+                    if not anchor:
+                        # nothing dates this sale, so no window can be drawn to attribute deposits: hold the search and say so
+                        res['conflicts'].append('no dated record anchors the sale; deposit attribution by window was not attempted')
+                    lo, hi = (min(anchor), max(anchor)) if anchor else (None, None)
                     gap = claim - got
                     near = [p for p in sorted(pool, key=lambda c: c['date'])
-                            if id(p) not in taken and -3 <= days(p['date'], lo) and days(p['date'], hi) <= 45 and p['amount'] <= gap * 1.1][:12]
+                            if lo and id(p) not in taken and -3 <= days(p['date'], lo) and days(p['date'], hi) <= 45 and p['amount'] <= gap * 1.1][:12]
                     best = None     # the subset of unexplained customer deposits whose sum is nearest the gap; fewest items on a tie
                     for n in range(1, 5):
                         for combo in itertools.combinations(near, n):
