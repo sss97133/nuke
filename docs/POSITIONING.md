@@ -58,18 +58,18 @@ and moves with it. The figures quoted in prose further down (objective 0, the sc
 2026-10-07 09:00Z and match the block at that date.
 
 <!-- evidence:start -->
-Measured 2026-11-14 00:48 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
+Measured 2026-11-14 06:32 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
 
 | Model | Sold lots graded, of lots ended | Median absolute error | Bias (mean signed error) | Hammer inside its stated band | Close: scheduled / final / predicted |
 |---|---|---|---|---|---|
-| 33 | 1,679 of 2,414 | 15.5% | −2.0% | 1,290 of 1,679 = 76.8% (80% band) | 1,651 / 28 / 0 |
-| 32 | 1,801 of 2,558 | 17.2% | +2.1% | 1,437 of 1,801 = 79.8% (80% band) | 1,755 / 46 / 0 |
+| 33 | 1,679 of 2,421 | 15.5% | −2.0% | 1,290 of 1,679 = 76.8% (80% band) | 1,651 / 28 / 0 |
+| 32 | 1,801 of 2,582 | 17.2% | +2.1% | 1,437 of 1,801 = 79.8% (80% band) | 1,755 / 46 / 0 |
 | 31 | 4,228 of 6,149 | 26.3% | +21.4% | 3,294 of 4,228 = 77.9% (80% band) | 3,582 / 646 / 0 |
 | 30 | 489 of 980 | 30.7% | +16.2% | 365 of 489 = 74.6% (80% band) | 30 / 459 / 0 |
 | 24 | 783 of 1,041 | 24.4% | −13.2% | 204 of 783 = 26.1% (50% band) | 8 / 272 / 503 |
 | 13 | 11 of 14 | 13.1% | −16.9% | 2 of 11 = 18.2% (band width unknown) | 0 / 0 / 11 |
 
-- **Lots predicted:** 7,724 distinct lots, in 93,897 of 134,075 prediction rows; 40,178 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
+- **Lots predicted:** 7,731 distinct lots, in 94,076 of 136,232 prediction rows; 42,156 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
 - **Lots graded:** 5,365 distinct sold lots, and 8,991 model-lot grades in all, because a lot priced by more than one model is graded once for each (`v_prediction_lot_grades`, horizon `last`, with a hammer; the table is `prediction_accuracy`).
 - **Stacks:** 66 registered, 65 at status measured; 6 at coverage 0.9 or above; mean coverage 0.22 (`v_stacks`). Order book SA v3: coverage 0.50, 9 of 18 needs present, 3 partial, 6 missing; status showable.
 - **Thesis vein V012 v1** (cited by S03; `vein_ledger`, status active): 68,957 distinct buyers, the top 1% took 14% of lots, 39 won 50 or more (discovery run, as of 2026-09-30). Runs that can grade it: 0 of 1 (`vein_runs`).
