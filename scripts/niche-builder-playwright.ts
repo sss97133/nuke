@@ -148,12 +148,13 @@ ${text.slice(0, 12000)}`;
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       max_tokens: 4000,
+      output_config: { effort: "low" },
       messages: [{ role: "user", content: prompt }],
     });
 
-    const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+    const responseText = response.content.find((b) => b.type === "text")?.text || "";
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
 
     if (jsonMatch) {
