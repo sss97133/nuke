@@ -4,10 +4,10 @@ import XCTest
 final class NavigationUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
-    private func openJourneyDay(_ mode: String) -> XCUIApplication {
+    private func openJourneyDay(_ mode: String, analysis: String = "") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
-        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_DAY_MODE": mode]
+        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_DAY_MODE": mode, "NUKE_FIXTURE_ANALYSIS_MODE": analysis]
         app.launch()
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
@@ -26,6 +26,76 @@ final class NavigationUITests: XCTestCase {
         let day = app.descendants(matching: .any).matching(identifier: "timeline.day.\(f.string(from: Date()))").firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 5)); day.tap()
         return app
+    }
+
+    func testAnalysisFailureRetriesOnExactPhotoAndReturnsToSameDay() {
+        let app = openJourneyDay("analysis", analysis: "failure")
+        let photo = app.buttons["day.photo.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
+        XCTAssertTrue(app.staticTexts["evidence.analysis.error"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["Analysis pending"].exists)
+        XCTAssertFalse(app.staticTexts["evidence.analysis.empty"].exists)
+        app.buttons["evidence.analysis.retry"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture analysis for exact photo"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["evidence.analysis.error"].exists)
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(photo.waitForExistence(timeout: 5))
+        app.buttons["Done"].firstMatch.tap()
+        let back = app.navigationBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 5)); back.tap()
+        XCTAssertTrue((app.searchFields.firstMatch.value as? String)?.contains("1234567") == true)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testSuccessfulEmptyAnalysisDoesNotClaimPendingOrFailure() {
+        let app = openJourneyDay("analysis", analysis: "empty")
+        let photo = app.buttons["day.photo.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
+        XCTAssertTrue(app.staticTexts["evidence.analysis.empty"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["evidence.analysis.error"].exists)
+        XCTAssertFalse(app.buttons["evidence.analysis.retry"].exists)
+        XCTAssertFalse(app.staticTexts["Analysis pending"].exists)
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(photo.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    private func checkAccountPhotos(_ status: String, label: String, explanation: String) {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_PHOTOS_STATUS": status]
+        app.launch()
+        let profile = app.tabBars.buttons["Profile"].firstMatch
+        XCTAssertTrue(profile.waitForExistence(timeout: 12)); profile.tap()
+        let account = app.buttons["Account"].firstMatch
+        XCTAssertTrue(account.waitForExistence(timeout: 5)); account.tap()
+        let grant = app.staticTexts["account.photos.status"]
+        for _ in 0..<8 {
+            if grant.exists && grant.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(grant.exists, app.debugDescription)
+        XCTAssertEqual(grant.label, label)
+        XCTAssertTrue(app.staticTexts["account.photos.explanation"].label.contains(explanation), app.debugDescription)
+        XCTAssertTrue(app.buttons["account.photos.settings"].exists)
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertEqual(app.tabBars.buttons["Library"].exists, status == "full")
+        XCTAssertTrue(app.tabBars.buttons["Work"].exists)
+        app.tabBars.buttons["Garage"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["1973 Fixture Coupe"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testAccountExplainsLimitedPhotosWithoutHidingGarage() {
+        checkAccountPhotos("limited", label: "Limited access", explanation: "Library requires full Photos access")
+    }
+
+    func testAccountExplainsPhotosOffWithoutHidingGarage() {
+        checkAccountPhotos("off", label: "Off", explanation: "Library is unavailable")
+    }
+
+    func testAccountShowsFullPhotosAccessAndLibrary() {
+        checkAccountPhotos("full", label: "Full access", explanation: "Library is available")
     }
 
     func testDayPhotoFailureRetriesAndReturnsThroughSameDayToGarageSearch() {

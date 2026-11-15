@@ -22,6 +22,9 @@ enum FixtureBackend {
     static let clientId = "00000000-0000-4000-8000-0000000000d1"
     static let providerId = "00000000-0000-4000-8000-0000000000d2"
     static let navigationVehicleId = "00000000-0000-4000-8000-00000000c001"
+    static let analysisMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_ANALYSIS_MODE"] ?? ""
+    private static let analysisReadLock = NSLock()
+    private static var analysisReadAttempts = 0
     static let dayMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_DAY_MODE"] ?? ""
     static let journeyDay: String = {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
@@ -168,6 +171,19 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "get_image_deep_analysis" where scenario == "navigation-garage" && !analysisMode.isEmpty:
+            guard args["p_image_id"] as? String == "00000000-0000-4000-8000-00000000e001" else {
+                return (400, Data(#"{"message":"wrong fixture image requested"}"#.utf8))
+            }
+            analysisReadLock.lock()
+            analysisReadAttempts += 1
+            let attempt = analysisReadAttempts
+            analysisReadLock.unlock()
+            if analysisMode == "failure", attempt == 1 {
+                return (400, Data(#"{"code":"fixture_read_error","message":"fixture analysis read failed","details":null,"hint":null}"#.utf8))
+            }
+            if analysisMode == "empty" { return ok("[]") }
+            return ok(#"[{"narrative":"Fixture analysis for exact photo"}]"#)
         case "get_vehicle_contribution_days" where scenario == "navigation-garage" && !dayMode.isEmpty:
             // A separate work day keeps the timeline available for the event-only day.
             return ok("""
