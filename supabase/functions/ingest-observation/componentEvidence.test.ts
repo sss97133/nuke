@@ -11,7 +11,7 @@ export async function componentFixture(label='Battery 78PRMJ',key='fluid.battery
  const subject={subject_id:T,subject_key:key,display_name:'Battery',is_active:true,domain:'mechanical',category:'fluid'};
  const source={id:S,vehicle_id:V,is_superseded:false,superseded_by:null as string|null,extraction_method:'reviewed_image_analysis_v1',source_url:'https://images.example/battery.jpg',
  observed_at:'2026-11-10T16:25:10.731Z',structured_data:{image_id:I,components_seen:[{label,bbox:[10,20,980,990],part_number_guess:'78PRMJ'}]}};
- const image={id:I,vehicle_id:V,image_url:source.source_url,is_sensitive:false,is_document:false,redaction_level:'none'};
+ const image={id:I,vehicle_id:V,image_url:source.source_url,superseded_by:null as string|null,is_sensitive:false,is_document:false,redaction_level:'none'};
  return {input,subject,source,image,digest};
 }
 Deno.test('registered component positions retain exact source quote, selector, clock and independent unknowns',async()=>{
@@ -74,4 +74,11 @@ Deno.test('a supersession pointer withdraws a retained source even before its fl
  const {superseded_by:_pointer,...missing}=f.source;
  assert(!(await prepareComponentEvidence(f.input,f.subject,missing as any,f.image,true)).ok,'missing pointer metadata is not positively current');
  assert((await prepareComponentEvidence(f.input,f.subject,{...f.source,superseded_by:null},f.image,true)).ok);
+});
+
+Deno.test('image successor pointer and missing pointer metadata refuse component qualification',async()=>{
+ const f=await componentFixture();
+ assert(!(await prepareComponentEvidence(f.input,f.subject,f.source,{...f.image,superseded_by:S},true)).ok);
+ const {superseded_by:_pointer,...missing}=f.image;
+ assert(!(await prepareComponentEvidence(f.input,f.subject,f.source,missing as any,true)).ok);
 });

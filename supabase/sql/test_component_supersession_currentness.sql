@@ -7,6 +7,8 @@ DO $$ BEGIN
  END IF;
 END $$;
 \ir test_component_evidence.sql
+-- Fixture compatibility only: production images already carry this pointer.
+ALTER TABLE public.vehicle_images ADD COLUMN superseded_by uuid;
 \ir ../migrations/20261117000300_component_supersession_pointer_currentness.sql
 
 WITH fixture AS (
@@ -16,16 +18,18 @@ WITH fixture AS (
  WHERE c.extraction_method='retained_component_reading_v1'
  AND public.component_reading_current(c.id)
  ORDER BY c.id LIMIT 1
-), cases(label, parent_patch, child_patch, expected) AS (VALUES
- ('current', '{}'::jsonb, '{}'::jsonb, true),
- ('parent pointer only', '{"superseded_by":"30000000-0000-4000-8000-000000000099"}'::jsonb, '{}'::jsonb, false),
- ('child pointer only', '{}'::jsonb, '{"superseded_by":"30000000-0000-4000-8000-000000000099"}'::jsonb, false),
- ('parent flag', '{"is_superseded":true}'::jsonb, '{}'::jsonb, false),
- ('child flag', '{}'::jsonb, '{"is_superseded":true}'::jsonb, false)
+), cases(label, parent_patch, child_patch, image_patch, expected) AS (VALUES
+ ('current', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, true),
+ ('parent pointer only', '{"superseded_by":"30000000-0000-4000-8000-000000000099"}'::jsonb, '{}'::jsonb, '{}'::jsonb, false),
+ ('child pointer only', '{}'::jsonb, '{"superseded_by":"30000000-0000-4000-8000-000000000099"}'::jsonb, '{}'::jsonb, false),
+ ('image pointer only', '{}'::jsonb, '{}'::jsonb, '{"superseded_by":"30000000-0000-4000-8000-000000000099"}'::jsonb, false),
+ ('parent flag', '{"is_superseded":true}'::jsonb, '{}'::jsonb, '{}'::jsonb, false),
+ ('child flag', '{}'::jsonb, '{"is_superseded":true}'::jsonb, '{}'::jsonb, false)
 )
 SELECT test_assert(public.component_reading_matches(
  jsonb_populate_record(NULL::public.vehicle_observations,to_jsonb(p)||parent_patch),
- jsonb_populate_record(NULL::public.vehicle_observations,to_jsonb(c)||child_patch),i
+ jsonb_populate_record(NULL::public.vehicle_observations,to_jsonb(c)||child_patch),
+ jsonb_populate_record(NULL::public.vehicle_images,to_jsonb(i)||image_patch)
  ) IS NOT DISTINCT FROM expected, label)
 FROM fixture CROSS JOIN cases;
 SELECT test_assert(EXISTS(SELECT 1 FROM public.vehicle_observations

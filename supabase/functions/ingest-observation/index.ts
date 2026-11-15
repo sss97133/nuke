@@ -943,7 +943,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         supabase.from("subject_taxonomy").select("subject_id,subject_key,display_name,is_active,domain,category").eq("subject_key", input.component_key).maybeSingle(),
         supabase.from("vehicle_observations").select("id,vehicle_id,is_superseded,superseded_by,extraction_method,source_url,observed_at,structured_data")
           .eq("id", selector.source_observation_id).maybeSingle(),
-        supabase.from("vehicle_images").select("id,vehicle_id,image_url,is_sensitive,is_document,redaction_level")
+        supabase.from("vehicle_images").select("id,vehicle_id,image_url,superseded_by,is_sensitive,is_document,redaction_level")
           .eq("id", selector.image_id).maybeSingle(),
         supabase.from("observation_witnesses").select("id").eq("observation_id", selector.source_observation_id)
           .eq("image_id", selector.image_id).limit(1),
