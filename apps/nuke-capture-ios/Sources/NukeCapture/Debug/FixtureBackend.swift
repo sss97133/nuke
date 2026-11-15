@@ -50,6 +50,8 @@ enum FixtureBackend {
           "taken_at":"\(journeyDay)T12:00:00Z","labels":[],"ai_processing_status":"pending"}]
         """)
     }
+    private static let workPageLock = NSLock()
+    private static var workPageAttempts = 0
     static var userId: String? {
         switch persona {
         case .visitor: return nil
@@ -240,6 +242,11 @@ enum FixtureBackend {
         case "vehicle_work_orders_read":
             let access = scenario == "post-job" ? #""vehicle_access":{"role":"owner","can_post_work_request":true},"# : ""
             return ok(JobFixtures.vehicleWorkOrders.replacingOccurrences(of: #""viewer":{"#, with: #""viewer":{\#(access)"#))
+        case "work_order_job_path_read" where scenario == "work-pagination":
+            guard args["p_work_order_id"] as? String == JobFixtures.workOrderId else {
+                return (400, Data(#"{"message":"wrong active job"}"#.utf8))
+            }
+            return ok(JobFixtures.jobPathWithLabels)
         case "work_order_job_path_read": return ok(jobPath(args["p_work_order_id"] as? String ?? ""))
         case "work_order_resources_read": return ok(JobFixtures.resources)
         case "work_order_quotes_read":
@@ -281,6 +288,33 @@ enum FixtureBackend {
         case "provider_job_record_read": return ok(ProviderFixtures.jobRecord)
         case "my_contact_requests": return ok(ContactFixtures.inbox)
         case "contact_thread_read": return ok(ContactFixtures.thread)
+        case "my_signature_queue" where scenario == "signature-missing-job":
+            return ok(#"{"items":[{"kind":"quote_to_accept","ref_id":"00000000-0000-4000-8000-0000000000f2","work_order_id":null,"display_title":"Fixture quote without job"}],"coverage":{"returned":1,"total":1}}"#)
+        case "my_signature_queue" where scenario == "work-pagination":
+            return ok(#"{"items":[],"coverage":{"returned":0,"total":0}}"#)
+        case "my_work_orders" where scenario == "work-pagination":
+            let cursor = "00000000-0000-4000-8000-00000000d025"
+            if let after = args["p_after"] as? String {
+                guard after == cursor else { return (400, Data(#"{"message":"wrong page cursor"}"#.utf8)) }
+                workPageLock.lock()
+                workPageAttempts += 1
+                let attempt = workPageAttempts
+                workPageLock.unlock()
+                if attempt == 1 {
+                    return (400, Data(#"{"code":"fixture_read_error","message":"fixture next page failed","details":null,"hint":null}"#.utf8))
+                }
+                return ok("""
+                {"rows":[{"work_order_id":"\(JobFixtures.workOrderId)","title":"Front brake service",
+                 "stage_states":{"execution":"recorded","completion":"absent"}}],"next_after":null,
+                 "coverage":{"returned":1,"total_for_viewer":26}}
+                """)
+            }
+            let rows = (1...25).map { index in
+                ["work_order_id": String(format: "00000000-0000-4000-8000-00000000d%03d", index),
+                 "title": "Finished fixture job \(index)", "stage_states": ["completion": "recorded", "accounting": "recorded"]] as [String: Any]
+            }
+            let page: [String: Any] = ["rows": rows, "next_after": cursor, "coverage": ["returned": 25, "total_for_viewer": 26]]
+            return (200, try! JSONSerialization.data(withJSONObject: page))
         case "my_signature_queue": return ok(JobFixtures.signatureQueue)
         case "my_work_orders": return ok(JobFixtures.myWorkOrders)
         case "my_identity_read": return ok(JobFixtures.identity)
