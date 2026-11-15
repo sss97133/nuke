@@ -321,8 +321,11 @@ struct WorkConsoleContent: View {
                 if inMotion.isEmpty {
                     VStack(spacing: NukeSpace.sm) {
                         Image(systemName: "wrench.and.screwdriver").font(.title).foregroundStyle(.tertiary)
-                        Text("No jobs in progress").font(.nukeCardTitle)
-                        Text("Jobs you're working on will show up here.")
+                        Text("No jobs in progress among loaded records").font(.nukeCardTitle)
+                            .accessibilityIdentifier("work.jobs.empty")
+                        Text(page.nextAfter != nil
+                             ? "More jobs are available. Load the next page to check them."
+                             : "This describes the records available in this view.")
                             .font(.nukeDetail).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
@@ -336,7 +339,10 @@ struct WorkConsoleContent: View {
                     }
                 }
                 if page.nextAfter != nil {
-                    if let jobsPageFailure { JobRefusalRow(refusal: jobsPageFailure) }
+                    if let jobsPageFailure {
+                        JobRefusalRow(refusal: jobsPageFailure)
+                            .accessibilityIdentifier("work.jobs.page-error")
+                    }
                     Button {
                         onLoadMore?()
                     } label: {
@@ -344,6 +350,7 @@ struct WorkConsoleContent: View {
                     }
                     .frame(minHeight: NukeSize.minTap)
                     .disabled(loadingMore)
+                    .accessibilityIdentifier("work.jobs.more")
                 }
                 if page.unreadableRows > 0 {
                     Text(JobCopy.newerVersion(page.unreadableRows)).font(.footnote).foregroundStyle(.secondary)
