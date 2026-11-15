@@ -5,6 +5,7 @@ This reads metadata only. It does not invent original bytes, filing, privacy dec
 """
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -13,7 +14,10 @@ from source_disposition import build, require
 
 
 def adapt(native_input, native_output, *, snapshot_id, observed_at, source_namespace,
-          access_scope, videos_outside_selector):
+          access_scope, videos_outside_selector, input_bytes):
+    require(json.loads(input_bytes) == native_input, "native parsed input differs from frozen bytes")
+    require(native_output.get("inputSha256") == hashlib.sha256(input_bytes).hexdigest(),
+            "native output input fingerprint missing or changed; replay discovery on exact input")
     assets = native_input.get("assets")
     require(isinstance(assets, list), "native input assets required")
     require(native_output.get("mediaScope") == "images_only", "native output must declare image-only scope")
@@ -54,12 +58,13 @@ def main():
     parser.add_argument("--input-output", type=Path, help="save the exact intermediate frozen input privately")
     args = parser.parse_args()
     try:
-        native_input = json.loads(args.native_input.read_text(encoding="utf-8"))
+        input_bytes = args.native_input.read_bytes()
+        native_input = json.loads(input_bytes)
         native_output = json.loads(args.native_output.read_text(encoding="utf-8"))
         document, result = adapt(native_input, native_output, snapshot_id=args.snapshot_id,
                                  observed_at=args.observed_at, source_namespace=args.source_namespace,
                                  access_scope=args.access_scope,
-                                 videos_outside_selector=args.videos_outside_selector)
+                                 videos_outside_selector=args.videos_outside_selector, input_bytes=input_bytes)
         if args.input_output:
             args.input_output.write_text(json.dumps(document, sort_keys=True, indent=2) + "\n", encoding="utf-8")
         args.manifest_output.write_text(json.dumps(result, sort_keys=True, indent=2) + "\n", encoding="utf-8")
