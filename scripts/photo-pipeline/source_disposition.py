@@ -61,6 +61,11 @@ def build(document):
     require(isinstance(intended_use, str) and intended_use, "intendedUse is required")
     snapshot = document.get("snapshot")
     require(isinstance(snapshot, dict), "snapshot is required")
+    source_scope = snapshot.get("sourceScope", "photos_permission_snapshot")
+    require(source_scope in ("photos_permission_snapshot", "retained_capture"), "invalid sourceScope")
+    if source_scope == "retained_capture":
+        require(snapshot.get("sourceVersionBasis") == "retained_provenance_sha256"
+                and snapshot.get("accessScope") == "sample", "retained capture must declare bounded version basis")
     require(isinstance(snapshot.get("snapshotId"), str) and snapshot["snapshotId"], "snapshotId is required")
     require(isinstance(snapshot.get("sourceNamespace"), str) and snapshot["sourceNamespace"],
             "sourceNamespace is required")
@@ -137,6 +142,8 @@ def build(document):
         has_gps = (type(gps[0]) in (int, float) and math.isfinite(gps[0]) and -90 <= gps[0] <= 90
                    and type(gps[1]) in (int, float) and math.isfinite(gps[1]) and -180 < gps[1] <= 180)
         original = fact.get("original")
+        require(source_scope != "retained_capture" or (not original and not fact.get("selectedForAdmission")),
+                "retained capture cannot establish current original bytes or new admission selection")
         rendition = fact.get("rendition")
         leaf = fact.get("existingLeaf")
         filing = fact.get("filing", {"status": "none"})
@@ -205,6 +212,9 @@ def build(document):
             reasons.append("complete_filing_proof_missing_or_disputed")
         elif complete_filing:
             disposition = "supported_complete"
+        elif filing_status == "partial":
+            disposition = "partial"
+            reasons.append("partial_filing_requires_review")
         elif exact_leaf:
             disposition = "admitted_unresolved"
             reasons.append("no_complete_current_filing")
@@ -212,9 +222,6 @@ def build(document):
             disposition = "source_unavailable" if fact.get("originalStatus") == "unavailable" else "original_unverified"
             reasons.append("current_original_unavailable" if disposition == "source_unavailable"
                            else "current_original_bytes_not_supplied")
-        elif filing_status == "partial":
-            disposition = "partial"
-            reasons.append("partial_filing_requires_review")
         elif not privacy_clear:
             disposition = "privacy_hold"
             reasons.append("privacy_not_current_clear")
@@ -239,6 +246,9 @@ def build(document):
                      "captureAt": asset.get("captureAt"), "hasGPS": has_gps,
                      "candidateReasons": sorted(set(candidate_by_id.get(sid, {}).get("reasons", []))),
                      "recordedFilingStatus": filing_status if filing_current else "unverified",
+                     "recordedVehicleId": filing.get("recordedVehicleId") if filing_current else None,
+                     "filingBasis": filing.get("basis") if filing_current else None,
+                     "filingInferred": filing.get("inferred") if filing_current else None,
                      "qualifiedCompleteFiling": bool(complete_filing),
                      "originalSha256": original["sha256"] if original else None,
                      "renditionSha256": rendition["sha256"] if rendition else None,
@@ -263,6 +273,7 @@ def build(document):
     proposals.sort(key=lambda p: p["sourceId"])
     counts = dict(sorted(Counter(row["disposition"] for row in rows).items()))
     result = {"schemaVersion": 1, "snapshotId": snapshot["snapshotId"], "intendedUse": intended_use,
+              "sourceScope": source_scope, "sourceVersionBasis": snapshot.get("sourceVersionBasis"),
               "sourceNamespace": snapshot["sourceNamespace"],
               "snapshotSha256": snapshot_hash, "accessScope": snapshot["accessScope"],
               "mediaCoverage": coverage, "counts": counts, "rows": rows, "sourceProposals": proposals,

@@ -33,6 +33,30 @@ def qualified(sha=H1):
 
 
 class SourceDispositionTests(unittest.TestCase):
+    def test_retained_capture_cannot_claim_original_or_admission(self):
+        d = document([asset("preview")])
+        d["snapshot"].update(sourceScope="retained_capture", sourceVersionBasis="retained_provenance_sha256")
+        d["sourceFacts"]["preview"] = qualified()
+        with self.assertRaisesRegex(ValueError, "retained capture cannot"):
+            build(d)
+
+    def test_exact_retained_leaf_keeps_partial_filing_and_version_scope(self):
+        d = document([asset("preview")])
+        d["snapshot"].update(sourceScope="retained_capture", sourceVersionBasis="retained_provenance_sha256")
+        fact = qualified()
+        fact["rendition"] = fact.pop("original")
+        fact["selectedForAdmission"] = False
+        fact["existingLeaf"] = {"imageId": "leaf", "sourceNamespace": "fixture-library",
+            "sourceId": "preview", "sourceVersion": "v1", "byteRole": "rendition", "sha256": H1,
+            "visibility": "current", "isSuperseded": False, "supersededBy": None, "sourceBindingId": "binding"}
+        fact["filing"] = {"status": "partial", "sourceVersion": "v1", "recordedVehicleId": "car"}
+        d["sourceFacts"]["preview"] = fact
+        result = build(d)
+        self.assertEqual(result["sourceScope"], "retained_capture")
+        self.assertEqual(result["rows"][0]["disposition"], "partial")
+        self.assertEqual(result["rows"][0]["recordedVehicleId"], "car")
+        self.assertEqual(result["sourceProposals"], [])
+
     def test_no_gps_can_propose_unassigned_source(self):
         d = document([asset("decal")])
         d["sourceFacts"]["decal"] = qualified()
