@@ -3,14 +3,30 @@ import hashlib
 import json
 
 from native_disposition_adapter import adapt
+from source_disposition import build
+from test_source_disposition import qualified
 
 def bound_adapt(source, selected, **kwargs):
     raw = json.dumps(source).encode()
     selected = {**selected, "inputSha256": hashlib.sha256(raw).hexdigest()}
+    selected.setdefault("unplaced", [{"id": asset["id"], "reasons": []} for asset in source["assets"]])
     return adapt(source, selected, input_bytes=raw, **kwargs)
 
 
 class NativeAdapterTests(unittest.TestCase):
+    def test_unknown_version_and_personal_control_outside_candidates(self):
+        source = {"assets": [{"id": "unknown"}, {"id": "personal", "sourceVersion": "v1", "isPersonal": False}]}
+        selected = {"mediaScope": "images_only", "sourceImages": 2, "candidates": [],
+                    "unplaced": [{"id": "unknown", "reasons": []}, {"id": "personal", "reasons": ["personal_review"]}]}
+        frozen, manifest = bound_adapt(source, selected, snapshot_id="fixture", observed_at="2026-11-15T00:00:00Z",
+                                      source_namespace="fixture-library", access_scope="sample", videos_outside_selector=0)
+        self.assertEqual(manifest["counts"], {"privacy_hold": 1, "version_unverified": 1})
+        self.assertEqual(frozen["candidates"], [])
+        self.assertIsNone(frozen["snapshot"]["assets"][0]["sourceVersion"])
+        frozen["sourceFacts"]["personal"] = qualified()
+        self.assertEqual(build(frozen)["counts"], {"privacy_hold": 1, "version_unverified": 1})
+        self.assertEqual(build(frozen)["sourceProposals"], [])
+
     def test_binds_native_candidate_to_current_source_and_holds_missing_lineage(self):
         source = {"assets": [{"id": "no-gps", "sourceVersion": "v1", "captureAt": "2026-05-13T21:40:00Z",
                               "latitude": None, "longitude": None, "labels": [], "exactVehicleIds": []}]}

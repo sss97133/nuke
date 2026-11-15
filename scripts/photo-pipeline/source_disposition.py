@@ -151,8 +151,8 @@ def build(document):
                 require(isinstance(item, dict) and item.get("sourceVersion") == version
                         and sha(item.get("sha256")) and type(item.get("byteSize")) is int
                         and item["byteSize"] > 0 and isinstance(item.get("mimeType"), str)
-                        and item["mimeType"].startswith("image/"),
-                        f"{name} requires current sourceVersion, SHA-256, byteSize and image MIME")
+                        and item["mimeType"].startswith("video/" if kind == "video" else "image/"),
+                        f"{name} requires current sourceVersion, SHA-256, byteSize and matching media MIME")
         exact_leaf = False
         if leaf is not None:
             require(isinstance(leaf, dict) and isinstance(leaf.get("imageId"), str)
@@ -172,7 +172,9 @@ def build(document):
         media_clear = (media_policy.get("status") == "clear" and media_policy.get("sourceVersion") == version
                        and media_policy.get("intendedUse") == intended_use
                        and isinstance(media_policy.get("decisionId"), str) and bool(media_policy["decisionId"]))
-        personal_control = asset.get("isPersonal") is True or "personal_review" in candidate_by_id.get(sid, {}).get("reasons", [])
+        personal_control = (asset.get("isPersonal") is True
+                            or "personal_review" in asset.get("discoveryControls", [])
+                            or "personal_review" in candidate_by_id.get(sid, {}).get("reasons", []))
         sensitive_media = kind == "screenshot" or personal_control
         complete_filing = (kind != "video" and version is not None and
                            filing_status == "supported_complete" and filing_current and exact_leaf

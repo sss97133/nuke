@@ -111,6 +111,7 @@ class SourceDispositionTests(unittest.TestCase):
     def test_video_accounting_and_fresh_leaf_complete(self):
         d = document([asset("video", "video"), asset("filed")])
         d["sourceFacts"]["video"] = qualified()
+        d["sourceFacts"]["video"]["original"]["mimeType"] = "video/quicktime"
         d["sourceFacts"]["filed"] = {**qualified(),
             "existingLeaf": {"imageId": "image-1", "sourceNamespace": "fixture-library",
                              "sourceId": "filed", "sourceVersion": "v1",

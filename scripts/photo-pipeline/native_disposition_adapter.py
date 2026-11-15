@@ -26,6 +26,13 @@ def adapt(native_input, native_output, *, snapshot_id, observed_at, source_names
             "videos outside selector must be a nonnegative count")
     versions = {asset["id"]: asset.get("sourceVersion") for asset in assets}
     require(len(versions) == len(assets), "native input has duplicate source IDs")
+    unplaced = native_output.get("unplaced")
+    require(isinstance(unplaced, list), "native full-source controls required")
+    controls = {item["id"]: item.get("reasons", []) for item in unplaced}
+    require(len(controls) == len(unplaced) and set(controls) == set(versions),
+            "native full-source controls do not cover snapshot")
+    assets = [{**asset, "sourceVersion": asset.get("sourceVersion"),
+               "discoveryControls": controls[asset["id"]]} for asset in assets]
     candidates = native_output.get("candidates")
     require(isinstance(candidates, list), "native output candidates required")
     bound = []
