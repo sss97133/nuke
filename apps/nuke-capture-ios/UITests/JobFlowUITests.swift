@@ -52,6 +52,20 @@ final class JobFlowUITests: XCTestCase {
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 
+    func testSupportedSignatureWithoutJobDoesNotPromiseUpgradeOrSigningScreen() {
+        let app = launch("client", scenario: "signature-missing-job", ["NUKE_DEBUG_SCREEN": "work"])
+        let item = text(app, contains: "Fixture quote without job")
+        reveal(item, in: app).tap()
+        XCTAssertTrue(app.staticTexts["signature.missing-job"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["This needs a newer version of the app to open."].exists)
+        XCTAssertFalse(app.staticTexts["You sign on the next screen, where the full terms are."].exists)
+        XCTAssertFalse(app.buttons["Open the job to sign"].exists)
+        XCTAssertTrue(app.staticTexts["Close this item and refresh Work to check for an updated record."].exists)
+        app.buttons["Close"].firstMatch.tap()
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
     // MARK: Helpers
 
     private func diagnose(_ app: XCUIApplication) {

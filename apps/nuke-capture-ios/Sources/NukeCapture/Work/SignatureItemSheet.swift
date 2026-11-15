@@ -66,10 +66,15 @@ struct SignatureItemSheet: View {
                             Label("Open the job to sign", systemImage: "signature")
                         }
                     } else {
-                        Text("This needs a newer version of the app to open.").font(.footnote).foregroundStyle(.secondary)
+                        Text("This item is not linked to a job.").font(.footnote).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("signature.missing-job")
                     }
                 } footer: {
-                    Text("You sign on the next screen, where the full terms are.")
+                    if item.kind == "contact_request" || item.workOrderId != nil {
+                        Text("You sign on the next screen, where the full terms are.")
+                    } else {
+                        Text("Close this item and refresh Work to check for an updated record.")
+                    }
                 }
             }
             .navigationTitle(JobCopy.action(item.kind))

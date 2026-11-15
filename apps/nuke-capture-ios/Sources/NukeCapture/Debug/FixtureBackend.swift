@@ -272,6 +272,8 @@ enum FixtureBackend {
         case "provider_job_record_read": return ok(ProviderFixtures.jobRecord)
         case "my_contact_requests": return ok(ContactFixtures.inbox)
         case "contact_thread_read": return ok(ContactFixtures.thread)
+        case "my_signature_queue" where scenario == "signature-missing-job":
+            return ok(#"{"items":[{"kind":"quote_to_accept","ref_id":"00000000-0000-4000-8000-0000000000f2","work_order_id":null,"display_title":"Fixture quote without job"}],"coverage":{"returned":1,"total":1}}"#)
         case "my_signature_queue" where scenario == "work-pagination":
             return ok(#"{"items":[],"coverage":{"returned":0,"total":0}}"#)
         case "my_work_orders" where scenario == "work-pagination":
