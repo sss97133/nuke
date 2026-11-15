@@ -14,6 +14,29 @@ def bound_adapt(source, selected, **kwargs):
 
 
 class NativeAdapterTests(unittest.TestCase):
+    def test_local_snapshot_keeps_video_denominator_and_does_not_rebind_changed_images(self):
+        image = {"id": "image", "sourceVersion": "local-v1", "mediaKind": "image"}
+        video = {"id": "video", "sourceVersion": "local-v2", "mediaKind": "video"}
+        source = {"assets": [image]}
+        meta = {"snapshotId": "fixture", "sourceNamespace": "local-store", "observedAt": "2026-11-15T00:00:00Z",
+                "sourceScope": "local_photos_database", "sourceVersionBasis": "local_modification_hint",
+                "accessScope": "sample", "declaredAssetCount": 2,
+                "mediaCoverage": {"imagesEnumerated": True, "videosEnumerated": True, "knownVideosOutsideSelector": 1},
+                "assets": [image, video]}
+        args = dict(snapshot_id="fixture", observed_at=meta["observedAt"], source_namespace="local-store",
+                    access_scope="sample", videos_outside_selector=1, source_snapshot={"snapshot": meta})
+        selected = {"mediaScope": "images_only", "sourceImages": 1, "candidates": []}
+        frozen, result = bound_adapt(source, selected, **args)
+        self.assertEqual(frozen["snapshot"]["sourceScope"], "local_photos_database")
+        self.assertEqual(result["counts"], {"original_unverified": 1, "unsupported_video": 1})
+        self.assertEqual(result["sourceProposals"], [])
+        changed = {"assets": [{**image, "sourceVersion": "new-version"}]}
+        with self.assertRaisesRegex(ValueError, "exact source snapshot"):
+            bound_adapt(changed, selected, **args)
+        args["source_namespace"] = "other-store"
+        with self.assertRaisesRegex(ValueError, "identity or scope differs"):
+            bound_adapt(source, selected, **args)
+
     def test_unknown_version_and_personal_control_outside_candidates(self):
         source = {"assets": [{"id": "unknown"}, {"id": "personal", "sourceVersion": "v1", "isPersonal": False}]}
         selected = {"mediaScope": "images_only", "sourceImages": 2, "candidates": [],
