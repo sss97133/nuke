@@ -244,6 +244,30 @@ it('sets the 1973 tribute headline in cutout lettering on the page surface, keep
   } finally { await act(async () => root.unmount()); }
 });
 
+it('keeps the sourced Trans Am lettering when the profile uses the clickable tribute marker', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const CAR = '20d21fb0-4651-4469-a0ba-e751309a1e54';
+  const host = document.createElement('div'), root = createRoot(host);
+  const onExplore = vi.fn();
+  try {
+    const starred = resolveVehicleArtwork({ year: 1973, make: 'Pontiac', model: 'Firebird', vehicleId: CAR,
+      variants: [{ kind: 'trim', value: 'Trans Am*' }] });
+    expect(starred.find(asset => asset.role === 'variant')?.file).toBe('pontiac-firebird-trans-am-style-owner-decal-cut.png');
+    await act(async () => root.render(<VehicleIdentity compact year={1973} make="Pontiac" model="Firebird" vehicleId={CAR}
+      variants={[{ kind: 'trim', value: 'Trans Am*' }]} onExplore={onExplore} />));
+    const mark = host.querySelector('.vehicle-identity__variant .vehicle-identity__art img');
+    expect(mark?.getAttribute('src')).toBe('/stacks/makes/pontiac-firebird-trans-am-style-owner-decal-cut.png');
+    expect(host.querySelector('.vehicle-identity__qualifier')?.textContent).toBe('*');
+    expect(host.querySelector('.sr-only')?.textContent).toBe('1973 Pontiac Firebird Trans Am*');
+    const button = host.querySelector<HTMLButtonElement>('[aria-label="Explore Trans Am* in this profile"]');
+    expect(button).not.toBeNull();
+    await act(async () => button!.click());
+    expect(onExplore).toHaveBeenCalledWith('trim', 'Trans Am*');
+    await act(async () => mark?.dispatchEvent(new Event('error')));
+    expect(button?.textContent).toBe('Trans Am*');
+  } finally { await act(async () => root.unmount()); }
+});
+
 it('sets the 1973 lettering in its period fonts once they load, injected on match only, raster until then', async () => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   const CAR = '20d21fb0-4651-4469-a0ba-e751309a1e54';

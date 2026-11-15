@@ -2,11 +2,16 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { FacetItem } from '../../kit/types';
 
 const rpc = vi.hoisted(() => vi.fn());
+const provenance = vi.hoisted(() => ({ read: vi.fn() }));
+const inventory = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc } }));
+vi.mock('./hooks/useFieldProvenance', async original => ({ ...await original<typeof import('./hooks/useFieldProvenance')>(), useFieldProvenance: provenance.read }));
+vi.mock('./hooks/useVehicleImageEvidence', () => ({ useVehicleImageEvidence: inventory.read }));
 vi.mock('../../components/map/OneMap', () => ({ default: ({ focus }: any) =>
   <div data-testid="one-map-focus" data-fips={focus.countyFips} data-geojson={focus.geojsonPath} data-lat={focus.centroid?.lat} /> }));
 import HeaderTokenItems from './HeaderTokenItems';
@@ -41,7 +46,8 @@ const location: FacetItem[] = [
 ];
 
 let host: HTMLDivElement; let root: Root;
-beforeEach(() => { host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host); rpc.mockReset(); });
+beforeEach(() => { host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host); rpc.mockReset();
+  provenance.read.mockReset(); inventory.read.mockReset(); });
 afterEach(() => { act(() => root.unmount()); host.remove(); });
 
 const render = async (node: React.ReactNode) => {
@@ -134,4 +140,83 @@ it('says when the location read fails', async () => {
   rpc.mockResolvedValue({ data: null, error: new Error('timeout') });
   await render(<HeaderTokenItems vehicleId="v-1" dimension="location" />);
   expect(host.textContent).toContain('Location read failed: timeout');
+});
+
+it('shows the replica points from cited readers while keeping the as-built gearbox missing', async () => {
+  const hoodUrl = 'https://example.supabase.co/storage/v1/object/public/vehicle-photos/hood.HEIC';
+  inventory.read.mockReturnValue({ data: { complete: true, images: [
+    { id: 'image-1', image_url: 'https://example.org/paint.jpg' },
+    { id: 'image-2', image_url: hoodUrl },
+  ] }, isLoading: false, isError: false });
+  provenance.read.mockImplementation((_vehicle: string, field: string) => ({ data: { vehicle_id: 'v-1', coverage: { status: 'complete_current_reader' },
+    image_observations: field === 'factory_color' ? [{ observation_id: 'paint-1', image_id: 'image-1', image_url: 'https://example.org/paint.jpg',
+      source_url: 'https://example.org/paint.jpg', claim_role: 'cowl_tag_paint', visual_relation: 'direct_code', value: 'Buccaneer Red',
+      reference: { url: 'https://example.org/chart' }, limitation: 'Factory code only.' }] : [{ observation_id: 'hood-1', image_id: 'image-2',
+      image_url: hoodUrl, source_url: hoodUrl, claim_role: 'visible_exterior_appearance',
+      visual_relation: 'direct_visual', image_region: { label: 'Hood bird and scoop.' }, limitation: 'Factory originality not established.' }] },
+    isLoading: false, isError: false }));
+  const item = (key: string, value: string | null, status: FacetItem['status']): FacetItem => ({ key, value, status,
+    facet: 'current', sources: [], needed: value ? null : 'build sheet' });
+  await render(<MemoryRouter><HeaderTokenItems vehicleId="v-1" dimension="trim" isReplica items={{
+    trim: [item('trim.tribute', 'tribute', 'claim')], engine: [item('engine.current.displacement', '7.5', 'established')],
+    transmission: [item('transmission.as_built.type', null, 'missing'), item('transmission.current.type', 'manual', 'established')],
+  }} /></MemoryRouter>);
+  expect(host.textContent).toContain('Buccaneer Red');
+  expect(host.textContent).toContain('Cowl-tag extract');
+  expect(host.textContent).toContain('Hood and scoop');
+  expect(host.textContent).toContain('Photo alone does not establish Ram Air intake function or factory originality');
+  expect(host.textContent).not.toContain('scoop..');
+  expect(host.textContent).toContain('Needed: build sheet');
+  expect(host.textContent).toContain('Source reading ID: paint-1');
+  expect(host.textContent).toContain('Source reading ID: hood-1');
+  expect(host.querySelector('a[href="/vehicle/v-1/observation/paint-1"]')).toBeNull();
+  expect(host.querySelector('a[href="/vehicle/v-1/observation/hood-1"]')).toBeNull();
+  expect(host.querySelector('a[href="'+hoodUrl+'"]')).toBeNull();
+  expect(host.querySelector('a[href="https://example.org/chart"]')).toBeTruthy();
+  const image = host.querySelector<HTMLImageElement>('.vp-tribute-point__figure img');
+  expect(image?.getAttribute('src')).toContain('/storage/v1/render/image/public/vehicle-photos/hood.HEIC?width=600');
+  await act(async () => image?.dispatchEvent(new Event('error')));
+  expect(host.textContent).toContain('Photo rendition unavailable');
+});
+
+it('does not apply the Firebird facts to another replica', async () => {
+  inventory.read.mockReturnValue({ data: { complete: true, images: [] }, isLoading: false, isError: false });
+  provenance.read.mockImplementation(() => ({ data: { vehicle_id: 'v-2', coverage: { status: 'complete_current_reader' },
+    image_observations: [] }, isLoading: false, isError: false }));
+  await render(<MemoryRouter><HeaderTokenItems vehicleId="v-2" dimension="trim" isReplica items={{ trim: [{
+    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', sources: [], needed: null,
+  }] }} /></MemoryRouter>);
+  expect(host.textContent).toContain('Engine line items unavailable');
+  expect(host.textContent).toContain('Transmission line items unavailable');
+  expect(host.textContent).toContain('Factory paint: no qualifying cited reading');
+  expect(host.textContent).toContain('Hood and scoop: no qualifying cited reading');
+  expect(host.textContent).not.toMatch(/455|Buccaneer|four-speed|Ram Air/i);
+});
+
+it('withholds a physical reading whose image was replaced or withdrawn', async () => {
+  inventory.read.mockReturnValue({ data: { complete: true, images: [{ id: 'image-1', image_url: 'https://example.org/replacement.jpg' }] },
+    isLoading: false, isError: false });
+  provenance.read.mockReturnValue({ data: { vehicle_id: 'v-1', coverage: { status: 'complete_current_reader' },
+    image_observations: [{ observation_id: 'paint-1', image_id: 'image-1', image_url: 'https://example.org/old.jpg',
+      source_url: 'https://example.org/old.jpg', claim_role: 'cowl_tag_paint', visual_relation: 'direct_code', value: 'Buccaneer Red' }] },
+    isLoading: false, isError: false });
+  await render(<MemoryRouter><HeaderTokenItems vehicleId="v-1" dimension="trim" isReplica items={{ trim: [{
+    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', sources: [], needed: null,
+  }] }} /></MemoryRouter>);
+  expect(host.textContent).toContain('Factory paint: no qualifying cited reading');
+  expect(host.querySelector('a[href="https://example.org/old.jpg"]')).toBeNull();
+});
+
+it('withholds physical citations when the eligible image inventory is incomplete', async () => {
+  inventory.read.mockReturnValue({ data: { complete: false, images: [{ id: 'image-1', image_url: 'https://example.org/paint.jpg' }] },
+    isLoading: false, isError: false });
+  provenance.read.mockReturnValue({ data: { vehicle_id: 'v-1', coverage: { status: 'complete_current_reader' },
+    image_observations: [{ observation_id: 'paint-1', image_id: 'image-1', image_url: 'https://example.org/paint.jpg',
+      source_url: 'https://example.org/paint.jpg', claim_role: 'cowl_tag_paint', visual_relation: 'direct_code', value: 'Buccaneer Red' }] },
+    isLoading: false, isError: false });
+  await render(<MemoryRouter><HeaderTokenItems vehicleId="v-1" dimension="trim" isReplica items={{ trim: [{
+    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', sources: [], needed: null,
+  }] }} /></MemoryRouter>);
+  expect(host.textContent).toContain('Factory paint: source read unavailable');
+  expect(host.querySelector('a[href="https://example.org/paint.jpg"]')).toBeNull();
 });

@@ -70,7 +70,10 @@ export function resolveVehicleArtwork({ make, model, year, variants = [], vehicl
   const numericYear = /^\d{4}$/.test(String(year)) ? Number(year) : null;
   if (numericYear === null) return [];
   // Match the complete recorded designation: Turbo + S must never inherit Turbo artwork.
-  const variant = variants.filter(token => token.kind === 'series' || token.kind === 'trim').map(token => token.value).join(' ');
+  // The profile's replica * is a display qualifier for the recorded -Style designation.
+  // Resolve its original catalogue entry so changing the suffix does not discard sourced lettering.
+  const variant = variants.filter(token => token.kind === 'series' || token.kind === 'trim')
+    .map(token => token.kind === 'trim' && token.value.endsWith('*') ? `${token.value.slice(0, -1)}-Style` : token.value).join(' ');
   return vehicleArtwork.filter(asset => keyFor(asset.make) === keyFor(make)
     // Lettering from one car's own photograph never stands for another car.
     && (!asset.vehicleIds?.length || (!!vehicleId && asset.vehicleIds.includes(vehicleId)))
@@ -81,7 +84,7 @@ export function resolveVehicleArtwork({ make, model, year, variants = [], vehicl
     && !asset.exceptVariants?.some(value => keyFor(value) === keyFor(variant)));
 }
 
-/** What the recorded designation adds to the lettering it shows: a tribute's "Trans Am-Style" keeps "-Style". */
+/** What the recorded designation adds to the lettering it shows: -Style or its profile marker *. */
 function variantQualifier(asset: VehicleArtwork, name: string) {
   const label = asset.label?.trim();
   if (!label || !name.toLowerCase().startsWith(label.toLowerCase())) return '';

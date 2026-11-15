@@ -46,10 +46,11 @@
   color:transparent; -webkit-background-clip:text; background-clip:text;
   background-image:linear-gradient(180deg, var(--chrome-face-a) 0%, var(--chrome-face-b) 46%, var(--chrome-face-c) 50%, var(--chrome-face-d) 56%, var(--chrome-face-a) 100%);
 }
-/* The script's edge is a filter, not -webkit-text-stroke: a stroke outlines every glyph and seams each join. */
+/* One sharp, subpixel offset keeps the script's hairlines legible without the soft halo from stacked blurs.
+   A text stroke would seam the connected letterforms. */
 .vehicle-identity__art--type[data-material="chrome"][data-font^="Firebird1971Script"] .vehicle-identity__type {
   color:transparent; -webkit-background-clip:text; background-clip:text;
   background-image:linear-gradient(180deg, var(--script-a) 0%, var(--script-b) 40%, var(--script-c) 50%, var(--script-d) 62%, var(--script-b) 100%);
-  filter:drop-shadow(0 0 .01em var(--chrome-rim-a)) drop-shadow(0 0 .006em var(--chrome-rim-a)) drop-shadow(0 .02em .015em var(--chrome-edge));
+  filter:drop-shadow(0 .012em 0 var(--chrome-edge));
 }
 .vehicle-identity__art--type[data-material="color"][data-font^="TransAm1973Decal"] { color:var(--decal-ink); }

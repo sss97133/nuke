@@ -73,6 +73,20 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); })
 const render = () => act(async () => root.render(<ProfileHeader priceLotId="lot-1" />));
 const renderLoaded = render;
 const openPrice = () => act(() => (host.querySelector('.k-masthead__result button.k-claim__value') as HTMLButtonElement).click());
+it('opens the replica marker on the existing cited trim items', async () => {
+  fixture.vehicle = { id: 'v-1', year: 1973, make: 'Pontiac', model: 'Firebird', trim: 'TRANS AM', is_replica: true, listing_kind: 'vehicle' };
+  fixture.read = { vehicle_id: 'v-1', viewer: 'anon', read_at: '2026-11-15T13:00:00Z', sections: [{
+    kind: 'masthead', year: 1973, make: 'Pontiac', model: 'Firebird',
+    identity_source: { year: 1973, make: 'Pontiac', model: 'Firebird', trim: 'TRANS AM', is_replica: true },
+    token_items: { trim: [{ key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', sources: [{ kind: 'record', label: 'vehicle record', method: 'vehicles.is_replica' }] }] },
+  }] } as ProfileRead;
+  await renderLoaded();
+  const marker = host.querySelector<HTMLButtonElement>('[aria-label="Explore Trans Am* in this profile"]');
+  expect(marker).toBeTruthy();
+  await act(async () => marker!.click());
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('trim');
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-items')).toBe('carried');
+});
 function priceSource(vehicleId: string, url: string | null) {
   fixture.vehicle = { id: vehicleId, year: 1966, make: 'Ford', model: 'Mustang', listing_kind: 'vehicle' };
   const read = mustangRead(); read.vehicle_id = vehicleId;
