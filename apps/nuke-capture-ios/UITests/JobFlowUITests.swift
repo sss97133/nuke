@@ -29,19 +29,20 @@ final class JobFlowUITests: XCTestCase {
 
     func testFinishedFirstPageDoesNotHideActiveJobAfterPageFailureAndRetry() {
         let app = launch("client", scenario: "work-pagination", ["NUKE_DEBUG_SCREEN": "work"])
+        XCTAssertTrue(app.navigationBars["Work"].waitForExistence(timeout: 10))
         let empty = app.staticTexts["work.jobs.empty"]
-        reveal(empty, in: app)
+        revealWork(empty, in: app)
         XCTAssertTrue(empty.label.contains("loaded records"), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertFalse(app.staticTexts["No jobs in progress"].exists)
         let more = app.buttons["work.jobs.more"]
-        reveal(more, in: app).tap()
+        revealWork(more, in: app).tap()
         let failure = app.descendants(matching: .any).matching(identifier: "work.jobs.page-error").firstMatch
         XCTAssertTrue(failure.waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertTrue(empty.exists)
         XCTAssertFalse(app.staticTexts["No jobs in progress"].exists)
-        reveal(more, in: app).tap()
+        revealWork(more, in: app).tap()
         let active = text(app, contains: "Front brake service")
-        reveal(active, in: app).tap()
+        revealWork(active, in: app).tap()
         XCTAssertTrue(app.navigationBars["Front brake service"].waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertTrue(text(app, contains: "1977 Chevrolet Blazer").waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         let back = app.navigationBars.buttons["Work"].firstMatch
@@ -65,6 +66,27 @@ final class JobFlowUITests: XCTestCase {
         app.buttons["Close"].firstMatch.tap()
         XCTAssertTrue(item.waitForExistence(timeout: 5))
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    /// Short drags keep the Work target in view instead of flicking past a
+    /// lazily rendered section. Report the actual journey step on failure.
+    @discardableResult
+    private func revealWork(_ element: XCUIElement, in app: XCUIApplication,
+                            file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
+        let list = app.collectionViews.firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 10), file: file, line: line)
+        for upward in [true, false] {
+            for _ in 0..<22 {
+                if element.exists && element.isHittable { return element }
+                let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.70))
+                let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+                (upward ? lower : upper).press(forDuration: 0.05,
+                    thenDragTo: upward ? upper : lower)
+            }
+        }
+        diagnose(app)
+        XCTFail("Work journey target not reachable: \(element)", file: file, line: line)
+        return element
     }
 
     // MARK: Helpers
