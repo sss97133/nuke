@@ -35,7 +35,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, appendFile
 import { join, extname } from 'path';
 import { homedir, tmpdir } from 'os';
 import dns from 'dns';
-import { ingestReviewedRenditions } from './lib/ingest-image-identity-payload.mjs';
+import { ingestReviewedRenditions, reconcileReviewedRenditions } from './lib/ingest-image-identity-payload.mjs';
 
 // ─── DNS fix (same as iphoto-intake/hd-intake — some networks break supabase DNS) ─
 const resolver = new dns.Resolver();
@@ -341,7 +341,18 @@ async function auditLabels(days) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   const reviewedPlan = argVal('--reviewed-rendition-plan');
+  const reconcileOutput = argVal('--reviewed-reconcile-output');
+  if (reconcileOutput && !reviewedPlan) throw new Error('--reviewed-reconcile-output requires --reviewed-rendition-plan');
   if (reviewedPlan) {
+    if (reconcileOutput) {
+      const result = await reconcileReviewedRenditions(supabase, JSON.parse(readFileSync(reviewedPlan, 'utf8')), {
+        userId: USER_ID, readBytes: path => readFileSync(path),
+      });
+      writeFileSync(reconcileOutput, JSON.stringify(result, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+      log(JSON.stringify({ mode: 'read_only_reconciliation', sources: result.snapshot.declaredAssetCount,
+        source_scope: result.snapshot.sourceScope, uploaded: 0, admitted: 0, model_calls: 0 }));
+      return;
+    }
     const receiptPath = argVal('--reviewed-receipt');
     if (!DRY_RUN && !receiptPath) throw new Error('--reviewed-receipt is required for reviewed intake');
     const result = await ingestReviewedRenditions(supabase, JSON.parse(readFileSync(reviewedPlan, 'utf8')), {

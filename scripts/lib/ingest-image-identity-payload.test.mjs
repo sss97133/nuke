@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildIdentityFirstPayload, personalLibraryStoragePath, ingestReviewedRenditions } from './ingest-image-identity-payload.mjs';
+import { buildIdentityFirstPayload, personalLibraryStoragePath, ingestReviewedRenditions, reconcileReviewedRenditions, reviewedFilingCurrent } from './ingest-image-identity-payload.mjs';
 import { createHash } from 'node:crypto';
 
 function base(overrides = {}) {
@@ -139,4 +139,116 @@ test('reviewed dry-run validates bytes but writes nothing', async () => {
   const f = reviewedFixture();
   const result = await ingestReviewedRenditions(f.sb, f.plan, { ...f.options, apply: false });
   assert.equal(result.mode, 'dry_run'); assert.equal(f.state.uploads, 0); assert.equal(f.state.admissions, 0);
+});
+
+async function reconciliationFixture() {
+  const f = reviewedFixture(), p = f.p;
+  f.state.rows = [{ id: '30000000-0000-4000-8000-000000000001', user_id: p.user_id,
+    vehicle_id: null, source: p.source, file_hash: p.content_sha256, file_size: p.file_size_bytes,
+    mime_type: p.mime_type, image_url: p.image_url, storage_path: p.storage_path, taken_at: p.taken_at,
+    exif_data: { source_rendition: p.source_provenance },
+    ai_scan_metadata: { processing_policy: { mode: 'subscription_review' } },
+    is_superseded: false, superseded_by: null, is_sensitive: false }];
+  f.state.stored = await f.options.readBytes();
+  f.options.loadFiling = async () => ({});
+  return f;
+}
+
+test('read-only reconciliation exports exact retained bytes without claiming a Photos version or filing', async () => {
+  const f = await reconciliationFixture();
+  const d = await reconcileReviewedRenditions(f.sb, f.plan, f.options);
+  const fact = d.sourceFacts[f.p.source_identifier];
+  assert.equal(d.snapshot.sourceScope, 'retained_capture');
+  assert.equal(d.snapshot.accessScope, 'sample');
+  assert.equal(fact.currentLibraryVersion, 'unknown');
+  assert.equal(fact.original, undefined);
+  assert.equal(fact.selectedForAdmission, false);
+  assert.equal(fact.existingLeaf.byteRole, 'rendition');
+  assert.equal(fact.filing.status, 'none');
+  assert.equal(f.state.uploads, 0); assert.equal(f.state.admissions, 0);
+});
+
+test('recorded vehicle alone stays partial; absent leaf is not called admitted', async () => {
+  const f = await reconciliationFixture();
+  f.state.rows[0].vehicle_id = 'car';
+  let d = await reconcileReviewedRenditions(f.sb, f.plan, f.options);
+  assert.equal(d.sourceFacts[f.p.source_identifier].filing.status, 'partial');
+  f.state.rows = [];
+  d = await reconcileReviewedRenditions(f.sb, f.plan, f.options);
+  assert.equal(d.sourceFacts[f.p.source_identifier].existingLeaf, undefined);
+  assert.equal(f.state.uploads, 0); assert.equal(f.state.admissions, 0);
+});
+
+test('reconciliation rejects stale bytes, missing currentness, changed provenance and duplicate leaves', async () => {
+  for (const mutate of [f => { f.state.stored = Buffer.from('wrong'); },
+    f => { delete f.state.rows[0].superseded_by; },
+    f => { f.state.rows[0].superseded_by = 'successor'; },
+    f => { f.state.rows[0].exif_data.source_rendition = { ...f.p.source_provenance, changed: true }; },
+    f => { f.state.rows.push(structuredClone(f.state.rows[0])); },
+    f => { f.state.rows[0].user_id = 'another-user'; }]) {
+    const f = await reconciliationFixture(); mutate(f);
+    await assert.rejects(reconcileReviewedRenditions(f.sb, f.plan, f.options));
+    assert.equal(f.state.uploads, 0); assert.equal(f.state.admissions, 0);
+  }
+});
+
+test('withdrawal during storage download invalidates reconciliation', async () => {
+  const f = await reconciliationFixture(), bucket = f.sb.storage.from();
+  const download = bucket.download;
+  bucket.download = async () => { f.state.rows[0].superseded_by = 'successor'; return download(); };
+  await assert.rejects(reconcileReviewedRenditions(f.sb, f.plan, f.options), /source_changed_during/);
+});
+
+function filingFixture() {
+  const current = { is_superseded: false, superseded_by: null };
+  const image = { ...current, is_sensitive: false, is_duplicate: false, is_document: false,
+    doc_flag: false, user_id: 'user', vehicle_id: 'vehicle', vision_gate_status: 'approved' };
+  const source = { image_url: 'https://example.test/source', reviewed_url: 'https://example.test/source',
+    reviewed_sha256: 'a'.repeat(64) };
+  const cls = { classifier_ok: true, is_automotive: true, image_medium: 'photograph',
+    v2: { is_document: false, vehicle_fields: [], vin: null } };
+  const row = { ...image, id: 'source-image', image_url: source.image_url, file_hash: source.reviewed_sha256,
+    ai_processing_status: 'completed', ai_scan_metadata: { classification: cls,
+      classification_review: { ...source, observation_id: 'classification', source_identifier: 'classified-source' } } };
+  const classification = { ...current, id: 'classification', source_id: 'pipeline', vehicle_id: null,
+    analysis_deferred: true, extraction_method: 'supplied_image_classification_v1',
+    source_url: row.image_url, source_identifier: 'classified-source',
+    extraction_metadata: { source }, structured_data: { source_image_id: row.id, classification: cls } };
+  const anchor = { ...image, id: 'anchor', image_url: 'https://example.test/anchor', file_hash: 'b'.repeat(64),
+    taken_at: '2026-04-27T17:31:07.519123Z' };
+  const proof = { ...current, id: 'proof', source_id: 'pipeline', kind: 'media', vehicle_id: null,
+    analysis_deferred: true, agent_model: 'fixture-reader', extraction_method: 'reviewed_image_attribution_v1',
+    extraction_metadata: { is_inferred: true }, source_url: row.image_url,
+    structured_data: { contract: 'reviewed_image_attribution_v1', source_image_id: row.id,
+      source_sha256: row.file_hash, target_vehicle_id: row.vehicle_id, contradictions: [], global_novelty_asserted: false,
+      basis: 'visual_correspondence', candidate_scope: 'fixture cohort', classification_observation_id: classification.id,
+      anchors: [{ image_id: anchor.id, source_url: anchor.image_url, source_sha256: anchor.file_hash, taken_at: anchor.taken_at }],
+      correspondences: [{ anchor_image_id: anchor.id, features: [
+        { kind: 'body_geometry', source_witness: 'body', anchor_witness: 'body' },
+        { kind: 'configuration', source_witness: 'trim', anchor_witness: 'trim' }] }] } };
+  const audit = { id: 'audit', observation_type: 'image', old_vehicle_id: null, new_vehicle_id: row.vehicle_id,
+    old_observation_id: row.id, new_observation_id: row.id,
+    reason: `first_attribution: reviewed_image_attribution_v1; proof_observation_id=${proof.id}; signal=reviewed_visual_chain` };
+  return { row, audit, proof, classification, anchors: [anchor], sourceId: 'pipeline',
+    vehicle: { id: row.vehicle_id, deleted_at: null, merged_into_vehicle_id: null } };
+}
+
+test('an existing reviewed filing retains its inferred current source-bound basis', () => {
+  assert.equal(reviewedFilingCurrent(filingFixture()), true);
+});
+
+test('withdrawal, foreign anchors, changed classification, deleted vehicle and uncited geometry invalidate filing', () => {
+  for (const mutate of [f => { f.proof.superseded_by = 'new-proof'; },
+    f => { f.classification.superseded_by = 'new-classification'; },
+    f => { f.anchors[0].vehicle_id = 'other-car'; },
+    f => { f.anchors[0].taken_at = '2026-04-27T17:31:07.519124Z'; },
+    f => { f.anchors[0].is_sensitive = true; },
+    f => { f.vehicle.deleted_at = '2026-11-15T00:00:00Z'; },
+    f => { f.row.ai_scan_metadata.classification = { ...f.row.ai_scan_metadata.classification, is_automotive: false }; },
+    f => { f.audit.new_vehicle_id = 'other-car'; },
+    f => { f.proof.structured_data.correspondences[0].features[0].kind = 'configuration'; },
+    f => { f.proof.structured_data.anchors.push(f.proof.structured_data.anchors[0]); }]) {
+    const f = filingFixture(); mutate(f);
+    assert.equal(reviewedFilingCurrent(f), false);
+  }
 });
