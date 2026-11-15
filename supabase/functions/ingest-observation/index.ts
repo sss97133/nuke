@@ -1066,7 +1066,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
     const componentReply = async (row: Record<string, unknown> | null, duplicate: boolean): Promise<Response | null> => {
       if (!component) return null;
-      if (!row?.id || row.is_superseded !== false || row.superseded_by != null || row.component_subject_id !== component.subjectId || row.source_observation_id !== component.sourceId)
+      if (!row?.id || row.is_superseded !== false || row.superseded_by !== null || row.component_subject_id !== component.subjectId || row.source_observation_id !== component.sourceId)
         return new Response(JSON.stringify({ error: "Component receipt unavailable", observation_id: row?.id ?? null }),
           { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const current = await supabase.rpc("component_reading_current", { p_observation: row.id });

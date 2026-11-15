@@ -28,7 +28,7 @@ Deno.test('actual component handler binds source/part/property/witness, replays 
     assert(body.component_subject_id===T&&body.source_observation_id===P&&body.property_id===R,'typed FKs');
     assert(body.extraction_method==='retained_component_reading_v1'&&body.observed_at==='2026-11-10T16:25:10.731Z','source analysis clock wins over caller clock');
     assert(body.analysis_deferred===true&&body.confidence_score<=.6&&body.source_event_at===null);
-    const row={...body,id:`a0000000-0000-4000-8000-${String(++writes).padStart(12,'0')}`,is_superseded:false};rows.set(body.content_hash,row);return respond(row,201);
+    const row={...body,id:`a0000000-0000-4000-8000-${String(++writes).padStart(12,'0')}`,is_superseded:false,superseded_by:null};rows.set(body.content_hash,row);return respond(row,201);
    }
    if(url.searchParams.has('id'))return readFailure?respond({message:'source lookup failed'},500):respond([{id:P,vehicle_id:V,is_superseded:false,superseded_by:parentPointer,
     extraction_method:'reviewed_image_analysis_v1',source_url:'https://images.example/battery.jpg',observed_at:'2026-11-10T16:25:10.731Z',
@@ -46,6 +46,8 @@ Deno.test('actual component handler binds source/part/property/witness, replays 
   parentPointer=P;assert((await handler(request())).status===400&&writes===1,'parent successor pointer refuses before write');parentPointer=null;
   for(const row of rows.values())row.superseded_by=P;
   assert((await handler(request())).status===409&&writes===1,'child successor pointer refuses replay even when current RPC says true');
+  for(const row of rows.values())delete row.superseded_by;
+  assert((await handler(request())).status===409&&writes===1,'missing child pointer metadata refuses replay');
   for(const row of rows.values())row.superseded_by=null;
   readFailure=true;assert((await handler(request())).status===503&&writes===1);readFailure=false;
   pending=true;assert((await handler(request())).status===400&&writes===1);pending=false;
