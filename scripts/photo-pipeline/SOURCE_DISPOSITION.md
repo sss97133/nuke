@@ -48,3 +48,45 @@ An optional `sourceFacts[id]` must carry the current `sourceVersion`. `original`
 The output has one row per current source plus explicitly evidenced withdrawn IDs, partitioned into `version_unverified` (a null PhotoKit modification hint), `original_unverified`, `source_unavailable` (only with explicit `originalStatus: unavailable`), `identity_ambiguous`, `partial`, `disputed`, `privacy_hold`, `candidate_unreviewed`, `unselected_source`, `ready_source_admission`, `admitted_unresolved`, `supported_complete`, `unsupported_video` or `withdrawn`. Each row names its next dependency. The manifest retains a digest of **all** supplied source facts and the privacy, media and filing decision IDs, so changing proof changes `manifestSha256` even when a disposition stays the same. `recordedFilingStatus` is an input assertion; `qualifiedCompleteFiling` is the strict source/leaf/privacy/use-scoped result. Candidate reasons remain retrieval evidence. A source may have multiple supported vehicle or depicted-subject relationships; this manifest never collapses those into a single inferred `vehicleId`. The output's `snapshotSha256` and `manifestSha256` make the frozen input and disposition replayable.
 
 Retained metadata replay (private files in `~/nuke-logs/library-context-discovery-20261115/`) has 347 images on seven sampled dates, 141 discovery candidates, 19 videos known outside the image selector, and no original-byte, privacy or exact existing-leaf facts. The bridge correctly emits 347 `original_unverified`, 175 missing-GPS context reasons and **zero proposals**. This is not a full Photos inventory or a finding that all 347 originals are genuinely unavailable; the retained replay simply did not supply their original-byte evidence. Add current source facts only after inspecting actual originals and exact existing leaves.
+
+
+## Reconcile retained captures through the existing intake owner
+
+The photo-sync daemon supports an explicit, read-only source-fact export from the
+same reviewed rendition plan used by its identity-first intake. It validates the
+local reviewed bytes, reads exact current canonical leaves and stored bytes, and
+rechecks each leaf after reading its dependencies. It performs no upload, RPC
+write, classification, filing, model call or sync-watermark change. The output
+must be a new private file; an existing receipt is never overwritten.
+
+```sh
+dotenvx run -- node scripts/photo-sync-daemon.mjs \
+  --reviewed-rendition-plan=/private/reviewed-plan.json \
+  --reviewed-reconcile-output=/private/source-facts.json
+python3 scripts/photo-pipeline/source_disposition.py \
+  /private/source-facts.json /private/dispositions.json
+```
+
+`sourceScope: retained_capture` and `sourceVersionBasis:
+retained_provenance_sha256` distinguish this frozen retained capture from a
+permission-visible Photos snapshot. Its owner-scoped namespace is not a Photos
+library identifier. The digest versions retained provenance, not the current
+PhotoKit original; `currentLibraryVersion` remains unknown. These manifests can
+neither establish original bytes nor select new admission. A preview's original
+availability at its earlier capture is not current original availability.
+
+A recorded vehicle ID alone remains a partial filing. An existing reviewed
+filing qualifies only after its latest attribution audit, current proof and
+classification, target vehicle and exact anchor URLs/hashes/clocks agree with
+the retained source. The result preserves inferred visual correspondence; it
+establishes neither ownership nor installation, payment or a uniquely identified
+physical component. A withdrawn proof or changed supporting source makes that
+filing disputed. Unfiled admitted sources stay unresolved. Privacy review remains
+bound to the exact supplied rendition, with its attribution and digest retained.
+
+The export is a bounded readback, not an atomic transaction or an admission
+certificate. Each source is read during the export interval; future consumers
+must refresh it and writers must still enforce their own atomic guards. It has a
+25-source and 120-second bound, with the CLI's 15-second per-request timeout. It
+cannot establish full-library coverage, and intentionally does not modify the
+original PhotoKit metadata replay or any spent execution checkpoint.
