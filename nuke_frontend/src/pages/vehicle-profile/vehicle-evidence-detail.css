@@ -16,6 +16,9 @@
 .evidence-detail section, .image-evidence-media { min-width: 0; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 .evidence-detail button:not(.btn-base) { min-height: var(--control-height); padding: 8px 12px; font: inherit; color: var(--link); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
 .evidence-metadata { font-size: var(--text-caption); color: var(--text-secondary); line-height: 1.6; }
+.evidence-metadata summary { cursor:pointer; padding:12px 0; }
+.cowl-tag-extract { margin:24px 0; max-width:620px; }
+.cowl-tag-extract figcaption { margin-top:12px; font-size:var(--text-caption); color:var(--text-secondary); }
 .evidence-read-notice { padding: 12px; margin: 12px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .image-evidence-layout { grid-template-columns: minmax(0, 440px) minmax(0, 1fr); }
 .image-evidence-media { position: sticky; top: var(--evidence-sticky-top); }

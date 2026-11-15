@@ -1,12 +1,17 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import ProfileIdentity from './ProfileIdentity';
+import { EngineIdentity } from '../../components/common/MakeIdentity';
+import { ZipOutlineDialog } from '../../components/map/ZipOutlineDialog';
+import { zipAreaRequest } from '../../components/map/zipAreaGeometry';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { getVehicleTitle } from '../../hooks/usePageTitle';
 import { Masthead, Facet, ClaimView, Text, Rows, Row, formatMeasure, day } from '../../kit';
 import { resolveSourceLogo } from '../../kit/Claim';
 import type { Claim, ListingState } from '../../kit';
+import type { FacetItem } from '../../kit/types';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { isAuctionPresentation } from './buildAuctionPulse';
@@ -180,6 +185,18 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const contributionDays = useContributionDays(vehicle?.id);
   const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
+  const hasLocationToken = doc?.sections.some(section => section.kind === 'strip'
+    && (section.facets.some(facet => facet.dimension === 'location') || section.gaps?.some(gap => gap.dimension === 'location')));
+  const locationRead = useQuery({
+    queryKey: ['vehicle_facet_items', vehicle?.id, 'location'],
+    queryFn: async (): Promise<FacetItem[]> => {
+      const { data, error } = await supabase.rpc('vehicle_facet_items', { p_vehicle_id: vehicle!.id, p_dimension: 'location' });
+      if (error) throw error;
+      return Array.isArray(data) ? data as FacetItem[] : [];
+    },
+    enabled: !!vehicle?.id && !!hasLocationToken,
+    staleTime: 5 * 60_000,
+  });
   const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
   const sticky = useRef<HTMLDivElement>(null);
   // On a phone the specs scroll with the page; only identity and price stay pinned (frontend.md, owner 2026-10-10).
@@ -189,6 +206,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const [listingOpen, setListingOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [zipOpen, setZipOpen] = useState(false);
   const [lotRead, setLotRead] = useState<LotProvenanceRead | null>(null);
 
   // The sticky stack below reads the masthead's measured height (vehicle-profile.css --vp-h-masthead).
@@ -203,11 +221,13 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     observer.observe(el);
     return () => { observer.disconnect(); page.style.removeProperty('--vp-h-masthead'); };
   }, [vehicle?.id, hasMasthead]);
-  useEffect(() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); }, [vehicle?.id]);
+  useEffect(() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); setZipOpen(false); }, [vehicle?.id]);
   useEffect(() => setLiveOpen(false), [vehicle?.id, auctionPulse?.listing_url, priceOwnedByLiveStack]);
 
   const masthead = doc?.sections.find(s => s.kind === 'masthead');
   const strip = doc?.sections.find(s => s.kind === 'strip');
+  const zipItem = locationRead.data?.find(item => item.key === 'location.map');
+  const zipArea = zipItem && zipAreaRequest(zipItem);
   const title = vehicle ? getVehicleTitle(vehicle) : '';
   const classified = masthead?.price?.unit === '';
 
@@ -368,13 +388,18 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   };
   const configuration = strip && <div className="vp-header-facets" role="group" aria-label="Explore this vehicle">
     {strip.odometer && <ClaimView label="Odometer" role="label" claim={strip.odometer} format={value => `${Number(value).toLocaleString('en-US')} mi`} />}
-    {strip.facets.map(f => {
+    {strip.facets.filter(f => f.dimension !== 'body_style' && f.dimension !== 'location').map(f => {
       const label = f.dimension === 'transmission' ? masthead.transmissionModel || f.label : f.label;
+      if (f.dimension === 'engine') return <button key={f.dimension} type="button" className="k-facet" aria-haspopup="dialog"
+        aria-expanded={activeFacet?.field === 'engine_type'} aria-label={`Explore ${label} in this profile`}
+        onClick={() => explore(f.dimension, label)}><Text role="label"><EngineIdentity make={vehicle.make ?? ''} model={masthead.model ?? undefined} year={vehicle.year} value={label} /></Text></button>;
       return <Facet key={f.dimension} label={label} expanded={activeFacet?.field === (f.dimension === 'engine' ? 'engine_type' : f.dimension)}
         ariaLabel={`Explore ${label} in this profile`}
         onClick={() => explore(f.dimension, label)} />;
     })}
-    {(strip.gaps ?? []).map(g => g.lead
+    {zipArea && <button type="button" className="k-facet" aria-haspopup="dialog" aria-expanded={zipOpen}
+      aria-label={`Explore ZIP ${zipArea.zip} area`} onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); setZipOpen(true); }}><Text role="label">{zipArea.zip}</Text></button>}
+    {(strip.gaps ?? []).filter(g => g.dimension !== 'body_style' && g.dimension !== 'location').map(g => g.lead
       // The record holds nothing, but the token's lead item does: its value, marked with its status.
       ? <Facet key={`gap:${g.dimension}`} label={g.lead.value} status={g.lead.status}
         expanded={activeFacet?.field === (g.dimension === 'engine' ? 'engine_type' : g.dimension)}
@@ -446,9 +471,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       </HeaderPopover>}
       {activeFacet && <HeaderPopover open onClose={() => setActiveFacet(null)} title={activeFacet.value} width={560} dismissBoundaryRef={sticky}>
         <React.Suspense fallback={<p role="status">Reading line items…</p>}>
-          <HeaderTokenItems key={`${vehicle.id}:${activeFacet.dimension}`} vehicleId={vehicle.id} dimension={activeFacet.dimension} items={masthead.token_items} />
+          <HeaderTokenItems key={`${vehicle.id}:${activeFacet.dimension}`} vehicleId={vehicle.id} dimension={activeFacet.dimension} items={masthead.token_items} isReplica={vehicle.is_replica === true} />
         </React.Suspense>
       </HeaderPopover>}
+      {zipOpen && zipItem && <ZipOutlineDialog location={zipItem} onClose={() => setZipOpen(false)} />}
     </div>
     {isMobile && specs && <div className="vp-header-specs">{specs}</div>}
   </>;

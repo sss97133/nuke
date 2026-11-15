@@ -14,7 +14,7 @@ import { Button } from '../../components/ui/button';
 import './vehicle-evidence-detail.css';
 import { supabase } from '../../lib/supabase';
 import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
-import { webSourceUrl } from './hooks/useVehicleImageEvidence';
+import { webSourceUrl, readImageWitnesses } from './hooks/useVehicleImageEvidence';
 
 interface ImageRow {
   id: string;
@@ -154,17 +154,7 @@ const ImagePageContent: React.FC = () => {
 
         // Dependent reads only follow a visible, correctly bound image.
         const [witnessRead, attributionRead, replacementRead] = await Promise.allSettled([
-          supabase
-            .from('observation_witnesses')
-            .select(`
-              witness_role,
-              observation:vehicle_observations!observation_id(
-                id, vehicle_id, kind, observed_at, content_text, structured_data, is_superseded
-              )
-            `)
-            .eq('image_id', imageId)
-            .abortSignal(controller.signal)
-            .limit(100),
+          readImageWitnesses(imageId, controller.signal),
           supabase
             .from('device_attributions')
             .select(`

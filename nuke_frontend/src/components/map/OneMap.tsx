@@ -6,6 +6,7 @@ import './maplibreWorker';
 import './one-map.css';
 import { CARTO_LIGHT } from './constants';
 import { SUPABASE_URL } from '../../lib/env';
+import { loadZipArea } from './zipAreaGeometry';
 import { BAND_RGBA, BANDS, BOUNDARY_TILES, band, eligible, makeLabel, outcome, platformName, readArea, readAreas, readBusinesses, readSellers, readZip, zipBounds, type AreaLayers, type BusinessLink, type LocationRow, type SellerLink } from './oneMapService';
 
 /**
@@ -25,7 +26,7 @@ const utc = (d: Date) => d.toISOString().slice(0, 10);
 /** One place on the map, for a reader that shows an area in place: the county's outline from the boundary tiles, the
  * county file's ZIP shapes (map-data/geo/v1/county/{fips}.geojson) and the area's public centre. No URL sync, no
  * counts, no panels. */
-export type OneMapFocus = { countyFips: string; geojsonPath?: string | null; centroid?: { lat: number; lng: number } | null; label?: string | null };
+export type OneMapFocus = { countyFips: string; geojsonPath?: string | null; centroid?: { lat: number; lng: number } | null; label?: string | null; selectedZip?: string | null };
 
 export default function OneMap({ focus }: { focus?: OneMapFocus } = {}) {
   const p = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -50,6 +51,7 @@ export default function OneMap({ focus }: { focus?: OneMapFocus } = {}) {
   const [showWindows, setShowWindows] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [note, setNote] = useState('');
+  const [focusAreaError, setFocusAreaError] = useState<string | null>(null);
   const paintedRef = useRef<Set<string>>(new Set());
   const win = useMemo(() => { const d = WINDOWS.find((w) => w.key === windowKey)!.days; return { from: utc(new Date(Date.now() - d * 86_400_000)), to: utc(new Date()) }; }, [windowKey]);
   const windowLabel = WINDOWS.find((w) => w.key === windowKey)!.label;
@@ -94,6 +96,29 @@ export default function OneMap({ focus }: { focus?: OneMapFocus } = {}) {
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
   }, [p, focus]);
+
+  // A focused ZIP is its exact retained Census polygon. It is not the city's centroid.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !focus?.selectedZip || !focus.geojsonPath) return;
+    const controller = new AbortController();
+    setFocusAreaError(null);
+    loadZipArea(focus.geojsonPath, focus.selectedZip, controller.signal).then(({ feature, bounds }) => {
+      if (controller.signal.aborted || !map.getStyle()) return;
+      if (map.getLayer('selected-zip-outline')) map.removeLayer('selected-zip-outline');
+      if (map.getLayer('selected-zip-fill')) map.removeLayer('selected-zip-fill');
+      if (map.getSource('selected-zip-area')) map.removeSource('selected-zip-area');
+      map.addSource('selected-zip-area', { type: 'geojson', data: feature });
+      map.addLayer({ id: 'selected-zip-fill', type: 'fill', source: 'selected-zip-area',
+        paint: { 'fill-color': '#0b78bc', 'fill-opacity': 0.22 } });
+      map.addLayer({ id: 'selected-zip-outline', type: 'line', source: 'selected-zip-area',
+        paint: { 'line-color': '#0369a1', 'line-width': 3, 'line-opacity': 0.95 } });
+      map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: 42, duration: 0 });
+    }).catch((error) => {
+      if (!controller.signal.aborted) setFocusAreaError(error instanceof Error ? error.message : 'ZIP area geometry is unavailable');
+    });
+    return () => controller.abort();
+  }, [ready, focus]);
 
   // The ZIPs and counties in view.
   useEffect(() => {
@@ -189,6 +214,7 @@ export default function OneMap({ focus }: { focus?: OneMapFocus } = {}) {
   const word = LAYER_WORD[layer];
   if (focus) return <div className="om om--focus" data-testid="one-map-focus" role="img" aria-label={focus.label ? `Map of ${focus.label}` : 'Map of the area'}>
     <div ref={containerRef} className="om-canvas" />
+    {focusAreaError && <div className="om-focus-error" role="status">{focusAreaError}</div>}
   </div>;
   return (
     <div className="om" data-testid="one-map">

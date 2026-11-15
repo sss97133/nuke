@@ -60,9 +60,12 @@ export function profileDocumentFrom(read: ProfileRead, priceOwnedByLiveStack: bo
       if (section.kind !== 'masthead') return section;
       const { identity_source, ...rest } = section;
       const tokens = getVehicleIdentityTokens(identity_source, { transmissionStrategy: 'never' });
+      // The tribute marker opens the existing trim line items; the record still carries is_replica.
+      const differentiators = tokens.differentiators.map(token => identity_source.is_replica && token.kind === 'trim'
+        ? { ...token, value: token.value.replace(/-Style$/, '*') } : token);
       return {
         ...rest,
-        identity: { primary: tokens.primary, differentiators: tokens.differentiators },
+        identity: { primary: tokens.primary, differentiators },
         model: tokens.primary.find(t => t.kind === 'model')?.value ?? rest.model ?? null,
         transmissionModel: identity_source.transmission_model?.trim() || null,
         price: priceOwnedByLiveStack ? null : rest.price ?? null,
