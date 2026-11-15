@@ -13,7 +13,7 @@ const MEANINGFUL = /^(work|maintenance|repair|restoration|photo|image|document|s
 export function contributionActivity(vehicleId: string, days: ContributionDay[]): ActivityEvent[] {
   return days.filter(d => ['photo', 'work', 'document'].includes(d.kind) && Number.isFinite(d.n) && d.n > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d.day))
     .map(d => ({ vehicle_id: vehicleId, event_date: d.day, event_type: d.kind,
-      title: d.kind === 'photo' ? `${d.n} photo${d.n === 1 ? '' : 's'} filed` : d.kind === 'document' ? `${d.n} receipt${d.n === 1 ? '' : 's'} on file` : 'Work recorded' }));
+      title: d.kind === 'photo' ? 'Photographs' : d.kind === 'document' ? 'Documents' : 'Work recorded' }));
 }
 
 export function elapsedActivity(iso: string, now: number): string {
@@ -77,12 +77,12 @@ export default function ProfileActivity({ vehicleId, events, pulse, days, readSt
     </button>
     {open && <HeaderPopover open title="Activity" align="right" width={440} onClose={() => { onClose(); trigger.current?.focus(); }} dismissBoundaryRef={boundaryRef}>
       <div className="vp-financial-panel">
-        {activity.live ? <><h3>Live auction · {pulse?.platform}</h3><p>Source feed received {elapsedActivity(activity.sourceAt!, now)}. Live status expires when the recorded close passes or the source feed becomes stale.</p>
-          <p>Recorded close: <time dateTime={pulse?.end_date ?? undefined}>{pulse?.end_date}</time></p></>
+        {activity.live ? <><h3>Live auction · {pulse?.platform}</h3>
+          <p>Recorded close: <time dateTime={pulse?.end_date ?? undefined}>{pulse?.end_date}</time></p>
+          {pulse?.listing_url && /^https:\/\//i.test(pulse.listing_url) && <a href={pulse.listing_url} target="_blank" rel="noreferrer">Open auction source ↗</a>}</>
         : activity.latest ? <><h3>{activity.latest.title || activity.latest.event_type?.replace(/_/g, ' ') || 'Recorded activity'}</h3>
-          <p><time dateTime={at}>{at}</time> · {activity.latest.event_type?.replace(/_/g, ' ')}</p>
-          <p>Activity is dated by this record’s event date. Uploading or importing an older record does not make the underlying activity more recent.</p>
-          {activity.latest.id && <details><summary>Record reference</summary><p>{activity.latest.id}</p></details>}
+          <p><time dateTime={at}>{at?.slice(0, 10)}</time> · {activity.latest.event_type?.replace(/_/g, ' ')}</p>
+          <a href={`/vehicle/${vehicleId}/day/${at?.slice(0, 10)}`} onClick={onClose}>View this day’s evidence →</a>
         </> : <p>No dated activity is available in the visible records.</p>}
         {incomplete && !activity.live && <p>Some activity reads are pending or unavailable. The visible record may not be the latest activity.</p>}
       </div>

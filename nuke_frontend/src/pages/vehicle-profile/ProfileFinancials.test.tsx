@@ -23,7 +23,7 @@ const rawCost = (extra = {}) => ({ use_id: 'use-a', book_owner_id: 'owner-a', do
 const render = async (market: React.ReactNode = null) => {
   await act(async () => root.render(<QueryClientProvider client={client}><ProfileFinancials vehicleId={vehicleId} market={market} open={open}
     onToggle={() => { open = !open; void render(market); }} onClose={() => { open = false; void render(market); }} boundaryRef={{ current: host }} /></QueryClientProvider>));
-  for (let index = 0; index < 4; index++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  for (let index = 0; index < 8; index++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 };
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -191,14 +191,15 @@ it('folds filed receipts in place by vendor with a readable total and keeps item
   expect([...host.querySelectorAll('button')].some(b => b.textContent === 'Show each receipt and its items')).toBe(true);
 });
 
-it('withholds receipt amounts from an untied viewer instead of totalling them', async () => {
+it('shows no receipt details to an anonymous viewer and offers sign in', async () => {
   fixture.user = null;
   fixture.tables.receipts_public_summary = [{ id: 'receipt', vendor_name: 'Synthetic receipt', total: null, amounts_visible: false }];
   open = true; await render();
-  const block = host.querySelector('[aria-label="Receipts filed to this vehicle"]')!;
-  expect(block.textContent).toContain('Withheld from this viewer');
-  expect(block.textContent).not.toContain('Total on receipts');
-  expect(host.querySelector('[aria-label="By vendor"]')?.textContent).toContain('Amount withheld · 1 receipt');
+  expect(host.textContent).toContain('Valuation not available');
+  expect(host.querySelector('a[href="/login"]')?.textContent).toContain('Sign in');
+  expect(host.textContent).not.toContain('Synthetic receipt');
+  expect(host.querySelector('[aria-label="Receipts filed to this vehicle"]')).toBeNull();
+  expect(fixture.from).not.toHaveBeenCalledWith('receipts_public_summary');
 });
 
 it('keeps conflicting receipt amount/date readings unresolved and never invents a currency', () => {

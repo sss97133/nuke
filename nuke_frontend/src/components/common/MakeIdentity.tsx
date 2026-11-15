@@ -74,7 +74,7 @@ export function resolveVehicleArtwork({ make, model, year, variants = [], vehicl
   // Resolve its original catalogue entry so changing the suffix does not discard sourced lettering.
   const variant = variants.filter(token => token.kind === 'series' || token.kind === 'trim')
     .map(token => token.kind === 'trim' && token.value.endsWith('*') ? `${token.value.slice(0, -1)}-Style` : token.value).join(' ');
-  return vehicleArtwork.filter(asset => keyFor(asset.make) === keyFor(make)
+  return vehicleArtwork.filter(asset => asset.role !== 'engine' && keyFor(asset.make) === keyFor(make)
     // Lettering from one car's own photograph never stands for another car.
     && (!asset.vehicleIds?.length || (!!vehicleId && asset.vehicleIds.includes(vehicleId)))
     && numericYear >= asset.years[0] && numericYear <= asset.years[1]
@@ -82,6 +82,20 @@ export function resolveVehicleArtwork({ make, model, year, variants = [], vehicl
     && (!asset.variants?.length || asset.variants.some(value => keyFor(value) === keyFor(variant)))
     // A badge documented "except <trim>" (the 1970-73 fender bird is not a Trans Am part) stays off that trim.
     && !asset.exceptVariants?.some(value => keyFor(value) === keyFor(variant)));
+}
+
+/** A complete engine designation selects artwork from the shared catalogue.
+ * Callers pass the supported specification, never a photographed badge as a substitute. */
+export function EngineIdentity({ make, value }: { make: string; model?: string; year?: number | string | null; value: string }) {
+  const [failedFile, setFailedFile] = useState<string | null>(null);
+  const asset = vehicleArtwork.find(row => row.role === 'engine' && keyFor(row.make) === keyFor(make)
+    && row.engines?.some(engine => keyFor(engine) === keyFor(value)));
+  if (!asset || failedFile === asset.file) return <>{value}</>;
+  return <span className="engine-identity">
+    <img src={`/stacks/makes/${asset.file}`} width={asset.width} height={asset.height} alt=""
+      onError={() => setFailedFile(asset.file)} />
+    <span className="sr-only">{value}</span>
+  </span>;
 }
 
 /** What the recorded designation adds to the lettering it shows: -Style or its profile marker *. */

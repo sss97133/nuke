@@ -25,8 +25,8 @@ it('counts the timeline bar\'s contribution days as activity: photos filed, work
     { day: '2026-10-29', kind: 'document', n: 2 }, { day: '2026-10-27', kind: 'work', n: 0 }, { day: '2027-01-01', kind: 'photo', n: 1 }];
   const result = selectProfileActivity('v', [{ id: 'old', vehicle_id: 'v', event_type: 'work_session', event_date: '2025-10-07' }], null, now, days);
   expect(result.latest?.event_date).toBe('2026-10-29');
-  expect(result.latest?.title).toBe('2 receipts on file');
-  expect(selectProfileActivity('v', [], null, now, [{ day: '2026-10-28', kind: 'photo', n: 391 }]).latest?.title).toBe('391 photos filed');
+  expect(result.latest?.title).toBe('Documents');
+  expect(selectProfileActivity('v', [], null, now, [{ day: '2026-10-28', kind: 'photo', n: 391 }]).latest?.title).toBe('Photographs');
   expect(selectProfileActivity('v', [], null, now, [{ day: '2026-10-30', kind: 'event', n: 3 }]).latest).toBeUndefined();
 });
 it('shows live only for an active auction with a fresh source-feed clock and future close', () => {

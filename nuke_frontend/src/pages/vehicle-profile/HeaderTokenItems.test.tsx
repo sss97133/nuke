@@ -41,7 +41,7 @@ const location: FacetItem[] = [
   { key: 'location.sources.photo_gps', facet: 'current', status: 'reading', unit: null, rule: null, equation: null, needed: null, sources: [],
     value: { photos: 12, days: 3, areas: [{ label: 'Example City, NV', photos: 12, days: 3, first_taken_at: '2026-01-01T00:00:00Z', last_taken_at: '2026-03-04T00:00:00Z' }] } },
   { key: 'location.map', facet: 'current', status: 'reading', unit: null, rule: null, equation: null, sources: [], needed: 'the ZCTA of this area',
-    value: { label: 'Example City, NV', county_fips: '32999', bounds: { grain: 'county', county_fips: '32999', geojson: 'map-data/geo/v1/county/32999.geojson' },
+    value: { label: 'Example City, NV', zcta: '89005', county_fips: '32999', bounds: { grain: 'county', county_fips: '32999', geojson: 'map-data/geo/v1/county/32999.geojson' },
       centroid: { lat: 36.1, lng: -115.1 } } },
 ];
 
@@ -86,6 +86,42 @@ it('renders every item of a carried token as a row with status, sources, rule, e
   expect(rpc).not.toHaveBeenCalled();
 });
 
+it('shows an identical answer once while retaining its cited source', async () => {
+  const item: FacetItem = { key: 'engine.current.displacement', facet: 'current', value: '455', status: 'established',
+    unit: null, rule: null, equation: null,
+    sources: [{ kind: 'vehicle_record', label: 'Vehicle record', value_label: '455', observed_at: '2026-01-02T00:00:00Z' }], needed: null };
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="engine" items={{ engine: [item] }} />);
+  expect((host.textContent?.match(/455/g) ?? [])).toHaveLength(1);
+  expect(host.textContent).toContain('Vehicle record');
+  expect(host.textContent).toContain('Jan 2, 2026');
+});
+
+it('folds duplicate current and decode answers while retaining both sources', async () => {
+  const item = (key: string, facet: FacetItem['facet'], source: string): FacetItem => ({ key, facet, value: 'Firebird', status: 'established',
+    unit: null, rule: null, equation: null,
+    sources: [{ kind: 'record', label: source, observed_at: '2026-01-02T00:00:00Z' }], needed: null });
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="model" items={{ model: [
+    item('model.current.name', 'current', 'Vehicle record'), item('model.decode.name', 'decode', 'VIN decode'),
+  ] }} />);
+  expect(host.querySelectorAll('.k-item')).toHaveLength(1);
+  expect(host.textContent).toContain('Vehicle record');
+  expect(host.textContent).toContain('VIN decode');
+});
+
+it('keeps body detail under model and describes an unlinked title only once', async () => {
+  const item = (key: string, value: string | null, status: FacetItem['status']): FacetItem => ({ key, facet: 'decode', value, status,
+    unit: null, rule: null, equation: null, sources: [], needed: value ? null : 'photo of title or registration' });
+  await render(<HeaderTokenItems vehicleId="v-1" dimension="model" items={{
+    model: [item('model.current.name', 'Firebird', 'established'), item('model.title', null, 'missing')],
+    body_style: [item('body_style.current.type', 'Coupe', 'established'), item('body_style.title', null, 'missing')],
+  }} />);
+  expect(host.textContent).toContain('Firebird');
+  expect(host.textContent).toContain('Coupe');
+  expect((host.textContent?.match(/No linked title evidence/g) ?? [])).toHaveLength(1);
+  expect(host.textContent).not.toContain('photo of title');
+  expect(host.querySelector('[data-key="model.title"]')).toBeNull();
+});
+
 it('prints the reader\'s labels for codes, ratios to two places, and every cited availability row', async () => {
   expect(codeText('not_original_unit')).toBe('not original unit');
   expect(equationText('gear_ratio[n] * axle_ratio')).toBe('gear ratio[n] * axle ratio');
@@ -124,16 +160,20 @@ it('prints the reader\'s labels for codes, ratios to two places, and every cited
   expect(text).not.toMatch(/[a-z0-9]_[a-z0-9]/);
 });
 
-it('reads location when it opens and draws its county and area centre on the map', async () => {
+it('reads location and opens only its cited ZIP area on request', async () => {
   rpc.mockResolvedValue({ data: location, error: null });
   await render(<HeaderTokenItems vehicleId="v-1" dimension="location" items={{ transmission }} />);
   expect(rpc).toHaveBeenCalledWith('vehicle_facet_items', { p_vehicle_id: 'v-1', p_dimension: 'location' });
   expect(host.textContent).toContain('Example City, NV');
   expect(host.textContent).toContain('12 photos · 3 days');
-  const map = host.querySelector('[data-testid="one-map-focus"]');
+  expect(host.querySelector('[data-testid="one-map-focus"]')).toBeNull();
+  await act(async () => host.querySelector<HTMLButtonElement>('button')?.click());
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  const map = document.body.querySelector('[data-testid="one-map-focus"]');
   expect(map?.getAttribute('data-fips')).toBe('32999');
   expect(map?.getAttribute('data-geojson')).toBe('map-data/geo/v1/county/32999.geojson');
-  expect(map?.closest('.k-item')?.getAttribute('data-key')).toBe('location.map');
+  expect(map?.getAttribute('data-lat')).toBeNull();
+  expect(document.body.querySelector('[aria-label="ZIP 89005 area map"]')).not.toBeNull();
 });
 
 it('says when the location read fails', async () => {
@@ -156,13 +196,13 @@ it('shows the replica points from cited readers while keeping the as-built gearb
       visual_relation: 'direct_visual', image_region: { label: 'Hood bird and scoop.' }, limitation: 'Factory originality not established.' }] },
     isLoading: false, isError: false }));
   const item = (key: string, value: string | null, status: FacetItem['status']): FacetItem => ({ key, value, status,
-    facet: 'current', sources: [], needed: value ? null : 'build sheet' });
+    facet: 'current', unit: null, rule: null, equation: null, sources: [], needed: value ? null : 'build sheet' });
   await render(<MemoryRouter><HeaderTokenItems vehicleId="v-1" dimension="trim" isReplica items={{
     trim: [item('trim.tribute', 'tribute', 'claim')], engine: [item('engine.current.displacement', '7.5', 'established')],
     transmission: [item('transmission.as_built.type', null, 'missing'), item('transmission.current.type', 'manual', 'established')],
   }} /></MemoryRouter>);
   expect(host.textContent).toContain('Buccaneer Red');
-  expect(host.textContent).toContain('Cowl-tag extract');
+  expect(host.textContent).toContain('Cowl tag');
   expect(host.textContent).toContain('Hood and scoop');
   expect(host.textContent).toContain('Photo alone does not establish Ram Air intake function or factory originality');
   expect(host.textContent).not.toContain('scoop..');
@@ -184,7 +224,7 @@ it('does not apply the Firebird facts to another replica', async () => {
   provenance.read.mockImplementation(() => ({ data: { vehicle_id: 'v-2', coverage: { status: 'complete_current_reader' },
     image_observations: [] }, isLoading: false, isError: false }));
   await render(<MemoryRouter><HeaderTokenItems vehicleId="v-2" dimension="trim" isReplica items={{ trim: [{
-    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', sources: [], needed: null,
+    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', unit: null, rule: null, equation: null, sources: [], needed: null,
   }] }} /></MemoryRouter>);
   expect(host.textContent).toContain('Engine line items unavailable');
   expect(host.textContent).toContain('Transmission line items unavailable');
@@ -201,7 +241,7 @@ it('withholds a physical reading whose image was replaced or withdrawn', async (
       source_url: 'https://example.org/old.jpg', claim_role: 'cowl_tag_paint', visual_relation: 'direct_code', value: 'Buccaneer Red' }] },
     isLoading: false, isError: false });
   await render(<MemoryRouter><HeaderTokenItems vehicleId="v-1" dimension="trim" isReplica items={{ trim: [{
-    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', sources: [], needed: null,
+    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', unit: null, rule: null, equation: null, sources: [], needed: null,
   }] }} /></MemoryRouter>);
   expect(host.textContent).toContain('Factory paint: no qualifying cited reading');
   expect(host.querySelector('a[href="https://example.org/old.jpg"]')).toBeNull();
@@ -215,7 +255,7 @@ it('withholds physical citations when the eligible image inventory is incomplete
       source_url: 'https://example.org/paint.jpg', claim_role: 'cowl_tag_paint', visual_relation: 'direct_code', value: 'Buccaneer Red' }] },
     isLoading: false, isError: false });
   await render(<MemoryRouter><HeaderTokenItems vehicleId="v-1" dimension="trim" isReplica items={{ trim: [{
-    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', sources: [], needed: null,
+    key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', unit: null, rule: null, equation: null, sources: [], needed: null,
   }] }} /></MemoryRouter>);
   expect(host.textContent).toContain('Factory paint: source read unavailable');
   expect(host.querySelector('a[href="https://example.org/paint.jpg"]')).toBeNull();

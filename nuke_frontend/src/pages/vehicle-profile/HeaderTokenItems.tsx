@@ -1,31 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { ItemList, Text } from '../../kit';
+import { ItemList, Text, valueText } from '../../kit';
 import type { FacetItem, TokenItems } from '../../kit/types';
-import type { OneMapFocus } from '../../components/map/OneMap';
+import { ZipOutlineDialog } from '../../components/map/ZipOutlineDialog';
+import { zipAreaRequest } from '../../components/map/zipAreaGeometry';
 import { useFieldProvenance, currentImageObservations } from './hooks/useFieldProvenance';
 import { useVehicleImageEvidence } from './hooks/useVehicleImageEvidence';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import CowlTagExtract from './CowlTagExtract';
 
-const OneMap = React.lazy(() => import('../../components/map/OneMap'));
-
-/** The map item's area as a OneMap focus: its county outline and the area's centroid. Area grain only, never a point. */
-function mapFocus(item: FacetItem): OneMapFocus | null {
-  const v = item.value as { label?: string; county_fips?: string; bounds?: { county_fips?: string; geojson?: string }; centroid?: { lat: number; lng: number } } | null;
-  const fips = v?.bounds?.county_fips ?? v?.county_fips;
-  if (!fips) return null;
-  return { countyFips: fips, geojsonPath: v?.bounds?.geojson ?? null, centroid: v?.centroid ?? null, label: v?.label ?? null };
+/** Show an item's answer once; source identity and clock remain visible beneath it. */
+function conciseItems(items: FacetItem[]): FacetItem[] {
+  const cleaned = items.map(item => {
+    const answer = valueText(item.value, item.unit)?.trim().toLowerCase();
+    if (!answer) return item;
+    return { ...item, sources: item.sources.map(source => {
+      const said = source.value_label ?? (typeof source.value === 'string' ? source.value : valueText(source.value));
+      return said?.trim().toLowerCase() === answer ? { ...source, value: null, value_label: null } : source;
+    }) };
+  });
+  const simple = (item: FacetItem) => !item.stated && !item.rule && !item.equation && !item.needed
+    && !item.sides?.length && !item.candidates?.length && !item.examined?.length && !item.availability?.length;
+  const result: FacetItem[] = [];
+  for (const item of cleaned) {
+    const answer = valueText(item.value, item.unit);
+    const duplicate = answer && simple(item) && ['established', 'reading'].includes(item.status)
+      ? result.find(previous => simple(previous) && previous.status === item.status && previous.unit === item.unit
+        && previous.facet !== item.facet && [previous.facet, item.facet].every(facet => facet === 'current' || facet === 'decode')
+        && valueText(previous.value, previous.unit) === answer) : null;
+    if (duplicate) duplicate.sources = [...duplicate.sources, ...item.sources];
+    else result.push(item);
+  }
+  return result;
 }
 
-function LocationMap({ item }: { item: FacetItem }) {
-  const focus = React.useMemo(() => mapFocus(item), [item]);
-  if (!focus) return null;
-  return <React.Suspense fallback={<div className="om om--focus" aria-busy="true" />}><OneMap focus={focus} /></React.Suspense>;
-}
+const isUnlinkedTitle = (item: FacetItem) => ['model.title', 'body_style.title'].includes(item.key) && item.status === 'missing';
 
 /** Location is read when its token opens: its sources are photo areas, which the profile read does not carry. */
 function LocationItems({ vehicleId }: { vehicleId: string }) {
+  const [mapOpen, setMapOpen] = useState(false);
   const read = useQuery({
     queryKey: ['vehicle_facet_items', vehicleId, 'location'],
     queryFn: async () => {
@@ -37,7 +51,13 @@ function LocationItems({ vehicleId }: { vehicleId: string }) {
   });
   if (read.isPending) return <Text role="caption" as="p" aria-busy="true">Reading location…</Text>;
   if (read.isError) return <Text role="caption" as="p" aria-live="polite">Location read failed: {read.error instanceof Error ? read.error.message : 'unknown error'}</Text>;
-  return <ItemList items={read.data} after={item => item.key === 'location.map' ? <LocationMap item={item} /> : null} />;
+  const mapItem = read.data.find(item => item.key === 'location.map');
+  const area = mapItem && zipAreaRequest(mapItem);
+  return <>
+    <ItemList items={conciseItems(read.data)} />
+    {area && <button type="button" className="vp-financial-action" onClick={() => setMapOpen(true)}>View ZIP {area.zip} area map</button>}
+    {mapOpen && mapItem && <ZipOutlineDialog location={mapItem} onClose={() => setMapOpen(false)} />}
+  </>;
 }
 
 function PhysicalPoint({ vehicleId, field, label, role, relation }: {
@@ -62,9 +82,10 @@ function PhysicalPoint({ vehicleId, field, label, role, relation }: {
   const imageSrc = [...new Set(renditions)][rendition] ?? null;
   const region = reading.image_region?.label?.trim().replace(/[.\s]+$/, '');
   return <div className="vp-tribute-point">
-    <strong>{field === 'factory_color' ? 'Cowl-tag extract' : label}</strong>
+    <strong>{field === 'factory_color' ? 'Cowl tag' : label}</strong>
     {field === 'factory_color'
-      ? <p>{label}: {reading.value} · interpreted photo reading</p>
+      ? <><CowlTagExtract vehicleId={vehicleId} observationId={reading.observation_id} sourceImageId={reading.image_id} />
+        <p>{label}: {reading.value}</p></>
       : <figure className="vp-tribute-point__figure">
         {imageSrc ? <img src={imageSrc} width={560} height={420} alt={region || 'Cited hood and scoop photograph'}
           onError={() => setRendition(current => current + 1)} />
@@ -82,13 +103,13 @@ function TributeEvidence({ vehicleId, items }: { vehicleId: string; items: Token
   const engine = items.engine?.filter(item => item.key === 'engine.as_built.engine' || item.key === 'engine.current.displacement') ?? [];
   const transmission = items.transmission?.filter(item => item.key === 'transmission.as_built.type' || item.key === 'transmission.current.type') ?? [];
   return <>
-    <ItemList items={trim} />
+    <ItemList items={conciseItems(trim)} />
     <Text role="label" as="h3">Engine, as built and current</Text>
-    {engine.length ? <ItemList items={engine} /> : <Text role="caption" as="p">Engine line items unavailable.</Text>}
+    {engine.length ? <ItemList items={conciseItems(engine)} /> : <Text role="caption" as="p">Engine line items unavailable.</Text>}
     <PhysicalPoint vehicleId={vehicleId} field="factory_color" label="Factory paint"
       role="cowl_tag_paint" relation="direct_code" />
     <Text role="label" as="h3">Transmission, as built and current</Text>
-    {transmission.length ? <ItemList items={transmission} /> : <Text role="caption" as="p">Transmission line items unavailable.</Text>}
+    {transmission.length ? <ItemList items={conciseItems(transmission)} /> : <Text role="caption" as="p">Transmission line items unavailable.</Text>}
     <PhysicalPoint vehicleId={vehicleId} field="appearance" label="Hood and scoop"
       role="visible_exterior_appearance" relation="direct_visual" />
   </>;
@@ -100,5 +121,17 @@ export default function HeaderTokenItems({ vehicleId, dimension, items, isReplic
   if (dimension === 'trim' && isReplica && items?.trim?.length) return <TributeEvidence vehicleId={vehicleId} items={items} />;
   const list = items?.[dimension];
   if (!list?.length) return <Text role="caption" as="p">vehicle_facet_items read no line items for {dimension.replace(/_/g, ' ')}.</Text>;
-  return <ItemList items={list} />;
+  if (dimension === 'model') {
+    const body = items?.body_style ?? [];
+    const titleUnlinked = [...list, ...body].some(isUnlinkedTitle);
+    const bodyDetails = body.filter(item => !isUnlinkedTitle(item));
+    return <>
+      <ItemList items={conciseItems(list.filter(item => !isUnlinkedTitle(item)))} />
+      {bodyDetails.length > 0 && <section><Text role="label" as="h3">Body style</Text><ItemList items={conciseItems(bodyDetails)} /></section>}
+      {titleUnlinked && <Text role="caption" as="p">No linked title evidence.</Text>}
+    </>;
+  }
+  return <>
+    <ItemList items={conciseItems(list)} />
+  </>;
 }

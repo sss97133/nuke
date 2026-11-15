@@ -90,3 +90,5 @@
 /* What the record adds beside the lettering ("-Style") is text at the same cap height (0.71em in the system and Arial
    faces); line-height 1 centres its capitals on the shared band. */
 .vehicle-identity[data-inline-artwork="true"] .vehicle-identity__qualifier { font-size:calc(var(--identity-cap) / 0.71); line-height:1; }
+.engine-identity { display:inline-flex; align-items:center; vertical-align:middle; }
+.engine-identity img { display:block; height:.85em; width:auto; max-width:none; }

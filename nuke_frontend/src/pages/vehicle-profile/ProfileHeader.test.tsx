@@ -1,16 +1,17 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import type { ProfileRead } from './profileDocument';
 const fixture = vi.hoisted(() => ({ vehicle: {} as Record<string, unknown>, pulse: null as Record<string, unknown> | null, read: null as ProfileRead | null,
-  auctionRows: [] as any[], eventRows: [] as any[], request: vi.fn(), gallery: vi.fn(), mobile: false }));
+  auctionRows: [] as any[], eventRows: [] as any[], locationRows: [] as any[], request: vi.fn(), gallery: vi.fn(), mobile: false }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
   let vehicleId: string;
   const query: any = { select: () => query, eq: (_key: string, id: string) => { vehicleId = id; return query; },
     order: () => query, limit: () => fixture.request(table, vehicleId) };
   return query;
-} } }));
+}, rpc: (name: string) => Promise.resolve({ data: name === 'vehicle_facet_items' ? fixture.locationRows : null, error: null }) } }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, auctionPulse: fixture.pulse, setGalleryFilter: fixture.gallery }) }));
 vi.mock('./profileDocument', async (original) => {
   const real = await original<typeof import('./profileDocument')>();
@@ -54,7 +55,7 @@ function mustangRead(): ProfileRead {
   };
 }
 
-let root: Root, host: HTMLDivElement;
+let root: Root, host: HTMLDivElement, client: QueryClient;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.mobile = false;
@@ -62,15 +63,18 @@ beforeEach(() => {
   host.className = 'vehicle-profile-page';
   document.body.appendChild(host);
   root = createRoot(host);
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   fixture.vehicle = { id: 'v-1', year: 1966, make: 'Ford', model: 'Mustang', listing_kind: 'vehicle' };
   fixture.pulse = null;
   fixture.gallery.mockReset();
   fixture.read = mustangRead();
   fixture.auctionRows = []; fixture.eventRows = [];
+  fixture.locationRows = [{ key: 'location.map', facet: 'current', status: 'reading', value: { zcta: '89005', label: 'Boulder City, NV', bounds: { county_fips: '32003', geojson: 'map-data/geo/v1/county/32003.geojson' } }, sources: [] }];
   fixture.request.mockReset().mockImplementation((table: string) => Promise.resolve({ data: table === 'auction_events_canonical' ? fixture.auctionRows : fixture.eventRows, error: null }));
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
-const render = () => act(async () => root.render(<ProfileHeader priceLotId="lot-1" />));
+afterEach(async () => { await act(async () => root.unmount()); client.clear(); host.remove(); });
+const render = async () => { await act(async () => root.render(<QueryClientProvider client={client}><ProfileHeader priceLotId="lot-1" /></QueryClientProvider>));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); }); };
 const renderLoaded = render;
 const openPrice = () => act(() => (host.querySelector('.k-masthead__result button.k-claim__value') as HTMLButtonElement).click());
 it('opens the replica marker on the existing cited trim items', async () => {
@@ -78,7 +82,9 @@ it('opens the replica marker on the existing cited trim items', async () => {
   fixture.read = { vehicle_id: 'v-1', viewer: 'anon', read_at: '2026-11-15T13:00:00Z', sections: [{
     kind: 'masthead', year: 1973, make: 'Pontiac', model: 'Firebird',
     identity_source: { year: 1973, make: 'Pontiac', model: 'Firebird', trim: 'TRANS AM', is_replica: true },
-    token_items: { trim: [{ key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', sources: [{ kind: 'record', label: 'vehicle record', method: 'vehicles.is_replica' }] }] },
+    token_items: { trim: [{ key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim',
+      unit: null, rule: null, equation: null, needed: null,
+      sources: [{ kind: 'record', label: 'vehicle record', method: 'vehicles.is_replica' }] }] },
   }] } as ProfileRead;
   await renderLoaded();
   const marker = host.querySelector<HTMLButtonElement>('[aria-label="Explore Trans Am* in this profile"]');
@@ -337,12 +343,29 @@ it('keeps one identity, price and contextual controls in the masthead without a 
   expect(price.textContent).toBe('$24,000');
   expect(host.textContent).toContain('Last recorded sale');
   expect(host.textContent).toContain('10,000 mi');
-  expect(host.querySelectorAll('button.k-facet').length).toBe(5);
+  expect(host.querySelectorAll('button.k-facet').length).toBe(4);
+  expect(host.querySelector('.vp-header-facets')?.textContent).not.toContain('Coupe');
+  expect(host.querySelector('.vp-header-facets')?.textContent).not.toContain('Boulder City');
+  expect(host.querySelector('[aria-label="Explore ZIP 89005 area"]')?.textContent).toBe('89005');
   expect(host.textContent).not.toContain('facts attributed');
   expect(host.querySelector('.vp-strip')).toBeNull();
   expect(host.querySelectorAll('.vehicle-identity')).toHaveLength(1);
   expect(host.querySelector('[style]')).toBeNull();
   expect(host.style.getPropertyValue('--vp-h-masthead')).toMatch(/px$/);
+});
+
+it('opens the supported ZIP outline directly from the header', async () => {
+  await render();
+  await act(async () => (host.querySelector('[aria-label="Explore ZIP 89005 area"]') as HTMLButtonElement).click());
+  expect(document.body.querySelector('[aria-label="ZIP 89005 area map"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="token-items"]')).toBeNull();
+});
+
+it('does not turn a city or an unverified ZIP into a header location chip', async () => {
+  fixture.locationRows = [{ key: 'location.map', facet: 'current', status: 'reading', value: { label: 'Boulder City, NV', zcta: '89005', bounds: { county_fips: '32003', geojson: 'map-data/geo/v1/county/other.geojson' } }, sources: [] }];
+  await render();
+  expect(host.querySelector('[aria-label="Explore ZIP 89005 area"]')).toBeNull();
+  expect(host.querySelector('.vp-header-facets')?.textContent).not.toContain('Boulder City');
 });
 
 it('opens the price source with its platform, clock and the stack link', async () => {
@@ -356,9 +379,9 @@ it('opens the price source with its platform, clock and the stack link', async (
 it('a facet opens its line items and coordinates the photo topic without navigation', async () => {
   await render();
   await act(async () => (host.querySelectorAll('button.k-facet')[0] as HTMLButtonElement).click());
-  expect(document.body.textContent).toContain('body_style line items');
-  expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'body_style', label: 'Coupe' });
-  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('body_style');
+  expect(document.body.textContent).toContain('engine line items');
+  expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'engine_type', label: '4.7L V8' });
+  expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('engine');
   expect(host.textContent).not.toContain('Auction performance unavailable');
 });
 
@@ -369,7 +392,7 @@ it('a token the read holds no value for is a muted gap that opens its line items
     strip.gaps = [{ dimension: 'trim', label: 'Trim' }, { dimension: 'drivetrain', label: 'Drivetrain' }];
   }
   await render();
-  expect(host.querySelectorAll('button.k-facet')).toHaveLength(6);
+  expect(host.querySelectorAll('button.k-facet')).toHaveLength(5);
   const gaps = [...host.querySelectorAll('button.k-facet--gap')] as HTMLButtonElement[];
   expect(gaps.map(g => g.textContent)).toEqual(['Trim \u2014', 'Drivetrain \u2014']);
   expect(gaps[1].getAttribute('aria-label')).toBe('Drivetrain: not established. Show what would establish it');
