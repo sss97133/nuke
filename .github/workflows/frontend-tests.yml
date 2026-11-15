@@ -182,7 +182,7 @@ jobs:
           set -euo pipefail
           trap 'dropdb --if-exists dm_refinement_component_ci; psql -X -v ON_ERROR_STOP=1 -d postgres -c "DROP ROLE IF EXISTS anon, authenticated, service_role"' EXIT
           createdb dm_refinement_component_ci
-          psql -X -v ON_ERROR_STOP=1 -f supabase/sql/test_component_evidence.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/sql/test_component_supersession_currentness.sql
           PSQL_BIN="$(command -v psql)" deno test --node-modules-dir=none --allow-env --allow-run=psql supabase/functions/ingest-observation/componentEvidencePostgres.test.ts
       - name: Run each database contract in its own fresh database
         run: scripts/ci/run-db-contracts.sh --ci-service

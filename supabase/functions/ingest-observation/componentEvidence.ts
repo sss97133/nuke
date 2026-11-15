@@ -31,11 +31,11 @@ export interface ComponentEvidenceInput {
 }
 export interface ComponentSubject { subject_id: string; subject_key: string; display_name: string; is_active: boolean; domain: string; category: string }
 export interface ComponentSource {
-  id: string; vehicle_id: string; is_superseded: boolean; extraction_method: string;
+  id: string; vehicle_id: string; is_superseded: boolean; superseded_by: string | null; extraction_method: string;
   source_url: string; observed_at: string; structured_data: ObjectValue;
 }
 export interface ComponentImage {
-  id: string; vehicle_id: string; image_url: string; is_sensitive?: boolean;
+  id: string; vehicle_id: string; image_url: string; superseded_by: string | null; is_sensitive?: boolean;
   is_document?: boolean; redaction_level?: string | null;
 }
 export type ComponentEvidenceResult = { ok: false; reason: string } | {
@@ -82,11 +82,11 @@ export async function prepareComponentEvidence(input: ComponentEvidenceInput, su
     input.agent_inferred !== true || input.defer_analysis !== true || !object(input.structured_data)) return fail("invalid_component_reading");
   if (!subject || subject.is_active !== true || subject.subject_key !== input.component_key) return fail("unknown_component_key");
   if (!source || source.id.toLowerCase() !== selector.source_observation_id.toLowerCase() ||
-    source.vehicle_id !== input.vehicle_id || source.is_superseded !== false ||
+    source.vehicle_id !== input.vehicle_id || source.is_superseded !== false || source.superseded_by !== null ||
     source.extraction_method !== "reviewed_image_analysis_v1" || !object(source.structured_data) ||
     source.source_url !== selector.source_url || !Number.isFinite(Date.parse(source.observed_at))) return fail("component_source_unavailable");
   if (!image || image.id.toLowerCase() !== selector.image_id.toLowerCase() || image.vehicle_id !== input.vehicle_id ||
-    image.image_url !== selector.source_url || image.is_sensitive === true || image.is_document === true ||
+    image.image_url !== selector.source_url || image.superseded_by !== null || image.is_sensitive === true || image.is_document === true ||
     ![undefined, null, "none"].includes(image.redaction_level) || !sourceWitness) return fail("component_image_unavailable");
   let selected: unknown = source.structured_data;
   for (const key of selector.path) {
