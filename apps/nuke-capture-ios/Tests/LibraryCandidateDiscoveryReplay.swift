@@ -77,6 +77,14 @@ private func photo(_ id: String, _ at: String?, _ labels: [String] = [], _ lat: 
         precondition(untargeted.unplaced.first { $0.id == "0695" }!.reasons.contains(.exactSerial))
         precondition(!untargeted.unplaced.first { $0.id == "0695" }!.reasons.contains(.conflictingIdentity))
         precondition(untargeted.unplaced.first { $0.id == "disputed" }!.reasons.contains(.conflictingIdentity))
+        var history = photo("history", day + "21:55:00Z")
+        history.recordedVehicleIds = ["mustang", "firebird"]
+        let historyResult = LibraryCandidateDiscovery.discover(.init(assets: assets + [history],
+            targetVehicleId: "firebird", timeZoneIdentifier: "America/Los_Angeles"))
+        let historicControl = historyResult.unplaced.first { $0.id == "history" }!
+        precondition(historicControl.reasons.contains(.existingBinding))
+        precondition(historicControl.reasons.contains(.conflictingIdentity))
+        precondition(historicControl.conflictingVehicleIds == ["mustang"])
         let midnight = photo("midnight", "2025-05-14T00:20:00Z")
         let midnightResult = LibraryCandidateDiscovery.discover(.init(assets: assets + [midnight],
             targetVehicleId: "firebird", timeZoneIdentifier: "UTC", seedAssetIds: ["0708"]))

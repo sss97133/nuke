@@ -18,19 +18,22 @@ enum LibraryCandidateDiscovery {
         var exactVehicleIds: [String]
         /// A pre-existing local association is a control, not independent proof.
         var filedVehicleId: String?
+        /// All historical local associations for this visible source, retained as caution controls.
+        var recordedVehicleIds: [String]? = nil
         var isPersonal: Bool
 
         init(id: String, sourceVersion: String? = nil, captureAt: String? = nil,
              latitude: Double? = nil, longitude: Double? = nil, labels: [String] = [],
              exactVehicleIds: [String] = [], filedVehicleId: String? = nil, isPersonal: Bool = false,
              captureClockBasis: String? = nil, reviewSourceVersion: String? = nil,
-             labelSource: String? = nil) {
+             labelSource: String? = nil, recordedVehicleIds: [String]? = nil) {
             self.id = id; self.sourceVersion = sourceVersion; self.captureAt = captureAt
             self.latitude = latitude; self.longitude = longitude; self.labels = labels
             self.exactVehicleIds = exactVehicleIds; self.filedVehicleId = filedVehicleId
             self.isPersonal = isPersonal
             self.captureClockBasis = captureClockBasis; self.reviewSourceVersion = reviewSourceVersion
             self.labelSource = labelSource
+            self.recordedVehicleIds = recordedVehicleIds
         }
     }
 
@@ -109,6 +112,21 @@ enum LibraryCandidateDiscovery {
         return Cell(lat: Int((lat / 0.002).rounded(.down)), lon: Int((lon / 0.002).rounded(.down)))
     }
 
+    /// Cheap Albums badge. Avoid building and sorting the full candidate projection on the UI actor.
+    static func workPoolCount(_ assets: [Asset]) -> Int {
+        assets.reduce(into: 0) { count, asset in
+            let labels = currentLabels(asset)
+            let normalized = Set(labels.map { $0.lowercased().replacingOccurrences(of: " ", with: "_") })
+            if !asset.isPersonal && normalized.isDisjoint(with: personalTerms)
+                && !normalized.isDisjoint(with: workTerms) { count += 1 }
+        }
+    }
+
+    private static func currentLabels(_ asset: Asset) -> [String] {
+        (asset.reviewSourceVersion != nil && asset.reviewSourceVersion == asset.sourceVersion)
+            || asset.labelSource == "current_source_metadata" ? asset.labels : []
+    }
+
     static func discover(_ input: Input) -> Output {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: input.timeZoneIdentifier) ?? TimeZone(secondsFromGMT: 0)!
@@ -142,18 +160,15 @@ enum LibraryCandidateDiscovery {
         var workPool: [Candidate] = []
         for item in indexed {
             let asset = item.asset
+            let recorded = Array(Set((asset.recordedVehicleIds ?? []) + (asset.filedVehicleId.map { [$0] } ?? []))).sorted()
             let sameDayAnchors = item.day.flatMap { anchorsByDay[$0] }
             let exactConflicts = input.targetVehicleId.isEmpty ? [] : asset.exactVehicleIds.filter { $0 != input.targetVehicleId }
-            let filedConflict = input.targetVehicleId.isEmpty ? nil : asset.filedVehicleId.flatMap { $0 == input.targetVehicleId ? nil : $0 }
-            let internalConflict = asset.filedVehicleId.flatMap { filed in
-                !asset.exactVehicleIds.isEmpty && !asset.exactVehicleIds.contains(filed) ? filed : nil
-            }
-            let conflicts = Array(Set(exactConflicts + (filedConflict.map { [$0] } ?? []) +
-                (internalConflict.map { [$0] } ?? []))).sorted()
-            let currentLabels = (asset.reviewSourceVersion != nil && asset.reviewSourceVersion == asset.sourceVersion)
-                || asset.labelSource == "current_source_metadata"
-                ? asset.labels : []
-            let labels = Set(currentLabels.map { $0.lowercased().replacingOccurrences(of: " ", with: "_") })
+            let recordedConflicts = input.targetVehicleId.isEmpty ? [] : recorded.filter { $0 != input.targetVehicleId }
+            let internalConflicts = recorded.filter { !asset.exactVehicleIds.isEmpty && !asset.exactVehicleIds.contains($0) }
+            let associationAmbiguity = input.targetVehicleId.isEmpty && recorded.count > 1 ? recorded : []
+            let conflicts = Array(Set(exactConflicts + recordedConflicts + internalConflicts + associationAmbiguity)).sorted()
+            let freshLabels = currentLabels(asset)
+            let labels = Set(freshLabels.map { $0.lowercased().replacingOccurrences(of: " ", with: "_") })
             let work = !labels.isDisjoint(with: workTerms)
             let personal = asset.isPersonal || !labels.isDisjoint(with: personalTerms)
             let near = item.date.map { nearTime($0, in: allAnchorTimes) } ?? false
@@ -170,7 +185,7 @@ enum LibraryCandidateDiscovery {
             if !asset.exactVehicleIds.isEmpty && (input.targetVehicleId.isEmpty || asset.exactVehicleIds.contains(input.targetVehicleId)) {
                 reasons.insert(.exactSerial)
             }
-            if asset.filedVehicleId != nil && (input.targetVehicleId.isEmpty || asset.filedVehicleId == input.targetVehicleId) {
+            if !recorded.isEmpty && (input.targetVehicleId.isEmpty || recorded.contains(input.targetVehicleId)) {
                 reasons.insert(.existingBinding)
             }
             if sameDayAnchors != nil { reasons.insert(.sameWorkday) }
@@ -178,9 +193,9 @@ enum LibraryCandidateDiscovery {
             if atPlace { reasons.insert(.shopLocation) }
             if work { reasons.insert(.workLabel) }
             if asset.latitude == nil || asset.longitude == nil { reasons.insert(.missingGPS) }
-            if currentLabels.isEmpty { reasons.insert(.noCurrentRead) }
-            if !exactConflicts.isEmpty || internalConflict != nil { reasons.insert(.conflictingIdentity) }
-            if filedConflict != nil { reasons.insert(.filedOther) }
+            if freshLabels.isEmpty { reasons.insert(.noCurrentRead) }
+            if !exactConflicts.isEmpty || !internalConflicts.isEmpty || recorded.count > 1 { reasons.insert(.conflictingIdentity) }
+            if !recordedConflicts.isEmpty { reasons.insert(.filedOther) }
             if personal { reasons.insert(.personal) }
             if selected.contains(asset.id) { reasons.insert(.chosenSource) }
             if !work { reasons.insert(.noWorkLabel) }

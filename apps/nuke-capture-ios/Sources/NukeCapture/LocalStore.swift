@@ -1030,7 +1030,7 @@ final class LocalStore {
         }
         return try dbQueue.read { db in
             var reviews: [String: LocalAlbumImageReview] = [:]
-            var recordedBindings: [String: String] = [:]
+            var recordedBindings: [String: Set<String>] = [:]
             for chunk in Array(photos.keys).chunked(400) where !chunk.isEmpty {
                 for row in try LocalAlbumImageReview.fetchAll(db, sql: """
                     SELECT * FROM photo_album_image_review
@@ -1041,14 +1041,12 @@ final class LocalStore {
                     reviews[row.localIdentifier] = row
                 }
                 for row in try Row.fetchAll(db, sql: """
-                    SELECT a.localIdentifier AS localIdentifier, vi.vehicleId AS vehicleId
-                    FROM appearance a JOIN vehicle_image vi
-                      ON vi.localIdentifier = a.localIdentifier AND vi.phashHex = a.phashHex
-                    WHERE a.localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
-                      AND vi.vehicleId IS NOT NULL
+                    SELECT localIdentifier, vehicleId FROM vehicle_image
+                    WHERE localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                      AND vehicleId IS NOT NULL
                     """, arguments: StatementArguments(chunk)) {
                     let id: String = row["localIdentifier"]
-                    if reviews[id] != nil { recordedBindings[id] = row["vehicleId"] as String }
+                    recordedBindings[id, default: []].insert(row["vehicleId"] as String)
                 }
             }
             var discoveryAssets: [LibraryCandidateDiscovery.Asset] = []
@@ -1060,10 +1058,11 @@ final class LocalStore {
                     captureAt: photo.captureAt,
                     latitude: photo.latitude, longitude: photo.longitude,
                     labels: review?.labels ?? [], exactVehicleIds: matches,
-                    filedVehicleId: recordedBindings[photo.localIdentifier],
+                    filedVehicleId: nil,
                     isPersonal: review.map { $0.hasPerson && !$0.isVehicle } ?? false,
                     captureClockBasis: "photokit_creation",
-                    reviewSourceVersion: review?.sourceVersion, labelSource: nil))
+                    reviewSourceVersion: review?.sourceVersion, labelSource: nil,
+                    recordedVehicleIds: recordedBindings[photo.localIdentifier].map { $0.sorted() }))
                 return LocalProfilePhotoEvidence(photo: photo, review: review,
                     candidateVehicleIds: matches, takenAt: nil)
             }.sorted { $0.photo.localIdentifier < $1.photo.localIdentifier }

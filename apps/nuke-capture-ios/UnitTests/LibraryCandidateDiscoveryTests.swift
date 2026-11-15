@@ -39,4 +39,35 @@ final class LibraryCandidateDiscoveryTests: XCTestCase {
         XCTAssertFalse(withdrawn.unplaced.contains { $0.id == "transfer-A" })
         XCTAssertTrue(withdrawn.candidates.contains { $0.id == "transfer-B" })
     }
+
+    func testUnreadHistoricalAssociationsRemainControlsButDoNotAnchor() {
+        var old = asset("old", "2025-05-13T21:40:00Z")
+        old.recordedVehicleIds = ["mustang", "firebird"]
+        let neighbor = asset("neighbor", "2025-05-13T21:41:00Z")
+        let result = LibraryCandidateDiscovery.discover(.init(assets: [old, neighbor],
+            targetVehicleId: "firebird", timeZoneIdentifier: "UTC"))
+        XCTAssertEqual(result.anchors, 0)
+        XCTAssertTrue(result.candidates.isEmpty)
+        let control = result.unplaced.first { $0.id == "old" }!
+        XCTAssertTrue(control.reasons.contains(.existingBinding))
+        XCTAssertTrue(control.reasons.contains(.conflictingIdentity))
+        XCTAssertEqual(control.conflictingVehicleIds, ["mustang"])
+        XCTAssertEqual(result.unplaced.count, 2)
+        let untargeted = LibraryCandidateDiscovery.discover(.init(assets: [old],
+            targetVehicleId: "", timeZoneIdentifier: "UTC"))
+        XCTAssertEqual(untargeted.unplaced[0].conflictingVehicleIds, ["firebird", "mustang"])
+    }
+
+    func testCheapBadgeCountMatchesSelectionWithStaleReview() {
+        var stale = asset("stale", "2025-05-13T21:40:00Z", labels: ["hood"])
+        stale.reviewSourceVersion = "older"
+        var personal = asset("personal", "2025-05-13T21:41:00Z", labels: ["car"])
+        personal.isPersonal = true
+        let current = asset("current", "2025-05-13T21:42:00Z", labels: ["decal"])
+        let assets = [stale, personal, current]
+        let selected = LibraryCandidateDiscovery.discover(.init(assets: assets,
+            targetVehicleId: "", timeZoneIdentifier: "UTC"))
+        XCTAssertEqual(LibraryCandidateDiscovery.workPoolCount(assets), selected.workPool.count)
+        XCTAssertEqual(selected.workPool.map(\.id), ["current"])
+    }
 }
