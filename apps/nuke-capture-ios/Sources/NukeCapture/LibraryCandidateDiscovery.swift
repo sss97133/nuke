@@ -162,11 +162,12 @@ enum LibraryCandidateDiscovery {
             let asset = item.asset
             let recorded = Array(Set((asset.recordedVehicleIds ?? []) + (asset.filedVehicleId.map { [$0] } ?? []))).sorted()
             let sameDayAnchors = item.day.flatMap { anchorsByDay[$0] }
+            let exactAmbiguity = input.targetVehicleId.isEmpty && Set(asset.exactVehicleIds).count > 1 ? asset.exactVehicleIds : []
             let exactConflicts = input.targetVehicleId.isEmpty ? [] : asset.exactVehicleIds.filter { $0 != input.targetVehicleId }
             let recordedConflicts = input.targetVehicleId.isEmpty ? [] : recorded.filter { $0 != input.targetVehicleId }
             let internalConflicts = recorded.filter { !asset.exactVehicleIds.isEmpty && !asset.exactVehicleIds.contains($0) }
             let associationAmbiguity = input.targetVehicleId.isEmpty && recorded.count > 1 ? recorded : []
-            let conflicts = Array(Set(exactConflicts + recordedConflicts + internalConflicts + associationAmbiguity)).sorted()
+            let conflicts = Array(Set(exactAmbiguity + exactConflicts + recordedConflicts + internalConflicts + associationAmbiguity)).sorted()
             let freshLabels = currentLabels(asset)
             let labels = Set(freshLabels.map { $0.lowercased().replacingOccurrences(of: " ", with: "_") })
             let work = !labels.isDisjoint(with: workTerms)
@@ -194,7 +195,7 @@ enum LibraryCandidateDiscovery {
             if work { reasons.insert(.workLabel) }
             if asset.latitude == nil || asset.longitude == nil { reasons.insert(.missingGPS) }
             if freshLabels.isEmpty { reasons.insert(.noCurrentRead) }
-            if !exactConflicts.isEmpty || !internalConflicts.isEmpty || recorded.count > 1 { reasons.insert(.conflictingIdentity) }
+            if !exactAmbiguity.isEmpty || !exactConflicts.isEmpty || !internalConflicts.isEmpty || recorded.count > 1 { reasons.insert(.conflictingIdentity) }
             if !recordedConflicts.isEmpty { reasons.insert(.filedOther) }
             if personal { reasons.insert(.personal) }
             if selected.contains(asset.id) { reasons.insert(.chosenSource) }

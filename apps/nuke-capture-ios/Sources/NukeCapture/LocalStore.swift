@@ -406,6 +406,14 @@ struct LocalAlbumCoverage: Sendable {
     let cachedDeepReads: Int
 }
 
+enum LocalAlbumCoverageScope {
+    static func choose(album: LocalPhotoAlbum?, displayedPhotos: [LocalAlbumPhoto], seeded: Bool) -> LocalPhotoAlbum {
+        let displayed = LocalPhotoAlbum(id: "derived-scope", name: nil, folderPath: [],
+            sourceKind: "derived", photos: displayedPhotos)
+        return seeded ? displayed : (album ?? displayed)
+    }
+}
+
 /// Cloud intake transports the observed grouping separately from byte witnesses.
 /// The source JSON is stable across retries; no labels, OCR or pixels are exported.
 struct NativeAlbumCaptureRequest: Sendable {
@@ -456,7 +464,10 @@ struct LocalProfileEvidence: Sendable {
     var vehicleFrames: Int { photos.filter { $0.review?.isVehicle == true }.count }
     var matched: Int { photos.filter { $0.candidateVehicleIds.count == 1 }.count }
     var conflicted: Int { photos.filter { $0.candidateVehicleIds.count > 1 }.count }
-    var unresolved: Int { discoveryAssets.count }
+    /// Source inventory for the Unplaced door. It includes photos with possible serial matches.
+    var sourceInventoryCount: Int { discoveryAssets.count }
+    /// Identity status for the ingestion snapshot; exact matches and conflicts have separate counters.
+    var unresolved: Int { photos.filter { $0.candidateVehicleIds.isEmpty }.count }
 }
 
 // MARK: - The store

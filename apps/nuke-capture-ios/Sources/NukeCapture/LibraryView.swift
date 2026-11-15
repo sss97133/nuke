@@ -259,11 +259,11 @@ struct LibraryAlbumsView: View {
                                     }
                                 }
                             }
-                            if evidence.unresolved > 0 {
+                            if evidence.sourceInventoryCount > 0 {
                                 NavigationLink {
                                     LibraryAlbumPhotosView(userId: userId, needsIdentity: true)
                                 } label: {
-                                    LabeledContent("Unplaced source photos", value: evidence.unresolved.formatted())
+                                    LabeledContent("Unplaced source photos", value: evidence.sourceInventoryCount.formatted())
                                 }
                             }
                             if evidence.conflicted > 0 {
@@ -510,7 +510,7 @@ private struct LibraryAlbumPhotosView: View {
             let mappedIndices = await store.indexMap(forLocalIdentifiers: scopedPhotos.map(\.localIdentifier))
             guard generation == reloadGeneration else { return }
             indices = mappedIndices
-            let scope = album ?? LocalPhotoAlbum(id: "derived-scope", name: nil, folderPath: [], sourceKind: "derived", photos: scopedPhotos)
+            let scope = LocalAlbumCoverageScope.choose(album: album, displayedPhotos: scopedPhotos, seeded: seed != nil)
             let loadedCoverage = try await Task.detached { try LocalStore.shared.albumCoverage(scope, methodVersion: method) }.value
             guard generation == reloadGeneration else { return }
             coverage = loadedCoverage

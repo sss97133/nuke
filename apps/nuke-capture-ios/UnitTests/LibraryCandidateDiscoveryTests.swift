@@ -58,6 +58,17 @@ final class LibraryCandidateDiscoveryTests: XCTestCase {
         XCTAssertEqual(untargeted.unplaced[0].conflictingVehicleIds, ["firebird", "mustang"])
     }
 
+    func testUntargetedMultipleExactSerialMatchesRemainAmbiguous() {
+        let ambiguous = asset("serial", "2025-05-13T21:40:00Z", labels: ["car"], exact: ["car-b", "car-a"])
+        let result = LibraryCandidateDiscovery.discover(.init(assets: [ambiguous], targetVehicleId: "",
+            timeZoneIdentifier: "UTC"))
+        let control = result.unplaced[0]
+        XCTAssertEqual(control.conflictingVehicleIds, ["car-a", "car-b"])
+        XCTAssertTrue(control.reasons.contains(.conflictingIdentity))
+        XCTAssertTrue(control.reasons.contains(.exactSerial))
+        XCTAssertEqual(result.workPool[0].conflictingVehicleIds, ["car-a", "car-b"])
+    }
+
     func testCheapBadgeCountMatchesSelectionWithStaleReview() {
         var stale = asset("stale", "2025-05-13T21:40:00Z", labels: ["hood"])
         stale.reviewSourceVersion = "older"
