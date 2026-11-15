@@ -28,3 +28,13 @@ remain visible until each stage completes.
 The disposable database contract covers intake, exact replay, concurrent
 capture, classification/anchor qualification and concurrent source withdrawal.
 It does not establish real-source coverage or deployed consumer acceptance.
+
+The existing `photo-sync-daemon.mjs` accepts
+`--reviewed-rendition-plan=/absolute/plan.json --reviewed-receipt=/absolute/receipt.jsonl`.
+Use `--dry-run` first. The plan contains at most 25 records in the prepared
+identity-first payload shape, plus a byte-bound local privacy review. Every file
+is hashed before any upload. The command probes the required writer capability,
+reconciles canonical rows before resending, verifies storage after an ambiguous
+upload response, and verifies exact source identity after admission. It does not
+advance the ordinary sync watermark or mark classification, filing or consumer
+acceptance complete. This is a bounded repair entry point, not a new daemon.
