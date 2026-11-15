@@ -1,4 +1,4 @@
-.cowl-repro { display: block; width: 100%; height: auto; max-width: 900px; background: #17191c; }
+.cowl-repro { display: block; width: 100%; height: auto; max-width: 900px; background: transparent; }
 .cowl-repro__shadow { fill: #050506; opacity: .8; }
 .cowl-repro__stamp { font-family: "Arial Narrow", "Helvetica Neue Condensed", Impact, sans-serif; font-size: 58px; font-weight: 800; letter-spacing: .045em; fill: #74797b; stroke: #1a1c1d; stroke-width: 2.4px; paint-order: stroke fill; filter: drop-shadow(2px 2px 1px #08090a) drop-shadow(-2px -2px 1px #b6b9ba); }
 .cowl-repro__heading { font-size: 61px; letter-spacing: .075em; }
