@@ -1,7 +1,19 @@
 .zip-outline-content { display: grid; gap: 8px; min-width: 0; color: var(--text); }
-.zip-outline-content .om--focus { height: min(410px, 48vh); min-height: 240px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.zip-outline-content .om--focus { height: min(300px, 34vh); min-height: 240px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .zip-outline-content__loading { min-height: 240px; display: grid; place-items: center; color: var(--text-muted); }
 .zip-outline-content__note { margin: 0; color: var(--text-muted); font-size: var(--text-caption); line-height: 1.4; }
+.zip-area-activity { display: grid; gap: 4px; padding-top: 8px; border-top: 1px solid var(--border); font-size: var(--text-caption); line-height: 1.4; }
+.zip-area-activity__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.zip-area-activity h3 { margin: 0; font-size: 12px; font-weight: 700; }
+.zip-area-activity select { min-height: 28px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; }
+.zip-area-activity p { margin: 0; }
+.zip-area-activity strong { color: var(--text); }
+.zip-area-activity__muted { color: var(--text-muted); }
+.zip-area-activity details { margin: 2px 0; }
+.zip-area-activity summary { cursor: pointer; color: var(--link); }
+.zip-area-activity details p { margin-top: 5px; }
+.zip-area-activity ul { margin: 5px 0; padding-left: 16px; }
+.zip-area-activity a { color: var(--link); }
 @media (max-width: 640px) {
-  .zip-outline-content .om--focus { height: 40vh; min-height: 220px; }
+  .zip-outline-content .om--focus { height: 32vh; min-height: 220px; }
 }

@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 
 vi.mock('./OneMap', () => ({ default: ({ focus }: any) => <div data-testid="zip-map" data-zip={focus.selectedZip} data-centroid={focus.centroid?.lat} /> }));
+vi.mock('./ZipAreaActivity', () => ({ ZipAreaActivity: ({ zip }: { zip: string }) => <div data-testid="zip-activity" data-zip={zip} /> }));
 import { ZipOutlineContent } from './ZipOutlineContent';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -19,6 +20,7 @@ it('embeds the exact ZIP polygon map without another dialog or city point', asyn
   expect(host.querySelector('[data-testid="zip-map"]')?.getAttribute('data-zip')).toBe('89005');
   expect(host.querySelector('[data-testid="zip-map"]')?.getAttribute('data-centroid')).toBeNull();
   expect(host.querySelector('dialog,[role="dialog"]')).toBeNull();
+  expect(host.querySelector('[data-testid="zip-activity"]')?.getAttribute('data-zip')).toBe('89005');
   expect(host.textContent).toContain('Census ZIP Code Tabulation Area outline');
   await act(async () => root.unmount());
 });
