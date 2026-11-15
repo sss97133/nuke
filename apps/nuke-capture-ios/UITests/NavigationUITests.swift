@@ -30,7 +30,8 @@ final class NavigationUITests: XCTestCase {
 
     func testDayPhotoFailureRetriesAndReturnsThroughSameDayToGarageSearch() {
         let app = openJourneyDay("failure")
-        XCTAssertTrue(app.staticTexts["day.photos.error"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["day.photos.error"].waitForExistence(timeout: 10),
+                      "Expected a terminal photo-read error. Screen: \(app.debugDescription.replacingOccurrences(of: "\n", with: " | "))")
         XCTAssertFalse(app.staticTexts["day.photos.empty"].exists)
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "none carry a capture date")).firstMatch.exists)
         app.buttons["day.photos.retry"].tap()

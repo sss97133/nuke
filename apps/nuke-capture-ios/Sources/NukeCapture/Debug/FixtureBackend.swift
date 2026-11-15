@@ -35,10 +35,10 @@ enum FixtureBackend {
         dayReadAttempts += 1
         let attempt = dayReadAttempts
         dayReadLock.unlock()
-        // The pinned SDK retries a GET twice on 503. Exhaust that request's
-        // retries so the sheet sees a failure; the user's Retry then succeeds.
-        if dayMode == "failure", attempt <= 3 {
-            return (503, Data(#"{"message":"fixture day photo read failed"}"#.utf8))
+        // Exercise the screen's explicit Retry, independently of the SDK's
+        // automatic 503 retry layers. This first read is a terminal response.
+        if dayMode == "failure", attempt == 1 {
+            return (400, Data(#"{"code":"fixture_read_error","message":"fixture day photo read failed","details":null,"hint":null}"#.utf8))
         }
         if dayMode == "empty" || dayMode == "events" { return ok("[]") }
         if dayMode == "changed", attempt > 1 { return ok("[]") }
