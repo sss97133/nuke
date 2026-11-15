@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import ProfileIdentity from './ProfileIdentity';
 import { EngineIdentity } from '../../components/common/MakeIdentity';
-import { ZipOutlineDialog } from '../../components/map/ZipOutlineDialog';
+import { ZipOutlineContent } from '../../components/map/ZipOutlineContent';
 import { zipAreaRequest } from '../../components/map/zipAreaGeometry';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -199,6 +199,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   });
   const hasMasthead = doc?.sections.some(section => section.kind === 'masthead') ?? false;
   const sticky = useRef<HTMLDivElement>(null);
+  const zipTrigger = useRef<HTMLButtonElement>(null);
   // On a phone the specs scroll with the page; only identity and price stay pinned (frontend.md, owner 2026-10-10).
   const isMobile = useIsMobile();
   const [activeFacet, setActiveFacet] = useState<{ field: string; value: string; dimension: string } | null>(null);
@@ -378,7 +379,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   // A header token opens its line items (vehicle_facet_items). Identity variant kinds the reader has no token for
   // (series, package) are trim.
   const explore = (field: string, value: string, gap = false) => {
-    setLiveOpen(false); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false);
+    setLiveOpen(false); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); setZipOpen(false);
     const evidenceField = field === 'engine' ? 'engine_type' : field;
     const dimension = field === 'engine_type' ? 'engine' : TOKEN_DIMENSIONS.has(field) ? field : 'trim';
     setActiveFacet(current => current?.field === evidenceField ? null : { field: evidenceField, value, dimension });
@@ -397,8 +398,8 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         ariaLabel={`Explore ${label} in this profile`}
         onClick={() => explore(f.dimension, label)} />;
     })}
-    {zipArea && <button type="button" className="k-facet" aria-haspopup="dialog" aria-expanded={zipOpen}
-      aria-label={`Explore ZIP ${zipArea.zip} area`} onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); setZipOpen(true); }}><Text role="label">{zipArea.zip}</Text></button>}
+    {zipArea && <button ref={zipTrigger} type="button" className="k-facet" aria-haspopup="dialog" aria-expanded={zipOpen}
+      aria-label={`Explore ZIP ${zipArea.zip} area`} onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); setLiveOpen(false); setZipOpen(true); }}><Text role="label">{zipArea.zip}</Text></button>}
     {(strip.gaps ?? []).filter(g => g.dimension !== 'body_style' && g.dimension !== 'location').map(g => g.lead
       // The record holds nothing, but the token's lead item does: its value, marked with its status.
       ? <Facet key={`gap:${g.dimension}`} label={g.lead.value} status={g.lead.status}
@@ -415,7 +416,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         currentBid={auctionPulse.current_bid} currencyCode={auctionCurrency} endDate={auctionPulse.end_date} listingStatus={auctionPulse.listing_status}
         sourceObservedAt={auctionPulse.source_observed_at}
         hideAmount={reduced}
-        onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setLiveOpen(current => !current); }} /></React.Suspense> : !reduced && enrichedPriceClaim && <ClaimView
+        onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setZipOpen(false); setLiveOpen(current => !current); }} /></React.Suspense> : !reduced && enrichedPriceClaim && <ClaimView
         label={masthead.priceLabel ?? 'Recorded price'}
         role="measure"
         claim={enrichedPriceClaim}
@@ -431,10 +432,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     <div ref={sticky} className="vp-header-sticky">
       <Masthead result={<div className="vp-header-departments">
         <ProfileActivity vehicleId={vehicle.id} events={timelineEvents ?? []} pulse={auctionPulse} days={contributionDays} readState={timelineReadState}
-          open={activityOpen} onToggle={() => { setFinancialOpen(false); setLiveOpen(false); setActiveFacet(null); setListingOpen(false); setActivityOpen(current => !current); }}
+          open={activityOpen} onToggle={() => { setFinancialOpen(false); setLiveOpen(false); setActiveFacet(null); setListingOpen(false); setZipOpen(false); setActivityOpen(current => !current); }}
           onClose={() => setActivityOpen(false)} boundaryRef={sticky} />
         <ProfileFinancials vehicleId={vehicle.id} market={market()} reducedMarket={market(true)} open={financialOpen}
-          onToggle={() => { setActivityOpen(false); setLiveOpen(false); setActiveFacet(null); setListingOpen(false); setFinancialOpen(current => !current); }}
+          onToggle={() => { setActivityOpen(false); setLiveOpen(false); setActiveFacet(null); setListingOpen(false); setZipOpen(false); setFinancialOpen(current => !current); }}
           onClose={() => setFinancialOpen(false)} boundaryRef={sticky} />
       </div>}>
         <Text role="entity" as="h1" aria-label={title}>
@@ -449,7 +450,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           const mark = <>{logo ? <img className="k-claim__logo" src={logo} alt={venue} width={40} height={16} /> : <span>{venue}</span>} <span>{listingWord(listing)}</span></>;
           return <Text role="label" as="p" className="vp-header-listing" aria-label={describeListing(listing)} title={describeListing(listing)}>
             <button type="button" className="vp-header-listing__mark" aria-expanded={listingOpen} aria-label={`${describeListing(listing)}. Show listing`}
-              onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setLiveOpen(false); setListingOpen(current => !current); }}>{mark}</button>
+              onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setLiveOpen(false); setZipOpen(false); setListingOpen(current => !current); }}>{mark}</button>
           </Text>;
         })()}
         {!isMobile && specs}
@@ -474,7 +475,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           <HeaderTokenItems key={`${vehicle.id}:${activeFacet.dimension}`} vehicleId={vehicle.id} dimension={activeFacet.dimension} items={masthead.token_items} isReplica={vehicle.is_replica === true} />
         </React.Suspense>
       </HeaderPopover>}
-      {zipOpen && zipItem && <ZipOutlineDialog location={zipItem} onClose={() => setZipOpen(false)} />}
+      {zipOpen && zipItem && zipArea && <HeaderPopover open title={`ZIP ${zipArea.zip} area`} width={720} align="right"
+        onClose={() => { setZipOpen(false); zipTrigger.current?.focus(); }} dismissBoundaryRef={sticky}>
+        <ZipOutlineContent location={zipItem} />
+      </HeaderPopover>}
     </div>
     {isMobile && specs && <div className="vp-header-specs">{specs}</div>}
   </>;

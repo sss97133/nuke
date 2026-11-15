@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { ItemList, Text, valueText } from '../../kit';
 import type { FacetItem, TokenItems } from '../../kit/types';
-import { ZipOutlineDialog } from '../../components/map/ZipOutlineDialog';
+import { ZipOutlineContent } from '../../components/map/ZipOutlineContent';
 import { zipAreaRequest } from '../../components/map/zipAreaGeometry';
 import { useFieldProvenance, currentImageObservations } from './hooks/useFieldProvenance';
 import { useVehicleImageEvidence } from './hooks/useVehicleImageEvidence';
@@ -39,7 +39,6 @@ const isUnlinkedTitle = (item: FacetItem) => ['model.title', 'body_style.title']
 
 /** Location is read when its token opens: its sources are photo areas, which the profile read does not carry. */
 function LocationItems({ vehicleId }: { vehicleId: string }) {
-  const [mapOpen, setMapOpen] = useState(false);
   const read = useQuery({
     queryKey: ['vehicle_facet_items', vehicleId, 'location'],
     queryFn: async () => {
@@ -55,8 +54,7 @@ function LocationItems({ vehicleId }: { vehicleId: string }) {
   const area = mapItem && zipAreaRequest(mapItem);
   return <>
     <ItemList items={conciseItems(read.data)} />
-    {area && <button type="button" className="vp-financial-action" onClick={() => setMapOpen(true)}>View ZIP {area.zip} area map</button>}
-    {mapOpen && mapItem && <ZipOutlineDialog location={mapItem} onClose={() => setMapOpen(false)} />}
+    {area && mapItem && <ZipOutlineContent location={mapItem} />}
   </>;
 }
 

@@ -160,20 +160,18 @@ it('prints the reader\'s labels for codes, ratios to two places, and every cited
   expect(text).not.toMatch(/[a-z0-9]_[a-z0-9]/);
 });
 
-it('reads location and opens only its cited ZIP area on request', async () => {
+it('reads location and shows its cited ZIP area within the existing item surface', async () => {
   rpc.mockResolvedValue({ data: location, error: null });
   await render(<HeaderTokenItems vehicleId="v-1" dimension="location" items={{ transmission }} />);
   expect(rpc).toHaveBeenCalledWith('vehicle_facet_items', { p_vehicle_id: 'v-1', p_dimension: 'location' });
   expect(host.textContent).toContain('Example City, NV');
   expect(host.textContent).toContain('12 photos · 3 days');
-  expect(host.querySelector('[data-testid="one-map-focus"]')).toBeNull();
-  await act(async () => host.querySelector<HTMLButtonElement>('button')?.click());
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
-  const map = document.body.querySelector('[data-testid="one-map-focus"]');
+  const map = host.querySelector('[data-testid="one-map-focus"]');
   expect(map?.getAttribute('data-fips')).toBe('32999');
   expect(map?.getAttribute('data-geojson')).toBe('map-data/geo/v1/county/32999.geojson');
   expect(map?.getAttribute('data-lat')).toBeNull();
-  expect(document.body.querySelector('[aria-label="ZIP 89005 area map"]')).not.toBeNull();
+  expect(host.querySelector('dialog,[role="dialog"]')).toBeNull();
 });
 
 it('says when the location read fails', async () => {
