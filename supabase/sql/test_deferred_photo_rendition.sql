@@ -20,7 +20,7 @@ SET request.jwt.claim.role='service_role';
 CREATE TYPE content_approval_status AS ENUM ('pending','auto_approved','approved','rejected');
 CREATE TYPE vision_gate_status AS ENUM ('pending','approved','rejected_personal','rejected_misattributed','review_needed');
 CREATE TABLE vehicles(id uuid PRIMARY KEY,deleted_at timestamptz,merged_into_vehicle_id uuid,user_id uuid);
-CREATE TABLE observation_sources(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),slug text);
+CREATE TABLE observation_sources(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),slug text,supported_observations text[]);
 CREATE TABLE vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),vehicle_id uuid,source_id uuid,source_url text,source_identifier text,
  kind text,extraction_method text,analysis_deferred boolean,is_superseded boolean DEFAULT false,superseded_by uuid,agent_model text,observed_at timestamptz,
  structured_data jsonb,extraction_metadata jsonb);
@@ -178,7 +178,8 @@ SELECT 'deferred photo rendition contract PASS';
 
 -- The separately held classification producer must implement this exact
 -- persisted contract. Here synthetic receipts exercise the source-bound writer.
-INSERT INTO observation_sources(id,slug) VALUES('50000000-0000-4000-8000-000000000001','photo_pipeline');
+INSERT INTO observation_sources(id,slug,supported_observations) VALUES('50000000-0000-4000-8000-000000000001','photo_pipeline',ARRAY['media','condition','specification','work_record']);
+\ir ../migrations/20261115185734_reviewed_filing_media_source_kind.sql
 INSERT INTO vehicle_images(id,vehicle_id,user_id,image_url,file_hash,taken_at,vision_gate_status,source,is_external)
  VALUES('6a000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001',
  '40000000-0000-4000-8000-000000000004','https://example.invalid/anchor.jpeg',repeat('c',64),'2026-04-27T17:35:00Z','approved','iphoto',true);
@@ -195,7 +196,7 @@ UPDATE vehicle_images i SET ai_processing_status='completed',updated_at=clock_ti
  FROM vehicle_observations o WHERE o.id='30000000-0000-4000-8000-000000000001' AND i.id=(:'concurrent_first'::jsonb->>'image_id')::uuid;
 INSERT INTO vehicle_observations(id,source_id,source_url,source_identifier,kind,extraction_method,analysis_deferred,agent_model,observed_at,structured_data,extraction_metadata)
  SELECT '30000000-0000-4000-8000-000000000002','50000000-0000-4000-8000-000000000001',image_url,
- 'reviewed_image_attribution_v1:fixture','provenance','reviewed_image_attribution_v1',true,'fixture-reviewer',clock_timestamp(),
+ 'reviewed_image_attribution_v1:fixture','media','reviewed_image_attribution_v1',true,'fixture-reviewer',clock_timestamp(),
  jsonb_build_object('contract','reviewed_image_attribution_v1','source_image_id',id,'source_sha256',file_hash,
   'target_vehicle_id','20000000-0000-4000-8000-000000000001','classification_observation_id','30000000-0000-4000-8000-000000000001',
   'basis','visual_sequence','candidate_scope','Synthetic two-frame comparison; no global novelty claim','global_novelty_asserted',false,
@@ -203,6 +204,9 @@ INSERT INTO vehicle_observations(id,source_id,source_url,source_identifier,kind,
    'source_url','https://example.invalid/anchor.jpeg','source_sha256',repeat('c',64),'taken_at','2026-04-27T17:35:00Z')),
   'correspondences','[{"anchor_image_id":"6a000000-0000-4000-8000-000000000001","sequence_context":"The same visible cabin structure appears in adjacent captured frames.","features":[{"kind":"component_geometry","source_witness":"Asymmetric seat support geometry beside the tunnel","anchor_witness":"The same asymmetric support beside the same tunnel"},{"kind":"fixed_wear","source_witness":"A distinctive triangular tear at the cushion seam","anchor_witness":"The same tear at the same seam"}]}]'::jsonb),
  '{"is_inferred":true}' FROM vehicle_images WHERE id=(:'concurrent_first'::jsonb->>'image_id')::uuid;
+SELECT t_assert(EXISTS(SELECT 1 FROM vehicle_observations o JOIN observation_sources s ON s.id=o.source_id
+ WHERE o.id='30000000-0000-4000-8000-000000000002' AND o.kind=ANY(s.supported_observations)),
+ 'filing proof uses the kind admitted by the canonical photo source');
 SELECT jsonb_build_object('image_url',image_url,'source_sha256',file_hash,'expected_updated_at',updated_at) AS expected_source
  FROM vehicle_images WHERE id=(:'concurrent_first'::jsonb->>'image_id')::uuid \gset
 CREATE FUNCTION expect_filing_refusal(image uuid,proof uuid,snapshot jsonb,expected text) RETURNS void LANGUAGE plpgsql AS $$BEGIN
