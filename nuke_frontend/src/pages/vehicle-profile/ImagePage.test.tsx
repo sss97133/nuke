@@ -3,279 +3,52 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-// Offline contracts only; no synthetic testimony is written to production.
-const fixture = vi.hoisted(() => ({ route: { vehicleId: 'offline-vehicle', imageId: 'offline-image' }, auth: { user: { id: 'viewer-a' } as { id: string } | null, loading: false }, read: vi.fn(), calls: [] as any[] }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => fixture.auth }));
-vi.mock('react-router-dom', async original => ({ ...await original<typeof import('react-router-dom')>(), useParams: () => fixture.route }));
-vi.mock('../../lib/supabase', () => {
-  const from = (table: string) => {
-    const call = { table, filters: [] as any[], selected: '', single: false, limit: 0, signal: undefined as AbortSignal | undefined };
-    const query: any = {
-      select: (s: string) => { call.selected = s; return query; },
-      eq: (k: string, v: unknown) => { call.filters.push([k, v]); return query; },
-      in: (k: string, v: unknown) => { call.filters.push([k, v]); return query; },
-      limit: (n: number) => { call.limit = n; return query; },
-      abortSignal: (s: AbortSignal) => { call.signal = s; return query; },
-      maybeSingle: () => { call.single = true; return query; },
-      then: (resolve: any, reject: any) => { fixture.calls.push(call); return Promise.resolve().then(() => fixture.read(call)).then(resolve, reject); },
-    }; return query;
-  };
-  // vehicle_row_read answers the one-row raw vehicles read (the owner's purchase facts masked server-side).
-  const rpc = (name: string, args: any) => {
-    const query = from(name === 'vehicle_row_read' ? 'vehicles' : name);
-    return query.select('*').eq('id', args?.p_vehicle_id).maybeSingle();
-  };
-  return { supabase: { from, rpc } };
-});
-
+const f=vi.hoisted(()=>({route:{vehicleId:'vehicle-a',imageId:'image-a'},auth:{user:{id:'viewer'} as {id:string}|null,loading:false},read:vi.fn(),calls:[] as any[]}));
+vi.mock('../../hooks/useAuth',()=>({useAuth:()=>f.auth}));
+vi.mock('react-router-dom',async original=>({...await original<typeof import('react-router-dom')>(),useParams:()=>f.route}));
+vi.mock('../../lib/supabase',()=>({supabase:{auth:{getSession:async()=>({data:{session:f.auth.user?{user:f.auth.user}:null}})},from:(table:string)=>{
+ const c={table,filters:[] as any[],selected:'',signal:undefined as AbortSignal|undefined,limit:0};
+ const q:any={select:(s:string)=>{c.selected=s;return q},eq:(k:string,v:unknown)=>{c.filters.push([k,v]);return q},not:(k:string,op:string,v:unknown)=>{c.filters.push([k,op,v]);return q},limit:(n:number)=>{c.limit=n;return q},abortSignal:(s:AbortSignal)=>{c.signal=s;return q},maybeSingle:()=>q,then:(ok:any,bad:any)=>{f.calls.push(c);return Promise.resolve().then(()=>f.read(c)).then(ok,bad)}};return q;
+}}}));
 import ImagePage from './ImagePage';
-const VEHICLE = 'offline-vehicle', IMAGE = 'offline-image', SOURCE = 'https://example.invalid/offline.jpg';
-function id(c: any, key = 'id') { return c.filters.find((f: any) => f[0] === key)?.[1]; }
-function image(extra = {}) { return { id: IMAGE, vehicle_id: VEHICLE, image_url: SOURCE, source: 'offline-source', ...extra }; }
-function read(c: any) {
-  const row = c.table === 'vehicles' ? { id: id(c), year: 1965, make: 'Offline', model: 'Example' } : c.table === 'vehicle_images' ? image() : null;
-  return { data: c.single ? row : row ? [row] : [], error: null };
-}
-let root: Root, host: HTMLDivElement;
-beforeEach(() => {
-  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.auth = { user: { id: 'viewer-a' }, loading: false };
-  fixture.route = { vehicleId: VEHICLE, imageId: IMAGE }; fixture.calls = []; fixture.read.mockReset(); fixture.read.mockImplementation(read);
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-});
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); });
-async function mount() { await act(async () => root.render(<MemoryRouter><ImagePage /></MemoryRouter>)); }
-it('attributes a stored image interpretation without presenting its gate status as factual verification', async () => {
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images'
-    ? { data: c.single ? image({ vision_gate_status: 'approved', vision_gate_agent_reasoning: 'Prior image interpretation', caption: 'Prior caption' }) : [], error: null }
-    : read(c));
-  await mount();
-  expect(host.textContent).toContain('Recorded review: approved');
-  expect(host.textContent).toContain('Stored review interpretation');
-  expect(host.textContent).toContain('This prior interpretation may differ from later claim corrections');
-  expect(host.querySelector('aside img')?.getAttribute('alt')).toBe('Recorded caption: Prior caption');
-});
-it.each([null, { id: 'viewer-a' }])('reads only vehicle identity and withholds over-returned private parent context for viewer %j', async user => {
-  fixture.auth.user = user;
-  fixture.read.mockImplementation(c => c.table === 'vehicles'
-    ? { data: { id: VEHICLE, year: 1965, make: 'Offline', model: 'Example', notes: 'private-accounting-canary', search_vector: 'private-search-canary', provenance_metadata: { private: 'private-metadata-canary' } }, error: null }
-    : read(c));
-  await mount();
-  const parentReads = fixture.calls.filter(c => c.table === 'vehicles');
-  expect(parentReads).toHaveLength(1);
-  expect(parentReads[0].selected).toBe('id, year, make, model, trim');
-  expect(host.textContent).toContain('vehicles · identity fields');
-  expect(host.textContent).not.toContain('private-accounting-canary');
-  expect(host.textContent).not.toContain('private-search-canary');
-  expect(host.textContent).not.toContain('private-metadata-canary');
-  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
-});
-it('keeps the cited original visible and links the separately read same-vehicle replacement', async () => {
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images'
-    ? { data: c.single ? id(c) === 'replacement' ? { id: 'replacement', vehicle_id: VEHICLE } : image({ is_superseded: true, superseded_by: 'replacement', superseded_at: '2026-01-02T00:00:00Z' }) : [], error: null }
-    : read(c));
-  await mount();
-  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
-  expect(host.textContent).toContain('You are viewing the original cited record');
-  expect(host.querySelector('a[href="/vehicle/offline-vehicle/image/replacement"]')).not.toBeNull();
-  expect(fixture.calls.find(c => c.table === 'vehicle_images' && id(c) === 'replacement')?.filters).toContainEqual(['vehicle_id', VEHICLE]);
-});
-it.each([
-  { data: { id: 'replacement', vehicle_id: 'foreign-vehicle' }, error: null },
-  { data: { id: 'different-image', vehicle_id: VEHICLE }, error: null },
-  { data: null, error: null },
-  { data: null, error: { message: 'private replacement payload' } },
-])('withholds a foreign, hidden or failed replacement without discarding the original: %j', async result => {
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images'
-    ? id(c) === 'replacement' ? result : { data: c.single ? image({ is_superseded: true, superseded_by: 'replacement' }) : [], error: null }
-    : read(c));
-  await mount();
-  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
-  expect(host.querySelector('a[href*="/image/replacement"]')).toBeNull();
-  expect(host.textContent).toContain('Replacement record unavailable for this vehicle');
-  expect(host.textContent).not.toContain('private replacement payload');
-});
-it('gates the parent and image before dependent reads, including scoped raw refetches', async () => {
-  await mount();
-  expect(fixture.calls.slice(0, 2).map(c => c.table)).toEqual(['vehicles', 'vehicle_images']);
-  expect(fixture.calls.filter(c => c.table === 'vehicle_images').every(c => id(c) === IMAGE && id(c, 'vehicle_id') === VEHICLE)).toBe(true);
-  expect(fixture.calls.every(c => c.signal instanceof AbortSignal)).toBe(true);
-  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
-  expect(host.textContent).toContain('Device metadata'); expect(host.textContent).not.toContain('Chain of Custody');
-  expect(host.textContent).toContain('bounded reads');
-});
-it.each([{ data: null, error: null }, { data: { id: 'offline-other-vehicle' }, error: null }, { data: null, error: { message: 'offline private contact and SQL' } }])('stops unavailable parent responses before any image/dependent query: %j', async result => {
-  fixture.read.mockResolvedValue(result); await mount();
-  expect(fixture.calls.map(c => c.table)).toEqual(['vehicles']); expect(host.querySelector('[role=alert]')).not.toBeNull();
-  expect(host.querySelector('aside')).toBeNull(); expect(host.textContent).not.toContain('private contact');
-});
-it.each([{ vehicle_id: 'offline-other-vehicle' }, { id: 'offline-other-image' }])('refuses contradictory image identity: %j', async extra => {
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images' ? { data: image(extra), error: null } : read(c)); await mount();
-  expect(fixture.calls).toHaveLength(2); expect(host.textContent).toContain('Image unavailable for this vehicle.'); expect(host.querySelector('aside')).toBeNull();
-});
-it.each([{ data: null, error: null }, { data: null, error: { message: 'offline sensitive source' } }])('keeps absent and failed images unavailable: %j', async result => {
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images' ? result : read(c)); await mount();
-  expect(fixture.calls).toHaveLength(2); expect(host.querySelector('[role=alert]')).not.toBeNull(); expect(host.querySelector('aside')).toBeNull(); expect(host.textContent).not.toContain('sensitive');
-});
-it('links a recorded witness to its actual vehicle and does not invent a parent for NULL', async () => {
-  fixture.read.mockImplementation(c => c.table === 'observation_witnesses' && c.selected !== '*' ? { data: [
-    { witness_role: 'source_image', observation: { id: 'offline-other-observation', vehicle_id: 'offline-other-vehicle', kind: 'condition', structured_data: {} } },
-    { witness_role: 'source_image', observation: { id: 'offline-parent-unknown', vehicle_id: null, kind: 'condition' } },
-  ], error: null } : read(c)); await mount();
-  expect(fixture.calls.find(c => c.table === 'observation_witnesses' && c.selected !== '*').selected).toContain('vehicle_id');
-  expect(host.querySelector('a[href="/vehicle/offline-other-vehicle/observation/offline-other-observation"]')).not.toBeNull();
-  expect(host.querySelector('a[href="/vehicle/offline-vehicle/observation/offline-other-observation"]')).toBeNull();
-  expect(host.querySelector('a[href*="offline-parent-unknown"]')).toBeNull();
-});
-it('distinguishes failed raw/device reads from completed empty projections', async () => {
-  fixture.read.mockImplementation(c => c.table === 'device_attributions' || c.table === 'observation_witnesses' && c.selected === '*' ? { data: null, error: { message: 'offline private permission' } } : read(c)); await mount();
-  expect(host.querySelector('aside img')).not.toBeNull(); expect(host.textContent).toContain('Device metadata unavailable.');
-  expect(host.textContent?.match(/Read unavailable/g)).toHaveLength(4); expect(host.textContent).not.toContain('0 rows returned'); expect(host.textContent).not.toContain('private permission');
-});
-it('retains distinct witness roles as links without counting them as independent observations', async () => {
-  fixture.read.mockImplementation(c => c.table === 'observation_witnesses' && c.selected !== '*' ? { data: ['source_image','install_witness'].map(witness_role => ({
-    witness_role, observation: { id: 'offline-shared-observation', vehicle_id: VEHICLE, kind: 'condition', structured_data: {} },
-  })), error: null } : read(c));
-  const errors = vi.spyOn(console, 'error');
-  try {
-    await mount();
-    expect(host.querySelectorAll('a[href="/vehicle/offline-vehicle/observation/offline-shared-observation"]')).toHaveLength(2);
-    expect(host.textContent).toContain('Recorded vehicle observation links · 2');
-    expect(host.textContent).toContain('Independent support remains unassessed');
-    expect(errors.mock.calls.some(call => String(call[0]).includes('same key'))).toBe(false);
-  } finally { errors.mockRestore(); }
-});
-it('refuses foreign raw image and witness payloads that contradict the query filters', async () => {
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images' && !c.single ? { data: [image({ id: 'offline-foreign-image', caption: 'offline foreign payload' })], error: null }
-    : c.table === 'observation_witnesses' && c.selected === '*' ? { data: [{ image_id: 'offline-foreign-image', observation_id: 'offline-foreign-observation' }], error: null } : read(c)); await mount();
-  expect(host.querySelector('aside img')).not.toBeNull(); expect(host.textContent).not.toContain('offline foreign payload');
-  expect(host.textContent).not.toContain('offline-foreign-observation'); expect(fixture.calls.some(c => c.table === 'vehicle_observations')).toBe(false);
-});
-it('withholds the previous image and substrate on a route change', async () => {
-  await mount(); let release: (v: any) => void = () => {};
-  fixture.read.mockImplementation(() => new Promise(r => { release = r; })); fixture.route = { vehicleId: 'offline-next-vehicle', imageId: 'offline-next-image' }; await mount();
-  expect(host.querySelector('aside')).toBeNull(); expect(host.textContent).not.toContain('offline-source'); expect(host.textContent).not.toContain('bounded reads');
-  await act(async () => release({ data: null, error: null })); expect(host.textContent).toContain('Vehicle unavailable.');
-});
-it('ignores a cancelled completion when only the image ID changes', async () => {
-  let release: (v: any) => void = () => {};
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images' && id(c) === IMAGE ? new Promise(r => { release = r; })
-    : c.table === 'vehicle_images' ? { data: c.single ? image({ id: 'offline-next-image', image_url: 'https://example.invalid/next.jpg' }) : [], error: null } : read(c));
-  await mount(); const oldSignal = fixture.calls.find(c => c.table === 'vehicle_images').signal;
-  fixture.route = { vehicleId: VEHICLE, imageId: 'offline-next-image' }; await mount(); expect(oldSignal.aborted).toBe(true);
-  await act(async () => release({ data: image(), error: null })); expect(host.querySelector('aside img')?.getAttribute('src')).toBe('https://example.invalid/next.jpg');
-  expect(host.querySelector('a[href="'+SOURCE+'"]')).toBeNull();
-});
-it.each(['vehicles', 'vehicle_images'])('ends a stalled %s read at a finite deadline', async table => {
-  vi.useFakeTimers(); fixture.read.mockImplementation(c => c.table === table ? new Promise((_, reject) => c.signal.addEventListener('abort', () => reject(new Error('offline secret timeout')), { once: true })) : read(c));
-  await mount(); await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
-  expect(host.querySelector('[role=alert]')).not.toBeNull(); expect(host.querySelector('[role=status]')).toBeNull(); expect(host.querySelector('aside')).toBeNull();
-  expect(host.textContent).not.toContain('secret'); expect(fixture.calls.some(c => ['device_attributions','observation_witnesses'].includes(c.table))).toBe(false);
-});
+const V='vehicle-a', I='image-a', URL='https://example.invalid/photo.jpg';
+const id=(c:any,key='id')=>c.filters.find((x:any)=>x[0]===key)?.[1];
+const gallery=(c:any)=>id(c,'vehicle_image_gallery_eligible')===true;
+const image=(extra={})=>({id:I,vehicle_id:V,image_url:URL,is_superseded:false,superseded_by:null,...extra});
+const read=(c:any)=>c.table==='vehicles'?{data:{id:id(c),year:1973,make:'Pontiac',model:'Firebird'},error:null}:['vehicle_images','vehicle_images_public'].includes(c.table)?{data:image(),error:null}:c.table==='observation_witnesses'?{data:[],error:null}:(()=>{throw Error('unexpected reader')})();
+let host:HTMLDivElement,root:Root;
+beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;f.route={vehicleId:V,imageId:I};f.auth={user:{id:'viewer'},loading:false};f.calls=[];f.read.mockReset();f.read.mockImplementation(read);host=document.createElement('div');document.body.append(host);root=createRoot(host)});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.useRealTimers()});
+const mount=()=>act(async()=>root.render(<MemoryRouter><ImagePage/></MemoryRouter>));
+const photo=()=>host.querySelector('.source-photo-viewport img');
+it('shows photo and navigation without raw/device/discovery queries or empty explanations',async()=>{await mount();expect(photo()?.getAttribute('src')).toBe(URL);expect(host.textContent).toContain('1973 Pontiac Firebird');expect(f.calls.every(c=>['vehicles','vehicle_images','observation_witnesses'].includes(c.table))).toBe(true);expect(f.calls.some(c=>c.selected.includes('*')||/content_text|structured_data|caption|file_name|reasoning/.test(c.selected))).toBe(false);expect(host.querySelector('table,details')).toBeNull();expect(host.textContent).not.toMatch(/Substrate|rows|metadata|capture_relay|image-a|unknown/i);expect(host.querySelector('[aria-label="Related records"]')).toBeNull()});
+it('uses canonical public gallery source and predicate anonymously',async()=>{f.auth.user=null;await mount();const c=f.calls.find(c=>c.selected.includes('image_url'));expect(c.table).toBe('vehicle_images_public');expect(gallery(c)).toBe(true);expect(c.filters).toContainEqual(['vehicle_id',V]);expect(c.filters).toContainEqual(['id',I])});
+it('does not render a readable but gallery-ineligible image',async()=>{f.read.mockImplementation(c=>gallery(c)?{data:null,error:null}:read(c));await mount();expect(photo()).toBeNull();expect(host.textContent).toContain('Photo unavailable.');expect(f.calls.some(c=>c.table==='observation_witnesses')).toBe(false)});
+it.each(['vehicle','reference','gallery'])('rejects foreign %s row even when returned despite filters',async which=>{f.read.mockImplementation(c=>which==='vehicle'&&c.table==='vehicles'?{data:{id:'foreign'},error:null}:(which==='reference'&&c.table==='vehicle_images'&&!gallery(c))||(which==='gallery'&&gallery(c))?{data:image({vehicle_id:'foreign'}),error:null}:read(c));await mount();expect(photo()).toBeNull()});
+it('shows known capture date, never upload date',async()=>{f.read.mockImplementation(c=>gallery(c)?{data:image({taken_at:'2026-10-28T22:45:35Z',created_at:'2026-11-01'}),error:null}:read(c));await mount();expect(host.querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-28T22:45:35Z');expect(host.textContent).not.toContain('Nov 1')});
+it.each([null,'invalid'])('omits missing/invalid capture date %s',async taken_at=>{f.read.mockImplementation(c=>gallery(c)?{data:image({taken_at,created_at:'2026-11-01'}),error:null}:read(c));await mount();expect(host.querySelector('time')).toBeNull()});
+it('uses HEIC contain rendition then medium/thumbnail and never raw HEIC fallback',async()=>{const heic='https://example.supabase.co/storage/v1/object/public/photos/source.HEIC';f.read.mockImplementation(c=>gallery(c)?{data:image({image_url:heic,medium_url:URL,thumbnail_url:'https://example.invalid/thumb.jpg'}),error:null}:read(c));await mount();expect(photo()?.getAttribute('src')).toBe(heic.replace('/object/public/','/render/image/public/')+'?width=1200&quality=90&resize=contain');for(const expected of [URL,'https://example.invalid/thumb.jpg']){await act(async()=>photo()!.dispatchEvent(new Event('error')));expect(photo()?.getAttribute('src')).toBe(expected)}await act(async()=>photo()!.dispatchEvent(new Event('error')));expect(photo()).toBeNull();expect(host.textContent).toContain('Photo couldn’t be displayed.')});
+it('rejects unsafe URLs',async()=>{f.read.mockImplementation(c=>gallery(c)?{data:image({image_url:'javascript:alert(1)',medium_url:'file:///private/source'}),error:null}:read(c));await mount();expect(photo()).toBeNull()});
+it('supports keyboard-accessible zoom and Escape to fit',async()=>{await mount();await act(async()=>(host.querySelector('[aria-label="Zoom into photo"]') as HTMLButtonElement).click());expect(host.querySelector('.is-zoomed')).not.toBeNull();await act(async()=>host.querySelector('[aria-label="Photo viewer"]')!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));expect(host.querySelector('.is-zoomed')).toBeNull();expect(photo()).not.toBeNull()});
+it('keeps historical reference without old pixels; qualifies replacement under same vehicle',async()=>{f.read.mockImplementation(c=>c.table==='vehicle_images'&&!gallery(c)?{data:image({is_superseded:true,superseded_by:'next'}),error:null}:gallery(c)?{data:image({id:'next'}),error:null}:read(c));await mount();expect(photo()).toBeNull();expect(host.textContent).toContain('no longer current');expect(host.querySelector(`a[href="/vehicle/${V}/image/next"]`)).not.toBeNull();expect(f.calls.filter(gallery)).toHaveLength(1)});
+it('withholds foreign replacement',async()=>{f.read.mockImplementation(c=>c.table==='vehicle_images'&&!gallery(c)?{data:image({superseded_by:'next'}),error:null}:gallery(c)?{data:image({id:'next',vehicle_id:'other'}),error:null}:read(c));await mount();expect(photo()).toBeNull();expect(host.querySelector('a[href*="/image/"]')).toBeNull()});
+it('deduplicates current same-vehicle references with closed labels, no testimony',async()=>{const o={id:'record-a',vehicle_id:V,kind:'work_record',is_superseded:false,superseded_by:null,content_text:'secret prose',structured_data:{vendor:'private'}};f.read.mockImplementation(c=>c.table==='observation_witnesses'?{data:[{observation:o},{observation:o},{observation:{...o,id:'foreign',vehicle_id:'other'}},{observation:{...o,id:'old',superseded_by:'new'}},{observation:{...o,id:'gone',is_superseded:true}},{observation:{...o,id:'pipeline',kind:'media'}}],error:null}:read(c));await mount();expect(host.querySelectorAll('a[href*="/observation/"]')).toHaveLength(1);expect(host.textContent).toContain('Work record');expect(host.textContent).not.toMatch(/secret|private|foreign|pipeline|record-a/)});
+it('keeps photo when optional refs fail and retries without leaking errors',async()=>{f.read.mockImplementation(c=>c.table==='observation_witnesses'?{data:null,error:{message:'private error'}}:read(c));await mount();expect(photo()).not.toBeNull();expect(host.textContent).toContain('Retry related records');expect(host.textContent).not.toContain('private error')});
+it.each(['vehicle','gallery','witness'])('bounds stalled %s reads even if the request ignores abort',async target=>{vi.useFakeTimers();f.read.mockImplementation(c=>(target==='vehicle'&&c.table==='vehicles')||(target==='gallery'&&gallery(c))||(target==='witness'&&c.table==='observation_witnesses')?new Promise(()=>{}):read(c));await mount();await act(async()=>{await vi.advanceTimersByTimeAsync(10000)});if(target==='witness'){expect(photo()).not.toBeNull();expect(host.textContent).toContain('Retry related records')}else{expect(photo()).toBeNull();expect(host.querySelector('[role="alert"]')).not.toBeNull()}expect(host.textContent).not.toContain('Loading')});
+it('clears prior photo on auth loading and logout',async()=>{await mount();f.auth.loading=true;await mount();expect(photo()).toBeNull();f.auth={user:null,loading:false};f.read.mockImplementation(()=>new Promise(()=>{}));await mount();expect(photo()).toBeNull()});
+it('ignores late results after route change',async()=>{let release:(v:any)=>void=()=>{};f.read.mockImplementation(c=>gallery(c)&&id(c)===I?new Promise(r=>{release=r}):read(c));await mount();const signal=f.calls.find(gallery).signal;f.route={vehicleId:V,imageId:'next'};f.read.mockImplementation(c=>['vehicle_images','vehicle_images_public'].includes(c.table)?{data:image({id:'next',image_url:'https://example.invalid/next.jpg'}),error:null}:read(c));await mount();expect(signal.aborted).toBe(true);await act(async()=>release({data:image(),error:null}));expect(photo()?.getAttribute('src')).toBe('https://example.invalid/next.jpg')});
 
+it.each(['is_sensitive','is_document','doc_flag','is_duplicate'])('rejects gallery-returned %s media for both source and replacement',async flag=>{
+ f.read.mockImplementation(c=>gallery(c)?{data:image({[flag]:true}),error:null}:read(c));await mount();expect(photo()).toBeNull();
+ expect(f.calls.find(gallery).filters).toContainEqual([flag,'is',true]);
+ f.route={vehicleId:V,imageId:'historical'};f.read.mockImplementation(c=>c.table==='vehicle_images'&&!gallery(c)?{data:image({id:'historical',superseded_by:I}),error:null}:gallery(c)?{data:image({[flag]:true}),error:null}:read(c));
+ await mount();expect(photo()).toBeNull();expect(host.querySelector('a[href*="/image/"]')).toBeNull();
+});
+it.each(['constructor','toString','__proto__'])('rejects prototype reference kind %s',async kind=>{f.read.mockImplementation(c=>c.table==='observation_witnesses'?{data:[{observation:{id:'bad',vehicle_id:V,kind,is_superseded:false,superseded_by:null}}],error:null}:read(c));await mount();expect(host.querySelector('[aria-label="Related records"]')).toBeNull()});
 
-it('clears prior viewer data immediately on logout and while the next read is pending', async () => {
-  await mount();
-  expect(host.textContent).toContain('offline-source');
-  let finish: (value: any) => void = () => {};
-  fixture.read.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
-  fixture.auth = { user: null, loading: false };
-  await mount();
-  expect(host.textContent).not.toContain('offline-source');
-  expect(host.querySelector('[role=status]')).not.toBeNull();
-  await act(async () => finish({ data: null, error: null }));
-  expect(host.querySelector('[role=alert]')).not.toBeNull();
-});
-it('waits for auth resolution and preserves the reader on a same-ID session refresh', async () => {
-  fixture.auth.loading = true; await mount();
-  expect(fixture.calls).toHaveLength(0);
-  fixture.auth.loading = false; await mount();
-  const calls = fixture.calls.length;
-  fixture.auth = { user: { id: 'viewer-a' }, loading: false };
-  await mount(); expect(fixture.calls).toHaveLength(calls);
-  expect(host.textContent).toContain('offline-source');
-  fixture.auth.loading = true; await mount();
-  expect(host.textContent).not.toContain('offline-source');
-});
-
-it('does not describe pending or failed device evidence as absent EXIF', async () => {
-  let release: (v: any) => void = () => {};
-  fixture.read.mockImplementation(c => c.table === 'device_attributions' ? new Promise(r => { release = r; }) : read(c));
-  await mount();
-  expect(host.querySelector('aside img')).not.toBeNull();
-  expect(host.textContent).not.toContain('no EXIF');
-  expect(host.textContent).toContain('Reading device metadata');
-  await act(async () => release({ data: null, error: { message: 'private failure' } }));
-  expect(host.textContent).toContain('Device metadata unavailable');
-  expect(host.textContent).not.toContain('no EXIF');
-  expect(host.textContent).not.toContain('private failure');
-});
-it('reports failed witness reads without claiming there are no related observations', async () => {
-  fixture.read.mockImplementation(c => c.table === 'observation_witnesses' ? { data: null, error: { message: 'private permission failure' } } : read(c));
-  await mount();
-  expect(host.querySelector('aside img')).not.toBeNull();
-  expect(host.textContent).toContain('Observation links unavailable');
-  expect(host.textContent).not.toContain('private permission');
-});
-
-it('shows an empty projection only after its upstream reader succeeds', async () => {
-  await mount();
-  expect(host.textContent).toContain('0 rows returned');
-  expect(host.textContent).toContain('No visible device metadata returned');
-  expect(host.textContent).not.toContain('Read unavailable');
-});
-it('keeps the verified image when an optional detail transport rejects and retries with the existing reader', async () => {
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images' && !c.single ? Promise.reject(new Error('private detail failure')) : read(c));
-  await mount();
-  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(SOURCE);
-  expect(host.textContent).toContain('Record details could not be read completely');
-  expect(host.textContent).not.toContain('private detail failure');
-  fixture.read.mockImplementation(read);
-  await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Retry details')!.click());
-  expect(host.textContent).not.toContain('could not be read completely');
-  expect(host.textContent).toContain('vehicle_images · 1 row');
-});
-it('refuses an unsafe original image URL while keeping the visible metadata', async () => {
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images' ? { data: c.single ? image({ image_url: 'javascript:alert(1)' }) : [], error: null } : read(c));
-  await mount();
-  expect(host.querySelector('aside img')).toBeNull();
-  expect(host.querySelector('a[href^="javascript:"]')).toBeNull();
-  expect(host.textContent).toContain('Original image URL unavailable');
-});
-it('does not publish a late viewer-A image after viewer B has replaced the reader', async () => {
-  let release: (v: any) => void = () => {};
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images' ? new Promise(r => { release = r; }) : read(c));
-  await mount();
-  const oldSignal = fixture.calls.find(call => call.table === 'vehicle_images').signal;
-  fixture.auth.user = { id: 'viewer-b' };
-  fixture.read.mockImplementation(c => c.table === 'vehicles' ? { data: null, error: null } : read(c));
-  await mount(); expect(oldSignal.aborted).toBe(true);
-  await act(async () => release({ data: image(), error: null }));
-  expect(host.querySelector('aside')).toBeNull();
-  expect(host.textContent).not.toContain('offline-source');
-});
-
-it('offers retry when only a raw relation read is unavailable', async () => {
-  fixture.read.mockImplementation(c => c.table === 'observation_witnesses' && c.selected === '*' ? { data: null, error: { message: 'unavailable' } } : read(c));
-  await mount();
-  const retry = Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'Retry details');
-  expect(retry).toBeDefined(); expect(host.querySelector('aside img')).not.toBeNull();
-  fixture.read.mockImplementation(read);
-  await act(async () => retry!.click());
-  expect(host.textContent).not.toContain('Read unavailable'); expect(host.textContent).not.toContain('Retry details');
-});
-
-it('renders HEIC through contain-sized JPEG service and falls back to stored renditions without retrying original', async () => {
-  const heic = 'https://example.supabase.co/storage/v1/object/public/vehicle-photos/IMG_5047.HEIC';
-  fixture.read.mockImplementation(c => c.table === 'vehicle_images' ? { data: c.single ? image({
-    image_url: heic, medium_url: 'https://example.invalid/medium.jpg', thumbnail_url: 'https://example.invalid/thumb.jpg',
-  }) : [], error: null } : read(c));
-  await mount();
-  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(heic.replace('/object/public/', '/render/image/public/')+'?width=1200&quality=90&resize=contain');
-  await act(async () => host.querySelector('aside img')!.dispatchEvent(new Event('error')));
-  expect(host.querySelector('aside img')?.getAttribute('src')).toBe('https://example.invalid/medium.jpg');
-  await act(async () => host.querySelector('aside img')!.dispatchEvent(new Event('error')));
-  expect(host.querySelector('aside img')?.getAttribute('src')).toBe('https://example.invalid/thumb.jpg');
-  await act(async () => host.querySelector('aside img')!.dispatchEvent(new Event('error')));
-  expect(host.querySelector('aside img')).toBeNull(); expect(host.textContent).toContain('Image rendition unavailable.');
+it('rejects unsafe primary source identity despite a valid medium rendition',async()=>{
+ f.read.mockImplementation(c=>gallery(c)?{data:image({image_url:'file:///private/source',medium_url:URL}),error:null}:read(c));
+ await mount();expect(photo()).toBeNull();expect(host.textContent).toContain('Photo unavailable.');
+ f.route={vehicleId:V,imageId:'old'};f.read.mockImplementation(c=>c.table==='vehicle_images'&&!gallery(c)?{data:image({id:'old',superseded_by:I}),error:null}:gallery(c)?{data:image({image_url:'javascript:alert(1)',medium_url:URL}),error:null}:read(c));
+ await mount();expect(host.querySelector('a[href*="/image/"]')).toBeNull();
 });

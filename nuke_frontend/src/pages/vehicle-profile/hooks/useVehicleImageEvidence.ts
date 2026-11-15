@@ -29,11 +29,14 @@ export interface EvidenceImage {
 const CAP = 500;
 /** Existing image-detail witness read shared with source reproductions. RLS is
  * retained; each consumer must bind the returned observation to its vehicle. */
-export function readImageWitnesses(imageId: string, signal: AbortSignal) {
-  return supabase.from('observation_witnesses').select(`witness_role,
+export function readImageWitnesses(imageId: string, signal: AbortSignal, projection: 'full' | 'references' = 'full') {
+  const columns = projection === 'references'
+    ? 'observation:vehicle_observations!observation_id(id,vehicle_id,kind,observed_at,is_superseded,superseded_by)'
+    : `witness_role,
     observation:vehicle_observations!observation_id(
       id, vehicle_id, kind, observed_at, content_text, structured_data, is_superseded, superseded_by, extraction_method
-    )`).eq('image_id', imageId).abortSignal(signal).limit(100);
+    )`;
+  return supabase.from('observation_witnesses').select(columns).eq('image_id', imageId).abortSignal(signal).limit(100);
 }
 const SELECT = 'id,image_url,thumbnail_url,medium_url,vehicle_zone,angle,ai_detected_angle,ai_processing_status,vision_analyzed_at,vision_model_version,created_at,taken_at,source,is_primary,is_document,category,caption,ai_byok_narrative:ai_scan_metadata->byok_deep_analysis->>narrative_one_line,ai_byok_components:ai_scan_metadata->byok_deep_analysis->components_seen,ai_byok_scene:ai_scan_metadata->byok_deep_analysis->>scene_type';
 

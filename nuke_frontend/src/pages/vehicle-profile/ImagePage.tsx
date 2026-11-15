@@ -1,686 +1,161 @@
-/**
- * ImagePage.tsx
- *
- * The image as a first-class navigable resource. Mounted at
- * /vehicle/:vehicleId/image/:imageId. Closes the click-through chain:
- * timeline cell → day → observation → image → back to every observation
- * that shares this image as evidence.
- */
-import React, { useEffect, useState } from 'react';
+/** The cited photograph, under the same access and gallery rules as the profile. */
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Link from '../../components/PrefetchLink';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/button';
-import './vehicle-evidence-detail.css';
+import { Text } from '../../kit';
 import { supabase } from '../../lib/supabase';
+import { vehicleImageGallerySource } from '../../lib/vehicleImageColumns';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
-import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
 import { webSourceUrl, readImageWitnesses } from './hooks/useVehicleImageEvidence';
+import './vehicle-evidence-detail.css';
 
-interface ImageRow {
-  id: string;
-  vehicle_id: string;
-  image_url: string;
-  thumbnail_url: string | null;
-  medium_url: string | null;
-  created_at: string | null;
-  taken_at: string | null;
-  source: string | null;
-  vision_gate_status: string | null;
-  vision_gate_agent_reasoning: string | null;
-  caption: string | null;
-  file_name: string | null;
-  is_primary: boolean | null;
-  is_superseded: boolean | null;
-  superseded_by: string | null;
-  superseded_at: string | null;
+type Photo = { id: string; vehicle_id: string; image_url: string; medium_url?: string | null;
+  thumbnail_url?: string | null; is_sensitive?: boolean | null; is_document?: boolean | null; doc_flag?: boolean | null; is_duplicate?: boolean | null; taken_at?: string | null; is_superseded?: boolean | null; superseded_by?: string | null };
+type Vehicle = { id: string; year: number | null; make: string | null; model: string | null; trim: string | null };
+type Reference = { id: string; label: string; at: string | null };
+const REFERENCE_LABELS: Record<string, string> = {
+  specification: 'Specification record', condition: 'Condition record', work_record: 'Work record',
+  sale_result: 'Sale record', listing: 'Listing record', service: 'Service record',
+};
+const PHOTO_COLUMNS = 'id,vehicle_id,image_url,medium_url,thumbnail_url,taken_at,is_superseded,superseded_by,is_sensitive,is_document,doc_flag,is_duplicate';
+function visiblePhoto(row: Photo | null, id: string, vehicleId: string): row is Photo {
+  return !!row && !!webSourceUrl(row.image_url) && row.id === id && row.vehicle_id === vehicleId && !row.is_superseded && !row.superseded_by
+    && row.is_sensitive !== true && row.is_document !== true && row.doc_flag !== true && row.is_duplicate !== true;
 }
-
-interface VehicleSummary {
-  id: string;
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  trim: string | null;
+function dateLabel(value?: string | null) {
+  if (typeof value !== 'string' || !value || !Number.isFinite(Date.parse(value))) return null;
+  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(value));
 }
-
-interface DeviceAttribution {
-  camera_make: string | null;
-  camera_model: string | null;
-  software: string | null;
-  device_fingerprint: string | null;
-  attribution_source: string | null;
-  extraction_method: string | null;
-  confidence_score: number | null;
-  datetime_original: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  camera_serial: string | null;
-}
-
-interface WitnessedObservation {
-  id: string;
-  vehicle_id: string;
-  kind: string;
-  observed_at: string | null;
-  content_text: string | null;
-  part_number: string | null;
-  vendor: string | null;
-  witness_role: string;
-}
-
-type Row = Record<string, unknown>;
-
-interface SubstrateBundle {
-  unavailableRelations: string[];
-  vehicle_images: Row[];
-  observation_witnesses: Row[];
-  vehicle_observations: Row[];
-  observation_discoveries: Row[];
-  observation_sources: Row[];
-  vehicles: Row[];
+export function imageReferenceLinks(rows: unknown, vehicleId: string): Reference[] {
+  if (!Array.isArray(rows)) return [];
+  const links = new Map<string, Reference>();
+  for (const row of rows) {
+    const observation = row?.observation;
+    if (!observation || observation.vehicle_id !== vehicleId || observation.is_superseded !== false
+      || observation.superseded_by != null || typeof observation.id !== 'string' || typeof observation.kind !== 'string' || !Object.prototype.hasOwnProperty.call(REFERENCE_LABELS, observation.kind)) continue;
+    links.set(observation.id, { id: observation.id, label: REFERENCE_LABELS[observation.kind], at: dateLabel(observation.observed_at) });
+  }
+  return [...links.values()];
 }
 
 const ImagePageContent: React.FC = () => {
   const { vehicleId, imageId } = useParams<{ vehicleId: string; imageId: string }>();
-  const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-  const [imageRow, setImage] = useState<ImageRow | null>(null);
-  const [loadedSubject, setLoadedSubject] = useState<string | null>(null);
-  const [witnessed, setWitnessed] = useState<WitnessedObservation[]>([]);
-  const [attribution, setAttribution] = useState<DeviceAttribution | null>(null);
-  const [attributionStatus, setAttributionStatus] = useState<'pending' | 'ready' | 'unavailable'>('pending');
-  const [witnessStatus, setWitnessStatus] = useState<'pending' | 'ready' | 'unavailable'>('pending');
-  const [replacementId, setReplacementId] = useState<string | null>(null);
-  const [replacementStatus, setReplacementStatus] = useState<'pending' | 'ready' | 'unavailable'>('pending');
-  const [detailError, setDetailError] = useState(false);
-  const [substrate, setSubstrate] = useState<SubstrateBundle | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [readAttempt, setReadAttempt] = useState(0);
-  const [renditionIndex, setRenditionIndex] = useState(0);
-  const image = loadedSubject === `${vehicleId}:${imageId}` ? imageRow : null;
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [photo, setPhoto] = useState<Photo | null>(null);
+  const [phase, setPhase] = useState<'loading' | 'ready' | 'unavailable' | 'error' | 'replaced'>('loading');
+  const [replacement, setReplacement] = useState<string | null>(null);
+  const [links, setLinks] = useState<Reference[]>([]);
+  const [linksFailed, setLinksFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [rendition, setRendition] = useState(0);
+  const [zoomed, setZoomed] = useState(false);
+  const viewport = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!vehicleId || !imageId) return;
-    let cancelled = false;
+    let cancelled = false, expired = false, acceptedPhoto = false;
     const controller = new AbortController();
-    const deadline = window.setTimeout(() => controller.abort(), 10_000);
-    setLoading(true);
-    setError(null);
-    setLoadedSubject(null);
-    setRenditionIndex(0);
-    setVehicle(null);
-    setImage(null);
-    setWitnessed([]);
-    setAttribution(null);
-    setAttributionStatus('pending');
-    setWitnessStatus('pending');
-    setReplacementId(null);
-    setReplacementStatus('pending');
-    setDetailError(false);
-    setSubstrate(null);
-
-    (async () => {
-      let acceptedImage = false;
-      try {
-        const vehRes = await supabase
-          .from('vehicles')
-          .select('id, year, make, model, trim')
-          .eq('id', vehicleId)
-          .abortSignal(controller.signal)
-          .maybeSingle();
-        if (cancelled) return;
-        if (vehRes.error) throw new Error('Unable to load this vehicle. Try again.');
-        if (!vehRes.data || vehRes.data.id !== vehicleId) throw new Error('Vehicle unavailable.');
-        setVehicle(vehRes.data as VehicleSummary);
-
-        const imgRes = await supabase
-          .from('vehicle_images')
-          .select(`
-              id, vehicle_id, image_url, thumbnail_url, medium_url,
-              created_at, taken_at, source,
-              vision_gate_status, vision_gate_agent_reasoning,
-              caption, file_name, is_primary, is_superseded, superseded_by, superseded_at
-            `)
-          .eq('id', imageId)
-          .eq('vehicle_id', vehicleId)
-          .abortSignal(controller.signal)
-          .maybeSingle();
-        if (cancelled) return;
-        if (imgRes.error) throw new Error('Unable to load this image. Try again.');
-        if (!imgRes.data || imgRes.data.id !== imageId || imgRes.data.vehicle_id !== vehicleId) {
-          throw new Error('Image unavailable for this vehicle.');
-        }
-        acceptedImage = true;
-        setImage(imgRes.data as ImageRow);
-        setLoadedSubject(`${vehicleId}:${imageId}`);
-
-        // Dependent reads only follow a visible, correctly bound image.
-        const [witnessRead, attributionRead, replacementRead] = await Promise.allSettled([
-          readImageWitnesses(imageId, controller.signal),
-          supabase
-            .from('device_attributions')
-            .select(`
-              camera_make, camera_model, software, device_fingerprint,
-              attribution_source, extraction_method, confidence_score,
-              datetime_original, latitude, longitude, camera_serial
-            `)
-            .eq('image_id', imageId)
-            .abortSignal(controller.signal)
-            .maybeSingle(),
-          // Inspect one explicit edge. Do not replace the cited original silently,
-          // or link a private/reattributed image under this vehicle's identity.
-          imgRes.data.is_superseded && imgRes.data.superseded_by && imgRes.data.superseded_by !== imageId
-            ? supabase.from('vehicle_images').select('id,vehicle_id')
-              .eq('id', imgRes.data.superseded_by).eq('vehicle_id', vehicleId)
-              .abortSignal(controller.signal).maybeSingle()
-            : Promise.resolve({ data: null, error: null }),
-        ]);
-        if (cancelled) return;
-        const witRes = witnessRead.status === 'fulfilled' ? witnessRead.value : { data: null, error: true };
-        const attribRes = attributionRead.status === 'fulfilled' ? attributionRead.value : { data: null, error: true };
-        if (!attribRes.error && attribRes.data) setAttribution(attribRes.data as DeviceAttribution);
-        setAttributionStatus(attribRes.error ? 'unavailable' : 'ready');
-        setWitnessStatus(witRes.error ? 'unavailable' : 'ready');
-        const replacement = replacementRead.status === 'fulfilled' ? replacementRead.value : { data: null, error: true };
-        setReplacementStatus(replacement.error ? 'unavailable' : 'ready');
-        if (!replacement.error && replacement.data?.id === imgRes.data.superseded_by && replacement.data?.vehicle_id === vehicleId) {
-          setReplacementId(replacement.data.id);
-        }
-
-        if (!witRes.error && witRes.data) {
-          const rows: WitnessedObservation[] = [];
-          for (const w of witRes.data as any[]) {
-            const obs = w.observation;
-            if (!obs || obs.is_superseded || !obs.vehicle_id) continue;
-            const sd = obs.structured_data || {};
-            rows.push({
-              id: obs.id,
-              vehicle_id: obs.vehicle_id,
-              kind: obs.kind,
-              observed_at: obs.observed_at,
-              content_text: obs.content_text,
-              part_number: sd.part_number ?? null,
-              vendor: sd.vendor ?? sd.merchant ?? null,
-              witness_role: w.witness_role,
-            });
-          }
-          rows.sort((a, b) => (b.observed_at || '').localeCompare(a.observed_at || ''));
-          setWitnessed(rows);
-        }
-
-        // Image/source substrate stays inspectable. The parent contributes only
-        // identity fields: free-text vehicle notes and derived metadata can carry
-        // private accounting context even when dedicated money fields are masked.
-        const [
-          imgFullRes,
-          witFullRes,
-        ] = await Promise.all([
-          supabase.from('vehicle_images').select(await vehicleImageRowColumns()).eq('id', imageId).eq('vehicle_id', vehicleId).limit(1).abortSignal(controller.signal),
-          supabase.from('observation_witnesses').select('*').eq('image_id', imageId).limit(200).abortSignal(controller.signal),
-        ]);
-
-        if (cancelled) return;
-        const witnessRows = ((witFullRes.data || []) as Row[]).filter(row => row.image_id === imageId);
-        const unavailableRelations = [
-          ['vehicle_images', imgFullRes], ['observation_witnesses', witFullRes],
-        ].filter(([, result]) => (result as { error?: unknown }).error).map(([name]) => name as string);
-        const obsIds = Array.from(new Set(witnessRows.map((r) => r.observation_id).filter(Boolean))) as string[];
-
-        // A failed bridge read cannot establish empty downstream collections.
-        if (witFullRes.error) unavailableRelations.push('vehicle_observations', 'observation_discoveries', 'observation_sources');
-        let obsRows: Row[] = [];
-        let discoveryRows: Row[] = [];
-        let sourceRows: Row[] = [];
-        if (obsIds.length > 0) {
-          const obsRes = await supabase.from('vehicle_observations').select('*').in('id', obsIds).limit(200).abortSignal(controller.signal);
-          if (obsRes.error) unavailableRelations.push('vehicle_observations', 'observation_sources');
-          obsRows = (obsRes.data || []) as Row[];
-
-          const sourceIds = Array.from(new Set(obsRows.map((r) => r.source_id).filter(Boolean))) as string[];
-          if (sourceIds.length > 0) {
-            const srcRes = await supabase.from('observation_sources').select('*').in('id', sourceIds).limit(50).abortSignal(controller.signal);
-            if (srcRes.error) unavailableRelations.push('observation_sources');
-            sourceRows = (srcRes.data || []) as Row[];
-          }
-
-          const discRes = await supabase
-            .from('observation_discoveries')
-            .select('*')
-            .in('observation_id', obsIds)
-            .abortSignal(controller.signal)
-            .limit(200);
-          if (!discRes.error) discoveryRows = (discRes.data || []) as Row[];
-          else unavailableRelations.push('observation_discoveries');
-        }
-
-        if (!cancelled) {
-          setSubstrate({
-            unavailableRelations,
-            vehicle_images: ((imgFullRes.data || []) as Row[]).filter(row => row.id === imageId && row.vehicle_id === vehicleId),
-            observation_witnesses: witnessRows,
-            vehicle_observations: obsRows,
-            observation_discoveries: discoveryRows,
-            observation_sources: sourceRows,
-            vehicles: [{ id: vehRes.data.id, year: vehRes.data.year, make: vehRes.data.make, model: vehRes.data.model, trim: vehRes.data.trim }],
-
-          });
-        }
-
-      } catch (failure) {
-        if (!cancelled && acceptedImage) {
-          // Failure in optional details does not erase the already verified image binding.
-          setDetailError(true);
-          setAttributionStatus(status => status === 'pending' ? 'unavailable' : status);
-          setWitnessStatus(status => status === 'pending' ? 'unavailable' : status);
-        } else if (!cancelled) {
-          setImage(null);
-          setLoadedSubject(null);
-    setRenditionIndex(0);
-          const messages = ['Vehicle unavailable.', 'Unable to load this vehicle. Try again.',
-            'Image unavailable for this vehicle.', 'Unable to load this image. Try again.'];
-          const message = failure instanceof Error ? failure.message : '';
-          setError(messages.includes(message) ? message : 'Unable to load this image. Try again.');
-        }
-      } finally {
-        window.clearTimeout(deadline);
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearTimeout(deadline);
+    const active = () => !cancelled && !expired;
+    setVehicle(null); setPhoto(null); setLinks([]); setReplacement(null);
+    setPhase('loading'); setLinksFailed(false); setRendition(0); setZoomed(false);
+    const deadline = window.setTimeout(() => {
+      expired = true; controller.abort();
+      if (!cancelled) { if (acceptedPhoto) setLinksFailed(true); else setPhase('error'); }
+    }, 10_000);
+    const readGalleryPhoto = async (id: string) => {
+      const source = await vehicleImageGallerySource();
+      return supabase.from(source).select(PHOTO_COLUMNS).eq('id', id).eq('vehicle_id', vehicleId)
+        .eq('vehicle_image_gallery_eligible', true).not('is_sensitive', 'is', true).not('is_document', 'is', true)
+        .not('doc_flag', 'is', true).not('is_duplicate', 'is', true).abortSignal(controller.signal).maybeSingle();
     };
-  }, [vehicleId, imageId, readAttempt]);
+    void (async () => {
+      try {
+        if (!vehicleId || !imageId) { setPhase('unavailable'); return; }
+        const vehicleRead = await supabase.from('vehicles').select('id,year,make,model,trim')
+          .eq('id', vehicleId).abortSignal(controller.signal).maybeSingle();
+        if (!active()) return;
+        if (vehicleRead.error) throw Error('read');
+        if (!vehicleRead.data || vehicleRead.data.id !== vehicleId) { setPhase('unavailable'); return; }
+        setVehicle(vehicleRead.data as Vehicle);
+        // Reference metadata can establish a historical replacement, never permission to show pixels.
+        const reference = await supabase.from('vehicle_images').select('id,vehicle_id,is_superseded,superseded_by')
+          .eq('id', imageId).eq('vehicle_id', vehicleId).abortSignal(controller.signal).maybeSingle();
+        if (!active()) return;
+        if (reference.error) throw Error('read');
+        if (!reference.data || reference.data.id !== imageId || reference.data.vehicle_id !== vehicleId) { setPhase('unavailable'); return; }
+        if (reference.data.is_superseded || reference.data.superseded_by) {
+          setPhase('replaced');
+          const next = reference.data.superseded_by;
+          if (next && next !== imageId) {
+            const nextRead = await readGalleryPhoto(next);
+            if (!active()) return;
+            if (nextRead.error) throw Error('read');
+            if (visiblePhoto(nextRead.data as Photo | null, next, vehicleId)) setReplacement(next);
+          }
+          return;
+        }
+        const gallery = await readGalleryPhoto(imageId);
+        if (!active()) return;
+        if (gallery.error) throw Error('read');
+        if (!visiblePhoto(gallery.data as Photo | null, imageId, vehicleId)) { setPhase('unavailable'); return; }
+        acceptedPhoto = true;
+        setPhoto(gallery.data as Photo); setPhase('ready');
+        const witnesses = await readImageWitnesses(imageId, controller.signal, 'references');
+        if (!active()) return;
+        if (witnesses.error) setLinksFailed(true);
+        else setLinks(imageReferenceLinks(witnesses.data, vehicleId));
+      } catch {
+        if (active()) { if (acceptedPhoto) setLinksFailed(true); else setPhase('error'); }
+      } finally { window.clearTimeout(deadline); }
+    })();
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(deadline); };
+  }, [vehicleId, imageId, attempt]);
 
-  const vehLabel = vehicle && vehicle.id === vehicleId
-    ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
-    : 'Vehicle';
-
-  // Render approved browser-compatible renditions; the stored original may be
-  // HEIC. The shared optimizer explicitly preserves aspect ratio with contain.
-  const originalUrl = webSourceUrl(image?.image_url);
-  const renditions = [...new Set([optimizeImageUrl(originalUrl, 'large'), image?.medium_url, image?.thumbnail_url]
+  const label = vehicle ? [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(' ') : 'Vehicle';
+  const taken = dateLabel(photo?.taken_at);
+  const renditions = [...new Set([optimizeImageUrl(webSourceUrl(photo?.image_url), 'large'), photo?.medium_url, photo?.thumbnail_url]
     .map(url => webSourceUrl(url)).filter((url): url is string => !!url
       && (!/\.hei[cf](?:[?#]|$)/i.test(url) || url.includes('/storage/v1/render/image/'))))];
-  const renderSrc = renditions[renditionIndex] ?? null;
-
-  return (
-    <div className="evidence-detail image-evidence-detail"
-      style={{
-        padding: '12px 12px 24px',
-        color: 'var(--text)',
-      }}
-    >
-      <nav
-        aria-label="breadcrumb"
-        style={{
-          color: 'var(--text-secondary)',
-          marginBottom: 8,
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 12,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Link to={`/vehicle/${vehicleId}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-          {vehLabel || 'Vehicle'}
-        </Link>
-        <span>/</span>
-        <span style={{ color: 'var(--text)' }}>Image</span>
-        {image?.vision_gate_status && (
-          <span style={{ border: '1px solid var(--border)', padding: '1px 5px' }}>
-            Recorded review: {image.vision_gate_status}
-          </span>
-        )}
-        {image?.source && (
-          <span>
-            {image.source}
-          </span>
-        )}
-        {image?.is_primary && (
-          <span style={{ border: '1px solid var(--success, #0a7)', color: 'var(--success, #0a7)', padding: '1px 4px' }}>
-            Primary
-          </span>
-        )}
-      </nav>
-
-      <h1>Image evidence</h1>
-      {image?.is_superseded && <section aria-label="Image record history" className="evidence-metadata evidence-read-notice">
-        <strong>This image record was superseded.</strong>
-        <p>You are viewing the original cited record. Supersession changes the record's standing; it does not establish a physical change to the vehicle.</p>
-        {image.superseded_at && <p>Supersession recorded: {image.superseded_at}</p>}
-        {replacementId ? <Link to={`/vehicle/${vehicleId}/image/${replacementId}`}>Inspect replacement image record {replacementId.slice(0, 8)}</Link>
-          : !image.superseded_by ? <p>No replacement reference is recorded.</p>
-          : replacementStatus === 'pending' ? <p role="status">Reading replacement reference…</p>
-          : <p role="status">Replacement record unavailable for this vehicle.</p>}
-      </section>}
-      {loading && !image && (
-        <div role="status" style={{ color: 'var(--text-secondary)', padding: 12 }}>Loading image…</div>
-      )}
-
-      {error && (
-        <div role="alert" style={{ color: 'var(--error, #c00)', padding: 12, border: '1px solid var(--error)' }}>
-          <p>{error}</p>
-          <Button type="button" variant="secondary" onClick={() => setReadAttempt(value => value + 1)}>Retry read</Button>
-        </div>
-      )}
-
-      {image && (
-        <div className="image-evidence-layout"
-          style={{
-            display: 'grid',
-            gap: 16,
-            alignItems: 'start',
-          }}
-        >
-          {/* LEFT: image pane, sticky so substrate scrolls beside it */}
-          <aside className="image-evidence-media"
-            style={{
-              alignSelf: 'start',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-          >
-            {renderSrc && (
-              <a
-                href={renderSrc!}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: 'block', border: '1px solid var(--border)', lineHeight: 0 }}
-              >
-                <img
-                  src={renderSrc}
-                  alt={image.caption ? `Recorded caption: ${image.caption}` : image.file_name || 'Vehicle image'}
-                  decoding="async"
-                  onError={() => setRenditionIndex(index => index + 1)}
-                  width={1200}
-                  height={900}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    height: 'auto',
-                    maxHeight: 'calc(100vh - 120px)',
-                    objectFit: 'contain',
-                  }}
-                />
-              </a>
-            )}
-            {!renderSrc && <p role="status">{originalUrl ? 'Image rendition unavailable.' : 'Original image URL unavailable.'}</p>}
-            {image.vision_gate_agent_reasoning && (
-              <div className="evidence-metadata">
-                <strong>Stored review interpretation</strong>
-                <p>{image.vision_gate_agent_reasoning}</p>
-                <p>This prior interpretation may differ from later claim corrections. The review status does not verify the description or current vehicle state.</p>
-              </div>
-            )}
-            <div className="evidence-metadata" style={{ lineHeight: 1.5, color: 'var(--text-secondary)' }}>
-              <div>id · {image.id}</div>
-              {image.file_name && <div>file · {image.file_name}</div>}
-              {image.taken_at && <div>taken · {image.taken_at.slice(0, 19).replace('T', ' ')}</div>}
-              {image.created_at && <div>created · {image.created_at.slice(0, 19).replace('T', ' ')}</div>}
-            </div>
-
-            {/* Chain of Custody — sourced from device_attributions */}
-            <div style={{ border: '1px solid var(--border)', padding: '6px 8px' }}>
-              <div style={{ fontWeight: 700, borderBottom: '1px solid var(--border)', paddingBottom: 2, marginBottom: 4 }}>
-                Device metadata
-              </div>
-              {attributionStatus === 'pending' && <p role="status">Reading device metadata…</p>}
-              {attributionStatus === 'unavailable' && <p role="status">Device metadata unavailable. Its absence has not been established.</p>}
-              {attributionStatus === 'ready' && (attribution ? (
-                <div style={{ lineHeight: 1.5, color: 'var(--text)' }}>
-                  {(attribution.camera_make || attribution.camera_model) && (
-                    <div>device · {[attribution.camera_make, attribution.camera_model].filter(Boolean).join(' ')}</div>
-                  )}
-                  {attribution.camera_serial && <div>serial · {attribution.camera_serial}</div>}
-                  {attribution.software && <div>software · {attribution.software}</div>}
-                  {attribution.datetime_original && (
-                    <div>shot · {String(attribution.datetime_original).slice(0, 19).replace('T', ' ')}</div>
-                  )}
-                  {attribution.latitude != null && attribution.longitude != null && (
-                    <div>gps · {attribution.latitude.toFixed(5)}, {attribution.longitude.toFixed(5)}</div>
-                  )}
-                  {attribution.extraction_method && (
-                    <div>method · {attribution.extraction_method}</div>
-                  )}
-                  {attribution.confidence_score != null && (
-                    <div>confidence · {attribution.confidence_score}%</div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ color: 'var(--text-secondary)' }}>
-                  <div>No visible device metadata returned. Device identity is unknown.</div>
-                  {image.source && <div>source · {image.source}</div>}
-                </div>
-              ))}
-            </div>
-          </aside>
-
-          {/* RIGHT: substrate pane */}
-          <div style={{ minWidth: 0 }}>
-          {witnessStatus === 'pending' && <p role="status">Reading observation links…</p>}
-          {witnessStatus === 'unavailable' && <p role="status">Observation links unavailable. Their absence has not been established.</p>}
-          {witnessed.length > 0 && (
-            <section style={{ marginBottom: 16 }}>
-              <h2
-                style={{
-                  fontWeight: 700,
-                  margin: '0 0 4px',
-                  paddingBottom: 2,
-                  borderBottom: '1px solid var(--border)',
-                }}
-              >
-                Recorded vehicle observation links · {witnessed.length}
-              </h2>
-              <div style={{ marginBottom: 4 }}>One observation can have several source roles. Independent support remains unassessed.</div>
-              <div style={{ border: '1px solid var(--border)' }}>
-                {witnessed.map((w, i) => (
-                  <Link
-                    key={`${w.id}:${w.witness_role}`}
-                    className="evidence-witness-row"
-                    to={`/vehicle/${w.vehicle_id}/observation/${w.id}`}
-                    style={{
-                      display: 'grid',
-                      gap: 8,
-                      padding: '6px 8px',
-                      color: 'var(--text)',
-                      textDecoration: 'none',
-                      borderTop: i === 0 ? 'none' : '1px solid var(--text-disabled, #ddd)',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ color: 'var(--text-secondary)' }}>
-                      {w.observed_at ? w.observed_at.slice(0, 10) : '—'}
-                    </span>
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        border: '1px solid var(--text, #1a1a1a)',
-                        padding: '1px 4px',
-                        textAlign: 'center',
-                      }}
-                    >
-                      {w.kind}
-                    </span>
-                    <span>
-                      {w.part_number || w.vendor || ''}
-                    </span>
-                    <span>
-                      {w.content_text || '—'}
-                    </span>
-                    <span style={{ color: 'var(--text-secondary)', textAlign: 'right' }}>
-                      {w.witness_role}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {detailError && <div className="evidence-read-notice"><p role="status">Record details could not be read completely. Coverage is unknown.</p></div>}
-          {(detailError || witnessStatus === 'unavailable' || attributionStatus === 'unavailable' || !!substrate?.unavailableRelations.length) && <Button type="button" variant="secondary" disabled={loading} onClick={() => setReadAttempt(value => value + 1)}>Retry details</Button>}
-          {loading && !substrate && <p role="status">Reading record details…</p>}
-          {substrate && (
-            <section style={{ marginTop: 32 }}>
-              <h2
-                style={{
-                  fontWeight: 700,
-                  margin: '0 0 4px',
-                  paddingBottom: 2,
-                  borderBottom: '1px solid var(--border)',
-                }}
-              >
-                Substrate · raw database rows touching this image
-              </h2>
-              <div
-                style={{
-                  color: 'var(--text-secondary)',
-                  margin: '4px 0 12px',
-                }}
-              >
-                Visible image and source rows returned by bounded reads, in native shape. Vehicle context is limited to identity fields. Read limits and permissions can restrict this view; it does not establish complete evidence coverage.
-              </div>
-              {(['vehicle_images', 'observation_witnesses', 'vehicle_observations',
-                'observation_discoveries', 'observation_sources', 'vehicles'] as const).map(name => (
-                <SubstrateTable key={name} name={name === 'vehicles' ? 'vehicles · identity fields' : name} rows={substrate[name]} unavailable={substrate.unavailableRelations.includes(name)} />
-              ))}
-            </section>
-          )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const src = renditions[rendition] ?? null;
+  const retry = () => setAttempt(value => value + 1);
+  const toggleZoom = () => { setZoomed(value => !value); viewport.current?.scrollTo?.({ left: 0, top: 0 }); };
+  return <main className="source-photo-page">
+    <header className="source-photo-bar">
+      <Link to={vehicleId ? `/vehicle/${vehicleId}` : '/vehicles'}>← {label}</Link>
+      {taken && <Text role="caption" as="span"><time dateTime={photo!.taken_at!}>Taken {taken}</time></Text>}
+      {phase === 'ready' && src && <Button type="button" variant="secondary" aria-pressed={zoomed}
+        onClick={toggleZoom}>{zoomed ? 'Fit photo' : 'Zoom in'}</Button>}
+    </header>
+    {phase === 'loading' && <Text role="caption" as="p" aria-live="polite">Loading photo…</Text>}
+    {phase === 'unavailable' && <div className="source-photo-message"><p>Photo unavailable.</p><Button variant="secondary" onClick={retry}>Try again</Button></div>}
+    {phase === 'error' && <div className="source-photo-message"><p role="alert">Couldn’t load this photo.</p><Button variant="secondary" onClick={retry}>Try again</Button></div>}
+    {phase === 'replaced' && <div className="source-photo-message"><p>This photo is no longer current.</p>
+      {replacement && <Link to={`/vehicle/${vehicleId}/image/${replacement}`}>View replacement photo</Link>}</div>}
+    {phase === 'ready' && <>
+      {src ? <div ref={viewport} className={`source-photo-viewport${zoomed ? ' is-zoomed' : ''}`}
+        role="region" aria-label="Photo viewer" tabIndex={zoomed ? 0 : -1}
+        onKeyDown={event => { if (event.key === 'Escape') setZoomed(false); }}>
+        <button type="button" className="source-photo-zoom" onClick={toggleZoom}
+          aria-label={zoomed ? 'Fit photo to screen' : 'Zoom into photo'}>
+          <img src={src} alt={`Photo of ${label}`} width={1200} height={900} decoding="async"
+            onError={() => { setRendition(index => index + 1); setZoomed(false); }} />
+        </button>
+      </div> : <div className="source-photo-message"><p role="alert">Photo couldn’t be displayed.</p><Button variant="secondary" onClick={retry}>Try again</Button></div>}
+      {links.length > 0 && <nav className="source-photo-references" aria-label="Related records">
+        {links.map(link => <Link key={link.id} to={`/vehicle/${vehicleId}/observation/${link.id}`}>
+          {link.label}{link.at ? ` · ${link.at}` : ''}</Link>)}
+      </nav>}
+      {linksFailed && <Button variant="secondary" onClick={retry}>Retry related records</Button>}
+    </>}
+  </main>;
 };
 
-// SubstrateTable: render any [{...}, {...}] as a literal table with the
-// union of columns as headers. JSONB values render as pretty-printed JSON
-// in-cell so the structure is visible without click ceremony. The goal is
-// not aesthetic — it's *transparency*. The shape on the screen should match
-// the shape in postgres.
-const SubstrateTable: React.FC<{ name: string; rows: Record<string, unknown>[]; unavailable?: boolean }> = ({ name, rows, unavailable }) => {
-  if (unavailable || !rows || rows.length === 0) {
-    return (
-      <div
-        style={{
-          marginBottom: 12,
-          border: '1px solid var(--border)',
-          padding: 8,
-          color: 'var(--text-secondary)',
-        }}
-      >
-        <div style={{ fontWeight: 700, color: 'var(--text)' }}>{name}</div>
-        <div>{unavailable ? 'Read unavailable' : '0 rows returned'}</div>
-      </div>
-    );
-  }
-
-  const cols = Array.from(rows.reduce<Set<string>>((acc, r) => {
-    Object.keys(r).forEach((k) => acc.add(k));
-    return acc;
-  }, new Set<string>()));
-
-  return (
-    <div className="evidence-substrate" style={{ marginBottom: 16 }}>
-      <div
-        style={{
-          fontWeight: 700,
-          marginBottom: 2,
-        }}
-      >
-        {name} · {rows.length} row{rows.length === 1 ? '' : 's'}
-      </div>
-      <div className="evidence-table-scroll" role="region" aria-label={`${name} returned rows`} tabIndex={0} style={{ overflowX: 'auto', border: '1px solid var(--border)' }}>
-        <table
-          style={{
-            borderCollapse: 'collapse',
-            minWidth: '100%',
-          }}
-        >
-          <thead>
-            <tr style={{ background: 'var(--surface-secondary)', color: 'var(--text)' }}>
-              {cols.map((c) => (
-                <th
-                  key={c}
-                  style={{
-                    textAlign: 'left',
-                    padding: '4px 8px',
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                    borderRight: '1px solid var(--border)',
-                  }}
-                >
-                  {c}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr
-                key={i}
-                style={{
-                  borderTop: i === 0 ? 'none' : '1px solid var(--text-disabled, #ddd)',
-                  verticalAlign: 'top',
-                }}
-              >
-                {cols.map((c) => {
-                  const v = r[c];
-                  const isObj = v !== null && typeof v === 'object';
-                  const display = v === null || v === undefined
-                    ? 'NULL'
-                    : isObj
-                      ? JSON.stringify(v, null, 2)
-                      : String(v);
-                  return (
-                    <td
-                      key={c}
-                      style={{
-                        padding: 0,
-                        borderRight: '1px solid var(--text-disabled, #eee)',
-                        maxWidth: isObj ? 520 : 360,
-                        verticalAlign: 'top',
-                        color: v === null || v === undefined ? 'var(--text-secondary, #999)' : 'var(--text)',
-                        fontStyle: v === null || v === undefined ? 'italic' : 'normal',
-                      }}
-                      title={isObj ? undefined : display}
-                    >
-                      <div
-                        style={{
-                          padding: '4px 8px',
-                          maxHeight: 180,
-                          overflow: 'auto',
-                          whiteSpace: 'pre-wrap',
-                          overflowWrap: 'anywhere',
-                          textOverflow: isObj ? 'clip' : 'ellipsis',
-                        }}
-                      >
-                        {display}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
-
-// Remount local reader state at the viewer/subject boundary; a token refresh for
-// the same user leaves the current inspection intact.
+/** Never carry a prior viewer's image across sign-out or a subject change. */
 const ImagePage: React.FC = () => {
   const { user, loading } = useAuth();
   const { vehicleId, imageId } = useParams();
-  if (loading) return <main className="evidence-detail"><p role="status">Checking access…</p></main>;
+  if (loading) return <main className="source-photo-page"><Text role="caption" as="p">Loading photo…</Text></main>;
   return <ImagePageContent key={`${user?.id || 'public'}:${vehicleId}:${imageId}`} />;
 };
-
 export default ImagePage;
