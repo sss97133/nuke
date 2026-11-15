@@ -1,0 +1,93 @@
+import importlib.util
+import json
+from pathlib import Path
+import sqlite3
+import tempfile
+import unittest
+
+spec = importlib.util.spec_from_file_location('census', Path(__file__).with_name('iphoto-census.py'))
+census = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(census)
+
+
+class MetadataSnapshotTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(self.temp.name) / 'Photos.sqlite'
+        with sqlite3.connect(self.path) as db:
+            db.execute('CREATE TABLE Z_METADATA (Z_UUID TEXT)')
+            db.execute("INSERT INTO Z_METADATA VALUES ('fixture-store')")
+            db.execute('CREATE TABLE ZASSET (ZUUID TEXT,ZKIND INTEGER,ZHIDDEN INTEGER,ZTRASHEDSTATE INTEGER,ZDATECREATED REAL,ZMODIFICATIONDATE REAL,ZLATITUDE REAL,ZLONGITUDE REAL)')
+            db.executemany('INSERT INTO ZASSET VALUES (?,?,?,?,?,?,?,?)', [
+                ('a', 0, 0, 0, 100, 200, None, None),
+                ('b', 0, 0, 0, 100, 201, 35, -114),
+                ('movie', 1, 0, 0, 300, 400, -180, -180),
+                ('hidden', 0, 1, 0, 100, 200, 35, -114),
+                ('trashed', 0, 0, 1, 100, 200, 35, -114),
+                ('unknown-visibility', 0, None, 0, 100, 200, 35, -114)])
+
+    def test_visible_inventory_keeps_video_and_same_time_sources_without_cloud_claim(self):
+        before = self.path.read_bytes()
+        d = census.metadata_snapshot(self.path)
+        s = d['snapshot']
+        self.assertEqual([a['id'] for a in s['assets']], ['a', 'b', 'movie'])
+        self.assertEqual(s['declaredAssetCount'], 3)
+        self.assertEqual(s['mediaCoverage']['knownVideosOutsideSelector'], 1)
+        self.assertEqual(s['enumeration']['excludedRows'], 3)
+        self.assertEqual(s['enumeration']['iCloudCompleteness'], 'not_measured')
+        self.assertEqual(s['enumeration']['photoKitPermission'], 'not_measured')
+        self.assertIsNone(s['assets'][2]['latitude'])
+        self.assertEqual(d['sourceFacts'], {})
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(census.metadata_snapshot(self.path)['snapshot']['snapshotId'], s['snapshotId'])
+
+    def test_version_change_changes_snapshot_but_not_source_identity(self):
+        before = census.metadata_snapshot(self.path)
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE ZASSET SET ZMODIFICATIONDATE=202 WHERE ZUUID='a'")
+        after = census.metadata_snapshot(self.path)
+        self.assertNotEqual(before['snapshot']['snapshotId'], after['snapshot']['snapshotId'])
+        self.assertEqual(before['snapshot']['assets'][0]['id'], after['snapshot']['assets'][0]['id'])
+
+    def test_null_clock_and_version_are_unknown(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE ZASSET SET ZMODIFICATIONDATE=NULL,ZDATECREATED=NULL WHERE ZUUID='a'")
+        a = census.metadata_snapshot(self.path)['snapshot']['assets'][0]
+        self.assertIsNone(a['sourceVersion'])
+        self.assertIsNone(a['captureAt'])
+
+    def test_bound_and_unsupported_kind_refuse_without_partial_inventory(self):
+        with self.assertRaisesRegex(ValueError, 'exceeds explicit bound'):
+            census.metadata_snapshot(self.path, 2)
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE ZASSET SET ZKIND=9 WHERE ZUUID='a'")
+        with self.assertRaisesRegex(ValueError, 'unsupported visible media'):
+            census.metadata_snapshot(self.path)
+
+    def test_duplicate_id_refuses_and_hidden_id_cannot_be_seeded(self):
+        d = census.metadata_snapshot(self.path)
+        with self.assertRaisesRegex(ValueError, 'seed missing'):
+            census.discovery_input(d, {'targetVehicleId': 'vehicle', 'timeZoneIdentifier': 'UTC', 'seedAssetIds': ['hidden']})
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE ZASSET SET ZUUID='a' WHERE ZUUID='b'")
+        with self.assertRaisesRegex(ValueError, 'duplicate source UUID'):
+            census.metadata_snapshot(self.path)
+
+    def test_native_input_is_only_images_with_no_invented_label_or_filing(self):
+        d = census.discovery_input(census.metadata_snapshot(self.path),
+            {'targetVehicleId': 'vehicle', 'timeZoneIdentifier': 'UTC', 'seedAssetIds': ['a']})
+        self.assertEqual([a['id'] for a in d['assets']], ['a', 'b'])
+        self.assertTrue(all(a['labels'] == [] and a['exactVehicleIds'] == [] and a['filedVehicleId'] is None for a in d['assets']))
+
+    def test_new_private_receipt_never_overwrites_checkpoint(self):
+        path = Path(self.temp.name) / 'snapshot.json'
+        census.write_private_json(path, {'version': 1})
+        with self.assertRaises(FileExistsError):
+            census.write_private_json(path, {'version': 2})
+        self.assertEqual(json.loads(path.read_text()), {'version': 1})
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+
+if __name__ == '__main__':
+    unittest.main()

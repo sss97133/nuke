@@ -63,7 +63,9 @@ jobs:
         run: node --test scripts/guardrails/no-raw-fetch.test.mjs
 
       - name: Reviewed photo intake replay and source custody
-        run: node --test scripts/lib/ingest-image-identity-payload.test.mjs
+        run: |
+          node --test scripts/lib/ingest-image-identity-payload.test.mjs
+          python3 -m unittest discover -s scripts/assays -p 'test_iphoto_census.py'
 
       - name: Edge deploy list includes importers of changed shared files
         run: node --test scripts/ci/functions-to-deploy.test.mjs

@@ -62,10 +62,13 @@ def build(document):
     snapshot = document.get("snapshot")
     require(isinstance(snapshot, dict), "snapshot is required")
     source_scope = snapshot.get("sourceScope", "photos_permission_snapshot")
-    require(source_scope in ("photos_permission_snapshot", "retained_capture"), "invalid sourceScope")
+    require(source_scope in ("photos_permission_snapshot", "retained_capture", "local_photos_database"), "invalid sourceScope")
     if source_scope == "retained_capture":
         require(snapshot.get("sourceVersionBasis") == "retained_provenance_sha256"
                 and snapshot.get("accessScope") == "sample", "retained capture must declare bounded version basis")
+    if source_scope == "local_photos_database":
+        require(snapshot.get("sourceVersionBasis") == "local_modification_hint"
+                and snapshot.get("accessScope") == "sample", "local database must declare bounded version basis")
     require(isinstance(snapshot.get("snapshotId"), str) and snapshot["snapshotId"], "snapshotId is required")
     require(isinstance(snapshot.get("sourceNamespace"), str) and snapshot["sourceNamespace"],
             "sourceNamespace is required")
@@ -114,6 +117,14 @@ def build(document):
 
     facts = document.get("sourceFacts", {})
     require(isinstance(facts, dict) and set(facts).issubset({a["id"] for a in assets}), "sourceFacts outside snapshot")
+    retained_refs = document.get("retainedCaptureReferences", {})
+    require(isinstance(retained_refs, dict) and set(retained_refs).issubset(versions_by_id),
+            "retained references outside snapshot")
+    for refs in retained_refs.values():
+        require(isinstance(refs, list) and all(isinstance(r, dict)
+                and r.get("relation") == "same_asset_uuid_candidate"
+                and r.get("currentSourceVersionVerified") is False and sha(r.get("manifestSha256"))
+                for r in refs), "retained references cannot assert current source version")
     prior = document.get("priorSourceIds", [])
     require(isinstance(prior, list) and len(prior) == len(set(prior)), "priorSourceIds must be unique")
     require(all(isinstance(x, str) and x for x in prior), "priorSourceIds must be strings")
@@ -243,6 +254,7 @@ def build(document):
         if sid in candidate_by_id:
             reasons.append("discovery_candidate_not_filing")
         rows.append({"sourceId": sid, "sourceVersion": version, "mediaKind": kind,
+                     "retainedCaptureReferences": retained_refs.get(sid, []),
                      "captureAt": asset.get("captureAt"), "hasGPS": has_gps,
                      "candidateReasons": sorted(set(candidate_by_id.get(sid, {}).get("reasons", []))),
                      "recordedFilingStatus": filing_status if filing_current else "unverified",
@@ -273,6 +285,7 @@ def build(document):
     proposals.sort(key=lambda p: p["sourceId"])
     counts = dict(sorted(Counter(row["disposition"] for row in rows).items()))
     result = {"schemaVersion": 1, "snapshotId": snapshot["snapshotId"], "intendedUse": intended_use,
+              "observedAt": snapshot["observedAt"], "enumeration": snapshot.get("enumeration"),
               "sourceScope": source_scope, "sourceVersionBasis": snapshot.get("sourceVersionBasis"),
               "sourceNamespace": snapshot["sourceNamespace"],
               "snapshotSha256": snapshot_hash, "accessScope": snapshot["accessScope"],

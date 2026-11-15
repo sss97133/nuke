@@ -90,3 +90,37 @@ must refresh it and writers must still enforce their own atomic guards. It has a
 25-source and 120-second bound, with the CLI's 15-second per-request timeout. It
 cannot establish full-library coverage, and intentionally does not modify the
 original PhotoKit metadata replay or any spent execution checkpoint.
+
+
+## Local metadata inventory and native retrieval
+
+The existing `scripts/assays/iphoto-census.py` accepts an explicit read-only
+`--metadata-database` and new private `--snapshot-output`. It does not import
+osxphotos, read pixels, query the server, record a census, or write to Photos.
+Its 30-second transaction and explicit source bound produce a consistent
+visible-source inventory, including videos. Missing/duplicate IDs, unsupported
+media kinds and schema drift refuse the export instead of silently reducing the
+denominator. Hidden/deleted/unknown-visibility rows are excluded before IDs leave
+the database. Local metadata, labels and coordinates never leave the local files.
+
+Optional `--discovery-config` and `--discovery-output` reuse only the selected
+vehicle, timezone and seed IDs from an existing native input. The complete new
+image set feeds the existing Foundation selector. Its exact-byte fingerprint is
+then checked by `native_disposition_adapter.py --source-snapshot <snapshot>`;
+the adapter also checks that the native image input matches the source export,
+retains videos outside that image-only selector, and preserves the local scope.
+
+The resulting `sourceScope: local_photos_database` uses a stable store namespace
+and a `local_modification_hint` version basis. `accessScope: sample` deliberately
+does not claim full PhotoKit permission or iCloud synchronization. The enumeration
+states completeness only within this local database; original bytes, privacy
+review, relevant-vehicle membership and cloud coverage remain separate questions.
+No labels or vehicle associations are invented from metadata.
+
+An optional `--retained-disposition` keeps fingerprint-verified retained-capture
+readbacks discoverable by matching asset UUIDs. These references explicitly say
+`same_asset_uuid_candidate` and `currentSourceVersionVerified: false`. They do not
+supply original bytes, privacy clearance, filing or admission selection to the
+local source, or prove ownership of a Photos library. Their retained namespace,
+version, result and observation time remain visible. Thus an already filed preview
+can remain discoverable while its current original is still unverified.

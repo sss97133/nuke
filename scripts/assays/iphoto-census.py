@@ -16,8 +16,106 @@ become the census taker).
 Run (dry run prints, --write records):
   cd ~/nuke && dotenvx run -- /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 \
       scripts/assays/iphoto-census.py --user-id <owner uuid> [--write]
+
+Local metadata-only mode (no remote census, import of osxphotos or write):
+  python3 scripts/assays/iphoto-census.py --metadata-database /private/Photos.sqlite \
+      --snapshot-output /private/new-snapshot.json \
+      --discovery-config /private/existing-native-input.json --discovery-output /private/new-native-input.json
+The optional discovery config supplies only targetVehicleId, timezone and explicit
+seedAssetIds. Its old assets are not reused. Feed the new native input through the
+existing compiled discover-library-candidates selector, then pass its exact input
+and output to native_disposition_adapter.py with --source-snapshot new-snapshot.json.
+Do not mistake this local database boundary for full iCloud or PhotoKit permission coverage.
 """
-import argparse, collections, datetime as dt, json, os, urllib.error, urllib.parse, urllib.request
+import argparse, collections, datetime as dt, hashlib, json, math, os, sqlite3, time, urllib.error, urllib.parse, urllib.request
+from pathlib import Path
+
+
+def metadata_snapshot(database, max_assets=100000):
+    """Private local metadata only: no osxphotos, pixels, cloud request or capture matching.
+
+    The local database is a source boundary, not proof of iCloud completeness or
+    the native app's PhotoKit permission scope. Hidden/deleted IDs never leave it.
+    """
+    if type(max_assets) is not int or not 1 <= max_assets <= 250000:
+        raise ValueError('max_assets must be between 1 and 250000')
+    started = time.monotonic()
+    observed = dt.datetime.now(dt.timezone.utc).isoformat()
+    db = sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True, timeout=5)
+    db.execute('PRAGMA query_only=ON')
+    db.set_progress_handler(lambda: int(time.monotonic() - started > 30), 10000)
+    def clock(value):
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            return None
+        try:
+            return (dt.datetime(2001, 1, 1, tzinfo=dt.timezone.utc) + dt.timedelta(seconds=value)).isoformat()
+        except (ValueError, OverflowError):
+            return None
+    try:
+        db.execute('BEGIN')
+        columns = {r[1] for r in db.execute('PRAGMA table_info(ZASSET)')}
+        required = {'ZUUID', 'ZKIND', 'ZHIDDEN', 'ZTRASHEDSTATE', 'ZDATECREATED', 'ZMODIFICATIONDATE', 'ZLATITUDE', 'ZLONGITUDE'}
+        if not required <= columns:
+            raise ValueError('unsupported Photos metadata schema: missing ' + ','.join(sorted(required - columns)))
+        metadata = db.execute('SELECT Z_UUID FROM Z_METADATA').fetchall()
+        if len(metadata) != 1 or not isinstance(metadata[0][0], str) or not metadata[0][0]:
+            raise ValueError('unambiguous local Photos store namespace required')
+        controls = db.execute('SELECT ZHIDDEN,ZTRASHEDSTATE,count(*) FROM ZASSET GROUP BY ZHIDDEN,ZTRASHEDSTATE').fetchall()
+        declared = sum(n for hidden, trashed, n in controls if hidden == 0 and trashed == 0)
+        if declared > max_assets:
+            raise ValueError(f'visible source count {declared} exceeds explicit bound {max_assets}')
+        assets, ids, kinds = [], set(), collections.Counter()
+        rows = db.execute('''SELECT ZUUID,ZKIND,ZDATECREATED,ZMODIFICATIONDATE,ZLATITUDE,ZLONGITUDE
+                             FROM ZASSET WHERE ZHIDDEN=0 AND ZTRASHEDSTATE=0 ORDER BY ZUUID''')
+        for sid, kind, captured, modified, lat, lon in rows:
+            if not isinstance(sid, str) or not sid or sid in ids:
+                raise ValueError('missing or duplicate source UUID')
+            if kind not in (0, 1):
+                raise ValueError(f'unsupported visible media kind {kind}; do not silently omit it')
+            ids.add(sid); kinds[kind] += 1
+            valid_gps = (type(lat) in (float, int) and type(lon) in (float, int)
+                         and math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 < lon <= 180)
+            version = ('photos_sqlite_modification_seconds:' + repr(modified)) if clock(modified) is not None else None
+            assets.append({'id': sid, 'sourceVersion': version, 'mediaKind': 'image' if kind == 0 else 'video',
+                           'captureAt': clock(captured), 'captureClockBasis': 'local_photos_database_creation_date',
+                           'latitude': lat if valid_gps else None, 'longitude': lon if valid_gps else None,
+                           'labels': [], 'exactVehicleIds': [], 'filedVehicleId': None, 'isPersonal': False})
+        if len(assets) != declared:
+            raise ValueError('source enumeration changed within snapshot')
+        identity = hashlib.sha256(json.dumps(assets, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+        return {'schemaVersion': 1, 'intendedUse': 'vehicle_gallery', 'snapshot': {
+            'snapshotId': 'local-photos:' + identity, 'sourceNamespace': 'photos_sqlite_store:' + metadata[0][0],
+            'sourceScope': 'local_photos_database', 'sourceVersionBasis': 'local_modification_hint',
+            'observedAt': observed, 'accessScope': 'sample', 'declaredAssetCount': declared,
+            'mediaCoverage': {'imagesEnumerated': True, 'videosEnumerated': True, 'knownVideosOutsideSelector': kinds[1]},
+            'enumeration': {'completeWithinLocalDatabase': True, 'photoKitPermission': 'not_measured',
+                            'iCloudCompleteness': 'not_measured', 'privacyClassification': 'not_supplied',
+                            'excludedRows': sum(n for hidden, trashed, n in controls if hidden != 0 or trashed != 0)},
+            'assets': assets}, 'sourceFacts': {}, 'candidates': [], 'priorSourceIds': []}
+    finally:
+        db.close()
+
+
+def discovery_input(snapshot, config):
+    """Use the existing native selector; no new relevance vocabulary or filing rule."""
+    for key in ('targetVehicleId', 'timeZoneIdentifier'):
+        if not isinstance(config.get(key), str) or not config[key]:
+            raise ValueError('discovery config requires ' + key)
+    assets = [a for a in snapshot['snapshot']['assets'] if a['mediaKind'] == 'image']
+    seeds = config.get('seedAssetIds', [])
+    if not isinstance(seeds, list) or any(not isinstance(x, str) for x in seeds) or len(set(seeds)) != len(seeds):
+        raise ValueError('discovery seeds must be unique source IDs')
+    if not set(seeds) <= {a['id'] for a in assets}:
+        raise ValueError('discovery seed missing from visible image snapshot')
+    return {'assets': assets, 'targetVehicleId': config['targetVehicleId'],
+            'timeZoneIdentifier': config['timeZoneIdentifier'], 'seedAssetIds': seeds}
+
+
+def write_private_json(path, value):
+    # O_EXCL preserves prior checkpoints and frozen source receipts.
+    with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as out:
+        json.dump(value, out, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        out.write('\n')
 
 # Apple on-device scene labels that suggest a vehicle. Broad on purpose ("machine", "wheel"), so the
 # count is an upper bound, not a measure of automotive relevance.
@@ -102,8 +200,29 @@ def match(keys, rows):
     return {"captured": cap, "captured_on_a_vehicle": cap_veh, "captured_vehicle_label": cap_car}
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("--user-id", required=True); ap.add_argument("--write", action="store_true")
+    ap = argparse.ArgumentParser(); ap.add_argument("--user-id"); ap.add_argument("--write", action="store_true")
+    ap.add_argument('--metadata-database', type=Path)
+    ap.add_argument('--snapshot-output', type=Path)
+    ap.add_argument('--max-assets', type=int, default=100000)
+    ap.add_argument('--discovery-config', type=Path)
+    ap.add_argument('--discovery-output', type=Path)
     a = ap.parse_args()
+    if a.metadata_database or a.snapshot_output or a.discovery_config or a.discovery_output:
+        if not a.metadata_database or not a.snapshot_output or a.write or bool(a.discovery_config) != bool(a.discovery_output):
+            ap.error('metadata mode requires database and new snapshot output, optional paired discovery config/output, and refuses --write')
+        for output in (a.snapshot_output, a.discovery_output):
+            if output and output.exists():
+                ap.error('output already exists: ' + str(output))
+        snapshot = metadata_snapshot(a.metadata_database, a.max_assets)
+        discovery = discovery_input(snapshot, json.loads(a.discovery_config.read_text())) if a.discovery_config else None
+        write_private_json(a.snapshot_output, snapshot)
+        if discovery is not None:
+            write_private_json(a.discovery_output, discovery)
+        print(json.dumps({'mode': 'read_only_local_metadata', 'assets': snapshot['snapshot']['declaredAssetCount'],
+                          'sourceScope': 'local_photos_database', 'sourceProposals': 0}))
+        raise SystemExit(0)
+    if not a.user_id:
+        ap.error('--user-id is required for the existing remote census mode')
     c, by_year, keys = library_census()
     rows, failed = owner_rows(a.user_id)
     m = match(keys, rows)
