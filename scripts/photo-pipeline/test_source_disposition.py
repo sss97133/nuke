@@ -33,6 +33,18 @@ def qualified(sha=H1):
 
 
 class SourceDispositionTests(unittest.TestCase):
+    def test_local_database_keeps_its_scope_and_cannot_claim_full_permission(self):
+        d = document([asset("local")])
+        d["snapshot"].update(sourceScope="local_photos_database", sourceVersionBasis="local_modification_hint",
+                             enumeration={"completeWithinLocalDatabase": True, "photoKitPermission": "not_measured"})
+        result = build(d)
+        self.assertEqual(result["sourceScope"], "local_photos_database")
+        self.assertEqual(result["observedAt"], d["snapshot"]["observedAt"])
+        self.assertEqual(result["enumeration"]["photoKitPermission"], "not_measured")
+        d["snapshot"]["accessScope"] = "full"
+        with self.assertRaisesRegex(ValueError, "bounded version basis"):
+            build(d)
+
     def test_retained_capture_cannot_claim_original_or_admission(self):
         d = document([asset("preview")])
         d["snapshot"].update(sourceScope="retained_capture", sourceVersionBasis="retained_provenance_sha256")
