@@ -33,6 +33,18 @@ final class PhotoAlbumLedgerTests: XCTestCase {
             isVehicle: vehicle, hasPerson: false, labelsJSON: "[\"car\"]", vinCandidatesJSON: "[]", textLinesJSON: "[\"SYNTHETIC12345\"]")
     }
 
+    func testSeededCoverageUsesDisplayedCandidatesRatherThanOriginalAlbum() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        let neighbor = LocalAlbumPhoto(localIdentifier: "nearby-unread", sourceVersion: "v1")
+        try store.recordAlbumImageReview(review(photo))
+        let original = album(photos: [photo])
+        let seeded = LocalAlbumCoverageScope.choose(album: original, displayedPhotos: [neighbor], seeded: true)
+        let ordinary = LocalAlbumCoverageScope.choose(album: original, displayedPhotos: [neighbor], seeded: false)
+        XCTAssertEqual(seeded.photos, [neighbor])
+        XCTAssertEqual(try store.albumCoverage(seeded, methodVersion: method).reviewed, 0)
+        XCTAssertEqual(try store.albumCoverage(ordinary, methodVersion: method).reviewed, 1)
+    }
+
     func testHumanHistoryRetainsRenameMembershipChangesAndReturningState() throws {
         let queue = try DatabaseQueue()
         let store = try LocalStore(databaseQueue: queue)
@@ -215,9 +227,23 @@ final class PhotoAlbumLedgerTests: XCTestCase {
         XCTAssertEqual(evidence.photos.count, 2)
         XCTAssertEqual(evidence.reviewed, 1)
         XCTAssertEqual(evidence.matched, 1)
+        XCTAssertEqual(evidence.unresolved, 1)
+        XCTAssertEqual(evidence.sourceInventoryCount, 2)
         XCTAssertEqual(evidence.photos.first { $0.photo == ungrouped }?.candidateVehicleIds, [])
         XCTAssertNil(evidence.photos.first { $0.photo == photo }?.takenAt)
         XCTAssertEqual(evidence.catalog.albums.count, 2)
+    }
+
+    func testFullyMatchedInventoryHasNoUnresolvedIdentityButRemainsInSourceDoor() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue())
+        try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: [album()], photos: [photo]))
+        try store.recordAlbumImageReview(review(photo))
+        store.cacheGarage(userId: "account", vehicles: [vehicle("one")])
+        let evidence = try XCTUnwrap(store.profileEvidence(userId: "account", methodVersion: method))
+        XCTAssertEqual(evidence.matched, 1)
+        XCTAssertEqual(evidence.conflicted, 0)
+        XCTAssertEqual(evidence.unresolved, 0)
+        XCTAssertEqual(evidence.sourceInventoryCount, 1)
     }
 
     func testSerialConflictAndChangedSourceRemainOpenWithoutInheritedAssignment() throws {
@@ -229,12 +255,14 @@ final class PhotoAlbumLedgerTests: XCTestCase {
         var evidence = try XCTUnwrap(store.profileEvidence(userId: "account", methodVersion: method))
         XCTAssertEqual(evidence.conflicted, 1)
         XCTAssertEqual(evidence.matched, 0)
+        XCTAssertEqual(evidence.unresolved, 0)
+        XCTAssertEqual(evidence.sourceInventoryCount, 1)
         XCTAssertEqual(evidence.photos[0].candidateVehicleIds, ["one", "two"])
         store.cacheGarage(userId: "account", vehicles: [vehicle("one", vin: "OTHER123456789")])
         store.cacheCloudVerdict(localIdentifier: photo.localIdentifier, narrative: "Existing assignment",
             intent: "labor", scene: nil, confidence: 1, buildPhase: nil, vehicleId: "one", agentModel: "model", analyzedAt: Date())
         evidence = try XCTUnwrap(store.profileEvidence(userId: "account", methodVersion: method))
-        XCTAssertEqual(evidence.unresolved, 1)
+        XCTAssertEqual(evidence.unresolved, 0)
         XCTAssertEqual(evidence.matched, 0)
         let edited = LocalAlbumPhoto(localIdentifier: photo.localIdentifier, sourceVersion: "source-v2")
         try store.recordAlbumCatalog(LocalAlbumCatalog(accessScope: "full", observedAt: Date(), albums: [], photos: [edited]))

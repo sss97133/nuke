@@ -174,6 +174,10 @@ struct LibraryAlbumsView: View {
     @ObservedObject private var ingest = LibraryIngest.shared
     @Environment(\.dismiss) private var dismiss
     @State private var evidence: LocalProfileEvidence?
+    @State private var workPoolCount = 0
+    @State private var discoveryAnchorIds: Set<String> = []
+    @State private var exactSerialCounts: [String: Int] = [:]
+    @State private var evidenceReloadGeneration = 0
 
     var body: some View {
         NavigationStack {
@@ -206,6 +210,33 @@ struct LibraryAlbumsView: View {
                 }
                 if let error = store.albumError { Section { Text(error).foregroundStyle(.secondary) } }
                 if store.refreshingAlbums && store.albumCatalog == nil { Section { ProgressView("Reading albums…") } }
+                if workPoolCount > 0 {
+                    Section("Source work candidates") {
+                        NavigationLink {
+                            LibraryAlbumPhotosView(userId: userId, workPool: true)
+                        } label: {
+                            LabeledContent("Work-tagged photos to review", value: workPoolCount.formatted())
+                        }
+                        Text("On-device tags suggest work. These photos are not filed to a vehicle. Videos are outside this image inventory.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if let evidence {
+                    let anchored = evidence.vehicles.filter { discoveryAnchorIds.contains($0.id) }
+                    if !anchored.isEmpty {
+                        Section("Vehicle context candidates") {
+                            ForEach(anchored) { vehicle in
+                                NavigationLink {
+                                    LibraryAlbumPhotosView(userId: userId, discoveryVehicleId: vehicle.id)
+                                } label: {
+                                    Text(vehicle.title)
+                                }
+                            }
+                            Text("An exact serial read starts a workday search. A recorded local association remains a review clue, not a filing decision.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
                 Section {
                     DisclosureGroup("Reading details") {
                         if let evidence, let total = evidence.catalog.photos?.count {
@@ -216,23 +247,23 @@ struct LibraryAlbumsView: View {
                             LabeledContent("Awaiting read", value: (total - evidence.reviewed).formatted())
                         }
                         if let evidence {
-                            let supported = evidence.vehicles.filter { v in evidence.photos.contains { $0.candidateVehicleIds == [v.id] } }
+                            let supported = evidence.vehicles.filter { exactSerialCounts[$0.id] != nil }
                             ForEach(supported) { vehicle in
                                 NavigationLink {
                                     LibraryAlbumPhotosView(userId: userId, candidateVehicleId: vehicle.id)
                                 } label: {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(vehicle.title)
-                                        Text("\(evidence.photos.filter { $0.candidateVehicleIds == [vehicle.id] }.count) photos matched by serial number · \(vehicle.relationshipLabel)")
+                                        Text("\(exactSerialCounts[vehicle.id] ?? 0) photos matched by serial number · \(vehicle.relationshipLabel)")
                                             .font(.caption).foregroundStyle(.secondary)
                                     }
                                 }
                             }
-                            if evidence.reviewed > 0 {
+                            if evidence.sourceInventoryCount > 0 {
                                 NavigationLink {
                                     LibraryAlbumPhotosView(userId: userId, needsIdentity: true)
                                 } label: {
-                                    LabeledContent("Photos still to match", value: evidence.unresolved.formatted())
+                                    LabeledContent("Unplaced source photos", value: evidence.sourceInventoryCount.formatted())
                                 }
                             }
                             if evidence.conflicted > 0 {
@@ -265,9 +296,33 @@ struct LibraryAlbumsView: View {
     }
 
     private func reloadEvidence() async {
+        evidenceReloadGeneration += 1
+        let generation = evidenceReloadGeneration
+        let access = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard access == .authorized || access == .limited else {
+            evidence = nil; workPoolCount = 0; discoveryAnchorIds = []; exactSerialCounts = [:]
+            return
+        }
         let owner = userId ?? ""
         let method = LibraryIngest.albumMethodVersion
-        evidence = try? await Task.detached { try LocalStore.shared.profileEvidence(userId: owner, methodVersion: method) }.value
+        let loaded = await Task.detached { () -> (LocalProfileEvidence?, Int, Set<String>, [String: Int]) in
+            guard let evidence = try? LocalStore.shared.profileEvidence(userId: owner, methodVersion: method) else {
+                return (nil, 0, [], [:])
+            }
+            var serialCounts: [String: Int] = [:]
+            for photo in evidence.photos where photo.candidateVehicleIds.count == 1 {
+                serialCounts[photo.candidateVehicleIds[0], default: 0] += 1
+            }
+            return (evidence, LibraryCandidateDiscovery.workPoolCount(evidence.discoveryAssets),
+                evidence.anchorVehicleIds, serialCounts)
+        }.value
+        guard generation == evidenceReloadGeneration else { return }
+        let currentAccess = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard currentAccess == .authorized || currentAccess == .limited else {
+            evidence = nil; workPoolCount = 0; discoveryAnchorIds = []; exactSerialCounts = [:]
+            return
+        }
+        evidence = loaded.0; workPoolCount = loaded.1; discoveryAnchorIds = loaded.2; exactSerialCounts = loaded.3
     }
 }
 
@@ -278,6 +333,8 @@ private struct LibraryAlbumPhotosView: View {
     var needsIdentity = false
     var conflictingIdentity = false
     var unreadOnly = false
+    var discoveryVehicleId: String? = nil
+    var workPool = false
     @ObservedObject private var store = LibraryStore.shared
     @ObservedObject private var ingest = LibraryIngest.shared
     @State private var indices: [String: Int] = [:]
@@ -285,6 +342,10 @@ private struct LibraryAlbumPhotosView: View {
     @State private var readError: String?
     @State private var detailIndex: Int?
     @State private var evidence: LocalProfileEvidence?
+    @State private var selectedSeedId: String?
+    @State private var candidatePhotos: [LocalAlbumPhoto] = []
+    @State private var candidateReasons: [String: String] = [:]
+    @State private var reloadGeneration = 0
 
     private var album: LocalPhotoAlbum? {
         guard store.albumCatalog?.accessScope == "full" else { return nil }
@@ -292,13 +353,15 @@ private struct LibraryAlbumPhotosView: View {
     }
 
     private var scopedPhotos: [LocalAlbumPhoto] {
+        if selectedSeedId != nil || discoveryVehicleId != nil || workPool || needsIdentity {
+            return candidatePhotos
+        }
         if let album { return album.photos }
         // A removed/inaccessible named album never falls through to the whole
         // library. Its recorded grouping remains, but this scope is unavailable.
         if albumId != nil { return [] }
         return evidence?.photos.filter {
             if let candidateVehicleId { return $0.candidateVehicleIds == [candidateVehicleId] }
-            if needsIdentity { return $0.review?.isVehicle == true && $0.candidateVehicleIds.isEmpty }
             if conflictingIdentity { return $0.candidateVehicleIds.count > 1 }
             if unreadOnly { return $0.review == nil }
             return true
@@ -306,10 +369,13 @@ private struct LibraryAlbumPhotosView: View {
     }
 
     private var scopeTitle: String {
+        if selectedSeedId != nil { return "Nearby work candidates" }
+        if workPool { return "Work photos to review" }
+        if let id = discoveryVehicleId { return evidence?.vehicles.first { $0.id == id }?.title ?? "Vehicle candidates" }
         if let album { return album.name ?? "Album" }
         if let id = candidateVehicleId { return evidence?.vehicles.first { $0.id == id }?.title ?? "Matched photos" }
         if albumId != nil { return "Album unavailable" }
-        return needsIdentity ? "Photos still to match" : (conflictingIdentity ? "Photos that may show more than one vehicle" : (unreadOnly ? "Unread photos" : "Source photos"))
+        return needsIdentity ? "Unplaced source photos" : (conflictingIdentity ? "Photos that may show more than one vehicle" : (unreadOnly ? "Unread photos" : "Source photos"))
     }
 
     var body: some View {
@@ -337,6 +403,10 @@ private struct LibraryAlbumPhotosView: View {
                         }
                     }
                     if let readError { Text(readError).font(.caption).foregroundStyle(.secondary) }
+                    if selectedSeedId != nil || discoveryVehicleId != nil || workPool {
+                        Text("Source candidates only · images in your current Photos access · no vehicle filing · videos excluded")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Button(ingest.running ? "Reading photos…" : (album == nil ? "Analyze library" : "Analyze album")) {
                         Task { await ingest.runAlbumReview(albumId: albumId); await reload() }
                     }.disabled(ingest.running || scopedPhotos.isEmpty)
@@ -344,11 +414,19 @@ private struct LibraryAlbumPhotosView: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
                     ForEach(scopedPhotos, id: \.localIdentifier) { photo in
                         if let index = indices[photo.localIdentifier] {
-                            LibraryCell(index: index, selecting: false, isSelected: false, localOnly: true)
-                                .onTapGesture { detailIndex = index }
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel("Photo")
-                                .accessibilityAddTraits(.isButton)
+                            VStack(spacing: 2) {
+                                LibraryCell(index: index, selecting: false, isSelected: false, localOnly: true)
+                                    .onTapGesture { detailIndex = index }
+                                    .contextMenu {
+                                        Button("Find work photos near this source") { selectedSeedId = photo.localIdentifier }
+                                    }
+                                    .accessibilityElement(children: .ignore)
+                                    .accessibilityLabel("Photo. \(candidateReasons[photo.localIdentifier] ?? "Choose as a source seed from the context menu")")
+                                    .accessibilityAddTraits(.isButton)
+                                if let reason = candidateReasons[photo.localIdentifier] {
+                                    Text(reason).font(.caption2).lineLimit(2).frame(maxWidth: .infinity)
+                                }
+                            }
                         }
                     }
                 }
@@ -362,7 +440,13 @@ private struct LibraryAlbumPhotosView: View {
         }
         .navigationTitle(scopeTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if selectedSeedId != nil { ToolbarItem(placement: .topBarTrailing) {
+                Button("All sources") { selectedSeedId = nil }
+            } }
+        }
         .task { await reload() }
+        .onChange(of: selectedSeedId) { _, _ in Task { await reload() } }
         .onReceive(store.$albumCatalog) { _ in Task { await reload() } }
         .onChange(of: ingest.running) { _, running in if !running { Task { await reload() } } }
         .fullScreenCover(item: Binding(get: { detailIndex.map(IndexBox.init) }, set: { detailIndex = $0?.id })) {
@@ -371,15 +455,70 @@ private struct LibraryAlbumPhotosView: View {
     }
 
     @MainActor private func reload() async {
+        reloadGeneration += 1
+        let generation = reloadGeneration
+        let access = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard access == .authorized || access == .limited else {
+            evidence = nil; indices = [:]; candidatePhotos = []; candidateReasons = [:]
+            coverage = nil; readError = "Photos access is unavailable."
+            return
+        }
         let method = LibraryIngest.albumMethodVersion
         let owner = userId ?? ""
+        let seed = selectedSeedId
+        let vehicle = discoveryVehicleId
+        let selectedWorkPool = workPool
+        let selectedUnplaced = needsIdentity
+        let needsDiscovery = seed != nil || vehicle != nil || selectedWorkPool || selectedUnplaced
         do {
-            evidence = try await Task.detached { try LocalStore.shared.profileEvidence(userId: owner, methodVersion: method) }.value
-            indices = await store.indexMap(forLocalIdentifiers: scopedPhotos.map(\.localIdentifier))
-            let scope = album ?? LocalPhotoAlbum(id: "derived-scope", name: nil, folderPath: [], sourceKind: "derived", photos: scopedPhotos)
-            coverage = try await Task.detached { try LocalStore.shared.albumCoverage(scope, methodVersion: method) }.value
+            let loaded = try await Task.detached { () throws -> (LocalProfileEvidence?, [LocalAlbumPhoto], [String: String]) in
+                let evidence = try LocalStore.shared.profileEvidence(userId: owner, methodVersion: method)
+                guard needsDiscovery, let evidence else { return (evidence, [], [:]) }
+                let result = evidence.discovery(vehicleId: vehicle ?? "", seedIds: seed.map { [$0] } ?? [])
+                let candidates = selectedWorkPool && seed == nil ? result.workPool :
+                    (selectedUnplaced && seed == nil ? result.unplaced : result.candidates)
+                let byID = Dictionary(evidence.photos.map { ($0.photo.localIdentifier, $0.photo) },
+                    uniquingKeysWith: { first, _ in first })
+                let selectedPhotos = candidates.compactMap { byID[$0.id] }
+                let titles = Dictionary(evidence.vehicles.map { ($0.id, $0.title) }, uniquingKeysWith: { first, _ in first })
+                let reasons = Dictionary(uniqueKeysWithValues: candidates.map { candidate in
+                    var words: [String] = []
+                    if candidate.reasons.contains(.personal) { words.append("Personal frame · review privately") }
+                    if !candidate.conflictingVehicleIds.isEmpty {
+                        words.append("Vehicle conflict: " + candidate.conflictingVehicleIds.map { titles[$0] ?? $0 }.joined(separator: ", "))
+                    }
+                    if candidate.reasons.contains(.chosenSource) { words.append("Chosen source") }
+                    if candidate.reasons.contains(.exactSerial) { words.append("Exact serial candidate") }
+                    if candidate.reasons.contains(.existingBinding) { words.append("Recorded local association") }
+                    if candidate.reasons.contains(.nearAnchor) { words.append("Near source in time") }
+                    if candidate.reasons.contains(.shopLocation) { words.append("Near source place") }
+                    if candidate.reasons.contains(.workLabel) { words.append("Work tag") }
+                    if candidate.reasons.contains(.missingGPS) { words.append("GPS unknown") }
+                    if candidate.reasons.contains(.noCurrentRead) { words.append("Image not read") }
+                    return (candidate.id, words.joined(separator: " · "))
+                })
+                return (evidence, selectedPhotos, reasons)
+            }.value
+            guard generation == reloadGeneration else { return }
+            let currentAccess = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            guard currentAccess == .authorized || currentAccess == .limited else {
+                evidence = nil; indices = [:]; candidatePhotos = []; candidateReasons = [:]
+                coverage = nil; readError = "Photos access is unavailable."
+                return
+            }
+            evidence = loaded.0; candidatePhotos = loaded.1; candidateReasons = loaded.2
+            let mappedIndices = await store.indexMap(forLocalIdentifiers: scopedPhotos.map(\.localIdentifier))
+            guard generation == reloadGeneration else { return }
+            indices = mappedIndices
+            let scope = LocalAlbumCoverageScope.choose(album: album, displayedPhotos: scopedPhotos, seeded: seed != nil)
+            let loadedCoverage = try await Task.detached { try LocalStore.shared.albumCoverage(scope, methodVersion: method) }.value
+            guard generation == reloadGeneration else { return }
+            coverage = loadedCoverage
             readError = nil
-        } catch { coverage = nil; readError = "Analysis coverage could not load. Totals are unknown." }
+        } catch {
+            guard generation == reloadGeneration else { return }
+            coverage = nil; readError = "Analysis coverage could not load. Totals are unknown."
+        }
     }
 }
 
