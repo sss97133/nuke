@@ -356,9 +356,28 @@ it('keeps one identity, price and contextual controls in the masthead without a 
 
 it('opens the supported ZIP outline directly from the header', async () => {
   await render();
-  await act(async () => (host.querySelector('[aria-label="Explore ZIP 89005 area"]') as HTMLButtonElement).click());
-  expect(document.body.querySelector('[aria-label="ZIP 89005 area map"]')).not.toBeNull();
+  const trigger = host.querySelector('[aria-label="Explore ZIP 89005 area"]') as HTMLButtonElement;
+  trigger.focus();
+  await act(async () => trigger.click());
+  expect(host.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).not.toBeNull();
+  expect(document.querySelector('dialog[aria-modal="true"]')).toBeNull();
   expect(host.querySelector('[data-testid="token-items"]')).toBeNull();
+  await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(host.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});
+
+it('uses the shared mobile header sheet for ZIP without a second modal', async () => {
+  fixture.mobile = true;
+  await render();
+  const trigger = host.querySelector('[aria-label="Explore ZIP 89005 area"]') as HTMLButtonElement;
+  trigger.focus();
+  await act(async () => trigger.click());
+  expect(document.body.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).not.toBeNull();
+  expect(document.querySelector('dialog[aria-modal="true"]')).toBeNull();
+  await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(document.body.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
 });
 
 it('does not turn a city or an unverified ZIP into a header location chip', async () => {
