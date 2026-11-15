@@ -78,10 +78,11 @@ function PhysicalPoint({ vehicleId, field, label, role, relation }: {
 }
 
 function TributeEvidence({ vehicleId, items }: { vehicleId: string; items: TokenItems }) {
+  const trim = items.trim?.filter(item => ['trim.recorded', 'trim.tribute', 'trim.decode'].includes(item.key)) ?? [];
   const engine = items.engine?.filter(item => item.key === 'engine.as_built.engine' || item.key === 'engine.current.displacement') ?? [];
   const transmission = items.transmission?.filter(item => item.key === 'transmission.as_built.type' || item.key === 'transmission.current.type') ?? [];
   return <>
-    <ItemList items={items.trim ?? []} />
+    <ItemList items={trim} />
     <Text role="label" as="h3">Engine, as built and current</Text>
     {engine.length ? <ItemList items={engine} /> : <Text role="caption" as="p">Engine line items unavailable.</Text>}
     <PhysicalPoint vehicleId={vehicleId} field="factory_color" label="Factory paint"
