@@ -20,6 +20,7 @@ class NativeAdapterTests(unittest.TestCase):
                                  source_namespace="fixture-library", access_scope="sample",
                                  videos_outside_selector=19)
         self.assertEqual(frozen["candidates"][0]["sourceVersion"], "v1")
+        self.assertEqual(frozen["snapshot"]["nativeInputSha256"], hashlib.sha256(json.dumps(source).encode()).hexdigest())
         self.assertEqual(manifest["counts"], {"original_unverified": 1})
         self.assertEqual(manifest["mediaCoverage"]["knownVideosOutsideSelector"], 19)
         self.assertEqual(manifest["sourceProposals"], [])

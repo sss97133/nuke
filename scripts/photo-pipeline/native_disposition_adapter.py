@@ -35,6 +35,7 @@ def adapt(native_input, native_output, *, snapshot_id, observed_at, source_names
         bound.append({"id": sid, "sourceVersion": versions[sid],
                       "reasons": candidate.get("reasons", [])})
     snapshot = {"snapshotId": snapshot_id, "sourceNamespace": source_namespace,
+                "nativeInputSha256": native_output["inputSha256"],
                 "observedAt": observed_at, "accessScope": access_scope,
                 "declaredAssetCount": len(assets),
                 "mediaCoverage": {"imagesEnumerated": True, "videosEnumerated": False,
