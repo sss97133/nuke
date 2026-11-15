@@ -3,7 +3,11 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ rows: [] as any[], sessions: [] as any[], fetch: vi.fn(), queueStats: vi.fn(), requests: [] as any[] }));
+const fixture = vi.hoisted(() => ({ rows: [] as any[], sessions: [] as any[], citedIds: [] as string[], fetch: vi.fn(), queueStats: vi.fn(), requests: [] as any[] }));
+vi.mock('../../pages/vehicle-profile/hooks/useVehicleImageEvidence', async original => ({
+  ...await original<typeof import('../../pages/vehicle-profile/hooks/useVehicleImageEvidence')>(),
+  useVehicleImageEvidence: () => ({ data: { citedImages: fixture.citedIds.map(id => ({ image: { id }, citations: [] })) }, isPending: false, isError: false }),
+}));
 vi.mock('../../lib/fetchVehicleImages', () => ({ fetchVehicleImages: (...args: any[]) => fixture.fetch(...args) }));
 vi.mock('../../lib/supabase', () => {
   const meta = { id: 'vehicle-fixture', year: 2006, make: 'Pontiac', model: 'Solstice',
@@ -51,6 +55,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   fixture.rows = photos();
   fixture.sessions = [];
+  fixture.citedIds = [];
   fixture.fetch.mockReset().mockImplementation(async (_id, _select, options) => {
     options?.onLoadCoverage?.({ loaded: fixture.rows.length, total: fixture.rows.length });
     return fixture.rows;
@@ -144,6 +149,22 @@ describe('ImageGallery canonical database rows', { timeout: 20_000 }, () => {
     await mount({ galleryFilter: { imageIds: [] }, onReadCount });
     expect(galleryPhotos()).toHaveLength(0);
     expect(onReadCount.mock.calls.at(-1)?.[0].shown).toBe(0);
+  });
+  it('keeps an exact cited engine image with no zone in the selected gallery', async () => {
+    fixture.rows = photos(3);
+    fixture.rows[1].vehicle_zone = 'mech_engine_bay';
+    fixture.citedIds = [fixture.rows[0].id];
+    const onReadCount = vi.fn();
+    await mount({ galleryFilter: { field: 'engine_type', label: '455 V8' }, onReadCount });
+    expect(galleryPhotos()).toHaveLength(2);
+    expect(onReadCount.mock.calls.at(-1)?.[0].shown).toBe(2);
+  });
+  it('lets an explicit image-id selection define its population before a topic filter', async () => {
+    fixture.rows = photos(3);
+    const onReadCount = vi.fn();
+    await mount({ galleryFilter: { field: 'engine_type', imageIds: [fixture.rows[0].id], label: 'Selected source' }, onReadCount });
+    expect(galleryPhotos()).toHaveLength(1);
+    expect(onReadCount.mock.calls.at(-1)?.[0].shown).toBe(1);
   });
   it.each([false, true])('groups the complete classified collection and opens a source beyond the thumbnail page (filtered=%s)', async (filtered) => {
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} unobserve() {} });

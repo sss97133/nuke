@@ -9,11 +9,11 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { Rows, Row } from '../../kit';
+import { Rows, Row, itemLabel, valueText } from '../../kit';
 import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
-import { useVehicleImageEvidence, relatedFieldImages, referenceFieldImages, isReferenceImage, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
+import { useVehicleImageEvidence, relatedFieldImages, referenceFieldImages, isReferenceImage, hasImageAnalysis, webSourceUrl, heroFacetImages } from './hooks/useVehicleImageEvidence';
 import { useFieldProvenance, citedFieldImages, currentImageObservations, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
 import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import FieldProvenanceDrawer from './FieldProvenanceDrawer';
@@ -172,14 +172,18 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   field, label, value, vehicleId, evidence, vinDecode, context, presentation,
 }) => {
   const { closeTop } = usePopup();
-  const inventory = useVehicleImageEvidence(vehicleId, context ? field : undefined);
+  const inventory = useVehicleImageEvidence(vehicleId, context ? field : undefined, field);
   const provenance = useFieldProvenance(vehicleId, field);
   const drivetrainContext = useFieldProvenance(context && field === 'drivetrain' ? vehicleId : '', 'transmission');
   const claims = useFieldEvidence(vehicleId);
   const claimGroup = evidence || claims.evidence[field];
-  const rows = inventory.data?.images || [];
-  const images = relatedFieldImages(rows, field);
-  const references = referenceFieldImages(rows, field);
+  const contextualRows = inventory.data?.images || [];
+  const facetCited = inventory.data?.citedImages || [];
+  const facetCitedIds = new Set(facetCited.map(item => item.image.id));
+  const rows = [...contextualRows, ...facetCited.map(item => item.image)
+    .filter(image => !contextualRows.some(row => row.id === image.id))];
+  const images = relatedFieldImages(contextualRows, field).filter(image => !facetCitedIds.has(image.id));
+  const references = referenceFieldImages(contextualRows, field).filter(image => !facetCitedIds.has(image.id));
   const citations = citedFieldImages(provenance.data, rows);
   const citedIds = new Set(citations.map(image => image.id));
   const imagesLoading = inventory.isLoading || provenance.isLoading;
@@ -193,7 +197,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     ? (provenance.data?.canonical?.status === 'resolved' ? provenance.data.canonical.value : null)
     : provenance.data?.value;
   const hasClaimImageReference = !!claimGroup?.sources.some(source => source.source_image_id);
-  const hasRecordedImageReference = hasClaimImageReference || imageObservations.length > 0 || !!provenance.data?.source_image_url || (provenance.data?.evidence || []).some(source => source.image_id && (source.source !== 'field_evidence' || source.verified === true));
+  const hasRecordedImageReference = !!inventory.data?.citations?.length || hasClaimImageReference || imageObservations.length > 0 || !!provenance.data?.source_image_url || (provenance.data?.evidence || []).some(source => source.image_id && (source.source !== 'field_evidence' || source.verified === true));
 
   const sources = claimGroup?.sources || (provenance.data?.evidence || [])
     .filter(source => source.source !== 'field_evidence' || source.verified === true)
@@ -214,7 +218,9 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   if (presentation === 'citations') {
     const correction = provenance.data?.current_correction;
     const readings = claimGroup?.sources.filter(source => source.source_type !== 'system_update') || [];
+    const directValueImages = heroFacetImages(facetCited, inventory.data?.citations || []);
     const imageIds = new Set([
+      ...directValueImages.map(image => image.id),
       ...readings.map(source => source.source_image_id),
       ...(provenance.data?.evidence || []).filter(source => source.source !== 'field_evidence').map(source => source.image_id),
       ...imageObservations.map(source => source.image_id),
@@ -339,6 +345,18 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       {claims.loading && <p role="status">Reading claim details and correction history…</p>}
 
       {/* Claim-specific references from the existing provenance reader. */}
+      {!imagesLoading && facetCited.length > 0 && <div className="ev-citation-grid">
+        {facetCited.filter(item => !citedIds.has(item.image.id)).map(({ image, citations: associations }) => <article key={image.id} className="ev-image-proof">
+          <button type="button" aria-label={`Inspect cited photograph for ${label}`} onClick={() => { closeTop(); openVehiclePhoto(image.id); }}>
+            <img src={optimizeImageUrl(image.image_url, 'medium') || image.image_url} alt={`Cited source for ${label.toLowerCase()}`} width={900} height={675} loading="lazy" />
+          </button>
+          {associations.map((citation, index) => <p key={index}>
+            {{ current: 'Current', as_built: 'As built', decode: 'Decoded', derived: 'Derived' }[citation.facet]} · {itemLabel({ key: citation.itemKey, facet: citation.facet })} · {' '}
+            {{ source: 'Source reading', conflict_side: 'Conflicting report', examined: 'Examined source', availability: 'Availability reference' }[citation.relation]}
+            {valueText(citation.sideValue ?? citation.source.value) && `: ${valueText(citation.sideValue ?? citation.source.value)}`}
+          </p>)}
+        </article>)}
+      </div>}
       {!imagesLoading && citations.length > 0 && (
         <div className="field-image-citations">
           <div className="ev-label">IMAGE-CITED OBSERVATIONS · {citations.length} IMAGE{citations.length !== 1 ? 'S' : ''}</div>

@@ -21,6 +21,7 @@ import { currentBidEvidenceAmount } from './auctionEvidenceDisplay';
 import { useProfileRead } from './profileDocument';
 import { ItemList } from '../../kit';
 import type { FacetItem, TokenItems } from '../../kit/types';
+import { FIELD_TOKEN } from './hooks/facetImageCitations';
 
 const VehicleEvidenceReview = React.lazy(() => import('../../components/vehicle/VehicleEvidenceAssessment').then(m => ({ default: m.VehicleEvidenceReview })));
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
@@ -41,9 +42,6 @@ const STRUCTURED_RECORD_LABELS: Record<RecordField, string> = { year: 'Year', ma
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 /** The header token whose line items state a record field (vehicle_profile_read masthead.token_items). Engine type
  * and size are both stated by the engine token, so its items render once, on the engine type row. */
-const FIELD_TOKEN: Partial<Record<RecordField, string>> = { year: 'year', make: 'make', model: 'model', trim: 'trim',
-  body_style: 'body_style', engine_type: 'engine', engine_size: 'engine', transmission: 'transmission', drivetrain: 'drivetrain',
-  color: 'paint' };
 
 /** The masthead's token items from the page's one profile read (shared with the header; no new request). */
 function useTokenItems(vehicleId: string): TokenItems | null {
