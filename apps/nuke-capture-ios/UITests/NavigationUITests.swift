@@ -32,11 +32,11 @@ final class NavigationUITests: XCTestCase {
         let app = openJourneyDay("analysis", analysis: "failure")
         let photo = app.buttons["day.photo.00000000-0000-4000-8000-00000000e001"]
         XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
-        XCTAssertTrue(app.staticTexts["evidence.analysis.error"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["evidence.analysis.error"].waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertFalse(app.staticTexts["Analysis pending"].exists)
         XCTAssertFalse(app.staticTexts["evidence.analysis.empty"].exists)
         app.buttons["evidence.analysis.retry"].tap()
-        XCTAssertTrue(app.staticTexts["Fixture analysis for exact photo"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Fixture analysis for exact photo"].waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertFalse(app.staticTexts["evidence.analysis.error"].exists)
         app.buttons["Done"].firstMatch.tap()
         XCTAssertTrue(photo.waitForExistence(timeout: 5))
@@ -51,7 +51,7 @@ final class NavigationUITests: XCTestCase {
         let app = openJourneyDay("analysis", analysis: "empty")
         let photo = app.buttons["day.photo.00000000-0000-4000-8000-00000000e001"]
         XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
-        XCTAssertTrue(app.staticTexts["evidence.analysis.empty"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["evidence.analysis.empty"].waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertFalse(app.staticTexts["evidence.analysis.error"].exists)
         XCTAssertFalse(app.buttons["evidence.analysis.retry"].exists)
         XCTAssertFalse(app.staticTexts["Analysis pending"].exists)
@@ -74,9 +74,9 @@ final class NavigationUITests: XCTestCase {
             if grant.exists && grant.isHittable { break }
             app.swipeUp()
         }
-        XCTAssertTrue(grant.exists, app.debugDescription)
-        XCTAssertEqual(grant.label, label)
-        XCTAssertTrue(app.staticTexts["account.photos.explanation"].label.contains(explanation), app.debugDescription)
+        XCTAssertTrue(grant.exists, app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
+        XCTAssertEqual(grant.label, "Photos, \(label)")
+        XCTAssertTrue(app.staticTexts["account.photos.explanation"].label.contains(explanation), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertTrue(app.buttons["account.photos.settings"].exists)
         app.buttons["Done"].firstMatch.tap()
         XCTAssertEqual(app.tabBars.buttons["Library"].exists, status == "full")
