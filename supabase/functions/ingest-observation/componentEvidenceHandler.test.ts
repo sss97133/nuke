@@ -7,7 +7,7 @@ await import('./index.ts');Deno.serve=serve;
 const V='10000000-0000-4000-8000-000000000001',I='20000000-0000-4000-8000-000000000001',
  P='30000000-0000-4000-8000-000000000001',T='40000000-0000-4000-8000-000000000001',S='80000000-0000-4000-8000-000000000001',R='90000000-0000-4000-8000-000000000001';
 Deno.test('actual component handler binds source/part/property/witness, replays current receipt and refuses changed-source result without inference',async()=>{
- const original=globalThis.fetch;const rows=new Map<string,any>();let current=true,writes=0,readFailure=false,pending=false;
+ const original=globalThis.fetch;const rows=new Map<string,any>();let current=true,writes=0,readFailure=false,pending=false,parentPointer:string|null=null;
  const label='Battery 78PRMJ';const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(label)))].map(b=>b.toString(16).padStart(2,'0')).join('');
  const payload={source_slug:'photo_pipeline',kind:'condition',observed_at:'1900-01-01T00:00:00Z',vehicle_id:V,component_key:'fluid.battery',
   property_key:'component_visible_present',agent_inferred:true,defer_analysis:true,structured_data:{component_visible_present:true},
@@ -30,7 +30,7 @@ Deno.test('actual component handler binds source/part/property/witness, replays 
     assert(body.analysis_deferred===true&&body.confidence_score<=.6&&body.source_event_at===null);
     const row={...body,id:`a0000000-0000-4000-8000-${String(++writes).padStart(12,'0')}`,is_superseded:false};rows.set(body.content_hash,row);return respond(row,201);
    }
-   if(url.searchParams.has('id'))return readFailure?respond({message:'source lookup failed'},500):respond([{id:P,vehicle_id:V,is_superseded:false,
+   if(url.searchParams.has('id'))return readFailure?respond({message:'source lookup failed'},500):respond([{id:P,vehicle_id:V,is_superseded:false,superseded_by:parentPointer,
     extraction_method:'reviewed_image_analysis_v1',source_url:'https://images.example/battery.jpg',observed_at:'2026-11-10T16:25:10.731Z',
     structured_data:{image_id:I,components_seen:[{label,bbox:[10,20,800,900],part_number_guess:'78PRMJ'}]}}]);
    const key=url.searchParams.get('content_hash')?.slice(3);return respond(key&&rows.has(key)?[rows.get(key)]:[]);
@@ -43,6 +43,10 @@ Deno.test('actual component handler binds source/part/property/witness, replays 
   assert(answer.installation_status==='unestablished'&&answer.model_calls===0&&writes===1);
   const replay=await handler(request());assert(replay.status===200&&(await replay.json()).duplicate===true&&writes===1);
   current=false;assert((await handler(request())).status===409&&writes===1,'withdrawn duplicate never passes');current=true;
+  parentPointer=P;assert((await handler(request())).status===400&&writes===1,'parent successor pointer refuses before write');parentPointer=null;
+  for(const row of rows.values())row.superseded_by=P;
+  assert((await handler(request())).status===409&&writes===1,'child successor pointer refuses replay even when current RPC says true');
+  for(const row of rows.values())row.superseded_by=null;
   readFailure=true;assert((await handler(request())).status===503&&writes===1);readFailure=false;
   pending=true;assert((await handler(request())).status===400&&writes===1);pending=false;
   assert((await handler(request({...payload,structured_data:{component_visible_present:true,installed:true}}))).status===400&&writes===1);

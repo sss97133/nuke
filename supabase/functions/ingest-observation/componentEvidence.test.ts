@@ -66,3 +66,10 @@ Deno.test('new property cannot enter through generic intake, pending registry or
  assert(validateObservationProperty(input,registry,false,false,true).ok);
  assert(!validateObservationProperty(input,{...registry,namespace:'pending'},false,false,true).ok);
 });
+
+Deno.test('a supersession pointer withdraws a retained source even before its flag changes',async()=>{
+ const f=await componentFixture('Blue engine block','engine.block');
+ const pointed={...f.source,is_superseded:false,superseded_by:'30000000-0000-4000-8000-000000000002'};
+ assert(!(await prepareComponentEvidence(f.input,f.subject,pointed,f.image,true)).ok);
+ assert((await prepareComponentEvidence(f.input,f.subject,{...f.source,superseded_by:null},f.image,true)).ok);
+});
