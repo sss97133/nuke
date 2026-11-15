@@ -13,6 +13,12 @@ comparison can then use the existing attribution owner. Supersession pointers,
 privacy, source hashes, current classification and anchor vehicle membership
 are checked at filing; a date or shop location alone cannot file an image.
 
+The retained attribution comparison is a `media` observation from `photo_pipeline`,
+with `extraction_method=reviewed_image_attribution_v1`. The first live canary
+exposed that this source does not admit `provenance`; its source registry remains
+unchanged. The filing consumer uses the existing supported media kind and still
+requires the complete source-bound proof contract.
+
 The three prerequisite function bodies were compared exactly with production
 on 2026-11-15. Deployment guards refuse a changed body rather than overwriting
 unknown live behavior. The earlier closed proposal's drift warning was dated
