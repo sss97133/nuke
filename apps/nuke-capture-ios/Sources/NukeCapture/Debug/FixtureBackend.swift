@@ -22,6 +22,31 @@ enum FixtureBackend {
     static let clientId = "00000000-0000-4000-8000-0000000000d1"
     static let providerId = "00000000-0000-4000-8000-0000000000d2"
     static let navigationVehicleId = "00000000-0000-4000-8000-00000000c001"
+    static let dayMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_DAY_MODE"] ?? ""
+    static let journeyDay: String = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(secondsFromGMT: 0)
+        return f.string(from: Date())
+    }()
+    private static let dayReadLock = NSLock()
+    private static var dayReadAttempts = 0
+    private static func dayPhotos() -> (Int, Data) {
+        dayReadLock.lock()
+        dayReadAttempts += 1
+        let attempt = dayReadAttempts
+        dayReadLock.unlock()
+        // Exercise the screen's explicit Retry, independently of the SDK's
+        // automatic 503 retry layers. This first read is a terminal response.
+        if dayMode == "failure", attempt == 1 {
+            return (400, Data(#"{"code":"fixture_read_error","message":"fixture day photo read failed","details":null,"hint":null}"#.utf8))
+        }
+        if dayMode == "empty" || dayMode == "events" { return ok("[]") }
+        if dayMode == "changed", attempt > 1 { return ok("[]") }
+        return ok("""
+        [{"id":"00000000-0000-4000-8000-00000000e001","image_url":null,
+          "taken_at":"\(journeyDay)T12:00:00Z","labels":[],"ai_processing_status":"pending"}]
+        """)
+    }
     static var userId: String? {
         switch persona {
         case .visitor: return nil
@@ -79,6 +104,14 @@ enum FixtureBackend {
     static func respond(_ request: URLRequest) -> (Int, Data) {
         guard let url = request.url, url.host == baseURL.host else { return (404, Data()) }
         let path = url.path
+        if scenario == "navigation-garage", !dayMode.isEmpty,
+           path == "/rest/v1/vehicle_images" || path == "/rest/v1/vehicle_images_public" {
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            if items.contains(where: { $0.name == "taken_at" && $0.value == "gte.\(journeyDay)" }),
+               items.contains(where: { $0.name == "taken_at" && ($0.value?.hasPrefix("lt.") ?? false) }) {
+                return dayPhotos()
+            }
+        }
         if scenario == "navigation-actors", path == "/functions/v1/universal-search" {
             return ok("""
             {"success":true,"results":[{"id":"\(clientId)","type":"user","title":"Fixture Person"}],
@@ -135,6 +168,12 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "get_vehicle_contribution_days" where scenario == "navigation-garage" && !dayMode.isEmpty:
+            // A separate work day keeps the timeline available for the event-only day.
+            return ok("""
+            [{"day":"\(journeyDay)","kind":"\(dayMode == "events" ? "event" : "photo")","n":2},
+             {"day":"2026-11-14","kind":"work","n":1}]
+            """)
         case "accounting_vehicle_financials" where scenario == "financial-qualification" || scenario == "financial-evidence-withheld":
             return ok("[\(AllocationEvidenceFixtures.row)]")
         case "accounting_record_evidence" where scenario == "financial-qualification" || scenario == "financial-evidence-withheld":

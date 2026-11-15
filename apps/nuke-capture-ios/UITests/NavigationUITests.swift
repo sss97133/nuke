@@ -4,6 +4,78 @@ import XCTest
 final class NavigationUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
+    private func openJourneyDay(_ mode: String) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment = ["NUKE_FIXTURE_SCENARIO": "navigation-garage", "NUKE_FIXTURE_DAY_MODE": mode]
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("1234567\n")
+        let vehicle = app.staticTexts["1973 Fixture Coupe"].firstMatch
+        XCTAssertTrue(vehicle.waitForExistence(timeout: 10)); vehicle.tap()
+        let timeline = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Build timeline")).firstMatch
+        for _ in 0..<12 {
+            if timeline.exists && timeline.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(timeline.isHittable); timeline.tap()
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(secondsFromGMT: 0)
+        let day = app.descendants(matching: .any).matching(identifier: "timeline.day.\(f.string(from: Date()))").firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 5)); day.tap()
+        return app
+    }
+
+    func testDayPhotoFailureRetriesAndReturnsThroughSameDayToGarageSearch() {
+        let app = openJourneyDay("failure")
+        XCTAssertTrue(app.staticTexts["day.photos.error"].waitForExistence(timeout: 10),
+                      "Expected a terminal photo-read error. Screen: \(app.debugDescription.replacingOccurrences(of: "\n", with: " | "))")
+        XCTAssertFalse(app.staticTexts["day.photos.empty"].exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "none carry a capture date")).firstMatch.exists)
+        app.buttons["day.photos.retry"].tap()
+        let photo = app.buttons["day.photo.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
+        let evidence = app.descendants(matching: .any).matching(identifier: "day.evidence.00000000-0000-4000-8000-00000000e001").firstMatch
+        XCTAssertTrue(evidence.waitForExistence(timeout: 5))
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(photo.waitForExistence(timeout: 5), "evidence dismissal must return to its exact day")
+        XCTAssertFalse(app.staticTexts["day.photos.error"].exists)
+        app.buttons["Done"].firstMatch.tap()
+        let back = app.navigationBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 5)); back.tap()
+        XCTAssertTrue((app.searchFields.firstMatch.value as? String)?.contains("1234567") == true)
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testSuccessfulEmptyDayDoesNotInventMissingCaptureDates() {
+        let app = openJourneyDay("empty")
+        XCTAssertTrue(app.staticTexts["day.photos.empty"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["day.photos.error"].exists)
+        XCTAssertFalse(app.buttons["day.photos.retry"].exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "none carry a capture date")).firstMatch.exists)
+    }
+
+    func testReturningFromEvidenceRechecksDayMembership() {
+        let app = openJourneyDay("changed")
+        let photo = app.buttons["day.photo.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
+        let evidence = app.descendants(matching: .any).matching(identifier: "day.evidence.00000000-0000-4000-8000-00000000e001").firstMatch
+        XCTAssertTrue(evidence.waitForExistence(timeout: 5))
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["day.photos.empty"].waitForExistence(timeout: 10))
+        XCTAssertFalse(photo.exists, "a source no longer returned for this day must not remain in its contact sheet")
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
+    func testEventOnlyDayDoesNotClaimWorkWasLogged() {
+        let app = openJourneyDay("events")
+        XCTAssertTrue(app.staticTexts["day.photos.empty"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["2 events recorded"].exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "work logged")).firstMatch.exists)
+    }
+
     func testSessionReviewInspectsSourceWithoutSelectingOrFiling() {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
