@@ -33,7 +33,7 @@ struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("exploreMode") private var exploreMode = false
     @State private var photoGrant = Self.currentPhotoGrant()
-    @State private var fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
+    @State private var fullAccess = (Self.currentPhotoStatus() == .authorized)
     @State private var tab: Tab = .explore
     @ObservedObject private var inboxBadge = InboxBadgeStore.shared
     /// Live per-photo progress for this shooting session (the slim bar at the top).
@@ -110,7 +110,7 @@ struct MainTabView: View {
             // Settings round-trips can change the grant — re-read it.
             if phase == .active {
                 photoGrant = Self.currentPhotoGrant()
-                fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
+                fullAccess = (Self.currentPhotoStatus() == .authorized)
                 Task { await inboxBadge.refresh() }
                 Task { await ingest.refresh() }
             }
@@ -149,8 +149,26 @@ struct MainTabView: View {
 
     /// Photo grant exists = .authorized or .limited (matches SyncEngine).
     static func currentPhotoGrant() -> Bool {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        let status = currentPhotoStatus()
         return status == .authorized || status == .limited
+    }
+
+    /// Account and tabs describe the same PhotoKit status. Fixture overrides
+    /// never request or modify the device's real permission and are DEBUG-only.
+    static func currentPhotoStatus() -> PHAuthorizationStatus {
+        #if DEBUG
+        if FixtureBackend.isActive {
+            switch ProcessInfo.processInfo.environment["NUKE_FIXTURE_PHOTOS_STATUS"] {
+            case "full": return .authorized
+            case "limited": return .limited
+            case "off": return .denied
+            case "restricted": return .restricted
+            case "not-requested": return .notDetermined
+            default: break
+            }
+        }
+        #endif
+        return PHPhotoLibrary.authorizationStatus(for: .readWrite)
     }
 }
 
