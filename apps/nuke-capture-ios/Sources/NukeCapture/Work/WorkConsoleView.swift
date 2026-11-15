@@ -93,6 +93,7 @@ final class WorkConsoleReader: ObservableObject {
 
     private enum Part: Hashable { case signatures, jobs, identity, inbox, open, notifications, listings }
     private var requests: [Part: ReadRequestGuard] = [:]
+    private var loadedJobPages = 1
     private let reads: Reads
     private let account: () -> String?
 
@@ -145,16 +146,32 @@ final class WorkConsoleReader: ObservableObject {
         await read(.notifications, operation: reads.notifications) { self.notifications = $0 }
     }
 
+    /// Returning from a job re-reads the pages already explored, then publishes
+    /// the complete refreshed window. Pull-to-refresh uses the same bounded scope.
+    /// This retains navigation depth without keeping stale job/completion states.
     func loadJobs() async {
+        let depth = loadedJobPages
         let request = requests[.jobs, default: ReadRequestGuard()].begin()
         let owner = account()
         loadingJobs = true
         loadingMore = false
         jobsPageFailure = nil
         defer { if requests[.jobs]?.isCurrent(request) == true { loadingJobs = false } }
-        let result = await reads.jobs(nil)
+        var result = await reads.jobs(nil)
+        var pages = 1
         guard !Task.isCancelled, requests[.jobs]?.isCurrent(request) == true, account() == owner else { return }
+        while pages < depth, case .loaded(let accumulated) = result, let cursor = accumulated.nextAfter {
+            let next = await reads.jobs(cursor)
+            guard !Task.isCancelled, requests[.jobs]?.isCurrent(request) == true, account() == owner else { return }
+            guard case .loaded(let page) = next else {
+                jobs = next   // a failed page is not an empty or complete refreshed window
+                return
+            }
+            result = .loaded(accumulated.appending(page))
+            pages += 1
+        }
         jobs = result
+        if case .loaded = result { loadedJobPages = pages }
     }
 
     func loadMoreJobs() async {
@@ -168,6 +185,7 @@ final class WorkConsoleReader: ObservableObject {
         guard !Task.isCancelled, requests[.jobs]?.isCurrent(request) == true, account() == owner else { return }
         if case .loaded(let next) = result {
             jobs = .loaded(page.appending(next))
+            loadedJobPages += 1
         } else if case .refused(let failure) = result {
             jobsPageFailure = failure
         }
