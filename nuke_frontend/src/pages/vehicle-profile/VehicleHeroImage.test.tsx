@@ -90,6 +90,19 @@ it('selects related drivetrain views explicitly and keeps the image original and
   expect(host!.querySelector('.vp-context-hero')).toBeNull();
   expect(actualImage().src).toBe(chosen);
 });
+it('renders a cited original HEIC through the existing browser rendition path', async () => {
+  fixture.galleryFilter = { field: 'engine_type', label: '455 V8' };
+  const citation = { imageId: 'current-photo', facet: 'current', status: 'reading', relation: 'source' };
+  fixture.facetEvidence = { citations: [citation], citedImages: [{
+    image: { id: 'current-photo', image_url: 'https://fixture.supabase.co/storage/v1/object/public/photos/source.HEIC' },
+    citations: [citation],
+  }] };
+  await client(chosen);
+  for (const image of host!.querySelectorAll<HTMLImageElement>('.vp-context-hero img')) {
+    expect(image.src).toContain('/storage/v1/render/image/public/photos/source.HEIC');
+    expect(image.src).toContain('format=origin');
+  }
+});
 it('does not call an available as-built citation unavailable when current photos are selected', async () => {
   fixture.galleryFilter = { field: 'engine_type', label: '455 V8' };
   const current = { imageId: 'current-photo', facet: 'current', status: 'reading', relation: 'source' };

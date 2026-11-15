@@ -5,6 +5,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { BadgePortal } from '../../components/badges/BadgePortal';
 import { openVehiclePhoto, openVehiclePhotoByUrl } from './VehiclePhotoLightbox';
 import { useVehicleImageEvidence, relatedFieldImages, heroFacetImages } from './hooks/useVehicleImageEvidence';
+import { getLightboxImageUrl } from '../../lib/imageOptimizer';
 
 interface VehicleHeroImageProps {
   overlayNode?: React.ReactNode;
@@ -23,10 +24,10 @@ function ContextualHero({ vehicleId, field, label, onClear }: { vehicleId: strin
     <div className="vp-context-hero__head"><span>{label} · {sourceLabel}</span><button type="button" onClick={onClear}>All photos</button></div>
     {image ? <>
       <button type="button" className="vp-context-hero__photo" onClick={() => openVehiclePhoto(image.id)} aria-label={`Open ${label} photograph ${index + 1}`}>
-        <img src={image.medium_url || image.image_url} alt={`${label} · ${(image.vehicle_zone || '').replace(/_/g, ' ')}`} width={1260} height={840} />
+        <img src={getLightboxImageUrl(image.medium_url || image.image_url)} alt={`${label} · ${(image.vehicle_zone || '').replace(/_/g, ' ')}`} width={1260} height={840} />
       </button>
       <div className="vp-context-hero__thumbnails">{images.map((item, position) => <button key={item.id} type="button" aria-label={`Show ${label} photograph ${position + 1}`} aria-pressed={position === index} onClick={() => setIndex(position)}>
-        <img src={item.thumbnail_url || item.medium_url || item.image_url} alt="" width={64} height={48} loading="lazy" />
+        <img src={getLightboxImageUrl(item.thumbnail_url || item.medium_url || item.image_url)} alt="" width={64} height={48} loading="lazy" />
       </button>)}</div>
     </> : <p role="status">{inventory.isPending ? 'Reading source photographs…' : inventory.isError ? 'Source photographs could not be read.'
       : inventory.data?.facetDimension ? 'No cited images or related areas returned by the current readers.'
