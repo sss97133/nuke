@@ -59,7 +59,7 @@ Deno.test({name:'component PostgreSQL: actual intake to canonical source guard, 
    const c=JSON.parse(await sql(`select to_jsonb(test_component(${n}))`));
    const retained=c.structured_data.component_reading;
    const {bbox:_bbox,source_role:_role,clock_basis:_clock,physical_unit_identity:_identity,...selector}=retained;
-   const input={source_slug:'photo_pipeline',kind:'condition',observed_at:c.observed_at,vehicle_id:V,component_key:c.structured_data.component_ref.key,
+   const input={source_slug:'photo_pipeline',kind:'condition',vehicle_id:V,component_key:c.structured_data.component_ref.key,
     property_key:'component_visible_present',component_reading:selector,agent_inferred:true,defer_analysis:true,
     structured_data:{component_visible_present:true,component_receipt_candidates:c.structured_data.component_receipt_candidates}};
    const request=()=>new Request('https://component-fixture.test/functions/v1/ingest-observation',{method:'POST',headers:{Authorization:'Bearer component-test-key','Content-Type':'application/json'},body:JSON.stringify(input)});

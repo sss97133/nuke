@@ -895,8 +895,11 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     };
 
-    // Validate required fields
-    if (!input.source_slug || !input.kind || !input.observed_at) {
+    // Qualified component readings derive their clock from the retained source
+    // below. Merely requesting that path does not qualify the source or clock.
+    const componentRequested = input.component_key !== undefined || input.component_reading !== undefined ||
+      input.extraction_method === COMPONENT_READING_METHOD || input.property_key === COMPONENT_PRESENCE_PROPERTY;
+    if (!input.source_slug || !input.kind || (!input.observed_at && !componentRequested)) {
       return new Response(JSON.stringify({
         error: "Missing required fields: source_slug, kind, observed_at"
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -931,8 +934,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     // Bind a part-scoped reading before hashing. The database repeats the source
     // and image checks under locks, including current visibility and witness.
     let component: Extract<ComponentEvidenceResult, { ok: true }> | null = null;
-    if (input.component_key !== undefined || input.component_reading !== undefined ||
-        input.extraction_method === COMPONENT_READING_METHOD || input.property_key === COMPONENT_PRESENCE_PROPERTY) {
+    if (componentRequested) {
       const selector = componentReadingSelector(input.component_reading);
       if (!selector || input.source_slug !== "photo_pipeline" || input.subject !== undefined || input.citation !== undefined ||
           input.source_comment_id !== undefined || input.extractor_id !== undefined || retainedSourceId !== null) {
