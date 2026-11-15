@@ -124,3 +124,28 @@ supply original bytes, privacy clearance, filing or admission selection to the
 local source, or prove ownership of a Photos library. Their retained namespace,
 version, result and observation time remain visible. Thus an already filed preview
 can remain discoverable while its current original is still unverified.
+
+
+### Bounded local-original facts
+
+Add `--verify-local-originals /private/selected-source-ids.json` and
+`--originals-root /private/Photos.photoslibrary/originals` to the census metadata
+mode to check at most 25 explicitly selected image sources. `--snapshot-input`
+reuses an existing frozen local snapshot; it does not repeat a full enumeration.
+Only sources present in that snapshot and still visible at the same modification
+hint can be checked. The exporter reads the exact metadata path, verifies a regular
+file, hashes its bytes, recognizes the media signature, and checks file identity
+and a fresh metadata transaction afterward. A changed/withdrawn source, changed
+file, redirecting path, unsupported format or exceeded 30-second/128-MiB aggregate
+bound refuses the result. Individual files are limited to 64 MiB.
+
+Verified originals keep their own SHA-256 and byte-read provenance. They never
+inherit a preview hash or its privacy review. A missing local file is
+`localOriginalStatus: not_present` with `originalStatus: unverified`, not a claim
+that the original is unavailable in iCloud. The last verified checksum survives local
+eviction as `lastVerifiedOriginal`; it is historical evidence, not current availability.
+Reappearing bytes under the same source version must match it. No cloud download or
+upload is attempted.
+The native adapter preserves these source facts through the exact snapshot binding;
+originals without their own privacy evidence remain held and no source is selected
+for admission. All outputs are new private files; existing snapshots remain intact.

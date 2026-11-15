@@ -64,7 +64,8 @@ def adapt(native_input, native_output, *, snapshot_id, observed_at, source_names
         snapshot = {**original, "nativeInputSha256": native_output["inputSha256"],
                     "assets": [{**a, "discoveryControls": controls.get(a["id"], [])} for a in original_assets]}
     document = {"schemaVersion": 1, "intendedUse": "vehicle_gallery", "snapshot": snapshot,
-                "candidates": bound, "sourceFacts": {}, "priorSourceIds": []}
+                "candidates": bound, "sourceFacts": source_snapshot.get("sourceFacts", {}) if source_snapshot else {},
+                "priorSourceIds": []}
     if retained_disposition is not None:
         retained = {k: v for k, v in retained_disposition.items() if k != "manifestSha256"}
         require(retained_disposition.get("manifestSha256") == digest(retained), "retained disposition fingerprint changed")

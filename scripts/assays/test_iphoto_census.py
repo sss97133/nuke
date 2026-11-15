@@ -1,9 +1,11 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('census', Path(__file__).with_name('iphoto-census.py'))
 census = importlib.util.module_from_spec(spec)
@@ -87,6 +89,123 @@ class MetadataSnapshotTests(unittest.TestCase):
             census.write_private_json(path, {'version': 2})
         self.assertEqual(json.loads(path.read_text()), {'version': 1})
         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def originals_fixture(self):
+        root = Path(self.temp.name) / 'originals'
+        (root / 'A').mkdir(parents=True)
+        with sqlite3.connect(self.path) as db:
+            db.execute('ALTER TABLE ZASSET ADD COLUMN ZDIRECTORY TEXT')
+            db.execute('ALTER TABLE ZASSET ADD COLUMN ZFILENAME TEXT')
+            db.execute("UPDATE ZASSET SET ZDIRECTORY='A',ZFILENAME=ZUUID||'.jpg'")
+        (root / 'A' / 'a.jpg').write_bytes(b'\xff\xd8\xff' + b'synthetic original fixture')
+        return root, census.metadata_snapshot(self.path)
+
+    def test_original_bytes_are_separate_from_missing_local_cloud_unknown(self):
+        root, snapshot = self.originals_fixture()
+        facts = census.local_original_facts(self.path, snapshot, ['a', 'b'], root)
+        self.assertEqual(facts['a']['original']['mimeType'], 'image/jpeg')
+        self.assertEqual(facts['a']['original']['byteSize'], (root / 'A/a.jpg').stat().st_size)
+        self.assertFalse(facts['a']['selectedForAdmission'])
+        self.assertEqual(facts['b']['localOriginalStatus'], 'not_present')
+        self.assertEqual(facts['b']['originalStatus'], 'unverified')
+        self.assertNotIn('original', facts['b'])
+        self.assertNotIn('privacy', facts['a'])
+
+    def test_original_selection_refuses_stale_version_hidden_source_and_path_escape(self):
+        root, snapshot = self.originals_fixture()
+        with self.assertRaisesRegex(ValueError, 'outside visible'):
+            census.local_original_facts(self.path, snapshot, ['hidden'], root)
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE ZASSET SET ZMODIFICATIONDATE=202 WHERE ZUUID='a'")
+        with self.assertRaisesRegex(ValueError, 'version changed'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+        snapshot = census.metadata_snapshot(self.path)
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE ZASSET SET ZDIRECTORY='..' WHERE ZUUID='a'")
+        with self.assertRaisesRegex(ValueError, 'source path'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+
+    def test_source_withdrawn_during_byte_read_is_not_certified(self):
+        root, snapshot = self.originals_fixture()
+        real_sha = census.hashlib.sha256
+        class ChangingHash:
+            def __init__(self): self.inner = real_sha()
+            def update(self, chunk):
+                self.inner.update(chunk)
+                with sqlite3.connect(self_path) as db:
+                    db.execute("UPDATE ZASSET SET ZHIDDEN=1 WHERE ZUUID='a'")
+            def hexdigest(self): return self.inner.hexdigest()
+        self_path = self.path
+        with patch.object(census.hashlib, 'sha256', ChangingHash):
+            with self.assertRaisesRegex(ValueError, 'withdrawn'):
+                census.local_original_facts(self.path, snapshot, ['a'], root)
+
+    def test_same_version_changed_bytes_and_symlink_refuse(self):
+        root, snapshot = self.originals_fixture()
+        snapshot['sourceFacts'] = census.local_original_facts(self.path, snapshot, ['a'], root)
+        file = root / 'A/a.jpg'
+        file.write_bytes(b'\xff\xd8\xffdifferent fixture')
+        with self.assertRaisesRegex(ValueError, 'same source version'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+        file.unlink()
+        file.symlink_to(root / 'A/another.jpg')
+        with self.assertRaisesRegex(ValueError, 'redirects'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+
+    def test_missing_original_preserves_last_byte_identity_across_resume(self):
+        root, snapshot = self.originals_fixture()
+        file = root / 'A/a.jpg'
+        original = file.read_bytes()
+        snapshot['sourceFacts'] = census.local_original_facts(self.path, snapshot, ['a'], root)
+        checksum = snapshot['sourceFacts']['a']['original']['sha256']
+        file.unlink()
+        for _ in range(2):
+            snapshot['sourceFacts'].update(census.local_original_facts(self.path, snapshot, ['a'], root))
+            missing = snapshot['sourceFacts']['a']
+            self.assertEqual(missing['originalStatus'], 'unverified')
+            self.assertNotIn('original', missing)
+            self.assertEqual(missing['lastVerifiedOriginal']['sha256'], checksum)
+        file.write_bytes(b'\xff\xd8\xffdifferent original after local eviction')
+        with self.assertRaisesRegex(ValueError, 'same source version'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+        file.write_bytes(original)
+        restored = census.local_original_facts(self.path, snapshot, ['a'], root)
+        self.assertEqual(restored['a']['original']['sha256'], checksum)
+        self.assertEqual(restored['a']['localOriginalStatus'], 'verified')
+
+    def test_parent_directory_redirect_is_rejected(self):
+        root, snapshot = self.originals_fixture()
+        (root / 'A').rename(root / 'B')
+        (root / 'A').symlink_to(root / 'B', target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, 'redirects'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+
+    def test_parent_directory_redirect_during_read_is_rejected(self):
+        root, snapshot = self.originals_fixture()
+        real_sha = census.hashlib.sha256
+        class RedirectingHash:
+            def __init__(self): self.inner = real_sha()
+            def update(self, chunk):
+                self.inner.update(chunk)
+                (root / 'A').rename(root / 'B')
+                (root / 'A').symlink_to(root / 'B', target_is_directory=True)
+            def hexdigest(self): return self.inner.hexdigest()
+        with patch.object(census.hashlib, 'sha256', RedirectingHash):
+            with self.assertRaisesRegex(ValueError, 'directory changed or redirects'):
+                census.local_original_facts(self.path, snapshot, ['a'], root)
+
+    def test_special_file_and_oversize_original_refuse_before_reading(self):
+        root, snapshot = self.originals_fixture()
+        file = root / 'A/a.jpg'
+        file.unlink()
+        os.mkfifo(file)
+        with self.assertRaisesRegex(ValueError, 'regular-file byte bound'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+        file.unlink()
+        with file.open('wb') as stream:
+            stream.truncate(65 * 1024 * 1024)
+        with self.assertRaisesRegex(ValueError, 'regular-file byte bound'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
 
 
 if __name__ == '__main__':
