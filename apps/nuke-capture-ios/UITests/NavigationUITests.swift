@@ -56,6 +56,18 @@ final class NavigationUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "none carry a capture date")).firstMatch.exists)
     }
 
+    func testReturningFromEvidenceRechecksDayMembership() {
+        let app = openJourneyDay("changed")
+        let photo = app.buttons["day.photo.00000000-0000-4000-8000-00000000e001"]
+        XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
+        let evidence = app.descendants(matching: .any).matching(identifier: "day.evidence.00000000-0000-4000-8000-00000000e001").firstMatch
+        XCTAssertTrue(evidence.waitForExistence(timeout: 5))
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["day.photos.empty"].waitForExistence(timeout: 10))
+        XCTAssertFalse(photo.exists, "a source no longer returned for this day must not remain in its contact sheet")
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
+    }
+
     func testEventOnlyDayDoesNotClaimWorkWasLogged() {
         let app = openJourneyDay("events")
         XCTAssertTrue(app.staticTexts["day.photos.empty"].waitForExistence(timeout: 10))

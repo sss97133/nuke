@@ -2371,7 +2371,12 @@ private struct DayDrillSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .task(id: retryAttempt) { await load() }
-        .fullScreenCover(item: $selectedPhoto) { photo in
+        .fullScreenCover(item: $selectedPhoto, onDismiss: {
+            // Evidence inspection can include a reassignment. Keep the day,
+            // but re-read its current membership rather than retaining a moved photo.
+            VehicleImageLoader.invalidate(vehicleId: vehicleId)
+            retryAttempt += 1
+        }) { photo in
             AnalyzedEvidenceView(photo: analyze(photo))
                 .accessibilityIdentifier("day.evidence.\(photo.id.uuidString.lowercased())")
         }
@@ -2398,6 +2403,7 @@ private struct DayDrillSheet: View {
     private func load() async {
         loaded = false
         photoReadFailed = false
+        photos = []
         defer { loaded = true }
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC")
         guard let d = f.date(from: day.day),

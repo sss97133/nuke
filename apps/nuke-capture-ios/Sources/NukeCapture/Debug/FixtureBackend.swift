@@ -41,6 +41,7 @@ enum FixtureBackend {
             return (503, Data(#"{"message":"fixture day photo read failed"}"#.utf8))
         }
         if dayMode == "empty" || dayMode == "events" { return ok("[]") }
+        if dayMode == "changed", attempt > 1 { return ok("[]") }
         return ok("""
         [{"id":"00000000-0000-4000-8000-00000000e001","image_url":null,
           "taken_at":"\(journeyDay)T12:00:00Z","labels":[],"ai_processing_status":"pending"}]
