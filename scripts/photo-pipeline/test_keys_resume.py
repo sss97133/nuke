@@ -41,6 +41,18 @@ class Transport:
     def consumer(self,*args):return self.visible
 
 class Tests(unittest.TestCase):
+    def test_live_transport_cannot_write_without_atomic_source_contract(self):
+        transport = resume.LiveTransport({}, lane, {})
+        with self.assertRaisesRegex(resume.Hold, 'atomic_source_admission'):
+            transport.post({}, 100)
+
+    def test_empty_checkpoint_is_not_a_new_budget(self):
+        m=Memory();m.state={};t=Transport(m)
+        with self.assertRaisesRegex(resume.Hold, 'checkpoint_invalid'):
+            self.run_plan(plan(),m,t)
+        self.assertEqual(m.state,{})
+        self.assertFalse(t.posts)
+
     def run_plan(self,p,m,t,write=True,now=1):return resume.resume(p,m.state,t,m.save,lane,write,lambda:now)
     def test_partial_photo_resumes_each_claim(self):
         p=plan();m=Memory();t=Transport(m);claims,_=resume.prepare(p,lane);t.put(claims[0]['body'])

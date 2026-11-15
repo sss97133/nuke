@@ -1,8 +1,11 @@
 # Frozen cached-unit resume
 
 `keys_lane.py --resume-plan FILE --plan-sha256 SHA256 --checkpoint PRIVATE_FILE`
-validates and reconciles a fixed source cohort. Add `--write` only for an authorized
-admission pass. The legacy `--write` entry point refuses before reading credentials
+validates and reconciles a fixed source cohort. Production writes remain refused:
+the generic writer does not atomically enforce this claim shape's retained-source
+contract and its typed consumer remains unresolved. `--write` exercises admission
+only with offline test transports until those dependencies are implemented.
+The legacy `--write` entry point refuses before reading credentials
 or invoking a model. Legacy dry-run behavior remains unchanged; it is not part of
 the zero-model resume mode.
 

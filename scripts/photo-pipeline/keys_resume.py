@@ -108,8 +108,9 @@ def prepare(plan, lane):
 def resume(plan, checkpoint, transport, save, lane, write=False, now=time.time):
     """One frozen plan, per-claim reconciliation, at most one request per identity."""
     version = digest(plan)
-    state = checkpoint or {'plan_hash': version, 'deadline': plan['deadline'], 'requests': 0, 'model_calls': 0,
+    state = checkpoint if checkpoint is not None else {'plan_hash': version, 'deadline': plan['deadline'], 'requests': 0, 'model_calls': 0,
                            'model_tokens': 0, 'claims': {}, 'phase': 'prepared'}
+    require(isinstance(state, dict) and all(k in state for k in ('plan_hash', 'deadline', 'requests', 'claims')), 'checkpoint_invalid')
     require(state['plan_hash'] == version and state['deadline'] == plan['deadline'], 'checkpoint_plan_changed')
     save(state)
     active = None
@@ -200,7 +201,10 @@ class LiveTransport:
         return self.rows('vehicle_observations', {'select':'id,vehicle_id,source_identifier,source_url,kind,extraction_method,raw_source_ref,content_text,structured_data,content_hash,is_superseded,superseded_by,descriptor_id,observed_at', 'source_id':'eq.'+source[0]['id'], 'source_identifier':'eq.'+body['source_identifier'],'limit':2}, deadline)
 
     def post(self, body, deadline):
-        return self.request('/functions/v1/ingest-observation', deadline, body)
+        # Client-side before/after reads cannot enforce source currentness at
+        # admission. Enable only once this claim shape has an atomic writer
+        # contract and a qualified consumer; offline transports exercise resume.
+        raise Hold('atomic_source_admission_and_consumer_dependency')
 
     def witness(self, observation, image, deadline):
         return bool(self.rows('observation_witnesses', {'select':'id','observation_id':'eq.'+observation,'image_id':'eq.'+image,'limit':1}, deadline))
@@ -234,10 +238,11 @@ def cli(argv, env, lane, out=print):
     # Never reset/steal a crashed run's lock or checkpoint.
     os.mkdir(lock, 0o700)
     try:
-        with open(args.resume_plan) as file:
+        with open(args.resume_plan, 'rb') as file:
             raw = file.read()
-        require(hashlib.sha256(raw.encode()).hexdigest() == args.plan_sha256, 'frozen_file_hash_changed')
+        require(hashlib.sha256(raw).hexdigest() == args.plan_sha256, 'frozen_file_hash_changed')
         plan = json.loads(raw)
+        require(not args.write, 'atomic_source_admission_and_consumer_dependency')
         require(all(env.get(k) for k in ('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY')), 'backend_credentials_missing')
         try:
             with open(args.checkpoint) as file:
