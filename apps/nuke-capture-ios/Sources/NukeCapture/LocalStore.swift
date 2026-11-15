@@ -324,6 +324,24 @@ struct ImageLedger {
 struct LocalAlbumPhoto: Codable, Equatable, Sendable {
     let localIdentifier: String
     let sourceVersion: String?
+    var captureAt: String? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+
+    private enum CodingKeys: String, CodingKey { case localIdentifier, sourceVersion, captureAt, latitude, longitude }
+    init(localIdentifier: String, sourceVersion: String?, captureAt: String? = nil,
+         latitude: Double? = nil, longitude: Double? = nil) {
+        self.localIdentifier = localIdentifier; self.sourceVersion = sourceVersion
+        self.captureAt = captureAt; self.latitude = latitude; self.longitude = longitude
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        localIdentifier = try c.decode(String.self, forKey: .localIdentifier)
+        sourceVersion = try c.decodeIfPresent(String.self, forKey: .sourceVersion)
+        captureAt = try c.decodeIfPresent(String.self, forKey: .captureAt)
+        latitude = try c.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
+    }
 }
 
 struct LocalPhotoAlbum: Codable, Equatable, Identifiable, Sendable {
@@ -426,11 +444,19 @@ struct LocalProfileEvidence: Sendable {
     let catalog: LocalAlbumCatalog
     let photos: [LocalProfilePhotoEvidence]
     let vehicles: [GarageVehicle]
+    let discoveryAssets: [LibraryCandidateDiscovery.Asset]
+    var anchorVehicleIds: Set<String> {
+        Set(discoveryAssets.flatMap(\.exactVehicleIds))
+    }
+    func discovery(vehicleId: String = "", seedIds: [String] = []) -> LibraryCandidateDiscovery.Output {
+        LibraryCandidateDiscovery.discover(.init(assets: discoveryAssets, targetVehicleId: vehicleId,
+            timeZoneIdentifier: TimeZone.current.identifier, seedAssetIds: seedIds))
+    }
     var reviewed: Int { photos.filter { $0.review != nil }.count }
     var vehicleFrames: Int { photos.filter { $0.review?.isVehicle == true }.count }
     var matched: Int { photos.filter { $0.candidateVehicleIds.count == 1 }.count }
     var conflicted: Int { photos.filter { $0.candidateVehicleIds.count > 1 }.count }
-    var unresolved: Int { photos.filter { $0.review?.isVehicle == true && $0.candidateVehicleIds.isEmpty }.count }
+    var unresolved: Int { discoveryAssets.count }
 }
 
 // MARK: - The store
@@ -996,9 +1022,15 @@ final class LocalStore {
         let source = catalog.photos ?? catalog.albums.flatMap(\.photos)
         let photos = Dictionary(source.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
         let known = cachedGarage(userId: userId)?.vehicles.map(\.projection) ?? []
+        var bySerial: [String: [String]] = [:]
+        for vehicle in known {
+            if let vin = vehicle.vin?.uppercased(), (10...17).contains(vin.count) {
+                bySerial[vin, default: []].append(vehicle.vehicle_id)
+            }
+        }
         return try dbQueue.read { db in
             var reviews: [String: LocalAlbumImageReview] = [:]
-            var clocks: [String: Date] = [:]
+            var recordedBindings: [String: String] = [:]
             for chunk in Array(photos.keys).chunked(400) where !chunk.isEmpty {
                 for row in try LocalAlbumImageReview.fetchAll(db, sql: """
                     SELECT * FROM photo_album_image_review
@@ -1009,23 +1041,33 @@ final class LocalStore {
                     reviews[row.localIdentifier] = row
                 }
                 for row in try Row.fetchAll(db, sql: """
-                    SELECT localIdentifier, takenAt FROM appearance
-                    WHERE localIdentifier IN (\(databaseQuestionMarks(count: chunk.count))) AND takenAt IS NOT NULL
+                    SELECT a.localIdentifier AS localIdentifier, vi.vehicleId AS vehicleId
+                    FROM appearance a JOIN vehicle_image vi
+                      ON vi.localIdentifier = a.localIdentifier AND vi.phashHex = a.phashHex
+                    WHERE a.localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                      AND vi.vehicleId IS NOT NULL
                     """, arguments: StatementArguments(chunk)) {
-                    clocks[row["localIdentifier"] as String] = row["takenAt"] as Date
+                    let id: String = row["localIdentifier"]
+                    if reviews[id] != nil { recordedBindings[id] = row["vehicleId"] as String }
                 }
             }
+            var discoveryAssets: [LibraryCandidateDiscovery.Asset] = []
             let evidence = photos.values.map { photo -> LocalProfilePhotoEvidence in
                 let review = reviews[photo.localIdentifier]
                 let tokens = review.map { Self.serialTokens($0.vinCandidates + $0.textLines) } ?? []
-                let matches = known.filter { v in
-                    guard let vin = v.vin?.uppercased(), vin.count >= 10, vin.count <= 17 else { return false }
-                    return tokens.contains(vin)
-                }.map(\.vehicle_id).sorted()
+                let matches = Array(Set(tokens.flatMap { bySerial[$0] ?? [] })).sorted()
+                discoveryAssets.append(.init(id: photo.localIdentifier, sourceVersion: photo.sourceVersion,
+                    captureAt: photo.captureAt,
+                    latitude: photo.latitude, longitude: photo.longitude,
+                    labels: review?.labels ?? [], exactVehicleIds: matches,
+                    filedVehicleId: recordedBindings[photo.localIdentifier],
+                    isPersonal: review.map { $0.hasPerson && !$0.isVehicle } ?? false,
+                    captureClockBasis: "photokit_creation",
+                    reviewSourceVersion: review?.sourceVersion, labelSource: nil))
                 return LocalProfilePhotoEvidence(photo: photo, review: review,
-                    candidateVehicleIds: matches, takenAt: clocks[photo.localIdentifier])
+                    candidateVehicleIds: matches, takenAt: nil)
             }.sorted { $0.photo.localIdentifier < $1.photo.localIdentifier }
-            return LocalProfileEvidence(catalog: catalog, photos: evidence, vehicles: known)
+            return LocalProfileEvidence(catalog: catalog, photos: evidence, vehicles: known, discoveryAssets: discoveryAssets)
         }
     }
 
