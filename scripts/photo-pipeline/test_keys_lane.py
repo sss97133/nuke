@@ -6,7 +6,9 @@ import ast, collections, json, os, re, subprocess, sys, tempfile, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import keys_lane
-from keys_lane import body_for, jsonb, landable, read_envelope, run, utc_ms
+# Historical characterization of the retired writer implementation. The public
+# run/CLI gate is tested separately and cannot enter this write path.
+from keys_lane import body_for, jsonb, landable, read_envelope, _legacy_run as run, utc_ms
 
 V, U = '1b1b1b1b-2222-4333-8444-555555555555', '66666666-7777-4888-8999-aaaaaaaaaaaa'
 P1, P2, P3 = ('aaaaaaaa-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000002', 'cccccccc-0000-4000-8000-000000000003')
