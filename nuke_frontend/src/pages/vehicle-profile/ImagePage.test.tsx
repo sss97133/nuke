@@ -264,3 +264,18 @@ it('offers retry when only a raw relation read is unavailable', async () => {
   await act(async () => retry!.click());
   expect(host.textContent).not.toContain('Read unavailable'); expect(host.textContent).not.toContain('Retry details');
 });
+
+it('renders HEIC through contain-sized JPEG service and falls back to stored renditions without retrying original', async () => {
+  const heic = 'https://example.supabase.co/storage/v1/object/public/vehicle-photos/IMG_5047.HEIC';
+  fixture.read.mockImplementation(c => c.table === 'vehicle_images' ? { data: c.single ? image({
+    image_url: heic, medium_url: 'https://example.invalid/medium.jpg', thumbnail_url: 'https://example.invalid/thumb.jpg',
+  }) : [], error: null } : read(c));
+  await mount();
+  expect(host.querySelector('aside img')?.getAttribute('src')).toBe(heic.replace('/object/public/', '/render/image/public/')+'?width=1200&quality=90&resize=contain');
+  await act(async () => host.querySelector('aside img')!.dispatchEvent(new Event('error')));
+  expect(host.querySelector('aside img')?.getAttribute('src')).toBe('https://example.invalid/medium.jpg');
+  await act(async () => host.querySelector('aside img')!.dispatchEvent(new Event('error')));
+  expect(host.querySelector('aside img')?.getAttribute('src')).toBe('https://example.invalid/thumb.jpg');
+  await act(async () => host.querySelector('aside img')!.dispatchEvent(new Event('error')));
+  expect(host.querySelector('aside img')).toBeNull(); expect(host.textContent).toContain('Image rendition unavailable.');
+});

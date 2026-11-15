@@ -13,6 +13,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/button';
 import './vehicle-evidence-detail.css';
 import { supabase } from '../../lib/supabase';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
 import { webSourceUrl, readImageWitnesses } from './hooks/useVehicleImageEvidence';
 
@@ -96,6 +97,7 @@ const ImagePageContent: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [readAttempt, setReadAttempt] = useState(0);
+  const [renditionIndex, setRenditionIndex] = useState(0);
   const image = loadedSubject === `${vehicleId}:${imageId}` ? imageRow : null;
 
   useEffect(() => {
@@ -106,6 +108,7 @@ const ImagePageContent: React.FC = () => {
     setLoading(true);
     setError(null);
     setLoadedSubject(null);
+    setRenditionIndex(0);
     setVehicle(null);
     setImage(null);
     setWitnessed([]);
@@ -273,6 +276,7 @@ const ImagePageContent: React.FC = () => {
         } else if (!cancelled) {
           setImage(null);
           setLoadedSubject(null);
+    setRenditionIndex(0);
           const messages = ['Vehicle unavailable.', 'Unable to load this vehicle. Try again.',
             'Image unavailable for this vehicle.', 'Unable to load this image. Try again.'];
           const message = failure instanceof Error ? failure.message : '';
@@ -295,10 +299,13 @@ const ImagePageContent: React.FC = () => {
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
     : 'Vehicle';
 
-  // Use the raw image_url. The Supabase render endpoint with only width set
-  // defaults to resize=cover and produces distorted/cropped output on portrait
-  // iPhone captures. For a single-image detail view, bandwidth is acceptable.
-  const renderSrc = webSourceUrl(image?.image_url);
+  // Render approved browser-compatible renditions; the stored original may be
+  // HEIC. The shared optimizer explicitly preserves aspect ratio with contain.
+  const originalUrl = webSourceUrl(image?.image_url);
+  const renditions = [...new Set([optimizeImageUrl(originalUrl, 'large'), image?.medium_url, image?.thumbnail_url]
+    .map(url => webSourceUrl(url)).filter((url): url is string => !!url
+      && (!/\.hei[cf](?:[?#]|$)/i.test(url) || url.includes('/storage/v1/render/image/'))))];
+  const renderSrc = renditions[renditionIndex] ?? null;
 
   return (
     <div className="evidence-detail image-evidence-detail"
@@ -390,6 +397,7 @@ const ImagePageContent: React.FC = () => {
                   src={renderSrc}
                   alt={image.caption ? `Recorded caption: ${image.caption}` : image.file_name || 'Vehicle image'}
                   decoding="async"
+                  onError={() => setRenditionIndex(index => index + 1)}
                   width={1200}
                   height={900}
                   style={{
@@ -402,7 +410,7 @@ const ImagePageContent: React.FC = () => {
                 />
               </a>
             )}
-            {!renderSrc && <p role="status">Original image URL unavailable.</p>}
+            {!renderSrc && <p role="status">{originalUrl ? 'Image rendition unavailable.' : 'Original image URL unavailable.'}</p>}
             {image.vision_gate_agent_reasoning && (
               <div className="evidence-metadata">
                 <strong>Stored review interpretation</strong>
