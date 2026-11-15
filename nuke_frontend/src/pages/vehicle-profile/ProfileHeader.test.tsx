@@ -21,10 +21,11 @@ vi.mock('./profileDocument', async (original) => {
 });
 // A header token opens its line items; the item renderer has its own suite (HeaderTokenItems.test.tsx).
 vi.mock('./HeaderTokenItems', () => ({ default: ({ dimension, items }: any) => <div data-testid="token-items" data-dimension={dimension} data-items={items ? 'carried' : 'none'}>{dimension} line items</div> }));
+vi.mock('../../components/map/ZipOutlineContent', () => ({ ZipOutlineContent: () => <div data-testid="zip-outline-content" /> }));
 // This suite owns price provenance; the financial department has its own reader/interaction tests.
-vi.mock('./ProfileFinancials', () => ({ default: ({ market }: any) => <>{market}<button>$$$</button></> }));
+vi.mock('./ProfileFinancials', () => ({ default: ({ market, open, onToggle }: any) => <>{market}<button aria-label="Explore vehicle financials" onClick={onToggle}>$$$</button>{open && <div role="dialog" aria-label="Financials" />}</> }));
 vi.mock('../../components/auction/ExternalAuctionLiveBanner', () => ({ default: () => null,
-  ExternalAuctionSummary: ({ currentBid }: any) => <button data-live-bid={currentBid}>Live episode</button> }));
+  ExternalAuctionSummary: ({ currentBid, onClick }: any) => <button data-live-bid={currentBid} onClick={onClick}>Live episode</button> }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => fixture.mobile }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a href={to}>{children}</a> }));
 import ProfileHeader, { comparableLotKey, extractInlineLotProvenance } from './ProfileHeader';
@@ -378,6 +379,35 @@ it('uses the shared mobile header sheet for ZIP without a second modal', async (
   await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(document.body.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).toBeNull();
   expect(document.activeElement).toBe(trigger);
+});
+
+it('closes ZIP before opening another header facet or financials', async () => {
+  await render();
+  const zip = host.querySelector('[aria-label="Explore ZIP 89005 area"]') as HTMLButtonElement;
+  const engine = host.querySelector('[aria-label="Explore 4.7L V8 in this profile"]') as HTMLButtonElement;
+  await act(async () => zip.click());
+  expect(host.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).not.toBeNull();
+  await act(async () => engine.click());
+  expect(host.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).toBeNull();
+  expect(host.querySelector('[role="dialog"][aria-label="4.7L V8"]')).not.toBeNull();
+  await act(async () => zip.click());
+  await act(async () => (host.querySelector('[aria-label="Explore vehicle financials"]') as HTMLButtonElement).click());
+  expect(host.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).toBeNull();
+  expect(host.querySelector('[role="dialog"][aria-label="Financials"]')).not.toBeNull();
+});
+
+it('opens ZIP instead of leaving the live auction popup beside it', async () => {
+  fixture.pulse = { platform: 'bat', listing_url: 'https://bringatrailer.com/listing/x', listing_status: 'active', event_type: 'auction', current_bid: 12345, end_date: '2099-01-01T00:00:00Z' };
+  await render();
+  await act(async () => (host.querySelector('[data-live-bid]') as HTMLButtonElement).click());
+  expect(host.querySelector('[role="dialog"][aria-label="Live auction"]')).not.toBeNull();
+  (host.querySelector('.vp-header-configuration') as HTMLDetailsElement).open = true;
+  await act(async () => (host.querySelector('[aria-label="Explore ZIP 89005 area"]') as HTMLButtonElement).click());
+  expect(host.querySelector('[role="dialog"][aria-label="Live auction"]')).toBeNull();
+  expect(host.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).not.toBeNull();
+  await act(async () => (host.querySelector('[data-live-bid]') as HTMLButtonElement).click());
+  expect(host.querySelector('[role="dialog"][aria-label="ZIP 89005 area"]')).toBeNull();
+  expect(host.querySelector('[role="dialog"][aria-label="Live auction"]')).not.toBeNull();
 });
 
 it('does not turn a city or an unverified ZIP into a header location chip', async () => {
