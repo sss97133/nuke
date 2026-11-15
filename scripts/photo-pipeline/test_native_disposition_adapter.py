@@ -56,6 +56,13 @@ class NativeAdapterTests(unittest.TestCase):
         _, with_original = bound_adapt(source, selected, **args)
         self.assertEqual(with_original["counts"], {"privacy_hold": 1, "unsupported_video": 1})
         self.assertEqual(with_original["sourceProposals"], [])
+        fact = args["source_snapshot"]["sourceFacts"]["image"]
+        fact["lastVerifiedOriginal"] = fact.pop("original")
+        fact["localOriginalStatus"] = "not_present"
+        fact["originalStatus"] = "unverified"
+        _, with_historical_original = bound_adapt(source, selected, **args)
+        self.assertEqual(with_historical_original["counts"], {"original_unverified": 1, "unsupported_video": 1})
+        self.assertEqual(with_historical_original["sourceProposals"], [])
         changed = {"assets": [{**image, "sourceVersion": "new-version"}]}
         with self.assertRaisesRegex(ValueError, "exact source snapshot"):
             bound_adapt(changed, selected, **args)

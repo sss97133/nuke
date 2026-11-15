@@ -233,10 +233,15 @@ def local_original_facts(database, snapshot, source_ids, originals_root):
             fact['originalStatus'] = 'verified'
         if current(sid) != before:
             raise ValueError('local source changed during original read')
-        prior = snapshot.get('sourceFacts', {}).get(sid, {}).get('original')
+        prior_facts = snapshot.get('sourceFacts', {}).get(sid, {})
+        prior = prior_facts.get('original') or prior_facts.get('lastVerifiedOriginal')
         if (prior and fact.get('original') and prior.get('sourceVersion') == version
                 and prior.get('sha256') != fact['original']['sha256']):
             raise ValueError('original bytes changed under the same source version')
+        if prior and not fact.get('original'):
+            # Local eviction does not reset the prior byte identity. Keep this
+            # historical fact separate: it cannot qualify current availability.
+            fact['lastVerifiedOriginal'] = prior
         facts[sid] = fact
     within()
     return facts

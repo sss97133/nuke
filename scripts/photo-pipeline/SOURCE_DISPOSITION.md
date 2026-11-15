@@ -142,7 +142,10 @@ bound refuses the result. Individual files are limited to 64 MiB.
 Verified originals keep their own SHA-256 and byte-read provenance. They never
 inherit a preview hash or its privacy review. A missing local file is
 `localOriginalStatus: not_present` with `originalStatus: unverified`, not a claim
-that the original is unavailable in iCloud. No cloud download or upload is attempted.
+that the original is unavailable in iCloud. The last verified checksum survives local
+eviction as `lastVerifiedOriginal`; it is historical evidence, not current availability.
+Reappearing bytes under the same source version must match it. No cloud download or
+upload is attempted.
 The native adapter preserves these source facts through the exact snapshot binding;
 originals without their own privacy evidence remain held and no source is selected
 for admission. All outputs are new private files; existing snapshots remain intact.

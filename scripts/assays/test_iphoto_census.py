@@ -152,6 +152,27 @@ class MetadataSnapshotTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'redirects'):
             census.local_original_facts(self.path, snapshot, ['a'], root)
 
+    def test_missing_original_preserves_last_byte_identity_across_resume(self):
+        root, snapshot = self.originals_fixture()
+        file = root / 'A/a.jpg'
+        original = file.read_bytes()
+        snapshot['sourceFacts'] = census.local_original_facts(self.path, snapshot, ['a'], root)
+        checksum = snapshot['sourceFacts']['a']['original']['sha256']
+        file.unlink()
+        for _ in range(2):
+            snapshot['sourceFacts'].update(census.local_original_facts(self.path, snapshot, ['a'], root))
+            missing = snapshot['sourceFacts']['a']
+            self.assertEqual(missing['originalStatus'], 'unverified')
+            self.assertNotIn('original', missing)
+            self.assertEqual(missing['lastVerifiedOriginal']['sha256'], checksum)
+        file.write_bytes(b'\xff\xd8\xffdifferent original after local eviction')
+        with self.assertRaisesRegex(ValueError, 'same source version'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+        file.write_bytes(original)
+        restored = census.local_original_facts(self.path, snapshot, ['a'], root)
+        self.assertEqual(restored['a']['original']['sha256'], checksum)
+        self.assertEqual(restored['a']['localOriginalStatus'], 'verified')
+
     def test_parent_directory_redirect_is_rejected(self):
         root, snapshot = self.originals_fixture()
         (root / 'A').rename(root / 'B')
