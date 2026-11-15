@@ -66,7 +66,7 @@ struct SignatureItemSheet: View {
                             Label("Open the job to sign", systemImage: "signature")
                         }
                     } else {
-                        Text("This item is not linked to a job.").font(.footnote).foregroundStyle(.secondary)
+                        Text("A job link is not available for this item.").font(.footnote).foregroundStyle(.secondary)
                             .accessibilityIdentifier("signature.missing-job")
                     }
                 } footer: {
