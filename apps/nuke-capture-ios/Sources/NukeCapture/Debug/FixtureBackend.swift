@@ -90,6 +90,9 @@ enum FixtureBackend {
         "work_order_statement_read", "facility_read", "my_vouches_read", "user_org_relations",
         // The vehicle screen's Comment summary section: a stable read-only SQL function, never a write.
         "popup_vehicle_intel",
+        // Versioned STABLE profile readers (20261116050000_profile_read_functions_v1.sql).
+        // Their _v1 suffix does not match the generic _read classifier.
+        "profile_vehicle_relationships_read_v1", "profile_labor_read_v1", "profile_money_read_v1",
     ]
 
     /// Explore's anonymous market reads. Explore is the default tab, so they run in every launch that
