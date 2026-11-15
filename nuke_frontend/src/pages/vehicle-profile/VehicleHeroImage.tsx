@@ -14,6 +14,8 @@ function ContextualHero({ vehicleId, field, label, onClear }: { vehicleId: strin
   const inventory = useVehicleImageEvidence(vehicleId, field);
   const [index, setIndex] = useState(0);
   const cited = heroFacetImages(inventory.data?.citedImages || [], inventory.data?.citations || []);
+  const citedReferenceIds = new Set((inventory.data?.citations || []).map(source => source.imageId));
+  const availableCitationIds = new Set((inventory.data?.citedImages || []).map(item => item.image.id));
   const images = cited.length ? cited : relatedFieldImages(inventory.data?.images || [], field);
   const sourceLabel = cited.length ? 'cited photographs' : 'related areas';
   const image = images[index % (images.length || 1)];
@@ -29,7 +31,7 @@ function ContextualHero({ vehicleId, field, label, onClear }: { vehicleId: strin
     </> : <p role="status">{inventory.isPending ? 'Reading source photographs…' : inventory.isError ? 'Source photographs could not be read.'
       : inventory.data?.facetDimension ? 'No cited images or related areas returned by the current readers.'
         : 'No related image areas are indexed in the records read.'}</p>}
-    {!!inventory.data?.citations?.length && cited.length < new Set(inventory.data.citations.map(source => source.imageId)).size &&
+    {citedReferenceIds.size > availableCitationIds.size &&
       <p className="vp-context-hero__note">Some cited images are unavailable in the current public gallery.</p>}
     {inventory.data && !inventory.data.complete && <p className="vp-context-hero__note">Showing {inventory.data.images.length} of {inventory.data.total ?? 'unknown'} available photographs.</p>}
   </section>;

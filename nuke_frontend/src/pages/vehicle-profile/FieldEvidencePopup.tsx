@@ -13,7 +13,7 @@ import { Rows, Row } from '../../kit';
 import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
-import { useVehicleImageEvidence, relatedFieldImages, referenceFieldImages, isReferenceImage, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
+import { useVehicleImageEvidence, relatedFieldImages, referenceFieldImages, isReferenceImage, hasImageAnalysis, webSourceUrl, heroFacetImages } from './hooks/useVehicleImageEvidence';
 import { useFieldProvenance, citedFieldImages, currentImageObservations, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
 import { useFieldEvidence, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import FieldProvenanceDrawer from './FieldProvenanceDrawer';
@@ -218,8 +218,9 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   if (presentation === 'citations') {
     const correction = provenance.data?.current_correction;
     const readings = claimGroup?.sources.filter(source => source.source_type !== 'system_update') || [];
+    const directValueImages = heroFacetImages(facetCited, inventory.data?.citations || []);
     const imageIds = new Set([
-      ...facetCited.map(item => item.image.id),
+      ...directValueImages.map(image => image.id),
       ...readings.map(source => source.source_image_id),
       ...(provenance.data?.evidence || []).filter(source => source.source !== 'field_evidence').map(source => source.image_id),
       ...imageObservations.map(source => source.image_id),

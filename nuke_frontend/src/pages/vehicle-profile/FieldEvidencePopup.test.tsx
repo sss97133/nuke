@@ -39,6 +39,23 @@ it('opens a cited object and quotation immediately without claim drawers or scor
   expect(html).not.toContain('Stored score');
   expect(html).not.toContain('system update');
 });
+it('keeps examined and conflict-side facet photos out of an unlabelled current-value citation figure', () => {
+  fixture.provenance.data.observations = [];
+  const direct = { imageId: 'direct-image', facet: 'current', status: 'reading', relation: 'source' };
+  const examined = { imageId: 'examined-image', facet: 'current', status: 'missing', relation: 'examined' };
+  const conflict = { imageId: 'conflict-image', facet: 'current', status: 'conflict', relation: 'conflict_side' };
+  fixture.inventory.data.citations = [direct, examined, conflict];
+  fixture.inventory.data.citedImages = [
+    { image: { id: 'direct-image', image_url: 'https://example.test/direct.jpg' }, citations: [direct] },
+    { image: { id: 'examined-image', image_url: 'https://example.test/examined.jpg' }, citations: [examined] },
+    { image: { id: 'conflict-image', image_url: 'https://example.test/conflict.jpg' }, citations: [conflict] },
+  ];
+  const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="engine_type" label="Engine" value="V8" presentation="citations" />);
+  expect(html).toContain('direct.jpg');
+  expect(html).not.toContain('examined.jpg');
+  expect(html).not.toContain('conflict.jpg');
+  expect(html).not.toContain('engine.current');
+});
 it('opens an appearance witness directly but never attaches its reading to replacement bytes', () => {
   fixture.provenance.data.observations = [];
   fixture.provenance.data.image_observations = [{ observation_id: 'appearance-reading', image_id: 'appearance-image',

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ vehicle: null as any, depth: [] as { dimension: string; value: unknown }[], depthLoads: 0,
   media: [] as string[], photoOpens: [] as unknown[], leadImageUrl: null as string | null, isMobile: false,
+  facetEvidence: null as null | { citations: any[]; citedImages: any[] },
   galleryFilter: null as null | {field: string; label: string}, clear: vi.fn(),
   vehicleImages: [{ id: 'synthetic-unscreened', image_url: 'https://images.test/unscreened-gallery.jpg' }] }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, vehicleId: 'synthetic-spec-card', leadImageUrl: fixture.leadImageUrl, heroMeta: null, vehicleImages: fixture.vehicleImages, galleryFilter: fixture.galleryFilter, setGalleryFilter: fixture.clear }) }));
@@ -14,7 +15,7 @@ vi.mock('./hooks/useVehicleImageEvidence', async original => ({
   useVehicleImageEvidence: () => ({ data: { complete: true, images: [
     { id: 'drive-photo', image_url: 'https://images.test/drivetrain.jpg', vehicle_zone: 'mech_drivetrain', is_document: false },
     { id: 'engine-photo', image_url: 'https://images.test/engine.jpg', vehicle_zone: 'mech_engine_bay', is_document: false },
-  ] } }),
+  ], ...fixture.facetEvidence } }),
 }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => fixture.isMobile }));
 vi.mock('../../components/image/MobileImageGallery', () => ({ __esModule: true, default: () => { fixture.media.push('mobile'); return null; } }));
@@ -35,6 +36,7 @@ beforeEach(() => {
   fixture.vehicle = Object.freeze({ year: 1976, make: 'Synthetic', model: 'Specimen', body_style: 'Coupe', transmission: 'Manual' });
   fixture.depth = []; fixture.depthLoads = 0; fixture.media = []; fixture.photoOpens = [];
   fixture.galleryFilter = null; fixture.clear.mockReset(); fixture.isMobile = false;
+  fixture.facetEvidence = null;
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network forbidden'); }));
 });
 afterEach(async () => { if (root) await act(async () => root!.unmount()); host?.remove(); expect(globalThis.fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); });
@@ -87,6 +89,23 @@ it('selects related drivetrain views explicitly and keeps the image original and
   fixture.galleryFilter = null; await client(chosen);
   expect(host!.querySelector('.vp-context-hero')).toBeNull();
   expect(actualImage().src).toBe(chosen);
+});
+it('does not call an available as-built citation unavailable when current photos are selected', async () => {
+  fixture.galleryFilter = { field: 'engine_type', label: '455 V8' };
+  const current = { imageId: 'current-photo', facet: 'current', status: 'reading', relation: 'source' };
+  const asBuilt = { imageId: 'factory-photo', facet: 'as_built', status: 'established', relation: 'source' };
+  fixture.facetEvidence = { citations: [current, asBuilt], citedImages: [
+    { image: { id: 'current-photo', image_url: 'https://images.test/current.jpg' }, citations: [current] },
+    { image: { id: 'factory-photo', image_url: 'https://images.test/factory.jpg' }, citations: [asBuilt] },
+  ] };
+  await client(chosen);
+  expect(host!.querySelector<HTMLImageElement>('.vp-context-hero__photo img')?.src).toBe('https://images.test/current.jpg');
+  expect(host!.textContent).not.toContain('unavailable in the current public gallery');
+  fixture.facetEvidence = { citations: [current, asBuilt], citedImages: [
+    { image: { id: 'current-photo', image_url: 'https://images.test/current.jpg' }, citations: [current] },
+  ] };
+  await client(chosen);
+  expect(host!.textContent).toContain('Some cited images are unavailable in the current public gallery.');
 });
 async function client(lead: string | null) {
   fixture.leadImageUrl = lead;
