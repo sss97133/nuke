@@ -51,6 +51,11 @@ class NativeAdapterTests(unittest.TestCase):
         self.assertEqual(frozen["snapshot"]["sourceScope"], "local_photos_database")
         self.assertEqual(result["counts"], {"original_unverified": 1, "unsupported_video": 1})
         self.assertEqual(result["sourceProposals"], [])
+        args["source_snapshot"]["sourceFacts"] = {"image": {"sourceVersion": "local-v1", "selectedForAdmission": False,
+            "original": {"sourceVersion": "local-v1", "sha256": "a" * 64, "byteSize": 12, "mimeType": "image/jpeg"}}}
+        _, with_original = bound_adapt(source, selected, **args)
+        self.assertEqual(with_original["counts"], {"privacy_hold": 1, "unsupported_video": 1})
+        self.assertEqual(with_original["sourceProposals"], [])
         changed = {"assets": [{**image, "sourceVersion": "new-version"}]}
         with self.assertRaisesRegex(ValueError, "exact source snapshot"):
             bound_adapt(changed, selected, **args)
