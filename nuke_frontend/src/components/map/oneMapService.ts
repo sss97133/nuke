@@ -45,7 +45,7 @@ export async function readZip(zip: string, countyFips: string, signal?: AbortSig
 
 /** The facts for one area, every layer (map-vehicles mode=area), and for every area at a level in view (mode=areas). */
 export interface AreaLayers { level: string; key: string; from: string; to: string; layers: { layer: string; entities: number; priced: number; value: number | null; avg: number | null; as_of: string | null; latest_day: string | null }[] }
-export interface AreasOut { level: string; layer: string; from: string; to: string; areas: { key: string; entities: number; priced: number; value: number; avg: number | null }[]; unkeyed: { entities: number }; undated: { entities: number }; totals: { entities: number; value: number; areas: number }; by_source: { source: string; entities: number }[]; as_of: string | null }
+export interface AreasOut { level: string; layer: string; areas: { key: string; entities: number; priced: number; value: number; avg: number | null }[]; unkeyed: { entities: number }; undated: { entities: number }; totals: { entities: number; value: number; areas: number }; by_source: { source: string; entities: number }[]; as_of: string | null }
 const fn = async <T,>(params: Record<string, string | undefined>, signal?: AbortSignal): Promise<T> => {
   const qs = new URLSearchParams(); for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
   const res = await fetch(`${SUPABASE_URL}/functions/v1/map-vehicles?${qs}`, { signal, headers: { apikey: SUPABASE_ANON_KEY } });

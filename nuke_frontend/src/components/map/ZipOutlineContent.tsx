@@ -1,6 +1,5 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { zipAreaRequest, type ZipMapReading } from './zipAreaGeometry';
-import { ZipAreaActivity } from './ZipAreaActivity';
 import './zip-outline-content.css';
 
 const OneMap = lazy(() => import('./OneMap'));
@@ -20,7 +19,6 @@ export function ZipOutlineContent({ location }: { location: ZipMapReading }) {
         <OneMap focus={focus} />
       </Suspense> : <p>The location reader has no supported ZIP boundary for this record.</p>}
       {area && <p className="zip-outline-content__note">Census ZIP Code Tabulation Area outline.</p>}
-      {area && <ZipAreaActivity zip={area.zip} />}
   </div>;
 }
 
