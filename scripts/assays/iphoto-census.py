@@ -29,7 +29,7 @@ Do not mistake this local database boundary for full iCloud or PhotoKit permissi
 """
 import argparse, collections, datetime as dt, hashlib, json, math, os, sqlite3, stat, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
-from contextlib import closing
+from contextlib import closing, ExitStack
 
 
 def metadata_snapshot(database, max_assets=100000):
@@ -167,6 +167,19 @@ def local_original_facts(database, snapshot, source_ids, originals_root):
             if header[8:12] in (b'mif1', b'msf1'): return 'image/heif'
             if header[8:12] in (b'avif', b'avis'): return 'image/avif'
         raise ValueError('unsupported original byte format')
+    def open_original(directory, filename):
+        # Pin both directory components without following redirects. Closing the
+        # directory descriptors after open is safe: the file descriptor is pinned,
+        # and the named directory identities are rechecked after the byte read.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        with ExitStack() as handles:
+            root_fd = os.open(root, flags)
+            handles.callback(os.close, root_fd)
+            directory_fd = os.open(directory, flags, dir_fd=root_fd)
+            handles.callback(os.close, directory_fd)
+            root_stat, directory_stat = os.fstat(root_fd), os.fstat(directory_fd)
+            fd = os.open(filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
+            return fd, root_stat, directory_stat
     for sid in source_ids:
         within()
         asset, before = assets[sid], current(sid)
@@ -180,13 +193,13 @@ def local_original_facts(database, snapshot, source_ids, originals_root):
                 or directory in ('', '.', '..') or filename in ('', '.', '..')):
             raise ValueError('invalid original source path')
         path = root / directory / filename
-        if not path.resolve().is_relative_to(root) or path.is_symlink():
+        if not path.resolve().is_relative_to(root) or path.parent.is_symlink() or path.is_symlink():
             raise ValueError('original source path escapes or redirects')
         fact = {'sourceVersion': version, 'selectedForAdmission': False,
                 'localOriginalReadAt': dt.datetime.now(dt.timezone.utc).isoformat(),
                 'originalStatus': 'unverified'}
         try:
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            fd, root_stat, directory_stat = open_original(directory, filename)
         except FileNotFoundError:
             fact['localOriginalStatus'] = 'not_present'
         else:
@@ -206,8 +219,12 @@ def local_original_facts(database, snapshot, source_ids, originals_root):
                     if size > initial.st_size: raise ValueError('original grew during read')
                 final = os.fstat(source.fileno())
             signature = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
-            if size != initial.st_size or signature(initial) != signature(final) or signature(final) != signature(path.stat()):
+            if size != initial.st_size or signature(initial) != signature(final) or signature(final) != signature(path.stat(follow_symlinks=False)):
                 raise ValueError('original changed during read')
+            for named, opened in ((root, root_stat), (path.parent, directory_stat)):
+                now = named.stat(follow_symlinks=False)
+                if not stat.S_ISDIR(now.st_mode) or (now.st_dev, now.st_ino) != (opened.st_dev, opened.st_ino):
+                    raise ValueError('original directory changed or redirects during read')
             total += size
             fact['original'] = {'sourceVersion': version, 'sha256': checksum.hexdigest(), 'byteSize': size, 'mimeType': mime(header),
                 'readBasis': {'kind': 'local_photos_original_path', 'sourceNamespace': meta['sourceNamespace'],

@@ -152,6 +152,27 @@ class MetadataSnapshotTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'redirects'):
             census.local_original_facts(self.path, snapshot, ['a'], root)
 
+    def test_parent_directory_redirect_is_rejected(self):
+        root, snapshot = self.originals_fixture()
+        (root / 'A').rename(root / 'B')
+        (root / 'A').symlink_to(root / 'B', target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, 'redirects'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+
+    def test_parent_directory_redirect_during_read_is_rejected(self):
+        root, snapshot = self.originals_fixture()
+        real_sha = census.hashlib.sha256
+        class RedirectingHash:
+            def __init__(self): self.inner = real_sha()
+            def update(self, chunk):
+                self.inner.update(chunk)
+                (root / 'A').rename(root / 'B')
+                (root / 'A').symlink_to(root / 'B', target_is_directory=True)
+            def hexdigest(self): return self.inner.hexdigest()
+        with patch.object(census.hashlib, 'sha256', RedirectingHash):
+            with self.assertRaisesRegex(ValueError, 'directory changed or redirects'):
+                census.local_original_facts(self.path, snapshot, ['a'], root)
+
     def test_special_file_and_oversize_original_refuse_before_reading(self):
         root, snapshot = self.originals_fixture()
         file = root / 'A/a.jpg'
