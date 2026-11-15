@@ -1,6 +1,7 @@
 -- Empty local PG17 only. Source capture through the actual existing owner and
 -- INSERT triggers; synthetic source data, no network or production connection.
 \set ON_ERROR_STOP on
+SET statement_timeout='30s';
 DO $$BEGIN
  IF current_database() NOT LIKE 'dm_refinement_%' OR to_regclass('public.vehicle_images') IS NOT NULL THEN
   RAISE EXCEPTION 'Empty disposable dm_refinement database required';
