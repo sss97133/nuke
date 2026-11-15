@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { Rows, Row } from '../../kit';
+import { Rows, Row, itemLabel, valueText } from '../../kit';
 import PrefetchLink from '../../components/PrefetchLink';
 import { Button } from '../../components/ui/button';
 import { usePopup } from '../../components/popups/usePopup';
@@ -345,6 +345,18 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
       {claims.loading && <p role="status">Reading claim details and correction history…</p>}
 
       {/* Claim-specific references from the existing provenance reader. */}
+      {!imagesLoading && facetCited.length > 0 && <div className="ev-citation-grid">
+        {facetCited.filter(item => !citedIds.has(item.image.id)).map(({ image, citations: associations }) => <article key={image.id} className="ev-image-proof">
+          <button type="button" aria-label={`Inspect cited photograph for ${label}`} onClick={() => { closeTop(); openVehiclePhoto(image.id); }}>
+            <img src={optimizeImageUrl(image.image_url, 'medium') || image.image_url} alt={`Cited source for ${label.toLowerCase()}`} width={900} height={675} loading="lazy" />
+          </button>
+          {associations.map((citation, index) => <p key={index}>
+            {{ current: 'Current', as_built: 'As built', decode: 'Decoded', derived: 'Derived' }[citation.facet]} · {itemLabel({ key: citation.itemKey, facet: citation.facet })} · {' '}
+            {{ source: 'Source reading', conflict_side: 'Conflicting report', examined: 'Examined source', availability: 'Availability reference' }[citation.relation]}
+            {valueText(citation.sideValue ?? citation.source.value) && `: ${valueText(citation.sideValue ?? citation.source.value)}`}
+          </p>)}
+        </article>)}
+      </div>}
       {!imagesLoading && citations.length > 0 && (
         <div className="field-image-citations">
           <div className="ev-label">IMAGE-CITED OBSERVATIONS · {citations.length} IMAGE{citations.length !== 1 ? 'S' : ''}</div>

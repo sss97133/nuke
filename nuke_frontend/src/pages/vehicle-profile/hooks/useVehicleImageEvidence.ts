@@ -225,8 +225,8 @@ export function useVehicleImageEvidence(vehicleId: string | undefined, field?: s
     isPending: inventory.isPending || (!!facetDimension && (facet.isPending || facet.isFetching)),
     isLoading: inventory.isLoading || (!!facetDimension && (facet.isLoading || facet.isFetching)),
     isFetching: inventory.isFetching || facet.isFetching,
-    isError: inventory.isError || facet.isError,
-    error: inventory.error || facet.error,
-    refetch: () => { void facet.refetch(); return inventory.refetch(); },
+    isError: inventory.isError || (!!facetDimension && facet.isError),
+    error: inventory.error || (facetDimension ? facet.error : null),
+    refetch: () => { if (facetDimension) void facet.refetch(); return inventory.refetch(); },
   };
 }
