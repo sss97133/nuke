@@ -12,8 +12,9 @@ the statement, so a wrong placement by the model can land. Each row is agent tes
 usage: keys_lane.py --vehicle-id <uuid> --user-id <uuid> [--photos 1] [--model sonnet]
                     [--after <photo id, or the 8-character cursor a run printed>] [--write]
 environment: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CLAUDE_CODE_OAUTH_TOKEN (the Claude subscription).
-Without --write it is a dry run: nothing is written anywhere. With --write each landable claim is POSTed to
-ingest-observation, the sanctioned writer, with the body keys-dry-run/land.sql builds.
+Legacy --write is disabled. Admission requires --resume-plan <file> --plan-sha256 <hash>
+--checkpoint <private-file> [--write]; cached mode uses zero model calls and needs no OAuth.
+The legacy dry-run remains available for inspection. See keys-resume.md for the frozen contract.
 It prints counts, the names of the places that were missing, and a tool's own error line, because this repository's
 logs are public: no id but a photo's first 8 characters, no statement, no part of a stored secret.
 
@@ -197,11 +198,11 @@ def ask_claude(prompt, model, timeout_s=240, runner=subprocess.run):
 
 
 # ---- the database, through PostgREST with the service key ------------------------------------------------------
-def http(method, url, headers, body=None):
+def http(method, url, headers, body=None, timeout=60):
     """One HTTP call: (status, headers with lower-case names, text). A refusal is an answer, not an exception."""
     request = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=60) as r:
+        with urllib.request.urlopen(request, timeout=timeout) as r:
             return r.status, {k.lower(): v for k, v in r.headers.items()}, r.read().decode('utf-8', 'replace')
     except urllib.error.HTTPError as e:
         return e.code, {k.lower(): v for k, v in e.headers.items()}, e.read().decode('utf-8', 'replace')
@@ -543,7 +544,7 @@ class Arguments(argparse.ArgumentParser):
 
 
 def arguments(argv, env):
-    p = Arguments(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = Arguments(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, allow_abbrev=False)
     p.add_argument('--vehicle-id', required=True); p.add_argument('--user-id', required=True)
     p.add_argument('--photos', default='1'); p.add_argument('--model', default='sonnet')
     p.add_argument('--after'); p.add_argument('--write', action='store_true')
@@ -562,7 +563,7 @@ def arguments(argv, env):
     return a
 
 
-def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
+def _legacy_run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
     """The whole lane. Returns the exit code. http, ask and sleep are parameters so the test can run it with no network and no waiting."""
     try: a = arguments(argv, env)
     except Stop as s:
@@ -688,6 +689,16 @@ def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
         with open(env['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
             f.write(f"### Keys lane ({'write' if a.write else 'dry run'})\n" + ''.join(f'- {line}\n' for line in [*([token_line] if token_line else []), *lines]))
     return code
+
+
+def run(argv, env, http=http, ask=ask_claude, out=print, sleep=time.sleep):
+    if '--resume-plan' in argv:
+        import keys_resume
+        return keys_resume.cli(argv, env, sys.modules[__name__], out)
+    if '--write' in argv:
+        out('keys lane: legacy writes refused; use a reviewed frozen --resume-plan with caps and exact readback')
+        return 2
+    return _legacy_run(argv, env, http=http, ask=ask, out=out, sleep=sleep)
 
 
 if __name__ == '__main__':
