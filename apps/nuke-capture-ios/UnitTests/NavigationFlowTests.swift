@@ -161,6 +161,33 @@ final class NavigationFlowTests: XCTestCase {
         XCTAssertEqual(cursors, [nil, "page-2", nil, "page-2", nil, nil])
     }
 
+    func testFailedDepthRefreshReportsFailureAndRetriesTheSameWindow() async throws {
+        let first = try page("first", next: "page-2")
+        let second = try page("second")
+        let failure = refusal("return page failed")
+        var cursors: [String?] = []
+        var failSecond = false
+        var sources = reads()
+        sources.jobs = { after in
+            cursors.append(after)
+            if after == nil { return .loaded(first) }
+            return failSecond ? .refused(failure) : .loaded(second)
+        }
+        let reader = WorkConsoleReader(reads: sources, account: { "test-account" })
+        await reader.loadJobs()
+        await reader.loadMoreJobs()
+        failSecond = true
+        await reader.loadJobs()
+        if case .refused(let result) = reader.jobs { XCTAssertEqual(result, failure) }
+        else { XCTFail("a partial refresh must not publish as a complete or empty window") }
+        failSecond = false
+        await reader.loadJobs()
+        XCTAssertEqual(cursors, [nil, "page-2", nil, "page-2", nil, "page-2"])
+        if case .loaded(let result) = reader.jobs { XCTAssertEqual(result.asOf, "second") }
+        else { XCTFail("retry must restore the same loaded scope") }
+        XCTAssertFalse(reader.loadingJobs)
+    }
+
     func testNewRefreshDiscardsTheOldDepthRefreshSecondPage() async throws {
         let started = expectation(description: "return refresh second page started")
         let gate = ControlledRead<JobLoad<MyWorkOrders>> { _ in started.fulfill() }
