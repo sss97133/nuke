@@ -22,8 +22,6 @@ enum FixtureBackend {
     static let clientId = "00000000-0000-4000-8000-0000000000d1"
     static let providerId = "00000000-0000-4000-8000-0000000000d2"
     static let navigationVehicleId = "00000000-0000-4000-8000-00000000c001"
-    private static let workPageLock = NSLock()
-    private static var workPageAttempts = 0
     static let dayMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_DAY_MODE"] ?? ""
     static let journeyDay: String = {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
@@ -49,6 +47,8 @@ enum FixtureBackend {
           "taken_at":"\(journeyDay)T12:00:00Z","labels":[],"ai_processing_status":"pending"}]
         """)
     }
+    private static let workPageLock = NSLock()
+    private static var workPageAttempts = 0
     static var userId: String? {
         switch persona {
         case .visitor: return nil
