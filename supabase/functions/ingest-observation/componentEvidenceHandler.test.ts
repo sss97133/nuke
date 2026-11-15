@@ -7,9 +7,9 @@ await import('./index.ts');Deno.serve=serve;
 const V='10000000-0000-4000-8000-000000000001',I='20000000-0000-4000-8000-000000000001',
  P='30000000-0000-4000-8000-000000000001',T='40000000-0000-4000-8000-000000000001',S='80000000-0000-4000-8000-000000000001',R='90000000-0000-4000-8000-000000000001';
 Deno.test('actual component handler binds source/part/property/witness, replays current receipt and refuses changed-source result without inference',async()=>{
- const original=globalThis.fetch;const rows=new Map<string,any>();let current=true,writes=0,readFailure=false,pending=false,parentPointer:string|null=null,imagePointer:string|null|undefined=null;
+ const original=globalThis.fetch;const rows=new Map<string,any>();let current=true,writes=0,readFailure=false,pending=false,parentPointer:string|null=null,imagePointer:string|null|undefined=null,sourceClock='2026-11-10T16:25:10.731Z',sourceVehicle=V;
  const label='Battery 78PRMJ';const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(label)))].map(b=>b.toString(16).padStart(2,'0')).join('');
- const payload={source_slug:'photo_pipeline',kind:'condition',observed_at:'1900-01-01T00:00:00Z',vehicle_id:V,component_key:'fluid.battery',
+ const payload={source_slug:'photo_pipeline',kind:'condition',vehicle_id:V,component_key:'fluid.battery',
   property_key:'component_visible_present',agent_inferred:true,defer_analysis:true,structured_data:{component_visible_present:true},
   component_reading:{source_observation_id:P,image_id:I,source_url:'https://images.example/battery.jpg',path:['components_seen','0','label'],value_sha256:hash,quote:label}};
  const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
@@ -30,8 +30,8 @@ Deno.test('actual component handler binds source/part/property/witness, replays 
     assert(body.analysis_deferred===true&&body.confidence_score<=.6&&body.source_event_at===null);
     const row={...body,id:`a0000000-0000-4000-8000-${String(++writes).padStart(12,'0')}`,is_superseded:false,superseded_by:null};rows.set(body.content_hash,row);return respond(row,201);
    }
-   if(url.searchParams.has('id'))return readFailure?respond({message:'source lookup failed'},500):respond([{id:P,vehicle_id:V,is_superseded:false,superseded_by:parentPointer,
-    extraction_method:'reviewed_image_analysis_v1',source_url:'https://images.example/battery.jpg',observed_at:'2026-11-10T16:25:10.731Z',
+   if(url.searchParams.has('id'))return readFailure?respond({message:'source lookup failed'},500):respond([{id:P,vehicle_id:sourceVehicle,is_superseded:false,superseded_by:parentPointer,
+    extraction_method:'reviewed_image_analysis_v1',source_url:'https://images.example/battery.jpg',observed_at:sourceClock,
     structured_data:{image_id:I,components_seen:[{label,bbox:[10,20,800,900],part_number_guess:'78PRMJ'}]}}]);
    const key=url.searchParams.get('content_hash')?.slice(3);return respond(key&&rows.has(key)?[rows.get(key)]:[]);
   }
@@ -42,6 +42,15 @@ Deno.test('actual component handler binds source/part/property/witness, replays 
   const first=await handler(request());const answer=await first.json();assert(first.status===200&&answer.current_source_verified===true,JSON.stringify(answer));
   assert(answer.installation_status==='unestablished'&&answer.model_calls===0&&writes===1);
   const replay=await handler(request());assert(replay.status===200&&(await replay.json()).duplicate===true&&writes===1);
+  const callerClock=await handler(request({...payload,observed_at:'1900-01-01T00:00:00Z'}));
+  assert(callerClock.status===200&&(await callerClock.json()).duplicate===true&&writes===1,'caller clock never changes source-derived identity');
+  for(const component_reading of [undefined,{}, {...payload.component_reading,path:['invented']}])
+   assert((await handler(request({...payload,component_reading}))).status===400&&writes===1,'malformed component cannot bypass required clock');
+  sourceClock='not-a-time';assert((await handler(request())).status===400&&writes===1,'invalid retained clock refuses');sourceClock='2026-11-10T16:25:10.731Z';
+  sourceVehicle=I;assert((await handler(request())).status===400&&writes===1,'foreign retained source refuses');sourceVehicle=V;
+  const ordinary=await handler(request({source_slug:'photo_pipeline',kind:'condition',vehicle_id:V}));
+  assert(ordinary.status===400&&(await ordinary.json()).error==='Missing required fields: source_slug, kind, observed_at'&&writes===1,'non-component intake still requires caller clock');
+
   current=false;assert((await handler(request())).status===409&&writes===1,'withdrawn duplicate never passes');current=true;
   parentPointer=P;assert((await handler(request())).status===400&&writes===1,'parent successor pointer refuses before write');parentPointer=null;
   for(const pointer of [I,undefined]){imagePointer=pointer;assert((await handler(request())).status===400&&writes===1,'image pointer missing or withdrawn refuses before write');}imagePointer=null;
