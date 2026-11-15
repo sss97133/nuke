@@ -147,6 +147,7 @@ def local_original_facts(database, snapshot, source_ids, originals_root):
         # committed during the file read; do not reuse the inventory transaction.
         with closing(sqlite3.connect(db_uri, uri=True, timeout=5)) as db:
             db.execute('PRAGMA query_only=ON')
+            db.set_progress_handler(lambda: int(time.monotonic() - started > 30), 10000)
             db.execute('BEGIN')
             namespace = db.execute('SELECT Z_UUID FROM Z_METADATA').fetchall()
             if len(namespace) != 1 or 'photos_sqlite_store:' + namespace[0][0] != meta['sourceNamespace']:
@@ -185,7 +186,7 @@ def local_original_facts(database, snapshot, source_ids, originals_root):
                 'localOriginalReadAt': dt.datetime.now(dt.timezone.utc).isoformat(),
                 'originalStatus': 'unverified'}
         try:
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         except FileNotFoundError:
             fact['localOriginalStatus'] = 'not_present'
         else:

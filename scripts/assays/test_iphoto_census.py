@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -149,6 +150,19 @@ class MetadataSnapshotTests(unittest.TestCase):
         file.unlink()
         file.symlink_to(root / 'A/another.jpg')
         with self.assertRaisesRegex(ValueError, 'redirects'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+
+    def test_special_file_and_oversize_original_refuse_before_reading(self):
+        root, snapshot = self.originals_fixture()
+        file = root / 'A/a.jpg'
+        file.unlink()
+        os.mkfifo(file)
+        with self.assertRaisesRegex(ValueError, 'regular-file byte bound'):
+            census.local_original_facts(self.path, snapshot, ['a'], root)
+        file.unlink()
+        with file.open('wb') as stream:
+            stream.truncate(65 * 1024 * 1024)
+        with self.assertRaisesRegex(ValueError, 'regular-file byte bound'):
             census.local_original_facts(self.path, snapshot, ['a'], root)
 
 
