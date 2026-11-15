@@ -21,6 +21,7 @@
 
 import AuthenticationServices
 import CryptoKit
+import Photos
 import SwiftUI
 
 // ─── The constellation ───────────────────────────────────────────────────────
@@ -276,6 +277,8 @@ enum AppleNonce {
 /// Delete Account is the last section with a confirmation alert.
 struct AccountView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var photoStatus = MainTabView.currentPhotoStatus()
     @ObservedObject private var siteStore = SiteStore.shared
     @ObservedObject private var sync = SyncEngine.shared
     @State private var confirmingDeletion = false
@@ -335,20 +338,22 @@ struct AccountView: View {
                     Text("When on, only clear vehicle/work photos upload to the shop. Anything with a face — or not work-related — stays on your phone and is never sent.")
                 }
 
-                // The photo grant, reported as a fact. Off → the one action
-                // that exists (Settings). On-grant ignition re-arms at the
-                // app level (NukeCaptureApp scenePhase handler).
-                if !MainTabView.currentPhotoGrant() {
-                    Section {
-                        LabeledContent("Photos") {
-                            Text("Off")
-                        }
-                        Button("Settings") {
-                            if let url = URL(string: UIApplication.openSettingsURLString) {
-                                UIApplication.shared.open(url)
-                            }
+                // Always explain the grant, including limited access, which
+                // permits selected photos but does not expose the Library tab.
+                Section {
+                    LabeledContent("Photos") {
+                        Text(Self.photoAccessLabel(photoStatus))
+                            .accessibilityIdentifier("account.photos.status")
+                    }
+                    Button("Manage Photos access") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
                         }
                     }
+                    .accessibilityIdentifier("account.photos.settings")
+                } footer: {
+                    Text(Self.photoAccessExplanation(photoStatus))
+                        .accessibilityIdentifier("account.photos.explanation")
                 }
 
                 // Confirmed work sites — rename in place (optional, never
@@ -418,6 +423,10 @@ struct AccountView: View {
                 }
             }
             .navigationTitle("Account")
+            .onAppear { photoStatus = MainTabView.currentPhotoStatus() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { photoStatus = MainTabView.currentPhotoStatus() }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -439,6 +448,34 @@ struct AccountView: View {
             } message: {
                 Text("This anonymizes your account and disables sign-in. Your uploaded photos remain in the record.")
             }
+        }
+    }
+
+    static func photoAccessLabel(_ status: PHAuthorizationStatus) -> String {
+        switch status {
+        case .authorized: return "Full access"
+        case .limited: return "Limited access"
+        case .denied: return "Off"
+        case .restricted: return "Restricted"
+        case .notDetermined: return "Not requested"
+        @unknown default: return "Unknown"
+        }
+    }
+
+    static func photoAccessExplanation(_ status: PHAuthorizationStatus) -> String {
+        switch status {
+        case .authorized:
+            return "Library is available. Garage and Work do not depend on Photos access."
+        case .limited:
+            return "Only selected photos are accessible. Library requires full Photos access; Garage and Work remain available."
+        case .denied:
+            return "Photo access is off. Library is unavailable; Garage and Work remain available."
+        case .restricted:
+            return "Photos access is restricted by device policy. Garage and Work remain available."
+        case .notDetermined:
+            return "Photos access has not been requested. Garage and Work remain available."
+        @unknown default:
+            return "Photos access status is unavailable. Garage and Work remain available."
         }
     }
 
