@@ -503,7 +503,7 @@ struct VehicleDetailView: View {
         }
         // Calendar cell → that day's evidence (fetched on demand, paging-independent).
         .sheet(item: $dayDrill) { d in
-            DayDrillSheet(vehicleId: vehicleId, day: d) { selectedPhoto = $0 }
+            DayDrillSheet(vehicleId: vehicleId, day: d, analyze: analyzedPhoto(from:))
         }
         // The Photos-style swipeable viewer over the loaded build photos. Its "Analysis"
         // action routes to the SAME AnalyzedEvidenceView (after the viewer closes) so the
@@ -2313,10 +2313,14 @@ private struct GalleryStart: Identifiable { let index: Int; var id: Int { index 
 private struct DayDrillSheet: View {
     let vehicleId: String
     let day: DayRecord
-    let onPhoto: (VehicleGalleryImage) -> Void
+    let analyze: (VehicleGalleryImage) -> AnalyzedPhoto
     @Environment(\.dismiss) private var dismiss
     @State private var photos: [VehicleGalleryImage] = []
     @State private var loaded = false
+
+    @State private var photoReadFailed = false
+    @State private var retryAttempt = 0
+    @State private var selectedPhoto: VehicleGalleryImage?
 
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
 
@@ -2330,27 +2334,32 @@ private struct DayDrillSheet: View {
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     if !photos.isEmpty {
-                        Text("\(photos.count) photo\(photos.count == 1 ? "" : "s")")
+                        Text("\(photos.count) photo\(photos.count == 1 ? "" : "s") shown")
                             .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                         LazyVGrid(columns: cols, spacing: 2) {
                             ForEach(photos) { p in
-                                Button { dismiss(); onPhoto(p) } label: {
+                                Button { selectedPhoto = p } label: {
                                     CachedAsyncImage(url: NukeImage.thumb(p.image_url, width: 300)) { i in
                                         i.resizable().scaledToFill()
                                     } placeholder: { Color(.secondarySystemFill) }
                                     .frame(height: 120).frame(maxWidth: .infinity).clipped()
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Inspect photo")
+                                .accessibilityIdentifier("day.photo.\(p.id.uuidString.lowercased())")
                             }
                         }
                     } else if !loaded {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 24)
-                    } else if day.photos == 0 {
-                        Text("No photos this day — the activity was work logged.")
-                            .font(.footnote).foregroundStyle(.tertiary)
+                    } else if photoReadFailed {
+                        Text("Couldn't load photos for this day.")
+                            .accessibilityIdentifier("day.photos.error")
+                        Button("Retry photos") { retryAttempt += 1 }
+                            .accessibilityIdentifier("day.photos.retry")
                     } else {
-                        Text("\(day.photos) photo\(day.photos == 1 ? "" : "s") recorded; none carry a capture date to place here yet.")
+                        Text("No photos available in this day's view.")
                             .font(.footnote).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("day.photos.empty")
                     }
                 }
                 .padding(16)
@@ -2361,7 +2370,11 @@ private struct DayDrillSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .task { await load() }
+        .task(id: retryAttempt) { await load() }
+        .fullScreenCover(item: $selectedPhoto) { photo in
+            AnalyzedEvidenceView(photo: analyze(photo))
+                .accessibilityIdentifier("day.evidence.\(photo.id.uuidString.lowercased())")
+        }
     }
 
     private var summaryRow: some View {
@@ -2383,13 +2396,20 @@ private struct DayDrillSheet: View {
         return inF.date(from: s).map { outF.string(from: $0) } ?? s
     }
     private func load() async {
+        loaded = false
+        photoReadFailed = false
         defer { loaded = true }
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC")
         guard let d = f.date(from: day.day),
-              let next = Calendar.current.date(byAdding: .day, value: 1, to: d) else { return }
+              let next = Calendar.current.date(byAdding: .day, value: 1, to: d) else {
+            photoReadFailed = true
+            return
+        }
         do {
             photos = try await VehicleImageLoader.day(vehicleId: vehicleId, from: day.day, to: f.string(from: next))
         } catch {
+            guard !Task.isCancelled else { return }
+            photoReadFailed = true
             NSLog("NukeCapture day drill load failed: %@", String(describing: error))
         }
     }

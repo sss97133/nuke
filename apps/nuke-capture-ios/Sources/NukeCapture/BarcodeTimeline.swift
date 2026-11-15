@@ -405,5 +405,9 @@ private struct CellView: View {
                 guard cell.inRange && cell.count > 0 else { return }
                 onTap(cell.id)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Activity on \(cell.id)")
+            .accessibilityIdentifier("timeline.day.\(cell.id)")
+            .accessibilityAddTraits(cell.inRange && cell.count > 0 ? .isButton : [])
     }
 }
