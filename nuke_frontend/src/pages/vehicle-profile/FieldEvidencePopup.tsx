@@ -172,14 +172,18 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
   field, label, value, vehicleId, evidence, vinDecode, context, presentation,
 }) => {
   const { closeTop } = usePopup();
-  const inventory = useVehicleImageEvidence(vehicleId, context ? field : undefined);
+  const inventory = useVehicleImageEvidence(vehicleId, context ? field : undefined, field);
   const provenance = useFieldProvenance(vehicleId, field);
   const drivetrainContext = useFieldProvenance(context && field === 'drivetrain' ? vehicleId : '', 'transmission');
   const claims = useFieldEvidence(vehicleId);
   const claimGroup = evidence || claims.evidence[field];
-  const rows = inventory.data?.images || [];
-  const images = relatedFieldImages(rows, field);
-  const references = referenceFieldImages(rows, field);
+  const contextualRows = inventory.data?.images || [];
+  const facetCited = inventory.data?.citedImages || [];
+  const facetCitedIds = new Set(facetCited.map(item => item.image.id));
+  const rows = [...contextualRows, ...facetCited.map(item => item.image)
+    .filter(image => !contextualRows.some(row => row.id === image.id))];
+  const images = relatedFieldImages(contextualRows, field).filter(image => !facetCitedIds.has(image.id));
+  const references = referenceFieldImages(contextualRows, field).filter(image => !facetCitedIds.has(image.id));
   const citations = citedFieldImages(provenance.data, rows);
   const citedIds = new Set(citations.map(image => image.id));
   const imagesLoading = inventory.isLoading || provenance.isLoading;
@@ -193,7 +197,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     ? (provenance.data?.canonical?.status === 'resolved' ? provenance.data.canonical.value : null)
     : provenance.data?.value;
   const hasClaimImageReference = !!claimGroup?.sources.some(source => source.source_image_id);
-  const hasRecordedImageReference = hasClaimImageReference || imageObservations.length > 0 || !!provenance.data?.source_image_url || (provenance.data?.evidence || []).some(source => source.image_id && (source.source !== 'field_evidence' || source.verified === true));
+  const hasRecordedImageReference = !!inventory.data?.citations?.length || hasClaimImageReference || imageObservations.length > 0 || !!provenance.data?.source_image_url || (provenance.data?.evidence || []).some(source => source.image_id && (source.source !== 'field_evidence' || source.verified === true));
 
   const sources = claimGroup?.sources || (provenance.data?.evidence || [])
     .filter(source => source.source !== 'field_evidence' || source.verified === true)
@@ -215,6 +219,7 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
     const correction = provenance.data?.current_correction;
     const readings = claimGroup?.sources.filter(source => source.source_type !== 'system_update') || [];
     const imageIds = new Set([
+      ...facetCited.map(item => item.image.id),
       ...readings.map(source => source.source_image_id),
       ...(provenance.data?.evidence || []).filter(source => source.source !== 'field_evidence').map(source => source.image_id),
       ...imageObservations.map(source => source.image_id),
