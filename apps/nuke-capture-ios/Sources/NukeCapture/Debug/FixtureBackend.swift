@@ -307,7 +307,7 @@ enum FixtureBackend {
                     return (400, Data(#"{"code":"fixture_read_error","message":"fixture next page failed","details":null,"hint":null}"#.utf8))
                 }
                 return ok("""
-                {"rows":[{"work_order_id":"\(JobFixtures.workOrderId)","title":"Front brake service",
+                {"rows":[{"work_order_id":"\(JobFixtures.workOrderId)","title":"Front brake service\(attempt > 2 ? " · refreshed" : "")",
                  "stage_states":{"execution":"recorded","completion":"absent"}}],"next_after":null,
                  "coverage":{"returned":1,"total_for_viewer":26}}
                 """)

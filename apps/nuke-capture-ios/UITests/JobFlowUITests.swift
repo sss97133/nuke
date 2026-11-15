@@ -31,22 +31,23 @@ final class JobFlowUITests: XCTestCase {
         let app = launch("client", scenario: "work-pagination", ["NUKE_DEBUG_SCREEN": "work"])
         let empty = app.staticTexts["work.jobs.empty"]
         reveal(empty, in: app)
-        XCTAssertTrue(empty.label.contains("loaded records"), app.debugDescription)
+        XCTAssertTrue(empty.label.contains("loaded records"), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertFalse(app.staticTexts["No jobs in progress"].exists)
         let more = app.buttons["work.jobs.more"]
         reveal(more, in: app).tap()
         let failure = app.descendants(matching: .any).matching(identifier: "work.jobs.page-error").firstMatch
-        XCTAssertTrue(failure.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(failure.waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertTrue(empty.exists)
         XCTAssertFalse(app.staticTexts["No jobs in progress"].exists)
         reveal(more, in: app).tap()
         let active = text(app, contains: "Front brake service")
         reveal(active, in: app).tap()
-        XCTAssertTrue(app.navigationBars["Front brake service"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(text(app, contains: "1977 Chevrolet Blazer").waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.navigationBars["Front brake service"].waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
+        XCTAssertTrue(text(app, contains: "1977 Chevrolet Blazer").waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         let back = app.navigationBars.buttons["Work"].firstMatch
         XCTAssertTrue(back.exists); back.tap()
-        XCTAssertTrue(active.waitForExistence(timeout: 5))
+        XCTAssertTrue(text(app, contains: "Front brake service · refreshed").waitForExistence(timeout: 10),
+                      app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertFalse(empty.exists)
         XCTAssertFalse(more.exists)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
@@ -56,7 +57,7 @@ final class JobFlowUITests: XCTestCase {
         let app = launch("client", scenario: "signature-missing-job", ["NUKE_DEBUG_SCREEN": "work"])
         let item = text(app, contains: "Fixture quote without job")
         reveal(item, in: app).tap()
-        XCTAssertTrue(app.staticTexts["signature.missing-job"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["signature.missing-job"].waitForExistence(timeout: 10), app.debugDescription.replacingOccurrences(of: "\n", with: " | "))
         XCTAssertFalse(app.staticTexts["This needs a newer version of the app to open."].exists)
         XCTAssertFalse(app.staticTexts["You sign on the next screen, where the full terms are."].exists)
         XCTAssertFalse(app.buttons["Open the job to sign"].exists)
