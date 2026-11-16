@@ -219,9 +219,11 @@ struct AnalyzedEvidenceView: View {
     @Environment(\.dismiss) private var dismiss
 
     // The deep verdict (get_image_deep_analysis). Loads after the view appears;
-    // nil until then (and stays nil if the photo has no verdict) — the rail
-    // renders nothing extra in that case.
+    // A successful empty read and a transport failure have separate rail states.
     @State private var deep: ImageDeepAnalysis?
+    @State private var deepLoaded = false
+    @State private var deepReadFailed = false
+    @State private var deepRetryAttempt = 0
 
     // The owner-correction leaf (the operating verb): "not this vehicle" → move it.
     @State private var showReassign = false
@@ -251,7 +253,9 @@ struct AnalyzedEvidenceView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    EvidenceRail(photo: photo, deep: deep, movedTo: movedTo,
+                    EvidenceRail(photo: photo, deep: deep,
+                                 isLoading: !deepLoaded, readFailed: deepReadFailed,
+                                 onRetry: { deepRetryAttempt += 1 }, movedTo: movedTo,
                                  onReassign: photo.vehicle_id == nil ? nil : { Task { await openReassign() } })
                 }
             }
@@ -271,7 +275,7 @@ struct AnalyzedEvidenceView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .preferredColorScheme(.dark)
-        .task { await loadDeep() }
+        .task(id: "\(photo.id)|\(deepRetryAttempt)") { await loadDeep() }
         .sheet(isPresented: $showReassign) { reassignSheet }
         .sheet(isPresented: $showChat) {
             AgentChatView(vehicleId: photo.vehicle_id?.uuidString.lowercased(),
@@ -388,17 +392,26 @@ struct AnalyzedEvidenceView: View {
 
     /// Pull the full byok_deep_analysis verdict for this photo. Read-only RPC,
     /// owner-gated by RLS; a photo with no verdict simply returns no rows → deep
-    /// stays nil and the rail's depth section renders nothing.
+    /// stays nil; the rail reports the read outcome separately.
     private func loadDeep() async {
         struct P: Encodable { let p_image_id: String }
+        let viewer = SupabaseService.currentUserId
+        deep = nil
+        deepLoaded = false
+        deepReadFailed = false
         do {
             let rows: [ImageDeepAnalysis] = try await SupabaseService.client
                 .rpc("get_image_deep_analysis",
                      params: P(p_image_id: photo.id.uuidString.lowercased()))
                 .execute()
                 .value
+            guard !Task.isCancelled, SupabaseService.currentUserId == viewer else { return }
             deep = rows.first
+            deepLoaded = true
         } catch {
+            guard !Task.isCancelled, SupabaseService.currentUserId == viewer else { return }
+            deepReadFailed = true
+            deepLoaded = true
             NSLog("NukeCapture deep analysis load failed: %@", String(describing: error))
         }
     }
@@ -406,12 +419,14 @@ struct AnalyzedEvidenceView: View {
 
 /// The atom rail — the back side of the work order. Skips every field that's
 /// null/empty (PROVENANCE LAW), and if no vision atoms exist at all, prints a
-/// single honest "Analysis pending" line instead of a wall of blanks.
+/// scoped empty state after a successful read, never inferring analysis is pending.
 private struct EvidenceRail: View {
     let photo: AnalyzedPhoto
-    /// The deep verdict, when loaded. nil → the depth section renders nothing and
-    /// the rail looks exactly as before (existing rendering is undisturbed).
+    /// The deep verdict when available; loading/failure are separate from emptiness.
     var deep: ImageDeepAnalysis? = nil
+    var isLoading = false
+    var readFailed = false
+    var onRetry: (() -> Void)? = nil
     /// Set after an owner correction lands — the leaf shows where it went.
     var movedTo: SupabaseService.RelinkTarget? = nil
     /// Present only when the photo is attributed to a vehicle (so it can be corrected).
@@ -434,8 +449,7 @@ private struct EvidenceRail: View {
         (photo.components ?? []).filter { !$0.isEmpty }
     }
 
-    /// The deep verdict carries renderable content (so "Analysis pending" should
-    /// not show even when the flat chips/components are empty).
+    /// The deep verdict carries renderable content even when flat atoms are empty.
     private var hasDepth: Bool {
         guard let d = deep else { return false }
         if let n = d.narrative, !n.isEmpty { return true }
@@ -454,6 +468,19 @@ private struct EvidenceRail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                if isLoading {
+                    ProgressView("Loading analysis")
+                        .accessibilityIdentifier("evidence.analysis.loading")
+                } else if readFailed {
+                    Text("Couldn't load analysis for this photo.")
+                        .font(.footnote)
+                        .foregroundStyle(.white)
+                        .accessibilityIdentifier("evidence.analysis.error")
+                    if let onRetry {
+                        Button("Retry analysis", action: onRetry)
+                            .accessibilityIdentifier("evidence.analysis.retry")
+                    }
+                }
                 // Capture time — the record's primary timestamp.
                 if let taken = photo.taken_at, !taken.isEmpty {
                     Text(taken.prefix(10))
@@ -508,10 +535,11 @@ private struct EvidenceRail: View {
                     // The deep verdict — narrative, reasoning, state, components
                     // with confidence, open questions. Renders only what exists.
                     depthSection
-                } else {
-                    Text("Analysis pending")
+                } else if !isLoading && !readFailed {
+                    Text("No analysis available in this view.")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.5))
+                        .accessibilityIdentifier("evidence.analysis.empty")
                 }
 
                 // Provenance line — when this was analyzed and by whom.

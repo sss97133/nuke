@@ -22,6 +22,36 @@ enum FixtureBackend {
     static let clientId = "00000000-0000-4000-8000-0000000000d1"
     static let providerId = "00000000-0000-4000-8000-0000000000d2"
     static let navigationVehicleId = "00000000-0000-4000-8000-00000000c001"
+    static let analysisMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_ANALYSIS_MODE"] ?? ""
+    private static let analysisReadLock = NSLock()
+    private static var analysisReadAttempts = 0
+    static let dayMode = ProcessInfo.processInfo.environment["NUKE_FIXTURE_DAY_MODE"] ?? ""
+    static let journeyDay: String = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(secondsFromGMT: 0)
+        return f.string(from: Date())
+    }()
+    private static let dayReadLock = NSLock()
+    private static var dayReadAttempts = 0
+    private static func dayPhotos() -> (Int, Data) {
+        dayReadLock.lock()
+        dayReadAttempts += 1
+        let attempt = dayReadAttempts
+        dayReadLock.unlock()
+        // Exercise the screen's explicit Retry, independently of the SDK's
+        // automatic 503 retry layers. This first read is a terminal response.
+        if dayMode == "failure", attempt == 1 {
+            return (400, Data(#"{"code":"fixture_read_error","message":"fixture day photo read failed","details":null,"hint":null}"#.utf8))
+        }
+        if dayMode == "empty" || dayMode == "events" { return ok("[]") }
+        if dayMode == "changed", attempt > 1 { return ok("[]") }
+        return ok("""
+        [{"id":"00000000-0000-4000-8000-00000000e001","image_url":null,
+          "taken_at":"\(journeyDay)T12:00:00Z","labels":[],"ai_processing_status":"pending"}]
+        """)
+    }
+    private static let workPageLock = NSLock()
+    private static var workPageAttempts = 0
     static var userId: String? {
         switch persona {
         case .visitor: return nil
@@ -62,6 +92,9 @@ enum FixtureBackend {
         "work_order_statement_read", "facility_read", "my_vouches_read", "user_org_relations",
         // The vehicle screen's Comment summary section: a stable read-only SQL function, never a write.
         "popup_vehicle_intel",
+        // Versioned STABLE profile readers (20261116050000_profile_read_functions_v1.sql).
+        // Their _v1 suffix does not match the generic _read classifier.
+        "profile_vehicle_relationships_read_v1", "profile_labor_read_v1", "profile_money_read_v1",
     ]
 
     /// Explore's anonymous market reads. Explore is the default tab, so they run in every launch that
@@ -79,6 +112,14 @@ enum FixtureBackend {
     static func respond(_ request: URLRequest) -> (Int, Data) {
         guard let url = request.url, url.host == baseURL.host else { return (404, Data()) }
         let path = url.path
+        if scenario == "navigation-garage", !dayMode.isEmpty,
+           path == "/rest/v1/vehicle_images" || path == "/rest/v1/vehicle_images_public" {
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            if items.contains(where: { $0.name == "taken_at" && $0.value == "gte.\(journeyDay)" }),
+               items.contains(where: { $0.name == "taken_at" && ($0.value?.hasPrefix("lt.") ?? false) }) {
+                return dayPhotos()
+            }
+        }
         if scenario == "navigation-actors", path == "/functions/v1/universal-search" {
             return ok("""
             {"success":true,"results":[{"id":"\(clientId)","type":"user","title":"Fixture Person"}],
@@ -135,6 +176,25 @@ enum FixtureBackend {
     private static func reader(_ name: String, _ args: [String: Any]) -> (Int, Data) {
         let signedIn = persona != .visitor
         switch name {
+        case "get_image_deep_analysis" where scenario == "navigation-garage" && !analysisMode.isEmpty:
+            guard args["p_image_id"] as? String == "00000000-0000-4000-8000-00000000e001" else {
+                return (400, Data(#"{"message":"wrong fixture image requested"}"#.utf8))
+            }
+            analysisReadLock.lock()
+            analysisReadAttempts += 1
+            let attempt = analysisReadAttempts
+            analysisReadLock.unlock()
+            if analysisMode == "failure", attempt == 1 {
+                return (400, Data(#"{"code":"fixture_read_error","message":"fixture analysis read failed","details":null,"hint":null}"#.utf8))
+            }
+            if analysisMode == "empty" { return ok("[]") }
+            return ok(#"[{"narrative":"Fixture analysis for exact photo"}]"#)
+        case "get_vehicle_contribution_days" where scenario == "navigation-garage" && !dayMode.isEmpty:
+            // A separate work day keeps the timeline available for the event-only day.
+            return ok("""
+            [{"day":"\(journeyDay)","kind":"\(dayMode == "events" ? "event" : "photo")","n":2},
+             {"day":"2026-11-14","kind":"work","n":1}]
+            """)
         case "accounting_vehicle_financials" where scenario == "financial-qualification" || scenario == "financial-evidence-withheld":
             return ok("[\(AllocationEvidenceFixtures.row)]")
         case "accounting_record_evidence" where scenario == "financial-qualification" || scenario == "financial-evidence-withheld":
@@ -185,6 +245,11 @@ enum FixtureBackend {
         case "vehicle_work_orders_read":
             let access = scenario == "post-job" ? #""vehicle_access":{"role":"owner","can_post_work_request":true},"# : ""
             return ok(JobFixtures.vehicleWorkOrders.replacingOccurrences(of: #""viewer":{"#, with: #""viewer":{\#(access)"#))
+        case "work_order_job_path_read" where scenario == "work-pagination":
+            guard args["p_work_order_id"] as? String == JobFixtures.workOrderId else {
+                return (400, Data(#"{"message":"wrong active job"}"#.utf8))
+            }
+            return ok(JobFixtures.jobPathWithLabels)
         case "work_order_job_path_read": return ok(jobPath(args["p_work_order_id"] as? String ?? ""))
         case "work_order_resources_read": return ok(JobFixtures.resources)
         case "work_order_quotes_read":
@@ -226,6 +291,33 @@ enum FixtureBackend {
         case "provider_job_record_read": return ok(ProviderFixtures.jobRecord)
         case "my_contact_requests": return ok(ContactFixtures.inbox)
         case "contact_thread_read": return ok(ContactFixtures.thread)
+        case "my_signature_queue" where scenario == "signature-missing-job":
+            return ok(#"{"items":[{"kind":"quote_to_accept","ref_id":"00000000-0000-4000-8000-0000000000f2","work_order_id":null,"display_title":"Fixture quote without job"}],"coverage":{"returned":1,"total":1}}"#)
+        case "my_signature_queue" where scenario == "work-pagination":
+            return ok(#"{"items":[],"coverage":{"returned":0,"total":0}}"#)
+        case "my_work_orders" where scenario == "work-pagination":
+            let cursor = "00000000-0000-4000-8000-00000000d025"
+            if let after = args["p_after"] as? String {
+                guard after == cursor else { return (400, Data(#"{"message":"wrong page cursor"}"#.utf8)) }
+                workPageLock.lock()
+                workPageAttempts += 1
+                let attempt = workPageAttempts
+                workPageLock.unlock()
+                if attempt == 1 {
+                    return (400, Data(#"{"code":"fixture_read_error","message":"fixture next page failed","details":null,"hint":null}"#.utf8))
+                }
+                return ok("""
+                {"rows":[{"work_order_id":"\(JobFixtures.workOrderId)","title":"Front brake service\(attempt > 2 ? " · refreshed" : "")",
+                 "stage_states":{"execution":"recorded","completion":"absent"}}],"next_after":null,
+                 "coverage":{"returned":1,"total_for_viewer":26}}
+                """)
+            }
+            let rows = (1...25).map { index in
+                ["work_order_id": String(format: "00000000-0000-4000-8000-00000000d%03d", index),
+                 "title": "Finished fixture job \(index)", "stage_states": ["completion": "recorded", "accounting": "recorded"]] as [String: Any]
+            }
+            let page: [String: Any] = ["rows": rows, "next_after": cursor, "coverage": ["returned": 25, "total_for_viewer": 26]]
+            return (200, try! JSONSerialization.data(withJSONObject: page))
         case "my_signature_queue": return ok(JobFixtures.signatureQueue)
         case "my_work_orders": return ok(JobFixtures.myWorkOrders)
         case "my_identity_read": return ok(JobFixtures.identity)
