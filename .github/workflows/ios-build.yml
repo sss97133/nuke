@@ -77,6 +77,20 @@ jobs:
             -scheme NukeCapture-iOS \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
             -derivedDataPath "$RUNNER_TEMP/dd" \
+            -resultBundlePath "$RUNNER_TEMP/ios-tests.xcresult" \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: unre|Test Case|Executed|BUILD|TEST" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" "$RUNNER_TEMP/xcodebuild.log"
+
+      # Keep the actual action trace and screenshots when a native assertion fails.
+      # The concise console filter alone omits the state needed to diagnose UI failures.
+      - name: Retain failed native test evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/ios-tests.xcresult
+          if-no-files-found: warn
+          retention-days: 7
