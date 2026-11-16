@@ -93,6 +93,7 @@ final class WorkConsoleReader: ObservableObject {
 
     private enum Part: Hashable { case signatures, jobs, identity, inbox, open, notifications, listings }
     private var requests: [Part: ReadRequestGuard] = [:]
+    private var loadedJobPages = 1
     private let reads: Reads
     private let account: () -> String?
 
@@ -145,16 +146,32 @@ final class WorkConsoleReader: ObservableObject {
         await read(.notifications, operation: reads.notifications) { self.notifications = $0 }
     }
 
+    /// Returning from a job re-reads the pages already explored, then publishes
+    /// the complete refreshed window. Pull-to-refresh uses the same bounded scope.
+    /// This retains navigation depth without keeping stale job/completion states.
     func loadJobs() async {
+        let depth = loadedJobPages
         let request = requests[.jobs, default: ReadRequestGuard()].begin()
         let owner = account()
         loadingJobs = true
         loadingMore = false
         jobsPageFailure = nil
         defer { if requests[.jobs]?.isCurrent(request) == true { loadingJobs = false } }
-        let result = await reads.jobs(nil)
+        var result = await reads.jobs(nil)
+        var pages = 1
         guard !Task.isCancelled, requests[.jobs]?.isCurrent(request) == true, account() == owner else { return }
+        while pages < depth, case .loaded(let accumulated) = result, let cursor = accumulated.nextAfter {
+            let next = await reads.jobs(cursor)
+            guard !Task.isCancelled, requests[.jobs]?.isCurrent(request) == true, account() == owner else { return }
+            guard case .loaded(let page) = next else {
+                jobs = next   // a failed page is not an empty or complete refreshed window
+                return
+            }
+            result = .loaded(accumulated.appending(page))
+            pages += 1
+        }
         jobs = result
+        if case .loaded = result { loadedJobPages = pages }
     }
 
     func loadMoreJobs() async {
@@ -168,6 +185,7 @@ final class WorkConsoleReader: ObservableObject {
         guard !Task.isCancelled, requests[.jobs]?.isCurrent(request) == true, account() == owner else { return }
         if case .loaded(let next) = result {
             jobs = .loaded(page.appending(next))
+            loadedJobPages += 1
         } else if case .refused(let failure) = result {
             jobsPageFailure = failure
         }
@@ -321,8 +339,11 @@ struct WorkConsoleContent: View {
                 if inMotion.isEmpty {
                     VStack(spacing: NukeSpace.sm) {
                         Image(systemName: "wrench.and.screwdriver").font(.title).foregroundStyle(.tertiary)
-                        Text("No jobs in progress").font(.nukeCardTitle)
-                        Text("Jobs you're working on will show up here.")
+                        Text("No jobs in progress among loaded records").font(.nukeCardTitle)
+                            .accessibilityIdentifier("work.jobs.empty")
+                        Text(page.nextAfter != nil
+                             ? "More jobs are available. Load the next page to check them."
+                             : "This describes the records available in this view.")
                             .font(.nukeDetail).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
@@ -336,7 +357,10 @@ struct WorkConsoleContent: View {
                     }
                 }
                 if page.nextAfter != nil {
-                    if let jobsPageFailure { JobRefusalRow(refusal: jobsPageFailure) }
+                    if let jobsPageFailure {
+                        JobRefusalRow(refusal: jobsPageFailure)
+                            .accessibilityIdentifier("work.jobs.page-error")
+                    }
                     Button {
                         onLoadMore?()
                     } label: {
@@ -344,6 +368,7 @@ struct WorkConsoleContent: View {
                     }
                     .frame(minHeight: NukeSize.minTap)
                     .disabled(loadingMore)
+                    .accessibilityIdentifier("work.jobs.more")
                 }
                 if page.unreadableRows > 0 {
                     Text(JobCopy.newerVersion(page.unreadableRows)).font(.footnote).foregroundStyle(.secondary)

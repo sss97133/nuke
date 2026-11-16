@@ -132,6 +132,92 @@ final class NavigationFlowTests: XCTestCase {
         XCTAssertFalse(reader.loadingMore)
     }
 
+    func testReturningToWorkRefreshesLoadedDepthAndStopsAtTheCurrentEnd() async throws {
+        let first = try page("first", next: "page-2")
+        let oldSecond = try page("old second")
+        let freshSecond = try page("fresh second")
+        var cursors: [String?] = []
+        var secondReads = 0
+        var fewerPages = false
+        let currentEnd = try page("current end")
+        var sources = reads()
+        sources.jobs = { after in
+            cursors.append(after)
+            if after == nil { return .loaded(fewerPages ? currentEnd : first) }
+            secondReads += 1
+            return .loaded(secondReads == 1 ? oldSecond : freshSecond)
+        }
+        let reader = WorkConsoleReader(reads: sources, account: { "test-account" })
+        await reader.loadJobs()
+        await reader.loadMoreJobs()
+        await reader.load()
+        XCTAssertEqual(cursors, [nil, "page-2", nil, "page-2"])
+        if case .loaded(let page) = reader.jobs { XCTAssertEqual(page.asOf, "fresh second") }
+        else { XCTFail("the refreshed loaded window must publish") }
+        fewerPages = true
+        await reader.loadJobs()
+        fewerPages = false
+        await reader.load()
+        XCTAssertEqual(cursors, [nil, "page-2", nil, "page-2", nil, nil])
+    }
+
+    func testFailedDepthRefreshReportsFailureAndRetriesTheSameWindow() async throws {
+        let first = try page("first", next: "page-2")
+        let second = try page("second")
+        let failure = refusal("return page failed")
+        var cursors: [String?] = []
+        var failSecond = false
+        var sources = reads()
+        sources.jobs = { after in
+            cursors.append(after)
+            if after == nil { return .loaded(first) }
+            return failSecond ? .refused(failure) : .loaded(second)
+        }
+        let reader = WorkConsoleReader(reads: sources, account: { "test-account" })
+        await reader.loadJobs()
+        await reader.loadMoreJobs()
+        failSecond = true
+        await reader.loadJobs()
+        if case .refused(let result) = reader.jobs { XCTAssertEqual(result, failure) }
+        else { XCTFail("a partial refresh must not publish as a complete or empty window") }
+        failSecond = false
+        await reader.loadJobs()
+        XCTAssertEqual(cursors, [nil, "page-2", nil, "page-2", nil, "page-2"])
+        if case .loaded(let result) = reader.jobs { XCTAssertEqual(result.asOf, "second") }
+        else { XCTFail("retry must restore the same loaded scope") }
+        XCTAssertFalse(reader.loadingJobs)
+    }
+
+    func testNewRefreshDiscardsTheOldDepthRefreshSecondPage() async throws {
+        let started = expectation(description: "return refresh second page started")
+        let gate = ControlledRead<JobLoad<MyWorkOrders>> { _ in started.fulfill() }
+        let first = try page("first", next: "page-2")
+        let second = try page("second")
+        let newest = try page("newest")
+        var starts = 0
+        var secondReads = 0
+        var sources = reads()
+        sources.jobs = { after in
+            if after == nil {
+                starts += 1
+                return .loaded(starts < 3 ? first : newest)
+            }
+            secondReads += 1
+            return secondReads == 1 ? .loaded(second) : await gate.next()
+        }
+        let reader = WorkConsoleReader(reads: sources, account: { "test-account" })
+        await reader.loadJobs()
+        await reader.loadMoreJobs()
+        let returning = Task { await reader.loadJobs() }
+        await fulfillment(of: [started], timeout: 3)
+        await reader.loadJobs()
+        gate.finish(0, with: .loaded(try page("stale second")))
+        await returning.value
+        if case .loaded(let page) = reader.jobs { XCTAssertEqual(page.asOf, "newest") }
+        else { XCTFail("late return response must not overwrite the newer refresh") }
+        XCTAssertFalse(reader.loadingJobs)
+    }
+
     func testQueryReturningToTheSameTextDoesNotReviveAnOlderRequest() {
         var requests = ReadRequestGuard()
         let old = requests.begin()
