@@ -698,4 +698,15 @@ BEGIN
 END;
 $function$;
 
+-- 10. The activity view reads as its caller ---------------------------------------------------------------------
+-- v_user_daily_activity shows the first 200 characters of every submitted observation and is granted to anon. Live it
+-- already carries security_invoker = true (read 2026-11-17), so row security above applies and only the speaker sees
+-- these rows in their own timeline; the repository's last definition of the view (20260507180000) does not say so.
+-- Pin it here so the privacy of these rows never depends on an unrecorded setting.
+DO $$ BEGIN
+  IF to_regclass('public.v_user_daily_activity') IS NOT NULL THEN
+    ALTER VIEW public.v_user_daily_activity SET (security_invoker = true);
+  END IF;
+END $$;
+
 COMMIT;
