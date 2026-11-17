@@ -119,6 +119,9 @@ BEGIN
   IF coalesce(p_withdraw, false) AND (p_supersedes IS NULL OR p_organization_id IS NOT NULL) THEN
     RAISE EXCEPTION 'a withdrawal names the link it withdraws and no organisation' USING ERRCODE = '23514';
   END IF;
+  -- One writer per speaker at a time, taken before the statement is read: a concurrent correction cannot
+  -- supersede it between this check and the insert.
+  PERFORM pg_advisory_xact_lock(hashtextextended('owner-statement-speaker:' || p_speaker::text, 0));
   SELECT * INTO stmt FROM public.vehicle_observations o
    WHERE o.id = p_statement_id AND o.extraction_method = 'owner_statement_v1' AND o.submitted_by_user_id = p_speaker;
   IF NOT FOUND THEN
@@ -155,7 +158,6 @@ BEGIN
     'is_public', false,
     'supersedes', p_supersedes);
 
-  PERFORM pg_advisory_xact_lock(hashtextextended('owner-statement-speaker:' || p_speaker::text, 0));
   SELECT * INTO old FROM public.vehicle_observations o
    WHERE o.source_id = v_source_id AND o.source_identifier = p_request_id::text AND o.content_hash = v_hash LIMIT 1;
   IF FOUND THEN
