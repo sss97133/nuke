@@ -31,6 +31,7 @@ jobs:
           deno test --node-modules-dir=none --allow-env --allow-read
           supabase/functions/ingest-observation/financialDelegation.test.ts
           supabase/functions/mcp-connector/accountingTools.test.ts
+          supabase/functions/mcp-connector/ownerStatements.test.ts
           supabase/functions/mcp-connector/oauth_test.ts
           supabase/functions/oauth-server/oauthPolicy.test.ts
           supabase/functions/oauth-server/http.test.ts

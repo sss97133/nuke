@@ -15,7 +15,11 @@ const handlerNames = [...source.matchAll(/^  (\w+): handle\w+,$/gm)].map((m) => 
 const entry = slice("Deno.serve(async (req: Request)");
 const moduleSource = `
 const ACCOUNTING_TOOLS = [];
+const OWNER_STATEMENT_TOOLS = [];
+type CallerContext = { userId?: string; scopes?: string[]; oauthToken?: string };
 const ACCOUNTING_TOOL_NAME = 'accounting_books';
+const RECORD_OWNER_STATEMENT = 'record_owner_statement';
+const READ_OWNER_STATEMENTS = 'read_owner_statements';
 const callAccounting = async () => (globalThis as any).__accountingResult;
 const SUPABASE_URL = "https://example.supabase.co";
 const SERVICE_ROLE_KEY = "sb_secret_test_key";
@@ -32,9 +36,9 @@ const handleAdvisorJsonRpc = async (_body: unknown) => null;
 const initAdvisorHandlers = (_deps: unknown) => {};
 const callEdgeApi = async () => ({});
 ` + slice("const CORS = {", "// ── Edge Function Proxy") + slice("interface JsonRpcRequest", "const sb = ()") + `
-const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+const calls: Array<{ name: string; args: Record<string, unknown>; caller?: unknown }> = [];
 const TOOL_HANDLERS = Object.fromEntries(${JSON.stringify(handlerNames)}.map((name: string) =>
-  [name, async (args: Record<string, unknown>) => { calls.push({ name, args }); return toolOk({ name, args }); }]));
+  [name, async (args: Record<string, unknown>, caller?: unknown) => { calls.push({ name, args, caller }); return toolOk({ name, args }); }]));
 ` + slice("const SERVER_INFO", "// HTTP ENTRY POINT") + `
 export const handle = ` + entry.slice("Deno.serve".length) + `
 export { calls };
@@ -57,7 +61,7 @@ const IS_ADMIN_OR_SERVICE = new Set(["Bearer sb_secret_test_key", "Bearer admin-
     : new Response(JSON.stringify({ error: "forbidden", reason: "admins only" }), { status: 403 });
 const connector = await import(`data:application/typescript,${encodeURIComponent(moduleSource)}`);
 const handle = connector.handle as (req: Request) => Promise<Response>;
-const calls = connector.calls as Array<{ name: string; args: Record<string, unknown> }>;
+const calls = connector.calls as Array<{ name: string; args: Record<string, unknown>; caller?: { userId?: string; scopes?: string[]; oauthToken?: string } }>;
 const dispatched = () => calls.length;
 const FN = "https://example.supabase.co/functions/v1/mcp-connector";
 
@@ -188,4 +192,49 @@ Deno.test('private accounting bridge cannot bypass the ChatGPT public surface al
  const result = await response.json();
  assert(result.error?.code === -32602, 'private accounting tool bypassed curated surface');
  assert(!JSON.stringify(result).includes('private result'), 'private bridge dispatched');
+});
+
+Deno.test('owner-statement tools need a sign-in and hand the handler only what this request presented', async () => {
+ calls.length = 0;
+ // No credential: both tools answer 401 with the login challenge, the reader included, and nothing is dispatched.
+ for (const name of ['record_owner_statement', 'read_owner_statements']) {
+  const anonymous = await toolCall(name, {});
+  assert(anonymous.status === 401 && (anonymous.headers.get('www-authenticate') ?? '').includes('nuke.ag'), `${name} without auth: ${anonymous.status}`);
+ }
+ assert(dispatched() === 0, 'an owner-statement tool dispatched without a credential');
+
+ // A login token without a write scope cannot reach the writer.
+ const token = 'nuke_oauth_' + 'b'.repeat(64);
+ const headers = { authorization: `Bearer ${token}` };
+ (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: '10000000-0000-4000-8000-000000000001', key_id: 'key', scopes: ['read'] }, error: null };
+ const readOnlyWrite = await toolCall('record_owner_statement', { statement: 'synthetic' }, headers);
+ assert(readOnlyWrite.status === 403 && dispatched() === 0, `read-only login reached the writer: ${readOnlyWrite.status}`);
+ const read = await toolCall('read_owner_statements', {}, headers);
+ assert(read.status === 200 && dispatched() === 1, `read-scoped login refused the reader: ${read.status}`);
+ assert(calls[0].caller?.oauthToken === token && calls[0].caller?.userId === '10000000-0000-4000-8000-000000000001',
+  'the handler must receive this request\'s own token and the user it resolved to');
+
+ // With the write scope the writer is dispatched with the same context; arguments never carry an identity.
+ (globalThis as any).__apiKeyCheck = { data: { allowed: true, user_id: '10000000-0000-4000-8000-000000000001', key_id: 'key', scopes: ['read', 'write:observations'] }, error: null };
+ const write = await toolCall('record_owner_statement', { statement: 'synthetic' }, headers);
+ assert(write.status === 200 && dispatched() === 2 && calls[1].caller?.oauthToken === token, `scoped login refused the writer: ${write.status}`);
+
+ assert(write.headers.get('cache-control') === 'no-store' && read.headers.get('cache-control') === 'no-store', 'a private statement response must not be cached');
+ // The public ChatGPT surface refuses both tools even for a fully scoped login: the allowlist, not the login gate.
+ for (const name of ['record_owner_statement', 'read_owner_statements']) {
+  const before = dispatched();
+  const curated = await toolCall(name, { statement: 'synthetic' }, { ...headers, 'x-nuke-surface': 'chatgpt' });
+  assert((await curated.json()).error?.code === -32602 && dispatched() === before, `${name} reachable on the public surface with a login`);
+ }
+
+ // An API key authenticates but carries no login token; the service key carries none either.
+ const apiKey = await toolCall('read_owner_statements', {}, { 'x-api-key': 'nk_live_probe' });
+ assert(apiKey.status === 200 && calls[2].caller?.oauthToken === undefined, 'an API key was passed on as a login token');
+ (globalThis as any).__apiKeyCheck = undefined;
+ const service = await toolCall('read_owner_statements', {}, { authorization: 'Bearer sb_secret_test_key' });
+ assert(service.status === 200 && calls[3].caller?.oauthToken === undefined && calls[3].caller?.userId === 'service-role',
+  'the service key was given a speaker');
+ // Other tools are unaffected: an anonymous public read still dispatches with no caller.
+ const open = await toolCall('search_vehicles', { query: 'synthetic' });
+ assert(open.status === 200 && calls[4].caller === undefined, 'an anonymous read gained a caller');
 });
