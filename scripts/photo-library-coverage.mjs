@@ -36,7 +36,7 @@ if (args.includes('--json')) { console.log(JSON.stringify(rows, null, 2)); proce
 const sum = (rs, k) => rs.reduce((a, r) => a + Number(r[k] ?? 0), 0);
 const fmt = (v) => (v === null || v === undefined ? '?' : String(v));
 const census = rows[0]?.library_count_status ?? 'unknown_no_census';
-console.log(`Photo library coverage: user ${body.p_uid}, capture months in ${body.p_tz}`);
+console.log(`Photo library coverage: capture months in ${body.p_tz}`);
 if (census === 'unknown_no_census') {
   console.log('LIBRARY COUNT UNKNOWN: no census has been reported yet (phone app #3033 + census, or the Mac Photos census script).');
   console.log('The Nuke-side numbers below only cover photos that reached Nuke. They are not a share of the library.');
