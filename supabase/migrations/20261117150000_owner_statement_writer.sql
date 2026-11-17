@@ -44,6 +44,19 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
 
+-- 0a. The activity view reads as its caller ---------------------------------------------------------------------
+-- v_user_daily_activity shows the first 200 characters of every submitted observation and is granted to anon. Live it
+-- already carries security_invoker = true (read 2026-11-17), so row security applies and only the speaker sees these
+-- rows in their own timeline; the repository's last definition of the view (20260507180000) does not say so. Pin it,
+-- so the privacy of these rows never depends on an unrecorded setting. Only when it is not already set (no lock taken
+-- on production), and before any lock on vehicle_observations (the order a reader of the view takes them in).
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_class c WHERE c.oid = to_regclass('public.v_user_daily_activity')
+               AND NOT coalesce(c.reloptions @> ARRAY['security_invoker=true'], false)) THEN
+    ALTER VIEW public.v_user_daily_activity SET (security_invoker = true);
+  END IF;
+END $$;
+
 -- 0. Registry rows for the two producers --------------------------------------------------------------------------
 INSERT INTO public.observation_extractors (source_id, slug, display_name, extractor_type, extractor_config, produces_kinds)
 SELECT s.id, x.slug, x.display_name, 'rule_based', x.config, ARRAY[]::public.observation_kind[]
@@ -699,16 +712,5 @@ BEGIN
          v_timeline, v_contrib, v_last;
 END;
 $function$;
-
--- 10. The activity view reads as its caller ---------------------------------------------------------------------
--- v_user_daily_activity shows the first 200 characters of every submitted observation and is granted to anon. Live it
--- already carries security_invoker = true (read 2026-11-17), so row security above applies and only the speaker sees
--- these rows in their own timeline; the repository's last definition of the view (20260507180000) does not say so.
--- Pin it here so the privacy of these rows never depends on an unrecorded setting.
-DO $$ BEGIN
-  IF to_regclass('public.v_user_daily_activity') IS NOT NULL THEN
-    ALTER VIEW public.v_user_daily_activity SET (security_invoker = true);
-  END IF;
-END $$;
 
 COMMIT;
