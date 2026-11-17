@@ -1420,3 +1420,69 @@ Gallery hygiene and identity (does not shrink unsorted, but unblocks later visua
 - Scripts and artifacts under `/workspace/sortrun`: `gate_reader.py`, `drain_loop.py`, `ledger_now.py`, `emptyplan/*`, `fingerprint/*`, `lookalike_pilot/*`, `garage/gallery_pollution_audit.md`, `garage/visual_identity_recheck_v1.md`, `garage/gross_mismatch_v1/*`, `held/same_scene_dryrun.py`, `ingest_audit/`, `unsorted/breakdown.json`, `unsorted/fresh_20261110/*`, `stamp_dto_pr/BRIEF.md`, `receipt_order_fix/`, `ledger_live_def.txt`
 - Repository: `github.com/sss97133/nuke` — especially `docs/receipt-work-contract.md`, `supabase/migrations/20261020001000_vehicle_image_review_holds.sql`, `supabase/migrations/20261109070000_rederive_ownership_roles.sql`, `scripts/ownership/rederive-ownership-roles.mjs`, `scripts/receipt-work/reconcile-receipt-work.mjs`, `scripts/photo-pipeline/local_image_analysis.py`, `scripts/iphoto-intake.mjs`, and the PRs in §20
 - Live read-only ledger and producer verifies on Supabase project `qkgaybvrernstplzjaam` (10 Nov 2026, last official in-database pass ~18:44 AST, after the typ-other restore and refused-day batch 3)
+
+## 23. Library coverage: the completion metric (2026-11-17)
+
+"Unsorted = 0" in `capture_ledger_states` only covers photos that already reached Nuke. It is not the same as "every photo from the last nine years is sorted". On 2026-11-17 Skylar asked "are all images from the last 9 years sorted? Your metric is flawed". The metric is now per capture month, and it is measured against a count of the library.
+
+**Definition (`capture_library_coverage_v1(p_uid, p_tz='America/Los_Angeles', p_from='2017-01-01', p_to)`, service role, #3555, live 2026-11-17).** Each capture month gets one row, plus an `undated` row:
+- `library_count`: the library census count L. It is taken from `library_inventory_census` and never derived from Nuke rows. The status is one of `unknown_no_census`, `limited_scope_lower_bound`, `max_of_origins_lower_bound` or `census`.
+- `census_age_hours`: how fresh the census is.
+- `sorted`: on_vehicle, private, pulled, non_vehicle, junk, duplicate or no_file.
+- `held_for_review`: held or unverified. This counts as **not** sorted.
+- `in_nuke_unsorted`: unsorted, failed or waiting.
+- `kept_as_evidence`, `counted_elsewhere`, `pending` and `gave_up` come from the phone's `library_inventory` drain states.
+- `unowned_linked_rows`: rows in a library source that have no `user_id` but are linked to him (documented_by, imported_by, or on his vehicles). The ledger does not count these.
+- `coverage_pct = (sorted + kept_as_evidence + counted_elsewhere) / L`. It is NULL unless there is a full census.
+
+**Done** means that every month has a fresh full census, with `pending = 0`, `in_nuke_unsorted = 0`, `unowned_linked_rows = 0`, and `coverage_pct` explained to 100%.
+
+**Census producers.**
+- Phone: `library_inventory_record_census` from LibraryInventory, at the start of each full run (#3557, not on the phone yet).
+- Mac Photos: `scripts/photo-library-census-mac.mjs` via `library_inventory_record_census_for` (#3557; run it on the Mac). Each origin is its own row. The month value is the max over origins and is shown as a lower bound until the reconciler joins assets by `cloud_identifier`.
+
+**Report.** `dotenvx run -- node scripts/photo-library-coverage.mjs [--json]`
+
+**Revert.** `supabase/sql/revert_20261117140000_library_coverage_v1.sql`. It refuses while census rows or non-phone inventory rows exist.
+
+**First live read (2026-11-17, America/Los_Angeles months, 2017-01 to 2026-11):** library count unknown for every month, because no census has been taken yet.
+
+| year | Nuke rows | sorted | held for review | unsorted | unowned linked |
+|---|---:|---:|---:|---:|---:|
+| 2017 | 1,672 | 441 | 1,229 | 2 | 2 |
+| 2018 | 4,144 | 763 | 3,377 | 4 | 29 |
+| 2019 | 2,585 | 507 | 2,076 | 2 | 0 |
+| 2020 | 1,464 | 1,142 | 322 | 0 | 20 |
+| 2021 | 2,260 | 2,106 | 154 | 0 | 1,076 |
+| 2022 | 798 | 725 | 73 | 0 | 451 |
+| 2023 | 1,022 | 967 | 55 | 0 | 772 |
+| 2024 | 3,871 | 3,271 | 600 | 0 | 2,058 |
+| 2025 | 4,943 | 4,213 | 730 | 0 | 4,013 |
+| 2026 | 6,841 | 4,826 | 2,014 | 1 | 1,845 |
+| undated | 43 | 31 | 12 | 0 | 5,392 |
+| total | 29,643 | 18,992 | 10,642 | 9 | 15,658 |
+
+The phone counted about 76K images at ignition. Nuke's owned rows from 2017 onward come to 29,643, so at least about 46K library photos never reached Nuke, or reached it without an owner.
+
+**Unowned archive rows (#3556, not live).** `capture_archive_owner_attribution_v1` stamps `user_id` only when the row records `documented_by_user_id = him`. It skips any conflicting attribution, private, privacy-hold, empty-url, superseded or primary rows, and any row on a vehicle that is not his. It is signed and capped at 50 per run, with revert-by-run through `capture_archive_owner_revert_v1`. Dry-run counts, read-only:
+
+| source | eligible | skipped |
+|---|---:|---|
+| hd_archive | 1,901 | superseded 633, other_vehicle 67, primary 1 |
+| iphoto | 1,114 | no owner evidence 462, other_vehicle 308, primary 3, superseded 1 (rule seeded with apply off) |
+| ssd_blast | 0 | 33,927 have no recorded owner evidence |
+| ssd_export | 0 | 11,088 have no recorded owner evidence |
+
+What would prove ownership for each source:
+- **ssd_blast:** the original intake run log or path, or a sha256 match to his owned rows (226 hash matches so far).
+- **ssd_export:** a content match, because these rows have no hash, no clock, and uuid names that match nothing.
+- **iphoto:** the same documented_by rule, after a review of the album-stamp history.
+
+**Blocked:** the `no-new-photo-reader` guardrail requires the owner's approval for the new photo-keyed revert log `capture_archive_owner_log` (an entry in `scripts/guardrails/photo-stores.allow.json`).
+
+**Matcher dry run (2026-11-17, no writes).** The source pairs are L = ledger, S = ssd_blast, E = ssd_export, H = hd_archive and I = unowned iphoto.
+- **No iCloud ids anywhere.** Nothing stores an iCloud id, and device-id matches are rare (I→L 47, L→L 1,144).
+- **Content hash:** S→L 226, S→S 3,487, L→L 2,801.
+- **Name + size:** H→I 747, I→H 659, H→L 63.
+- **Exact time:** this is proposal-only and needs a dhash/size check: S→L 9,664, L→S 11,116, S→I 848, S→H 589.
+- **E matches nothing** by any key.
