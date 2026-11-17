@@ -188,6 +188,13 @@ machine-layer delivery does not close the unfinished renderer or estimate work.
     `decide_evidence` is called only from the owner's own aal2 session. No job can call it (it is not granted to the
     service role and its body refuses a job caller), and a delegated Sign (`owner_delegated_sign_register`) never
     stands in for it.
+  - A person's own statement, said in conversation (from `20261117150000`): `record_owner_statement` stores the message
+    whole, uninterpreted and unsigned (it is a transcribed claim, not a Sign) as a private `vehicle_observations` row;
+    `record_owner_statement_link` stores the recording agent's resolution of a name in it to an organisation, on its
+    own row. The speaker comes only from the caller's authentication (a signed-in session, or the OAuth token the
+    connector's caller presented); no argument names a speaker and the service key alone cannot write one. A correction
+    or withdrawal is a successor row. Read back with `get_my_owner_statements`. Only the speaker reads these rows
+    through the API; do not read them through `q.sh` or another service-key path.
   - No raw INSERT, UPDATE or DELETE on testimony tables.
   - No `DISABLE TRIGGER`.
   - No `statement_timeout = 0`.
