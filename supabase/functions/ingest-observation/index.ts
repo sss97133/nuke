@@ -1276,6 +1276,9 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         // (subject_type='vehicle', subject_id=NULL) applies.
         ...(input.subject?.type ? { subject_type: input.subject.type } : {}),
         ...(input.subject?.id ? { subject_id: input.subject.id } : {}),
+        // An organisation subject carries its typed key: check_observation_organization_subject refuses
+        // subject_type='organization' with a subject_id and no matching subject_organization_id.
+        ...(input.subject?.type === "organization" && input.subject?.id ? { subject_organization_id: input.subject.id } : {}),
         observed_at: input.observed_at,
         source_id: source.id,
         source_url: input.source_url,
