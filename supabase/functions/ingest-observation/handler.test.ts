@@ -221,3 +221,21 @@ Deno.test("replayed deferred comment uses the existing observation without downs
 addEventListener("unload", () => envNames.forEach((name, index) => {
   if (saved[index] === undefined) Deno.env.delete(name); else Deno.env.set(name, saved[index]!);
 }));
+Deno.test("an organisation subject carries its typed key; other subjects do not", async () => {
+  // check_observation_organization_subject (live trigger) refuses subject_type='organization' with a subject_id and
+  // no matching subject_organization_id, so the insert must send both.
+  const base = { source_slug: "photo_pipeline", kind: "condition", observed_at: "2026-10-01T00:00:00Z",
+    content_text: "synthetic organisation observation", structured_data: { synthetic: true } };
+  const org = await run({ ...base, subject: { type: "organization", id: UUID } }, "success");
+  assert(org.status === 200 && org.data.success === true, "organisation-subject intake succeeds");
+  const orgInsert = org.calls.find(call => call.method === "POST" && call.path.endsWith("vehicle_observations"));
+  assert(orgInsert?.body?.subject_type === "organization" && orgInsert?.body?.subject_id === UUID);
+  assert(orgInsert?.body?.subject_organization_id === UUID, "typed organisation key is sent");
+  const user = await run({ ...base, subject: { type: "user", id: UUID } }, "success");
+  const userInsert = user.calls.find(call => call.method === "POST" && call.path.endsWith("vehicle_observations"));
+  assert(userInsert?.body?.subject_type === "user" && userInsert?.body?.subject_organization_id === undefined,
+    "a user subject sends no organisation key");
+  const vehicle = await run({ ...base, vehicle_id: UUID }, "success");
+  const vehicleInsert = vehicle.calls.find(call => call.method === "POST" && call.path.endsWith("vehicle_observations"));
+  assert(vehicleInsert?.body && vehicleInsert.body.subject_organization_id === undefined, "a vehicle row is unchanged");
+});
