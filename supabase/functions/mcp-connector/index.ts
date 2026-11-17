@@ -1,4 +1,5 @@
 import { ACCOUNTING_TOOLS, ACCOUNTING_TOOL_NAME, callAccounting } from "./accountingTools.ts";
+import { callOwnerStatement, type CallerContext, OWNER_STATEMENT_TOOLS, READ_OWNER_STATEMENTS, RECORD_OWNER_STATEMENT } from "./ownerStatements.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -94,6 +95,8 @@ interface AuthResult {
   ok: boolean;
   userId?: string;
   scopes?: string[];
+  /** The raw opaque OAuth bearer of this request. Only the owner-statement tools use it: the database hashes it to find the speaker. */
+  oauthToken?: string;
   error?: string;
   status?: number;
 }
@@ -143,7 +146,8 @@ async function authenticate(req: Request): Promise<AuthResult> {
     const keyScopes = Array.isArray(data.scopes) && data.scopes.length
       ? data.scopes.map((s: unknown) => String(s))
       : ["read", "write:observations"];
-    return { ok: true, userId: data.user_id || `agent:${data.agent_registration_id || "anon"}`, scopes: keyScopes };
+    return { ok: true, userId: data.user_id || `agent:${data.agent_registration_id || "anon"}`, scopes: keyScopes,
+      ...(opaqueOAuth && apiKey ? { oauthToken: apiKey } : {}) };
   }
 
   // 3. No auth — reject
@@ -257,6 +261,7 @@ interface ToolDef {
 
 const TOOLS: ToolDef[] = [
   ...ACCOUNTING_TOOLS,
+  ...OWNER_STATEMENT_TOOLS,
   // ── Schema Discovery ──────────────────────────────────────────────────
   {
     name: "describe_platform",
@@ -5987,11 +5992,26 @@ async function handleProposeAttribute(args: Record<string, unknown>): Promise<To
   });
 }
 
+// ── Owner statements (private, unsigned, speaker from this request's OAuth token) ──
+
+const ownerStatementRpc = async (fn: string, params: Record<string, unknown>) => {
+  const { data, error } = await sb().rpc(fn, params);
+  return { data, error: error ? { code: error.code, message: error.message } : null };
+};
+function handleRecordOwnerStatement(args: Record<string, unknown>, caller?: CallerContext): Promise<ToolResult> {
+  return callOwnerStatement(RECORD_OWNER_STATEMENT, args, caller, ownerStatementRpc) as Promise<ToolResult>;
+}
+function handleReadOwnerStatements(args: Record<string, unknown>, caller?: CallerContext): Promise<ToolResult> {
+  return callOwnerStatement(READ_OWNER_STATEMENTS, args, caller, ownerStatementRpc) as Promise<ToolResult>;
+}
+
 // =============================================================================
 // TOOL DISPATCH
 // =============================================================================
 
-const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<ToolResult>> = {
+const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>, caller?: CallerContext) => Promise<ToolResult>> = {
+  record_owner_statement: handleRecordOwnerStatement,
+  read_owner_statements: handleReadOwnerStatements,
   describe_platform: handleDescribePlatform,
   describe_schema: handleDescribeSchema,
   get_pipeline_registry: handleGetPipelineRegistry,
@@ -6102,7 +6122,7 @@ function handleToolsList(req: JsonRpcRequest, chatgptSurface = false): JsonRpcRe
   return rpcResult(req.id, { tools });
 }
 
-async function handleToolsCall(req: JsonRpcRequest, chatgptSurface = false): Promise<JsonRpcResponse> {
+async function handleToolsCall(req: JsonRpcRequest, chatgptSurface = false, caller?: CallerContext): Promise<JsonRpcResponse> {
   const params = req.params as { name: string; arguments?: Record<string, unknown> } | undefined;
   if (!params?.name || typeof params.name !== "string") {
     return rpcError(req.id, -32602, "Missing tool name");
@@ -6118,7 +6138,7 @@ async function handleToolsCall(req: JsonRpcRequest, chatgptSurface = false): Pro
   }
 
   try {
-    const result = await handler(params.arguments || {});
+    const result = await handler(params.arguments || {}, caller);
     return rpcResult(req.id, result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -6130,7 +6150,7 @@ function handlePing(req: JsonRpcRequest): JsonRpcResponse {
   return rpcResult(req.id, {});
 }
 
-async function handleJsonRpc(body: JsonRpcRequest, chatgptSurface = false): Promise<JsonRpcResponse | null> {
+async function handleJsonRpc(body: JsonRpcRequest, chatgptSurface = false, caller?: CallerContext): Promise<JsonRpcResponse | null> {
   // Notifications (no id) — return null to signal 202
   if (body.id === undefined || body.id === null) {
     if (body.method === "notifications/initialized") {
@@ -6148,7 +6168,7 @@ async function handleJsonRpc(body: JsonRpcRequest, chatgptSurface = false): Prom
     case "tools/list":
       return handleToolsList(body, chatgptSurface);
     case "tools/call":
-      return await handleToolsCall(body, chatgptSurface);
+      return await handleToolsCall(body, chatgptSurface, caller);
     case "ping":
       return handlePing(body);
     default:
@@ -6312,6 +6332,7 @@ Deno.serve(async (req: Request) => {
     submit_attribute_values: "observations",
     submit_vehicle_event: "observations",
     ingest_photos: "observations",
+    record_owner_statement: "observations",
     create_profile: "canonical",
     link_account: "canonical",
     verify_account_link: "canonical",
@@ -6321,12 +6342,16 @@ Deno.serve(async (req: Request) => {
   // the JWT itself (ES256 against the project JWKS) and looks up admin_users, because the connector's own API-key auth
   // cannot judge a user JWT. Anonymous → 401, a signed-in non-admin or an API key → 403/401.
   const ADMIN_OR_SERVICE_TOOLS = new Set(["execute_sql"]);
+  // Read tools that return one person's private rows: no anonymous call, so a client without a token is sent to log in.
+  const SIGN_IN_READ_TOOLS = new Set(["read_owner_statements"]);
+  // Who called, for the handlers that act as the caller. Set only from a credential this request presented.
+  let caller: CallerContext | undefined;
   if (body.method === "tools/call") {
     const toolName = body?.params?.name as string | undefined;
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
     const requiredTier: WriteTier | undefined = toolName ? WRITE_TIERS[toolName] : undefined;
-    const isWrite = Boolean(requiredTier);
+    const isWrite = Boolean(requiredTier) || (typeof toolName === "string" && SIGN_IN_READ_TOOLS.has(toolName));
     const adminOrService = typeof toolName === "string" && ADMIN_OR_SERVICE_TOOLS.has(toolName);
 
     if (adminOrService) {
@@ -6360,10 +6385,11 @@ Deno.serve(async (req: Request) => {
           { status: 403, headers: { ...CORS, "Content-Type": "application/json" } },
         );
       }
+      caller = { userId: auth.userId, scopes: auth.scopes, oauthToken: auth.oauthToken };
     } else if (isWrite) {
       // No auth + write tool → trigger OAuth flow via 401 + WWW-Authenticate.
       return new Response(
-        JSON.stringify(rpcError(body.id, -32000, `Authentication required for write tool '${toolName}'.`)),
+        JSON.stringify(rpcError(body.id, -32000, `Authentication required for tool '${toolName}'.`)),
         {
           status: 401,
           headers: {
@@ -6377,7 +6403,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Route to MCP handler (full catalog or ChatGPT allowlist — not advisor)
-  const response = await handleJsonRpc(body, isChatGptSurface(req));
+  const response = await handleJsonRpc(body, isChatGptSurface(req), caller);
 
   // Notifications get 202 (no body)
   if (response === null) {
@@ -6389,6 +6415,9 @@ Deno.serve(async (req: Request) => {
   if (body.method === "initialize") {
     baseHeaders["Mcp-Session-Id"] = crypto.randomUUID();
   }
+  // A person's private statements are never stored by an intermediary.
+  const privateResult = body.method === "tools/call" &&
+    (body.params?.name === RECORD_OWNER_STATEMENT || body.params?.name === READ_OWNER_STATEMENTS);
 
   // MCP Streamable HTTP: check Accept header to decide response format.
   // If client prefers text/event-stream (SSE), wrap response in SSE format.
@@ -6400,12 +6429,12 @@ Deno.serve(async (req: Request) => {
     const ssePayload = `event: message\ndata: ${JSON.stringify(response)}\n\n`;
     return new Response(ssePayload, {
       status: 200,
-      headers: { ...baseHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      headers: { ...baseHeaders, "Content-Type": "text/event-stream", "Cache-Control": privateResult ? "no-store" : "no-cache" },
     });
   }
 
   return new Response(JSON.stringify(response), {
     status: 200,
-    headers: { ...baseHeaders, "Content-Type": "application/json" },
+    headers: { ...baseHeaders, "Content-Type": "application/json", ...(privateResult ? { "Cache-Control": "no-store" } : {}) },
   });
 });

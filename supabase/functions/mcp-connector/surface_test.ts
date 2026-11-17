@@ -1,11 +1,12 @@
 import { ACCOUNTING_TOOLS } from './accountingTools.ts';
+import { OWNER_STATEMENT_TOOLS } from './ownerStatements.ts';
 // Run: deno test --allow-read supabase/functions/mcp-connector/surface_test.ts
 // Load the actual definitions and protocol handlers without starting HTTP, reading
 // credentials, or reaching the database. Tool handlers are spies, so denied calls
 // must fail before dispatch and allowed calls must preserve their arguments.
 const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
 const handlerNames = [...source.matchAll(/^  (\w+): handle\w+,$/gm)].map((m) => m[1]);
-const moduleSource = `const ACCOUNTING_TOOLS = ${JSON.stringify(ACCOUNTING_TOOLS)};\n` + source.slice(source.indexOf("interface JsonRpcRequest"), source.indexOf("const sb = ()")) + `
+const moduleSource = `const ACCOUNTING_TOOLS = ${JSON.stringify(ACCOUNTING_TOOLS)};\nconst OWNER_STATEMENT_TOOLS = ${JSON.stringify(OWNER_STATEMENT_TOOLS)};\ntype CallerContext = unknown;\n` + source.slice(source.indexOf("interface JsonRpcRequest"), source.indexOf("const sb = ()")) + `
 const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
 const TOOL_HANDLERS = Object.fromEntries(${JSON.stringify(handlerNames)}.map((name: string) =>
   [name, async (args: Record<string, unknown>) => { calls.push({ name, args }); return toolOk({ name, args }); }]));
@@ -26,8 +27,15 @@ Deno.test("ChatGPT lists and dispatches only the public allowlist for either sur
   ];
   const publicSet = new Set(publicNames);
   const allNames = connector.TOOLS.map((tool: { name: string }) => tool.name);
-  assert(allNames.length === 55 && new Set(allNames).size === 55, "Full catalog must retain 54 generic tools plus one accounting bridge");
-  assert(handlerNames.length === 54, "The 54 generic tools retain handlers; accounting uses the authenticated HTTP bridge");
+  assert(allNames.length === 57 && new Set(allNames).size === 57, "Full catalog must retain 54 generic tools, two owner-statement tools and one accounting bridge");
+  assert(handlerNames.length === 56, "The 54 generic and two owner-statement tools retain handlers; accounting uses the authenticated HTTP bridge");
+  for (const name of ["record_owner_statement", "read_owner_statements"]) {
+    assert(allNames.includes(name) && !publicSet.has(name), `${name} must be listed on the full catalog only`);
+  }
+  const byName = Object.fromEntries(connector.TOOLS.map((tool: { name: string }) => [tool.name, tool]));
+  assert(byName.read_owner_statements.annotations.readOnlyHint === true, "the statement reader is read-only");
+  assert(byName.record_owner_statement.annotations.readOnlyHint === false && byName.record_owner_statement.annotations.destructiveHint === false,
+    "the statement writer appends and destroys nothing");
   for (const tool of connector.TOOLS) {
     for (const hint of ["readOnlyHint", "destructiveHint", "openWorldHint"]) {
       assert(typeof tool.annotations[hint] === "boolean", `${tool.name} is missing ${hint}`);

@@ -97,6 +97,21 @@ Carry the next observed gap into code and the methodology together, preserving d
 Roles such as artist, buyer and researcher describe evidenced behavior in context; do not turn them
 into permanent identity types or mandatory arrival choices without a separate model decision.
 
+## What the owner has already told an agent
+
+A person's statements about organisations (their own companies, brands, shops and the dealings between them) are
+stored whole by `record_owner_statement` and read back by the connector tool `read_owner_statements` (database
+reader `get_my_owner_statements`). Before answering a question about the account's organisations, read the stored
+statements through that tool when you are connected through a connector the owner authorised with his own login,
+and say what was found with its count; a session without that connector says it cannot read them and does not reach
+for `q.sh` or another service-key path instead. When the owner states such a fact to you as something to keep, and
+you hold that connector, record the message verbatim with `record_owner_statement` in the same turn and tell him in
+the same reply that it was stored, under which id, and that he can correct or withdraw it. Do not store asides,
+hypotheticals or questions. This is the Observe tier: an unsigned, private transcript that decides nothing and
+creates no organisation, ownership or value; it is not a Sign and nothing may treat it as one. Quote a stored
+statement as what he said and when, never as a verified fact. Do not copy a statement into this repository, a commit
+message or a pull request.
+
 ## Reading photos
 
 Owner direction, 2026-11-10. A photo reading is finished when it is keyed in the model's own vocabulary
