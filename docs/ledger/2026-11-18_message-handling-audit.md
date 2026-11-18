@@ -6,18 +6,10 @@ connectors and a clone at `fe4a6e0`. Reads ran as `postgres`; `anon` and `authen
 Counts are exact and carry this date; re-measure before acting on them. No personal data is in this file:
 rows are referred to by table, source and count.
 
-## The outcome this serves
-
-The owner's stated outcome (chat, 2026-11-18, paraphrased): a content-completion delivery metric for a
-production, measured from the moment an image is taken to the approval of the media package, defined in the
-ledger during the production, with messages as the measuring points and their keyed values. His order of
-operations: permission for a user, then the targeting of which messages matter, then the metric. Standards come
-first (CRM, KPI, marketing and communication standards) and nothing is built ahead of them.
-
 ## The answer
 
-**Holding a person's messages already has an owner here for every part except two: an inbound message store
-and the media package.** Extend the owners in §1. Do not mint a messages table.
+**Holding a person's messages already has an owner here for every part except one: an inbound message store.**
+Extend the owners in §1. Do not mint a messages table.
 
 ## 1. What exists
 
@@ -29,12 +21,10 @@ and the media package.** Extend the owners in §1. Do not mint a messages table.
 | Sending to a person (email, SMS, WhatsApp, iMessage) | the gate in `supabase/functions/_shared/outbound.ts`, outbox `outbound_messages` (20261113160000) | 0 rows |
 | Citing a message thread as evidence | books rule (20261105190000): the cite names the medium and locates it by a date or an id | live |
 | Capture clock and image approval | `vehicle_images.taken_at`, `approval_status`, `approved_at`, `approved_by`; `image_capture_time_claims`; capture sets | live |
-| Gates of a delivery | `transfer_milestones` with `transfer_communications` (8 rows: a message linked to a milestone), `concierge_fulfillment_milestones`, `production_stages` (0 rows) | three patterns; choose one, do not add a fourth |
+| Gates and milestones | `transfer_milestones` with `transfer_communications` (8 rows: a message linked to a milestone), `concierge_fulfillment_milestones`, `production_stages` (0 rows) | three patterns; choose one, do not add a fourth |
 
-Not present:
-- An inbound message store at message grain for any channel. `telegram_message_log` (71 rows) belongs to the
-  retired Telegram capability; `contact_inbox` (266 rows) is inbound email.
-- A media package entity. No table, function or document described one before this note.
+Not present: an inbound message store at message grain for any channel. `telegram_message_log` (71 rows)
+belongs to the retired Telegram capability; `contact_inbox` (266 rows) is inbound email.
 
 ## 2. What the 2026-04-11 load did
 
@@ -52,8 +42,8 @@ attached to a vehicle:
 
 - The `whatsapp_ingest` rows are one per chat (135 chats, 46 of them groups). Each is a summary of a chat; the
   `total_messages` values sum to 7,972. Their metadata keys include `contact_name`, `contact_phone` and
-  `contact_jid`. They hold no message text, message id or media, so they cannot be the measuring points of a
-  delivery.
+  `contact_jid`. They hold no message text, message id or media, so no single message can be located from
+  them.
 - `timeline_events` carries the permissive policy "Public can view all timeline events" (`USING (true)`) and
   `anon` holds SELECT, so all 3,470 rows were returned to `anon` and to any signed-in account.
 
@@ -88,12 +78,12 @@ Other rows with no vehicle returned to `anon`: 28,295 before and after. Rows sto
    calls it. Give it the visibility test on `vehicles` when it is repaired.
 4. **`publishing_contacts`** holds two rows that are a messaging service's notification senders, not people
    (`is_noise` false): the email-archive extractor let service senders through.
-5. **Before the metric:** consent rows in `user_consents`; a handle platform for phone and WhatsApp in
-   `external_identities`; one gate table chosen; the media package and its approval designed.
+5. **Before anything is measured from messages:** consent rows in `user_consents`; a handle platform for phone
+   and WhatsApp in `external_identities`; one gate table chosen.
 
 ## 5. Practice adopted for other people's messages
 
-Agent judgment, adopted at the owner's direction to follow standard practice (2026-11-18); not an owner ruling.
+Agent judgment (2026-11-18), following standard data-minimisation practice; not an owner ruling.
 
 - Keep the derived signal and a pointer: who (a resolved identity), when, what kind (media drop, approval,
   blocker), and the thread by medium and date or id, as the books rule already cites one. Do not store the text
