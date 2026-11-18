@@ -12,8 +12,9 @@ Rows were added for image sets, productions and the registries.
 
 ## The answer
 
-**Holding a person's messages already has an owner here for every part except one: an inbound message store.**
-Extend the owners in §1. Do not mint a messages table.
+**Holding a person's messages already has an owner here for every part except two: an inbound message store,
+and a private way to key another person's phone or WhatsApp handle.** Extend the owners in §1. Do not mint a
+messages table.
 
 ## 1. What exists
 
@@ -30,8 +31,10 @@ Extend the owners in §1. Do not mint a messages table.
 | Productions | `lofficiel_shoots`, `publication_issues`, `production_stages` (no foreign keys) | 4 rows; 27 (atlas estimate); 0 rows |
 | New vocabulary, producers and sources | `schema_proposals`, `observation_properties`, `observation_extractors`. An `imessage` source exists; there is no `whatsapp` source | 11 `add_source` proposals open, none approved |
 
-`vehicle_images.approval_status`, `approved_at`, `approved_by` and `is_approved` are content moderation, set
-at insert by `trg_auto_approve_vehicle_images`. They are not a client's approval of anything.
+`vehicle_images.approval_status` is a content moderation status. `approved_at` and `approved_by` are set at
+insert by `trg_auto_approve_vehicle_images` when a row is auto-approved. `is_approved` is a boolean companion
+that the trigger does not write and that disagrees with `approval_status` on some rows (their column comments,
+20261003230000, say how). None of the four is a client's approval of anything.
 
 Not present: an inbound message store at message grain for any channel. `telegram_message_log` (71 rows)
 belongs to the retired Telegram capability; `contact_inbox` (266 rows) is inbound email.
@@ -116,4 +119,14 @@ select count(*) filter (where source in ('whatsapp_ingest', 'call_history', 'cal
                                          'imessage_thread', 'apple_health_export')),
        count(*)
 from public.timeline_events where vehicle_id is null;
+
+-- the inventory rows of §1 (as postgres, 2026-11-18; population: every row of the named table)
+select platform, count(*) from public.external_identities group by 1;
+select coalesce(source_contract, '(none)'), is_auto_session, is_personal, count(*)
+from public.image_sets group by 1, 2, 3;
+select coalesce(role, '(null)'), count(*) from public.image_set_members group by 1;
+select proposal_type, status, count(*) from public.schema_proposals group by 1, 2;
+select count(*) from public.lofficiel_shoots;  -- likewise production_stages, user_phones, user_consents,
+                                               -- image_capture_time_claims, telegram_message_log, contact_inbox
+-- a count marked "atlas estimate" is v_schema_atlas.est_rows, not a count(*)
 ```
