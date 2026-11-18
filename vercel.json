@@ -38,6 +38,14 @@
       "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/.well-known/oauth-protected-resource"
     },
     {
+      "source": "/.well-known/oauth-protected-resource/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/.well-known/oauth-authorization-server"
+    },
+    {
       "source": "/oauth/:path*",
       "destination": "/api/oauth-proxy?p=:path*"
     },
