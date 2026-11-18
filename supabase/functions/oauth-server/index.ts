@@ -19,6 +19,12 @@
  * 2026-11-18: code issued, claude.ai never called /oauth/token). The emailed link remains
  * for accounts without a password; it lands on /oauth/callback.
  *
+ * The page offers the same sign-ins as nuke.ag itself: a browser already signed in to nuke.ag
+ * continues as that account, and Google, Apple and GitHub sign in through the auth server and
+ * return to /oauth/callback in the same browser. A provider session starts without an email
+ * (stored as "provider:<name>") and is bound to the signed-in account's email when that
+ * account approves; an emailed-link session keeps the email it was sent to.
+ *
  * @owner external-agent-write-api
  */
 
@@ -37,8 +43,12 @@ const REVOCATION_ENDPOINT = `${ISSUER}/oauth/revoke`;
 const RESOURCE_METADATA_ENDPOINT = `${ISSUER}/.well-known/oauth-protected-resource`;
 const LOGIN_ENDPOINT = `${ISSUER}/oauth/login`;
 const CALLBACK_ENDPOINT = `${ISSUER}/oauth/callback`;
+const SIGN_IN_PROVIDERS = ["google", "apple", "github"];
 const CALLBACK_FINISH_ENDPOINT = `${ISSUER}/oauth/callback-finish`;
 const MCP_RESOURCE = `${ISSUER}/mcp`;
+
+// Where the nuke.ag site keeps its own signed-in session in this browser (supabase-js default key).
+const SITE_SESSION_KEY = `sb-${(() => { try { return new URL(Deno.env.get("SUPABASE_URL") ?? "").hostname.split(".")[0]; } catch { return ""; } })()}-auth-token`;
 
 const SCOPES_SUPPORTED = OAUTH_SCOPES;
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;          // 1 hour
@@ -335,8 +345,21 @@ async function handleAuthorize(req: Request): Promise<Response> {
     <div class="meta scopes">
       <span class="pill">scope</span> ${scope.split(" ").filter(Boolean).map((s) => `<code>${s.replace(/[<>&"']/g, "")}</code>`).join(" ")}
     </div>
+    <form id="resume" method="post" action="${LOGIN_ENDPOINT}" hidden>
+      <input type="hidden" name="oauth_params" value="${params2}" />
+      <input type="hidden" name="method" value="session" />
+      <input type="hidden" name="access_token" id="resume-token" />
+      <button type="submit">Continue as <span id="resume-who"></span></button>
+      <p class="meta">You are signed in to NUKE in this browser.</p>
+    </form>
     <form method="post" action="${LOGIN_ENDPOINT}">
-      <label for="email">Your NUKE email</label>
+      <input type="hidden" name="oauth_params" value="${params2}" />
+      <button type="submit" name="method" value="google" class="alt">Continue with Google</button>
+      <button type="submit" name="method" value="apple" class="alt">Continue with Apple</button>
+      <button type="submit" name="method" value="github" class="alt">Continue with GitHub</button>
+    </form>
+    <form method="post" action="${LOGIN_ENDPOINT}">
+      <label for="email">Or your NUKE email</label>
       <input id="email" name="email" type="email" required autocomplete="username" placeholder="you@example.com" />
       <label for="password">Password</label>
       <input id="password" name="password" type="password" autocomplete="current-password" />
@@ -346,8 +369,19 @@ async function handleAuthorize(req: Request): Promise<Response> {
       <button type="submit" name="method" value="password">Sign in</button>
       <button type="submit" name="method" value="link" class="alt" formnovalidate>Email me a sign-in link instead</button>
     </form>
-    <p class="meta">Signing in with your password finishes the connection on this page. An emailed link only works when it opens in this same browser; from a mail app on a phone it usually does not.</p>
+    <p class="meta">Use the sign-in you use on nuke.ag. An emailed link only works when it opens in this same browser; from a mail app on a phone it usually does not.</p>
   </div>
+  <script>
+  (() => { try {
+    const raw = localStorage.getItem(${JSON.stringify(SITE_SESSION_KEY)});
+    const s = raw && JSON.parse(raw);
+    if (s && s.access_token && s.user && s.user.email && s.expires_at * 1000 > Date.now() + 30000) {
+      document.getElementById('resume-token').value = s.access_token;
+      document.getElementById('resume-who').textContent = s.user.email;
+      document.getElementById('resume').hidden = false;
+    }
+  } catch { /* no stored session: the other sign-ins remain */ } })();
+  </script>
 </body>
 </html>`;
   return htmlResp(html);
@@ -383,6 +417,7 @@ async function handleLogin(req: Request): Promise<Response> {
   let password = "";
   let totp = "";
   let method = "";
+  let siteToken = "";
   if (ct.includes("application/x-www-form-urlencoded")) {
     const form = await req.formData();
     email = String(form.get("email") ?? "").trim().toLowerCase();
@@ -390,6 +425,7 @@ async function handleLogin(req: Request): Promise<Response> {
     password = String(form.get("password") ?? "");
     totp = String(form.get("totp") ?? "").replace(/\s+/g, "");
     method = String(form.get("method") ?? "");
+    siteToken = String(form.get("access_token") ?? "");
   } else if (ct.includes("application/json")) {
     const body = await req.json();
     email = String(body?.email ?? "").trim().toLowerCase();
@@ -401,7 +437,9 @@ async function handleLogin(req: Request): Promise<Response> {
     return errorPage("Unsupported Content-Type for login");
   }
 
-  if (!email || !email.includes("@")) return errorPage("Valid email required");
+  const viaProvider = SIGN_IN_PROVIDERS.includes(method);
+  const viaSite = method === "session";
+  if (!viaProvider && !viaSite && (!email || !email.includes("@"))) return errorPage("Valid email required");
   let oauthParams: Record<string, string>;
   try {
     oauthParams = JSON.parse(decodeURIComponent(oauthParamsStr));
@@ -412,7 +450,14 @@ async function handleLogin(req: Request): Promise<Response> {
   const oauthClient = await makeServiceClient().from("oauth_clients").select("redirect_uris,token_endpoint_auth_method").eq("client_id", oauthParams.client_id).maybeSingle();
   oauthParams.scope ??= DEFAULT_OAUTH_SCOPE;
   if (!validOAuthLogin(oauthParams, oauthClient.data)) return errorPage("Invalid OAuth client, redirect, scope, or PKCE challenge");
-  const usePassword = method !== "link" && password.length > 0;
+  if (viaSite) {
+    // The account already signed in to nuke.ag in this browser. Its token is checked with the auth server.
+    const { data: u } = await makeServiceClient().auth.getUser(siteToken);
+    email = String(u?.user?.email ?? "").toLowerCase();
+    if (!u?.user?.id || !email) return errorPage("That NUKE sign-in has expired. Go back and choose another way to sign in.");
+  }
+  if (viaProvider) email = `provider:${method}`; // bound to the account's email when it approves
+  const usePassword = !viaProvider && !viaSite && method !== "link" && password.length > 0;
   if (method === "password" && !password) return errorPage("Enter your password, or go back and choose the emailed link.");
   // Same-browser sign-in. Nothing is stored unless the account's own credentials are accepted.
   let passwordAccessToken = "";
@@ -428,6 +473,7 @@ async function handleLogin(req: Request): Promise<Response> {
   logEvent("oauth_login_session_created", {
     session_id: sessionId,
     email_domain: email.split("@")[1] ?? null,
+    method: method || "link",
     client_id: oauthParams.client_id ?? null,
     redirect_uri: oauthParams.redirect_uri ?? null,
     code_challenge_len: maskLen(oauthParams.code_challenge),
@@ -449,6 +495,18 @@ async function handleLogin(req: Request): Promise<Response> {
     return errorPage("Could not start login session");
   }
 
+  if (viaProvider) {
+    logEvent("oauth_login_provider_redirect", { session_id: sessionId, provider: method });
+    const u = new URL(`${getEnv("SUPABASE_URL")}/auth/v1/authorize`);
+    u.searchParams.set("provider", method);
+    u.searchParams.set("redirect_to", `${CALLBACK_ENDPOINT}?session=${sessionId}`);
+    return redirectResp(u.toString());
+  }
+  if (viaSite) {
+    logEvent("oauth_login_site_session_accepted", { session_id: sessionId });
+    const { data: named } = await supabase.from("oauth_clients").select("client_name").eq("client_id", oauthParams.client_id).maybeSingle();
+    return consentPage({ client_id: oauthParams.client_id, redirect_uri: oauthParams.redirect_uri, scope: oauthParams.scope }, sessionId, siteToken, named?.client_name);
+  }
   if (usePassword) {
     logEvent("oauth_login_password_accepted", { session_id: sessionId });
     const { data: named } = await supabase.from("oauth_clients").select("client_name").eq("client_id", oauthParams.client_id).maybeSingle();
@@ -603,6 +661,13 @@ async function handleCallbackFinish(req: Request): Promise<Response> {
   const { data: u } = await supabase.auth.getUser(accessToken);
   const userId = u?.user?.id;
   if (!userId) return jsonResp({ error: "could not resolve user from access_token" }, 400);
+  // A provider sign-in started without an email. Bind the session to the account that signed in and is
+  // approving; a session started with an email (link, password, site session) is never rebound.
+  const signedInEmail = String(u?.user?.email ?? "").toLowerCase();
+  if (signedInEmail) {
+    await supabase.from("oauth_login_sessions").update({ email: signedInEmail })
+      .eq("session_id", sessionId).like("email", "provider:%").is("completed_at", null);
+  }
   return finishCallback(sessionId, userId, true);
 }
 

@@ -75,3 +75,26 @@ Deno.test('two refreshes racing on one token derive the same successor pair',asy
  assert(seen[0].p_refresh_hash===seen[1].p_refresh_hash && seen[0].p_access_hash===seen[1].p_access_hash);
  mock.rpc=prev;
 });
+
+Deno.test('provider and site-session sign-ins stay in the browser and bind only provider sessions',async()=>{
+ const mock=(globalThis as any).__oauthClient;const prevFrom=mock.from,prevAuth=mock.auth,prevRpc=mock.rpc;
+ const inserted:any[]=[];const updates:any[]=[];
+ mock.from=()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{redirect_uris:['https://client.test/cb'],token_endpoint_auth_method:'none',client_name:'Fixture'}})})}),insert:async(row:any)=>{inserted.push(row);return {error:null};},
+  update:(v:any)=>{const u:any={v,f:[]};updates.push(u);const c:any={eq:(...a:any[])=>{u.f.push(['eq',...a]);return c;},like:(...a:any[])=>{u.f.push(['like',...a]);return c;},is:(...a:any[])=>{u.f.push(['is',...a]);return c;},then:(r:any)=>r({error:null})};return c;}});
+ mock.auth={getUser:async(t:string)=>t==='good'?{data:{user:{id:'u1',email:'Owner@Example.Test'}}}:{data:{user:null}}};
+ mock.rpc=async()=>({data:{redirect_uri:'https://client.test/cb',state:'s',client_id:'client'}});
+ const params=encodeURIComponent(JSON.stringify({client_id:'client',redirect_uri:'https://client.test/cb',scope:'read',state:'s',code_challenge:'a'.repeat(43),code_challenge_method:'S256'}));
+ const post=(fields:Record<string,string>)=>handle(new Request('https://nuke.ag/oauth/login',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({oauth_params:params,...fields})}));
+ const g=await post({method:'google'});const loc=new URL(g.headers.get('location')!);
+ assert(g.status===302 && loc.pathname==='/auth/v1/authorize' && loc.searchParams.get('provider')==='google');
+ assert(loc.searchParams.get('redirect_to')==='https://nuke.ag/oauth/callback?session='+inserted[0].session_id && inserted[0].email==='provider:google');
+ const bad=await post({method:'session',access_token:'stale'});assert(bad.status===400 && inserted.length===1);
+ const ok=await post({method:'session',access_token:'good'});const html=await ok.text();
+ assert(html.includes('Approve these permissions') && html.includes('"good"') && inserted[1].email==='owner@example.test');
+ const page=await (await handle(new Request('https://nuke.ag/oauth/authorize?client_id=client&redirect_uri=https%3A%2F%2Fclient.test%2Fcb&scope=read&code_challenge='+'a'.repeat(43)))).text();
+ assert(page.includes('Continue with Google') && page.includes('Continue with Apple') && page.includes('value="session"') && page.includes('-auth-token'));
+ const fin=await handle(new Request('https://nuke.ag/oauth/callback-finish',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded',origin:'https://nuke.ag'},body:new URLSearchParams({session:'sess',access_token:'good',consent:'approve'})}));
+ assert(fin.status===200 && updates.length===1 && updates[0].v.email==='owner@example.test');
+ assert(JSON.stringify(updates[0].f)===JSON.stringify([['eq','session_id','sess'],['like','email','provider:%'],['is','completed_at',null]]));
+ mock.from=prevFrom;mock.auth=prevAuth;mock.rpc=prevRpc;
+});
