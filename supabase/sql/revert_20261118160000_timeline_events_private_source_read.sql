@@ -4,5 +4,6 @@
 -- revert only together with moving those rows out of public.timeline_events.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '10s';
 DROP POLICY IF EXISTS timeline_events_private_source_read ON public.timeline_events;
 COMMIT;
