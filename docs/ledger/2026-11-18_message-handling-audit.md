@@ -6,6 +6,10 @@ connectors and a clone at `fe4a6e0`. Reads ran as `postgres`; `anon` and `authen
 Counts are exact and carry this date; re-measure before acting on them. No personal data is in this file:
 rows are referred to by table, source and count.
 
+Corrected the same day after a second read (17:30Z to 18:10Z): the image approval columns are content
+moderation, not a client's approval; `external_identities` is public read, so it cannot hold a phone number.
+Rows were added for image sets, productions and the registries.
+
 ## The answer
 
 **Holding a person's messages already has an owner here for every part except one: an inbound message store.**
@@ -17,11 +21,17 @@ Extend the owners in §1. Do not mint a messages table.
 |---|---|---|
 | A person's own statement, one row per message, private, uninterpreted | `record_owner_statement` on `vehicle_observations` (20261117150000); speaker-only read policies | live |
 | Permission record (scope, evidence, revocation) | `user_consents` | 0 rows |
-| Identity for a handle | `external_identities` (platform x handle) | 11 platform values, none for phone, WhatsApp, iMessage or email |
+| Identity for a handle | `external_identities` (platform x handle). It is public read (policy "Public read external identities", `USING (true)`), so a phone number must not be stored there in clear. An account's own numbers have `user_phones` (owner-only) | 11 platform values, none for phone, WhatsApp, iMessage or email; `user_phones` 0 rows |
 | Sending to a person (email, SMS, WhatsApp, iMessage) | the gate in `supabase/functions/_shared/outbound.ts`, outbox `outbound_messages` (20261113160000) | 0 rows |
 | Citing a message thread as evidence | books rule (20261105190000): the cite names the medium and locates it by a date or an id | live |
-| Capture clock and image approval | `vehicle_images.taken_at`, `approval_status`, `approved_at`, `approved_by`; `image_capture_time_claims`; capture sets | live |
+| Capture clock | `vehicle_images.taken_at` (the capture time as its writer understood it; read its column comment); `image_capture_time_claims`; capture sets | live; `image_capture_time_claims` 0 rows |
 | Gates and milestones | `transfer_milestones` with `transfer_communications` (8 rows: a message linked to a milestone), `concierge_fulfillment_milestones`, `production_stages` (0 rows) | three patterns; choose one, do not add a fourth |
+| Sets of images | `image_sets` and `image_set_members` (order, role, caption). A private shape keyed by `source_contract` exists: `photokit_album_v1` with the RESTRICTIVE policy `native_album_private_read` | 1,999 sets (1,863 auto-detected sessions, 133 PhotoKit albums, 3 others); 22,090 members |
+| Productions | `lofficiel_shoots`, `publication_issues`, `production_stages` (no foreign keys) | 4 rows; 27 (atlas estimate); 0 rows |
+| New vocabulary, producers and sources | `schema_proposals`, `observation_properties`, `observation_extractors`. An `imessage` source exists; there is no `whatsapp` source | 11 `add_source` proposals open, none approved |
+
+`vehicle_images.approval_status`, `approved_at`, `approved_by` and `is_approved` are content moderation, set
+at insert by `trg_auto_approve_vehicle_images`. They are not a client's approval of anything.
 
 Not present: an inbound message store at message grain for any channel. `telegram_message_log` (71 rows)
 belongs to the retired Telegram capability; `contact_inbox` (266 rows) is inbound email.
@@ -78,8 +88,8 @@ Other rows with no vehicle returned to `anon`: 28,295 before and after. Rows sto
    calls it. Give it the visibility test on `vehicles` when it is repaired.
 4. **`publishing_contacts`** holds two rows that are a messaging service's notification senders, not people
    (`is_noise` false): the email-archive extractor let service senders through.
-5. **Before anything is measured from messages:** consent rows in `user_consents`; a handle platform for phone
-   and WhatsApp in `external_identities`; one gate table chosen.
+5. **Before anything is measured from messages:** consent rows in `user_consents`; a private way to key a
+   phone or WhatsApp handle (not `external_identities`, which is public read); one gate pattern chosen.
 
 ## 5. Practice adopted for other people's messages
 
