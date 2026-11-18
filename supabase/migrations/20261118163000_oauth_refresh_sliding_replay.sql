@@ -22,7 +22,7 @@
 -- No row is rewritten: existing sessions keep their expiry until their next refresh.
 
 SET lock_timeout = '5s';
-SET statement_timeout = '30s';
+SET statement_timeout = '10s';
 
 ALTER TABLE public.oauth_login_sessions
   ADD COLUMN IF NOT EXISTS prev_refresh_token_hash text,
