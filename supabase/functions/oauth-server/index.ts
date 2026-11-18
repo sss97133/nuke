@@ -344,7 +344,7 @@ async function handleAuthorize(req: Request): Promise<Response> {
       <input id="totp" name="totp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
       <input type="hidden" name="oauth_params" value="${params2}" />
       <button type="submit" name="method" value="password">Sign in</button>
-      <button type="submit" name="method" value="link" class="alt">Email me a sign-in link instead</button>
+      <button type="submit" name="method" value="link" class="alt" formnovalidate>Email me a sign-in link instead</button>
     </form>
     <p class="meta">Signing in with your password finishes the connection on this page. An emailed link only works when it opens in this same browser; from a mail app on a phone it usually does not.</p>
   </div>
@@ -571,7 +571,7 @@ function consentPage(sess: { client_id: string; redirect_uri: string; scope?: st
 (() => {
  const frag = new URLSearchParams(location.hash.replace(/^#/,''));
  const access_token = ${JSON.stringify(accessToken).replace(/</g,'\\u003c')} || frag.get('access_token');
- if(location.hash) history.replaceState(null,'',location.pathname + '?session=' + encodeURIComponent(${JSON.stringify(sessionId).replace(/</g,'\\u003c')}));
+ if(location.pathname.endsWith('/oauth/callback')) history.replaceState(null,'',location.pathname + '?session=' + encodeURIComponent(${JSON.stringify(sessionId).replace(/</g,'\\u003c')}));
  const button=document.getElementById('approve'), status=document.getElementById('status');
  button.addEventListener('click', async () => {
   button.disabled=true;button.style.opacity='0.5';status.textContent='Finishing…';

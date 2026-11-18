@@ -16,6 +16,9 @@
 --      same pair (oauth-server derives them from the presented token with a server-held key, so only a caller
 --      going through oauth-server with that exact token can match). Nothing is written on a replay.
 --
+-- revoke_mcp_oauth_credential also matches the previous refresh hash, so a caller still holding the token that was
+-- just rotated can end the connection with it (before, that revoke matched nothing and the session lived on).
+--
 -- No row is rewritten: existing sessions keep their expiry until their next refresh.
 
 SET lock_timeout = '5s';
@@ -76,6 +79,22 @@ BEGIN
  IF p_grant_type='authorization_code' THEN UPDATE oauth_authorization_codes SET used_at=now() WHERE code=c.code; END IF;
  RETURN jsonb_build_object('user_id',s.user_id,'key_id',key_id,'scopes',scopes);
 END $function$;
+
+CREATE OR REPLACE FUNCTION public.revoke_mcp_oauth_credential(p_token_hash text, p_client_id text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE s oauth_login_sessions%ROWTYPE;
+BEGIN
+ IF auth.role() IS DISTINCT FROM 'service_role' THEN RAISE EXCEPTION 'Service only' USING ERRCODE='42501'; END IF;
+ SELECT o.* INTO s FROM oauth_login_sessions o LEFT JOIN api_keys k ON k.id=o.access_key_id WHERE o.client_id=p_client_id AND (o.refresh_token_hash=p_token_hash OR o.prev_refresh_token_hash=p_token_hash OR k.key_hash=p_token_hash) FOR UPDATE OF o;
+ IF s.session_id IS NOT NULL THEN UPDATE api_keys SET is_active=false WHERE id=s.access_key_id; UPDATE oauth_login_sessions SET revoked_at=now(),refresh_token_hash=NULL,prev_refresh_token_hash=NULL WHERE session_id=s.session_id; END IF;
+END $function$;
+
+REVOKE ALL ON FUNCTION public.revoke_mcp_oauth_credential(text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.revoke_mcp_oauth_credential(text,text) TO service_role;
 
 REVOKE ALL ON FUNCTION public.exchange_mcp_oauth_credential(text,text,text,text,text,text,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.exchange_mcp_oauth_credential(text,text,text,text,text,text,text) TO service_role;
