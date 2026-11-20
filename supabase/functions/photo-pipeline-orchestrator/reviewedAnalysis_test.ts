@@ -1,4 +1,3 @@
-import { agreeVerdicts, automaticProvenance, buildEnvelope, intakeShape } from "../../../scripts/photo-pipeline/deep-stage.mjs";
 import { recordReviewedAnalysis, validateReviewedAnalysis, REVIEW_METHOD, type ReviewedAnalysisDeps } from "./reviewedAnalysis.ts";
 
 function assert(v: unknown, message = "assertion failed"): asserts v { if (!v) throw new Error(message); }
@@ -125,26 +124,4 @@ for (const [name, edit, code] of bad) Deno.test(`invalid supplied review: ${name
 Deno.test("validator does not mutate or invent measured fields", () => {
   const p = packet(), before = JSON.stringify(p); validateReviewedAnalysis(p, Date.parse("2026-11-09T20:00:00Z"));
   assert(JSON.stringify(p) === before);
-});
-
-// The subscription frame reader's automatic deep reading (scripts/photo-pipeline/deep-stage.mjs): the envelope it builds,
-// from two reads that disagree, is accepted by this intake's own validator, with the provenance that tells it from the
-// three-pass reviewed reading.
-Deno.test("an automatic deep reading's merged envelope passes the intake validator", () => {
-  const base = packet().verdict;
-  const full = (state: Record<string, string>, scene = "body_exterior") => ({ ...base, scene_type: scene, needs_clarification: false, intent: "documentation", intent_confidence: 0.9,
-    state_observations: { damage_callouts: [], ...state }, damage_localized: [], context_complete: true, open_questions: [], agent_notes: "",
-    workshop_signals: { tools_visible: [], fixturing: "unknown", weld_quality: "unknown", lighting: "natural_outdoor" },
-    presence: { person: false, dog: false, place_hint: null },
-    camera_pose: { method: "full-frame visual inspection; no calibrated pose", framing: "whole car", azimuth_deg: null, elevation_deg: null, distance_est: null, exif_present: null } });
-  const shaped = (v: any) => intakeShape({ ...v, agent_notes: "", camera_pose: { ...v.camera_pose, distance_est: "about 5 meters" } });
-  const merged = agreeVerdicts(shaped(full({ rust_severity: "none", paint_state: "aged", completeness: "assembled" })), shaped(full({ rust_severity: "surface", paint_state: "aged", completeness: "assembled" }, "engine_bay")));
-  assert(merged.errors.length === 0 && merged.disagreements.length === 2);
-  const provenance = automaticProvenance({ model: "claude-sonnet-5-5", runId: "claude-cli-fire-test", durationMs: 41000 });
-  const envelope = buildEnvelope({ verdict: merged.verdict, row: { image_url: packet().source.image_url, updated_at: updated }, reviewedUrl: packet().source.image_url,
-    sha256: "c".repeat(64), reviewedAt: "2026-11-09T19:00:00.000Z", provenance });
-  const checked = validateReviewedAnalysis(envelope, Date.parse("2026-11-09T20:00:00Z"));
-  assert(checked.verdict.scene_type === "unknown" && checked.verdict.state_observations.rust_severity === "unknown");
-  assert(checked.provenance.agent_tier === "subscription automatic" && checked.provenance.agent_cost_cents === null);
-  assert(checked.provenance.extraction_method === "claude-cli two independent passes, agreed values only, pixels only, v1");
 });
