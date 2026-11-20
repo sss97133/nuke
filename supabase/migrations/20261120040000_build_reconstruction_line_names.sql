@@ -7,11 +7,22 @@
 -- What this changes (revert: re-apply 20261120030000_build_reconstruction_paper_subjects.sql):
 --   vehicle_build_reconstruction(uuid)  each line gains name: the stored catalog product title (redacted of contact text, trimmed,
 --                                       160 characters at most, null when no product is linked or the card is withdrawn).
---                                       description stays exactly as printed. Nothing else changes; no price is read.
+--                                       description stays as printed for a caller who may see amounts (owner, granted user, service
+--                                       role). For any other caller (anon included) embedded supplier list prices ("; list 10.15") are
+--                                       removed from description, the same rule that gates amount. Nothing else changes.
+--   receipt_line_strip_list_price(text) new IMMUTABLE helper holding the exact expression vehicle_part_installation_evidence
+--                                       (20261120020000) applies inline; that function should adopt this helper later.
 -- Contract: supabase/sql/test_vehicle_build_reconstruction.sql.
 
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
+
+CREATE OR REPLACE FUNCTION public.receipt_line_strip_list_price(p_text text) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path = pg_catalog AS $$
+  SELECT regexp_replace(p_text, ';? *\ylist *\$?[0-9][0-9,]*(\.[0-9]+)?', '', 'gi')
+$$;
+COMMENT ON FUNCTION public.receipt_line_strip_list_price(text) IS
+  'Removes supplier list-price fragments ("; list 10.15") that receipt line text embeds. Same expression as vehicle_part_installation_evidence.';
 
 CREATE OR REPLACE FUNCTION public.vehicle_build_reconstruction(p_vehicle_id uuid) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
@@ -172,7 +183,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
         'lines', (SELECT jsonb_agg(jsonb_build_object(
                     'item_id', x.item_id, 'receipt_id', x.receipt_id, 'kind', x.line_kind, 'day', x.anchor_date,
                     'source', nullif(left(btrim(public.text_redact_contact(x.vendor_name)), 300), ''),
-                    'description', nullif(left(btrim(public.text_redact_contact(x.description)), 500), ''),
+                    'description', nullif(left(btrim(public.text_redact_contact(CASE WHEN (SELECT tied FROM v) THEN x.description
+                                                                  ELSE public.receipt_line_strip_list_price(x.description) END)), 500), ''),
                     'name', x.product_name,
                     'part_number', x.part_number, 'paper_hours', x.printed_hours, 'operation_code', x.op_code,
                     'amount', CASE WHEN (SELECT tied FROM v) THEN x.total_price END)

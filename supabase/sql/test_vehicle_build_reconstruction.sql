@@ -204,6 +204,8 @@ INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a3', 1973
 INSERT INTO public.fixture_lines VALUES
   ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-03', 'Supplier', '70-73 RR LIGHT HRNESS', 'W2', 100, NULL, NULL),
   ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-03', 'Supplier', '72-73 UNDERDASH WIRING HRNS', 'W1', 300, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-05', 'Supplier', '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727; list 10.15', 'B1', 5, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-05', 'Supplier', 'BATTERY (SSB, 2Y warranty; list $313.54)', 'B2', 5, NULL, NULL),
   ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-04', 'Supplier', '70-73 LOOP CARPET SET', 'C1', 200, NULL, NULL);
 DO $$
 DECLARE r jsonb; l jsonb;
@@ -219,9 +221,20 @@ BEGIN
   ASSERT length(l ->> 'name') = 160, 'title capped at 160 characters';
   ASSERT r::text !~ '99\.5' AND r::text !~ 'quote_price' AND r::text !~ '"amount": ?[0-9]', 'no price for anon';
   ASSERT r #>> '{totals,recorded_amount}' IS NULL AND r ->> 'amounts_visible' = 'false';
+  ASSERT r::text !~* 'list *[$0-9]', 'anon sees no list price in any description';
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B1';
+  ASSERT l ->> 'description' = '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727', 'size, quantity and store survive; only the price goes: ' || l::text;
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B2';
+  ASSERT l ->> 'description' = 'BATTERY (SSB, 2Y warranty)', l::text;
   RESET ROLE;
+  PERFORM set_config('test.uid', '00000000-0000-0000-0000-0000000000c1', true);
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a3');
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B1';
+  ASSERT l ->> 'description' = '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727; list 10.15', 'the owner keeps the printed text: ' || l::text;
+  PERFORM set_config('test.uid', '', true);
 END $$;
 
+DROP FUNCTION public.receipt_line_strip_list_price(text);
 DROP FUNCTION public.receipt_item_product_card(uuid);
 DROP FUNCTION public.photo_reading_is_print(jsonb); DROP FUNCTION public.build_phase_system(text);
 DROP FUNCTION public.photo_part_key_system(text);
