@@ -268,3 +268,18 @@ it('withholds physical citations when the eligible image inventory is incomplete
   expect(host.querySelector('.vp-key-point[data-point="Factory paint"]')?.textContent).toContain('source read unavailable');
   expect(host.querySelector('a[href="https://example.org/paint.jpg"]')).toBeNull();
 });
+
+it('prints years, casting numbers and codes as-is, quantities with separators, and day keys in the page date format', async () => {
+  expect(valueText(1970)).toBe('1970');
+  expect(valueText(85000, 'mi')).toBe('85,000 mi');
+  const item: FacetItem = { key: 'engine.current.block_casting', facet: 'current', value: '3955', unit: null, status: 'reading', rule: null, equation: null, needed: null,
+    sources: [{ kind: 'image', label: 'photo reading', observed_at: '2026-02-03T00:00:00Z',
+      decoded: { block_casting_year: 1970, zip: 89005, lines: 1204, printed_hours: 50.75, first_day: '2024-09-26', last_day: '2025-01-13' } }] };
+  const { ItemList } = await import('../../kit');
+  await act(async () => { root.render(<ItemList items={[item]} />); });
+  expect(host.textContent).toContain('block casting year: 1970');
+  expect(host.textContent).toContain('zip: 89005');
+  expect(host.textContent).toContain('lines: 1,204');
+  expect(host.textContent).toContain('first day: Sep 26, 2024 · last day: Jan 13, 2025');
+  expect(host.textContent).not.toContain('1,970');
+});

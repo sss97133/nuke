@@ -305,15 +305,8 @@
    which renders the same classes). Imported by VehicleProfile.tsx and
    user-profile/UserBarcodeTimeline.tsx. Do not redefine barcode/hm-* rules here. */
 
-/* Gallery filter chip — sticky above gallery toolbar inside right column */
-.gallery-filter-chip {
-  display: flex; align-items: center; gap: 8px; padding: 4px 12px;
-  font: var(--text-callout)/1.4 var(--font-family);
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  min-width: 0; width: 100%;
-}
-.gallery-filter-chip > span { overflow-wrap: anywhere; min-width: 0; }
-.gallery-filter-chip button { flex-shrink: 0; margin-left: auto; min-height: var(--control-height); padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: var(--accent-dim); color: var(--link); font: inherit; cursor: pointer; }
+/* Gallery filter: the heading says "N of total · filtered to X" and its clear control sits beside it */
+.gallery-filter-clear { flex-shrink: 0; min-height: var(--control-height); padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: var(--accent-dim); color: var(--link); font: var(--text-callout)/1.4 var(--font-family); cursor: pointer; }
 
 /* Receipt popup */
 .receipt {
@@ -914,7 +907,7 @@
 }
 .gallery-btn:hover { background: var(--surface-hover); }
 .gallery-btn--active, .gallery-btn--active:hover { background: var(--action); color: var(--on-action); border-color: var(--action); }
-.gallery-btn:focus-visible, .gallery-slider:focus-visible, .gallery-filter-chip button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.gallery-btn:focus-visible, .gallery-slider:focus-visible, .gallery-filter-clear:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
 .gallery-slider-row { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); }
 .gallery-slider-label, .gallery-slider-val { font: var(--text-callout)/1.4 var(--font-family); color: var(--text-secondary); }
 .gallery-slider { width: 112px; height: var(--control-height); margin: 0; accent-color: var(--action); cursor: pointer; }

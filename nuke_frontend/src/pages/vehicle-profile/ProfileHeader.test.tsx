@@ -12,7 +12,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
     order: () => query, limit: () => fixture.request(table, vehicleId) };
   return query;
 }, rpc: (name: string) => Promise.resolve({ data: name === 'vehicle_facet_items' ? fixture.locationRows : null, error: null }) } }));
-vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, auctionPulse: fixture.pulse, setGalleryFilter: fixture.gallery }) }));
+vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({ vehicle: fixture.vehicle, auctionPulse: fixture.pulse, setGalleryFilter: fixture.gallery, galleryFilter: (fixture as any).filter ?? null }) }));
 vi.mock('./profileDocument', async (original) => {
   const real = await original<typeof import('./profileDocument')>();
   // The real document mapping over the fixture read, without a QueryClient: the fetch is the only thing mocked.
@@ -432,6 +432,19 @@ it('a facet opens its line items and coordinates the photo topic without navigat
   expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'engine_type', label: '4.7L V8' });
   expect(host.querySelector('[data-testid="token-items"]')?.getAttribute('data-dimension')).toBe('engine');
   expect(host.textContent).not.toContain('Auction performance unavailable');
+});
+
+it('closing a facet popup takes back the photo filter that opening it set', async () => {
+  (fixture as any).filter = null;
+  fixture.gallery.mockImplementation((f: unknown) => { (fixture as any).filter = f; });
+  await render();
+  const engine = host.querySelectorAll('button.k-facet')[0] as HTMLButtonElement;
+  await act(async () => engine.click());
+  expect(fixture.gallery).toHaveBeenLastCalledWith({ field: 'engine_type', label: '4.7L V8' });
+  expect((fixture as any).filter).not.toBeNull();
+  await act(async () => engine.click());
+  expect(fixture.gallery).toHaveBeenLastCalledWith(null);
+  expect((fixture as any).filter).toBeNull();
 });
 
 it('a token the read holds no value for is a muted gap that opens its line items without filtering the photos', async () => {

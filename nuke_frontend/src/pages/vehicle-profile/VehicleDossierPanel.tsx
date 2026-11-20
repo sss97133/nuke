@@ -19,7 +19,7 @@ import { readProfileSourcePage, sourceValueText, physicalRecordedValue, PHYSICAL
   type PhysicalReadingField, type StructuredClaim } from './profileSourceClaims';
 import { currentBidEvidenceAmount } from './auctionEvidenceDisplay';
 import { useProfileRead } from './profileDocument';
-import { ItemList } from '../../kit';
+import { ItemList, valueText } from '../../kit';
 import type { FacetItem, TokenItems } from '../../kit/types';
 import { FIELD_TOKEN } from './hooks/facetImageCitations';
 
@@ -204,7 +204,8 @@ export const StructuredProfileData: React.FC<{ vehicleId: string; isReplica?: bo
         </table>}
     </section>
     <section aria-label="Structured source claims" className="vp-structured-claims"
-      hidden={current.claimStatus === 'ready' && current.claims.length === 0 && !current.unresolved?.length}>
+      hidden={current.claimStatus === 'ready' && current.claims.length === 0
+        && !current.unresolved?.some(p => p.reason === 'source_reader_refused_input_limit')}>
     <h3>Structured source claims</h3>
     {(current.claimStatus ?? current.status) === 'loading' ? <p role="status">Reading structured evidence…</p>
       : (current.claimStatus ?? current.status) === 'failed' ? <p role="status">Structured evidence could not be read. Missing information has not been established.</p>
@@ -622,11 +623,13 @@ const VehicleDossierPanel: React.FC = () => {
   const vinRead = useFieldProvenance(vehicle?.id || '', 'vin');
   const vinConsensus = (vinRead.data as any)?.identifier_consensus as { status?: string; canonical_value?: string; citation_summary?: string } | undefined;
   const engineReads: Record<string, typeof configuration> = { engine_configuration: configuration, engine_displacement_l: displacement };
+  const headerStatesEngine = !!tokenItems?.engine?.some(item => valueText(item.value, item.unit) || item.stated?.trim());
   const engineValue = (field: string) => {
     const read = engineReads[field];
     if (!read || read.isLoading || read.error || !read.data || read.data.canonical?.status === 'unavailable') return '';
     if (read.data.canonical?.status === 'resolved') return formatProvenanceValue(field, read.data.canonical.value!);
-    return read.data.observations.length > 0 ? 'Unknown' : '';
+    // "Unknown" must not sit beside an engine the header's own line items state (masthead.token_items.engine).
+    return read.data.observations.length > 0 && !headerStatesEngine ? 'Unknown' : '';
   };
   const engineReadFailed = [configuration, displacement].some(read => !!read.error || provenanceCoverageUnavailable(read.data) || read.data?.canonical?.status === 'unavailable');
   // the SALE PRICE row is the typed price said as what it is (sold / bid / ask), never a raw sale_price
