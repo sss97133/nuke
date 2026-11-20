@@ -89,6 +89,11 @@ describe('BuildRecord', () => {
     expect(html.match(/vp-build-seen/g)).toHaveLength(1);
     expect(html).toContain('1 of 3 bought parts are named in a photograph of the finished car');
     expect(renderToStaticMarkup(<BuildRecord record={base} />)).not.toContain('vp-build-seen');
+  it('quotes what the shop paper printed as its subject', () => {
+    const subject = record(false);
+    const machining = subject.systems.find(system => system.paper.lines > 0)!;
+    machining.paper.subjects = ['1970 Pontiac Block, Heads, Crank; Engine: 455'];
+    expect(renderToStaticMarkup(<BuildRecord record={subject} />)).toContain('Written up by the shop as: “1970 Pontiac Block, Heads, Crank; Engine: 455”');
   });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;

@@ -14,7 +14,7 @@ export interface BuildStage { phase: string; images: number; prints: number; fir
 export interface BuildSystem {
   system_key: string; first_day: string | null; last_day: string | null; part_lines: number; backordered_lines: number;
   suppliers: string[];
-  paper: { lines: number; lines_without_hours: number; hours: number | null; performers: number; shops: string[] };
+  paper: { lines: number; lines_without_hours: number; hours: number | null; performers: number; shops: string[]; subjects?: string[] | null };
   reference: { hours: number | null; parts_without_reference: number;
     operations: { code: string; name: string; hours: number; part_lines: number; basis: 'part_on_receipt' | 'implied_by_machine_shop_work' }[] };
   priced_lines: number; recorded_amount: number | null; lines: BuildLine[] | null;

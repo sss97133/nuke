@@ -44,6 +44,14 @@ CREATE TABLE public.stage_transition_labor_map(id uuid PRIMARY KEY DEFAULT gen_r
   description text, estimated_hours_min numeric, estimated_hours_max numeric, estimated_hours_typical numeric, confidence text);
 \ir ../migrations/20261119230000_build_reconstruction_stages.sql
 
+-- slice 4 dependency: the document each line came from, with the subject it printed
+CREATE TABLE public.fixture_documents(id uuid PRIMARY KEY, raw_json jsonb);
+CREATE VIEW public.receipts AS SELECT * FROM public.fixture_documents;
+INSERT INTO public.fixture_documents VALUES
+  ('00000000-0000-0000-0000-0000000000b1', '{"data_v2":{"vehicle_hint":"FIREBIRD/TRANS AM"}}'),
+  ('00000000-0000-0000-0000-0000000000b2', '{"data_v2":{"vehicle_hint":"1970 Pontiac Block, Heads, Crank; Engine: 455"}}');
+\ir ../migrations/20261120030000_build_reconstruction_paper_subjects.sql
+
 DO $$ BEGIN
   ASSERT public.photo_reading_is_print('{"narrative_one_line":"Two printed photographs show rear-quarter surface preparation."}');
   ASSERT public.photo_reading_is_print('{"narrative_one_line":"A sheet.","components_seen":[{"label":"paper sheet containing two printed engine photographs"}]}');
@@ -107,6 +115,19 @@ INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded
   ('00000000-0000-0000-0000-0000000000a1', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-0000000000d2","build_phase_guess":"final_assembly","narrative_one_line":"A wheel."}'),
   ('00000000-0000-0000-0000-0000000000a1', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-0000000000d3","build_phase_guess":"paint_prep","narrative_one_line":"A sensitive photo."}');
 GRANT SELECT ON public.stage_transition_labor_map TO anon;
+
+GRANT SELECT ON public.receipts TO anon;
+DO $$
+DECLARE r jsonb; s jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1');
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'machining';
+  ASSERT s #> '{paper,subjects}' = '["1970 Pontiac Block, Heads, Crank; Engine: 455"]'::jsonb, 'the shop document''s printed subject: ' || (s -> 'paper')::text;
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'electrical';
+  ASSERT s #> '{paper,subjects}' = '[]'::jsonb, 'a parts-only document''s banner is not a subject';
+  RESET ROLE;
+END $$;
 
 DO $$
 DECLARE r jsonb; s jsonb;
