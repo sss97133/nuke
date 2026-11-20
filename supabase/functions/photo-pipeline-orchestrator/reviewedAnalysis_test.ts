@@ -1,4 +1,4 @@
-import { recordReviewedAnalysis, validateReviewedAnalysis, REVIEW_METHOD, type ReviewedAnalysisDeps } from "./reviewedAnalysis.ts";
+import { intakeRefusalWord, recordReviewedAnalysis, validateReviewedAnalysis, REVIEW_METHOD, type ReviewedAnalysisDeps } from "./reviewedAnalysis.ts";
 
 function assert(v: unknown, message = "assertion failed"): asserts v { if (!v) throw new Error(message); }
 const imageId = "10000000-0000-4000-8000-000000000001";
@@ -124,4 +124,14 @@ for (const [name, edit, code] of bad) Deno.test(`invalid supplied review: ${name
 Deno.test("validator does not mutate or invent measured fields", () => {
   const p = packet(), before = JSON.stringify(p); validateReviewedAnalysis(p, Date.parse("2026-11-09T20:00:00Z"));
   assert(JSON.stringify(p) === before);
+});
+
+Deno.test("the intake guard's two words for an automatic reading pass on by name; every other refusal stays opaque", () => {
+  // ingest-observation answers a refused insert as { error, details: <the database's message> }
+  assert(intakeRefusalWord({ error: "Failed to insert observation", details: "thin_review_over_reviewed" }) === "thin_review_over_reviewed");
+  assert(intakeRefusalWord({ error: "Failed to insert observation", details: "thin_review_asserts_unchecked_field" }) === "thin_review_asserts_unchecked_field");
+  for (const body of [null, undefined, "thin_review_over_reviewed", ["thin_review_over_reviewed"], {}, { details: 7 }, { details: "invalid_review_observation" },
+    { details: "thin_review_over_reviewed and more" }, { details: "duplicate key value violates unique constraint" }, { error: "thin_review_over_reviewed" }]) {
+    assert(intakeRefusalWord(body) === null, JSON.stringify(body));
+  }
 });

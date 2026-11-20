@@ -18,6 +18,16 @@ export class ReviewedAnalysisError extends Error {
 }
 function assert(ok: unknown, code: string, status = 400): asserts ok { if (!ok) throw new ReviewedAnalysisError(code, status); }
 
+/** The two words guard_reviewed_image_analysis uses for an automatic reading it will not store (migration 20261120140000).
+ * ingest-observation answers a refused insert as { error, details: <the database's message> }. Only these exact words are
+ * passed on, so the reader can tell "a reading that is not mine already stands" and "my shape is wrong" from a write that
+ * failed; every other message stays opaque. */
+const INTAKE_REFUSALS = ["thin_review_over_reviewed", "thin_review_asserts_unchecked_field"];
+export function intakeRefusalWord(body: unknown): string | null {
+  const said = body !== null && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).details : null;
+  return typeof said === "string" && INTAKE_REFUSALS.includes(said) ? said : null;
+}
+
 /** The existing BYOK schema, with bounded JSON and explicit source/provenance.
  * No camera estimates, confidence, labor intent or components are filled in here. */
 export function validateReviewedAnalysis(input: unknown, now = Date.now()): ObjectValue {

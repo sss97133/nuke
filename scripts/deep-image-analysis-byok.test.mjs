@@ -7,7 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { computeSaturation, factFingerprint, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT,
   attributionDoubt, landEntityPage, frameClock, loadAnalysisImages, receiptRoster, receiptRosterLine, prepare,
   receiptContextVendor, contextWithoutPersonalFields,
-  groupReceiptRoster, receiptRosterSections } from './deep-image-analysis-byok.mjs';
+  groupReceiptRoster, receiptRosterSections, reviewedStamp } from './deep-image-analysis-byok.mjs';
+import { AUTOMATIC_READING_TIER } from './lib/byok-stage-schema.mjs';
 import { projectImageProperties } from './lib/image-property-projection.mjs';
 
 const now = '2026-10-30T20:00:00Z';
@@ -312,6 +313,15 @@ test('exact representative selection preserves IDs across days and refuses alrea
     rows[0].ai_scan_metadata = { byok_deep_analysis: { already: 'read' } };
     await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [first] }), /already analyzed/);
     assert.equal(readFileSync(worklist, 'utf8'), '');
+    // the subscription reader's automatic reading is a placeholder a reviewed reading replaces: the photo is still unread here
+    rows[0].ai_scan_metadata = { byok_deep_analysis: { scene_type: 'undercarriage', agent_tier: AUTOMATIC_READING_TIER } };
+    assert.equal(reviewedStamp(rows[0]), null);
+    await prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [first] });
+    assert.deepEqual(readFileSync(worklist, 'utf8').trim().split('\n').map(JSON.parse).map(w => w.image_id), [first]);
+    // a stamp of any other tier, or of none (a legacy reading), is a reading
+    assert.ok(reviewedStamp({ ai_scan_metadata: { byok_deep_analysis: { agent_tier: 'caller-byok subscription' } } }));
+    assert.ok(reviewedStamp({ ai_scan_metadata: { byok_deep_analysis: { scene_type: 'engine_bay' } } }));
+    assert.equal(reviewedStamp({ ai_scan_metadata: {} }), null);
     await assert.rejects(prepare(client, { vehicleId: 'vehicle', limit: 2, worklist, imageIds: [second, second] }), /invalid exact/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

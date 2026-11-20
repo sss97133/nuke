@@ -52,6 +52,7 @@ import { createHash } from 'crypto';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { projectCachedRun } from './lib/image-property-projection.mjs';
+import { AUTOMATIC_READING_TIER } from './lib/byok-stage-schema.mjs';
 
 import { receiptContextVendor } from './lib/receipt-context-text.mjs';
 export { receiptContextVendor, contextWithoutPersonalFields } from './lib/receipt-context-text.mjs';
@@ -165,6 +166,14 @@ function computeSaturation(v, prior, nowIso) {
     dry_passes: dry,
     resolved_at: saturated ? (nowIso || null) : null,
   };
+}
+
+// A photo's stored reading when a reviewed reader made it. The subscription reader's automatic two-pass reading
+// (agent_tier AUTOMATIC_READING_TIER) is a placeholder that a reviewed reading replaces at the intake, so a photo that
+// holds only that is still unread here: it stays on the first-pass worklist and is never a rehash candidate.
+export function reviewedStamp(r) {
+  const d = (r?.ai_scan_metadata || {}).byok_deep_analysis;
+  return d && d.agent_tier !== AUTOMATIC_READING_TIER ? d : null;
 }
 
 // Is a row's verdict saturated at the CURRENT schema version? Used by the worklist to SKIP it.
@@ -710,8 +719,8 @@ export async function prepare(client = sb, options = {}) {
   //              costs zero. This kills the old bug where any open question re-failed forever.
   const REHASH = args.includes('--rehash');
   let pendingAll = REHASH
-    ? all.filter((r) => ((r.ai_scan_metadata || {}).byok_deep_analysis) && !isSaturatedRow(r))
-    : all.filter((r) => !((r.ai_scan_metadata || {}).byok_deep_analysis));
+    ? all.filter((r) => reviewedStamp(r) && !isSaturatedRow(r))
+    : all.filter((r) => !reviewedStamp(r));
 
   // --date YYYY-MM-DD: target ONE specific day (resolution passes re-run a chosen day
   // with enriched context instead of whatever day sorts earliest). Composes with
@@ -1149,6 +1158,9 @@ async function queue() {
       .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
       .not('vehicle_id', 'is', null)
       .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
+      // the subscription reader's automatic reading is not an analysis here (reviewedStamp): a vehicle that holds only
+      // those is still uncovered and must not fall to the back of the queue. Filter checked against the live API 2026-11-20.
+      .or(`ai_scan_metadata->byok_deep_analysis->>agent_tier.is.null,ai_scan_metadata->byok_deep_analysis->>agent_tier.neq.${AUTOMATIC_READING_TIER}`)
       .order('vehicle_id', { ascending: true })
       .range(offset, offset + PAGE - 1);
     // Failed coverage queries are unknown, never zero or a new processing order.

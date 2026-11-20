@@ -3,6 +3,19 @@
 // frame reader (scripts/photo-pipeline/subscription-frame-classifier.mjs, which hands it to `claude --json-schema`) both
 // import it, so the two cannot drift. The shared validator (supabase/functions/_shared/byokImageVerdict.mjs) stays
 // authoritative; this only closes the shape the model may answer in.
+/** The agent_tier of the subscription reader's automatic two-pass reading (platform_config image_reading_tiers, automatic.tier). */
+export const AUTOMATIC_READING_TIER = 'subscription automatic';
+
+/**
+ * Every value the four cross-checked fields of a verdict may hold (scene_type, rust_severity, paint_state, completeness),
+ * read from the grammar below: the only words an automatic reading's question may name. The intake guard holds the same
+ * list (c_vocab in image_reading_thin_violation, migration 20261120140000); a value added to the grammar must be added there.
+ */
+export function crossCheckedValues() {
+  const v = stageSchema('verdicts').properties.verdicts.items.properties, s = v.state_observations.properties;
+  return [...new Set([...v.scene_type.enum, ...s.rust_severity.enum, ...s.paint_state.enum, ...s.completeness.enum])];
+}
+
 export function stageSchema(key) {
   const str = { type: "string" }, bool = { type: "boolean" }, probability = { type: "number", minimum: 0, maximum: 1 };
   const obj = (properties) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });

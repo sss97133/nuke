@@ -12,7 +12,7 @@ import { existsSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { validateVerdict } from '../../supabase/functions/_shared/byokImageVerdict.mjs';
-import { stageSchema } from '../lib/byok-stage-schema.mjs';
+import { stageSchema, crossCheckedValues, AUTOMATIC_READING_TIER } from '../lib/byok-stage-schema.mjs';
 import { receiptForDeepResult, receiptForResult, receiptForKeyedResult } from './stage-queue.mjs';
 import { projectCachedRun } from '../lib/image-property-projection.mjs';
 
@@ -21,7 +21,7 @@ const run = promisify(execFile);
 /** The model every call asks for, by exact id (owner, 2026-11-20: "update all the keys to use sonnet 5.5 at least"). */
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 /** Where a deep reading's tier, method and cost basis say how it was made (never the three-pass reviewed reading's words). */
-export const AUTOMATIC_TIER = 'subscription automatic';
+export const AUTOMATIC_TIER = AUTOMATIC_READING_TIER;
 /**
  * How the reading was made. The method names the reader's version and the set of values the database admitted when it
  * read (automaticMethod adds that fingerprint), so a photo read under an older rule or a narrower set is read again
@@ -139,10 +139,13 @@ export const REFERENCE_SCENES = Object.freeze(['receipt_document', 'cross_refere
 /**
  * Words by which a read says, in its own sentences, that the frame is a picture of a picture. Used only to withhold:
  * a read's sentences never reach the ledger, but one that says "printed page" beside a vehicle scene has contradicted
- * its own scene value. Deliberately without bare "sheet", "paper", "page" or "screen" (sheet metal, masking paper,
- * windscreen): withholding a real photo costs one reading, posting a print as the car costs a false fact.
+ * its own scene value. Deliberately without bare "sheet", "paper", "page", "screen", "printed" or "binder" (sheet metal,
+ * masking paper, windscreen, markings printed on a brake pad, a chain binder): withholding a real photo costs one
+ * reading, posting a print as the car costs a false fact. Measured 2026-11-20 on the stored reads of 33 proof-vehicle
+ * photos: 14 of 14 reads of a printed sheet matched, 0 of 52 reads of a real photo (a first, looser pattern with bare
+ * "printed" held one real brake close-up).
  */
-export const PRINT_WORDS = /\b(print(ed|out|outs|s)?|photocop(y|ies|ied)|binder|album|scrapbook|collage|screen ?shots?|sheet of paper|(paper|printed|album|binder) (sheet|page)s?|(computer|phone|laptop|tablet|display|tv|television) screen|monitor|page (holding|showing|with))\b/i;
+export const PRINT_WORDS = /\b(print(ed)? (page|sheet|photo(graph)?s?|pictures?|images?|cop(y|ies))|printed (\w+ ){1,2}(photo(graph)?s?|pictures?|images?)|(photo(graph)?s?|pictures?) (printed|taped|pasted|mounted) (on|onto|to) (a |the )?(page|sheet|paper|board|wall)|prints? of (the|a|this) (car|vehicle|truck|engine)|printouts?|photocop(y|ies|ied)|(binder|album|scrapbook) (page|sleeve|sheet)s?|in an? (binder|album|scrapbook)|photo album|scrapbook|collage|screen ?shots?|sheet of paper|paper (sheet|page)s?|(computer|phone|laptop|tablet|tv|television) (screen|monitor)|page (holding|showing|with))\b/i;
 
 /** Does one read say the frame is a picture of a picture: by its scene, or by the words of its own description? */
 export function saysPictureOfPicture(v) {
@@ -152,7 +155,9 @@ export function saysPictureOfPicture(v) {
     ...(Array.isArray(v?.open_questions) ? v.open_questions : [])];
   return said.some((s) => typeof s === 'string' && PRINT_WORDS.test(s));
 }
-const token = (x) => (typeof x === 'string' && /^[a-z_]+$/.test(x) ? x : 'missing');
+/** The words a question may name: the grammar's closed values for the four cross-checked fields. Anything else, a field a read left out included, is said as "unknown": the intake refuses a question that names any other word. */
+export const QUESTION_TOKENS = Object.freeze(crossCheckedValues());
+const token = (x) => (QUESTION_TOKENS.includes(x) ? x : 'unknown');
 
 /**
  * Which closed values this reader may post: the database's own row (platform_config image_reading_tiers,
@@ -217,7 +222,15 @@ export function thinViolation(v, admits = NO_ADMITS) {
   if (cp.method !== THIN_CAMERA_METHOD || cp.framing !== 'unknown' || !nul(cp.azimuth_deg) || !nul(cp.elevation_deg) || !nul(cp.distance_est) || !nul(cp.exif_present)
     || Object.keys(cp).some((k) => !['method', 'framing', 'azimuth_deg', 'elevation_deg', 'distance_est', 'exif_present'].includes(k))) return 'camera_pose';
   if (v.narrative_one_line !== thinNarrative({ scene_type: v.scene_type, rust_severity: so.rust_severity, paint_state: so.paint_state })) return 'narrative_one_line';
-  if (!(v.open_questions === undefined || (Array.isArray(v.open_questions) && v.open_questions.every((q) => typeof q === 'string' && OPEN_QUESTION_PATTERNS.some((re) => re.test(q)))))) return 'open_questions';
+  if (v.open_questions !== undefined) {
+    // at most eight, each one of the two sentence forms, and naming only the grammar's closed values (the guard's c_vocab)
+    if (!Array.isArray(v.open_questions) || v.open_questions.length > 8) return 'open_questions';
+    for (const q of v.open_questions) {
+      if (typeof q !== 'string' || !OPEN_QUESTION_PATTERNS.some((re) => re.test(q))) return 'open_questions';
+      const words = q.match(/: ([a-z_]+) vs ([a-z_]+); posted as/)?.slice(1) ?? q.match(/ is ([a-z_]+); this reader may not/)?.slice(1);
+      if (!words || !words.every((w) => QUESTION_TOKENS.includes(w))) return 'open_questions';
+    }
+  }
   if (!(v.agent_notes === undefined || v.agent_notes === AUTOMATIC_NOTES)) return 'agent_notes';
   if (typeof v.confidence !== 'number' || !(v.confidence >= 0 && v.confidence <= 1)) return 'confidence';
   if (!(v.needs_review === undefined || typeof v.needs_review === 'boolean')) return 'needs_review';
@@ -262,8 +275,12 @@ export function thinVerdict(first, second, admits = NO_ADMITS) {
     }
   }
   const held = saysPictureOfPicture(first) || saysPictureOfPicture(second) ? 'picture_of_picture' : null;
-  if (held && posted.scene_type !== 'unknown') { cannotPost('scene_type', posted.scene_type); posted.scene_type = 'unknown'; }
-  if (posted.scene_type === 'unknown') {
+  if (held) {
+    // the hold withholds values this reader may post, so "may not post that value yet" would be false of them: no
+    // question is added. The receipt's `held` says why nothing was posted, and a later count of agreed values that
+    // were not admitted reads the receipt, not these questions.
+    for (const field of ['scene_type', 'rust_severity', 'paint_state']) posted[field] = 'unknown';
+  } else if (posted.scene_type === 'unknown') {
     for (const field of ['rust_severity', 'paint_state']) if (posted[field] !== 'unknown') { cannotPost(field, posted[field]); posted[field] = 'unknown'; }
   }
   const p1 = first?.presence?.person, p2 = second?.presence?.person;
@@ -283,6 +300,18 @@ export function thinVerdict(first, second, admits = NO_ADMITS) {
   const why = thinViolation(verdict, admits);
   return { verdict, agreed: disagreements.length === 0, disagreements, values, held, posted: { scene_type: posted.scene_type, rust_severity: posted.rust_severity, paint_state: posted.paint_state },
     errors: [...validateVerdict(verdict), ...(why ? [`not the thin shape: ${why}`] : [])] };
+}
+
+/**
+ * A reading of this photo that is not this reader's own already stands: a current deep reading (condition, not superseded)
+ * whose tier is not the automatic one, found by the observation itself and not by the photo's stamp, which can be missing
+ * or stale. The intake refuses a thin reading over it (thin_review_over_reviewed in guard_reviewed_image_analysis, which
+ * asks the same question of the same index), so no read is spent finding that out.
+ *   readings  [{ kind, is_superseded, agent_tier }]  every image_deep_byok observation naming the photo
+ */
+export function standingReadingHold(readings) {
+  return Array.isArray(readings) && readings.some((r) => r?.kind === 'condition' && r?.is_superseded !== true && r?.agent_tier !== AUTOMATIC_TIER)
+    ? 'already_read' : null;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -488,7 +517,15 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
     row = Array.isArray(rows) ? rows[0] : null;
   } catch { return typed({ intake: { http: 503, error: 'review_source_unavailable' } }); }
   const method = automaticMethod(admits);
-  const hold = eligibilityHold(row, { method });
+  let hold = eligibilityHold(row, { method });
+  // the stamp says the photo is free: ask the observations too (a reviewed reading whose stamp is missing or stale)
+  let standing = null;
+  if (!hold) {
+    try {
+      standing = standingReadingHold(await deps.rest(`vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${row.id}&limit=50`));
+    } catch { return typed({ intake: { http: 503, error: 'review_source_unavailable' } }); }
+    hold = standing;
+  }
   // a dry run may read a photo that already holds a reading (it posts nothing); a real one never does
   if (hold && !((hold === 'already_read' || hold === 'already_read_same_method') && !post)) return typed({ policy: hold });
   if (typeof row.updated_at !== 'string' || !Number.isFinite(Date.parse(row.updated_at))) return typed({ policy: 'row_clock_missing' });

@@ -13,7 +13,7 @@ import { stageSchema } from '../lib/byok-stage-schema.mjs';
 import {
   AUTOMATIC_METHOD, AUTOMATIC_NOTES, AUTOMATIC_TIER, DEFAULT_MODEL, OPEN_QUESTION_PATTERNS, STATE_STANDARD, admitsFingerprint, admitsFrom, automaticMethod, automaticProvenance, buildEnvelope, countReceipt, deepPrompt, deepReadFrame,
   PRINT_WORDS, REFUSAL_STREAK_STOP, refusalStreak, saysPictureOfPicture, thinNarrative, thinVerdict, thinViolation,
-  cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput,
+  cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput, QUESTION_TOKENS, standingReadingHold,
 } from './deep-stage.mjs';
 
 const IMAGE = '10000000-0000-4000-8000-000000000001', VEHICLE = '20000000-0000-4000-8000-000000000001';
@@ -104,7 +104,8 @@ test('a thin verdict: no admitted set posts nothing; a reading that cannot name 
   assert.deepEqual([person(false, false), person(true, true), person(true, false)], [{ person: false, dog: false, place_hint: null }, { person: true, dog: false, place_hint: null }, { person: true, dog: false, place_hint: null }]);
   // a value that is not a closed token never reaches an open question
   const odd = thinVerdict(verdict({ scene_type: 'Engine bay; DROP' }), verdict({ scene_type: 'undercarriage' }), ADMITS);
-  assert.equal(odd.verdict.open_questions[0], 'Two independent reads of this photo disagree on scene_type: missing vs undercarriage; posted as unknown.');
+  assert.equal(odd.verdict.open_questions[0], 'Two independent reads of this photo disagree on scene_type: unknown vs undercarriage; posted as unknown.',
+    'a value a read left out is said as unknown: the intake refuses a question that names any word outside the closed values');
 });
 
 test('the shared cases: the reader builds each accepted verdict, and its own rule refuses each refused one', () => {
@@ -115,11 +116,13 @@ test('the shared cases: the reader builds each accepted verdict, and its own rul
     thinVerdict(read('undercarriage', { rust_severity: 'none', paint_state: 'unknown', completeness: 'unknown' }, { confidence: 0.55, presence: { person: true, dog: false, place_hint: null } }),
       read('data_plate', { rust_severity: 'none', paint_state: 'unknown', completeness: 'unknown' }, { confidence: 0.6, presence: { person: true, dog: false, place_hint: null } }), ADMITS),
     thinVerdict(read('body_exterior', { rust_severity: 'unknown', paint_state: 'clear', completeness: 'assembled' }, { confidence: 0.8 }), read('body_exterior', { rust_severity: 'unknown', paint_state: 'clear', completeness: 'assembled' }, { confidence: 0.8 }), ADMITS),
+    // a scene value of the grammar that the guard's first word list left out (off_property): the question must be storable
+    thinVerdict(read('off_property', { rust_severity: 'unknown', paint_state: 'unknown', completeness: 'partial' }, { confidence: 0.7 }), read('off_property', { rust_severity: 'unknown', paint_state: 'unknown', completeness: 'unknown' }, { confidence: 0.8 }), ADMITS),
   ];
   assert.equal(FIXTURE.accepted.length, built.length);
   built.forEach((b, i) => { assert.deepEqual(b.errors, []); assert.deepEqual(b.verdict, FIXTURE.accepted[i], `accepted case ${i}`); });
   for (const v of FIXTURE.accepted) assert.equal(thinViolation(v, ADMITS), null);
-  assert.equal(FIXTURE.refused.length, 24);
+  assert.equal(FIXTURE.refused.length, 26);
   for (const c of FIXTURE.refused) assert.equal(typeof thinViolation(c.verdict, ADMITS), 'string', c.why);
   assert.equal(FIXTURE.agent_notes, AUTOMATIC_NOTES);
   assert.equal(thinNarrative({ scene_type: 'engine_bay', rust_severity: 'unknown', paint_state: 'unknown' }), 'Automatic read: scene engine_bay; rust unknown; paint unknown.');
@@ -170,29 +173,39 @@ test('a picture of a picture posts nothing: either read saying so, by its scene 
   const leak = thinVerdict(car(), car({ narrative_one_line: 'Printed page with two photos of a car in body prep.' }), ADMITS);
   assert.equal(leak.held, 'picture_of_picture');
   assert.deepEqual(leak.posted, { scene_type: 'unknown', rust_severity: 'unknown', paint_state: 'unknown' });
-  assert.deepEqual(leak.verdict.open_questions, ['Both reads say scene_type is body_exterior; this reader may not post that value yet.', 'Both reads say rust_severity is surface; this reader may not post that value yet.']);
+  // the hold withholds values this reader may post: "may not post that value yet" would be false, so no question says it
+  assert.deepEqual(leak.verdict.open_questions, []);
   assert.deepEqual(leak.errors, []);
   assert.equal(thinViolation(leak.verdict, ADMITS), null);
   assert.equal(/Printed page|red coupe/.test(JSON.stringify(leak.verdict)), false, 'the words that held it are not posted');
-  // one read names a reference scene: the disagreement already withholds the scene; the hold is recorded all the same
+  // one read names a reference scene: the disagreement is said (it is true of the reads), the withheld rust value is not
   const split = thinVerdict(car(), car({ scene_type: 'cross_reference' }), ADMITS);
   assert.deepEqual([split.held, split.posted.scene_type, split.posted.rust_severity], ['picture_of_picture', 'unknown', 'unknown']);
+  assert.deepEqual(split.verdict.open_questions, ['Two independent reads of this photo disagree on scene_type: body_exterior vs cross_reference; posted as unknown.']);
+  // both reads name a scene this reader may not post: that is said, as for any photo
+  const both = thinVerdict(car({ scene_type: 'cross_reference' }), car({ scene_type: 'cross_reference' }), ADMITS);
+  assert.deepEqual([both.held, both.verdict.open_questions], ['picture_of_picture', ['Both reads say scene_type is cross_reference; this reader may not post that value yet.']]);
   // a real photo is not held
   const real = thinVerdict(car(), car(), ADMITS);
   assert.deepEqual([real.held, real.posted.scene_type, real.posted.rust_severity], [null, 'body_exterior', 'surface']);
-  // the words: what a read says about a print, a binder page, a screen; and what it says about sheet metal, masking paper and glass
+  // the words: what a read says about a print, a binder page, a screen...
   for (const s of ['Printed page with two photos of a car in body prep.', 'Binder page holding two printed photos of a red car.', 'A printed sheet pairs a red Firebird with an engine.',
-    'Screenshot of a listing showing a red coupe.', 'Photo of a laptop screen showing a parts diagram.', 'An album page with four photographs.', 'Two prints of the car taped to a wall.', 'A sheet of paper with a hand-written parts list.']) {
+    'Photo of a binder page with two printed photos of a weathered red car.', 'Printed page in a binder holding two photos.',
+    'Screenshot of a listing showing a red coupe.', 'Photo of a laptop screen showing a parts diagram.', 'An album page with four photographs.', 'Two prints of the car taped to a wall.',
+    'A sheet of paper with a hand-written parts list.', 'Two photographs taped to a board beside the lift.']) {
     assert.ok(PRINT_WORDS.test(s), s);
     assert.ok(saysPictureOfPicture(verdict({ narrative_one_line: s })), s);
   }
+  // ...and what it says about a real photo. The brake close-up is a measured false hold of the first, looser pattern.
   for (const s of ['Sheet metal patch welded into the rear quarter panel.', 'Masking paper covers the glass while primer cures.', 'Windscreen and cowl seen from the driver side.',
-    'Underside of the car showing the rear axle and leaf springs.', 'Fingerprints on fresh clear coat near the fuel door.', 'Blueprinted engine on a stand.', 'A page of the build: door panel removed.']) {
+    'Underside of the car showing the rear axle and leaf springs.', 'Fingerprints on fresh clear coat near the fuel door.', 'Blueprinted engine on a stand.', 'A page of the build: door panel removed.',
+    'Dark close-up of a brake rotor, pad backing plate with printed markings and caliper piston, shot sideways through the wheel opening.',
+    'A part number is printed on the tag.', 'A chain binder holds the axle on the trailer.', 'Dash with a touchscreen display and a three-spoke wheel.', 'A printed circuit board behind the gauge cluster.']) {
     assert.ok(!PRINT_WORDS.test(s), s);
   }
   // said anywhere a read describes the frame: a component label, the framing, a note, a question
   assert.ok(saysPictureOfPicture(verdict({ components_seen: [{ label: 'Printed photograph of an engine', confidence: 0.7, bbox: [0, 0, 500, 500], part_number_guess: null }] })));
-  assert.ok(saysPictureOfPicture(verdict({ camera_pose: { method: 'visual', framing: 'top-down on a binder', azimuth_deg: null, elevation_deg: null, distance_est: null, exif_present: null } })));
+  assert.ok(saysPictureOfPicture(verdict({ camera_pose: { method: 'visual', framing: 'top-down on a binder page', azimuth_deg: null, elevation_deg: null, distance_est: null, exif_present: null } })));
   assert.ok(saysPictureOfPicture(verdict({ agent_notes: 'This appears to be a screenshot.' })));
   assert.ok(!saysPictureOfPicture(verdict()));
 });
@@ -285,13 +298,18 @@ test('a failed read is tried once more; a fault that is the batch\'s is not', as
 
 // --- a whole photo, with stand-ins ---------------------------------------------------------------------------------
 
-function frameDeps({ row = {}, answers = [], orchestrator = async () => ({ http: 200, success: true, observation_id: '30000000-0000-4000-8000-000000000001' }), download = { ok: true, status: 200 }, snapshotFails = false } = {}) {
+function frameDeps({ row = {}, answers = [], orchestrator = async () => ({ http: 200, success: true, observation_id: '30000000-0000-4000-8000-000000000001' }), download = { ok: true, status: 200 }, snapshotFails = false, readings = [], readingsFail = false } = {}) {
   const calls = { rest: [], ask: [], orchestrator: [], order: [] };
   const base = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg', updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null, deep_scene: null,
     is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, doc_flag: null, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...row };
   let n = 0;
   return { calls, deps: {
-    rest: async (q) => { calls.order.push('snapshot'); calls.rest.push(q); if (snapshotFails) throw new Error('503'); return [base]; },
+    rest: async (q) => {
+      calls.rest.push(q);
+      // the photo's deep readings, asked of the observations themselves after the stamp says the photo is free
+      if (q.startsWith('vehicle_observations?')) { calls.order.push('standing'); if (readingsFail) throw new Error('503'); return readings; }
+      calls.order.push('snapshot'); if (snapshotFails) throw new Error('503'); return [base];
+    },
     fetchBytes: async (url) => { calls.order.push('download'); return download.ok ? { ok: true, status: 200, bytes: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) } : download; },
     convert: async (raw) => raw.replace(/\.[^.]+$/, '.jpg'),
     ask: async (argv, text, cwd) => { calls.order.push('read'); calls.ask.push({ argv, text, cwd }); const a = answers[n++ % answers.length]; if (a instanceof Error) throw a; return typeof a === 'function' ? a() : a; },
@@ -305,7 +323,8 @@ const frame = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test
 test('two agreeing reads: the row is snapshotted before the download, both reads use the lean call, the envelope is posted, the receipt succeeds with the cost in its detail', () => withDir(async (dir) => {
   const { deps, calls } = frameDeps({ answers: [cli(verdict()), cli(verdict())] });
   const r = await deepReadFrame(frame, deps, opts(dir));
-  assert.deepEqual(calls.order, ['snapshot', 'download', 'read', 'read', 'post'], 'snapshot, then bytes, then both reads, then the intake');
+  assert.deepEqual(calls.order, ['snapshot', 'standing', 'download', 'read', 'read', 'post'], 'snapshot, the standing-reading check, then bytes, both reads, the intake');
+  assert.equal(calls.rest[1], `vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${IMAGE}&limit=50`);
   assert.match(calls.rest[0], /select=id,vehicle_id,image_url,updated_at,/);
   assert.match(calls.rest[0], /id=eq\.10000000-0000-4000-8000-000000000001$/);
   assert.equal(calls.ask.length, 2);
@@ -402,6 +421,63 @@ test('a usage limit mid-photo stops the batch and posts nothing', () => withDir(
   const r = await deepReadFrame(frame, deps, opts(dir));
   assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.stop, calls.orchestrator.length], ['rate_limited', 'reader_usage_limit', true, 0]);
 }));
+
+test('a reading that is not this reader\'s already stands on the photo, by the observation and not the stamp: no read is spent', () => withDir(async (dir) => {
+  const reading = (over = {}) => ({ id: '30000000-0000-4000-8000-000000000009', kind: 'condition', is_superseded: false, agent_tier: 'caller-byok subscription', ...over });
+  // a reviewed reading whose stamp is missing, one with no tier at all (legacy), one of a tier nobody listed: all stand
+  for (const r of [reading(), reading({ agent_tier: null }), reading({ agent_tier: 'interactive' })]) {
+    const { deps, calls } = frameDeps({ readings: [r], answers: [cli(verdict())] });
+    const got = await deepReadFrame(frame, deps, opts(dir));
+    assert.deepEqual([got.receipt.outcome, got.receipt.detail.skipped, calls.order], ['policy_skip', 'already_read', ['snapshot', 'standing']], String(r.agent_tier));
+  }
+  // this reader's own earlier reading, a superseded reading and a row of another kind do not stand in the way
+  for (const r of [reading({ agent_tier: AUTOMATIC_TIER }), reading({ is_superseded: true }), reading({ kind: 'specification' })]) {
+    const { deps, calls } = frameDeps({ readings: [r], answers: [cli(verdict())] });
+    const got = await deepReadFrame(frame, deps, opts(dir));
+    assert.deepEqual([got.receipt.outcome, calls.ask.length, calls.orchestrator.length], ['succeeded', 2, 1], JSON.stringify(r));
+  }
+  assert.equal(standingReadingHold([]), null);
+  assert.equal(standingReadingHold(null), null);
+  // the check could not be made: nothing is read, and the batch goes on
+  const { deps, calls } = frameDeps({ readingsFail: true, answers: [cli(verdict())] });
+  const got = await deepReadFrame(frame, deps, opts(dir));
+  assert.deepEqual([got.receipt.outcome, got.receipt.error_class, got.stop, calls.ask.length], ['unavailable', 'review_source_unavailable', false, 0]);
+  // a dry run reads the photo all the same (it posts nothing)
+  const dry = frameDeps({ readings: [reading()], answers: [cli(verdict())] });
+  const d = await deepReadFrame(frame, dry.deps, opts(dir, { post: false }));
+  assert.deepEqual([d.valid, dry.calls.ask.length, dry.calls.orchestrator.length], [true, 2, 0]);
+}));
+
+test('the database\'s two words for an automatic reading it refuses: a standing reading closes the photo, a wrong shape stops the stage', () => withDir(async (dir) => {
+  const over = frameDeps({ answers: [cli(verdict())], orchestrator: async () => ({ http: 409, success: false, error: 'thin_review_over_reviewed' }) });
+  const a = await deepReadFrame(frame, over.deps, opts(dir));
+  assert.deepEqual([a.receipt.outcome, a.receipt.detail.skipped, a.receipt.detail.intake_error, a.stop], ['policy_skip', 'already_read', 'thin_review_over_reviewed', false]);
+  const shape = frameDeps({ answers: [cli(verdict())], orchestrator: async () => ({ http: 409, success: false, error: 'thin_review_asserts_unchecked_field' }) });
+  const b = await deepReadFrame(frame, shape.deps, opts(dir));
+  assert.deepEqual([b.receipt.outcome, b.receipt.error_class, b.receipt.retry_after_seconds, b.stop], ['unavailable', 'thin_shape_refused', 3600, true]);
+  // an orchestrator that does not pass the words on answers as before: an hour's wait, the stage goes on, the streak counts it
+  const opaque = frameDeps({ answers: [cli(verdict())], orchestrator: async () => ({ http: 502, success: false, error: 'review_observation_not_persisted' }) });
+  const c = await deepReadFrame(frame, opaque.deps, opts(dir));
+  assert.deepEqual([c.receipt.outcome, c.receipt.error_class, c.receipt.retry_after_seconds, c.stop, refusalStreak(0, c.receipt)], ['unavailable', 'review_observation_not_persisted', 3600, false, 1]);
+}));
+
+test('the words a question may name are the grammar\'s closed values, the list the intake guard holds', () => {
+  // c_vocab of image_reading_thin_violation (migration 20261120140000): a value added to the grammar must be added there
+  const guard = ['unknown', 'engine_bay', 'body_exterior', 'body_interior', 'undercarriage', 'receipt_document', 'data_plate', 'hand_drawn_diagram',
+    'shop_context', 'fabrication_in_progress', 'paint_booth', 'wheel_assembly', 'road_test', 'off_property', 'cross_reference', 'product_screenshot', 'spreadsheet',
+    'none', 'surface', 'pitting', 'perforation', 'bare_metal', 'primer', 'sealer', 'base', 'clear', 'aged', 'stripped', 'partial', 'assembled'];
+  assert.deepEqual([...QUESTION_TOKENS].sort(), [...guard].sort());
+  // every question the merge step can write names only those words, whatever the reads hold
+  const odd = thinVerdict(verdict({ scene_type: 'off_property' }, { rust_severity: 'rusty', paint_state: undefined, completeness: 'partial' }), verdict({ scene_type: 'off_property' }, { rust_severity: 'surface', paint_state: 'clear', completeness: 'partial' }), ADMITS);
+  for (const q of odd.verdict.open_questions) {
+    const words = q.match(/: ([a-z_]+) vs ([a-z_]+); posted as/)?.slice(1) ?? q.match(/ is ([a-z_]+); this reader may not/)?.slice(1) ?? ['no match'];
+    assert.ok(words.every((w) => guard.includes(w)), q);
+    assert.ok(OPEN_QUESTION_PATTERNS.some((p) => p.test(q)), q);
+  }
+  assert.ok(odd.verdict.open_questions.includes('Both reads say scene_type is off_property; this reader may not post that value yet.'));
+  assert.ok(odd.verdict.open_questions.includes('Two independent reads of this photo disagree on rust_severity: unknown vs surface; posted as unknown.'));
+  assert.ok(odd.verdict.open_questions.length <= 8);
+});
 
 test('a photo that moved or left is a policy skip and spends no read; bytes that will not download are the download receipts', () => withDir(async (dir) => {
   for (const [row, why] of [[{ is_document: true }, 'document'], [{ vehicle_id: null }, 'unfiled'], [{ is_external: true }, 'external'], [{ is_sensitive: true }, 'sensitive'], [{ deep_scene: 'body_exterior' }, 'already_read']]) {

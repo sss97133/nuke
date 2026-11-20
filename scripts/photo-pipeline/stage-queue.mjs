@@ -166,7 +166,8 @@ export async function recordStageReceipt(rpc, { imageId, stage = STAGE, version,
  * 'review_projection_refused'): review_requires_service_role 403; invalid_review_envelope|identity|verdict|state|presence|
  * workshop|camera|regions|flags|notes|lists|source|provenance 400 and review_too_large 400; review_source_changed 409;
  * review_source_withdrawn 409; review_projection_refused 409; review_projection_not_persisted 409;
- * review_source_unavailable 503; review_observation_not_persisted 502; review_persistence_failed 500.
+ * review_source_unavailable 503; review_observation_not_persisted 502; review_persistence_failed 500; and the intake
+ * guard's two words for an automatic reading, thin_review_over_reviewed 409 and thin_review_asserts_unchecked_field 409.
  */
 export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   const detail = { reader: reader ?? null, prompt_version: promptVersion ?? null, ...(result.detail ?? {}) };
@@ -198,8 +199,15 @@ export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   // the database refused to place a valid reading on this photo (SQL-side rules the reader cannot see, e.g. a withdrawal on
   // record). Each attempt spends two reads, so wait an hour between attempts rather than two minutes.
   if (code === 'review_projection_refused') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
-  // the observation was not written: the ingest failed, or the database's own rule for this reader's tier refused the row
-  // (guard_reviewed_image_analysis; the intake answers both the same way). The second repeats on every attempt and each
+  // the database's own words for an automatic reading it will not store (guard_reviewed_image_analysis, migration
+  // 20261120140000), passed on by the orchestrator. A reading that is not this reader's already stands on the photo
+  // (a reviewed landing won the race, or one the reader's own check could not see): the photo is read, by someone better.
+  if (code === 'thin_review_over_reviewed') return { outcome: 'policy_skip', detail: { ...d, skipped: 'already_read' } };
+  // the reading is not the shape the database takes from this reader: a reader fault that repeats on every photo and
+  // spends two reads each time, so the stage stops for the fire at once and the fire's summary carries the word
+  if (code === 'thin_review_asserts_unchecked_field') return { outcome: 'unavailable', error_class: 'thin_shape_refused', http_status: o.http ?? null, retry_after_seconds: 3600, stop: true, detail: d };
+  // the observation was not written: the ingest failed, or (from an orchestrator that does not pass the words above on)
+  // the database's rule for this reader's tier refused the row. The second repeats on every attempt and each
   // attempt spends two reads, so an hour between attempts. Nothing ends the retries for good (the gap finder offers a
   // photo again a day after its last allowed attempt); what bounds the cost is the reader stopping the stage for the
   // fire after REFUSAL_STREAK_STOP refusals in a row (deep-stage.mjs), and "intake_refusing" in the fire's summary.

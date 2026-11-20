@@ -54,8 +54,8 @@ const FAKE_SUPABASE_JS = `exports.createClient = () => ({
     then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; },
 });`;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, extraArgs = [], supabaseJs = false, failClaims = [], oldCli = false } = {}) {
-  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], tiers: 0 };
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, extraArgs = [], supabaseJs = false, failClaims = [], oldCli = false } = {}) {
+  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], standing: [], tiers: 0 };
   const cursor = {};   // each stage hands out its photos once, at most p_limit a call, like the database
   let port;
   const server = createServer((req, res) => {
@@ -73,6 +73,11 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         return tiers === 'error' ? json(503, { code: 'PGRST002' }) : json(200, tiers ? [{ config_value: tiers }] : []);
       }
       if (req.url.startsWith('/rest/v1/platform_config')) return config === 'error' ? json(503, { code: 'PGRST002' }) : json(200, config ? [{ config_value: config }] : []);
+      // the photo's deep readings, asked of the observations themselves once the stamp says the photo is free
+      if (req.url.startsWith('/rest/v1/vehicle_observations')) {
+        const q = decodeURIComponent(req.url); calls.standing.push(q);
+        return json(200, standing[q.match(/structured_data->>image_id=eq\.([^&]+)/)?.[1]] ?? []);
+      }
       if (req.url.startsWith('/rest/v1/vehicle_images') && /[?&]id=eq\./.test(req.url)) {
         const id = req.url.match(/id=eq\.([^&]+)/)[1]; calls.snapshots.push(id); calls.snapshotQueries.push(req.url);
         return json(200, [{ id, vehicle_id: '00000000-0000-4000-8000-0000000000cc', image_url: `https://example.test/${id}`, updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null,
@@ -290,11 +295,15 @@ test('deep readings: the reader\'s own reading by the same method closes the sta
   const method = automaticMethod(admitsFrom(TIERS));
   await withStandIns([], ({ calls, summary, claudeArgs }) => {
     const got = calls.receipts.filter((r) => r.p_stage === 'deep_reading').map((r) => [r.p_image_id, r.p_outcome, r.p_detail.already_read ?? null, r.p_detail.skipped ?? null]);
-    assert.deepEqual(got, [['a-mine.jpg', 'succeeded', 'same_method', null], ['b-reviewed.jpg', 'policy_skip', null, 'already_read']]);
-    assert.equal(claudeArgs.length, 0, 'no read was spent on either');
-    assert.deepEqual([summary.stages.deep_reading.succeeded, summary.stages.deep_reading.policy_skip], [1, 1]);
+    assert.deepEqual(got, [['a-mine.jpg', 'succeeded', 'same_method', null], ['b-reviewed.jpg', 'policy_skip', null, 'already_read'], ['c-standing.jpg', 'policy_skip', null, 'already_read']]);
+    assert.equal(claudeArgs.length, 0, 'no read was spent on any of them');
+    assert.deepEqual([summary.stages.deep_reading.succeeded, summary.stages.deep_reading.policy_skip], [1, 2]);
+    // only the photo whose stamp is free is asked about; the question is the guard's own (same filter, same index)
+    assert.deepEqual(calls.standing, ['/rest/v1/vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.c-standing.jpg&limit=50']);
     assert.match(decodeURIComponent(calls.snapshotQueries[0]), /deep_tier:ai_scan_metadata->byok_deep_analysis->>agent_tier,deep_method:ai_scan_metadata->byok_deep_analysis->>extraction_method/);
-  }, { deepFrames: ['a-mine.jpg', 'b-reviewed.jpg'], extraArgs: ['--deep-limit', '2'],
+  }, { deepFrames: ['a-mine.jpg', 'b-reviewed.jpg', 'c-standing.jpg'], extraArgs: ['--deep-limit', '3'],
+    // c: no stamp on the photo, yet a reviewed reading of it is current (its stamp is missing): found by the observation
+    standing: { 'c-standing.jpg': [{ id: '30000000-0000-4000-8000-000000000009', kind: 'condition', is_superseded: false, agent_tier: 'caller-byok subscription' }] },
     rows: { 'a-mine.jpg': { deep_scene: 'undercarriage', deep_tier: AUTOMATIC_TIER, deep_method: method }, 'b-reviewed.jpg': { deep_scene: 'undercarriage', deep_tier: 'caller-byok subscription', deep_method: 'three passes' } } });
 });
 

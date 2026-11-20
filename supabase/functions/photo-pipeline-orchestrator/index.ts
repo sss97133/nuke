@@ -24,7 +24,7 @@ import { qualifyVinRead, vinCitation, type VinAdmission } from "./vinAdmission.t
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt, type PipelineSource } from "./persistence.ts";
 import { recordSuppliedClassification, SuppliedClassificationError, CLASSIFICATION_SELECT } from "./suppliedClassification.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
-import { recordReviewedAnalysis, ReviewedAnalysisError, REVIEW_SELECT } from "./reviewedAnalysis.ts";
+import { intakeRefusalWord, recordReviewedAnalysis, ReviewedAnalysisError, REVIEW_SELECT } from "./reviewedAnalysis.ts";
 import { admitPhotoFields, type FieldSourceAdmission } from "./fieldSourceAdmission.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -281,7 +281,12 @@ Deno.serve(async (req) => {
           },
           async ingest(observation) {
             const { data, error } = await supabase.functions.invoke("ingest-observation", { body: observation });
-            if (error) throw new ReviewedAnalysisError("review_observation_not_persisted", 502);
+            if (error) {
+              // the database's own refusal of an automatic reading is passed on by name; every other failure stays opaque
+              const context = (error as { context?: unknown }).context;
+              const word = intakeRefusalWord(context instanceof Response ? await context.clone().json().catch(() => null) : null);
+              throw new ReviewedAnalysisError(word ?? "review_observation_not_persisted", word ? 409 : 502);
+            }
             return data;
           },
           async project(observationId) {

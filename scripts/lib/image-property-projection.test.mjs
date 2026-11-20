@@ -712,7 +712,7 @@ test('project-cached --single with imageIds: only the reading the photo points a
   assert.ok(!keyed.some(r => r.structured_data.rust_severity === 'perforation'));
 });
 
-test('a reading of a picture of a picture keys nothing: paper and screen scenes, and the words the database reads as a print', async () => {
+test('a reading whose own words say picture of a picture keys nothing new: the words the database reads as a print', async () => {
   const db = standIn();
   // the reviewed reader gave a vehicle scene and an assembly state to a photographed sheet of printed photos; its sentence says so
   const print = db.reading(at(1), { data: { scene_type: 'body_exterior', narrative_one_line: 'Two printed photographs show the car masked for primer.' } });
@@ -721,9 +721,15 @@ test('a reading of a picture of a picture keys nothing: paper and screen scenes,
   const screen = db.reading(at(4), { data: { scene_type: 'product_screenshot' } });
   const reference = db.reading(at(5), { data: { scene_type: 'cross_reference' } });
   const real = db.reading(at(6), { data: { scene_type: 'body_exterior', narrative_one_line: 'Masking paper covers the glass while the sheet metal is in primer.' } });
-  for (const row of [print, sheet, label, screen, reference]) {
+  for (const row of [print, sheet, label]) {
     const { receipt } = await walk(db, { apply: true, single: true, imageIds: [row.structured_data.image_id] });
     assert.deepEqual([receipt.eligible_claims, receipt.inserted, receipt.deferred], [0, 0, { picture_of_picture: 1 }], row.structured_data.scene_type);
+  }
+  // a paper or screen scene alone is not this hold (no measured case of a wrong keyed value; the scene values have no
+  // registry definition yet): such a reading keys as it did before
+  for (const row of [screen, reference]) {
+    const { receipt } = await walk(db, { apply: true, single: true, imageIds: [row.structured_data.image_id] });
+    assert.deepEqual([receipt.inserted, receipt.deferred], [3, {}], row.structured_data.scene_type);
   }
   const { receipt } = await walk(db, { apply: true, single: true, imageIds: [real.structured_data.image_id] });
   assert.deepEqual([receipt.inserted, receipt.deferred], [3, {}], 'masking paper and sheet metal are not a print');

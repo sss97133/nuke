@@ -143,6 +143,50 @@
     "Both reads say completeness is assembled; this reader may not post that value yet."
    ],
    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+  },
+  {
+   "image_id": "11111111-1111-4111-8111-111111111111",
+   "vehicle_id": "22222222-2222-4222-8222-222222222222",
+   "scene_type": "unknown",
+   "build_phase_guess": "unknown",
+   "intent": "unknown",
+   "intent_confidence": 0,
+   "needs_clarification": true,
+   "components_seen": [],
+   "text_regions": [],
+   "damage_localized": [],
+   "state_observations": {
+    "rust_severity": "unknown",
+    "paint_state": "unknown",
+    "completeness": "unknown",
+    "damage_callouts": []
+   },
+   "workshop_signals": {
+    "tools_visible": [],
+    "fixturing": "unknown",
+    "lighting": "unknown"
+   },
+   "presence": {
+    "person": false,
+    "dog": false,
+    "place_hint": null
+   },
+   "camera_pose": {
+    "method": "automatic two-pass read; no pose measured",
+    "framing": "unknown",
+    "azimuth_deg": null,
+    "elevation_deg": null,
+    "distance_est": null,
+    "exif_present": null
+   },
+   "narrative_one_line": "Automatic read: scene unknown; rust unknown; paint unknown.",
+   "confidence": 0.7,
+   "context_complete": false,
+   "open_questions": [
+    "Both reads say scene_type is off_property; this reader may not post that value yet.",
+    "Two independent reads of this photo disagree on completeness: partial vs unknown; posted as unknown."
+   ],
+   "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
   }
  ],
  "refused": [
@@ -1240,6 +1284,106 @@
     "confidence": 0.72,
     "context_complete": true,
     "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "a question that names a word outside the closed values",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [
+     "Both reads say scene_type is rebuilt_motor; this reader may not post that value yet."
+    ],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "more than eight questions",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say paint_state is clear; this reader may not post that value yet."
+    ],
     "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
    }
   }

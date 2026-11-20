@@ -28,16 +28,16 @@ export function clarificationIsIntentOnly(data) {
 }
 
 /**
- * A stored reading that says its frame is a picture of a picture: a scene that is paper or a screen, or the reading's own
- * words, by the database's photo_reading_is_print (the same pattern over the narrative and the first component label;
- * vehicle_build_reconstruction and vehicle_part_installation_evidence already leave such photos out). Its three fields
- * describe the car in the print, and the photo's date is the day the print was photographed, so nothing is keyed from it.
- * Measured 2026-11-20 on the proof vehicle: 6 such photos, 2 of them carrying a keyed assembly state.
+ * A stored reading whose own words say its frame is a picture of a picture. This is the database's
+ * public.photo_reading_is_print (migration 20261119230000) copied: the same pattern over the narrative and the first
+ * component label, so a change to one must change the other. vehicle_build_reconstruction and
+ * vehicle_part_installation_evidence already leave such photos out; here nothing new is keyed from one, because its
+ * three fields describe the car in the print and the photo's date is the day the print was photographed.
+ * Measured 2026-11-20 on the proof vehicle: 6 such photos of 481, 2 of them carrying a keyed assembly state from before
+ * this hold (those two rows stay current: retracting them is the database's to do, no agent route supersedes a child).
  */
 const PRINT_READING = /\b(printed|paper|album)\s+(sheet|page)\b|\bprinted\s+(\w+\s+){0,2}(photograph|picture)s?\b/i;
-const PAPER_SCENES = ['cross_reference', 'product_screenshot', 'spreadsheet', 'hand_drawn_diagram'];
 export function readingIsPictureOfPicture(data) {
-  if (PAPER_SCENES.includes(data?.scene_type)) return true;
   const first = Array.isArray(data?.components_seen) ? data.components_seen[0]?.label : null;
   return PRINT_READING.test(`${typeof data?.narrative_one_line === 'string' ? data.narrative_one_line : ''} ${typeof first === 'string' ? first : ''}`);
 }
