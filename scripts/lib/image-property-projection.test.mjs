@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-import { applyImagePropertyClaims as applyBatchClaims, projectImageProperties, PROJECTION_VERSION } from './image-property-projection.mjs';
+import { applyImagePropertyClaims as applyBatchClaims, projectImageProperties, childCarriesOnlyEnumAndPointers, PROJECTION_VERSION } from './image-property-projection.mjs';
 
 const applyImagePropertyClaims = (sb, claims, options = {}) => applyBatchClaims(sb, claims, { ...options, mode: 'legacy' });
 
@@ -542,12 +542,23 @@ test('project-cached --single: a superseded projected row is left alone and coun
   assert.deepEqual([receipt.already_projected, receipt.already_projected_superseded, receipt.inserted, receipt.failed, exitCode], [3, 1, 0, 0, 0]);
 });
 
-test('project-cached --single: asks the database whether a reading may be shown, and fails closed', async () => {
-  const privateWord = data => !JSON.stringify(data).includes('made-up private');
+test('project-cached --single: judges the child row, not the source reading prose, and fails closed', async () => {
+  // The database stand-in answers like observation_is_public's prose rule: a payment/receipt/amount word makes a row private.
+  const privateWord = data => !/(invoice|receipt|\$\s?[0-9])/i.test(JSON.stringify(data));
   let db = standIn({ isPublic: privateWord });
-  db.reading(at(1)); db.reading(at(2), { data: { agent_notes: 'made-up private note' } });
+  db.reading(at(1));
+  db.reading(at(2), { data: { agent_notes: 'made-up note: no receipt line matches this part, $12 quoted' } });
   let { receipt } = await walk(db, { apply: true, single: true });
-  assert.deepEqual([receipt.inserted, receipt.deferred], [3, { source_not_public: 1 }]);
+  assert.deepEqual([receipt.inserted, receipt.deferred], [6, {}], 'a parent whose notes mention a receipt or an amount still projects its clean child');
+  assert.equal(db.calls.rpc, 6, 'the database is asked about each child it would write');
+  for (const row of db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1')) {
+    assert.equal(JSON.stringify(row.structured_data).includes('made-up note'), false, 'no source prose reaches a child');
+  }
+  // A child that would itself carry private text is refused, by the database's verdict on the child.
+  db = standIn({ isPublic: () => false });
+  db.reading(at(1));
+  ({ receipt } = await walk(db, { apply: true, single: true }));
+  assert.deepEqual([receipt.inserted, receipt.deferred], [0, { child_not_public: 1 }]);
   db = standIn({ isPublic: () => 'error' });
   db.reading(at(1));
   ({ receipt } = await walk(db, { single: true }));
@@ -556,6 +567,71 @@ test('project-cached --single: asks the database whether a reading may be shown,
   db.reading(at(1));
   await walk(db, {});
   assert.equal(db.calls.rpc, 0, 'the batch route leaves that check to its intake');
+});
+
+test('child shape: only an enum, ids, a pointer and fixed words; any extra field or free text is refused', () => {
+  const { observation, image } = fixtures();
+  const [claim] = projectImageProperties(observation, image).claims;
+  assert.equal(childCarriesOnlyEnumAndPointers(claim), true);
+  for (const mutate of [
+    c => { c.structured_data.agent_notes = 'made-up note'; },
+    c => { c.structured_data.narrative = 'made-up text'; },
+    c => { c.structured_data.limitation = 'made-up free text'; },
+    c => { c.structured_data.source_extraction_method = 'made-up words with spaces and $5'; },
+    c => { c.structured_data[c.property_key] = 'made-up value'; },
+    c => { delete c.structured_data.source_observation_id; },
+    c => { c.raw_source_ref = 'vehicle_observations:not-the-pointer'; },
+    c => { c.kind = 'media'; },
+  ]) {
+    const copy = structuredClone(claim); mutate(copy);
+    assert.equal(childCarriesOnlyEnumAndPointers(copy), false);
+  }
+});
+
+test('intent-only clarification: released on the one-at-a-time route only, when the contract explains the flag', () => {
+  const flagged = (patch = {}) => {
+    const { observation, image } = fixtures();
+    Object.assign(observation.structured_data, { needs_clarification: true, intent: 'documentation', intent_confidence: 0.55, ...patch });
+    return { observation, image };
+  };
+  let { observation, image } = flagged();
+  assert.equal(projectImageProperties(observation, image).deferred, 'source_requires_review', 'default route holds');
+  assert.equal(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).claims.length, 3);
+  assert.equal(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).released_intent_only_clarification, true);
+  ({ observation, image } = flagged({ intent: 'unknown', intent_confidence: 0.1 }));
+  assert.equal(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).claims.length, 3);
+  // The flag beside a confirmed intent has another cause: still held, and so is a missing intent_confidence.
+  for (const patch of [{ intent_confidence: 0.9 }, { intent_confidence: undefined }, { intent: undefined, intent_confidence: undefined }, { intent_confidence: 'low' }]) {
+    ({ observation, image } = flagged(patch));
+    assert.equal(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).deferred, 'source_requires_review');
+  }
+  // Every other hold stays, flag or no flag.
+  for (const patch of [{ needs_review: true }, { attribution_doubt: 'made-up doubt' }, { scene_type: 'receipt_document' }]) {
+    ({ observation, image } = flagged(patch));
+    assert.deepEqual(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).claims, []);
+  }
+  ({ observation, image } = flagged());
+  observation.confidence = 'low';
+  assert.deepEqual(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).claims, []);
+  ({ observation, image } = flagged());
+  for (const patch of [{ is_sensitive: true }, { is_document: true }, { image_vehicle_match_status: 'mismatch' }]) {
+    assert.deepEqual(projectImageProperties(observation, { ...image, ...patch }, { releaseIntentOnlyClarification: true }).claims, []);
+  }
+});
+
+test('project-cached --single: counts intent-only releases; the batch route still holds them', async () => {
+  const flagged = { needs_clarification: true, intent: 'inspection', intent_confidence: 0.55 };
+  let db = standIn();
+  db.reading(at(1), { data: flagged });
+  db.reading(at(2), { data: { ...flagged, intent_confidence: 0.9 } });
+  db.reading(at(3), { image: { is_sensitive: true }, data: flagged });
+  let { receipt } = await walk(db, { apply: true, single: true });
+  assert.deepEqual([receipt.inserted, receipt.released_intent_only_clarification, receipt.deferred],
+    [3, 1, { source_requires_review: 1, image_not_eligible: 1 }]);
+  db = standIn();
+  db.reading(at(1), { data: flagged });
+  ({ receipt } = await walk(db, {}));
+  assert.deepEqual([receipt.eligible_claims, receipt.deferred], [0, { source_requires_review: 1 }]);
 });
 
 test('project-cached: a photographed paper is deferred on either route', async () => {
