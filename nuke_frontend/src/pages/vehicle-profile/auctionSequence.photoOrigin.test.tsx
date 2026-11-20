@@ -82,7 +82,7 @@ beforeEach(() => {
           expect(read.url.searchParams.get('limit')).toBe('600');
           selected = selected.filter(p => /bat/i.test(p.source ?? '') || /bringatrailer.com/i.test(p.source_url ?? '') || p.taken_at == null);
         } else if (read.url.searchParams.has('taken_at')) {
-          expect(read.url.searchParams.get('limit')).toBe('120'); expect(read.url.searchParams.get('order')).toBe('taken_at.asc');
+          expect(read.url.searchParams.get('limit')).toBe('1000'); expect(read.url.searchParams.get('order')).toBe('taken_at.asc');
           const bounds = read.url.searchParams.getAll('taken_at');
           selected = selected.filter(p => p.taken_at && bounds.every(bound => bound.startsWith('gte.') ? Date.parse(p.taken_at) >= Date.parse(bound.slice(4)) : Date.parse(p.taken_at) < Date.parse(bound.slice(3))));
         } else expect(read.url.searchParams.get('limit')).toBe('2000');
@@ -195,7 +195,7 @@ it.each([
   expect(params.get('vehicle_id')).toBe(`eq.${vehicleId}`); expect(params.get('is_duplicate')).toBe('not.is.true');
   expect(params.has('or')).toBe(control.mode === 'listing');
   if (control.mode === 'listing') { expect(params.get('or')).toBe('(source.ilike.%bat%,source_url.ilike.%bringatrailer.com%,taken_at.is.null)'); expect(params.get('limit')).toBe('600'); expect(params.has('taken_at')).toBe(false); }
-  else { expect(params.getAll('taken_at')).toEqual(['gte.2026-09-09T00:00:00Z', 'lt.2026-09-10T00:00:00.000Z']); expect(params.get('limit')).toBe('120'); expect(params.get('order')).toBe('taken_at.asc'); }
+  else { expect(params.getAll('taken_at')).toEqual(['gte.2026-09-09T00:00:00Z', 'lt.2026-09-10T00:00:00.000Z']); expect(params.get('limit')).toBe('1000'); expect(params.get('order')).toBe('taken_at.asc'); }
 });
 
 
@@ -235,7 +235,7 @@ it.each([
   const drawerReads = () => reads.filter(r => r.url.pathname.endsWith('/vehicle_images') && r.url.searchParams.get('select') === 'id,image_url,taken_at,source,source_url');
   expect(drawerReads()).toHaveLength(1); const query = drawerReads()[0].url.searchParams;
   expect(query.get('vehicle_id')).toBe(`eq.${vehicleId}`); expect(query.get('is_duplicate')).toBe('not.is.true');
-  expect(query.get('limit')).toBe(control.listing ? '600' : '120');
+  expect(query.get('limit')).toBe(control.listing ? '600' : '1000');
   expect(query.getAll('taken_at')).toEqual(control.listing ? [] : ['gte.2026-09-02T00:00:00Z', 'lt.2026-09-03T00:00:00.000Z']);
   await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Close day"]')!.click());
   expect(await openDay(selectedDay)).toEqual(expected); expect(drawerReads()).toHaveLength(1);

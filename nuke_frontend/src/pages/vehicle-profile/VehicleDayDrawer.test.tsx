@@ -96,7 +96,7 @@ beforeEach(() => {
         const predicates = url.searchParams.getAll('taken_at');
         expect(predicates).toHaveLength(2); expect(predicates[0]).toBe(`gte.${requestedDay}T00:00:00Z`);
         expect(predicates[1]).toMatch(/^lt\.\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/);
-        expect(url.searchParams.get('order')).toBe('taken_at.asc'); expect(url.searchParams.get('limit')).toBe('120');
+        expect(url.searchParams.get('order')).toBe('taken_at.asc'); expect(url.searchParams.get('limit')).toBe('1000');
         selected = selected.filter(row => matchesTime(row.taken_at, url.searchParams.getAll('taken_at')))
           .sort((a, b) => utcMicros(a.taken_at) < utcMicros(b.taken_at) ? -1 : utcMicros(a.taken_at) > utcMicros(b.taken_at) ? 1 : 0);
       }
@@ -270,7 +270,7 @@ it.each([
   await draw([auction], control.date); expect(visible()).toHaveLength(control.count); expect(requests).toHaveLength(1);
   const query = requests[0].searchParams; expect(query.has('or')).toBe(control.mode === 'listing');
   if (control.mode === 'listing') { expect(query.get('limit')).toBe('600'); expect(visible().every(p => p.title === 'listing association inferred; capture and publication times unknown')).toBe(true); }
-  else { expect(query.get('limit')).toBe('120'); expect(query.getAll('taken_at')).toEqual(['gte.2026-09-01T00:00:00Z', 'lt.2026-09-02T00:00:00.000Z']); }
+  else { expect(query.get('limit')).toBe('1000'); expect(query.getAll('taken_at')).toEqual(['gte.2026-09-01T00:00:00Z', 'lt.2026-09-02T00:00:00.000Z']); }
   const first = visible(); await close(); await draw([auction], control.date); expect(visible()).toEqual(first); expect(requests).toHaveLength(1);
 });
 
