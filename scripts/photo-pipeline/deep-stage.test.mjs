@@ -8,10 +8,11 @@ import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateVerdict } from '../../supabase/functions/_shared/byokImageVerdict.mjs';
+import { childCarriesOnlyEnumAndPointers, projectImageProperties } from '../lib/image-property-projection.mjs';
 import { stageSchema } from '../lib/byok-stage-schema.mjs';
 import {
   AUTOMATIC_METHOD, AUTOMATIC_NOTES, AUTOMATIC_TIER, DEFAULT_MODEL, OPEN_QUESTION_PATTERNS, STATE_STANDARD, admitsFingerprint, admitsFrom, automaticMethod, automaticProvenance, buildEnvelope, countReceipt, deepPrompt, deepReadFrame,
-  REFUSAL_STREAK_STOP, refusalStreak, thinNarrative, thinVerdict, thinViolation,
+  PRINT_WORDS, REFUSAL_STREAK_STOP, refusalStreak, saysPictureOfPicture, thinNarrative, thinVerdict, thinViolation,
   cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput,
 } from './deep-stage.mjs';
 
@@ -135,6 +136,65 @@ test('the admitted set is the database row; its fingerprint is part of the metho
   assert.equal(admitsFingerprint({ ...ADMITS, scene_type: [...ADMITS.scene_type].reverse() }), admitsFingerprint(ADMITS), 'order does not matter');
   assert.match(automaticMethod(ADMITS), /; pixels only, v2; admits [0-9a-f]{8}$/);
   assert.ok(automaticMethod(ADMITS).length <= 200, 'inside the intake\'s text limit');
+});
+
+test('a thin reading keys: the row the intake stores for it projects exactly its posted rust value, through the one-photo route only', () => {
+  // the stored row: the verdict plus what the intake adds, the confidence as the writer stores it (the verdict's own, capped at 0.6)
+  const stored = (v, over = {}) => ({ id: '30000000-0000-4000-8000-000000000001', kind: 'condition', is_superseded: false, vehicle_id: v.vehicle_id,
+    confidence: 'medium', confidence_score: Math.min(v.confidence, 0.6), agent_model: 'claude-sonnet-5-5', agent_tier: AUTOMATIC_TIER, extraction_method: 'reviewed_image_analysis_v1',
+    observed_at: '2026-11-20T18:05:00.000Z', ingested_at: '2026-11-20T18:05:03.123456+00:00',
+    structured_data: { ...v, analysis_kind: 'image_deep_byok', witness_image_id: v.image_id, is_inferred: true }, ...over });
+  const image = (v) => ({ id: v.image_id, vehicle_id: v.vehicle_id, is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, vision_gate_status: 'approved', image_vehicle_match_status: 'match' });
+  const surface = FIXTURE.accepted[0];
+  const withQuestion = { ...surface, open_questions: ['Both reads say paint_state is aged; this reader may not post that value yet.'] };
+  for (const v of [surface, withQuestion]) {
+    const r = projectImageProperties(stored(v), image(v), { releaseIntentOnlyClarification: true });
+    assert.equal(r.deferred, null);
+    assert.deepEqual(r.claims.map((c) => [c.property_key, c.structured_data[c.property_key]]), [['image_visible_rust_severity', 'surface']], 'one value, the one both reads agreed on');
+    assert.ok(r.claims.every(childCarriesOnlyEnumAndPointers), 'the child carries the value and pointers, no sentence');
+    assert.equal(r.claims[0].agent_tier, AUTOMATIC_TIER, 'the keyed value says which kind of reader it came from');
+  }
+  // every thin reading carries needs_clarification (its intent is unknown by rule): the batch route holds it, as it holds any such reading
+  assert.equal(projectImageProperties(stored(surface), image(surface)).deferred, 'source_requires_review');
+  // a pair of reads whose own confidence is under 0.6 posts its reading but keys nothing
+  const unsure = { ...surface, confidence: 0.55 };
+  assert.equal(projectImageProperties(stored(unsure), image(unsure), { releaseIntentOnlyClarification: true }).deferred, 'source_confidence_ineligible');
+  // nothing posted, nothing keyed
+  assert.equal(projectImageProperties(stored({ ...FIXTURE.accepted[1], confidence: 0.8 }), image(FIXTURE.accepted[1]), { releaseIntentOnlyClarification: true }).deferred, 'no_known_scalar_values');
+  assert.equal(projectImageProperties(stored(FIXTURE.accepted[2]), image(FIXTURE.accepted[2]), { releaseIntentOnlyClarification: true }).deferred, 'no_known_scalar_values');
+});
+
+test('a picture of a picture posts nothing: either read saying so, by its scene or in its own words, holds the photo', () => {
+  const car = (over = {}, state = {}) => verdict({ scene_type: 'body_exterior', narrative_one_line: 'A red coupe stands on a concrete pad.', ...over }, { rust_severity: 'surface', paint_state: 'unknown', completeness: 'unknown', ...state });
+  // both passes called a photographed sheet of two printed photos body_exterior (measured 2026-11-20); one of them said "printed"
+  const leak = thinVerdict(car(), car({ narrative_one_line: 'Printed page with two photos of a car in body prep.' }), ADMITS);
+  assert.equal(leak.held, 'picture_of_picture');
+  assert.deepEqual(leak.posted, { scene_type: 'unknown', rust_severity: 'unknown', paint_state: 'unknown' });
+  assert.deepEqual(leak.verdict.open_questions, ['Both reads say scene_type is body_exterior; this reader may not post that value yet.', 'Both reads say rust_severity is surface; this reader may not post that value yet.']);
+  assert.deepEqual(leak.errors, []);
+  assert.equal(thinViolation(leak.verdict, ADMITS), null);
+  assert.equal(/Printed page|red coupe/.test(JSON.stringify(leak.verdict)), false, 'the words that held it are not posted');
+  // one read names a reference scene: the disagreement already withholds the scene; the hold is recorded all the same
+  const split = thinVerdict(car(), car({ scene_type: 'cross_reference' }), ADMITS);
+  assert.deepEqual([split.held, split.posted.scene_type, split.posted.rust_severity], ['picture_of_picture', 'unknown', 'unknown']);
+  // a real photo is not held
+  const real = thinVerdict(car(), car(), ADMITS);
+  assert.deepEqual([real.held, real.posted.scene_type, real.posted.rust_severity], [null, 'body_exterior', 'surface']);
+  // the words: what a read says about a print, a binder page, a screen; and what it says about sheet metal, masking paper and glass
+  for (const s of ['Printed page with two photos of a car in body prep.', 'Binder page holding two printed photos of a red car.', 'A printed sheet pairs a red Firebird with an engine.',
+    'Screenshot of a listing showing a red coupe.', 'Photo of a laptop screen showing a parts diagram.', 'An album page with four photographs.', 'Two prints of the car taped to a wall.', 'A sheet of paper with a hand-written parts list.']) {
+    assert.ok(PRINT_WORDS.test(s), s);
+    assert.ok(saysPictureOfPicture(verdict({ narrative_one_line: s })), s);
+  }
+  for (const s of ['Sheet metal patch welded into the rear quarter panel.', 'Masking paper covers the glass while primer cures.', 'Windscreen and cowl seen from the driver side.',
+    'Underside of the car showing the rear axle and leaf springs.', 'Fingerprints on fresh clear coat near the fuel door.', 'Blueprinted engine on a stand.', 'A page of the build: door panel removed.']) {
+    assert.ok(!PRINT_WORDS.test(s), s);
+  }
+  // said anywhere a read describes the frame: a component label, the framing, a note, a question
+  assert.ok(saysPictureOfPicture(verdict({ components_seen: [{ label: 'Printed photograph of an engine', confidence: 0.7, bbox: [0, 0, 500, 500], part_number_guess: null }] })));
+  assert.ok(saysPictureOfPicture(verdict({ camera_pose: { method: 'visual', framing: 'top-down on a binder', azimuth_deg: null, elevation_deg: null, distance_est: null, exif_present: null } })));
+  assert.ok(saysPictureOfPicture(verdict({ agent_notes: 'This appears to be a screenshot.' })));
+  assert.ok(!saysPictureOfPicture(verdict()));
 });
 
 test('an intake that keeps refusing stops the stage for the fire: a refusal counts, a success resets, anything else leaves the count', () => {
@@ -322,6 +382,7 @@ test('fewer than two valid reads posts nothing and the receipt is a retryable on
   assert.equal(calls.orchestrator.length, 0, 'nothing posted');
   assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.receipt.retry_after_seconds], ['unavailable', 'reader_output_invalid', 1800]);
   assert.equal(r.receipt.detail.no_two_valid_reads, true);
+  assert.match(r.receipt.detail.why, /^the verdict fails the contract: /, 'the receipt says why the read was refused');
   assert.equal(r.valid, false);
 }));
 

@@ -110,13 +110,16 @@ if (args['stage-dry-run'] === true) {
     const res = await deepReadFrame({ id: f.id, vehicle_id: f.vehicle_id }, deepDeps(dir), { dir, contract: contractText(), model, runId, post: false, reader: READER, admits });
     console.log(JSON.stringify({ stage: DEEP_STAGE, image_id: f.id, valid: res.valid, seconds: res.seconds,
       tokens: (res.reads ?? []).map((r) => ({ input: r.stats.input_tokens, output: r.stats.output_tokens, seconds: r.stats.seconds, attempts: r.stats.attempts, notional_usd: r.stats.notional_cost_usd })),
-      agreement: res.agreement ? { agreed: res.agreement.agreed, disagreements: res.agreement.disagreements, values: res.agreement.values, posted: res.agreement.posted } : null,
+      agreement: res.agreement ? { agreed: res.agreement.agreed, disagreements: res.agreement.disagreements, values: res.agreement.values, posted: res.agreement.posted, held: res.agreement.held } : null,
+      // what each pass said in its own words (kept in the stage receipt on a real fire, never posted)
+      raw_reads: (res.reads ?? []).map((r) => ({ scene_type: r.verdict.scene_type, state: r.verdict.state_observations, narrative: r.verdict.narrative_one_line, confidence: r.verdict.confidence, components: (r.verdict.components_seen ?? []).length })),
       would_post: res.envelope ?? null, receipt_if_not_two_valid_reads: res.envelope ? null : res.receipt }));
     }
     if (!which.includes(KEYED_STAGE)) continue;
     sb ??= await supabaseClient();
+    const k0 = Date.now();
     const keyed = await keyedValuesForFrame({ id: f.id, vehicle_id: f.vehicle_id }, { sb, apply: false, reader: READER });
-    console.log(JSON.stringify({ stage: KEYED_STAGE, image_id: f.id, dry_run: true, would_write_values: keyed.projection?.eligible_claims ?? null, projection: keyed.projection, error: keyed.receipt.outcome === 'unavailable' ? keyed.receipt.detail?.error ?? keyed.receipt.error_class : null }));
+    console.log(JSON.stringify({ stage: KEYED_STAGE, image_id: f.id, dry_run: true, ms: Date.now() - k0, would_write_values: keyed.projection?.eligible_claims ?? null, projection: keyed.projection, error: keyed.receipt.outcome === 'unavailable' ? keyed.receipt.detail?.error ?? keyed.receipt.error_class : null }));
   }
   rmSync(dir, { recursive: true, force: true });
   process.exit(0);
@@ -275,6 +278,7 @@ async function deepPhase() {
           s.reads_valid += res.reads.length; s.read_seconds += Math.round(res.seconds);
           for (const x of res.reads) { s.input_tokens += x.stats.input_tokens; s.output_tokens += x.stats.output_tokens; }
           if (res.agreement.agreed) s.agreed_all++;
+          if (res.agreement.held) s.held_pictures = (s.held_pictures || 0) + 1;
           s.posted_values += ['rust_severity', 'paint_state'].filter((k) => res.agreement.posted?.[k] && res.agreement.posted[k] !== 'unknown').length;
           for (const d of res.agreement.disagreements) s.disagreements[d.field] = (s.disagreements[d.field] || 0) + 1;
         }

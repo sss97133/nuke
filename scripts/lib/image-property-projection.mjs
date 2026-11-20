@@ -28,6 +28,21 @@ export function clarificationIsIntentOnly(data) {
 }
 
 /**
+ * A stored reading that says its frame is a picture of a picture: a scene that is paper or a screen, or the reading's own
+ * words, by the database's photo_reading_is_print (the same pattern over the narrative and the first component label;
+ * vehicle_build_reconstruction and vehicle_part_installation_evidence already leave such photos out). Its three fields
+ * describe the car in the print, and the photo's date is the day the print was photographed, so nothing is keyed from it.
+ * Measured 2026-11-20 on the proof vehicle: 6 such photos, 2 of them carrying a keyed assembly state.
+ */
+const PRINT_READING = /\b(printed|paper|album)\s+(sheet|page)\b|\bprinted\s+(\w+\s+){0,2}(photograph|picture)s?\b/i;
+const PAPER_SCENES = ['cross_reference', 'product_screenshot', 'spreadsheet', 'hand_drawn_diagram'];
+export function readingIsPictureOfPicture(data) {
+  if (PAPER_SCENES.includes(data?.scene_type)) return true;
+  const first = Array.isArray(data?.components_seen) ? data.components_seen[0]?.label : null;
+  return PRINT_READING.test(`${typeof data?.narrative_one_line === 'string' ? data.narrative_one_line : ''} ${typeof first === 'string' ? first : ''}`);
+}
+
+/**
  * What a projected child may carry: ids, a pointer to its source reading, one enum value, clocks, a fixed sentence.
  * Never the reader's notes, questions, text regions or any other prose. Returns true only for that exact shape, so a
  * child that ever picked up free text is refused here before the database is even asked.
@@ -68,6 +83,7 @@ export function projectImageProperties(observation, image, { releaseIntentOnlyCl
   // is_document and the receipt scene are refused by the batch intake too (20261004064216): a photographed paper
   // is not the vehicle, whatever the reading's three fields say.
   if (data.scene_type === 'receipt_document') return deferred('receipt_document');
+  if (readingIsPictureOfPicture(data)) return deferred('picture_of_picture');
   if (image.is_sensitive === true || image.is_superseded === true || image.is_duplicate === true || image.is_document === true ||
       ![null, undefined, 'approved'].includes(image.vision_gate_status) ||
       ['mismatch', 'unrelated'].includes(image.image_vehicle_match_status)) {

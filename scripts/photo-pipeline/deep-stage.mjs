@@ -133,6 +133,25 @@ export const OPEN_QUESTION_PATTERNS = Object.freeze([
 /** @typedef {{ scene_type: string[], rust_severity: string[], paint_state: string[] }} Admits */
 /** @type {Admits} */
 const NO_ADMITS = Object.freeze({ scene_type: [], rust_severity: [], paint_state: [] });
+
+/** Scenes that say the frame is reference material (paper, a screen, a drawing), not the vehicle in front of the camera. */
+export const REFERENCE_SCENES = Object.freeze(['receipt_document', 'cross_reference', 'product_screenshot', 'spreadsheet', 'hand_drawn_diagram']);
+/**
+ * Words by which a read says, in its own sentences, that the frame is a picture of a picture. Used only to withhold:
+ * a read's sentences never reach the ledger, but one that says "printed page" beside a vehicle scene has contradicted
+ * its own scene value. Deliberately without bare "sheet", "paper", "page" or "screen" (sheet metal, masking paper,
+ * windscreen): withholding a real photo costs one reading, posting a print as the car costs a false fact.
+ */
+export const PRINT_WORDS = /\b(print(ed|out|outs|s)?|photocop(y|ies|ied)|binder|album|scrapbook|collage|screen ?shots?|sheet of paper|(paper|printed|album|binder) (sheet|page)s?|(computer|phone|laptop|tablet|display|tv|television) screen|monitor|page (holding|showing|with))\b/i;
+
+/** Does one read say the frame is a picture of a picture: by its scene, or by the words of its own description? */
+export function saysPictureOfPicture(v) {
+  if (REFERENCE_SCENES.includes(v?.scene_type)) return true;
+  const said = [v?.narrative_one_line, v?.agent_notes, v?.camera_pose?.framing, v?.camera_pose?.method,
+    ...(Array.isArray(v?.components_seen) ? v.components_seen.map((c) => c?.label) : []),
+    ...(Array.isArray(v?.open_questions) ? v.open_questions : [])];
+  return said.some((s) => typeof s === 'string' && PRINT_WORDS.test(s));
+}
 const token = (x) => (typeof x === 'string' && /^[a-z_]+$/.test(x) ? x : 'missing');
 
 /**
@@ -218,6 +237,8 @@ export function thinViolation(v, admits = NO_ADMITS) {
  *   - scene_type, rust_severity and paint_state: the value both reads give, when the database admits it for this
  *     reader; otherwise "unknown" with one sentence saying which (a disagreement, or an agreed value not admitted);
  *   - a reading that cannot name its scene asserts no state;
+ *   - when either read says the frame is a picture of a picture (a reference scene, or its own words: saysPictureOfPicture),
+ *     nothing is posted for the photo: a printed photo of the car is not the car on the day the print was photographed;
  *   - assembly state is never posted (2026-11-20, 20 photos not seen before: one agreed value, contradicting the
  *     reviewed reading, and none of six partly assembled photos recognised);
  *   - a person in frame: the agreed answer, or true when the reads differ;
@@ -240,6 +261,8 @@ export function thinVerdict(first, second, admits = NO_ADMITS) {
       if ((admits[field] ?? []).includes(a)) posted[field] = a; else cannotPost(field, a);
     }
   }
+  const held = saysPictureOfPicture(first) || saysPictureOfPicture(second) ? 'picture_of_picture' : null;
+  if (held && posted.scene_type !== 'unknown') { cannotPost('scene_type', posted.scene_type); posted.scene_type = 'unknown'; }
   if (posted.scene_type === 'unknown') {
     for (const field of ['rust_severity', 'paint_state']) if (posted[field] !== 'unknown') { cannotPost(field, posted[field]); posted[field] = 'unknown'; }
   }
@@ -258,7 +281,7 @@ export function thinVerdict(first, second, admits = NO_ADMITS) {
     confidence: Math.round(Math.min(c1, c2) * 1000) / 1000, context_complete: false, open_questions: open, agent_notes: AUTOMATIC_NOTES,
   };
   const why = thinViolation(verdict, admits);
-  return { verdict, agreed: disagreements.length === 0, disagreements, values, posted: { scene_type: posted.scene_type, rust_severity: posted.rust_severity, paint_state: posted.paint_state },
+  return { verdict, agreed: disagreements.length === 0, disagreements, values, held, posted: { scene_type: posted.scene_type, rust_severity: posted.rust_severity, paint_state: posted.paint_state },
     errors: [...validateVerdict(verdict), ...(why ? [`not the thin shape: ${why}`] : [])] };
 }
 
@@ -397,15 +420,19 @@ export async function readOnce({ ask, ids, retries = 1, signal }) {
 }
 
 /**
- * When a pixel-only read must answer "unknown" for a state value. No new vocabulary: every value named is one the
- * contract already lists. This is the text the hold rates were measured with (2026-11-20, 40 Firebird photos against
- * the reviewed reading); without it two reads of one photo disagreed on 10 of 60 state values, with it on 3.
+ * When a pixel-only read must answer "unknown" for a state value, and what a picture of a picture is. No new
+ * vocabulary: every value named is one the contract already lists. The state text is what the hold rates were measured
+ * with (2026-11-20, 40 Firebird photos against the reviewed reading); without it two reads of one photo disagreed on 10
+ * of 60 state values, with it on 3. The last rule was added the same day: both passes called a photographed sheet of
+ * two printed photos "body_exterior" (the first read had called it vehicle_exterior too).
  */
 export const STATE_STANDARD = `STATE VALUES: WHEN TO USE "unknown"
 - rust_severity: "none" only when vehicle steel or iron is a clear, lit, in-focus part of the frame and shows no rust; otherwise "unknown". Rust on an exhaust manifold, caliper, drum, bracket or fastener counts: "surface".
 - paint_state: exterior body paint only. A frame that shows no exterior body paint (an engine bay, the underside, an interior, one component) is "unknown".
 - completeness: the assembly state of the whole vehicle, or of one whole major assembly (the complete engine bay, the complete interior, a complete side or end of the body), and only when the frame shows enough of it to judge. A view of part of the car (a wheel well, a section of the underside, one component, a close-up) does not show whether the vehicle is complete: use "unknown". "partial" and "stripped" need visible evidence of missing or removed parts (open mounting points, loose wiring, bare shells), not just a limited view.
-- A document, a screen or a printed picture: "unknown" for all three.`;
+- A document, a screen or a printed picture: "unknown" for all three.
+A PICTURE OF A PICTURE
+- When the frame is itself a photograph of a printed page, a printed photo, a binder or album page, or a screen, scene_type is "cross_reference" (paperwork such as a receipt, an invoice or a title is "receipt_document"), never the scene shown in the print, and narrative_one_line says "printed" or "screen".`;
 
 /** The prompt for one read: the reviewed reader's contract text, the state standard, then which photo and where it is. */
 export function deepPrompt({ contract, imageId, vehicleId, imagePath }) {
@@ -430,6 +457,7 @@ export function deepDetail({ model, runId, reads, agreement, seconds, admits = n
     disagreements: agreement ? agreement.disagreements.map((d) => d.field) : [],
     values: agreement ? agreement.values : null,
     posted: agreement ? agreement.posted ?? null : null,
+    held: agreement ? agreement.held ?? null : null,
     admits: admits ? { ...admits, fingerprint: admitsFingerprint(admits) } : null,
     reads: reads.map((r) => ({ ...r.stats, verdict: JSON.stringify(r.verdict).length <= 16_000 ? r.verdict : null, state: { scene_type: r.verdict.scene_type, rust_severity: r.verdict.state_observations.rust_severity, paint_state: r.verdict.state_observations.paint_state, completeness: r.verdict.state_observations.completeness } })),
   };
@@ -502,7 +530,9 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
         const real = failed.filter((e) => !e?.aborted);
         const e = real.find((x) => receiptForResult({ reader: { error: String(x?.message || x), apiStatus: x?.apiStatus ?? null, invalidOutput: x?.invalidOutput === true, missingTool: x?.code === 'ENOENT' } }).stop) ?? real[0] ?? failed[0];
         return typed({ reader: { error: String(e.message || e), apiStatus: e.apiStatus ?? null, invalidOutput: e.invalidOutput === true, missingTool: e?.code === 'ENOENT' },
-          detail: { model, run_id: runId, no_two_valid_reads: true } });
+          // why the read failed, in the reader's own fixed sentence (plus at most two contract errors): without it a photo that
+          // never yields two valid reads cannot be told from a flaky one
+          detail: { model, run_id: runId, no_two_valid_reads: true, why: String(e.message || e).replace(/[^\x20-\x7e]/g, ' ').slice(0, 240) } });
       }
       reads = settled.map((x) => x.value);
     } finally { signal?.removeEventListener('abort', onParent); }

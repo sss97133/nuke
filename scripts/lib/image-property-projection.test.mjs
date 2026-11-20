@@ -439,7 +439,7 @@ test('batch source registry mismatch fails even when the returned source ID is a
 // ── project-cached: the walk over one vehicle's stored readings ─────────────────────────────────────────────────────
 // A stand-in for the database client: made-up rows in memory, the same filters the walk sends, and the edge function's
 // rule that the same claim is answered as a duplicate.
-import { projectCachedRun, currentReadingIds, instantMicros, SINGLE_SLICE } from './image-property-projection.mjs';
+import { projectCachedRun, currentReadingIds, readingIsPictureOfPicture, instantMicros, SINGLE_SLICE } from './image-property-projection.mjs';
 
 const VEHICLE = '77777777-7777-4777-8777-777777777777';
 const PROPERTY_IDS = { image_visible_rust_severity: 'aaaaaaaa-0000-4000-8000-000000000001',
@@ -710,6 +710,28 @@ test('project-cached --single with imageIds: only the reading the photo points a
   const keyed = db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1');
   assert.deepEqual(keyed.map(r => r.structured_data.source_observation_id), [landed.id, landed.id, landed.id], 'every value comes from the reading the photo carries');
   assert.ok(!keyed.some(r => r.structured_data.rust_severity === 'perforation'));
+});
+
+test('a reading of a picture of a picture keys nothing: paper and screen scenes, and the words the database reads as a print', async () => {
+  const db = standIn();
+  // the reviewed reader gave a vehicle scene and an assembly state to a photographed sheet of printed photos; its sentence says so
+  const print = db.reading(at(1), { data: { scene_type: 'body_exterior', narrative_one_line: 'Two printed photographs show the car masked for primer.' } });
+  const sheet = db.reading(at(2), { data: { scene_type: 'paint_booth', narrative_one_line: 'A printed sheet pairs the booth with painted panels outside.' } });
+  const label = db.reading(at(3), { data: { scene_type: 'engine_bay', narrative_one_line: 'An engine on a stand.', components_seen: [{ label: 'Album page of engine photos' }] } });
+  const screen = db.reading(at(4), { data: { scene_type: 'product_screenshot' } });
+  const reference = db.reading(at(5), { data: { scene_type: 'cross_reference' } });
+  const real = db.reading(at(6), { data: { scene_type: 'body_exterior', narrative_one_line: 'Masking paper covers the glass while the sheet metal is in primer.' } });
+  for (const row of [print, sheet, label, screen, reference]) {
+    const { receipt } = await walk(db, { apply: true, single: true, imageIds: [row.structured_data.image_id] });
+    assert.deepEqual([receipt.eligible_claims, receipt.inserted, receipt.deferred], [0, 0, { picture_of_picture: 1 }], row.structured_data.scene_type);
+  }
+  const { receipt } = await walk(db, { apply: true, single: true, imageIds: [real.structured_data.image_id] });
+  assert.deepEqual([receipt.inserted, receipt.deferred], [3, {}], 'masking paper and sheet metal are not a print');
+  // the same pattern as the database's photo_reading_is_print: the narrative and the first component label only
+  assert.equal(readingIsPictureOfPicture({ narrative_one_line: 'Printed 4x6 picture of the dash.' }), true);
+  assert.equal(readingIsPictureOfPicture({ narrative_one_line: 'A dash.', components_seen: [{ label: 'Gauge' }, { label: 'printed sheet' }] }), false, 'a later component label is not read, as in the database');
+  assert.equal(readingIsPictureOfPicture({ narrative_one_line: 'A part number is printed on the tag.' }), false);
+  assert.equal(readingIsPictureOfPicture(null), false);
 });
 
 test('project-cached --single with imageIds: the current reading is chosen as the database chooses it', async () => {

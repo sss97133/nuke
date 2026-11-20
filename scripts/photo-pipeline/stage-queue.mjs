@@ -200,7 +200,9 @@ export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   if (code === 'review_projection_refused') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
   // the observation was not written: the ingest failed, or the database's own rule for this reader's tier refused the row
   // (guard_reviewed_image_analysis; the intake answers both the same way). The second repeats on every attempt and each
-  // attempt spends two reads, so an hour between attempts; the stage's max_attempts bounds the total.
+  // attempt spends two reads, so an hour between attempts. Nothing ends the retries for good (the gap finder offers a
+  // photo again a day after its last allowed attempt); what bounds the cost is the reader stopping the stage for the
+  // fire after REFUSAL_STREAK_STOP refusals in a row (deep-stage.mjs), and "intake_refusing" in the fire's summary.
   if (code === 'review_observation_not_persisted') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
   // the contract refused this answer: another reading of the photo can be valid
   if (/^invalid_review_/.test(code) || code === 'review_too_large') {
