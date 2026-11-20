@@ -575,6 +575,7 @@ drop function if exists public.image_stage_photo_levels(uuid, uuid);
 drop function if exists public.enqueue_image_stage_work(uuid[], text);
 drop function if exists public.image_stage_backfill_cap_left(text);
 drop function if exists public.image_stage_keyed_child_exists(uuid, uuid);
+drop function if exists public.image_stage_reading_is_thin(text);
 drop function if exists public.image_stage_reading_parent(uuid, uuid, uuid);
 drop function if exists public.image_stage_stage_room(text);
 drop function if exists public.image_stage_reading_observation_id(jsonb);

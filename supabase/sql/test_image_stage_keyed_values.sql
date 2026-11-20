@@ -79,7 +79,7 @@ INSERT INTO public.photo_pipeline_provider_state(provider) VALUES ('classifier')
 -- production shapes of the observation tables the projection and the levels read (columns used, no more)
 CREATE TABLE public.observation_properties (id uuid PRIMARY KEY, property_key text);
 CREATE TABLE public.vehicle_observations (id uuid PRIMARY KEY, vehicle_id uuid, kind text, extraction_method text, structured_data jsonb,
-  is_superseded boolean DEFAULT false, descriptor_id uuid, property_id uuid, observed_at timestamptz, ingested_at timestamptz DEFAULT now());
+  is_superseded boolean DEFAULT false, descriptor_id uuid, property_id uuid, observed_at timestamptz, ingested_at timestamptz DEFAULT now(), agent_tier text);
 CREATE INDEX idx_vobs_image_id_analysis ON public.vehicle_observations (((structured_data ->> 'image_id')), ((structured_data ->> 'analysis_kind')))
   WHERE ((structured_data ->> 'image_id') IS NOT NULL);
 CREATE TABLE public.observation_witnesses (observation_id uuid REFERENCES public.vehicle_observations(id), image_id uuid, witness_role text);
@@ -808,6 +808,73 @@ UPDATE platform_config SET config_value = config_value || '{"enabled": true}' WH
 DELETE FROM image_stage_work;
 SELECT pg_temp.ok(has_function_privilege('service_role', 'public.assay_photo_reading_flow(boolean)', 'execute') AND NOT has_function_privilege('anon', 'public.assay_photo_reading_flow(boolean)', 'execute'), 'the assay''s grants are as they were');
 
+-- ===== 9b. reading tiers: a thin-tier (automatic) reading is closed by a receipt, a reviewed-tier reading by existing
+-- 20261120140000 lists the tiers in platform_config 'image_reading_tiers'. This migration stands alone: with no such row only the
+-- reader's own literal tier, 'subscription automatic', is thin; with the row, every tier it does not list is thin.
+DELETE FROM image_stage_work; DELETE FROM image_stage_receipts; DELETE FROM public.observation_witnesses; DELETE FROM public.vehicle_observations;
+DELETE FROM public.image_observations; DELETE FROM public.vehicle_images;
+SELECT pg_temp.scope('{"enabled": true, "user_ids": ["00000000-0000-4000-8000-0000000000a1"], "vehicle_ids": ["00000000-0000-4000-8000-0000000000b1"]}');
+-- a reading with its stamp and observation, by tier (the stamp and the observation carry the tier the intake wrote)
+CREATE FUNCTION pg_temp.tiered(n int, tier text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_temp.mk(n, meta => jsonb_set(pg_temp.reading(n), '{byok_deep_analysis,agent_tier}', to_jsonb(tier)));
+  INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, agent_tier)
+  VALUES (pg_temp.obs(n), pg_temp.v1(), 'condition', jsonb_build_object('analysis_kind', 'image_deep_byok', 'image_id', pg_temp.img(n)), tier);
+END $$;
+SELECT pg_temp.tiered(401, 'subscription automatic');          -- thin
+SELECT pg_temp.tiered(402, 'caller-byok subscription');        -- reviewed
+SELECT pg_temp.tiered(403, 'a tier nobody listed');            -- unlisted
+SELECT pg_temp.mk(404, meta => pg_temp.reading(404)); SELECT pg_temp.parent(404);   -- no tier at all: a legacy reading
+SELECT pg_temp.mk(405, meta => jsonb_set(pg_temp.reading(405), '{byok_deep_analysis,agent_tier}', '"subscription automatic"'));   -- a thin stamp, no observation
+SELECT pg_temp.mk(406, meta => '{"classification":{"image_type":"exterior","confidence":0.9,"classifier_ok":true},"byok_deep_analysis":{"scene_type":"exterior"}}');  -- a legacy stamp, no observation
+SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM platform_config WHERE config_key = 'image_reading_tiers'), 'no tier row in this fixture: the migration stands alone');
+SELECT pg_temp.ok(pg_temp.has_gap(401, 'deep_reading') AND NOT pg_temp.has_gap(402, 'deep_reading') AND NOT pg_temp.has_gap(403, 'deep_reading')
+  AND NOT pg_temp.has_gap(404, 'deep_reading') AND pg_temp.has_gap(405, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading'),
+  'no tier row: only the literal automatic tier is thin (a thin reading with no receipt is a gap, whatever else is not)');
+SELECT pg_temp.ok(image_stage_reading_is_thin('subscription automatic') AND NOT image_stage_reading_is_thin('caller-byok subscription')
+  AND NOT image_stage_reading_is_thin(NULL) AND NOT image_stage_reading_is_thin(''), 'the stage helper: literal fallback, no tier = reviewed');
+INSERT INTO platform_config (config_key, config_value) VALUES ('image_reading_tiers', '{"reviewed_tiers": ["caller-byok subscription"], "automatic": {"tier": "subscription automatic"}}');
+SELECT pg_temp.ok(pg_temp.has_gap(401, 'deep_reading') AND NOT pg_temp.has_gap(402, 'deep_reading') AND pg_temp.has_gap(403, 'deep_reading')
+  AND NOT pg_temp.has_gap(404, 'deep_reading') AND pg_temp.has_gap(405, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading'),
+  'with the tier row: a listed tier is reviewed, every other tier is thin, no tier at all is a legacy reading and reviewed');
+-- keyed_values keeps its rule: the parent is the current reading, whatever its tier
+SELECT pg_temp.ok(pg_temp.has_gap(401, 'keyed_values') AND pg_temp.has_gap(402, 'keyed_values') AND pg_temp.has_gap(403, 'keyed_values'),
+  'keyed_values: a current reading of any tier is a parent');
+-- levels follow the gap finder
+SELECT pg_temp.ok((SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(401)) = 'unqueued'
+  AND (SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(402)) = 'done'
+  AND (SELECT deep_read FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(401)),
+  'levels: a thin reading is a reading (deep_read) but not done for the stage; a reviewed one is done');
+-- a succeeded deep_reading receipt at the stage's version closes a thin reading
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome) VALUES
+  (pg_temp.img(401), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'succeeded'), (pg_temp.img(402), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'succeeded'),
+  (pg_temp.img(403), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'succeeded'), (pg_temp.img(405), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'succeeded');
+SELECT pg_temp.ok(NOT pg_temp.has_gap(401, 'deep_reading') AND NOT pg_temp.has_gap(402, 'deep_reading') AND NOT pg_temp.has_gap(403, 'deep_reading')
+  AND NOT pg_temp.has_gap(405, 'deep_reading'), 'a succeeded receipt at the current version closes a thin reading');
+SELECT pg_temp.ok((SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(401)) = 'done', 'levels: done with the receipt');
+-- raising the stage's version offers every thin-read photo again and none of the reviewed ones
+UPDATE image_pipeline_stages SET required_version = 2 WHERE stage = 'deep_reading';
+SELECT pg_temp.ok(pg_temp.has_gap(401, 'deep_reading') AND pg_temp.has_gap(403, 'deep_reading') AND pg_temp.has_gap(405, 'deep_reading')
+  AND NOT pg_temp.has_gap(402, 'deep_reading') AND NOT pg_temp.has_gap(404, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading'),
+  'raising the stage version: thin-read photos are offered again, reviewed ones are not');
+SELECT pg_temp.ok((SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(401)) = 'unqueued'
+  AND (SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(402)) = 'done', 'levels: the same after the raise');
+SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(401)]) WHERE stage = 'deep_reading') = 'outdated', 'the reason is outdated');
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome) VALUES (pg_temp.img(401), 'deep_reading', 'photo-pipeline-orchestrator', 2, 'succeeded');
+SELECT pg_temp.ok(NOT pg_temp.has_gap(401, 'deep_reading') AND pg_temp.has_gap(403, 'deep_reading'), 'a receipt at the new version closes it again');
+UPDATE image_pipeline_stages SET required_version = 1 WHERE stage = 'deep_reading';
+-- policy_skip reasons: detail.skipped first, then detail.reason
+SELECT pg_temp.mk(410); SELECT pg_temp.mk(411); SELECT pg_temp.mk(412); SELECT pg_temp.mk(413);
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, detail) VALUES
+  (pg_temp.img(410), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'policy_skip', '{"skipped":"already_read"}'),
+  (pg_temp.img(411), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'policy_skip', '{"reason":"not_a_vehicle_photo"}'),
+  (pg_temp.img(412), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'policy_skip', '{"skipped":"already_read","reason":"other"}'),
+  (pg_temp.img(413), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'policy_skip', '{}');
+SELECT pg_temp.ok((SELECT array_agg(deep_detail ORDER BY image_id) FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id IN (SELECT pg_temp.img(n) FROM generate_series(410, 413) n))
+  = ARRAY['already_read', 'not_a_vehicle_photo', 'already_read', 'unspecified'], 'levels read a policy_skip reason from detail.skipped first, then detail.reason');
+DELETE FROM image_stage_work; DELETE FROM image_stage_receipts; DELETE FROM public.observation_witnesses; DELETE FROM public.vehicle_observations;
+DELETE FROM public.vehicle_images; DELETE FROM platform_config WHERE config_key = 'image_reading_tiers';
+
 -- ===== 10. a replay changes nothing, and keeps a scope someone has switched on
 UPDATE platform_config SET config_value = config_value || '{"enabled": true}' WHERE config_key = 'image_stage_deep_reading';
 UPDATE image_pipeline_stages SET backfill_daily_cap = 99 WHERE stage = 'deep_reading';
@@ -831,7 +898,8 @@ SELECT pg_temp.ok((SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.image_sta
   'revert: all eight replaced functions are the bodies production held');
 SELECT pg_temp.ok(to_regprocedure('public.enqueue_image_stage_work(uuid[],text)') IS NULL AND to_regprocedure('public.image_stage_levels(uuid)') IS NULL
   AND to_regprocedure('public.image_stage_photo_levels(uuid,uuid)') IS NULL AND to_regprocedure('public.image_stage_scope_ok(jsonb,uuid,uuid)') IS NULL
-  AND to_regprocedure('public.image_stage_backfill_cap_left(text)') IS NULL AND to_regprocedure('public.image_stage_keyed_child_exists(uuid,uuid)') IS NULL,
+  AND to_regprocedure('public.image_stage_backfill_cap_left(text)') IS NULL AND to_regprocedure('public.image_stage_keyed_child_exists(uuid,uuid)') IS NULL
+  AND to_regprocedure('public.image_stage_reading_is_thin(text)') IS NULL,
   'revert: the new functions are gone');
 SELECT pg_temp.ok((SELECT count(*) FROM image_pipeline_stages) = 4 AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'image_pipeline_stages' AND column_name = 'backfill_daily_cap')
   AND NOT EXISTS (SELECT 1 FROM platform_config WHERE config_key = 'image_stage_deep_reading')

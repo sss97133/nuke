@@ -17,8 +17,10 @@
 --    gap, so work for a stage that is not required is dropped at claim. The canary is bounded by the scope row.
 --    New column backfill_daily_cap (null = none; deep_reading 150).
 -- 2. image_stage_gaps: the two applies_when values, the shared eligibility (image_stage_photo_block), the scope
---    (image_stage_scope_ok), and what satisfies a stage without a receipt: a deep reading (byok_deep_analysis with a
---    scene_type) satisfies deep_reading and is never read again; a current projected child for the photo's current
+--    (image_stage_scope_ok), and what satisfies a stage without a receipt: a deep reading of a reviewed tier
+--    (byok_deep_analysis with a scene_type) satisfies deep_reading outright; a thin-tier (automatic) reading goes through the
+--    receipt logic (image_stage_reading_is_thin; the tiers are listed by 20261120140000) so raising the stage's version offers
+--    it again; a current projected child for the photo's current
 --    reading satisfies keyed_values (looked up in vehicle_observations by the existing idx_vobs_image_id_analysis). A
 --    keyed_values receipt older than the current reading's parent observation does not close the stage for it.
 -- 3. enqueue_image_stage_work(uuid[], text): work is created by the event that makes it due. Called from
@@ -45,7 +47,7 @@ do $guard$
 declare r record;
 begin
   for r in select * from (values
-      ('public.image_stage_gaps(uuid[])', '2190aee1bc568d23a95dcf5f4fd76687', '0b274def78845eb62bddba4c501888b0'),
+      ('public.image_stage_gaps(uuid[])', '2190aee1bc568d23a95dcf5f4fd76687', '6d2369e5a0d39198b1c4f7a750781ecb'),
       ('public.image_stage_legacy_evidence(text,jsonb,jsonb,text)', '0ff666f6cc4fc8611737cf73e9c37b29', 'fbba96e6a73479b341a067bd8b59fbd9'),
       ('public.image_stage_legacy_version(text,jsonb)', 'f21e15d0a93aad124a1d078de9e8a053', '14983fe5d168ca3606b4907c47de9da1'),
       ('public.photo_land_trigger()', '307261071b2aa3fef7a83297d63a9638', 'bdb3b709bfdee1138fe76e68457a8650'),
@@ -77,7 +79,7 @@ comment on column public.image_pipeline_stages.backfill_daily_cap is
 
 insert into public.image_pipeline_stages (stage, producer, required_version, required, applies_when, max_attempts, backfill_daily_cap, description) values
   ('deep_reading', 'photo-pipeline-orchestrator', 1, true, 'filed_for_reading', 6, 150,
-   'Deep reading of one filed, approved, first-read photo: scene, components and state_observations, stamped as ai_scan_metadata.byok_deep_analysis by the reviewed-analysis intake. Satisfied by a reading that carries a scene_type, whoever made it. In scope only per platform_config image_stage_deep_reading.'),
+   'Deep reading of one filed, approved, first-read photo: scene, components and state_observations, stamped as ai_scan_metadata.byok_deep_analysis by the reviewed-analysis intake. Satisfied outright by a reading of a reviewed tier that carries a scene_type; a thin-tier (automatic) reading satisfies it only through a succeeded receipt at the stage''s version, so raising the version offers it again. In scope only per platform_config image_stage_deep_reading.'),
   ('keyed_values', 'ingest-observation-batch', 1, true, 'deep_reading_landed', 6, NULL,
    'Keyed values for a photo whose deep reading landed: the reading''s rust, paint and assembly state projected as registered properties with the photo as witness. Satisfied by a current projected child for the photo''s current reading; closed with a policy_skip receipt naming the projection''s deferral reason when the reading yields none.')
 on conflict (stage) do update set producer = excluded.producer, required_version = excluded.required_version,
@@ -158,6 +160,21 @@ returns boolean language sql stable as $$
        and o.structured_data ->> 'analysis_kind' = 'image_property_projection'
        and o.is_superseded is not true
        and o.structured_data ->> 'source_observation_id' = p_observation_id::text) $$;
+
+-- Is a reading's tier thin? (A thin reading is an automatic one: it satisfies deep_reading only through a stage receipt, so a raise of
+-- the stage's version offers it again; a reviewed-tier reading satisfies the stage outright.) The tiers are listed in platform_config
+-- 'image_reading_tiers' (config_value.reviewed_tiers, inserted by 20261120140000); a tier that is not listed is thin. No tier at all =
+-- a legacy reading = reviewed. This migration must stand alone, so while that row is missing (or has no reviewed_tiers array) only the
+-- reader's own literal tier, 'subscription automatic', is thin: no reviewed reading is ever re-offered because a config row is absent.
+-- Own function, dropped by this migration's own revert; the intake's guard uses its own, stricter, helper (20261120140000).
+create or replace function public.image_stage_reading_is_thin(p_tier text)
+returns boolean language sql stable set search_path to 'public', 'pg_temp' as $$
+  select case when coalesce(p_tier, '') = '' then false
+              else coalesce((select case when jsonb_typeof(c.config_value -> 'reviewed_tiers') = 'array'
+                                         then not (c.config_value -> 'reviewed_tiers' ? p_tier)
+                                         else p_tier = 'subscription automatic' end
+                               from public.platform_config c where c.config_key = 'image_reading_tiers'),
+                            p_tier = 'subscription automatic') end $$;
 
 -- What is left of a stage's backfill cap today (America/Los_Angeles); null when the stage has none.
 create or replace function public.image_stage_backfill_cap_left(p_stage text)
@@ -257,6 +274,12 @@ AS $function$
   -- the reading the photo holds, as an observation (only looked up for the two reading stages)
   left join lateral (select p.id, p.ingested_at from public.image_stage_reading_parent(v.id, v.vehicle_id, public.image_stage_reading_observation_id(v.ai_scan_metadata)) p
                       where s.applies_when in ('filed_for_reading', 'deep_reading_landed')) kp on true
+  -- What the reading is and who made it (reading tiers, 20261120140000): a reading satisfies deep_reading outright only when it is
+  -- not thin tier. rd.le = a reading exists (the stamp); rd.thin = its tier is thin (the observation's agent_tier, else the stamp's;
+  -- no tier at all = a legacy reading = reviewed). ev = the stamp as evidence for this stage, a thin reading not counting for deep_reading.
+  left join lateral (select public.image_stage_legacy_evidence(s.stage, v.ai_scan_metadata, v.exif_data, s.contract) as le,
+                            case when s.applies_when = 'filed_for_reading' then public.image_stage_reading_is_thin(
+                              coalesce((select o.agent_tier from public.vehicle_observations o where o.id = kp.id), v.ai_scan_metadata #>> '{byok_deep_analysis,agent_tier}')) else false end as thin) rd on true
   -- the newest receipt of this stage whatever its outcome (image_stage_current prefers a closing one)
   left join lateral (select r.outcome, r.observed_at, r.retry_after, r.attempt from public.image_stage_receipts r
                       where s.applies_when = 'deep_reading_landed' and r.image_id = v.id and r.stage = s.stage and r.producer_version >= s.required_version
@@ -269,14 +292,16 @@ AS $function$
                    v.is_sensitive, v.is_duplicate, v.is_superseded, v.is_external, v.image_url, v.ai_processing_status) is null
              and public.image_stage_scope_ok((select pc.config_value from public.platform_config pc where pc.config_key = 'image_stage_deep_reading'), v.user_id, v.vehicle_id)
              and (s.applies_when = 'filed_for_reading' or kp.id is not null)))
-    -- satisfied without a receipt: a deep reading exists (a stamp with a scene_type, or the reading's own observation, whatever any
-    -- receipt says), or a projected child exists for the current reading
-    and not (s.applies_when = 'filed_for_reading' and (kp.id is not null or public.image_stage_legacy_evidence(s.stage, v.ai_scan_metadata, v.exif_data, s.contract)))
+    -- satisfied without a receipt: a deep reading of a reviewed tier exists (a stamp with a scene_type, or the reading's own
+    -- observation, whatever any receipt says), or a projected child exists for the current reading. A thin-tier reading is not
+    -- that: it goes through the receipt logic below (a succeeded receipt at the stage's version closes it; raising the version
+    -- offers it again)
+    and not (s.applies_when = 'filed_for_reading' and (kp.id is not null or rd.le) and not rd.thin)
     and not (s.applies_when = 'deep_reading_landed' and public.image_stage_keyed_child_exists(v.id, kp.id))
     and (
-      (c.image_id is null and (not public.image_stage_legacy_evidence(s.stage, v.ai_scan_metadata, v.exif_data, s.contract)
+      (c.image_id is null and (not (rd.le and not rd.thin)
                                or public.image_stage_legacy_unavailable(v.ai_scan_metadata, s.legacy_unavailable_key)))
-      or (c.producer_version < s.required_version and not public.image_stage_legacy_evidence(s.stage, v.ai_scan_metadata, v.exif_data, s.contract))
+      or (c.producer_version < s.required_version and not (rd.le and not rd.thin))
       or (c.producer_version >= s.required_version and c.outcome in ('unavailable', 'rate_limited')
           and c.retry_after <= now()
           and (c.attempt < s.max_attempts or c.observed_at < now() - interval '1 day'))
@@ -599,6 +624,7 @@ language sql stable set search_path to '' as $$
            v.vision_gate_status::text as gate, v.image_vehicle_match_status as match_status,
            public.image_stage_legacy_evidence('deep_reading', v.ai_scan_metadata, null, null) as has_reading,
            public.image_stage_reading_observation_id(v.ai_scan_metadata) as stamp_obs,
+           v.ai_scan_metadata #>> '{byok_deep_analysis,agent_tier}' as stamp_tier,
            public.image_stage_photo_block(v.vehicle_id, v.vision_gate_status::text, v.is_document, v.doc_flag, v.image_vehicle_match_status,
                                           v.is_sensitive, v.is_duplicate, v.is_superseded, v.is_external, v.image_url, v.ai_processing_status) as block
       from public.vehicle_images v
@@ -609,6 +635,7 @@ language sql stable set search_path to '' as $$
            v.vision_gate_status::text, v.image_vehicle_match_status,
            public.image_stage_legacy_evidence('deep_reading', v.ai_scan_metadata, null, null),
            public.image_stage_reading_observation_id(v.ai_scan_metadata),
+           v.ai_scan_metadata #>> '{byok_deep_analysis,agent_tier}',
            public.image_stage_photo_block(v.vehicle_id, v.vision_gate_status::text, v.is_document, v.doc_flag, v.image_vehicle_match_status,
                                           v.is_sensitive, v.is_duplicate, v.is_superseded, v.is_external, v.image_url, v.ai_processing_status)
       from public.vehicle_images v
@@ -619,6 +646,7 @@ language sql stable set search_path to '' as $$
            v.vision_gate_status::text, v.image_vehicle_match_status,
            public.image_stage_legacy_evidence('deep_reading', v.ai_scan_metadata, null, null),
            public.image_stage_reading_observation_id(v.ai_scan_metadata),
+           v.ai_scan_metadata #>> '{byok_deep_analysis,agent_tier}',
            public.image_stage_photo_block(v.vehicle_id, v.vision_gate_status::text, v.is_document, v.doc_flag, v.image_vehicle_match_status,
                                           v.is_sensitive, v.is_duplicate, v.is_superseded, v.is_external, v.image_url, v.ai_processing_status)
       from public.vehicle_images v
@@ -636,7 +664,9 @@ language sql stable set search_path to '' as $$
      group by ow.image_id
   ), raw as (
     select j.*, kv.n as kv_n, kv.first_at as kv_first_at, par.id as par_id, par.ingested_at as par_at,
-           rd.outcome as rd_outcome, rd.error_class as rd_error, rd.detail as rd_detail,
+           (select o.agent_tier from public.vehicle_observations o where o.id = par.id) as par_tier,
+           rd.outcome as rd_outcome, rd.error_class as rd_error, rd.detail as rd_detail, rd.producer_version as rd_ver,
+           (select s2.required_version from public.image_pipeline_stages s2 where s2.stage = 'deep_reading') as deep_req,
            kr.outcome as kr_outcome, kr.error_class as kr_error, kr.detail as kr_detail, kr.observed_at as kr_at,
            klr.outcome as klr_outcome, klr.error_class as klr_error, klr.observed_at as klr_at,
            dopen.status as dopen_status, dopen.created_at as dopen_at, kopen.status as kopen_status, kopen.created_at as kopen_at, dw.first_at as dw_at,
@@ -646,7 +676,7 @@ language sql stable set search_path to '' as $$
       from base j
       left join kv on kv.image_id = j.id
       left join lateral (select p.id, p.ingested_at from public.image_stage_reading_parent(j.id, j.vehicle_id, j.stamp_obs) p where j.block is null) par on true
-      left join lateral (select r.outcome, r.error_class, r.detail from public.image_stage_receipts r
+      left join lateral (select r.outcome, r.error_class, r.detail, r.producer_version from public.image_stage_receipts r
                           where r.image_id = j.id and r.stage = 'deep_reading'
                           order by r.producer_version desc, (r.outcome in ('succeeded', 'policy_skip')) desc, r.attempt desc limit 1) rd on true
       left join lateral (select r.outcome, r.error_class, r.detail, r.observed_at from public.image_stage_receipts r
@@ -666,7 +696,12 @@ language sql stable set search_path to '' as $$
     -- the receipt that speaks for the current reading: a closing keyed_values receipt older than the reading's observation
     -- was written for an earlier reading, so the newest receipt answers instead (as the gap finder reads it)
     select r.*, (r.kr_outcome in ('succeeded', 'policy_skip') and r.par_at > r.kr_at) as kr_stale,
-           (r.has_reading or r.par_id is not null) as deep_read_z
+           (r.has_reading or r.par_id is not null) as deep_read_z,
+           -- a thin-tier (automatic) reading is done for deep_reading only through a closing receipt at the stage's version, as the
+           -- gap finder reads it (image_stage_reading_is_thin; a reading with no tier at all is a legacy one, reviewed)
+           ((r.has_reading or r.par_id is not null)
+            and public.image_stage_reading_is_thin(coalesce(r.par_tier, r.stamp_tier))
+            and not (r.rd_outcome in ('succeeded', 'policy_skip') and r.rd_ver >= r.deep_req)) as thin_open
       from raw r
   )
   select j.id, j.vehicle_id, j.created_at,
@@ -690,20 +725,22 @@ language sql stable set search_path to '' as $$
          j.par_id,
          j.block,
          j.scope_ok,
-         case when j.deep_read_z then 'done'
+         case when j.deep_read_z and not j.thin_open then 'done'
               when j.block is not null or j.user_id is null then 'not_eligible'
               when not j.scope_ok then 'out_of_scope'
               when j.dopen_status is not null then j.dopen_status
+              when j.thin_open and j.rd_outcome in ('succeeded', 'policy_skip') and j.rd_ver < j.deep_req then 'unqueued'
               when j.rd_outcome = 'policy_skip' then 'closed_no_value'
               when j.rd_outcome = 'succeeded' then 'receipt_without_result'
               when j.rd_outcome in ('blocked_input', 'failed') then 'given_up'
               when j.rd_outcome is not null then 'retrying'
               else 'unqueued' end,
-         case when j.deep_read_z then null
+         case when j.deep_read_z and not j.thin_open then null
               when j.block is not null then j.block
               when j.user_id is null then 'no_owner'
               when not j.scope_ok or j.dopen_status is not null then null
-              when j.rd_outcome = 'policy_skip' then coalesce(j.rd_detail ->> 'reason', 'unspecified')
+              when j.thin_open and j.rd_outcome in ('succeeded', 'policy_skip') and j.rd_ver < j.deep_req then null
+              when j.rd_outcome = 'policy_skip' then coalesce(j.rd_detail ->> 'skipped', j.rd_detail ->> 'reason', 'unspecified')
               when j.rd_outcome is not null then coalesce(j.rd_error, 'unspecified') end,
          case when j.child then 'done'
               when j.block is not null then case when j.deep_read_z then 'not_eligible' else 'no_reading' end
@@ -722,7 +759,7 @@ language sql stable set search_path to '' as $$
               when j.par_id is null then null
               when j.user_id is null then 'no_owner'
               when not j.scope_ok or j.kopen_status is not null then null
-              when j.kr_outcome = 'policy_skip' and not j.kr_stale then coalesce(j.kr_detail ->> 'reason', 'unspecified')
+              when j.kr_outcome = 'policy_skip' and not j.kr_stale then coalesce(j.kr_detail ->> 'skipped', j.kr_detail ->> 'reason', 'unspecified')
               when j.kr_stale then case when j.klr_at >= j.par_at then coalesce(j.klr_error, 'unspecified') end
               when j.kr_outcome is not null then coalesce(j.kr_error, 'unspecified') end
     from st j
@@ -1179,6 +1216,7 @@ revoke all on function public.image_stage_reading_observation_id(jsonb) from pub
 revoke all on function public.image_stage_reading_parent(uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.image_stage_stage_room(text) from public, anon, authenticated;
 revoke all on function public.image_stage_keyed_child_exists(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.image_stage_reading_is_thin(text) from public, anon, authenticated;
 revoke all on function public.image_stage_photo_levels(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.image_stage_level_counts(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.image_stage_levels_json(uuid) from public, anon, authenticated;
@@ -1187,6 +1225,7 @@ grant execute on function public.enqueue_image_stage_work(uuid[], text), public.
   public.image_stage_photo_block(uuid, text, boolean, boolean, text, boolean, boolean, boolean, boolean, text, text),
   public.image_stage_scope_ok(jsonb, uuid, uuid), public.image_stage_reading_observation_id(jsonb),
   public.image_stage_reading_parent(uuid, uuid, uuid), public.image_stage_stage_room(text), public.image_stage_keyed_child_exists(uuid, uuid),
+  public.image_stage_reading_is_thin(text),
   public.image_stage_photo_levels(uuid, uuid), public.image_stage_level_counts(uuid, uuid), public.image_stage_levels_json(uuid),
   public.image_stage_levels(uuid) to service_role;
 grant execute on function public.image_stage_levels(uuid) to authenticated;
