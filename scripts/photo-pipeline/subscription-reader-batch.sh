@@ -37,7 +37,10 @@ run_reader() { # name script args...
   local started_s; started_s=$(date +%s)
   local summary
   # the reader's own exit status, not tail's: a reader that crashed must not look like one that reported
-  summary="$(cd "$HOME/nuke" && dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
+  # READER_PATH_FIRST: a directory searched ahead of the rest of PATH for this reader only. On 2026-11-20 /usr/local/bin/claude
+  # (2.1.20, no --safe-mode) shadowed ~/.local/bin/claude (2.1.329); the frame reader's lean calls need the newer one, and the
+  # reader falls back to its old call when the CLI it finds cannot take them.
+  summary="$(cd "$HOME/nuke" && PATH="${READER_PATH_FIRST:+$READER_PATH_FIRST:}$PATH" dotenvx run -q -f "$ENV_FILE" -- node "$@" --owner "$OWNER" --out "$out" 2>>"$LOGDIR/subscription-reader.log" | tail -1; exit "${PIPESTATUS[0]}")"
   local rc=$?
   echo "$STAMP $name exit=$rc ${summary:-no summary}"
   # 4. heartbeat: record_reader_heartbeat (service role only) upserts one job_assay_readings row per reader; the cron job
@@ -54,4 +57,4 @@ run_reader() { # name script args...
 
 # 2. documents, then 3. frames (failed first, then pending)
 run_reader subscription-document-reader "$MAIN/scripts/photo-pipeline/subscription-document-reader.mjs" --limit "$DOCS_LIMIT" --concurrency 2
-run_reader subscription-frame-classifier "$MAIN/scripts/photo-pipeline/subscription-frame-classifier.mjs" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending --deep-limit "$DEEP_LIMIT" --keyed-limit "$KEYED_LIMIT"
+READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-frame-classifier "$MAIN/scripts/photo-pipeline/subscription-frame-classifier.mjs" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending --deep-limit "$DEEP_LIMIT" --keyed-limit "$KEYED_LIMIT"

@@ -218,6 +218,8 @@ export function receiptForKeyedResult(result, { reader, promptVersion } = {}) {
   // the photo already carries every value its reading yields (landed by hand, or by an earlier fire whose receipt was lost)
   if (counts.already_projected > 0) return { outcome: 'succeeded', detail: { ...detail, ...counts, values: counts.already_projected, already_there: true, deferred } };
   if (!p.source_rows) return { outcome: 'unavailable', error_class: 'reading_not_found', retry_after_seconds: 900, detail: { ...detail, ...counts } };
+  // a check that could not be asked is not a decision about the photo: try again
+  if (deferred.privacy_check_unavailable > 0) return { outcome: 'unavailable', error_class: 'privacy_check_unavailable', retry_after_seconds: 900, detail: { ...detail, ...counts, deferred } };
   // nothing is written for this photo, and the projection said why (its own words, most frequent first)
   const why = Object.entries(deferred).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] ?? 'nothing_to_project';
   return { outcome: 'policy_skip', detail: { ...detail, ...counts, skipped: why, deferred } };

@@ -279,17 +279,23 @@ test('a dry run does everything but the post, may read a photo that already hold
 
 // --- keyed values ---------------------------------------------------------------------------------------------------
 
-test('keyed values call the sanctioned projection for exactly this photo and map its receipt', async () => {
-  // a database with no reading for the photo: the projection runs, finds nothing, the receipt says so (retryable)
+test('keyed values call the sanctioned projection for exactly this photo\'s current reading and map its receipt', async () => {
+  // the photo points at a reading the database no longer returns: the projection runs, finds nothing, the receipt says so (retryable)
+  const OBS = '30000000-0000-4000-8000-000000000009';
   const queries = [];
   const builder = (table) => { const b = { select: () => b, eq: (k, v) => { queries.push([table, 'eq', k, v]); return b; }, lt: () => b, in: (k, v) => { queries.push([table, 'in', k, v]); return b; },
-    or: () => b, order: () => b, limit: () => b, abortSignal: () => b, then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; };
+    or: () => b, order: () => b, limit: () => b, abortSignal: () => b,
+    then: (res, rej) => Promise.resolve({ data: table === 'vehicle_images' ? [{ id: IMAGE, current_observation_id: OBS }] : [], error: null }).then(res, rej) }; return b; };
   const r = await keyedValuesForFrame({ id: IMAGE, vehicle_id: VEHICLE }, { sb: { from: builder }, reader: 'r' });
-  assert.deepEqual(queries.filter((q) => q[2] === 'structured_data->>image_id'), [['vehicle_observations', 'in', 'structured_data->>image_id', [IMAGE]]]);
+  assert.ok(queries.some((q) => q[0] === 'vehicle_images' && q[1] === 'in' && q[2] === 'id' && q[3][0] === IMAGE), 'the photo says which reading is current');
+  assert.deepEqual(queries.filter((q) => q[0] === 'vehicle_observations' && q[1] === 'in'), [['vehicle_observations', 'in', 'id', [OBS]]], 'and only that reading is read');
   assert.ok(queries.some((q) => q[2] === 'vehicle_id' && q[3] === VEHICLE));
-  assert.ok(queries.some((q) => q[2] === 'is_superseded' && q[3] === false), 'only the current reading');
+  assert.ok(queries.some((q) => q[2] === 'is_superseded' && q[3] === false));
   assert.deepEqual([r.receipt.outcome, r.receipt.error_class], ['unavailable', 'reading_not_found']);
   assert.equal(r.projection.model_calls, 0);
+  // a photo that carries no reading: nothing is walked
+  const none = await keyedValuesForFrame({ id: IMAGE, vehicle_id: VEHICLE }, { sb: { from: (t) => ({ select: () => ({ in: () => ({ abortSignal: async () => ({ data: [{ id: IMAGE, current_observation_id: null }], error: null }) }) }) }) }, reader: 'r' });
+  assert.deepEqual([none.receipt.error_class, none.projection.source_rows, none.projection.pages_walked], ['reading_not_found', 0, 0]);
   // the projection could not even read: retried later, never thrown at the fire
   const down = await keyedValuesForFrame({ id: IMAGE, vehicle_id: VEHICLE }, { sb: { from: () => { throw new Error('boom'); } }, reader: 'r' });
   assert.deepEqual([down.receipt.outcome, down.receipt.error_class], ['unavailable', 'projection_error']);

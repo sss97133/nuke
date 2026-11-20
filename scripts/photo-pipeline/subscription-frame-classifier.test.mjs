@@ -20,6 +20,8 @@ const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
 
 // `claude -p --output-format json`: the prompt arrives on stdin and names the image file; the file name picks the answer.
 const FAKE_CLAUDE = `#!${process.execPath}
+if (process.argv.includes('--help')) { console.log(process.env.FAKE_CLAUDE_OLD ? 'Usage: claude [options]\\n  --model <model>' : 'Usage: claude [options]\\n  --safe-mode\\n  --json-schema <schema>'); process.exit(0); }
+if (process.argv.includes('--safe-mode') && process.env.FAKE_CLAUDE_OLD) { console.error("error: unknown option '--safe-mode'"); process.exit(1); }
 let input = '';
 process.getBuiltinModule('node:fs').appendFileSync(process.getBuiltinModule('node:path').join(process.env.HOME, 'claude-args.jsonl'), JSON.stringify(process.argv.slice(2)) + '\\n');
 process.stdin.on('data', (d) => { input += d; });
@@ -47,7 +49,7 @@ const FAKE_SUPABASE_JS = `exports.createClient = () => ({
     then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; },
 });`;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, extraArgs = [], supabaseJs = false, failClaims = [] } = {}) {
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, extraArgs = [], supabaseJs = false, failClaims = [], oldCli = false } = {}) {
   const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [] };
   let port;
   const server = createServer((req, res) => {
@@ -105,7 +107,7 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
       cwd: project,
       // PATH holds only the stand-ins (they run under this node by absolute path): a real `claude` or `sips` on the
       // machine, which can sit in node's own directory, is never reached
-      env: { PATH: bin, HOME: bin, SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key' },
+      env: { PATH: bin, HOME: bin, ...(oldCli ? { FAKE_CLAUDE_OLD: '1' } : {}), SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key' },
     }).then((r) => ({ code: 0, ...r }), (e) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));
     let summary = null; try { summary = JSON.parse(result.stdout.trim().split('\n').pop()); } catch { /* the run failed before its summary */ }
     let claudeArgs = []; try { claudeArgs = readFileSync(join(bin, 'claude-args.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { /* no CLI call */ }
@@ -279,4 +281,16 @@ test('the stages run only from the ledger: the status worklist has no stage', as
     assert.equal(calls.claims.length, 0);
     assert.equal('stages' in summary, false);
   }, { config: { enabled: false, user_ids: [] }, statusFrames: [] });
+});
+
+test('a CLI that cannot start lean keeps the first reads as they were and waits to deep-read', async () => {
+  await withStandIns(['a-ok.jpg'], ({ calls, summary, claudeArgs }) => {
+    assert.equal(summary.cli, 'legacy_no_safe_mode');
+    assert.equal(claudeArgs.length, 1);
+    assert.deepEqual(claudeArgs[0], ['-p', '--output-format', 'json', '--model', 'claude-sonnet-5-5', '--allowedTools', 'Read'], 'the call that has always worked, with the exact model id');
+    assert.equal(calls.receipts[0].p_outcome, 'succeeded');
+    assert.equal(summary.stages.deep_reading.skipped, 'cli_without_safe_mode');
+    assert.ok(!calls.claims.some((c) => c.p_stage === 'deep_reading'), 'no deep reading is claimed that cannot be read');
+    assert.ok(calls.claims.some((c) => c.p_stage === 'keyed_values'), 'keyed values need no model');
+  }, { oldCli: true });
 });

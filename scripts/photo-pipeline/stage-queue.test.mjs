@@ -221,6 +221,7 @@ test('keyed values: the number written, or the projection\'s own reason', () => 
     assert.deepEqual(of({ ...base, deferred: { [why]: 1 } }), ['policy_skip', why, 0], why);
   }
   assert.equal(of({ ...base, deferred: { a_reason: 1, receipt_document: 2 } })[1], 'receipt_document', 'the commonest reason');
+  assert.deepEqual(of({ ...base, deferred: { privacy_check_unavailable: 1 } }), ['unavailable', 'privacy_check_unavailable', 0], 'a check that could not be asked is retried, not closed');
   assert.deepEqual(of({ ...base, source_rows: 0 }), ['unavailable', 'reading_not_found', 0], 'the ledger says a reading landed but the projection found none');
   assert.deepEqual(of({ ...base, eligible_claims: 3, failed: 1, reason: 'batch_receipt_invalid' }), ['unavailable', 'projection_failed', 0]);
   assert.deepEqual(of({ ...base, eligible_claims: 3, inserted: 1, unattempted: 2, failed: 1, reason: 'run_budget_exhausted' }), ['unavailable', 'projection_failed', 1], 'a partial landing is retried; the rest is landed next time');

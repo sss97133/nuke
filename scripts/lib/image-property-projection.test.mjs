@@ -456,7 +456,7 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
       agent_model: 'made-up-model', agent_tier: null, extraction_method: 'made_up_reader_v1', confidence: 'medium', confidence_score: 0.8,
       structured_data: { analysis_kind: 'image_deep_byok', image_id: imageId,
         state_observations: { rust_severity: 'surface', paint_state: 'aged', completeness: 'assembled' }, ...data }, ...over };
-    db.rows.push(row); return row;
+    db.rows.push(row); db.images.get(imageId).current_observation_id = row.is_superseded ? null : row.id; return row;
   };
   const newestFirst = (a, b) => { const d = instantMicros(b.ingested_at) - instantMicros(a.ingested_at); return d > 0n ? 1 : d < 0n ? -1 : (a.id < b.id ? 1 : -1); };
   const builder = table => {
@@ -474,7 +474,7 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
       if (++db.calls.source === failSourceQueryAt) return { data: null, error: { message: 'made-up failure' } };
       const keep = row => row.vehicle_id === f.eq.vehicle_id && row.kind === f.eq.kind &&
         row.structured_data.analysis_kind === f.eq['structured_data->>analysis_kind'] &&
-        (!f.in || f.in[1].includes(row.structured_data.image_id)) && (f.eq.is_superseded === undefined || row.is_superseded === f.eq.is_superseded) &&
+        (!f.in || f.in[1].includes(row.id)) && (f.eq.is_superseded === undefined || row.is_superseded === f.eq.is_superseded) &&
         (f.lt ? instantMicros(row.ingested_at) < instantMicros(f.lt)
           : instantMicros(row.ingested_at) < instantMicros(f.or.at) || (instantMicros(row.ingested_at) === instantMicros(f.or.at) && row.id < f.or.id));
       return { data: db.rows.filter(keep).sort(newestFirst).slice(0, f.limit), error: null };
@@ -692,4 +692,21 @@ test('project-cached --single with imageIds: only the named photos, through the 
   for (const bad of [[], ['not-a-uuid'], Array(101).fill(one.structured_data.image_id)]) {
     await assert.rejects(walk(db, { imageIds: bad }), /imageIds must be 1\.\.100 uuids/);
   }
+});
+
+test('project-cached --single with imageIds: only the reading the photo points at, never a second unsuperseded one', async () => {
+  const db = standIn();
+  const landed = db.reading(at(1));
+  const imageId = landed.structured_data.image_id;
+  // a retried intake left a second, unsuperseded reading of the same photo that the photo does not point at
+  db.rows.push({ ...landed, id: 'dddddddd-0000-4000-8000-0000000000aa', ingested_at: at(2), structured_data: { ...landed.structured_data, state_observations: { rust_severity: 'perforation', paint_state: 'bare_metal', completeness: 'stripped' } } });
+  const { receipt } = await walk(db, { apply: true, single: true, imageIds: [imageId] });
+  assert.deepEqual([receipt.source_rows, receipt.inserted], [1, 3]);
+  const keyed = db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1');
+  assert.deepEqual(keyed.map(r => r.structured_data.source_observation_id), [landed.id, landed.id, landed.id], 'every value comes from the reading the photo carries');
+  assert.ok(!keyed.some(r => r.structured_data.rust_severity === 'perforation'));
+  // a photo that points at no reading projects nothing
+  db.images.get(imageId).current_observation_id = null;
+  const none = await walk(db, { apply: true, single: true, imageIds: [imageId] });
+  assert.deepEqual([none.receipt.source_rows, none.receipt.eligible_claims, none.receipt.reached_oldest_row, none.exitCode], [0, 0, true, 1]);
 });

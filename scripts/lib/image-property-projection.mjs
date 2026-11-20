@@ -296,9 +296,10 @@ const IMAGE_COLUMNS = 'id,vehicle_id,is_sensitive,is_superseded,is_duplicate,is_
  * projected here (the flag is about labor attribution, not about the three values).
  */
 export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, before, apply = false, single = false, imageIds = null }) {
-  // imageIds: only the current readings of these photos (the stage worker's one-photo call). Everything below is the same
-  // code path, holds and safety checks included; a superseded reading is not selected, so the receipt describes the reading
-  // the photo carries now.
+  // imageIds: only the CURRENT reading of each named photo (the stage worker's one-photo call): the observation the photo's own
+  // ai_scan_metadata.byok_deep_analysis.observation_id points at, not every unsuperseded reading that names the photo (a retried
+  // intake can leave a second one that never landed on the photo). Everything below is the same code path, holds and safety
+  // checks included.
   if (imageIds !== null && (!Array.isArray(imageIds) || imageIds.length === 0 || imageIds.length > 100 || !imageIds.every(id => UUID.test(id ?? '')))) {
     throw new Error('project-cached: imageIds must be 1..100 uuids');
   }
@@ -308,16 +309,23 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
   const deferred = {};
   const defer = why => { deferred[why] = (deferred[why] || 0) + 1; };
   const signal = () => AbortSignal.timeout(10000);
-  let cursor = null, walked = 0, reachedOldest = false, last = {}, reason;
+  let cursor = null, walked = 0, reachedOldest = false, last = {}, reason, currentIds = null;
+  if (imageIds) {
+    const pointers = await sb.from('vehicle_images').select('id,current_observation_id:ai_scan_metadata->byok_deep_analysis->>observation_id')
+      .in('id', imageIds).abortSignal(AbortSignal.timeout(10000));
+    if (pointers.error || !Array.isArray(pointers.data)) throw new Error('project-cached: current readings unavailable');
+    currentIds = [...new Set(pointers.data.map(row => row.current_observation_id).filter(id => UUID.test(id ?? '')))];
+    if (!currentIds.length) reachedOldest = true;   // none of the photos carries a reading: nothing to walk
+  }
   // Before anything has landed a failed read is an error, as it always was. After, the receipt must still say what landed.
   const stop = why => {
     if (!landed.inserted && !landed.duplicates && walked <= 1) throw new Error(`project-cached: ${why.replaceAll('_', ' ')}`);
     landed.failed++; reason = why;
   };
-  while (walked < pages) {
+  while (walked < pages && !(currentIds && !currentIds.length)) {
     let query = sb.from('vehicle_observations').select(SOURCE_COLUMNS)
       .eq('vehicle_id', vehicleId).eq('kind', 'condition').eq('structured_data->>analysis_kind', 'image_deep_byok');
-    if (imageIds) query = query.eq('is_superseded', false).in('structured_data->>image_id', imageIds);
+    if (imageIds) query = query.eq('is_superseded', false).in('id', currentIds);
     // Keyset on (ingested_at, id): readings that share one instant across a window's edge are not skipped.
     query = cursor ? query.or(`ingested_at.lt."${cursor.at}",and(ingested_at.eq."${cursor.at}",id.lt.${cursor.id})`)
       : query.lt('ingested_at', before);
@@ -325,7 +333,8 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
       .limit(limit).abortSignal(signal());
     walked++;
     if (result.error || !Array.isArray(result.data)) { stop('source_query_failed'); break; }
-    const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok');
+    const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok' &&
+      (!imageIds || imageIds.includes(row.structured_data?.image_id)));
     const ids = [...new Set(sources.map(row => row.structured_data?.image_id).filter(id => UUID.test(id ?? '')))];
     const images = ids.length ? await sb.from('vehicle_images').select(IMAGE_COLUMNS).in('id', ids).abortSignal(signal())
       : { data: [], error: null };

@@ -41,6 +41,23 @@ export function leanClaudeArgs({ model = DEFAULT_MODEL, schema = null } = {}) {
   return argv;
 }
 
+/**
+ * The argument list a CLI without --safe-mode can take: how the first reads were started before this change (plus the
+ * exact model id). The machine's launchd PATH reached /usr/local/bin/claude 2.1.20 ahead of ~/.local/bin (2.1.329) on
+ * 2026-11-20, and 2.1.20 answers "unknown option '--safe-mode'" to every call.
+ */
+export function legacyClaudeArgs({ model = DEFAULT_MODEL } = {}) {
+  return ['-p', '--output-format', 'json', '--model', model, '--allowedTools', 'Read'];
+}
+
+/** True when the `claude` this process would start knows the lean flags. A probe that fails answers false (the old call). */
+export async function cliSupportsLean({ env = subscriptionEnv(), timeoutMs = 20_000 } = {}) {
+  try {
+    const { stdout } = await run('claude', ['--help'], { env, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 });
+    return /--safe-mode\b/.test(stdout) && /--json-schema\b/.test(stdout);
+  } catch { return false; }
+}
+
 /** The environment of a CLI call: the subscription login only, never a metered key or an inherited Claude Code session. */
 export function subscriptionEnv(env = process.env) {
   const out = { ...env };

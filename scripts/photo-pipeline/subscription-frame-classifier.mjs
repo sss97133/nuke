@@ -30,7 +30,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
-import { DEFAULT_MODEL, claudePrint, countReceipt, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, subscriptionEnv } from './deep-stage.mjs';
+import { DEFAULT_MODEL, claudePrint, cliSupportsLean, countReceipt, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, subscriptionEnv } from './deep-stage.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -88,6 +88,7 @@ const contractText = () => readFileSync(join(here, '..', 'daily-receipt', 'byok-
 if (args['stage-dry-run'] === true) {
   const ids = String(args['image-ids'] === true ? '' : args['image-ids'] ?? '').split(',').map((x) => x.trim()).filter(Boolean);
   if (!ids.length || ids.some((x) => !/^[0-9a-f-]{36}$/i.test(x))) { console.error('--stage-dry-run needs --image-ids <uuid,uuid>'); process.exit(2); }
+  if (!(await cliSupportsLean())) { console.error('the claude CLI on this PATH does not know --safe-mode / --json-schema (upgrade it, or put ~/.local/bin first)'); process.exit(2); }
   const rows = await rest(`vehicle_images?select=id,vehicle_id&user_id=eq.${OWNER}&id=in.(${ids.join(',')})`);
   const dir = mkdtempSync(join(tmpdir(), 'nuke-deep-dry-'));
   const runId = newRunId();
@@ -112,6 +113,10 @@ if (args['stage-dry-run'] === true) {
 
 const checklist = await orchestrator({ action: 'classifier_prompt' });
 if (checklist.http !== 200 || typeof checklist.prompt !== 'string') { console.error(`could not get the checklist: ${checklist.http} ${checklist.error ?? ''}`); process.exit(1); }
+// Every call starts lean (leanClaudeArgs) when this machine's `claude` can; an older CLI keeps the previous first-read call and
+// the deep readings wait for a CLI that can hold them to the grammar.
+const lean = dry || await cliSupportsLean();
+const firstReadArgv = lean ? leanClaudeArgs({ model }) : legacyClaudeArgs({ model });
 const fromQueue = source === 'stage-queue' || (source === 'auto' && await stageQueueEnabled(rest, OWNER));
 let frames;
 if (fromQueue) {
@@ -132,7 +137,7 @@ console.error(`${frames.length} frames (${fromQueue ? 'stage queue' : statuses.j
 
 // error_classes: why frames failed, from the receipt vocabulary (fixed words, never reader text), so the heartbeat row
 // says what is wrong without anyone opening the log on the Mac.
-const out = []; const summary = { frames: frames.length, source: fromQueue ? 'stage-queue' : 'status', read: 0, accepted: 0, classifier_rejected: 0, errors: 0, error_classes: {}, receipts: 0, receipt_errors: 0, stopped: null, by_type: {}, read_seconds: 0 };
+const out = []; const summary = { cli: lean ? 'lean' : 'legacy_no_safe_mode', frames: frames.length, source: fromQueue ? 'stage-queue' : 'status', read: 0, accepted: 0, classifier_rejected: 0, errors: 0, error_classes: {}, receipts: 0, receipt_errors: 0, stopped: null, by_type: {}, read_seconds: 0 };
 let stop = false;
 // Each photo's result is typed once (receiptForResult). The type is counted in the summary on either worklist, and a
 // fault that is the batch's rather than the photo's (compute exhausted, login or key refused, a missing tool, the API
@@ -177,7 +182,7 @@ if (!dry) {
         stage = 'reader';
         // lean start (leanClaudeArgs), in the empty temp directory: measured 2026-11-20 on six photos, 6 of 6 answers accepted by
         // the orchestrator's own validator either way, at 16k tokens of startup instead of 145k and 6 s instead of 9 s
-        const stdout = await claudePrint(leanClaudeArgs({ model }), `${checklist.prompt}\n\nThe image is the file at ${img}. Read it first, then answer with ONLY the JSON object.`, { env: subscriptionEnv(), cwd: dir });
+        const stdout = await claudePrint(firstReadArgv, `${checklist.prompt}\n\nThe image is the file at ${img}. Read it first, then answer with ONLY the JSON object.`, { env: subscriptionEnv(), cwd: dir });
         // an answer that does not parse is the reader's invalid output, whatever the parser's message happens to contain
         const invalid = (why) => Object.assign(new Error(why), { invalidOutput: true });
         let outer; try { outer = JSON.parse(stdout); } catch { throw invalid('no JSON in the reader output'); }
@@ -232,6 +237,7 @@ async function deepPhase() {
   if (deepLimit < 1) { s.skipped = 'off'; return s; }
   // a fault that is the batch's (usage limit, login refused, API unreachable, a missing tool) would fail every deep reading the same way
   if (summary.stopped) { s.skipped = 'first_read_fault'; return s; }
+  if (!lean) { s.skipped = 'cli_without_safe_mode'; return s; }
   const leaseSeconds = Math.max(900, Math.ceil(Math.min(deepLimit, 25) / Math.max(1, conc)) * 600);   // one photo: download, two reads (each may be retried once), the intake
   const claimed = await claimStageWorkUpTo(rpc, { stage: DEEP_STAGE, limit: deepLimit, leaseSeconds, userId: OWNER });
   if (claimed.error) { s.claim_error = claimed.error; console.error(`${DEEP_STAGE}: ${claimed.error} ${claimed.detail}`); return s; }
