@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PartEvidence, PartEvidenceLine, BuildLine, BuildReconstruction, BuildSystem } from './hooks/useBuildReconstruction';
+import type { BuildWindow, PartEvidence, PartEvidenceLine, BuildLine, BuildReconstruction, BuildSystem } from './hooks/useBuildReconstruction';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
@@ -19,6 +19,10 @@ const span = (first: string | null, last: string | null) => !first ? 'Undated' :
 const hours = (value: number | null | undefined) => value == null ? null : `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })} h`;
 const money = (value: number) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
+/** A reconstructed window in plain words; null when the database could bound neither end. */
+export const windowText = (window: BuildWindow | null | undefined): string | null => !window ? null
+  : window.earliest && window.latest ? (month(window.earliest) === month(window.latest) ? `Done in ${month(window.earliest)}` : `Done between ${month(window.earliest)} and ${month(window.latest)}`)
+  : window.latest ? `Done by ${month(window.latest)}` : window.earliest ? `Started after ${month(window.earliest)}` : null;
 const isWork = (line: BuildLine) => line.kind === 'labor' || line.kind === 'service' || line.kind === 'note';
 
 /** item id → the photographs that show that part, when the evidence read has arrived. */
@@ -55,10 +59,14 @@ export function SystemRow({ system, amounts, open = false, anchor = false }: { s
   ].filter(Boolean);
   return <details className="vp-build-system" id={anchor ? `build-${system.system_key}` : undefined} data-system={system.system_key} open={open || undefined}>
     <summary>
-      <span className="vp-build-system__name"><strong>{name(system.system_key)}</strong><small>{system.first_day ? span(system.first_day, system.last_day) : 'No paper on file'}</small></span>
+      <span className="vp-build-system__name"><strong>{name(system.system_key)}</strong><small>{system.first_day ? span(system.first_day, system.last_day) : windowText(system.window) ?? 'Known from photographs'}</small></span>
       <span className="vp-build-system__facts">{facts.join(' · ') || 'No dated work or parts'}</span>
       {amounts && system.recorded_amount != null && <span className="vp-build-system__paid">{money(system.recorded_amount)}<small>on receipts</small></span>}
     </summary>
+    {!system.first_day && !!system.window?.basis?.length && <p className="vp-build-window">{windowText(system.window)}. How this is known: {system.window.basis.map((witness, index) => <React.Fragment key={`${witness.end}:${witness.id}`}>
+      {index > 0 && '; '}{witness.kind === 'photograph'
+        ? <button type="button" className="vp-build-seen vp-build-seen--inline" onClick={() => openVehiclePhoto(witness.id)}>{witness.phrase}{witness.day ? `, ${dayOf(witness.day)}` : ''}</button>
+        : <>{witness.phrase}{witness.day ? `, ${dayOf(witness.day)}` : ''}</>}</React.Fragment>)}.</p>}
     {!!system.photos?.sample?.length && <><h5>As photographed · {count(system.photos.images, 'photo')}{system.photos.last_day ? `, ${span(system.photos.first_day, system.photos.last_day)}` : ''}</h5>
       <div className="vp-build-photos">{system.photos.sample.map(photo => <button type="button" key={photo.image_id} onClick={() => openVehiclePhoto(photo.image_id)}
         aria-label={`Open ${name(system.system_key)} photo`}><img src={optimizeImageUrl(photo.image_url, 'thumbnail') || photo.image_url} alt="" loading="lazy" /></button>)}</div></>}
@@ -116,7 +124,10 @@ export function BuildRecord({ record, evidence }: { record: BuildReconstruction;
     </dl>
     <p className="vp-build-note">Paper hours, reference time and stage ranges are different measures and are not added together. Neither is the full labor in this build.
       {evidence && <> {evidence.totals.lines_seen.toLocaleString('en-US')} of {evidence.totals.part_lines.toLocaleString('en-US')} bought parts are named in a photograph of the finished car; a photograph shows that kind of part is on the car, not that the receipt's unit is the one fitted.</>}
-      {record.systems_without_paper.length > 0 && <> No receipt or work order on file for: {record.systems_without_paper.map(name).join(', ')}.</>}</p>
+      {record.systems_without_paper.length > 0 && <> Reconstructed from the evidence around them: {record.systems_without_paper.map(key => {
+        const text = windowText(record.systems.find(system => system.system_key === key)?.window);
+        return text ? `${name(key)} (${text.charAt(0).toLowerCase()}${text.slice(1)})` : `${name(key)} (known from photographs)`;
+      }).join(', ')}.</>}</p>
     <div className="vp-build-systems">{main.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} anchor />)}</div>
     {minor.length > 0 && <div className="vp-build-systems vp-build-systems--minor">{minor.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} anchor />)}</div>}
   </section></SeenContext.Provider>;

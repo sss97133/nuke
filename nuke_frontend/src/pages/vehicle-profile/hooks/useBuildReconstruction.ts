@@ -11,6 +11,8 @@ export interface BuildLine {
 export interface BuildStage { phase: string; images: number; prints: number; first_day: string | null; last_day: string | null;
   sample: { image_id: string; image_url: string }[] | null;
   reference: { description: string; hours_typical: number | null; hours_min: number | null; hours_max: number | null; confidence: string | null; source: string; transition: string } | null }
+export interface BuildWindow { kind: 'documented' | 'bounded' | 'open_start' | 'open_end' | 'unknown'; earliest: string | null; latest: string | null;
+  basis?: { end: 'earliest' | 'latest'; kind: 'receipt_line' | 'photograph'; id: string; day: string | null; phrase: string }[] | null }
 export interface BuildSystem {
   system_key: string; first_day: string | null; last_day: string | null; part_lines: number; backordered_lines: number;
   suppliers: string[];
@@ -18,6 +20,8 @@ export interface BuildSystem {
   reference: { hours: number | null; parts_without_reference: number;
     operations: { code: string; name: string; hours: number; part_lines: number; basis: 'part_on_receipt' | 'implied_by_machine_shop_work' }[] };
   priced_lines: number; recorded_amount: number | null; lines: BuildLine[] | null;
+  /** When this system's work happened, reconstructed by the database from dated evidence around it. */
+  window?: BuildWindow | null;
   /** Build stages a reviewed photo reading names for this system, each with the stored hour range for that stage. */
   stages?: BuildStage[] | null;
   /** Photographs whose part-keyed readings name this system; absent before the reader carries them. */

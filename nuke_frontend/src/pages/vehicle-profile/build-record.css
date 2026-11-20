@@ -35,3 +35,5 @@
 .vp-build--token h4 { font-size: 16px; }
 .vp-build-system { scroll-margin-top: 150px; }
 .vp-build-seen { display: block; margin-top: 2px; padding: 0; background: none; border: 0; font: inherit; font-size: 12px; color: var(--success, #4ade80); text-decoration: underline; cursor: pointer; text-align: left; min-height: 24px; }
+.vp-build-window { margin: 6px 0 10px; font-size: 13px; line-height: 1.5; }
+.vp-build-seen--inline { display: inline; margin: 0; min-height: 0; font-size: inherit; }
