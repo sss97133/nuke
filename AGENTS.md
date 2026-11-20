@@ -133,6 +133,26 @@ questions there. A pull request that adds a photo reader or a table keyed by a p
 Keying readings that already exist is a dedicated role: give an agent `skills/image-keys/SKILL.md` as its
 brief, with the registry snapshot and the decisions made so far.
 
+## Model access
+
+Owner rule, 2026-11-08 and again 2026-11-20 ("ai read should be fueled by my subscription"; "im asked every session
+to go fetch one"). AI reading (photos, receipts, documents, doubts) runs on the owner's Claude subscription, not on a
+metered key, and a failed key is never handed to the owner as a task.
+- On the Mac: `claude -p` under his login, with `CLAUDECODE*`, `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` removed
+  from the child's environment (`scripts/doubts/readers.mjs`, `scripts/photo-pipeline/subscription-frame-classifier.mjs`).
+- In GitHub Actions: the repo secret `CLAUDE_CODE_OAUTH_TOKEN` (`.github/workflows/photo-keys.yml`). Never set
+  `ANTHROPIC_API_KEY` beside it: the key wins and bills the API.
+- A new reader defaults to that route. A metered provider runs only when a flag names it.
+- The metered Anthropic key for work the CLI cannot do is `NUKE_ANTHROPIC_API_KEY` in the repo's encrypted `.env`
+  (read it only through `dotenvx run`). Console keys default to a 30-day expiry, which is how the earlier names
+  (`NUKE_PHOTO_ANTHROPIC_API_KEY`, `NUKE_CLAUDE_API`, `CLAUDE_API_KEY`, `ANTHROPIC_API_KEY`) all came to answer 401:
+  treat those names as dead and do not add another. This one was made on 2026-11-20 with no expiry.
+- Before saying a key is missing or dead, run `scripts/ops/model-access-check.mjs` (its header has the command) and use
+  a route it shows answering. Measured 2026-11-20: the subscription CLI and `NUKE_ANTHROPIC_API_KEY` answer; OpenAI is
+  out of quota, Gemini refuses on billing, xAI answers 403. Re-measure; do not trust this line.
+- A reading that needs agreement from a second model family waits for one. Two runs of the same model under two agent
+  names are one reader. Topping up a provider is spending, which is the owner's decision: name it once, do not block on it.
+
 ## Invariants
 ### Data-machine-first design — owner rule, 2026-11-11
 
