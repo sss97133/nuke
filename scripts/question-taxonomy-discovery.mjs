@@ -204,9 +204,9 @@ async function callConsolidationLLM(systemPrompt, userMessage) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5-5',
         max_tokens: 8192,
-        temperature: 0.2,
+        thinking: { type: 'between_tools' }, // Sonnet 5.5 rejects non-default temperature
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
       }),

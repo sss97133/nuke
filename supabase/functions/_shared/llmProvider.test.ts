@@ -28,7 +28,7 @@ Deno.test('unsupported and malformed image payloads refuse before a provider req
   try {
     for (const url of ['data:image/heic;base64,' + bytes, 'data:text/plain;base64,' + bytes, 'data:image/png;base64,broken', 'file:///photo.jpg']) {
       let refused = false;
-      try { await callLLM({ provider: 'anthropic', model: 'configured-model', apiKey: 'test-only', source: 'user' },
+      try { await callLLM({ provider: 'anthropic', model: 'claude-sonnet-5-5', apiKey: 'test-only', source: 'user' },
         [{ role: 'user', content: [{ type: 'image_url', image_url: { url } }] }], { vision: true, maxTokens: 400 }); } catch { refused = true; }
       equal(refused, true);
     }
@@ -46,17 +46,17 @@ Deno.test('the actual Claude request serializer sends native image blocks and pr
       { headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   try {
-    const result = await callLLM({ provider: 'anthropic', model: 'configured-model', apiKey: 'test-only', source: 'user' }, [
+    const result = await callLLM({ provider: 'anthropic', model: 'claude-sonnet-5-5', apiKey: 'test-only', source: 'user' }, [
       { role: 'system', content: 'retain evidence' }, { role: 'user', content: [image('image/png'), { type: 'text', text: 'compare' }] },
     ], { vision: true, maxTokens: 400, temperature: 0.2 });
     equal(target, 'https://api.anthropic.com/v1/messages');
-    equal(body.model, 'configured-model'); equal(body.max_tokens, 400); equal(body.temperature, 0.2);
+    equal(body.model, 'claude-sonnet-5-5'); equal(body.max_tokens, 400); equal('temperature' in body, false);
     equal(body.system, 'retain evidence');
     equal(body.messages[0].content, [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: bytes } }, { type: 'text', text: 'compare' }]);
     equal(result.content, '{"ok":true}');
   } finally { globalThis.fetch = previous; }
 });
-Deno.test('platform Haiku uses its supported effort configuration and retains text after thinking blocks', async () => {
+Deno.test('platform Sonnet 5.5 uses its supported effort configuration and retains text after thinking blocks', async () => {
   const previous = globalThis.fetch; let body: any; let headers: any;
   globalThis.fetch = (async (_url, init) => {
     body = JSON.parse(String(init?.body));
@@ -66,11 +66,28 @@ Deno.test('platform Haiku uses its supported effort configuration and retains te
       { headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
   try {
-    const result = await callLLM({ provider: 'anthropic', model: 'claude-haiku-5-5', apiKey: 'fixture', source: 'system', workspaceId: 'workspace-fixture' },
+    const result = await callLLM({ provider: 'anthropic', model: 'claude-sonnet-5-5', apiKey: 'fixture', source: 'system', workspaceId: 'workspace-fixture' },
       [{ role: 'user', content: 'fixture' }], { maxTokens: 1600, temperature: 0.2 });
-    equal(body.model, 'claude-haiku-5-5'); equal(body.max_tokens, 1600);
+    equal(body.model, 'claude-sonnet-5-5'); equal(body.max_tokens, 1600);
     equal(headers['anthropic-workspace-id'], 'workspace-fixture');
     equal('temperature' in body, false); equal(body.output_config, { effort: 'low' });
     equal(result.content, '{"ok":true}');
+  } finally { globalThis.fetch = previous; }
+});
+
+Deno.test('a stored model below the floor is sent as claude-sonnet-5-5 (Opus 4.x as claude-opus-5-5) without sampling params', async () => {
+  const previous = globalThis.fetch; const bodies: any[] = [];
+  globalThis.fetch = (async (_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 1, output_tokens: 1 } }),
+      { headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  try {
+    for (const stored of ['claude-haiku-4-5', 'claude-3-5-sonnet-20241022', 'claude-sonnet-4-6', 'claude-opus-4-8']) {
+      await callLLM({ provider: 'anthropic', model: stored, apiKey: 'fixture', source: 'user' } as any,
+        [{ role: 'user', content: 'fixture' }], { maxTokens: 100, temperature: 0.7 });
+    }
+    equal(bodies.map(b => b.model), ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']);
+    equal(bodies.map(b => 'temperature' in b), [false, false, false, false]);
   } finally { globalThis.fetch = previous; }
 });

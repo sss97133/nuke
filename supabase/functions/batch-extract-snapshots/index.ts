@@ -17,7 +17,7 @@
  * }
  *
  * The regex parser runs first. Without no_ai, a row it reads as empty on content over 500 characters goes to
- * claude-haiku, and mode "ai" and platforms with no regex parser use the model as the parser. With no_ai: true none of
+ * claude-sonnet-5-5, and mode "ai" and platforms with no regex parser use the model as the parser. With no_ai: true none of
  * that runs: the response counts regex_empty rows and ai_blocked calls, and a regex-empty queue row ends with status
  * 'regex_empty' rather than 'completed'. no_ai with mode "ai" or a platform that has no regex parser is a 400.
  *

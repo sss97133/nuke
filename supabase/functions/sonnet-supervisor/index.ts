@@ -1,7 +1,7 @@
 /**
  * Sonnet Supervisor
  *
- * The quality control layer. Uses claude-sonnet-4-6 to:
+ * The quality control layer. Uses claude-sonnet-5-5 to:
  * - Review Haiku extractions that need validation (pending_review status)
  * - Handle edge cases Haiku couldn't resolve
  * - Re-extract from archived HTML when Haiku gets low confidence
@@ -727,7 +727,7 @@ Deno.serve(async (req) => {
         return json(200, {
           status: "healthy",
           tier: "sonnet",
-          model: "claude-sonnet-4-6",
+          model: "claude-sonnet-5-5",
           queue: {
             pending_review: pendingReview || 0,
             pending_strategy: pendingStrategy || 0,

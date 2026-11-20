@@ -22,7 +22,7 @@ on:
         default: '40'
       model:
         description: Claude model
-        default: 'claude-sonnet-4-6'
+        default: 'claude-sonnet-5-5'
   schedule:
     - cron: '17 9 * * *'   # daily; idempotent (only classifies unclassified frames)
 
@@ -50,7 +50,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          BYOK_MODEL: ${{ github.event.inputs.model || 'claude-sonnet-4-6' }}
+          BYOK_MODEL: ${{ github.event.inputs.model || 'claude-sonnet-5-5' }}
         run: |
           unset ANTHROPIC_API_KEY
           if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then

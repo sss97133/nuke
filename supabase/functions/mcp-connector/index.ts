@@ -696,7 +696,7 @@ const TOOLS: ToolDef[] = [
           },
           required: ["class", "ref"],
         },
-        model_slug: { type: "string", description: "Identifier for the caller's model (e.g. 'claude-opus-4-7-via-byok', 'gpt-4o-mini', 'custom-yolo-v8'). Used to attribute the projection." },
+        model_slug: { type: "string", description: "Identifier for the caller's model (e.g. 'claude-opus-5-5-via-byok', 'gpt-4o-mini', 'custom-yolo-v8'). Used to attribute the projection." },
         model_version: { type: "string", description: "Optional version string for the caller's model" },
         confidence: { type: "number", description: "Caller's confidence in their answer, 0..1" },
         observation_ids: { type: "array", items: { type: "string" }, description: "Optional UUIDs of substrate rows the caller cited as basis (e.g. specific vehicle_observations rows that informed the answer)" },

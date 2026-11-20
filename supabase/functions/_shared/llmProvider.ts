@@ -33,9 +33,8 @@ export const PROVIDER_MODELS: Record<LLMProvider, ProviderModel[]> = {
     { name: 'gpt-4-turbo', costPer1kTokens: 10.00, maxTokens: 128000, supportsVision: true, speed: 'slow', quality: 'excellent' },
   ],
   anthropic: [
-    { name: 'claude-haiku-4-5', costPer1kTokens: 0.25, maxTokens: 200000, supportsVision: true, speed: 'fast', quality: 'good' },
-    { name: 'claude-sonnet-4-5', costPer1kTokens: 3.00, maxTokens: 200000, supportsVision: true, speed: 'medium', quality: 'excellent' },
-    { name: 'claude-opus-4-5', costPer1kTokens: 15.00, maxTokens: 200000, supportsVision: true, speed: 'slow', quality: 'excellent' },
+    { name: 'claude-sonnet-5-5', costPer1kTokens: 2.00, maxTokens: 1000000, supportsVision: true, speed: 'medium', quality: 'excellent' },
+    { name: 'claude-opus-5-5', costPer1kTokens: 4.00, maxTokens: 1000000, supportsVision: true, speed: 'slow', quality: 'excellent' },
   ],
   google: [
     { name: 'gemini-flash-lite-latest', costPer1kTokens: 0.00, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE, separate quota
@@ -48,12 +47,18 @@ export const TIER_CONFIGS: Record<AnalysisTier, { provider: LLMProvider; model: 
   tier1: { provider: 'google', model: 'gemini-flash-lite-latest', description: 'Fast, free basic analysis' },
   tier2: { provider: 'google', model: 'gemini-flash-latest', description: 'Good quality, cheap' },
   tier3: { provider: 'openai', model: 'gpt-4o', description: 'High quality, balanced cost' },
-  expert: { provider: 'anthropic', model: 'claude-sonnet-4-5', description: 'Highest quality, comprehensive analysis' },
+  expert: { provider: 'anthropic', model: 'claude-sonnet-5-5', description: 'Highest quality, comprehensive analysis' },
 };
 
 /**
  * Get LLM configuration with user preference and fallback
  */
+/** A stored or requested Anthropic model below the floor is replaced where the config is built, so the
+ *  cost rows and analyzer strings that read config.model name the model that actually ran. */
+export function configModel(provider: LLMProvider, model: string): string {
+  return provider === 'anthropic' ? floorClaudeModel(model) : model;
+}
+
 export async function getLLMConfig(
   supabase: any,
   userId: string | null,
@@ -77,7 +82,7 @@ export async function getLLMConfig(
     if (apiKeyResult.apiKey) {
       return {
         provider: tierConfig.provider,
-        model: tierConfig.model,
+        model: configModel(tierConfig.provider, tierConfig.model),
         apiKey: apiKeyResult.apiKey,
         source: apiKeyResult.source
       };
@@ -100,7 +105,7 @@ export async function getLLMConfig(
     // This lets the caller handle missing keys in their own fallback chain
     return {
       provider: preferredProvider,
-      model: preferredModel,
+      model: configModel(preferredProvider, preferredModel),
       apiKey: apiKeyResult.apiKey || '',
       source: apiKeyResult.source
     };
@@ -212,7 +217,26 @@ async function callOpenAI(config: LLMConfig, messages: any[], options?: any): Pr
   };
 }
 
+/** Lowest Claude model any caller may use, and the Opus tier above it. */
+export const CLAUDE_FLOOR_MODEL = 'claude-sonnet-5-5';
+export const CLAUDE_TOP_MODEL = 'claude-opus-5-5';
+
+/**
+ * Floor a stored or requested Claude model id: anything below claude-sonnet-5-5
+ * (Haiku, Claude 3.x, Sonnet 4.x) becomes claude-sonnet-5-5, and an Opus 4.x id
+ * becomes claude-opus-5-5. Fable/Mythos, Opus 5/5.5 and non-Claude ids pass through.
+ */
+export function floorClaudeModel(model: string): string {
+  if (!/^claude-/.test(model)) return model;
+  if (/^claude-(fable|mythos)-/.test(model)) return model;
+  if (/^claude-opus-(5|5-5)$/.test(model)) return model;
+  if (model === CLAUDE_FLOOR_MODEL) return model;
+  if (/^claude-opus-/.test(model)) return CLAUDE_TOP_MODEL;
+  return CLAUDE_FLOOR_MODEL;
+}
+
 async function callAnthropic(config: LLMConfig, messages: any[], options?: any): Promise<any> {
+  const model = floorClaudeModel(config.model);
   // Convert messages format for Anthropic
   const systemMessage = messages.find(m => m.role === 'system')?.content || '';
   const conversationMessages = messages
@@ -231,9 +255,10 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: config.model,
+      model,
       max_tokens: options?.maxTokens ?? 4096,
-      ...(config.model === "claude-haiku-5-5" ? { output_config: { effort: "low" } } : { temperature: options?.temperature ?? 0.7 }),
+      // Sonnet 5.5 / Opus 5.5 reject non-default sampling params (400): no temperature.
+      ...(model === CLAUDE_FLOOR_MODEL ? { output_config: { effort: "low" } } : {}),
       system: systemMessage,
       messages: conversationMessages,
     }),

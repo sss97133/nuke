@@ -38,7 +38,7 @@ on:
         default: '12'
       model:
         description: Claude vision model
-        default: 'claude-sonnet-4-6'
+        default: 'claude-sonnet-5-5'
       vehicle_id:
         description: Analyze only this vehicle (blank = whole fleet)
         default: ''
@@ -135,7 +135,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # Subscription auth — NOT an API key. See header.
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          BYOK_MODEL: ${{ github.event.inputs.model || 'claude-sonnet-4-6' }}
+          BYOK_MODEL: ${{ github.event.inputs.model || 'claude-sonnet-5-5' }}
           NUKE_LOG_DIR: ${{ github.workspace }}/logs
         run: |
           # ANTHROPIC_API_KEY would take precedence and bill the API instead of the

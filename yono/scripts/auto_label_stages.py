@@ -3,7 +3,7 @@
 YONO Fabrication Stage Auto-Labeler — Label vehicle images with fabrication stage using Claude Haiku vision.
 
 Queries vehicle_images from Supabase where vehicle_zone IS NOT NULL, downloads each,
-sends to claude-haiku-4-5 vision API for fabrication stage classification.
+sends to claude-sonnet-5-5 vision API for fabrication stage classification.
 Writes labels to yono/training_labels/stage_labels.jsonl.
 
 10-Stage Taxonomy (visually distinct):
@@ -248,8 +248,9 @@ def label_image(client, image_data: bytes, media_type: str = "image/jpeg") -> di
     for attempt in range(3):
         try:
             message = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-5-5",
                 max_tokens=200,
+                extra_body={"thinking": {"type": "between_tools"}},
                 system=SYSTEM_PROMPT,
                 messages=[
                     {

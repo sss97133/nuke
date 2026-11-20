@@ -201,8 +201,9 @@ Return ONLY JSON. Be specific about what you see.`
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-3-opus-20240229',
+      model: 'claude-sonnet-5-5',
       max_tokens: 2000,
+      thinking: { type: 'between_tools' },
       messages: [userMessage]
     }),
     signal: AbortSignal.timeout(60000),

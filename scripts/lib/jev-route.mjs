@@ -15,8 +15,21 @@
 
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
 const TIERS = ['haiku', 'sonnet', 'opus', 'fable'];
-// What `claude --model` gets for each tier (aliases where they exist, full id for fable).
-const MODEL_ARG = { haiku: 'haiku', sonnet: 'sonnet', opus: 'opus', fable: 'claude-fable-5-1' };
+// What `claude --model` gets for each tier: explicit ids. The haiku tier runs on the sonnet 5.5 floor.
+const MODEL_ARG = { haiku: 'claude-sonnet-5-5', sonnet: 'claude-sonnet-5-5', opus: 'claude-opus-5-5', fable: 'claude-fable-5-2' };
+
+/**
+ * Floor any model the spawners are given at claude-sonnet-5-5: the haiku/sonnet aliases and any
+ * Haiku, Claude 3.x or Sonnet 4.x id become claude-sonnet-5-5; the opus alias and Opus 4.x ids
+ * become claude-opus-5-5; Opus 5/5.5, Sonnet 5.5, Fable and Mythos ids pass through.
+ */
+export function claudeModelId(model) {
+  const m = String(model ?? '').trim();
+  if (/^claude-(fable|mythos)-/.test(m) || /^claude-opus-(5|5-5)$/.test(m) || m === 'claude-sonnet-5-5') return m;
+  if (m === 'fable') return MODEL_ARG.fable;
+  if (m === 'opus' || /^claude-opus-/.test(m)) return MODEL_ARG.opus;
+  return MODEL_ARG.sonnet;
+}
 
 const QUESTIONS = {
   tier: {

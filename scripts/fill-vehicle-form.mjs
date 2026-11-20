@@ -26,7 +26,7 @@ import Anthropic from '@anthropic-ai/sdk';
 // ============================================================
 
 const DB_HOST = '54.177.55.191';
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = 'claude-sonnet-5-5';
 const MAX_TOKENS = 8192;
 
 const anthropic = new Anthropic({ apiKey: process.env.VITE_NUKE_CLAUDE_API });
@@ -305,6 +305,7 @@ Generate INSERT statements to fill the tables above with data from the source ma
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
+    thinking: { type: 'between_tools' },
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });

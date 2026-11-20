@@ -10,7 +10,7 @@ talks to the Messages API directly: a short cached system prompt + one downscale
 a JSON verdict out. ~20x leaner, and it records the REAL per-image token cost.
 
 Levers (the three that move $/image):
-  --model      claude-haiku-4-5-* | claude-sonnet-4-6 | claude-opus-4-8   (6-17x swing)
+  --model      claude-sonnet-5-5 | claude-opus-5-5   (the floor is claude-sonnet-5-5)
   --max-dim    downscale long edge before send (image tokens scale with pixels)
   prompt cache the verdict-schema system block is marked cache_control (90% off after 1st)
 
@@ -27,9 +27,8 @@ Pricing: USD per 1M tokens; VERIFY against current Anthropic pricing before trus
 import os, sys, io, json, base64, argparse, time
 
 PRICES = {  # (input, output, cache_read) USD / 1M tokens — verify before trusting
-    "claude-haiku-4-5-20251001": (1.0, 5.0, 0.10),
-    "claude-sonnet-4-6":         (3.0, 15.0, 0.30),
-    "claude-opus-4-8":           (15.0, 75.0, 1.50),
+    "claude-sonnet-5-5":         (2.0, 10.0, 0.10),
+    "claude-opus-5-5":           (4.0, 20.0, 0.20),
 }
 MODELS = list(PRICES)
 
@@ -88,7 +87,7 @@ def run(args):
     rows = sb.get(q, timeout=60).json()
     print(f"to analyze: {len(rows)}", file=sys.stderr)
     sink = open(args.sink, "w") if args.sink else sys.stdout
-    pin, pout, pcache = PRICES.get(args.model, (3.0, 15.0, 0.30))
+    pin, pout, pcache = PRICES.get(args.model, PRICES["claude-sonnet-5-5"])
     tot_usd = 0.0; n = 0
     for r in rows:
         try:
@@ -103,6 +102,8 @@ def run(args):
                     {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
                     {"type": "text", "text": "Analyze this frame per the schema."}]}],
             }
+            if args.model == "claude-sonnet-5-5":
+                body["thinking"] = {"type": "between_tools"}  # Sonnet 5.5 rejects thinking disabled; one-shot verdicts
             t0 = time.time()
             resp = requests.post("https://api.anthropic.com/v1/messages",
                 headers={"x-api-key": AK, "anthropic-version": "2023-06-01", "content-type": "application/json"},
@@ -131,7 +132,7 @@ def run(args):
 ap = argparse.ArgumentParser()
 ap.add_argument("--estimate", action="store_true")
 ap.add_argument("--vehicle-id"); ap.add_argument("--limit", type=int, default=20)
-ap.add_argument("--model", default="claude-haiku-4-5-20251001")
+ap.add_argument("--model", default="claude-sonnet-5-5", choices=MODELS)
 ap.add_argument("--max-dim", type=int, default=1024)
 ap.add_argument("--sink")
 a = ap.parse_args()

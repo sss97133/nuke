@@ -23,8 +23,8 @@ import Anthropic from '@anthropic-ai/sdk';
 const DB_HOST = '54.177.55.191';
 
 const JURY_MODELS = [
-  { id: 'claude-haiku-4-5-20251001', provider: 'anthropic', name: 'Claude Haiku 4.5' },
-  { id: 'claude-sonnet-4-6-20250514', provider: 'anthropic', name: 'Claude Sonnet 4.6' },
+  { id: 'claude-sonnet-5-5', provider: 'anthropic', name: 'Claude Sonnet 5.5' },
+  { id: 'claude-opus-5-5', provider: 'anthropic', name: 'Claude Opus 5.5' },
 ];
 
 const MAX_TOKENS = 8192;
@@ -197,10 +197,12 @@ OUTPUT FORMAT: One INSERT per line, each ending with a semicolon.`;
     const response = await anthropic.messages.create({
       model: modelConfig.id,
       max_tokens: MAX_TOKENS,
+      ...(modelConfig.id === 'claude-sonnet-5-5' ? { thinking: { type: 'between_tools' } } : {}),
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     });
-    return response.content[0].text;
+    // Opus 5.5 always thinks, so block 0 can be a thinking block: take the text blocks.
+    return response.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
   }
 
   throw new Error(`Unsupported provider: ${modelConfig.provider}`);

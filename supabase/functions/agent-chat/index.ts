@@ -37,7 +37,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const MODEL = "claude-opus-4-8"; // latest; swap per Config if needed
+const MODEL = "claude-opus-5-5"; // latest; swap per Config if needed
 
 // The owner's own compute, in funnel order (see _shared/claudeSubscriptionAuth.ts):
 //   their Claude subscription → their own API key → the platform key (metered).
@@ -213,7 +213,8 @@ Deno.serve(async (req) => {
         run = await runWithChain(
           admin,
           userId,
-          { model: MODEL, max_tokens: 1024, system, tools: TOOLS, messages },
+          // Opus 5.5 always thinks; max_tokens holds thinking plus the reply or tool call.
+          { model: MODEL, max_tokens: 4096, system, tools: TOOLS, messages },
           { mode: "slow", maxWaitSeconds: NEVER_AUTO_UPGRADE_SECONDS },
         );
       } catch (e) {

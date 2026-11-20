@@ -28,7 +28,7 @@ export function scrubbedEnv(env) {
   for (const k of ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_CHILD_SESSION', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN']) delete out[k];
   return out;
 }
-export const CLI_ARGS = ['-p', '--output-format', 'json', '--model', 'sonnet', '--allowedTools', 'Read'];
+export const CLI_ARGS = ['-p', '--output-format', 'json', '--model', 'claude-sonnet-5-5', '--allowedTools', 'Read'];
 export const CLI_PROMPT = 'Read task.json and the frame image files named in it, all in the current directory (use the Read tool on each file). '
   + 'Follow the instructions in task.json. Reply with ONLY the answer JSON object, no other text.';
 
