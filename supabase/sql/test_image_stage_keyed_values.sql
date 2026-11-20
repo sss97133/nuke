@@ -168,10 +168,10 @@ CREATE FUNCTION pg_temp.parent(n int, veh uuid DEFAULT NULL) RETURNS void LANGUA
 CREATE FUNCTION pg_temp.child(n int, source_n int DEFAULT NULL, veh uuid DEFAULT NULL, sup boolean DEFAULT false) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE cid uuid := gen_random_uuid();
 BEGIN
-  INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, property_id, is_superseded)
+  INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, property_id, is_superseded, extraction_method)
   VALUES (cid, coalesce(veh, pg_temp.v1()), 'condition',
           jsonb_build_object('analysis_kind', 'image_property_projection', 'image_id', pg_temp.img(n),
-                             'source_observation_id', pg_temp.obs(coalesce(source_n, n))), gen_random_uuid(), sup);
+                             'source_observation_id', pg_temp.obs(coalesce(source_n, n))), gen_random_uuid(), sup, 'cached_byok_property_projection_v1');
   INSERT INTO public.observation_witnesses VALUES (cid, pg_temp.img(n), 'subject');
 END $$;
 CREATE FUNCTION pg_temp.has_gap(n int, st text) RETURNS boolean LANGUAGE sql AS
@@ -361,6 +361,43 @@ SELECT pg_temp.ok(pg_temp.has_gap(47, 'keyed_values') AND (SELECT reason FROM im
 SELECT pg_temp.ok(pg_temp.has_gap(48, 'keyed_values'), 'nor does a policy_skip receipt that predates the current reading');
 SELECT pg_temp.child(47);
 SELECT pg_temp.ok(NOT pg_temp.has_gap(47, 'keyed_values'), 'a child for the current reading closes it whatever the receipts say');
+-- A reading that exists as an observation is never read again, whether or not the photo's stamp says so (older readings carry
+-- no observation id, and some photos hold the observation with no stamp at all). The observation is the evidence.
+SELECT pg_temp.mk(200); SELECT pg_temp.parent(200);                                      -- the reading's observation, no stamp
+SELECT pg_temp.mk(201, meta => '{"classification":{"image_type":"exterior","confidence":0.9,"classifier_ok":true},"byok_deep_analysis":{"scene_type":"exterior"}}');
+SELECT pg_temp.parent(201);                                                              -- a stamp with no observation id, and its observation
+SELECT pg_temp.ok(NOT pg_temp.has_gap(200, 'deep_reading'), 'photo 200 holds a reading observation and no stamp: never read again');
+SELECT pg_temp.ok(pg_temp.has_gap(200, 'keyed_values') AND (SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(200)]) WHERE stage = 'keyed_values') = 'missing',
+  'photo 200: its reading is found by its observation, so keyed_values is a gap');
+SELECT pg_temp.ok(NOT pg_temp.has_gap(201, 'deep_reading') AND pg_temp.has_gap(201, 'keyed_values'), 'photo 201: a stamp with no observation id still has its keyed_values found');
+SELECT pg_temp.child(201);
+SELECT pg_temp.ok(NOT pg_temp.has_gap(201, 'keyed_values'), 'photo 201: and a child of that reading closes it');
+-- a photo whose stamp names another, superseded observation: the current one is used
+SELECT pg_temp.mk(205, meta => pg_temp.reading(205)); SELECT pg_temp.parent(205);
+INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, is_superseded) VALUES (pg_temp.obs(215), pg_temp.v1(), 'condition',
+  jsonb_build_object('analysis_kind', 'image_deep_byok', 'image_id', pg_temp.img(205)), true);
+UPDATE public.vehicle_images SET ai_scan_metadata = jsonb_set(ai_scan_metadata, '{byok_deep_analysis,observation_id}', to_jsonb(pg_temp.obs(215)::text)) WHERE id = pg_temp.img(205);
+SELECT pg_temp.child(205);
+SELECT pg_temp.ok(NOT pg_temp.has_gap(205, 'keyed_values'), 'photo 205: a stamp naming a superseded observation falls back to the current one');
+-- a receipt that predates the reading reopens the stage once, not forever: a later receipt of the current reading answers
+SELECT pg_temp.mk(203, meta => pg_temp.reading(203)); SELECT pg_temp.parent(203);
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, attempt, observed_at) VALUES (pg_temp.img(203), 'keyed_values', 'ingest-observation-batch', 1, 'policy_skip', 1, now() - interval '1 day');
+SELECT pg_temp.ok(pg_temp.has_gap(203, 'keyed_values'), 'photo 203: a policy_skip receipt older than the reading reopens keyed_values');
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, attempt, error_class, observed_at) VALUES (pg_temp.img(203), 'keyed_values', 'ingest-observation-batch', 1, 'failed', 2, 'projection_error', now() + interval '1 minute');
+SELECT pg_temp.ok(NOT pg_temp.has_gap(203, 'keyed_values'), 'photo 203: a failed receipt for the current reading closes it again (no loop)');
+SELECT pg_temp.mk(204, meta => pg_temp.reading(204)); SELECT pg_temp.parent(204);
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, attempt, observed_at) VALUES (pg_temp.img(204), 'keyed_values', 'ingest-observation-batch', 1, 'succeeded', 1, now() - interval '1 day');
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, attempt, error_class, retry_after, observed_at) VALUES (pg_temp.img(204), 'keyed_values', 'ingest-observation-batch', 1, 'unavailable', 2, 'reader_down', now() + interval '1 hour', now() + interval '1 minute');
+SELECT pg_temp.ok(NOT pg_temp.has_gap(204, 'keyed_values'), 'photo 204: an unavailable receipt for the current reading waits for its retry_after');
+UPDATE image_stage_receipts SET retry_after = now() - interval '1 minute' WHERE image_id = pg_temp.img(204) AND outcome = 'unavailable';
+SELECT pg_temp.ok(pg_temp.has_gap(204, 'keyed_values'), 'photo 204: and is retried once it is due');
+UPDATE image_stage_receipts SET attempt = 6 WHERE image_id = pg_temp.img(204) AND outcome = 'unavailable';
+SELECT pg_temp.ok(NOT pg_temp.has_gap(204, 'keyed_values'), 'photo 204: and not past max_attempts');
+-- the photos of this block are not part of the later sections
+DELETE FROM public.observation_witnesses WHERE image_id IN (SELECT pg_temp.img(n) FROM generate_series(200, 205) n);
+DELETE FROM image_stage_receipts WHERE image_id IN (SELECT pg_temp.img(n) FROM generate_series(200, 205) n);
+DELETE FROM public.vehicle_observations WHERE structured_data ->> 'image_id' IN (SELECT pg_temp.img(n)::text FROM generate_series(200, 205) n);
+DELETE FROM public.vehicle_images WHERE id IN (SELECT pg_temp.img(n) FROM generate_series(200, 205) n);
 -- scope variations
 SELECT pg_temp.scope('{"enabled": true, "user_ids": ["00000000-0000-4000-8000-0000000000a1"], "exclude_vehicle_ids": ["00000000-0000-4000-8000-0000000000bf"]}');
 SELECT pg_temp.ok(pg_temp.has_gap(20, 'deep_reading') AND NOT pg_temp.has_gap(21, 'deep_reading') AND pg_temp.has_gap(10, 'deep_reading') AND NOT pg_temp.has_gap(33, 'deep_reading'),
@@ -425,6 +462,24 @@ UPDATE platform_config SET config_value = config_value || '{"enabled": true, "ma
 SELECT pg_temp.ok(public.enqueue_image_stage_work((SELECT ids FROM all_ids)) = 0, 'a max_open it cannot read: 0, no error');
 UPDATE platform_config SET config_value = config_value || '{"max_open": 300}' WHERE config_key = 'image_stage_reconciler';
 DELETE FROM image_stage_work;
+-- the two reading stages have a room of their own in the queue, so they cannot fill it and stop the first read being queued
+SELECT pg_temp.ok(image_stage_stage_room('deep_reading') = 100 AND image_stage_stage_room('keyed_values') = 100 AND image_stage_stage_room('classifier') IS NULL AND image_stage_stage_room('nope') IS NULL,
+  'stage room: 100 per reading stage by default, none for the first read');
+UPDATE platform_config SET config_value = config_value || '{"max_open": 3}' WHERE config_key = 'image_stage_deep_reading';
+SELECT public.enqueue_image_stage_work((SELECT ids FROM all_ids)) AS n \gset
+SELECT pg_temp.ok(:n = 6 AND (SELECT count(*) FROM image_stage_work WHERE stage = 'deep_reading') = 3 AND (SELECT count(*) FROM image_stage_work WHERE stage = 'keyed_values') = 3,
+  'each reading stage stops at its own room (four deep_reading gaps queue three; keyed_values has three)');
+SELECT pg_temp.ok(image_stage_stage_room('deep_reading') = 0 AND public.enqueue_image_stage_work((SELECT ids FROM all_ids)) = 0, 'a stage with no room takes nothing');
+-- a classifier gap is still queued while the reading stages are full
+INSERT INTO public.vehicle_images (id, user_id, vehicle_id, image_url, created_at, vision_gate_status, ai_processing_status, ai_scan_metadata)
+  VALUES (pg_temp.img(57), pg_temp.u1(), pg_temp.v1(), 'https://example.test/57.jpg', now() - interval '1 hour', 'approved', 'pending', '{}');
+SELECT pg_temp.ok((SELECT count(*) FROM image_stage_work) = 6 AND pg_temp.has_gap(57, 'classifier'), 'the first read of a new photo is a gap while six reading items are open (the reconciler queues it: max_open 300)');
+DELETE FROM image_stage_work;
+SELECT reconcile_image_stages(100) IS NOT NULL AS r \gset
+SELECT pg_temp.ok(pg_temp.open_items(57, 'classifier') = 1 AND (SELECT count(*) FROM image_stage_work WHERE stage = 'deep_reading') = 3 AND (SELECT count(*) FROM image_stage_work WHERE stage = 'keyed_values') = 3,
+  'the reconciler queues the first read and holds each reading stage to its room of three');
+UPDATE platform_config SET config_value = config_value - 'max_open' WHERE config_key = 'image_stage_deep_reading';
+DELETE FROM image_stage_work; DELETE FROM public.vehicle_images WHERE id = pg_temp.img(57);
 
 -- ===== 4b. lanes and the backfill cap
 UPDATE image_pipeline_stages SET backfill_daily_cap = 2 WHERE stage = 'deep_reading';
@@ -588,6 +643,7 @@ INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, o
   (pg_temp.img(101), 'keyed_values', 'ingest-observation-batch', 1, 'succeeded', now() - interval '105 minutes');
 INSERT INTO image_stage_work (image_id, stage, target_version, reason, lane, status, created_at, finished_at) VALUES (pg_temp.img(101), 'deep_reading', 1, 'missing', 'live', 'done', now() - interval '150 minutes', now() - interval '110 minutes');
 UPDATE public.vehicle_observations SET ingested_at = now() - interval '120 minutes' WHERE structured_data ->> 'image_id' = pg_temp.img(101)::text AND property_id IS NOT NULL;
+UPDATE public.vehicle_observations SET ingested_at = now() - interval '160 minutes' WHERE structured_data ->> 'image_id' = pg_temp.img(101)::text AND property_id IS NULL;   -- the reading is older than its receipts
 INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, error_class, retry_after) VALUES (pg_temp.img(106), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'unavailable', 'reader_down', now() + interval '1 hour');
 INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, detail) VALUES (pg_temp.img(107), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'policy_skip', '{"reason":"not_a_vehicle_photo"}');
 INSERT INTO image_stage_work (image_id, stage, target_version, reason, lane, status, created_at) VALUES
@@ -601,8 +657,8 @@ SELECT image_stage_coverage(pg_temp.v1()) -> 'levels' AS lv \gset
 SELECT pg_temp.ok((:'lv')::jsonb -> 'photos' = '11' AND (:'lv')::jsonb -> 'with_pixels' = '11' AND (:'lv')::jsonb -> 'first_read' = '10', 'levels: photos, with pixels, first read');
 SELECT pg_temp.ok((:'lv')::jsonb -> 'deep_read' = '{"total": 3, "automatic": 1, "by_hand": 2}',
   'deep_read: three readings, one automatic (a succeeded receipt), two by hand (a text that says "automatic" is not a receipt)');
-SELECT pg_temp.ok((:'lv')::jsonb -> 'keyed' = '{"photos": 2, "automatic": 1, "by_hand": 1, "values": 3}', 'keyed: two photos, one automatic, one by hand, three values');
-SELECT pg_temp.ok((:'lv')::jsonb #> '{waiting,deep_reading}' = '{"queued": 1, "claimed": 1, "unqueued": 1,
+SELECT pg_temp.ok(((:'lv')::jsonb -> 'keyed') - 'basis' = '{"photos": 2, "automatic": 1, "by_hand": 1, "values": 3}', 'keyed: two photos, one automatic, one by hand, three values');
+SELECT pg_temp.ok((:'lv')::jsonb #> '{waiting,deep_reading}' = '{"queued": 1, "claimed": 1, "unqueued": 1, "given_up": 0, "receipt_without_result": 0,
   "retrying": {"photos": 1, "commonest_error_class": "reader_down"}, "closed_no_value": {"photos": 1, "by_reason": {"not_a_vehicle_photo": 1}},
   "not_eligible": {"photos": 3, "by_condition": {"document": 1, "sensitive": 1, "no_first_read": 1}}, "out_of_scope": 0, "no_reading": 0}',
   'waiting deep_reading: by state, with the commonest error class, the closing reason and the failed condition');
@@ -660,6 +716,50 @@ SELECT pg_temp.as_raises('anon', $q$SELECT * FROM image_stage_levels('00000000-0
 SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
 SELECT pg_temp.ok(pg_temp.as_count('service_role', $q$SELECT * FROM image_stage_levels('00000000-0000-4000-8000-0000000000a2')$q$) = 1, 'the service role reads any user''s levels');
 SELECT set_config('request.jwt.claims', '', false);
+
+-- ===== 8b. one population, one state per photo: the two readers and the gap finder cannot disagree
+-- V3 (U1): 160 holds a reading observation and no stamp; 161 has no owner; 162 a keyed value of an earlier reading and a receipt that
+-- predates the current one; 163 has no gate verdict.
+SELECT pg_temp.scope('{"enabled": true, "user_ids": ["00000000-0000-4000-8000-0000000000a1"]}');
+SELECT pg_temp.mk(160, veh => '00000000-0000-4000-8000-0000000000b3'); SELECT pg_temp.parent(160, '00000000-0000-4000-8000-0000000000b3');
+SELECT pg_temp.mk(161, veh => '00000000-0000-4000-8000-0000000000b3'); UPDATE public.vehicle_images SET user_id = NULL WHERE id = pg_temp.img(161);
+SELECT pg_temp.mk(162, veh => '00000000-0000-4000-8000-0000000000b3', meta => pg_temp.reading(162)); SELECT pg_temp.parent(162, '00000000-0000-4000-8000-0000000000b3');
+SELECT pg_temp.child(162, source_n => 99, veh => '00000000-0000-4000-8000-0000000000b3');
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, attempt, observed_at) VALUES (pg_temp.img(162), 'keyed_values', 'ingest-observation-batch', 1, 'succeeded', 1, now() - interval '1 day');
+SELECT pg_temp.mk(163, veh => '00000000-0000-4000-8000-0000000000b3', gate => NULL);
+-- the same population: every photo of the vehicle, whoever owns it
+SELECT pg_temp.ok((SELECT landed FROM image_stage_levels(pg_temp.u1()) WHERE vehicle_id = '00000000-0000-4000-8000-0000000000b3') = 4
+  AND image_stage_coverage('00000000-0000-4000-8000-0000000000b3') #>> '{levels,photos}' = '4', 'levels(user) and coverage(vehicle) both count the ownerless photo: 4');
+SELECT pg_temp.ok((SELECT (deep_state, deep_detail, keyed_state, keyed_detail) IS NOT DISTINCT FROM ('not_eligible', 'no_owner', 'no_reading', NULL) FROM image_stage_photo_levels(NULL, '00000000-0000-4000-8000-0000000000b3') WHERE image_id = pg_temp.img(161)),
+  'an ownerless photo says so: not eligible, no_owner');
+-- a reading found by its observation counts as a deep reading
+SELECT pg_temp.ok((SELECT (deep_read, deep_state, keyed_state) = (true, 'done', 'unqueued') FROM image_stage_photo_levels(NULL, '00000000-0000-4000-8000-0000000000b3') WHERE image_id = pg_temp.img(160)),
+  'photo 160 holds a reading (its observation, no stamp): deep_read, and its keyed_values is an unqueued gap');
+-- a receipt for an earlier reading is not "automatic" for the current one
+SELECT pg_temp.ok((SELECT (keyed, keyed_automatic, keyed_state) = (true, false, 'unqueued') FROM image_stage_photo_levels(NULL, '00000000-0000-4000-8000-0000000000b3') WHERE image_id = pg_temp.img(162)),
+  'photo 162: keyed, but not automatic (the receipt predates the reading) and waiting as a gap');
+SELECT pg_temp.ok((SELECT (gate_approved, gate_undecided) = (3, 1) FROM image_stage_level_counts(NULL, '00000000-0000-4000-8000-0000000000b3')), 'gate_approved counts approvals; photos with no verdict are counted apart');
+-- the levels' unqueued photos are exactly the gap finder's gaps
+SELECT pg_temp.ok((SELECT unqueued_deep + unqueued_keyed FROM image_stage_levels(pg_temp.u1()) WHERE vehicle_id = '00000000-0000-4000-8000-0000000000b3')
+  = (SELECT count(*) FROM image_stage_gaps(ARRAY(SELECT id FROM public.vehicle_images WHERE vehicle_id = '00000000-0000-4000-8000-0000000000b3')) WHERE stage IN ('deep_reading', 'keyed_values'))
+  AND (SELECT unqueued_deep + unqueued_keyed FROM image_stage_levels(pg_temp.u1()) WHERE vehicle_id = '00000000-0000-4000-8000-0000000000b3') = 3,
+  'unqueued deep + keyed (levels) = gaps (gap finder): 163 deep; 160 and 162 keyed');
+SELECT pg_temp.ok(image_stage_coverage('00000000-0000-4000-8000-0000000000b3') #> '{levels,waiting,keyed_values,unqueued}' = '2'
+  AND image_stage_coverage('00000000-0000-4000-8000-0000000000b3') #> '{levels,waiting,deep_reading,unqueued}' = '1', 'coverage(vehicle).waiting shows the same unqueued counts');
+-- states for receipts: a succeeded receipt with no result, a failed one
+SELECT pg_temp.mk(164, veh => '00000000-0000-4000-8000-0000000000b3');
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome) VALUES (pg_temp.img(164), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'succeeded');
+SELECT pg_temp.mk(165, veh => '00000000-0000-4000-8000-0000000000b3');
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, error_class) VALUES (pg_temp.img(165), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'failed', 'bad_json');
+SELECT pg_temp.ok((SELECT deep_state FROM image_stage_photo_levels(NULL, '00000000-0000-4000-8000-0000000000b3') WHERE image_id = pg_temp.img(164)) = 'receipt_without_result'
+  AND (SELECT deep_state FROM image_stage_photo_levels(NULL, '00000000-0000-4000-8000-0000000000b3') WHERE image_id = pg_temp.img(165)) = 'given_up',
+  'a succeeded receipt with no reading is receipt_without_result, a failed one is given_up (neither is "retrying")');
+DELETE FROM public.observation_witnesses WHERE image_id IN (SELECT pg_temp.img(n) FROM generate_series(160, 165) n);
+DELETE FROM image_stage_receipts WHERE image_id IN (SELECT pg_temp.img(n) FROM generate_series(160, 165) n);
+DELETE FROM public.vehicle_observations WHERE vehicle_id = '00000000-0000-4000-8000-0000000000b3';
+DELETE FROM public.vehicle_images WHERE id IN (SELECT pg_temp.img(n) FROM generate_series(160, 165) n);
+SELECT pg_temp.scope('{"enabled": true, "user_ids": ["00000000-0000-4000-8000-0000000000a1"], "vehicle_ids": ["00000000-0000-4000-8000-0000000000b1"],
+  "exclude_vehicle_ids": ["00000000-0000-4000-8000-0000000000bf"]}');
 
 -- ===== 9. the flow watch tells the truth
 DELETE FROM image_stage_work; DELETE FROM public.observation_witnesses; DELETE FROM public.vehicle_observations;
