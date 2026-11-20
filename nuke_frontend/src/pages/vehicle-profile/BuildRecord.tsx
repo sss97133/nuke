@@ -61,6 +61,7 @@ export function SystemRow({ system, amounts, open = false, anchor = false }: { s
         aria-label={`Open ${PHASE[stage.phase] ?? stage.phase} photo`}><img src={optimizeImageUrl(photo.image_url, 'thumbnail') || photo.image_url} alt="" loading="lazy" /></button>)}</div>}
     </React.Fragment>)}
     {work.length > 0 && <><h5>Shop work on paper{system.paper.hours != null ? ` · ${hours(system.paper.hours)}` : ''}</h5>
+      {!!system.paper.subjects?.length && <p className="vp-build-note">Written up by the shop as: {system.paper.subjects.map(subject => `“${subject}”`).join('; ')}</p>}
       {system.paper.lines_without_hours > 0 && <p className="vp-build-note">{count(system.paper.lines_without_hours, 'line')} printed without hours.</p>}
       <Lines lines={work} amounts={amounts} /></>}
     {system.reference.operations.length > 0 && <><h5>Reference fitting time · {hours(system.reference.hours)}</h5>

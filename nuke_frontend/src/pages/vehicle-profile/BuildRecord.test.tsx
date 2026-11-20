@@ -80,6 +80,12 @@ describe('BuildRecord', () => {
     expect(renderToStaticMarkup(<BuildRecord record={record(false)} />)).toMatch(/id="build-[a-z_]+"/);
     expect(renderToStaticMarkup(<TokenBuildRecord record={record(false)} dimension="engine" />)).not.toMatch(/id="build-/);
   });
+  it('quotes what the shop paper printed as its subject', () => {
+    const subject = record(false);
+    const machining = subject.systems.find(system => system.paper.lines > 0)!;
+    machining.paper.subjects = ['1970 Pontiac Block, Heads, Crank; Engine: 455'];
+    expect(renderToStaticMarkup(<BuildRecord record={subject} />)).toContain('Written up by the shop as: “1970 Pontiac Block, Heads, Crank; Engine: 455”');
+  });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;
     expect(renderToStaticMarkup(<BuildRecord record={empty} />)).toBe('');
