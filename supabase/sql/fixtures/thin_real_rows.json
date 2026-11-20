@@ -1,0 +1,423 @@
+[
+ {
+  "n": 1,
+  "image_id": "30000000-0000-4000-8000-000000000101",
+  "image_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000101.jpg",
+  "expected_updated_at": "2026-11-20T20:00:00.123456+00:00",
+  "row": {
+   "vehicle_id": "20000000-0000-4000-8000-000000000101",
+   "vehicle_match_confidence": 1,
+   "vehicle_match_signals": null,
+   "observed_at": "2026-11-20T20:05:00.000Z",
+   "source_id": null,
+   "source_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000101.jpg",
+   "source_identifier": "reviewed_image_analysis_v1:30000000-0000-4000-8000-000000000101:2c20bf8d3bcf5eaaa5b544427c34e055160a582ed2c14927b4ff4d1001f61cda",
+   "kind": "condition",
+   "content_text": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+   "content_hash": "9da735e15ecfdacfe414d1399d53739b559c41abbddcc9fa0f0c16dcdae386f6",
+   "structured_data": {
+    "image_id": "30000000-0000-4000-8000-000000000101",
+    "vehicle_id": "20000000-0000-4000-8000-000000000101",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier.",
+    "analysis_kind": "image_deep_byok",
+    "witness_image_id": "30000000-0000-4000-8000-000000000101",
+    "is_inferred": true
+   },
+   "confidence": "medium",
+   "confidence_score": 0.6,
+   "confidence_factors": {
+    "vehicle_match": 0.1,
+    "has_source_url": 0.05,
+    "agent_inferred_cap": -0.25
+   },
+   "observer_raw": {
+    "image_id": "30000000-0000-4000-8000-000000000101",
+    "review_hash": "2c20bf8d3bcf5eaaa5b544427c34e055160a582ed2c14927b4ff4d1001f61cda"
+   },
+   "extraction_metadata": {
+    "reviewed_image": {
+     "image_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000101.jpg",
+     "expected_updated_at": "2026-11-20T20:00:00.123456+00:00",
+     "reviewed_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000101.jpg",
+     "reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "reviewed_at": "2026-11-20T20:05:00.000Z"
+    },
+    "reviewer_provenance": {
+     "agent_model": "claude-sonnet-5-5",
+     "agent_tier": "subscription automatic",
+     "extraction_method": "claude-cli two passes; only closed values both passes agree on and the database admits for this reader are posted; pixels only, v2; admits 1cffdc42",
+     "run_id": "claude-cli-fire-20261120T200000Z-abc123",
+     "agent_duration_ms": 20000,
+     "agent_cost_cents": null,
+     "cost_basis": "Owner subscription via the claude CLI; nothing is billed per photo. The CLI's notional cost and token counts are kept in the stage receipt, not here. agent_duration_ms is the photo's wall-clock (download, both reads, any retry)."
+    },
+    "review_hash": "2c20bf8d3bcf5eaaa5b544427c34e055160a582ed2c14927b4ff4d1001f61cda"
+   },
+   "analysis_deferred": true,
+   "agent_tier": "subscription automatic",
+   "agent_model": "claude-sonnet-5-5",
+   "agent_cost_cents": null,
+   "agent_duration_ms": 20000,
+   "extraction_method": "reviewed_image_analysis_v1",
+   "raw_source_ref": "vehicle_images:30000000-0000-4000-8000-000000000101",
+   "citation_document_id": null,
+   "citation_secure_document_id": null,
+   "citation_page_number": null,
+   "citation_excerpt": null
+  }
+ },
+ {
+  "n": 2,
+  "image_id": "30000000-0000-4000-8000-000000000102",
+  "image_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000102.jpg",
+  "expected_updated_at": "2026-11-20T20:00:00.123456+00:00",
+  "row": {
+   "vehicle_id": "20000000-0000-4000-8000-000000000101",
+   "vehicle_match_confidence": 1,
+   "vehicle_match_signals": null,
+   "observed_at": "2026-11-20T20:05:00.000Z",
+   "source_id": null,
+   "source_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000102.jpg",
+   "source_identifier": "reviewed_image_analysis_v1:30000000-0000-4000-8000-000000000102:4c09cc8062bc19335d1bdeb309fc115f8c679ba539b2f9f232c1722e6d128af5",
+   "kind": "condition",
+   "content_text": "Automatic read: scene unknown; rust unknown; paint unknown.",
+   "content_hash": "0f1f545dfbe7c51aa0809609b21c82b1626cc57635a3631959fa05d88f141e9a",
+   "structured_data": {
+    "image_id": "30000000-0000-4000-8000-000000000102",
+    "vehicle_id": "20000000-0000-4000-8000-000000000101",
+    "scene_type": "unknown",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "unknown",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": true,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene unknown; rust unknown; paint unknown.",
+    "confidence": 0.55,
+    "context_complete": false,
+    "open_questions": [
+     "Two independent reads of this photo disagree on scene_type: undercarriage vs data_plate; posted as unknown.",
+     "Both reads say rust_severity is none; this reader may not post that value yet."
+    ],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier.",
+    "analysis_kind": "image_deep_byok",
+    "witness_image_id": "30000000-0000-4000-8000-000000000102",
+    "is_inferred": true
+   },
+   "confidence": "medium",
+   "confidence_score": 0.6,
+   "confidence_factors": {
+    "vehicle_match": 0.1,
+    "has_source_url": 0.05,
+    "agent_inferred_cap": -0.25
+   },
+   "observer_raw": {
+    "image_id": "30000000-0000-4000-8000-000000000102",
+    "review_hash": "4c09cc8062bc19335d1bdeb309fc115f8c679ba539b2f9f232c1722e6d128af5"
+   },
+   "extraction_metadata": {
+    "reviewed_image": {
+     "image_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000102.jpg",
+     "expected_updated_at": "2026-11-20T20:00:00.123456+00:00",
+     "reviewed_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000102.jpg",
+     "reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "reviewed_at": "2026-11-20T20:05:00.000Z"
+    },
+    "reviewer_provenance": {
+     "agent_model": "claude-sonnet-5-5",
+     "agent_tier": "subscription automatic",
+     "extraction_method": "claude-cli two passes; only closed values both passes agree on and the database admits for this reader are posted; pixels only, v2; admits 1cffdc42",
+     "run_id": "claude-cli-fire-20261120T200000Z-abc123",
+     "agent_duration_ms": 20000,
+     "agent_cost_cents": null,
+     "cost_basis": "Owner subscription via the claude CLI; nothing is billed per photo. The CLI's notional cost and token counts are kept in the stage receipt, not here. agent_duration_ms is the photo's wall-clock (download, both reads, any retry)."
+    },
+    "review_hash": "4c09cc8062bc19335d1bdeb309fc115f8c679ba539b2f9f232c1722e6d128af5"
+   },
+   "analysis_deferred": true,
+   "agent_tier": "subscription automatic",
+   "agent_model": "claude-sonnet-5-5",
+   "agent_cost_cents": null,
+   "agent_duration_ms": 20000,
+   "extraction_method": "reviewed_image_analysis_v1",
+   "raw_source_ref": "vehicle_images:30000000-0000-4000-8000-000000000102",
+   "citation_document_id": null,
+   "citation_secure_document_id": null,
+   "citation_page_number": null,
+   "citation_excerpt": null
+  }
+ },
+ {
+  "n": 3,
+  "image_id": "30000000-0000-4000-8000-000000000103",
+  "image_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000103.jpg",
+  "expected_updated_at": "2026-11-20T20:00:00.123456+00:00",
+  "row": {
+   "vehicle_id": "20000000-0000-4000-8000-000000000101",
+   "vehicle_match_confidence": 1,
+   "vehicle_match_signals": null,
+   "observed_at": "2026-11-20T20:05:00.000Z",
+   "source_id": null,
+   "source_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000103.jpg",
+   "source_identifier": "reviewed_image_analysis_v1:30000000-0000-4000-8000-000000000103:f9a9cd4c6f9623aaf2774e38253d953946c31195e20189d0263a5a02cd467e33",
+   "kind": "condition",
+   "content_text": "Automatic read: scene body_exterior; rust unknown; paint unknown.",
+   "content_hash": "44984f63137d70032f6c697c96a0ae3a3ce14730bad850d6444961e17e82091b",
+   "structured_data": {
+    "image_id": "30000000-0000-4000-8000-000000000103",
+    "vehicle_id": "20000000-0000-4000-8000-000000000101",
+    "scene_type": "body_exterior",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "unknown",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene body_exterior; rust unknown; paint unknown.",
+    "confidence": 0.8,
+    "context_complete": false,
+    "open_questions": [
+     "Both reads say paint_state is clear; this reader may not post that value yet.",
+     "Both reads say completeness is assembled; this reader may not post that value yet."
+    ],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier.",
+    "analysis_kind": "image_deep_byok",
+    "witness_image_id": "30000000-0000-4000-8000-000000000103",
+    "is_inferred": true
+   },
+   "confidence": "medium",
+   "confidence_score": 0.6,
+   "confidence_factors": {
+    "vehicle_match": 0.1,
+    "has_source_url": 0.05,
+    "agent_inferred_cap": -0.25
+   },
+   "observer_raw": {
+    "image_id": "30000000-0000-4000-8000-000000000103",
+    "review_hash": "f9a9cd4c6f9623aaf2774e38253d953946c31195e20189d0263a5a02cd467e33"
+   },
+   "extraction_metadata": {
+    "reviewed_image": {
+     "image_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000103.jpg",
+     "expected_updated_at": "2026-11-20T20:00:00.123456+00:00",
+     "reviewed_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000103.jpg",
+     "reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "reviewed_at": "2026-11-20T20:05:00.000Z"
+    },
+    "reviewer_provenance": {
+     "agent_model": "claude-sonnet-5-5",
+     "agent_tier": "subscription automatic",
+     "extraction_method": "claude-cli two passes; only closed values both passes agree on and the database admits for this reader are posted; pixels only, v2; admits 1cffdc42",
+     "run_id": "claude-cli-fire-20261120T200000Z-abc123",
+     "agent_duration_ms": 20000,
+     "agent_cost_cents": null,
+     "cost_basis": "Owner subscription via the claude CLI; nothing is billed per photo. The CLI's notional cost and token counts are kept in the stage receipt, not here. agent_duration_ms is the photo's wall-clock (download, both reads, any retry)."
+    },
+    "review_hash": "f9a9cd4c6f9623aaf2774e38253d953946c31195e20189d0263a5a02cd467e33"
+   },
+   "analysis_deferred": true,
+   "agent_tier": "subscription automatic",
+   "agent_model": "claude-sonnet-5-5",
+   "agent_cost_cents": null,
+   "agent_duration_ms": 20000,
+   "extraction_method": "reviewed_image_analysis_v1",
+   "raw_source_ref": "vehicle_images:30000000-0000-4000-8000-000000000103",
+   "citation_document_id": null,
+   "citation_secure_document_id": null,
+   "citation_page_number": null,
+   "citation_excerpt": null
+  }
+ },
+ {
+  "n": 4,
+  "image_id": "30000000-0000-4000-8000-000000000104",
+  "image_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000104.jpg",
+  "expected_updated_at": "2026-11-20T20:00:00.123456+00:00",
+  "row": {
+   "vehicle_id": "20000000-0000-4000-8000-000000000101",
+   "vehicle_match_confidence": 1,
+   "vehicle_match_signals": null,
+   "observed_at": "2026-11-20T20:05:00.000Z",
+   "source_id": null,
+   "source_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000104.jpg",
+   "source_identifier": "reviewed_image_analysis_v1:30000000-0000-4000-8000-000000000104:13d328d90ccc6b311140cdd779ba5ea64e6a7be10f123d2830be3c609a71f4d3",
+   "kind": "condition",
+   "content_text": "Automatic read: scene unknown; rust unknown; paint unknown.",
+   "content_hash": "35bb2772f0378bfbf716bcb0d5959f503a4db279ea8aa6227e96921e25df93f9",
+   "structured_data": {
+    "image_id": "30000000-0000-4000-8000-000000000104",
+    "vehicle_id": "20000000-0000-4000-8000-000000000101",
+    "scene_type": "unknown",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "unknown",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene unknown; rust unknown; paint unknown.",
+    "confidence": 0.7,
+    "context_complete": false,
+    "open_questions": [
+     "Both reads say scene_type is off_property; this reader may not post that value yet.",
+     "Two independent reads of this photo disagree on completeness: partial vs unknown; posted as unknown."
+    ],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier.",
+    "analysis_kind": "image_deep_byok",
+    "witness_image_id": "30000000-0000-4000-8000-000000000104",
+    "is_inferred": true
+   },
+   "confidence": "medium",
+   "confidence_score": 0.6,
+   "confidence_factors": {
+    "vehicle_match": 0.1,
+    "has_source_url": 0.05,
+    "agent_inferred_cap": -0.25
+   },
+   "observer_raw": {
+    "image_id": "30000000-0000-4000-8000-000000000104",
+    "review_hash": "13d328d90ccc6b311140cdd779ba5ea64e6a7be10f123d2830be3c609a71f4d3"
+   },
+   "extraction_metadata": {
+    "reviewed_image": {
+     "image_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000104.jpg",
+     "expected_updated_at": "2026-11-20T20:00:00.123456+00:00",
+     "reviewed_url": "https://example.invalid/storage/v1/object/public/vehicle-images/30000000-0000-4000-8000-000000000104.jpg",
+     "reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "reviewed_at": "2026-11-20T20:05:00.000Z"
+    },
+    "reviewer_provenance": {
+     "agent_model": "claude-sonnet-5-5",
+     "agent_tier": "subscription automatic",
+     "extraction_method": "claude-cli two passes; only closed values both passes agree on and the database admits for this reader are posted; pixels only, v2; admits 1cffdc42",
+     "run_id": "claude-cli-fire-20261120T200000Z-abc123",
+     "agent_duration_ms": 20000,
+     "agent_cost_cents": null,
+     "cost_basis": "Owner subscription via the claude CLI; nothing is billed per photo. The CLI's notional cost and token counts are kept in the stage receipt, not here. agent_duration_ms is the photo's wall-clock (download, both reads, any retry)."
+    },
+    "review_hash": "13d328d90ccc6b311140cdd779ba5ea64e6a7be10f123d2830be3c609a71f4d3"
+   },
+   "analysis_deferred": true,
+   "agent_tier": "subscription automatic",
+   "agent_model": "claude-sonnet-5-5",
+   "agent_cost_cents": null,
+   "agent_duration_ms": 20000,
+   "extraction_method": "reviewed_image_analysis_v1",
+   "raw_source_ref": "vehicle_images:30000000-0000-4000-8000-000000000104",
+   "citation_document_id": null,
+   "citation_secure_document_id": null,
+   "citation_page_number": null,
+   "citation_excerpt": null
+  }
+ }
+]
