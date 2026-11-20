@@ -62,6 +62,20 @@ describe('BuildRecord', () => {
     expect(renderToStaticMarkup(<TokenBuildRecord record={record(false)} dimension="mileage" />)).toBe('');
     expect(renderToStaticMarkup(<TokenBuildRecord record={record(false)} dimension="transmission" />)).toBe('');
   });
+  it('shows a stage seen only in prints with its stored range, and never a day for a print', () => {
+    const staged = record(false); staged.totals.stage_hours = { typical: 16, min: 8, max: 24, stages: 1 };
+    staged.systems.push({ system_key: 'paint', first_day: null, last_day: null, part_lines: 0, backordered_lines: 0, suppliers: [],
+      paper: { lines: 0, lines_without_hours: 0, hours: null, performers: 0, shops: [] }, reference: { hours: null, parts_without_reference: 0, operations: [] },
+      priced_lines: 0, recorded_amount: null, lines: null, photos: null,
+      stages: [{ phase: 'paint_prep', images: 2, prints: 2, first_day: null, last_day: null, sample: [{ image_id: 's1', image_url: 'https://x.test/s1.jpg' }],
+        reference: { description: 'Full body block sand', hours_typical: 16, hours_min: 8, hours_max: 24, confidence: 'medium', source: 'stage_transition_labor_map', transition: 'primed > blocked' } }] });
+    const html = renderToStaticMarkup(<BuildRecord record={staged} />);
+    expect(html).toContain('Paint preparation · seen in 2 photos');
+    expect(html).toContain('Prints of older photographs');
+    expect(html).toContain('Full body block sand): 8 h to 24 h');
+    expect(html).toContain('Stages seen in photos');
+    expect(html).toContain('paint preparation photographed');
+  });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;
     expect(renderToStaticMarkup(<BuildRecord record={empty} />)).toBe('');
