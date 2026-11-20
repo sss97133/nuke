@@ -5,7 +5,8 @@ import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import './build-record.css';
 
-const SYSTEM: Record<string, string> = { body: 'Body & metalwork', paint: 'Paint', glass: 'Glass', trim: 'Exterior trim', interior: 'Interior',
+const PHASE: Record<string, string> = { teardown: 'Teardown', metalwork: 'Metalwork', paint_prep: 'Paint preparation', paint_application: 'Paint application' };
+const SYSTEM: Record<string, string> = { teardown: 'Teardown', body: 'Body & metalwork', paint: 'Paint', glass: 'Glass', trim: 'Exterior trim', interior: 'Interior',
   engine: 'Engine', machining: 'Engine machine work', transmission: 'Transmission & clutch', suspension: 'Suspension', steering: 'Steering',
   brakes: 'Brakes', axle: 'Rear axle', electrical: 'Electrical', cooling: 'Cooling', fuel: 'Fuel system', exhaust: 'Exhaust',
   tires: 'Wheels & tires', hardware: 'Hardware', supplies: 'Shop supplies', unplaced: 'Not placed yet' };
@@ -39,6 +40,7 @@ export function SystemRow({ system, amounts, open = false }: { system: BuildSyst
     system.part_lines > 0 ? count(system.part_lines, 'part') : null,
     system.reference.hours != null ? `${hours(system.reference.hours)} reference fitting time` : null,
     system.photos?.images ? count(system.photos.images, 'photo') : null,
+    system.stages?.length ? `${system.stages.map(stage => (PHASE[stage.phase] ?? stage.phase).toLowerCase()).join(', ')} photographed` : null,
   ].filter(Boolean);
   return <details className="vp-build-system" data-system={system.system_key} open={open || undefined}>
     <summary>
@@ -49,6 +51,15 @@ export function SystemRow({ system, amounts, open = false }: { system: BuildSyst
     {!!system.photos?.sample?.length && <><h5>As photographed · {count(system.photos.images, 'photo')}{system.photos.last_day ? `, ${span(system.photos.first_day, system.photos.last_day)}` : ''}</h5>
       <div className="vp-build-photos">{system.photos.sample.map(photo => <button type="button" key={photo.image_id} onClick={() => openVehiclePhoto(photo.image_id)}
         aria-label={`Open ${name(system.system_key)} photo`}><img src={optimizeImageUrl(photo.image_url, 'thumbnail') || photo.image_url} alt="" loading="lazy" /></button>)}</div></>}
+    {system.stages?.map(stage => <React.Fragment key={stage.phase}>
+      <h5>{PHASE[stage.phase] ?? stage.phase} · seen in {count(stage.images, 'photo')}</h5>
+      <p className="vp-build-note">{stage.prints === stage.images ? 'Prints of older photographs: the day of the work is not on them.' : span(stage.first_day, stage.last_day)}
+        {stage.reference && stage.reference.hours_min != null && stage.reference.hours_max != null
+          ? ` Stored range for this stage on a whole car (${stage.reference.description}): ${hours(stage.reference.hours_min)} to ${hours(stage.reference.hours_max)}. A range for the stage, not a measure of this car's hours.`
+          : ' No stored hour range for this stage.'}</p>
+      {!!stage.sample?.length && <div className="vp-build-photos">{stage.sample.map(photo => <button type="button" key={photo.image_id} onClick={() => openVehiclePhoto(photo.image_id)}
+        aria-label={`Open ${PHASE[stage.phase] ?? stage.phase} photo`}><img src={optimizeImageUrl(photo.image_url, 'thumbnail') || photo.image_url} alt="" loading="lazy" /></button>)}</div>}
+    </React.Fragment>)}
     {work.length > 0 && <><h5>Shop work on paper{system.paper.hours != null ? ` · ${hours(system.paper.hours)}` : ''}</h5>
       {system.paper.lines_without_hours > 0 && <p className="vp-build-note">{count(system.paper.lines_without_hours, 'line')} printed without hours.</p>}
       <Lines lines={work} amounts={amounts} /></>}
@@ -75,9 +86,10 @@ export function BuildRecord({ record }: { record: BuildReconstruction }) {
       <div><dt>Reference fitting time</dt><dd>{hours(totals.reference_hours) ?? 'None'}</dd><small>{count(totals.reference_operations, 'job')} with a book time on file</small></div>
       <div><dt>Parts with no labor counted</dt><dd>{totals.parts_without_reference.toLocaleString('en-US')} of {totals.part_lines.toLocaleString('en-US')}</dd><small>no fitting time on file for them yet</small></div>
       {!!totals.photo_images && <div><dt>Photos tied to a system</dt><dd>{totals.photo_images.toLocaleString('en-US')}</dd><small>analysed photos that name a part</small></div>}
+      {!!totals.stage_hours?.stages && totals.stage_hours.min != null && totals.stage_hours.max != null && <div><dt>Stages seen in photos</dt><dd>{hours(totals.stage_hours.min)} to {hours(totals.stage_hours.max)}</dd><small>stored range for {count(totals.stage_hours.stages, 'photographed stage')}</small></div>}
       {record.amounts_visible && totals.recorded_amount != null && <div><dt>On the receipts</dt><dd>{money(totals.recorded_amount)}</dd><small>visible to you only</small></div>}
     </dl>
-    <p className="vp-build-note">Paper hours and reference time are different measures and are not added together. Neither is the full labor in this build.
+    <p className="vp-build-note">Paper hours, reference time and stage ranges are different measures and are not added together. Neither is the full labor in this build.
       {record.systems_without_paper.length > 0 && <> No receipt or work order on file for: {record.systems_without_paper.map(name).join(', ')}.</>}</p>
     <div className="vp-build-systems">{main.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} />)}</div>
     {minor.length > 0 && <div className="vp-build-systems vp-build-systems--minor">{minor.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} />)}</div>}
