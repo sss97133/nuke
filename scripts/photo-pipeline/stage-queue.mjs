@@ -41,7 +41,7 @@ export async function claimStageWork(rpc, { stage = STAGE, limit = 20, leaseSeco
 // "You're out of extra usage", earlier "Claude usage limit reached"), plus an API rate-limit or overload error. A bare
 // number is not a signal: "JSON at position 429" and "(req 4291)" are not rate limits, and "Context limit reached" is
 // about one photo's prompt, not the account.
-const USAGE_LIMIT = /usage limit|(?:hit|reached) your [\w' -]{0,24}limit|(?:5-hour|session|weekly|opus|sonnet) limit reached|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b/i;
+export const USAGE_LIMIT = /usage limit|(?:hit|reached) your [\w' -]{0,24}limit|(?:5-hour|session|weekly|opus|sonnet) limit reached|out of (?:extra )?usage|rate[ _-]?limit|quota|overloaded|credit balance|(?:http|status|api error)[: ]+(?:429|529)\b/i;
 const OUTPUT_INVALID = /no JSON|not valid JSON|in JSON at position|Unexpected (?:token|end)|is not valid JSON/i;
 // the API cannot be reached from this machine: the next photo would fail the same way
 const API_DOWN = /API Error: (?:5\d\d|Connection|connect|fetch failed|network|socket)|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT/i;
