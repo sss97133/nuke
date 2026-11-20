@@ -31,7 +31,7 @@ describe('BuildRecord', () => {
     expect(html).toContain('8 h');
     expect(html).not.toContain('12.5');
     expect(html).toContain('1 of 2');
-    expect(html).toContain('Paint, Wheels &amp; tires');
+    expect(html).toContain('Paint (known from photographs), Wheels &amp; tires (known from photographs)');
     expect(html).toContain('1 line printed without hours');
   });
   it('shows recorded amounts only when the reader says the viewer may see them', () => {
@@ -48,7 +48,8 @@ describe('BuildRecord', () => {
       photos: { images: 9, readings: 9, first_day: '2026-10-28', last_day: '2026-10-28', sample: [{ image_id: 'p1', image_url: 'https://x.test/1.jpg' }] } });
     const html = renderToStaticMarkup(<BuildRecord record={withPhotos} />);
     expect(html).toContain('Wheels &amp; tires');
-    expect(html).toContain('No paper on file');
+    expect(html).toContain('Known from photographs');
+    expect(html).not.toContain('No paper on file');
     expect(html).toContain('As photographed · 9 photos, Oct 2026');
     expect(html).toContain('Open Wheels &amp; tires photo');
   });
@@ -113,6 +114,22 @@ describe('BuildRecord', () => {
     const html = renderToStaticMarkup(<BuildRecord record={split} />);
     expect(html).toMatch(/shop work lines?: [^<]+ 50\.75 h · [^<]+ 3 h</);
     expect(html).toContain('that carry a part or work line');
+  });
+  it('gives a system with no paper its reconstructed window and how it is known, never a request for paper', () => {
+    const rebuilt = record(false);
+    rebuilt.systems_without_paper = ['paint'];
+    rebuilt.systems.push({ system_key: 'paint', first_day: null, last_day: null, part_lines: 0, backordered_lines: 0, suppliers: [],
+      paper: { lines: 0, lines_without_hours: 0, hours: null, performers: 0, shops: [] }, reference: { hours: null, parts_without_reference: 0, operations: [] },
+      priced_lines: 0, recorded_amount: null, lines: null,
+      window: { kind: 'bounded', earliest: '2024-09-12', latest: '2025-10-06', basis: [
+        { end: 'earliest', kind: 'receipt_line', id: 'r1', day: '2024-09-12', phrase: 'body panels bought through this day' },
+        { end: 'latest', kind: 'photograph', id: 'p7', day: '2025-10-06', phrase: 'first photograph showing finished paint' }] } });
+    const html = renderToStaticMarkup(<BuildRecord record={rebuilt} />);
+    expect(html).toContain('Done between Sep 2024 and Oct 2025');
+    expect(html).toContain('body panels bought through this day, Sep 12, 2024');
+    expect(html).toContain('first photograph showing finished paint, Oct 6, 2025');
+    expect(html).toContain('Reconstructed from the evidence around them: Paint (done between Sep 2024 and Oct 2025)');
+    expect(html).not.toMatch(/No receipt or work order|No paper on file|needed/i);
   });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;
