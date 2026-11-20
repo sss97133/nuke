@@ -11,7 +11,7 @@ set -u
 cd "$(dirname "$0")/../.." || exit 1
 USER_ID="${1:?usage: subject-classify-batch.sh <user-id> [batch_size]}"
 BATCH="${2:-40}"
-MODEL="${BYOK_MODEL:-claude-sonnet-4-6}"
+MODEL="${BYOK_MODEL:-claude-sonnet-5-5}"
 DIR="$(mktemp -d)"; JOB="$DIR/job.json"; PROMPT="$DIR/prompt.txt"; OUT="$DIR/out.json"
 log(){ echo "$(date -u '+%F %T') | subject-classify | $*"; }
 trap 'rm -rf "$DIR"' EXIT

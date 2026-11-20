@@ -2,11 +2,11 @@
  * BATCH COMMENT DISCOVERY
  *
  * High-throughput comment analysis pipeline.
- * Processes vehicles with unanalyzed comments through Claude Haiku
+ * Processes vehicles with unanalyzed comments through Claude Sonnet 5.5
  * to extract sentiment, condition signals, expert insights, market signals.
  *
  * Modes:
- *   discover             — Claude Haiku vehicle-level comment analysis (default)
+ *   discover             — Claude Sonnet 5.5 vehicle-level comment analysis (default)
  *   extract_claims       — Per-comment claim extraction via LLM
  *   question_classify_llm — Gemini Flash fallback for question taxonomy classification
  *
@@ -41,7 +41,7 @@ const corsHeaders = {
 };
 
 // Measured 2026-11-12 on closed BaT lots: the first model is the cheapest that returns the full shape.
-const DISCOVERY_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
+const DISCOVERY_MODELS = ["claude-sonnet-5-5", "claude-opus-5-5"];
 const DISCOVERY_PROMPT_VERSION = "comment_discovery_v2";
 
 const DISCOVERY_PROMPT = `You are analyzing auction comments from a collector vehicle listing. Extract insights for BOTH vehicle-level assessment AND market-level trends.
@@ -367,10 +367,12 @@ async function processVehicle(
       },
       body: JSON.stringify({
         model: run.model,
-        max_tokens: 6000,
-        // Output tokens include the model's thinking. At default effort Haiku spent all 6,000 before closing the
-        // JSON on 5 of 5 lots (2026-11-12); low effort leaves the budget for the answer.
-        output_config: { effort: "low" },
+        max_tokens: 12000,
+        // Output tokens include the model's thinking. Measured on Sonnet 5.5, 2026-11-20, lots already summarized:
+        // low effort stopped cleanly at 1,936 to 2,452 output tokens (5 of 5 lots) but dropped seller statements a
+        // 57-comment thread holds (new tires, working AC); medium kept them at 2,417 and 3,815 tokens (57 and 200
+        // comments, 20 and 26 s); high used 5,347 on the 200-comment lot. Medium, with room above it.
+        output_config: { effort: "medium" },
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -596,7 +598,7 @@ async function extractClaims(
 
       const prompt = buildClaimExtractionPrompt(vehicleCtx, batch, existingFieldNames);
 
-      // Call LLM — try Kimi (fast), then Grok, then Gemini, then Haiku
+      // Call LLM — try Kimi (fast), then Grok, then Gemini, then Sonnet 5.5
       let content = "";
       let costCents = 0;
       let modelUsed = "";
@@ -686,19 +688,19 @@ async function extractClaims(
         } catch (e: any) { errors.push(`Gemini error: ${e.message}`); }
       }
 
-      // 3. Haiku fallback
+      // 3. Sonnet 5.5 fallback (the floor; sampling params are rejected by this model)
       if (!content && anthropicKey) {
         try {
           const resp = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
-            body: JSON.stringify({ model: "claude-3-5-haiku-latest", max_tokens: 4096, temperature: 0.1, messages: [{ role: "user", content: prompt }] }),
+            body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 4096, thinking: { type: "between_tools" }, messages: [{ role: "user", content: prompt }] }),
           });
           if (resp.ok) {
             const lr = await resp.json();
             content = lr.content?.[0]?.text || "";
-            costCents = ((lr.usage?.input_tokens || 0) * 0.0025 + (lr.usage?.output_tokens || 0) * 0.0125) / 10;
-            modelUsed = "claude-3-5-haiku-latest";
+            costCents = ((lr.usage?.input_tokens || 0) * 0.0002 + (lr.usage?.output_tokens || 0) * 0.001); // $2 / $10 per MTok
+            modelUsed = "claude-sonnet-5-5";
           }
         } catch { /* ignore */ }
       }

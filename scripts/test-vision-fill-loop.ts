@@ -37,15 +37,15 @@ import { dirname } from "node:path";
 // ─── Constants ────────────────────────────────────────────────────────────
 const MUSTANG_VEHICLE_ID = "83f6f033-a3c3-4cf4-a85e-a60d2c588838";
 const MUSTANG_VIN = "6F07C219593";
-const MODEL = "claude-opus-4-5";
+const MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 4096;
 const TOOL_TURN_LIMIT = 8; // safety cap on tool-use loop
 const LOG_PATH = "output/vision-fill-test-2026-05-03.log";
 const TEST_PREFIX = "VISION-FILL TEST: ";
 
-// Cost estimates for claude-opus-4-5 ($15/M input, $75/M output) in USD.
-const COST_PER_INPUT_TOKEN = 15 / 1_000_000;
-const COST_PER_OUTPUT_TOKEN = 75 / 1_000_000;
+// Cost estimates for claude-opus-5-5 ($4/M input, $20/M output) in USD.
+const COST_PER_INPUT_TOKEN = 4 / 1_000_000;
+const COST_PER_OUTPUT_TOKEN = 20 / 1_000_000;
 
 // ─── Environment ──────────────────────────────────────────────────────────
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;

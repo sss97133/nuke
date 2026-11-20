@@ -13,7 +13,7 @@ set -euo pipefail
 : "${SUPABASE_SERVICE_ROLE_KEY:?run under dotenvx run --}"
 URL="https://qkgaybvrernstplzjaam.supabase.co/functions/v1/batch-comment-discovery"
 MAX="${1:-20}"
-MODEL="${MODEL:-claude-haiku-5-5}"
+MODEL="${MODEL:-claude-sonnet-5-5}"
 CLAUDE="${CLAUDE:-$HOME/.local/bin/claude}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 

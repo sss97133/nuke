@@ -41,6 +41,36 @@ import {
   holdCredits, settleHold, releaseHold, estimateCents, usageToCents, type ClaudeUsage,
 } from "./aiCredits.ts";
 import { encryptSecret, decryptSecret } from "./secretBox.ts";
+import { floorClaudeModel, CLAUDE_FLOOR_MODEL, CLAUDE_TOP_MODEL } from "./llmProvider.ts";
+
+/**
+ * Floor a Messages payload at claude-sonnet-5-5 and make it valid for the 5.5 models:
+ * a stored or caller-supplied model below the floor is replaced (Opus 4.x -> claude-opus-5-5,
+ * everything else -> claude-sonnet-5-5); sampling params, disabled/budget thinking and forced
+ * tool_choice are rejected with a 400 by these models, so they are dropped or relaxed to auto.
+ */
+export function normalizeClaudePayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...payload };
+  const model = floorClaudeModel(String(out.model ?? CLAUDE_TOP_MODEL));
+  out.model = model;
+  // After the floor a Claude id is Sonnet 5.5, an Opus 5 or a Fable/Mythos: all refuse sampling values and a
+  // thinking budget; all but Opus 5 refuse disabled thinking, which is dropped there too (it then thinks).
+  if (/^claude-/.test(model)) {
+    delete out.temperature; delete out.top_p; delete out.top_k;
+    const thinking = out.thinking as { type?: string } | undefined;
+    if (thinking && (thinking.type === "disabled" || thinking.type === "enabled")) delete out.thinking;
+  }
+  if (model === CLAUDE_FLOOR_MODEL || model === CLAUDE_TOP_MODEL) {
+    const tc = out.tool_choice as { type?: string } | undefined;
+    if (tc && (tc.type === "any" || tc.type === "tool")) out.tool_choice = { type: "auto" };
+    // between_tools (thinking off) is refused at xhigh and max effort; leave thinking adaptive there.
+    const effort = (out.output_config as { effort?: string } | undefined)?.effort;
+    if (model === CLAUDE_FLOOR_MODEL && out.thinking === undefined && effort !== "xhigh" && effort !== "max") {
+      out.thinking = { type: "between_tools" };
+    }
+  }
+  return out;
+}
 
 const SUBSCRIPTION_PROVIDER = "anthropic_subscription";
 
@@ -196,7 +226,7 @@ export async function storeSubscriptionToken(
     user_id: userId,
     provider: SUBSCRIPTION_PROVIDER,
     api_key_encrypted: encoded,
-    model_name: "claude-opus-4-8",
+    model_name: "claude-opus-5-5",
     is_active: true,
   };
   const { error } = existing
@@ -335,6 +365,7 @@ export async function runWithChain(
   payload: Record<string, unknown>,
   opts: { mode?: "slow" | "upgrade"; maxWaitSeconds?: number } = {},
 ): Promise<RunResult> {
+  payload = normalizeClaudePayload(payload);
   const mode = opts.mode ?? "slow";
   const maxWait = opts.maxWaitSeconds ?? 300;
 
@@ -402,7 +433,7 @@ async function runMeteredPlatform(
   priorRateLimited?: RunResult,
 ): Promise<RunResult> {
   if (!userId) throw new Error("platform-key call requires a user to bill");
-  const model = String((payload as any).model ?? "claude-opus-4-8");
+  const model = String((payload as any).model ?? "claude-opus-5-5");
   const maxOut = Number((payload as any).max_tokens ?? 1024);
   const estInput = 2000; // rough; refine with a token-count pass if needed
   const hold = await holdCredits(

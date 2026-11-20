@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { claudeModelId } from './lib/jev-route.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NUKE_DIR = join(__dirname, '..');
@@ -35,7 +36,7 @@ const AGENT_FILTER = arg('--agent') || arg('-a');
 const DRY_RUN = flag('--dry-run');
 const LIST_ONLY = flag('--list');
 const MAX_TASKS = parseInt(arg('--max-tasks') || '30');
-const MODEL = arg('--model') || 'sonnet';
+const MODEL = claudeModelId(arg('--model') || 'sonnet');
 
 // ─── Supabase ──────────────────────────────────────────────────────────────
 

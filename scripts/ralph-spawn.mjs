@@ -20,6 +20,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync, existsSync } from 'fs';
+import { claudeModelId } from './lib/jev-route.mjs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -268,7 +269,7 @@ async function runAgent(task) {
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         settingSources: ['project', 'user'],
-        model: agentModel,
+        model: claudeModelId(agentModel),
         maxTurns: 100,
         maxTokens: tokenBudget,
         env: { ...process.env, CLAUDECODE: undefined },

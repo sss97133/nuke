@@ -31,7 +31,7 @@ export function imageAnalysisPopulations(images: GalleryAnalysisRead['images']) 
     const deep = m.byok_deep_analysis;
     const hasDetail = !!(text(deep?.scene_type) || text(deep?.build_phase_guess) || text(deep?.narrative_one_line)
       || (Array.isArray(deep?.components_seen) && deep.components_seen.length)
-      || m.classifier === 'claude-opus-4-7-byok' || m.classifier === 'caller-byok-cascade');
+      || m.classifier === 'claude-opus-4-7-byok' || m.classifier === 'claude-opus-5-5-byok' || m.classifier === 'caller-byok-cascade');
     if (subject) { classified.push(image.id); add(subjects, subject, image.id); }
     if (hasDetail) {
       detailed.push(image.id);

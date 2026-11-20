@@ -26,7 +26,7 @@
  *   --limit N             max rows to process (default 100)
  *   --include-null        also process legacy rows with vision_gate_status IS NULL
  *   --dry-run             log verdicts, don't write
- *   --call-vision         allow L4 (Haiku vision via check-image-vehicle-match)
+ *   --call-vision         allow L4 (Sonnet 5.5 vision via check-image-vehicle-match)
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -306,7 +306,7 @@ async function L4_vision(row) {
   return {
     verdict: map[r.status] || 'review_needed',
     confidence: r.confidence ?? 0.6,
-    reasoning: `L4(haiku): ${r.status} — ${r.reason || '(no reason)'}`,
+    reasoning: `L4(vision): ${r.status} — ${r.reason || '(no reason)'}`,
   };
 }
 

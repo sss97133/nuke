@@ -78,10 +78,10 @@ const METHODS: { value: Method; label: string; blurb: string; needsCredential: b
 
 // Sensible model defaults per provider; the user can override.
 const MODEL_SUGGESTIONS: Record<string, string[]> = {
-  anthropic: ['claude-sonnet-4-6', 'claude-opus-4-8', 'claude-haiku-4-5-20251001'],
+  anthropic: ['claude-sonnet-5-5', 'claude-opus-5-5'],
   openai: ['gpt-4o', 'gpt-4o-mini'],
   google: ['gemini-2.0-flash', 'gemini-1.5-pro'],
-  subscription: ['claude-sonnet-4-6', 'claude-opus-4-8'],
+  subscription: ['claude-sonnet-5-5', 'claude-opus-5-5'],
 };
 
 export default function AnalysisSettingsPage() {

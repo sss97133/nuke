@@ -44,7 +44,8 @@ async function getDb() {
 // ─── Confidence ──────────────────────────────────────────────────────────────
 
 const MODEL_QUALITY = {
-  'claude-haiku-4-5-20251001': 1.0,
+  'claude-sonnet-5-5': 1.0,
+  'claude-haiku-4-5-20251001': 1.0, // rows written before the Sonnet 5.5 floor
   'claude-3-haiku': 0.95,
   'qwen2.5:7b': 0.85,
   'qwen2.5:7b-modal': 0.85,

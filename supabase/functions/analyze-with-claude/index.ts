@@ -36,7 +36,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-const DEFAULT_MODEL = "claude-opus-4-8";
+const DEFAULT_MODEL = "claude-opus-5-5";
 
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
   const mode: "slow" | "upgrade" = body.mode === "upgrade" ? "upgrade" : "slow";
   const model = String(body.model ?? DEFAULT_MODEL);
-  const maxTokens = Math.min(Number(body.max_tokens ?? 1024), 8192);
+  const maxTokens = Math.min(Number(body.max_tokens ?? 4096), 8192);
 
   // Ground the prompt in real vehicle data when a vehicle_id is given (facts-are-
   // sacred: we pass the stored row, we don't invent specs).

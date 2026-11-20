@@ -22,7 +22,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
 }) => {
   const [availableModels, setAvailableModels] = useState<AIModel[]>([
     { provider: 'openai', modelName: 'gpt-4o', displayName: 'GPT-4o', icon: '', enabled: false },
-    { provider: 'anthropic', modelName: 'claude-3-5-sonnet-20241022', displayName: 'Claude 3.5', icon: '', enabled: false },
+    { provider: 'anthropic', modelName: 'claude-sonnet-5-5', displayName: 'Claude Sonnet 5.5', icon: '', enabled: false },
     { provider: 'custom', modelName: 'custom', displayName: 'Custom', icon: '', enabled: false }
   ]);
   const [userProviders, setUserProviders] = useState<any[]>([]);

@@ -20,7 +20,7 @@
  *
  * Usage:
  *   dotenvx run -- node scripts/daily-receipt/classify-unfiled-day.mjs \
- *     --user-id <uuid> --date YYYY-MM-DD [--model claude-opus-4-8] [--threshold 0.8] [--dry-run]
+ *     --user-id <uuid> --date YYYY-MM-DD [--model claude-opus-5-5] [--threshold 0.8] [--dry-run]
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -38,7 +38,7 @@ const arg = (n, d) => { const i = args.indexOf(n); return i !== -1 ? args[i + 1]
 const has = (n) => args.includes(n);
 const USER_ID = arg('--user-id');
 const DATE = arg('--date');
-const MODEL = arg('--model', 'claude-opus-4-8');
+const MODEL = arg('--model', 'claude-opus-5-5');
 const THRESHOLD = parseFloat(arg('--threshold', '0.8'));
 const DRY = has('--dry-run');
 if (!USER_ID || !DATE) { console.error('Required: --user-id --date'); process.exit(1); }

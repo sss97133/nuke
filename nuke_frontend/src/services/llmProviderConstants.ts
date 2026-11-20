@@ -21,9 +21,8 @@ export const PROVIDER_MODELS: Record<LLMProvider, ModelInfo[]> = {
     { name: 'gpt-4-turbo', cost: 0.01, speed: 'slow', quality: 'excellent' }
   ],
   anthropic: [
-    { name: 'claude-3-haiku-20240307', cost: 0.00008, speed: 'fast', quality: 'good' },
-    { name: 'claude-3-5-sonnet-20241022', cost: 0.003, speed: 'medium', quality: 'excellent' },
-    { name: 'claude-3-opus-20240229', cost: 0.015, speed: 'slow', quality: 'excellent' }
+    { name: 'claude-sonnet-5-5', cost: 0.002, speed: 'medium', quality: 'excellent' },
+    { name: 'claude-opus-5-5', cost: 0.004, speed: 'slow', quality: 'excellent' }
   ],
   google: [
     { name: 'gemini-1.5-flash', cost: 0, speed: 'very_fast', quality: 'medium' },
@@ -50,12 +49,12 @@ export const TIER_CONFIGS: Record<AnalysisTier, TierConfig> = {
   },
   tier3: {
     provider: 'anthropic',
-    model: 'claude-3-5-sonnet-20241022',
+    model: 'claude-sonnet-5-5',
     description: 'High quality, balanced cost/speed'
   },
   expert: {
     provider: 'anthropic',
-    model: 'claude-3-5-sonnet-20241022',
+    model: 'claude-sonnet-5-5',
     description: 'Highest quality, comprehensive analysis'
   }
 };

@@ -8,7 +8,7 @@
  * Never reads the Mac Photos library. The worklist selection skips rejected_personal and sensitive rows.
  *
  *   dotenvx run -- node scripts/photo-work-ledger/read-photos.mjs --worklist work.jsonl --out readings.jsonl \
- *     [--model claude-haiku-4-5] [--concurrency 6] [--limit N] [--batch] [--batch-id msgbatch_...]
+ *     [--model claude-sonnet-5-5] [--concurrency 6] [--limit N] [--batch] [--batch-id msgbatch_...]
  *
  * --batch submits chunks (--chunk 800) through the Message Batches API (half price, asynchronous), records the batch ids in
  * <out>.batches, polls and collects each one; --batch --collect-only resumes collection without submitting.
@@ -113,7 +113,7 @@ export function requestParams(model, image) {
   };
 }
 
-const PRICES = { 'claude-haiku-4-5': [1, 5], 'claude-sonnet-5-5': [2, 10], 'claude-opus-5-5': [4, 20] };
+const PRICES = { 'claude-sonnet-5-5': [2, 10], 'claude-opus-5-5': [4, 20] };
 export const costUsd = (model, u, batch = false) => {
   const [pi, po] = PRICES[model] ?? [NaN, NaN];
   return ((u.input_tokens + (u.cache_creation_input_tokens ?? 0) * 1.25 + (u.cache_read_input_tokens ?? 0) * 0.1) * pi
@@ -128,7 +128,7 @@ function parseReading(msg) {
 async function main() {
   const worklist = arg('worklist'); const out = arg('out');
   if (!worklist || !out) { console.error('usage: --worklist <jsonl> --out <jsonl>'); process.exit(2); }
-  const model = arg('model', 'claude-haiku-4-5');
+  const model = arg('model', 'claude-sonnet-5-5');
   const conc = Number(arg('concurrency', 6)); const limit = Number(arg('limit', 1e9));
   const photoKey = process.env.NUKE_PHOTO_ANTHROPIC_API_KEY;
   const workspace = photoKey ? process.env.NUKE_PHOTO_ANTHROPIC_WORKSPACE_ID : undefined;

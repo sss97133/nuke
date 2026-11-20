@@ -3,7 +3,7 @@
 YONO Zone Labeling Pass — adds vehicle_zone to existing labels.
 
 Reads yono/training_labels/labels.jsonl, for each record that has no
-vehicle_zone field, sends the image to claude-haiku vision asking for
+vehicle_zone field, sends the image to claude-sonnet-5-5 vision asking for
 the zone from the full taxonomy defined in VISION_ARCHITECTURE.md.
 
 Updates the JSONL in place (writes to a temp file, then atomically replaces).
@@ -187,7 +187,7 @@ SAVE_EVERY = 50  # save to disk every N successful labels
 
 def classify_zone(client, record: dict) -> dict | None:
     """
-    Send image to Claude Haiku and get vehicle_zone.
+    Send image to Claude Sonnet 5.5 and get vehicle_zone.
     Returns updated record dict with vehicle_zone + zone_confidence, or None on failure.
     """
     img_path = Path(record["image_path"])
@@ -205,8 +205,9 @@ def classify_zone(client, record: dict) -> dict | None:
     for attempt in range(3):
         try:
             message = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-5-5",
                 max_tokens=80,
+                extra_body={"thinking": {"type": "between_tools"}},
                 messages=[{
                     "role": "user",
                     "content": [
@@ -308,7 +309,7 @@ def main():
         for idx in needs_zone_idx[:5]:
             r = records[idx]
             print(f"  {Path(r['image_path']).name} | photo_type={r.get('photo_type','?')}")
-        print(f"\nEstimated cost: ~${len(needs_zone_idx) * 0.000035:.2f} (haiku, ~70 tokens each)")
+        print(f"\nEstimated cost: ~${len(needs_zone_idx) * 0.00007:.2f} (sonnet-5-5, ~70 tokens each; 2x the earlier Haiku 4.5 estimate)")
         return
 
     if not needs_zone_idx:

@@ -26,6 +26,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { floorClaudeModel, CLAUDE_FLOOR_MODEL } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -115,7 +116,8 @@ Deno.serve(async (req) => {
     // ── Compute: which key + model (the settings toggle) ─────────────────────
     const { data: settings } = await supabase
       .from("user_analysis_settings").select("method, provider, model").eq("user_id", user.id).maybeSingle();
-    const model = (settings?.model && /^claude-/.test(settings.model)) ? settings.model : "claude-sonnet-4-6";
+    // A stored setting below the floor (Haiku, Claude 3.x, Sonnet 4.x) runs on the floor; stored data is untouched.
+    const model = floorClaudeModel((settings?.model && /^claude-/.test(settings.model)) ? settings.model : CLAUDE_FLOOR_MODEL);
     let apiKey = Deno.env.get("ANTHROPIC_API_KEY") || "";
     let computeNote = "platform";
     if (settings?.method === "byo_api_key" && settings.provider === "anthropic") {
@@ -147,7 +149,9 @@ Deno.serve(async (req) => {
     const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: 1500, system, messages }),
+      // Above the floor (Opus 5.5, Fable) the model always thinks and thinking counts against max_tokens, so 1,500
+      // could end before the reply; the floor model runs with thinking off and keeps the 1,500 reply bound.
+      body: JSON.stringify({ model, max_tokens: model === CLAUDE_FLOOR_MODEL ? 1500 : 8000, ...(model === CLAUDE_FLOOR_MODEL ? { thinking: { type: "between_tools" } } : {}), system, messages }),
       signal: AbortSignal.timeout(90_000),
     });
     if (!aiRes.ok) {
