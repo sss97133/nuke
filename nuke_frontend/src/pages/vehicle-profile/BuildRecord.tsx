@@ -99,13 +99,15 @@ export function BuildRecord({ record, evidence }: { record: BuildReconstruction;
   }, [record]);
   const { totals } = record;
   if (!totals.lines) return null;
+  /** where the printed hours sit, system by system, in the reader's own figures; shown so one total never hides two */
+  const paperSplit = record.systems.filter(system => system.paper.hours != null && system.paper.hours > 0).map(system => `${name(system.system_key)} ${hours(system.paper.hours)}`);
   const main = record.systems.filter(system => !MINOR.has(system.system_key));
   const minor = record.systems.filter(system => MINOR.has(system.system_key));
   return <SeenContext.Provider value={seen}><section id="build-record" className="vp-build" aria-label="Build record">
     <header><h4>Build record</h4>
-      <p>Computed from {count(totals.lines, 'line')} on {count(totals.receipts, 'receipt and work order', 'receipts and work orders')}, {span(totals.first_day, totals.last_day)}.</p></header>
+      <p>Computed from {count(totals.lines, 'line')} on {count(totals.receipts, 'receipt and work order', 'receipts and work orders')} that carry a part or work line, {span(totals.first_day, totals.last_day)}.</p></header>
     <dl className="vp-build-totals">
-      <div><dt>Shop hours on paper</dt><dd>{hours(totals.paper_hours) ?? 'None printed'}</dd><small>printed on {count(totals.paper_work_lines, 'shop work line')}</small></div>
+      <div><dt>Shop hours on paper</dt><dd>{hours(totals.paper_hours) ?? 'None printed'}</dd><small>printed on {count(totals.paper_work_lines, 'shop work line')}{paperSplit.length > 1 ? `: ${paperSplit.join(' · ')}` : ''}</small></div>
       <div><dt>Reference fitting time</dt><dd>{hours(totals.reference_hours) ?? 'None'}</dd><small>{count(totals.reference_operations, 'job')} with a book time on file</small></div>
       <div><dt>Parts with no labor counted</dt><dd>{totals.parts_without_reference.toLocaleString('en-US')} of {totals.part_lines.toLocaleString('en-US')}</dd><small>no fitting time on file for them yet</small></div>
       {!!totals.photo_images && <div><dt>Photos tied to a system</dt><dd>{totals.photo_images.toLocaleString('en-US')}</dd><small>analysed photos that name a part</small></div>}
