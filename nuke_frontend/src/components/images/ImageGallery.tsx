@@ -91,7 +91,7 @@ const GALLERY_IMAGE_SELECT =
   // key above is legacy and unfed). Project its scalars + the small components_seen array so
   // analyzed tiles can show scene/phase/what's-in-it. See engineering-manual Ch.19.
   'ai_byok_scene:ai_scan_metadata->byok_deep_analysis->>scene_type, ai_byok_phase:ai_scan_metadata->byok_deep_analysis->>build_phase_guess, ai_byok_narrative:ai_scan_metadata->byok_deep_analysis->>narrative_one_line, ai_byok_components:ai_scan_metadata->byok_deep_analysis->components_seen, ' +
-  'ai_review_version:ai_scan_metadata->byok_deep_analysis->>prompt_version, ai_review_observation:ai_scan_metadata->byok_deep_analysis->>observation_id, ' +
+  'ai_review_version:ai_scan_metadata->byok_deep_analysis->>prompt_version, ai_review_observation:ai_scan_metadata->byok_deep_analysis->>observation_id, ai_review_tier:ai_scan_metadata->byok_deep_analysis->>agent_tier, ' +
   'ai_legacy_classifier:ai_scan_metadata->>classifier, ai_legacy_scene:ai_scan_metadata->>scene_class, ai_legacy_phase:ai_scan_metadata->>phase, ' +
   'exif_source_url:exif_data->>source_url, exif_discovery_url:exif_data->>discovery_url, exif_original_url:exif_data->>original_url, exif_listing_urls:exif_data->listing_urls, exif_listing_positions:exif_data->listing_positions, exif_auction_start_date:exif_data->>auction_start_date, exif_listed_date:exif_data->>listed_date, exif_start_date:exif_data->>start_date, exif_auction_end_date:exif_data->>auction_end_date, exif_end_date:exif_data->>end_date, exif_camera:exif_data->camera, exif_location:exif_data->location';
 
@@ -111,7 +111,7 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
     const {
       ai_tier1, ai_classification, ai_deep_condition_score, ai_fabrication_stage,
       ai_byok_scene, ai_byok_phase, ai_byok_narrative, ai_byok_components,
-      ai_review_version, ai_review_observation,
+      ai_review_version, ai_review_observation, ai_review_tier,
       ai_legacy_classifier, ai_legacy_scene, ai_legacy_phase,
       exif_source_url, exif_discovery_url, exif_original_url, exif_listing_urls,
       exif_listing_positions, exif_auction_start_date, exif_listed_date,
@@ -133,6 +133,7 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
         byok_deep_analysis: compactObject({
           prompt_version: ai_review_version,
           observation_id: ai_review_observation,
+          agent_tier: ai_review_tier,
           scene_type: ai_byok_scene,
           build_phase_guess: ai_byok_phase,
           narrative_one_line: ai_byok_narrative,

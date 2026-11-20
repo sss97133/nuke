@@ -19,6 +19,8 @@
 export const STAGE = 'classifier';
 export const DEEP_STAGE = 'deep_reading';
 export const KEYED_STAGE = 'keyed_values';
+/** Holds a deep reading can recover from; they are receipts a gap rule reopens, never a policy_skip. */
+export const TRANSIENT_HOLDS = ['gate_not_approved'];
 
 /**
  * True when this owner's photos are handed out by the stage ledger: the reconciler is switched on (platform_config
@@ -168,6 +170,8 @@ export async function recordStageReceipt(rpc, { imageId, stage = STAGE, version,
  */
 export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   const detail = { reader: reader ?? null, prompt_version: promptVersion ?? null, ...(result.detail ?? {}) };
+  // a hold that can lift (the approval gate has not passed yet) is a pause, not a retirement: image_stage_gaps never reopens a policy_skip
+  if (result.policy && TRANSIENT_HOLDS.includes(result.policy)) return { outcome: 'unavailable', error_class: String(result.policy).slice(0, 48), retry_after_seconds: 3600, detail: { ...detail, held: String(result.policy).slice(0, 60) } };
   if (result.policy) return { outcome: 'policy_skip', detail: { ...detail, skipped: String(result.policy).slice(0, 60) } };
   if (!result.intake) {
     const r = receiptForResult(result, { reader, promptVersion });
@@ -179,14 +183,18 @@ export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   if (o.http === 200 && o.success !== false) {
     return { outcome: 'succeeded', detail: { ...d, ...(typeof o.observation_id === 'string' ? { observation_id: o.observation_id } : {}) } };
   }
-  if (code === 'review_source_withdrawn' || code === 'review_source_previously_withdrawn') {
-    return { outcome: 'policy_skip', detail: { ...d, skipped: code } };
-  }
-  // the photo moved while it was being read (or the database refused to place the reading on it): the next claim reads the
-  // current row again, so this is a short retry, not a retirement
-  if (['review_source_changed', 'review_source_changed_during_projection', 'review_projection_refused', 'review_projection_not_persisted'].includes(code)) {
+  // withdrawn once before: permanent for this photo
+  if (code === 'review_source_previously_withdrawn') return { outcome: 'policy_skip', detail: { ...d, skipped: code } };
+  // the photo left the eligible set between the claim and the post (gate flipped, flagged, replaced). The next claim re-checks
+  // the row before any read: a photo that is still held becomes a policy_skip there at no cost, one that was only waiting is read.
+  if (code === 'review_source_withdrawn') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
+  // the photo moved while it was being read: the next claim reads the current row again, so a short retry
+  if (['review_source_changed', 'review_source_changed_during_projection', 'review_projection_not_persisted'].includes(code)) {
     return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 120, detail: d };
   }
+  // the database refused to place a valid reading on this photo (SQL-side rules the reader cannot see, e.g. a withdrawal on
+  // record). Each attempt spends two reads, so wait an hour between attempts rather than two minutes.
+  if (code === 'review_projection_refused') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
   // the contract refused this answer: another reading of the photo can be valid
   if (/^invalid_review_/.test(code) || code === 'review_too_large') {
     return { outcome: 'unavailable', error_class: 'reader_output_invalid', http_status: o.http ?? null, retry_after_seconds: 1800, detail: d };

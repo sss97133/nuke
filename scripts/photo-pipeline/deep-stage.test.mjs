@@ -11,7 +11,7 @@ import { validateVerdict } from '../../supabase/functions/_shared/byokImageVerdi
 import { stageSchema } from '../lib/byok-stage-schema.mjs';
 import {
   AUTOMATIC_METHOD, AUTOMATIC_TIER, DEFAULT_MODEL, agreeVerdicts, automaticProvenance, buildEnvelope, countReceipt, deepReadFrame,
-  eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput,
+  cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput,
 } from './deep-stage.mjs';
 
 const IMAGE = '10000000-0000-4000-8000-000000000001', VEHICLE = '20000000-0000-4000-8000-000000000001';
@@ -44,6 +44,13 @@ test('every call starts lean: no CLAUDE.md, memory, plugins, MCP or hooks, one t
   assert.equal(DEFAULT_MODEL, 'claude-sonnet-5-5');
 });
 
+test('a deep read may open files under its own directory only', () => {
+  const argv = leanClaudeArgs({ readDir: '/private/var/x/nuke-deep-ab12', schema: stageSchema('verdicts') });
+  assert.equal(argv[argv.indexOf('--allowedTools') + 1], 'Read(//private/var/x/nuke-deep-ab12/**)');
+  assert.equal(argv[argv.indexOf('--setting-sources') + 1], '', 'no settings file can widen the rule');
+  assert.ok(!leanClaudeArgs().includes('--setting-sources'), 'the first-read call is unchanged');
+});
+
 test('the CLI never sees a metered key or an inherited Claude Code session', () => {
   const env = subscriptionEnv({ PATH: '/bin', ANTHROPIC_API_KEY: 'x', ANTHROPIC_AUTH_TOKEN: 'y', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', HOME: '/h' });
   assert.deepEqual(env, { PATH: '/bin', HOME: '/h' });
@@ -68,7 +75,10 @@ test('agreement: equal reads post as read; any difference on the scene or a stat
   assert.match(r.verdict.open_questions[3], /completeness: assembled vs partial/);
   assert.deepEqual(r.errors, [], 'the merged verdict passes validateVerdict');
   // everything else is the first read, untouched
-  assert.deepEqual({ ...r.verdict, scene_type: first.scene_type, state_observations: first.state_observations, open_questions: first.open_questions }, first);
+  assert.deepEqual({ ...r.verdict, scene_type: first.scene_type, state_observations: first.state_observations, open_questions: first.open_questions, confidence: first.confidence }, first);
+  assert.equal(r.verdict.confidence, 0.59, 'a photo whose reads differ is capped below the keyed projection\'s gate (0.6)');
+  assert.equal(agreeVerdicts(verdict({ confidence: 0.4 }), verdict({ confidence: 0.4, scene_type: 'engine_bay' })).verdict.confidence, 0.4, 'a lower confidence is kept');
+  assert.equal(agreeVerdicts(first, first).verdict.confidence, 0.8, 'agreeing reads keep theirs');
   assert.deepEqual(validateVerdict(r.verdict), []);
 });
 
@@ -79,10 +89,12 @@ test('agreement: a merged verdict that fails the contract is reported, not poste
 
 test('provenance tells an automatic reading from the three-pass reviewed one', () => {
   const p = automaticProvenance({ model: 'claude-sonnet-5-5', runId: 'claude-cli-fire-x', durationMs: 41234.6 });
-  assert.deepEqual(p, { agent_model: 'claude-sonnet-5-5', agent_tier: 'subscription automatic', extraction_method: 'claude-cli two independent passes, agreed values only, pixels only, v1',
+  assert.deepEqual(p, { agent_model: 'claude-sonnet-5-5', agent_tier: 'subscription automatic', extraction_method: AUTOMATIC_METHOD,
     run_id: 'claude-cli-fire-x', agent_duration_ms: 41235, agent_cost_cents: null, cost_basis: p.cost_basis });
   assert.match(p.cost_basis, /nothing is billed per photo/);
-  assert.equal([AUTOMATIC_TIER, AUTOMATIC_METHOD].join('|'), 'subscription automatic|claude-cli two independent passes, agreed values only, pixels only, v1');
+  assert.equal([AUTOMATIC_TIER, AUTOMATIC_METHOD].join('|'), 'subscription automatic|' + AUTOMATIC_METHOD);
+  assert.match(AUTOMATIC_METHOD, /only where both passes agree.*every other field is the first pass/, 'the method says what was cross-checked and what was not');
+  assert.ok(AUTOMATIC_METHOD.length <= 200 && p.cost_basis.length <= 1000, 'inside the intake\'s text limits');
   assert.notEqual(newRunId(new Date('2026-11-20T18:00:00Z'), () => 'a'), newRunId(new Date('2026-11-20T18:10:00Z'), () => 'a'), 'unique per fire');
   assert.match(newRunId(), /^claude-cli-fire-\d{8}T\d{6}Z-[a-z0-9]+$/);
 });
@@ -102,7 +114,7 @@ test('a photo that no longer satisfies the intake is not read', () => {
   const ok = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg', vision_gate_status: 'approved', image_vehicle_match_status: 'match' };
   assert.equal(eligibilityHold(ok), null);
   assert.equal(eligibilityHold({ ...ok, vision_gate_status: null }), null, 'a missing gate reads as approved, as the SQL does');
-  for (const [over, why] of [[{ vehicle_id: null }, 'unfiled'], [{ vision_gate_status: 'rejected_personal' }, 'gate_not_approved'], [{ vision_gate_status: 'pending' }, 'gate_not_approved'],
+  for (const [over, why] of [[{ vehicle_id: null }, 'unfiled'], [{ is_external: true }, 'external'], [{ vision_gate_status: 'pending' }, 'gate_not_approved'],
     [{ is_document: true }, 'document'], [{ doc_flag: true }, 'document'], [{ is_sensitive: true }, 'sensitive'], [{ is_duplicate: true }, 'duplicate'], [{ is_superseded: true }, 'superseded'],
     [{ image_vehicle_match_status: 'mismatch' }, 'vehicle_mismatch'], [{ image_vehicle_match_status: 'unrelated' }, 'vehicle_mismatch'],
     [{ image_url: 'http://example.test/a.jpg' }, 'image_url_not_https'], [{ deep_scene: 'engine_bay' }, 'already_read']]) {
@@ -234,10 +246,15 @@ test('a usage limit mid-photo stops the batch and posts nothing', () => withDir(
 }));
 
 test('a photo that moved or left is a policy skip and spends no read; bytes that will not download are the download receipts', () => withDir(async (dir) => {
-  for (const [row, why] of [[{ is_document: true }, 'document'], [{ vehicle_id: null }, 'unfiled'], [{ vision_gate_status: 'rejected_personal' }, 'gate_not_approved'], [{ is_sensitive: true }, 'sensitive'], [{ deep_scene: 'body_exterior' }, 'already_read']]) {
+  for (const [row, why] of [[{ is_document: true }, 'document'], [{ vehicle_id: null }, 'unfiled'], [{ is_external: true }, 'external'], [{ is_sensitive: true }, 'sensitive'], [{ deep_scene: 'body_exterior' }, 'already_read']]) {
     const { deps, calls } = frameDeps({ row, answers: [cli(verdict())] });
     const r = await deepReadFrame(frame, deps, opts(dir));
     assert.deepEqual([r.receipt.outcome, r.receipt.detail.skipped, calls.order], ['policy_skip', why, ['snapshot']], why);
+  }
+  { // a gate that has not passed is a pause the ledger reopens, not a policy skip it never would
+    const { deps, calls } = frameDeps({ row: { vision_gate_status: 'review_needed' }, answers: [cli(verdict())] });
+    const r = await deepReadFrame(frame, deps, opts(dir));
+    assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.receipt.retry_after_seconds, calls.order], ['unavailable', 'gate_not_approved', 3600, ['snapshot']]);
   }
   let { deps } = frameDeps({ download: { ok: false, status: 404 }, answers: [cli(verdict())] });
   let r = await deepReadFrame(frame, deps, opts(dir));
@@ -251,10 +268,12 @@ test('every answer of the intake becomes a typed receipt', () => withDir(async (
   const run = async (intake) => (await deepReadFrame(frame, frameDeps({ answers: [cli(verdict())], orchestrator: async () => intake }).deps, opts(dir)));
   const row = async (intake) => { const r = (await run(intake)).receipt; return [r.outcome, r.error_class ?? r.detail.skipped ?? null, r.retry_after_seconds ?? null, r.stop ?? false]; };
   assert.deepEqual(await row({ http: 200, success: true, observation_id: 'o' }), ['succeeded', null, null, false]);
-  for (const code of ['review_source_changed', 'review_projection_refused', 'review_projection_not_persisted']) {
+  for (const code of ['review_source_changed', 'review_projection_not_persisted']) {
     assert.deepEqual(await row({ http: 409, success: false, error: code }), ['unavailable', code, 120, false], code);
   }
-  assert.deepEqual(await row({ http: 409, success: false, error: 'review_source_withdrawn' }), ['policy_skip', 'review_source_withdrawn', null, false]);
+  // each attempt costs two reads: a refusal the reader cannot see the reason for waits an hour, and so does a withdrawal
+  for (const code of ['review_projection_refused', 'review_source_withdrawn']) assert.deepEqual(await row({ http: 409, success: false, error: code }), ['unavailable', code, 3600, false], code);
+  assert.deepEqual(await row({ http: 409, success: false, error: 'review_source_previously_withdrawn' }), ['policy_skip', 'review_source_previously_withdrawn', null, false]);
   for (const code of ['invalid_review_envelope', 'invalid_review_verdict', 'invalid_review_camera', 'invalid_review_regions', 'invalid_review_source', 'review_too_large']) {
     assert.deepEqual(await row({ http: 400, success: false, error: code }), ['unavailable', 'reader_output_invalid', 1800, false], code);
   }
@@ -321,4 +340,94 @@ test('what the intake would refuse is left out of a read before it is judged: em
   assert.equal(v.agent_notes, '', 'the input is not changed');
   assert.deepEqual(validateVerdict(out), []);
   assert.deepEqual(verdictFromCliOutput(cli(v), { imageId: IMAGE, vehicleId: VEHICLE }).verdict, out, 'a read is shaped as it is accepted');
+});
+
+// --- the findings of the pre-merge review -----------------------------------------------------------------------------
+
+test('a failed read ends its sibling: no model call after the photo\'s receipt, and the files stay until both reads have settled', () => withDir(async (dir) => {
+  const limit = JSON.stringify({ is_error: true, api_error_status: 429, result: 'You\'ve hit your 5-hour limit' });
+  const { deps, calls } = frameDeps({ answers: [limit] });
+  let started = 0, endedAfterReturn = 0, returned = false;
+  deps.ask = async (argv, text, cwd, signal) => {
+    const n = started++;
+    calls.order.push('read');
+    if (n === 0) throw Object.assign(new Error('reader error: You\'ve hit your 5-hour limit'), { apiStatus: 429 });
+    // the sibling: still running when the first fails; it must be told to stop, and must not start a retry
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(resolve, 300);
+      signal.addEventListener('abort', () => { clearTimeout(t); reject(Object.assign(new Error('read aborted'), { aborted: true })); }, { once: true });
+    });
+    if (returned) endedAfterReturn++;
+    return 'no json';   // it would be retried, were it not aborted
+  };
+  const r = await deepReadFrame(frame, deps, opts(dir)); returned = true;
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.stop], ['rate_limited', 'reader_usage_limit', true]);
+  assert.equal(started, 2, 'two reads began; the sibling was aborted and no retry followed');
+  assert.equal(endedAfterReturn, 0, 'the sibling had ended before the photo returned');
+}));
+
+test('a halt from another photo ends this one without a receipt (the lease hands it back, no attempt counted)', () => withDir(async (dir) => {
+  const halt = new AbortController();
+  const { deps } = frameDeps({ answers: [cli(verdict())] });
+  deps.ask = (argv, text, cwd, signal) => new Promise((resolve, reject) => { signal.addEventListener('abort', () => reject(Object.assign(new Error('read aborted'), { aborted: true })), { once: true }); setTimeout(() => halt.abort(), 20); });
+  const r = await deepReadFrame(frame, deps, opts(dir, { signal: halt.signal }));
+  assert.deepEqual([r.receipt, r.aborted, r.stop], [null, true, false]);
+  assert.deepEqual(readdirSync(dir), [], 'the bytes are removed');
+}));
+
+test('claimAndWork: small claims, each worked before the next; a halt or the deadline strands at most one chunk', async () => {
+  const held = Array.from({ length: 10 }, (_, i) => i);
+  const claims = [];
+  const claim = async (n) => { claims.push(n); const work = held.splice(0, n); return { work, error: null }; };
+  const done = [];
+  let halted = false;
+  const out = await claimAndWork({ claim, work: async (x) => { done.push(x); if (x === 2) halted = true; }, limit: 10, chunk: 4, width: 2, halted: () => halted });
+  assert.deepEqual(claims, [4], 'the halt came in the first chunk: nothing further was claimed');
+  assert.equal(out.claimed, 4);
+  assert.ok(done.length < 4 + 1 && done.includes(2), 'workers stopped pulling photos once halted');
+  // the deadline
+  held.splice(0, held.length, ...Array.from({ length: 10 }, (_, i) => i)); claims.length = 0;
+  let t = 0;
+  const out2 = await claimAndWork({ claim, work: async () => { t += 100; }, limit: 10, chunk: 2, width: 1, deadline: 350, now: () => t });
+  assert.deepEqual([claims, out2.claimed], [[2, 2], 4], 'no chunk is claimed once the deadline has passed');
+  // limit and a short answer
+  held.splice(0, held.length, 1, 2, 3); claims.length = 0;
+  const out3 = await claimAndWork({ claim, work: async () => {}, limit: 20, chunk: 2, width: 1 });
+  assert.deepEqual([claims, out3.claimed], [[2, 2], 3], 'a short claim ends the stage');
+  const out4 = await claimAndWork({ claim: async () => ({ work: [], error: 'claim_failed' }), work: async () => {}, limit: 5, chunk: 2, width: 1 });
+  assert.equal(out4.error, 'claim_failed');
+});
+
+test('a deep read\'s child carries no credentials, only the login', () => {
+  const env = deepChildEnv({ PATH: '/bin', HOME: '/h', SUPABASE_SERVICE_ROLE_KEY: 'a', DOTENV_PRIVATE_KEY: 'b', GITHUB_TOKEN: 'c', DB_PASSWORD: 'd', APP_SECRET: 'e', ANTHROPIC_API_KEY: 'f', CLAUDE_CODE_OAUTH_TOKEN: 'login', LANG: 'en_US.UTF-8' });
+  assert.deepEqual(env, { PATH: '/bin', HOME: '/h', CLAUDE_CODE_OAUTH_TOKEN: 'login', LANG: 'en_US.UTF-8' });
+});
+
+test('the model the receipt records is the CLI\'s report: the busiest of several, or "unreported" beside what was requested', () => withDir(async (dir) => {
+  assert.equal(cliStats({ modelUsage: { 'claude-haiku': { inputTokens: 10, outputTokens: 2 }, 'claude-sonnet-5-5': { inputTokens: 900, outputTokens: 1200 } } }, 1).model, 'claude-sonnet-5-5');
+  const none = (v) => JSON.stringify({ type: 'result', is_error: false, structured_output: { verdicts: [v] } });
+  const { deps, calls } = frameDeps({ answers: [none(verdict()), none(verdict())] });
+  await deepReadFrame(frame, deps, opts(dir));
+  assert.equal(calls.orchestrator[0].provenance.agent_model, 'unreported (requested claude-sonnet-5-5)');
+}));
+
+test('the receipt keeps both full reads; the prompt allows its one Read and says no hints are supplied', () => withDir(async (dir) => {
+  const { deps, calls } = frameDeps({ answers: [cli(verdict()), cli(verdict({ narrative_one_line: 'Another sentence.' }))] });
+  const r = await deepReadFrame(frame, deps, opts(dir));
+  assert.deepEqual(r.receipt.detail.reads.map((x) => x.verdict.narrative_one_line).sort(), ['A complete car stands in the frame.', 'Another sentence.']);
+  assert.match(calls.ask[0].text, /Read tool is permitted for this one file only; no apple_hints are supplied/);
+}));
+
+test('a disagreeing photo cannot key: the posted confidence is below the projection gate', () => withDir(async (dir) => {
+  const { deps, calls } = frameDeps({ answers: [cli(verdict({}, { rust_severity: 'none' })), cli(verdict({}, { rust_severity: 'surface' }))] });
+  await deepReadFrame(frame, deps, opts(dir));
+  assert.ok(calls.orchestrator[0].verdict.confidence < 0.6);
+}));
+
+test('a scene_type disagreement keeps the first read\'s components with scene_type unknown, and the envelope is still valid', () => {
+  const r = agreeVerdicts(verdict({ scene_type: 'engine_bay' }), verdict({ scene_type: 'undercarriage' }));
+  assert.equal(r.verdict.scene_type, 'unknown');
+  assert.equal(r.verdict.components_seen.length, 1);
+  assert.deepEqual(r.errors, []);
 });

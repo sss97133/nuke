@@ -51,6 +51,7 @@ const FAKE_SUPABASE_JS = `exports.createClient = () => ({
 
 async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, extraArgs = [], supabaseJs = false, failClaims = [], oldCli = false } = {}) {
   const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [] };
+  const cursor = {};   // each stage hands out its photos once, at most p_limit a call, like the database
   let port;
   const server = createServer((req, res) => {
     let data = '';
@@ -75,7 +76,8 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         const claim = JSON.parse(data); calls.claims.push(claim);
         if (failClaims.includes(claim.p_stage)) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
         const names = claim.p_stage === 'deep_reading' ? deepFrames : claim.p_stage === 'keyed_values' ? keyedFrames : frameNames;
-        return json(200, names.map((n, i) => ({ work_id: i + 1, image_id: n, image_url: n.includes('no-url') ? '' : `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: claim.p_stage === 'classifier' ? null : '00000000-0000-4000-8000-0000000000cc', lane: 'live', reason: 'missing', target_version: 1 })));
+        const from = cursor[claim.p_stage] ?? 0, take = names.slice(from, from + claim.p_limit); cursor[claim.p_stage] = from + take.length;
+        return json(200, take.map((n, i) => ({ work_id: from + i + 1, image_id: n, image_url: n.includes('no-url') ? '' : `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: claim.p_stage === 'classifier' ? null : '00000000-0000-4000-8000-0000000000cc', lane: 'live', reason: 'missing', target_version: 1 })));
       }
       if (req.url === '/rest/v1/rpc/record_image_stage_receipt') {
         if (failFirstReceipt && ++calls.receiptAttempts === 1) return json(503, { message: 'upstream connect error' });
@@ -224,8 +226,8 @@ test('every model call starts lean and asks for the exact model id', async () =>
 test('a database without the new stages: both claim nothing, the fire is clean, and the heartbeat reading keeps its shape', async () => {
   await withStandIns(['a-ok.jpg'], ({ calls, summary, result }) => {
     assert.equal(result.code, 0);
-    assert.deepEqual(calls.claims.map((c) => [c.p_stage, c.p_limit]), [['classifier', 20], ['deep_reading', 20], ['keyed_values', 25]],
-      'first reads, then deep readings (default 20), then keyed values (default 60, claimed 25 a call)');
+    assert.deepEqual(calls.claims.map((c) => [c.p_stage, c.p_limit]), [['classifier', 20], ['deep_reading', 2], ['keyed_values', 25]],
+      'first reads, then deep readings (default 20, claimed 2 x concurrency a call), then keyed values (default 60, claimed 25 a call)');
     assert.deepEqual([summary.frames, summary.accepted, summary.receipts, summary.stopped], [1, 1, 1, null], 'the existing top-level fields keep their meaning');
     assert.deepEqual(Object.keys(summary.stages), ['deep_reading', 'keyed_values']);
     for (const stage of ['deep_reading', 'keyed_values']) {
@@ -248,8 +250,9 @@ test('deep readings: claimed with a lease that covers the batch; a photo that no
   const gone = { 'a-document.jpg': { is_document: true }, 'b-unfiled.jpg': { vehicle_id: null }, 'c-http.jpg': { image_url: 'http://example.test/c.jpg' }, 'd-read.jpg': { deep_scene: 'engine_bay' } };
   await withStandIns([], ({ calls, summary, claudeArgs }) => {
     const deep = calls.claims.find((c) => c.p_stage === 'deep_reading');
-    assert.deepEqual(deep, { p_stage: 'deep_reading', p_limit: 12, p_lease_seconds: 7200, p_user_id: OWNER },
-      '12 photos at concurrency 1, 600 s each (download, two reads each retried once, the intake)');
+    assert.deepEqual(deep, { p_stage: 'deep_reading', p_limit: 2, p_lease_seconds: 1200, p_user_id: OWNER },
+      'claimed two at a time (twice the concurrency), leased for those two only');
+    assert.equal(calls.claims.filter((c) => c.p_stage === 'deep_reading').length, 3, 'a claim that comes back short (2, 2, 0 of the 4 held) ends the stage: no claim for the 12th');
     assert.deepEqual(calls.snapshots, Object.keys(gone), 'the row is read again before anything is fetched');
     const got = calls.receipts.filter((r) => r.p_stage === 'deep_reading').map((r) => [r.p_image_id, r.p_outcome, r.p_detail.skipped]);
     assert.deepEqual(got, [['a-document.jpg', 'policy_skip', 'document'], ['b-unfiled.jpg', 'policy_skip', 'unfiled'], ['c-http.jpg', 'policy_skip', 'image_url_not_https'], ['d-read.jpg', 'policy_skip', 'already_read']]);

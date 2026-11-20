@@ -8,7 +8,7 @@
 // answer becomes. See docs in the PR for the measurements behind the decisions.
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { validateVerdict } from '../../supabase/functions/_shared/byokImageVerdict.mjs';
@@ -22,10 +22,14 @@ const run = promisify(execFile);
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 /** Where a deep reading's tier, method and cost basis say how it was made (never the three-pass reviewed reading's words). */
 export const AUTOMATIC_TIER = 'subscription automatic';
-export const AUTOMATIC_METHOD = 'claude-cli two independent passes, agreed values only, pixels only, v1';
-export const AUTOMATIC_COST_BASIS = 'Owner subscription via the claude CLI; nothing is billed per photo. The CLI\'s notional cost and token counts are kept in the stage receipt, not here.';
+export const AUTOMATIC_METHOD = 'claude-cli two passes; scene_type and the three state values are posted only where both passes agree, every other field is the first pass; pixels only, v1';
+export const AUTOMATIC_COST_BASIS = 'Owner subscription via the claude CLI; nothing is billed per photo. The CLI\'s notional cost and token counts are kept in the stage receipt, not here. agent_duration_ms is the photo\'s wall-clock (download, both reads, any retry).';
 export const SYSTEM_PROMPT = 'You read one photograph and report what is visible in it as one JSON object in the requested shape. You have one tool, Read, to open the image file you are given. Do nothing else.';
 const READ_TIMEOUT_MS = 240_000;
+/** A deep read's own limit: reads took 19-26 s on 2026-11-20, so 120 s is generous and bounds a stuck photo (first reads keep READ_TIMEOUT_MS). */
+export const DEEP_READ_TIMEOUT_MS = 120_000;
+/** No new deep photo is claimed or started after this long into the deep phase: the next fire's first reads must not wait behind it. */
+export const DEEP_BUDGET_MS = 420_000;
 
 /**
  * The argument list of every model call this reader makes. Lean: no CLAUDE.md, memory, plugins, MCP servers or hooks
@@ -34,9 +38,13 @@ const READ_TIMEOUT_MS = 240_000;
  * reviewed reader's grammar passed as --json-schema 20 of 20 answers passed the strict validator (6 of 20 before).
  * --bare is not used: it never reads the subscription login. Run it in an empty directory.
  */
-export function leanClaudeArgs({ model = DEFAULT_MODEL, schema = null } = {}) {
+export function leanClaudeArgs({ model = DEFAULT_MODEL, schema = null, readDir = null } = {}) {
+  // readDir: the Read tool may open files under that directory only. Measured 2026-11-20 on CLI 2.1.329: with a bare
+  // `--allowedTools Read` (or the owner's own settings allowing Read) the model read a file anywhere on the disk; with no setting
+  // sources and a scoped rule it read the photo and was refused a file outside. Rule paths starting with // are absolute.
   const argv = ['-p', '--safe-mode', '--model', model, '--output-format', 'json', '--system-prompt', SYSTEM_PROMPT,
-    '--tools', 'Read', '--allowedTools', 'Read', '--strict-mcp-config', '--no-session-persistence'];
+    '--tools', 'Read', ...(readDir ? ['--setting-sources', '', '--allowedTools', `Read(/${String(readDir).replace(/\/+$/, '')}/**)`] : ['--allowedTools', 'Read']),
+    '--strict-mcp-config', '--no-session-persistence'];
   if (schema) argv.push('--json-schema', JSON.stringify(schema));
   return argv;
 }
@@ -65,19 +73,34 @@ export function subscriptionEnv(env = process.env) {
   return out;
 }
 
-/** Start `claude` with `argv`, send `text` on stdin, resolve with its stdout (a result JSON, even from a run that ended in an error). */
-export function claudePrint(argv, text, { env, cwd, timeoutMs = READ_TIMEOUT_MS } = {}) {
+/**
+ * The environment of a deep read's child: subscriptionEnv minus every variable that looks like a credential (service key,
+ * dotenvx keys, anything named *KEY, *SECRET, *PASSWORD, *TOKEN). The CLI's own login variable stays. The model has one tool
+ * (Read), so this is depth, not the only control.
+ */
+export function deepChildEnv(base = process.env) {
+  const out = subscriptionEnv(base);
+  for (const k of Object.keys(out)) if (k !== 'CLAUDE_CODE_OAUTH_TOKEN' && /(?:KEY|SECRET|PASSWORD|TOKEN)/i.test(k)) delete out[k];
+  return out;
+}
+
+/** Start `claude` with `argv`, send `text` on stdin, resolve with its stdout (a result JSON, even from a run that ended in an error). `signal` kills the child. */
+export function claudePrint(argv, text, { env, cwd, timeoutMs = READ_TIMEOUT_MS, signal } = {}) {
   return new Promise((resolve, reject) => {
+    const aborted = () => Object.assign(new Error('read aborted'), { aborted: true });
+    if (signal?.aborted) return reject(aborted());
     const child = spawn('claude', argv, { env, cwd, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '', err = '';
     const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`reader timed out after ${Math.round(timeoutMs / 1000)} s`)); }, timeoutMs);
+    const onAbort = () => { clearTimeout(timer); child.kill('SIGKILL'); reject(aborted()); };
+    signal?.addEventListener('abort', onAbort, { once: true });
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { err += d; });
     child.on('error', (e) => { clearTimeout(timer); reject(e); });
     // A run that ends in an error (a usage limit, an API error) can exit non-zero with its JSON result on stdout: hand
     // that result on so the caller reads is_error and api_error_status instead of an empty stderr.
     const hasResult = () => { try { return typeof JSON.parse(out) === 'object' && JSON.parse(out) !== null; } catch { return false; } };
-    child.on('close', (code) => { clearTimeout(timer); code === 0 || hasResult() ? resolve(out) : reject(new Error(`claude exited ${code}: ${(err || out).slice(0, 200)}`)); });
+    child.on('close', (code) => { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); code === 0 || hasResult() ? resolve(out) : reject(new Error(`claude exited ${code}: ${(err || out).slice(0, 200)}`)); });
     child.stdin.end(text);
   });
 }
@@ -93,13 +116,17 @@ export const AGREEMENT_FIELDS = Object.freeze([
   ['completeness', (v) => v?.state_observations?.completeness],
 ]);
 
+/** The most confidence a verdict can carry when its two reads disagree; the keyed projection needs 0.6. */
+export const DISAGREEMENT_CONFIDENCE_CAP = 0.59;
+
 /**
  * Two independent reads of one photo become one verdict. The posted verdict is the first read; where the two differ on
  * scene_type, rust_severity, paint_state or completeness the posted value is "unknown" and one open_questions entry names
- * the field and both values. The merged verdict itself passes validateVerdict, or `errors` says why not (the caller then
+ * the field and both values, and the confidence is capped below the keyed projection's gate (0.6). Every other field
+ * (components, text, damage, narrative) is the first read's: only these four are cross-checked. The merged verdict itself passes validateVerdict, or `errors` says why not (the caller then
  * posts nothing). Pure: neither input is changed.
  *
- * Why: two single reads of the same photo disagreed on 10 of 60 state values (2026-11-20, 20 photos), and one read
+ * Why: two single reads of the same photo disagreed on 10 of 60 state values with the shipped prompt (2026-11-20, 20 photos; other prompt wordings measured 3 to 22 of 60), and one read
  * asserts values (no rust, clear coat) where the careful three-pass reading said unknown. A value is written only where
  * two readings of the pixels say the same thing.
  */
@@ -115,6 +142,11 @@ export function agreeVerdicts(first, second) {
     if (field === 'scene_type') verdict.scene_type = 'unknown'; else verdict.state_observations[field] = 'unknown';
     verdict.open_questions = [...(Array.isArray(verdict.open_questions) ? verdict.open_questions : []),
       `Two independent reads of this photo disagree on ${field}: ${a ?? 'missing'} vs ${b ?? 'missing'}; posted as unknown.`];
+  }
+  // a photo whose two reads differ must not key from the first read's say-so
+  if (disagreements.length && typeof verdict.confidence === 'number') {
+    const c2 = typeof second?.confidence === 'number' ? second.confidence : 1;
+    verdict.confidence = Math.round(Math.min(verdict.confidence, c2, DISAGREEMENT_CONFIDENCE_CAP) * 1000) / 1000;
   }
   return { verdict, agreed: disagreements.length === 0, disagreements, values, errors: validateVerdict(verdict) };
 }
@@ -156,6 +188,7 @@ export function eligibilityHold(row) {
   if (row.is_document || row.doc_flag) return 'document';
   if (!['approved', null, undefined].includes(row.vision_gate_status)) return 'gate_not_approved';
   if (['mismatch', 'unrelated'].includes(row.image_vehicle_match_status)) return 'vehicle_mismatch';
+  if (row.is_external) return 'external';
   if (!/^https:\/\//.test(row.image_url ?? '')) return 'image_url_not_https';
   if (typeof row.deep_scene === 'string' && row.deep_scene) return 'already_read';
   return null;
@@ -193,9 +226,11 @@ const invalid = (why) => Object.assign(new Error(why), { invalidOutput: true });
 /** Token counts and cost the CLI reports for one call (data for the stage receipt, never the testimony). */
 export function cliStats(outer, seconds) {
   const u = outer?.usage ?? {};
-  const models = outer?.modelUsage && typeof outer.modelUsage === 'object' ? Object.keys(outer.modelUsage) : [];
+  const usageByModel = outer?.modelUsage && typeof outer.modelUsage === 'object' ? outer.modelUsage : {};
+  const weight = (k) => Number(usageByModel[k]?.outputTokens ?? 0) + Number(usageByModel[k]?.inputTokens ?? 0);
+  const models = Object.keys(usageByModel).sort((a, b) => weight(b) - weight(a));
   return {
-    seconds, turns: outer?.num_turns ?? null, model: models.length === 1 ? models[0] : null,
+    seconds, turns: outer?.num_turns ?? null, model: models[0] ?? null,
     input_tokens: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
     output_tokens: u.output_tokens ?? 0,
     notional_cost_usd: typeof outer?.total_cost_usd === 'number' ? Math.round(outer.total_cost_usd * 10000) / 10000 : null,
@@ -225,15 +260,17 @@ export function verdictFromCliOutput(stdout, { imageId, vehicleId }) {
  * One read, valid on its own. A failed read is tried once more; a fault that is the batch's (usage limit, login, API down,
  * no CLI) is not retried: it ends the attempt at once.
  */
-export async function readOnce({ ask, ids, retries = 1 }) {
+export async function readOnce({ ask, ids, retries = 1, signal }) {
   let last;
   for (let n = 0; n <= retries; n++) {
+    if (signal?.aborted) throw last ?? Object.assign(new Error('read aborted'), { aborted: true });
     const t0 = Date.now();
     try {
       const { verdict, outer } = verdictFromCliOutput(await ask(), ids);
       return { verdict, stats: { ...cliStats(outer, Math.round((Date.now() - t0) / 100) / 10), attempts: n + 1 } };
     } catch (e) {
       last = e;
+      if (e?.aborted) break;
       if (receiptForResult({ reader: { error: String(e.message || e), apiStatus: e.apiStatus ?? null, invalidOutput: e.invalidOutput === true, missingTool: e?.code === 'ENOENT' } }).stop) break;
     }
   }
@@ -246,7 +283,7 @@ export function deepPrompt({ contract, imageId, vehicleId, imagePath }) {
     `Keep inscriptions distinct from identity. Removable lettering does not prove engine or factory trim. Use unknown/null for unsupported measurements.\n` +
     `Report visible evidence only; this is a read of pixels with no receipt or work context.\n${contract}\n` +
     `SOURCE: ${JSON.stringify([{ image_id: imageId, vehicle_id: vehicleId, attached_image_index: 1 }])}\n` +
-    `The image is the file at ${imagePath}. Read it first with the Read tool, then answer with the JSON object {"verdicts":[ ... ]} holding exactly one verdict, with the exact image_id and vehicle_id above. No timestamps or provenance in the verdict.`;
+    `The Read tool is permitted for this one file only; no apple_hints are supplied. The image is the file at ${imagePath}. Read it first with the Read tool, then answer with the JSON object {"verdicts":[ ... ]} holding exactly one verdict, with the exact image_id and vehicle_id above. No timestamps or provenance in the verdict.`;
 }
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -258,7 +295,7 @@ export function deepDetail({ model, runId, reads, agreement, seconds }) {
     agreed: agreement ? agreement.agreed : null,
     disagreements: agreement ? agreement.disagreements.map((d) => d.field) : [],
     values: agreement ? agreement.values : null,
-    reads: reads.map((r) => ({ ...r.stats, state: { scene_type: r.verdict.scene_type, rust_severity: r.verdict.state_observations.rust_severity, paint_state: r.verdict.state_observations.paint_state, completeness: r.verdict.state_observations.completeness } })),
+    reads: reads.map((r) => ({ ...r.stats, verdict: JSON.stringify(r.verdict).length <= 16_000 ? r.verdict : null, state: { scene_type: r.verdict.scene_type, rust_severity: r.verdict.state_observations.rust_severity, paint_state: r.verdict.state_observations.paint_state, completeness: r.verdict.state_observations.completeness } })),
   };
 }
 
@@ -274,7 +311,7 @@ export function deepDetail({ model, runId, reads, agreement, seconds }) {
  *
  * Returns { receipt (typed, ready for recordStageReceipt), envelope, agreement, reads, valid, seconds, stop }.
  */
-export async function deepReadFrame(frame, deps, { dir, contract, model, runId, post = true, now = () => new Date(), reader, promptVersion = 'reviewed_image_analysis_v1' }) {
+export async function deepReadFrame(frame, deps, { dir, contract, model, runId, post = true, now = () => new Date(), reader, promptVersion = 'reviewed_image_analysis_v1', signal }) {
   const t0 = Date.now();
   const typed = (result) => {
     const receipt = receiptForDeepResult(result, { reader, promptVersion });
@@ -283,7 +320,7 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
   // the row as it is now, immediately before the download: its clock is the compare-and-set token the intake checks
   let row;
   try {
-    const rows = await deps.rest(`vehicle_images?select=id,vehicle_id,image_url,updated_at,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status,file_name,deep_scene:ai_scan_metadata->byok_deep_analysis->>scene_type&id=eq.${frame.id}`);
+    const rows = await deps.rest(`vehicle_images?select=id,vehicle_id,image_url,updated_at,is_external,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status,file_name,deep_scene:ai_scan_metadata->byok_deep_analysis->>scene_type&id=eq.${frame.id}`);
     row = Array.isArray(rows) ? rows[0] : null;
   } catch { return typed({ intake: { http: 503, error: 'review_source_unavailable' } }); }
   const hold = eligibilityHold(row);
@@ -309,23 +346,37 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
     }
     const ids = { imageId: row.id, vehicleId: row.vehicle_id };
     const prompt = deepPrompt({ contract, imageId: row.id, vehicleId: row.vehicle_id, imagePath: img });
-    const argv = leanClaudeArgs({ model, schema: stageSchema('verdicts') });
-    const ask = () => deps.ask(argv, prompt, dir);
+    const argv = leanClaudeArgs({ model, schema: stageSchema('verdicts'), readDir: realpathSync(dir) });
+    // One controller per photo: the first read that fails ends its sibling (a photo needs two valid reads, so a second call
+    // would be spent on nothing), and the phase's halt ends this photo. Both reads have settled before the files go.
+    const ctl = new AbortController();
+    const onParent = () => ctl.abort();
+    if (signal?.aborted) ctl.abort(); else signal?.addEventListener('abort', onParent, { once: true });
+    const ask = () => deps.ask(argv, prompt, dir, ctl.signal);
+    const one = () => readOnce({ ask, ids, signal: ctl.signal }).catch((e) => { ctl.abort(); throw e; });
     let reads;
     try {
       // two independent reads, run together; each valid on its own, each allowed one retry
-      reads = await Promise.all([readOnce({ ask, ids }), readOnce({ ask, ids })]);
-    } catch (e) {
-      return typed({ reader: { error: String(e.message || e), apiStatus: e.apiStatus ?? null, invalidOutput: e.invalidOutput === true, missingTool: e?.code === 'ENOENT' },
-        detail: { model, run_id: runId, no_two_valid_reads: true } });
-    }
+      const settled = await Promise.allSettled([one(), one()]);
+      const failed = settled.filter((x) => x.status === 'rejected').map((x) => x.reason);
+      if (failed.length) {
+        // the halt ended this photo, not a fault of its own: no receipt, the lease hands it back
+        if (signal?.aborted) return { receipt: null, aborted: true, stop: false, valid: false, seconds: Math.round((Date.now() - t0) / 100) / 10 };
+        const real = failed.filter((e) => !e?.aborted);
+        const e = real.find((x) => receiptForResult({ reader: { error: String(x?.message || x), apiStatus: x?.apiStatus ?? null, invalidOutput: x?.invalidOutput === true, missingTool: x?.code === 'ENOENT' } }).stop) ?? real[0] ?? failed[0];
+        return typed({ reader: { error: String(e.message || e), apiStatus: e.apiStatus ?? null, invalidOutput: e.invalidOutput === true, missingTool: e?.code === 'ENOENT' },
+          detail: { model, run_id: runId, no_two_valid_reads: true } });
+      }
+      reads = settled.map((x) => x.value);
+    } finally { signal?.removeEventListener('abort', onParent); }
     const agreement = agreeVerdicts(reads[0].verdict, reads[1].verdict);
     const seconds = Math.round((Date.now() - t0) / 100) / 10;
     const detail = deepDetail({ model, runId, reads, agreement, seconds });
     if (agreement.errors.length) {
       return { ...typed({ reader: { error: 'the merged verdict fails the contract', invalidOutput: true }, detail }), reads, agreement };
     }
-    const reportedModel = reads.map((r) => r.stats.model).find(Boolean) ?? model;
+    // the CLI's own report of the model that answered; when it reports none, say so beside what was asked for
+    const reportedModel = reads.map((r) => r.stats.model).find(Boolean) ?? `unreported (requested ${model})`;
     const envelope = buildEnvelope({ verdict: agreement.verdict, row, reviewedUrl: row.image_url, sha256: sha256(bytes), reviewedAt: now().toISOString(),
       provenance: automaticProvenance({ model: reportedModel, runId, durationMs: Date.now() - t0 }) });
     if (!post) {
@@ -353,6 +404,35 @@ export async function keyedValuesForFrame(frame, { sb, apply = true, reader, pro
   } catch (e) {
     return { receipt: receiptForKeyedResult({ error: String(e?.message || e) }, { reader, promptVersion }), projection: null };
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Working a stage in small claims
+
+/** Run `fn` over `items` with `width` workers; no worker starts an item once `halted()` is true. */
+export async function pool(items, width, fn, halted = () => false) {
+  let n = 0;
+  await Promise.all(Array.from({ length: Math.max(1, width) }, async () => { while (n < items.length && !halted()) await fn(items[n++]); }));
+}
+
+/**
+ * Claim and work a stage in small chunks instead of all at once: the lease of a claim covers only the chunk, and a halt (usage
+ * limit, login refused) or the deadline strands at most one chunk, not the whole limit. Stops when a claim comes back short
+ * (nothing more is due), the limit is reached, `halted()` is true or `now() >= deadline`.
+ *   claim(n)  -> { work, error }     work(item) -> Promise
+ * Returns { claimed, error }.
+ */
+export async function claimAndWork({ claim, work, limit, chunk, width, halted = () => false, deadline = Infinity, now = Date.now }) {
+  let claimed = 0, error = null;
+  while (claimed < limit && !halted() && now() < deadline) {
+    const want = Math.min(chunk, limit - claimed);
+    const got = await claim(want);
+    if (got.error) { error = got.error; break; }
+    claimed += got.work.length;
+    await pool(got.work, width, work, () => halted() || now() >= deadline);
+    if (got.work.length < want) break;
+  }
+  return { claimed, error };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -30,7 +30,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
-import { DEFAULT_MODEL, claudePrint, cliSupportsLean, countReceipt, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, subscriptionEnv } from './deep-stage.mjs';
+import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, subscriptionEnv } from './deep-stage.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -61,8 +61,8 @@ async function rpc(name, body) {
   if (!r.ok) throw new Error(`${name}: ${r.status} ${(await r.text()).slice(0, 200)}`);
   return r.json();
 }
-async function orchestrator(body) {
-  const r = await fetch(`${URL_}/functions/v1/photo-pipeline-orchestrator`, { method: 'POST', headers: H, body: JSON.stringify(body) });
+async function orchestrator(body, timeoutMs = 0) {
+  const r = await fetch(`${URL_}/functions/v1/photo-pipeline-orchestrator`, { method: 'POST', headers: H, body: JSON.stringify(body), ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}) });
   const text = await r.text();
   let j; try { j = JSON.parse(text); } catch { j = { error: text.slice(0, 200) }; }
   return { http: r.status, ...j };
@@ -77,10 +77,10 @@ async function supabaseClient() {
 }
 const deepDeps = (dir) => ({
   rest,
-  fetchBytes: async (url) => { const res = await fetch(url).catch(() => ({ ok: false, status: 0 })); return res.ok ? { ok: true, status: res.status, bytes: Buffer.from(await res.arrayBuffer()) } : { ok: false, status: res.status }; },
+  fetchBytes: async (url) => { const res = await fetch(url, { signal: AbortSignal.timeout(60_000) }).catch(() => ({ ok: false, status: 0 })); return res.ok ? { ok: true, status: res.status, bytes: Buffer.from(await res.arrayBuffer()) } : { ok: false, status: res.status }; },
   convert: async (raw) => { const out = raw.replace(/\.[^.]+$/, '') + '.jpg'; await run('sips', ['-s', 'format', 'jpeg', '-Z', '1600', raw, '--out', out]); return out; },
-  ask: (argv, text, cwd) => claudePrint(argv, text, { env: subscriptionEnv(), cwd }),
-  orchestrator,
+  ask: (argv, text, cwd, signal) => claudePrint(argv, text, { env: deepChildEnv(), cwd, signal, timeoutMs: DEEP_READ_TIMEOUT_MS }),
+  orchestrator: (body) => orchestrator(body, 120_000),
 });
 const contractText = () => readFileSync(join(here, '..', 'daily-receipt', 'byok-vision-prompt.md'), 'utf8');
 
@@ -228,44 +228,48 @@ const settleStage = async (stageName, summary, f, receipt) => {
   if (saved.ok) summary.receipts++; else { summary.receipt_errors++; console.error(`${f.id} ${stageName} receipt not recorded: ${saved.error}`); }
 };
 const toFrame = (w) => ({ id: w.image_id, vehicle_id: w.vehicle_id, user_id: w.user_id, image_url: w.image_url, target_version: w.target_version, lane: w.lane, reason: w.reason });
-async function pool(items, width, fn, halted) {
-  let n = 0;
-  await Promise.all(Array.from({ length: Math.max(1, width) }, async () => { while (n < items.length && !halted()) await fn(items[n++]); }));
-}
+// Each stage runs inside its own boundary: a fault in one cannot cost the fire its first-read summary or its other stage.
+const phaseFailed = (e) => ({ ...newStageSummary(), error: 'phase_failed', error_text: String(e?.message || e).slice(0, 120) });
 async function deepPhase() {
   const s = newStageSummary();
   if (deepLimit < 1) { s.skipped = 'off'; return s; }
   // a fault that is the batch's (usage limit, login refused, API unreachable, a missing tool) would fail every deep reading the same way
   if (summary.stopped) { s.skipped = 'first_read_fault'; return s; }
   if (!lean) { s.skipped = 'cli_without_safe_mode'; return s; }
-  const leaseSeconds = Math.max(900, Math.ceil(Math.min(deepLimit, 25) / Math.max(1, conc)) * 600);   // one photo: download, two reads (each may be retried once), the intake
-  const claimed = await claimStageWorkUpTo(rpc, { stage: DEEP_STAGE, limit: deepLimit, leaseSeconds, userId: OWNER });
-  if (claimed.error) { s.claim_error = claimed.error; console.error(`${DEEP_STAGE}: ${claimed.error} ${claimed.detail}`); return s; }
-  const frames2 = claimed.work.map(toFrame);
-  s.claimed = frames2.length;
-  if (!frames2.length) return s;
-  Object.assign(s, { reads_valid: 0, agreed_all: 0, disagreements: {}, read_seconds: 0, input_tokens: 0, output_tokens: 0 });
-  console.error(`${frames2.length} photos to read deeply (model ${model}, concurrency ${conc})`);
-  const dir = mkdtempSync(join(tmpdir(), 'nuke-deep-'));
-  const contract = contractText(), runId = newRunId();
-  let halt = false;
+  Object.assign(s, { reads_valid: 0, agreed_all: 0, disagreements: {}, read_seconds: 0, input_tokens: 0, output_tokens: 0, aborted: 0 });
+  // Claimed in small chunks, each leased for its own work (a photo is a download, two reads each allowed a retry, the intake):
+  // a halt or the deadline then strands at most one chunk, not the whole limit.
+  const chunk = Math.max(1, 2 * conc);
+  const leaseSeconds = Math.max(900, Math.ceil(chunk / Math.max(1, conc)) * 600);
+  const halt = new AbortController();
+  let dir = null;
   try {
-    await pool(frames2, conc, async (f) => {
-      s.started++;
-      let res;
-      try { res = await deepReadFrame(f, deepDeps(dir), { dir, contract, model, runId, reader: READER }); }
-      catch (e) { res = { receipt: receiptForResult({ reader: { error: String(e?.message || e), missingTool: e?.code === 'ENOENT' } }, { reader: READER, promptVersion: 'reviewed_image_analysis_v1' }), stop: false }; }
-      if (res.agreement && res.reads) {
-        s.reads_valid += res.reads.length; s.read_seconds += Math.round(res.seconds);
-        for (const r of res.reads) { s.input_tokens += r.stats.input_tokens; s.output_tokens += r.stats.output_tokens; }
-        if (res.agreement.agreed) s.agreed_all++;
-        for (const d of res.agreement.disagreements) s.disagreements[d.field] = (s.disagreements[d.field] || 0) + 1;
-      }
-      if (res.receipt.stop) { halt = true; s.stopped = res.receipt.error_class; }
-      await settleStage(DEEP_STAGE, s, f, res.receipt);
-      console.error(`${f.id} ${DEEP_STAGE} ${res.receipt.outcome}${res.receipt.error_class ? ' ' + res.receipt.error_class : ''}${res.receipt.detail?.skipped ? ' ' + res.receipt.detail.skipped : ''}`);
-    }, () => halt);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+    const contract = contractText(), runId = newRunId();
+    dir = mkdtempSync(join(tmpdir(), 'nuke-deep-'));
+    const r = await claimAndWork({
+      limit: deepLimit, chunk, width: conc, halted: () => halt.signal.aborted, deadline: Date.now() + DEEP_BUDGET_MS,
+      claim: async (n) => { const c = await claimStageWorkUpTo(rpc, { stage: DEEP_STAGE, limit: n, leaseSeconds, userId: OWNER }); if (c.error) console.error(`${DEEP_STAGE}: ${c.error} ${c.detail}`); return { work: c.work.map(toFrame), error: c.error }; },
+      work: async (f) => {
+        s.started++;
+        let res;
+        try { res = await deepReadFrame(f, deepDeps(dir), { dir, contract, model, runId, reader: READER, signal: halt.signal }); }
+        catch (e) { res = { receipt: receiptForResult({ reader: { error: String(e?.message || e), missingTool: e?.code === 'ENOENT' } }, { reader: READER, promptVersion: 'reviewed_image_analysis_v1' }), stop: false }; }
+        if (res.aborted || !res.receipt) { s.aborted++; return; }   // ended by a sibling's halt: no receipt, no attempt counted; the lease hands it back
+        if (res.agreement && res.reads) {
+          s.reads_valid += res.reads.length; s.read_seconds += Math.round(res.seconds);
+          for (const x of res.reads) { s.input_tokens += x.stats.input_tokens; s.output_tokens += x.stats.output_tokens; }
+          if (res.agreement.agreed) s.agreed_all++;
+          for (const d of res.agreement.disagreements) s.disagreements[d.field] = (s.disagreements[d.field] || 0) + 1;
+        }
+        if (res.receipt.stop) { s.stopped = res.receipt.error_class; halt.abort(); }
+        await settleStage(DEEP_STAGE, s, f, res.receipt);
+        console.error(`${f.id} ${DEEP_STAGE} ${res.receipt.outcome}${res.receipt.error_class ? ' ' + res.receipt.error_class : ''}${res.receipt.detail?.skipped ? ' ' + res.receipt.detail.skipped : ''}`);
+      },
+    });
+    s.claimed = r.claimed;
+    if (r.error) s.claim_error = r.error;
+    if (r.claimed) console.error(`${r.claimed} photos claimed to read deeply (model ${model}, concurrency ${conc}, chunks of ${chunk})`);
+  } finally { if (dir) rmSync(dir, { recursive: true, force: true }); }
   return s;
 }
 async function keyedPhase() {
@@ -286,12 +290,12 @@ async function keyedPhase() {
     if (res.receipt.outcome === 'succeeded') s.values += res.receipt.detail.values || 0;
     await settleStage(KEYED_STAGE, s, f, res.receipt);
     console.error(`${f.id} ${KEYED_STAGE} ${res.receipt.outcome}${res.receipt.error_class ? ' ' + res.receipt.error_class : ''}${res.receipt.detail?.skipped ? ' ' + res.receipt.detail.skipped : ''}`);
-  }, () => false);
+  });
   return s;
 }
 if (fromQueue && !dry) {
-  stages[DEEP_STAGE] = await deepPhase();
-  stages[KEYED_STAGE] = await keyedPhase();
+  stages[DEEP_STAGE] = await deepPhase().catch((e) => { console.error(`${DEEP_STAGE} phase failed: ${String(e?.message || e).slice(0, 160)}`); return phaseFailed(e); });
+  stages[KEYED_STAGE] = await keyedPhase().catch((e) => { console.error(`${KEYED_STAGE} phase failed: ${String(e?.message || e).slice(0, 160)}`); return phaseFailed(e); });
   summary.stages = stages;
 }
 const receipt = { run: 'subscription-frame-classifier', at: new Date().toISOString(), owner: OWNER, model, prompt_version: checklist.prompt_version, summary, results: out };

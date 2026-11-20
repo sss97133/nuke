@@ -184,10 +184,14 @@ test('deep reading: every answer the intake can give is a typed receipt', () => 
   assert.deepEqual(of({ intake: { http: 200, success: true, observation_id: 'o1' } }), ['succeeded', null, null, false]);
   assert.equal(receiptForDeepResult({ intake: { http: 200, success: true, observation_id: 'o1' } }, dctx).detail.observation_id, 'o1');
   // the source changed during the read: retried in about two minutes
-  for (const code of ['review_source_changed', 'review_source_changed_during_projection', 'review_projection_refused', 'review_projection_not_persisted']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['unavailable', code, 120, false]);
+  for (const code of ['review_source_changed', 'review_source_changed_during_projection', 'review_projection_not_persisted']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['unavailable', code, 120, false]);
+  // two reads are spent per attempt: a refusal with no reason the reader can see, and a withdrawal, wait an hour
+  for (const code of ['review_projection_refused', 'review_source_withdrawn']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['unavailable', code, 3600, false]);
   // withdrawn or not eligible: closed with its reason
-  for (const code of ['review_source_withdrawn', 'review_source_previously_withdrawn']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['policy_skip', code, null, false]);
+  assert.deepEqual(of({ intake: { http: 409, success: false, error: 'review_source_previously_withdrawn' } }), ['policy_skip', 'review_source_previously_withdrawn', null, false]);
   assert.deepEqual(of({ policy: 'document' }), ['policy_skip', 'document', null, false]);
+  // a gate that has not passed yet can pass: a pause the ledger reopens, never a policy_skip (which no gap rule reopens)
+  assert.deepEqual(of({ policy: 'gate_not_approved' }), ['unavailable', 'gate_not_approved', 3600, false]);
   // the contract refused the answer
   for (const code of ['invalid_review_envelope', 'invalid_review_identity', 'invalid_review_verdict', 'invalid_review_state', 'invalid_review_presence', 'invalid_review_workshop', 'invalid_review_camera',
     'invalid_review_regions', 'invalid_review_flags', 'invalid_review_notes', 'invalid_review_lists', 'invalid_review_source', 'invalid_review_provenance', 'review_too_large']) assert.deepEqual(of({ intake: { http: 400, success: false, error: code } }), ['unavailable', 'reader_output_invalid', 1800, false], code);
