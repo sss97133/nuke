@@ -12,6 +12,8 @@ import type { DayDocument } from './VehicleDayDrawer';
 import { useVehicleWorkOrderFinancials, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
 import { useVisualWork } from './hooks/useVisualWork';
 import { VisualWorkCards } from './VisualWorkCards';
+import { useBuildReconstruction } from './hooks/useBuildReconstruction';
+import { BuildRecord } from './BuildRecord';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
@@ -215,6 +217,7 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
 
 function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords>; work?: ReturnType<typeof useVisualWork> }) {
   const { user, loading } = useAuthContext();
+  const build = useBuildReconstruction(vehicleId);
   const [vendor, setVendor] = useState('');
   const [showAll, setShowAll] = useState(false);
   const rows = (loading || read.isError ? [] : read.rows)
@@ -228,10 +231,12 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
     <div className="vp-receipt-heading"><h3>Work & parts</h3><span>Receipt collection</span></div>
     <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
     {(rows.length > 0 || !!work?.ledger?.scenarios.length) && <nav className="vp-receipt-jump" aria-label="Work and parts sections">
+      {!!build.data?.totals.lines && <a href="#build-record">Build record</a>}
       {!!work?.ledger?.scenarios.length && <a href="#build-estimates">Estimates</a>}
       {rows.length > 0 && <a href="#build-receipt-pages">Receipts ({rows.length}{read.hasNextPage ? '+' : ''})</a>}
       {!!work?.rows.length && <a href="#build-work-photos">Work photos</a>}
     </nav>}
+    {build.data && <BuildRecord record={build.data} />}
     {work && <VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger}
       components={loading ? null : work.components} renderSource={line => line.source_url_sha256 ? <ReceiptSource
       key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}

@@ -1,0 +1,41 @@
+import { useQuery } from '@tanstack/react-query';
+import { useAuthContext } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
+import { bounded } from '../../../services/accountingCloseout';
+
+export interface BuildLine {
+  item_id: string; receipt_id: string; kind: 'part' | 'labor' | 'note' | 'service' | 'backordered' | 'kit_component';
+  day: string | null; source: string | null; description: string | null; part_number: string | null;
+  paper_hours: number | null; operation_code: string | null; amount: number | null;
+}
+export interface BuildSystem {
+  system_key: string; first_day: string | null; last_day: string | null; part_lines: number; backordered_lines: number;
+  suppliers: string[];
+  paper: { lines: number; lines_without_hours: number; hours: number | null; performers: number; shops: string[] };
+  reference: { hours: number | null; parts_without_reference: number;
+    operations: { code: string; name: string; hours: number; part_lines: number; basis: 'part_on_receipt' | 'implied_by_machine_shop_work' }[] };
+  priced_lines: number; recorded_amount: number | null; lines: BuildLine[] | null;
+}
+export interface BuildReconstruction {
+  version: number; as_of: string; amounts_visible: boolean; rule: string; systems_without_paper: string[];
+  totals: { lines: number; placed_lines: number; receipts: number; first_day: string | null; last_day: string | null;
+    part_lines: number; paper_work_lines: number; paper_hours: number | null; reference_hours: number | null;
+    reference_operations: number; parts_without_reference: number; recorded_amount: number | null };
+  systems: BuildSystem[];
+}
+
+/** The build per car system, computed by the database from the vehicle's receipt lines. No arithmetic happens here. */
+export function useBuildReconstruction(vehicleId: string) {
+  const { user, loading: authLoading } = useAuthContext();
+  return useQuery({
+    queryKey: ['vehicle-build-reconstruction', vehicleId, user?.id ?? 'anonymous'],
+    enabled: !!vehicleId && !authLoading, staleTime: 60_000, retry: false,
+    queryFn: async ({ signal }) => {
+      const { data, error } = await bounded(requestSignal => supabase.rpc('vehicle_build_reconstruction', { p_vehicle_id: vehicleId })
+        .abortSignal(requestSignal), signal);
+      if (error) throw new Error('Build record could not be read');
+      if (!data || data.version !== 1 || !Array.isArray(data.systems) || !data.totals) return null;
+      return data as BuildReconstruction;
+    },
+  });
+}
