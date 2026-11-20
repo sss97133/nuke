@@ -10,7 +10,7 @@ import { ANSWER_SCHEMA } from './fact-doubts.mjs';
 
 export const PROVIDERS = ['api', 'subscription', 'gemini'];
 export const AGENTS = { api: 'fact-doubt-reader', subscription: 'fact-doubt-reader', gemini: 'fact-doubt-reader-gemini' };
-export const API_KEY_ENVS = ['NUKE_PHOTO_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'];
+export const API_KEY_ENVS = ['NUKE_ANTHROPIC_API_KEY', 'NUKE_PHOTO_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'];
 export const GEMINI_KEY_ENVS = ['GEMINI_API_KEY', 'GOOGLE_AI_API_KEY'];
 export const GEMINI_HOST = 'https://generativelanguage.googleapis.com';
 export const CLI_TIMEOUT_MS = 240_000;
