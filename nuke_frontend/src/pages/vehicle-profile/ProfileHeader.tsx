@@ -182,7 +182,7 @@ export function extractInlineLotProvenance(vehicle: Record<string, any> | null |
  * borrow an unrelated auction study or replace the vehicle route with a market page.
  */
 export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
-  const { vehicle, auctionPulse, auctionCurrency, setGalleryFilter, timelineEvents, timelineReadState } = useVehicleProfile();
+  const { vehicle, auctionPulse, auctionCurrency, galleryFilter, setGalleryFilter, timelineEvents, timelineReadState } = useVehicleProfile();
   const contributionDays = useContributionDays(vehicle?.id);
   const priceOwnedByLiveStack = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
   const doc = useProfileDocument(vehicle?.id, priceOwnedByLiveStack);
@@ -204,6 +204,14 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   // On a phone the specs scroll with the page; only identity and price stay pinned (frontend.md, owner 2026-10-10).
   const isMobile = useIsMobile();
   const [activeFacet, setActiveFacet] = useState<{ field: string; value: string; dimension: string } | null>(null);
+  // The filter a header token set while opening its popup. Closing the popup takes it back, unless the visitor has since
+  // changed the filter themselves (a different filter object): a filter the popup did not set stays.
+  const popupFilter = useRef<NonNullable<typeof galleryFilter> | null>(null);
+  useEffect(() => {
+    if (activeFacet || !popupFilter.current) return;
+    if (galleryFilter === popupFilter.current) setGalleryFilter?.(null);
+    popupFilter.current = null;
+  }, [activeFacet]); // eslint-disable-line react-hooks/exhaustive-deps
   const [liveOpen, setLiveOpen] = useState(false);
   const [listingOpen, setListingOpen] = useState(false);
   const [financialOpen, setFinancialOpen] = useState(false);
@@ -385,8 +393,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     const dimension = field === 'engine_type' ? 'engine' : TOKEN_DIMENSIONS.has(field) ? field : 'trim';
     setActiveFacet(current => current?.field === evidenceField ? null : { field: evidenceField, value, dimension });
     // A gap has no member to filter the gallery by.
-    setGalleryFilter?.(!gap && ['transmission', 'drivetrain', 'engine_type', 'body_style', 'mileage'].includes(evidenceField)
-      ? { field: evidenceField, label: value } : null);
+    const filter = !gap && ['transmission', 'drivetrain', 'engine_type', 'body_style', 'mileage'].includes(evidenceField)
+      ? { field: evidenceField, label: value } : null;
+    popupFilter.current = filter;
+    setGalleryFilter?.(filter);
   };
   const configuration = strip && <div className="vp-header-facets" role="group" aria-label="Explore this vehicle">
     {strip.odometer && <ClaimView label="Odometer" role="label" claim={strip.odometer} format={value => `${Number(value).toLocaleString('en-US')} mi`} />}

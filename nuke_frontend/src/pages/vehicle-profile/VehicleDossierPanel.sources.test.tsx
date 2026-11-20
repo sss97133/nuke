@@ -228,3 +228,10 @@ it('on a replica renders trim only as its items, and the exterior color row as t
   expect(paint?.querySelector('.vp-structured-record__items-label')?.textContent).toBe('Exterior color');
   expect(paint?.textContent).toContain('P-01/P-01');
 });
+
+it('a claims reader that returns nothing renders no box, so no empty-claims note sits beside the facts the page shows', async () => {
+  state.rpc.mockImplementation((_name, args) => ({ abortSignal: () => Promise.resolve(response(args.p_include_typed_claims ? page([]) : record())) }));
+  await render();
+  const box = host.querySelector('[aria-label="Structured source claims"]') as HTMLElement | null;
+  expect(box === null || box.hidden).toBe(true);
+});

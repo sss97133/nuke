@@ -23,7 +23,22 @@ export function itemLabel(item: Pick<FacetItem, 'key' | 'facet'>): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-const numberText = (n: number) => (Number.isInteger(n) ? n.toLocaleString('en-US') : String(n));
+/** Keys that name a quantity (something counted or measured); every other integer is an identifier (year, casting number, code, ZIP) and prints as-is. */
+const QUANTITY_KEY = /(^|_)(hours?|hrs|lines?|counts?|miles?|mileage|photos?|images?|days|observations?|bids?|comments?|views?|rows?|total|number_of|n)(_|$)/i;
+export const isQuantityKey = (key: string) => QUANTITY_KEY.test(key);
+/** A day key (`first_day`, `last_at`, `date`) whose ISO value is shown with the page's date formatter. */
+const DAY_KEY = /(^|_)(day|date|at)$/i;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** Integers get thousands separators only as quantities: with a unit or a quantity key. Years, casting numbers, codes and ZIPs never do. */
+const numberText = (n: number, quantity = true) => (Number.isInteger(n) && quantity ? n.toLocaleString('en-US') : String(n));
+
+/** One decoded key-value pair as words: quantity keys read with separators, day keys with the page's date format, the rest as-is. */
+export function decodedText(key: string, value: unknown): string {
+  if (typeof value === 'number') return numberText(value, isQuantityKey(key));
+  if (typeof value === 'string' && DAY_KEY.test(key) && ISO_DAY.test(value.trim())) return day(value.trim());
+  return valueText(value) ?? '';
+}
 
 /** Machine codes the reader sent without a label (`not_original_unit`), as words. The reader's label wins when present. */
 export const codeText = (s: string) => s.replace(/\b[a-z0-9]+(?:_[a-z0-9]+)+\b/g, code => code.replace(/_/g, ' '));
@@ -47,7 +62,7 @@ export function valueText(value: unknown, unit?: string | null): string | null {
   if (value == null) return null;
   const withUnit = (t: string) => (unit ? `${t} ${unit}` : t);
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'number') return withUnit(numberText(value));
+  if (typeof value === 'number') return withUnit(numberText(value, !!unit));
   if (typeof value === 'string') return value.trim() ? withUnit(value) : null;
   if (Array.isArray(value)) {
     const parts = value.map(v => valueText(v)).filter((v): v is string => !!v);
@@ -93,7 +108,7 @@ function SourceLine({ source }: { source: FacetItemSource }) {
         {(source.observed_at || source.class !== 'record') && <Text role="caption">{day(source.observed_at)}</Text>}
       </span>
       {said && <Text role="caption">{said}</Text>}
-      {decoded.length > 0 && <Text role="caption">{decoded.map(([k, v]) => `${k.replace(/_/g, ' ')}: ${valueText(v) ?? ''}`).join(' · ')}</Text>}
+      {decoded.length > 0 && <Text role="caption">{decoded.map(([k, v]) => `${k.replace(/_/g, ' ')}: ${decodedText(k, v)}`).join(' · ')}</Text>}
       {source.limitation && <Text role="caption">Limitation: {source.limitation}</Text>}
     </span>
   </li>;
