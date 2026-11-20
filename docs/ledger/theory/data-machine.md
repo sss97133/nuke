@@ -323,7 +323,7 @@ none was present when a photo was read.
 | Training: reference knowledge | `condition_knowledge`, `component_definitions` | mixed; some of it is manual text parsed into fragments |
 | Experience: what has been seen, and what people ask | listing photos and comments, `question_taxonomy` | not consulted when a photo is read |
 | Context: this vehicle, this job, this day, this view | the vehicle, its jobs and receipts, capture sets, the first read's view | not handed to the reader |
-| The critique: ask, answer, agree, fact | `evidence_judgment_requests`, `ingest-observation` with witnesses | one question kind; no photo reading goes through it |
+| The critique: ask, answer, agree, fact | `evidence_judgment_requests`, `ingest-observation` with witnesses | two question kinds from 2026-11-20 (`receipt_part_visible`, and `fact_doubt`: a reader's doubt about one registered key, migration `20261120070000`, not live until it deploys); no photo reading goes through either; no runner answers `fact_doubt` yet |
 
 ## Construction direction, owner priority 2026-10-04
 
