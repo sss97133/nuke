@@ -199,14 +199,22 @@ it('shows the replica points from cited readers while keeping the as-built gearb
     trim: [item('trim.tribute', 'tribute', 'claim')], engine: [item('engine.current.displacement', '7.5', 'established')],
     transmission: [item('transmission.as_built.type', null, 'missing'), item('transmission.current.type', 'manual', 'established')],
   }} /></MemoryRouter>);
-  expect(host.textContent).toContain('Buccaneer Red');
-  expect(host.textContent).toContain('Cowl tag');
-  expect(host.textContent).toContain('Hood and scoop');
-  expect(host.textContent).toContain('Photo alone does not establish Ram Air intake function or factory originality');
+  // Four key points, answer first, in the readers' own values.
+  const points = Array.from(host.querySelectorAll('.vp-key-point')).map(point => point.getAttribute('data-point'));
+  expect(points).toEqual(['Engine', 'Factory paint', 'Transmission', 'Hood and scoop']);
+  const line = (label: string) => host.querySelector(`.vp-key-point[data-point="${label}"] .vp-key-point__line`)?.textContent;
+  expect(line('Engine')).toContain('7.5 now · as built not on record');
+  expect(line('Factory paint')).toContain('Buccaneer Red');
+  expect(line('Transmission')).toContain('manual now · as built not on record');
+  expect(line('Hood and scoop')).toContain('visible in the cited photo');
+  expect(host.querySelector('[aria-label="Cowl tag"]')).toBeTruthy();
+  expect(host.textContent).toContain('Hood bird and scoop.');
+  expect(host.textContent).toContain('Limitation: Factory originality not established.');
+  expect(host.textContent).not.toMatch(/Ram Air/i);
   expect(host.textContent).not.toContain('scoop..');
   expect(host.textContent).toContain('Needed: build sheet');
-  expect(host.textContent).toContain('Source reading ID: paint-1');
-  expect(host.textContent).toContain('Source reading ID: hood-1');
+  expect(host.textContent).toContain('paint-1');
+  expect(host.textContent).toContain('hood-1');
   expect(host.querySelector('a[href="/vehicle/v-1/observation/paint-1"]')).toBeNull();
   expect(host.querySelector('a[href="/vehicle/v-1/observation/hood-1"]')).toBeNull();
   expect(host.querySelector('a[href="'+hoodUrl+'"]')).toBeNull();
@@ -224,10 +232,12 @@ it('does not apply the Firebird facts to another replica', async () => {
   await render(<MemoryRouter><HeaderTokenItems vehicleId="v-2" dimension="trim" isReplica items={{ trim: [{
     key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', unit: null, rule: null, equation: null, sources: [], needed: null,
   }] }} /></MemoryRouter>);
-  expect(host.textContent).toContain('Engine line items unavailable');
-  expect(host.textContent).toContain('Transmission line items unavailable');
-  expect(host.textContent).toContain('Factory paint: no qualifying cited reading');
-  expect(host.textContent).toContain('Hood and scoop: no qualifying cited reading');
+  const line = (label: string) => host.querySelector(`.vp-key-point[data-point="${label}"] .vp-key-point__line`)?.textContent;
+  expect(line('Engine')).toContain('line items unavailable');
+  expect(line('Transmission')).toContain('line items unavailable');
+  expect(line('Factory paint')).toContain('no qualifying cited reading');
+  expect(line('Hood and scoop')).toContain('no qualifying cited reading');
+  expect(host.querySelector('[aria-label="Cowl tag"]')).toBeNull();
   expect(host.textContent).not.toMatch(/455|Buccaneer|four-speed|Ram Air/i);
 });
 
@@ -241,7 +251,7 @@ it('withholds a physical reading whose image was replaced or withdrawn', async (
   await render(<MemoryRouter><HeaderTokenItems vehicleId="v-1" dimension="trim" isReplica items={{ trim: [{
     key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', unit: null, rule: null, equation: null, sources: [], needed: null,
   }] }} /></MemoryRouter>);
-  expect(host.textContent).toContain('Factory paint: no qualifying cited reading');
+  expect(host.querySelector('.vp-key-point[data-point="Factory paint"]')?.textContent).toContain('no qualifying cited reading');
   expect(host.querySelector('a[href="https://example.org/old.jpg"]')).toBeNull();
 });
 
@@ -255,6 +265,6 @@ it('withholds physical citations when the eligible image inventory is incomplete
   await render(<MemoryRouter><HeaderTokenItems vehicleId="v-1" dimension="trim" isReplica items={{ trim: [{
     key: 'trim.tribute', facet: 'current', value: 'tribute', status: 'claim', unit: null, rule: null, equation: null, sources: [], needed: null,
   }] }} /></MemoryRouter>);
-  expect(host.textContent).toContain('Factory paint: source read unavailable');
+  expect(host.querySelector('.vp-key-point[data-point="Factory paint"]')?.textContent).toContain('source read unavailable');
   expect(host.querySelector('a[href="https://example.org/paint.jpg"]')).toBeNull();
 });

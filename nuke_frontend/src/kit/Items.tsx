@@ -90,7 +90,7 @@ function SourceLine({ source }: { source: FacetItemSource }) {
     <span className="k-item__source-body">
       <span className="k-item__source-head">
         {url ? <a href={url} target="_blank" rel="noreferrer">{identity}</a> : identity}
-        <Text role="caption">{day(source.observed_at)}</Text>
+        {(source.observed_at || source.class !== 'record') && <Text role="caption">{day(source.observed_at)}</Text>}
       </span>
       {said && <Text role="caption">{said}</Text>}
       {decoded.length > 0 && <Text role="caption">{decoded.map(([k, v]) => `${k.replace(/_/g, ' ')}: ${valueText(v) ?? ''}`).join(' · ')}</Text>}
