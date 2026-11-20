@@ -13,7 +13,7 @@ import { useVehicleWorkOrderFinancials, useVehicleReceiptRecords, type VehicleRe
 import { useVisualWork } from './hooks/useVisualWork';
 import { VisualWorkCards } from './VisualWorkCards';
 import { useBuildReconstruction, usePartEvidence } from './hooks/useBuildReconstruction';
-import { BuildRecord } from './BuildRecord';
+import { BuildRecord, SeenContext } from './BuildRecord';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
@@ -219,6 +219,7 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   const { user, loading } = useAuthContext();
   const build = useBuildReconstruction(vehicleId);
   const partEvidence = usePartEvidence(vehicleId, !!build.data);
+  const seenParts = React.useMemo(() => partEvidence.data ? new Map(partEvidence.data.lines.map(line => [line.item_id, line])) : null, [partEvidence.data]);
   const [vendor, setVendor] = useState('');
   const [showAll, setShowAll] = useState(false);
   const rows = (loading || read.isError ? [] : read.rows)
@@ -238,11 +239,11 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
       {!!work?.rows.length && <a href="#build-work-photos">Work photos</a>}
     </nav>}
     {build.data && <BuildRecord record={build.data} evidence={partEvidence.data} />}
-    {work && <VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger}
+    {work && <SeenContext.Provider value={seenParts}><VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger}
       components={loading ? null : work.components} renderSource={line => line.source_url_sha256 ? <ReceiptSource
       key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}
       expectedSourceHash={line.source_url_sha256} receipt={{ sourceTable: line.source_table, sourceId: line.source_id }} />
-      : <p>Original source unavailable in this read.</p>} />}
+      : <p>Original source unavailable in this read.</p>} /></SeenContext.Provider>}
     {work?.isError && <p role="status">Photographed work could not load. <button type="button" onClick={() => void work.refetch()}>Retry work</button></p>}
     {work?.limited && <p role="status">This view reached its work-record limit; it is not the complete work history.</p>}
     {vendors.length > 1 && <label className="vp-receipt-filter">Supplier <select value={selectedVendor} onChange={event => setVendor(event.target.value)}><option value="">All suppliers</option>{vendors.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}

@@ -10,6 +10,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: { rpc: (...args: unknown[]) => 
   const result = fixture.rpc(...args); return { abortSignal: () => result };
 }, storage: { from: () => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `https://files.example/${path}` } }) }) } } }));
 import { VisualWorkCards, photoDate } from './VisualWorkCards';
+import { SeenContext } from './BuildRecord';
 import { isComponentEvidence, useVisualWork, type ComponentEvidence, type MasterCostLedger, type VisualWork } from './hooks/useVisualWork';
 import { hasRecordedInstallation } from './PartPage';
 
@@ -31,6 +32,23 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); client.clear(); host.remove(); });
 const render = async (rows = [record]) => act(async () => root.render(<VisualWorkCards rows={rows} renderSource={line => <button>Read source {line.source_id}</button>} />));
+
+it('says a bought part is seen on the car when a photograph reading names it, and that none shows it otherwise', async () => {
+ const material = record.receipts.find(line => line.relation === 'candidate_material')!;
+ const show = async (status: 'seen' | 'not_photographed') => act(async () => root.render(<SeenContext.Provider value={new Map([[material.item_id,
+  { item_id: material.item_id, status, seen_images: status === 'seen' ? 3 : 0, first_day: '2026-10-28', last_day: '2026-10-28',
+   seen: status === 'seen' ? [{ image_id: 'p9', image_url: 'https://images.example/p9.jpg' }] : null }]])}>
+  <VisualWorkCards rows={[record]} renderSource={() => null} /></SeenContext.Provider>));
+ await show('seen');
+ expect(host.textContent).toContain('Bought part · seen on the car');
+ expect(host.textContent).toContain('Seen on the car in 3 photos');
+ expect(host.textContent).not.toContain('installation not established');
+ await act(async () => host.querySelector<HTMLButtonElement>('.vp-build-seen')!.click());
+ expect(fixture.open).toHaveBeenCalledWith('p9');
+ await show('not_photographed');
+ expect(host.textContent).toContain('Bought part · no photograph shows it yet');
+ expect(host.querySelector('.vp-build-seen')).toBeNull();
+});
 
 it('opens the exact before/after images directly and separates all four lenses', async () => {
  await render();
