@@ -2,7 +2,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BuildRecord } from './BuildRecord';
+import { BuildRecord, TokenBuildRecord } from './BuildRecord';
 import type { BuildReconstruction } from './hooks/useBuildReconstruction';
 
 const record = (amounts: boolean): BuildReconstruction => ({
@@ -51,6 +51,16 @@ describe('BuildRecord', () => {
     expect(html).toContain('No paper on file');
     expect(html).toContain('As photographed · 9 photos, Oct 2026');
     expect(html).toContain('Open Wheels &amp; tires photo');
+  });
+  it('gives a header token only the systems it names, first one open, and nothing for a token with no build system', () => {
+    const html = renderToStaticMarkup(<TokenBuildRecord record={record(false)} dimension="engine" />);
+    expect(html).toContain('Work on record');
+    expect(html).toContain('Engine machine work');
+    expect(html).toContain('Bore cylinders .060');
+    expect(html).not.toContain('Electrical');
+    expect(html).toMatch(/<details[^>]*open/);
+    expect(renderToStaticMarkup(<TokenBuildRecord record={record(false)} dimension="mileage" />)).toBe('');
+    expect(renderToStaticMarkup(<TokenBuildRecord record={record(false)} dimension="transmission" />)).toBe('');
   });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;

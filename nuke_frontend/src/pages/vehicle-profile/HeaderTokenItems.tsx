@@ -9,6 +9,8 @@ import { useFieldProvenance, currentImageObservations } from './hooks/useFieldPr
 import { useVehicleImageEvidence } from './hooks/useVehicleImageEvidence';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import CowlTagExtract from './CowlTagExtract';
+import { useBuildReconstruction } from './hooks/useBuildReconstruction';
+import { TokenBuildRecord } from './BuildRecord';
 
 /** Show an item's answer once; source identity and clock remain visible beneath it. */
 function conciseItems(items: FacetItem[]): FacetItem[] {
@@ -211,5 +213,12 @@ export default function HeaderTokenItems({ vehicleId, dimension, items, isReplic
   }
   return <>
     <ItemList items={conciseItems(list)} />
+    <TokenWork vehicleId={vehicleId} dimension={dimension} />
   </>;
+}
+
+/** The component's work, from the same database fold the build record renders. */
+function TokenWork({ vehicleId, dimension }: { vehicleId: string; dimension: string }) {
+  const build = useBuildReconstruction(vehicleId);
+  return <TokenBuildRecord record={build.data} dimension={dimension} />;
 }

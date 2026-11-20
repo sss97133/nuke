@@ -30,7 +30,7 @@ function Lines({ lines, amounts }: { lines: BuildLine[]; amounts: boolean }) {
   </li>)}</ul>;
 }
 
-function SystemRow({ system, amounts }: { system: BuildSystem; amounts: boolean }) {
+export function SystemRow({ system, amounts, open = false }: { system: BuildSystem; amounts: boolean; open?: boolean }) {
   const lines = system.lines ?? [];
   const work = lines.filter(isWork); const parts = lines.filter(line => !isWork(line));
   const shops = system.paper.shops.map(receiptSupplierLabel).filter(Boolean).join(', ');
@@ -40,7 +40,7 @@ function SystemRow({ system, amounts }: { system: BuildSystem; amounts: boolean 
     system.reference.hours != null ? `${hours(system.reference.hours)} reference fitting time` : null,
     system.photos?.images ? count(system.photos.images, 'photo') : null,
   ].filter(Boolean);
-  return <details className="vp-build-system" data-system={system.system_key}>
+  return <details className="vp-build-system" data-system={system.system_key} open={open || undefined}>
     <summary>
       <span className="vp-build-system__name"><strong>{name(system.system_key)}</strong><small>{system.first_day ? span(system.first_day, system.last_day) : 'No paper on file'}</small></span>
       <span className="vp-build-system__facts">{facts.join(' · ') || 'No dated work or parts'}</span>
@@ -81,5 +81,20 @@ export function BuildRecord({ record }: { record: BuildReconstruction }) {
       {record.systems_without_paper.length > 0 && <> No receipt or work order on file for: {record.systems_without_paper.map(name).join(', ')}.</>}</p>
     <div className="vp-build-systems">{main.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} />)}</div>
     {minor.length > 0 && <div className="vp-build-systems vp-build-systems--minor">{minor.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} />)}</div>}
+  </section>;
+}
+
+/** The header tokens name a component; these are the build systems whose paper and photos are that component's work. */
+const TOKEN_SYSTEMS: Record<string, string[]> = { engine: ['machining', 'engine', 'fuel', 'cooling', 'exhaust'], transmission: ['transmission'], drivetrain: ['axle'] };
+
+/** In a header token's popup: the same per-system rows as the build record, for the systems that token names. */
+export function TokenBuildRecord({ record, dimension }: { record: BuildReconstruction | null | undefined; dimension: string }) {
+  const wanted = TOKEN_SYSTEMS[dimension];
+  if (!record || !wanted) return null;
+  const systems = wanted.map(key => record.systems.find(system => system.system_key === key)).filter((system): system is BuildSystem => !!system);
+  if (!systems.length) return null;
+  return <section className="vp-build vp-build--token" aria-label="Work on record">
+    <header><h4>Work on record</h4><p>From the receipts, work orders and analysed photos. Paper hours and reference time are different measures and are not added.</p></header>
+    <div className="vp-build-systems">{systems.map((system, index) => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} open={index === 0} />)}</div>
   </section>;
 }
