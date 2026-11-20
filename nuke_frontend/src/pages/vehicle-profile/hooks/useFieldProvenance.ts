@@ -29,7 +29,7 @@ export interface ImageObservation {
   visual_relation: string | null;
   limitation: string | null;
   image_region: { label?: string } | null;
-  reference?: { url?: string; pdf_page?: number; supplementary_pdf_page?: number } | null;
+  reference?: { url?: string; title?: string; pdf_page?: number; supplementary_pdf_page?: number } | null;
   source_family?: string | null;
   is_inferred: boolean | null;
 }

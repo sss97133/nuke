@@ -320,7 +320,8 @@ it('shows the server cost folds and opens a single inline calculation with direc
  expect(region.closest('tr')?.previousElementSibling?.textContent).toContain('Install door-glass pair');
  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Open source photo: Torn seating"]')!.click());
  expect(fixture.open).toHaveBeenCalledWith('before-a');
- expect(host.querySelectorAll('details')).toHaveLength(0);
+ // The calculation opens inline; the only fold is the whole-car item list.
+ expect(host.querySelectorAll('details:not(.vp-ledger-all)')).toHaveLength(0);
  const close = Array.from(region.querySelectorAll<HTMLButtonElement>('button')).find(b => b.textContent === 'Close')!;
  await act(async () => close.click());
  expect(document.activeElement).toBe(open);

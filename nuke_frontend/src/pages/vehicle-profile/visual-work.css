@@ -117,3 +117,7 @@
   .vp-ledger-value .vp-cost-value small { display: none; }
 }
 @media(max-width: 640px) { .vp-work-lenses { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vp-work-materials { grid-template-columns: 1fr; } .vp-visual-work .vp-work-swipe { display: block; padding: 0 20px 12px; font-size: 12px; color: var(--text-secondary, #666); } }
+
+.vp-ledger-systems td { vertical-align: middle; }
+.vp-ledger-back { border: 0; background: transparent; color: var(--link); font: inherit; font-weight: 600; min-height: 44px; padding: 0 12px; cursor: pointer; }
+.vp-ledger-all > summary { cursor: pointer; padding: 12px; min-height: 44px; font-weight: 600; color: var(--text-secondary); }
