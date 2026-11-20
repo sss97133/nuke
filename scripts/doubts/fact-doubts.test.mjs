@@ -117,3 +117,64 @@ test('exported task file carries no earlier value, caption, reader or asker word
   for (const bad of [SECRET, WORDS, '547975', 'reader-a', 'obs-id', 'simulated_reader', 'origin']) assert.ok(!text.includes(bad), bad);
   assert.ok(text.includes('frame-2.jpg') && text.includes(I2) && text.includes('CLUTCH FORK') && text.includes('cannot_tell'));
 });
+
+// ── providers ──
+import { selectProvider, scrubbedEnv, parseCliStdout, readCliResult, isUsageLimit, answerJsonFrom, pickGeminiModel, geminiRequest, readGeminiResponse, CLI_ARGS } from './readers.mjs';
+import { reopenForSecondReader } from './answer-fact-doubts.mjs';
+
+test('provider selection: flag wins, else api with a key, else subscription', () => {
+  assert.equal(selectProvider('gemini', {}), 'gemini');
+  assert.equal(selectProvider(undefined, { CLAUDE_API_KEY: 'x' }), 'api');
+  assert.equal(selectProvider(undefined, {}), 'subscription');
+  assert.throws(() => selectProvider('openai', {}));
+});
+test('subscription env is scrubbed of keys and parent-session markers', () => {
+  const e = scrubbedEnv({ PATH: '/bin', ANTHROPIC_API_KEY: 'k', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'x', CLAUDE_CODE_SESSION_ID: 's', CLAUDE_CODE_CHILD_SESSION: '1', HOME: '/h' });
+  assert.deepEqual(Object.keys(e).sort(), ['HOME', 'PATH']);
+  assert.ok(CLI_ARGS.includes('--allowedTools') && CLI_ARGS[CLI_ARGS.indexOf('--allowedTools') + 1] === 'Read');
+});
+test('CLI stdout with a leading warning line parses to the last JSON object; model is the resolved id', () => {
+  const out = 'mcp-sdk: warning {something}\n{"type":"result","is_error":false,"result":"{\\"outcome\\":\\"cannot_tell\\",\\"confidence\\":0.4}","usage":{"input_tokens":10,"output_tokens":5},"modelUsage":{"claude-sonnet-5-5":{"inputTokens":10}}}\n';
+  const r = readCliResult(out);
+  assert.equal(r.model, 'claude-sonnet-5-5'); assert.equal(r.usage.input_tokens, 10);
+  assert.deepEqual(answerJsonFrom(r.text), { outcome: 'cannot_tell', confidence: 0.4 });
+  assert.throws(() => parseCliStdout('only a warning\n'));
+});
+test('a usage limit stops the run; an ordinary reader error does not', () => {
+  const lim = readCliResult('{"is_error":true,"result":"You\'ve hit your 5-hour limit · resets 3pm","modelUsage":{}}');
+  assert.equal(lim.stop, true);
+  assert.equal(readCliResult('{"is_error":true,"result":"Execution error","modelUsage":{}}').stop, false);
+  assert.ok(isUsageLimit('Claude usage limit reached') && !isUsageLimit('JSON at position 429'));
+});
+test('gemini request: key in a header only, inline images, closed schema; newest stable pro is picked', () => {
+  const task = buildBlindTask({ params: stored, registryRow: { label: 'X' }, lines: [] });
+  const r = geminiRequest({ model: 'gemini-2.5-pro', task, images: new Map([[I1, 'AAA'], [I2, 'BBB']]), key: 'SECRET-KEY-123' });
+  assert.ok(!r.url.includes('SECRET-KEY-123') && !r.url.includes('key=') && !JSON.stringify(r.body).includes('SECRET-KEY-123'));
+  assert.equal(r.headers['x-goog-api-key'], 'SECRET-KEY-123');
+  assert.equal(r.body.generationConfig.responseMimeType, 'application/json');
+  const wire = JSON.stringify(r.body);
+  assert.ok(wire.includes('AAA') && wire.includes(I2) && !wire.includes(SECRET) && !wire.includes(WORDS));
+  const g = (n) => ({ name: `models/${n}`, supportedGenerationMethods: ['generateContent'] });
+  assert.equal(pickGeminiModel([g('gemini-2.5-pro'), g('gemini-3.1-pro-preview'), g('gemini-pro-latest'), g('gemini-3.8-flash'), g('gemini-2.5-pro-preview-tts'), g('gemini-2.5-flash')]), 'gemini-2.5-pro');
+  assert.equal(readGeminiResponse({ candidates: [{ content: { parts: [{ text: '{"outcome":"cannot_tell","confidence":0.2}' }] } }], usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 3 } }).usage.input_tokens, 7);
+});
+
+// ── second reader ──
+const mkDb = (rows, wouldFor) => { const calls = []; return { calls, req: async () => rows, rpc: async (fn, b) => { calls.push([fn, b.p_dry_run]); return wouldFor(b); } }; };
+test('second reader: reopens a version whose answers are all this vehicle\'s singly-read doubts; refuses one that spills over', async () => {
+  const rows = [{ id: 'q1', answer_agent: 'first', answer_model: 'm1', answer_version: 'v1', answer_history: [] }, { id: 'q2', answer_agent: 'first', answer_model: 'm1', answer_version: 'v1', answer_history: [] },
+    { id: 'q3', answer_agent: 'gem', answer_model: 'g', answer_version: 'v9', answer_history: [] }, { id: 'q4', answer_agent: 'first', answer_model: 'm1', answer_version: 'v2', answer_history: [{ answer: {} }] }];
+  const ok = mkDb(rows, () => [{ id: 'q1' }, { id: 'q2' }]);
+  const r = await reopenForSecondReader({ db: ok, vehicleId: 'v', agent: 'gem', model: 'g', runId: 'r' });
+  assert.equal(r.reopened, 2); assert.equal(r.skipped, 2); assert.deepEqual(ok.calls, [['reopen_evidence_judgment_answers', true], ['reopen_evidence_judgment_answers', false]]);
+  const spill = mkDb(rows, () => [{ id: 'q1' }, { id: 'q2' }, { id: 'other' }]);
+  const r2 = await reopenForSecondReader({ db: spill, vehicleId: 'v', agent: 'gem', model: 'g', runId: 'r' });
+  assert.equal(r2.reopened, 0); assert.match(r2.refused[0].rule, /per answer_version/); assert.equal(spill.calls.length, 1);
+});
+test('second reader task never carries the first answer, even from a reopened row', () => {
+  const reopened = { ...stored, answer: undefined };
+  const row = { params: reopened, answer: null, answer_history: [{ answer: { outcome: 'value', value: SECRET }, answer_agent: 'blind-photo-reader', answer_model: 'claude-sonnet-5-5' }] };
+  const task = buildBlindTask({ params: row.params, registryRow: { label: 'Bellhousing casting number' } });
+  const wire = JSON.stringify(geminiRequest({ model: 'm', task, images: new Map([[I1, 'A']]), key: 'k' }).body) + JSON.stringify(buildExportTask({ task, params: row.params, frames: [] }));
+  assert.ok(!wire.includes(SECRET) && !wire.includes('blind-photo-reader') && !wire.includes('answer_history'));
+});
