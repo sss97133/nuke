@@ -48,3 +48,22 @@ export function useBuildReconstruction(vehicleId: string) {
     },
   });
 }
+
+export interface PartEvidenceLine { item_id: string; status: 'seen' | 'seen_in_prints_only' | 'not_photographed'; seen_images: number;
+  first_day: string | null; last_day: string | null; seen: { image_id: string; image_url: string; words?: string | null }[] | null }
+export interface PartEvidence { limitation: string; totals: { part_lines: number; lines_seen: number; lines_not_photographed: number }; lines: PartEvidenceLine[] }
+
+/** Per bought part, the photographs whose readings name that part on the car. Read after the build record; the page works without it. */
+export function usePartEvidence(vehicleId: string, enabled: boolean) {
+  const { user, loading: authLoading } = useAuthContext();
+  return useQuery({
+    queryKey: ['vehicle-part-installation-evidence', vehicleId, user?.id ?? 'anonymous'],
+    enabled: enabled && !!vehicleId && !authLoading, staleTime: 300_000, retry: false,
+    queryFn: async ({ signal }) => {
+      const { data, error } = await bounded(requestSignal => supabase.rpc('vehicle_part_installation_evidence', { p_vehicle_id: vehicleId })
+        .abortSignal(requestSignal), signal);
+      if (error || !data || data.version !== 1 || !Array.isArray(data.lines)) return null;
+      return data as PartEvidence;
+    },
+  });
+}

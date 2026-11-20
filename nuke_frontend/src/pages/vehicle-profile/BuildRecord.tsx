@@ -1,5 +1,5 @@
 import React from 'react';
-import type { BuildLine, BuildReconstruction, BuildSystem } from './hooks/useBuildReconstruction';
+import type { PartEvidence, PartEvidenceLine, BuildLine, BuildReconstruction, BuildSystem } from './hooks/useBuildReconstruction';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
@@ -21,12 +21,23 @@ const money = (value: number) => value.toLocaleString('en-US', { style: 'currenc
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
 const isWork = (line: BuildLine) => line.kind === 'labor' || line.kind === 'service' || line.kind === 'note';
 
+/** item id → the photographs that show that part, when the evidence read has arrived. */
+const SeenContext = React.createContext<Map<string, PartEvidenceLine> | null>(null);
+
+function Seen({ itemId }: { itemId: string }) {
+  const seen = React.useContext(SeenContext)?.get(itemId);
+  if (!seen || seen.status === 'not_photographed' || !seen.seen?.length) return null;
+  return <button type="button" className="vp-build-seen" onClick={() => openVehiclePhoto(seen.seen![0].image_id)}>
+    Seen on the car in {count(seen.seen_images, 'photo')}{seen.status === 'seen_in_prints_only' ? ' (prints of older photographs)' : seen.last_day ? `, ${span(seen.first_day, seen.last_day)}` : ''}
+  </button>;
+}
+
 function Lines({ lines, amounts }: { lines: BuildLine[]; amounts: boolean }) {
   return <ul className="vp-build-lines">{lines.map(line => <li key={line.item_id}>
     <span className="vp-build-lines__day">{dayOf(line.day)}</span>
     <span className="vp-build-lines__what">{line.description ?? line.part_number ?? 'Unreadable line'}
       <small>{[receiptSupplierLabel(line.source), line.part_number && line.kind !== 'labor' ? `No. ${line.part_number}` : null,
-        line.kind === 'backordered' ? 'backordered, not shipped' : null].filter(Boolean).join(' · ')}</small></span>
+        line.kind === 'backordered' ? 'backordered, not shipped' : null].filter(Boolean).join(' · ')}</small><Seen itemId={line.item_id} /></span>
     <span className="vp-build-lines__n">{line.paper_hours != null ? hours(line.paper_hours) : ''}{amounts && line.amount != null ? <small>{money(line.amount)}</small> : null}</span>
   </li>)}</ul>;
 }
@@ -74,7 +85,8 @@ export function SystemRow({ system, amounts, open = false, anchor = false }: { s
 }
 
 /** Renders the database's own fold of the receipt lines. Paper hours and reference hours are shown side by side, never summed. */
-export function BuildRecord({ record }: { record: BuildReconstruction }) {
+export function BuildRecord({ record, evidence }: { record: BuildReconstruction; evidence?: PartEvidence | null }) {
+  const seen = React.useMemo(() => evidence ? new Map(evidence.lines.map(line => [line.item_id, line])) : null, [evidence]);
   // A link to #build-<system> opens that system's row and brings it into view, so a letter or comment can cite one system.
   React.useEffect(() => {
     const show = () => {
@@ -89,7 +101,7 @@ export function BuildRecord({ record }: { record: BuildReconstruction }) {
   if (!totals.lines) return null;
   const main = record.systems.filter(system => !MINOR.has(system.system_key));
   const minor = record.systems.filter(system => MINOR.has(system.system_key));
-  return <section id="build-record" className="vp-build" aria-label="Build record">
+  return <SeenContext.Provider value={seen}><section id="build-record" className="vp-build" aria-label="Build record">
     <header><h4>Build record</h4>
       <p>Computed from {count(totals.lines, 'line')} on {count(totals.receipts, 'receipt and work order', 'receipts and work orders')}, {span(totals.first_day, totals.last_day)}.</p></header>
     <dl className="vp-build-totals">
@@ -101,10 +113,11 @@ export function BuildRecord({ record }: { record: BuildReconstruction }) {
       {record.amounts_visible && totals.recorded_amount != null && <div><dt>On the receipts</dt><dd>{money(totals.recorded_amount)}</dd><small>visible to you only</small></div>}
     </dl>
     <p className="vp-build-note">Paper hours, reference time and stage ranges are different measures and are not added together. Neither is the full labor in this build.
+      {evidence && <> {evidence.totals.lines_seen.toLocaleString('en-US')} of {evidence.totals.part_lines.toLocaleString('en-US')} bought parts are named in a photograph of the finished car; a photograph shows that kind of part is on the car, not that the receipt's unit is the one fitted.</>}
       {record.systems_without_paper.length > 0 && <> No receipt or work order on file for: {record.systems_without_paper.map(name).join(', ')}.</>}</p>
     <div className="vp-build-systems">{main.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} anchor />)}</div>
     {minor.length > 0 && <div className="vp-build-systems vp-build-systems--minor">{minor.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} anchor />)}</div>}
-  </section>;
+  </section></SeenContext.Provider>;
 }
 
 /** The header tokens name a component; these are the build systems whose paper and photos are that component's work. */
