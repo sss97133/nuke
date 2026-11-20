@@ -3,7 +3,7 @@ import { cliArgs, eligibleWorklist, exactRows, packReviews, parseStage, requireS
   subscriptionEnvironment, stageSchema, captureCommand, validateEnvelopeBatch, runBatch, sourceClockContext } from "./reviewed-image-batch.ts";
 import { admitReviewedBatch, persistReviewedBatchReceipt } from "../deep-image-analysis-byok.mjs";
 import { recordReviewedAnalysis, validateReviewedAnalysis } from "../../supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis.ts";
-import { agreeVerdicts, automaticProvenance, buildEnvelope, intakeShape } from "../photo-pipeline/deep-stage.mjs";
+import { AUTOMATIC_METHOD, agreeVerdicts, automaticProvenance, buildEnvelope, intakeShape } from "../photo-pipeline/deep-stage.mjs";
 
 const vehicle = "20000000-0000-4000-8000-000000000001", image = "10000000-0000-4000-8000-000000000001";
 const other = "10000000-0000-4000-8000-000000000002", now = new Date().toISOString();
@@ -348,5 +348,5 @@ Deno.test("an automatic deep reading's merged envelope passes the intake validat
   const checked = validateReviewedAnalysis(envelope, Date.parse("2026-11-09T20:00:00Z"));
   assertEquals([checked.verdict.scene_type, checked.verdict.state_observations.rust_severity], ["unknown", "unknown"]);
   assertEquals([checked.provenance.agent_tier, checked.provenance.agent_cost_cents, checked.provenance.extraction_method],
-    ["subscription automatic", null, "claude-cli two independent passes, agreed values only, pixels only, v1"]);
+    ["subscription automatic", null, AUTOMATIC_METHOD]);
 });
