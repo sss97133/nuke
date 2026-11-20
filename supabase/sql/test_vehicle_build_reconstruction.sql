@@ -39,6 +39,19 @@ CREATE TABLE public.fixture_readings(id uuid PRIMARY KEY DEFAULT gen_random_uuid
 CREATE VIEW public.vehicle_observations AS SELECT * FROM public.fixture_readings;
 \ir ../migrations/20261119213000_build_reconstruction_photos.sql
 
+-- slice 3 dependency: the stored hour range per build stage
+CREATE TABLE public.stage_transition_labor_map(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), from_stage text, to_stage text, zone_pattern text,
+  description text, estimated_hours_min numeric, estimated_hours_max numeric, estimated_hours_typical numeric, confidence text);
+\ir ../migrations/20261119230000_build_reconstruction_stages.sql
+
+DO $$ BEGIN
+  ASSERT public.photo_reading_is_print('{"narrative_one_line":"Two printed photographs show rear-quarter surface preparation."}');
+  ASSERT public.photo_reading_is_print('{"narrative_one_line":"A sheet.","components_seen":[{"label":"paper sheet containing two printed engine photographs"}]}');
+  ASSERT NOT public.photo_reading_is_print('{"narrative_one_line":"A printed ignition lead crosses the distributor area."}');
+  ASSERT NOT public.photo_reading_is_print('{}');
+  ASSERT public.build_phase_system('paint_prep') = 'paint' AND public.build_phase_system('final_assembly') IS NULL;
+END $$;
+
 DO $$ BEGIN
   ASSERT public.photo_part_key_system('undercarriage.steering.linkage') = 'steering';
   ASSERT public.photo_part_key_system('engine.brake.master.cylinder') = 'brakes';
@@ -87,6 +100,31 @@ INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded
   ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', true,  '{"part_key":"glass.rear","image_id":"00000000-0000-0000-0000-0000000000d1"}'),
   ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"undercarriage","image_id":"00000000-0000-0000-0000-0000000000d1"}');
 
+INSERT INTO public.stage_transition_labor_map(from_stage, to_stage, zone_pattern, description, estimated_hours_min, estimated_hours_max, estimated_hours_typical, confidence) VALUES
+  ('primed', 'blocked', '*', 'Full body block sand', 8, 24, 16, 'medium'), ('primed', 'blocked', 'panel_*', 'Block sand single panel', 2, 6, 3, 'high');
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data) VALUES
+  ('00000000-0000-0000-0000-0000000000a1', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-0000000000d1","build_phase_guess":"paint_prep","narrative_one_line":"Two printed photographs show surface preparation."}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-0000000000d2","build_phase_guess":"final_assembly","narrative_one_line":"A wheel."}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-0000000000d3","build_phase_guess":"paint_prep","narrative_one_line":"A sensitive photo."}');
+GRANT SELECT ON public.stage_transition_labor_map TO anon;
+
+DO $$
+DECLARE r jsonb; s jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1');
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'paint';
+  ASSERT jsonb_array_length(s -> 'stages') = 1 AND (s #>> '{stages,0,images}')::int = 1 AND (s #>> '{stages,0,prints}')::int = 1
+     AND s #> '{stages,0,last_day}' = 'null'::jsonb AND (s #>> '{stages,0,reference,hours_typical}')::numeric = 16
+     AND s #>> '{stages,0,reference,description}' = 'Full body block sand',
+    'a photographed stage has a row with the whole-car stored range, no day for a print, hidden photos not counted: ' || coalesce(s::text, 'no paint row');
+  ASSERT (r #>> '{totals,stage_hours,typical}')::numeric = 16 AND (r #>> '{totals,stage_hours,min}')::numeric = 8 AND (r #>> '{totals,stage_images}')::int = 1;
+  ASSERT (r #>> '{totals,reference_hours}')::numeric = 20.0, 'stage hours are not added to reference hours';
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'electrical';
+  ASSERT s #> '{photos,last_day}' = 'null'::jsonb, 'a part reading on a print carries no day: ' || (s -> 'photos')::text;
+  RESET ROLE;
+END $$;
+
 DO $$
 DECLARE r jsonb; s jsonb;
 BEGIN
@@ -130,6 +168,7 @@ BEGIN
   ASSERT public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a2') IS NOT NULL, 'owner sees a private vehicle';
 END $$;
 
+DROP FUNCTION public.photo_reading_is_print(jsonb); DROP FUNCTION public.build_phase_system(text);
 DROP FUNCTION public.photo_part_key_system(text);
 \ir revert_20261119200000_vehicle_build_reconstruction.sql
 DO $$ BEGIN ASSERT to_regprocedure('public.vehicle_build_reconstruction(uuid)') IS NULL; END $$;
