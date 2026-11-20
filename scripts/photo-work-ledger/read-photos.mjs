@@ -77,21 +77,21 @@ export const SCHEMA = {
   },
 };
 
-export async function fetchImage(url) {
+export async function fetchImage(url, edge = 768) {
   const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
   if (!res.ok) throw new Error(`fetch ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   let out;
   try {
     out = await sharp(buf, { failOn: 'none' }).rotate()
-      .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 75 }).toBuffer();
+      .resize({ width: edge, height: edge, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 75 }).toBuffer();
   } catch (e) {
     // HEIC/HEVC and some truncated files: macOS sips decodes what this sharp build cannot.
     if (process.platform !== 'darwin') throw e;
     const dir = mkdtempSync(join(tmpdir(), 'pwl-'));
     try {
       writeFileSync(join(dir, 'in'), buf);
-      await execFileAsync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '75', '-Z', '768', join(dir, 'in'), '--out', join(dir, 'out.jpg')], { timeout: 60000 });
+      await execFileAsync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '75', '-Z', String(edge), join(dir, 'in'), '--out', join(dir, 'out.jpg')], { timeout: 60000 });
       out = readFileSync(join(dir, 'out.jpg'));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }
