@@ -1,0 +1,1247 @@
+{
+ "note": "Shared cases for the thin-tier rule (contract-tiers.md, Rule 1). The reader's thinVerdict() must build the accepted verdicts; the database guard must accept them and refuse each refused one with thin_review_asserts_unchecked_field. image_id and vehicle_id are placeholders.",
+ "admits": {
+  "scene_type": [
+   "undercarriage",
+   "engine_bay",
+   "body_exterior",
+   "body_interior",
+   "wheel_assembly"
+  ],
+  "rust_severity": [
+   "surface"
+  ],
+  "paint_state": []
+ },
+ "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier.",
+ "accepted": [
+  {
+   "image_id": "11111111-1111-4111-8111-111111111111",
+   "vehicle_id": "22222222-2222-4222-8222-222222222222",
+   "scene_type": "undercarriage",
+   "build_phase_guess": "unknown",
+   "intent": "unknown",
+   "intent_confidence": 0,
+   "needs_clarification": true,
+   "components_seen": [],
+   "text_regions": [],
+   "damage_localized": [],
+   "state_observations": {
+    "rust_severity": "surface",
+    "paint_state": "unknown",
+    "completeness": "unknown",
+    "damage_callouts": []
+   },
+   "workshop_signals": {
+    "tools_visible": [],
+    "fixturing": "unknown",
+    "lighting": "unknown"
+   },
+   "presence": {
+    "person": false,
+    "dog": false,
+    "place_hint": null
+   },
+   "camera_pose": {
+    "method": "automatic two-pass read; no pose measured",
+    "framing": "unknown",
+    "azimuth_deg": null,
+    "elevation_deg": null,
+    "distance_est": null,
+    "exif_present": null
+   },
+   "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+   "confidence": 0.72,
+   "context_complete": false,
+   "open_questions": [],
+   "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+  },
+  {
+   "image_id": "11111111-1111-4111-8111-111111111111",
+   "vehicle_id": "22222222-2222-4222-8222-222222222222",
+   "scene_type": "unknown",
+   "build_phase_guess": "unknown",
+   "intent": "unknown",
+   "intent_confidence": 0,
+   "needs_clarification": true,
+   "components_seen": [],
+   "text_regions": [],
+   "damage_localized": [],
+   "state_observations": {
+    "rust_severity": "unknown",
+    "paint_state": "unknown",
+    "completeness": "unknown",
+    "damage_callouts": []
+   },
+   "workshop_signals": {
+    "tools_visible": [],
+    "fixturing": "unknown",
+    "lighting": "unknown"
+   },
+   "presence": {
+    "person": true,
+    "dog": false,
+    "place_hint": null
+   },
+   "camera_pose": {
+    "method": "automatic two-pass read; no pose measured",
+    "framing": "unknown",
+    "azimuth_deg": null,
+    "elevation_deg": null,
+    "distance_est": null,
+    "exif_present": null
+   },
+   "narrative_one_line": "Automatic read: scene unknown; rust unknown; paint unknown.",
+   "confidence": 0.55,
+   "context_complete": false,
+   "open_questions": [
+    "Two independent reads of this photo disagree on scene_type: undercarriage vs data_plate; posted as unknown.",
+    "Both reads say rust_severity is none; this reader may not post that value yet."
+   ],
+   "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+  },
+  {
+   "image_id": "11111111-1111-4111-8111-111111111111",
+   "vehicle_id": "22222222-2222-4222-8222-222222222222",
+   "scene_type": "body_exterior",
+   "build_phase_guess": "unknown",
+   "intent": "unknown",
+   "intent_confidence": 0,
+   "needs_clarification": true,
+   "components_seen": [],
+   "text_regions": [],
+   "damage_localized": [],
+   "state_observations": {
+    "rust_severity": "unknown",
+    "paint_state": "unknown",
+    "completeness": "unknown",
+    "damage_callouts": []
+   },
+   "workshop_signals": {
+    "tools_visible": [],
+    "fixturing": "unknown",
+    "lighting": "unknown"
+   },
+   "presence": {
+    "person": false,
+    "dog": false,
+    "place_hint": null
+   },
+   "camera_pose": {
+    "method": "automatic two-pass read; no pose measured",
+    "framing": "unknown",
+    "azimuth_deg": null,
+    "elevation_deg": null,
+    "distance_est": null,
+    "exif_present": null
+   },
+   "narrative_one_line": "Automatic read: scene body_exterior; rust unknown; paint unknown.",
+   "confidence": 0.8,
+   "context_complete": false,
+   "open_questions": [
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say completeness is assembled; this reader may not post that value yet."
+   ],
+   "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+  }
+ ],
+ "refused": [
+  {
+   "why": "build_phase_guess asserted",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "final_assembly",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "a component with a part number guess",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [
+     {
+      "label": "brake booster",
+      "confidence": 0.9,
+      "bbox": [
+       10,
+       10,
+       200,
+       200
+      ],
+      "part_number_guess": "D1234"
+     }
+    ],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "completeness asserted",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "assembled",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "rust value the database does not admit",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "none",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust none; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "paint value the database does not admit",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "clear",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint clear.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "scene value the database does not admit",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "data_plate",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene data_plate; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "state asserted while the scene is unknown",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "unknown",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene unknown; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "free-text narrative",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Glossy red car parked in a shop with an engine on a stand behind.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "narrative that does not match the posted values",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust unknown; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "text region",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [
+     {
+      "text": "3857584GM",
+      "bbox": [
+       10,
+       10,
+       200,
+       200
+      ],
+      "confidence": 0.9
+     }
+    ],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "localized damage",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [
+     {
+      "label": "dent",
+      "bbox": [
+       10,
+       10,
+       200,
+       200
+      ],
+      "severity": "minor"
+     }
+    ],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "damage callout",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": [
+      "dent in the fender"
+     ]
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "free-text open question",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [
+     "Is this the original engine?"
+    ],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "intent asserted",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "labor",
+    "intent_confidence": 0.9,
+    "needs_clarification": false,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "intent confidence above zero",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0.4,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "tools listed",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [
+      "welder"
+     ],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "weld quality stated",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown",
+     "weld_quality": "clean beads"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "lighting described",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "bright shop light"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "free-text agent notes",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "The owner should be told the frame is bent."
+   }
+  },
+  {
+   "why": "camera framing described",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "wide view from the front left",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "camera distance stated",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": "~3 m",
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "place hint",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": "a shop yard"
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "dog asserted",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": true,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": false,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  },
+  {
+   "why": "context marked complete",
+   "verdict": {
+    "image_id": "11111111-1111-4111-8111-111111111111",
+    "vehicle_id": "22222222-2222-4222-8222-222222222222",
+    "scene_type": "undercarriage",
+    "build_phase_guess": "unknown",
+    "intent": "unknown",
+    "intent_confidence": 0,
+    "needs_clarification": true,
+    "components_seen": [],
+    "text_regions": [],
+    "damage_localized": [],
+    "state_observations": {
+     "rust_severity": "surface",
+     "paint_state": "unknown",
+     "completeness": "unknown",
+     "damage_callouts": []
+    },
+    "workshop_signals": {
+     "tools_visible": [],
+     "fixturing": "unknown",
+     "lighting": "unknown"
+    },
+    "presence": {
+     "person": false,
+     "dog": false,
+     "place_hint": null
+    },
+    "camera_pose": {
+     "method": "automatic two-pass read; no pose measured",
+     "framing": "unknown",
+     "azimuth_deg": null,
+     "elevation_deg": null,
+     "distance_est": null,
+     "exif_present": null
+    },
+    "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+    "confidence": 0.72,
+    "context_complete": true,
+    "open_questions": [],
+    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+   }
+  }
+ ]
+}

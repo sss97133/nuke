@@ -30,7 +30,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
-import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, subscriptionEnv } from './deep-stage.mjs';
+import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, REFUSAL_STREAK_STOP, admitsFrom, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, subscriptionEnv, refusalStreak } from './deep-stage.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -83,6 +83,12 @@ const deepDeps = (dir) => ({
   orchestrator: (body) => orchestrator(body, 120_000),
 });
 const contractText = () => readFileSync(join(here, '..', 'daily-receipt', 'byok-vision-prompt.md'), 'utf8');
+// Which closed values the database admits from this reader (platform_config image_reading_tiers; contract-tiers Rule 1).
+// The row is the rule: no row, or a row that admits no scene, means nothing may be posted, so nothing is read.
+async function readAdmits() {
+  const rows = await rest('platform_config?select=config_value&config_key=eq.image_reading_tiers');
+  return admitsFrom(Array.isArray(rows) ? rows[0]?.config_value : null);
+}
 
 // Dry run of the new stages on named photos: reads and prints, claims nothing, writes nothing.
 if (args['stage-dry-run'] === true) {
@@ -92,14 +98,19 @@ if (args['stage-dry-run'] === true) {
   const rows = await rest(`vehicle_images?select=id,vehicle_id&user_id=eq.${OWNER}&id=in.(${ids.join(',')})`);
   const dir = mkdtempSync(join(tmpdir(), 'nuke-deep-dry-'));
   const runId = newRunId();
+  // a dry run may name the admitted set in a file (for measuring before the database row exists); a real fire never can
+  const admits = args['admits-file'] && args['admits-file'] !== true
+    ? admitsFrom({ automatic: { admits: JSON.parse(readFileSync(args['admits-file'], 'utf8')).admits } })
+    : await readAdmits();
+  console.error(`admitted values: ${JSON.stringify(admits)}`);
   let sb = null;
   const which = String(args.stages === true || !args.stages ? 'deep_reading,keyed_values' : args.stages).split(',');
   for (const f of rows) {
     if (which.includes(DEEP_STAGE)) {
-    const res = await deepReadFrame({ id: f.id, vehicle_id: f.vehicle_id }, deepDeps(dir), { dir, contract: contractText(), model, runId, post: false, reader: READER });
+    const res = await deepReadFrame({ id: f.id, vehicle_id: f.vehicle_id }, deepDeps(dir), { dir, contract: contractText(), model, runId, post: false, reader: READER, admits });
     console.log(JSON.stringify({ stage: DEEP_STAGE, image_id: f.id, valid: res.valid, seconds: res.seconds,
       tokens: (res.reads ?? []).map((r) => ({ input: r.stats.input_tokens, output: r.stats.output_tokens, seconds: r.stats.seconds, attempts: r.stats.attempts, notional_usd: r.stats.notional_cost_usd })),
-      agreement: res.agreement ? { agreed: res.agreement.agreed, disagreements: res.agreement.disagreements, values: res.agreement.values } : null,
+      agreement: res.agreement ? { agreed: res.agreement.agreed, disagreements: res.agreement.disagreements, values: res.agreement.values, posted: res.agreement.posted } : null,
       would_post: res.envelope ?? null, receipt_if_not_two_valid_reads: res.envelope ? null : res.receipt }));
     }
     if (!which.includes(KEYED_STAGE)) continue;
@@ -236,7 +247,12 @@ async function deepPhase() {
   // a fault that is the batch's (usage limit, login refused, API unreachable, a missing tool) would fail every deep reading the same way
   if (summary.stopped) { s.skipped = 'first_read_fault'; return s; }
   if (!lean) { s.skipped = 'cli_without_safe_mode'; return s; }
-  Object.assign(s, { reads_valid: 0, agreed_all: 0, disagreements: {}, read_seconds: 0, input_tokens: 0, output_tokens: 0, aborted: 0 });
+  let admits;
+  try { admits = await readAdmits(); } catch (e) { s.skipped = 'admitted_values_unreadable'; s.error_text = String(e?.message || e).slice(0, 120); return s; }
+  if (!admits.scene_type.length) { s.skipped = 'nothing_admitted'; return s; }
+  Object.assign(s, { reads_valid: 0, agreed_all: 0, disagreements: {}, posted_values: 0, read_seconds: 0, input_tokens: 0, output_tokens: 0, aborted: 0 });
+  // a refusal by the intake costs two reads; several in a row means the rule and the reader differ, which every later photo would repeat
+  let refusedInARow = 0;
   // Claimed in small chunks, each leased for its own work (a photo is a download, two reads each allowed a retry, the intake):
   // a halt or the deadline then strands at most one chunk, not the whole limit.
   const chunk = Math.max(1, 2 * conc);
@@ -252,15 +268,18 @@ async function deepPhase() {
       work: async (f) => {
         s.started++;
         let res;
-        try { res = await deepReadFrame(f, deepDeps(dir), { dir, contract, model, runId, reader: READER, signal: halt.signal }); }
+        try { res = await deepReadFrame(f, deepDeps(dir), { dir, contract, model, runId, reader: READER, signal: halt.signal, admits }); }
         catch (e) { res = { receipt: receiptForResult({ reader: { error: String(e?.message || e), missingTool: e?.code === 'ENOENT' } }, { reader: READER, promptVersion: 'reviewed_image_analysis_v1' }), stop: false }; }
         if (res.aborted || !res.receipt) { s.aborted++; return; }   // ended by a sibling's halt: no receipt, no attempt counted; the lease hands it back
         if (res.agreement && res.reads) {
           s.reads_valid += res.reads.length; s.read_seconds += Math.round(res.seconds);
           for (const x of res.reads) { s.input_tokens += x.stats.input_tokens; s.output_tokens += x.stats.output_tokens; }
           if (res.agreement.agreed) s.agreed_all++;
+          s.posted_values += ['rust_severity', 'paint_state'].filter((k) => res.agreement.posted?.[k] && res.agreement.posted[k] !== 'unknown').length;
           for (const d of res.agreement.disagreements) s.disagreements[d.field] = (s.disagreements[d.field] || 0) + 1;
         }
+        refusedInARow = refusalStreak(refusedInARow, res.receipt);
+        if (refusedInARow >= REFUSAL_STREAK_STOP && !s.stopped) { s.stopped = 'intake_refusing'; halt.abort(); }
         if (res.receipt.stop) { s.stopped = res.receipt.error_class; halt.abort(); }
         await settleStage(DEEP_STAGE, s, f, res.receipt);
         console.error(`${f.id} ${DEEP_STAGE} ${res.receipt.outcome}${res.receipt.error_class ? ' ' + res.receipt.error_class : ''}${res.receipt.detail?.skipped ? ' ' + res.receipt.detail.skipped : ''}`);

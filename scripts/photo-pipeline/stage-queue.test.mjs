@@ -197,7 +197,11 @@ test('deep reading: every answer the intake can give is a typed receipt', () => 
     'invalid_review_regions', 'invalid_review_flags', 'invalid_review_notes', 'invalid_review_lists', 'invalid_review_source', 'invalid_review_provenance', 'review_too_large']) assert.deepEqual(of({ intake: { http: 400, success: false, error: code } }), ['unavailable', 'reader_output_invalid', 1800, false], code);
   assert.equal(receiptForDeepResult({ intake: { http: 400, error: 'invalid_review_camera' } }, dctx).detail.intake_error, 'invalid_review_camera', 'the refusal\'s own word is kept in the detail');
   // the intake or its writer is down: retried, the batch goes on
-  for (const [http, code] of [[503, 'review_source_unavailable'], [502, 'review_observation_not_persisted'], [500, 'review_persistence_failed']]) assert.deepEqual(of({ intake: { http, success: false, error: code } }), ['unavailable', code, 900, false]);
+  for (const [http, code] of [[503, 'review_source_unavailable'], [500, 'review_persistence_failed']]) assert.deepEqual(of({ intake: { http, success: false, error: code } }), ['unavailable', code, 900, false]);
+  // not written (the ingest failed, or the database's rule for the reader's tier refused the row): an hour, each attempt spends two reads
+  assert.deepEqual(of({ intake: { http: 502, success: false, error: 'review_observation_not_persisted' } }), ['unavailable', 'review_observation_not_persisted', 3600, false]);
+  // the reader's own reading by the same method is already on the photo: the stage is done, no read was spent
+  assert.deepEqual([receiptForDeepResult({ policy: 'already_read_same_method' }, dctx).outcome, receiptForDeepResult({ policy: 'already_read_same_method' }, dctx).detail.already_read], ['succeeded', 'same_method']);
   assert.deepEqual(of({ intake: { http: 0, error: 'orchestrator_request_error' } }), ['unavailable', 'orchestrator_request_error', 900, false]);
   // the service key was refused: the batch stops
   assert.deepEqual(of({ intake: { http: 403, success: false, error: 'review_requires_service_role' } }), ['unavailable', 'orchestrator_unauthorized', 900, true]);

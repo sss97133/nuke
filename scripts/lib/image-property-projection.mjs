@@ -285,6 +285,28 @@ const SOURCE_COLUMNS = 'id,vehicle_id,kind,is_superseded,observed_at,ingested_at
 const IMAGE_COLUMNS = 'id,vehicle_id,is_sensitive,is_superseded,is_duplicate,is_document,vision_gate_status,image_vehicle_match_status';
 
 /**
+ * The current deep reading of each photo, as the database's image_stage_reading_parent picks it: of the photo's deep
+ * readings on this vehicle that are not superseded, the one its stamp points at, else the newest by ingested_at (a missing
+ * clock last), ties to the lowest id.
+ *   pointers  [{ id, current_observation_id }]   the photo's own stamp
+ *   readings  [{ id, vehicle_id, kind, is_superseded, ingested_at, image_id }]   every deep reading naming those photos
+ */
+export function currentReadingIds(pointers, readings, vehicleId) {
+  const stamp = new Map(pointers.map(row => [row.id, row.current_observation_id]));
+  const micros = row => { try { return row.ingested_at ? instantMicros(row.ingested_at) : -1n; } catch { return -1n; } };
+  const chosen = new Map();
+  for (const row of readings) {
+    if (!stamp.has(row.image_id) || row.vehicle_id !== vehicleId || row.kind !== 'condition' || row.is_superseded === true || !UUID.test(row.id ?? '')) continue;
+    const have = chosen.get(row.image_id);
+    if (!have) { chosen.set(row.image_id, row); continue; }
+    if (have.id === stamp.get(row.image_id)) continue;
+    const newer = micros(row) > micros(have) || (micros(row) === micros(have) && row.id < have.id);
+    if (row.id === stamp.get(row.image_id) || newer) chosen.set(row.image_id, row);
+  }
+  return [...new Set([...chosen.values()].map(row => row.id))];
+}
+
+/**
  * project-cached: walk one vehicle's stored deep readings, newest first, and project their three values (dry run)
  * or land them. Returns { receipt, exitCode }; the receipt holds counts and fixed reason words only.
  *
@@ -296,10 +318,12 @@ const IMAGE_COLUMNS = 'id,vehicle_id,is_sensitive,is_superseded,is_duplicate,is_
  * projected here (the flag is about labor attribution, not about the three values).
  */
 export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, before, apply = false, single = false, imageIds = null }) {
-  // imageIds: only the CURRENT reading of each named photo (the stage worker's one-photo call): the observation the photo's own
-  // ai_scan_metadata.byok_deep_analysis.observation_id points at, not every unsuperseded reading that names the photo (a retried
-  // intake can leave a second one that never landed on the photo). Everything below is the same code path, holds and safety
-  // checks included.
+  // imageIds: only the CURRENT reading of each named photo (the stage worker's one-photo call), chosen by the database's own
+  // rule (image_stage_reading_parent, which its gap finder uses to say a photo has a reading to key): among the photo's
+  // unsuperseded deep readings on this vehicle, the one the photo's ai_scan_metadata.byok_deep_analysis.observation_id points
+  // at; when that pointer is missing or names a reading that is no longer current, the newest. Never every unsuperseded
+  // reading that names the photo (a retried intake can leave a second one that never landed on the photo). Everything below
+  // is the same code path, holds and safety checks included.
   if (imageIds !== null && (!Array.isArray(imageIds) || imageIds.length === 0 || imageIds.length > 100 || !imageIds.every(id => UUID.test(id ?? '')))) {
     throw new Error('project-cached: imageIds must be 1..100 uuids');
   }
@@ -314,7 +338,12 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     const pointers = await sb.from('vehicle_images').select('id,current_observation_id:ai_scan_metadata->byok_deep_analysis->>observation_id')
       .in('id', imageIds).abortSignal(AbortSignal.timeout(10000));
     if (pointers.error || !Array.isArray(pointers.data)) throw new Error('project-cached: current readings unavailable');
-    currentIds = [...new Set(pointers.data.map(row => row.current_observation_id).filter(id => UUID.test(id ?? '')))];
+    // found through the (image_id, analysis_kind) index alone; the vehicle, the kind and currency are checked on the few rows back
+    const readings = await sb.from('vehicle_observations').select('id,vehicle_id,kind,is_superseded,ingested_at,image_id:structured_data->>image_id')
+      .eq('structured_data->>analysis_kind', 'image_deep_byok').in('structured_data->>image_id', imageIds)
+      .limit(1000).abortSignal(AbortSignal.timeout(10000));
+    if (readings.error || !Array.isArray(readings.data)) throw new Error('project-cached: current readings unavailable');
+    currentIds = currentReadingIds(pointers.data, readings.data, vehicleId);
     if (!currentIds.length) reachedOldest = true;   // none of the photos carries a reading: nothing to walk
   }
   // Before anything has landed a failed read is an error, as it always was. After, the receipt must still say what landed.
@@ -325,7 +354,7 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
   while (walked < pages && !(currentIds && !currentIds.length)) {
     let query = sb.from('vehicle_observations').select(SOURCE_COLUMNS)
       .eq('vehicle_id', vehicleId).eq('kind', 'condition').eq('structured_data->>analysis_kind', 'image_deep_byok');
-    if (imageIds) query = query.eq('is_superseded', false).in('id', currentIds);
+    if (imageIds) query = query.in('id', currentIds);   // currency was decided by currentReadingIds (not superseded, as the database counts it)
     // Keyset on (ingested_at, id): readings that share one instant across a window's edge are not skipped.
     query = cursor ? query.or(`ingested_at.lt."${cursor.at}",and(ingested_at.eq."${cursor.at}",id.lt.${cursor.id})`)
       : query.lt('ingested_at', before);

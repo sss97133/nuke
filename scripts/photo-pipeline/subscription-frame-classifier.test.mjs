@@ -13,7 +13,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
+import { AUTOMATIC_TIER, admitsFrom, automaticMethod } from './deep-stage.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
+// the database's row for this reader, with the admitted set of the shared cases
+const TIERS = { reviewed_tiers: ['caller-byok subscription'], automatic: { tier: 'subscription automatic',
+  admits: JSON.parse(readFileSync(join(here, 'fixtures', 'automatic-thin-verdicts.json'), 'utf8')).admits } };
 const run = promisify(execFile);
 const OWNER = '00000000-0000-4000-8000-0000000000aa';
 const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
@@ -49,8 +54,8 @@ const FAKE_SUPABASE_JS = `exports.createClient = () => ({
     then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; },
 });`;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, extraArgs = [], supabaseJs = false, failClaims = [], oldCli = false } = {}) {
-  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [] };
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, extraArgs = [], supabaseJs = false, failClaims = [], oldCli = false } = {}) {
+  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], tiers: 0 };
   const cursor = {};   // each stage hands out its photos once, at most p_limit a call, like the database
   let port;
   const server = createServer((req, res) => {
@@ -62,9 +67,14 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         if (req.url.includes('gone')) return res.writeHead(404).end();
         return res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
       }
+      // the row that says which closed values the database admits from this reader (read once, before any deep reading is claimed)
+      if (req.url.startsWith('/rest/v1/platform_config') && req.url.includes('config_key=eq.image_reading_tiers')) {
+        calls.tiers++;
+        return tiers === 'error' ? json(503, { code: 'PGRST002' }) : json(200, tiers ? [{ config_value: tiers }] : []);
+      }
       if (req.url.startsWith('/rest/v1/platform_config')) return config === 'error' ? json(503, { code: 'PGRST002' }) : json(200, config ? [{ config_value: config }] : []);
       if (req.url.startsWith('/rest/v1/vehicle_images') && /[?&]id=eq\./.test(req.url)) {
-        const id = req.url.match(/id=eq\.([^&]+)/)[1]; calls.snapshots.push(id);
+        const id = req.url.match(/id=eq\.([^&]+)/)[1]; calls.snapshots.push(id); calls.snapshotQueries.push(req.url);
         return json(200, [{ id, vehicle_id: '00000000-0000-4000-8000-0000000000cc', image_url: `https://example.test/${id}`, updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null,
           deep_scene: null, is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, doc_flag: null, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...(rows[id] ?? {}) }]);
       }
@@ -260,7 +270,32 @@ test('deep readings: claimed with a lease that covers the batch; a photo that no
     const s = summary.stages.deep_reading;
     assert.deepEqual([s.claimed, s.started, s.policy_skip, s.receipts, s.skip_reasons], [4, 4, 4, 4, { document: 1, unfiled: 1, image_url_not_https: 1, already_read: 1 }]);
     for (const r of calls.receipts) assert.equal(r.p_producer_version, 1);
+    assert.equal(calls.tiers, 1, 'the admitted set is read once a fire');
   }, { deepFrames: Object.keys(gone), rows: gone, extraArgs: ['--deep-limit', '12'] });
+});
+
+test('deep readings wait for the database to say what this reader may post: no row, an empty row or an unreadable one claims nothing', async () => {
+  for (const [tiers, why] of [[null, 'nothing_admitted'], [{ automatic: { admits: { scene_type: [], rust_severity: ['surface'] } } }, 'nothing_admitted'], ['error', 'admitted_values_unreadable']]) {
+    await withStandIns([], ({ calls, summary, claudeArgs, result }) => {
+      assert.equal(result.code, 0);
+      assert.equal(summary.stages.deep_reading.skipped, why);
+      assert.ok(!calls.claims.some((c) => c.p_stage === 'deep_reading'), 'nothing is claimed that could not be posted');
+      assert.ok(calls.claims.some((c) => c.p_stage === 'keyed_values'), 'the keyed stage still runs');
+      assert.equal(claudeArgs.length, 0);
+    }, { tiers, deepFrames: ['a.jpg'] });
+  }
+});
+
+test('deep readings: the reader\'s own reading by the same method closes the stage without a read; by an older method it is read again', async () => {
+  const method = automaticMethod(admitsFrom(TIERS));
+  await withStandIns([], ({ calls, summary, claudeArgs }) => {
+    const got = calls.receipts.filter((r) => r.p_stage === 'deep_reading').map((r) => [r.p_image_id, r.p_outcome, r.p_detail.already_read ?? null, r.p_detail.skipped ?? null]);
+    assert.deepEqual(got, [['a-mine.jpg', 'succeeded', 'same_method', null], ['b-reviewed.jpg', 'policy_skip', null, 'already_read']]);
+    assert.equal(claudeArgs.length, 0, 'no read was spent on either');
+    assert.deepEqual([summary.stages.deep_reading.succeeded, summary.stages.deep_reading.policy_skip], [1, 1]);
+    assert.match(decodeURIComponent(calls.snapshotQueries[0]), /deep_tier:ai_scan_metadata->byok_deep_analysis->>agent_tier,deep_method:ai_scan_metadata->byok_deep_analysis->>extraction_method/);
+  }, { deepFrames: ['a-mine.jpg', 'b-reviewed.jpg'], extraArgs: ['--deep-limit', '2'],
+    rows: { 'a-mine.jpg': { deep_scene: 'undercarriage', deep_tier: AUTOMATIC_TIER, deep_method: method }, 'b-reviewed.jpg': { deep_scene: 'undercarriage', deep_tier: 'caller-byok subscription', deep_method: 'three passes' } } });
 });
 
 const K1 = 'aaaaaaaa-0000-4000-8000-000000000001', K2 = 'aaaaaaaa-0000-4000-8000-000000000002';

@@ -439,15 +439,15 @@ test('batch source registry mismatch fails even when the returned source ID is a
 // ── project-cached: the walk over one vehicle's stored readings ─────────────────────────────────────────────────────
 // A stand-in for the database client: made-up rows in memory, the same filters the walk sends, and the edge function's
 // rule that the same claim is answered as a duplicate.
-import { projectCachedRun, instantMicros, SINGLE_SLICE } from './image-property-projection.mjs';
+import { projectCachedRun, currentReadingIds, instantMicros, SINGLE_SLICE } from './image-property-projection.mjs';
 
 const VEHICLE = '77777777-7777-4777-8777-777777777777';
 const PROPERTY_IDS = { image_visible_rust_severity: 'aaaaaaaa-0000-4000-8000-000000000001',
   image_visible_paint_stage: 'aaaaaaaa-0000-4000-8000-000000000002', image_visible_assembly_state: 'aaaaaaaa-0000-4000-8000-000000000003' };
-function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0 } = {}) {
+function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0, failReadingsQueryAt = 0 } = {}) {
   let n = 0;
   const id = prefix => `${prefix.repeat(8)}-0000-4000-8000-${String(++n).padStart(12, '0')}`;
-  const db = { rows: [], images: new Map(), witnesses: [], calls: { source: 0, invoke: 0, rpc: 0, prior: 0 } };
+  const db = { rows: [], images: new Map(), witnesses: [], calls: { source: 0, invoke: 0, rpc: 0, prior: 0, readings: 0 } };
   db.reading = (ingestedAt, { image = {}, data = {}, ...over } = {}) => {
     const imageId = id('c');
     db.images.set(imageId, { id: imageId, vehicle_id: VEHICLE, is_sensitive: false, is_superseded: false, is_duplicate: false,
@@ -466,6 +466,11 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
       if (table === 'observation_properties') return { data: f.in[1].map(key => ({ id: PROPERTY_IDS[key], property_key: key })), error: null };
       if (table === 'observation_witnesses') return { data: db.witnesses.filter(w => w.observation_id === f.eq.observation_id && w.image_id === f.eq.image_id), error: null };
       if (f.eq.id) return { data: db.rows.find(row => row.id === f.eq.id) ?? null, error: null };
+      if (f.in?.[0] === 'structured_data->>image_id') {   // every deep reading naming the photos, whatever its vehicle or currency
+        if (++db.calls.readings === failReadingsQueryAt) return { data: null, error: { message: 'made-up failure' } };
+        return { data: db.rows.filter(row => row.structured_data?.analysis_kind === f.eq['structured_data->>analysis_kind'] && f.in[1].includes(row.structured_data.image_id))
+          .map(row => ({ id: row.id, vehicle_id: row.vehicle_id, kind: row.kind, is_superseded: row.is_superseded, ingested_at: row.ingested_at, image_id: row.structured_data.image_id })), error: null };
+      }
       if (f.eq.extraction_method) {   // which claims a row already holds
         db.calls.prior++;
         return { data: db.rows.filter(row => row.extraction_method === f.eq.extraction_method && f.in[1].includes(row.structured_data.source_observation_id))
@@ -705,8 +710,37 @@ test('project-cached --single with imageIds: only the reading the photo points a
   const keyed = db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1');
   assert.deepEqual(keyed.map(r => r.structured_data.source_observation_id), [landed.id, landed.id, landed.id], 'every value comes from the reading the photo carries');
   assert.ok(!keyed.some(r => r.structured_data.rust_severity === 'perforation'));
-  // a photo that points at no reading projects nothing
+});
+
+test('project-cached --single with imageIds: the current reading is chosen as the database chooses it', async () => {
+  // a stamp that kept no pointer (readings made before the pointer existed): the photo's newest current reading on this vehicle
+  const db = standIn();
+  const older = db.reading(at(1));
+  const imageId = older.structured_data.image_id;
+  const newer = { ...older, id: 'dddddddd-0000-4000-8000-0000000000bb', ingested_at: at(2), structured_data: { ...older.structured_data, state_observations: { rust_severity: 'pitting', paint_state: 'primer', completeness: 'partial' } } };
+  db.rows.push(newer);
   db.images.get(imageId).current_observation_id = null;
-  const none = await walk(db, { apply: true, single: true, imageIds: [imageId] });
+  const fallback = await walk(db, { apply: true, single: true, imageIds: [imageId] });
+  assert.deepEqual([fallback.receipt.source_rows, fallback.receipt.inserted], [1, 3]);
+  assert.deepEqual([...new Set(db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1').map(r => r.structured_data.source_observation_id))], [newer.id]);
+  // a photo no deep reading names projects nothing
+  const bare = standIn(); const lone = bare.reading(at(1)); bare.rows.length = 0;
+  const none = await walk(bare, { apply: true, single: true, imageIds: [lone.structured_data.image_id] });
   assert.deepEqual([none.receipt.source_rows, none.receipt.eligible_claims, none.receipt.reached_oldest_row, none.exitCode], [0, 0, true, 1]);
+  // the lookup failing is an error, not "no reading"
+  const broken = standIn({ failReadingsQueryAt: 1 }); const r = broken.reading(at(1));
+  await assert.rejects(walk(broken, { apply: true, single: true, imageIds: [r.structured_data.image_id] }), /current readings unavailable/);
+
+  // the rule itself, row by row
+  const I = 'cccccccc-0000-4000-8000-000000000001', A = 'dddddddd-0000-4000-8000-00000000000a', B = 'dddddddd-0000-4000-8000-00000000000b', C = 'dddddddd-0000-4000-8000-00000000000c';
+  const row = (id, second, over = {}) => ({ id, vehicle_id: VEHICLE, kind: 'condition', is_superseded: false, ingested_at: at(second), image_id: I, ...over });
+  const pick = (stamp, rows) => currentReadingIds([{ id: I, current_observation_id: stamp }], rows, VEHICLE);
+  assert.deepEqual(pick(A, [row(B, 9), row(A, 1)]), [A], 'the stamp wins over a newer reading');
+  assert.deepEqual(pick(A, [row(A, 1), row(B, 9)]), [A], 'whatever order the rows come back in');
+  assert.deepEqual(pick(A, [row(A, 9, { is_superseded: true }), row(B, 1), row(C, 2)]), [C], 'a stamp that names a superseded reading: the newest current one');
+  assert.deepEqual(pick(null, [row(B, 2), row(A, 2), row(C, 1)]), [A], 'the same instant: the lowest id');
+  assert.deepEqual(pick(null, [row(A, 1, { ingested_at: null }), row(B, 1)]), [B], 'a reading without a clock comes last');
+  assert.deepEqual(pick(null, [row(A, 5, { is_superseded: null })]), [A], 'a null flag is current, as the database counts it');
+  assert.deepEqual(pick(null, [row(A, 5, { vehicle_id: '88888888-8888-4888-8888-888888888888' }), row(B, 5, { kind: 'specification' }), row(C, 5, { image_id: 'cccccccc-0000-4000-8000-000000000002' })]), [],
+    'another vehicle\'s reading, another kind and another photo are not this photo\'s reading');
 });

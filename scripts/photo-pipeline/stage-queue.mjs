@@ -172,6 +172,9 @@ export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   const detail = { reader: reader ?? null, prompt_version: promptVersion ?? null, ...(result.detail ?? {}) };
   // a hold that can lift (the approval gate has not passed yet) is a pause, not a retirement: image_stage_gaps never reopens a policy_skip
   if (result.policy && TRANSIENT_HOLDS.includes(result.policy)) return { outcome: 'unavailable', error_class: String(result.policy).slice(0, 48), retry_after_seconds: 3600, detail: { ...detail, held: String(result.policy).slice(0, 60) } };
+  // this reader's own reading, made by the same method, is already on the photo and only its receipt is missing (a fire
+  // that ended between the post and the receipt): the stage is done, and no read is spent finding that out
+  if (result.policy === 'already_read_same_method') return { outcome: 'succeeded', detail: { ...detail, already_read: 'same_method' } };
   if (result.policy) return { outcome: 'policy_skip', detail: { ...detail, skipped: String(result.policy).slice(0, 60) } };
   if (!result.intake) {
     const r = receiptForResult(result, { reader, promptVersion });
@@ -195,6 +198,10 @@ export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   // the database refused to place a valid reading on this photo (SQL-side rules the reader cannot see, e.g. a withdrawal on
   // record). Each attempt spends two reads, so wait an hour between attempts rather than two minutes.
   if (code === 'review_projection_refused') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
+  // the observation was not written: the ingest failed, or the database's own rule for this reader's tier refused the row
+  // (guard_reviewed_image_analysis; the intake answers both the same way). The second repeats on every attempt and each
+  // attempt spends two reads, so an hour between attempts; the stage's max_attempts bounds the total.
+  if (code === 'review_observation_not_persisted') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
   // the contract refused this answer: another reading of the photo can be valid
   if (/^invalid_review_/.test(code) || code === 'review_too_large') {
     return { outcome: 'unavailable', error_class: 'reader_output_invalid', http_status: o.http ?? null, retry_after_seconds: 1800, detail: d };
