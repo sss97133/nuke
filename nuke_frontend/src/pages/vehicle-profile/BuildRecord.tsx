@@ -31,7 +31,7 @@ function Lines({ lines, amounts }: { lines: BuildLine[]; amounts: boolean }) {
   </li>)}</ul>;
 }
 
-export function SystemRow({ system, amounts, open = false }: { system: BuildSystem; amounts: boolean; open?: boolean }) {
+export function SystemRow({ system, amounts, open = false, anchor = false }: { system: BuildSystem; amounts: boolean; open?: boolean; anchor?: boolean }) {
   const lines = system.lines ?? [];
   const work = lines.filter(isWork); const parts = lines.filter(line => !isWork(line));
   const shops = system.paper.shops.map(receiptSupplierLabel).filter(Boolean).join(', ');
@@ -42,7 +42,7 @@ export function SystemRow({ system, amounts, open = false }: { system: BuildSyst
     system.photos?.images ? count(system.photos.images, 'photo') : null,
     system.stages?.length ? `${system.stages.map(stage => (PHASE[stage.phase] ?? stage.phase).toLowerCase()).join(', ')} photographed` : null,
   ].filter(Boolean);
-  return <details className="vp-build-system" data-system={system.system_key} open={open || undefined}>
+  return <details className="vp-build-system" id={anchor ? `build-${system.system_key}` : undefined} data-system={system.system_key} open={open || undefined}>
     <summary>
       <span className="vp-build-system__name"><strong>{name(system.system_key)}</strong><small>{system.first_day ? span(system.first_day, system.last_day) : 'No paper on file'}</small></span>
       <span className="vp-build-system__facts">{facts.join(' · ') || 'No dated work or parts'}</span>
@@ -74,6 +74,16 @@ export function SystemRow({ system, amounts, open = false }: { system: BuildSyst
 
 /** Renders the database's own fold of the receipt lines. Paper hours and reference hours are shown side by side, never summed. */
 export function BuildRecord({ record }: { record: BuildReconstruction }) {
+  // A link to #build-<system> opens that system's row and brings it into view, so a letter or comment can cite one system.
+  React.useEffect(() => {
+    const show = () => {
+      const match = /^#build-([a-z_]+)$/.exec(window.location.hash);
+      const row = match && document.getElementById(`build-${match[1]}`);
+      if (row instanceof HTMLDetailsElement) { row.open = true; row.scrollIntoView({ block: 'start' }); }
+    };
+    show(); window.addEventListener('hashchange', show);
+    return () => window.removeEventListener('hashchange', show);
+  }, [record]);
   const { totals } = record;
   if (!totals.lines) return null;
   const main = record.systems.filter(system => !MINOR.has(system.system_key));
@@ -91,8 +101,8 @@ export function BuildRecord({ record }: { record: BuildReconstruction }) {
     </dl>
     <p className="vp-build-note">Paper hours, reference time and stage ranges are different measures and are not added together. Neither is the full labor in this build.
       {record.systems_without_paper.length > 0 && <> No receipt or work order on file for: {record.systems_without_paper.map(name).join(', ')}.</>}</p>
-    <div className="vp-build-systems">{main.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} />)}</div>
-    {minor.length > 0 && <div className="vp-build-systems vp-build-systems--minor">{minor.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} />)}</div>}
+    <div className="vp-build-systems">{main.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} anchor />)}</div>
+    {minor.length > 0 && <div className="vp-build-systems vp-build-systems--minor">{minor.map(system => <SystemRow key={system.system_key} system={system} amounts={record.amounts_visible} anchor />)}</div>}
   </section>;
 }
 
