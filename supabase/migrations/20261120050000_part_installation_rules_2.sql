@@ -19,6 +19,11 @@
 --   vehicle_part_installation_evidence(uuid)  one change: the readings that never count also exclude "without", "no visible",
 --                                             "not visible", "possibly" and "probably" (a reading that denies or hedges the part
 --                                             does not show it). Same output shape, still no amounts, grants unchanged.
+--                                             Also a second basis: a current answered question (evidence_judgment_requests, kind
+--                                             receipt_part_visible; not cancelled, withdrawn or superseded) with visible=yes makes its line
+--                                             seen (matched_on 'answered_question', the request id as witness, the answer's quote and
+--                                             confidence) through a photograph that passes the same gates as a reading. visible=no or
+--                                             cannot_tell is never evidence of absence; it is only counted per line (asked, asked_not_visible).
 -- Read-only; writes nothing.
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
@@ -193,10 +198,11 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
                     CASE lower(ev0.part_side) WHEN 'left' THEN 'left' WHEN 'driver' THEN 'left' WHEN 'right' THEN 'right' WHEN 'passenger' THEN 'right' END) AS ev_side,
            public.part_text_level(ev0.words) AS ev_level
       FROM ev0),
-  m0 AS (
+  mr AS (
     -- one row per (line, photograph): the reading whose words name the part (words preferred over a key)
     SELECT DISTINCT ON (lr.item_id, e.image_id) lr.item_id, e.image_id, e.image_url, e.day, e.is_print, e.phase, e.observation_id, e.part_key,
-           e.words, coalesce(lr.key_re IS NOT NULL AND e.part_key ~ lr.key_re, false) AS by_key
+           e.words, coalesce(lr.key_re IS NOT NULL AND e.part_key ~ lr.key_re, false) AS by_key,
+           NULL::uuid AS request_id, NULL::numeric AS answer_confidence, false AS by_answer
       FROM lr JOIN ev e ON lr.rule IS NOT NULL
        -- a part-keyed reading counts by its key alone (its statement often names neighbours); a component label counts by its words
        AND (CASE WHEN e.part_key IS NOT NULL THEN lr.key_re IS NOT NULL AND e.part_key ~ lr.key_re
@@ -208,11 +214,33 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
        -- a photograph taken before the receipt cannot show that purchase; a print carries no day and is kept apart
        AND (e.is_print OR lr.anchor_date IS NULL OR e.day >= lr.anchor_date)
      ORDER BY lr.item_id, e.image_id, coalesce(lr.key_re IS NOT NULL AND e.part_key ~ lr.key_re, false), e.observation_id),
+  aq0 AS (
+    -- current answered "is the part on this receipt line visible" questions for this vehicle: not cancelled, withdrawn or superseded
+    SELECT q.id AS request_id, q.answer AS ans, (q.params #>> '{context,item_id}')::uuid AS item_id
+      FROM v JOIN public.evidence_judgment_requests q ON q.vehicle_id = v.id
+     WHERE q.question_kind = 'receipt_part_visible' AND q.status = 'answered' AND q.superseded_by IS NULL AND q.cancelled_at IS NULL
+       AND q.params #>> '{context,item_id}' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+  aq AS (
+    -- a yes answer counts only through a photograph that passes the same gates as a reading (rd), on or after the receipt day
+    SELECT lr.item_id, rd.image_id, rd.image_url, CASE WHEN rd.is_print THEN NULL ELSE rd.taken_at::date END AS day, rd.is_print, rd.phase,
+           NULL::uuid AS observation_id, NULL::text AS part_key, nullif(left(btrim(aq0.ans ->> 'quote'), 300), '') AS words, false AS by_key,
+           aq0.request_id, CASE WHEN aq0.ans ->> 'confidence' ~ '^[0-9.]+$' THEN (aq0.ans ->> 'confidence')::numeric END AS answer_confidence, true AS by_answer
+      FROM aq0 JOIN lr ON lr.item_id = aq0.item_id
+      JOIN rd ON rd.image_id = CASE WHEN aq0.ans ->> 'image_id' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN (aq0.ans ->> 'image_id')::uuid END
+     WHERE aq0.ans ->> 'visible' = 'yes' AND (rd.is_print OR lr.anchor_date IS NULL OR rd.taken_at::date >= lr.anchor_date)),
+  asked AS (
+    -- a "no" or "cannot tell" is not evidence of absence; it is only counted, so a page can say "asked, not visible in the frames checked"
+    SELECT item_id, count(*) AS n, count(*) FILTER (WHERE ans ->> 'visible' = 'no') AS n_no FROM aq0 GROUP BY item_id),
+  m0 AS (
+    SELECT DISTINCT ON (u.item_id, u.image_id) u.*
+      FROM (SELECT * FROM mr UNION ALL SELECT * FROM aq) u
+     ORDER BY u.item_id, u.image_id, u.by_answer, u.by_key, u.observation_id),
   m AS (
-    SELECT m0.*, row_number() OVER (PARTITION BY m0.item_id ORDER BY m0.is_print, m0.by_key, m0.day, m0.image_id) AS rn
+    SELECT m0.*, row_number() OVER (PARTITION BY m0.item_id ORDER BY m0.is_print, m0.by_answer, m0.by_key, m0.day, m0.image_id) AS rn
       FROM m0),
   st AS (
     SELECT lr.item_id, lr.receipt_id, lr.anchor_date, lr.system_key, lr.rule, lr.basis, lr.description,
+           coalesce(a.n, 0) AS asked, coalesce(a.n_no, 0) AS asked_no, coalesce(bool_or(m.by_answer), false) AS has_answer,
            count(m.image_id) FILTER (WHERE NOT m.is_print) AS dated_images, count(m.image_id) FILTER (WHERE m.is_print) AS print_images,
            min(m.day) AS first_day, max(m.day) AS last_day,
            CASE WHEN count(m.image_id) FILTER (WHERE NOT m.is_print) > 0 THEN 'seen'
@@ -222,21 +250,24 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
                 ELSE 'rule found no qualifying photograph reading' END AS reason,
            coalesce(jsonb_agg(jsonb_build_object(
              'image_id', m.image_id, 'image_url', m.image_url, 'day', m.day, 'is_print', m.is_print, 'build_phase', m.phase,
-             'part_key', m.part_key, 'matched_on', CASE WHEN m.by_key THEN 'part_key' ELSE 'reading words' END,
-             'reading', nullif(left(btrim(public.text_redact_contact(m.words)), 300), ''), 'observation_id', m.observation_id)
+             'part_key', m.part_key, 'matched_on', CASE WHEN m.by_answer THEN 'answered_question' WHEN m.by_key THEN 'part_key' ELSE 'reading words' END,
+             'reading', nullif(left(btrim(public.text_redact_contact(m.words)), 300), ''), 'observation_id', m.observation_id,
+             'request_id', m.request_id, 'answer_confidence', m.answer_confidence)
              ORDER BY m.rn) FILTER (WHERE m.rn <= 4), '[]'::jsonb) AS seen
-      FROM lr LEFT JOIN m ON m.item_id = lr.item_id
-     GROUP BY lr.item_id, lr.receipt_id, lr.anchor_date, lr.system_key, lr.rule, lr.basis, lr.description)
+      FROM lr LEFT JOIN m ON m.item_id = lr.item_id LEFT JOIN asked a ON a.item_id = lr.item_id
+     GROUP BY lr.item_id, lr.receipt_id, lr.anchor_date, lr.system_key, lr.rule, lr.basis, lr.description, a.n, a.n_no)
   SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM v) THEN NULL ELSE jsonb_build_object(
     'function', 'vehicle_part_installation_evidence', 'version', 1, 'vehicle_id', p_vehicle_id, 'as_of', statement_timestamp(),
     'limitation', 'A photograph that shows a part is evidence that kind of part is on the car on that photograph''s day. It does not prove that the unit on the receipt is the unit fitted, and a part no photograph shows is not shown to be absent. Photographs of printed sheets carry no day.',
-    'rule', 'Each current receipt part line is read for the part its words name. A photograph counts only when its reading names that same part (a part key or its own words), shows the assembled car, is taken on or after the receipt day, and is gallery-eligible and not sensitive. A line no rule names, or no reading matches, is not photographed. Nothing is guessed from the car system alone.',
+    'rule', 'Each current receipt part line is read for the part its words name. A photograph counts only when its reading names that same part (a part key or its own words), shows the assembled car, is taken on or after the receipt day, and is gallery-eligible and not sensitive. A line no rule names, or no reading matches, is not photographed unless a current answered visibility question for that line says visible in one of those photographs. An answer of not visible or cannot tell is counted (asked) but is never evidence of absence. Nothing is guessed from the car system alone.',
     'totals', jsonb_build_object(
       'part_lines', (SELECT count(*) FROM st),
       'lines_seen', (SELECT count(*) FROM st WHERE status = 'seen'),
       'lines_seen_in_prints_only', (SELECT count(*) FROM st WHERE status = 'seen_in_prints_only'),
       'lines_not_photographed', (SELECT count(*) FROM st WHERE status = 'not_photographed'),
       'lines_without_rule', (SELECT count(*) FROM st WHERE rule IS NULL),
+      'lines_seen_by_answer', (SELECT count(*) FROM st WHERE has_answer),
+      'lines_asked', (SELECT count(*) FROM st WHERE asked > 0),
       'photographs_read', (SELECT count(*) FROM rd)),
     'by_system', (SELECT coalesce(jsonb_agg(jsonb_build_object('system_key', g.system_key, 'part_lines', g.n, 'lines_seen', g.seen,
                     'lines_seen_in_prints_only', g.prints, 'lines_not_photographed', g.n - g.seen - g.prints)
@@ -249,8 +280,10 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
                 'description', nullif(left(btrim(public.text_redact_contact(
                     regexp_replace(s.description, ';? *\ylist *\$?[0-9][0-9,]*(\.[0-9]+)?', '', 'gi'))), 500), ''),
                 'status', s.status, 'reason', s.reason, 'rule', s.rule,
-                'match_basis', CASE WHEN s.rule IS NULL THEN NULL
-                                    ELSE 'rule ' || s.rule || ': a photograph reading ' || s.basis || ' (part key or the reading''s own words), on or after the receipt day' END,
+                'match_basis', CASE WHEN s.rule IS NULL AND NOT s.has_answer THEN NULL
+                                    ELSE concat_ws('; ', CASE WHEN s.rule IS NOT NULL THEN 'rule ' || s.rule || ': a photograph reading ' || s.basis || ' (part key or the reading''s own words), on or after the receipt day' END,
+                                      CASE WHEN s.has_answer THEN 'answered question: a current answer says the part is visible in the cited photograph (answer quote shown)' END) END,
+                'asked', s.asked, 'asked_not_visible', s.asked_no,
                 'seen_images', s.dated_images + s.print_images, 'first_day', s.first_day, 'last_day', s.last_day, 'seen', s.seen)
                 ORDER BY s.system_key, s.anchor_date NULLS LAST, s.item_id), '[]'::jsonb) FROM st s)) END
 $$;

@@ -158,6 +158,9 @@ END $$;
 
 
 -- Rules 2 (20261120050000): applied on top, with its own vehicle so the totals above stay as they were.
+CREATE TABLE public.fixture_requests(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, question_kind text, status text, superseded_by uuid,
+  cancelled_at timestamptz, params jsonb, answer jsonb);
+CREATE VIEW public.evidence_judgment_requests AS SELECT * FROM public.fixture_requests;
 \ir ../migrations/20261120050000_part_installation_rules_2.sql
 INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a3', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL);
 INSERT INTO public.fixture_lines
@@ -227,6 +230,65 @@ BEGIN
   ASSERT (r #>> '{totals,lines_seen}')::int = 14 AND (r #>> '{totals,lines_not_photographed}')::int = 2, 'totals: ' || (r -> 'totals')::text;
   RESET ROLE;
   ASSERT (SELECT count(*) FROM public.part_installation_rules()) = 100 AND (SELECT count(*) = count(DISTINCT ord) FROM public.part_installation_rules()), 'seven rules added, ords unique';
+END $$;
+
+
+-- Answered questions as a second basis (vehicle a4): only a current answered visible=yes counts, through a photograph that passes the reading gates
+INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a4', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL);
+INSERT INTO public.fixture_lines VALUES
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-01-02', 'Supplier', 'WATER PUMP (MTC) LT', 'W', 1, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-01-02', 'Supplier', 'THERMOSTAT (MCS) 1Y', 'T', 1, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-000000000303', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-01-02', 'Supplier', 'STARTER (ULT) LT', 'S', 1, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-000000000304', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-01-02', 'Supplier', 'FAN CLUTCH (MTC) LT', 'F', 1, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-000000000305', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-01-02', 'Supplier', 'HOSE CLAMPS (MHC)', 'H', 1, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-000000000306', '00000000-0000-0000-0000-0000000000b6', 'part', '2026-12-01', 'Supplier', 'SEALED BEAM (SYL) 1Y', 'B', 1, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-000000000307', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-01-02', 'Supplier', 'MINI BULB (SYL) 1Y BP', 'M', 1, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-000000000308', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-01-02', 'Supplier', 'STD RADIATOR CAP', 'R', 1, NULL, NULL);
+INSERT INTO public.fixture_photos VALUES
+  ('00000000-0000-0000-0000-000000000401', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/q1.jpg', '2026-10-28T19:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-000000000402', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/q2.jpg', '2026-10-28T19:01:00Z', true,  false, false, true),
+  ('00000000-0000-0000-0000-000000000403', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/q3.jpg', '2026-10-28T19:02:00Z', false, false, false, true);
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data)
+  SELECT '00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false,
+         jsonb_build_object('image_id', i, 'build_phase_guess', 'final_assembly', 'state_observations', jsonb_build_object('completeness', 'assembled'),
+           'components_seen', CASE WHEN i LIKE '%403' THEN '[{"label":"Radiator filler neck and pressure cap"}]'::jsonb ELSE '[{"label":"Engine bay"}]'::jsonb END)
+    FROM unnest(ARRAY['00000000-0000-0000-0000-000000000401','00000000-0000-0000-0000-000000000402','00000000-0000-0000-0000-000000000403']) i;
+INSERT INTO public.fixture_requests(vehicle_id, question_kind, status, superseded_by, cancelled_at, params, answer) VALUES
+  ('00000000-0000-0000-0000-0000000000a4','receipt_part_visible','answered',NULL,NULL,'{"context":{"item_id":"00000000-0000-0000-0000-000000000301"}}','{"visible":"yes","installed":"cannot_tell","confidence":0.55,"image_id":"00000000-0000-0000-0000-000000000401","quote":"Water pump is mounted behind the pulley."}'),
+  ('00000000-0000-0000-0000-0000000000a4','receipt_part_visible','answered',NULL,NULL,'{"context":{"item_id":"00000000-0000-0000-0000-000000000302"}}','{"visible":"no","installed":"cannot_tell","confidence":0.3,"image_id":null,"quote":"Not visible in the frames."}'),
+  ('00000000-0000-0000-0000-0000000000a4','receipt_part_visible','answered',NULL,NULL,'{"context":{"item_id":"00000000-0000-0000-0000-000000000303"}}','{"visible":"yes","installed":"yes","confidence":0.8,"image_id":"00000000-0000-0000-0000-000000000402","quote":"Starter on a sensitive photograph."}'),
+  ('00000000-0000-0000-0000-0000000000a4','receipt_part_visible','cancelled',NULL,now(),'{"context":{"item_id":"00000000-0000-0000-0000-000000000304"}}','{"visible":"yes","installed":"yes","confidence":0.8,"image_id":"00000000-0000-0000-0000-000000000401","quote":"Cancelled."}'),
+  ('00000000-0000-0000-0000-0000000000a4','receipt_part_visible','answered','00000000-0000-0000-0000-0000000000ff',NULL,'{"context":{"item_id":"00000000-0000-0000-0000-000000000305"}}','{"visible":"yes","installed":"yes","confidence":0.8,"image_id":"00000000-0000-0000-0000-000000000401","quote":"Superseded."}'),
+  ('00000000-0000-0000-0000-0000000000a4','receipt_part_visible','answered',NULL,NULL,'{"context":{"item_id":"00000000-0000-0000-0000-000000000306"}}','{"visible":"yes","installed":"yes","confidence":0.8,"image_id":"00000000-0000-0000-0000-000000000401","quote":"Photographed before the receipt day."}'),
+  ('00000000-0000-0000-0000-0000000000a4','receipt_part_visible','answered',NULL,NULL,'{"context":{"item_id":"00000000-0000-0000-0000-000000000307"}}','{"visible":"cannot_tell","installed":"cannot_tell","confidence":0.2,"image_id":null,"quote":"Cannot tell."}'),
+  ('00000000-0000-0000-0000-0000000000a4','receipt_part_visible','answered',NULL,NULL,'{"context":{"item_id":"00000000-0000-0000-0000-000000000308"}}','{"visible":"yes","installed":"yes","confidence":0.7,"image_id":"00000000-0000-0000-0000-000000000401","quote":"Cap on the radiator neck."}');
+DO $$
+DECLARE r jsonb; l jsonb; i int;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_part_installation_evidence('00000000-0000-0000-0000-0000000000a4');
+  -- a line with no rule is seen through a current answered yes: witness, quote, confidence
+  SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'item_id' = '00000000-0000-0000-0000-000000000301';
+  ASSERT l ->> 'status' = 'seen' AND l ->> 'rule' IS NULL AND l #>> '{seen,0,matched_on}' = 'answered_question' AND l #>> '{seen,0,reading}' = 'Water pump is mounted behind the pulley.'
+     AND l #>> '{seen,0,request_id}' IS NOT NULL AND (l #>> '{seen,0,answer_confidence}')::numeric = 0.55 AND l ->> 'match_basis' ~ 'answered question' AND l ->> 'asked' = '1', 'answered yes: ' || l::text;
+  -- visible=no is not evidence of absence and changes nothing, but is counted
+  SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'item_id' = '00000000-0000-0000-0000-000000000302';
+  ASSERT l ->> 'status' = 'not_photographed' AND l ->> 'asked' = '1' AND l ->> 'asked_not_visible' = '1' AND l ->> 'reason' = 'no rule names this part', 'answered no: ' || l::text;
+  -- sensitive photograph, cancelled request, superseded request, photograph before the receipt, cannot tell: never seen
+  FOR i IN 3..7 LOOP
+    SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'item_id' = '00000000-0000-0000-0000-00000000030' || i;
+    ASSERT l ->> 'status' = 'not_photographed' AND l -> 'seen' = '[]'::jsonb, 'answer must not count, line ' || i || ': ' || l::text;
+  END LOOP;
+  SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'item_id' = '00000000-0000-0000-0000-000000000304';
+  ASSERT l ->> 'asked' = '0', 'a cancelled question is not asked: ' || l::text;
+  SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'item_id' = '00000000-0000-0000-0000-000000000307';
+  ASSERT l ->> 'asked' = '1' AND l ->> 'asked_not_visible' = '0', 'cannot tell is asked, not "no": ' || l::text;
+  -- both bases on one line: the reading words (rule) and the answer, as two photographs
+  SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'item_id' = '00000000-0000-0000-0000-000000000308';
+  ASSERT l ->> 'status' = 'seen' AND l ->> 'seen_images' = '2' AND l ->> 'rule' = 'radiator_cap' AND l -> 'seen' @> '[{"matched_on":"answered_question"}]' AND l -> 'seen' @> '[{"matched_on":"reading words"}]', 'both bases: ' || l::text;
+  ASSERT (r #>> '{totals,lines_seen}')::int = 2 AND (r #>> '{totals,lines_seen_by_answer}')::int = 2 AND (r #>> '{totals,lines_asked}')::int = 6, 'totals: ' || (r -> 'totals')::text;
+  ASSERT r::text !~ '000000000402' AND r::text !~ 'q2\.jpg', 'a sensitive photograph never leaves the reader';
+  RESET ROLE;
 END $$;
 
 \ir ../sql/revert_20261120050000_part_installation_rules_2.sql
