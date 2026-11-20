@@ -341,8 +341,8 @@ it('keeps the photographs of ledger-itemized work on the page, one strip per tit
  // The strip shows photographs only: no summary, lenses or receipt lines are repeated beside the ledger.
  expect(photos.textContent).not.toContain('The earlier seating is torn');
  expect(photos.querySelector('.vp-work-lenses')).toBeNull();
- // It sits before the ledger, and the uncosted record keeps its full card after it.
- expect(photos.compareDocumentPosition(host.querySelector('.vp-master-ledger')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+ // The estimate leads; the strip follows it, and the uncosted record keeps its full card after both.
+ expect(photos.compareDocumentPosition(host.querySelector('.vp-master-ledger')!) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
  expect(host.querySelector('[aria-label="Other photographed work"]')!.querySelectorAll('article')).toHaveLength(1);
  await act(async () => photos.querySelector<HTMLButtonElement>('button[aria-label="Open after photo: Rear seat covered"]')!.click());
  expect(fixture.open).toHaveBeenCalledWith('after-b');

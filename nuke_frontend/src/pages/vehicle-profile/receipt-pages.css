@@ -3,6 +3,9 @@
 .vp-receipt-heading h3 { margin: 0; font-size: 22px; }
 .vp-receipt-heading > span, .vp-receipt-intro { color: var(--text-secondary); font-size: 14px; }
 .vp-receipt-intro { margin: 6px 0 16px; }
+.vp-receipt-jump { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 16px; }
+.vp-receipt-jump a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+#build-estimates, #build-receipt-pages, #build-work-photos { scroll-margin-top: 140px; }
 .vp-receipt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); align-items: start; gap: 20px; }
 .vp-receipt-page { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; min-width: 0; font-size: 14px; line-height: 1.45; }
 .vp-receipt-page > header { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }

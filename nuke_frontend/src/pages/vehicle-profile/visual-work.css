@@ -21,7 +21,9 @@
 @media (max-width: 900px) { .vp-component-evidence { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .vp-component-evidence { grid-template-columns: minmax(0, 1fr); } }
 .vp-expected-assemblies { margin: 20px 0 28px; padding: 18px 20px; border: 1px solid var(--border, #d6d6dc); border-radius: var(--radius-lg, 12px); background: var(--surface, white); }
-.vp-expected-assemblies h4 { margin: 0 0 6px; font-size: 22px; }
+.vp-expected-assemblies h4 { margin: 0; font-size: 22px; }
+.vp-expected-assemblies > summary { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; cursor: pointer; min-height: 44px; }
+.vp-expected-assemblies > summary span { font-size: 14px; color: var(--text-secondary); }
 .vp-expected-assemblies header p, .vp-expected-assemblies article > p { margin: 6px 0 12px; font-size: 14px; line-height: 1.5; }
 .vp-expected-assemblies article { border-top: 1px solid var(--border, #d6d6dc); margin-top: 18px; padding-top: 16px; }
 .vp-expected-heading { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
