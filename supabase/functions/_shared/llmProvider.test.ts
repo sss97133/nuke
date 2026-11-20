@@ -70,7 +70,7 @@ Deno.test('platform Sonnet 5.5 uses its supported effort configuration and retai
       [{ role: 'user', content: 'fixture' }], { maxTokens: 1600, temperature: 0.2 });
     equal(body.model, 'claude-sonnet-5-5'); equal(body.max_tokens, 1600);
     equal(headers['anthropic-workspace-id'], 'workspace-fixture');
-    equal('temperature' in body, false); equal(body.output_config, { effort: 'low' });
+    equal('temperature' in body, false); equal(body.output_config, { effort: 'low' }); equal(body.thinking, { type: 'between_tools' });
     equal(result.content, '{"ok":true}');
   } finally { globalThis.fetch = previous; }
 });

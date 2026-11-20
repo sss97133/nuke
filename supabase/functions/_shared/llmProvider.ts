@@ -258,7 +258,9 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
       model,
       max_tokens: options?.maxTokens ?? 4096,
       // Sonnet 5.5 / Opus 5.5 reject non-default sampling params (400): no temperature.
-      ...(model === CLAUDE_FLOOR_MODEL ? { output_config: { effort: "low" } } : {}),
+      // Single-shot reads (platform vision caps max_tokens at 300-600 and treats stop_reason max_tokens as a failure):
+      // adaptive thinking is on when `thinking` is omitted and would spend that budget, so Sonnet 5.5 gets between_tools.
+      ...(model === CLAUDE_FLOOR_MODEL ? { output_config: { effort: "low" }, thinking: { type: "between_tools" } } : {}),
       system: systemMessage,
       messages: conversationMessages,
     }),
