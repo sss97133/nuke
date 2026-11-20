@@ -32,11 +32,11 @@ BEGIN
  RETURN id;
 END $$;
 -- The reading as the intake stores it: the verdict plus the keys the intake adds, with the review envelope the guard checks.
-CREATE FUNCTION tt_obs(p_image uuid, p_tier text, p_verdict jsonb) RETURNS uuid LANGUAGE plpgsql AS $$
-DECLARE i vehicle_images%ROWTYPE; v jsonb; oid uuid; h text := md5(random()::text || clock_timestamp()::text) || md5(random()::text); reviewed timestamptz := now();
+CREATE FUNCTION tt_obs(p_image uuid, p_tier text, p_verdict jsonb, p_prov jsonb DEFAULT '{}', p_extra jsonb DEFAULT '{}', p_raw jsonb DEFAULT '{}') RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE i vehicle_images%ROWTYPE; v jsonb; oid uuid; h text := md5(random()::text || clock_timestamp()::text) || md5(random()::text); reviewed timestamptz := clock_timestamp();
 BEGIN
  SELECT * INTO i FROM vehicle_images WHERE id=p_image;
- v := p_verdict || jsonb_build_object('image_id',i.id,'vehicle_id',i.vehicle_id,'analysis_kind','image_deep_byok','witness_image_id',i.id,'is_inferred',true);
+ v := p_verdict || jsonb_build_object('image_id',i.id,'vehicle_id',i.vehicle_id,'analysis_kind','image_deep_byok','witness_image_id',i.id,'is_inferred',true) || p_raw;
  INSERT INTO vehicle_observations(vehicle_id,kind,source_id,source_url,source_identifier,observed_at,content_text,confidence_score,agent_model,agent_tier,
    extraction_method,extractor_id,raw_source_ref,structured_data,extraction_metadata,analysis_deferred)
  VALUES(i.vehicle_id,'condition',(SELECT id FROM observation_sources WHERE slug='photo_pipeline'),i.image_url,
@@ -44,7 +44,7 @@ BEGIN
    'reviewed_image_analysis_v1',NULL,'vehicle_images:'||i.id,v,
    jsonb_build_object('review_hash',h,'reviewed_image',jsonb_build_object('image_url',i.image_url,'expected_updated_at',i.updated_at,'reviewed_url',i.image_url,
      'reviewed_sha256',repeat('b',64),'reviewed_at',reviewed),
-     'reviewer_provenance',jsonb_build_object('agent_model','fixture-model','agent_tier',p_tier,'extraction_method','fixture review','run_id','fixture')),true)
+     'reviewer_provenance',jsonb_build_object('agent_model','fixture-model','agent_tier',p_tier,'extraction_method','fixture review','run_id','fixture') || p_prov) || p_extra,true)
  RETURNING id INTO oid;
  RETURN oid;
 END $$;
@@ -1313,7 +1313,13 @@ DO $$ DECLARE cfg jsonb; BEGIN
    AND has_function_privilege('service_role','image_reading_thin_violation(jsonb,jsonb)','EXECUTE')
    AND NOT has_function_privilege('anon','image_reading_tier_is_reviewed(text,boolean)','EXECUTE')
    AND NOT has_function_privilege('authenticated','image_reading_tier_is_reviewed(text,boolean)','EXECUTE')
-   AND has_function_privilege('service_role','image_reading_tier_is_reviewed(text,boolean)','EXECUTE'), 'helpers: service_role only';
+   AND has_function_privilege('service_role','image_reading_tier_is_reviewed(text,boolean)','EXECUTE')
+   AND NOT has_function_privilege('anon','image_reading_tier_is_automatic(text)','EXECUTE') AND NOT has_function_privilege('authenticated','image_reading_tier_is_automatic(text)','EXECUTE')
+   AND has_function_privilege('service_role','image_reading_tier_is_automatic(text)','EXECUTE')
+   AND NOT has_function_privilege('anon','image_reading_thin_envelope_violation(jsonb,jsonb)','EXECUTE') AND NOT has_function_privilege('authenticated','image_reading_thin_envelope_violation(jsonb,jsonb)','EXECUTE')
+   AND has_function_privilege('service_role','image_reading_thin_envelope_violation(jsonb,jsonb)','EXECUTE'), 'helpers: service_role only';
+ ASSERT image_reading_tier_is_automatic('subscription automatic') AND NOT image_reading_tier_is_automatic('caller-byok') AND NOT image_reading_tier_is_automatic('never seen')
+   AND NOT image_reading_tier_is_automatic(NULL) AND NOT image_reading_tier_is_automatic(''), 'a stored reading is automatic only when its tier is the configured automatic tier';
  -- total: garbage in, a word out, never an error
  ASSERT image_reading_thin_violation('[]'::jsonb,NULL)='shape' AND image_reading_thin_violation('null'::jsonb,NULL) IS NOT NULL
    AND image_reading_thin_violation(NULL,NULL) IS NOT NULL AND image_reading_thin_violation('{}'::jsonb,'[1]'::jsonb) IS NOT NULL
@@ -1480,6 +1486,99 @@ DO $$ DECLARE img uuid; t1 uuid; c1 uuid; rv uuid; BEGIN
  RAISE NOTICE 'PASS: refused projection supersedes nothing';
 END $$;
 
+-- ===== review findings: closed question tokens, the envelope, stored readings judged by the automatic tier, ordering of two thin readings
+DO $$ DECLARE v jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); adm jsonb := (SELECT config_value->'automatic'->'admits' FROM platform_config WHERE config_key='image_reading_tiers'); q text; r text; BEGIN
+ -- open questions: values of the closed vocabulary only, at most 8 of them
+ ASSERT image_reading_thin_violation(v || '{"open_questions":["Two independent reads of this photo disagree on scene_type: undercarriage vs data_plate; posted as unknown.","Both reads say rust_severity is none; this reader may not post that value yet.","Both reads say completeness is assembled; this reader may not post that value yet."]}', adm) IS NULL, 'vocabulary questions pass';
+ FOREACH q IN ARRAY ARRAY['Two independent reads of this photo disagree on scene_type: rebuilt_motor_with_new_pistons_and_cam vs matching_numbers_confirmed_by_owner; posted as unknown.',
+     'Two independent reads of this photo disagree on scene_type: undercarriage vs rebuilt_motor; posted as unknown.',
+     'Both reads say completeness is rebuilt_by_owner; this reader may not post that value yet.',
+     'Both reads say paint_state is '||repeat('a',1000000)||'; this reader may not post that value yet.'] LOOP
+   r := image_reading_thin_violation(v || jsonb_build_object('open_questions',jsonb_build_array(q)), adm);
+   ASSERT r = 'open_questions', 'a question with words of its own is refused: '||left(q,60)||' -> '||coalesce(r,'null');
+ END LOOP;
+ ASSERT image_reading_thin_violation(v || jsonb_build_object('open_questions',(SELECT jsonb_agg('Both reads say paint_state is clear; this reader may not post that value yet.'::text) FROM generate_series(1,9))), adm) = 'open_questions', 'nine questions are refused';
+ ASSERT image_reading_thin_violation(v || jsonb_build_object('open_questions',(SELECT jsonb_agg('Both reads say paint_state is clear; this reader may not post that value yet.'::text) FROM generate_series(1,8))), adm) IS NULL, 'eight questions pass';
+ RAISE NOTICE 'PASS: open questions carry closed vocabulary tokens only, at most 8';
+END $$;
+DO $$ DECLARE v jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); img uuid; BEGIN
+ -- the envelope: end to end through the trigger, then the helper directly
+ FOR i IN 1..5 LOOP
+   img := tt_image();
+   BEGIN
+     PERFORM CASE i
+       WHEN 1 THEN tt_obs(img,'subscription automatic',v, '{"cost_basis":"free text: this car has a rebuilt 350 and new floors"}')
+       WHEN 2 THEN tt_obs(img,'subscription automatic',v, '{"agent_duration_ms":{"a":"b"}}')
+       WHEN 3 THEN tt_obs(img,'subscription automatic',v, '{"agent_cost_cents":"12"}')
+       WHEN 4 THEN tt_obs(img,'subscription automatic',v, '{}', '{"free":"text"}')
+       ELSE tt_obs(img,'subscription automatic',v, '{"extra":"text"}') END;
+     RAISE EXCEPTION 'envelope case % unexpectedly landed', i;
+   EXCEPTION WHEN check_violation THEN ASSERT SQLERRM = 'thin_review_asserts_unchecked_field', 'envelope case '||i||': '||SQLERRM; END;
+ END LOOP;
+ img := tt_image();
+ BEGIN PERFORM tt_obs(img,'subscription automatic',v,'{}','{}',jsonb_build_object('witness_image_id',jsonb_build_object('free','text')));
+   RAISE EXCEPTION 'witness object unexpectedly landed';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM = 'thin_review_asserts_unchecked_field', SQLERRM; END;
+ -- the legitimate envelope: the reader's own cost_basis sentence, a numeric duration, a null cost
+ PERFORM tt_obs(img,'subscription automatic',v, jsonb_build_object('agent_duration_ms',1234,'agent_cost_cents',NULL,
+   'cost_basis','Owner subscription via the claude CLI; nothing is billed per photo. The CLI''s notional cost and token counts are kept in the stage receipt, not here. agent_duration_ms is the photo''s wall-clock (download, both reads, any retry).'));
+ -- a reviewed tier keeps the free envelope it has today
+ PERFORM tt_obs(tt_image(),'caller-byok subscription',tt_rich(),'{"cost_basis":"free text"}','{"free":"text"}');
+ ASSERT image_reading_thin_envelope_violation('[]','{}') = 'envelope' AND image_reading_thin_envelope_violation(NULL,NULL) = 'envelope', 'the envelope test is total';
+ RAISE NOTICE 'PASS: a thin reading carries a closed envelope too; a reviewed one is unchanged';
+END $$;
+-- stored readings: protected unless positively the automatic tier
+DO $$ DECLARE img uuid; img2 uuid; r_int uuid; r_rv uuid; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); cfg jsonb; BEGIN
+ SELECT config_value INTO cfg FROM platform_config WHERE config_key='image_reading_tiers';
+ -- a rich reading of a tier that is listed only for a moment (a producer nobody seeded), stored
+ UPDATE platform_config SET config_value=jsonb_set(cfg,'{reviewed_tiers}',(cfg->'reviewed_tiers')||'"interactive"'::jsonb) WHERE config_key='image_reading_tiers';
+ img := tt_image();
+ r_int := tt_obs(img,'interactive',tt_rich()); PERFORM project_reviewed_image_analysis(r_int);
+ UPDATE platform_config SET config_value=cfg WHERE config_key='image_reading_tiers';
+ ASSERT NOT image_reading_tier_is_reviewed('interactive'), 'the tier is unlisted again';
+ BEGIN PERFORM tt_obs(img,'subscription automatic',thin); RAISE EXCEPTION 'thin over a stored unlisted-tier reading unexpectedly landed';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
+ -- the same through the photo's stamp alone (no observation): an unlisted tier on the stamp is protected
+ img2 := tt_image('20000000-0000-4000-8000-000000000101','{"byok_deep_analysis":{"scene_type":"body_exterior","agent_tier":"interactive"}}');
+ BEGIN PERFORM tt_obs(img2,'subscription automatic',thin); RAISE EXCEPTION 'thin over an unlisted-tier stamp unexpectedly landed';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
+ -- a reviewed reading landing over it does not supersede it (it is not the automatic tier)
+ r_rv := tt_obs(img,'caller-byok subscription',tt_rich('engine_bay')); PERFORM project_reviewed_image_analysis(r_rv);
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=r_int), 'a stored reading of an unlisted tier is not superseded';
+ -- a damaged tier list does not expose stored reviewed readings: reviewed_tiers = [] and a reviewed reading is stored
+ img := tt_image();
+ r_rv := tt_obs(img,'caller-byok subscription',tt_rich()); PERFORM project_reviewed_image_analysis(r_rv);
+ UPDATE platform_config SET config_value=jsonb_set(cfg,'{reviewed_tiers}','[]'::jsonb) WHERE config_key='image_reading_tiers';
+ BEGIN PERFORM tt_obs(img,'subscription automatic',thin); RAISE EXCEPTION 'thin over a stored reviewed reading landed with an empty tier list';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
+ UPDATE platform_config SET config_value=cfg WHERE config_key='image_reading_tiers';
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=r_rv), 'the reviewed reading is current';
+ -- the row without an automatic tier: nothing stored is automatic, so nothing is superseded
+ img := tt_image();
+ r_int := tt_obs(img,'subscription automatic',thin); PERFORM project_reviewed_image_analysis(r_int);
+ UPDATE platform_config SET config_value=cfg-'automatic' WHERE config_key='image_reading_tiers';
+ r_rv := tt_obs(img,'caller-byok subscription',tt_rich()); PERFORM project_reviewed_image_analysis(r_rv);
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=r_int), 'no automatic tier in the row: nothing is superseded';
+ UPDATE platform_config SET config_value=cfg WHERE config_key='image_reading_tiers';
+ RAISE NOTICE 'PASS: stored readings are protected unless positively the automatic tier (unlisted tier, emptied list, no automatic tier)';
+END $$;
+-- two thin readings posted before either is projected: the older never supersedes the newer
+DO $$ DECLARE img uuid; a uuid; b uuid; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); BEGIN
+ img := tt_image();
+ a := tt_obs(img,'subscription automatic',thin); b := tt_obs(img,'subscription automatic',(SELECT jsonb_array_elements(tt_accepted()) OFFSET 1 LIMIT 1));
+ PERFORM project_reviewed_image_analysis(a);
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=b), 'the older thin reading did not supersede the newer, unprojected one';
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=a), 'the older reading is current';
+ -- the other order: the newer lands first and replaces the older one
+ img := tt_image();
+ a := tt_obs(img,'subscription automatic',thin); b := tt_obs(img,'subscription automatic',(SELECT jsonb_array_elements(tt_accepted()) OFFSET 1 LIMIT 1));
+ PERFORM project_reviewed_image_analysis(b);
+ ASSERT (SELECT is_superseded AND superseded_by=b FROM vehicle_observations WHERE id=a), 'the newer thin reading replaces the older, unprojected one';
+ BEGIN PERFORM project_reviewed_image_analysis(a); RAISE EXCEPTION 'the superseded older reading projected';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='review_observation_not_eligible', SQLERRM; END;
+ RAISE NOTICE 'PASS: two unprojected thin readings: the older never supersedes the newer';
+END $$;
+
 -- ===== the config row is what keeps a reviewed producer working
 DO $$ DECLARE img uuid; img_r uuid; img_t uuid; t1 uuid; c1 uuid; t2 uuid; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) OFFSET 1 LIMIT 1); BEGIN
  -- readings already on photos: a reviewed one, and a thin one with a keyed child and a newer thin reading posted behind it
@@ -1555,7 +1654,7 @@ END $$;
 -- and the migration applies again on the restored bodies
 \ir ../migrations/20261120140000_image_reading_tiers.sql
 DO $$ BEGIN
- ASSERT (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.guard_reviewed_image_analysis()'::regprocedure)='fc9eb47ef4906edf0609a21a5047a296', 'guard body is the migration''s';
- ASSERT (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.project_reviewed_image_analysis(uuid)'::regprocedure)='de1ab0844936b7f4700fe887124f8526', 'projection body is the migration''s';
+ ASSERT (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.guard_reviewed_image_analysis()'::regprocedure)='d6b512f7468e03685a871ff61d1873c5', 'guard body is the migration''s';
+ ASSERT (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.project_reviewed_image_analysis(uuid)'::regprocedure)='258d31ac9240fef4138226a9a0a7d506', 'projection body is the migration''s';
  RAISE NOTICE 'PASS: migration applies again after the revert';
 END $$;

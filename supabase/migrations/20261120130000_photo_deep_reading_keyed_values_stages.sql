@@ -162,19 +162,17 @@ returns boolean language sql stable as $$
        and o.structured_data ->> 'source_observation_id' = p_observation_id::text) $$;
 
 -- Is a reading's tier thin? (A thin reading is an automatic one: it satisfies deep_reading only through a stage receipt, so a raise of
--- the stage's version offers it again; a reviewed-tier reading satisfies the stage outright.) The tiers are listed in platform_config
--- 'image_reading_tiers' (config_value.reviewed_tiers, inserted by 20261120140000); a tier that is not listed is thin. No tier at all =
--- a legacy reading = reviewed. This migration must stand alone, so while that row is missing (or has no reviewed_tiers array) only the
--- reader's own literal tier, 'subscription automatic', is thin: no reviewed reading is ever re-offered because a config row is absent.
--- Own function, dropped by this migration's own revert; the intake's guard uses its own, stricter, helper (20261120140000).
+-- the stage's version offers it again; every other reading satisfies the stage outright.) Thin is positively the automatic reader's
+-- tier: platform_config 'image_reading_tiers', config_value.automatic.tier (inserted by 20261120140000), else this migration's own
+-- fallback, the reader's literal tier 'subscription automatic'. A reviewed tier, a tier nobody listed and no tier at all (a legacy
+-- reading) are not thin, the same answer the intake's guard gives for a reading already stored, so the gap finder never offers a photo
+-- the intake would refuse. This migration must stand alone, so no config row is needed.
+-- Own function, dropped by this migration's own revert.
 create or replace function public.image_stage_reading_is_thin(p_tier text)
 returns boolean language sql stable set search_path to 'public', 'pg_temp' as $$
   select case when coalesce(p_tier, '') = '' then false
-              else coalesce((select case when jsonb_typeof(c.config_value -> 'reviewed_tiers') = 'array'
-                                         then not (c.config_value -> 'reviewed_tiers' ? p_tier)
-                                         else p_tier = 'subscription automatic' end
-                               from public.platform_config c where c.config_key = 'image_reading_tiers'),
-                            p_tier = 'subscription automatic') end $$;
+              else p_tier = coalesce((select c.config_value -> 'automatic' ->> 'tier' from public.platform_config c
+                                       where c.config_key = 'image_reading_tiers'), 'subscription automatic') end $$;
 
 -- What is left of a stage's backfill cap today (America/Los_Angeles); null when the stage has none.
 create or replace function public.image_stage_backfill_cap_left(p_stage text)

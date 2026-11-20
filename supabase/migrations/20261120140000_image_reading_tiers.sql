@@ -17,11 +17,15 @@
 --    test and of the thin shape (service_role only). With the row missing (or no reviewed_tiers array) every NEW reading is thin: a
 --    reviewed producer is then refused loudly (thin_review_asserts_unchecked_field), never trusted silently; the insert here is what
 --    keeps that from happening. Readings already stored are then treated as reviewed: nothing is displaced or superseded.
--- 3. guard_reviewed_image_analysis(): the same body plus Rule 1 (a thin reading carries only the thin shape,
---    thin_review_asserts_unchecked_field) and Rule 2 (a thin reading never displaces a reading that is not thin,
---    thin_review_over_reviewed). Both after every existing check; every existing error word is kept.
--- 4. project_reviewed_image_analysis(uuid): the same body plus Rule 3 (a reading that lands supersedes every current thin-tier
---    reading of the photo and its current keyed children, in the projection's transaction; a reviewed reading is never touched) and
+--    Also image_reading_tier_is_automatic(text) (a reading already stored is automatic only when its tier is the config row's
+--    automatic.tier: every other stored reading is protected) and image_reading_thin_envelope_violation(jsonb, jsonb) (the review
+--    envelope of a thin reading is closed too). Open questions of a thin reading name only values of a closed vocabulary, at most 8.
+-- 3. guard_reviewed_image_analysis(): the same body plus Rule 1 (a thin reading carries only the thin shape and envelope,
+--    thin_review_asserts_unchecked_field) and Rule 2 (a thin reading never displaces a stored reading that is not positively the
+--    automatic tier, thin_review_over_reviewed). Both after every existing check; every existing error word is kept.
+-- 4. project_reviewed_image_analysis(uuid): the same body plus Rule 3 (a reading that lands supersedes every current
+--    automatic-tier reading of the photo (a thin landing: only older ones) and its current keyed children, in the projection's
+--    transaction; a reviewed, unlisted or tierless reading is never touched) and
 --    no cover recompute for a thin reading (image_hero_score reads scene_type, confidence and presence.person of the stamp).
 -- Revert: supabase/sql/revert_20261120140000_image_reading_tiers.sql (restores both bodies; leaves the config row).
 begin;
@@ -34,8 +38,8 @@ do $guard$
 declare r record;
 begin
   for r in select * from (values
-      ('public.guard_reviewed_image_analysis()', '4cce782e45863596f359e44bf1c602a6', 'fc9eb47ef4906edf0609a21a5047a296'),
-      ('public.project_reviewed_image_analysis(uuid)', 'c5d8f9b483490c82c90b23e7fc0cb042', 'de1ab0844936b7f4700fe887124f8526')) as t(fn, md5_before, md5_after) loop
+      ('public.guard_reviewed_image_analysis()', '4cce782e45863596f359e44bf1c602a6', 'd6b512f7468e03685a871ff61d1873c5'),
+      ('public.project_reviewed_image_analysis(uuid)', 'c5d8f9b483490c82c90b23e7fc0cb042', '258d31ac9240fef4138226a9a0a7d506')) as t(fn, md5_before, md5_after) loop
     -- a function that is missing is refused too (a null md5 would otherwise pass "not in")
     if coalesce((select md5(prosrc) from pg_proc where oid = to_regprocedure(r.fn)), 'missing') not in (r.md5_before, r.md5_after) then
       raise exception '% is not the body this migration replaces (md5 %); review before applying', r.fn,
@@ -75,6 +79,39 @@ returns boolean language sql stable set search_path to 'public', 'pg_temp' as $$
                                          then (c.config_value -> 'reviewed_tiers') ? p_tier end
                                from public.platform_config c where c.config_key = 'image_reading_tiers'), p_if_no_config) end $$;
 
+-- Is a reading ALREADY STORED an automatic one? Only the tier the config row names as automatic.tier is: a stored reading with any
+-- other tier (reviewed, unlisted, or none) is never displaced (Rule 2) and never superseded (Rule 3), so editing or damaging the
+-- reviewed_tiers list cannot turn stored testimony into something a thin reading replaces. No row, or no automatic.tier: nothing
+-- stored is automatic.
+create or replace function public.image_reading_tier_is_automatic(p_tier text)
+returns boolean language sql stable set search_path to 'public', 'pg_temp' as $$
+  select coalesce(p_tier, '') <> '' and coalesce((select c.config_value -> 'automatic' ->> 'tier' = p_tier
+                                                    from public.platform_config c where c.config_key = 'image_reading_tiers'), false) $$;
+
+-- What the review envelope of a thin-tier reading may carry besides structured_data (a thin reading is closed values only, here too):
+-- extraction_metadata keys, reviewer_provenance keys, numeric or null durations and costs, the one cost_basis sentence the reader
+-- writes, and a witness that is the photo itself. Null when allowed, else the first path that is not. Total: never raises.
+create or replace function public.image_reading_thin_envelope_violation(m jsonb, v jsonb)
+returns text language plpgsql immutable set search_path to 'pg_catalog' as $$
+declare
+  k text; p jsonb := m -> 'reviewer_provenance';
+  c_basis constant text := 'Owner subscription via the claude CLI; nothing is billed per photo. The CLI''s notional cost and token counts are kept in the stage receipt, not here. agent_duration_ms is the photo''s wall-clock (download, both reads, any retry).';
+begin
+  if jsonb_typeof(m) is distinct from 'object' or jsonb_typeof(p) is distinct from 'object' then return 'envelope'; end if;
+  for k in select jsonb_object_keys(m) loop
+    if k <> all (array['review_hash','reviewed_image','reviewer_provenance','prior_analysis']) then return 'extraction_metadata.' || left(k, 40); end if;
+  end loop;
+  for k in select jsonb_object_keys(p) loop
+    if k <> all (array['agent_model','agent_tier','extraction_method','run_id','agent_duration_ms','agent_cost_cents','cost_basis']) then
+      return 'reviewer_provenance.' || left(k, 40); end if;
+  end loop;
+  if p -> 'agent_duration_ms' is not null and jsonb_typeof(p -> 'agent_duration_ms') not in ('number','null') then return 'agent_duration_ms'; end if;
+  if p -> 'agent_cost_cents' is not null and jsonb_typeof(p -> 'agent_cost_cents') not in ('number','null') then return 'agent_cost_cents'; end if;
+  if p -> 'cost_basis' is not null and p -> 'cost_basis' <> 'null'::jsonb and p -> 'cost_basis' is distinct from to_jsonb(c_basis) then return 'cost_basis'; end if;
+  if v -> 'witness_image_id' is not null and v -> 'witness_image_id' is distinct from v -> 'image_id' then return 'witness_image_id'; end if;
+  return null;
+end $$;
+
 -- What a thin-tier reading may not carry: null when the shape is allowed, else the first path that is not (a short word). v is the
 -- reading as the intake stores it (structured_data); p_admits is image_reading_tiers.automatic.admits (field name -> array of admitted
 -- values; a missing field, a non-array or a missing object admits nothing beyond 'unknown'). Total: no cast, so it never raises.
@@ -84,6 +121,11 @@ declare
   scene text; rust text; paint text; q jsonb; k text;
   c_method constant text := 'automatic two-pass read; no pose measured';
   c_notes constant text := 'Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier.';
+  -- the closed vocabulary a question may name (the reviewed reader's documented values: scene_type, rust_severity, paint_state, completeness)
+  c_vocab constant text[] := array['unknown','engine_bay','body_exterior','body_interior','undercarriage','receipt_document','data_plate','hand_drawn_diagram',
+    'shop_context','fabrication_in_progress','paint_booth','wheel_assembly','road_test','cross_reference','product_screenshot','spreadsheet',
+    'none','surface','pitting','perforation','bare_metal','primer','sealer','base','clear','aged','stripped','partial','assembled'];
+  m text[];
   c_q1 constant text := '^Two independent reads of this photo disagree on (scene_type|rust_severity|paint_state|completeness): [a-z_]+ vs [a-z_]+; posted as unknown\.$';
   c_q2 constant text := '^Both reads say (scene_type|rust_severity|paint_state|completeness) is [a-z_]+; this reader may not post that value yet\.$';
 begin
@@ -146,8 +188,15 @@ begin
   if v -> 'narrative_one_line' is distinct from to_jsonb('Automatic read: scene ' || scene || '; rust ' || rust || '; paint ' || paint || '.') then return 'narrative'; end if;
   if v -> 'open_questions' is not null then
     if jsonb_typeof(v -> 'open_questions') is distinct from 'array' then return 'open_questions'; end if;
+    if jsonb_array_length(v -> 'open_questions') > 8 then return 'open_questions'; end if;
     if exists (select 1 from jsonb_array_elements(v -> 'open_questions') e
                 where jsonb_typeof(e) is distinct from 'string' or not ((e #>> '{}') ~ c_q1 or (e #>> '{}') ~ c_q2)) then return 'open_questions'; end if;
+    -- the tokens of a question are values of the closed vocabulary, never words of the reader's own
+    for k in select e #>> '{}' from jsonb_array_elements(v -> 'open_questions') e loop
+      m := regexp_match(k, ': ([a-z_]+) vs ([a-z_]+); posted as');
+      if m is null then m := regexp_match(k, ' is ([a-z_]+); this reader may not'); end if;
+      if m is null or exists (select 1 from unnest(m) t where t <> all (c_vocab)) then return 'open_questions'; end if;
+    end loop;
   end if;
   if v -> 'agent_notes' is not null and v -> 'agent_notes' <> to_jsonb(c_notes) then return 'agent_notes'; end if;
   if v -> 'needs_review' is not null and jsonb_typeof(v -> 'needs_review') is distinct from 'boolean' then return 'needs_review'; end if;
@@ -218,18 +267,19 @@ BEGIN
   IF NOT public.image_reading_tier_is_reviewed(NEW.agent_tier) THEN
     thin_why := public.image_reading_thin_violation(v,
       (SELECT c.config_value->'automatic'->'admits' FROM public.platform_config c WHERE c.config_key='image_reading_tiers'));
+    thin_why := coalesce(thin_why, public.image_reading_thin_envelope_violation(NEW.extraction_metadata, v));
     IF thin_why IS NOT NULL THEN
       RAISE EXCEPTION 'thin_review_asserts_unchecked_field' USING ERRCODE='23514', DETAIL=thin_why;
     END IF;
-    -- the photo's cache names a reading with a reviewed tier or no tier at all (a legacy one), or a current reading of this photo
-    -- (found by idx_vobs_image_id_analysis) has a reviewed tier or none. A stored reading is judged with the tier list's absence
-    -- counting as reviewed (the second argument), so a missing config row never lets a thin reading displace one
+    -- the photo's cache names a reading, or a current reading of this photo (found by idx_vobs_image_id_analysis) exists, whose tier is
+    -- not the automatic one (reviewed, unlisted, or none: a legacy reading). A stored reading is protected unless it is positively
+    -- the automatic tier, so a missing or edited config row never lets a thin reading displace one
     IF (jsonb_typeof(i.ai_scan_metadata->'byok_deep_analysis')='object'
-        AND public.image_reading_tier_is_reviewed(i.ai_scan_metadata#>>'{byok_deep_analysis,agent_tier}', true))
+        AND NOT public.image_reading_tier_is_automatic(i.ai_scan_metadata#>>'{byok_deep_analysis,agent_tier}'))
        OR EXISTS (SELECT 1 FROM (SELECT q.kind, q.is_superseded, q.agent_tier FROM public.vehicle_observations q
                    WHERE q.structured_data->>'image_id'=i.id::text AND q.structured_data->>'analysis_kind'='image_deep_byok' OFFSET 0) o
                   WHERE o.kind::text='condition' AND o.is_superseded IS NOT TRUE
-                    AND public.image_reading_tier_is_reviewed(o.agent_tier, true)) THEN
+                    AND NOT public.image_reading_tier_is_automatic(o.agent_tier)) THEN
       RAISE EXCEPTION 'thin_review_over_reviewed' USING ERRCODE='23514';
     END IF;
   END IF;
@@ -280,6 +330,7 @@ BEGIN
     RAISE EXCEPTION 'review_source_withdrawn' USING ERRCODE='23514';
   END IF;
   replay := i.ai_scan_metadata->'byok_deep_analysis'->>'observation_id'=o.id::text;
+  thin_new := NOT public.image_reading_tier_is_reviewed(o.agent_tier);
   IF EXISTS(SELECT 1 FROM public.image_observations io WHERE io.image_id=i.id
     AND io.observed_by='caller-byok' AND io.agent_version='reviewed_image_analysis_v1'
     AND io.confidence_basis#>>'{reviewed_image_analysis_v1,observation_id}'=o.id::text
@@ -296,16 +347,18 @@ BEGIN
       END IF;
     END IF;
     -- Reading tiers (20261120140000, Rule 3): a reading that lands replaces every current thin-tier reading this intake made of the
-    -- photo, and every current keyed child projected from one (a child names its parent in structured_data.source_observation_id):
+    -- photo (a thin landing replaces only readings older than itself, so two unprojected thin readings never supersede each other
+    -- backwards), and every current keyed child projected from one (a child names its parent in structured_data.source_observation_id):
     -- superseded by this observation, the way supersede_observation writes it (that function needs an owner session; this is a rule
     -- of the intake, done here, in the projection's transaction, so a refused projection undoes it). Testimony is superseded, never
-    -- edited or deleted. A reviewed-tier reading is never touched, and with no tier list (config row missing) no stored reading is
-    -- called thin, so none is superseded. Not on a replay (the first projection did it) and never itself.
+    -- edited or deleted. Only a reading whose tier is positively the automatic one is replaced (image_reading_tier_is_automatic):
+    -- a reviewed, unlisted or tierless reading is never touched, and with no config row none is superseded. Not on a replay (the first projection did it) and never itself.
     SELECT coalesce(array_agg(p.id), '{}') INTO prev_ids
-      FROM (SELECT q.id, q.kind, q.is_superseded, q.vehicle_id, q.agent_tier, q.extraction_method FROM public.vehicle_observations q
+      FROM (SELECT q.id, q.kind, q.is_superseded, q.vehicle_id, q.agent_tier, q.extraction_method, q.observed_at FROM public.vehicle_observations q
              WHERE q.structured_data->>'image_id'=i.id::text AND q.structured_data->>'analysis_kind'='image_deep_byok' OFFSET 0) p
      WHERE p.id<>o.id AND p.kind::text='condition' AND p.is_superseded IS NOT TRUE AND p.vehicle_id IS NOT DISTINCT FROM o.vehicle_id
-       AND p.extraction_method='reviewed_image_analysis_v1' AND NOT public.image_reading_tier_is_reviewed(p.agent_tier, true);
+       AND p.extraction_method='reviewed_image_analysis_v1' AND public.image_reading_tier_is_automatic(p.agent_tier)
+       AND (NOT thin_new OR p.observed_at < o.observed_at);
     IF cardinality(prev_ids)>0 THEN
       UPDATE public.vehicle_observations SET is_superseded=true, superseded_by=o.id, superseded_at=now(),
         lineage_chain=array_append(coalesce(lineage_chain,ARRAY[]::uuid[]),o.id)
@@ -364,7 +417,6 @@ BEGIN
   -- A thin-tier reading does not choose a cover: image_hero_score reads its scene, confidence and presence.person, and any stamp
   -- makes a frame eligible for the scored tier of recompute_vehicle_primary_image, so a thin reading could move the cover.
   -- Skipped for a thin tier; a reviewed reading recomputes as before.
-  thin_new := NOT public.image_reading_tier_is_reviewed(o.agent_tier);
   cover := CASE WHEN thin_new THEN jsonb_build_object('vehicle_id',o.vehicle_id,'changed',false,'reason','thin_tier_reading')
            ELSE public.recompute_vehicle_primary_image(o.vehicle_id) END;
   RETURN jsonb_build_object('success',true,'observation_id',o.id,'image_id',i.id,'vehicle_id',o.vehicle_id,
@@ -376,6 +428,9 @@ $function$;
 -- ===== grants: service role only. The guard and the projection keep their existing grants (CREATE OR REPLACE keeps them).
 revoke all on function public.image_reading_tier_is_reviewed(text, boolean) from public, anon, authenticated;
 revoke all on function public.image_reading_thin_violation(jsonb, jsonb) from public, anon, authenticated;
-grant execute on function public.image_reading_tier_is_reviewed(text, boolean), public.image_reading_thin_violation(jsonb, jsonb) to service_role;
+revoke all on function public.image_reading_tier_is_automatic(text) from public, anon, authenticated;
+revoke all on function public.image_reading_thin_envelope_violation(jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.image_reading_tier_is_reviewed(text, boolean), public.image_reading_thin_violation(jsonb, jsonb),
+  public.image_reading_tier_is_automatic(text), public.image_reading_thin_envelope_violation(jsonb, jsonb) to service_role;
 
 commit;

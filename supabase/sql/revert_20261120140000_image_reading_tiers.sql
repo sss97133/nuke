@@ -179,4 +179,6 @@ $function$;
 
 drop function if exists public.image_reading_thin_violation(jsonb, jsonb);
 drop function if exists public.image_reading_tier_is_reviewed(text, boolean);
+drop function if exists public.image_reading_tier_is_automatic(text);
+drop function if exists public.image_reading_thin_envelope_violation(jsonb, jsonb);
 commit;
