@@ -606,7 +606,9 @@ end $function$;
 -- looked up as the gap finder looks it up (image_stage_reading_parent), for photos that are not refused, so a state here is
 -- the state the gap finder sees. deep_state and keyed_state say where a photo is: done, queued, claimed, unqueued (a gap nobody
 -- queued), retrying, closed_no_value (policy_skip), receipt_without_result (succeeded, yet no reading or no keyed value for
--- the current reading), given_up (failed or blocked), not_eligible, out_of_scope, no_reading (keyed_values only).
+-- the current reading), given_up (failed or blocked), not_eligible, out_of_scope, no_reading (keyed_values only). A receipt made
+-- before a stage's required_version was raised is a gap again whatever its outcome (the gap finder's rule), so such a photo is
+-- unqueued here too, never given_up or closed_no_value.
 create or replace function public.image_stage_photo_levels(p_user_id uuid, p_vehicle_id uuid)
 returns table (
   image_id uuid, vehicle_id uuid, created_at timestamptz,
@@ -665,7 +667,8 @@ language sql stable set search_path to '' as $$
            (select o.agent_tier from public.vehicle_observations o where o.id = par.id) as par_tier,
            rd.outcome as rd_outcome, rd.error_class as rd_error, rd.detail as rd_detail, rd.producer_version as rd_ver,
            (select s2.required_version from public.image_pipeline_stages s2 where s2.stage = 'deep_reading') as deep_req,
-           kr.outcome as kr_outcome, kr.error_class as kr_error, kr.detail as kr_detail, kr.observed_at as kr_at,
+           kr.outcome as kr_outcome, kr.error_class as kr_error, kr.detail as kr_detail, kr.observed_at as kr_at, kr.producer_version as kr_ver,
+           (select s3.required_version from public.image_pipeline_stages s3 where s3.stage = 'keyed_values') as keyed_req,
            klr.outcome as klr_outcome, klr.error_class as klr_error, klr.observed_at as klr_at,
            dopen.status as dopen_status, dopen.created_at as dopen_at, kopen.status as kopen_status, kopen.created_at as kopen_at, dw.first_at as dw_at,
            (par.id is not null and public.image_stage_keyed_child_exists(j.id, par.id)) as child,
@@ -677,7 +680,7 @@ language sql stable set search_path to '' as $$
       left join lateral (select r.outcome, r.error_class, r.detail, r.producer_version from public.image_stage_receipts r
                           where r.image_id = j.id and r.stage = 'deep_reading'
                           order by r.producer_version desc, (r.outcome in ('succeeded', 'policy_skip')) desc, r.attempt desc limit 1) rd on true
-      left join lateral (select r.outcome, r.error_class, r.detail, r.observed_at from public.image_stage_receipts r
+      left join lateral (select r.outcome, r.error_class, r.detail, r.observed_at, r.producer_version from public.image_stage_receipts r
                           where r.image_id = j.id and r.stage = 'keyed_values'
                           order by r.producer_version desc, (r.outcome in ('succeeded', 'policy_skip')) desc, r.attempt desc limit 1) kr on true
       left join lateral (select r.outcome, r.error_class, r.observed_at from public.image_stage_receipts r
@@ -727,7 +730,7 @@ language sql stable set search_path to '' as $$
               when j.block is not null or j.user_id is null then 'not_eligible'
               when not j.scope_ok then 'out_of_scope'
               when j.dopen_status is not null then j.dopen_status
-              when j.thin_open and j.rd_outcome in ('succeeded', 'policy_skip') and j.rd_ver < j.deep_req then 'unqueued'
+              when j.rd_outcome is not null and j.rd_ver < j.deep_req then 'unqueued'
               when j.rd_outcome = 'policy_skip' then 'closed_no_value'
               when j.rd_outcome = 'succeeded' then 'receipt_without_result'
               when j.rd_outcome in ('blocked_input', 'failed') then 'given_up'
@@ -737,7 +740,7 @@ language sql stable set search_path to '' as $$
               when j.block is not null then j.block
               when j.user_id is null then 'no_owner'
               when not j.scope_ok or j.dopen_status is not null then null
-              when j.thin_open and j.rd_outcome in ('succeeded', 'policy_skip') and j.rd_ver < j.deep_req then null
+              when j.rd_outcome is not null and j.rd_ver < j.deep_req then null
               when j.rd_outcome = 'policy_skip' then coalesce(j.rd_detail ->> 'skipped', j.rd_detail ->> 'reason', 'unspecified')
               when j.rd_outcome is not null then coalesce(j.rd_error, 'unspecified') end,
          case when j.child then 'done'
@@ -746,6 +749,7 @@ language sql stable set search_path to '' as $$
               when j.user_id is null then 'not_eligible'
               when not j.scope_ok then 'out_of_scope'
               when j.kopen_status is not null then j.kopen_status
+              when j.kr_outcome is not null and j.kr_ver < j.keyed_req then 'unqueued'
               when j.kr_stale and j.klr_at < j.par_at then 'unqueued'
               when j.kr_outcome = 'policy_skip' and not j.kr_stale then 'closed_no_value'
               when j.kr_outcome = 'succeeded' and not j.kr_stale then 'receipt_without_result'
@@ -757,6 +761,7 @@ language sql stable set search_path to '' as $$
               when j.par_id is null then null
               when j.user_id is null then 'no_owner'
               when not j.scope_ok or j.kopen_status is not null then null
+              when j.kr_outcome is not null and j.kr_ver < j.keyed_req then null
               when j.kr_outcome = 'policy_skip' and not j.kr_stale then coalesce(j.kr_detail ->> 'skipped', j.kr_detail ->> 'reason', 'unspecified')
               when j.kr_stale then case when j.klr_at >= j.par_at then coalesce(j.klr_error, 'unspecified') end
               when j.kr_outcome is not null then coalesce(j.kr_error, 'unspecified') end
