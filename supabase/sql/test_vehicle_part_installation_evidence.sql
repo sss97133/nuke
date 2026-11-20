@@ -156,5 +156,81 @@ BEGIN
   ASSERT (public.vehicle_part_installation_evidence('00000000-0000-0000-0000-0000000000a2') #>> '{totals,part_lines}')::int = 1, 'owner reads a private vehicle';
 END $$;
 
+
+-- Rules 2 (20261120050000): applied on top, with its own vehicle so the totals above stay as they were.
+\ir ../migrations/20261120050000_part_installation_rules_2.sql
+INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a3', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL);
+INSERT INTO public.fixture_lines
+  SELECT '00000000-0000-0000-0000-0000000000a3', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-02', 'Supplier', d, 'P', 1, NULL, NULL
+    FROM unnest(ARRAY['70-73 FBRD TAIL LAMP LENS-LH','70-73 TAIL LAMP HOUSING LH','70-81 F-BODY DR GLASS-CLEAR-RH','73-74 SD455 HOOD DECAL BLACK',
+      '73-75 TRANS/AM HOOD DECAL ORNG','71-75 FB STD F/S UPH BLACK (SET)','POWER STEERING PUMP PULLEY','66-81 WATER NECK PONTIAC V8',
+      '71-72 AIR CLNR VENT TUBE','TRANS MOUNT (ENS) 1Y','70-81 INNER CONSOLE GLOVE BOX','72-77 CAM/FB LWR DOOR PNL KIT',
+      '68-81 STD REMOTE MIRROR BEZEL (SET)','70-81 DASH FILLER PLATE DELETE','70-73 F-BODY RR SPKR SHLF PNL','BEARING SET']) d;
+INSERT INTO public.fixture_photos
+  SELECT ('00000000-0000-0000-0000-0000000001' || lpad(n::text, 2, '0'))::uuid, '00000000-0000-0000-0000-0000000000a3', 'https://x.test/r2-' || n || '.jpg',
+         '2026-10-28T18:00:00Z', false, false, false, true FROM generate_series(1, 14) n;
+-- image 1 = what must NOT count (every label names a neighbour, a denial, a hedge or a glimpse); image 14 = what must count (new rules)
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data)
+  SELECT '00000000-0000-0000-0000-0000000000a3', 'reviewed_image_analysis_v1', false,
+         jsonb_build_object('image_id', '00000000-0000-0000-0000-0000000001' || lpad(n::text, 2, '0'), 'build_phase_guess', 'final_assembly',
+           'state_observations', jsonb_build_object('completeness', 'assembled'),
+           'components_seen', (SELECT jsonb_agg(jsonb_build_object('label', x)) FROM unnest(labels) x))
+    FROM (VALUES
+      (1, ARRAY['Driver-side round headlamp lens','Left rear lamp assembly','Upper door glass belt molding','Shaker scoop with SD-455 lettering',
+                'Red hood with shaker opening and no visible bird graphic','Passenger floor mat with bird graphic',
+                'Black front bucket seat visible through windshield','Black accessory pulley hub, possibly power-steering pulley',
+                'Bright metal hose connection, possibly coolant outlet','Right exhaust outlet','Transmission mounting bracket with partly enclosed apparent isolator',
+                'Transmission crossmember','Closed console armrest and storage body','Red outer door panel','Black rear package-shelf bracket']),
+      (2, ARRAY['Left tail lamp lens and bezel']),
+      (3, ARRAY['Partial left tail lamp housing']),
+      (4, ARRAY['Right door glass']),
+      (5, ARRAY['Hood scoop with SD-455 lettering']),
+      (6, ARRAY['Hood bird graphic and shaker scoop']),
+      (7, ARRAY['Black pleated front seat cushion']),
+      (8, ARRAY['Water outlet neck with mounting fastener','Bent metal air-cleaner vent tube']),
+      (9, ARRAY['Transmission crossmember and mount','Empty console storage liner']),
+      (10, ARRAY['Black molded lower door panel with armrest and storage recess','Remote mirror control and square bezel']),
+      (11, ARRAY['Rectangular engine-turned filler plate','Rear parcel shelf covering'])) v(n, labels);
+-- a part-keyed reading on the front seat must not stand for the upholstery any more (a key names the seat, not its covering)
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data) VALUES
+  ('00000000-0000-0000-0000-0000000000a3', 'photo_map_harvest_v1', false, '{"part_key":"interior.seat.front","image_id":"00000000-0000-0000-0000-000000000112","source_text":"Front upholstery has creases."}');
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data) VALUES
+  ('00000000-0000-0000-0000-0000000000a3', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-000000000112","build_phase_guess":"final_assembly","state_observations":{"completeness":"assembled"},"components_seen":[{"label":"Dashboard"}]}');
+
+DO $$
+DECLARE r jsonb; l jsonb;
+  n text[] := ARRAY['70-73 FBRD TAIL LAMP LENS-LH','70-73 TAIL LAMP HOUSING LH','70-81 F-BODY DR GLASS-CLEAR-RH','73-74 SD455 HOOD DECAL BLACK',
+      '73-75 TRANS/AM HOOD DECAL ORNG','71-75 FB STD F/S UPH BLACK (SET)','POWER STEERING PUMP PULLEY','66-81 WATER NECK PONTIAC V8',
+      '71-72 AIR CLNR VENT TUBE','TRANS MOUNT (ENS) 1Y','70-81 INNER CONSOLE GLOVE BOX','72-77 CAM/FB LWR DOOR PNL KIT',
+      '68-81 STD REMOTE MIRROR BEZEL (SET)','70-81 DASH FILLER PLATE DELETE','70-73 F-BODY RR SPKR SHLF PNL'];
+  -- the one image each line must be seen in (image 1, the negatives, never counts); null = not photographed
+  img int[] := ARRAY[2, 3, 4, 5, 6, 7, NULL, 8, 8, 9, 9, 10, 10, 11, 11];
+  i int;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_part_installation_evidence('00000000-0000-0000-0000-0000000000a3');
+  ASSERT (r #>> '{totals,part_lines}')::int = 16, 'sixteen part lines: ' || (r -> 'totals')::text;
+  FOR i IN 1..array_length(n, 1) LOOP
+    SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'description' = n[i];
+    IF img[i] IS NULL THEN
+      ASSERT l ->> 'status' = 'not_photographed' AND l ->> 'seen_images' = '0', 'hedged or neighbour readings do not show ' || n[i] || ': ' || l::text;
+    ELSE
+      ASSERT l ->> 'status' = 'seen' AND l ->> 'seen_images' = '1' AND l #>> '{seen,0,image_id}' = '00000000-0000-0000-0000-0000000001' || lpad(img[i]::text, 2, '0'),
+        'only the reading that names ' || n[i] || ' counts: ' || l::text;
+    END IF;
+  END LOOP;
+  -- the rule that owns a new line, and a part that cannot be seen still has no rule
+  SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'description' = '66-81 WATER NECK PONTIAC V8';
+  ASSERT l ->> 'rule' = 'water_outlet_neck', 'new rule owns the line: ' || l::text;
+  SELECT e INTO l FROM jsonb_array_elements(r -> 'lines') e WHERE e ->> 'description' = 'BEARING SET';
+  ASSERT l ->> 'status' = 'not_photographed' AND l ->> 'rule' IS NULL AND l ->> 'reason' = 'no rule names this part', 'a bearing set is never matched: ' || l::text;
+  ASSERT (r #>> '{totals,lines_seen}')::int = 14 AND (r #>> '{totals,lines_not_photographed}')::int = 2, 'totals: ' || (r -> 'totals')::text;
+  RESET ROLE;
+  ASSERT (SELECT count(*) FROM public.part_installation_rules()) = 100 AND (SELECT count(*) = count(DISTINCT ord) FROM public.part_installation_rules()), 'seven rules added, ords unique';
+END $$;
+
+\ir ../sql/revert_20261120050000_part_installation_rules_2.sql
+DO $$ BEGIN ASSERT (SELECT count(*) FROM public.part_installation_rules()) = 93 AND public.vehicle_part_installation_evidence('00000000-0000-0000-0000-0000000000a3') IS NOT NULL, 'revert restores the first rule table'; END $$;
+
 \ir ../sql/revert_20261120020000_vehicle_part_installation_evidence.sql
 DO $$ BEGIN ASSERT to_regprocedure('public.vehicle_part_installation_evidence(uuid)') IS NULL AND to_regprocedure('public.part_installation_rules()') IS NULL; END $$;
