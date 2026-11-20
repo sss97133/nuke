@@ -121,9 +121,11 @@ declare
   scene text; rust text; paint text; q jsonb; k text;
   c_method constant text := 'automatic two-pass read; no pose measured';
   c_notes constant text := 'Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier.';
-  -- the closed vocabulary a question may name (the reviewed reader's documented values: scene_type, rust_severity, paint_state, completeness)
+  -- the closed vocabulary a question may name: every value the verdict contract allows for scene_type, rust_severity, paint_state and
+  -- completeness (supabase/functions/_shared/byokImageVerdict.mjs; the reader derives its own list from the same grammar and its test
+  -- pins it to this one). off_property is one of them: this intake's own projection below places such a scene as 'subject'.
   c_vocab constant text[] := array['unknown','engine_bay','body_exterior','body_interior','undercarriage','receipt_document','data_plate','hand_drawn_diagram',
-    'shop_context','fabrication_in_progress','paint_booth','wheel_assembly','road_test','cross_reference','product_screenshot','spreadsheet',
+    'shop_context','fabrication_in_progress','paint_booth','wheel_assembly','road_test','off_property','cross_reference','product_screenshot','spreadsheet',
     'none','surface','pitting','perforation','bare_metal','primer','sealer','base','clear','aged','stripped','partial','assembled'];
   m text[];
   c_q1 constant text := '^Two independent reads of this photo disagree on (scene_type|rust_severity|paint_state|completeness): [a-z_]+ vs [a-z_]+; posted as unknown\.$';

@@ -2,7 +2,7 @@
 -- tier (a thin one: the automatic reader, or any tier nobody listed) may carry only the closed values the database admits for it and
 -- never displaces a reviewed reading; a reading that lands replaces the thin reading before it and that reading's keyed children;
 -- a reviewed-tier reading is checked exactly as before. The verdicts below are the shared examples of the reader's fixture
--- (scripts/photo-pipeline/fixtures/automatic-thin-verdicts.json on PR 3609), embedded as literals: 3 accepted, 24 refused.
+-- (scripts/photo-pipeline/fixtures/automatic-thin-verdicts.json on PR 3609), embedded as literals: 4 accepted, 26 refused.
 -- Synthetic images; no network, no model calls. The production triggers on vehicle_observations that are not part of the intake
 -- (UPDATE guards for other claim families, analysis queues) are not in this fixture; the migration's header names what they do.
 \set ON_ERROR_STOP on
@@ -183,6 +183,50 @@ CREATE FUNCTION tt_accepted() RETURNS jsonb LANGUAGE sql AS $j$ SELECT $json$[
   "open_questions": [
    "Both reads say paint_state is clear; this reader may not post that value yet.",
    "Both reads say completeness is assembled; this reader may not post that value yet."
+  ],
+  "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+ },
+ {
+  "image_id": "11111111-1111-4111-8111-111111111111",
+  "vehicle_id": "22222222-2222-4222-8222-222222222222",
+  "scene_type": "unknown",
+  "build_phase_guess": "unknown",
+  "intent": "unknown",
+  "intent_confidence": 0,
+  "needs_clarification": true,
+  "components_seen": [],
+  "text_regions": [],
+  "damage_localized": [],
+  "state_observations": {
+   "rust_severity": "unknown",
+   "paint_state": "unknown",
+   "completeness": "unknown",
+   "damage_callouts": []
+  },
+  "workshop_signals": {
+   "tools_visible": [],
+   "fixturing": "unknown",
+   "lighting": "unknown"
+  },
+  "presence": {
+   "person": false,
+   "dog": false,
+   "place_hint": null
+  },
+  "camera_pose": {
+   "method": "automatic two-pass read; no pose measured",
+   "framing": "unknown",
+   "azimuth_deg": null,
+   "elevation_deg": null,
+   "distance_est": null,
+   "exif_present": null
+  },
+  "narrative_one_line": "Automatic read: scene unknown; rust unknown; paint unknown.",
+  "confidence": 0.7,
+  "context_complete": false,
+  "open_questions": [
+   "Both reads say scene_type is off_property; this reader may not post that value yet.",
+   "Two independent reads of this photo disagree on completeness: partial vs unknown; posted as unknown."
   ],
   "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
  }
@@ -1284,6 +1328,106 @@ CREATE FUNCTION tt_refused() RETURNS jsonb LANGUAGE sql AS $j$ SELECT $json$[
    "open_questions": [],
    "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
   }
+ },
+ {
+  "why": "a question that names a word outside the closed values",
+  "verdict": {
+   "image_id": "11111111-1111-4111-8111-111111111111",
+   "vehicle_id": "22222222-2222-4222-8222-222222222222",
+   "scene_type": "undercarriage",
+   "build_phase_guess": "unknown",
+   "intent": "unknown",
+   "intent_confidence": 0,
+   "needs_clarification": true,
+   "components_seen": [],
+   "text_regions": [],
+   "damage_localized": [],
+   "state_observations": {
+    "rust_severity": "surface",
+    "paint_state": "unknown",
+    "completeness": "unknown",
+    "damage_callouts": []
+   },
+   "workshop_signals": {
+    "tools_visible": [],
+    "fixturing": "unknown",
+    "lighting": "unknown"
+   },
+   "presence": {
+    "person": false,
+    "dog": false,
+    "place_hint": null
+   },
+   "camera_pose": {
+    "method": "automatic two-pass read; no pose measured",
+    "framing": "unknown",
+    "azimuth_deg": null,
+    "elevation_deg": null,
+    "distance_est": null,
+    "exif_present": null
+   },
+   "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+   "confidence": 0.72,
+   "context_complete": false,
+   "open_questions": [
+    "Both reads say scene_type is rebuilt_motor; this reader may not post that value yet."
+   ],
+   "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+  }
+ },
+ {
+  "why": "more than eight questions",
+  "verdict": {
+   "image_id": "11111111-1111-4111-8111-111111111111",
+   "vehicle_id": "22222222-2222-4222-8222-222222222222",
+   "scene_type": "undercarriage",
+   "build_phase_guess": "unknown",
+   "intent": "unknown",
+   "intent_confidence": 0,
+   "needs_clarification": true,
+   "components_seen": [],
+   "text_regions": [],
+   "damage_localized": [],
+   "state_observations": {
+    "rust_severity": "surface",
+    "paint_state": "unknown",
+    "completeness": "unknown",
+    "damage_callouts": []
+   },
+   "workshop_signals": {
+    "tools_visible": [],
+    "fixturing": "unknown",
+    "lighting": "unknown"
+   },
+   "presence": {
+    "person": false,
+    "dog": false,
+    "place_hint": null
+   },
+   "camera_pose": {
+    "method": "automatic two-pass read; no pose measured",
+    "framing": "unknown",
+    "azimuth_deg": null,
+    "elevation_deg": null,
+    "distance_est": null,
+    "exif_present": null
+   },
+   "narrative_one_line": "Automatic read: scene undercarriage; rust surface; paint unknown.",
+   "confidence": 0.72,
+   "context_complete": false,
+   "open_questions": [
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say paint_state is clear; this reader may not post that value yet.",
+    "Both reads say paint_state is clear; this reader may not post that value yet."
+   ],
+   "agent_notes": "Automatic two-pass reading. Posted: closed values both passes agree on and the database admits for this reader. Components, text, damage, phase and intent are not read at this tier."
+  }
  }
 ]$json$::jsonb $j$;
 
@@ -1342,8 +1486,8 @@ DO $$ DECLARE a jsonb; n int := 0; img uuid; oid uuid; r jsonb; before_cover tex
    ASSERT r->>'success'='true' AND r#>>'{cover,reason}'='thin_tier_reading', 'accepted example '||n||' lands: '||r::text;
    ASSERT (SELECT primary_image_url IS NOT DISTINCT FROM before_cover FROM vehicles WHERE id='20000000-0000-4000-8000-000000000101'), 'a thin reading does not move the cover';
  END LOOP;
- ASSERT n = 3, 'three accepted examples, saw '||n;
- RAISE NOTICE 'PASS: 3 accepted examples land, no cover recompute';
+ ASSERT n = 4, 'four accepted examples, saw '||n;
+ RAISE NOTICE 'PASS: 4 accepted examples land, no cover recompute';
 END $$;
 DO $$ DECLARE a jsonb; n int := 0; img uuid; BEGIN
  FOR a IN SELECT jsonb_array_elements(tt_refused()) LOOP
@@ -1357,8 +1501,8 @@ DO $$ DECLARE a jsonb; n int := 0; img uuid; BEGIN
    END;
    ASSERT NOT EXISTS(SELECT FROM vehicle_observations WHERE structured_data->>'image_id'=img::text), 'a refused example leaves no observation';
  END LOOP;
- ASSERT n = 24, '24 refused examples, saw '||n;
- RAISE NOTICE 'PASS: 24 refused examples refused with thin_review_asserts_unchecked_field';
+ ASSERT n = 26, '26 refused examples, saw '||n;
+ RAISE NOTICE 'PASS: 26 refused examples refused with thin_review_asserts_unchecked_field';
 END $$;
 -- a tier nobody listed is thin: rich content refused, thin shape lands
 DO $$ DECLARE img uuid; oid uuid; BEGIN
@@ -1490,6 +1634,11 @@ END $$;
 DO $$ DECLARE v jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); adm jsonb := (SELECT config_value->'automatic'->'admits' FROM platform_config WHERE config_key='image_reading_tiers'); q text; r text; BEGIN
  -- open questions: values of the closed vocabulary only, at most 8 of them
  ASSERT image_reading_thin_violation(v || '{"open_questions":["Two independent reads of this photo disagree on scene_type: undercarriage vs data_plate; posted as unknown.","Both reads say rust_severity is none; this reader may not post that value yet.","Both reads say completeness is assembled; this reader may not post that value yet."]}', adm) IS NULL, 'vocabulary questions pass';
+ -- every scene value of the verdict contract (supabase/functions/_shared/byokImageVerdict.mjs SCENE_TYPES) can be named: the reader's grammar lets a read answer any of them
+ FOREACH q IN ARRAY ARRAY['engine_bay','body_exterior','body_interior','undercarriage','receipt_document','data_plate','hand_drawn_diagram','shop_context','fabrication_in_progress','paint_booth','wheel_assembly','road_test','off_property','cross_reference','product_screenshot','spreadsheet','unknown'] LOOP
+   r := image_reading_thin_violation(v || jsonb_build_object('open_questions',jsonb_build_array('Both reads say scene_type is '||q||'; this reader may not post that value yet.')), adm);
+   ASSERT r IS NULL, 'a question may name the scene value '||q||': '||coalesce(r,'null');
+ END LOOP;
  FOREACH q IN ARRAY ARRAY['Two independent reads of this photo disagree on scene_type: rebuilt_motor_with_new_pistons_and_cam vs matching_numbers_confirmed_by_owner; posted as unknown.',
      'Two independent reads of this photo disagree on scene_type: undercarriage vs rebuilt_motor; posted as unknown.',
      'Both reads say completeness is rebuilt_by_owner; this reader may not post that value yet.',
