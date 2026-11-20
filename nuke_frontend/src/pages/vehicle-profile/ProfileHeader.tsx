@@ -21,6 +21,7 @@ import ProfileActivity from './ProfileActivity';
 import { useContributionDays } from './useContributionDays';
 import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import type { AuctionPulse } from './types';
+import { identityLead } from './identityLead';
 
 const LISTING_VENUES: Record<string, string> = { bat: 'Bring a Trailer', ebay: 'eBay', carsandbids: 'Cars & Bids', hemmings: 'Hemmings', hagerty: 'Hagerty', carscom: 'Cars.com', autotrader: 'Autotrader', craigslist: 'Craigslist', facebook: 'Facebook Marketplace', nzero: 'Nuke' };
 
@@ -399,7 +400,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         onClick={() => explore(f.dimension, label)} />;
     })}
     {zipArea && <button ref={zipTrigger} type="button" className="k-facet" aria-haspopup="dialog" aria-expanded={zipOpen}
-      aria-label={`Explore ZIP ${zipArea.zip} area`} onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); setLiveOpen(false); setZipOpen(true); }}><Text role="label">{zipArea.zip}</Text></button>}
+      aria-label={`Explore ZIP ${zipArea.zip} area`} onClick={() => { setActiveFacet(null); setFinancialOpen(false); setActivityOpen(false); setListingOpen(false); setLiveOpen(false); setZipOpen(true); }}><Text role="label">ZIP {zipArea.zip}</Text></button>}
     {(strip.gaps ?? []).filter(g => g.dimension !== 'body_style' && g.dimension !== 'location').map(g => g.lead
       // The record holds nothing, but the token's lead item does: its value, marked with its status.
       ? <Facet key={`gap:${g.dimension}`} label={g.lead.value} status={g.lead.status}
@@ -427,6 +428,8 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         </>}
       />;
 
+  const trimLabel = masthead.identity?.differentiators?.find(token => token.kind === 'trim')?.value ?? null;
+  const lead = vehicle.is_replica === true ? identityLead(masthead.token_items, trimLabel) : null;
   const specs = priceOwnedByLiveStack ? <details className="vp-header-configuration"><summary>Configuration</summary>{configuration}</details> : configuration;
   return <>
     <div ref={sticky} className="vp-header-sticky">
@@ -481,5 +484,6 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       </HeaderPopover>}
     </div>
     {isMobile && specs && <div className="vp-header-specs">{specs}</div>}
+    {lead && <Text role="body" as="p" className="vp-header-lead">{lead} <button type="button" className="vp-header-lead__more" onClick={() => explore('trim', trimLabel ?? 'trim')}>See the evidence</button></Text>}
   </>;
 }

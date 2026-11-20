@@ -347,7 +347,7 @@ it('keeps one identity, price and contextual controls in the masthead without a 
   expect(host.querySelectorAll('button.k-facet').length).toBe(4);
   expect(host.querySelector('.vp-header-facets')?.textContent).not.toContain('Coupe');
   expect(host.querySelector('.vp-header-facets')?.textContent).not.toContain('Boulder City');
-  expect(host.querySelector('[aria-label="Explore ZIP 89005 area"]')?.textContent).toBe('89005');
+  expect(host.querySelector('[aria-label="Explore ZIP 89005 area"]')?.textContent).toBe('ZIP 89005');
   expect(host.textContent).not.toContain('facts attributed');
   expect(host.querySelector('.vp-strip')).toBeNull();
   expect(host.querySelectorAll('.vehicle-identity')).toHaveLength(1);

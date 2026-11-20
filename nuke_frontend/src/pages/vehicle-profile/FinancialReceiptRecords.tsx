@@ -232,7 +232,7 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
     <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
     {(rows.length > 0 || !!work?.ledger?.scenarios.length) && <nav className="vp-receipt-jump" aria-label="Work and parts sections">
       {!!build.data?.totals.lines && <a href="#build-record">Build record</a>}
-      {!!work?.ledger?.scenarios.length && <a href="#build-estimates">Estimates</a>}
+      {!!work?.ledger?.scenarios.length && <a href="#build-estimates">Cost scenario</a>}
       {rows.length > 0 && <a href="#build-receipt-pages">Receipts ({rows.length}{read.hasNextPage ? '+' : ''})</a>}
       {!!work?.rows.length && <a href="#build-work-photos">Work photos</a>}
     </nav>}
