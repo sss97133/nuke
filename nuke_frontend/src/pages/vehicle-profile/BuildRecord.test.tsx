@@ -105,6 +105,15 @@ describe('BuildRecord', () => {
     expect(html).toContain('1970-81 Camaro, Firebird; Upper Rear Body Panel');
     expect(html).toContain(`Printed as “${printed}”`);
   });
+  it('says where the printed shop hours sit when more than one system carries them', () => {
+    const split = record(false);
+    const [a, b] = split.systems;
+    a.paper.hours = 50.75; b.paper.hours = 3;
+    for (const other of split.systems.slice(2)) other.paper.hours = null;
+    const html = renderToStaticMarkup(<BuildRecord record={split} />);
+    expect(html).toMatch(/shop work lines?: [^<]+ 50\.75 h · [^<]+ 3 h</);
+    expect(html).toContain('that carry a part or work line');
+  });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;
     expect(renderToStaticMarkup(<BuildRecord record={empty} />)).toBe('');
