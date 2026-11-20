@@ -98,6 +98,8 @@ jobs:
         run: node --test supabase/functions/_shared/receiptProductCapture.test.mjs
       - name: Verify deterministic source masking and metadata removal
         run: node --test scripts/receipts/redacted-source.test.mjs
+      - name: Verify fact-doubt producer and blind runner pure parts (offline)
+        run: node --test scripts/doubts/fact-doubts.test.mjs
 
   autotrader-history-contract:
     runs-on: ubuntu-latest
