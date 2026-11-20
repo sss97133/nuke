@@ -89,6 +89,7 @@ describe('BuildRecord', () => {
     expect(html.match(/vp-build-seen/g)).toHaveLength(1);
     expect(html).toContain('1 of 3 bought parts are named in a photograph of the finished car');
     expect(renderToStaticMarkup(<BuildRecord record={base} />)).not.toContain('vp-build-seen');
+  });
   it('quotes what the shop paper printed as its subject', () => {
     const subject = record(false);
     const machining = subject.systems.find(system => system.paper.lines > 0)!;
