@@ -150,6 +150,16 @@ export function buildBlindTask({ params, registryRow, lines = [] }) {
   return { system, text, evidence };
 }
 
+// The blind task as a file for an external reader: the same question, definition, schema and allowed values, the frames by file
+// name and image id, and receipt lines. frames = [{file, image_id}]. Nothing else from the request is carried.
+export function buildExportTask({ task, params, frames }) {
+  return {
+    instructions: task.system, question: task.text, answer_schema: ANSWER_SCHEMA, allowed: Array.isArray(params.allowed) ? params.allowed : null,
+    frames, receipt_lines: task.evidence.filter((e) => e.kind === 'line').map((e) => ({ receipt_item_id: e.id, text: e.text })),
+    answer_file: 'answer.json', answer_format: { outcome: 'value | not_visible | cannot_tell', value: 'only with outcome value', confidence: '0..1', image_ids: ['frame image ids that show it'], quote: 'what in the evidence shows it' },
+  };
+}
+
 // Local mirror of fact_doubt_answer_problems (the database re-checks; this keeps a malformed answer from being submitted).
 export function validateAnswer(params, answer) {
   const probs = [];

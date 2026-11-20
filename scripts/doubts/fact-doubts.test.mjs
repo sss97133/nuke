@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveDoubts, doubtsFromReaderFile, pickFrames, buildQuestionRow, buildBlindTask, plainDefinition, validateAnswer, closedAnswer, ITEM_MAP } from './fact-doubts.mjs';
+import { deriveDoubts, doubtsFromReaderFile, pickFrames, buildQuestionRow, buildBlindTask, buildExportTask, plainDefinition, validateAnswer, closedAnswer, ITEM_MAP } from './fact-doubts.mjs';
 import { requestParams } from './answer-fact-doubts.mjs';
 
 const V = { id: '20d21fb0-4651-4469-a0ba-e751309a1e54', user_id: '0b9f107a-d124-49de-9ded-94698f63c1c4' };
@@ -109,4 +109,11 @@ test('registry examples never reach the blind reader (they can equal the stored 
   assert.equal(plainDefinition('e.g. V8, I6, flat-6'), '');
   const task = buildBlindTask({ params: stored, registryRow: { label: 'Engine block casting number', description: 'Casting number on the engine block as read (e.g. 9799140). Instance reading of x' } });
   assert.ok(!task.text.includes('9799140'));
+});
+
+test('exported task file carries no earlier value, caption, reader or asker words', () => {
+  const task = buildBlindTask({ params: stored, registryRow: { label: 'Bellhousing casting number', description: 'Casting number on the bellhousing as read (e.g. 547975). Instance reading of x' }, lines: [{ id: L1, description: 'CLUTCH FORK', part_number: 'A1' }] });
+  const text = JSON.stringify(buildExportTask({ task, params: stored, frames: [{ file: 'frame-1.jpg', image_id: I1 }, { file: 'frame-2.jpg', image_id: I2 }] }));
+  for (const bad of [SECRET, WORDS, '547975', 'reader-a', 'obs-id', 'simulated_reader', 'origin']) assert.ok(!text.includes(bad), bad);
+  assert.ok(text.includes('frame-2.jpg') && text.includes(I2) && text.includes('CLUTCH FORK') && text.includes('cannot_tell'));
 });
