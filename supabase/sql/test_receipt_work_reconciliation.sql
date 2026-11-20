@@ -32,12 +32,18 @@ CREATE TABLE public.garage_derivation_evidence(id uuid PRIMARY KEY DEFAULT gen_r
 -- (after this point the migration is applied: \i supabase/migrations/20261111210500_receipt_work_reconciliation.sql)
 \ir ../migrations/20261111210500_receipt_work_reconciliation.sql
 \ir ../migrations/20261114120002_evidence_judgment_candidate_set_equality.sql
+\ir ../migrations/20261120080000_receipt_line_kind_free_shipping.sql
 DO $$
 DECLARE r record; n int;
   V constant uuid := '00000000-0000-0000-0000-0000000000a1'; U constant uuid := '00000000-0000-0000-0000-0000000000b1';
 BEGIN
   -- line kinds
   ASSERT receipt_line_kind('SHIPPING', '{SHIPPING}', 9.17, NULL, NULL, NULL) = 'charge';
+  ASSERT receipt_line_kind('RED HEI DISTRIBUTOR + SPARK PLUG WIRES (Condition New, free standard shipping)', NULL, 89.00, NULL, NULL, NULL) = 'part',
+    'a part sold with free shipping is a part';
+  ASSERT receipt_line_kind('Free shipping', NULL, 0, NULL, NULL, NULL) = 'charge', 'a line that is only the remark stays a charge';
+  ASSERT receipt_line_kind('WIDGET, free returns; shipping and handling', NULL, 12.00, NULL, NULL, NULL) = 'charge',
+    'a named shipping charge is still a charge';
   ASSERT receipt_line_kind('72-73 UNDERDASH WIRING HRNS (BACKORDERED, qty shipped 0)', 'FB20383', 0, NULL, NULL, NULL) = 'backordered';
   ASSERT receipt_line_kind('V8 DIPSTICK TUBE, STAINLESS (APE) ** KIT COMPONENT ** (no price)', NULL, NULL, NULL, NULL, NULL) = 'kit_component';
   ASSERT receipt_line_kind('Bore cylinders .060', NULL, NULL, NULL, '2024-11-13', NULL) = 'labor';
