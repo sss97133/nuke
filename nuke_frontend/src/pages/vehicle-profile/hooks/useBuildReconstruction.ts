@@ -7,7 +7,7 @@ export interface BuildLine {
   item_id: string; receipt_id: string; kind: 'part' | 'labor' | 'note' | 'service' | 'backordered' | 'kit_component';
   day: string | null; source: string | null; description: string | null; part_number: string | null;
   paper_hours: number | null; operation_code: string | null; amount: number | null;
-}
+ /** the supplier's stored product title for this line, when one is linked */ name?: string | null;}
 export interface BuildStage { phase: string; images: number; prints: number; first_day: string | null; last_day: string | null;
   sample: { image_id: string; image_url: string }[] | null;
   reference: { description: string; hours_typical: number | null; hours_min: number | null; hours_max: number | null; confidence: string | null; source: string; transition: string } | null }
