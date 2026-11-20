@@ -1352,3 +1352,7 @@ summary.vp-key-point__line:focus-visible { outline: 2px solid var(--border-focus
 .vp-tribute-point__figure { margin: 8px 0; }
 .vp-tribute-point__figure img { display: block; width: 100%; height: auto; max-height: 55vh; object-fit: contain; }
 .vp-tribute-point__figure figcaption { margin-top: 6px; }
+.vp-header-lead { margin: 10px 0 4px; padding: 0 12px; max-width: 78ch; }
+.vp-header-lead__more { background: none; border: 0; padding: 0; color: var(--accent, #6aa9ff); text-decoration: underline; cursor: pointer; font: inherit; min-height: 24px; }
+.vp-ledger-fold > summary { cursor: pointer; padding: 14px 20px; display: grid; gap: 4px; min-height: 44px; }
+.vp-ledger-fold > summary small { color: var(--text-secondary, #9a9aa3); font-weight: 400; }

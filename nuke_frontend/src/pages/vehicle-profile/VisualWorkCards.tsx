@@ -133,7 +133,8 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
         <CatalogProductReference product={line.product} />{renderSource(line)}
       </div>)}</div>}
     </div>;
-  return <section id="build-estimates" className="vp-master-ledger" aria-label="Master cost ledger">
+  return <section id="build-estimates" className="vp-master-ledger" aria-label="Replacement cost scenario">
+    <details className="vp-ledger-fold"><summary><strong>Replacement-cost scenario</strong><small>An estimate of what it would cost to redo this work today. Not what was paid, and not this car's recorded hours.</small></summary>
     <header><div><span>Itemized build costs</span><h4>Master ledger</h4></div>
       <time dateTime={ledger.as_of}>Calculated {date(ledger.as_of)}</time></header>
     <p className="vp-ledger-intro">{scenario.scenario === 'finish_scenario' ? 'Possible finishing work, with optional work excluded until selected.' : 'The work and materials in the reconstruction scenario for this build.'} {!selectedSystem && scenario.systems.length > 1 ? 'Open a system for its jobs, parts, calculations and source photos.' : 'Open an item for its calculation and source photos.'}</p>
@@ -205,6 +206,7 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
       })}</tbody></table></div></ItemsFold>
 
     {(ledger.coverage.source_read_limited || ledger.coverage.cards_without_estimates > 0) && <p className="vp-ledger-qualification">The work record still has sources without cost lines; the subtotal is incomplete.</p>}
+    </details>
   </section>;
 }
 
