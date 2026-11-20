@@ -6,15 +6,16 @@
 # functions, whose writers land them. This wrapper:
 #   1. refreshes a checkout of origin/main (the stable ~/nuke checkout is on another branch and must not be moved),
 #   2. runs the document reader (receipt-photo-ocr intake) for a bounded batch,
-#   3. runs the frame classifier (photo-pipeline-orchestrator intake) for a bounded batch,
+#   3. runs the frame classifier (photo-pipeline-orchestrator intake) for a bounded batch: first reads, then (same process)
+#      deep readings and keyed values from the stage ledger, each bounded (DEEP_LIMIT, KEYED_LIMIT),
 #   4. writes one heartbeat row per reader to job_assay_readings so a dead reader is never silent.
 # Runs in the login shell (launchd), never inside Claude Code's sandbox. Secrets come from ~/nuke/.env via dotenvx and
 # are never printed. Idempotent: each reader's work list excludes frames already read.
 #
-#   subscription-reader-batch.sh [docs_limit=20] [frames_limit=20]
+#   subscription-reader-batch.sh [docs_limit=20] [frames_limit=20] [deep_limit=20] [keyed_limit=60]
 set -u
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin:$PATH"
-DOCS_LIMIT="${1:-20}"; FRAMES_LIMIT="${2:-20}"
+DOCS_LIMIT="${1:-20}"; FRAMES_LIMIT="${2:-20}"; DEEP_LIMIT="${3:-20}"; KEYED_LIMIT="${4:-60}"
 OWNER="${NUKE_OWNER_ID:-0b9f107a-d124-49de-9ded-94698f63c1c4}"
 ENV_FILE="$HOME/nuke/.env"
 MAIN="$HOME/.worktrees/nuke-main"
@@ -53,4 +54,4 @@ run_reader() { # name script args...
 
 # 2. documents, then 3. frames (failed first, then pending)
 run_reader subscription-document-reader "$MAIN/scripts/photo-pipeline/subscription-document-reader.mjs" --limit "$DOCS_LIMIT" --concurrency 2
-run_reader subscription-frame-classifier "$MAIN/scripts/photo-pipeline/subscription-frame-classifier.mjs" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending
+run_reader subscription-frame-classifier "$MAIN/scripts/photo-pipeline/subscription-frame-classifier.mjs" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending --deep-limit "$DEEP_LIMIT" --keyed-limit "$KEYED_LIMIT"

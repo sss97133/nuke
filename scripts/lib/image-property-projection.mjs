@@ -295,7 +295,13 @@ const IMAGE_COLUMNS = 'id,vehicle_id,is_sensitive,is_superseded,is_duplicate,is_
  * superseded) is not sent again. Readings flagged needs_clarification only because their intent is unconfirmed are
  * projected here (the flag is about labor attribution, not about the three values).
  */
-export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, before, apply = false, single = false }) {
+export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, before, apply = false, single = false, imageIds = null }) {
+  // imageIds: only the current readings of these photos (the stage worker's one-photo call). Everything below is the same
+  // code path, holds and safety checks included; a superseded reading is not selected, so the receipt describes the reading
+  // the photo carries now.
+  if (imageIds !== null && (!Array.isArray(imageIds) || imageIds.length === 0 || imageIds.length > 100 || !imageIds.every(id => UUID.test(id ?? '')))) {
+    throw new Error('project-cached: imageIds must be 1..100 uuids');
+  }
   const counts = { sampled_condition_rows: 0, source_rows: 0, eligible_claims: 0 };
   const landed = { inserted: 0, duplicates: 0, verified: 0, failed: 0, unattempted: 0 };
   const held = { already_projected: 0, already_projected_superseded: 0, released_intent_only_clarification: 0 };
@@ -311,6 +317,7 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
   while (walked < pages) {
     let query = sb.from('vehicle_observations').select(SOURCE_COLUMNS)
       .eq('vehicle_id', vehicleId).eq('kind', 'condition').eq('structured_data->>analysis_kind', 'image_deep_byok');
+    if (imageIds) query = query.eq('is_superseded', false).in('structured_data->>image_id', imageIds);
     // Keyset on (ingested_at, id): readings that share one instant across a window's edge are not skipped.
     query = cursor ? query.or(`ingested_at.lt."${cursor.at}",and(ingested_at.eq."${cursor.at}",id.lt.${cursor.id})`)
       : query.lt('ingested_at', before);

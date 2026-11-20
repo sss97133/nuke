@@ -11,14 +11,26 @@
 // one gets a typed receipt through record_image_stage_receipt (stage-queue.mjs); otherwise the worklist is the owner's
 // rows by ai_processing_status, as before, and nothing here writes to the database.
 //
-//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model sonnet] [--status failed,pending] [--source auto|stage-queue|status] [--dry-run] [--out receipt.json]
+// After the first reads, one process works two more stages of the same ledger, in this order (deep-stage.mjs):
+//   deep_reading   (--deep-limit, default 20)   two independent lean reads of the photo, agreed values only, posted through the
+//                                               orchestrator's record_reviewed_analysis; skipped in a fire whose first reads
+//                                               ended on a batch-level fault (usage limit, login refused, API down, missing tool)
+//   keyed_values   (--keyed-limit, default 60)  the sanctioned projection of that photo's current reading; no model call
+// A stage the database does not hold yet claims nothing: a quiet no-op. Every model call starts lean (leanClaudeArgs).
+//
+//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model claude-sonnet-5-5] [--status failed,pending] [--source auto|stage-queue|status] [--deep-limit 20] [--keyed-limit 60] [--dry-run] [--out receipt.json]
+//   ... --stage-dry-run --image-ids <uuid,uuid> [--stages deep_reading,keyed_values]   reads those photos twice and prints, per photo, validity, seconds, tokens, the agreement
+//                                                 and the exact envelope it would post, plus the keyed projection as a dry run; claims and writes nothing
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { claimStageWork, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
+import { DEFAULT_MODEL, claudePrint, countReceipt, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, subscriptionEnv } from './deep-stage.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -29,7 +41,10 @@ if (process.env.ANTHROPIC_API_KEY) { console.error('refusing: ANTHROPIC_API_KEY 
 const OWNER = args.owner;
 const limit = args.limit && args.limit !== true ? Number(args.limit) : 200;
 const conc = args.concurrency && args.concurrency !== true ? Number(args.concurrency) : 2;
-const model = args.model && args.model !== true ? String(args.model) : 'sonnet';
+const model = args.model && args.model !== true ? String(args.model) : DEFAULT_MODEL;
+const count = (name, fallback) => (args[name] && args[name] !== true && Number.isFinite(Number(args[name])) ? Math.max(0, Math.trunc(Number(args[name]))) : fallback);
+const deepLimit = count('deep-limit', 20), keyedLimit = count('keyed-limit', 60);
+const here = dirname(fileURLToPath(import.meta.url));
 const statuses = (args.status && args.status !== true ? String(args.status) : 'failed,pending').split(',').map((s) => s.trim()).filter(Boolean);
 const dry = args['dry-run'] === true;
 const source = args.source && args.source !== true ? String(args.source) : 'auto';
@@ -53,20 +68,46 @@ async function orchestrator(body) {
   return { http: r.status, ...j };
 }
 
-function claudePrint(text, env) {
-  return new Promise((resolve, reject) => {
-    const child = spawn('claude', ['-p', '--output-format', 'json', '--model', model, '--allowedTools', 'Read'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
-    let out = '', err = '';
-    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('reader timed out after 240 s')); }, 240_000);
-    child.stdout.on('data', (d) => { out += d; });
-    child.stderr.on('data', (d) => { err += d; });
-    child.on('error', (e) => { clearTimeout(timer); reject(e); });
-    // A run that ends in an error (a usage limit, an API error) can exit non-zero with its JSON result on stdout: hand
-    // that result on so the caller reads is_error and api_error_status instead of an empty stderr.
-    const hasResult = () => { try { return typeof JSON.parse(out) === 'object' && JSON.parse(out) !== null; } catch { return false; } };
-    child.on('close', (code) => { clearTimeout(timer); code === 0 || hasResult() ? resolve(out) : reject(new Error(`claude exited ${code}: ${(err || out).slice(0, 200)}`)); });
-    child.stdin.end(text);
-  });
+async function supabaseClient() {
+  // The reader runs from a checkout of origin/main that has no node_modules; the project's own checkout does (the
+  // wrapper starts this script with it as the working directory), so the client is resolved from there.
+  let mod;
+  try { mod = createRequire(join(process.cwd(), 'noop.js'))('@supabase/supabase-js'); } catch { mod = await import('@supabase/supabase-js'); }
+  return mod.createClient(URL_, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+const deepDeps = (dir) => ({
+  rest,
+  fetchBytes: async (url) => { const res = await fetch(url).catch(() => ({ ok: false, status: 0 })); return res.ok ? { ok: true, status: res.status, bytes: Buffer.from(await res.arrayBuffer()) } : { ok: false, status: res.status }; },
+  convert: async (raw) => { const out = raw.replace(/\.[^.]+$/, '') + '.jpg'; await run('sips', ['-s', 'format', 'jpeg', '-Z', '1600', raw, '--out', out]); return out; },
+  ask: (argv, text, cwd) => claudePrint(argv, text, { env: subscriptionEnv(), cwd }),
+  orchestrator,
+});
+const contractText = () => readFileSync(join(here, '..', 'daily-receipt', 'byok-vision-prompt.md'), 'utf8');
+
+// Dry run of the new stages on named photos: reads and prints, claims nothing, writes nothing.
+if (args['stage-dry-run'] === true) {
+  const ids = String(args['image-ids'] === true ? '' : args['image-ids'] ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (!ids.length || ids.some((x) => !/^[0-9a-f-]{36}$/i.test(x))) { console.error('--stage-dry-run needs --image-ids <uuid,uuid>'); process.exit(2); }
+  const rows = await rest(`vehicle_images?select=id,vehicle_id&user_id=eq.${OWNER}&id=in.(${ids.join(',')})`);
+  const dir = mkdtempSync(join(tmpdir(), 'nuke-deep-dry-'));
+  const runId = newRunId();
+  let sb = null;
+  const which = String(args.stages === true || !args.stages ? 'deep_reading,keyed_values' : args.stages).split(',');
+  for (const f of rows) {
+    if (which.includes(DEEP_STAGE)) {
+    const res = await deepReadFrame({ id: f.id, vehicle_id: f.vehicle_id }, deepDeps(dir), { dir, contract: contractText(), model, runId, post: false, reader: READER });
+    console.log(JSON.stringify({ stage: DEEP_STAGE, image_id: f.id, valid: res.valid, seconds: res.seconds,
+      tokens: (res.reads ?? []).map((r) => ({ input: r.stats.input_tokens, output: r.stats.output_tokens, seconds: r.stats.seconds, attempts: r.stats.attempts, notional_usd: r.stats.notional_cost_usd })),
+      agreement: res.agreement ? { agreed: res.agreement.agreed, disagreements: res.agreement.disagreements, values: res.agreement.values } : null,
+      would_post: res.envelope ?? null, receipt_if_not_two_valid_reads: res.envelope ? null : res.receipt }));
+    }
+    if (!which.includes(KEYED_STAGE)) continue;
+    sb ??= await supabaseClient();
+    const keyed = await keyedValuesForFrame({ id: f.id, vehicle_id: f.vehicle_id }, { sb, apply: false, reader: READER });
+    console.log(JSON.stringify({ stage: KEYED_STAGE, image_id: f.id, dry_run: true, would_write_values: keyed.projection?.eligible_claims ?? null, projection: keyed.projection, error: keyed.receipt.outcome === 'unavailable' ? keyed.receipt.detail?.error ?? keyed.receipt.error_class : null }));
+  }
+  rmSync(dir, { recursive: true, force: true });
+  process.exit(0);
 }
 
 const checklist = await orchestrator({ action: 'classifier_prompt' });
@@ -133,9 +174,10 @@ if (!dry) {
           img = join(dir, `${f.id}.jpg`);
           await run('sips', ['-s', 'format', 'jpeg', '-Z', '1600', raw, '--out', img]);
         }
-        const env = { ...process.env }; delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT; delete env.ANTHROPIC_API_KEY;
         stage = 'reader';
-        const stdout = await claudePrint(`${checklist.prompt}\n\nThe image is the file at ${img}. Read it first, then answer with ONLY the JSON object.`, env);
+        // lean start (leanClaudeArgs), in the empty temp directory: measured 2026-11-20 on six photos, 6 of 6 answers accepted by
+        // the orchestrator's own validator either way, at 16k tokens of startup instead of 145k and 6 s instead of 9 s
+        const stdout = await claudePrint(leanClaudeArgs({ model }), `${checklist.prompt}\n\nThe image is the file at ${img}. Read it first, then answer with ONLY the JSON object.`, { env: subscriptionEnv(), cwd: dir });
         // an answer that does not parse is the reader's invalid output, whatever the parser's message happens to contain
         const invalid = (why) => Object.assign(new Error(why), { invalidOutput: true });
         let outer; try { outer = JSON.parse(stdout); } catch { throw invalid('no JSON in the reader output'); }
@@ -170,6 +212,81 @@ if (!dry) {
   };
   await Promise.all(Array.from({ length: Math.max(1, conc) }, worker));
   rmSync(dir, { recursive: true, force: true });
+}
+
+// ---- the stages after the first read: deep readings, then keyed values (same ledger, same receipts) --------------------
+// Per-stage summaries go under "stages" in the heartbeat; the top-level fields above keep their meaning (the first reads).
+const stages = {};
+const settleStage = async (stageName, summary, f, receipt) => {
+  countReceipt(summary, receipt);
+  const saved = await recordStageReceipt(rpc, { stage: stageName, imageId: f.id, version: f.target_version, receipt, fingerprint: inputFingerprint(f.image_url, md5) });
+  if (saved.ok) summary.receipts++; else { summary.receipt_errors++; console.error(`${f.id} ${stageName} receipt not recorded: ${saved.error}`); }
+};
+const toFrame = (w) => ({ id: w.image_id, vehicle_id: w.vehicle_id, user_id: w.user_id, image_url: w.image_url, target_version: w.target_version, lane: w.lane, reason: w.reason });
+async function pool(items, width, fn, halted) {
+  let n = 0;
+  await Promise.all(Array.from({ length: Math.max(1, width) }, async () => { while (n < items.length && !halted()) await fn(items[n++]); }));
+}
+async function deepPhase() {
+  const s = newStageSummary();
+  if (deepLimit < 1) { s.skipped = 'off'; return s; }
+  // a fault that is the batch's (usage limit, login refused, API unreachable, a missing tool) would fail every deep reading the same way
+  if (summary.stopped) { s.skipped = 'first_read_fault'; return s; }
+  const leaseSeconds = Math.max(900, Math.ceil(Math.min(deepLimit, 25) / Math.max(1, conc)) * 600);   // one photo: download, two reads (each may be retried once), the intake
+  const claimed = await claimStageWorkUpTo(rpc, { stage: DEEP_STAGE, limit: deepLimit, leaseSeconds, userId: OWNER });
+  if (claimed.error) { s.claim_error = claimed.error; console.error(`${DEEP_STAGE}: ${claimed.error} ${claimed.detail}`); return s; }
+  const frames2 = claimed.work.map(toFrame);
+  s.claimed = frames2.length;
+  if (!frames2.length) return s;
+  Object.assign(s, { reads_valid: 0, agreed_all: 0, disagreements: {}, read_seconds: 0, input_tokens: 0, output_tokens: 0 });
+  console.error(`${frames2.length} photos to read deeply (model ${model}, concurrency ${conc})`);
+  const dir = mkdtempSync(join(tmpdir(), 'nuke-deep-'));
+  const contract = contractText(), runId = newRunId();
+  let halt = false;
+  try {
+    await pool(frames2, conc, async (f) => {
+      s.started++;
+      let res;
+      try { res = await deepReadFrame(f, deepDeps(dir), { dir, contract, model, runId, reader: READER }); }
+      catch (e) { res = { receipt: receiptForResult({ reader: { error: String(e?.message || e), missingTool: e?.code === 'ENOENT' } }, { reader: READER, promptVersion: 'reviewed_image_analysis_v1' }), stop: false }; }
+      if (res.agreement && res.reads) {
+        s.reads_valid += res.reads.length; s.read_seconds += Math.round(res.seconds);
+        for (const r of res.reads) { s.input_tokens += r.stats.input_tokens; s.output_tokens += r.stats.output_tokens; }
+        if (res.agreement.agreed) s.agreed_all++;
+        for (const d of res.agreement.disagreements) s.disagreements[d.field] = (s.disagreements[d.field] || 0) + 1;
+      }
+      if (res.receipt.stop) { halt = true; s.stopped = res.receipt.error_class; }
+      await settleStage(DEEP_STAGE, s, f, res.receipt);
+      console.error(`${f.id} ${DEEP_STAGE} ${res.receipt.outcome}${res.receipt.error_class ? ' ' + res.receipt.error_class : ''}${res.receipt.detail?.skipped ? ' ' + res.receipt.detail.skipped : ''}`);
+    }, () => halt);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  return s;
+}
+async function keyedPhase() {
+  const s = newStageSummary();
+  if (keyedLimit < 1) { s.skipped = 'off'; return s; }
+  const claimed = await claimStageWorkUpTo(rpc, { stage: KEYED_STAGE, limit: keyedLimit, leaseSeconds: 1800, userId: OWNER });
+  if (claimed.error) { s.claim_error = claimed.error; console.error(`${KEYED_STAGE}: ${claimed.error} ${claimed.detail}`); return s; }
+  const frames3 = claimed.work.map(toFrame);
+  s.claimed = frames3.length;
+  if (!frames3.length) return s;
+  s.values = 0;
+  let sb = null, sbError = null;
+  try { sb = await supabaseClient(); } catch (e) { sbError = String(e?.message || e).slice(0, 120); }
+  await pool(frames3, Math.min(conc, 3), async (f) => {
+    s.started++;
+    const res = sb ? await keyedValuesForFrame(f, { sb, reader: READER })
+      : { receipt: { outcome: 'unavailable', error_class: 'projection_error', retry_after_seconds: 900, detail: { reader: READER, error: sbError } } };
+    if (res.receipt.outcome === 'succeeded') s.values += res.receipt.detail.values || 0;
+    await settleStage(KEYED_STAGE, s, f, res.receipt);
+    console.error(`${f.id} ${KEYED_STAGE} ${res.receipt.outcome}${res.receipt.error_class ? ' ' + res.receipt.error_class : ''}${res.receipt.detail?.skipped ? ' ' + res.receipt.detail.skipped : ''}`);
+  }, () => false);
+  return s;
+}
+if (fromQueue && !dry) {
+  stages[DEEP_STAGE] = await deepPhase();
+  stages[KEYED_STAGE] = await keyedPhase();
+  summary.stages = stages;
 }
 const receipt = { run: 'subscription-frame-classifier', at: new Date().toISOString(), owner: OWNER, model, prompt_version: checklist.prompt_version, summary, results: out };
 if (args.out && args.out !== true) writeFileSync(args.out, JSON.stringify(receipt, null, 1));

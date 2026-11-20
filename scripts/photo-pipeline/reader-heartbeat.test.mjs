@@ -180,3 +180,27 @@ test('the wrapper hands the summary over in the environment, keeps the reader ex
     'the summary is never spliced into a bash -c script');
   assert.ok(!/"HTTP 200"/.test(wrapper), 'no text match on the status line');
 });
+
+test('the per-stage summaries ride under "stages"; the top-level fields keep their names and meaning', () => {
+  const stage = { claimed: 20, started: 20, succeeded: 17, policy_skip: 1, unavailable: 2, receipts: 20, receipt_errors: 0, stopped: null, skipped: null, claim_error: null,
+    error_classes: { reader_output_invalid: 2 }, skip_reasons: { document: 1 }, reads_valid: 40, agreed_all: 12, disagreements: { rust_severity: 4, paint_state: 5, completeness: 3, scene_type: 2 }, read_seconds: 700, input_tokens: 1300000, output_tokens: 52000 };
+  const summary = JSON.stringify({ frames: 20, source: 'stage-queue', read: 20, accepted: 20, classifier_rejected: 0, errors: 0, error_classes: {}, receipts: 20, receipt_errors: 0, stopped: null, by_type: { engine_bay: 20 }, read_seconds: 160,
+    stages: { deep_reading: stage, keyed_values: { ...stage, values: 51 } } });
+  const body = buildHeartbeatBody({ name: 'subscription-frame-classifier', summary, elapsedMs: '900000', readerExit: '0' });
+  assert.equal(body.p_jobname, 'subscription-frame-classifier', 'one name: record_reader_heartbeat accepts only the two existing readers');
+  assert.deepEqual(body.p_reading, JSON.parse(summary));
+  assert.ok(Buffer.byteLength(JSON.stringify(body.p_reading)) < 20000 && Buffer.byteLength(JSON.stringify(body.p_reading)) < MAX_READING_BYTES / 4, 'well under the 20 kB the database takes');
+  // zero-read carry-over still reads the first-read fields only: a fire that deep-read photos but first-read none is not a zero-read fire
+  const idle = withZeroReadRun({ frames: 0, read: 0, stages: { deep_reading: stage } }, null, '2026-11-20T00:00:00Z');
+  assert.equal('zero_read_since' in idle, false);
+  assert.equal(withZeroReadRun({ frames: 5, read: 0, stages: {} }, null, '2026-11-20T00:00:00Z').zero_read_fires, 1);
+});
+
+test('an oversized reading drops the stage summaries before it drops the first-read fields', () => {
+  const stages = { deep_reading: { error_classes: Object.fromEntries(Array.from({ length: 400 }, (_, i) => [`class_${i}_${'x'.repeat(30)}`, i])) } };
+  const r = readingFromSummary(JSON.stringify({ frames: 20, read: 18, accepted: 18, by_type: { engine_bay: 18 }, error_classes: {}, stages }));
+  assert.deepEqual(r, { frames: 20, read: 18, accepted: 18, by_type: { engine_bay: 18 }, error_classes: {}, stages_dropped: true });
+  // no stages and still too large: the old behavior, counts only
+  const big = readingFromSummary(JSON.stringify({ frames: 20, read: 18, by_type: Object.fromEntries(Array.from({ length: 600 }, (_, i) => [`type_${i}_${'y'.repeat(30)}`, 1])) }));
+  assert.deepEqual([big.frames, big.read, big.summary_reduced, 'by_type' in big], [20, 18, true, false]);
+});

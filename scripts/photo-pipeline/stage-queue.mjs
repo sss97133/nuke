@@ -17,6 +17,8 @@
 // Pure functions plus two thin RPC wrappers; no model, no file system.
 
 export const STAGE = 'classifier';
+export const DEEP_STAGE = 'deep_reading';
+export const KEYED_STAGE = 'keyed_values';
 
 /**
  * True when this owner's photos are handed out by the stage ledger: the reconciler is switched on (platform_config
@@ -35,6 +37,27 @@ export async function stageQueueEnabled(rest, owner) {
 export async function claimStageWork(rpc, { stage = STAGE, limit = 20, leaseSeconds = 900, userId = null } = {}) {
   const rows = await rpc('claim_image_stage_work', { p_stage: stage, p_limit: Math.min(Math.max(limit, 1), 25), p_lease_seconds: leaseSeconds, p_user_id: userId });
   return Array.isArray(rows) ? rows : [];
+}
+
+/**
+ * Claim up to `limit` photos for a stage over as many calls as it takes (the database hands out at most 25 a call).
+ * A database that does not know the stage yet answers an empty list (claim_image_stage_work filters by stage), so a
+ * stage that is not deployed is a quiet no-op here; an error is returned as `error`, never thrown, so a fault in one
+ * stage cannot cost the fire its other stages.
+ */
+export async function claimStageWorkUpTo(rpc, { stage, limit, leaseSeconds, userId }) {
+  const work = [];
+  try {
+    while (work.length < limit) {
+      const want = Math.min(limit - work.length, 25);
+      const rows = await claimStageWork(rpc, { stage, limit: want, leaseSeconds, userId });
+      work.push(...rows);
+      if (rows.length < want) break;   // a short answer: nothing more is due
+    }
+  } catch (e) {
+    return { work, error: 'claim_failed', detail: String(e?.message || e).slice(0, 160) };
+  }
+  return { work, error: null };
 }
 
 // The subscription's own words for "no compute left" (Claude Code prints "You've hit your 5-hour limit · resets 3pm",
@@ -126,4 +149,76 @@ export async function recordStageReceipt(rpc, { imageId, stage = STAGE, version,
     }
   }
   return { ok: false, error };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The deep-reading and keyed-values stages. Same ledger, same receipt vocabulary; the answers differ.
+
+/**
+ * The receipt for one photo's deep reading.
+ *   { download | input | convert | reader }   the same faults as a first read (receiptForResult); a deep reading that could
+ *                                             not get two valid reads of the photo is { reader: { invalidOutput: true } }
+ *   { policy: 'document' }                    the row no longer satisfies what the intake requires: no read was spent
+ *   { intake: { http, success, error, ... } } the photo-pipeline-orchestrator's answer to record_reviewed_analysis
+ * The intake's own words (reviewedAnalysis.ts; the SQL function project_reviewed_image_analysis behind it answers only
+ * 'review_projection_refused'): review_requires_service_role 403; invalid_review_envelope|identity|verdict|state|presence|
+ * workshop|camera|regions|flags|notes|lists|source|provenance 400 and review_too_large 400; review_source_changed 409;
+ * review_source_withdrawn 409; review_projection_refused 409; review_projection_not_persisted 409;
+ * review_source_unavailable 503; review_observation_not_persisted 502; review_persistence_failed 500.
+ */
+export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
+  const detail = { reader: reader ?? null, prompt_version: promptVersion ?? null, ...(result.detail ?? {}) };
+  if (result.policy) return { outcome: 'policy_skip', detail: { ...detail, skipped: String(result.policy).slice(0, 60) } };
+  if (!result.intake) {
+    const r = receiptForResult(result, { reader, promptVersion });
+    return { ...r, detail: { ...r.detail, ...(result.detail ?? {}) } };
+  }
+  const o = result.intake;
+  const code = String(o.error ?? o.error_class ?? '');
+  const d = { ...detail, intake_http: o.http ?? null, ...(code ? { intake_error: code.slice(0, 60) } : {}) };
+  if (o.http === 200 && o.success !== false) {
+    return { outcome: 'succeeded', detail: { ...d, ...(typeof o.observation_id === 'string' ? { observation_id: o.observation_id } : {}) } };
+  }
+  if (code === 'review_source_withdrawn' || code === 'review_source_previously_withdrawn') {
+    return { outcome: 'policy_skip', detail: { ...d, skipped: code } };
+  }
+  // the photo moved while it was being read (or the database refused to place the reading on it): the next claim reads the
+  // current row again, so this is a short retry, not a retirement
+  if (['review_source_changed', 'review_source_changed_during_projection', 'review_projection_refused', 'review_projection_not_persisted'].includes(code)) {
+    return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 120, detail: d };
+  }
+  // the contract refused this answer: another reading of the photo can be valid
+  if (/^invalid_review_/.test(code) || code === 'review_too_large') {
+    return { outcome: 'unavailable', error_class: 'reader_output_invalid', http_status: o.http ?? null, retry_after_seconds: 1800, detail: d };
+  }
+  if (o.http === 429) return { outcome: 'rate_limited', error_class: 'orchestrator_rate_limited', http_status: 429, retry_after_seconds: 900, detail: d };
+  if (o.http === 401 || o.http === 403 || code === 'review_requires_service_role') {
+    return { outcome: 'unavailable', error_class: 'orchestrator_unauthorized', http_status: o.http ?? null, retry_after_seconds: 900, stop: true, detail: d };
+  }
+  return { outcome: 'unavailable', error_class: code ? code.replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 48) : 'orchestrator_http_error', http_status: o.http ?? null, retry_after_seconds: 900, detail: d };
+}
+
+/**
+ * The receipt for one photo's keyed values: the receipt projectCachedRun returned for exactly that photo, or the fault
+ * that kept it from running.
+ *   { projection: receipt }   succeeded with the number of values written (or already there), or policy_skip with the
+ *                             projection's own deferral reason (receipt_document, no_known_scalar_values, source_requires_review ...)
+ *   { error: 'text' }         the projection could not run: retried later
+ */
+export function receiptForKeyedResult(result, { reader, promptVersion } = {}) {
+  const detail = { reader: reader ?? null, prompt_version: promptVersion ?? null };
+  if (result.error) return { outcome: 'unavailable', error_class: 'projection_error', retry_after_seconds: 900, detail: { ...detail, error: String(result.error).slice(0, 160) } };
+  const p = result.projection ?? {};
+  const deferred = p.deferred && typeof p.deferred === 'object' ? p.deferred : {};
+  const counts = { values: (p.inserted || 0) + (p.duplicates || 0), inserted: p.inserted || 0, duplicates: p.duplicates || 0, already_projected: p.already_projected || 0 };
+  if (p.failed > 0 || p.reason) {
+    return { outcome: 'unavailable', error_class: 'projection_failed', retry_after_seconds: 900, detail: { ...detail, ...counts, reason: String(p.reason || 'ingest_failed').slice(0, 60) } };
+  }
+  if (counts.values > 0) return { outcome: 'succeeded', detail: { ...detail, ...counts, deferred } };
+  // the photo already carries every value its reading yields (landed by hand, or by an earlier fire whose receipt was lost)
+  if (counts.already_projected > 0) return { outcome: 'succeeded', detail: { ...detail, ...counts, values: counts.already_projected, already_there: true, deferred } };
+  if (!p.source_rows) return { outcome: 'unavailable', error_class: 'reading_not_found', retry_after_seconds: 900, detail: { ...detail, ...counts } };
+  // nothing is written for this photo, and the projection said why (its own words, most frequent first)
+  const why = Object.entries(deferred).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] ?? 'nothing_to_project';
+  return { outcome: 'policy_skip', detail: { ...detail, ...counts, skipped: why, deferred } };
 }

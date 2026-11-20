@@ -474,6 +474,7 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
       if (++db.calls.source === failSourceQueryAt) return { data: null, error: { message: 'made-up failure' } };
       const keep = row => row.vehicle_id === f.eq.vehicle_id && row.kind === f.eq.kind &&
         row.structured_data.analysis_kind === f.eq['structured_data->>analysis_kind'] &&
+        (!f.in || f.in[1].includes(row.structured_data.image_id)) && (f.eq.is_superseded === undefined || row.is_superseded === f.eq.is_superseded) &&
         (f.lt ? instantMicros(row.ingested_at) < instantMicros(f.lt)
           : instantMicros(row.ingested_at) < instantMicros(f.or.at) || (instantMicros(row.ingested_at) === instantMicros(f.or.at) && row.id < f.or.id));
       return { data: db.rows.filter(keep).sort(newestFirst).slice(0, f.limit), error: null };
@@ -668,4 +669,27 @@ test('project-cached: one page on the batch route keeps the receipt it always pr
   for (const key of ['inserted', 'duplicates', 'verified', 'failed', 'unattempted', 'requests']) assert.equal(receipt[key], 0, key);
   assert.deepEqual([receipt.route, receipt.eligible_claims, exitCode], ['batch', 0, 1], 'apply with nothing to do is still a failure');
   assert.equal((await walk(db, {})).exitCode, 0, 'a dry run with nothing stored is not');
+});
+
+test('project-cached --single with imageIds: only the named photos, through the same checks, and their own deferral reasons', async () => {
+  const db = standIn();
+  const one = db.reading(at(1)), other = db.reading(at(2));
+  const paper = db.reading(at(3), { data: { scene_type: 'receipt_document' } });
+  const unknown = db.reading(at(4), { data: { state_observations: { rust_severity: 'unknown', paint_state: 'unknown', completeness: 'unknown' } } });
+  const old = db.reading(at(5), { is_superseded: true });
+  const only = async (row, extra = {}) => walk(db, { apply: true, single: true, imageIds: [row.structured_data.image_id], ...extra });
+  let { receipt, exitCode } = await only(one);
+  assert.deepEqual([receipt.source_rows, receipt.inserted, receipt.verified, receipt.failed, exitCode], [1, 3, 3, 0, 0]);
+  assert.equal(db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1' && r.structured_data.image_id === other.structured_data.image_id).length, 0, 'the other photo was not touched');
+  ({ receipt } = await only(paper));
+  assert.deepEqual([receipt.eligible_claims, receipt.deferred], [0, { receipt_document: 1 }], 'the projection\'s own holds still apply');
+  ({ receipt } = await only(unknown));
+  assert.deepEqual([receipt.eligible_claims, receipt.deferred], [0, { no_known_scalar_values: 1 }]);
+  ({ receipt } = await only(old));
+  assert.equal(receipt.source_rows, 0, 'a superseded reading is not selected when photos are named');
+  ({ receipt } = await only(one));
+  assert.deepEqual([receipt.eligible_claims, receipt.already_projected, receipt.inserted], [0, 3, 0], 'a second call for the same photo sends nothing');
+  for (const bad of [[], ['not-a-uuid'], Array(101).fill(one.structured_data.image_id)]) {
+    await assert.rejects(walk(db, { imageIds: bad }), /imageIds must be 1\.\.100 uuids/);
+  }
 });

@@ -3,9 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { claimStageWork, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
+import { claimStageWork, claimStageWorkUpTo, inputFingerprint, receiptForDeepResult, receiptForKeyedResult, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
 
-const ctx = { reader: 'claude-cli sonnet subscription', promptVersion: 'v98' };
+const ctx = { reader: 'claude-cli claude-sonnet-5-5 subscription', promptVersion: 'v98' };
 
 test('the ledger is used only when the reconciler is on and names this owner', async () => {
   const cfg = (config_value) => async () => [{ config_value }];
@@ -165,4 +165,65 @@ test('recording a receipt never throws, and carries the fingerprint of the URL t
   const bad = await recordStageReceipt(async () => { calls++; throw new Error('record_image_stage_receipt: 500 boom'); }, { imageId: 'img', version: 1, receipt: { outcome: 'succeeded' }, pauseMs: 0 });
   assert.deepEqual([bad.ok, calls], [false, 3], 'three tries, then it gives up without throwing');
   assert.match(bad.error, /500 boom/);
+});
+
+test('a stage claims across calls (the database hands out 25 at most), and a stage the database lacks is a quiet no-op', async () => {
+  const asked = [];
+  const rpc = async (name, body) => { asked.push(body.p_limit); return Array.from({ length: asked.length < 3 ? body.p_limit : 5 }, (_, i) => ({ work_id: asked.length * 100 + i, image_id: `i${asked.length}-${i}` })); };
+  const got = await claimStageWorkUpTo(rpc, { stage: 'keyed_values', limit: 60, leaseSeconds: 1800, userId: 'u1' });
+  assert.deepEqual([got.work.length, got.error, asked], [55, null, [25, 25, 10]], 'a short answer ends the claims');
+  const none = await claimStageWorkUpTo(async () => [], { stage: 'deep_reading', limit: 20, leaseSeconds: 900, userId: 'u1' });
+  assert.deepEqual([none.work, none.error], [[], null], 'claim_image_stage_work answers an empty list for a stage that is not registered');
+  const failed = await claimStageWorkUpTo(async () => { throw new Error('claim_image_stage_work: 500 boom'); }, { stage: 'deep_reading', limit: 20, leaseSeconds: 900, userId: 'u1' });
+  assert.deepEqual([failed.work, failed.error], [[], 'claim_failed'], 'returned, never thrown');
+});
+
+test('deep reading: every answer the intake can give is a typed receipt', () => {
+  const dctx = { reader: 'claude-cli claude-sonnet-5-5 subscription', promptVersion: 'reviewed_image_analysis_v1' };
+  const of = (result) => { const r = receiptForDeepResult(result, dctx); return [r.outcome, r.error_class ?? r.detail.skipped ?? null, r.retry_after_seconds ?? null, r.stop === true]; };
+  assert.deepEqual(of({ intake: { http: 200, success: true, observation_id: 'o1' } }), ['succeeded', null, null, false]);
+  assert.equal(receiptForDeepResult({ intake: { http: 200, success: true, observation_id: 'o1' } }, dctx).detail.observation_id, 'o1');
+  // the source changed during the read: retried in about two minutes
+  for (const code of ['review_source_changed', 'review_source_changed_during_projection', 'review_projection_refused', 'review_projection_not_persisted']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['unavailable', code, 120, false]);
+  // withdrawn or not eligible: closed with its reason
+  for (const code of ['review_source_withdrawn', 'review_source_previously_withdrawn']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['policy_skip', code, null, false]);
+  assert.deepEqual(of({ policy: 'document' }), ['policy_skip', 'document', null, false]);
+  // the contract refused the answer
+  for (const code of ['invalid_review_envelope', 'invalid_review_identity', 'invalid_review_verdict', 'invalid_review_state', 'invalid_review_presence', 'invalid_review_workshop', 'invalid_review_camera',
+    'invalid_review_regions', 'invalid_review_flags', 'invalid_review_notes', 'invalid_review_lists', 'invalid_review_source', 'invalid_review_provenance', 'review_too_large']) assert.deepEqual(of({ intake: { http: 400, success: false, error: code } }), ['unavailable', 'reader_output_invalid', 1800, false], code);
+  assert.equal(receiptForDeepResult({ intake: { http: 400, error: 'invalid_review_camera' } }, dctx).detail.intake_error, 'invalid_review_camera', 'the refusal\'s own word is kept in the detail');
+  // the intake or its writer is down: retried, the batch goes on
+  for (const [http, code] of [[503, 'review_source_unavailable'], [502, 'review_observation_not_persisted'], [500, 'review_persistence_failed']]) assert.deepEqual(of({ intake: { http, success: false, error: code } }), ['unavailable', code, 900, false]);
+  assert.deepEqual(of({ intake: { http: 0, error: 'orchestrator_request_error' } }), ['unavailable', 'orchestrator_request_error', 900, false]);
+  // the service key was refused: the batch stops
+  assert.deepEqual(of({ intake: { http: 403, success: false, error: 'review_requires_service_role' } }), ['unavailable', 'orchestrator_unauthorized', 900, true]);
+  assert.deepEqual(of({ intake: { http: 401, error: 'unauthorized' } }), ['unavailable', 'orchestrator_unauthorized', 900, true]);
+  assert.deepEqual(of({ intake: { http: 429 } }), ['rate_limited', 'orchestrator_rate_limited', 900, false]);
+  // faults before the intake are the first read's receipts, unchanged
+  assert.deepEqual(of({ download: { status: 404 } }), ['blocked_input', 'image_http_error', null, false]);
+  assert.deepEqual(of({ download: { status: 0 } }), ['unavailable', 'image_download_error', 900, false]);
+  assert.deepEqual(of({ convert: { missingTool: true } }), ['unavailable', 'reader_tool_missing', 3600, true]);
+  assert.deepEqual(of({ reader: { error: 'You\'ve hit your 5-hour limit', apiStatus: 429 } }), ['rate_limited', 'reader_usage_limit', 3600, true]);
+  assert.deepEqual(of({ reader: { error: 'no valid pair', invalidOutput: true } }), ['unavailable', 'reader_output_invalid', 1800, false], 'fewer than two valid reads: retryable');
+  assert.deepEqual(of({ reader: { error: 'reader timed out after 240 s' } }), ['unavailable', 'reader_timeout', 1800, false]);
+  assert.equal(receiptForDeepResult({ reader: { invalidOutput: true }, detail: { run_id: 'r' } }, dctx).detail.run_id, 'r', 'the stage detail is kept');
+});
+
+test('keyed values: the number written, or the projection\'s own reason', () => {
+  const kctx = { reader: 'r', promptVersion: 'byok_image_properties_v1' };
+  const of = (projection, error) => { const r = receiptForKeyedResult({ projection, error }, kctx); return [r.outcome, r.error_class ?? r.detail.skipped ?? null, r.detail.values ?? null]; };
+  const base = { source_rows: 1, eligible_claims: 0, inserted: 0, duplicates: 0, failed: 0, deferred: {} };
+  assert.deepEqual(of({ ...base, eligible_claims: 3, inserted: 3, verified: 3 }), ['succeeded', null, 3]);
+  assert.deepEqual(of({ ...base, eligible_claims: 3, inserted: 1, duplicates: 2 }), ['succeeded', null, 3], 'a claim the database already held counts: it is keyed');
+  const already = receiptForKeyedResult({ projection: { ...base, already_projected: 3 } }, kctx);
+  assert.deepEqual([already.outcome, already.detail.values, already.detail.already_there], ['succeeded', 3, true]);
+  for (const why of ['receipt_document', 'no_known_scalar_values', 'source_requires_review', 'image_not_eligible', 'child_not_public', 'not_current_byok_testimony']) {
+    assert.deepEqual(of({ ...base, deferred: { [why]: 1 } }), ['policy_skip', why, 0], why);
+  }
+  assert.equal(of({ ...base, deferred: { a_reason: 1, receipt_document: 2 } })[1], 'receipt_document', 'the commonest reason');
+  assert.deepEqual(of({ ...base, source_rows: 0 }), ['unavailable', 'reading_not_found', 0], 'the ledger says a reading landed but the projection found none');
+  assert.deepEqual(of({ ...base, eligible_claims: 3, failed: 1, reason: 'batch_receipt_invalid' }), ['unavailable', 'projection_failed', 0]);
+  assert.deepEqual(of({ ...base, eligible_claims: 3, inserted: 1, unattempted: 2, failed: 1, reason: 'run_budget_exhausted' }), ['unavailable', 'projection_failed', 1], 'a partial landing is retried; the rest is landed next time');
+  assert.deepEqual(of(null, 'project-cached: source query failed'), ['unavailable', 'projection_error', null]);
+  assert.equal(receiptForKeyedResult({ projection: { ...base, failed: 1 } }, kctx).retry_after_seconds, 900);
 });

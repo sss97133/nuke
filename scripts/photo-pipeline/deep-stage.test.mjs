@@ -1,0 +1,318 @@
+// node --test scripts/photo-pipeline/deep-stage.test.mjs
+// The deep-reading and keyed-values stages: how a call is started, how two independent reads become one posted verdict,
+// the envelope, and what each answer becomes. No model, no network: the CLI, the orchestrator and PostgREST are stand-ins.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, rmSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { validateVerdict } from '../../supabase/functions/_shared/byokImageVerdict.mjs';
+import { stageSchema } from '../lib/byok-stage-schema.mjs';
+import {
+  AUTOMATIC_METHOD, AUTOMATIC_TIER, DEFAULT_MODEL, agreeVerdicts, automaticProvenance, buildEnvelope, countReceipt, deepReadFrame,
+  eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput,
+} from './deep-stage.mjs';
+
+const IMAGE = '10000000-0000-4000-8000-000000000001', VEHICLE = '20000000-0000-4000-8000-000000000001';
+const verdict = (over = {}, state = {}) => ({
+  image_id: IMAGE, vehicle_id: VEHICLE, scene_type: 'body_exterior', build_phase_guess: 'final_assembly', intent: 'documentation', intent_confidence: 0.9,
+  needs_clarification: false, components_seen: [{ label: 'Front wheel', confidence: 0.8, bbox: [100, 400, 300, 800], part_number_guess: null }],
+  text_regions: [], damage_localized: [],
+  state_observations: { rust_severity: 'none', paint_state: 'aged', completeness: 'assembled', damage_callouts: [], ...state },
+  workshop_signals: { tools_visible: [], fixturing: 'unknown', weld_quality: 'unknown', lighting: 'natural_outdoor' },
+  presence: { person: false, dog: false, place_hint: null },
+  camera_pose: { method: 'full-frame visual inspection; no calibrated pose', framing: 'whole car', azimuth_deg: null, elevation_deg: null, distance_est: null, exif_present: null },
+  narrative_one_line: 'A complete car stands in the frame.', confidence: 0.8, context_complete: true, open_questions: [], agent_notes: '', ...over,
+});
+const cli = (v, extra = {}) => JSON.stringify({ type: 'result', is_error: false, num_turns: 2, total_cost_usd: 0.0412,
+  usage: { input_tokens: 4, cache_creation_input_tokens: 9000, cache_read_input_tokens: 23000, output_tokens: 1300 }, modelUsage: { 'claude-sonnet-5-5': {} },
+  structured_output: { verdicts: [v] }, ...extra });
+
+test('every call starts lean: no CLAUDE.md, memory, plugins, MCP or hooks, one tool, no session file, the shared grammar', () => {
+  const argv = leanClaudeArgs({ schema: stageSchema('verdicts') });
+  assert.equal(argv[0], '-p');
+  for (const flag of ['--safe-mode', '--strict-mcp-config', '--no-session-persistence']) assert.ok(argv.includes(flag), flag);
+  assert.equal(argv[argv.indexOf('--model') + 1], 'claude-sonnet-5-5', 'the default is the exact id');
+  assert.equal(argv[argv.indexOf('--tools') + 1], 'Read');
+  assert.equal(argv[argv.indexOf('--allowedTools') + 1], 'Read');
+  assert.equal(argv[argv.indexOf('--output-format') + 1], 'json');
+  assert.ok(!argv.includes('--bare'), '--bare never reads the subscription login');
+  assert.deepEqual(JSON.parse(argv[argv.indexOf('--json-schema') + 1]), stageSchema('verdicts'), 'the grammar is the reviewed reader\'s, not a copy');
+  assert.ok(!leanClaudeArgs({ model: 'sonnet' }).includes('--json-schema'), 'the first-read call has no schema');
+  assert.equal(leanClaudeArgs({ model: 'sonnet' })[leanClaudeArgs({ model: 'sonnet' }).indexOf('--model') + 1], 'sonnet', '--model still overrides');
+  assert.equal(DEFAULT_MODEL, 'claude-sonnet-5-5');
+});
+
+test('the CLI never sees a metered key or an inherited Claude Code session', () => {
+  const env = subscriptionEnv({ PATH: '/bin', ANTHROPIC_API_KEY: 'x', ANTHROPIC_AUTH_TOKEN: 'y', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', HOME: '/h' });
+  assert.deepEqual(env, { PATH: '/bin', HOME: '/h' });
+});
+
+test('agreement: equal reads post as read; any difference on the scene or a state value becomes unknown with one question naming both values', () => {
+  const a = verdict(), b = verdict();
+  const same = agreeVerdicts(a, b);
+  assert.deepEqual([same.agreed, same.disagreements, same.errors, same.verdict], [true, [], [], a]);
+  const first = verdict({ scene_type: 'engine_bay', open_questions: ['Which year is the block?'] }, { rust_severity: 'none', paint_state: 'clear', completeness: 'assembled' });
+  const second = verdict({ scene_type: 'undercarriage' }, { rust_severity: 'surface', paint_state: 'clear', completeness: 'partial' });
+  const snapshot = JSON.stringify([first, second]);
+  const r = agreeVerdicts(first, second);
+  assert.equal(JSON.stringify([first, second]), snapshot, 'neither read is changed');
+  assert.equal(r.agreed, false);
+  assert.deepEqual(r.disagreements.map((d) => [d.field, d.first, d.second]), [['scene_type', 'engine_bay', 'undercarriage'], ['rust_severity', 'none', 'surface'], ['completeness', 'assembled', 'partial']]);
+  assert.equal(r.verdict.scene_type, 'unknown');
+  assert.deepEqual(r.verdict.state_observations, { rust_severity: 'unknown', paint_state: 'clear', completeness: 'unknown', damage_callouts: [] }, 'the agreed value stays');
+  assert.equal(r.verdict.open_questions.length, 1 + 3, 'the first read\'s own question is kept; one entry per disputed field');
+  assert.match(r.verdict.open_questions[1], /scene_type: engine_bay vs undercarriage/);
+  assert.match(r.verdict.open_questions[2], /rust_severity: none vs surface/);
+  assert.match(r.verdict.open_questions[3], /completeness: assembled vs partial/);
+  assert.deepEqual(r.errors, [], 'the merged verdict passes validateVerdict');
+  // everything else is the first read, untouched
+  assert.deepEqual({ ...r.verdict, scene_type: first.scene_type, state_observations: first.state_observations, open_questions: first.open_questions }, first);
+  assert.deepEqual(validateVerdict(r.verdict), []);
+});
+
+test('agreement: a merged verdict that fails the contract is reported, not posted', () => {
+  const bad = verdict({ components_seen: [{ label: 'x', confidence: 0.5, bbox: [0, 0, 5000, 5], part_number_guess: null }] });
+  assert.ok(agreeVerdicts(bad, bad).errors.length > 0);
+});
+
+test('provenance tells an automatic reading from the three-pass reviewed one', () => {
+  const p = automaticProvenance({ model: 'claude-sonnet-5-5', runId: 'claude-cli-fire-x', durationMs: 41234.6 });
+  assert.deepEqual(p, { agent_model: 'claude-sonnet-5-5', agent_tier: 'subscription automatic', extraction_method: 'claude-cli two independent passes, agreed values only, pixels only, v1',
+    run_id: 'claude-cli-fire-x', agent_duration_ms: 41235, agent_cost_cents: null, cost_basis: p.cost_basis });
+  assert.match(p.cost_basis, /nothing is billed per photo/);
+  assert.equal([AUTOMATIC_TIER, AUTOMATIC_METHOD].join('|'), 'subscription automatic|claude-cli two independent passes, agreed values only, pixels only, v1');
+  assert.notEqual(newRunId(new Date('2026-11-20T18:00:00Z'), () => 'a'), newRunId(new Date('2026-11-20T18:10:00Z'), () => 'a'), 'unique per fire');
+  assert.match(newRunId(), /^claude-cli-fire-\d{8}T\d{6}Z-[a-z0-9]+$/);
+});
+
+test('the envelope is the existing one: verdict, the source as snapshotted and as fetched, the provenance, and nothing else', () => {
+  const row = { image_url: 'https://example.test/a.jpg', updated_at: '2026-11-20T18:00:00.123456+00:00' };
+  const e = buildEnvelope({ verdict: verdict(), row, reviewedUrl: row.image_url, sha256: 'b'.repeat(64), reviewedAt: '2026-11-20T18:05:00.000Z',
+    provenance: automaticProvenance({ model: DEFAULT_MODEL, runId: 'r', durationMs: 1000 }) });
+  assert.deepEqual(Object.keys(e), ['action', 'verdict', 'source', 'provenance']);
+  assert.equal(e.action, 'record_reviewed_analysis');
+  assert.deepEqual(e.source, { image_url: row.image_url, expected_updated_at: row.updated_at, reviewed_url: row.image_url, reviewed_sha256: 'b'.repeat(64), reviewed_at: '2026-11-20T18:05:00.000Z' });
+  assert.deepEqual(Object.keys(e.provenance).sort(), ['agent_cost_cents', 'agent_duration_ms', 'agent_model', 'agent_tier', 'cost_basis', 'extraction_method', 'run_id']);
+  assert.equal(e.provenance.agent_cost_cents, null);
+});
+
+test('a photo that no longer satisfies the intake is not read', () => {
+  const ok = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg', vision_gate_status: 'approved', image_vehicle_match_status: 'match' };
+  assert.equal(eligibilityHold(ok), null);
+  assert.equal(eligibilityHold({ ...ok, vision_gate_status: null }), null, 'a missing gate reads as approved, as the SQL does');
+  for (const [over, why] of [[{ vehicle_id: null }, 'unfiled'], [{ vision_gate_status: 'rejected_personal' }, 'gate_not_approved'], [{ vision_gate_status: 'pending' }, 'gate_not_approved'],
+    [{ is_document: true }, 'document'], [{ doc_flag: true }, 'document'], [{ is_sensitive: true }, 'sensitive'], [{ is_duplicate: true }, 'duplicate'], [{ is_superseded: true }, 'superseded'],
+    [{ image_vehicle_match_status: 'mismatch' }, 'vehicle_mismatch'], [{ image_vehicle_match_status: 'unrelated' }, 'vehicle_mismatch'],
+    [{ image_url: 'http://example.test/a.jpg' }, 'image_url_not_https'], [{ deep_scene: 'engine_bay' }, 'already_read']]) {
+    assert.equal(eligibilityHold({ ...ok, ...over }), why, JSON.stringify(over));
+  }
+  assert.equal(eligibilityHold(null), 'photo_not_found');
+});
+
+test('one CLI answer: valid on its own means the grammar, the identity and validateVerdict', () => {
+  const ids = { imageId: IMAGE, vehicleId: VEHICLE };
+  assert.equal(verdictFromCliOutput(cli(verdict()), ids).verdict.scene_type, 'body_exterior');
+  const inText = JSON.stringify({ is_error: false, result: `Here: ${JSON.stringify({ verdicts: [verdict()] })}` });
+  assert.equal(verdictFromCliOutput(inText, ids).verdict.image_id, IMAGE, 'an answer in the result text is read when structured_output is absent');
+  for (const [out, why] of [['not json', /no JSON/], [cli(verdict({ image_id: '99999999-0000-4000-8000-000000000009' })), /another photo/],
+    [cli(verdict({ components_seen: [{ label: 'x', confidence: 0.5, bbox: [0, 0, 1500, 5], part_number_guess: null }] })), /fails the contract/],
+    [JSON.stringify({ structured_output: { verdicts: [verdict(), verdict()] } }), /single verdict/], [JSON.stringify({ result: 'I could not decide.' }), /no JSON/]]) {
+    assert.throws(() => verdictFromCliOutput(out, ids), (e) => e.invalidOutput === true && why.test(e.message), String(out).slice(0, 40));
+  }
+  assert.throws(() => verdictFromCliOutput(JSON.stringify({ is_error: true, api_error_status: 429, result: 'You\'ve hit your 5-hour limit' }), ids), (e) => e.apiStatus === 429);
+});
+
+test('a failed read is tried once more; a fault that is the batch\'s is not', async () => {
+  const ids = { imageId: IMAGE, vehicleId: VEHICLE };
+  let calls = 0;
+  const flaky = async () => (++calls === 1 ? 'no json' : cli(verdict()));
+  const r = await readOnce({ ask: flaky, ids });
+  assert.deepEqual([calls, r.stats.attempts, r.stats.input_tokens, r.stats.output_tokens, r.stats.notional_cost_usd, r.stats.model], [2, 2, 32004, 1300, 0.0412, 'claude-sonnet-5-5']);
+  calls = 0;
+  await assert.rejects(readOnce({ ask: async () => { calls++; return 'no json'; }, ids }), (e) => e.invalidOutput === true);
+  assert.equal(calls, 2, 'one retry, no more');
+  calls = 0;
+  await assert.rejects(readOnce({ ask: async () => { calls++; return JSON.stringify({ is_error: true, api_error_status: 429, result: 'You\'ve hit your 5-hour limit' }); }, ids }), (e) => e.apiStatus === 429);
+  assert.equal(calls, 1, 'a usage limit is not retried');
+  calls = 0;
+  await assert.rejects(readOnce({ ask: async () => { calls++; throw Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' }); }, ids }), /ENOENT/);
+  assert.equal(calls, 1, 'a missing CLI is not retried');
+});
+
+// --- a whole photo, with stand-ins ---------------------------------------------------------------------------------
+
+function frameDeps({ row = {}, answers = [], orchestrator = async () => ({ http: 200, success: true, observation_id: '30000000-0000-4000-8000-000000000001' }), download = { ok: true, status: 200 }, snapshotFails = false } = {}) {
+  const calls = { rest: [], ask: [], orchestrator: [], order: [] };
+  const base = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg', updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null, deep_scene: null,
+    is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, doc_flag: null, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...row };
+  let n = 0;
+  return { calls, deps: {
+    rest: async (q) => { calls.order.push('snapshot'); calls.rest.push(q); if (snapshotFails) throw new Error('503'); return [base]; },
+    fetchBytes: async (url) => { calls.order.push('download'); return download.ok ? { ok: true, status: 200, bytes: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) } : download; },
+    convert: async (raw) => raw.replace(/\.[^.]+$/, '.jpg'),
+    ask: async (argv, text, cwd) => { calls.order.push('read'); calls.ask.push({ argv, text, cwd }); const a = answers[n++ % answers.length]; if (a instanceof Error) throw a; return typeof a === 'function' ? a() : a; },
+    orchestrator: async (body) => { calls.order.push('post'); calls.orchestrator.push(body); return orchestrator(body); },
+  } };
+}
+const opts = (dir, extra = {}) => ({ dir, contract: 'CONTRACT TEXT', model: DEFAULT_MODEL, runId: 'claude-cli-fire-test', reader: 'claude-cli claude-sonnet-5-5 subscription', now: () => new Date('2026-11-20T18:05:00Z'), ...extra });
+const withDir = async (fn) => { const dir = mkdtempSync(join(tmpdir(), 'deep-stage-test-')); try { return await fn(dir); } finally { rmSync(dir, { recursive: true, force: true }); } };
+const frame = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg' };
+
+test('two agreeing reads: the row is snapshotted before the download, both reads use the lean call, the envelope is posted, the receipt succeeds with the cost in its detail', () => withDir(async (dir) => {
+  const { deps, calls } = frameDeps({ answers: [cli(verdict()), cli(verdict())] });
+  const r = await deepReadFrame(frame, deps, opts(dir));
+  assert.deepEqual(calls.order, ['snapshot', 'download', 'read', 'read', 'post'], 'snapshot, then bytes, then both reads, then the intake');
+  assert.match(calls.rest[0], /select=id,vehicle_id,image_url,updated_at,/);
+  assert.match(calls.rest[0], /id=eq\.10000000-0000-4000-8000-000000000001$/);
+  assert.equal(calls.ask.length, 2);
+  for (const a of calls.ask) {
+    assert.equal(a.cwd, dir);
+    assert.deepEqual(JSON.parse(a.argv[a.argv.indexOf('--json-schema') + 1]), stageSchema('verdicts'));
+    assert.ok(a.argv.includes('--safe-mode'));
+    assert.match(a.text, /CONTRACT TEXT/);
+    assert.match(a.text, new RegExp(`The image is the file at ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/${IMAGE}\\.jpg`));
+  }
+  assert.equal(calls.orchestrator.length, 1);
+  const e = calls.orchestrator[0];
+  assert.equal(e.action, 'record_reviewed_analysis');
+  assert.deepEqual({ ...e.source, reviewed_sha256: undefined }, { image_url: 'https://example.test/a.jpg', expected_updated_at: '2026-11-20T18:00:00.123456+00:00', reviewed_url: 'https://example.test/a.jpg',
+    reviewed_sha256: undefined, reviewed_at: '2026-11-20T18:05:00.000Z' });
+  assert.equal(e.source.reviewed_sha256, createHash('sha256').update(Buffer.from([0xff, 0xd8, 0xff, 0xd9])).digest('hex'), 'the hash of the bytes fetched');
+  assert.equal(e.provenance.agent_tier, 'subscription automatic');
+  assert.equal(e.provenance.agent_model, 'claude-sonnet-5-5');
+  assert.equal(e.provenance.run_id, 'claude-cli-fire-test');
+  assert.equal(r.receipt.outcome, 'succeeded');
+  assert.equal(r.receipt.detail.observation_id, '30000000-0000-4000-8000-000000000001');
+  assert.equal(r.receipt.detail.agreed, true);
+  assert.equal(r.receipt.detail.reads.length, 2);
+  assert.deepEqual([r.receipt.detail.reads[0].input_tokens, r.receipt.detail.reads[0].output_tokens, r.receipt.detail.reads[0].notional_cost_usd], [32004, 1300, 0.0412]);
+  assert.deepEqual(r.receipt.detail.reads[0].state, { scene_type: 'body_exterior', rust_severity: 'none', paint_state: 'aged', completeness: 'assembled' });
+  assert.equal(/input_tokens|output_tokens|total_cost|notional_cost_usd/.test(JSON.stringify(e)), false, 'cost and tokens are in the receipt, not the testimony');
+  assert.deepEqual(readdirSync(dir), [], 'the downloaded bytes are removed');
+}));
+
+test('two disagreeing reads: the unknown is posted, the receipt keeps both reads\' raw values', () => withDir(async (dir) => {
+  const { deps, calls } = frameDeps({ answers: [cli(verdict({}, { rust_severity: 'none', paint_state: 'clear' })), cli(verdict({}, { rust_severity: 'surface', paint_state: 'clear' }))] });
+  const r = await deepReadFrame(frame, deps, opts(dir));
+  const posted = calls.orchestrator[0].verdict;
+  assert.equal(posted.state_observations.rust_severity, 'unknown');
+  assert.equal(posted.state_observations.paint_state, 'clear');
+  assert.equal(posted.open_questions.length, 1);
+  assert.equal(r.receipt.outcome, 'succeeded');
+  assert.deepEqual([r.receipt.detail.agreed, r.receipt.detail.disagreements], [false, ['rust_severity']]);
+  assert.deepEqual(r.receipt.detail.values.rust_severity, { first: 'none', second: 'surface' });
+}));
+
+test('fewer than two valid reads posts nothing and the receipt is a retryable one', () => withDir(async (dir) => {
+  // the second read is invalid twice (original and the one retry)
+  const bad = cli(verdict({ components_seen: [{ label: 'x', confidence: 0.5, bbox: [0, 0, 1500, 5], part_number_guess: null }] }));
+  const { deps, calls } = frameDeps({ answers: [cli(verdict()), bad, bad] });
+  const r = await deepReadFrame(frame, deps, opts(dir));
+  assert.equal(calls.orchestrator.length, 0, 'nothing posted');
+  assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.receipt.retry_after_seconds], ['unavailable', 'reader_output_invalid', 1800]);
+  assert.equal(r.receipt.detail.no_two_valid_reads, true);
+  assert.equal(r.valid, false);
+}));
+
+test('one failed read is retried once and the photo still posts', () => withDir(async (dir) => {
+  const answers = ['no json', cli(verdict()), cli(verdict())];
+  let i = 0;
+  const { deps, calls } = frameDeps({ answers: [() => answers[i++]] });
+  const r = await deepReadFrame(frame, deps, opts(dir));
+  assert.equal(calls.ask.length, 3);
+  assert.equal(r.receipt.outcome, 'succeeded');
+  assert.deepEqual(r.receipt.detail.reads.map((x) => x.attempts).sort(), [1, 2]);
+}));
+
+test('a usage limit mid-photo stops the batch and posts nothing', () => withDir(async (dir) => {
+  const limit = JSON.stringify({ is_error: true, api_error_status: 429, result: 'You\'ve hit your 5-hour limit' });
+  const { deps, calls } = frameDeps({ answers: [limit] });
+  const r = await deepReadFrame(frame, deps, opts(dir));
+  assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.stop, calls.orchestrator.length], ['rate_limited', 'reader_usage_limit', true, 0]);
+}));
+
+test('a photo that moved or left is a policy skip and spends no read; bytes that will not download are the download receipts', () => withDir(async (dir) => {
+  for (const [row, why] of [[{ is_document: true }, 'document'], [{ vehicle_id: null }, 'unfiled'], [{ vision_gate_status: 'rejected_personal' }, 'gate_not_approved'], [{ is_sensitive: true }, 'sensitive'], [{ deep_scene: 'body_exterior' }, 'already_read']]) {
+    const { deps, calls } = frameDeps({ row, answers: [cli(verdict())] });
+    const r = await deepReadFrame(frame, deps, opts(dir));
+    assert.deepEqual([r.receipt.outcome, r.receipt.detail.skipped, calls.order], ['policy_skip', why, ['snapshot']], why);
+  }
+  let { deps } = frameDeps({ download: { ok: false, status: 404 }, answers: [cli(verdict())] });
+  let r = await deepReadFrame(frame, deps, opts(dir));
+  assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.receipt.http_status], ['blocked_input', 'image_http_error', 404]);
+  ({ deps } = frameDeps({ snapshotFails: true, answers: [] }));
+  r = await deepReadFrame(frame, deps, opts(dir));
+  assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.stop], ['unavailable', 'review_source_unavailable', false], 'a failed snapshot does not end the batch');
+}));
+
+test('every answer of the intake becomes a typed receipt', () => withDir(async (dir) => {
+  const run = async (intake) => (await deepReadFrame(frame, frameDeps({ answers: [cli(verdict())], orchestrator: async () => intake }).deps, opts(dir)));
+  const row = async (intake) => { const r = (await run(intake)).receipt; return [r.outcome, r.error_class ?? r.detail.skipped ?? null, r.retry_after_seconds ?? null, r.stop ?? false]; };
+  assert.deepEqual(await row({ http: 200, success: true, observation_id: 'o' }), ['succeeded', null, null, false]);
+  for (const code of ['review_source_changed', 'review_projection_refused', 'review_projection_not_persisted']) {
+    assert.deepEqual(await row({ http: 409, success: false, error: code }), ['unavailable', code, 120, false], code);
+  }
+  assert.deepEqual(await row({ http: 409, success: false, error: 'review_source_withdrawn' }), ['policy_skip', 'review_source_withdrawn', null, false]);
+  for (const code of ['invalid_review_envelope', 'invalid_review_verdict', 'invalid_review_camera', 'invalid_review_regions', 'invalid_review_source', 'review_too_large']) {
+    assert.deepEqual(await row({ http: 400, success: false, error: code }), ['unavailable', 'reader_output_invalid', 1800, false], code);
+  }
+  assert.deepEqual(await row({ http: 403, success: false, error: 'review_requires_service_role' }), ['unavailable', 'orchestrator_unauthorized', 900, true]);
+  assert.deepEqual(await row({ http: 401, error: 'unauthorized' }), ['unavailable', 'orchestrator_unauthorized', 900, true]);
+  assert.deepEqual(await row({ http: 429 }), ['rate_limited', 'orchestrator_rate_limited', 900, false]);
+  for (const [http, code] of [[503, 'review_source_unavailable'], [502, 'review_observation_not_persisted'], [500, 'review_persistence_failed']]) {
+    assert.deepEqual(await row({ http, success: false, error: code }), ['unavailable', code, 900, false], code);
+  }
+  assert.deepEqual(await row({ http: 0, error: 'orchestrator_request_error' }), ['unavailable', 'orchestrator_request_error', 900, false]);
+}));
+
+test('a dry run does everything but the post, may read a photo that already holds a reading, and hands back the exact envelope', () => withDir(async (dir) => {
+  const { deps, calls } = frameDeps({ row: { deep_scene: 'engine_bay' }, answers: [cli(verdict()), cli(verdict())] });
+  const r = await deepReadFrame(frame, deps, opts(dir, { post: false }));
+  assert.equal(calls.orchestrator.length, 0);
+  assert.equal(r.valid, true);
+  assert.equal(r.receipt, null);
+  assert.equal(r.envelope.action, 'record_reviewed_analysis');
+  assert.equal(r.agreement.agreed, true);
+}));
+
+// --- keyed values ---------------------------------------------------------------------------------------------------
+
+test('keyed values call the sanctioned projection for exactly this photo and map its receipt', async () => {
+  // a database with no reading for the photo: the projection runs, finds nothing, the receipt says so (retryable)
+  const queries = [];
+  const builder = (table) => { const b = { select: () => b, eq: (k, v) => { queries.push([table, 'eq', k, v]); return b; }, lt: () => b, in: (k, v) => { queries.push([table, 'in', k, v]); return b; },
+    or: () => b, order: () => b, limit: () => b, abortSignal: () => b, then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; };
+  const r = await keyedValuesForFrame({ id: IMAGE, vehicle_id: VEHICLE }, { sb: { from: builder }, reader: 'r' });
+  assert.deepEqual(queries.filter((q) => q[2] === 'structured_data->>image_id'), [['vehicle_observations', 'in', 'structured_data->>image_id', [IMAGE]]]);
+  assert.ok(queries.some((q) => q[2] === 'vehicle_id' && q[3] === VEHICLE));
+  assert.ok(queries.some((q) => q[2] === 'is_superseded' && q[3] === false), 'only the current reading');
+  assert.deepEqual([r.receipt.outcome, r.receipt.error_class], ['unavailable', 'reading_not_found']);
+  assert.equal(r.projection.model_calls, 0);
+  // the projection could not even read: retried later, never thrown at the fire
+  const down = await keyedValuesForFrame({ id: IMAGE, vehicle_id: VEHICLE }, { sb: { from: () => { throw new Error('boom'); } }, reader: 'r' });
+  assert.deepEqual([down.receipt.outcome, down.receipt.error_class], ['unavailable', 'projection_error']);
+});
+
+test('a stage summary counts receipts in fixed words only', () => {
+  const s = newStageSummary();
+  countReceipt(s, { outcome: 'succeeded', detail: {} });
+  countReceipt(s, { outcome: 'policy_skip', detail: { skipped: 'receipt_document' } });
+  countReceipt(s, { outcome: 'unavailable', error_class: 'reader_output_invalid $(rm -rf /)', detail: {} });
+  assert.deepEqual([s.succeeded, s.policy_skip, s.unavailable], [1, 1, 1]);
+  assert.deepEqual(s.skip_reasons, { receipt_document: 1 });
+  assert.deepEqual(Object.keys(s.error_classes), ['reader_output_invalid___rm_-rf___']);
+});
+
+test('what the intake would refuse is left out of a read before it is judged: empty optional text, and camera numbers no source supports', () => {
+  const v = verdict({ agent_notes: '', open_questions: ['', 'Which year?'], camera_pose: { method: 'm', framing: 'f', azimuth_deg: 45, elevation_deg: 10, distance_est: 'about 5 meters', exif_present: true },
+    workshop_signals: { tools_visible: ['', 'jack'], fixturing: 'unknown', weld_quality: '', lighting: 'good' }, presence: { person: false, dog: false, place_hint: '' } });
+  const out = intakeShape(v);
+  assert.equal('agent_notes' in out, false);
+  assert.deepEqual([out.open_questions, out.workshop_signals.tools_visible, 'weld_quality' in out.workshop_signals, out.presence.place_hint], [['Which year?'], ['jack'], false, null]);
+  assert.deepEqual(out.camera_pose, { method: 'm', framing: 'f', azimuth_deg: null, elevation_deg: null, distance_est: null, exif_present: null });
+  assert.equal(v.agent_notes, '', 'the input is not changed');
+  assert.deepEqual(validateVerdict(out), []);
+  assert.deepEqual(verdictFromCliOutput(cli(v), { imageId: IMAGE, vehicleId: VEHICLE }).verdict, out, 'a read is shaped as it is accepted');
+});
