@@ -12,7 +12,7 @@ import type { DayDocument } from './VehicleDayDrawer';
 import { useVehicleWorkOrderFinancials, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
 import { useVisualWork } from './hooks/useVisualWork';
 import { VisualWorkCards } from './VisualWorkCards';
-import { useBuildReconstruction } from './hooks/useBuildReconstruction';
+import { useBuildReconstruction, usePartEvidence } from './hooks/useBuildReconstruction';
 import { BuildRecord } from './BuildRecord';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
@@ -218,6 +218,7 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
 function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords>; work?: ReturnType<typeof useVisualWork> }) {
   const { user, loading } = useAuthContext();
   const build = useBuildReconstruction(vehicleId);
+  const partEvidence = usePartEvidence(vehicleId, !!build.data);
   const [vendor, setVendor] = useState('');
   const [showAll, setShowAll] = useState(false);
   const rows = (loading || read.isError ? [] : read.rows)
@@ -236,7 +237,7 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
       {rows.length > 0 && <a href="#build-receipt-pages">Receipts ({rows.length}{read.hasNextPage ? '+' : ''})</a>}
       {!!work?.rows.length && <a href="#build-work-photos">Work photos</a>}
     </nav>}
-    {build.data && <BuildRecord record={build.data} />}
+    {build.data && <BuildRecord record={build.data} evidence={partEvidence.data} />}
     {work && <VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger}
       components={loading ? null : work.components} renderSource={line => line.source_url_sha256 ? <ReceiptSource
       key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}

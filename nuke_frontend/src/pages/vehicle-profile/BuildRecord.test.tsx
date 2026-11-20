@@ -80,6 +80,16 @@ describe('BuildRecord', () => {
     expect(renderToStaticMarkup(<BuildRecord record={record(false)} />)).toMatch(/id="build-[a-z_]+"/);
     expect(renderToStaticMarkup(<TokenBuildRecord record={record(false)} dimension="engine" />)).not.toMatch(/id="build-/);
   });
+  it('marks a bought part that a photograph shows on the car, and says nothing for one that none shows', () => {
+    const base = record(false);
+    const part = base.systems.flatMap(system => system.lines ?? []).find(line => line.kind === 'part')!;
+    const html = renderToStaticMarkup(<BuildRecord record={base} evidence={{ limitation: 'x', totals: { part_lines: 3, lines_seen: 1, lines_not_photographed: 2 },
+      lines: [{ item_id: part.item_id, status: 'seen', seen_images: 2, first_day: '2026-10-28', last_day: '2026-10-28', seen: [{ image_id: 'p1', image_url: 'https://x.test/1.jpg' }] }] }} />);
+    expect(html).toContain('Seen on the car in 2 photos, Oct 2026');
+    expect(html.match(/vp-build-seen/g)).toHaveLength(1);
+    expect(html).toContain('1 of 3 bought parts are named in a photograph of the finished car');
+    expect(renderToStaticMarkup(<BuildRecord record={base} />)).not.toContain('vp-build-seen');
+  });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;
     expect(renderToStaticMarkup(<BuildRecord record={empty} />)).toBe('');

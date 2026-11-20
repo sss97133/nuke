@@ -34,3 +34,4 @@
 .vp-build--token { margin: 16px 0 0; }
 .vp-build--token h4 { font-size: 16px; }
 .vp-build-system { scroll-margin-top: 150px; }
+.vp-build-seen { display: block; margin-top: 2px; padding: 0; background: none; border: 0; font: inherit; font-size: 12px; color: var(--success, #4ade80); text-decoration: underline; cursor: pointer; text-align: left; min-height: 24px; }
