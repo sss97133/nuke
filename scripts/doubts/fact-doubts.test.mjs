@@ -122,9 +122,10 @@ test('exported task file carries no earlier value, caption, reader or asker word
 import { selectProvider, scrubbedEnv, parseCliStdout, readCliResult, isUsageLimit, answerJsonFrom, pickGeminiModel, geminiRequest, readGeminiResponse, CLI_ARGS } from './readers.mjs';
 import { reopenForSecondReader } from './answer-fact-doubts.mjs';
 
-test('provider selection: flag wins, else api with a key, else subscription', () => {
+test('provider selection: subscription unless a flag names another', () => {
   assert.equal(selectProvider('gemini', {}), 'gemini');
-  assert.equal(selectProvider(undefined, { CLAUDE_API_KEY: 'x' }), 'api');
+  assert.equal(selectProvider(undefined, { CLAUDE_API_KEY: 'x' }), 'subscription');
+  assert.equal(selectProvider('api', {}), 'api');
   assert.equal(selectProvider(undefined, {}), 'subscription');
   assert.throws(() => selectProvider('openai', {}));
 });

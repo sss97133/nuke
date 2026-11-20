@@ -15,10 +15,11 @@ export const GEMINI_KEY_ENVS = ['GEMINI_API_KEY', 'GOOGLE_AI_API_KEY'];
 export const GEMINI_HOST = 'https://generativelanguage.googleapis.com';
 export const CLI_TIMEOUT_MS = 240_000;
 
-// --provider wins; otherwise api when a key env is set, else subscription.
+// Owner rule (2026-11-08): AI reading runs on the subscription CLI, not a metered key. Subscription is the default;
+// api and gemini run only when --provider names them.
 export function selectProvider(flag, env) {
   if (flag != null) { if (!PROVIDERS.includes(flag)) throw new Error(`--provider must be ${PROVIDERS.join('|')}`); return flag; }
-  return API_KEY_ENVS.some((k) => env[k]) ? 'api' : 'subscription';
+  return 'subscription';
 }
 
 // The subscription CLI must run under the owner's login: no API key, no parent-session markers.
