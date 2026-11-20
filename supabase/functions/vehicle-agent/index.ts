@@ -149,7 +149,9 @@ Deno.serve(async (req) => {
     const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: 1500, ...(model === CLAUDE_FLOOR_MODEL ? { thinking: { type: "between_tools" } } : {}), system, messages }),
+      // Above the floor (Opus 5.5, Fable) the model always thinks and thinking counts against max_tokens, so 1,500
+      // could end before the reply; the floor model runs with thinking off and keeps the 1,500 reply bound.
+      body: JSON.stringify({ model, max_tokens: model === CLAUDE_FLOOR_MODEL ? 1500 : 8000, ...(model === CLAUDE_FLOOR_MODEL ? { thinking: { type: "between_tools" } } : {}), system, messages }),
       signal: AbortSignal.timeout(90_000),
     });
     if (!aiRes.ok) {

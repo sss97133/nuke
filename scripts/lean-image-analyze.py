@@ -96,7 +96,7 @@ def run(args):
             buf = io.BytesIO(); im.save(buf, "JPEG", quality=85)
             b64 = base64.b64encode(buf.getvalue()).decode()
             body = {
-                "model": args.model, "max_tokens": 1024,
+                "model": args.model, "max_tokens": 1024 if args.model == "claude-sonnet-5-5" else 4096,  # others think inside the cap
                 "system": [{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
                 "messages": [{"role": "user", "content": [
                     {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},

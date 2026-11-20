@@ -53,13 +53,21 @@ export function normalizeClaudePayload(payload: Record<string, unknown>): Record
   const out: Record<string, unknown> = { ...payload };
   const model = floorClaudeModel(String(out.model ?? CLAUDE_TOP_MODEL));
   out.model = model;
-  if (model === CLAUDE_FLOOR_MODEL || model === CLAUDE_TOP_MODEL) {
+  // After the floor a Claude id is Sonnet 5.5, an Opus 5 or a Fable/Mythos: all refuse sampling values and a
+  // thinking budget; all but Opus 5 refuse disabled thinking, which is dropped there too (it then thinks).
+  if (/^claude-/.test(model)) {
     delete out.temperature; delete out.top_p; delete out.top_k;
     const thinking = out.thinking as { type?: string } | undefined;
     if (thinking && (thinking.type === "disabled" || thinking.type === "enabled")) delete out.thinking;
+  }
+  if (model === CLAUDE_FLOOR_MODEL || model === CLAUDE_TOP_MODEL) {
     const tc = out.tool_choice as { type?: string } | undefined;
     if (tc && (tc.type === "any" || tc.type === "tool")) out.tool_choice = { type: "auto" };
-    if (model === CLAUDE_FLOOR_MODEL && out.thinking === undefined) out.thinking = { type: "between_tools" };
+    // between_tools (thinking off) is refused at xhigh and max effort; leave thinking adaptive there.
+    const effort = (out.output_config as { effort?: string } | undefined)?.effort;
+    if (model === CLAUDE_FLOOR_MODEL && out.thinking === undefined && effort !== "xhigh" && effort !== "max") {
+      out.thinking = { type: "between_tools" };
+    }
   }
   return out;
 }

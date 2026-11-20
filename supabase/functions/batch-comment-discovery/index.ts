@@ -367,10 +367,12 @@ async function processVehicle(
       },
       body: JSON.stringify({
         model: run.model,
-        max_tokens: 6000,
-        // Output tokens include the model's thinking. At default effort Haiku 5.5 spent all 6,000 before closing the
-        // JSON on 5 of 5 lots (2026-11-12); low effort leaves the budget for the answer.
-        output_config: { effort: "low" },
+        max_tokens: 12000,
+        // Output tokens include the model's thinking. Measured on Sonnet 5.5, 2026-11-20, lots already summarized:
+        // low effort stopped cleanly at 1,936 to 2,452 output tokens (5 of 5 lots) but dropped seller statements a
+        // 57-comment thread holds (new tires, working AC); medium kept them at 2,417 and 3,815 tokens (57 and 200
+        // comments, 20 and 26 s); high used 5,347 on the 200-comment lot. Medium, with room above it.
+        output_config: { effort: "medium" },
         messages: [{ role: "user", content: prompt }],
       }),
     });

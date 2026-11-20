@@ -184,11 +184,12 @@ async function analyzeDocument(imageUrl: string): Promise<DocumentDetectionResul
     try {
       console.log(`🔄 Trying ${provider.name}...`);
       
-      // 10 second timeout per provider
+      // 45 second timeout per provider: a Sonnet 5.5 read of one image with up to 1,500 output tokens does not
+      // finish in 10 (measured 13 to 26 s for 2,000 to 3,800 output tokens on text, 2026-11-20).
       const result = await Promise.race([
         provider.fn(imageUrl),
         new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Provider timeout')), 10000)
+          setTimeout(() => reject(new Error('Provider timeout')), 45000)
         )
       ]);
 
@@ -202,16 +203,10 @@ async function analyzeDocument(imageUrl: string): Promise<DocumentDetectionResul
     }
   }
 
-  // All providers failed - return non-sensitive default
-  console.error('❌ All providers failed, marking as non-sensitive');
-  return {
-    is_sensitive: false,
-    document_type: null,
-    confidence: 0,
-    extracted_data: {},
-    raw_text: '',
-    provider: 'none'
-  };
+  // No provider answered. "Not sensitive" is a reading, and nothing was read: fail, so the caller sees an error
+  // and the image keeps whatever mark it had, instead of being reported clean.
+  console.error('❌ All providers failed; no verdict');
+  throw new Error(`no provider read the image: ${lastError?.message ?? 'unknown'}`);
 }
 
 /**
@@ -337,11 +332,14 @@ async function analyzeWithAnthropic(imageUrl: string): Promise<Omit<DocumentDete
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
-  // Fetch image and convert to base64
-  const imageResponse = await fetch(imageUrl);
-  const imageBuffer = await imageResponse.arrayBuffer();
-  const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-  const mediaType = imageResponse.headers.get('content-type') || 'image/jpeg';
+  // The image goes by address, not as base64: spreading a multi-megabyte photo into String.fromCharCode overflowed
+  // the stack, so that route failed on any full-size photo before the model was asked. A photo in public storage
+  // is asked for as a 1,600 px render (the address heic_render_url() builds): the model cannot read a HEIC
+  // original (400 "file format is invalid or unsupported", measured 2026-11-20) and reads the render in 3 to 8 s.
+  const modelUrl = imageUrl.includes('/storage/v1/object/public/') && !imageUrl.includes('?')
+    ? imageUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') +
+      '?width=1600&height=1600&resize=contain&quality=80'
+    : imageUrl;
 
   const prompt = `Analyze this image for sensitive vehicle documents.
 
@@ -375,11 +373,7 @@ Return ONLY valid JSON:
           content: [
             {
               type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: base64Image
-              }
+              source: { type: 'url', url: modelUrl }
             },
             {
               type: 'text',
@@ -396,25 +390,24 @@ Return ONLY valid JSON:
   }
 
   const data = await response.json();
-  const content = data.content[0]?.text;
-  
-  if (!content) {
-    return {
-      is_sensitive: false,
-      document_type: null,
-      confidence: 0,
-      extracted_data: {},
-      raw_text: ''
-    };
+  // The reply can open with a thinking block, so take the text blocks by type. No text or no JSON is a failed
+  // read, not a "not sensitive" verdict: throw, so the next provider is tried or the call fails.
+  const content = (Array.isArray(data.content) ? data.content : [])
+    .filter((b: any) => b?.type === 'text').map((b: any) => b.text ?? '').join('');
+  if (!content.trim()) {
+    throw new Error(`Anthropic returned no text (stop_reason ${data.stop_reason ?? 'unknown'})`);
   }
 
   // Extract JSON from response (Claude sometimes wraps in markdown)
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   let result;
   try {
-    result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
+    result = JSON.parse(jsonMatch ? jsonMatch[0] : content);
   } catch {
-    return { is_sensitive: false, document_type: null, confidence: 0, extracted_data: {}, raw_text: '' };
+    throw new Error(`Anthropic answer was not JSON (stop_reason ${data.stop_reason ?? 'unknown'})`);
+  }
+  if (typeof result?.is_sensitive !== 'boolean') {
+    throw new Error('Anthropic answer has no is_sensitive verdict');
   }
 
   return {
