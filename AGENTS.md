@@ -210,6 +210,13 @@ machine-layer delivery does not close the unfinished renderer or estimate work.
     connector's caller presented); no argument names a speaker and the service key alone cannot write one. A correction
     or withdrawal is a successor row. Read back with `get_my_owner_statements`. Only the speaker reads these rows
     through the API; do not read them through `q.sh` or another service-key path.
+  - A person's statement about a vehicle (from `20261120100000`): `record_vehicle_statement` stores what a representative,
+    seller's agent, shop, previous owner or the owner said about a car, whole and unsigned, as that person's claim, with
+    speaker_role, statement_kind (assertion, estimate, recollection), the said-on date and an optional target key (pending
+    until the key is ratified). Same speaker rules as `record_owner_statement`; the speaker must be tied to the vehicle, and
+    role `owner` only when the vehicle record names the speaker. The page reads it with `vehicle_statements(vehicle_id)`:
+    words and amounts only for tied viewers, anon sees role, kind, date and "amount private". Never copy a statement or its
+    amount into this repository.
   - No raw INSERT, UPDATE or DELETE on testimony tables.
   - No `DISABLE TRIGGER`.
   - No `statement_timeout = 0`.
