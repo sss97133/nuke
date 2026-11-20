@@ -5,6 +5,7 @@ import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import type { ComponentEvidence, ComponentReading, CostRange, CostTotals, ExpectedAssembly, MasterCostLedger, MasterCostLine, VisualWork } from './hooks/useVisualWork';
 import { supabase } from '../../lib/supabase';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
+import { Seen, SeenContext } from './BuildRecord';
 import './visual-work.css';
 
 const date = (value: string) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -308,10 +309,19 @@ function WorkPhotos({ images }: { images: VisualWork['images'] }) {
   </button>)}</div>;
 }
 
+/** A bought part's standing: what the photograph readings say when they have arrived, the plain caveat when they have not. */
+function materialLabel(seen: React.ContextType<typeof SeenContext>, itemId: string): string {
+  if (!seen) return 'Candidate material · installation not established';
+  const status = seen.get(itemId)?.status;
+  return status === 'seen' ? 'Bought part · seen on the car' : status === 'seen_in_prints_only' ? 'Bought part · seen in prints of older photographs'
+    : 'Bought part · no photograph shows it yet';
+}
+
 export function VisualWorkCards({ rows, ledger, components, renderSource }: {
   rows: VisualWork[]; ledger?: MasterCostLedger | null; components?: ComponentEvidence | null;
   renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode;
 }) {
+  const seen = React.useContext(SeenContext);
   if (ledger?.scenarios.length) {
     const cited = new Set(ledger.scenarios.flatMap(s => s.rows.flatMap(r => r.work_observation_ids)));
     const remaining = rows.filter(work => !cited.has(work.observation_id));
@@ -346,7 +356,8 @@ export function VisualWorkCards({ rows, ledger, components, renderSource }: {
         <div><dt>Paid value</dt><dd>Paid labor {work.paid_labor?.status === 'unreconciled' ? 'not reconciled' : 'not established by these sources'}</dd><small>Receipt charges below remain document amounts.</small></div>
       </dl>
       {work.receipts.length > 0 && <div className="vp-work-materials">{work.receipts.map(line => <div key={line.item_id}>
-        <span>{line.relation === 'candidate_material' ? 'Candidate material · installation not established' : 'Work recorded on the document'}</span>
+        <span>{line.relation === 'candidate_material' ? materialLabel(seen, line.item_id) : 'Work recorded on the document'}</span>
+        {line.relation === 'candidate_material' && <Seen itemId={line.item_id} />}
         <strong>{line.description || line.part_number || 'Receipt line'}</strong>
         <small>{[receiptSupplierLabel(line.vendor), line.part_number, line.quantity != null ? `Qty ${line.quantity}` : null, line.page_date ? date(line.page_date) : null].filter(Boolean).join(' · ')}</small>
         {line.amounts_visible ? line.amount != null && <b>{amount(line.amount, line.currency)} · line charge</b> : <small>Amount visible to owner & contributors</small>}

@@ -22,9 +22,9 @@ const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString(
 const isWork = (line: BuildLine) => line.kind === 'labor' || line.kind === 'service' || line.kind === 'note';
 
 /** item id → the photographs that show that part, when the evidence read has arrived. */
-const SeenContext = React.createContext<Map<string, PartEvidenceLine> | null>(null);
+export const SeenContext = React.createContext<Map<string, PartEvidenceLine> | null>(null);
 
-function Seen({ itemId }: { itemId: string }) {
+export function Seen({ itemId }: { itemId: string }) {
   const seen = React.useContext(SeenContext)?.get(itemId);
   if (!seen || seen.status === 'not_photographed' || !seen.seen?.length) return null;
   return <button type="button" className="vp-build-seen" onClick={() => openVehiclePhoto(seen.seen![0].image_id)}>
