@@ -10,9 +10,52 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const timestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
 const nonempty = value => typeof value === 'string' && value.trim().length > 0;
 const deferred = reason => ({ claims: [], deferred: reason });
+const CHILD_LIMITATION = 'Projection of an existing model reading of one image. Capture and analysis clocks are unverified. Not whole-vehicle condition or independent corroboration.';
+const HASH = /^[0-9a-f]{64}$/;
+const CONTRACT_INTENT_CONFIRM_THRESHOLD = 0.6; // supabase/functions/_shared/byokImageVerdict.mjs INTENT_CONFIRM_THRESHOLD
+
+/**
+ * The reader's own contract makes needs_clarification true whenever the photo's INTENT (why it was taken: labor,
+ * inspection, documentation...) is unknown or under 0.6 (byokImageVerdict.mjs, the labor-value guard). That flag is
+ * about labor attribution, not about what the photo shows. A stored reading whose flag is explained by exactly that
+ * condition is intent-only; a flag beside a confirmed intent has some other cause and stays a hold.
+ */
+export function clarificationIsIntentOnly(data) {
+  return data?.needs_clarification === true &&
+    (data.intent === 'unknown' ||
+     (typeof data.intent === 'string' && data.intent.length > 0 && Number.isFinite(data.intent_confidence) &&
+      data.intent_confidence < CONTRACT_INTENT_CONFIRM_THRESHOLD));
+}
+
+/**
+ * What a projected child may carry: ids, a pointer to its source reading, one enum value, clocks, a fixed sentence.
+ * Never the reader's notes, questions, text regions or any other prose. Returns true only for that exact shape, so a
+ * child that ever picked up free text is refused here before the database is even asked.
+ */
+export function childCarriesOnlyEnumAndPointers(claim) {
+  const d = claim?.structured_data;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
+  const spec = Object.values(IMAGE_PROPERTIES).find(([key]) => key === claim.property_key);
+  if (!spec) return false;
+  const allowed = new Set([claim.property_key, 'image_id', 'property_key', 'analysis_kind', 'projection_version',
+    'source_observation_id', 'source_result_hash', 'source_extraction_method', 'source_model_confidence',
+    'source_recorded_at', 'source_observed_at', 'observed_at_basis', 'capture_at', 'analyzed_at', 'claim_role',
+    'source_family', 'limitation']);
+  if (Object.keys(d).length !== allowed.size || Object.keys(d).some(key => !allowed.has(key))) return false;
+  return spec[1].includes(d[claim.property_key]) && d.property_key === claim.property_key &&
+    UUID.test(d.image_id ?? '') && UUID.test(d.source_observation_id ?? '') && HASH.test(d.source_result_hash ?? '') &&
+    d.analysis_kind === 'image_property_projection' && d.projection_version === PROJECTION_VERSION &&
+    d.claim_role === 'inferred' && d.observed_at_basis === 'source_testimony_recorded_at' &&
+    d.capture_at === null && d.analyzed_at === null && d.source_family === `image:${d.image_id}` &&
+    /^[a-z0-9_.:-]{1,80}$/i.test(d.source_extraction_method ?? '') && Number.isFinite(d.source_model_confidence) &&
+    timestamp(d.source_recorded_at) && (d.source_observed_at === null || timestamp(d.source_observed_at)) &&
+    d.limitation === CHILD_LIMITATION &&
+    claim.raw_source_ref === `vehicle_observations:${d.source_observation_id}` &&
+    claim.kind === 'condition' && nonempty(claim.source_identifier);
+}
 
 /** Read immutable stored testimony, not today's mutable image cache. No inference. */
-export function projectImageProperties(observation, image) {
+export function projectImageProperties(observation, image, { releaseIntentOnlyClarification = false } = {}) {
   const data = observation?.structured_data;
   if (!UUID.test(observation?.id ?? '') || observation?.kind !== 'condition' ||
       observation.is_superseded === true || data?.analysis_kind !== 'image_deep_byok') {
@@ -30,7 +73,11 @@ export function projectImageProperties(observation, image) {
       ['mismatch', 'unrelated'].includes(image.image_vehicle_match_status)) {
     return deferred('image_not_eligible');
   }
-  if (observation.confidence === 'low' || data.needs_review === true || data.needs_clarification === true || data.attribution_doubt) {
+  // The batch intake and the public field reader still hold every needs_clarification reading, so only the
+  // one-at-a-time route may ask for the intent-only release.
+  const clarificationHeld = data.needs_clarification === true &&
+    !(releaseIntentOnlyClarification && clarificationIsIntentOnly(data));
+  if (observation.confidence === 'low' || data.needs_review === true || clarificationHeld || data.attribution_doubt) {
     return deferred('source_requires_review');
   }
   if (!nonempty(observation.agent_model) || !nonempty(observation.extraction_method) ||
@@ -77,11 +124,12 @@ export function projectImageProperties(observation, image) {
         observed_at_basis: 'source_testimony_recorded_at',
         capture_at: null, analyzed_at: null, claim_role: 'inferred',
         source_family: `image:${image.id}`,
-        limitation: 'Projection of an existing model reading of one image. Capture and analysis clocks are unverified. Not whole-vehicle condition or independent corroboration.',
+        limitation: CHILD_LIMITATION,
       },
     });
   }
-  return { claims, deferred: claims.length ? null : 'no_known_scalar_values' };
+  return { claims, deferred: claims.length ? null : 'no_known_scalar_values',
+    ...(data.needs_clarification === true && claims.length ? { released_intent_only_clarification: true } : {}) };
 }
 
 // PostgreSQL retains microseconds; Date.parse alone would accept sub-ms drift.
@@ -242,13 +290,15 @@ const IMAGE_COLUMNS = 'id,vehicle_id,is_sensitive,is_superseded,is_duplicate,is_
  *
  * single: the batch intake takes a public vehicle's listing photos only. This route sends one claim at a time through
  * ingest-observation and reads each row and its witness back, so it serves an owner's own photos. It keeps what the
- * batch intake checks beside that rule: the reading must pass the database's observation_is_public, and a claim
- * that a row already holds (current or superseded) is not sent again.
+ * batch intake checks beside that rule: each child row it would write must pass the database's observation_is_public
+ * on its own (the source reading's prose is not what gets written), and a claim that a row already holds (current or
+ * superseded) is not sent again. Readings flagged needs_clarification only because their intent is unconfirmed are
+ * projected here (the flag is about labor attribution, not about the three values).
  */
 export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, before, apply = false, single = false }) {
   const counts = { sampled_condition_rows: 0, source_rows: 0, eligible_claims: 0 };
   const landed = { inserted: 0, duplicates: 0, verified: 0, failed: 0, unattempted: 0 };
-  const held = { already_projected: 0, already_projected_superseded: 0 };
+  const held = { already_projected: 0, already_projected_superseded: 0, released_intent_only_clarification: 0 };
   const deferred = {};
   const defer = why => { deferred[why] = (deferred[why] || 0) + 1; };
   const signal = () => AbortSignal.timeout(10000);
@@ -276,14 +326,25 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     const byId = new Map(images.data.map(row => [row.id, row]));
     let claims = [];
     for (const source of sources) {
-      const projected = projectImageProperties(source, byId.get(source.structured_data.image_id));
+      const projected = projectImageProperties(source, byId.get(source.structured_data.image_id),
+        { releaseIntentOnlyClarification: single });
       if (projected.deferred) { defer(projected.deferred); continue; }
-      if (single) {   // the batch intake asks the database whether the reading may be shown; so does this route
-        let open;
-        try { open = await sb.rpc('observation_is_public', { p_kind: source.kind, p_data: source.structured_data }).abortSignal(signal()); }
-        catch { open = { error: true }; }
-        if (!open || open.error) { defer('privacy_check_unavailable'); continue; }
-        if (open.data !== true) { defer('source_not_public'); continue; }
+      if (single) {
+        // The batch intake asks the database whether the SOURCE reading may be shown. This route judges what it would
+        // write: the child row, which holds an enum value, ids and a pointer, never the reader's prose. The photo's
+        // own eligibility (sensitive, document, mismatch) was judged above. A child that carries anything else, or
+        // that the database would not show on its own, is refused.
+        let refused = null;
+        for (const claim of projected.claims) {
+          if (!childCarriesOnlyEnumAndPointers(claim)) { refused = 'child_not_public'; break; }
+          let open;
+          try { open = await sb.rpc('observation_is_public', { p_kind: claim.kind, p_data: claim.structured_data }).abortSignal(signal()); }
+          catch { open = { error: true }; }
+          if (!open || open.error) { refused = 'privacy_check_unavailable'; break; }
+          if (open.data !== true) { refused = 'child_not_public'; break; }
+        }
+        if (refused) { defer(refused); continue; }
+        if (projected.released_intent_only_clarification) held.released_intent_only_clarification++;
       }
       claims.push(...projected.claims);
     }
