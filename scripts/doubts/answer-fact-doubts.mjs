@@ -3,7 +3,7 @@
 // an earlier answer, a stored value, a caption or the asker's words). Claims pending doubts (claim_evidence_judgments),
 // builds the blind task from the registry row and the cited frames/lines, asks a Claude vision model for the closed answer,
 // validates it locally, and submits through answer_evidence_judgment. It never lands a fact and writes nowhere else.
-//   cd ~/nuke && dotenvx run --quiet -- node scripts/doubts/answer-fact-doubts.mjs --vehicle <uuid> [--limit N] [--model id] [--dry-run]
+//   cd ~/nuke && dotenvx run --quiet -- node scripts/doubts/answer-fact-doubts.mjs --vehicle <uuid> [--limit N] [--model id] [--key-env NAME] [--reclaim-minutes N] [--dry-run]
 // Claiming is department-wide in the store; the runner refuses to claim while pending doubts of another vehicle exist.
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -37,7 +37,7 @@ export function requestParams(model, task, images) {
 
 export async function main(argv = process.argv.slice(2), env = process.env) {
   const vehicleId = arg(argv, '--vehicle'); const limit = Number(arg(argv, '--limit', 12)); const model = arg(argv, '--model', DEFAULT_MODEL);
-  const dry = argv.includes('--dry-run');
+  const dry = argv.includes('--dry-run'); const reclaim = Number(arg(argv, '--reclaim-minutes', 30)); // a claim older than this is re-claimable (a run that died)
   if (!vehicleId) throw new Error('--vehicle <uuid> required');
   if (!(limit >= 1 && limit <= 50)) throw new Error('--limit must be 1..50');
   const db = client(env); const version = producerVersion(SCRIPT); const runId = randomUUID(); const claimedBy = `${AGENT}:${runId}`;
@@ -56,11 +56,12 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   }
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const { fetchImage } = await import('../photo-work-ledger/read-photos.mjs');
-  const photoKey = env.NUKE_PHOTO_ANTHROPIC_API_KEY; const workspace = photoKey ? env.NUKE_PHOTO_ANTHROPIC_WORKSPACE_ID : undefined;
-  const apiKey = photoKey || env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('no Anthropic key in the environment (NUKE_PHOTO_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY)');
+  // Key: --key-env NAME, else the photo-reading key (with its workspace), else ANTHROPIC_API_KEY, else CLAUDE_API_KEY.
+  const keyEnv = arg(argv, '--key-env', env.NUKE_PHOTO_ANTHROPIC_API_KEY ? 'NUKE_PHOTO_ANTHROPIC_API_KEY' : env.ANTHROPIC_API_KEY ? 'ANTHROPIC_API_KEY' : 'CLAUDE_API_KEY');
+  const apiKey = env[keyEnv]; const workspace = keyEnv === 'NUKE_PHOTO_ANTHROPIC_API_KEY' ? env.NUKE_PHOTO_ANTHROPIC_WORKSPACE_ID : undefined;
+  if (!apiKey) throw new Error(`no Anthropic key in ${keyEnv}`);
   const ai = new Anthropic({ apiKey, maxRetries: 3, ...(workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {}) });
-  const claimed = await db.rpc('claim_evidence_judgments', { p_department: DEPARTMENT, p_question_kind: QUESTION, p_limit: limit, p_claimed_by: claimedBy });
+  const claimed = await db.rpc('claim_evidence_judgments', { p_department: DEPARTMENT, p_question_kind: QUESTION, p_limit: limit, p_claimed_by: claimedBy, p_stale_minutes: reclaim });
   for (const q of claimed) {
     const key = q.params.property_key;
     try {
