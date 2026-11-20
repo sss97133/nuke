@@ -40,6 +40,18 @@ describe('BuildRecord', () => {
     expect(own).toContain('$900.00');
     expect(own).toContain('visible to you only');
   });
+  it('shows a system seen only in photos, with its photographs and no invented paper', () => {
+    const withPhotos = record(false); withPhotos.totals.photo_images = 9;
+    withPhotos.systems.push({ system_key: 'tires', first_day: null, last_day: null, part_lines: 0, backordered_lines: 0, suppliers: [],
+      paper: { lines: 0, lines_without_hours: 0, hours: null, performers: 0, shops: [] }, reference: { hours: null, parts_without_reference: 0, operations: [] },
+      priced_lines: 0, recorded_amount: null, lines: null,
+      photos: { images: 9, readings: 9, first_day: '2026-10-28', last_day: '2026-10-28', sample: [{ image_id: 'p1', image_url: 'https://x.test/1.jpg' }] } });
+    const html = renderToStaticMarkup(<BuildRecord record={withPhotos} />);
+    expect(html).toContain('Wheels &amp; tires');
+    expect(html).toContain('No paper on file');
+    expect(html).toContain('As photographed · 9 photos, Oct 2026');
+    expect(html).toContain('Open Wheels &amp; tires photo');
+  });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;
     expect(renderToStaticMarkup(<BuildRecord record={empty} />)).toBe('');

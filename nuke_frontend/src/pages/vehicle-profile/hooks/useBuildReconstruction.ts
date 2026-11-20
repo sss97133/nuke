@@ -15,12 +15,15 @@ export interface BuildSystem {
   reference: { hours: number | null; parts_without_reference: number;
     operations: { code: string; name: string; hours: number; part_lines: number; basis: 'part_on_receipt' | 'implied_by_machine_shop_work' }[] };
   priced_lines: number; recorded_amount: number | null; lines: BuildLine[] | null;
+  /** Photographs whose part-keyed readings name this system; absent before the reader carries them. */
+  photos?: { images: number; readings: number; first_day: string | null; last_day: string | null;
+    sample: { image_id: string; image_url: string }[] | null } | null;
 }
 export interface BuildReconstruction {
   version: number; as_of: string; amounts_visible: boolean; rule: string; systems_without_paper: string[];
   totals: { lines: number; placed_lines: number; receipts: number; first_day: string | null; last_day: string | null;
     part_lines: number; paper_work_lines: number; paper_hours: number | null; reference_hours: number | null;
-    reference_operations: number; parts_without_reference: number; recorded_amount: number | null };
+    reference_operations: number; parts_without_reference: number; recorded_amount: number | null; photo_images?: number };
   systems: BuildSystem[];
 }
 
