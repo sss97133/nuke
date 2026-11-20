@@ -42,8 +42,8 @@ interface DiscoveryInput {
   dry_run?: boolean;
 }
 
-const ALLOWED_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
-const DEFAULT_MODEL = "claude-haiku-5-5";
+const ALLOWED_MODELS = ["claude-sonnet-5-5", "claude-opus-5-5"];
+const DEFAULT_MODEL = "claude-sonnet-5-5";
 
 const SENTIMENT_PROMPT = `Analyze the sentiment and themes in these observations about a vehicle.
 
@@ -197,8 +197,9 @@ Deno.serve(async (req) => {
       const response = await anthropic.messages.create({
         model,
         max_tokens: 4000,
+        ...(model === "claude-sonnet-5-5" ? { thinking: { type: "between_tools" } } : {}),
         messages: [{ role: "user", content: prompt }]
-      });
+      } as any) as any;
       usage.input_tokens += response.usage.input_tokens;
       usage.output_tokens += response.usage.output_tokens;
       usage.calls++;
@@ -249,8 +250,9 @@ Deno.serve(async (req) => {
       const response = await anthropic.messages.create({
         model,
         max_tokens: 4000,
+        ...(model === "claude-sonnet-5-5" ? { thinking: { type: "between_tools" } } : {}),
         messages: [{ role: "user", content: prompt }]
-      });
+      } as any) as any;
       usage.input_tokens += response.usage.input_tokens;
       usage.output_tokens += response.usage.output_tokens;
       usage.calls++;

@@ -26,7 +26,7 @@ export const SCRIPT = 'scripts/doubts/answer-fact-doubts.mjs';
 export const AGENT = 'fact-doubt-reader';
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 export const IMAGE_EDGE = 1280;
-const PRICES = { 'claude-haiku-4-5': [1, 5], 'claude-sonnet-5-5': [2, 10], 'claude-opus-5-5': [4, 20] };
+const PRICES = { 'claude-sonnet-5-5': [2, 10], 'claude-opus-5-5': [4, 20], 'claude-fable-5-2': [8, 40] }; // USD per MTok, claude-api model table 2026-11-03
 const MAX_IMAGES = 8;
 const CONCURRENCY = 2;
 

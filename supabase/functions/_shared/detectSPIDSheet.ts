@@ -87,7 +87,7 @@ export async function detectSPIDSheet(
     },
     {
       name: 'anthropic',
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-5-5',
       envVar: 'ANTHROPIC_API_KEY',
       fn: extractWithAnthropic
     },
@@ -221,6 +221,7 @@ async function extractWithAnthropic(
     body: JSON.stringify({
       model,
       max_tokens: 2000,
+      thinking: { type: 'between_tools' },
       messages: [
         {
           role: 'user',

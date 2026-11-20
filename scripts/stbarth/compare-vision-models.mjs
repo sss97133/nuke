@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Vision Model Comparison — Haiku vs GPT-4o vs Gemini
+ * Vision Model Comparison — Sonnet 5.5 vs GPT-4o vs Gemini
  *
  * Runs the same 20 publication pages through all 3 models and compares:
  *   - Entity count (brands, locations, people, artworks, businesses)
@@ -13,7 +13,7 @@
  * Usage:
  *   cd /Users/skylar/nuke && dotenvx run -- node scripts/stbarth/compare-vision-models.mjs
  *   dotenvx run -- node scripts/stbarth/compare-vision-models.mjs --pages 10
- *   dotenvx run -- node scripts/stbarth/compare-vision-models.mjs --models haiku,gemini
+ *   dotenvx run -- node scripts/stbarth/compare-vision-models.mjs --models sonnet,gemini
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -47,7 +47,7 @@ function getArg(name, defaultVal) {
   return args[idx + 1];
 }
 const NUM_PAGES = parseInt(getArg('pages', '20'), 10);
-const MODELS_ARG = getArg('models', 'haiku,gpt4o,gemini');
+const MODELS_ARG = getArg('models', 'sonnet,gpt4o,gemini');
 const ENABLED_MODELS = new Set(MODELS_ARG.split(',').map(s => s.trim().toLowerCase()));
 
 // ---------------------------------------------------------------------------
@@ -58,11 +58,11 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
 
 const MODELS = {
-  haiku: {
-    name: 'Claude Haiku 4.5',
-    id: 'claude-haiku-4-5-20251001',
-    enabled: ENABLED_MODELS.has('haiku') && !!ANTHROPIC_KEY,
-    costPerMTok: { input: 0.80, output: 4.00 },
+  sonnet: {
+    name: 'Claude Sonnet 5.5',
+    id: 'claude-sonnet-5-5',
+    enabled: ENABLED_MODELS.has('sonnet') && !!ANTHROPIC_KEY,
+    costPerMTok: { input: 2.00, output: 10.00 },
   },
   gpt4o: {
     name: 'GPT-4o',
@@ -115,7 +115,7 @@ async function callHaiku(base64Data, userPrompt) {
   const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
   const start = Date.now();
   const response = await client.messages.create({
-    model: MODELS.haiku.id,
+    model: MODELS.sonnet.id,
     max_tokens: 4096,
     system: SYSTEM_PROMPT,
     messages: [{
@@ -130,7 +130,7 @@ async function callHaiku(base64Data, userPrompt) {
   const text = response.content.filter(c => c.type === 'text').map(c => c.text).join('');
   const inputTokens = response.usage.input_tokens;
   const outputTokens = response.usage.output_tokens;
-  const cost = (inputTokens * MODELS.haiku.costPerMTok.input + outputTokens * MODELS.haiku.costPerMTok.output) / 1_000_000;
+  const cost = (inputTokens * MODELS.sonnet.costPerMTok.input + outputTokens * MODELS.sonnet.costPerMTok.output) / 1_000_000;
   return { text, inputTokens, outputTokens, cost, duration };
 }
 
@@ -190,7 +190,7 @@ async function callGemini(base64Data, userPrompt) {
   return { text, inputTokens, outputTokens, cost, duration };
 }
 
-const MODEL_CALLERS = { haiku: callHaiku, gpt4o: callGPT4o, gemini: callGemini };
+const MODEL_CALLERS = { sonnet: callHaiku, gpt4o: callGPT4o, gemini: callGemini };
 
 // ---------------------------------------------------------------------------
 // Score extraction results

@@ -14,7 +14,7 @@ function fixture() {
     reserve: async () => { events.push("reserve"); return { status: "reserved" as const, hold_id: "hold" }; },
     settle: async (_db: unknown, _user: string, _hold: string, cents: number) => { events.push(`settle:${cents}`); },
     call: async (config: any) => {
-      equal([config.provider, config.source, config.model], ["anthropic", "system", "claude-haiku-5-5"]);
+      equal([config.provider, config.source, config.model], ["anthropic", "system", "claude-sonnet-5-5"]);
       equal(config.workspaceId, "workspace-fixture");
       events.push("inference");
       return { content: '{"subjects":[]}', usage: { input_tokens: 5000, output_tokens: 300 }, duration_ms: 1 } as any;
@@ -37,7 +37,7 @@ Deno.test("platform reserves before inference and charges only after protected r
   equal((await result.settleBilling!(false)).status, "pending");
   equal(events, ["reserve", "inference"]);
   equal((await result.settleBilling!(true)).status, "settled");
-  equal(events, ["reserve", "inference", "settle:1"]);
+  equal(events, ["reserve", "inference", "settle:2"]);
 });
 
 Deno.test("missing platform configuration never reads a customer key or starts inference", async () => {
@@ -87,7 +87,7 @@ Deno.test("missing usage or failed settlement preserves the interpretation with 
   }
 });
 
-Deno.test("three-frame reading can exceed the old output ceiling within the same two-cent reservation", async () => {
+Deno.test("three-frame reading can exceed the old output ceiling within the same reservation", async () => {
   const { deps, events } = fixture();
   let reserved = 0, outputLimit = 0;
   const result = await platformVisionMultiJSON({}, "owner", {
@@ -100,10 +100,10 @@ Deno.test("three-frame reading can exceed the old output ceiling within the same
         usage: { input_tokens: 8035, output_tokens: 2000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } };
     },
   });
-  equal([reserved, outputLimit], [2, 4096]);
+  equal([reserved, outputLimit], [25, 4096]);
   equal(result.data, { subjects: [] });
   equal((await result.settleBilling!(true)).status, "settled");
-  equal(events, ["settle:1"]);
+  equal(events, ["settle:5"]);
 });
 
 Deno.test("token-limited JSON is never retained as a complete reading or charged and is not retried", async () => {

@@ -51,7 +51,7 @@ struct CommentSummary: Decodable {
     var quotes: [Quote] { (key_quotes ?? []).filter { !$0.quote.isEmpty }.prefix(3).map { $0 } }
     var concerns: [String] { (community_concerns ?? []).map(\.text).filter { !$0.isEmpty }.prefix(3).map { $0 } }
 
-    /// "claude-haiku-5-5 · written Nov 12, 2026 · read 59 of 59 comments", from the stored fields only.
+    /// "claude-sonnet-5-5 · written Nov 12, 2026 · read 59 of 59 comments", from the stored fields only.
     var provenance: String? {
         guard let model = model_used, let day = CommentSummary.day(analyzed_at) else { return nil }
         var parts = ["Stored model interpretation", model, "written \(day)"]

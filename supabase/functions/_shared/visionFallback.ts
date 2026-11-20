@@ -16,7 +16,7 @@
 // When neither YONO nor a user key is available, legacy fallback callers surface
 // "connect your AI subscription to enable analysis" rather than silently spending Nuke's money.
 
-import { callLLM, type LLMConfig } from "./llmProvider.ts";
+import { callLLM, configModel, type LLMConfig } from "./llmProvider.ts";
 import { getUserApiKey } from "./getUserApiKey.ts";
 import { ProviderHTTPError, VisionProviderUnavailable, safeAnthropicUsage, type AnthropicTokenUsage, type CredentialKind, type ProviderDiagnostic } from "./providerDiagnostic.ts";
 import { reserveCredits, settleHold, estimateCents, usageToCents } from "./aiCredits.ts";
@@ -27,7 +27,7 @@ type Provider = "google" | "anthropic" | "openai";
 // Cheapest-first provider preference; each resolved BYOK-first via getUserApiKey.
 const PROVIDER_PREFS: Array<{ provider: Provider; model: string; env: string }> = [
   { provider: "google", model: "gemini-flash-lite-latest", env: "GOOGLE_AI_API_KEY" },
-  { provider: "anthropic", model: "claude-haiku-4-5-20251001", env: "ANTHROPIC_API_KEY" },
+  { provider: "anthropic", model: "claude-sonnet-5-5", env: "ANTHROPIC_API_KEY" },
   { provider: "openai", model: "gpt-4o-mini", env: "OPENAI_API_KEY" },
 ];
 
@@ -47,7 +47,7 @@ async function resolveTiers(supabase: unknown, userId: string | null, getKey = g
       const r = await getKey(supabase, userId, p.provider, p.env);
       // user keys only: the system pool is retired (header)
       if (r.apiKey && r.source === "user") {
-        tiers.push({ provider: p.provider, model: r.modelName || p.model, apiKey: r.apiKey, source: r.source, keySource: r.source,
+        tiers.push({ provider: p.provider, model: configModel(p.provider, r.modelName || p.model), apiKey: r.apiKey, source: r.source, keySource: r.source,
           credentialKind: r.credentialKind });
       } else if (r.userKeyStatus === "lookup_failed") {
         diagnostics.push({ code: "credential_lookup_failed", provider: p.provider, http_status: null, credential_kind: null });
@@ -117,7 +117,7 @@ export async function platformVisionMultiJSON(
   const env = deps.env ?? (name => Deno.env.get(name));
   const apiKey = env("NUKE_PHOTO_ANTHROPIC_API_KEY");
   if (!apiKey) return fail("platform_not_configured");
-  const model = "claude-haiku-5-5";
+  const model = "claude-sonnet-5-5";
   const margin = Number(env("AI_CREDIT_MARGIN") ?? "1.2");
   if (!Number.isFinite(margin) || margin < 1 || margin > 10) return fail("platform_unavailable");
   // Each high-resolution image is capped at4,784 visual tokens. Pinned subject

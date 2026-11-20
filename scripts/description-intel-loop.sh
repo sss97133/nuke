@@ -16,7 +16,7 @@
 #   INTEL_BATCH_SIZE=100     # Vehicles per batch
 #   INTEL_MIN_PRICE=0        # Only analyze vehicles above this price
 #   INTEL_DELAY=1            # Seconds between vehicles
-#   INTEL_LLM_MODEL=haiku    # LLM model (haiku/sonnet)
+#   INTEL_LLM_MODEL=claude-sonnet-5-5    # LLM model (floor: claude-sonnet-5-5)
 #
 
 set -uo pipefail
@@ -31,7 +31,7 @@ STATE_FILE="$LOG_DIR/state.json"
 BATCH_SIZE=${INTEL_BATCH_SIZE:-100}
 MIN_PRICE=${INTEL_MIN_PRICE:-0}
 DELAY=${INTEL_DELAY:-1}
-LLM_MODEL=${INTEL_LLM_MODEL:-haiku}
+LLM_MODEL=${INTEL_LLM_MODEL:-claude-sonnet-5-5}
 
 # Load environment
 cd "$PROJECT_DIR"
@@ -216,7 +216,7 @@ case "${1:-}" in
     echo "Environment:"
     echo "  INTEL_BATCH_SIZE=100   Vehicles per batch"
     echo "  INTEL_MIN_PRICE=0      Min sale price filter"
-    echo "  INTEL_LLM_MODEL=haiku  LLM model"
+    echo "  INTEL_LLM_MODEL=claude-sonnet-5-5  LLM model"
     echo ""
     echo "Context: scripts/rlm/description_intelligence_context.md"
     echo ""

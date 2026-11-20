@@ -8,7 +8,7 @@ produces a per-zone condition report with coverage map.
 
 Modes:
   Local-only (free):  Uses YONO zone classifier + Florence-2 vision heads
-  Hybrid (--cloud):   YONO zones + Claude Haiku vision for arboreal damage/mod taxonomy
+  Hybrid (--cloud):   YONO zones + Claude Sonnet 5.5 vision for arboreal damage/mod taxonomy
 
 Usage:
   /Users/skylar/nuke/yono/.venv/bin/python3 scripts/vehicle-deep-analysis.py --album "1977 K5 Chevrolet Blazer" --sample 50
@@ -246,7 +246,7 @@ class VisionAnalyzer:
 
 
 # ---------------------------------------------------------------------------
-# Cloud Vision Analyzer (Claude Haiku — arboreal taxonomy)
+# Cloud Vision Analyzer (Claude Sonnet 5.5 — arboreal taxonomy)
 # ---------------------------------------------------------------------------
 
 # The full arboreal taxonomy for damage and modifications
@@ -312,7 +312,7 @@ ZONE_ANALYSIS_HINTS = {
 
 
 class CloudVisionAnalyzer:
-    """Uses Claude Haiku vision for comprehensive arboreal damage/modification analysis."""
+    """Uses Claude Sonnet 5.5 vision for comprehensive arboreal damage/modification analysis."""
 
     def __init__(self, vehicle_context: str = ""):
         import anthropic
@@ -322,13 +322,13 @@ class CloudVisionAnalyzer:
             raise RuntimeError("NUKE_CLAUDE_API or ANTHROPIC_API_KEY must be set (sk-ant-*). Run with: dotenvx run -- python3 ...")
         self.client = anthropic.Anthropic(api_key=api_key)
         self.vehicle_context = vehicle_context
-        self.model = "claude-haiku-4-5-20251001"
+        self.model = "claude-sonnet-5-5"
         self.call_count = 0
         self.total_cost = 0.0
         print(f"  Cloud vision analyzer ready (model: {self.model})")
 
     def analyze(self, image_path: str, zone: str = "unknown", zone_confidence: float = 0.0) -> dict:
-        """Send image to Claude Haiku for arboreal analysis. Returns structured findings."""
+        """Send image to Claude Sonnet 5.5 for arboreal analysis. Returns structured findings."""
         # Encode image as base64
         b64 = image_to_base64_thumbnail(image_path, max_width=800)
         if not b64:
@@ -383,6 +383,7 @@ Return ONLY the JSON object, no other text."""
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=1024,
+                extra_body={"thinking": {"type": "between_tools"}},
                 messages=[{
                     "role": "user",
                     "content": [
@@ -403,7 +404,7 @@ Return ONLY the JSON object, no other text."""
             )
 
             self.call_count += 1
-            # Estimate cost: ~$0.001 input + ~$0.002 output for Haiku with image
+            # Estimate cost for Sonnet 5.5 with image
             self.total_cost += 0.003
 
             # Parse JSON from response
@@ -1386,7 +1387,7 @@ def main():
     parser.add_argument("--albums", nargs="+", help="Multiple album names")
     parser.add_argument("--sample", type=int, default=50, help="Photos per album")
     parser.add_argument("--output-dir", default=None, help="Output directory for reports")
-    parser.add_argument("--cloud", action="store_true", help="Enable Claude Haiku vision for arboreal analysis (~$0.003/image)")
+    parser.add_argument("--cloud", action="store_true", help="Enable Claude Sonnet 5.5 vision for arboreal analysis (~$0.003/image)")
     parser.add_argument("--cloud-sample", type=int, default=1, help="Send every Nth image to cloud (cost control, e.g., 2 = every other image)")
     args = parser.parse_args()
 

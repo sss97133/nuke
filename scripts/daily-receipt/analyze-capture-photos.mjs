@@ -47,7 +47,7 @@
  *              --sink /tmp/cap/verdicts.jsonl --worklist /tmp/cap/work.jsonl
  *   run (all phases; recommended):
  *            dotenvx run -- node scripts/daily-receipt/analyze-capture-photos.mjs run \
- *              --user-id <uuid> [--limit 25] [--model claude-sonnet-4-6]
+ *              --user-id <uuid> [--limit 25] [--model claude-sonnet-5-5]
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -76,7 +76,7 @@ const COMPLETE = new Set(['stripped','partial','assembled','unknown']);
 
 const CAPTURE_SOURCE = 'capture_relay_ios';
 const TIER = 1; // BYOK
-const MODEL_DEFAULT = 'claude-sonnet-4-6';
+const MODEL_DEFAULT = 'claude-sonnet-5-5';
 
 const args = process.argv.slice(2);
 const mode = args[0];

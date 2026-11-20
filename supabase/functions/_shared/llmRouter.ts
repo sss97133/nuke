@@ -98,29 +98,13 @@ const QUALITY_ORDER: Record<ModelQuality, number> = {
 };
 
 export const MODEL_REGISTRY: Record<string, ModelEntry> = {
-  "claude-haiku-4-5": {
-    id: "claude-haiku-4-5-20251001",
+  "claude-sonnet-5-5": {
+    id: "claude-sonnet-5-5",
     provider: "anthropic",
-    displayName: "Haiku 4.5",
-    costPerInputMTok: 1.00,
-    costPerOutputMTok: 5.00,
-    maxContext: 200_000,
-    maxOutput: 4096,
-    supportsVision: true,
-    supportsJson: true,
-    speed: "fast",
-    quality: "good",
-    isLocal: false,
-    endpoint: "https://api.anthropic.com/v1/messages",
-    timeoutMs: 30_000,
-  },
-  "claude-sonnet-4-6": {
-    id: "claude-sonnet-4-6",
-    provider: "anthropic",
-    displayName: "Sonnet 4.6",
-    costPerInputMTok: 3.00,
-    costPerOutputMTok: 15.00,
-    maxContext: 200_000,
+    displayName: "Sonnet 5.5",
+    costPerInputMTok: 2.00,
+    costPerOutputMTok: 10.00,
+    maxContext: 1_000_000,
     maxOutput: 8192,
     supportsVision: true,
     supportsJson: true,
@@ -130,13 +114,13 @@ export const MODEL_REGISTRY: Record<string, ModelEntry> = {
     endpoint: "https://api.anthropic.com/v1/messages",
     timeoutMs: 60_000,
   },
-  "claude-opus-4-6": {
-    id: "claude-opus-4-6",
+  "claude-opus-5-5": {
+    id: "claude-opus-5-5",
     provider: "anthropic",
-    displayName: "Opus 4.6",
-    costPerInputMTok: 5.00,
-    costPerOutputMTok: 25.00,
-    maxContext: 200_000,
+    displayName: "Opus 5.5",
+    costPerInputMTok: 4.00,
+    costPerOutputMTok: 20.00,
+    maxContext: 1_000_000,
     maxOutput: 16384,
     supportsVision: true,
     supportsJson: true,
@@ -311,16 +295,16 @@ export const MODEL_REGISTRY: Record<string, ModelEntry> = {
 // ── Task Routing ─────────────────────────────────────────────
 
 const TASK_DEFAULTS: Record<string, { model: string; fallback: string }> = {
-  title_parsing:      { model: "nuke-agent",      fallback: "claude-haiku-4-5" },
-  extraction:         { model: "nuke-agent",      fallback: "claude-haiku-4-5" },
-  quality_review:     { model: "claude-sonnet-4-6", fallback: "kimi-k2.5" },
-  market_strategy:    { model: "kimi-k2.5",       fallback: "claude-opus-4-6" },
+  title_parsing:      { model: "nuke-agent",      fallback: "claude-sonnet-5-5" },
+  extraction:         { model: "nuke-agent",      fallback: "claude-sonnet-5-5" },
+  quality_review:     { model: "claude-sonnet-5-5", fallback: "kimi-k2.5" },
+  market_strategy:    { model: "kimi-k2.5",       fallback: "claude-opus-5-5" },
   batch_enrichment:   { model: "qwen3-30b",       fallback: "nuke-agent" },
   comment_mining:     { model: "nuke-agent",      fallback: "qwen2.5-7b" },
-  image_analysis:     { model: "claude-haiku-4-5", fallback: "gpt-4o" },
-  expert_chat:        { model: "claude-sonnet-4-6", fallback: "kimi-k2.5" },
-  coaching:           { model: "claude-sonnet-4-6", fallback: "kimi-k2.5" },
-  listing_generation: { model: "claude-sonnet-4-6", fallback: "kimi-k2.5" },
+  image_analysis:     { model: "claude-sonnet-5-5", fallback: "gpt-4o" },
+  expert_chat:        { model: "claude-sonnet-5-5", fallback: "kimi-k2.5" },
+  coaching:           { model: "claude-sonnet-5-5", fallback: "kimi-k2.5" },
+  listing_generation: { model: "claude-sonnet-5-5", fallback: "kimi-k2.5" },
   description_discovery: { model: "nuke-agent",   fallback: "qwen2.5-7b" },
 };
 
@@ -366,7 +350,7 @@ export function selectModel(req: TaskRequirements): ModelEntry {
   if (candidates.length > 0) return candidates[0];
 
   // 4. Absolute fallback
-  return MODEL_REGISTRY["claude-haiku-4-5"];
+  return MODEL_REGISTRY["claude-sonnet-5-5"];
 }
 
 function meetsRequirements(model: ModelEntry, req: TaskRequirements): boolean {
@@ -470,9 +454,9 @@ export async function callTier(
   },
 ): Promise<AgentCallResult> {
   const modelMap: Record<AgentTier, string> = {
-    haiku: "claude-haiku-4-5",
-    sonnet: "claude-sonnet-4-6",
-    opus: "claude-opus-4-6",
+    haiku: "claude-sonnet-5-5",
+    sonnet: "claude-sonnet-5-5",
+    opus: "claude-opus-5-5",
   };
 
   const result = await callModel(modelMap[tier], systemPrompt, userMessage, options);
@@ -496,7 +480,7 @@ async function callAnthropic(
   systemPrompt: string,
   userMessage: string,
   maxTokens: number,
-  temperature: number,
+  _temperature: number,
 ): Promise<LLMCallResult> {
   const apiKey = getEnv("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
@@ -511,7 +495,10 @@ async function callAnthropic(
     body: JSON.stringify({
       model: model.id,
       max_tokens: maxTokens,
-      temperature,
+      // Sonnet 5.5 / Opus 5.5 reject non-default sampling params (400), so
+      // `temperature` is intentionally not sent to Anthropic. Sonnet 5.5 rejects
+      // thinking "disabled"; "between_tools" keeps these calls single-shot.
+      ...(model.id === "claude-sonnet-5-5" ? { thinking: { type: "between_tools" } } : {}),
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
     }),
@@ -528,7 +515,7 @@ async function callAnthropic(
   const outputTokens = data.usage?.output_tokens ?? 0;
 
   return {
-    content: data.content?.[0]?.text ?? "",
+    content: (data.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n"),
     provider: "anthropic",
     model: model.id,
     inputTokens,
@@ -745,9 +732,9 @@ export function parseJsonResponse<T = unknown>(raw: string): T {
 export { QUALITY_ORDER as _QUALITY_ORDER };
 
 export const TIER_CONFIGS = {
-  haiku: MODEL_REGISTRY["claude-haiku-4-5"],
-  sonnet: MODEL_REGISTRY["claude-sonnet-4-6"],
-  opus: MODEL_REGISTRY["claude-opus-4-6"],
+  haiku: MODEL_REGISTRY["claude-sonnet-5-5"],
+  sonnet: MODEL_REGISTRY["claude-sonnet-5-5"],
+  opus: MODEL_REGISTRY["claude-opus-5-5"],
 };
 
 export const QUALITY_THRESHOLDS = {
@@ -777,7 +764,7 @@ export function estimateBatchCost(
   avgInputTokens = 1500,
   avgOutputTokens = 500,
 ): { totalCostCents: number; perItemCostCents: number } {
-  const modelMap: Record<AgentTier, string> = { haiku: "claude-haiku-4-5", sonnet: "claude-sonnet-4-6", opus: "claude-opus-4-6" };
+  const modelMap: Record<AgentTier, string> = { haiku: "claude-sonnet-5-5", sonnet: "claude-sonnet-5-5", opus: "claude-opus-5-5" };
   const model = MODEL_REGISTRY[modelMap[tier]];
   const totalInput = itemCount * avgInputTokens;
   const totalOutput = itemCount * avgOutputTokens;

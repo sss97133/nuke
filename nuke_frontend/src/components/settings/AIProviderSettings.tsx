@@ -155,9 +155,8 @@ const AIProviderSettings: React.FC = () => {
     { provider: 'openai' as const, modelName: 'gpt-4o', displayName: 'GPT-4o (Recommended)' },
     { provider: 'openai' as const, modelName: 'gpt-4o-mini', displayName: 'GPT-4o Mini (Cheaper)' },
     { provider: 'openai' as const, modelName: 'gpt-4-turbo', displayName: 'GPT-4 Turbo' },
-    { provider: 'anthropic' as const, modelName: 'claude-3-5-sonnet-20241022', displayName: 'Claude 3.5 Sonnet (Recommended)' },
-    { provider: 'anthropic' as const, modelName: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku (Cheaper)' },
-    { provider: 'anthropic' as const, modelName: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus (Best)' },
+    { provider: 'anthropic' as const, modelName: 'claude-sonnet-5-5', displayName: 'Claude Sonnet 5.5 (Recommended)' },
+    { provider: 'anthropic' as const, modelName: 'claude-opus-5-5', displayName: 'Claude Opus 5.5 (Best)' },
     { provider: 'google' as const, modelName: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro (Recommended)' },
     { provider: 'google' as const, modelName: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash (Cheaper)' }
   ];

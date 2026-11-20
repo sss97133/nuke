@@ -96,7 +96,7 @@ Respond ONLY with valid JSON:
   "reasoning": "..."
 }`
 
-    const llmConfig = await getLLMConfig(supabase, null, 'anthropic', 'claude-haiku-4-5')
+    const llmConfig = await getLLMConfig(supabase, null, 'anthropic', 'claude-sonnet-5-5')
 
     const response = await callLLM(
       llmConfig,

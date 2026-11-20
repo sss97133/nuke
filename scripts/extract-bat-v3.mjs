@@ -14,8 +14,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import pg from 'pg';
 
 const API_KEY = process.env.VITE_NUKE_CLAUDE_API;
-const MODEL = 'claude-haiku-4-5-20251001';
-const CONCURRENCY = 10;  // Haiku can handle parallel requests
+const MODEL = 'claude-sonnet-5-5';
+const CONCURRENCY = 10;  // Sonnet can handle parallel requests
 const DB_HOST = '54.177.55.191'; // Direct IP — DNS is flaky
 
 const anthropic = new Anthropic({ apiKey: API_KEY });
@@ -116,6 +116,7 @@ async function extractVehicle(vehicle, codes, rules) {
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 2048,
+      thinking: { type: 'between_tools' },
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
     });
@@ -138,7 +139,7 @@ async function extractVehicle(vehicle, codes, rules) {
       extraction: parsed,
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
-      cost: (response.usage.input_tokens * 1.0 + response.usage.output_tokens * 5.0) / 1_000_000,
+      cost: (response.usage.input_tokens * 2.0 + response.usage.output_tokens * 10.0) / 1_000_000,
       elapsed_ms: elapsed,
     };
   } catch (err) {

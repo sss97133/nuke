@@ -25,9 +25,20 @@ const PRICING_PER_MTOK: Record<string, { input: number; output: number }> = {
   "claude-opus-4-8":   { input: 15, output: 75 },
   "claude-sonnet-4-6": { input: 3,  output: 15 },
   "claude-haiku-4-5":  { input: 1,  output: 5  },
-  "claude-haiku-5-5":  { input: 0.1, output: 0.5 }, // official short-context price, verified 2026-10-18
+  "claude-haiku-5-5":  { input: 0.1, output: 0.5 }, // official short-context price, verified 2026-10-18 (historical ledger rows only; callers are floored at sonnet-5-5)
+  // Current list prices (USD per 1M tokens), claude-api skill model table cached 2026-11-03.
+  "claude-sonnet-5-5": { input: 2,  output: 10 },
+  "claude-opus-5-5":   { input: 4,  output: 20 },
+  "claude-fable-5-2":  { input: 8,  output: 40 },
+  "claude-fable-5-1":  { input: 10, output: 50 },
+  "claude-fable-5":    { input: 10, output: 50 },
+  "claude-mythos-5-2": { input: 8,  output: 40 },
+  "claude-mythos-5-1": { input: 10, output: 50 },
+  "claude-opus-5":     { input: 5,  output: 25 },
+  "claude-sonnet-5":   { input: 2,  output: 10 },
 };
-const DEFAULT_MODEL = "claude-opus-4-8";
+// An id with no row prices at the dearest row, so a new or unlisted model never under-bills.
+const DEAREST_PRICE = Object.values(PRICING_PER_MTOK).reduce((a, b) => (b.output > a.output ? b : a));
 function platformMargin(): number {
   const margin = Number(Deno.env.get("AI_CREDIT_MARGIN") ?? "1.2");
   if (!Number.isFinite(margin) || margin < 1 || margin > 10) throw new Error("invalid AI credit margin");
@@ -42,7 +53,7 @@ export interface ClaudeUsage {
 /** Convert Anthropic `usage` + model into cents to bill (cost × margin, rounded up). */
 export function usageToCents(model: string, usage: ClaudeUsage, margin = platformMargin()): number {
   if (!Number.isFinite(margin) || margin < 1 || margin > 10) throw new Error("invalid AI credit margin");
-  const p = PRICING_PER_MTOK[model] ?? PRICING_PER_MTOK[DEFAULT_MODEL];
+  const p = PRICING_PER_MTOK[model] ?? DEAREST_PRICE;
   const inTok = usage.input_tokens ?? 0;
   const outTok = usage.output_tokens ?? 0;
   const dollars = ((inTok * p.input) + (outTok * p.output)) / 1_000_000;
