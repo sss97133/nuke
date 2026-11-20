@@ -29,6 +29,25 @@ CREATE FUNCTION public.receipt_work_lines(p_vehicle_id uuid) RETURNS SETOF publi
 
 \ir ../migrations/20261119200000_vehicle_build_reconstruction.sql
 
+-- slice 2 dependencies, as views over fixture tables: photo readings keyed to a part, and the photos they cite
+CREATE TABLE public.fixture_photos(id uuid PRIMARY KEY, vehicle_id uuid, image_url text, taken_at timestamptz, is_sensitive boolean,
+  is_duplicate boolean, is_superseded boolean, eligible boolean DEFAULT true);
+CREATE VIEW public.vehicle_images AS SELECT * FROM public.fixture_photos;
+CREATE FUNCTION public.vehicle_image_gallery_eligible(i public.vehicle_images) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT i.eligible $$;
+CREATE TABLE public.fixture_readings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, extraction_method text,
+  is_superseded boolean, structured_data jsonb);
+CREATE VIEW public.vehicle_observations AS SELECT * FROM public.fixture_readings;
+\ir ../migrations/20261119213000_build_reconstruction_photos.sql
+
+DO $$ BEGIN
+  ASSERT public.photo_part_key_system('undercarriage.steering.linkage') = 'steering';
+  ASSERT public.photo_part_key_system('engine.brake.master.cylinder') = 'brakes';
+  ASSERT public.photo_part_key_system('engine.bay') = 'engine';
+  ASSERT public.photo_part_key_system('wheel') = 'tires';
+  ASSERT public.photo_part_key_system('trim.bumper.front') = 'trim';
+  ASSERT public.photo_part_key_system('undercarriage') IS NULL AND public.photo_part_key_system('document.data.plate') IS NULL;
+END $$;
+
 DO $$ BEGIN
   ASSERT public.receipt_line_system('72-73 UNDERDASH WIRING HRNS') = 'electrical';
   ASSERT public.receipt_line_system('70-73 FIREBIRD TAIL PANEL STEE[L]') = 'body';
@@ -53,6 +72,36 @@ INSERT INTO public.fixture_lines VALUES
   ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b2', 'part', '2024-10-07', 'Machine Shop', 'Valve Job', NULL, 500, NULL, NULL),
   ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b3', 'charge', '2025-01-03', 'Supplier', 'Shipping', NULL, 20, NULL, NULL),
   ('00000000-0000-0000-0000-0000000000a2', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b4', 'part', '2025-01-03', 'Supplier', 'OIL FILTER', 'F1', 9, NULL, NULL);
+
+INSERT INTO public.fixture_photos VALUES
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a1', 'https://x.test/1.jpg', '2026-10-28T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000a1', 'https://x.test/2.jpg', '2026-10-28T17:05:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-0000000000d3', '00000000-0000-0000-0000-0000000000a1', 'https://x.test/3.jpg', '2026-10-28T17:06:00Z', true, false, false, true),
+  ('00000000-0000-0000-0000-0000000000d4', '00000000-0000-0000-0000-0000000000a1', 'https://x.test/4.jpg', '2026-10-28T17:07:00Z', false, false, false, false);
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data) VALUES
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"electrical.harness","image_id":"00000000-0000-0000-0000-0000000000d1"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-0000000000d2"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-0000000000d2"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-0000000000d3"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-0000000000d4"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', true,  '{"part_key":"glass.rear","image_id":"00000000-0000-0000-0000-0000000000d1"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"undercarriage","image_id":"00000000-0000-0000-0000-0000000000d1"}');
+
+DO $$
+DECLARE r jsonb; s jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1');
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'tires';
+  ASSERT (s #>> '{photos,images}')::int = 1 AND (s #>> '{photos,readings}')::int = 2 AND (s ->> 'part_lines')::int = 0 AND s -> 'lines' = 'null'::jsonb,
+    'a system seen only in photos has a row; sensitive and gallery-ineligible photos are not counted: ' || s::text;
+  ASSERT r::text !~ '(3|4)\.jpg', 'hidden photos never leave the reader';
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'electrical';
+  ASSERT (s #>> '{photos,images}')::int = 1 AND (s #>> '{reference,hours}')::numeric = 8.0, 'photos sit beside the paper figures, which do not change';
+  ASSERT NOT EXISTS (SELECT 1 FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'glass'), 'superseded readings are not current';
+  ASSERT (r #>> '{totals,photo_images}')::int = 2;
+  RESET ROLE;
+END $$;
 
 DO $$
 DECLARE r jsonb; s jsonb;
@@ -81,5 +130,6 @@ BEGIN
   ASSERT public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a2') IS NOT NULL, 'owner sees a private vehicle';
 END $$;
 
+DROP FUNCTION public.photo_part_key_system(text);
 \ir revert_20261119200000_vehicle_build_reconstruction.sql
 DO $$ BEGIN ASSERT to_regprocedure('public.vehicle_build_reconstruction(uuid)') IS NULL; END $$;
