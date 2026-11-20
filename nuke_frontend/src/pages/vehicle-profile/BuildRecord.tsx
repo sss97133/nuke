@@ -35,8 +35,8 @@ export function Seen({ itemId }: { itemId: string }) {
 function Lines({ lines, amounts }: { lines: BuildLine[]; amounts: boolean }) {
   return <ul className="vp-build-lines">{lines.map(line => <li key={line.item_id}>
     <span className="vp-build-lines__day">{dayOf(line.day)}</span>
-    <span className="vp-build-lines__what">{line.description ?? line.part_number ?? 'Unreadable line'}
-      <small>{[receiptSupplierLabel(line.source), line.part_number && line.kind !== 'labor' ? `No. ${line.part_number}` : null,
+    <span className="vp-build-lines__what">{line.name ?? line.description ?? line.part_number ?? 'Unreadable line'}
+      <small>{[line.name && line.description ? `Printed as “${line.description}”` : null, receiptSupplierLabel(line.source), line.part_number && line.kind !== 'labor' ? `No. ${line.part_number}` : null,
         line.kind === 'backordered' ? 'backordered, not shipped' : null].filter(Boolean).join(' · ')}</small><Seen itemId={line.item_id} /></span>
     <span className="vp-build-lines__n">{line.paper_hours != null ? hours(line.paper_hours) : ''}{amounts && line.amount != null ? <small>{money(line.amount)}</small> : null}</span>
   </li>)}</ul>;

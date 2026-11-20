@@ -96,6 +96,15 @@ describe('BuildRecord', () => {
     machining.paper.subjects = ['1970 Pontiac Block, Heads, Crank; Engine: 455'];
     expect(renderToStaticMarkup(<BuildRecord record={subject} />)).toContain('Written up by the shop as: “1970 Pontiac Block, Heads, Crank; Engine: 455”');
   });
+  it('leads a line with the supplier product title and keeps the printed words beside it', () => {
+    const named = record(false);
+    const part = named.systems.flatMap(system => system.lines ?? []).find(line => line.kind === 'part')!;
+    const printed = part.description!;
+    part.name = '1970-81 Camaro, Firebird; Upper Rear Body Panel';
+    const html = renderToStaticMarkup(<BuildRecord record={named} />);
+    expect(html).toContain('1970-81 Camaro, Firebird; Upper Rear Body Panel');
+    expect(html).toContain(`Printed as “${printed}”`);
+  });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;
     expect(renderToStaticMarkup(<BuildRecord record={empty} />)).toBe('');
