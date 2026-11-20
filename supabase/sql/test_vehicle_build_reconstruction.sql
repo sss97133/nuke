@@ -52,6 +52,16 @@ INSERT INTO public.fixture_documents VALUES
   ('00000000-0000-0000-0000-0000000000b2', '{"data_v2":{"vehicle_hint":"1970 Pontiac Block, Heads, Crank; Engine: 455"}}');
 \ir ../migrations/20261120030000_build_reconstruction_paper_subjects.sql
 
+-- slice 5 dependency: the stored supplier product title per receipt line, read through receipt_item_product_card
+-- (stubbed over a fixture table; the real reader returns jsonb with the title in name and a quote price beside it)
+CREATE TABLE public.fixture_products(item_id uuid PRIMARY KEY, name text);
+CREATE FUNCTION public.receipt_item_product_card(p_item uuid) RETURNS jsonb LANGUAGE sql STABLE AS
+  $$ SELECT jsonb_build_object('name', f.name, 'quote_price', 99.5, 'part_number', 'P1') FROM public.fixture_products f WHERE f.item_id = p_item $$;
+INSERT INTO public.fixture_products VALUES
+  ('00000000-0000-0000-0000-0000000000e1', '  1970-73 Pontiac Firebird; Rear Light Wiring Harness Assembly  '),
+  ('00000000-0000-0000-0000-0000000000e3', repeat('x', 200));
+\ir ../migrations/20261120040000_build_reconstruction_line_names.sql
+
 DO $$ BEGIN
   ASSERT public.photo_reading_is_print('{"narrative_one_line":"Two printed photographs show rear-quarter surface preparation."}');
   ASSERT public.photo_reading_is_print('{"narrative_one_line":"A sheet.","components_seen":[{"label":"paper sheet containing two printed engine photographs"}]}');
@@ -189,6 +199,43 @@ BEGIN
   ASSERT public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a2') IS NOT NULL, 'owner sees a private vehicle';
 END $$;
 
+-- slice 5: a line carries the stored product title; the printed description is untouched; no price rides along
+INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a3', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL);
+INSERT INTO public.fixture_lines VALUES
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-03', 'Supplier', '70-73 RR LIGHT HRNESS', 'W2', 100, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-03', 'Supplier', '72-73 UNDERDASH WIRING HRNS', 'W1', 300, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-05', 'Supplier', '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727; list 10.15', 'B1', 5, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-05', 'Supplier', 'BATTERY (SSB, 2Y warranty; list $313.54)', 'B2', 5, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-04', 'Supplier', '70-73 LOOP CARPET SET', 'C1', 200, NULL, NULL);
+DO $$
+DECLARE r jsonb; l jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a3');
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'description' = '70-73 RR LIGHT HRNESS';
+  ASSERT l ->> 'name' = '1970-73 Pontiac Firebird; Rear Light Wiring Harness Assembly', 'stored title, trimmed: ' || l::text;
+  ASSERT l ->> 'description' = '70-73 RR LIGHT HRNESS', 'the printed description stays as printed';
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'description' = '72-73 UNDERDASH WIRING HRNS';
+  ASSERT l -> 'name' = 'null'::jsonb, 'no stored product, no name (nothing is guessed): ' || l::text;
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'description' = '70-73 LOOP CARPET SET';
+  ASSERT length(l ->> 'name') = 160, 'title capped at 160 characters';
+  ASSERT r::text !~ '99\.5' AND r::text !~ 'quote_price' AND r::text !~ '"amount": ?[0-9]', 'no price for anon';
+  ASSERT r #>> '{totals,recorded_amount}' IS NULL AND r ->> 'amounts_visible' = 'false';
+  ASSERT r::text !~* 'list *[$0-9]', 'anon sees no list price in any description';
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B1';
+  ASSERT l ->> 'description' = '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727', 'size, quantity and store survive; only the price goes: ' || l::text;
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B2';
+  ASSERT l ->> 'description' = 'BATTERY (SSB, 2Y warranty)', l::text;
+  RESET ROLE;
+  PERFORM set_config('test.uid', '00000000-0000-0000-0000-0000000000c1', true);
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a3');
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B1';
+  ASSERT l ->> 'description' = '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727; list 10.15', 'the owner keeps the printed text: ' || l::text;
+  PERFORM set_config('test.uid', '', true);
+END $$;
+
+DROP FUNCTION public.receipt_line_strip_list_price(text);
+DROP FUNCTION public.receipt_item_product_card(uuid);
 DROP FUNCTION public.photo_reading_is_print(jsonb); DROP FUNCTION public.build_phase_system(text);
 DROP FUNCTION public.photo_part_key_system(text);
 \ir revert_20261119200000_vehicle_build_reconstruction.sql
