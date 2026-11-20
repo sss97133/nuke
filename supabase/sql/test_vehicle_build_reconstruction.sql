@@ -234,6 +234,88 @@ BEGIN
   PERFORM set_config('test.uid', '', true);
 END $$;
 
+-- slice 6: every system carries a window reconstructed from dated evidence
+\ir ../migrations/20261120110000_build_reconstruction_windows.sql
+DO $$ BEGIN
+  ASSERT (SELECT count(*) FROM public.build_system_precedence()) = 5
+     AND EXISTS (SELECT 1 FROM public.build_system_precedence() WHERE before_system = 'body' AND after_system = 'paint')
+     AND NOT EXISTS (SELECT 1 FROM public.build_system_precedence() WHERE after_system = 'interior' AND before_system IN ('glass', 'trim')),
+    'the precedence table is small and explicit';
+END $$;
+INSERT INTO public.vehicles VALUES
+  ('00000000-0000-0000-0000-0000000000a4', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL),
+  ('00000000-0000-0000-0000-0000000000a5', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL),
+  ('00000000-0000-0000-0000-0000000000a6', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL);
+INSERT INTO public.fixture_lines VALUES
+  -- a4: body bought through 2024-09-12 (no paint paper); trim and interior have their own paper
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000f0', '00000000-0000-0000-0000-0000000000b6', 'part', '2024-09-10', 'Supplier', '70-73 FIREBIRD TAIL PANEL STEE[L]', 'P0', 700, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b6', 'part', '2024-09-12', 'Supplier', '70-73 FIREBIRD TAIL PANEL STEE[L]', 'P1', 800, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000b6', 'part', '2024-11-01', 'Supplier', '73-75 T/A FENDER DCL ORANGE', 'T1', 50, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-02-01', 'Supplier', '70-73 LOOP CARPET SET', 'C1', 200, NULL, NULL),
+  -- a6: body through 2024-09-12; shop work billed on the interior 2025-06-01; interior parts bought 2025-02-01 (a purchase, not used)
+  ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000b7', 'part', '2024-09-12', 'Supplier', '70-73 FIREBIRD TAIL PANEL STEE[L]', 'P1', 800, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000f5', '00000000-0000-0000-0000-0000000000b7', 'part', '2025-02-01', 'Supplier', '70-73 LOOP CARPET SET', 'C1', 200, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000f6', '00000000-0000-0000-0000-0000000000b7', 'labor', '2025-06-01', 'Trim Shop', '70-73 LOOP CARPET SET', NULL, NULL, 3.0, NULL);
+INSERT INTO public.fixture_photos VALUES
+  ('00000000-0000-0000-0000-00000000d011', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/11.jpg', '2024-12-01T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d012', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/12.jpg', '2025-10-06T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d013', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/13.jpg', '2025-02-01T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d014', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/14.jpg', '2024-12-15T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d061', '00000000-0000-0000-0000-0000000000a6', 'https://x.test/61.jpg', '2025-01-15T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d021', '00000000-0000-0000-0000-0000000000a5', 'https://x.test/21.jpg', '2025-05-01T17:00:00Z', false, false, false, true);
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data) VALUES
+  ('00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d011","build_phase_guess":"final_assembly","scene_type":"body_exterior","narrative_one_line":"Two printed photographs show the finished red body."}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d012","build_phase_guess":"final_assembly","scene_type":"body_exterior","narrative_one_line":"A red coupe outside a shop."}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d013","build_phase_guess":"final_assembly","scene_type":"body_exterior","state_observations":{"paint_state":"bare_metal"},"narrative_one_line":"A coupe in bare metal."}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'photo_map_harvest_v1', false, '{"part_key":"trim.bumper.front","image_id":"00000000-0000-0000-0000-00000000d011"}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'photo_map_harvest_v1', false, '{"part_key":"trim.bumper.front","image_id":"00000000-0000-0000-0000-00000000d012"}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-00000000d012"}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d014","build_phase_guess":"paint_prep","narrative_one_line":"A printed sheet of surface preparation photographs."}'),
+  ('00000000-0000-0000-0000-0000000000a6', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d061","build_phase_guess":"paint_prep","narrative_one_line":"A printed sheet of surface preparation photographs."}'),
+  ('00000000-0000-0000-0000-0000000000a5', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d021","build_phase_guess":"paint_prep","narrative_one_line":"Printed sheet of surface preparation photographs."}');
+DO $$
+DECLARE r jsonb; w jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a4');
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'paint';
+  ASSERT w ->> 'kind' = 'bounded' AND w ->> 'earliest' = '2024-09-12' AND w ->> 'latest' = '2025-10-06',
+    'paint: bounded by the last body line and the first finished photograph; a print (2024-12-01) and a bare-metal view (2025-02-01) set no date: ' || w::text;
+  ASSERT w #>> '{basis,0,id}' = '00000000-0000-0000-0000-0000000000f1' AND w #>> '{basis,0,kind}' = 'receipt_line'
+     AND w #>> '{basis,1,id}' = '00000000-0000-0000-0000-00000000d012' AND w #>> '{basis,1,kind}' = 'photograph', 'the witnesses: ' || w::text;
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'trim';
+  ASSERT w ->> 'kind' = 'documented' AND w ->> 'earliest' = '2024-11-01' AND w ->> 'latest' = '2025-10-06',
+    'own paper: documented; the print of 2024-12-01 sets no latest day: ' || w::text;
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'interior';
+  ASSERT w ->> 'kind' = 'open_end' AND w ->> 'earliest' = '2025-02-01' AND w -> 'latest' = 'null'::jsonb, 'own paper, no finished photograph: ' || w::text;
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'tires';
+  ASSERT w ->> 'kind' = 'open_start' AND w -> 'earliest' = 'null'::jsonb AND w ->> 'latest' = '2025-10-06', 'photographs only: ' || w::text;
+  -- reconstructed_systems: systems with no paper, with the window; amounts and wording
+  ASSERT (SELECT array_agg(e ->> 'system_key' ORDER BY e ->> 'system_key') FROM jsonb_array_elements(r -> 'reconstructed_systems') e) = ARRAY['paint', 'tires'],
+    'only systems without paper: ' || (r -> 'reconstructed_systems')::text;
+  ASSERT r #>> '{reconstructed_systems,0,window,kind}' = 'bounded', 'paint window rides along';
+  ASSERT r #>> '{reconstructed_systems,1,photos,images}' = '1';
+  ASSERT r ->> 'amounts_visible' = 'false' AND r::text !~ '"amount": ?[0-9]' AND r #>> '{totals,recorded_amount}' IS NULL, 'anon sees no amounts';
+  ASSERT r::text !~* 'receipt (is |are )?(needed|required|missing)|need(s)? (a )?receipt', 'no wording asks for paper';
+  -- shop work billed on a following system is a witness; a purchase of its parts is not
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a6');
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'paint';
+  ASSERT w ->> 'kind' = 'bounded' AND w ->> 'earliest' = '2024-09-12' AND w ->> 'latest' = '2025-06-01'
+     AND w #>> '{basis,1,id}' = '00000000-0000-0000-0000-0000000000f6' AND w #>> '{basis,1,kind}' = 'receipt_line', 'shop work on the interior: ' || w::text;
+  -- a print alone: neither end known
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a5');
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'reconstructed_systems') e WHERE e ->> 'system_key' = 'paint';
+  ASSERT w ->> 'kind' = 'unknown' AND w -> 'earliest' = 'null'::jsonb AND w -> 'latest' = 'null'::jsonb AND w -> 'basis' = '[]'::jsonb, 'a print sets no day: ' || coalesce(w::text, 'none');
+  ASSERT r #>> '{reconstructed_systems,0,stages,0,phase}' = 'paint_prep' AND r #>> '{reconstructed_systems,0,stage_hours,typical}' = '16', 'stage hour range rides along';
+  RESET ROLE;
+  -- the owner's amounts stay what they were
+  PERFORM set_config('test.uid', '00000000-0000-0000-0000-0000000000c1', true);
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a4');
+  ASSERT (r #>> '{totals,recorded_amount}')::numeric = 1750 AND r ->> 'amounts_visible' = 'true', r::text;
+  PERFORM set_config('test.uid', '', true);
+END $$;
+
+DROP FUNCTION public.build_system_precedence();
 DROP FUNCTION public.receipt_line_strip_list_price(text);
 DROP FUNCTION public.receipt_item_product_card(uuid);
 DROP FUNCTION public.photo_reading_is_print(jsonb); DROP FUNCTION public.build_phase_system(text);
