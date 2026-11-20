@@ -4,16 +4,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { validateVerdict } from '../../supabase/functions/_shared/byokImageVerdict.mjs';
 import { childCarriesOnlyEnumAndPointers, projectImageProperties } from '../lib/image-property-projection.mjs';
 import { stageSchema } from '../lib/byok-stage-schema.mjs';
 import {
   AUTOMATIC_METHOD, AUTOMATIC_NOTES, AUTOMATIC_TIER, DEFAULT_MODEL, OPEN_QUESTION_PATTERNS, STATE_STANDARD, admitsFingerprint, admitsFrom, automaticMethod, automaticProvenance, buildEnvelope, countReceipt, deepPrompt, deepReadFrame,
   PRINT_WORDS, REFUSAL_STREAK_STOP, refusalStreak, saysPictureOfPicture, thinNarrative, thinVerdict, thinViolation,
-  cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput, QUESTION_TOKENS, standingReadingHold,
+  cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput, QUESTION_TOKENS, standingReadingHold, standingReadingQuery,
 } from './deep-stage.mjs';
 
 const IMAGE = '10000000-0000-4000-8000-000000000001', VEHICLE = '20000000-0000-4000-8000-000000000001';
@@ -324,17 +324,26 @@ test('two agreeing reads: the row is snapshotted before the download, both reads
   const { deps, calls } = frameDeps({ answers: [cli(verdict()), cli(verdict())] });
   const r = await deepReadFrame(frame, deps, opts(dir));
   assert.deepEqual(calls.order, ['snapshot', 'standing', 'download', 'read', 'read', 'post'], 'snapshot, the standing-reading check, then bytes, both reads, the intake');
-  assert.equal(calls.rest[1], `vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${IMAGE}&limit=50`);
+  // the standing-reading question is filtered by the database: one current condition reading that is not this reader's own
+  assert.equal(calls.rest[1], standingReadingQuery(IMAGE));
+  assert.equal(standingReadingQuery(IMAGE), `vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${IMAGE}&kind=eq.condition&is_superseded=not.is.true&or=(agent_tier.is.null,agent_tier.neq.subscription automatic)&limit=1`);
   assert.match(calls.rest[0], /select=id,vehicle_id,image_url,updated_at,/);
   assert.match(calls.rest[0], /id=eq\.10000000-0000-4000-8000-000000000001$/);
   assert.equal(calls.ask.length, 2);
   for (const a of calls.ask) {
-    assert.equal(a.cwd, dir);
+    // the photo has a directory of its own under the phase's, and the one Read rule covers that directory only
+    assert.notEqual(a.cwd, dir);
+    assert.equal(dirname(a.cwd), dir);
+    assert.match(basename(a.cwd), /^photo_/);
+    assert.equal(a.argv[a.argv.indexOf('--allowedTools') + 1], `Read(/${realpathSync(dir)}/${basename(a.cwd)}/**)`);
+    assert.equal(a.argv[a.argv.indexOf('--setting-sources') + 1], '');
     assert.deepEqual(JSON.parse(a.argv[a.argv.indexOf('--json-schema') + 1]), stageSchema('verdicts'));
     assert.ok(a.argv.includes('--safe-mode'));
     assert.match(a.text, /CONTRACT TEXT/);
-    assert.match(a.text, new RegExp(`The image is the file at ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/${IMAGE}\\.jpg`));
+    assert.ok(a.text.includes(`The image is the file at ${a.cwd}/${IMAGE}.jpg`));
   }
+  assert.equal(calls.ask[0].cwd, calls.ask[1].cwd, 'both reads of one photo share its directory');
+  assert.deepEqual(readdirSync(dir), [], 'the photo and its directory are gone once both reads have settled');
   assert.equal(calls.orchestrator.length, 1);
   const e = calls.orchestrator[0];
   assert.equal(e.action, 'record_reviewed_analysis');
@@ -638,6 +647,10 @@ test('claimAndWork: small claims, each worked before the next; a halt or the dea
   assert.deepEqual([claims, out3.claimed], [[2, 2], 3], 'a short claim ends the stage');
   const out4 = await claimAndWork({ claim: async () => ({ work: [], error: 'claim_failed' }), work: async () => {}, limit: 5, chunk: 2, width: 1 });
   assert.equal(out4.error, 'claim_failed');
+  // a claim whose later page failed still hands over what the earlier page leased: those photos are worked, then the stage stops
+  const worked = [], asked = [];
+  const out5 = await claimAndWork({ claim: async (n) => { asked.push(n); return { work: ['a', 'b'], error: 'claim_failed' }; }, work: async (x) => { worked.push(x); }, limit: 10, chunk: 4, width: 1 });
+  assert.deepEqual([worked, asked, out5.claimed, out5.error], [['a', 'b'], [4], 2, 'claim_failed']);
 });
 
 test('a deep read\'s child carries no credentials, only the login', () => {

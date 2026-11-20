@@ -24,7 +24,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -130,7 +130,6 @@ if (checklist.http !== 200 || typeof checklist.prompt !== 'string') { console.er
 // Every call starts lean (leanClaudeArgs) when this machine's `claude` can; an older CLI keeps the previous first-read call and
 // the deep readings wait for a CLI that can hold them to the grammar.
 const lean = dry || await cliSupportsLean();
-const firstReadArgv = lean ? leanClaudeArgs({ model }) : legacyClaudeArgs({ model });
 const fromQueue = source === 'stage-queue' || (source === 'auto' && await stageQueueEnabled(rest, OWNER));
 let frames;
 if (fromQueue) {
@@ -180,23 +179,31 @@ if (!dry) {
       const f = frames[i++];
       const t0 = Date.now();
       let stage = 'download';
+      // A directory of its own for this photo: the lean call's Read rule covers that directory only, and two photos are
+      // read side by side. The pixels are not trusted (a photographed page can carry instructions), so the one tool the
+      // model has must not reach another photo, the checkout or a key file.
+      const own = mkdtempSync(join(dir, 'photo_'));
       try {
         if (!/^https?:\/\//.test(f.image_url ?? '')) { await settle(f, { input: {} }); throw new Error('no http(s) image URL'); }
         const ext = (f.file_name || f.image_url).toLowerCase().match(/\.(heic|heif|png|webp|jpe?g)/)?.[1] || 'jpg';
-        const raw = join(dir, `${f.id}.${ext}`);
+        const raw = join(own, `${f.id}.${ext}`);
         const res = await fetch(f.image_url).catch(() => ({ ok: false, status: 0 }));
         if (!res.ok) { await settle(f, { download: { status: res.status } }); throw new Error(`download ${res.status}`); }
         writeFileSync(raw, Buffer.from(await res.arrayBuffer()));
         let img = raw;
         if (ext !== 'jpg' && ext !== 'jpeg') {
           stage = 'convert';
-          img = join(dir, `${f.id}.jpg`);
+          img = join(own, `${f.id}.jpg`);
           await run('sips', ['-s', 'format', 'jpeg', '-Z', '1600', raw, '--out', img]);
         }
         stage = 'reader';
         // lean start (leanClaudeArgs), in the empty temp directory: measured 2026-11-20 on six photos, 6 of 6 answers accepted by
         // the orchestrator's own validator either way, at 16k tokens of startup instead of 145k and 6 s instead of 9 s
-        const stdout = await claudePrint(firstReadArgv, `${checklist.prompt}\n\nThe image is the file at ${img}. Read it first, then answer with ONLY the JSON object.`, { env: subscriptionEnv(), cwd: dir });
+        // The lean call may open files under this photo's directory only and starts without the service key or any other
+        // credential in its environment (deepChildEnv), as the deep reads do; an older CLI keeps the call it had.
+        const stdout = lean
+          ? await claudePrint(leanClaudeArgs({ model, readDir: realpathSync(own) }), `${checklist.prompt}\n\nThe image is the file at ${img}. Read it first, then answer with ONLY the JSON object.`, { env: deepChildEnv(), cwd: own })
+          : await claudePrint(legacyClaudeArgs({ model }), `${checklist.prompt}\n\nThe image is the file at ${img}. Read it first, then answer with ONLY the JSON object.`, { env: subscriptionEnv(), cwd: own });
         // an answer that does not parse is the reader's invalid output, whatever the parser's message happens to contain
         const invalid = (why) => Object.assign(new Error(why), { invalidOutput: true });
         let outer; try { outer = JSON.parse(stdout); } catch { throw invalid('no JSON in the reader output'); }
@@ -215,7 +222,6 @@ if (!dry) {
         else summary.errors++;
         out.push({ image_id: f.id, image_type: t, http: r.http, success: r.success, error_class: r.error_class, skipped: r.skipped });
         console.error(`${f.id} ${t} ${r.http} ${r.success === false ? (r.error_class || 'refused') : (r.skipped ? 'skipped:' + r.classification : 'ok')}`);
-        for (const p of [raw, img]) if (existsSync(p)) rmSync(p, { force: true });
       } catch (e) {
         // Every claimed photo gets exactly one receipt (settle ignores a second call): an HTTP refusal was settled where
         // it happened; a body that could not be read, bytes that would not convert, a reader fault and an orchestrator
@@ -226,7 +232,7 @@ if (!dry) {
         else if (stage === 'orchestrator') await settle(f, { orchestrator: { http: 0, error_class: 'orchestrator_request_error' } });
         summary.errors++; out.push({ image_id: f.id, error: String(e.message || e).slice(0, 300) });
         console.error(`${f.id} ERROR ${String(e.message || e).slice(0, 160)}`);
-      }
+      } finally { rmSync(own, { recursive: true, force: true }); }
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, conc) }, worker));
@@ -299,7 +305,8 @@ async function keyedPhase() {
   const s = newStageSummary();
   if (keyedLimit < 1) { s.skipped = 'off'; return s; }
   const claimed = await claimStageWorkUpTo(rpc, { stage: KEYED_STAGE, limit: keyedLimit, leaseSeconds: 1800, userId: OWNER });
-  if (claimed.error) { s.claim_error = claimed.error; console.error(`${KEYED_STAGE}: ${claimed.error} ${claimed.detail}`); return s; }
+  // photos an earlier page handed over are leased to this fire: work them even when a later page failed
+  if (claimed.error) { s.claim_error = claimed.error; console.error(`${KEYED_STAGE}: ${claimed.error} ${claimed.detail}`); }
   const frames3 = claimed.work.map(toFrame);
   s.claimed = frames3.length;
   if (!frames3.length) return s;

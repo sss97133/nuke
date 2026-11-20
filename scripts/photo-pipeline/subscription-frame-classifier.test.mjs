@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { AUTOMATIC_TIER, admitsFrom, automaticMethod } from './deep-stage.mjs';
+import { AUTOMATIC_TIER, admitsFrom, automaticMethod, standingReadingQuery } from './deep-stage.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // the database's row for this reader, with the admitted set of the shared cases
@@ -29,6 +29,7 @@ if (process.argv.includes('--help')) { console.log(process.env.FAKE_CLAUDE_OLD ?
 if (process.argv.includes('--safe-mode') && process.env.FAKE_CLAUDE_OLD) { console.error("error: unknown option '--safe-mode'"); process.exit(1); }
 let input = '';
 process.getBuiltinModule('node:fs').appendFileSync(process.getBuiltinModule('node:path').join(process.env.HOME, 'claude-args.jsonl'), JSON.stringify(process.argv.slice(2)) + '\\n');
+process.getBuiltinModule('node:fs').appendFileSync(process.getBuiltinModule('node:path').join(process.env.HOME, 'claude-runs.jsonl'), JSON.stringify({ cwd: process.cwd(), service_key: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY) }) + '\\n');
 process.stdin.on('data', (d) => { input += d; });
 process.stdin.on('end', () => {
   const name = (input.match(/file at (\\S+)\\./) || [])[1] || '';
@@ -54,9 +55,10 @@ const FAKE_SUPABASE_JS = `exports.createClient = () => ({
     then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; },
 });`;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, extraArgs = [], supabaseJs = false, failClaims = [], oldCli = false } = {}) {
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, extraArgs = [], supabaseJs = false, failClaims = [], failClaimsAfter = {}, oldCli = false } = {}) {
   const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], standing: [], tiers: 0 };
   const cursor = {};   // each stage hands out its photos once, at most p_limit a call, like the database
+  const claimCount = {};   // failClaimsAfter: { stage: n } answers that stage's first n claims and fails the ones after
   let port;
   const server = createServer((req, res) => {
     let data = '';
@@ -89,7 +91,8 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
       }
       if (req.url === '/rest/v1/rpc/claim_image_stage_work') {
         const claim = JSON.parse(data); calls.claims.push(claim);
-        if (failClaims.includes(claim.p_stage)) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
+        claimCount[claim.p_stage] = (claimCount[claim.p_stage] ?? 0) + 1;
+        if (failClaims.includes(claim.p_stage) || claimCount[claim.p_stage] > (failClaimsAfter[claim.p_stage] ?? Infinity)) return json(404, { code: 'PGRST202', message: 'Could not find the function' });
         const names = claim.p_stage === 'deep_reading' ? deepFrames : claim.p_stage === 'keyed_values' ? keyedFrames : frameNames;
         const from = cursor[claim.p_stage] ?? 0, take = names.slice(from, from + claim.p_limit); cursor[claim.p_stage] = from + take.length;
         return json(200, take.map((n, i) => ({ work_id: from + i + 1, image_id: n, image_url: n.includes('no-url') ? '' : `http://127.0.0.1:${port}/img/${n}`, user_id: OWNER, vehicle_id: claim.p_stage === 'classifier' ? null : '00000000-0000-4000-8000-0000000000cc', lane: 'live', reason: 'missing', target_version: 1 })));
@@ -128,8 +131,9 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
     }).then((r) => ({ code: 0, ...r }), (e) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));
     let summary = null; try { summary = JSON.parse(result.stdout.trim().split('\n').pop()); } catch { /* the run failed before its summary */ }
     let claudeArgs = []; try { claudeArgs = readFileSync(join(bin, 'claude-args.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { /* no CLI call */ }
+    let claudeRuns = []; try { claudeRuns = readFileSync(join(bin, 'claude-runs.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { /* no CLI call */ }
     if (process.env.DEBUG_STAND_INS) console.error(result.stderr, JSON.stringify(calls.receipts));
-    await fn({ calls, summary, port, result, claudeArgs });
+    await fn({ calls, summary, port, result, claudeArgs, claudeRuns });
   } finally {
     server.close();
     rmSync(bin, { recursive: true, force: true });
@@ -224,13 +228,20 @@ test('no converter on the machine stops the batch instead of blocking every non-
 });
 
 test('every model call starts lean and asks for the exact model id', async () => {
-  await withStandIns(['a-ok.jpg'], ({ claudeArgs }) => {
+  await withStandIns(['a-ok.jpg'], ({ claudeArgs, claudeRuns }) => {
     assert.equal(claudeArgs.length, 1);
     const argv = claudeArgs[0];
     for (const flag of ['-p', '--safe-mode', '--strict-mcp-config', '--no-session-persistence']) assert.ok(argv.includes(flag), flag);
     assert.equal(argv[argv.indexOf('--model') + 1], 'claude-sonnet-5-5');
     assert.equal(argv[argv.indexOf('--tools') + 1], 'Read');
     assert.ok(!argv.includes('--json-schema') && !argv.includes('--bare'));
+    // a first read may open files under its own photo's directory only (the pixels are not trusted), loads no settings
+    // file that could widen that, and starts without the service key
+    const run1 = claudeRuns[0];
+    assert.match(run1.cwd, /\/nuke-classify-[^/]+\/photo_[^/]+$/);
+    assert.equal(argv[argv.indexOf('--allowedTools') + 1], `Read(/${run1.cwd}/**)`);
+    assert.equal(argv[argv.indexOf('--setting-sources') + 1], '');
+    assert.equal(run1.service_key, false);
   });
   await withStandIns(['a-ok.jpg'], ({ claudeArgs, calls }) => {
     assert.equal(claudeArgs[0][claudeArgs[0].indexOf('--model') + 1], 'sonnet', '--model still overrides');
@@ -299,7 +310,7 @@ test('deep readings: the reader\'s own reading by the same method closes the sta
     assert.equal(claudeArgs.length, 0, 'no read was spent on any of them');
     assert.deepEqual([summary.stages.deep_reading.succeeded, summary.stages.deep_reading.policy_skip], [1, 2]);
     // only the photo whose stamp is free is asked about; the question is the guard's own (same filter, same index)
-    assert.deepEqual(calls.standing, ['/rest/v1/vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.c-standing.jpg&limit=50']);
+    assert.deepEqual(calls.standing.map((u) => decodeURIComponent(u)), [`/rest/v1/${standingReadingQuery('c-standing.jpg')}`]);
     assert.match(decodeURIComponent(calls.snapshotQueries[0]), /deep_tier:ai_scan_metadata->byok_deep_analysis->>agent_tier,deep_method:ai_scan_metadata->byok_deep_analysis->>extraction_method/);
   }, { deepFrames: ['a-mine.jpg', 'b-reviewed.jpg', 'c-standing.jpg'], extraArgs: ['--deep-limit', '3'],
     // c: no stamp on the photo, yet a reviewed reading of it is current (its stamp is missing): found by the observation
@@ -316,6 +327,13 @@ test('keyed values: claimed per photo, one receipt each, no model call', async (
     assert.equal(claudeArgs.length, 0);
     assert.deepEqual([summary.stages.keyed_values.claimed, summary.stages.keyed_values.receipts, summary.stages.keyed_values.error_classes], [2, 2, { reading_not_found: 2 }]);
   }, { keyedFrames: [K1, K2], supabaseJs: true, extraArgs: ['--keyed-limit', '2'] });
+  // a claim whose second page fails: the 25 photos the first page leased are still worked, and the summary says the claim failed
+  const many = Array.from({ length: 30 }, (_, i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`);
+  await withStandIns([], ({ calls, summary }) => {
+    assert.deepEqual(calls.claims.filter((c) => c.p_stage === 'keyed_values').map((c) => c.p_limit), [25, 5]);
+    assert.equal(calls.receipts.filter((r) => r.p_stage === 'keyed_values').length, 25, 'every photo the first page leased got its receipt');
+    assert.deepEqual([summary.stages.keyed_values.claimed, summary.stages.keyed_values.receipts, summary.stages.keyed_values.claim_error], [25, 25, 'claim_failed']);
+  }, { keyedFrames: many, supabaseJs: true, extraArgs: ['--keyed-limit', '30'], failClaimsAfter: { keyed_values: 1 } });
   // switched off with 0: neither claimed nor counted
   await withStandIns([], ({ calls, summary }) => {
     assert.deepEqual(calls.claims.map((c) => c.p_stage), ['classifier']);

@@ -8,7 +8,7 @@
 // answer becomes. See docs in the PR for the measurements behind the decisions.
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
-import { existsSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { validateVerdict } from '../../supabase/functions/_shared/byokImageVerdict.mjs';
@@ -309,6 +309,14 @@ export function thinVerdict(first, second, admits = NO_ADMITS) {
  * asks the same question of the same index), so no read is spent finding that out.
  *   readings  [{ kind, is_superseded, agent_tier }]  every image_deep_byok observation naming the photo
  */
+/**
+ * The standing-reading question as a PostgREST query: a current condition reading of this photo that is not this reader's
+ * own (the intake guard's Rule 2 asks the same of the same index). The database filters, so one row answers it and
+ * this reader's own leftovers (each retry is a new observation) can never crowd a reviewed reading out of the answer.
+ */
+export const standingReadingQuery = (imageId) =>
+  `vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${imageId}` +
+  `&kind=eq.condition&is_superseded=not.is.true&or=(agent_tier.is.null,agent_tier.neq.${AUTOMATIC_TIER})&limit=1`;
 export function standingReadingHold(readings) {
   return Array.isArray(readings) && readings.some((r) => r?.kind === 'condition' && r?.is_superseded !== true && r?.agent_tier !== AUTOMATIC_TIER)
     ? 'already_read' : null;
@@ -522,7 +530,7 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
   let standing = null;
   if (!hold) {
     try {
-      standing = standingReadingHold(await deps.rest(`vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${row.id}&limit=50`));
+      standing = standingReadingHold(await deps.rest(standingReadingQuery(row.id)));
     } catch { return typed({ intake: { http: 503, error: 'review_source_unavailable' } }); }
     hold = standing;
   }
@@ -537,24 +545,26 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
     bytes = got.bytes;
   } catch { return typed({ download: { status: 0 } }); }
   ext = (row.file_name || row.image_url).toLowerCase().match(/\.(heic|heif|png|webp|jpe?g)/)?.[1] || 'jpg';
-  const raw = join(dir, `${frame.id}.${ext}`);
-  writeFileSync(raw, bytes);
-  const files = [raw];
+  // A directory of its own for this photo: the Read rule below covers a directory, and photos are read side by side, so a
+  // shared one would let this photo's read open its neighbour's file.
+  const own = mkdtempSync(join(dir, 'photo_'));
+  const raw = join(own, `${frame.id}.${ext}`);
   try {
+    writeFileSync(raw, bytes);
     img = raw;
     if (ext !== 'jpg' && ext !== 'jpeg') {
-      try { img = await deps.convert(raw); files.push(img); }
+      try { img = await deps.convert(raw); }
       catch (e) { return typed({ convert: { missingTool: e?.code === 'ENOENT' } }); }
     }
     const ids = { imageId: row.id, vehicleId: row.vehicle_id };
     const prompt = deepPrompt({ contract, imageId: row.id, vehicleId: row.vehicle_id, imagePath: img });
-    const argv = leanClaudeArgs({ model, schema: stageSchema('verdicts'), readDir: realpathSync(dir) });
+    const argv = leanClaudeArgs({ model, schema: stageSchema('verdicts'), readDir: realpathSync(own) });
     // One controller per photo: the first read that fails ends its sibling (a photo needs two valid reads, so a second call
     // would be spent on nothing), and the phase's halt ends this photo. Both reads have settled before the files go.
     const ctl = new AbortController();
     const onParent = () => ctl.abort();
     if (signal?.aborted) ctl.abort(); else signal?.addEventListener('abort', onParent, { once: true });
-    const ask = () => deps.ask(argv, prompt, dir, ctl.signal);
+    const ask = () => deps.ask(argv, prompt, own, ctl.signal);
     const one = () => readOnce({ ask, ids, signal: ctl.signal }).catch((e) => { ctl.abort(); throw e; });
     let reads;
     try {
@@ -592,7 +602,7 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
     const out = typed({ intake, detail });
     return { ...out, envelope: undefined, agreement, reads, valid: out.receipt.outcome === 'succeeded', seconds };
   } finally {
-    for (const p of files) if (existsSync(p)) rmSync(p, { force: true });
+    rmSync(own, { recursive: true, force: true });
   }
 }
 
@@ -631,9 +641,10 @@ export async function claimAndWork({ claim, work, limit, chunk, width, halted = 
   while (claimed < limit && !halted() && now() < deadline) {
     const want = Math.min(chunk, limit - claimed);
     const got = await claim(want);
-    if (got.error) { error = got.error; break; }
+    // photos an earlier page handed over are leased to this fire: work them even when a later page failed
     claimed += got.work.length;
-    await pool(got.work, width, work, () => halted() || now() >= deadline);
+    if (got.work.length) await pool(got.work, width, work, () => halted() || now() >= deadline);
+    if (got.error) { error = got.error; break; }
     if (got.work.length < want) break;
   }
   return { claimed, error };
