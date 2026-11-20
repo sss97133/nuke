@@ -76,6 +76,10 @@ describe('BuildRecord', () => {
     expect(html).toContain('Stages seen in photos');
     expect(html).toContain('paint preparation photographed');
   });
+  it('gives each system on the page an anchor a letter can link to, and none inside a header popup', () => {
+    expect(renderToStaticMarkup(<BuildRecord record={record(false)} />)).toMatch(/id="build-[a-z_]+"/);
+    expect(renderToStaticMarkup(<TokenBuildRecord record={record(false)} dimension="engine" />)).not.toMatch(/id="build-/);
+  });
   it('renders nothing when the vehicle has no receipt lines', () => {
     const empty = record(false); empty.totals.lines = 0;
     expect(renderToStaticMarkup(<BuildRecord record={empty} />)).toBe('');
