@@ -4,6 +4,15 @@ import XCTest
 final class NavigationUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
+    /// Scrolls the list until `element` is on screen; the garage cards are tall, so rows below them start off screen.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, swipes: Int = 8) -> Bool {
+        for _ in 0..<swipes {
+            if element.waitForExistence(timeout: 2) && element.isHittable { return true }
+            app.swipeUp()
+        }
+        return element.exists && element.isHittable
+    }
+
     private func openJourneyDay(_ mode: String, analysis: String = "") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
@@ -154,7 +163,7 @@ final class NavigationUITests: XCTestCase {
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
         let organize = app.buttons["Organize photos"].firstMatch
-        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits below the garage cards"); organize.tap()
         let day = app.staticTexts["2026-10-31"].firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
         let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
@@ -177,7 +186,7 @@ final class NavigationUITests: XCTestCase {
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
         let organize = app.buttons["Organize photos"].firstMatch
-        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits below the garage cards"); organize.tap()
         let day = app.staticTexts["2026-10-31"].firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
         let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
@@ -203,7 +212,7 @@ final class NavigationUITests: XCTestCase {
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
         let organize = app.buttons["Organize photos"].firstMatch
-        XCTAssertTrue(organize.waitForExistence(timeout: 10)); organize.tap()
+        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits below the garage cards"); organize.tap()
         let day = app.staticTexts["2026-10-31"].firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
         let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
@@ -273,7 +282,13 @@ final class NavigationUITests: XCTestCase {
         if !app.staticTexts["2 / 3"].waitForExistence(timeout: 5) { photo.swipeLeft() }
         XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5), "the reel pages through the car's photos")
         let top = XCTAttachment(screenshot: app.screenshot()); top.name = "garage-cards-top"; top.lifetime = .keepAlways; add(top)
-        let headings = ["2026 · 2", "2024 · 1", "2023 · 1", "No dated activity · 1"]
+        // The two recent cars are 2 and 40 days old (UTC), so early in a year they fall under two headings.
+        let year: (Int) -> String = { daysAgo in
+            var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(secondsFromGMT: 0)!
+            return String(c.component(.year, from: Date().addingTimeInterval(-Double(daysAgo) * 86_400)))
+        }
+        let recent = year(2) == year(40) ? ["\(year(2)) · 2"] : ["\(year(2)) · 1", "\(year(40)) · 1"]
+        let headings = recent + ["2024 · 1", "2023 · 1", "No dated activity · 1"]
         var seen: [String] = []
         for _ in 0..<14 {
             for h in headings where !seen.contains(h) && app.staticTexts[h].exists { seen.append(h) }
@@ -287,7 +302,7 @@ final class NavigationUITests: XCTestCase {
         let log = app.buttons["Log book"].firstMatch
         XCTAssertTrue(log.waitForExistence(timeout: 5)); log.tap()
         XCTAssertTrue(app.staticTexts["Fixture note: rear end rebuilt over the winter."].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["2026-11-18 · owner · recollection"].exists)
+        XCTAssertTrue(app.staticTexts["2026-11-18 · owner · recollection"].waitForExistence(timeout: 5))
         let sheet = XCTAttachment(screenshot: app.screenshot()); sheet.name = "garage-log-book"; sheet.lifetime = .keepAlways; add(sheet)
         app.buttons["Done"].firstMatch.tap()
         XCTAssertTrue(first.waitForExistence(timeout: 5)); first.tap()
