@@ -641,6 +641,10 @@ jobs:
         run: createdb dm_refinement_fresh_image_admission
       - name: Verify actual pulse migration, admission policy, scope caps and retained grants
         run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_fresh_image_admission -f supabase/sql/test_fresh_image_admission.sql
+      - name: Create disposable duplicate-copy retirement database
+        run: createdb dm_refinement_retire_duplicate_image_ci
+      - name: Verify duplicate-copy retirement (hard key only, audit row with before-image, per-run revert, service role only)
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_retire_duplicate_image_ci -f supabase/sql/test_retire_duplicate_vehicle_image.sql
 
   map-public-cells-contract:
     runs-on: ubuntu-latest
