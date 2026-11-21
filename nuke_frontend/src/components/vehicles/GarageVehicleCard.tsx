@@ -457,7 +457,8 @@ export function MiniBarcode({ vehicle, axis, litDay, movable = false, onWindow, 
       onClick={onDay || movable ? event => {
         // The end of a drag is not a click on a square.
         if (dragged.current) { dragged.current = false; return; }
-        if (!onDay) return;
+        // The second click of a double-click is the reset's, not another jump.
+        if (!onDay || event.detail > 1) return;
         const square = (event.target as Element).closest?.('rect[data-day]');
         const day = square?.getAttribute('data-day') ?? dayAtPoint(event.currentTarget, frame, event.clientX, event.clientY);
         if (day && photoDays.has(day)) onDay(day);
