@@ -3,6 +3,11 @@
  * adding files and merging a duplicate. Every write goes through a writer that
  * already exists (vehicle-agent, record_vehicle_statement, the upload queue,
  * merge_duplicate_vehicles) and happens only on an explicit press.
+ *
+ * The agent only proposes: a proposal shows under its reply with Confirm / Dismiss,
+ * and only Confirm sends it back to vehicle-agent, which re-checks it and writes.
+ * Its sessions are kept in the car's log book only while "Keep in log book" is on
+ * for that car (set_vehicle_agent_log_consent; read back with vehicle_agent_log).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from '../PrefetchLink';
@@ -68,14 +73,19 @@ export function GarageCardMenu({ vehicle, x, y, onClose, onSheet, onMerge }: {
 
 interface Statement { statement_id: string | null; speaker_role: string; statement_kind: string; said_on: string | null; recorded_at: string; words: string | null }
 
+/** The role a note is said as, by default: what the garage reader says the account is to this car. */
+export const defaultSpeakerRole = (vehicle: GarageVehicle) =>
+  ['OWNER', 'VERIFIED OWNER', 'CO-OWNER'].includes(vehicle.relationship_type) ? 'owner'
+    : vehicle.relationship_type === 'PREVIOUSLY OWNED' ? 'previous_owner' : 'representative';
+
 const ROLES = [['owner', 'Owner'], ['representative', 'Representative'], ['shop', 'Shop'], ['previous_owner', 'Previous owner'], ['seller_agent', "Seller's agent"]] as const;
 const KINDS = [['assertion', 'A fact'], ['recollection', 'From memory'], ['estimate', 'An estimate']] as const;
 
 function LogBook({ vehicle }: { vehicle: GarageVehicle }) {
   const [rows, setRows] = useState<Statement[] | null>(null);
+  const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [text, setText] = useState('');
-  const [role, setRole] = useState<string>(['OWNER', 'VERIFIED OWNER', 'CO-OWNER'].includes(vehicle.relationship_type) ? 'owner'
-    : vehicle.relationship_type === 'PREVIOUSLY OWNED' ? 'previous_owner' : 'representative');
+  const [role, setRole] = useState<string>(defaultSpeakerRole(vehicle));
   const [kind, setKind] = useState<string>('assertion');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -86,6 +96,9 @@ function LogBook({ vehicle }: { vehicle: GarageVehicle }) {
     const { data, error } = await supabase.rpc('vehicle_statements', { p_vehicle_id: vehicle.id });
     if (error) { setNotice('The log book could not be read.'); setRows([]); return; }
     setRows(((data as any)?.statements ?? []) as Statement[]);
+    // The account's own kept agent sessions for this car; none, or the reader missing, shows nothing.
+    const { data: log } = await supabase.rpc('vehicle_agent_log', { p_vehicle_id: vehicle.id });
+    setSessions(((log as any)?.sessions ?? []) as AgentSession[]);
   }, [vehicle.id]);
   useEffect(() => { void read(); }, [read]);
 
@@ -118,10 +131,60 @@ function LogBook({ vehicle }: { vehicle: GarageVehicle }) {
         <span>{row.said_on ?? row.recorded_at.slice(0, 10)} · {row.speaker_role.replaceAll('_', ' ')} · {row.statement_kind}</span>
         {row.words && <p>{row.words}</p>}
       </li>)}</ol>}
+    {sessions.length > 0 && <ol className="garage-log-rows" aria-label="Your agent sessions">{sessions.map(session => <li key={session.conversation_ref}>
+      <span>{session.started_at.slice(0, 10)} · agent session · yours only</span>
+      {session.turns.map((turn, index) => <p key={index} data-role={turn.role}>{turn.role === 'user' ? 'You: ' : 'Agent: '}{turn.words}</p>)}
+    </li>)}</ol>}
   </div>;
 }
 
-interface Turn { role: 'user' | 'assistant'; content: string; wrote?: number }
+interface AgentSession { conversation_ref: string; started_at: string; turns: Array<{ role: 'user' | 'assistant'; words: string; at: string }> }
+
+export interface Proposal { id: string; writer: string; summary: string; token: string }
+type ProposalState = { status: 'open' | 'busy' | 'kept' | 'dismissed'; note?: string };
+interface Turn { role: 'user' | 'assistant'; content: string; proposals?: Proposal[] }
+
+/** The message a failed function call carries in its body, else its own message. */
+async function failure(failed: any, fallback: string): Promise<string> {
+  const body = await failed?.context?.json?.().catch(() => null);
+  return body?.error ?? failed?.message ?? fallback;
+}
+
+/** One proposal under a reply: what it would record, Confirm and Dismiss. Nothing is written before Confirm. */
+export function ProposalRow({ proposal, state, onConfirm, onDismiss }: {
+  proposal: Proposal; state: ProposalState; onConfirm: () => void; onDismiss: () => void;
+}) {
+  if (state.status === 'dismissed') return null;
+  return <div className="garage-agent-proposal" data-status={state.status}>
+    <span>{proposal.summary}</span>
+    {state.status === 'kept'
+      ? <small role="status">{state.note ?? 'Kept.'}</small>
+      : <span className="garage-agent-proposal-actions">
+        <button type="button" disabled={state.status === 'busy'} onClick={onConfirm}>{state.status === 'busy' ? 'Keeping…' : 'Confirm'}</button>
+        <button type="button" disabled={state.status === 'busy'} onClick={onDismiss}>Dismiss</button>
+      </span>}
+    {state.status !== 'kept' && state.note && <small role="alert">{state.note}</small>}
+  </div>;
+}
+
+/** Whether this account keeps this car's agent sessions (its own consent row; row security limits it to the account). */
+function useKeepSessions(vehicleId: string) {
+  const [keep, setKeep] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    void supabase.from('user_consents').select('id').eq('consent_scope', 'vehicle_agent_log').eq('vehicle_id', vehicleId)
+      .eq('granted', true).is('revoked_at', null).limit(1)
+      .then(({ data, error }) => { if (live) setKeep(error ? null : (data?.length ?? 0) > 0); });
+    return () => { live = false; };
+  }, [vehicleId]);
+  const toggle = async () => {
+    if (keep === null) return;
+    const next = !keep;
+    const { data, error } = await supabase.rpc('set_vehicle_agent_log_consent', { p_vehicle_id: vehicleId, p_keep: next });
+    if (!error) setKeep((data as any)?.keep === true);
+  };
+  return { keep, toggle };
+}
 
 /** The car's agent: a text box. The exchange appears above it once there is one. */
 function AgentBox({ vehicle }: { vehicle: GarageVehicle }) {
@@ -129,6 +192,10 @@ function AgentBox({ vehicle }: { vehicle: GarageVehicle }) {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [states, setStates] = useState<Record<string, ProposalState>>({});
+  // One id per opened box: the turns of this session share it in the log book.
+  const conversationRef = useRef(crypto.randomUUID());
+  const { keep, toggle } = useKeepSessions(vehicle.id);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView?.({ block: 'nearest' }); }, [turns, busy]);
   const send = async () => {
@@ -139,19 +206,37 @@ function AgentBox({ vehicle }: { vehicle: GarageVehicle }) {
     setTurns(current => [...current, { role: 'user', content: message }]);
     try {
       const { data, error: failed } = await supabase.functions.invoke('vehicle-agent', {
-        body: { vehicle_id: vehicle.id, message, history, allow_writes: true },
+        body: { vehicle_id: vehicle.id, message, history, allow_writes: true, propose: true, conversation_ref: conversationRef.current },
       });
-      if (failed) {
-        const body = await (failed as any)?.context?.json?.().catch(() => null);
-        setError(body?.error ?? failed.message ?? 'The agent did not answer.');
-      } else setTurns(current => [...current, { role: 'assistant', content: data?.reply || 'No answer.', wrote: data?.wrote?.length }]);
+      if (failed) setError(await failure(failed, 'The agent did not answer.'));
+      else setTurns(current => [...current, { role: 'assistant', content: data?.reply || 'No answer.', proposals: data?.proposals ?? [] }]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The agent did not answer.');
     } finally { setBusy(false); }
   };
+  const setState = (id: string, state: ProposalState) => setStates(current => ({ ...current, [id]: state }));
+  const confirm = async (proposal: Proposal) => {
+    if (states[proposal.id]?.status === 'busy' || states[proposal.id]?.status === 'kept') return;
+    setState(proposal.id, { status: 'busy' });
+    try {
+      const { error: failed } = await supabase.functions.invoke('vehicle-agent', {
+        // No role is sent: the server says it as the owner only when the car's record names this account as owner.
+        body: { vehicle_id: vehicle.id, confirm: proposal.token, conversation_ref: conversationRef.current },
+      });
+      if (failed) setState(proposal.id, { status: 'open', note: await failure(failed, 'Not kept.') });
+      else setState(proposal.id, { status: 'kept', note: proposal.writer === 'record_vehicle_statement' ? 'Kept in the log book.' : 'Recorded.' });
+    } catch (caught) {
+      setState(proposal.id, { status: 'open', note: caught instanceof Error ? caught.message : 'Not kept.' });
+    }
+  };
   return <>
     {(turns.length > 0 || busy || error) && <div className="garage-agent-turns">
-      {turns.map((turn, index) => <p key={index} data-role={turn.role}>{turn.content}{turn.wrote ? <small> · {turn.wrote} recorded</small> : null}</p>)}
+      {turns.map((turn, index) => <React.Fragment key={index}>
+        <p data-role={turn.role}>{turn.content}</p>
+        {turn.proposals?.map(proposal => <ProposalRow key={proposal.id} proposal={proposal}
+          state={states[proposal.id] ?? { status: 'open' }}
+          onConfirm={() => void confirm(proposal)} onDismiss={() => setState(proposal.id, { status: 'dismissed' })} />)}
+      </React.Fragment>)}
       {busy && <p data-role="assistant">…</p>}
       {error && <p role="alert">{error}</p>}
       <div ref={end} />
@@ -160,6 +245,8 @@ function AgentBox({ vehicle }: { vehicle: GarageVehicle }) {
       aria-label={`Ask the agent about ${vehicleName(vehicle)}`}
       onChange={event => setInput(event.target.value)}
       onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} />
+    {keep !== null && <button type="button" role="switch" aria-checked={keep} className="garage-agent-keep" onClick={() => void toggle()}
+      title="Keep this car's agent sessions in its log book. Only you read them.">Keep in log book</button>}
   </>;
 }
 
