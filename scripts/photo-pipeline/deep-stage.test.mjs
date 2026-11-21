@@ -16,6 +16,7 @@ import {
   cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput, QUESTION_TOKENS, standingReadingHold, standingReadingQuery,
   PROJECTION_WORDS, finishedLanding, ownReading, ownReadingQuery, projectionAnswer,
 } from './deep-stage.mjs';
+import { receiptForDeepResult } from './stage-queue.mjs';
 
 const IMAGE = '10000000-0000-4000-8000-000000000001', VEHICLE = '20000000-0000-4000-8000-000000000001';
 // The shared cases of the thin-tier rule: the database guard's contract test carries the same ones (contract-tiers Rule 1).
@@ -218,6 +219,16 @@ test('an intake that keeps refusing stops the stage for the fire: a refusal coun
   assert.equal(n, REFUSAL_STREAK_STOP);
   assert.equal(refusalStreak(2, { outcome: 'succeeded' }), 0);
   assert.equal(refusalStreak(0, null), 0);
+  // finishing a stored reading's landing spent no read and asked the intake for nothing: it leaves the count, so an intake
+  // that refuses every new reading still stops the stage when finished landings are mixed in between
+  const finished = receiptForDeepResult({ policy: 'already_read_same_method', detail: { observation_id: 'o', landing_finished: true } }, {});
+  assert.deepEqual([finished.outcome, finished.detail.already_read], ['succeeded', 'same_method']);
+  assert.equal(refusalStreak(2, finished), 2);
+  n = 0;
+  for (const r of [refused, refused, finished, refused]) n = refusalStreak(n, r);
+  assert.equal(n, REFUSAL_STREAK_STOP);
+  // a reading that landed through a post still resets it
+  assert.equal(refusalStreak(2, receiptForDeepResult({ intake: { http: 200, success: true, observation_id: 'o', thin_tier: true } }, {})), 0);
   // the projection calling a stored reading not eligible counts too
   assert.equal(refusalStreak(1, { outcome: 'unavailable', error_class: 'review_observation_not_eligible' }), 2);
   // a reading refused as standing over someone else's AFTER two reads were spent counts (the reader's own checks should

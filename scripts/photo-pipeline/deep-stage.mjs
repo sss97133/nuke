@@ -184,13 +184,15 @@ export const automaticMethod = (admits = NO_ADMITS) => `${AUTOMATIC_METHOD}; adm
  * and the reader differ, so the stage stops for the fire at REFUSAL_STREAK_STOP. Counted: the observation was not written,
  * the projection refused it without a word or called it not eligible, and a reading refused as standing over someone
  * else's AFTER it was read (the reader's own checks should have held that photo before any read: one is a race, three in
- * a row means those checks are blind). A success resets the count; any other outcome leaves it.
+ * a row means those checks are blind). A reading that landed through a post resets the count. Any other outcome leaves
+ * it, and so does finishing a stored reading's landing: that spent no read and never asked the intake to take a reading,
+ * so it says nothing about whether the intake would.
  */
 export const REFUSAL_STREAK_STOP = 3;
 export function refusalStreak(streak, receipt) {
   if (['review_observation_not_persisted', 'review_projection_refused', 'review_observation_not_eligible'].includes(receipt?.error_class)) return streak + 1;
   if (receipt?.detail?.intake_error === 'thin_review_over_reviewed') return streak + 1;
-  return receipt?.outcome === 'succeeded' ? 0 : streak;
+  return receipt?.outcome === 'succeeded' && receipt?.detail?.already_read !== 'same_method' ? 0 : streak;
 }
 
 /** The one sentence a thin reading's narrative may be: built from the posted closed values, never from the model. */

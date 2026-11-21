@@ -104,6 +104,20 @@ for (const word of ["thin_review_over_reviewed", "review_source_changed", "revie
     } finally { projectionReply = null; }
   });
 }
+// A fault of the database is not a rule: a lock timeout, statement timeout or deadlock in the projection (PostgREST
+// answers 500 with the SQLSTATE as code) reaches the caller as "unavailable", the same name the Mac reader's direct call
+// gives it. The observation is stored, so the next attempt only finishes its landing.
+for (const [code, message] of [["55P03", "canceling statement due to lock timeout"], ["57014", "canceling statement due to statement timeout"], ["40P01", "deadlock detected"]]) {
+  Deno.test(`actual projection fault ${code} is answered as unavailable, not as a refusal`, async () => {
+    calls.length = 0; rejectProjection = false;
+    projectionReply = () => Response.json({ code, details: null, hint: null, message }, { status: 500 });
+    try {
+      const response = await handler(request()), result = await response.json();
+      assert(response.status === 503 && result.success === false && result.error === "review_source_unavailable" && result.model_calls === 0);
+      assert(calls.length === 3 && !calls.some(c => c.startsWith("PATCH")));
+    } finally { projectionReply = null; }
+  });
+}
 Deno.test("actual automatic reading is answered as landed with no placement", async () => {
   calls.length = 0; rejectProjection = false;
   projectionReply = () => Response.json({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId,

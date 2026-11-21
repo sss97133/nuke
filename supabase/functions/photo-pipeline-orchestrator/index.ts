@@ -24,7 +24,7 @@ import { qualifyVinRead, vinCitation, type VinAdmission } from "./vinAdmission.t
 import { persistPipelineState, rowVinQualifies, type PipelineReceipt, type PipelineSource } from "./persistence.ts";
 import { recordSuppliedClassification, SuppliedClassificationError, CLASSIFICATION_SELECT } from "./suppliedClassification.ts";
 import { runClassifierAssay } from "./classifierAssay.ts";
-import { intakeRefusalWord, projectionRefusalWord, recordReviewedAnalysis, ReviewedAnalysisError, REVIEW_SELECT } from "./reviewedAnalysis.ts";
+import { intakeRefusalWord, projectionFailure, recordReviewedAnalysis, ReviewedAnalysisError, REVIEW_SELECT } from "./reviewedAnalysis.ts";
 import { admitPhotoFields, type FieldSourceAdmission } from "./fieldSourceAdmission.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -290,9 +290,9 @@ Deno.serve(async (req) => {
             return data;
           },
           async project(observationId) {
-            const { data, error } = await supabase.rpc("project_reviewed_image_analysis", { p_observation_id: observationId });
-            // the projection's own refusal words are passed on by name; every other failure stays opaque
-            if (error) throw new ReviewedAnalysisError(projectionRefusalWord(error) ?? "review_projection_refused", 409);
+            const { data, error, status } = await supabase.rpc("project_reviewed_image_analysis", { p_observation_id: observationId });
+            // the projection's own refusal words are passed on by name, a database fault is "unavailable", every other failure stays opaque
+            if (error) { const said = projectionFailure(error, status); throw new ReviewedAnalysisError(said.word, said.http); }
             return data;
           },
         });

@@ -1,4 +1,4 @@
-import { intakeRefusalWord, projectionRefusalWord, recordReviewedAnalysis, validateReviewedAnalysis, REVIEW_METHOD, type ReviewedAnalysisDeps } from "./reviewedAnalysis.ts";
+import { intakeRefusalWord, projectionFailure, projectionRefusalWord, recordReviewedAnalysis, validateReviewedAnalysis, REVIEW_METHOD, type ReviewedAnalysisDeps } from "./reviewedAnalysis.ts";
 
 function assert(v: unknown, message = "assertion failed"): asserts v { if (!v) throw new Error(message); }
 const imageId = "10000000-0000-4000-8000-000000000001";
@@ -97,6 +97,13 @@ Deno.test("a cache-only projector cannot report completed reviewed analysis", as
 const thinAnswer = (): any => ({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId,
   projection_duplicate: null, image_observation_id: null, search_vehicle_id: null,
   cover: { vehicle_id: vehicleId, changed: false, reason: "thin_tier_reading" }, thin_tier: true, superseded_readings: 1, model_calls: 0 });
+// What ties an answer to this landing, whatever its tier: this vehicle, this observation, and success that is the boolean true.
+const notThisLanding: Array<[string, (a: any) => void]> = [
+  ["another vehicle", (a: any) => { a.vehicle_id = "20000000-0000-4000-8000-000000000002"; }],
+  ["another observation", (a: any) => { a.observation_id = "30000000-0000-4000-8000-000000000002"; }],
+  ["success that is not true", (a: any) => { a.success = false; }],
+  ["success that is not the boolean true", (a: any) => { a.success = "true"; }],
+];
 Deno.test("an automatic reading lands without a placement when the projection says thin_tier", async () => {
   const f = fixture(); f.deps.project = async () => { f.effects.push("project"); return thinAnswer(); };
   const out = await recordReviewedAnalysis(packet(), f.deps);
@@ -109,12 +116,38 @@ for (const [name, change] of [
   ["thin_tier that is not the boolean true", (a: any) => { a.thin_tier = "true"; }],
   ["no thin_tier", (a: any) => { delete a.thin_tier; }],
   ["another photo", (a: any) => { a.image_id = "10000000-0000-4000-8000-000000000002"; }],
+  ...notThisLanding,
 ] as Array<[string, (a: any) => void]>) {
   Deno.test(`a thin answer with ${name} cannot claim success`, async () => {
     const f = fixture(); f.deps.project = async () => { const a = thinAnswer(); change(a); return a; };
     await refuses(() => recordReviewedAnalysis(packet(), f.deps), "review_projection_not_persisted");
   });
 }
+// The same three on a placed answer, which is whole in every other respect: each must be refused for that field alone.
+for (const [name, change] of [["another photo", (a: any) => { a.image_id = "10000000-0000-4000-8000-000000000002"; }], ...notThisLanding] as Array<[string, (a: any) => void]>) {
+  Deno.test(`a placed answer with ${name} cannot claim success`, async () => {
+    const f = fixture(); const placed = f.deps.project;
+    f.deps.project = async (id) => { const a: any = await placed(id); change(a); return a; };
+    await refuses(() => recordReviewedAnalysis(packet(), f.deps), "review_projection_not_persisted");
+    assert(f.effects.join(",") === "read,ingest,project");
+  });
+}
+Deno.test("a failed projection is named: its own word, a database fault as unavailable, anything else refused", () => {
+  const named = (error: unknown, status?: unknown) => { const f = projectionFailure(error, status); return `${f.word} ${f.http}`; };
+  // one of the projection's words wins, whatever the status
+  assert(named({ code: "23514", message: "review_source_changed" }, 400) === "review_source_changed 409");
+  assert(named({ code: "23514", message: "thin_review_over_reviewed" }, 500) === "thin_review_over_reviewed 409");
+  // the database could not answer: a 5xx, no HTTP answer at all, or a lock timeout, statement timeout or deadlock by code
+  assert(named({ code: "55P03", message: "canceling statement due to lock timeout" }, 500) === "review_source_unavailable 503");
+  assert(named({ code: "XX000", message: "internal error" }, 502) === "review_source_unavailable 503");
+  assert(named({ code: "", message: "TypeError: fetch failed" }, 0) === "review_source_unavailable 503");
+  for (const code of ["55P03", "57014", "40P01"]) assert(named({ code, message: "x" }) === "review_source_unavailable 503", code);
+  // a rule the caller has no word for stays a refusal: a 4xx, a raised check with other text, no status and no known code
+  assert(named({ code: "23514", message: "some other check" }, 400) === "review_projection_refused 409");
+  assert(named({ code: "42501", message: "review_requires_service_role" }, 403) === "review_projection_refused 409");
+  assert(named({ code: "PGRST202", message: "Could not find the function" }, 404) === "review_projection_refused 409");
+  assert(named({ message: "x" }) === "review_projection_refused 409" && named(null) === "review_projection_refused 409" && named("55P03", "500") === "review_projection_refused 409");
+});
 Deno.test("the projection's own refusal words are passed on by name, and nothing else is", () => {
   for (const word of ["thin_review_over_reviewed", "review_observation_not_eligible", "review_source_changed", "review_source_withdrawn",
     "review_source_previously_withdrawn", "review_source_changed_during_projection", "review_search_projection_not_persisted"]) {

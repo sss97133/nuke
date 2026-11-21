@@ -40,6 +40,21 @@ export function projectionRefusalWord(error: unknown): string | null {
   return typeof said === "string" && PROJECTION_REFUSALS.includes(said) ? said : null;
 }
 
+/** How a failed projection call is named for the caller. One of the projection's own words: that word, 409. A fault of
+ * the database and not a rule (no HTTP answer, a 5xx, or a lock timeout, statement timeout or deadlock by its SQLSTATE):
+ * review_source_unavailable 503, because the observation is stored and the next attempt only finishes its landing.
+ * Anything else stays review_projection_refused 409. The Mac reader's direct call splits the same way
+ * (scripts/photo-pipeline/deep-stage.mjs projectionAnswer). */
+export const PROJECTION_FAULT_CODES = ["55P03", "57014", "40P01"];
+export function projectionFailure(error: unknown, status?: unknown): { word: string; http: number } {
+  const word = projectionRefusalWord(error);
+  if (word) return { word, http: 409 };
+  const code = error !== null && typeof error === "object" && !Array.isArray(error) ? (error as Record<string, unknown>).code : null;
+  const fault = (typeof status === "number" && Number.isInteger(status) && (status === 0 || status >= 500))
+    || (typeof code === "string" && PROJECTION_FAULT_CODES.includes(code));
+  return fault ? { word: "review_source_unavailable", http: 503 } : { word: "review_projection_refused", http: 409 };
+}
+
 /** The existing BYOK schema, with bounded JSON and explicit source/provenance.
  * No camera estimates, confidence, labor intent or components are filled in here. */
 export function validateReviewedAnalysis(input: unknown, now = Date.now()): ObjectValue {
