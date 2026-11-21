@@ -755,7 +755,9 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
             <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title">
               {name || 'Unknown vehicle'}
             </Link>
-            {price != null && <span className="garage-card-price" title={priceTitle}>{formatCurrency(price)}</span>}
+            {price != null && <span className="garage-card-price" title={priceTitle}>
+              {/* A class figure is a fallback from comps, never this car's price: it carries its name in the head. */}
+              {header?.price == null && <small>class median</small>}{formatCurrency(price)}</span>}
           </div>
           {/* One lane, most important first; what the card's width cannot hold drops off the end. */}
           <div className="garage-card-lane">
