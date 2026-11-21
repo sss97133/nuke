@@ -59,6 +59,14 @@ describe('JournalPage', () => {
     expect(link?.textContent).toBe('1977 Chevrolet Blazer');
   });
 
+  it('draws a stored original as a resized copy, so an iPhone HEIC shows in any browser', async () => {
+    fixture.result.work_log.photos[0].url = 'https://proj.supabase.co/storage/v1/object/public/vehicle-photos/u/shot.heic';
+    await render();
+    const srcs = [...container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
+    expect(srcs[0]).toBe('https://proj.supabase.co/storage/v1/render/image/public/vehicle-photos/u/shot.heic?width=300&quality=80&resize=contain');
+    expect(srcs[1]).toBe('https://example.test/2.jpg');
+  });
+
   it('shows no id fragments: a private vehicle is labelled, not linked', async () => {
     await render();
     expect(container.textContent).toContain('PRIVATE VEHICLE');
