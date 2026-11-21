@@ -88,6 +88,20 @@ describe('JournalPage', () => {
     expect(container.textContent).not.toContain('ERROR');
     expect(container.textContent).not.toContain('LOADING');
     expect(container.textContent).not.toContain('401');
+    expect(container.textContent).not.toContain('NO SHOP WORK');
+  });
+
+  it('says there is no shop work when the public record for the day is empty and the projection is refused', async () => {
+    fixture.refused = true;
+    const log = fixture.result.work_log;
+    const empty = { date: '2026-09-24', audience: 'public', work_log: { ...log, photos: [], summary: { ...log.summary, photo_count: 0 } } };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(empty), { status: 200 })));
+    await render();
+    for (let i = 0; i < 20 && !container.textContent?.includes('NO SHOP WORK'); i++) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    expect(container.textContent).toContain('NO SHOP WORK IN THE PUBLIC RECORD FOR 2026-09-24.');
+    expect(container.textContent).not.toContain('ERROR');
+    expect(container.textContent).not.toContain('LOADING');
+    expect(container.textContent).not.toContain('401');
   });
 
   it('says the day record failed only when both reads have failed', async () => {

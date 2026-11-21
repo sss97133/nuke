@@ -38,7 +38,7 @@ const ALLOWLIST = {
   "api-v1-signal": "apiKeyAuth.authenticateRequest refuses anonymous callers (401)",
   "api-v1-vehicles": "apiKeyAuth.authenticateRequest refuses anonymous callers (401)",
   "api-v1-agent-register": "anonymous self-registration by design; IP rate-limited",
-  "mcp-connector": "own tiered auth: write tools need nk_live_/service; the execute_sql tool the service key only; read tools open",
+  "mcp-connector": "own tiered auth: write tools need nk_live_/service; the execute_sql tool the service key only; with no credential only the reference tools in PUBLIC_TOOLS run; every other tool needs the service key or an active admin",
   "oauth-server": "OAuth authorization/token flows carry their own proofs (client secret, PKCE, user session)",
   "stripe-webhook": "Stripe signature is the auth",
   "notify-transfer-parties": "authenticateWriter refuses anonymous callers and any caller but the service key (403); its only write is the outbound gate's held row",

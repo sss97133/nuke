@@ -163,6 +163,10 @@ export default function JournalPage() {
 
   if (!date) return <div style={styles.page}>missing date</div>;
 
+  // The public record can stand without the projection, so a day with nothing in it says so itself.
+  const log = data?.work_log;
+  const emptyDay = !!log && log.photos.length === 0 && log.work_orders.length === 0 && (log.receipts?.length ?? 0) === 0;
+
   return (
     <div style={styles.page}>
       <div style={styles.chrome}>
@@ -182,10 +186,15 @@ export default function JournalPage() {
         )}
       </div>
 
-      {data?.result === "insufficient_substrate" && (
+      {(data?.result === "insufficient_substrate" || emptyDay) && (
         <div style={styles.empty}>
-          NO SHOP WORK IN THE PUBLIC RECORD FOR {date}.<br />
-          <span style={styles.meta}>{data.note}</span>
+          NO SHOP WORK IN THE PUBLIC RECORD FOR {date}.
+          {data?.note && (
+            <>
+              <br />
+              <span style={styles.meta}>{data.note}</span>
+            </>
+          )}
         </div>
       )}
 
