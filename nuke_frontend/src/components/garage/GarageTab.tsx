@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { garageFirstDay, garageLastDay, type GarageVehicle, type VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
 import { GarageVehicleCard, garageAxis } from '../vehicles/GarageVehicleCard';
 import { GarageToolbar } from './GarageToolbar';
+import { GarageSummary } from './GarageSummary';
 import { addFilesToVehicle, GarageCardMenu, GarageMergeBar, GarageSheetPanel, type GarageSheet } from './GarageCardActions';
 import './garage.css';
 
@@ -85,7 +86,8 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
         <Button variant="secondary" type="button" disabled={isLoading} onClick={refresh}>{isLoading ? 'Reading garage…' : 'Refresh garage'}</Button>
       </div>}
     </div>
-    {signedIn && !isLoading && !error && <GarageToolbar vehicleCount={visibleVehicles.length} loadedVehicleCount={dashboard.loadedVehicleCount ?? vehicles.length} searchQuery={query} onSearchChange={setQuery} viewMode={viewMode} sortMode={sortMode} filterMode={filterMode} onViewChange={setViewMode} onSortChange={setSortMode} onFilterChange={setFilterMode} />}
+    {signedIn && !isLoading && !error && <GarageSummary vehicles={vehicles} sortMode={sortMode} onSort={setSortMode} />}
+    {signedIn && !isLoading && !error && <GarageToolbar vehicleCount={visibleVehicles.length} loadedVehicleCount={dashboard.loadedVehicleCount ?? vehicles.length} searchQuery={query} onSearchChange={setQuery} viewMode={viewMode} sortMode={sortMode} sortReversed={dashboard.sortReversed} filterMode={filterMode} onViewChange={setViewMode} onSortChange={setSortMode} onSortReverse={dashboard.setSortReversed} onFilterChange={setFilterMode} />}
     {isLoading ? <div role="status" className="garage-notice">Reading vehicle relationships…</div>
       : error ? <section role="alert" className="garage-notice"><h2>Garage unavailable</h2><p>{error}</p><Button type="button" onClick={refresh}>Retry garage</Button></section>
       : <>

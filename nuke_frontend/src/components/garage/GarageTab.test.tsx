@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import GarageTab from './GarageTab';
 import type { VehiclesDashboardState, GarageVehicle } from '../../hooks/useVehiclesDashboard';
 vi.mock('../PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
-vi.mock('../vehicles/GarageVehicleCard', () => ({ garageAxis: () => undefined, GarageVehicleCard: ({vehicle}: any) => <a href={`/vehicle/${vehicle.id}`}>{vehicle.id}</a> }));
+vi.mock('../vehicles/GarageVehicleCard', () => ({ garageAxis: () => ({ start: 0, end: Number.MAX_SAFE_INTEGER, weeks: 53, steps: [1, 2, 3], grid: '' }), MiniBarcode: () => <svg className="garage-barcode" />, formatCurrency: (n: number) => `$${n.toLocaleString('en-US')}`, GarageVehicleCard: ({vehicle}: any) => <a href={`/vehicle/${vehicle.id}`}>{vehicle.id}</a> }));
 const vehicle = {id:'synthetic-car',relationship_type:'OWNER'} as GarageVehicle;
 let root: Root, host: HTMLDivElement, state: VehiclesDashboardState;
 beforeEach(() => {
@@ -123,4 +123,25 @@ it('keeps org-held and recently worked cars in the one list instead of pulling t
   state={...state,vehicles:rows};await mount();
   expect(host.querySelectorAll('.garage-sections section')).toHaveLength(1);
   expect([...host.querySelectorAll('.garage-sections a')].map(a=>a.textContent)).toEqual(['own','blue','ghia']);
+});
+
+it('sums the loaded garage above the cards, and a total orders the cars by what it counts', async()=>{
+  const day=(d:string,photos:number):[string,number,number,number,number]=>[d,photos,1,0,2];
+  state={...state,setSortReversed:vi.fn(),sortReversed:false,vehicles:[
+    {...vehicle,id:'a',vin:'VIN0000000000001',image_count:10,class_price:{status:'priced',value:20000},timeline:{first_day:'2026-01-02',last_day:'2026-01-03',active_days:2,photos:7,work_days:2,events:0,documents:4,days:[day('2026-01-02',3),day('2026-01-03',4)]}},
+    {...vehicle,id:'b',vin:null,image_count:5,class_price:{status:'blocked',value:null},timeline:null},
+  ]};
+  await mount();
+  const summary=host.querySelector('.garage-summary')!;
+  expect(summary.textContent).toContain('2 cars');
+  expect(summary.textContent).toContain('2 active days in the last year');
+  const tile=(label:string)=>[...summary.querySelectorAll('.garage-summary-tiles > *')].find(node=>node.querySelector('dt')?.textContent===label)!;
+  expect(tile('Photos').querySelector('dd')?.textContent).toBe('15');
+  expect(tile('Work days').querySelector('dd')?.textContent).toBe('2');
+  expect(tile('Document pages').querySelector('dd')?.textContent).toBe('4');
+  expect(tile('With a VIN').querySelector('dd')?.textContent).toBe('1of 2 cars');
+  expect(tile('Class medians added up').querySelector('dd')?.textContent).toBe('$20,0001 of 2 cars priced');
+  await act(async()=>(tile('Photos') as HTMLButtonElement).click()); expect(state.setSortMode).toHaveBeenCalledWith('PHOTOS');
+  await act(async()=>(host.querySelector('button[aria-label="Reverse the order"]') as HTMLButtonElement).click()); expect(state.setSortReversed).toHaveBeenCalledWith(true);
+  expect(host.querySelectorAll('.garage-sort option').length).toBe(14);
 });
