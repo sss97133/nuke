@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import GarageTab from './GarageTab';
 import type { VehiclesDashboardState, GarageVehicle } from '../../hooks/useVehiclesDashboard';
 vi.mock('../PrefetchLink', () => ({ default: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
-vi.mock('../vehicles/GarageVehicleCard', () => ({ GarageVehicleCard: ({vehicle}: any) => <a href={`/vehicle/${vehicle.id}`}>{vehicle.id}</a> }));
+vi.mock('../vehicles/GarageVehicleCard', () => ({ garageAxis: () => undefined, GarageVehicleCard: ({vehicle}: any) => <a href={`/vehicle/${vehicle.id}`}>{vehicle.id}</a> }));
 const vehicle = {id:'synthetic-car',relationship_type:'OWNER'} as GarageVehicle;
 let root: Root, host: HTMLDivElement, state: VehiclesDashboardState;
 beforeEach(() => {
@@ -71,7 +71,7 @@ it('groups current inventory together independently of title and retains past bu
   expect(rows[5].relationship_type).toBe('BUSINESS HANDLING');
 });
 it('lists cars under the year of their newest dated activity, undated cars last',async()=>{
-  const timeline=(first_day:string,last_day:string)=>({first_day,last_day,active_days:1,photos:1,work_days:0,events:0,documents:0,months:[[last_day.slice(0,7),1,0,0,0]]});
+  const timeline=(first_day:string,last_day:string)=>({first_day,last_day,active_days:1,photos:1,work_days:0,events:0,documents:0,weeks:[[last_day,1,0,0,0]]});
   state={...state,vehicles:[
     {...vehicle,id:'this-year',timeline:timeline('2021-03-04','2026-11-02')},
     {...vehicle,id:'also-this-year',timeline:timeline('2026-01-01','2026-02-01'),inventory_status:'previous'},

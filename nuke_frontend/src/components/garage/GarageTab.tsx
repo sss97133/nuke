@@ -1,9 +1,9 @@
 /** The owner's garage, preserving recorded relationships and unresolved evidence. */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from '../PrefetchLink';
 import { Button } from '../ui/button';
 import { garageFirstDay, garageLastDay, type GarageVehicle, type VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
-import { GarageVehicleCard } from '../vehicles/GarageVehicleCard';
+import { GarageVehicleCard, garageAxis } from '../vehicles/GarageVehicleCard';
 import { GarageToolbar } from './GarageToolbar';
 import './garage.css';
 
@@ -29,13 +29,8 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
     if (last?.key === key) last.vehicles.push(vehicle);
     else groups.push({ key, label: !dayOf ? null : key === 'undated' ? 'No dated activity' : key, vehicles: [vehicle] });
   }
-  // Every strip spans the same months: the last three years, or less when the garage is younger.
-  // A car whose record starts earlier stretches its own strip back to its first month.
-  const firstMonths = vehicles.flatMap(vehicle => vehicle.timeline?.first_day ? [vehicle.timeline.first_day.slice(0, 7)] : []).sort();
-  const today = new Date();
-  const monthsBack = (n: number) => new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - n, 1)).toISOString().slice(0, 7);
-  const axis = firstMonths.length
-    ? { start: firstMonths[0] > monthsBack(35) ? firstMonths[0] : monthsBack(35), end: monthsBack(0) } : undefined;
+  // One window and one intensity scale for every strip, taken from the whole garage.
+  const axis = useMemo(() => garageAxis(vehicles), [vehicles]);
 
   return <main className="garage-page">
     <div className="garage-heading"><div><h1>Garage</h1><p>Every car you are tied to, in the order of its recorded activity.</p></div>

@@ -41,10 +41,10 @@ export interface EventSummary {
   last_event_date: string | null;
 }
 
-/** One month of recorded activity: [YYYY-MM, photos, work sessions, events, document pages]. */
-export type GarageTimelineMonth = [string, number, number, number, number];
+/** One week of recorded activity: [Monday YYYY-MM-DD, photos, work sessions, events, document pages]. */
+export type GarageTimelineWeek = [string, number, number, number, number];
 
-/** The profile timeline's sources folded to months (get_vehicle_contribution_months_batch). */
+/** The profile timeline's sources folded to weeks (get_vehicle_contribution_weeks_batch). */
 export interface GarageTimeline {
   first_day: string;
   last_day: string;
@@ -53,7 +53,7 @@ export interface GarageTimeline {
   work_days: number;
   events: number;
   documents: number;
-  months: GarageTimelineMonth[];
+  weeks: GarageTimelineWeek[];
 }
 
 export interface GarageVehicle {
@@ -91,6 +91,8 @@ export interface GarageVehicle {
   event_summary: EventSummary | null;
   /** Dated activity from photos, work sessions, events and documents. Null when none is recorded or readable. */
   timeline?: GarageTimeline | null;
+  /** vehicle_activity's newest genuine activity (photo, work session or event by a tied account), from get_user_garage. */
+  last_activity_at?: string | null;
   /** Organization that holds the car, from organization_vehicles (not a hard-coded list). */
   custody_org?: CustodyOrg | null;
   /** Latest EXIF photo or work session by the viewer inside the recency window. */
@@ -218,7 +220,7 @@ interface GarageRelationship {
   end_date: string | null;
 }
 
-interface GarageRecord { vehicle_id: string; relationship: string }
+interface GarageRecord { vehicle_id: string; relationship: string; last_activity_at?: string | null }
 
 /** Account membership is broader than ownership. Keep the period/verification
  * fold authoritative while making contributed and created profiles findable. */
@@ -349,8 +351,9 @@ export function isCurrentGarageOwner(vehicle: Pick<GarageVehicle, 'relationship_
 }
 
 /** The day of the newest dated activity on the car: the garage's default order. */
-export function garageLastDay(v: Pick<GarageVehicle, 'timeline' | 'last_event_at'>): string | null {
-  return v.timeline?.last_day ?? v.last_event_at?.slice(0, 10) ?? null;
+export function garageLastDay(v: Pick<GarageVehicle, 'timeline' | 'last_event_at' | 'last_activity_at'>): string | null {
+  // The database's activity clock leads: it is in the first read and counts only genuine activity.
+  return v.last_activity_at?.slice(0, 10) ?? v.timeline?.last_day ?? v.last_event_at?.slice(0, 10) ?? null;
 }
 
 /** The first day the car appears in the record. */
@@ -490,6 +493,7 @@ function rowToGarageVehicle(
   event_weeks?: string[] | null,
   event_summary?: EventSummary | null,
   timeline?: GarageTimeline | null,
+  last_activity_at?: string | null,
 ): GarageVehicle {
   const estimated_value = estimate?.estimated_value ?? null;
 
@@ -527,6 +531,7 @@ function rowToGarageVehicle(
     event_weeks: event_weeks ?? null,
     event_summary: event_summary ?? null,
     timeline: timeline ?? null,
+    last_activity_at: last_activity_at ?? null,
   };
 }
 
@@ -681,6 +686,12 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
         const eventSummaries = new Map<string, EventSummary>();
         const eventWeeksMap = new Map<string, string[]>();
         const timelines = new Map<string, GarageTimeline>();
+        const activityAt = new Map<string, string>();
+        for (const record of accountRecords) {
+          const at = typeof record.last_activity_at === 'string' && Number.isFinite(Date.parse(record.last_activity_at)) ? record.last_activity_at : null;
+          const id = terminalId(record.vehicle_id);
+          if (at && at > (activityAt.get(id) ?? '')) activityAt.set(id, at);
+        }
         const estimates = new Map<string, { estimated_value: number; calculated_at: string }>();
         const readWarnings: string[] = [];
         const unreadable = [...relMap.keys()].filter(id => !allRows.has(id));
@@ -692,7 +703,7 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
             const rel = relMap.get(id);
             if (!rel || row.deleted_at || row.listing_kind === 'non_vehicle_item' ||
                 (row.status && EXCLUDED_STATUSES.has(row.status))) continue;
-            garage.push(rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id), timelines.get(id)));
+            garage.push(rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id), timelines.get(id), activityAt.get(id)));
           }
           setWarnings([...readWarnings]);
           setRawVehicles(applyGarageOwnerCorrections(garage, corrections));
@@ -741,7 +752,7 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
           const readTimelines = async () => {
             const data: (GarageTimeline & { vehicle_id: string })[] = [];
             for (let offset = 0; offset < vehicleIdArray.length && !cancelled; offset += 500) {
-              const result = await supabase.rpc('get_vehicle_contribution_months_batch', { p_vehicle_ids: vehicleIdArray.slice(offset, offset + 500) });
+              const result = await supabase.rpc('get_vehicle_contribution_weeks_batch', { p_vehicle_ids: vehicleIdArray.slice(offset, offset + 500) });
               if (result.error || !Array.isArray(result.data)) return { data: null, error: true };
               data.push(...result.data);
             }
@@ -770,16 +781,16 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
           setActivity(garageActivity);
           if (fallbackRes.error) readWarnings.push('Some vehicle cover photos are unavailable.');
           if (eventSummaryRes.error) readWarnings.push('Event summaries are unavailable. Activity counts remain unknown.');
-          // The event weeks stay as the strip's fallback when the month reader is unavailable.
+          // The event weeks stay as the timeline's fallback when the week reader is unavailable.
           if (eventWeeksRes.error && timelineRes.error) readWarnings.push('Activity timelines are unavailable.');
           for (const t of timelineRes.error ? [] : (timelineRes.data ?? []) as (GarageTimeline & { vehicle_id: string })[]) {
-            if (typeof t.vehicle_id === 'string' && allRows.has(t.vehicle_id) && Array.isArray(t.months) &&
+            if (typeof t.vehicle_id === 'string' && allRows.has(t.vehicle_id) && Array.isArray(t.weeks) &&
                 /^\d{4}-\d{2}-\d{2}$/.test(String(t.first_day)) && /^\d{4}-\d{2}-\d{2}$/.test(String(t.last_day))) {
               timelines.set(t.vehicle_id, {
                 first_day: t.first_day, last_day: t.last_day, active_days: Number(t.active_days) || 0,
                 photos: Number(t.photos) || 0, work_days: Number(t.work_days) || 0,
                 events: Number(t.events) || 0, documents: Number(t.documents) || 0,
-                months: t.months.filter(m => Array.isArray(m) && /^\d{4}-\d{2}$/.test(String(m[0]))),
+                weeks: t.weeks.filter(w => Array.isArray(w) && /^\d{4}-\d{2}-\d{2}$/.test(String(w[0]))),
               });
             }
           }

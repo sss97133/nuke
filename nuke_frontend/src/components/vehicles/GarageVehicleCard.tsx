@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import Link from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl as sharedOptimizeImageUrl } from '../../lib/imageOptimizer';
+import { fetchVehicleImages } from '../../lib/fetchVehicleImages';
 import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
 import '../garage/garage.css';
 
@@ -19,7 +20,8 @@ export interface GarageVehicleCardProps {
   axis?: GarageAxis;
 }
 
-export interface GarageAxis { start: string; end: string }
+/** The years, the intensity steps and the empty grid are the garage's, not the car's, so two cards compare. */
+export interface GarageAxis { startYear: number; years: number; steps: [number, number, number]; grid: string }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -165,17 +167,6 @@ const TOOLTIP_STYLE: React.CSSProperties = {
 };
 
 // ---------------------------------------------------------------------------
-// Barcode colors (matches BarcodeTimeline.tsx)
-// ---------------------------------------------------------------------------
-
-const BARCODE_COLORS: Record<number, string> = {
-  1: 'var(--heat-3, #34d399)',
-  2: 'var(--heat-4, #059669)',
-  3: 'var(--heat-5, #047857)',
-  4: 'var(--heat-6, #065f46)',
-};
-
-// ---------------------------------------------------------------------------
 // HoverData — wraps any element with tooltip + click action
 // ---------------------------------------------------------------------------
 
@@ -260,63 +251,90 @@ function HoverData({
 }
 
 // ---------------------------------------------------------------------------
-// MiniBarcode — the car's activity by month. A strip in the grid card, a sliver
-// over the thumbnail in the list card.
+// MiniBarcode — the car's recorded activity as week squares: one row per year,
+// the last five years, shaded on the garage's own scale.
 // ---------------------------------------------------------------------------
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const monthIndex = (ym: string) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
 const monthLabel = (ym: string) => `${MONTH_NAMES[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+const DAY_MS = 86_400_000;
+const CELL = 5; // one square and its gap, in viewBox units
+const TIMELINE_YEARS = 5;
 
-/** Recorded items per month: the month reader when present, otherwise the event weeks. */
-function monthTotals(vehicle: GarageVehicle): Map<string, number> {
+/** A week's place in the grid: its year (by its Thursday) and its column in that year. */
+function weekCell(weekStart: string): { year: number; col: number } | null {
+  const monday = Date.parse(`${weekStart}T00:00:00Z`);
+  if (!Number.isFinite(monday)) return null;
+  const thursday = new Date(monday + 3 * DAY_MS);
+  const year = thursday.getUTCFullYear();
+  return { year, col: Math.min(52, Math.floor((thursday.getTime() - Date.UTC(year, 0, 1)) / (7 * DAY_MS))) };
+}
+
+/** Recorded items per week: the week reader when present, otherwise the event weeks. */
+function weekTotals(vehicle: GarageVehicle): Map<string, number> {
   const totals = new Map<string, number>();
-  if (vehicle.timeline?.months.length) {
-    for (const [ym, photos, work, events, documents] of vehicle.timeline.months) {
-      totals.set(ym, (Number(photos) || 0) + (Number(work) || 0) + (Number(events) || 0) + (Number(documents) || 0));
+  if (vehicle.timeline?.weeks.length) {
+    for (const [week, photos, work, events, documents] of vehicle.timeline.weeks) {
+      totals.set(week, (Number(photos) || 0) + (Number(work) || 0) + (Number(events) || 0) + (Number(documents) || 0));
     }
     return totals;
   }
   for (const week of vehicle.event_weeks ?? []) {
-    const ym = week.slice(0, 7);
-    if (/^\d{4}-\d{2}$/.test(ym)) totals.set(ym, (totals.get(ym) || 0) + 1);
+    const key = week.slice(0, 10);
+    totals.set(key, (totals.get(key) || 0) + 1);
   }
   return totals;
 }
 
-/** The same thresholds on every card, so two strips can be compared. */
-const monthLevel = (n: number) => (n >= 60 ? 4 : n >= 20 ? 3 : n >= 5 ? 2 : 1);
+/** This year and the four before it, with steps at the quartiles of the garage's active weeks. */
+export function garageAxis(vehicles: GarageVehicle[], now = new Date()): GarageAxis {
+  const startYear = now.getUTCFullYear() - TIMELINE_YEARS + 1;
+  const totals: number[] = [];
+  for (const vehicle of vehicles) {
+    for (const [week, n] of weekTotals(vehicle)) {
+      const cell = weekCell(week);
+      if (cell && n > 0 && cell.year >= startYear && cell.year <= now.getUTCFullYear()) totals.push(n);
+    }
+  }
+  totals.sort((a, b) => a - b);
+  const at = (q: number) => totals.length ? totals[Math.min(totals.length - 1, Math.floor(q * totals.length))] : 1;
+  // Every week that has happened is a square; the weeks still to come this year are not drawn.
+  const thisWeek = weekCell(new Date(now.getTime() - ((now.getUTCDay() + 6) % 7) * DAY_MS).toISOString().slice(0, 10))!;
+  let grid = '';
+  for (let row = 0; row < TIMELINE_YEARS; row++) {
+    const last = startYear + row < thisWeek.year ? 52 : thisWeek.col;
+    for (let col = 0; col <= last; col++) grid += `M${col * CELL} ${row * CELL}h4v4h-4z`;
+  }
+  return { startYear, years: TIMELINE_YEARS, steps: [at(0.25), at(0.5), at(0.75)], grid };
+}
 
-function MiniBarcode({ vehicle, axis, variant }: { vehicle: GarageVehicle; axis?: GarageAxis; variant: 'strip' | 'overlay' }) {
-  const strip = useMemo(() => {
-    const totals = monthTotals(vehicle);
-    const active = [...totals.entries()].filter(([, n]) => n > 0).sort(([a], [b]) => a.localeCompare(b));
-    if (active.length === 0) return null;
-    const first = Math.min(monthIndex(active[0][0]), axis ? monthIndex(axis.start) : Infinity);
-    const last = Math.max(monthIndex(active[active.length - 1][0]), axis ? monthIndex(axis.end) : -Infinity);
-    const years: number[] = [];
-    for (let m = Math.ceil(first / 12) * 12; m <= last; m += 12) if (m > first) years.push(m - first);
-    return {
-      span: last - first + 1,
-      years,
-      bars: active.map(([ym, n]) => ({ ym, x: monthIndex(ym) - first, level: monthLevel(n), n })),
-      label: `Recorded activity by month: ${active.length} active ${active.length === 1 ? 'month' : 'months'}, ${monthLabel(active[0][0])} to ${monthLabel(active[active.length - 1][0])}`,
-    };
+function MiniBarcode({ vehicle, axis }: { vehicle: GarageVehicle; axis?: GarageAxis }) {
+  const drawn = useMemo(() => {
+    const frame = axis ?? garageAxis([vehicle]);
+    const cells: { key: string; x: number; y: number; level: number; title: string }[] = [];
+    for (const [week, n] of weekTotals(vehicle)) {
+      const cell = weekCell(week);
+      if (!cell || n <= 0 || cell.year < frame.startYear || cell.year >= frame.startYear + frame.years) continue;
+      cells.push({
+        key: week, x: cell.col * CELL, y: (cell.year - frame.startYear) * CELL,
+        // Above each quartile of the garage's active weeks the square steps up one shade.
+        level: 1 + frame.steps.filter(step => n > step).length,
+        title: `Week of ${monthLabel(week.slice(0, 7)).replace(' ', ` ${Number(week.slice(8, 10))}, `)}: ${n.toLocaleString('en-US')} recorded`,
+      });
+    }
+    return { frame, cells };
   }, [vehicle, axis]);
 
-  if (!strip) return variant === 'strip' ? null : <div className="garage-barcode garage-barcode-overlay" />;
-
+  const { frame, cells } = drawn;
+  const label = `${cells.length} active ${cells.length === 1 ? 'week' : 'weeks'} recorded, ${frame.startYear} to ${frame.startYear + frame.years - 1}`;
   return (
-    <div className={`garage-barcode garage-barcode-${variant}`} role="img" aria-label={strip.label} title={strip.label}>
-      <svg viewBox={`0 0 ${strip.span} 4`} preserveAspectRatio="none" width="100%" height="100%" aria-hidden="true">
-        {variant === 'strip' && strip.years.map(x => <rect key={`y${x}`} className="garage-barcode-year" x={x} y={0} width={0.12} height={4} />)}
-        {strip.bars.map(bar => (
-          <rect key={bar.ym} x={bar.x + 0.08} width={0.84}
-            y={variant === 'strip' ? 4 - bar.level : 0} height={variant === 'strip' ? bar.level : 4}
-            style={{ fill: BARCODE_COLORS[bar.level] }} />
-        ))}
-      </svg>
-    </div>
+    <svg className="garage-barcode" role="img" aria-label={label}
+      viewBox={`0 0 ${53 * CELL - 1} ${frame.years * CELL - 1}`} preserveAspectRatio="xMinYMid meet">
+      <path className="garage-barcode-grid" d={frame.grid} />
+      {cells.map(cell => (
+        <rect key={cell.key} x={cell.x} y={cell.y} width={4} height={4} data-level={cell.level}><title>{cell.title}</title></rect>
+      ))}
+    </svg>
   );
 }
 
@@ -502,6 +520,20 @@ function recordCounts(vehicle: GarageVehicle): string[] {
 
 function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefresh?: () => void; axis?: GarageAxis }) {
   const [vinCopied, setVinCopied] = useState(false);
+  // The car's other photos load the first time the pointer or a finger reaches the cover;
+  // the reel is a native scroll-snap strip, so a two-finger swipe flips through them.
+  const [reel, setReel] = useState<string[]>([]);
+  const [frame, setFrame] = useState(0);
+  const reelAsked = useRef(false);
+  const loadReel = useCallback(() => {
+    if (reelAsked.current || !vehicle.resolved_image_url) return;
+    reelAsked.current = true;
+    // The shared gallery reader: the display gate, and the public source for a signed-out visitor.
+    fetchVehicleImages<{ image_url: string; is_sensitive: boolean | null }>(vehicle.id, 'image_url, is_sensitive', { maxRows: 12, includeMismatchFilter: true })
+      .then(rows => setReel([...new Set(rows.filter(row => !row.is_sensitive).map(row => row.image_url))]
+        .filter(url => typeof url === 'string' && url && url !== vehicle.resolved_image_url)))
+      .catch(() => { reelAsked.current = false; });
+  }, [vehicle.id, vehicle.resolved_image_url]);
   const title = formatVehicleTitle(vehicle);
   const name = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim && vehicle.trim !== vehicle.model ? vehicle.trim : null]
     .filter(Boolean).join(' ');
@@ -517,6 +549,9 @@ function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefr
   const period = ownershipPeriod(vehicle);
   const relationship = [
     sentence(vehicle.relationship_type),
+    // An owner-stated detail (transfer pending, disputed interest) belongs on the card, not in a tooltip.
+    vehicle.relationship_detail && !/\d{4}-\d{2}-\d{2}/.test(vehicle.relationship_detail) ? sentence(vehicle.relationship_detail) : null,
+    vehicle.inventory_status === 'previous' && vehicle.relationship_type !== 'PREVIOUSLY OWNED' ? 'previous' : null,
     vehicle.custody_org ? `at ${vehicle.custody_org.name}` : null,
     /\d{4}-\d{2}-\d{2}/.test(period) ? period : null,
   ].filter(Boolean).join(' · ');
@@ -526,39 +561,50 @@ function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefr
   return (
     <div className="garage-vehicle-card">
       <article className="garage-card">
-        <div className="garage-card-photo">
-          <Link to={`/vehicle/${vehicle.id}`} className="garage-card-image-link" aria-hidden="true" tabIndex={-1} />
-          {vehicle.resolved_image_url ? (
-            <img
-              key={vehicle.resolved_image_url}
-              src={sharedOptimizeImageUrl(vehicle.resolved_image_url, 'medium') || vehicle.resolved_image_url}
-              alt={title}
-              width={600}
-              height={450}
-              loading="lazy"
-              decoding="async"
-              style={{ display: 'block' }}
-              onError={(e) => {
-                // Two-stage fallback. The optimized src routes through the Supabase
-                // /render/image transform endpoint — a single sitewide point of failure
-                // (outage/quota blanks every image at once while raw object URLs keep
-                // serving). First error: strip the render prefix/params and retry the
-                // raw /storage/v1/object/public/ URL. Second error: hide.
-                const img = e.target as HTMLImageElement;
-                const renderMarker = '/storage/v1/render/image/public/';
-                if (!img.dataset.rawFallbackTried && img.src.includes(renderMarker)) {
-                  img.dataset.rawFallbackTried = '1';
-                  img.src = img.src
-                    .replace(renderMarker, '/storage/v1/object/public/')
-                    .split('?')[0];
-                  return;
-                }
-                img.style.display = 'none';
-              }}
-            />
-          ) : (
-            <span className="garage-card-photo-empty">No photo yet</span>
-          )}
+        <div className="garage-card-photo" onPointerEnter={loadReel} onTouchStart={loadReel}>
+          <div className="garage-card-reel"
+            onScroll={event => setFrame(Math.round(event.currentTarget.scrollLeft / Math.max(1, event.currentTarget.clientWidth)))}>
+            <Link to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
+              {vehicle.resolved_image_url ? (
+                <img
+                  key={vehicle.resolved_image_url}
+                  src={sharedOptimizeImageUrl(vehicle.resolved_image_url, 'medium') || vehicle.resolved_image_url}
+                  alt={title}
+                  width={600}
+                  height={450}
+                  loading="lazy"
+                  decoding="async"
+                  style={{ display: 'block' }}
+                  onError={(e) => {
+                    // Two-stage fallback. The optimized src routes through the Supabase
+                    // /render/image transform endpoint — a single sitewide point of failure
+                    // (outage/quota blanks every image at once while raw object URLs keep
+                    // serving). First error: strip the render prefix/params and retry the
+                    // raw /storage/v1/object/public/ URL. Second error: hide.
+                    const img = e.target as HTMLImageElement;
+                    const renderMarker = '/storage/v1/render/image/public/';
+                    if (!img.dataset.rawFallbackTried && img.src.includes(renderMarker)) {
+                      img.dataset.rawFallbackTried = '1';
+                      img.src = img.src
+                        .replace(renderMarker, '/storage/v1/object/public/')
+                        .split('?')[0];
+                      return;
+                    }
+                    img.style.display = 'none';
+                  }}
+                />
+              ) : (
+                // The cover arrives after the roster; only a car with no photos says so.
+                !vehicle.image_count && <span className="garage-card-photo-empty">No photo yet</span>
+              )}
+            </Link>
+            {reel.map(url => (
+              <Link key={url} to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
+                <img src={sharedOptimizeImageUrl(url, 'medium') || url} alt="" width={600} height={450} loading="lazy" decoding="async" />
+              </Link>
+            ))}
+          </div>
+          {reel.length > 0 && <span className="garage-card-frame">{frame + 1} / {reel.length + 1}</span>}
 
           {/* This RPC revokes discovery membership, not an ownership period. */}
           {vehicle.relationship_source === 'discovered' && (
@@ -593,7 +639,7 @@ function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefr
           </Link>
           <p className="garage-card-relationship" title={relationshipTooltip(vehicle)}>{relationship}</p>
 
-          <MiniBarcode vehicle={vehicle} axis={axis} variant="strip" />
+          <MiniBarcode vehicle={vehicle} axis={axis} />
           {(span || counts.length > 0) && (
             <p className="garage-card-record">
               {span && <span className="garage-card-span">{span}</span>}
@@ -626,7 +672,7 @@ function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefr
 // List card (horizontal)
 // ---------------------------------------------------------------------------
 
-function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
+function ListCard({ vehicle, axis }: { vehicle: GarageVehicle; axis?: GarageAxis }) {
   const [hovered, setHovered] = useState(false);
   const [vinCopied, setVinCopied] = useState(false);
   const title = formatVehicleTitle(vehicle);
@@ -676,7 +722,6 @@ function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
               <span style={{ ...LABEL, fontSize: 'var(--text-caption)' }}>NO IMAGE</span>
             </div>
           )}
-          <MiniBarcode vehicle={vehicle} variant="overlay" />
         </div>
 
         {/* Content */}
@@ -703,14 +748,8 @@ function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
                 <MissingTag label="NO VIN" />
               </HoverData>
             )}
-            {vehicle.estimated_value == null && (
-              <HoverData tooltip="CURRENT BUILD-CLASS ESTIMATE UNAVAILABLE">
-                <MissingTag label="NOT ESTIMATED" />
-              </HoverData>
-            )}
           </div>
 
-          <span style={LABEL}>Source: {relationshipSource(vehicle)}</span>
           {vehicle.vin && (
             <HoverData
               tooltip={vinCopied ? 'COPIED!' : `${vehicle.vin} | CLICK TO COPY`}
@@ -730,17 +769,18 @@ function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
             </HoverData>
           )}
 
+          <div style={{ maxWidth: 300 }}><MiniBarcode vehicle={vehicle} axis={axis} /></div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', alignItems: 'baseline' }}>
-            <HoverData tooltip={estimateTooltip(vehicle)}>
-              <span style={LABEL}>Estimate</span>
-              <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, marginLeft: 4 }}>
-                {vehicle.estimated_value != null ? formatCurrency(vehicle.estimated_value) : '—'}
-              </span>
-            </HoverData>
-            <HoverData tooltip={vehicle.view_count == null ? 'View count unavailable' : `${vehicle.view_count} recorded views`}>
-              <span style={LABEL}>VWS</span>
-              <span style={{ ...MONO, fontSize: 'var(--text-callout)', marginLeft: 3 }}>{vehicle.view_count ?? '—'}</span>
-            </HoverData>
+            {recordSpan(vehicle) && <span style={LABEL}>{recordSpan(vehicle)}</span>}
+            {recordCounts(vehicle).length > 0 && <span style={LABEL}>{recordCounts(vehicle).join(' · ')}</span>}
+            {vehicle.estimated_value != null && (
+              <HoverData tooltip={estimateTooltip(vehicle)}>
+                <span style={LABEL}>Estimate</span>
+                <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, marginLeft: 4 }}>
+                  {formatCurrency(vehicle.estimated_value)}
+                </span>
+              </HoverData>
+            )}
           </div>
 
           <div style={{ maxWidth: 280 }}>
@@ -834,7 +874,7 @@ export function GarageVehicleCard({
   onRefresh,
   axis,
 }: GarageVehicleCardProps) {
-  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} />;
+  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} axis={axis} />;
   if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} />;
   return <GridCard vehicle={vehicle} onRefresh={onRefresh} axis={axis} />;
 }
