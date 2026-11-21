@@ -1,17 +1,62 @@
 /** The owner's garage, preserving recorded relationships and unresolved evidence. */
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from '../PrefetchLink';
 import { Button } from '../ui/button';
-import type { VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
-import { bucketGarage, RECENT_WORK_DAYS } from '../../hooks/garageCustody';
-import { GarageVehicleCard } from '../vehicles/GarageVehicleCard';
+import { garageFirstDay, garageLastDay, type GarageVehicle, type VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
+import { GarageVehicleCard, garageAxis } from '../vehicles/GarageVehicleCard';
 import { GarageToolbar } from './GarageToolbar';
+import { addFilesToVehicle, GarageCardMenu, GarageMergeBar, GarageSheetPanel, type GarageSheet } from './GarageCardActions';
 import './garage.css';
+
+const CARD_WIDTH_KEY = 'garage-card-width';
+const CARD_WIDTH_DEFAULT = 280;
+const CARD_WIDTH_MIN = 130;
+const CARD_WIDTH_MAX = 720;
 
 function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
   const { vehicles, isLoading, error, warnings = [], viewMode, sortMode, filterMode,
     setViewMode, setSortMode, setFilterMode, refresh, unresolvedSources = [], signedIn } = dashboard;
   const [query, setQuery] = useState('');
+  // A two-finger click on a card opens its actions; files dropped on a card go to that car.
+  const [menu, setMenu] = useState<{ vehicle: GarageVehicle; x: number; y: number } | null>(null);
+  // Any number of cars can have their agent or log book open at once; each stays on its own card.
+  const [sheets, setSheets] = useState<Record<string, GarageSheet['kind']>>({});
+  const setSheet = (sheet: GarageSheet) => setSheets(current => ({ ...current, [sheet.vehicle.id]: sheet.kind }));
+  const closeSheet = (id: string) => setSheets(current => { const next = { ...current }; delete next[id]; return next; });
+  const [merge, setMerge] = useState<{ keeper: GarageVehicle; duplicate: GarageVehicle | null } | null>(null);
+  const [dropOn, setDropOn] = useState<string | null>(null);
+  const hasFiles = (event: React.DragEvent) => [...event.dataTransfer.types].includes('Files');
+  // A pinch resizes the cards (more cars or bigger cars), not the browser's magnification.
+  const pageRef = useRef<HTMLElement>(null);
+  const [cardWidth, setCardWidth] = useState(() => {
+    let saved = 0;
+    try { saved = Number(globalThis.localStorage?.getItem?.(CARD_WIDTH_KEY)); } catch { /* storage unavailable */ }
+    return saved >= CARD_WIDTH_MIN && saved <= CARD_WIDTH_MAX ? saved : CARD_WIDTH_DEFAULT;
+  });
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page) return;
+    const clamp = (width: number) => Math.round(Math.min(CARD_WIDTH_MAX, Math.max(CARD_WIDTH_MIN, width)));
+    // A trackpad pinch arrives as a wheel event with ctrlKey set.
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      setCardWidth(width => clamp(width * Math.exp(-event.deltaY * 0.01)));
+    };
+    // Safari reports the pinch as gesture events carrying a scale.
+    let base = CARD_WIDTH_DEFAULT;
+    const onGestureStart = (event: Event) => { event.preventDefault(); setCardWidth(width => (base = width)); };
+    const onGestureChange = (event: Event) => { event.preventDefault(); setCardWidth(clamp(base * ((event as any).scale || 1))); };
+    page.addEventListener('wheel', onWheel, { passive: false });
+    page.addEventListener('gesturestart', onGestureStart);
+    page.addEventListener('gesturechange', onGestureChange);
+    return () => {
+      page.removeEventListener('wheel', onWheel);
+      page.removeEventListener('gesturestart', onGestureStart);
+      page.removeEventListener('gesturechange', onGestureChange);
+    };
+  }, []);
+  useEffect(() => { try { globalThis.localStorage?.setItem?.(CARD_WIDTH_KEY, String(cardWidth)); } catch { /* private mode */ } }, [cardWidth]);
   const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matches = (text: string) => words.every(word => text.toLocaleLowerCase().includes(word));
   const visibleVehicles = vehicles.filter(vehicle => matches([
@@ -19,27 +64,22 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
   ].filter(value => value != null).join(' ')));
   const visibleSources = unresolvedSources.filter(source => matches([source.label, ...source.stated_roles].join(' ')));
   const filtered = filterMode !== 'ALL' || words.length > 0;
-  // Cars worked on this week lead; cars held by an organization sit together under it;
-  // everything else keeps the relationship-status groups.
-  const buckets = bucketGarage(visibleVehicles);
-  const statusGroups = [
-    { key: 'current', label: 'Current vehicles' },
-    { key: 'previous', label: 'Previous vehicles' },
-    { key: 'unknown', label: 'Other vehicle relationships' },
-  ].map(group => ({ ...group, vehicles: buckets.rest.filter(vehicle => {
-    const status = vehicle.inventory_status ??
-      (['VERIFIED OWNER', 'OWNER', 'CO-OWNER'].includes(vehicle.relationship_type) ? 'current'
-        : vehicle.relationship_type === 'PREVIOUSLY OWNED' ? 'previous' : 'unknown');
-    return status === group.key;
-  }) }));
-  const groups = [
-    { key: 'recent', label: 'Worked on this week', note: `Photos or work sessions in the last ${RECENT_WORK_DAYS} days`, vehicles: buckets.recent },
-    ...buckets.orgGroups.map(({ org, vehicles }) => ({ key: `org-${org.id}`, label: `At ${org.name}`, note: undefined as string | undefined, vehicles })),
-    ...statusGroups.map(group => ({ ...group, note: undefined as string | undefined })),
-  ].filter(group => group.vehicles.length > 0);
+  // One list in date order. A year heading marks where the order crosses a year;
+  // a car with no dated activity comes after the dated ones. Custody and relationship
+  // are labels on the card, not sections.
+  const dayOf = sortMode === 'FIRST' ? garageFirstDay : sortMode === 'RECENT' ? garageLastDay : null;
+  const groups: { key: string; label: string | null; vehicles: GarageVehicle[] }[] = [];
+  for (const vehicle of visibleVehicles) {
+    const key = dayOf ? dayOf(vehicle)?.slice(0, 4) ?? 'undated' : 'all';
+    const last = groups[groups.length - 1];
+    if (last?.key === key) last.vehicles.push(vehicle);
+    else groups.push({ key, label: !dayOf ? null : key === 'undated' ? 'No dated activity' : key, vehicles: [vehicle] });
+  }
+  // One window and one intensity scale for every strip, taken from the whole garage.
+  const axis = useMemo(() => garageAxis(vehicles), [vehicles]);
 
-  return <main className="garage-page">
-    <div className="garage-heading"><div><h1>Garage</h1><p>Your vehicle relationships and the evidence recorded for them.</p></div>
+  return <main className="garage-page" ref={pageRef} style={{ '--garage-card-min': `${cardWidth}px` } as React.CSSProperties}>
+    <div className="garage-heading"><div><h1>Garage</h1><p>Every car you are tied to, in the order of its recorded activity.</p></div>
       {signedIn && <div className="garage-heading-actions">
         <Link className="btn-base btn-secondary" to="/capture/ledger">Capture ledger</Link>
         <Button variant="secondary" type="button" disabled={isLoading} onClick={refresh}>{isLoading ? 'Reading garage…' : 'Refresh garage'}</Button>
@@ -66,15 +106,37 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
         </section>}
         {vehicles.length > 0 && <p className="garage-relationship-note">Relationships reflect recorded ownership and account statements. Relationship changes are not available from this page.</p>}
         <div className="garage-sections">
-          {groups.map(section => <section key={section.key} aria-label={section.label}>
-            <h2 className="garage-section-heading">{section.label} <span>{section.vehicles.length}</span></h2>
-            {section.note && <p className="garage-section-note">{section.note}</p>}
+          {groups.map(section => <section key={section.key} aria-label={section.label ?? 'Vehicles'}>
+            {section.label && <h2 className="garage-section-heading">{section.label} <span>{section.vehicles.length}</span></h2>}
             <div className={`garage-vehicles garage-view-${viewMode.toLowerCase()}`}>
-              {section.vehicles.map(vehicle => <GarageVehicleCard key={vehicle.id} vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} />)}
+              {section.vehicles.map(vehicle => <div key={vehicle.id} className="garage-card-slot"
+                data-drop={dropOn === vehicle.id || undefined} data-merge-pick={merge && !merge.duplicate && merge.keeper.id !== vehicle.id || undefined}
+                onContextMenu={event => {
+                  if (!signedIn) return;
+                  event.preventDefault();
+                  // The bubble opens on the card, at the click, pulled in so it stays inside the card's width.
+                  const box = event.currentTarget.getBoundingClientRect();
+                  setMenu({ vehicle, x: Math.min(event.clientX - box.left, Math.max(4, box.width - 248)), y: event.clientY - box.top });
+                }}
+                onClickCapture={event => {
+                  // While a merge is being set up, a press on a card names the duplicate instead of opening it.
+                  if (!merge || merge.duplicate || merge.keeper.id === vehicle.id) return;
+                  event.preventDefault(); event.stopPropagation(); setMerge({ keeper: merge.keeper, duplicate: vehicle });
+                }}
+                onDragOver={event => { if (!signedIn || !hasFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDropOn(vehicle.id); }}
+                onDragLeave={() => setDropOn(current => current === vehicle.id ? null : current)}
+                onDrop={event => { if (!signedIn || !hasFiles(event)) return; event.preventDefault(); event.stopPropagation(); setDropOn(null); addFilesToVehicle(vehicle, [...event.dataTransfer.files]); }}>
+                <GarageVehicleCard vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} />
+                {signedIn && !sheets[vehicle.id] && <button type="button" className="garage-card-corner" aria-label={`Open the agent for ${[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}`}
+                  title="Open this car's agent" onClick={() => setSheet({ kind: 'agent', vehicle })} />}
+                {menu?.vehicle.id === vehicle.id && <GarageCardMenu vehicle={vehicle} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onSheet={setSheet} onMerge={keeper => setMerge({ keeper, duplicate: null })} />}
+                {sheets[vehicle.id] && <GarageSheetPanel key={sheets[vehicle.id]} sheet={{ kind: sheets[vehicle.id], vehicle }} onClose={() => closeSheet(vehicle.id)} />}
+              </div>)}
             </div>
           </section>)}
         </div>
       </>}
+    {merge && <GarageMergeBar keeper={merge.keeper} duplicate={merge.duplicate} viewerId={dashboard.viewerId} onCancel={() => setMerge(null)} onDone={() => { setMerge(null); refresh(); }} />}
   </main>;
 }
 

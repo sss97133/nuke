@@ -25,7 +25,7 @@ export function GarageToolbar({ vehicleCount, loadedVehicleCount, searchQuery, o
         {(['GRID', 'LIST', 'COMPACT'] as const).map(mode => <button key={mode} type="button" aria-pressed={viewMode === mode} onClick={() => onViewChange(mode)}>{mode === 'GRID' ? 'Grid' : mode === 'LIST' ? 'List' : 'Compact'}</button>)}
       </div></div>
       <label>Sort<select value={sortMode} onChange={event => onSortChange(event.target.value as SortMode)}>
-        <option value="RECENT">Recently updated</option><option value="VALUE">Recorded estimate</option><option value="NAME">Vehicle name</option>
+        <option value="RECENT">Latest activity</option><option value="FIRST">First on record</option><option value="VALUE">Recorded estimate</option><option value="NAME">Vehicle name</option>
       </select></label>
       <label>Relationship<select value={filterMode} onChange={event => onFilterChange(event.target.value as FilterMode)}>
         <option value="ALL">All relationships</option><option value="OWNED">Ownership records, current and past</option>
