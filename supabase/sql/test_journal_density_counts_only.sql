@@ -3,6 +3,8 @@
 -- imports and ungated photos, counts receipts and completed payments, names the day's top vehicle, and carries no money.
 -- Then (20261121123000) that the view reads as its caller: a caller without owner rights counts only the rows its row
 -- policy lets it read, and the owner-rights caller's counts are unchanged.
+-- And that the 90-day photo bound is an index condition for that caller: under row security a bound whose operator is
+-- not leakproof (timestamptz against timestamp) cannot be one, and the per-user probe stops being a probe.
 -- The inserts below seed stub tables in a disposable database, never production: -- ALLOW_RAW_TESTIMONY_WRITE
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -20,6 +22,7 @@ CREATE TABLE public.profiles (id uuid PRIMARY KEY);
 CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, user_id uuid DEFAULT 'cccccccc-0000-0000-0000-000000000001', taken_at timestamptz, source text, vision_gate_status text, is_sensitive boolean NOT NULL DEFAULT false);
 CREATE TABLE public.receipts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), receipt_date date, total numeric, total_amount numeric, vendor_name text);
 CREATE TABLE public.work_order_payments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), payment_date timestamptz, amount numeric, status text);
+CREATE INDEX idx_vehicle_images_user_taken_at ON public.vehicle_images (user_id, taken_at);
 
 -- ALLOW_RAW_TESTIMONY_WRITE (stub tables in a disposable database)
 INSERT INTO public.vehicle_images (vehicle_id, taken_at, source, vision_gate_status) VALUES
@@ -107,4 +110,23 @@ BEGIN
   IF (SELECT count(*) FROM public.vw_journal_density) <> 91 THEN RAISE EXCEPTION 'visitor days: %', (SELECT count(*) FROM public.vw_journal_density); END IF;
   RAISE NOTICE 'vw_journal_density: reads as its caller; a visitor counts only rows it may read';
 END $$;
+
+-- The visitor's photo probe: with sequential and bitmap scans off the planner must use the (user_id, taken_at) index,
+-- and the 90-day bound has to sit in its index condition. As a filter it would be applied to every photo the user has.
+SET enable_seqscan = off;
+SET enable_bitmapscan = off;
+DO $$
+DECLARE plan json;
+BEGIN
+  EXECUTE 'EXPLAIN (FORMAT JSON) SELECT * FROM public.vw_journal_density' INTO plan;
+  IF plan::text !~ '"Index Name": "idx_vehicle_images_user_taken_at"' THEN
+    RAISE EXCEPTION 'as a visitor the photo probe does not use idx_vehicle_images_user_taken_at: %', plan;
+  END IF;
+  IF plan::text !~ '"Index Cond": "[^"]*user_id = [^"]*taken_at >= ' THEN
+    RAISE EXCEPTION 'as a visitor the 90-day bound is not an index condition of the photo probe: %', plan;
+  END IF;
+  RAISE NOTICE 'vw_journal_density: as a visitor the 90-day bound is an index condition of the per-user photo probe';
+END $$;
+RESET enable_seqscan;
+RESET enable_bitmapscan;
 RESET ROLE;
