@@ -69,7 +69,8 @@ Applied to Supabase project `qkgaybvrernstplzjaam` (also applied via SQL; the mi
    47 s on the default model; the reader uses sonnet by default.
    Photos too: `photo-pipeline-orchestrator` hands out its checklist (`action: classifier_prompt`, the v98 prompt) and accepts
    `classification_raw` + `reader`; `scripts/photo-pipeline/subscription-frame-classifier.mjs` runs it. Unattended:
-   `scripts/photo-pipeline/subscription-reader-batch.sh` (launchd `scripts/com.nuke.subscription-reader.plist`, every 10 min,
+   `scripts/photo-pipeline/subscription-reader-batch.sh` (launchd `scripts/com.nuke.subscription-reader.plist`: a full fire about
+   every 10 min and, each minute between, a fast fire that runs the first read of a newly landed photo when one is queued;
    bounded batches, a checkout of origin/main at `~/.worktrees/nuke-main`) writes a `job_assay_readings` heartbeat per reader.
    Visual gate on the subscription too: `scripts/photo-pipeline/subscription_gate_reader.py` views each awaiting_gate chunk's
    pre_gate sample as a reference/sample sheet with `claude -p` and records the verdicts, then calls `capture_landing_gate_check`
