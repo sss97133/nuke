@@ -30,6 +30,39 @@ describe('garage card analysis lines', () => {
     expect(lines.find(line => line.key === 'receipts')?.group).toBe('record');
   });
 
+  it('states quoted money beside the receipts, never added to them', () => {
+    const quoted = { documents: 1, first_day: '2024-05-01', last_day: '2024-05-01', amount: null, amount_basis: 'options_not_added',
+      rule: 'quote rule', quotes: [{ options: [{ label: 'A' }, { label: 'B' }, { label: 'C' }] }] };
+    const lines = analysisLines({ build: { ...build({}), quoted } as BuildReconstruction });
+    const keys = lines.filter(line => line.group === 'money').map(line => line.key);
+    expect(keys).toEqual(['amount', 'quoted']);
+    const line = lines.find(l => l.key === 'quoted')!;
+    expect([line.label, line.value, line.cite]).toEqual(['Quoted', '3 options', 'May 2024']);
+    expect(line.title).toBe('quote rule. vehicle_build_reconstruction, as of Nov 20, 2026');
+    expect(lines.find(l => l.key === 'amount')!.value).toBe('$1,200');
+  });
+
+  it('states the accepted option, a single quote amount, and only a count for several quotes', () => {
+    const accepted = analysisLines({ build: { ...build({ lines: 0 }), quoted: { documents: 1, first_day: '2024-08-15', last_day: '2024-08-15',
+      amount: '1800', amount_basis: 'accepted_option', quotes: [{ options: [{}, {}] }] } } as BuildReconstruction });
+    expect(accepted.map(l => [l.key, l.value, l.cite])).toEqual([['quoted', '$1,800', 'Aug 2024 · accepted of 2']]);
+    const single = analysisLines({ build: { ...build({}), quoted: { documents: 1, first_day: '2024-03-01', last_day: '2024-03-01',
+      amount: 800, amount_basis: 'printed_total', quotes: [{ options: [] }] } } as BuildReconstruction });
+    expect(single.find(l => l.key === 'quoted')!.value).toBe('$800');
+    const several = analysisLines({ build: { ...build({}), quoted: { documents: 2, first_day: '2024-03-01', last_day: '2024-09-01',
+      amount: null, amount_basis: 'documents_not_added', quotes: [{ options: [] }, { options: [] }] } } as BuildReconstruction });
+    expect(several.find(l => l.key === 'quoted')).toMatchObject({ group: 'money', value: '2 quotes', cite: 'Mar 2024 – Sep 2024' });
+  });
+
+  it('shows a visitor the quote count in the record line, with no amount, and nothing when the reader has no quotes', () => {
+    const lines = analysisLines({ build: { ...build({}, false), quoted: { documents: 1, first_day: '2024-05-01', last_day: '2024-05-01',
+      amount: null, quotes: [{ options: [] }] } } as BuildReconstruction });
+    expect(lines.filter(l => l.group === 'record').map(l => [l.key, l.value])).toEqual([['receipts', '3 receipts · Jan 2024 – Feb 2025'],
+      ['quoted', '1 quote · May 2024']]);
+    expect(analysisLines({ build: build({}) }).some(l => l.key === 'quoted')).toBe(false);
+    expect(analysisLines({ build: { ...build({}), quoted: null } as BuildReconstruction }).some(l => l.key === 'quoted')).toBe(false);
+  });
+
   it('splits owner-confirmed from inferred work and cites the sessions', () => {
     const lines = analysisLines({ sessions: [
       { session_date: '2026-04-24', duration_minutes: 30, owner_confirmed_at: '2026-04-25T00:00:00Z' },
