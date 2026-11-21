@@ -32,6 +32,13 @@ final class GarageCardTests: XCTestCase {
         XCTAssertNil(map[GarageCardFixtures.undated], "a car with no dated activity has no row")
     }
 
+    func testIdentityPendingFixtureDecodesAsOneUnresolvedSource() throws {
+        let rows = try JSONDecoder().decode([GarageOwnerCorrection].self, from: Data(GarageCardFixtures.corrections.utf8))
+        let pending = GarageUnresolvedSource.from(rows)
+        XCTAssertEqual(pending.map(\.label), ["Fixture pending pickup"])
+        XCTAssertEqual(GarageVehicle.applying(rows, to: try garage()).count, 5, "an unresolved source never becomes a card")
+    }
+
     func testBatchReaderDropsAMalformedRowAndKeepsTheRest() throws {
         let json = """
         [{"vehicle_id":"A","first_day":"not a day","last_day":"2026-01-01","days":[]},
