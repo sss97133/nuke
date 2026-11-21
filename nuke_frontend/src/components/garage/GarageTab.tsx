@@ -6,7 +6,7 @@ import { garageFirstDay, garageLastDay, type GarageVehicle, type VehiclesDashboa
 import { GarageVehicleCard, garageAxis } from '../vehicles/GarageVehicleCard';
 import { GarageToolbar } from './GarageToolbar';
 import { GarageSummary } from './GarageSummary';
-import { addFilesToVehicle, GarageCardMenu, GarageMergeBar, GarageSheetPanel, type GarageSheet } from './GarageCardActions';
+import { addFilesToVehicle, GarageCardMenu, GarageDisclaimBar, GarageMergeBar, GarageSheetPanel, type GarageSheet } from './GarageCardActions';
 import './garage.css';
 
 const CARD_WIDTH_KEY = 'garage-card-width';
@@ -25,6 +25,7 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
   const setSheet = (sheet: GarageSheet) => setSheets(current => ({ ...current, [sheet.vehicle.id]: sheet.kind }));
   const closeSheet = (id: string) => setSheets(current => { const next = { ...current }; delete next[id]; return next; });
   const [merge, setMerge] = useState<{ keeper: GarageVehicle; duplicate: GarageVehicle | null } | null>(null);
+  const [disclaim, setDisclaim] = useState<GarageVehicle | null>(null);
   const [dropOn, setDropOn] = useState<string | null>(null);
   const hasFiles = (event: React.DragEvent) => [...event.dataTransfer.types].includes('Files');
   // A pinch resizes the cards (more cars or bigger cars), not the browser's magnification.
@@ -131,7 +132,7 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
                 <GarageVehicleCard vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} />
                 {signedIn && !sheets[vehicle.id] && <button type="button" className="garage-card-corner" aria-label={`Open the agent for ${[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}`}
                   title="Open this car's agent" onClick={() => setSheet({ kind: 'agent', vehicle })} />}
-                {menu?.vehicle.id === vehicle.id && <GarageCardMenu vehicle={vehicle} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onSheet={setSheet} onMerge={keeper => setMerge({ keeper, duplicate: null })} />}
+                {menu?.vehicle.id === vehicle.id && <GarageCardMenu vehicle={vehicle} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onSheet={setSheet} onMerge={keeper => setMerge({ keeper, duplicate: null })} onDisclaim={setDisclaim} />}
                 {sheets[vehicle.id] && <GarageSheetPanel key={sheets[vehicle.id]} sheet={{ kind: sheets[vehicle.id], vehicle }} onClose={() => closeSheet(vehicle.id)} />}
               </div>)}
             </div>
@@ -139,6 +140,8 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
         </div>
       </>}
     {merge && <GarageMergeBar keeper={merge.keeper} duplicate={merge.duplicate} viewerId={dashboard.viewerId} onCancel={() => setMerge(null)} onDone={() => { setMerge(null); refresh(); }} />}
+    {disclaim && <GarageDisclaimBar vehicle={disclaim} viewerId={dashboard.viewerId} onCancel={() => setDisclaim(null)}
+      onRemoved={() => refresh()} onRestored={() => refresh()} />}
   </main>;
 }
 
