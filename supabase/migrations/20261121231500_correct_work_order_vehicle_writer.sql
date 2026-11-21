@@ -89,7 +89,7 @@ CREATE OR REPLACE FUNCTION public.correct_work_order_vehicle(
 AS $function$
 DECLARE
   c_writer CONSTANT text := 'correct_work_order_vehicle';
-  c_version CONSTANT text := '20261121233000';
+  c_version CONSTANT text := '20261121231500';
   c_meta_keys CONSTANT text[] := ARRAY['vehicle_id_old', 'vehicle_id_new', 'vehicle_id_corrected_at', 'vehicle_id_correction_ref',
     'correction_source'];
   -- Lifecycle writers key their Sign observations '<kind>:' || work order id (live pg_proc, 2026-11-21).
@@ -243,7 +243,7 @@ COMMENT ON FUNCTION public.correct_work_order_vehicle(uuid, uuid, text, jsonb, u
   'Moves a work order to another live vehicle with a reason, cited evidence and an actor; journals old/new vehicle in work_order_scalar_corrections (append-only) and rewrites the metadata vehicle_id_old/new/corrected_at/correction_ref keys (never correction_source). Undo = call it again pointing back (reverses_correction_id). Refuses requested jobs, parent/child work orders and work orders with rows carrying their own vehicle copy or signed history. Service role for an actor tied to both vehicles, or the signed-in actor who can edit both.';
 
 UPDATE public.pipeline_registry
-   SET description = 'Audit rows of scalar corrections to work_orders: totals by the reviewed migration 20261020000500; vehicle moves by correct_work_order_vehicle (20261121233000).',
+   SET description = 'Audit rows of scalar corrections to work_orders: totals by the reviewed migration 20261020000500; vehicle moves by correct_work_order_vehicle (20261121231500).',
        write_via = 'reviewed migration (totals); correct_work_order_vehicle (vehicle_id)'
  WHERE table_name = 'work_order_scalar_corrections' AND column_name = 'id';
 

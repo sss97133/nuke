@@ -1,4 +1,4 @@
--- Isolated PostgreSQL 17 contract for 20261121233000_correct_work_order_vehicle_writer.sql. Synthetic rows only; never production.
+-- Isolated PostgreSQL 17 contract for 20261121231500_correct_work_order_vehicle_writer.sql. Synthetic rows only; never production.
 -- Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_wo_vehicle
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_wo_vehicle -f supabase/sql/test_correct_work_order_vehicle.sql
@@ -201,7 +201,7 @@ INSERT INTO work_orders (id, vehicle_id, title, parent_work_order_id, request_ob
 -- The table as 20261020000500 made it, with one totals row, then the writer.
 \ir ../migrations/20261020000500_work_order_invented_zero_totals.sql
 SELECT pg_temp.ok('the earlier migration journaled its totals rows', (SELECT count(*) FROM work_order_scalar_corrections) = 2);
-\ir ../migrations/20261121233000_correct_work_order_vehicle_writer.sql
+\ir ../migrations/20261121231500_correct_work_order_vehicle_writer.sql
 SELECT pg_temp.ok('existing totals rows pass the widened checks and keep their values',
   (SELECT count(*) FROM work_order_scalar_corrections WHERE column_name IN ('estimated_total', 'actual_total')
      AND reason = 'invented_zero_no_priced_basis' AND old_value = 0 AND new_value IS NULL AND old_ref IS NULL) = 2);
@@ -302,7 +302,7 @@ SELECT pg_temp.ok('one journal row: old/new vehicle, trimmed reason, evidence, a
          AND c.new_ref = '00000000-0000-0000-0000-0000000000a1' AND c.old_value IS NULL AND c.new_value IS NULL
          AND c.reason = 'The agreement belongs on the build; the 2026-04-29 hand correction put it on the trade-in.'
          AND c.evidence = :EV::jsonb AND c.actor_user_id = :OWNER AND c.writer = 'correct_work_order_vehicle'
-         AND c.migration_version = '20261121233000' AND c.reverses_correction_id IS NULL
+         AND c.migration_version = '20261121231500' AND c.reverses_correction_id IS NULL
          AND c.metadata_before = jsonb_build_object('vehicle_id_old', '00000000-0000-0000-0000-0000000000a1',
            'vehicle_id_new', '00000000-0000-0000-0000-0000000000a2', 'vehicle_id_corrected_at', '2026-04-29', 'correction_source', 'session_verbal')
        FROM work_order_scalar_corrections c, pg_temp.first f WHERE c.column_name = 'vehicle_id'));
@@ -361,7 +361,7 @@ SELECT pg_temp.ok('the checks refuse a vehicle row without evidence or actor wri
 
 -- 8. rerunning the migration changes no row.
 CREATE TABLE pg_temp.journal AS SELECT * FROM work_order_scalar_corrections;
-\ir ../migrations/20261121233000_correct_work_order_vehicle_writer.sql
+\ir ../migrations/20261121231500_correct_work_order_vehicle_writer.sql
 SELECT pg_temp.ok('a second run of the migration changes no journal row',
   NOT EXISTS (SELECT 1 FROM work_order_scalar_corrections c FULL JOIN pg_temp.journal j USING (id) WHERE to_jsonb(c) IS DISTINCT FROM to_jsonb(j)));
 SELECT 'correct_work_order_vehicle contract: PASS' AS result;

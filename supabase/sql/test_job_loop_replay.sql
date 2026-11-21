@@ -431,8 +431,8 @@ ALTER TABLE public.work_order_payments ADD COLUMN IF NOT EXISTS amount numeric,
  ADD COLUMN IF NOT EXISTS payment_date timestamptz;
 \echo REPLAY 20261030192441_work_order_workload_read.sql
 \ir ../migrations/20261030192441_work_order_workload_read.sql
-\echo REPLAY 20261121233000_correct_work_order_vehicle_writer.sql
-\ir ../migrations/20261121233000_correct_work_order_vehicle_writer.sql
+\echo REPLAY 20261121231500_correct_work_order_vehicle_writer.sql
+\ir ../migrations/20261121231500_correct_work_order_vehicle_writer.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
