@@ -24,7 +24,7 @@ const VehicleAgentChat: React.FC<{ vehicleId: string; defaultCollapsed?: boolean
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [allowWrites, setAllowWrites] = useState(true);
+  const allowWrites = false;
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -66,8 +66,8 @@ const VehicleAgentChat: React.FC<{ vehicleId: string; defaultCollapsed?: boolean
     <CollapsibleWidget variant="profile" title="Ask the Vehicle Agent" defaultCollapsed={defaultCollapsed}>
       <div style={{ fontFamily: 'Arial, sans-serif' }}>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
-          Claude with this vehicle's data as context. It can record durable new facts as
-          observations on your behalf — tracked and reversible.
+          Answers from this vehicle's own records. It writes nothing from here: a change is proposed and
+          confirmed from the car's card in your garage.
         </div>
 
         {turns.length > 0 && (
@@ -107,10 +107,8 @@ const VehicleAgentChat: React.FC<{ vehicleId: string; defaultCollapsed?: boolean
           }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-            <input type="checkbox" checked={allowWrites} onChange={(e) => setAllowWrites(e.target.checked)} />
-            Let it record observations
-          </label>
+          {/* The agent no longer writes on its own (vehicle-agent, 2026-11-20): no switch to offer here. */}
+          <span />
           <button
             onClick={send}
             disabled={busy || !input.trim()}
