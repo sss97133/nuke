@@ -50,7 +50,53 @@ export async function readReelStart(vehicleId: string): Promise<{ sequence: Reel
   return { sequence: sequence.flat(), page, total: Math.max(total, page.length) };
 }
 
-/** A later page of the reel, newest first, from `offset`. */
-export function readReelPage(vehicleId: string, offset: number): Promise<ReelRow[]> {
-  return fetchVehicleImages<ReelRow>(vehicleId, REEL_COLUMNS, { includeMismatchFilter: true, order: 'newest', maxRows: REEL_PAGE, offset, count: false });
+/** A later page of the reel, newest first, from `offset`; `rows` past one page is one read of up to 1,000. */
+export function readReelPage(vehicleId: string, offset: number, rows = REEL_PAGE): Promise<ReelRow[]> {
+  return fetchVehicleImages<ReelRow>(vehicleId, REEL_COLUMNS, { includeMismatchFilter: true, order: 'newest', maxRows: rows, offset, count: false });
+}
+
+/**
+ * A day square's photo: the reel holds at most this many loaded photos while it looks for a day, so a click on an
+ * old square of a car with more photos than this does nothing (the gallery reader takes an offset, not a day).
+ */
+export const REEL_DAY_CAP = 3000;
+/** Reads one click may spend looking for its day before it gives up. */
+export const REEL_DAY_READS = 4;
+/** The most photos one read asks for (the gallery reader's row cap). */
+const REEL_DAY_READ = 1000;
+
+/**
+ * The first frame of `day` in the reel's newest-first run (frames from `runStart` on), so a swipe forward walks
+ * the rest of that day; else the cover or a lead view taken that day; else -1. Indexes are into `frames`.
+ */
+export function dayFrameIndex(frames: ReelFrame[], day: string, runStart: number): number {
+  for (let index = runStart; index < frames.length; index++) if (frames[index].day === day) return index;
+  for (let index = 0; index < Math.min(runStart, frames.length); index++) if (frames[index].day === day) return index;
+  return -1;
+}
+
+/**
+ * How many more photos to read, from `loaded`, to reach `day` in the newest-first reel; 0 when the loaded run
+ * already passed the day (or reached undated photos), nothing is left, or the cap is reached. The day reader's
+ * photo counts (`days`: [day, photos, ...]) place the day: the photos of newer days come before it. The gallery
+ * keeps some photos the day reader leaves out, so when that estimate falls short the read reaches further.
+ */
+export function dayReadSize(args: {
+  day: string; lastDay: string | null | undefined; loaded: number; total: number;
+  days: readonly (readonly [string, ...unknown[]])[] | null | undefined; cap?: number;
+}): number {
+  const { day, lastDay, loaded, total, days, cap = REEL_DAY_CAP } = args;
+  // Newest first, undated last: a loaded day older than the one asked for, or an undated one, is past it.
+  if (lastDay === null || (lastDay !== undefined && lastDay < day)) return 0;
+  const end = Math.min(total, cap);
+  if (loaded >= end) return 0;
+  let before = 0;
+  let on = 0;
+  for (const [at, photos] of days ?? []) {
+    const n = Number(photos) || 0;
+    if (at > day) before += n; else if (at === day) on += n;
+  }
+  const estimate = before + on + REEL_PAGE;
+  const want = estimate > loaded ? estimate : loaded + Math.max(REEL_PAGE, Math.ceil(loaded / 2));
+  return Math.max(0, Math.min(want, end, loaded + REEL_DAY_READ) - loaded);
 }
