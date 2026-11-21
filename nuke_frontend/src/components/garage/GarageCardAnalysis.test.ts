@@ -67,7 +67,7 @@ describe('garage card analysis lines', () => {
     const [line] = analysisLines({ classPrice: { vehicle_id: 'car', status: 'priced', value: '46200', value_low: '35100',
       value_high: '76850', n: 35, subject_class: 'build', computed_at: '2026-11-21T08:00:00Z',
       basis: 'median of 35 sold comps of the same build class (build) in the 1973 Pontiac Firebird cohort' } });
-    expect([line.key, line.label, line.value, line.cite]).toEqual(['class-value', 'Class value · 35 comps', '$46,200',
+    expect([line.key, line.label, line.value, line.cite]).toEqual(['class-value', 'Class · 35 comps', '$46,200',
       '$35,100 – $76,850']);
     expect(line.title).toBe('median of 35 sold comps of the same build class (build) in the 1973 Pontiac Firebird cohort. '
       + 'computed Nov 21, 2026. get_vehicle_class_prices');

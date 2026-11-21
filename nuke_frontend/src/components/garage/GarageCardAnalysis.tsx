@@ -75,7 +75,7 @@ export function analysisLines(reads: CardAnalysisReads): AnalysisLine[] {
   const cp = reads.classPrice;
   if (cp && cp.status === 'priced' && num(cp.value) != null) {
     const n = num(cp.n);
-    lines.push({ key: 'class-value', group: 'money', label: n != null ? `Class value · ${plural(n, 'comp')}` : 'Class value', value: usd(num(cp.value)!),
+    lines.push({ key: 'class-value', group: 'money', label: n != null ? `Class · ${plural(n, 'comp')}` : 'Class value', value: usd(num(cp.value)!),
       cite: band(cp.value_low, cp.value_high) ?? '',
       title: [cp.basis, cp.computed_at ? `computed ${day(cp.computed_at)}` : null, 'get_vehicle_class_prices'].filter(Boolean).join('. ') });
   }
