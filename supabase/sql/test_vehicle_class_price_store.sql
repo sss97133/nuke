@@ -958,4 +958,125 @@ AS $function$ BEGIN queue := 'drifted'; RETURN NEXT; END; $function$;
 SELECT public.assert((SELECT array_agg(queue) FROM public.drain_vehicle_derived_queues()) = ARRAY['drifted'],
   'a drifted controller is refused, not overwritten');
 
-SELECT 'vehicle_class_price store, refresh, tied reader, garage value, classifier parity, cohort resolution and registration, never blank, refresh queue: PASS' AS result;
+-- build_class_v5 (20261121160000): seven terms that matched the wrong thing, and the class version bump --------------
+SELECT set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+-- Before: S is priced from a fully classified v4 cohort.
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+SELECT public.assert((public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000))->>'status' = 'priced',
+  'before v5: S is priced');
+RESET ROLE;
+CREATE TEMP TABLE v5_price_before AS SELECT * FROM public.vehicle_class_price WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+GRANT SELECT ON v5_price_before TO service_role;
+CREATE TEMP TABLE v5_src_before AS SELECT oid, prosrc, proconfig, prosecdef, provolatile, proacl FROM pg_proc
+  WHERE oid IN ('public.classify_vehicle_build_class(uuid[])'::regprocedure,
+                'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure);
+SELECT public.assert((SELECT count(*) FROM public.vehicle_build_class WHERE method_version = 'v4_store_word_terms') > 0,
+  'before v5: the store holds v4 rows');
+
+\ir ../migrations/20261121160000_build_class_term_context.sql
+-- Idempotent: a second apply (as the deploy does on merge) changes nothing.
+\ir ../migrations/20261121160000_build_class_term_context.sql
+
+-- The bump changed one literal in each body and nothing else (settings, definer, volatility and grants too).
+SELECT public.assert((SELECT bool_and(replace(p.prosrc, '''v5_store_term_context''', '''v4_store_word_terms''') = b.prosrc
+    AND p.prosrc <> b.prosrc AND p.proconfig IS NOT DISTINCT FROM b.proconfig AND p.prosecdef = b.prosecdef
+    AND p.provolatile = b.provolatile AND p.proacl IS NOT DISTINCT FROM b.proacl) = true
+    AND count(*) = 2 FROM v5_src_before b JOIN pg_proc p ON p.oid = b.oid),
+  'classify and refresh differ from their v4 bodies only by the version literal');
+SELECT public.assert((SELECT substring(prosrc FROM 'c_class\s+constant text := ''([^'']+)''') FROM pg_proc
+    WHERE oid = 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure) = 'v5_store_term_context',
+  'refresh c_class is the version the classifier writes');
+SELECT public.assert(has_function_privilege('anon', 'public.nuke_build_class_rule(numeric,integer,text)', 'EXECUTE'), 'anon runs the rule');
+
+-- Every earlier rule case answers as before.
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected),
+  'v4 rule cases under v5: ' || coalesce((SELECT string_agg(format('%s [%s] got %s want %s', c.why, c.txt,
+      public.nuke_build_class_rule(0, 0, c.txt)->>'build_class', c.expected), '; ')
+    FROM rule_cases c WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected), ''));
+-- Each fixed term (no receipts, no sessions, text only).
+CREATE TEMP TABLE rule_cases_v5(txt text, expected text, why text);
+INSERT INTO rule_cases_v5 VALUES
+ -- Weld: the wheels count, welding does not
+ ('15-inch weld racing wheels', 'modified', 'Weld Racing wheels'),
+ ('rides on weld wheels', 'modified', 'Weld wheels'),
+ ('polished two-piece 15″ weld wheels', 'modified', 'Weld wheels after a size'),
+ ('weld draglites 15x6 front', 'modified', 'a Weld wheel line'),
+ ('weld-style aluminum wheels', 'modified', 'Weld-style wheels'),
+ ('floor pans welded in, needs welding', 'unknown', 'welding'),
+ ('previous weld repair on the case', 'unknown', 'a weld repair'),
+ ('weld in new metal. it will be a big job', 'unknown', 'weld in metal'),
+ ('all wheel welds are rust free', 'unknown', 'wheel welds'),
+ ('seller: weldingpro99', 'unknown', 'a word containing weld'),
+ -- Restored: "unrestored" and "needs restoration" are not restored
+ ('unrestored survivor', 'stock', '"unrestored" is a stock word only (two stock terms, no build)'),
+ ('an unrestored time capsule', 'stock', 'unrestored'),
+ ('an un-restored example', 'unknown', 'un-restored is not restored'),
+ ('this car needs total restoration', 'unknown', 'needs restoration'),
+ ('needing a full restoration', 'unknown', 'needing a full restoration'),
+ ('an excellent restoration candidate', 'unknown', 'restoration candidate'),
+ ('it has never been restored', 'unknown', 'never restored'),
+ ('frame-off restoration completed 2019', 'modified', 'a restoration still counts'),
+ ('restored in 2010', 'modified', 'restored still counts'),
+ -- Original owner: the manual is not the owner
+ ('includes original owner''s manual', 'unknown', 'original owner''s manual'),
+ ('original owners manual and jack', 'unknown', 'original owners manual'),
+ ('original owner’s handbook', 'unknown', 'curly apostrophe, handbook'),
+ ('bought from the original owner', 'stock', 'original owner still counts'),
+ ('original owner, with original owner''s manual', 'stock', 'the owner with the manual still counts'),
+ -- Numbers matching: the negation is not a stock signal
+ ('it is a not numbers-matching car', 'unknown', 'not numbers-matching'),
+ ('non-numbers matching 289', 'unknown', 'non-numbers matching'),
+ ('non-matching numbers engine', 'unknown', 'non-matching numbers'),
+ ('the seller admits the car isn’t numbers-matching', 'unknown', 'isn''t numbers-matching'),
+ ('non-original engine', 'unknown', 'non-original engine'),
+ ('numbers matching 327', 'stock', 'numbers matching still counts'),
+ -- Bagged, Rally wheels, Coys
+ ('when dismantled the car is bagged and tagged', 'unknown', 'bagged and tagged'),
+ ('bagged all around', 'modified', 'bagged (air bags)'),
+ ('rally wheels and redline tires', 'unknown', 'factory Rally wheels'),
+ ('event_name: coys auction - brands hatch', 'unknown', 'the Coys auction house'),
+ ('20 inch coys custom color-matched wheels', 'modified', 'Coys wheels'),
+ ('coys wheels with redline tires', 'modified', 'Coys wheels');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases_v5 c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected),
+  'v5 rule cases: ' || coalesce((SELECT string_agg(format('%s [%s] got %s want %s', c.why, c.txt,
+      public.nuke_build_class_rule(0, 0, c.txt)->>'build_class', c.expected), '; ')
+    FROM rule_cases_v5 c WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected), ''));
+SELECT public.assert(public.nuke_build_class_rule(5000, 0, 'unrestored survivor')->>'build_class' = 'documented_build', 'paper first');
+
+-- Reclassification after the bump: every v4 member is out of date. Never blank: a refresh with no budget keeps the stored
+-- price and answers incomplete; a full one reclassifies the cohort; a third finds nothing out of date.
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+DO $$ DECLARE r jsonb; n_members int;
+BEGIN
+  SELECT count(*) - 1 INTO n_members FROM public.cohort_members('50000000-0000-4000-8000-000000000001');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 0);
+  PERFORM public.assert(r->>'status' = 'pending' AND NOT (r->>'complete')::boolean AND (r->>'kept_prior_price')::boolean
+    AND (r->>'classified_this_call')::int = 0, 'no budget: the stored price is kept: ' || r::text);
+  PERFORM public.assert((SELECT p.status = 'priced' AND p.value = b.value AND p.n = b.n AND p.computed_at = b.computed_at
+    FROM public.vehicle_class_price p, v5_price_before b WHERE p.vehicle_id = b.vehicle_id), 'the priced row is untouched');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND (r->>'complete')::boolean AND (r->>'classified_this_call')::int = n_members,
+    'the bump reclassifies the whole cohort: ' || r::text);
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.cohort_members('50000000-0000-4000-8000-000000000001') m
+    JOIN public.vehicle_build_class b ON b.vehicle_id = m.vehicle_id WHERE b.method_version <> 'v5_store_term_context'),
+    'every cohort member is on v5');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000');
+  PERFORM public.assert((r->>'classified_this_call')::int = 0 AND r->>'status' = 'priced', 'v5 rows are current');
+END $$;
+RESET ROLE;
+
+-- The guard: a rule body that drifted is not replaced (the migration rolls back).
+CREATE OR REPLACE FUNCTION public.nuke_build_class_rule(p_receipts numeric, p_sessions integer, p_text text)
+ RETURNS jsonb LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path TO pg_catalog, pg_temp
+AS $function$ SELECT '{"build_class": "drifted"}'::jsonb $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261121160000_build_class_term_context.sql
+\set ON_ERROR_STOP on
+SELECT public.assert(public.nuke_build_class_rule(0, 0, 'lifted')->>'build_class' = 'drifted',
+  'a drifted rule is refused, not overwritten');
+
+SELECT 'vehicle_class_price store, refresh, tied reader, garage value, classifier parity, cohort resolution and registration, never blank, refresh queue, v5 terms and version bump: PASS' AS result;
