@@ -1,13 +1,21 @@
-// GarageView.swift — searchable account vehicles and their profiles, followed by photos
-// waiting for a vehicle. Relationship and work controls remain under Garage details.
+// GarageView.swift — searchable account vehicles as cards in the order of their recorded activity, followed by
+// photos waiting for a vehicle. The phone's copy of the web garage (PR #3612): one list, newest dated activity
+// first, year headings, undated cars last; the relationship is the first item on the card's lane, not a section.
+// Relationship and work controls remain under Garage details (the card's menu).
 //
-// Reads: get_user_garage + get_my_garage_owner_corrections (GarageReaders.ownGarage, shared with
-// ProfileView) and my_unorganized_photo_count. Each vehicle opens VehicleDetailView.
+// Reads: get_user_garage + get_my_garage_owner_corrections (GarageReaders.ownGarage, shared with ProfileView),
+// get_vehicle_contribution_days_batch (every card's day squares, one window and scale for the garage) and
+// my_unorganized_photo_count. Each card reads its own header and reel (GarageCard). Each car opens VehicleDetailView.
 //
-// The top of the list is "Today in your garage" (GarageActivityViews), and vehicles are ordered by
-// their most recent activity (GarageActivity.swift). Both reuse reads the app already makes.
+// The top of the list is "Today in your garage" (GarageActivityViews).
 
 import SwiftUI
+
+/// Where a tap came from: a card (garage.vehicle.profile.<id>) or the activity feed (garage.activity.profile.<id>).
+struct GarageRoute: Hashable, Identifiable {
+    let id: String
+    let fromCard: Bool
+}
 
 struct GarageView: View {
     let userId: String
@@ -17,27 +25,53 @@ struct GarageView: View {
     @State private var cachedAt: Date?
     @State private var failure: JobRefusal?
     @State private var photos: JobLoad<UnorganizedPhotos> = .loading
-    @State private var showContributed = false
+    @State private var timelines: JobLoad<[String: GarageTimeline]> = .loading
+    @State private var axis = GarageAxis.make([])
     @State private var query = ""
     @State private var manageVehicle: GarageVehicle?
+    @State private var logBookVehicle: GarageVehicle?
+    @State private var agentVehicle: GarageVehicle?
     @State private var requests = ReadRequestGuard()
-    @State private var openVehicleId: String?
+    @State private var openRoute: GarageRoute?
     @StateObject private var activity = GarageActivityStore()
     @Environment(\.scenePhase) private var scenePhase
 
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
+    private var timelineMap: [String: GarageTimeline] {
+        if case .loaded(let map) = timelines { return map }
+        return [:]
+    }
+
+    private var timelineFailed: Bool {
+        if case .refused = timelines { return true }
+        return false
+    }
+
     var body: some View {
         List {
             if !isSearching {
-                GarageActivitySections(store: activity, retry: { refreshActivity() }, open: { openVehicleId = $0 })
+                GarageActivitySections(store: activity, retry: { refreshActivity() },
+                                       open: { openRoute = GarageRoute(id: $0, fromCard: false) })
             }
             if let garage {
-                let matches = GarageSections.matching(activity.sorted(garage.vehicles), query: query)
+                let matches = GarageSections.matching(garage.vehicles, query: query)
                 if isSearching && matches.isEmpty {
                     ContentUnavailableView.search(text: query)
+                } else if garage.vehicles.isEmpty {
+                    Section { Text(GarageCopy.noneOwned).font(.footnote).foregroundStyle(.secondary) }
                 } else {
-                    vehicleSections(GarageSections(matches), unresolved: isSearching ? [] : garage.unresolved)
+                    let map = timelineMap
+                    ForEach(GarageOrder.grouped(matches, timelines: map)) { group in
+                        Section {
+                            ForEach(group.vehicles) { v in card(v, timeline: map[v.vehicle_id.lowercased()]) }
+                        } header: {
+                            Text("\(group.label) · \(group.vehicles.count)")
+                        }
+                    }
+                }
+                if !isSearching && !garage.unresolved.isEmpty {
+                    unresolvedSection(garage.unresolved)
                 }
                 Section {} footer: {
                     if isSearching { Text("\(matches.count) matches in the \(garage.vehicles.count) vehicle records loaded for your account.") }
@@ -73,9 +107,9 @@ struct GarageView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { refreshActivity() }
         }
-        .navigationDestination(item: $openVehicleId) { id in
-            VehicleDetailView(vehicleId: id, embedInNavigationStack: false)
-                .accessibilityIdentifier("garage.activity.profile.\(id)")
+        .navigationDestination(item: $openRoute) { route in
+            VehicleDetailView(vehicleId: route.id, embedInNavigationStack: false)
+                .accessibilityIdentifier(route.fromCard ? "garage.vehicle.profile.\(route.id)" : "garage.activity.profile.\(route.id)")
         }
         .sheet(item: $manageVehicle) { vehicle in
             NavigationStack {
@@ -83,88 +117,63 @@ struct GarageView: View {
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { manageVehicle = nil } } }
             }
         }
-    }
-
-    @ViewBuilder private func vehicleSections(_ s: GarageSections, unresolved: [GarageUnresolvedSource]) -> some View {
-        if !s.owned.isEmpty || s.total == 0 {
-            Section {
-                if s.owned.isEmpty {
-                    Text(GarageCopy.noneOwned).font(.footnote).foregroundStyle(.secondary)
-                }
-                ForEach(s.owned) { v in vehicleLink(v) }
-            } header: {
-                Text("Owned · \(s.owned.count)")
-            }
-        }
-        ForEach(s.other) { interest in
-            Section("\(interest.label) · \(interest.vehicles.count)") {
-                ForEach(interest.vehicles) { v in vehicleLink(v) }
-            }
-        }
-        if !s.previouslyOwned.isEmpty {
-            Section("Previously owned · \(s.previouslyOwned.count)") {
-                ForEach(s.previouslyOwned) { v in vehicleLink(v) }
-            }
-        }
-        if !s.contributed.isEmpty {
-            Section {
-                if showContributed || isSearching { ForEach(s.contributed) { v in vehicleLink(v) } }
-            } header: {
-                Button { withAnimation(.snappy(duration: 0.2)) { showContributed.toggle() } } label: {
-                    HStack {
-                        Text("Contributed · \(s.contributed.count)")
-                        Spacer()
-                        Image(systemName: showContributed ? "chevron.up" : "chevron.down").font(.caption2)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            } footer: {
-                Text(GarageCopy.contributedFooter)
-            }
-        }
-        if !s.documenting.isEmpty {
-            Section {
-                ForEach(s.documenting) { v in vehicleLink(v) }
-            } header: {
-                Text("Documenting · \(s.documenting.count)")
-            } footer: {
-                Text(GarageCopy.documentingFooter)
-            }
-        }
-        if !unresolved.isEmpty {
-            Section {
-                ForEach(unresolved) { source in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(source.label).font(.subheadline)
-                        Text("Account stated · photo evidence still needs to identify this vehicle")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Identity pending · \(unresolved.count)")
-            }
+        .sheet(item: $logBookVehicle) { vehicle in GarageLogBookView(vehicle: vehicle) }
+        .sheet(item: $agentVehicle) { vehicle in
+            AgentChatView(vehicleId: vehicle.vehicle_id, backend: .vehicleAgent,
+                          prompt: "Ask about \(vehicle.title.isEmpty ? "this vehicle" : vehicle.title)")
         }
     }
 
-    private func vehicleLink(_ v: GarageVehicle) -> some View {
-        NavigationLink {
-            VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: false)
-                .accessibilityIdentifier("garage.vehicle.profile.\(v.vehicle_id)")
-        } label: { GarageRowLabel(vehicle: v, lastActivity: activity.latestByVehicle[v.vehicle_id.lowercased()]) }
-        .accessibilityIdentifier("garage.vehicle.\(v.vehicle_id)")
-        .swipeActions(edge: .trailing) {
-            Button("Garage details") { manageVehicle = v }
-                .tint(.secondary)
+    private func card(_ v: GarageVehicle, timeline: GarageTimeline?) -> some View {
+        GarageCard(vehicle: v, timeline: timeline, timelineFailed: timelineFailed, axis: axis,
+                   onOpen: { openRoute = GarageRoute(id: v.vehicle_id, fromCard: true) })
+            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("garage.vehicle.\(v.vehicle_id)")
+            .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: NukeRadius.card))
+            .contextMenu {
+                Button { agentVehicle = v } label: { Label("Ask this car's agent", systemImage: "bubble.left.and.text.bubble.right") }
+                Button { logBookVehicle = v } label: { Label("Log book", systemImage: "book.closed") }
+                Button { manageVehicle = v } label: { Label("Garage details", systemImage: "slider.horizontal.3") }
+                if let vin = v.vin, !vin.isEmpty {
+                    Button { UIPasteboard.general.string = vin } label: { Label("Copy VIN", systemImage: "doc.on.doc") }
+                }
+                Button { openRoute = GarageRoute(id: v.vehicle_id, fromCard: true) } label: { Label("Open the profile", systemImage: "car.side") }
+            }
+    }
+
+    private func unresolvedSection(_ unresolved: [GarageUnresolvedSource]) -> some View {
+        Section {
+            ForEach(unresolved) { source in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(source.label).font(.subheadline)
+                    Text("Account stated · photo evidence still needs to identify this vehicle")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Identity pending · \(unresolved.count)")
         }
-        .contextMenu { Button("Garage details") { manageVehicle = v } }
     }
 
     private func load() async {
         async let counted = GarageReaders.unorganizedPhotos()
         await loadGarage()
-        if let vehicles = garage?.vehicles { await activity.refresh(vehicles: vehicles) }
+        if let vehicles = garage?.vehicles {
+            async let read = GarageTimelineReader.read(ids: vehicles.map(\.vehicle_id))
+            await activity.refresh(vehicles: vehicles)
+            apply(await read)
+        }
         photos = await counted
+    }
+
+    /// A failed re-read keeps the squares already drawn; the axis is the whole garage's, never the search's.
+    private func apply(_ read: JobLoad<[String: GarageTimeline]>) {
+        if case .refused = read, case .loaded = timelines { return }
+        timelines = read
+        if case .loaded(let map) = read { axis = GarageAxis.make(Array(map.values)) }
     }
 
     private func refreshActivity() {
@@ -192,38 +201,6 @@ struct GarageView: View {
                 failure = nil
             } else if garage == nil {
                 failure = JobReaders.refusal(GarageReaders.garageName, error)
-            }
-        }
-    }
-}
-
-/// One garage row: the server's cover thumbnail, the vehicle and what the record says it is to you.
-struct GarageRowLabel: View {
-    let vehicle: GarageVehicle
-    /// Newest real activity on this vehicle; nil hides the line.
-    var lastActivity: Date? = nil
-
-    var body: some View {
-        HStack(spacing: 12) {
-            CachedAsyncImage(url: NukeImage.thumb(vehicle.image_url, width: 170)) { img in
-                img.resizable().scaledToFill()
-            } placeholder: {
-                Image(systemName: "car.side").foregroundStyle(.secondary)
-            }
-            .frame(width: 56, height: 42)
-            .clipped()
-            VStack(alignment: .leading, spacing: 2) {
-                Text(vehicle.title.isEmpty ? "Unnamed vehicle" : vehicle.title).foregroundStyle(Color.primary)
-                Text(GarageRelation.line(vehicle)).font(.caption2).foregroundStyle(.secondary)
-                if let line = GarageActivityFeed.lastActivity(lastActivity, now: Date()) {
-                    Text(line).font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
-                }
-                if let detail = vehicle.relationshipDetail {
-                    Text(detail).font(.caption2).foregroundStyle(.secondary)
-                }
-                if let period = vehicle.relationshipPeriod {
-                    Text(period).font(.caption2).foregroundStyle(.secondary)
-                }
             }
         }
     }

@@ -33,21 +33,50 @@ enum AgentService {
         return try await SupabaseService.client.functions
             .invoke("agent-chat", options: FunctionInvokeOptions(body: body))
     }
+
+    // The car's own agent (vehicle-agent), as the web garage card's "Ask this car's agent" calls it: one
+    // message plus the earlier turns, writes allowed (it records observations through ingest-observation).
+    struct VehicleReply: Decodable {
+        struct Wrote: Decodable { let id: String? }
+        let reply: String?; let wrote: [Wrote]?; let error: String?
+    }
+    private struct VehicleBody: Encodable {
+        let vehicle_id: String; let message: String; let history: [Message]; let allow_writes: Bool
+    }
+
+    static func askVehicle(_ message: String, history: [Message], vehicleId: String) async throws -> VehicleReply {
+        let body = VehicleBody(vehicle_id: vehicleId, message: message, history: history, allow_writes: true)
+        do {
+            return try await SupabaseService.client.functions
+                .invoke("vehicle-agent", options: FunctionInvokeOptions(body: body))
+        } catch FunctionsError.httpError(_, let data) {
+            // The function answers its refusals as {"error": "..."}; say that, not a transport error.
+            if let r = try? JSONDecoder().decode(VehicleReply.self, from: data), r.error != nil { return r }
+            throw FunctionsError.httpError(code: 0, data: data)
+        }
+    }
 }
 
 // ─── The chat surface — restrained, the app's grammar ────────────────────────
 
 struct AgentChatView: View {
+    /// Which agent answers: the app's agent-chat, or one car's vehicle-agent (the garage card's).
+    enum Backend { case agentChat, vehicleAgent }
+
     /// Context the agent is grounded in (the photo/vehicle you opened it from).
     var vehicleId: String? = nil
     var imageId: String? = nil
+    var backend: Backend = .agentChat
+    /// The first line shown before any message (the garage card names the car).
+    var prompt: String? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var messages: [ChatMsg] = []
     @State private var draft = ""
     @State private var sending = false
 
-    struct ChatMsg: Identifiable { let id = UUID(); let role: String; let text: String }
+    /// `isError` bubbles are shown but never sent back as history.
+    struct ChatMsg: Identifiable { let id = UUID(); let role: String; let text: String; var isError = false; var note: String? = nil }
 
     var body: some View {
         NavigationStack {
@@ -56,7 +85,7 @@ struct AgentChatView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
                             if messages.isEmpty {
-                                Text("Tell me what's off and I'll fix it — e.g. “the interior shots are my white daily-driver, not this truck.”")
+                                Text(prompt ?? "Tell me what's off and I'll fix it — e.g. “the interior shots are my white daily-driver, not this truck.”")
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                                     .padding()
@@ -97,7 +126,7 @@ struct AgentChatView: View {
     @ViewBuilder private func bubble(_ m: ChatMsg) -> some View {
         HStack {
             if m.role == "user" { Spacer(minLength: 44) }
-            Text(m.text)
+            Text(m.note.map { "\(m.text)\n\n\($0)" } ?? m.text)
                 .font(.callout)
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .background(
@@ -114,6 +143,25 @@ struct AgentChatView: View {
     private func send() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !sending else { return }
+        if backend == .vehicleAgent, let vehicleId {
+            let history = messages.filter { !$0.isError }.map { AgentService.Message(role: $0.role, content: $0.text) }
+            messages.append(ChatMsg(role: "user", text: text))
+            draft = ""
+            sending = true
+            do {
+                let r = try await AgentService.askVehicle(text, history: history, vehicleId: vehicleId)
+                if let err = r.error {
+                    messages.append(ChatMsg(role: "assistant", text: err, isError: true))
+                } else {
+                    let wrote = r.wrote?.count ?? 0
+                    messages.append(ChatMsg(role: "assistant", text: r.reply ?? "No answer.", note: wrote > 0 ? "\(wrote) recorded" : nil))
+                }
+            } catch {
+                messages.append(ChatMsg(role: "assistant", text: "The agent did not answer.", isError: true))
+            }
+            sending = false
+            return
+        }
         messages.append(ChatMsg(role: "user", text: text))
         draft = ""
         sending = true

@@ -350,7 +350,8 @@ Standing rules the code carries:
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
   DEBUG-only deep links (`NUKE_DEBUG_*`, `NukeCaptureApp.swift`) drive the screenshot loop and are compiled
   out of Release: `NUKE_DEBUG_VEHICLE_ID=<uuid>` roots on a profile as anon, `NUKE_DEBUG_SCREEN=app|
-  profile|explore|today|work|library`, `NUKE_DEBUG_JOB_ID=<uuid>` roots on that work order's `JobView` (with `NUKE_DEBUG_SCROLL_TO=job-completion|job-invoice`) (readable signed out when the reader
+  profile|explore|today|work|library|garage` (`garage` roots on the signed-in account's garage cards; with
+  `-NukeFixtureBackend 1 -NukeFixturePersona client` and `NUKE_FIXTURE_SCENARIO=garage-cards` it reads the fixture garage), `NUKE_DEBUG_JOB_ID=<uuid>` roots on that work order's `JobView` (with `NUKE_DEBUG_SCROLL_TO=job-completion|job-invoice`) (readable signed out when the reader
   allows it; `NUKE_DEBUG_CODES=1` shows raw reader codes under the plain copy),
   `NUKE_DEBUG_VEHICLE_WORK=<uuid>` hosts a vehicle's Work card alone, `NUKE_DEBUG_STATEMENT_VEHICLE=<uuid>` its statement,
   `NUKE_DEBUG_PROVIDER=<user uuid>` hosts a profile's provider face alone (no photos),
@@ -463,11 +464,25 @@ the offline cache. Business handling, consignment, representation and pending or
 disputed interests remain separate from personal ownership. A fork requires review.
 
 The own profile's **Garage** door (`Garage/`) opens the same fold (`GarageReaders.ownGarage`, shared
-with the profile list) grouped by the server's relationship: owned, other interests, previously owned,
-contributed; the footer states the total and its clock. A photographed or contributed vehicle is never
-shown as owned. `my_unorganized_photo_count` (the web's inbox badge, capped at 1,000 and shown as
+with the profile list) as the web garage's cards (#3612): one list in the order of recorded activity
+(`get_user_garage.last_activity_at`, else the timeline's last day), newest first, under year headings, with
+undated cars last under "No dated activity". The relationship (owned, previously owned, contributed, …) is the
+first item on the card's lane, never a section, and a photographed or contributed vehicle is never shown as
+owned; the footer states the total by relationship and its clock. A card (`GarageCard.swift`) is the web's grid
+card: a 4:3 pager through the cover and reel ("n / N"; the reel is read on the first swipe, 12
+`VehicleGalleryImage.eligible` rows that are not sensitive, in the web's order), the title and the masthead price
+from `vehicle_profile_read` (a Claim that opens its source; never `current_value`), one lane of relationship,
+"Active 19d ago" and the strip's facets (what the width cannot hold drops off the end), a year of day squares
+(`GarageDayGrid.swift`: `get_vehicle_contribution_days_batch`, 500 ids per call, Monday rows, 53 weeks to today in
+UTC days, heat 3–6 at the garage-wide quartiles, `HeatRamp` in `DesignSystem.swift` from the web's `--heat-*`
+tokens; the day of the photo on screen is outlined; a failed read says "Timeline unavailable"), the record's span
+and non-zero counts, and the VIN (tap to copy) or "No VIN recorded". The pure rules live in `GarageTimeline.swift`
+and are unit-tested (`GarageCardTests`). A card's menu (long press) holds the car's agent (`vehicle-agent` through
+`AgentChatView`, writes allowed), the log book (`vehicle_statements`; Save calls `record_vehicle_statement` with the
+web log book's parameters) and Garage details. Merging a duplicate, adding photos and pinch resize stay on the web.
+`my_unorganized_photo_count` (the web's inbox badge, capped at 1,000 and shown as
 "1,000+") leads to `SessionConfirmView`, which reviews only this app's dated uploads; the screen says so.
-Each vehicle opens a hub: visibility, removal or merge from `vehicle_row_read`, the Work card (jobs,
+Garage details opens a hub: visibility, removal or merge from `vehicle_row_read`, the Work card (jobs,
 "Post a job" for an owned vehicle until `vehicle_access` says otherwise, else an inspection) and the
 profile. `my_vehicles` is not read: on 2026-10-19 no `work_record` observation carried an observer and
 the reader ran past the statement timeout.

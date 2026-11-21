@@ -250,6 +250,52 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue((search.value as? String)?.contains("1234567") == true, "returning must retain the Garage search")
     }
 
+    /// The garage cards (garage-cards fixture): newest activity first under year headings, the undated car last,
+    /// the price only from the profile's masthead Claim, the log book read from the card's menu, and no writes.
+    func testGarageCardsOrderByActivityAndOpenTheLogBook() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "client", "-ignitionComplete", "YES"]
+        app.launchEnvironment["NUKE_FIXTURE_SCENARIO"] = "garage-cards"
+        app.launch()
+        let garage = app.tabBars.buttons["Garage"].firstMatch
+        XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        let first = app.staticTexts["1973 Fixture Coupe Formula"].firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Last recorded sale, $41,500"].waitForExistence(timeout: 10), "the masthead's recorded sale is the card's price")
+        for value in ["$99,999", "$45,000"] {
+            XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch.exists,
+                           "current_value never reaches a card")
+        }
+        // The first drag loads the reel (cover first, then the others once each); the pager counts them.
+        let photo = app.descendants(matching: .any).matching(identifier: "garage.card.photo.00000000-0000-4000-8000-00000000c101").firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 5))
+        photo.swipeLeft()
+        if !app.staticTexts["2 / 3"].waitForExistence(timeout: 5) { photo.swipeLeft() }
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5), "the reel pages through the car's photos")
+        let top = XCTAttachment(screenshot: app.screenshot()); top.name = "garage-cards-top"; top.lifetime = .keepAlways; add(top)
+        let headings = ["2026 · 2", "2024 · 1", "2023 · 1", "No dated activity · 1"]
+        var seen: [String] = []
+        for _ in 0..<14 {
+            for h in headings where !seen.contains(h) && app.staticTexts[h].exists { seen.append(h) }
+            if seen.count == headings.count { break }
+            app.swipeUp()
+        }
+        XCTAssertEqual(seen, headings, "one list in date order, the undated car last")
+        let bottom = XCTAttachment(screenshot: app.screenshot()); bottom.name = "garage-cards-bottom"; bottom.lifetime = .keepAlways; add(bottom)
+        for _ in 0..<14 where !(first.exists && first.isHittable) { app.swipeDown() }
+        first.press(forDuration: 1.2)
+        let log = app.buttons["Log book"].firstMatch
+        XCTAssertTrue(log.waitForExistence(timeout: 5)); log.tap()
+        XCTAssertTrue(app.staticTexts["Fixture note: rear end rebuilt over the winter."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["2026-11-18 · owner · recollection"].exists)
+        let sheet = XCTAttachment(screenshot: app.screenshot()); sheet.name = "garage-log-book"; sheet.lifetime = .keepAlways; add(sheet)
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(first.waitForExistence(timeout: 5)); first.tap()
+        let profile = app.descendants(matching: .any).matching(identifier: "garage.vehicle.profile.00000000-0000-4000-8000-00000000c101").firstMatch
+        XCTAssertTrue(profile.waitForExistence(timeout: 10), "a card opens the actual vehicle profile")
+        XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes", "reading the garage and its log book writes nothing")
+    }
+
     func testSellerSourceSheetShowsConfigurationLimits() {
         let app = XCUIApplication()
         app.launchArguments = ["-NukeFixtureBackend", "1", "-NukeFixturePersona", "visitor"]
