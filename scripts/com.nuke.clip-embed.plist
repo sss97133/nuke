@@ -5,12 +5,13 @@
     <key>Label</key>
     <string>com.nuke.clip-embed</string>
 
-    <!-- CLIP embedding drainer for the Tier-2 (PLACED) search engine. Closes the Phase-4(c)
-         gap: image_observations rows exist but ~94% lacked embedding_clip_vitb32, so visual
-         search/convergence was dark. clip-embed-drain.sh runs the local CLIP ViT-B/32 embedder
-         (MPS, ZERO API cost) with --all to drain every null-embedding active row, then exits;
-         this StartInterval re-fires it so rows newly PLACED by the BYOK deep writer get embedded
-         as fleet coverage deepens. mkdir-lock prevents overlapping GPU runs.
+    <!-- CLIP embedding drainer. clip-embed-drain.sh runs the local CLIP ViT-B/32 embedder (MPS, zero API
+         cost) with --all: every active image_observations row without an embedding, newest photo first,
+         then exits. The embeddings are the visual leg of capture_sets_score, which is what files a phone
+         photo to a vehicle, so this job is part of the photo pipeline: a photo that lands is embedded
+         within one interval. The wrapper runs the scripts of ~/.worktrees/nuke-main (origin/main, kept
+         fresh by the subscription reader), picks an interpreter that has the model's libraries, and keeps
+         fires from overlapping.
 
          Runs in the login shell (NOT Claude Code's Bash sandbox) so it reaches Supabase + MPS.
          This repo copy is the source of truth; keep it identical to
@@ -18,13 +19,13 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/skylar/nuke/scripts/daily-receipt/clip-embed-drain.sh</string>
+        <string>/Users/skylar/.worktrees/nuke-main/scripts/daily-receipt/clip-embed-drain.sh</string>
     </array>
 
-    <!-- 30 min between fires. A full backfill takes hours the first time; the lock makes
-         re-fires no-op while one runs, and once drained each fire only embeds new PLACED rows. -->
+    <!-- 5 min between fires. A fire that finds nothing to embed costs one RPC (the model is loaded only
+         when there is a row); the lock makes a fire a no-op while a long drain runs. -->
     <key>StartInterval</key>
-    <integer>1800</integer>
+    <integer>300</integer>
 
     <key>StandardOutPath</key>
     <string>/Users/skylar/nuke/logs/clip-embed.log</string>
