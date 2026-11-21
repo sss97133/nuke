@@ -1,4 +1,4 @@
--- Revert of 20261121113427_job_writer_functions_execute_revoke.sql. Not a migration; run by hand only if a caller
+-- Revert of 20261121113427_cron_writer_functions_execute_revoke.sql. Not a migration; run by hand only if a caller
 -- that needs one of these as anon or authenticated turns up, and prefer granting that one function to that one role.
 -- It puts back the built-in EXECUTE to PUBLIC that the 22 job writers held before, which makes each of them an API
 -- endpoint for anyone again. The service role's explicit grant stays. A signature that no longer exists is skipped.

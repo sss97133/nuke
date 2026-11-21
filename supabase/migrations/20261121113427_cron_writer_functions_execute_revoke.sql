@@ -30,8 +30,8 @@
 -- the 22: that caller would start failing for its clients. None exists today. A signature that no longer exists is
 -- skipped with a notice. CREATE OR REPLACE keeps these privileges; a function dropped and created again gets the
 -- default grant back.
--- Contract: supabase/sql/test_job_writer_functions_execute_revoke.sql
--- Revert: supabase/sql/revert_20261121113427_job_writer_functions_execute_revoke.sql
+-- Contract: supabase/sql/test_cron_writer_functions_execute_revoke.sql
+-- Revert: supabase/sql/revert_20261121113427_cron_writer_functions_execute_revoke.sql
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';

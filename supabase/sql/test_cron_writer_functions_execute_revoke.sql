@@ -1,5 +1,5 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_job_writer_execute -f this-file.sql
--- Contract for 20261121113427_job_writer_functions_execute_revoke.sql. Synthetic functions and rows only; never
+-- Contract for 20261121113427_cron_writer_functions_execute_revoke.sql. Synthetic functions and rows only; never
 -- production.
 --
 -- The fixture is the live grant shape, read from production on 2026-11-21 (UTC): each of the 22 job writers is owned
@@ -228,7 +228,7 @@ SELECT pg_temp.ok('before: a signed-in insert fires the owner-run trigger, which
 -- ---------------------------------------------------------------------------------------------------------------
 -- 2. The revoke.
 -- ---------------------------------------------------------------------------------------------------------------
-\ir ../migrations/20261121113427_job_writer_functions_execute_revoke.sql
+\ir ../migrations/20261121113427_cron_writer_functions_execute_revoke.sql
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- 3. After.
@@ -278,7 +278,7 @@ SELECT pg_temp.ok('after: a signed-in insert still fires the owner-run trigger, 
 -- 4. Rerun, replace, drop and re-create.
 -- ---------------------------------------------------------------------------------------------------------------
 CREATE TEMP TABLE t_acl AS SELECT pg_temp.acl_md5() AS before_rerun;
-\ir ../migrations/20261121113427_job_writer_functions_execute_revoke.sql
+\ir ../migrations/20261121113427_cron_writer_functions_execute_revoke.sql
 SELECT pg_temp.ok('a rerun changes no ACL', (SELECT before_rerun FROM t_acl) = pg_temp.acl_md5());
 
 CREATE OR REPLACE FUNCTION public.photo_requeue_drain() RETURNS void
@@ -287,7 +287,7 @@ BEGIN INSERT INTO public.t_job_log(fn) VALUES ('photo_requeue_drain'); END $f$;
 SELECT pg_temp.ok('CREATE OR REPLACE keeps the revoke', pg_temp.can('anon') = 0 AND pg_temp.can('authenticated') = 0);
 
 DROP FUNCTION public.photo_yield_resnap_drain(integer);
-\ir ../migrations/20261121113427_job_writer_functions_execute_revoke.sql
+\ir ../migrations/20261121113427_cron_writer_functions_execute_revoke.sql
 SELECT pg_temp.ok('a signature that no longer exists is skipped; the other 21 stay closed and stay with the service role',
   pg_temp.can('anon') = 0 AND pg_temp.can('authenticated') = 0 AND pg_temp.can('service_role') = 21);
 
@@ -296,18 +296,18 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $f$
 BEGIN INSERT INTO public.t_job_log(fn) VALUES ('photo_yield_resnap_drain'); END $f$;
 SELECT pg_temp.ok('a function dropped and created again is open to anon and authenticated again',
   pg_temp.can('anon') = 1 AND pg_temp.can('authenticated') = 1);
-\ir ../migrations/20261121113427_job_writer_functions_execute_revoke.sql
+\ir ../migrations/20261121113427_cron_writer_functions_execute_revoke.sql
 SELECT pg_temp.ok('and the migration closes it again',
   pg_temp.can('anon') = 0 AND pg_temp.can('authenticated') = 0 AND pg_temp.can('service_role') = 22);
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- 5. The revert.
 -- ---------------------------------------------------------------------------------------------------------------
-\ir revert_20261121113427_job_writer_functions_execute_revoke.sql
+\ir revert_20261121113427_cron_writer_functions_execute_revoke.sql
 SELECT pg_temp.ok('revert: anon, authenticated and the service role may execute all 22 again',
   pg_temp.can('anon') = 22 AND pg_temp.can('authenticated') = 22 AND pg_temp.can('service_role') = 22);
 UPDATE t_acl SET before_rerun = pg_temp.acl_md5();
-\ir revert_20261121113427_job_writer_functions_execute_revoke.sql
+\ir revert_20261121113427_cron_writer_functions_execute_revoke.sql
 SELECT pg_temp.ok('revert twice changes no ACL', (SELECT before_rerun FROM t_acl) = pg_temp.acl_md5());
 
 -- ---------------------------------------------------------------------------------------------------------------
@@ -318,24 +318,24 @@ CREATE FUNCTION public.t_client_helper(uuid) RETURNS void LANGUAGE plpgsql AS $f
 BEGIN PERFORM public.compute_vehicle_activity($1); END $f$;
 UPDATE t_acl SET before_rerun = pg_temp.acl_md5();
 \set ON_ERROR_STOP off
-\ir ../migrations/20261121113427_job_writer_functions_execute_revoke.sql
+\ir ../migrations/20261121113427_cron_writer_functions_execute_revoke.sql
 \set ON_ERROR_STOP on
 SELECT pg_temp.ok('refused: a caller-run function open to clients calls a job writer, and no ACL changed',
   pg_temp.can('anon') = 22 AND pg_temp.can('authenticated') = 22 AND (SELECT before_rerun FROM t_acl) = pg_temp.acl_md5());
 
 -- (b) The same function closed to clients is not a client path: the migration applies.
 REVOKE EXECUTE ON FUNCTION public.t_client_helper(uuid) FROM PUBLIC;
-\ir ../migrations/20261121113427_job_writer_functions_execute_revoke.sql
+\ir ../migrations/20261121113427_cron_writer_functions_execute_revoke.sql
 SELECT pg_temp.ok('applied: a caller-run function that clients cannot execute does not stop the revoke',
   pg_temp.can('anon') = 0 AND pg_temp.can('authenticated') = 0 AND pg_temp.can('service_role') = 22);
 DROP FUNCTION public.t_client_helper(uuid);
-\ir revert_20261121113427_job_writer_functions_execute_revoke.sql
+\ir revert_20261121113427_cron_writer_functions_execute_revoke.sql
 
 -- (c) One of the 22 no longer runs as its owner. It is the 13th in the list: the twelve revokes before it roll back.
 ALTER FUNCTION public.photo_land_backfill_drain(integer) SECURITY INVOKER;
 UPDATE t_acl SET before_rerun = pg_temp.acl_md5();
 \set ON_ERROR_STOP off
-\ir ../migrations/20261121113427_job_writer_functions_execute_revoke.sql
+\ir ../migrations/20261121113427_cron_writer_functions_execute_revoke.sql
 \set ON_ERROR_STOP on
 SELECT pg_temp.ok('refused: one of the 22 no longer runs as its owner, and no ACL changed',
   pg_temp.can('anon') = 22 AND pg_temp.can('authenticated') = 22 AND (SELECT before_rerun FROM t_acl) = pg_temp.acl_md5());
@@ -344,7 +344,7 @@ ALTER FUNCTION public.photo_land_backfill_drain(integer) SECURITY DEFINER;
 -- ---------------------------------------------------------------------------------------------------------------
 -- 7. Re-apply.
 -- ---------------------------------------------------------------------------------------------------------------
-\ir ../migrations/20261121113427_job_writer_functions_execute_revoke.sql
+\ir ../migrations/20261121113427_cron_writer_functions_execute_revoke.sql
 TRUNCATE public.t_job_log;
 SET ROLE anon;
 SELECT pg_temp.ok('re-applied after the refusals: every one of the 22 refuses a logged-out call',
@@ -354,4 +354,4 @@ SELECT pg_temp.ok('re-applied after the refusals: nothing was written, and the s
   (SELECT count(*) FROM public.t_job_log) = 0 AND pg_temp.can('service_role') = 22);
 
 RESET ROLE;
-\echo 'test_job_writer_functions_execute_revoke: all contract assertions passed'
+\echo 'test_cron_writer_functions_execute_revoke: all contract assertions passed'
