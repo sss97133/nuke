@@ -91,14 +91,15 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
     {isLoading ? <div role="status" className="garage-notice">Reading vehicle relationships…</div>
       : error ? <section role="alert" className="garage-notice"><h2>Garage unavailable</h2><p>{error}</p><Button type="button" onClick={refresh}>Retry garage</Button></section>
       : <>
-        {warnings.length > 0 && <section role="status" className="garage-notice"><h2>Some details are unavailable</h2><ul>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul><Button variant="secondary" type="button" onClick={refresh}>Retry details</Button></section>}
-        {visibleSources.length > 0 && <section className="garage-unresolved"><h2>Identity pending <span>{visibleSources.length === unresolvedSources.length ? visibleSources.length : `${visibleSources.length} of ${unresolvedSources.length}`}</span></h2>
+        {warnings.length > 0 && <p role="status" className="garage-note">{warnings.join(' ')} <button type="button" onClick={refresh}>Retry details</button></p>}
+        {visibleSources.length > 0 && <details className="garage-note garage-unresolved">
+          <summary>Identity pending <span>{visibleSources.length === unresolvedSources.length ? visibleSources.length : `${visibleSources.length} of ${unresolvedSources.length}`}</span> · {visibleSources.map(source => source.label).join(', ')}</summary>
           {visibleSources.map(source => <article key={source.id}>
             <h3>{source.label}</h3><p>{source.stated_roles.map(role => role.replaceAll('_', ' ')).join(' · ')} · account stated</p>
             <p>Photo evidence still needs to identify this vehicle.</p>
-            {source.source_excerpt && <details><summary>Source statement</summary><p>{source.source_excerpt}</p><p>Recorded <time dateTime={source.observed_at}>{source.observed_at.slice(0, 10)}</time></p></details>}
+            {source.source_excerpt && <><p>{source.source_excerpt}</p><p>Recorded <time dateTime={source.observed_at}>{source.observed_at.slice(0, 10)}</time></p></>}
           </article>)}
-        </section>}
+        </details>}
         {visibleVehicles.length === 0 && <section className="garage-empty"><h2>{filtered ? 'No matching vehicle records' : signedIn ? (unresolvedSources.length ? 'No identified vehicle records yet' : 'No vehicles yet') : 'Your garage'}</h2>
           <p>{filtered ? 'No loaded records match the current vehicle search and relationship filter.' : signedIn ? (unresolvedSources.length ? 'The statements above are preserved while vehicle identity is unresolved.' : 'Add a vehicle to start building your garage.') : 'Sign in to see the vehicles you own and the records you hold for them.'}</p>
           <div className="garage-empty-actions">{filterMode !== 'ALL' && <Button variant="secondary" type="button" onClick={() => setFilterMode('ALL')}>Clear filter</Button>}
@@ -106,7 +107,6 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
             {!filtered && (!signedIn || !unresolvedSources.length) && <Link className="btn-base btn-primary" to={signedIn ? '/vehicle/add' : '/login'}>{signedIn ? 'Add vehicle' : 'Sign in'}</Link>}
           </div>
         </section>}
-        {vehicles.length > 0 && <p className="garage-relationship-note">Relationships reflect recorded ownership and account statements. Relationship changes are not available from this page.</p>}
         <div className="garage-sections">
           {groups.map(section => <section key={section.key} aria-label={section.label ?? 'Vehicles'}>
             {section.label && <h2 className="garage-section-heading">{section.label} <span>{section.vehicles.length}</span></h2>}

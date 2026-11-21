@@ -44,7 +44,7 @@ it('retains records beside an optional-detail failure and retries the existing r
 });
 it('explains the relationship editing boundary beside recorded vehicle links',async()=>{
   await mount();
-  expect(host.textContent).toContain('Relationship changes are not available from this page.');
+  expect(host.querySelector('select[aria-label="Relationship"]')?.getAttribute('title')).toContain('Relationship changes are not available from this page.');
   expect(host.querySelector('a[href="/vehicle/synthetic-car"]')).not.toBeNull();
   expect(host.querySelector('[draggable="true"]')).toBeNull();
 });

@@ -37,7 +37,7 @@ export function GarageToolbar({ vehicleCount, loadedVehicleCount, searchQuery, o
       </select>
       {onSortReverse && <button type="button" aria-pressed={sortReversed} aria-label="Reverse the order" title="Reverse the order" onClick={() => onSortReverse(!sortReversed)}>{sortReversed ? '↑' : '↓'}</button>}
     </div>
-    <select aria-label="Relationship" value={filterMode} onChange={event => onFilterChange(event.target.value as FilterMode)}>
+    <select aria-label="Relationship" title="Relationships reflect recorded ownership and account statements. Relationship changes are not available from this page." value={filterMode} onChange={event => onFilterChange(event.target.value as FilterMode)}>
       <option value="ALL">All relationships</option><option value="OWNED">Ownership records, current and past</option>
     </select>
     <div className="garage-segments" role="group" aria-label="View">
