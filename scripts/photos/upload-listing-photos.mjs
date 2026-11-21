@@ -7,7 +7,8 @@
 // service key only, so a browser page cannot call it. Collect the URLs in the page, save them to a file (one per
 // line, or a JSON array) and run this. --shifted reads URLs whose characters the collecting page moved up one code
 // point each, and moves them back. The function fetches the URLs itself, one after another: 3 per call by default.
-// Prints one line per call and a total. Exits 1 when a photo failed or none was stored, 2 on a usage error.
+// Prints one line per call and a total. Exits 1 when a photo failed or none was stored, and 2 before any call when the
+// arguments, the file, one of its entries or the key is wrong.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -125,24 +126,35 @@ export async function send({ url, key }, { vehicleId, batch }, urls, { fetchImpl
   return total;
 }
 
-async function main() {
-  let opts;
+// Everything that can be wrong before a call is made: the arguments, the file and its entries. Each throws, and main
+// answers all of them with exit 2, so a wrapper that retries on exit 1 (an upload that failed) never resends bad input.
+export function inputs(argv, { read = (file) => readFileSync(file, 'utf8') } = {}) {
+  const opts = parseArgs(argv);
+  let text;
   try {
-    opts = parseArgs(process.argv.slice(2));
+    text = read(opts.file);
+  } catch (err) {
+    throw new Error(`cannot read the urls file (${err.code ?? 'error'})`);
+  }
+  const urls = readUrls(text, { shifted: opts.shifted });
+  if (urls.length === 0) throw new Error('the file holds no URL');
+  return { opts, urls };
+}
+
+async function main() {
+  let opts, urls, target;
+  try {
+    ({ opts, urls } = inputs(process.argv.slice(2)));
+    if (!opts.dryRun) target = await credentials();
   } catch (err) {
     console.error(err.message);
-    process.exit(2);
-  }
-  const urls = readUrls(readFileSync(opts.file, 'utf8'), { shifted: opts.shifted });
-  if (urls.length === 0) {
-    console.error('the file holds no URL');
     process.exit(2);
   }
   if (opts.dryRun) {
     console.log(`dry run: ${urls.length} urls for vehicle ${opts.vehicleId} in ${batches(urls, opts.batch).length} calls; nothing sent`);
     return;
   }
-  const total = await send(await credentials(), opts, urls);
+  const total = await send(target, opts, urls);
   console.log(`total: ${total.urls} urls, stored ${total.stored}, failed ${total.failed}`);
   if (total.failed > 0 || total.stored === 0) process.exit(1);
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { batches, parseArgs, readUrls, send, unshift } from './upload-listing-photos.mjs';
+import { batches, inputs, parseArgs, readUrls, send, unshift } from './upload-listing-photos.mjs';
 
 const VEHICLE = '0a0a0a0a-0000-4000-8000-00000000000a';
 const shiftUp = (text) => Array.from(text, (c) => String.fromCodePoint(c.codePointAt(0) + 1)).join('');
@@ -82,4 +82,15 @@ test('a refused call, a broken answer and a request error each count every URL i
   assert.match(lines[0], /^call 1: 2 failed, HTTP 401/);
   assert.match(lines[1], /^call 2: 2 failed, the answer was not JSON/);
   assert.match(lines[2], /^call 3: 1 failed, request error: timed out/);
+});
+
+test('inputs refuses a file it cannot read, a bad entry and an empty file before anything is sent', () => {
+  const VEHICLE = '11111111-2222-3333-4444-555555555555';
+  const missing = () => { throw Object.assign(new Error('no such file'), { code: 'ENOENT' }); };
+  assert.throws(() => inputs([VEHICLE, 'urls.txt'], { read: missing }), /cannot read the urls file \(ENOENT\)/);
+  assert.throws(() => inputs([VEHICLE, 'urls.txt'], { read: () => 'not a url' }), /not a URL \(entry 1\)/);
+  assert.throws(() => inputs([VEHICLE, 'urls.txt'], { read: () => '\n\n' }), /the file holds no URL/);
+  assert.throws(() => inputs(['urls.txt'], { read: () => 'https://example.test/a.jpg' }), /usage:/);
+  const ok = inputs([VEHICLE, 'urls.txt', '--batch', '2'], { read: () => 'https://example.test/a.jpg\nhttps://example.test/b.jpg' });
+  assert.deepEqual([ok.opts.batch, ok.urls.length], [2, 2]);
 });
