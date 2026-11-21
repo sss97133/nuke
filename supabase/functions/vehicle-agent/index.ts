@@ -59,7 +59,7 @@ import {
   isUuid, normalizeProposals, PROPOSAL_TTL_MS, signProposal, speakerRole, splitReply, verifyProposal,
   type ObservationArgs, type SignedPayload, type StatementArgs,
 } from "./scope.ts";
-import { buildRecordsDigest, readAll, readSummary, type RecordReads } from "./records.ts";
+import { buildRecordsDigest, readAll, readSummary, RECORD_READERS, type RecordReads } from "./records.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -253,26 +253,36 @@ Deno.serve(async (req) => {
     // ── The car's record, read as the person asking ──────────────────────────
     // Started first so the slowest reader (vehicle_build_reconstruction, ~2 s) overlaps the memory loads below.
     // The person's own session, so each reader's privacy rule decides; every read takes the request's vehicle_id only.
-    const asCaller = createClient(Deno.env.get("SUPABASE_URL")!, projectPublishableKey()!, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
     const readsFetchedAt = new Date().toISOString();
-    const rpc = (fn: string) => (signal: AbortSignal) => asCaller.rpc(fn, { p_vehicle_id: vehicleId }).abortSignal(signal);
-    const recordsRead: Promise<RecordReads> = readAll({
-      vehicle_build_reconstruction: rpc("vehicle_build_reconstruction"),
-      vehicle_profile_read: rpc("vehicle_profile_read"),
-      vehicle_testimony_summary: rpc("vehicle_testimony_summary"),
-      vehicle_open_questions: rpc("vehicle_open_questions"),
-      get_vehicle_day_depth: rpc("get_vehicle_day_depth"),
-      vehicle_statements: rpc("vehicle_statements"),
-      // Times and confirmation only; the money columns on this table are not read.
-      work_sessions: (signal) => asCaller.from("work_sessions")
-        .select("session_date, duration_minutes, owner_confirmed_at")
-        .eq("vehicle_id", vehicleId).order("session_date", { ascending: true }).limit(1000).abortSignal(signal),
-    }).catch((e) => {
-      console.error(`[vehicle-agent] records not read: ${e instanceof Error ? e.message : String(e)}`);
-      return {} as RecordReads;
+    let recordsRead: Promise<RecordReads>;
+    try {
+      const publishable = projectPublishableKey();
+      if (!publishable) throw new Error("no publishable key in the function environment");
+      const asCaller = createClient(Deno.env.get("SUPABASE_URL")!, publishable, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const rpc = (fn: string) => (signal: AbortSignal) => asCaller.rpc(fn, { p_vehicle_id: vehicleId }).abortSignal(signal);
+      recordsRead = readAll({
+        vehicle_build_reconstruction: rpc("vehicle_build_reconstruction"),
+        vehicle_profile_read: rpc("vehicle_profile_read"),
+        vehicle_testimony_summary: rpc("vehicle_testimony_summary"),
+        vehicle_open_questions: rpc("vehicle_open_questions"),
+        get_vehicle_day_depth: rpc("get_vehicle_day_depth"),
+        vehicle_statements: rpc("vehicle_statements"),
+        // Times and confirmation only; the money columns on this table are not read.
+        work_sessions: (signal) => asCaller.from("work_sessions")
+          .select("session_date, duration_minutes, owner_confirmed_at")
+          .eq("vehicle_id", vehicleId).order("session_date", { ascending: true }).limit(1000).abortSignal(signal),
+      });
+    } catch (e) {
+      recordsRead = Promise.reject(e);
+    }
+    // A failure here never fails the turn: every reader is then named as unread in the digest.
+    recordsRead = recordsRead.catch((e) => {
+      const detail = e instanceof Error ? e.message : String(e);
+      console.error(`[vehicle-agent] records not read: ${detail}`);
+      return Object.fromEntries(RECORD_READERS.map((r) => [r, { status: "error", ms: 0, detail }])) as RecordReads;
     });
 
     // ── Harness: load the vehicle's memory ───────────────────────────────────
@@ -324,6 +334,9 @@ Deno.serve(async (req) => {
     const records = await recordsRead;
     const recordsStatus = readSummary(records);
     console.log(`[vehicle-agent] records ${Object.entries(recordsStatus).map(([k, r]) => `${k}=${r.status}:${r.ms}ms`).join(" ")}`);
+    for (const [name, r] of Object.entries(records)) {
+      if (r && r.status !== "ok") console.warn(`[vehicle-agent] reader ${name} ${r.status}${r.detail ? `: ${r.detail}` : ""}`);
+    }
     const recordsDigest = buildRecordsDigest(records, { fetchedAt: readsFetchedAt });
 
     const system =
@@ -347,7 +360,8 @@ Deno.serve(async (req) => {
           `when that message itself states something about this car (not for a question). target_key/target_value ` +
           `(lower_snake_case key, short value) are optional. ingest_observation records a finding of yours from this ` +
           `car's data, in your own voice. At most ${3} proposals. Never name another vehicle or any id: everything ` +
-          `applies to this car only. Most replies need NO json block.`
+          `applies to this car only. Figures in THIS CAR'S RECORDS are already in the database: never propose them ` +
+          `as a record. Most replies need NO json block.`
         : `Writing is disabled for this conversation; answer only.`);
 
     const messages = [

@@ -190,6 +190,20 @@ Deno.test("statement words stay hidden when the reader hides them; profile field
   has(text, "A reader proposed, not settled: The evidence shows: 12345.");
 });
 
+Deno.test("masthead price: the reader's claim object with its label and source; none when absent", () => {
+  const reads = allReads();
+  const profile = (reads.vehicle_profile_read as { data: { sections: Array<Record<string, unknown>> } }).data;
+  profile.sections[0].price = {
+    value: 12345, unit: "USD", observed_at: "2029-06-01T00:00:00Z", trust: 0.5,
+    source: { kind: "listing", url: "https://example.test/lot/1", label: "EXAMPLE HOUSE", method: "asking" },
+  };
+  profile.sections[0].priceLabel = "Asking";
+  const text = buildRecordsDigest(reads, { fetchedAt: FETCHED });
+  has(text, "Price claim on the masthead: Asking 12345 USD (EXAMPLE HOUSE, asking, 2029-06-01, trust 0.5).");
+  lacks(text, "example.test");
+  has(buildRecordsDigest(allReads(), { fetchedAt: FETCHED }), "Price claim on the masthead: none shown.");
+});
+
 Deno.test("a car with many fat systems stays within the budget by dropping detail, not by cutting text", () => {
   const fat = Array.from({ length: 40 }, (_, i) => ({
     system_key: `system_${i}`, first_day: "2029-01-01", last_day: "2029-12-31", part_lines: 50,

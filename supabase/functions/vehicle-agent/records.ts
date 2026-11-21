@@ -287,8 +287,7 @@ function profileSection(data: unknown, fetchedAt: string, detail: number): strin
   if (idn.is_replica === true) bits.push("marked a replica");
   if (clean(idn.transmission, 30)) bits.push(`transmission ${clean(idn.transmission, 30)}`);
   out.push(`Masthead: ${bits.join(", ")}.`);
-  const price = num(masthead.price);
-  out.push(`Price claim on the masthead: ${price !== null ? `${price}${clean(masthead.priceLabel, 40) ? ` (${clean(masthead.priceLabel, 40)})` : ""}` : "none shown"}.`);
+  out.push(`Price claim on the masthead: ${priceText(masthead.price, masthead.priceLabel)}.`);
 
   // Each field keeps its facet (as built / current / decode) and status, so "as built" and "now" are not conflated.
   const tokens = obj(masthead.token_items);
@@ -321,6 +320,18 @@ function profileSection(data: unknown, fetchedAt: string, detail: number): strin
   return out;
 }
 
+/** The masthead price: { value, unit, source: { label, method }, observed_at, trust } with its label (Asking, High bid,
+ *  Last recorded sale). A bare number is accepted too. Anything without a readable value is "none shown". */
+export function priceText(price: unknown, label: unknown): string {
+  const p = isObj(price) ? price : { value: price };
+  const value = num(p.value);
+  if (value === null) return "none shown";
+  const src = obj(p.source);
+  const from = [clean(src.label, 40), clean(src.method, 20), day(p.observed_at), num(p.trust) !== null ? `trust ${num(p.trust)}` : null]
+    .filter(Boolean).join(", ");
+  return `${clean(label, 50) ?? "price"} ${value}${clean(p.unit, 8) ? ` ${clean(p.unit, 8)}` : ""}${from ? ` (${from})` : ""}`;
+}
+
 // ── vehicle_testimony_summary ───────────────────────────────────────────────────────────────────────────────────────
 
 function testimonySection(data: unknown, fetchedAt: string): string[] {
@@ -328,7 +339,7 @@ function testimonySection(data: unknown, fetchedAt: string): string[] {
   const kinds = Object.entries(obj(d.by_kind)).map(([k, n]) => `${clean(k, 30)} ${num(n) ?? "?"}`).join(", ");
   return [
     header("vehicle_testimony_summary", null, fetchedAt),
-    `Observations on file: ${num(d.total) ?? "unknown"}${kinds ? ` (${kinds})` : ""}, observed ${span(d.first_observed, d.last_observed) ?? "undated"}. ` +
+    `Observations visible to this viewer: ${num(d.total) ?? "unknown"}${kinds ? ` (${kinds})` : ""}, observed ${span(d.first_observed, d.last_observed) ?? "undated"}. ` +
       `The OBSERVATIONS section below holds only the most recent of these, so count from this line, not from that list.`,
   ];
 }
