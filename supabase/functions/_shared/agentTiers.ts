@@ -39,9 +39,9 @@ import { type AgentTier, type AgentCallResult, TIER_CONFIGS as _TIERS } from "./
 
 // Need the original TIER_CONFIGS format for vision (has model, timeoutMs, cost)
 const VISION_TIER_CONFIGS: Record<string, { model: string; maxTokens: number; timeoutMs: number; costPerInputMTok: number; costPerOutputMTok: number }> = {
-  haiku: { model: "claude-haiku-4-5-20251001", maxTokens: 4096, timeoutMs: 30_000, costPerInputMTok: 1.00, costPerOutputMTok: 5.00 },
-  sonnet: { model: "claude-sonnet-4-6", maxTokens: 8192, timeoutMs: 60_000, costPerInputMTok: 3.00, costPerOutputMTok: 15.00 },
-  opus: { model: "claude-opus-4-6", maxTokens: 16384, timeoutMs: 120_000, costPerInputMTok: 5.00, costPerOutputMTok: 25.00 },
+  haiku: { model: "claude-sonnet-5-5", maxTokens: 4096, timeoutMs: 60_000, costPerInputMTok: 2.00, costPerOutputMTok: 10.00 },
+  sonnet: { model: "claude-sonnet-5-5", maxTokens: 8192, timeoutMs: 60_000, costPerInputMTok: 2.00, costPerOutputMTok: 10.00 },
+  opus: { model: "claude-opus-5-5", maxTokens: 16384, timeoutMs: 120_000, costPerInputMTok: 4.00, costPerOutputMTok: 20.00 },
 };
 
 /**
@@ -67,7 +67,7 @@ export async function callTierVision(
   }
 
   const maxTokens = options?.maxTokens ?? config.maxTokens;
-  const temperature = options?.temperature ?? 0.1;
+  // Sonnet 5.5 / Opus 5.5 reject non-default temperature (400): not sent.
 
   // Build content array with images + text
   const content: any[] = [];
@@ -114,7 +114,7 @@ export async function callTierVision(
     body: JSON.stringify({
       model: config.model,
       max_tokens: maxTokens,
-      temperature,
+      ...(config.model === "claude-sonnet-5-5" ? { thinking: { type: "between_tools" } } : {}),
       system: systemPrompt,
       messages: [{ role: "user", content }],
     }),
@@ -136,7 +136,7 @@ export async function callTierVision(
   const costCents =
     (inputTokens * config.costPerInputMTok + outputTokens * config.costPerOutputMTok) / 1_000_000;
 
-  const resultContent = data.content?.[0]?.text ?? "";
+  const resultContent = (data.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
 
   return {
     content: resultContent,

@@ -274,6 +274,17 @@ function setDayParam(date: string | null): void {
   window.history.replaceState(window.history.state, '', url.toString());
 }
 
+/**
+ * A stored 'pending_analysis' event is written when photos land and is never rewritten. The day's real state
+ * is the photo reader's own count (get_vehicle_day_depth: photos on the day, photos analysed), so that decides the label.
+ */
+export function photoDayLabel(label: string, read: { photos: number; seen: number } | undefined): string {
+  if (label !== EVENT_LABELS.pending_analysis || !read || read.photos <= 0) return label;
+  if (read.seen >= read.photos) return `Photo Session (${read.photos.toLocaleString('en-US')} photos, analysed)`;
+  if (read.seen > 0) return `Photo Session (${read.seen.toLocaleString('en-US')} of ${read.photos.toLocaleString('en-US')} photos analysed)`;
+  return label;
+}
+
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, onSelectAuction, selectionPending = false }) => {
   const { vehicle, vehicleId, timelineEvents, timelineReadState, setGalleryFilter } = useVehicleProfile();
   const popup = useContext(PopupStackContext);
@@ -287,21 +298,24 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
   // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
   // an owner-confirmed T4 day glows brightest. One RPC per vehicle (get_vehicle_day_depth).
-  const [depthRead, setDepthRead] = useState<{ vehicleId: typeof vehicleId; values: Record<string, number> }>(() => ({ vehicleId, values: {} }));
+  const [depthRead, setDepthRead] = useState<{ vehicleId: typeof vehicleId; values: Record<string, number>; days: Record<string, { photos: number; seen: number }> }>(() => ({ vehicleId, values: {}, days: {} }));
   // A changed route starts a fresh optional-read lifetime, including a return to a prior vehicle.
-  if (depthRead.vehicleId !== vehicleId) setDepthRead({ vehicleId, values: {} });
+  if (depthRead.vehicleId !== vehicleId) setDepthRead({ vehicleId, values: {}, days: {} });
   const depthByDay = depthRead.vehicleId === vehicleId ? depthRead.values : {};
+  const photoReadByDay = depthRead.vehicleId === vehicleId ? depthRead.days : {};
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
     Promise.resolve(supabase.rpc('get_vehicle_day_depth', { p_vehicle_id: vehicleId })).then(({ data }) => {
       if (cancelled || !data) return;
       const m: Record<string, number> = {};
+      const days: Record<string, { photos: number; seen: number }> = {};
       for (const r of data as any[]) {
         const dp = Number(r.depth) || 0;
         m[r.day] = dp >= 0.5 ? 4 : dp >= 0.35 ? 3 : dp >= 0.18 ? 2 : dp > 0 ? 1 : 0;
+        days[r.day] = { photos: Number(r.photos) || 0, seen: Number(r.seen) || 0 };
       }
-      if (!cancelled) setDepthRead(current => current.vehicleId === vehicleId ? { vehicleId, values: m } : current);
+      if (!cancelled) setDepthRead(current => current.vehicleId === vehicleId ? { vehicleId, values: m, days } : current);
     }).catch(() => { /* coverage is best-effort; timeline still renders from events */ });
     return () => { cancelled = true; };
   }, [vehicleId]);
@@ -511,6 +525,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       for (const ds in mp) {
         const dl = depthByDay[ds];
         if (dl && dl > mp[ds].level) mp[ds].level = dl;
+        mp[ds].label = photoDayLabel(mp[ds].label, photoReadByDay[ds]);
+        mp[ds].items = mp[ds].items.map(item => ({ ...item, k: photoDayLabel(item.k, photoReadByDay[ds]) }));
       }
     };
     applyDepth(allMap);
@@ -555,7 +571,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       weeks: wks,
       sortedDates: sorted,
     };
-  }, [enrichedEvents, buildEventMap, depthByDay]);
+  }, [enrichedEvents, buildEventMap, depthByDay, photoReadByDay]);
 
   // Heatmap weeks for expanded view
   const heatmapWeeks = useMemo(() => {

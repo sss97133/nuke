@@ -1,10 +1,13 @@
-/** Garage cards preserve recorded relationships, evidence and estimate coverage. */
+/** Garage cards: the photo, the car, its activity timeline, and the facts on record. */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import Link from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl as sharedOptimizeImageUrl } from '../../lib/imageOptimizer';
+import { GarageCardAnalysis, readCardAnalysis, type AnalysisLine } from '../garage/GarageCardAnalysis';
+import { appendFrames, coverDayOf, readReelPage, readReelStart, REEL_PAGE, type ReelFrame } from '../garage/garageReel';
 import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
+import '../garage/garage.css';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -14,7 +17,14 @@ export interface GarageVehicleCardProps {
   vehicle: GarageVehicle;
   viewMode?: ViewMode;
   onRefresh?: () => void;
+  /** The window and scale every card's timeline shares. */
+  axis?: GarageAxis;
+  /** Card buttons, in priority order; the lane shows as many as the card's width holds. */
+  actions?: { label: string; onPress: () => void }[];
 }
+
+/** The window and the intensity steps are the garage's, not the car's, so two cards compare. */
+export interface GarageAxis { start: number; end: number; weeks: number; steps: [number, number, number]; grid: string }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -160,18 +170,6 @@ const TOOLTIP_STYLE: React.CSSProperties = {
 };
 
 // ---------------------------------------------------------------------------
-// Barcode colors (matches BarcodeTimeline.tsx)
-// ---------------------------------------------------------------------------
-
-const BARCODE_COLORS: Record<number, string> = {
-  0: 'var(--bg, #f5f5f5)',
-  1: 'var(--success-dim, rgba(22, 130, 93, 0.1))',
-  2: 'var(--success, #16825d)',
-  3: 'var(--success, #16825d)',
-  4: 'var(--accent, #2a2a2a)',
-};
-
-// ---------------------------------------------------------------------------
 // HoverData — wraps any element with tooltip + click action
 // ---------------------------------------------------------------------------
 
@@ -256,97 +254,85 @@ function HoverData({
 }
 
 // ---------------------------------------------------------------------------
-// MiniBarcode — compressed timeline strip under image
+// MiniBarcode — the car's recorded activity as day squares, the contribution-grid
+// layout: seven rows (Monday to Sunday), one column per week, the last year,
+// shaded on the garage's own scale. Five years of days would be one-pixel squares
+// at card width, so the window is the year and the caption carries the full span.
 // ---------------------------------------------------------------------------
 
-function MiniBarcode({ eventWeeks }: { eventWeeks: string[] | null }) {
-  const bars = useMemo(() => {
-    if (!eventWeeks || eventWeeks.length === 0) return null;
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthLabel = (ym: string) => `${MONTH_NAMES[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+const DAY_MS = 86_400_000;
+const TIMELINE_WEEKS = 53; // a year of week columns, ending with this week
 
-    // Count events per week bucket
-    const weekCounts = new Map<string, number>();
-    for (const w of eventWeeks) {
-      const key = w.slice(0, 10); // YYYY-MM-DD
-      weekCounts.set(key, (weekCounts.get(key) || 0) + 1);
+/** Recorded items per day: the day reader when present, otherwise the event weeks on their Monday. */
+function dayTotals(vehicle: GarageVehicle): Map<string, number> {
+  const totals = new Map<string, number>();
+  if (vehicle.timeline?.days.length) {
+    for (const [day, photos, work, events, documents] of vehicle.timeline.days) {
+      totals.set(day, (Number(photos) || 0) + (Number(work) || 0) + (Number(events) || 0) + (Number(documents) || 0));
     }
-
-    const sorted = [...weekCounts.keys()].sort();
-    if (sorted.length === 0) return null;
-
-    const earliest = new Date(sorted[0] + 'T00:00:00');
-    const latest = new Date(sorted[sorted.length - 1] + 'T00:00:00');
-
-    // Build all weeks from earliest to latest
-    const allWeeks: { key: string; level: number }[] = [];
-    const cur = new Date(earliest);
-    while (cur <= latest) {
-      const key = cur.toISOString().slice(0, 10);
-      const count = weekCounts.get(key) || 0;
-      const level = count === 0 ? 0 : count >= 4 ? 4 : count >= 3 ? 3 : count >= 2 ? 2 : 1;
-      allWeeks.push({ key, level });
-      cur.setDate(cur.getDate() + 7);
-    }
-
-    // If too many weeks (>200), group by month
-    if (allWeeks.length > 200) {
-      const monthMap = new Map<string, number>();
-      for (const w of allWeeks) {
-        const monthKey = w.key.slice(0, 7); // YYYY-MM
-        monthMap.set(monthKey, Math.max(monthMap.get(monthKey) || 0, w.level));
-      }
-      return [...monthMap.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, level]) => ({ key, level }));
-    }
-
-    return allWeeks;
-  }, [eventWeeks]);
-
-  if (!bars || bars.length === 0) {
-    // Empty barcode — subtle indicator that no events exist
-    return (
-      <div
-        style={{
-          width: '100%',
-          height: '3%',
-          minHeight: 3,
-          maxHeight: 6,
-          backgroundColor: 'var(--bg, #f5f5f5)',
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-        }}
-      />
-    );
+    return totals;
   }
+  for (const week of vehicle.event_weeks ?? []) {
+    const key = week.slice(0, 10);
+    totals.set(key, (totals.get(key) || 0) + 1);
+  }
+  return totals;
+}
 
+/** The window (its first Monday) and steps at the quartiles of the garage's active days. */
+export function garageAxis(vehicles: GarageVehicle[], now = new Date()): GarageAxis {
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const thisMonday = today - ((new Date(today).getUTCDay() + 6) % 7) * DAY_MS;
+  const start = thisMonday - (TIMELINE_WEEKS - 1) * 7 * DAY_MS;
+  const totals: number[] = [];
+  for (const vehicle of vehicles) {
+    for (const [day, n] of dayTotals(vehicle)) {
+      const at = Date.parse(`${day}T00:00:00Z`);
+      if (n > 0 && at >= start && at <= today) totals.push(n);
+    }
+  }
+  totals.sort((a, b) => a - b);
+  const at = (q: number) => totals.length ? totals[Math.min(totals.length - 1, Math.floor(q * totals.length))] : 1;
+  // Every day that has happened is a square; the rest of this week is not drawn.
+  let grid = '';
+  for (let index = 0; start + index * DAY_MS <= today; index++) grid += `M${Math.floor(index / 7)} ${index % 7}h.84v.84h-.84z`;
+  return { start, end: today, weeks: TIMELINE_WEEKS, steps: [at(0.25), at(0.5), at(0.75)], grid };
+}
+
+function MiniBarcode({ vehicle, axis, litDay }: { vehicle: GarageVehicle; axis?: GarageAxis; litDay?: string | null }) {
+  const drawn = useMemo(() => {
+    const frame = axis ?? garageAxis([vehicle]);
+    const cells: { key: string; x: number; y: number; level: number; title: string }[] = [];
+    for (const [day, n] of dayTotals(vehicle)) {
+      const at = Date.parse(`${day}T00:00:00Z`);
+      if (!Number.isFinite(at) || n <= 0 || at < frame.start || at > frame.end) continue;
+      const index = Math.round((at - frame.start) / DAY_MS);
+      cells.push({
+        key: day, x: Math.floor(index / 7), y: index % 7,
+        // Above each quartile of the garage's active days the square steps up one shade.
+        level: 1 + frame.steps.filter(step => n > step).length,
+        title: `${monthLabel(day.slice(0, 7)).replace(' ', ` ${Number(day.slice(8, 10))}, `)}: ${n.toLocaleString('en-US')} recorded`,
+      });
+    }
+    return { frame, cells };
+  }, [vehicle, axis]);
+
+  const { frame, cells } = drawn;
+  // The day of the photo showing in the card's viewer, when it falls inside the window.
+  const litAt = litDay ? Date.parse(`${litDay}T00:00:00Z`) : NaN;
+  const litIndex = Number.isFinite(litAt) && litAt >= frame.start && litAt <= frame.end ? Math.round((litAt - frame.start) / DAY_MS) : null;
+  const label = `${cells.length} active ${cells.length === 1 ? 'day' : 'days'} recorded in the last year`;
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '3%',
-        minHeight: 3,
-        maxHeight: 6,
-        display: 'flex',
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        backgroundColor: 'var(--bg, #f5f5f5)',
-      }}
-      title={`${bars.filter(b => b.level > 0).length} active periods`}
-    >
-      {bars.map((bar) => (
-        <div
-          key={bar.key}
-          style={{
-            flex: 1,
-            height: '100%',
-            backgroundColor: BARCODE_COLORS[bar.level],
-            minWidth: 1,
-          }}
-        />
+    <svg className="garage-barcode" role="img" aria-label={label}
+      viewBox={`0 0 ${frame.weeks - 0.16} 6.84`} preserveAspectRatio="xMinYMid meet">
+      <path className="garage-barcode-grid" d={frame.grid} />
+      {cells.map(cell => (
+        <rect key={cell.key} x={cell.x} y={cell.y} width={0.84} height={0.84} rx={0.15} data-level={cell.level}><title>{cell.title}</title></rect>
       ))}
-    </div>
+      {litIndex != null && <rect className="garage-barcode-lit" x={Math.floor(litIndex / 7) - 0.08} y={(litIndex % 7) - 0.08} width={1} height={1} rx={0.2} />}
+    </svg>
   );
 }
 
@@ -500,15 +486,167 @@ function ActionStrip({
 }
 
 // ---------------------------------------------------------------------------
-// Grid card (full detail)
+// Grid card: the photo, the car, its timeline, and only the facts on record
 // ---------------------------------------------------------------------------
 
-function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  const [vinCopied, setVinCopied] = useState(false);
-  const title = formatVehicleTitle(vehicle);
+const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
 
-  const copyVin = useCallback((e: React.MouseEvent) => {
+/** "Mar 2021 – Nov 2026", or one month when the record sits inside it. */
+function recordSpan(vehicle: GarageVehicle): string | null {
+  const first = vehicle.timeline?.first_day ?? vehicle.event_summary?.first_event_date ?? null;
+  const last = vehicle.timeline?.last_day ?? vehicle.event_summary?.last_event_date ?? null;
+  if (!first || !last) return null;
+  const from = monthLabel(first.slice(0, 7));
+  const to = monthLabel(last.slice(0, 7));
+  return from === to ? from : `${from} – ${to}`;
+}
+
+/** Counts that exist; a zero is left out instead of printed. */
+function recordCounts(vehicle: GarageVehicle): string[] {
+  const t = vehicle.timeline;
+  if (!t) return vehicle.image_count ? [plural(vehicle.image_count, 'photo', 'photos')] : [];
+  // image_count also holds undated photos, so it is the photo total when it is larger.
+  const photos = Math.max(t.photos, vehicle.image_count ?? 0);
+  return [
+    photos > 0 ? plural(photos, 'photo', 'photos') : null,
+    t.work_days > 0 ? plural(t.work_days, 'work day', 'work days') : null,
+    t.events > 0 ? plural(t.events, 'event', 'events') : null,
+    t.documents > 0 ? plural(t.documents, 'paper', 'papers') : null,
+  ].filter((part): part is string => part !== null);
+}
+
+/** The profile header's own read, so a card and its profile state the same price and configuration. */
+interface CardHeader { price: number | null; priceLabel: string | null; facets: { dimension: string; label: string }[] }
+const headerReads = new Map<string, Promise<CardHeader | null>>();
+function readCardHeader(vehicleId: string): Promise<CardHeader | null> {
+  let read = headerReads.get(vehicleId);
+  if (!read) {
+    read = Promise.resolve(supabase.rpc('vehicle_profile_read', { p_vehicle_id: vehicleId })).then(({ data, error }) => {
+      const sections: any[] = !error && Array.isArray((data as any)?.sections) ? (data as any).sections : [];
+      const masthead = sections.find(section => section?.kind === 'masthead');
+      const strip = sections.find(section => section?.kind === 'strip');
+      if (!masthead && !strip) return null;
+      return {
+        // The read ships the price as a claim ({ value, unit, source, observed_at }).
+        price: (amount => Number.isFinite(amount) && amount > 0 ? amount : null)(Number(masthead?.price?.value ?? masthead?.price)),
+        priceLabel: typeof masthead?.priceLabel === 'string' ? masthead.priceLabel : null,
+        facets: (Array.isArray(strip?.facets) ? strip.facets : [])
+          .filter((facet: any) => typeof facet?.label === 'string' && facet.label && facet.dimension !== 'body_style')
+          .map((facet: any) => ({ dimension: String(facet.dimension), label: facet.label as string })),
+      };
+    }).catch(() => null);
+    headerReads.set(vehicleId, read);
+  }
+  return read;
+}
+
+/** "Active 19d ago" from the car's newest dated activity. */
+function activeAgo(vehicle: GarageVehicle, now = Date.now()): string | null {
+  const day = vehicle.last_activity_at?.slice(0, 10) ?? vehicle.timeline?.last_day ?? null;
+  const at = day ? Date.parse(`${day}T12:00:00Z`) : NaN;
+  if (!Number.isFinite(at)) return null;
+  const days = Math.max(0, Math.round((now - at) / DAY_MS));
+  return days === 0 ? 'Active today' : days < 60 ? `Active ${days}d ago` : days < 730 ? `Active ${Math.round(days / 30)}mo ago` : `Active ${Math.round(days / 365)}y ago`;
+}
+
+function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageVehicle; onRefresh?: () => void; axis?: GarageAxis; actions?: { label: string; onPress: () => void }[] }) {
+  // The header read is asked for once the card is on screen.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [header, setHeader] = useState<CardHeader | null>(null);
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    let live = true;
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      void readCardHeader(vehicle.id).then(read => { if (live) setHeader(read); });
+    }, { rootMargin: '200px' });
+    observer.observe(node);
+    return () => { live = false; observer.disconnect(); };
+  }, [vehicle.id]);
+  const price = header?.price ?? vehicle.estimated_value;
+  const priceTitle = header?.price != null ? header.priceLabel ?? 'Price on the profile' : estimateTooltip(vehicle);
+  const active = activeAgo(vehicle);
+  const [vinCopied, setVinCopied] = useState(false);
+  // The car's other photos load the first time the pointer or a finger reaches the photo; the reel is a
+  // native scroll-snap strip (a two-finger swipe flips it) with arrows for a mouse. Order: garageReel.ts.
+  const cover = vehicle.resolved_image_url;
+  const [loadedReel, setReel] = useState<ReelFrame[]>([]);
+  // A cover that arrives after the reel loaded is not shown twice.
+  const reel = useMemo(() => cover ? loadedReel.filter(item => item.url !== cover) : loadedReel, [loadedReel, cover]);
+  const [photoTotal, setPhotoTotal] = useState(0);
+  const [coverDay, setCoverDay] = useState<string | null>(null);
+  const [frame, setFrame] = useState(0);
+  const reelRef = useRef<HTMLDivElement>(null);
+  const reelAsked = useRef(false);
+  const nextOffset = useRef(REEL_PAGE);
+  const paging = useRef(false);
+  // The analysis frame is read when the reel is first asked for, and exists only when a reader returned a line.
+  const [analysis, setAnalysis] = useState<AnalysisLine[] | null>(null);
+  const analysisAsked = useRef(false);
+  const loadAnalysis = useCallback(() => {
+    if (analysisAsked.current) return;
+    analysisAsked.current = true;
+    readCardAnalysis(vehicle.id).then(setAnalysis).catch(() => { analysisAsked.current = false; });
+  }, [vehicle.id]);
+  const loadReel = useCallback(() => {
+    if (reelAsked.current || (!cover && !vehicle.image_count)) return;
+    reelAsked.current = true;
+    // Asked for with the reel, so the Analysis chip is there however many photos sit in front of the frame.
+    loadAnalysis();
+    readReelStart(vehicle.id)
+      .then(({ sequence, page, total }) => {
+        const frames = appendFrames([], [...sequence, ...page], cover);
+        setCoverDay(coverDayOf([...sequence, ...page], cover));
+        setReel(frames);
+        setPhotoTotal(total);
+        // A short reel is already at its end.
+        if ((cover ? 1 : 0) + frames.length <= 3) loadAnalysis();
+      })
+      .catch(() => { reelAsked.current = false; });
+  }, [vehicle.id, cover, vehicle.image_count, loadAnalysis]);
+  const loadMore = useCallback(() => {
+    if (paging.current || nextOffset.current >= photoTotal) return;
+    paging.current = true;
+    const offset = nextOffset.current;
+    readReelPage(vehicle.id, offset)
+      .then(rows => {
+        nextOffset.current = offset + REEL_PAGE;
+        setCoverDay(day => day ?? coverDayOf(rows, cover));
+        setReel(frames => appendFrames(frames, rows, cover));
+      })
+      .catch(() => {})
+      .finally(() => { paging.current = false; });
+  }, [vehicle.id, cover, photoTotal]);
+  // Frame one is the cover when there is one; the reel's photos follow it; the analysis is always last.
+  const photoFrames = (cover ? 1 : 0) + reel.length;
+  const hasAnalysis = !!analysis?.length;
+  const lastFrame = photoFrames - 1 + (hasAnalysis ? 1 : 0);
+  const onAnalysis = hasAnalysis && frame >= photoFrames;
+  const onReelScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const at = Math.round(event.currentTarget.scrollLeft / Math.max(1, event.currentTarget.clientWidth));
+    setFrame(at);
+    // Three frames from the end of what has loaded, the next page is asked for (not while the analysis shows,
+    // so a page never lands in front of it), and the analysis with it.
+    if (at >= photoFrames - 3) { if (at < photoFrames) loadMore(); loadAnalysis(); }
+  };
+  const toAnalysis = () => {
+    const node = reelRef.current;
+    // At once, so the photos passed on the way do not ask for more pages.
+    if (node) node.scrollTo({ left: photoFrames * node.clientWidth });
+  };
+  const step = (by: number) => {
+    loadReel();
+    const node = reelRef.current;
+    if (node) node.scrollBy({ left: by * node.clientWidth, behavior: 'smooth' });
+  };
+  const title = formatVehicleTitle(vehicle);
+  const name = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim && vehicle.trim !== vehicle.model ? vehicle.trim : null]
+    .filter(Boolean).join(' ');
+
+  const copyVin = useCallback(() => {
     if (vehicle.vin) {
       navigator.clipboard.writeText(vehicle.vin);
       setVinCopied(true);
@@ -516,114 +654,77 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
     }
   }, [vehicle.vin]);
 
-
-
-  const yearAge = vehicle.year ? `${new Date().getFullYear() - vehicle.year} YEARS OLD` : '';
-  const valueTooltip = estimateTooltip(vehicle);
-  const deltaTooltip = vehicle.value_delta != null && vehicle.purchase_price != null
-    ? `${formatCurrency(vehicle.purchase_price)} → ${formatCurrency(vehicle.estimated_value!)}`
-    : '';
-
-
+  const period = ownershipPeriod(vehicle);
+  const relationship = [
+    sentence(vehicle.relationship_type),
+    // An owner-stated detail (transfer pending, disputed interest) belongs on the card, not in a tooltip.
+    vehicle.relationship_detail && !/\d{4}-\d{2}-\d{2}/.test(vehicle.relationship_detail) ? sentence(vehicle.relationship_detail) : null,
+    vehicle.inventory_status === 'previous' && vehicle.relationship_type !== 'PREVIOUSLY OWNED' ? 'previous' : null,
+    vehicle.custody_org ? `at ${vehicle.custody_org.name}` : null,
+    /\d{4}-\d{2}-\d{2}/.test(period) ? period : null,
+  ].filter(Boolean).join(' · ');
+  const span = recordSpan(vehicle);
+  const counts = recordCounts(vehicle);
 
   return (
-    <div
-      className="garage-vehicle-card"
-      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <article style={{ ...BASE, ...(hovered ? BASE_HOVER : {}) }}>
-        {/* Image 16:9 + mini barcode */}
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            paddingBottom: '56.25%',
-            backgroundColor: 'var(--bg, #f5f5f5)',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          <Link to={`/vehicle/${vehicle.id}`} className="garage-card-image-link" aria-hidden="true" tabIndex={-1} />
-          {vehicle.resolved_image_url ? (
-            <img
-              key={vehicle.resolved_image_url}
-              src={optimizeImageUrl(vehicle.resolved_image_url)}
-              alt={title}
-              width={400}
-              height={225}
-              loading="lazy"
-              decoding="async"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                display: 'block',
-              }}
-              onError={(e) => {
-                // Two-stage fallback. The optimized src routes through the Supabase
-                // /render/image transform endpoint — a single sitewide point of failure
-                // (outage/quota blanks every image at once while raw object URLs keep
-                // serving). First error: strip the render prefix/params and retry the
-                // raw /storage/v1/object/public/ URL. Second error: hide.
-                const img = e.target as HTMLImageElement;
-                const renderMarker = '/storage/v1/render/image/public/';
-                if (!img.dataset.rawFallbackTried && img.src.includes(renderMarker)) {
-                  img.dataset.rawFallbackTried = '1';
-                  img.src = img.src
-                    .replace(renderMarker, '/storage/v1/object/public/')
-                    .split('?')[0];
-                  return;
-                }
-                img.style.display = 'none';
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <img
-                src="/nuke.png"
-                alt="No image"
-                width={48}
-                height={48}
-                loading="lazy"
-                decoding="async"
-                style={{ width: 48, height: 48, opacity: 0.3, objectFit: 'contain' }}
-              />
-            </div>
-          )}
-
-          {/* Relationship badge — top-left, solid bg */}
-          <HoverData
-            tooltip={relationshipTooltip(vehicle)}
-            style={{ position: 'absolute', top: 6, left: 6, zIndex: 2 }}
-          >
-            <div
-              style={{
-                backgroundColor: 'var(--surface, #ebebeb)',
-                border: '1px solid var(--border)', padding: '1px 4px',
-              }}
-            >
-              <span style={{ ...LABEL, fontSize: 'var(--text-caption)', color: 'var(--text-secondary, #666666)' }}>
-                {vehicle.relationship_type}
-              </span>
-            </div>
-          </HoverData>
+    <div className="garage-vehicle-card" ref={cardRef}>
+      <article className="garage-card">
+        <div className="garage-card-photo" onPointerEnter={loadReel} onTouchStart={loadReel}>
+          <div className="garage-card-reel" ref={reelRef} onScroll={onReelScroll}>
+            {(cover || !vehicle.image_count) && <Link to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
+              {cover ? (
+                <img
+                  key={cover}
+                  src={sharedOptimizeImageUrl(cover, 'medium') || cover}
+                  alt={title}
+                  width={600}
+                  height={450}
+                  loading="lazy"
+                  decoding="async"
+                  style={{ display: 'block' }}
+                  onError={(e) => {
+                    // Two-stage fallback. The optimized src routes through the Supabase
+                    // /render/image transform endpoint — a single sitewide point of failure
+                    // (outage/quota blanks every image at once while raw object URLs keep
+                    // serving). First error: strip the render prefix/params and retry the
+                    // raw /storage/v1/object/public/ URL. Second error: hide.
+                    const img = e.target as HTMLImageElement;
+                    const renderMarker = '/storage/v1/render/image/public/';
+                    if (!img.dataset.rawFallbackTried && img.src.includes(renderMarker)) {
+                      img.dataset.rawFallbackTried = '1';
+                      img.src = img.src
+                        .replace(renderMarker, '/storage/v1/object/public/')
+                        .split('?')[0];
+                      return;
+                    }
+                    img.style.display = 'none';
+                  }}
+                />
+              ) : (
+                // The cover arrives after the roster; only a car with no photos says so.
+                <span className="garage-card-photo-empty">No photo yet</span>
+              )}
+            </Link>}
+            {reel.map(({ url }) => (
+              <Link key={url} to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
+                <img src={sharedOptimizeImageUrl(url, 'medium') || url} alt="" width={600} height={450} loading="lazy" decoding="async" />
+              </Link>
+            ))}
+            {hasAnalysis && <GarageCardAnalysis lines={analysis!} />}
+          </div>
+          {lastFrame > 0 && <>
+            {frame > 0 && <button type="button" className="garage-card-step" data-dir="back" aria-label="Previous frame" onClick={() => step(-1)}>‹</button>}
+            {frame < lastFrame && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next frame" onClick={() => step(1)}>›</button>}
+            {hasAnalysis && !onAnalysis && <button type="button" className="garage-card-to-analysis" onClick={toAnalysis}>Analysis</button>}
+            {!onAnalysis && photoFrames > 1 && <span className="garage-card-frame">{Math.min(frame + 1, photoFrames)} / {Math.max(photoTotal, photoFrames).toLocaleString('en-US')}</span>}
+          </>}
+          {lastFrame <= 0 && (vehicle.image_count ?? 0) > 1 && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next photo" onClick={() => step(1)}>›</button>}
 
           {/* This RPC revokes discovery membership, not an ownership period. */}
           {vehicle.relationship_source === 'discovered' && (
             <button
               type="button"
+              className="garage-card-eject"
               title="Remove from garage"
               aria-label="Remove discovery from garage"
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -642,149 +743,43 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
                 }
                 onRefresh?.();
               }}
-              style={{
-                position: 'absolute',
-                zIndex: 2,
-                top: 6,
-                right: 6,
-                width: 44,
-                height: 44,
-                padding: 0,
-                fontFamily: FONT_MONO,
-                fontSize: '12px',
-                fontWeight: 700,
-                lineHeight: 1,
-                cursor: 'pointer',
-                backgroundColor: 'var(--surface, #ebebeb)',
-                color: 'var(--text-secondary, #666666)',
-                border: '1px solid var(--border)',
-
-              }}
             >×</button>
           )}
-
-          {/* Mini timeline barcode */}
-          <MiniBarcode eventWeeks={vehicle.event_weeks} />
         </div>
 
-        {/* Body */}
-        <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1, overflow: 'visible' }}>
-          {/* Title — each part hoverable */}
-          <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title"
-            style={{
-              fontSize: 'var(--text-callout)',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              color: 'var(--text, #2a2a2a)',
-              lineHeight: 1.2,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: 'flex',
-              gap: 4,
-            }}
-          >
-            {vehicle.year ? (
-              <HoverData tooltip={`${vehicle.year} MODEL YEAR | ${yearAge}`}>{String(vehicle.year)}</HoverData>
-            ) : null}
-            {vehicle.make ? (
-              <HoverData tooltip={`MANUFACTURER: ${vehicle.make.toUpperCase()}`}>{vehicle.make.toUpperCase()}</HoverData>
-            ) : null}
-            {vehicle.model ? (
-              <HoverData tooltip={`MODEL: ${vehicle.model.toUpperCase()}${vehicle.trim ? ' ' + vehicle.trim.toUpperCase() : ''}`}>{vehicle.model.toUpperCase()}</HoverData>
-            ) : null}
-            {vehicle.trim && vehicle.model !== vehicle.trim ? (
-              <HoverData tooltip={`TRIM: ${vehicle.trim.toUpperCase()}`}>{vehicle.trim.toUpperCase()}</HoverData>
-            ) : null}
-            {!title && <span>UNKNOWN VEHICLE</span>}
-          </Link>
-
-          <span style={{ ...MONO, ...LABEL }} title={relationshipTooltip(vehicle)}>
-            {ownershipPeriod(vehicle)}
-          </span>
-          <span style={LABEL}>Source: {relationshipSource(vehicle)}</span>
-
-          {/* VIN + missing tags */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-            {vehicle.vin ? (
-              <HoverData
-                tooltip={vinCopied ? 'COPIED!' : `${vehicle.vin} | CLICK TO COPY`}
-                onClick={copyVin}
-              >
-                <span
-                  style={{
-                    ...MONO,
-                    fontSize: 'var(--text-caption)',
-                    color: vinCopied ? 'var(--success, #16825d)' : 'var(--text-secondary, #666666)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: 130,
-                    transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                  }}
-                >
-                  {vinCopied ? 'COPIED' : truncateVin(vehicle.vin)}
-                </span>
-              </HoverData>
-            ) : (
-              <HoverData tooltip="VIN NOT YET RECORDED">
-                <MissingTag label="NO VIN" />
-              </HoverData>
-            )}
-            {vehicle.estimated_value == null && (
-              <HoverData tooltip="CURRENT BUILD-CLASS ESTIMATE UNAVAILABLE">
-                <MissingTag label="NOT ESTIMATED" />
-              </HoverData>
-            )}
+        <div className="garage-card-body">
+          {/* Year, make and model lead from the left; the price holds the right edge. */}
+          <div className="garage-card-head">
+            <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title">
+              {name || 'Unknown vehicle'}
+            </Link>
+            {price != null && <span className="garage-card-price" title={priceTitle}>{formatCurrency(price)}</span>}
+          </div>
+          {/* One lane, most important first; what the card's width cannot hold drops off the end. */}
+          <div className="garage-card-lane">
+            <Link to={`/vehicle/${vehicle.id}`} title={relationshipTooltip(vehicle)}>{relationship}</Link>
+            {active && <Link to={`/vehicle/${vehicle.id}`} title="Open this car's timeline">{active}</Link>}
+            {(header?.facets ?? []).map(facet => <Link key={facet.dimension} to={`/search?q=${encodeURIComponent(facet.label)}`} title={`Find other vehicles: ${facet.label}`}>{facet.label}</Link>)}
+            {actions.map(action => <button key={action.label} type="button" onClick={action.onPress}>{action.label}</button>)}
           </div>
 
-          {/* Divider */}
-          <div style={{ borderTop: '1px solid var(--border, #bdbdbd)' }} />
+          <MiniBarcode vehicle={vehicle} axis={axis} litDay={cover ? (frame === 0 ? coverDay : reel[frame - 1]?.day) : reel[frame]?.day} />
+          {(span || counts.length > 0) && (
+            <p className="garage-card-record">
+              {span && <span className="garage-card-span">{span}</span>}
+              {counts.length > 0 && <span>{counts.join(' · ')}</span>}
+            </p>
+          )}
 
-          {/* Data rows */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {/* Value */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <HoverData tooltip={valueTooltip}>
-                <span style={LABEL}>Estimate</span>
-                {vehicle.estimated_value != null ? (
-                  <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, color: 'var(--text, #2a2a2a)', marginLeft: 4 }}>
-                    {formatCurrency(vehicle.estimated_value)}
-                  </span>
-                ) : (
-                  <span style={{ ...MONO, fontSize: 'var(--text-callout)', color: 'var(--text-secondary, #666666)', marginLeft: 4 }}>—</span>
-                )}
-              </HoverData>
-              {vehicle.value_delta != null && vehicle.value_delta !== 0 && (
-                <HoverData tooltip={deltaTooltip}>
-                  <span
-                    style={{
-                      ...MONO,
-                      fontSize: 'var(--text-caption)',
-                      color: vehicle.value_delta > 0 ? 'var(--success, #16825d)' : 'var(--error, #d13438)',
-                    }}
-                  >
-                    {vehicle.value_delta > 0 ? '+' : ''}{formatCurrency(vehicle.value_delta)}
-                  </span>
-                </HoverData>
-              )}
-            </div>
-
-            {/* Counts */}
-            <div style={{ display: 'flex', gap: 12 }}>
-              <HoverData tooltip={vehicle.view_count == null ? 'View count unavailable' : `${vehicle.view_count} recorded views`}>
-                <span style={LABEL}>VIEWS</span>
-                <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, marginLeft: 3 }}>{vehicle.view_count ?? '—'}</span>
-              </HoverData>
-            </div>
-
-            {/* Health bar */}
-            <HealthBar score={vehicle.health_score} vehicle={vehicle} />
+          <div className="garage-card-foot">
+            {vehicle.vin
+              ? <button type="button" className="garage-card-vin" onClick={copyVin}
+                title="Copy VIN" aria-label={`Copy VIN ${vehicle.vin}`}>
+                {vinCopied ? 'Copied' : truncateVin(vehicle.vin)}
+              </button>
+              : <span className="garage-card-vin-none">No VIN recorded</span>}
           </div>
         </div>
-
-        <ActionStrip vehicle={vehicle} />
       </article>
     </div>
   );
@@ -794,7 +789,7 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
 // List card (horizontal)
 // ---------------------------------------------------------------------------
 
-function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
+function ListCard({ vehicle, axis }: { vehicle: GarageVehicle; axis?: GarageAxis }) {
   const [hovered, setHovered] = useState(false);
   const [vinCopied, setVinCopied] = useState(false);
   const title = formatVehicleTitle(vehicle);
@@ -844,7 +839,6 @@ function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
               <span style={{ ...LABEL, fontSize: 'var(--text-caption)' }}>NO IMAGE</span>
             </div>
           )}
-          <MiniBarcode eventWeeks={vehicle.event_weeks} />
         </div>
 
         {/* Content */}
@@ -871,14 +865,8 @@ function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
                 <MissingTag label="NO VIN" />
               </HoverData>
             )}
-            {vehicle.estimated_value == null && (
-              <HoverData tooltip="CURRENT BUILD-CLASS ESTIMATE UNAVAILABLE">
-                <MissingTag label="NOT ESTIMATED" />
-              </HoverData>
-            )}
           </div>
 
-          <span style={LABEL}>Source: {relationshipSource(vehicle)}</span>
           {vehicle.vin && (
             <HoverData
               tooltip={vinCopied ? 'COPIED!' : `${vehicle.vin} | CLICK TO COPY`}
@@ -898,17 +886,18 @@ function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
             </HoverData>
           )}
 
+          <div style={{ maxWidth: 300 }}><MiniBarcode vehicle={vehicle} axis={axis} /></div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', alignItems: 'baseline' }}>
-            <HoverData tooltip={estimateTooltip(vehicle)}>
-              <span style={LABEL}>Estimate</span>
-              <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, marginLeft: 4 }}>
-                {vehicle.estimated_value != null ? formatCurrency(vehicle.estimated_value) : '—'}
-              </span>
-            </HoverData>
-            <HoverData tooltip={vehicle.view_count == null ? 'View count unavailable' : `${vehicle.view_count} recorded views`}>
-              <span style={LABEL}>VWS</span>
-              <span style={{ ...MONO, fontSize: 'var(--text-callout)', marginLeft: 3 }}>{vehicle.view_count ?? '—'}</span>
-            </HoverData>
+            {recordSpan(vehicle) && <span style={LABEL}>{recordSpan(vehicle)}</span>}
+            {recordCounts(vehicle).length > 0 && <span style={LABEL}>{recordCounts(vehicle).join(' · ')}</span>}
+            {vehicle.estimated_value != null && (
+              <HoverData tooltip={estimateTooltip(vehicle)}>
+                <span style={LABEL}>Estimate</span>
+                <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, marginLeft: 4 }}>
+                  {formatCurrency(vehicle.estimated_value)}
+                </span>
+              </HoverData>
+            )}
           </div>
 
           <div style={{ maxWidth: 280 }}>
@@ -1000,10 +989,12 @@ export function GarageVehicleCard({
   vehicle,
   viewMode = 'GRID',
   onRefresh,
+  axis,
+  actions,
 }: GarageVehicleCardProps) {
-  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} />;
+  if (viewMode === 'LIST') return <ListCard vehicle={vehicle} axis={axis} />;
   if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} />;
-  return <GridCard vehicle={vehicle} onRefresh={onRefresh} />;
+  return <GridCard vehicle={vehicle} onRefresh={onRefresh} axis={axis} actions={actions} />;
 }
 
 export default GarageVehicleCard;

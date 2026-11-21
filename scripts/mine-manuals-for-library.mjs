@@ -30,7 +30,7 @@ const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const MODAL_URL = process.env.MODAL_LLM_URL || 'https://sss97133--nuke-vllm-serve.modal.run';
 
 const PROVIDER_MODELS = {
-  anthropic: 'claude-haiku-4-5-20251001',
+  anthropic: 'claude-sonnet-5-5',
   ollama: 'qwen2.5:7b',
   gemini: 'gemini-2.0-flash-lite',
   modal: 'qwen2.5-7b',
@@ -158,14 +158,15 @@ async function callAnthropic(systemPrompt, userPrompt) {
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 4096,
+    ...(MODEL === 'claude-sonnet-5-5' ? { thinking: { type: 'between_tools' } } : {}),
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });
   return {
-    text: response.content[0]?.text?.trim() || '',
+    text: response.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim(),
     input_tokens: response.usage.input_tokens,
     output_tokens: response.usage.output_tokens,
-    cost: (response.usage.input_tokens * 1.0 + response.usage.output_tokens * 5.0) / 1_000_000,
+    cost: (response.usage.input_tokens * 2.0 + response.usage.output_tokens * 10.0) / 1_000_000,
   };
 }
 

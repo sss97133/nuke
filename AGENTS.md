@@ -97,6 +97,21 @@ Carry the next observed gap into code and the methodology together, preserving d
 Roles such as artist, buyer and researcher describe evidenced behavior in context; do not turn them
 into permanent identity types or mandatory arrival choices without a separate model decision.
 
+## What the owner has already told an agent
+
+A person's statements about organisations (their own companies, brands, shops and the dealings between them) are
+stored whole by `record_owner_statement` and read back by the connector tool `read_owner_statements` (database
+reader `get_my_owner_statements`). Before answering a question about the account's organisations, read the stored
+statements through that tool when you are connected through a connector the owner authorised with his own login,
+and say what was found with its count; a session without that connector says it cannot read them and does not reach
+for `q.sh` or another service-key path instead. When the owner states such a fact to you as something to keep, and
+you hold that connector, record the message verbatim with `record_owner_statement` in the same turn and tell him in
+the same reply that it was stored, under which id, and that he can correct or withdraw it. Do not store asides,
+hypotheticals or questions. This is the Observe tier: an unsigned, private transcript that decides nothing and
+creates no organisation, ownership or value; it is not a Sign and nothing may treat it as one. Quote a stored
+statement as what he said and when, never as a verified fact. Do not copy a statement into this repository, a commit
+message or a pull request.
+
 ## Reading photos
 
 Owner direction, 2026-11-10. A photo reading is finished when it is keyed in the model's own vocabulary
@@ -117,6 +132,26 @@ questions there. A pull request that adds a photo reader or a table keyed by a p
 `scripts/guardrails/no-new-photo-reader.mjs`. The card lists the other gates and which are not built.
 Keying readings that already exist is a dedicated role: give an agent `skills/image-keys/SKILL.md` as its
 brief, with the registry snapshot and the decisions made so far.
+
+## Model access
+
+Owner rule, 2026-11-08 and again 2026-11-20 ("ai read should be fueled by my subscription"; "im asked every session
+to go fetch one"). AI reading (photos, receipts, documents, doubts) runs on the owner's Claude subscription, not on a
+metered key, and a failed key is never handed to the owner as a task.
+- On the Mac: `claude -p` under his login, with `CLAUDECODE*`, `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` removed
+  from the child's environment (`scripts/doubts/readers.mjs`, `scripts/photo-pipeline/subscription-frame-classifier.mjs`).
+- In GitHub Actions: the repo secret `CLAUDE_CODE_OAUTH_TOKEN` (`.github/workflows/photo-keys.yml`). Never set
+  `ANTHROPIC_API_KEY` beside it: the key wins and bills the API.
+- A new reader defaults to that route. A metered provider runs only when a flag names it.
+- The metered Anthropic key for work the CLI cannot do is `NUKE_ANTHROPIC_API_KEY` in the repo's encrypted `.env`
+  (read it only through `dotenvx run`). Console keys default to a 30-day expiry, which is how the earlier names
+  (`NUKE_PHOTO_ANTHROPIC_API_KEY`, `NUKE_CLAUDE_API`, `CLAUDE_API_KEY`, `ANTHROPIC_API_KEY`) all came to answer 401:
+  treat those names as dead and do not add another. This one was made on 2026-11-20 with no expiry.
+- Before saying a key is missing or dead, run `scripts/ops/model-access-check.mjs` (its header has the command) and use
+  a route it shows answering. Measured 2026-11-20: the subscription CLI and `NUKE_ANTHROPIC_API_KEY` answer; OpenAI is
+  out of quota, Gemini refuses on billing, xAI answers 403. Re-measure; do not trust this line.
+- A reading that needs agreement from a second model family waits for one. Two runs of the same model under two agent
+  names are one reader. Topping up a provider is spending, which is the owner's decision: name it once, do not block on it.
 
 ## Invariants
 ### Data-machine-first design — owner rule, 2026-11-11
@@ -188,6 +223,20 @@ machine-layer delivery does not close the unfinished renderer or estimate work.
     `decide_evidence` is called only from the owner's own aal2 session. No job can call it (it is not granted to the
     service role and its body refuses a job caller), and a delegated Sign (`owner_delegated_sign_register`) never
     stands in for it.
+  - A person's own statement, said in conversation (from `20261117150000`): `record_owner_statement` stores the message
+    whole, uninterpreted and unsigned (it is a transcribed claim, not a Sign) as a private `vehicle_observations` row;
+    `record_owner_statement_link` stores the recording agent's resolution of a name in it to an organisation, on its
+    own row. The speaker comes only from the caller's authentication (a signed-in session, or the OAuth token the
+    connector's caller presented); no argument names a speaker and the service key alone cannot write one. A correction
+    or withdrawal is a successor row. Read back with `get_my_owner_statements`. Only the speaker reads these rows
+    through the API; do not read them through `q.sh` or another service-key path.
+  - A person's statement about a vehicle (from `20261120100000`): `record_vehicle_statement` stores what a representative,
+    seller's agent, shop, previous owner or the owner said about a car, whole and unsigned, as that person's claim, with
+    speaker_role, statement_kind (assertion, estimate, recollection), the said-on date and an optional target key (pending
+    until the key is ratified). Same speaker rules as `record_owner_statement`; the speaker must be tied to the vehicle, and
+    role `owner` only when the vehicle record names the speaker. The page reads it with `vehicle_statements(vehicle_id)`:
+    words and amounts only for tied viewers, anon sees role, kind, date and "amount private". Never copy a statement or its
+    amount into this repository.
   - No raw INSERT, UPDATE or DELETE on testimony tables.
   - No `DISABLE TRIGGER`.
   - No `statement_timeout = 0`.

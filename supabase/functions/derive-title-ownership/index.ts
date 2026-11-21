@@ -37,7 +37,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 
-const MODEL = "claude-opus-4-8";
+const MODEL = "claude-opus-5-5";
 const BUCKET = "user-documents";
 
 // Storage's render endpoint downscales server-side. Full title scans are ~3.6 MB;
@@ -174,15 +174,16 @@ Deno.serve(async (req) => {
 
       const payloadForModel = {
         model: MODEL,
-        max_tokens: 1024,
+        max_tokens: 4096, // Opus 5.5 always thinks; this holds thinking plus the tool call
         system: SYSTEM,
         tools: [TITLE_SCHEMA],
-        tool_choice: { type: "tool", name: "title_reading" },
+        // Opus 5.5 rejects forced tool_choice (400); auto plus the instruction below.
+        tool_choice: { type: "auto" },
         messages: [{
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
-            { type: "text", text: "Read this title. Report only what is printed." },
+            { type: "text", text: "Read this title. Report only what is printed. Respond by calling the title_reading tool." },
           ],
         }],
       };

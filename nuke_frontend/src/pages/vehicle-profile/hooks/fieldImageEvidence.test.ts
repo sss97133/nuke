@@ -1,10 +1,75 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../lib/supabase', () => ({ supabase: {} }));
-import { hasImageAnalysis, hasImageZone, isRelatedFieldImage, relatedFieldImages, referenceFieldImages, webSourceUrl, type EvidenceImage } from './useVehicleImageEvidence';
+import { bindFacetCitations, hasImageAnalysis, hasImageZone, heroFacetImages, isRelatedFieldImage, relatedFieldImages, referenceFieldImages, webSourceUrl, type EvidenceImage } from './useVehicleImageEvidence';
+import { FIELD_TOKEN, facetImageCitations } from './facetImageCitations';
+import type { FacetItem } from '../../../kit/types';
 import { citedFieldImages, evidenceOrder, type FieldProvenance } from './useFieldProvenance';
-const image = (id: string, changes: Partial<EvidenceImage> = {}): EvidenceImage => ({ id, image_url: `https://example.com/${id}.jpg`, thumbnail_url: null, medium_url: null, vehicle_zone: null, angle: null, ai_detected_angle: null, ai_processing_status: 'pending', vision_analyzed_at: null, vision_model_version: null, created_at: null, taken_at: null, source: 'external_import', is_primary: false, is_document: false, category: 'general', ...changes });
+const image = (id: string, changes: Partial<EvidenceImage> = {}): EvidenceImage => ({ id, image_url: `https://example.com/${id}.jpg`, thumbnail_url: null, medium_url: null, vehicle_zone: null, angle: null, ai_detected_angle: null, ai_processing_status: 'pending', vision_analyzed_at: null, vision_model_version: null, created_at: null, taken_at: null, source: 'external_import', is_primary: false, is_document: false, is_sensitive: false, is_duplicate: false, is_superseded: false, superseded_by: null, category: 'general', ...changes });
 const provenance = (changes: Partial<FieldProvenance> = {}): FieldProvenance => ({ field: 'color', value: 'Silver Pearl', inline_source: 'listing', source_image_url: null, evidence: [], observations: [], ...changes });
 describe('field image evidence boundaries', () => {
+  it('reuses dossier field owners and keeps current, as-built, conflict-side and examined citations separate', () => {
+    expect([FIELD_TOKEN.engine_type, FIELD_TOKEN.engine_size, FIELD_TOKEN.transmission, FIELD_TOKEN.drivetrain, FIELD_TOKEN.color]).toEqual([
+      'engine', 'engine', 'transmission', 'drivetrain', 'paint',
+    ]);
+    expect(FIELD_TOKEN.vin).toBeUndefined();
+    const engine = '10000000-0000-4000-8000-000000000001';
+    const conflict = '10000000-0000-4000-8000-000000000002';
+    const examined = '10000000-0000-4000-8000-000000000003';
+    const source = (id: string) => ({ witness: { kind: 'image', id }, value: 'recorded reading' });
+    const items = [{ key: 'engine.current.displacement', facet: 'current', status: 'reading', sources: [source(engine)] },
+      { key: 'engine.as_built.engine', facet: 'as_built', status: 'conflict', sources: [],
+        sides: [{ value: '250', sources: [source(conflict)] }] },
+      { key: 'engine.current.bore', facet: 'current', status: 'missing', sources: [], examined: [source(examined)] }] as unknown as FacetItem[];
+    const citations = facetImageCitations(items);
+    expect(citations.map(c => [c.imageId, c.itemKey, c.facet, c.status, c.relation, c.sideValue])).toEqual([
+      [engine, 'engine.current.displacement', 'current', 'reading', 'source', undefined],
+      [conflict, 'engine.as_built.engine', 'as_built', 'conflict', 'conflict_side', '250'],
+      [examined, 'engine.current.bore', 'current', 'missing', 'examined', undefined],
+    ]);
+    expect(facetImageCitations([{ ...items[0], sources: [{ witness: { kind: 'observation', id: engine }, url: 'https://example.com/source' }] }] as FacetItem[])).toEqual([]);
+  });
+  it('binds exact facet citations only to current same-vehicle public gallery rows', () => {
+    const id = '10000000-0000-4000-8000-000000000001';
+    const citations = facetImageCitations([{ key: 'transmission.current.type', facet: 'current', status: 'conflict',
+      sources: [{ witness: { kind: 'image', id }, value: 'manual' }] }] as FacetItem[]);
+    const current = image(id, { vehicle_id: 'vehicle-a' });
+    expect(bindFacetCitations('vehicle-a', citations, [current]).map(x => x.image.id)).toEqual([id]);
+    for (const held of [image(id, { vehicle_id: 'vehicle-b' }), image(id, { vehicle_id: 'vehicle-a', is_sensitive: true }),
+      image(id, { vehicle_id: 'vehicle-a', is_document: true }), image(id, { vehicle_id: 'vehicle-a', is_duplicate: true }),
+      image(id, { vehicle_id: 'vehicle-a', is_superseded: true }), image(id, { vehicle_id: 'vehicle-a', superseded_by: 'replacement' }),
+      image(id, { vehicle_id: 'vehicle-a', superseded_by: undefined }),
+      image(id, { vehicle_id: 'vehicle-a', image_url: 'file:///private/source.jpg' })]) {
+      expect(bindFacetCitations('vehicle-a', citations, [held])).toEqual([]);
+    }
+    expect(bindFacetCitations('vehicle-a', citations, [image('10000000-0000-4000-8000-000000000099', { vehicle_id: 'vehicle-a' })])).toEqual([]);
+  });
+  it('keeps as-built and current citations in the drill while the current hero selects current evidence', () => {
+    const asBuiltId = '10000000-0000-4000-8000-000000000010';
+    const currentId = '10000000-0000-4000-8000-000000000011';
+    const source = (id: string) => ({ witness: { kind: 'image', id } });
+    const citations = facetImageCitations([
+      { key: 'engine.as_built.engine', facet: 'as_built', status: 'established', sources: [source(asBuiltId)] },
+      { key: 'engine.current.displacement', facet: 'current', status: 'reading', sources: [source(currentId)] },
+    ] as FacetItem[]);
+    const bound = bindFacetCitations('vehicle-a', citations, [image(asBuiltId, { vehicle_id: 'vehicle-a' }), image(currentId, { vehicle_id: 'vehicle-a' })]);
+    expect(bound).toHaveLength(2);
+    expect(heroFacetImages(bound, citations).map(row => row.id)).toEqual([currentId]);
+    expect(heroFacetImages(bound.slice(0, 1), citations)).toEqual([]);
+    expect(heroFacetImages(bound.slice(0, 1), citations.filter(c => c.facet === 'as_built')).map(row => row.id)).toEqual([asBuiltId]);
+  });
+  it('retains examined and conflict-side photos without presenting them as support for a current value', () => {
+    const examinedId = '10000000-0000-4000-8000-000000000021';
+    const conflictId = '10000000-0000-4000-8000-000000000022';
+    const citations = facetImageCitations([
+      { key: 'engine.current.displacement', facet: 'current', status: 'missing', sources: [],
+        examined: [{ witness: { kind: 'image', id: examinedId } }] },
+      { key: 'engine.current.family', facet: 'current', status: 'conflict', sources: [],
+        sides: [{ value: 'Pontiac V8', sources: [{ witness: { kind: 'image', id: conflictId } }] }] },
+    ] as unknown as FacetItem[]);
+    const bound = bindFacetCitations('vehicle-a', citations, [image(examinedId, { vehicle_id: 'vehicle-a' }), image(conflictId, { vehicle_id: 'vehicle-a' })]);
+    expect(bound).toHaveLength(2);
+    expect(heroFacetImages(bound, citations)).toEqual([]);
+  });
   it('rejects executable, malformed and local source links while retaining web citations', () => {
     for (const url of ['javascript:alert(1)', 'data:text/html,x', 'file:///tmp/source.jpg', '//example.com/a', 'https-not-a-url', null]) expect(webSourceUrl(url)).toBeNull();
     expect(webSourceUrl('https://example.com/source.jpg')).toBe('https://example.com/source.jpg');

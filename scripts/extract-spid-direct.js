@@ -28,8 +28,9 @@ const response = await fetch('https://api.anthropic.com/v1/messages', {
     'content-type': 'application/json',
   },
   body: JSON.stringify({
-    model: 'claude-3-opus-20240229',
+    model: 'claude-sonnet-5-5',
     max_tokens: 2000,
+    thinking: { type: 'between_tools' },
     messages: [
       {
         role: 'user',

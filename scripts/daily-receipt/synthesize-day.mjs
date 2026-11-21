@@ -157,7 +157,7 @@ export async function synthesizeDay({
   photos, byok, frameNarrative, laborFrames,
   intentCounts, dominantIntent, opCounts, spanMinutes, laborMinutes,
   DATE, VEHICLE_ID, priorArcs,
-  vehicleLabel, model = 'claude-opus-4-8', timeoutMs,
+  vehicleLabel, model = 'claude-opus-5-5', timeoutMs,
 }) {
   const frames = (photos || []).map((p) => frameAtom(p, byok, frameNarrative));
   const frameCount = frames.length;
@@ -285,7 +285,7 @@ export async function synthesizeDay({
 // mixes, runs synthesizeDay, and writes work_description/title/work_type/metadata onto
 // the existing work_sessions row WITHOUT touching the owner-confirmed cost gate.
 //   dotenvx run -- node scripts/daily-receipt/synthesize-day.mjs \
-//     --vehicle-id <uuid> --date YYYY-MM-DD [--model claude-opus-4-8] [--dry-run]
+//     --vehicle-id <uuid> --date YYYY-MM-DD [--model claude-opus-5-5] [--dry-run]
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { createClient } = await import('@supabase/supabase-js');
   const argv = process.argv.slice(2);
@@ -293,7 +293,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const has = (n) => argv.includes(n);
   const VEHICLE_ID = a('--vehicle-id');
   const DATE = a('--date');
-  const MODEL = a('--model', 'claude-opus-4-8');
+  const MODEL = a('--model', 'claude-opus-5-5');
   const DRY = has('--dry-run');
   if (!VEHICLE_ID || !DATE) { console.error('Required: --vehicle-id --date'); process.exit(1); }
 

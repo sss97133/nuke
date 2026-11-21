@@ -18,6 +18,43 @@ export class ReviewedAnalysisError extends Error {
 }
 function assert(ok: unknown, code: string, status = 400): asserts ok { if (!ok) throw new ReviewedAnalysisError(code, status); }
 
+/** The two words guard_reviewed_image_analysis uses for an automatic reading it will not store (migration 20261120140000).
+ * ingest-observation answers a refused insert as { error, details: <the database's message> }. Only these exact words are
+ * passed on, so the reader can tell "a reading that is not mine already stands" and "my shape is wrong" from a write that
+ * failed; every other message stays opaque. */
+const INTAKE_REFUSALS = ["thin_review_over_reviewed", "thin_review_asserts_unchecked_field"];
+export function intakeRefusalWord(body: unknown): string | null {
+  const said = body !== null && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).details : null;
+  return typeof said === "string" && INTAKE_REFUSALS.includes(said) ? said : null;
+}
+
+/** The words project_reviewed_image_analysis raises that a caller acts on by name (migration 20261120140000). The RPC's
+ * error message is exactly the word. Only an exact match is passed on; every other failure of the projection stays
+ * review_projection_refused. The Mac reader holds the same list (scripts/photo-pipeline/deep-stage.mjs
+ * PROJECTION_WORDS); reviewedIntakeChain_test.ts holds the two equal. */
+export const PROJECTION_REFUSALS = ["thin_review_over_reviewed", "review_observation_not_eligible", "review_source_changed",
+  "review_source_withdrawn", "review_source_previously_withdrawn", "review_source_changed_during_projection",
+  "review_search_projection_not_persisted"];
+export function projectionRefusalWord(error: unknown): string | null {
+  const said = error !== null && typeof error === "object" && !Array.isArray(error) ? (error as Record<string, unknown>).message : null;
+  return typeof said === "string" && PROJECTION_REFUSALS.includes(said) ? said : null;
+}
+
+/** How a failed projection call is named for the caller. One of the projection's own words: that word, 409. A fault of
+ * the database and not a rule (no HTTP answer, a 5xx, or a lock timeout, statement timeout or deadlock by its SQLSTATE):
+ * review_source_unavailable 503, because the observation is stored and the next attempt only finishes its landing.
+ * Anything else stays review_projection_refused 409. The Mac reader's direct call splits the same way
+ * (scripts/photo-pipeline/deep-stage.mjs projectionAnswer). */
+export const PROJECTION_FAULT_CODES = ["55P03", "57014", "40P01"];
+export function projectionFailure(error: unknown, status?: unknown): { word: string; http: number } {
+  const word = projectionRefusalWord(error);
+  if (word) return { word, http: 409 };
+  const code = error !== null && typeof error === "object" && !Array.isArray(error) ? (error as Record<string, unknown>).code : null;
+  const fault = (typeof status === "number" && Number.isInteger(status) && (status === 0 || status >= 500))
+    || (typeof code === "string" && PROJECTION_FAULT_CODES.includes(code));
+  return fault ? { word: "review_source_unavailable", http: 503 } : { word: "review_projection_refused", http: 409 };
+}
+
 /** The existing BYOK schema, with bounded JSON and explicit source/provenance.
  * No camera estimates, confidence, labor intent or components are filled in here. */
 export function validateReviewedAnalysis(input: unknown, now = Date.now()): ObjectValue {
@@ -123,8 +160,11 @@ export async function recordReviewedAnalysis(input: unknown, deps: ReviewedAnaly
   const landed = await deps.ingest(observation);
   assert(landed?.success === true && uuid(landed.observation_id), "review_observation_not_persisted", 502);
   const projection = await deps.project(landed.observation_id);
+  // A reviewed reading is placed on the photo, and the projection names the placement. An automatic reading is its
+  // observation alone (no stamp, no placement, no cover): the projection says so itself with thin_tier and a null
+  // placement. An answer that is neither did not land.
   assert(projection?.success === true && projection.observation_id === landed.observation_id && projection.image_id === v.image_id && projection.vehicle_id === v.vehicle_id
-    && uuid(projection.image_observation_id),
+    && (uuid(projection.image_observation_id) || (projection.thin_tier === true && projection.image_observation_id === null)),
     "review_projection_not_persisted", 409);
   return { ...projection, model_calls: 0, observation_duplicate: landed.duplicate === true };
 }

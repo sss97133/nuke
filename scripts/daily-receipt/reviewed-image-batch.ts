@@ -2,6 +2,7 @@
 // No database/raw writes, scheduling, identity or financial cascade here.
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { stageSchema as sharedStageSchema } from "../lib/byok-stage-schema.mjs";
 import { validateReviewedAnalysis } from "../../supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis.ts";
 import { contextWithoutPersonalFields } from "../lib/receipt-context-text.mjs";
 type Row = Record<string, any>;
@@ -110,29 +111,8 @@ export function parseStage(stream: string, sourcePaths: string[], requestedModel
     usage: completed[0].usage ?? null, warnings, api_equivalent_cost_usd: null };
 }
 
-// Closed output grammar mirrors the existing verdict contract. The shared
-// validator remains authoritative; no provider output repair or defaults.
-export function stageSchema(key: "verdicts" | "reviews"): Row {
-  const str = { type: "string" }, bool = { type: "boolean" }, probability = { type: "number", minimum: 0, maximum: 1 };
-  const obj = (properties: Row) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
-  const arr = (items: Row) => ({ type: "array", items });
-  const nullable = (type: string) => ({ type: [type, "null"] });
-  const choice = (values: string) => ({ type: "string", enum: values.split("|") });
-  const bbox = { type: "array", items: { type: "number", minimum: 0, maximum: 999 }, minItems: 4, maxItems: 4 };
-  const verdict = obj({ image_id: str, vehicle_id: str,
-    scene_type: choice("engine_bay|body_exterior|body_interior|undercarriage|receipt_document|data_plate|hand_drawn_diagram|shop_context|fabrication_in_progress|paint_booth|wheel_assembly|road_test|off_property|cross_reference|product_screenshot|spreadsheet|unknown"),
-    build_phase_guess: choice("discovery|teardown|metalwork|paint_prep|paint_application|mechanical_assembly|wiring|interior|final_assembly|drivable|show_finish|unknown"),
-    intent: choice("labor|inspection|parts_sourcing|communication|acquisition|documentation|unknown"), intent_confidence: probability, needs_clarification: bool,
-    components_seen: arr(obj({ label: str, confidence: probability, bbox, part_number_guess: nullable("string") })),
-    text_regions: arr(obj({ text: str, bbox, confidence: probability })),
-    damage_localized: arr(obj({ label: str, bbox, severity: str })),
-    state_observations: obj({ rust_severity: choice("none|surface|pitting|perforation|unknown"), paint_state: choice("bare_metal|primer|sealer|base|clear|aged|unknown"), completeness: choice("stripped|partial|assembled|unknown"), damage_callouts: arr(str) }),
-    workshop_signals: obj({ tools_visible: arr(str), fixturing: str, weld_quality: str, lighting: str }),
-    presence: obj({ person: bool, dog: bool, place_hint: nullable("string") }),
-    camera_pose: obj({ method: str, framing: str, azimuth_deg: nullable("number"), elevation_deg: nullable("number"), distance_est: nullable("string"), exif_present: nullable("boolean") }),
-    narrative_one_line: str, confidence: probability, context_complete: bool, open_questions: arr(str), agent_notes: str });
-  return obj({ [key]: arr(key === "reviews" ? obj({ image_id: str, findings: arr(str) }) : verdict) });
-}
+// Closed output grammar: one shared copy (scripts/lib/byok-stage-schema.mjs), also used by the subscription frame reader.
+export function stageSchema(key: "verdicts" | "reviews"): Row { return sharedStageSchema(key); }
 export function exactRows(values: unknown, work: Row[], field = "verdicts") {
   ensure(Array.isArray(values) && values.length === work.length, `incomplete_${field}`);
   const expected = new Set(work.map(r => r.image_id)), seen = new Set();

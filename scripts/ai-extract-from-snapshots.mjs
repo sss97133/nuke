@@ -85,9 +85,9 @@ async function callHaiku(content, url) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-sonnet-5-5",
       max_tokens: 1024,
-      temperature: 0.0,
+      thinking: { type: "between_tools" }, // Sonnet 5.5 rejects temperature
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMsg }],
     }),
@@ -103,7 +103,7 @@ async function callHaiku(content, url) {
   const text = data.content?.[0]?.text || "";
   const inputTokens = data.usage?.input_tokens || 0;
   const outputTokens = data.usage?.output_tokens || 0;
-  const costCents = (inputTokens * 1.0 + outputTokens * 5.0) / 1_000_000;
+  const costCents = (inputTokens * 2.0 + outputTokens * 10.0) / 1_000_000;
   const durationMs = Date.now() - start;
 
   // Parse JSON from response

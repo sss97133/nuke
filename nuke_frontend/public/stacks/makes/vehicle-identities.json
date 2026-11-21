@@ -1078,5 +1078,33 @@
     "retrievedAt": "2026-11-11",
     "attribution": "Pontiac, Firebird and Trans Am trademarks belong to General Motors. Photograph: Phoenix Graphix (GM Restoration Parts licensee) reproduction decal, reference identification; colourway shown is not evidence of a specific car's decal colour.",
     "sourceSha256Base64": "CZFv3XvUquy26C90ziMZ5g5+suYMoig/rs4PDHrAUpk="
+  },
+  {
+    "make": "Pontiac",
+    "models": [],
+    "years": [
+      0,
+      9999
+    ],
+    "role": "engine",
+    "engines": [
+      "SD-455",
+      "SD-455 V8",
+      "455-SD V8",
+      "455 SD V8"
+    ],
+    "label": "SD-455",
+    "file": "pontiac-sd455.svg",
+    "viewport": "0 0 607 78",
+    "width": 130,
+    "height": 17,
+    "sourceWidth": 607,
+    "sourceHeight": 78,
+    "tone": "color",
+    "source": "Owner-supplied SD-455 lettering reference, 2026-11-15",
+    "sourceAsset": "pontiac-sd455-owner-reference.png",
+    "sourceSha256": "e6144fd8f6a6d8d609301342609c207c1216944451d773c937eb3667edf2312a",
+    "notes": "Vector contours traced from owner-supplied red SD-455 lettering. Engine-designation artwork only; never establishes displacement, factory configuration or Super Duty identity. Matches a supported complete engine designation, not a decal/photo claim. Independent of host vehicle model year because engine swaps are possible. Red mask r>110,r>1.6g,r>1.6b, cropped to ink; potrace 1.16 turdsize8 alphamax1 opttolerance0.2.",
+    "attribution": "SD-455 and Pontiac are General Motors marks. Owner-provided graphic reference; not a mechanical certification."
   }
 ]

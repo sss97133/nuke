@@ -10,9 +10,67 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const timestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
 const nonempty = value => typeof value === 'string' && value.trim().length > 0;
 const deferred = reason => ({ claims: [], deferred: reason });
+const CHILD_LIMITATION = 'Projection of an existing model reading of one image. Capture and analysis clocks are unverified. Not whole-vehicle condition or independent corroboration.';
+const HASH = /^[0-9a-f]{64}$/;
+const CONTRACT_INTENT_CONFIRM_THRESHOLD = 0.6; // supabase/functions/_shared/byokImageVerdict.mjs INTENT_CONFIRM_THRESHOLD
+
+/**
+ * The reader's own contract makes needs_clarification true whenever the photo's INTENT (why it was taken: labor,
+ * inspection, documentation...) is unknown or under 0.6 (byokImageVerdict.mjs, the labor-value guard). That flag is
+ * about labor attribution, not about what the photo shows. A stored reading whose flag is explained by exactly that
+ * condition is intent-only; a flag beside a confirmed intent has some other cause and stays a hold.
+ */
+export function clarificationIsIntentOnly(data) {
+  return data?.needs_clarification === true &&
+    (data.intent === 'unknown' ||
+     (typeof data.intent === 'string' && data.intent.length > 0 && Number.isFinite(data.intent_confidence) &&
+      data.intent_confidence < CONTRACT_INTENT_CONFIRM_THRESHOLD));
+}
+
+/**
+ * A stored reading whose own words say its frame is a picture of a picture. This is the database's
+ * public.photo_reading_is_print (migration 20261119230000) copied: the same pattern over the narrative and the first
+ * component label, so a change to one must change the other. vehicle_build_reconstruction and
+ * vehicle_part_installation_evidence already leave such photos out; here nothing new is keyed from one, because its
+ * three fields describe the car in the print and the photo's date is the day the print was photographed.
+ * Measured 2026-11-20 on the proof vehicle: 6 such photos of 481, 2 of them carrying a keyed assembly state from before
+ * this hold (those two rows stay current: retracting them is the database's to do, no agent route supersedes a child).
+ */
+const PRINT_READING = /\b(printed|paper|album)\s+(sheet|page)\b|\bprinted\s+(\w+\s+){0,2}(photograph|picture)s?\b/i;
+export function readingIsPictureOfPicture(data) {
+  const first = Array.isArray(data?.components_seen) ? data.components_seen[0]?.label : null;
+  return PRINT_READING.test(`${typeof data?.narrative_one_line === 'string' ? data.narrative_one_line : ''} ${typeof first === 'string' ? first : ''}`);
+}
+
+/**
+ * What a projected child may carry: ids, a pointer to its source reading, one enum value, clocks, a fixed sentence.
+ * Never the reader's notes, questions, text regions or any other prose. Returns true only for that exact shape, so a
+ * child that ever picked up free text is refused here before the database is even asked.
+ */
+export function childCarriesOnlyEnumAndPointers(claim) {
+  const d = claim?.structured_data;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
+  const spec = Object.values(IMAGE_PROPERTIES).find(([key]) => key === claim.property_key);
+  if (!spec) return false;
+  const allowed = new Set([claim.property_key, 'image_id', 'property_key', 'analysis_kind', 'projection_version',
+    'source_observation_id', 'source_result_hash', 'source_extraction_method', 'source_model_confidence',
+    'source_recorded_at', 'source_observed_at', 'observed_at_basis', 'capture_at', 'analyzed_at', 'claim_role',
+    'source_family', 'limitation']);
+  if (Object.keys(d).length !== allowed.size || Object.keys(d).some(key => !allowed.has(key))) return false;
+  return spec[1].includes(d[claim.property_key]) && d.property_key === claim.property_key &&
+    UUID.test(d.image_id ?? '') && UUID.test(d.source_observation_id ?? '') && HASH.test(d.source_result_hash ?? '') &&
+    d.analysis_kind === 'image_property_projection' && d.projection_version === PROJECTION_VERSION &&
+    d.claim_role === 'inferred' && d.observed_at_basis === 'source_testimony_recorded_at' &&
+    d.capture_at === null && d.analyzed_at === null && d.source_family === `image:${d.image_id}` &&
+    /^[a-z0-9_.:-]{1,80}$/i.test(d.source_extraction_method ?? '') && Number.isFinite(d.source_model_confidence) &&
+    timestamp(d.source_recorded_at) && (d.source_observed_at === null || timestamp(d.source_observed_at)) &&
+    d.limitation === CHILD_LIMITATION &&
+    claim.raw_source_ref === `vehicle_observations:${d.source_observation_id}` &&
+    claim.kind === 'condition' && nonempty(claim.source_identifier);
+}
 
 /** Read immutable stored testimony, not today's mutable image cache. No inference. */
-export function projectImageProperties(observation, image) {
+export function projectImageProperties(observation, image, { releaseIntentOnlyClarification = false } = {}) {
   const data = observation?.structured_data;
   if (!UUID.test(observation?.id ?? '') || observation?.kind !== 'condition' ||
       observation.is_superseded === true || data?.analysis_kind !== 'image_deep_byok') {
@@ -25,12 +83,17 @@ export function projectImageProperties(observation, image) {
   // is_document and the receipt scene are refused by the batch intake too (20261004064216): a photographed paper
   // is not the vehicle, whatever the reading's three fields say.
   if (data.scene_type === 'receipt_document') return deferred('receipt_document');
+  if (readingIsPictureOfPicture(data)) return deferred('picture_of_picture');
   if (image.is_sensitive === true || image.is_superseded === true || image.is_duplicate === true || image.is_document === true ||
       ![null, undefined, 'approved'].includes(image.vision_gate_status) ||
       ['mismatch', 'unrelated'].includes(image.image_vehicle_match_status)) {
     return deferred('image_not_eligible');
   }
-  if (observation.confidence === 'low' || data.needs_review === true || data.needs_clarification === true || data.attribution_doubt) {
+  // The batch intake and the public field reader still hold every needs_clarification reading, so only the
+  // one-at-a-time route may ask for the intent-only release.
+  const clarificationHeld = data.needs_clarification === true &&
+    !(releaseIntentOnlyClarification && clarificationIsIntentOnly(data));
+  if (observation.confidence === 'low' || data.needs_review === true || clarificationHeld || data.attribution_doubt) {
     return deferred('source_requires_review');
   }
   if (!nonempty(observation.agent_model) || !nonempty(observation.extraction_method) ||
@@ -77,11 +140,12 @@ export function projectImageProperties(observation, image) {
         observed_at_basis: 'source_testimony_recorded_at',
         capture_at: null, analyzed_at: null, claim_role: 'inferred',
         source_family: `image:${image.id}`,
-        limitation: 'Projection of an existing model reading of one image. Capture and analysis clocks are unverified. Not whole-vehicle condition or independent corroboration.',
+        limitation: CHILD_LIMITATION,
       },
     });
   }
-  return { claims, deferred: claims.length ? null : 'no_known_scalar_values' };
+  return { claims, deferred: claims.length ? null : 'no_known_scalar_values',
+    ...(data.needs_clarification === true && claims.length ? { released_intent_only_clarification: true } : {}) };
 }
 
 // PostgreSQL retains microseconds; Date.parse alone would accept sub-ms drift.
@@ -237,30 +301,76 @@ const SOURCE_COLUMNS = 'id,vehicle_id,kind,is_superseded,observed_at,ingested_at
 const IMAGE_COLUMNS = 'id,vehicle_id,is_sensitive,is_superseded,is_duplicate,is_document,vision_gate_status,image_vehicle_match_status';
 
 /**
+ * The current deep reading of each photo, as the database's image_stage_reading_parent picks it: of the photo's deep
+ * readings on this vehicle that are not superseded, the one its stamp points at, else the newest by ingested_at (a missing
+ * clock last), ties to the lowest id.
+ *   pointers  [{ id, current_observation_id }]   the photo's own stamp
+ *   readings  [{ id, vehicle_id, kind, is_superseded, ingested_at, image_id }]   every deep reading naming those photos
+ */
+export function currentReadingIds(pointers, readings, vehicleId) {
+  const stamp = new Map(pointers.map(row => [row.id, row.current_observation_id]));
+  const micros = row => { try { return row.ingested_at ? instantMicros(row.ingested_at) : -1n; } catch { return -1n; } };
+  const chosen = new Map();
+  for (const row of readings) {
+    if (!stamp.has(row.image_id) || row.vehicle_id !== vehicleId || row.kind !== 'condition' || row.is_superseded === true || !UUID.test(row.id ?? '')) continue;
+    const have = chosen.get(row.image_id);
+    if (!have) { chosen.set(row.image_id, row); continue; }
+    if (have.id === stamp.get(row.image_id)) continue;
+    const newer = micros(row) > micros(have) || (micros(row) === micros(have) && row.id < have.id);
+    if (row.id === stamp.get(row.image_id) || newer) chosen.set(row.image_id, row);
+  }
+  return [...new Set([...chosen.values()].map(row => row.id))];
+}
+
+/**
  * project-cached: walk one vehicle's stored deep readings, newest first, and project their three values (dry run)
  * or land them. Returns { receipt, exitCode }; the receipt holds counts and fixed reason words only.
  *
  * single: the batch intake takes a public vehicle's listing photos only. This route sends one claim at a time through
  * ingest-observation and reads each row and its witness back, so it serves an owner's own photos. It keeps what the
- * batch intake checks beside that rule: the reading must pass the database's observation_is_public, and a claim
- * that a row already holds (current or superseded) is not sent again.
+ * batch intake checks beside that rule: each child row it would write must pass the database's observation_is_public
+ * on its own (the source reading's prose is not what gets written), and a claim that a row already holds (current or
+ * superseded) is not sent again. Readings flagged needs_clarification only because their intent is unconfirmed are
+ * projected here (the flag is about labor attribution, not about the three values).
  */
-export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, before, apply = false, single = false }) {
+export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, before, apply = false, single = false, imageIds = null }) {
+  // imageIds: only the CURRENT reading of each named photo (the stage worker's one-photo call), chosen by the database's own
+  // rule (image_stage_reading_parent, which its gap finder uses to say a photo has a reading to key): among the photo's
+  // unsuperseded deep readings on this vehicle, the one the photo's ai_scan_metadata.byok_deep_analysis.observation_id points
+  // at; when that pointer is missing or names a reading that is no longer current, the newest. Never every unsuperseded
+  // reading that names the photo (a retried intake can leave a second one that never landed on the photo). Everything below
+  // is the same code path, holds and safety checks included.
+  if (imageIds !== null && (!Array.isArray(imageIds) || imageIds.length === 0 || imageIds.length > 100 || !imageIds.every(id => UUID.test(id ?? '')))) {
+    throw new Error('project-cached: imageIds must be 1..100 uuids');
+  }
   const counts = { sampled_condition_rows: 0, source_rows: 0, eligible_claims: 0 };
   const landed = { inserted: 0, duplicates: 0, verified: 0, failed: 0, unattempted: 0 };
-  const held = { already_projected: 0, already_projected_superseded: 0 };
+  const held = { already_projected: 0, already_projected_superseded: 0, released_intent_only_clarification: 0 };
   const deferred = {};
   const defer = why => { deferred[why] = (deferred[why] || 0) + 1; };
   const signal = () => AbortSignal.timeout(10000);
-  let cursor = null, walked = 0, reachedOldest = false, last = {}, reason;
+  let cursor = null, walked = 0, reachedOldest = false, last = {}, reason, currentIds = null;
+  if (imageIds) {
+    const pointers = await sb.from('vehicle_images').select('id,current_observation_id:ai_scan_metadata->byok_deep_analysis->>observation_id')
+      .in('id', imageIds).abortSignal(AbortSignal.timeout(10000));
+    if (pointers.error || !Array.isArray(pointers.data)) throw new Error('project-cached: current readings unavailable');
+    // found through the (image_id, analysis_kind) index alone; the vehicle, the kind and currency are checked on the few rows back
+    const readings = await sb.from('vehicle_observations').select('id,vehicle_id,kind,is_superseded,ingested_at,image_id:structured_data->>image_id')
+      .eq('structured_data->>analysis_kind', 'image_deep_byok').in('structured_data->>image_id', imageIds)
+      .limit(1000).abortSignal(AbortSignal.timeout(10000));
+    if (readings.error || !Array.isArray(readings.data)) throw new Error('project-cached: current readings unavailable');
+    currentIds = currentReadingIds(pointers.data, readings.data, vehicleId);
+    if (!currentIds.length) reachedOldest = true;   // none of the photos carries a reading: nothing to walk
+  }
   // Before anything has landed a failed read is an error, as it always was. After, the receipt must still say what landed.
   const stop = why => {
     if (!landed.inserted && !landed.duplicates && walked <= 1) throw new Error(`project-cached: ${why.replaceAll('_', ' ')}`);
     landed.failed++; reason = why;
   };
-  while (walked < pages) {
+  while (walked < pages && !(currentIds && !currentIds.length)) {
     let query = sb.from('vehicle_observations').select(SOURCE_COLUMNS)
       .eq('vehicle_id', vehicleId).eq('kind', 'condition').eq('structured_data->>analysis_kind', 'image_deep_byok');
+    if (imageIds) query = query.in('id', currentIds);   // currency was decided by currentReadingIds (not superseded, as the database counts it)
     // Keyset on (ingested_at, id): readings that share one instant across a window's edge are not skipped.
     query = cursor ? query.or(`ingested_at.lt."${cursor.at}",and(ingested_at.eq."${cursor.at}",id.lt.${cursor.id})`)
       : query.lt('ingested_at', before);
@@ -268,7 +378,8 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
       .limit(limit).abortSignal(signal());
     walked++;
     if (result.error || !Array.isArray(result.data)) { stop('source_query_failed'); break; }
-    const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok');
+    const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok' &&
+      (!imageIds || imageIds.includes(row.structured_data?.image_id)));
     const ids = [...new Set(sources.map(row => row.structured_data?.image_id).filter(id => UUID.test(id ?? '')))];
     const images = ids.length ? await sb.from('vehicle_images').select(IMAGE_COLUMNS).in('id', ids).abortSignal(signal())
       : { data: [], error: null };
@@ -276,14 +387,25 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     const byId = new Map(images.data.map(row => [row.id, row]));
     let claims = [];
     for (const source of sources) {
-      const projected = projectImageProperties(source, byId.get(source.structured_data.image_id));
+      const projected = projectImageProperties(source, byId.get(source.structured_data.image_id),
+        { releaseIntentOnlyClarification: single });
       if (projected.deferred) { defer(projected.deferred); continue; }
-      if (single) {   // the batch intake asks the database whether the reading may be shown; so does this route
-        let open;
-        try { open = await sb.rpc('observation_is_public', { p_kind: source.kind, p_data: source.structured_data }).abortSignal(signal()); }
-        catch { open = { error: true }; }
-        if (!open || open.error) { defer('privacy_check_unavailable'); continue; }
-        if (open.data !== true) { defer('source_not_public'); continue; }
+      if (single) {
+        // The batch intake asks the database whether the SOURCE reading may be shown. This route judges what it would
+        // write: the child row, which holds an enum value, ids and a pointer, never the reader's prose. The photo's
+        // own eligibility (sensitive, document, mismatch) was judged above. A child that carries anything else, or
+        // that the database would not show on its own, is refused.
+        let refused = null;
+        for (const claim of projected.claims) {
+          if (!childCarriesOnlyEnumAndPointers(claim)) { refused = 'child_not_public'; break; }
+          let open;
+          try { open = await sb.rpc('observation_is_public', { p_kind: claim.kind, p_data: claim.structured_data }).abortSignal(signal()); }
+          catch { open = { error: true }; }
+          if (!open || open.error) { refused = 'privacy_check_unavailable'; break; }
+          if (open.data !== true) { refused = 'child_not_public'; break; }
+        }
+        if (refused) { defer(refused); continue; }
+        if (projected.released_intent_only_clarification) held.released_intent_only_clarification++;
       }
       claims.push(...projected.claims);
     }
@@ -328,7 +450,10 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     cursor = { at: tail.ingested_at, id: tail.id };
   }
   const summed = single || pages > 1;
+  // imageIds: the readings this call judged current for the named photos (ids only), so its caller can say which reading
+  // its answer is about
   const receipt = { mode: apply ? 'apply' : 'dry_run', route: single ? 'single' : 'batch', vehicle_id: vehicleId,
+    ...(currentIds ? { current_reading_ids: currentIds } : {}),
     ...counts, window_limit: limit, window_before: before, pages_walked: walked, reached_oldest_row: reachedOldest,
     full_history_verified: false, model_calls: 0, deferred, ...(single ? held : {}),
     ...(apply && !summed ? last : {}),

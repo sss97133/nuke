@@ -83,6 +83,40 @@ const MODEL_DEFINITIONS: Record<string, ModelInfo> = {
     tier: 'premium',
     cost: '~$0.01-0.05 per image'
   },
+  'claude-sonnet-5-5': {
+    name: 'Claude Sonnet 5.5',
+    description: 'Balanced performance and accuracy (the lowest Claude model used)',
+    searchesFor: [
+      'Detailed visual analysis',
+      'Component identification',
+      'Context and environment'
+    ],
+    outputs: [
+      'Comprehensive description',
+      'Component details',
+      'Context extraction'
+    ],
+    tier: 'premium',
+    cost: '$2 / $10 per million input / output tokens'
+  },
+  'claude-opus-5-5': {
+    name: 'Claude Opus 5.5',
+    description: 'Highest accuracy, most expensive',
+    searchesFor: [
+      'Deep visual analysis',
+      'Complex component identification',
+      'Detailed context',
+      'Expert-level insights'
+    ],
+    outputs: [
+      'Expert-level analysis',
+      'Detailed findings',
+      'Comprehensive metadata'
+    ],
+    tier: 'premium',
+    cost: '$4 / $20 per million input / output tokens'
+  },
+  // Display-only entries for analyses recorded before the Sonnet 5.5 floor.
   'claude-3-haiku': {
     name: 'Claude 3 Haiku',
     description: 'Fast analysis model',

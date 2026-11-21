@@ -9,8 +9,8 @@
     "charts"
   ],
   "routes": {
-    "vehicle": 259.7,
-    "vehicle_workspace": 273.7,
+    "vehicle": 285.9,
+    "vehicle_workspace": 301.2,
     "jobs": 221.3,
     "job": 237.4,
     "provider": 240.4,

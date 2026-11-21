@@ -149,3 +149,11 @@ it('keeps failed gallery reads distinct from zero and replaces them after retry'
   await act(async () => fixture.gallery.mock.calls.at(-1)![0].onReadCount({ vehicleId: 'offline-subject', filterKey: 'null', shown: 29, partial: false }));
   expect(count()).toBe('29');
 });
+
+it('the Images heading says what a filter hides: shown of total, and the filter by name', async () => {
+  const { galleryCount } = await import('./WorkspaceContent');
+  expect(galleryCount({ shown: 468, partial: false }, null, null)).toBe('468');
+  expect(galleryCount({ shown: 3, partial: false }, { field: 'engine_type', label: '455 V8' }, { shown: 468, partial: false })).toBe('3 of 468 · filtered to 455 V8');
+  expect(galleryCount({ shown: 3, partial: false }, { field: 'engine_type', label: '455 V8' }, null)).toBe('3 · filtered to 455 V8');
+  expect(galleryCount(null, { field: 'engine_type' }, null)).toBe('Reading…');
+});

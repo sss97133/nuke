@@ -267,14 +267,15 @@ Output as JSON.`;
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        model: 'claude-sonnet-5-5',
+        max_tokens: 4000,
+        output_config: { effort: 'low' },
         messages: [{ role: 'user', content: prompt }]
       })
     });
 
     const result = await response.json();
-    const analysis = result.content?.[0]?.text;
+    const analysis = result.content?.find((b) => b.type === 'text')?.text;
 
     if (!analysis) {
       console.log('  API returned no content, using pattern-based analysis');

@@ -1,0 +1,7 @@
+.zip-outline-content { display: grid; gap: 8px; min-width: 0; color: var(--text); }
+.zip-outline-content .om--focus { height: min(410px, 48vh); min-height: 240px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.zip-outline-content__loading { min-height: 240px; display: grid; place-items: center; color: var(--text-muted); }
+.zip-outline-content__note { margin: 0; color: var(--text-muted); font-size: var(--text-caption); line-height: 1.4; }
+@media (max-width: 640px) {
+  .zip-outline-content .om--focus { height: 40vh; min-height: 220px; }
+}

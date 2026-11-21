@@ -163,18 +163,25 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         var albums: [String: PHFetchResult<PHAsset>]
     }
 
-    private nonisolated static func photo(_ asset: PHAsset) -> LocalAlbumPhoto {
+    private nonisolated static func photo(_ asset: PHAsset, formatter: ISO8601DateFormatter) -> LocalAlbumPhoto {
         // Modification time is a source-version hint, never a capture date.
-        LocalAlbumPhoto(localIdentifier: asset.localIdentifier,
-                        sourceVersion: asset.modificationDate.map { String($0.timeIntervalSince1970) })
+        let location = asset.location?.coordinate
+        let validLocation = location.map { (-90...90).contains($0.latitude) && (-180...180).contains($0.longitude)
+            && $0.latitude != -180 && $0.longitude != -180 } ?? false
+        return LocalAlbumPhoto(localIdentifier: asset.localIdentifier,
+                        sourceVersion: asset.modificationDate.map { String($0.timeIntervalSince1970) },
+                        captureAt: asset.creationDate.map { formatter.string(from: $0) },
+                        latitude: validLocation ? location?.latitude : nil,
+                        longitude: validLocation ? location?.longitude : nil)
     }
 
     /// One fetch's change as a membership delta, or nil when PhotoKit can only offer a new
     /// result (no incremental info) and the caller must rescan.
     private nonisolated static func delta(_ d: PHFetchResultChangeDetails<PHAsset>) -> CatalogDelta? {
         guard d.hasIncrementalChanges else { return nil }
+        let formatter = ISO8601DateFormatter()
         return CatalogDelta(removed: Set(d.removedObjects.map(\.localIdentifier)),
-                            upserted: (d.insertedObjects + d.changedObjects).map(photo))
+                            upserted: (d.insertedObjects + d.changedObjects).map { photo($0, formatter: formatter) })
     }
 
     /// Apply a PhotoKit change to the catalog in place. Returns false when the change needs a
@@ -222,9 +229,10 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         }
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        let formatter = ISO8601DateFormatter()
         var visible: [LocalAlbumPhoto] = []
         let allPhotos = PHAsset.fetchAssets(with: options)
-        allPhotos.enumerateObjects { asset, _, _ in visible.append(photo(asset)) }
+        allPhotos.enumerateObjects { asset, _, _ in visible.append(photo(asset, formatter: formatter)) }
         if status == .limited {
             return (LocalAlbumCatalog(accessScope: "limited", observedAt: Date(), albums: [], photos: visible),
                     CatalogSources(photos: allPhotos, collections: nil, topLevel: nil, albums: [:]))
@@ -249,7 +257,7 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
             var photos: [LocalAlbumPhoto] = []
             let fetch = PHAsset.fetchAssets(in: album, options: options)
             albumFetches[album.localIdentifier] = fetch
-            fetch.enumerateObjects { asset, _, _ in photos.append(photo(asset)) }
+            fetch.enumerateObjects { asset, _, _ in photos.append(photo(asset, formatter: formatter)) }
             albums.append(LocalPhotoAlbum(id: album.localIdentifier, name: album.localizedTitle,
                 folderPath: paths[album.localIdentifier] ?? [],
                 sourceKind: String(album.assetCollectionSubtype.rawValue), photos: photos))

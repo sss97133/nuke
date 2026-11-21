@@ -61,7 +61,7 @@ fi
 # user picked byo_api_key, the subscription token would take a back seat to the API key
 # we just exported; if they picked byo_subscription, drop any stray API key so it wins.
 if [ "$METHOD" = "byo_subscription" ]; then unset ANTHROPIC_API_KEY OPENAI_API_KEY GOOGLE_API_KEY; fi
-log "compute method: $METHOD (model ${BYOK_MODEL:-claude-sonnet-4-6})"
+log "compute method: $METHOD (model ${BYOK_MODEL:-claude-sonnet-5-5})"
 
 # Vision can't run without SOME credential. For nuke_hosted / byo_subscription that's the
 # OAuth token (repo secret or the user's vault); for byo_api_key it's the provider key the
@@ -117,7 +117,7 @@ if [ "$SHARD_COUNT" -gt 1 ]; then
   fi
   log "shard ${SHARD_INDEX}/${SHARD_COUNT}: ${#VEH[@]} of the fleet's vehicles"
 fi
-log "queue: ${#VEH[@]} vehicles; time budget ${MINUTES}m, batch ${BATCH}, model ${BYOK_MODEL:-claude-sonnet-4-6}"
+log "queue: ${#VEH[@]} vehicles; time budget ${MINUTES}m, batch ${BATCH}, model ${BYOK_MODEL:-claude-sonnet-5-5}"
 
 # Round-robin across vehicles: ONE batch per vehicle per pass, cycling until the time
 # budget runs out or every vehicle is drained. Biggest-first (drain each vehicle fully

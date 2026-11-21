@@ -69,8 +69,9 @@ async function main() {
   console.log('Analyzing with AI...\n');
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 2000,
+    model: 'claude-sonnet-5-5',
+    max_tokens: 4000,
+    output_config: { effort: 'low' },
     messages: [{
       role: 'user',
       content: `Analyze this forum build thread and extract structured data.
@@ -93,7 +94,7 @@ Return ONLY valid JSON, no markdown.`
     }]
   });
 
-  const jsonText = response.content[0].text;
+  const jsonText = response.content.find((b) => b.type === 'text')?.text || '';
   let structured;
   try {
     structured = JSON.parse(jsonText);

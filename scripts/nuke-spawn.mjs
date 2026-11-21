@@ -21,7 +21,7 @@ import { execSync } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
-import { routeTask } from './lib/jev-route.mjs';
+import { routeTask, claudeModelId } from './lib/jev-route.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NUKE_DIR = join(__dirname, '..');
@@ -184,7 +184,7 @@ function spawnPane(task) {
     // Build the command — CLAUDECODE= prevents nested session detection
     const launch = task.runner === 'codex'
       ? `codex exec -p ${model === 'deep' ? 'deep' : 'fast'} - < '${promptFile}'`
-      : `CLAUDECODE= claude -p "$(cat '${promptFile}')" --model ${model} --max-budget-usd ${BUDGET_USD} ${personaFlag}`;
+      : `CLAUDECODE= claude -p "$(cat '${promptFile}')" --model ${claudeModelId(model)} --max-budget-usd ${BUDGET_USD} ${personaFlag}`;
     const cmd = `${launch}; echo ''; echo '━━━ AGENT COMPLETE ━━━'; rm -f '${promptFile}'; read -p 'Enter to close...'`;
 
     // Send it (using base64 encoding to avoid escaping issues)

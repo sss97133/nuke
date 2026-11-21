@@ -138,12 +138,13 @@ Deno.serve(async (req) => {
 
         const prompt = QUICK_SENTIMENT_PROMPT.replace("{{OBSERVATIONS}}", formattedObs);
 
-        // Use Haiku for speed
+        // Sonnet 5.5 is the floor for every Claude caller
         const response = await anthropic.messages.create({
-          model: "claude-3-5-haiku-20241022",
+          model: "claude-sonnet-5-5",
           max_tokens: 200,
+          thinking: { type: "between_tools" }, // not in SDK 0.39 types; sent as-is
           messages: [{ role: "user", content: prompt }]
-        });
+        } as any) as any;
 
         const content = response.content[0];
         if (content.type === "text") {

@@ -9,9 +9,10 @@
  *   docs/POSITIONING.md     <!-- evidence:start --> … <!-- evidence:end -->    (graded predictions, stack registry, vein V012)
  *   nuke_frontend/public/evidence.md   the same evidence block, whole, served as /evidence.md for the About page
  *
- * Every database query runs inside `begin read only … commit` on the Supabase
- * Management API (the same path scripts/data/q.sh uses), so this script cannot
- * write to the database. It needs SUPABASE_ACCESS_TOKEN in the environment.
+ * Every database query runs inside `begin read only … commit`, so this script cannot write to the database.
+ * Transport is scripts/ci/db-transport.mjs: a direct Postgres connection when one is in the environment
+ * (DATABASE_URL / SUPABASE_DB_URL / SUPABASE_DB_PASSWORD, as in CI), otherwise the Supabase Management API with
+ * SUPABASE_ACCESS_TOKEN — the path scripts/data/q.sh uses. It needs one of those.
  *
  * All four blocks are measured before any file is written. When a query fails, the error is printed, the exit code
  * is 1 and no file changes, so the previous blocks stay in place; each block carries its own measured-at time, so a
@@ -35,6 +36,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INVALID_INDEXES_SQL, invalidIndexesLine, riseReport } from '../ci/invalid-indexes.mjs';
 import { OWNER_WRITABLE_VIEWS_SQL, ownerWritableViewsLine, ownerWritableViewsReport } from '../ci/owner-writable-views.mjs';
+import { DB_DIRECT, dbRows, closeDb } from '../ci/db-transport.mjs';
 
 const PROJECT = 'qkgaybvrernstplzjaam';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -46,8 +48,8 @@ const EVIDENCE_PUBLIC = resolve(ROOT, 'nuke_frontend', 'public', 'evidence.md');
 const DRY = process.argv.includes('--dry-run');
 
 const token = process.env.SUPABASE_ACCESS_TOKEN;
-if (!token) {
-  console.error('readme-stats: SUPABASE_ACCESS_TOKEN is not set');
+if (!token && !DB_DIRECT) {
+  console.error('readme-stats: set a database connection (DATABASE_URL / SUPABASE_DB_URL / SUPABASE_DB_PASSWORD) or SUPABASE_ACCESS_TOKEN');
   process.exit(2);
 }
 
@@ -57,6 +59,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // (on 2026-10-13 the API returned a 55 s cancel at 56 s, inside its own limit).
 async function q(sql, { timeout = '45s', attempt = 1, t0 = Date.now() } = {}) {
   const query = `begin read only; set local statement_timeout = '${timeout}'; ${sql}; commit;`;
+  if (DB_DIRECT) {
+    // Direct Postgres (CI, and anywhere a DB connection is set). Same read-only wrapper, same returned rows.
+    const rows = await dbRows(query);
+    console.error(`readme-stats: ${((Date.now() - t0) / 1000).toFixed(1)}s  ${sql.replace(/\s+/g, ' ').trim().slice(0, 110)}`);
+    await sleep(1500); // be polite to production, like the API path
+    return rows;
+  }
   const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT}/database/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -565,7 +574,9 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(`readme-stats: ${e.message}`);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error(`readme-stats: ${e.message}`);
+    process.exitCode = 1;
+  })
+  .finally(() => closeDb()); // end the DB connection so the run does not hang on an open socket

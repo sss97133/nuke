@@ -895,8 +895,11 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     };
 
-    // Validate required fields
-    if (!input.source_slug || !input.kind || !input.observed_at) {
+    // Qualified component readings derive their clock from the retained source
+    // below. Merely requesting that path does not qualify the source or clock.
+    const componentRequested = input.component_key !== undefined || input.component_reading !== undefined ||
+      input.extraction_method === COMPONENT_READING_METHOD || input.property_key === COMPONENT_PRESENCE_PROPERTY;
+    if (!input.source_slug || !input.kind || (!input.observed_at && !componentRequested)) {
       return new Response(JSON.stringify({
         error: "Missing required fields: source_slug, kind, observed_at"
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -931,8 +934,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     // Bind a part-scoped reading before hashing. The database repeats the source
     // and image checks under locks, including current visibility and witness.
     let component: Extract<ComponentEvidenceResult, { ok: true }> | null = null;
-    if (input.component_key !== undefined || input.component_reading !== undefined ||
-        input.extraction_method === COMPONENT_READING_METHOD || input.property_key === COMPONENT_PRESENCE_PROPERTY) {
+    if (componentRequested) {
       const selector = componentReadingSelector(input.component_reading);
       if (!selector || input.source_slug !== "photo_pipeline" || input.subject !== undefined || input.citation !== undefined ||
           input.source_comment_id !== undefined || input.extractor_id !== undefined || retainedSourceId !== null) {
@@ -941,9 +943,9 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       }
       const [subjectRead, sourceRead, imageRead, witnessRead] = await Promise.all([
         supabase.from("subject_taxonomy").select("subject_id,subject_key,display_name,is_active,domain,category").eq("subject_key", input.component_key).maybeSingle(),
-        supabase.from("vehicle_observations").select("id,vehicle_id,is_superseded,extraction_method,source_url,observed_at,structured_data")
+        supabase.from("vehicle_observations").select("id,vehicle_id,is_superseded,superseded_by,extraction_method,source_url,observed_at,structured_data")
           .eq("id", selector.source_observation_id).maybeSingle(),
-        supabase.from("vehicle_images").select("id,vehicle_id,image_url,is_sensitive,is_document,redaction_level")
+        supabase.from("vehicle_images").select("id,vehicle_id,image_url,superseded_by,is_sensitive,is_document,redaction_level")
           .eq("id", selector.image_id).maybeSingle(),
         supabase.from("observation_witnesses").select("id").eq("observation_id", selector.source_observation_id)
           .eq("image_id", selector.image_id).limit(1),
@@ -1054,7 +1056,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       let query = supabase.from("vehicle_observations").select(ecr ? protectedColumns : retainedVin?.ok
         ? protectedColumns + ",source_vin,source_vin_taxonomy_revision_id,content_hash" : archivedSale?.ok
         ? protectedColumns + (input.source_vehicle_event_id ? ",source_vehicle_event_id,extraction_metadata,content_hash" : "")
-        : component ? "id,is_superseded,component_subject_id,source_observation_id,content_hash" : "id").eq("content_hash",contentHash);
+        : component ? "id,is_superseded,superseded_by,component_subject_id,source_observation_id,content_hash" : "id").eq("content_hash",contentHash);
       if (ecr || archivedSale?.ok || retainedVin?.ok) query = query.eq("source_id",source.id).eq("source_identifier",input.source_identifier!).eq("kind",input.kind);
       return query.maybeSingle().returns<Record<string, unknown> | null>();
     };
@@ -1066,7 +1068,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
     const componentReply = async (row: Record<string, unknown> | null, duplicate: boolean): Promise<Response | null> => {
       if (!component) return null;
-      if (!row?.id || row.is_superseded !== false || row.component_subject_id !== component.subjectId || row.source_observation_id !== component.sourceId)
+      if (!row?.id || row.is_superseded !== false || row.superseded_by !== null || row.component_subject_id !== component.subjectId || row.source_observation_id !== component.sourceId)
         return new Response(JSON.stringify({ error: "Component receipt unavailable", observation_id: row?.id ?? null }),
           { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const current = await supabase.rpc("component_reading_current", { p_observation: row.id });
@@ -1274,6 +1276,9 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         // (subject_type='vehicle', subject_id=NULL) applies.
         ...(input.subject?.type ? { subject_type: input.subject.type } : {}),
         ...(input.subject?.id ? { subject_id: input.subject.id } : {}),
+        // An organisation subject carries its typed key: check_observation_organization_subject refuses
+        // subject_type='organization' with a subject_id and no matching subject_organization_id.
+        ...(input.subject?.type === "organization" && input.subject?.id ? { subject_organization_id: input.subject.id } : {}),
         observed_at: input.observed_at,
         source_id: source.id,
         source_url: input.source_url,

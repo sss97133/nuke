@@ -305,15 +305,8 @@
    which renders the same classes). Imported by VehicleProfile.tsx and
    user-profile/UserBarcodeTimeline.tsx. Do not redefine barcode/hm-* rules here. */
 
-/* Gallery filter chip — sticky above gallery toolbar inside right column */
-.gallery-filter-chip {
-  display: flex; align-items: center; gap: 8px; padding: 4px 12px;
-  font: var(--text-callout)/1.4 var(--font-family);
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  min-width: 0; width: 100%;
-}
-.gallery-filter-chip > span { overflow-wrap: anywhere; min-width: 0; }
-.gallery-filter-chip button { flex-shrink: 0; margin-left: auto; min-height: var(--control-height); padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: var(--accent-dim); color: var(--link); font: inherit; cursor: pointer; }
+/* Gallery filter: the heading says "N of total · filtered to X" and its clear control sits beside it */
+.gallery-filter-clear { flex-shrink: 0; min-height: var(--control-height); padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: var(--accent-dim); color: var(--link); font: var(--text-callout)/1.4 var(--font-family); cursor: pointer; }
 
 /* Receipt popup */
 .receipt {
@@ -914,7 +907,7 @@
 }
 .gallery-btn:hover { background: var(--surface-hover); }
 .gallery-btn--active, .gallery-btn--active:hover { background: var(--action); color: var(--on-action); border-color: var(--action); }
-.gallery-btn:focus-visible, .gallery-slider:focus-visible, .gallery-filter-chip button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.gallery-btn:focus-visible, .gallery-slider:focus-visible, .gallery-filter-clear:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
 .gallery-slider-row { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); }
 .gallery-slider-label, .gallery-slider-val { font: var(--text-callout)/1.4 var(--font-family); color: var(--text-secondary); }
 .gallery-slider { width: 112px; height: var(--control-height); margin: 0; accent-color: var(--action); cursor: pointer; }
@@ -1176,6 +1169,7 @@
 .vehicle-profile-page .vp-header-facets .k-facet { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 6px; color: var(--text-secondary); font: 500 var(--text-callout)/1.3 var(--font-family); }
 .vehicle-profile-page .vp-header-facets .k-facet:hover,
 .vehicle-profile-page .vp-header-facets .k-facet[aria-expanded="true"] { color: var(--link); border-bottom-color: var(--link); }
+.vehicle-profile-page .vp-header-facets .k-status[data-status="reading"] { display: none; }
 .vp-header-departments,
 .vp-header-money { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .vp-header-departments { justify-content: flex-end; }
@@ -1334,3 +1328,24 @@
 .vp-structured-record__note { margin-top: 4px; font-size: var(--text-caption); }
 .vp-structured-record__value { border: 0; background: transparent; color: var(--link); padding: 0; min-height: 44px; font: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .vp-structured-record__value:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.vp-tribute-lead { margin: 0 0 4px; }
+.vp-key-points { list-style: none; margin: 0; padding: 0; }
+.vp-key-point { border-bottom: 1px solid var(--border); }
+.vp-key-point__line { display: flex; align-items: center; gap: 12px; padding: 10px 0; min-height: 44px; }
+summary.vp-key-point__line { cursor: pointer; list-style: none; }
+summary.vp-key-point__line::-webkit-details-marker { display: none; }
+summary.vp-key-point__line:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.vp-key-point__text { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.vp-key-point__blank { display: block; background: var(--surface-secondary, transparent); }
+.vp-key-point__detail { padding: 0 0 12px 52px; }
+.vp-key-point__detail .k-item:last-child { border-bottom: 0; }
+.vp-tribute-tag .cowl-tag-extract { margin: 16px 0 8px; }
+.vp-tribute-record { padding: 10px 0; }
+.vp-tribute-record > summary { cursor: pointer; min-height: 24px; }
+.vp-tribute-point__figure { margin: 8px 0; }
+.vp-tribute-point__figure img { display: block; width: 100%; height: auto; max-height: 55vh; object-fit: contain; }
+.vp-tribute-point__figure figcaption { margin-top: 6px; }
+.vp-header-lead { margin: 10px 0 4px; padding: 0 12px; max-width: 78ch; }
+.vp-header-lead__more { background: none; border: 0; padding: 0; color: var(--accent, #6aa9ff); text-decoration: underline; cursor: pointer; font: inherit; min-height: 24px; }
+.vp-ledger-fold > summary { cursor: pointer; padding: 14px 20px; display: grid; gap: 4px; min-height: 44px; }
+.vp-ledger-fold > summary small { color: var(--text-secondary, #9a9aa3); font-weight: 400; }

@@ -1,7 +1,7 @@
 /**
  * Haiku Extraction Worker
  *
- * The workhorse of the agent hierarchy. Uses claude-haiku-4-5 for:
+ * The workhorse of the agent hierarchy. Uses claude-sonnet-5-5 (the floor; was haiku) for:
  * - Extracting structured vehicle data from HTML/markdown
  * - Parsing listing titles into year/make/model
  * - Simple field extraction (price, mileage, VIN, colors, etc.)
@@ -463,7 +463,7 @@ async function processBatchFromQueue(
           cost: {
             content: "",
             tier: "haiku",
-            model: "claude-haiku-4-5-20251001",
+            model: "claude-sonnet-5-5",
             inputTokens: 0,
             outputTokens: 0,
             costCents: 0,
@@ -706,7 +706,7 @@ Deno.serve(async (req) => {
         return json(200, {
           status: "healthy",
           tier: "haiku",
-          model: "claude-haiku-4-5-20251001",
+          model: "claude-sonnet-5-5",
           capabilities: [
             "extract_listing",
             "parse_title",

@@ -423,8 +423,9 @@ async function classifyWithClaude(base64Image: string, mediaType: string): Promi
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-sonnet-5-5",
       max_tokens: 500,
+      thinking: { type: "between_tools" },
       messages: [{
         role: "user",
         content: [
@@ -578,7 +579,7 @@ async function extractWithClaude(base64Image: string, mediaType: string, docType
     model: "claude-sonnet-5-5",
     tokens_input: usage.input_tokens || 0,
     tokens_output: usage.output_tokens || 0,
-    cost_usd: ((usage.input_tokens || 0) * 3 / 1_000_000) + ((usage.output_tokens || 0) * 15 / 1_000_000),
+    cost_usd: ((usage.input_tokens || 0) * 2 / 1_000_000) + ((usage.output_tokens || 0) * 10 / 1_000_000), // Sonnet 5.5 list $2/$10 per MTok
   };
 }
 

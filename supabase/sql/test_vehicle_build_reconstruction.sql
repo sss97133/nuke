@@ -1,0 +1,324 @@
+-- Contract for 20261119200000_vehicle_build_reconstruction (empty disposable database; dependencies stubbed here, the
+-- migration applied with \ir). Asserts: lines land in the system their words name; a priced line whose words are work
+-- becomes shop work, not a part; paper hours and reference hours stay separate; a stored operation counts once per
+-- vehicle however many parts point at it; machine-shop work implies one engine removal; a part with no stored operation
+-- is counted as a gap; amounts are null for anon and present for the owner; a hidden vehicle returns null.
+DO $$ BEGIN
+  IF to_regclass('public.vehicles') IS NOT NULL THEN RAISE EXCEPTION 'Requires an empty disposable database'; END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon; END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated; END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role; END IF;
+END $$;
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.role', true), '') $$;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.uid', true), '')::uuid $$;
+CREATE TABLE public.vehicles(id uuid PRIMARY KEY, year int, user_id uuid, owner_id uuid, uploaded_by uuid, is_public boolean, deleted_at timestamptz);
+CREATE FUNCTION public.vehicle_user_has_access(p_vehicle uuid, p_user uuid) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT false $$;
+CREATE FUNCTION public.text_redact_contact(p text) RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT p $$;
+CREATE TABLE public.labor_operations(code text PRIMARY KEY, name text, base_hours numeric, system text, model_year_min int, model_year_max int);
+INSERT INTO public.labor_operations VALUES
+  ('ELEC-WIRING-HARNESS','Wiring harness R&R',8.0,'electrical',NULL,NULL),
+  ('MECH-ENGINE-RR','Engine R&R',12.0,'mechanical',NULL,NULL),
+  ('INT-CARPET-RR','Carpet R&R',2.0,'interior',1990,2000);
+CREATE TABLE public.fixture_lines(vehicle_id uuid, item_id uuid, receipt_id uuid, line_kind text, anchor_date date, vendor_name text,
+  description text, part_number text, total_price numeric, printed_hours numeric, printed_performer text);
+CREATE FUNCTION public.receipt_work_lines(p_vehicle_id uuid) RETURNS SETOF public.fixture_lines LANGUAGE sql STABLE AS
+  $$ SELECT * FROM public.fixture_lines WHERE vehicle_id = p_vehicle_id $$;
+
+\ir ../migrations/20261119200000_vehicle_build_reconstruction.sql
+
+-- slice 2 dependencies, as views over fixture tables: photo readings keyed to a part, and the photos they cite
+CREATE TABLE public.fixture_photos(id uuid PRIMARY KEY, vehicle_id uuid, image_url text, taken_at timestamptz, is_sensitive boolean,
+  is_duplicate boolean, is_superseded boolean, eligible boolean DEFAULT true);
+CREATE VIEW public.vehicle_images AS SELECT * FROM public.fixture_photos;
+CREATE FUNCTION public.vehicle_image_gallery_eligible(i public.vehicle_images) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT i.eligible $$;
+CREATE TABLE public.fixture_readings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, extraction_method text,
+  is_superseded boolean, structured_data jsonb);
+CREATE VIEW public.vehicle_observations AS SELECT * FROM public.fixture_readings;
+\ir ../migrations/20261119213000_build_reconstruction_photos.sql
+
+-- slice 3 dependency: the stored hour range per build stage
+CREATE TABLE public.stage_transition_labor_map(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), from_stage text, to_stage text, zone_pattern text,
+  description text, estimated_hours_min numeric, estimated_hours_max numeric, estimated_hours_typical numeric, confidence text);
+\ir ../migrations/20261119230000_build_reconstruction_stages.sql
+
+-- slice 4 dependency: the document each line came from, with the subject it printed
+CREATE TABLE public.fixture_documents(id uuid PRIMARY KEY, raw_json jsonb);
+CREATE VIEW public.receipts AS SELECT * FROM public.fixture_documents;
+INSERT INTO public.fixture_documents VALUES
+  ('00000000-0000-0000-0000-0000000000b1', '{"data_v2":{"vehicle_hint":"FIREBIRD/TRANS AM"}}'),
+  ('00000000-0000-0000-0000-0000000000b2', '{"data_v2":{"vehicle_hint":"1970 Pontiac Block, Heads, Crank; Engine: 455"}}');
+\ir ../migrations/20261120030000_build_reconstruction_paper_subjects.sql
+
+-- slice 5 dependency: the stored supplier product title per receipt line, read through receipt_item_product_card
+-- (stubbed over a fixture table; the real reader returns jsonb with the title in name and a quote price beside it)
+CREATE TABLE public.fixture_products(item_id uuid PRIMARY KEY, name text);
+CREATE FUNCTION public.receipt_item_product_card(p_item uuid) RETURNS jsonb LANGUAGE sql STABLE AS
+  $$ SELECT jsonb_build_object('name', f.name, 'quote_price', 99.5, 'part_number', 'P1') FROM public.fixture_products f WHERE f.item_id = p_item $$;
+INSERT INTO public.fixture_products VALUES
+  ('00000000-0000-0000-0000-0000000000e1', '  1970-73 Pontiac Firebird; Rear Light Wiring Harness Assembly  '),
+  ('00000000-0000-0000-0000-0000000000e3', repeat('x', 200));
+\ir ../migrations/20261120040000_build_reconstruction_line_names.sql
+
+DO $$ BEGIN
+  ASSERT public.photo_reading_is_print('{"narrative_one_line":"Two printed photographs show rear-quarter surface preparation."}');
+  ASSERT public.photo_reading_is_print('{"narrative_one_line":"A sheet.","components_seen":[{"label":"paper sheet containing two printed engine photographs"}]}');
+  ASSERT NOT public.photo_reading_is_print('{"narrative_one_line":"A printed ignition lead crosses the distributor area."}');
+  ASSERT NOT public.photo_reading_is_print('{}');
+  ASSERT public.build_phase_system('paint_prep') = 'paint' AND public.build_phase_system('final_assembly') IS NULL;
+END $$;
+
+DO $$ BEGIN
+  ASSERT public.photo_part_key_system('undercarriage.steering.linkage') = 'steering';
+  ASSERT public.photo_part_key_system('engine.brake.master.cylinder') = 'brakes';
+  ASSERT public.photo_part_key_system('engine.bay') = 'engine';
+  ASSERT public.photo_part_key_system('wheel') = 'tires';
+  ASSERT public.photo_part_key_system('trim.bumper.front') = 'trim';
+  ASSERT public.photo_part_key_system('undercarriage') IS NULL AND public.photo_part_key_system('document.data.plate') IS NULL;
+END $$;
+
+DO $$ BEGIN
+  ASSERT public.receipt_line_system('72-73 UNDERDASH WIRING HRNS') = 'electrical';
+  ASSERT public.receipt_line_system('70-73 FIREBIRD TAIL PANEL STEE[L]') = 'body';
+  ASSERT public.receipt_line_system('73-75 T/A FENDER DCL ORANGE') = 'trim';
+  ASSERT public.receipt_line_system('75-76 FBIRD POS BATT CABLE V8') = 'electrical', 'positive is not posi';
+  ASSERT public.receipt_line_system('32OZBRAKEFLD') = 'brakes';
+  ASSERT public.receipt_line_system('Bore cylinders .060') = 'machining';
+  ASSERT public.receipt_line_system('CHECK AND REPAIR REAR END POSI RING PINION BEARING AND AXELS') = 'axle';
+  ASSERT public.receipt_line_system('BUDDY BRA (BBI) 3D PR') IS NULL, 'unknown words stay unplaced';
+  ASSERT public.receipt_line_labor_operation('74 8CYL W/HEI DIST ENG HARNESS') = 'ELEC-WIRING-HARNESS';
+  ASSERT public.receipt_line_labor_operation('HOSE CLAMPS (MHC)') IS NULL, 'no default operation';
+END $$;
+
+INSERT INTO public.vehicles VALUES
+  ('00000000-0000-0000-0000-0000000000a1', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL),
+  ('00000000-0000-0000-0000-0000000000a2', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, false, NULL);
+INSERT INTO public.fixture_lines VALUES
+  ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b1', 'part', '2025-01-02', 'Supplier', '72-73 UNDERDASH WIRING HRNS', 'W1', 300, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b1', 'part', '2025-01-03', 'Supplier', '70-73 RR LIGHT HRNESS', 'W2', 100, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b1', 'part', '2025-01-03', 'Supplier', '70-73 LOOP CARPET SET', 'C1', 200, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b2', 'labor', '2024-10-07', 'Machine Shop', 'Bore cylinders .060', NULL, NULL, 4.0, 'Tech A'),
+  ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b2', 'part', '2024-10-07', 'Machine Shop', 'Valve Job', NULL, 500, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a1', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b3', 'charge', '2025-01-03', 'Supplier', 'Shipping', NULL, 20, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a2', gen_random_uuid(), '00000000-0000-0000-0000-0000000000b4', 'part', '2025-01-03', 'Supplier', 'OIL FILTER', 'F1', 9, NULL, NULL);
+
+INSERT INTO public.fixture_photos VALUES
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a1', 'https://x.test/1.jpg', '2026-10-28T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000a1', 'https://x.test/2.jpg', '2026-10-28T17:05:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-0000000000d3', '00000000-0000-0000-0000-0000000000a1', 'https://x.test/3.jpg', '2026-10-28T17:06:00Z', true, false, false, true),
+  ('00000000-0000-0000-0000-0000000000d4', '00000000-0000-0000-0000-0000000000a1', 'https://x.test/4.jpg', '2026-10-28T17:07:00Z', false, false, false, false);
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data) VALUES
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"electrical.harness","image_id":"00000000-0000-0000-0000-0000000000d1"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-0000000000d2"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-0000000000d2"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-0000000000d3"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-0000000000d4"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', true,  '{"part_key":"glass.rear","image_id":"00000000-0000-0000-0000-0000000000d1"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'photo_map_harvest_v1', false, '{"part_key":"undercarriage","image_id":"00000000-0000-0000-0000-0000000000d1"}');
+
+INSERT INTO public.stage_transition_labor_map(from_stage, to_stage, zone_pattern, description, estimated_hours_min, estimated_hours_max, estimated_hours_typical, confidence) VALUES
+  ('primed', 'blocked', '*', 'Full body block sand', 8, 24, 16, 'medium'), ('primed', 'blocked', 'panel_*', 'Block sand single panel', 2, 6, 3, 'high');
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data) VALUES
+  ('00000000-0000-0000-0000-0000000000a1', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-0000000000d1","build_phase_guess":"paint_prep","narrative_one_line":"Two printed photographs show surface preparation."}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-0000000000d2","build_phase_guess":"final_assembly","narrative_one_line":"A wheel."}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-0000000000d3","build_phase_guess":"paint_prep","narrative_one_line":"A sensitive photo."}');
+GRANT SELECT ON public.stage_transition_labor_map TO anon;
+
+GRANT SELECT ON public.receipts TO anon;
+DO $$
+DECLARE r jsonb; s jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1');
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'machining';
+  ASSERT s #> '{paper,subjects}' = '["1970 Pontiac Block, Heads, Crank; Engine: 455"]'::jsonb, 'the shop document''s printed subject: ' || (s -> 'paper')::text;
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'electrical';
+  ASSERT s #> '{paper,subjects}' = '[]'::jsonb, 'a parts-only document''s banner is not a subject';
+  RESET ROLE;
+END $$;
+
+DO $$
+DECLARE r jsonb; s jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1');
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'paint';
+  ASSERT jsonb_array_length(s -> 'stages') = 1 AND (s #>> '{stages,0,images}')::int = 1 AND (s #>> '{stages,0,prints}')::int = 1
+     AND s #> '{stages,0,last_day}' = 'null'::jsonb AND (s #>> '{stages,0,reference,hours_typical}')::numeric = 16
+     AND s #>> '{stages,0,reference,description}' = 'Full body block sand',
+    'a photographed stage has a row with the whole-car stored range, no day for a print, hidden photos not counted: ' || coalesce(s::text, 'no paint row');
+  ASSERT (r #>> '{totals,stage_hours,typical}')::numeric = 16 AND (r #>> '{totals,stage_hours,min}')::numeric = 8 AND (r #>> '{totals,stage_images}')::int = 1;
+  ASSERT (r #>> '{totals,reference_hours}')::numeric = 20.0, 'stage hours are not added to reference hours';
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'electrical';
+  ASSERT s #> '{photos,last_day}' = 'null'::jsonb, 'a part reading on a print carries no day: ' || (s -> 'photos')::text;
+  RESET ROLE;
+END $$;
+
+DO $$
+DECLARE r jsonb; s jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1');
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'tires';
+  ASSERT (s #>> '{photos,images}')::int = 1 AND (s #>> '{photos,readings}')::int = 2 AND (s ->> 'part_lines')::int = 0 AND s -> 'lines' = 'null'::jsonb,
+    'a system seen only in photos has a row; sensitive and gallery-ineligible photos are not counted: ' || s::text;
+  ASSERT r::text !~ '(3|4)\.jpg', 'hidden photos never leave the reader';
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'electrical';
+  ASSERT (s #>> '{photos,images}')::int = 1 AND (s #>> '{reference,hours}')::numeric = 8.0, 'photos sit beside the paper figures, which do not change';
+  ASSERT NOT EXISTS (SELECT 1 FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'glass'), 'superseded readings are not current';
+  ASSERT (r #>> '{totals,photo_images}')::int = 2;
+  RESET ROLE;
+END $$;
+
+DO $$
+DECLARE r jsonb; s jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1');
+  ASSERT (r #>> '{totals,lines}')::int = 5, 'charges are not build lines: ' || r::text;
+  ASSERT (r #>> '{totals,part_lines}')::int = 3, 'a priced line whose words are work is shop work';
+  ASSERT (r #>> '{totals,paper_hours}')::numeric = 4.0;
+  ASSERT (r #>> '{totals,reference_hours}')::numeric = 20.0, 'harness once (8) + implied engine removal (12); the 1990-2000 carpet operation does not apply to a 1973';
+  ASSERT (r #>> '{totals,parts_without_reference}')::int = 1;
+  ASSERT r #>> '{totals,recorded_amount}' IS NULL AND r ->> 'amounts_visible' = 'false', 'anon sees no amounts';
+  ASSERT r::text !~ '"amount": ?[0-9]', 'no line amount for anon';
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'electrical';
+  ASSERT (s #>> '{reference,hours}')::numeric = 8.0 AND (s #>> '{reference,operations,0,part_lines}')::int = 2, 'one operation, two parts';
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'machining';
+  ASSERT (s #>> '{paper,lines}')::int = 2 AND (s #>> '{paper,lines_without_hours}')::int = 1 AND s #>> '{reference,hours}' IS NULL;
+  SELECT e INTO s FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'engine';
+  ASSERT s IS NULL, 'the implied operation does not invent a system row without lines';
+  ASSERT r -> 'systems_without_paper' ? 'paint';
+  ASSERT public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a2') IS NULL, 'hidden vehicle';
+  RESET ROLE;
+  PERFORM set_config('test.uid', '00000000-0000-0000-0000-0000000000c1', true);
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a1');
+  ASSERT (r #>> '{totals,recorded_amount}')::numeric = 1100 AND r ->> 'amounts_visible' = 'true', 'owner sees amounts';
+  ASSERT public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a2') IS NOT NULL, 'owner sees a private vehicle';
+END $$;
+
+-- slice 5: a line carries the stored product title; the printed description is untouched; no price rides along
+INSERT INTO public.vehicles VALUES ('00000000-0000-0000-0000-0000000000a3', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL);
+INSERT INTO public.fixture_lines VALUES
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-03', 'Supplier', '70-73 RR LIGHT HRNESS', 'W2', 100, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-03', 'Supplier', '72-73 UNDERDASH WIRING HRNS', 'W1', 300, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-05', 'Supplier', '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727; list 10.15', 'B1', 5, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-05', 'Supplier', 'BATTERY (SSB, 2Y warranty; list $313.54)', 'B2', 5, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000b5', 'part', '2025-01-04', 'Supplier', '70-73 LOOP CARPET SET', 'C1', 200, NULL, NULL);
+DO $$
+DECLARE r jsonb; l jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a3');
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'description' = '70-73 RR LIGHT HRNESS';
+  ASSERT l ->> 'name' = '1970-73 Pontiac Firebird; Rear Light Wiring Harness Assembly', 'stored title, trimmed: ' || l::text;
+  ASSERT l ->> 'description' = '70-73 RR LIGHT HRNESS', 'the printed description stays as printed';
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'description' = '72-73 UNDERDASH WIRING HRNS';
+  ASSERT l -> 'name' = 'null'::jsonb, 'no stored product, no name (nothing is guessed): ' || l::text;
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'description' = '70-73 LOOP CARPET SET';
+  ASSERT length(l ->> 'name') = 160, 'title capped at 160 characters';
+  ASSERT r::text !~ '99\.5' AND r::text !~ 'quote_price' AND r::text !~ '"amount": ?[0-9]', 'no price for anon';
+  ASSERT r #>> '{totals,recorded_amount}' IS NULL AND r ->> 'amounts_visible' = 'false';
+  ASSERT r::text !~* 'list *[$0-9]', 'anon sees no list price in any description';
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B1';
+  ASSERT l ->> 'description' = '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727', 'size, quantity and store survive; only the price goes: ' || l::text;
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B2';
+  ASSERT l ->> 'description' = 'BATTERY (SSB, 2Y warranty)', l::text;
+  RESET ROLE;
+  PERFORM set_config('test.uid', '00000000-0000-0000-0000-0000000000c1', true);
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a3');
+  SELECT x INTO l FROM jsonb_array_elements(r -> 'systems') e, jsonb_array_elements(e -> 'lines') x WHERE x ->> 'part_number' = 'B1';
+  ASSERT l ->> 'description' = '7/16"-14 X 6-5/8" MOUNT BOLT (DOR) LT BP; ordered 8 from Store 2727; list 10.15', 'the owner keeps the printed text: ' || l::text;
+  PERFORM set_config('test.uid', '', true);
+END $$;
+
+-- slice 6: every system carries a window reconstructed from dated evidence
+\ir ../migrations/20261120110000_build_reconstruction_windows.sql
+DO $$ BEGIN
+  ASSERT (SELECT count(*) FROM public.build_system_precedence()) = 5
+     AND EXISTS (SELECT 1 FROM public.build_system_precedence() WHERE before_system = 'body' AND after_system = 'paint')
+     AND NOT EXISTS (SELECT 1 FROM public.build_system_precedence() WHERE after_system = 'interior' AND before_system IN ('glass', 'trim')),
+    'the precedence table is small and explicit';
+END $$;
+INSERT INTO public.vehicles VALUES
+  ('00000000-0000-0000-0000-0000000000a4', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL),
+  ('00000000-0000-0000-0000-0000000000a5', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL),
+  ('00000000-0000-0000-0000-0000000000a6', 1973, '00000000-0000-0000-0000-0000000000c1', NULL, NULL, true, NULL);
+INSERT INTO public.fixture_lines VALUES
+  -- a4: body bought through 2024-09-12 (no paint paper); trim and interior have their own paper
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000f0', '00000000-0000-0000-0000-0000000000b6', 'part', '2024-09-10', 'Supplier', '70-73 FIREBIRD TAIL PANEL STEE[L]', 'P0', 700, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b6', 'part', '2024-09-12', 'Supplier', '70-73 FIREBIRD TAIL PANEL STEE[L]', 'P1', 800, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000b6', 'part', '2024-11-01', 'Supplier', '73-75 T/A FENDER DCL ORANGE', 'T1', 50, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000b6', 'part', '2025-02-01', 'Supplier', '70-73 LOOP CARPET SET', 'C1', 200, NULL, NULL),
+  -- a6: body through 2024-09-12; shop work billed on the interior 2025-06-01; interior parts bought 2025-02-01 (a purchase, not used)
+  ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000b7', 'part', '2024-09-12', 'Supplier', '70-73 FIREBIRD TAIL PANEL STEE[L]', 'P1', 800, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000f5', '00000000-0000-0000-0000-0000000000b7', 'part', '2025-02-01', 'Supplier', '70-73 LOOP CARPET SET', 'C1', 200, NULL, NULL),
+  ('00000000-0000-0000-0000-0000000000a6', '00000000-0000-0000-0000-0000000000f6', '00000000-0000-0000-0000-0000000000b7', 'labor', '2025-06-01', 'Trim Shop', '70-73 LOOP CARPET SET', NULL, NULL, 3.0, NULL);
+INSERT INTO public.fixture_photos VALUES
+  ('00000000-0000-0000-0000-00000000d011', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/11.jpg', '2024-12-01T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d012', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/12.jpg', '2025-10-06T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d013', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/13.jpg', '2025-02-01T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d014', '00000000-0000-0000-0000-0000000000a4', 'https://x.test/14.jpg', '2024-12-15T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d061', '00000000-0000-0000-0000-0000000000a6', 'https://x.test/61.jpg', '2025-01-15T17:00:00Z', false, false, false, true),
+  ('00000000-0000-0000-0000-00000000d021', '00000000-0000-0000-0000-0000000000a5', 'https://x.test/21.jpg', '2025-05-01T17:00:00Z', false, false, false, true);
+INSERT INTO public.fixture_readings(vehicle_id, extraction_method, is_superseded, structured_data) VALUES
+  ('00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d011","build_phase_guess":"final_assembly","scene_type":"body_exterior","narrative_one_line":"Two printed photographs show the finished red body."}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d012","build_phase_guess":"final_assembly","scene_type":"body_exterior","narrative_one_line":"A red coupe outside a shop."}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d013","build_phase_guess":"final_assembly","scene_type":"body_exterior","state_observations":{"paint_state":"bare_metal"},"narrative_one_line":"A coupe in bare metal."}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'photo_map_harvest_v1', false, '{"part_key":"trim.bumper.front","image_id":"00000000-0000-0000-0000-00000000d011"}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'photo_map_harvest_v1', false, '{"part_key":"trim.bumper.front","image_id":"00000000-0000-0000-0000-00000000d012"}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'photo_map_harvest_v1', false, '{"part_key":"wheel","image_id":"00000000-0000-0000-0000-00000000d012"}'),
+  ('00000000-0000-0000-0000-0000000000a4', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d014","build_phase_guess":"paint_prep","narrative_one_line":"A printed sheet of surface preparation photographs."}'),
+  ('00000000-0000-0000-0000-0000000000a6', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d061","build_phase_guess":"paint_prep","narrative_one_line":"A printed sheet of surface preparation photographs."}'),
+  ('00000000-0000-0000-0000-0000000000a5', 'reviewed_image_analysis_v1', false, '{"image_id":"00000000-0000-0000-0000-00000000d021","build_phase_guess":"paint_prep","narrative_one_line":"Printed sheet of surface preparation photographs."}');
+DO $$
+DECLARE r jsonb; w jsonb;
+BEGIN
+  SET LOCAL ROLE anon;
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a4');
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'paint';
+  ASSERT w ->> 'kind' = 'bounded' AND w ->> 'earliest' = '2024-09-12' AND w ->> 'latest' = '2025-10-06',
+    'paint: bounded by the last body line and the first finished photograph; a print (2024-12-01) and a bare-metal view (2025-02-01) set no date: ' || w::text;
+  ASSERT w #>> '{basis,0,id}' = '00000000-0000-0000-0000-0000000000f1' AND w #>> '{basis,0,kind}' = 'receipt_line'
+     AND w #>> '{basis,1,id}' = '00000000-0000-0000-0000-00000000d012' AND w #>> '{basis,1,kind}' = 'photograph', 'the witnesses: ' || w::text;
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'trim';
+  ASSERT w ->> 'kind' = 'documented' AND w ->> 'earliest' = '2024-11-01' AND w ->> 'latest' = '2025-10-06',
+    'own paper: documented; the print of 2024-12-01 sets no latest day: ' || w::text;
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'interior';
+  ASSERT w ->> 'kind' = 'open_end' AND w ->> 'earliest' = '2025-02-01' AND w -> 'latest' = 'null'::jsonb, 'own paper, no finished photograph: ' || w::text;
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'tires';
+  ASSERT w ->> 'kind' = 'open_start' AND w -> 'earliest' = 'null'::jsonb AND w ->> 'latest' = '2025-10-06', 'photographs only: ' || w::text;
+  -- reconstructed_systems: systems with no paper, with the window; amounts and wording
+  ASSERT (SELECT array_agg(e ->> 'system_key' ORDER BY e ->> 'system_key') FROM jsonb_array_elements(r -> 'reconstructed_systems') e) = ARRAY['paint', 'tires'],
+    'only systems without paper: ' || (r -> 'reconstructed_systems')::text;
+  ASSERT r #>> '{reconstructed_systems,0,window,kind}' = 'bounded', 'paint window rides along';
+  ASSERT r #>> '{reconstructed_systems,1,photos,images}' = '1';
+  ASSERT r ->> 'amounts_visible' = 'false' AND r::text !~ '"amount": ?[0-9]' AND r #>> '{totals,recorded_amount}' IS NULL, 'anon sees no amounts';
+  ASSERT r::text !~* 'receipt (is |are )?(needed|required|missing)|need(s)? (a )?receipt', 'no wording asks for paper';
+  -- shop work billed on a following system is a witness; a purchase of its parts is not
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a6');
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'systems') e WHERE e ->> 'system_key' = 'paint';
+  ASSERT w ->> 'kind' = 'bounded' AND w ->> 'earliest' = '2024-09-12' AND w ->> 'latest' = '2025-06-01'
+     AND w #>> '{basis,1,id}' = '00000000-0000-0000-0000-0000000000f6' AND w #>> '{basis,1,kind}' = 'receipt_line', 'shop work on the interior: ' || w::text;
+  -- a print alone: neither end known
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a5');
+  SELECT e -> 'window' INTO w FROM jsonb_array_elements(r -> 'reconstructed_systems') e WHERE e ->> 'system_key' = 'paint';
+  ASSERT w ->> 'kind' = 'unknown' AND w -> 'earliest' = 'null'::jsonb AND w -> 'latest' = 'null'::jsonb AND w -> 'basis' = '[]'::jsonb, 'a print sets no day: ' || coalesce(w::text, 'none');
+  ASSERT r #>> '{reconstructed_systems,0,stages,0,phase}' = 'paint_prep' AND r #>> '{reconstructed_systems,0,stage_hours,typical}' = '16', 'stage hour range rides along';
+  RESET ROLE;
+  -- the owner's amounts stay what they were
+  PERFORM set_config('test.uid', '00000000-0000-0000-0000-0000000000c1', true);
+  r := public.vehicle_build_reconstruction('00000000-0000-0000-0000-0000000000a4');
+  ASSERT (r #>> '{totals,recorded_amount}')::numeric = 1750 AND r ->> 'amounts_visible' = 'true', r::text;
+  PERFORM set_config('test.uid', '', true);
+END $$;
+
+DROP FUNCTION public.build_system_precedence();
+DROP FUNCTION public.receipt_line_strip_list_price(text);
+DROP FUNCTION public.receipt_item_product_card(uuid);
+DROP FUNCTION public.photo_reading_is_print(jsonb); DROP FUNCTION public.build_phase_system(text);
+DROP FUNCTION public.photo_part_key_system(text);
+\ir revert_20261119200000_vehicle_build_reconstruction.sql
+DO $$ BEGIN ASSERT to_regprocedure('public.vehicle_build_reconstruction(uuid)') IS NULL; END $$;

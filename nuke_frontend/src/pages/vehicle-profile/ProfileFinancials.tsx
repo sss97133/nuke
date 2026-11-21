@@ -56,6 +56,15 @@ function ReceiptTotals({ rows, total, complete, onOpenItems }: { rows: VehicleRe
 
 function FinancialDetails({ vehicleId, market, onClose }: { vehicleId: string; market: React.ReactNode; onClose: () => void }) {
   const { user } = useAuthContext();
+  if (!user) return <div className="vp-financial-panel">
+    {market && <section><h3>Recorded market price</h3>{market}</section>}
+    <p>Valuation not available.</p>
+    <a className="vp-financial-action" href="/login" onClick={onClose}>Sign in to view your financial records</a>
+  </div>;
+  return <AuthorizedFinancialDetails vehicleId={vehicleId} market={market} onClose={onClose} />;
+}
+
+function AuthorizedFinancialDetails({ vehicleId, market, onClose }: { vehicleId: string; market: React.ReactNode; onClose: () => void }) {
   const ledger = useBuildLedger(vehicleId, false);
   const receipts = useVehicleReceiptRecords(vehicleId);
   // Booked allocations lead; filed receipts are payment evidence, folded in place after them.
@@ -63,7 +72,7 @@ function FinancialDetails({ vehicleId, market, onClose }: { vehicleId: string; m
     onOpenItems={() => { onClose(); document.getElementById('build-receipts')?.scrollIntoView({ block: 'start' }); }} />;
   return <div className="vp-financial-panel">
     {market && <section><h3>Market</h3>{market}</section>}
-    {!user ? <><p>Sign in to read the financial records available to you.</p>{receiptTotals}</> : <>
+    <>
       {ledger.loading && <p role="status">Reading vehicle financial records…</p>}
       {ledger.error && <div role="status"><p>Some financial records could not load. Available records remain shown; missing reads do not establish a zero balance.</p><button className="vp-financial-action" type="button" onClick={() => void ledger.retry()}>Retry financial records</button></div>}
       <FinancialLedger vehicleId={vehicleId} />
@@ -91,7 +100,7 @@ function FinancialDetails({ vehicleId, market, onClose }: { vehicleId: string; m
         </details>)}
       </section>}
       </details>
-    </>}
+    </>
 
   </div>;
 }

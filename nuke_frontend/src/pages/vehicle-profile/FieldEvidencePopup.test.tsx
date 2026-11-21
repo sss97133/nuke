@@ -39,6 +39,23 @@ it('opens a cited object and quotation immediately without claim drawers or scor
   expect(html).not.toContain('Stored score');
   expect(html).not.toContain('system update');
 });
+it('keeps examined and conflict-side facet photos out of an unlabelled current-value citation figure', () => {
+  fixture.provenance.data.observations = [];
+  const direct = { imageId: 'direct-image', facet: 'current', status: 'reading', relation: 'source' };
+  const examined = { imageId: 'examined-image', facet: 'current', status: 'missing', relation: 'examined' };
+  const conflict = { imageId: 'conflict-image', facet: 'current', status: 'conflict', relation: 'conflict_side' };
+  fixture.inventory.data.citations = [direct, examined, conflict];
+  fixture.inventory.data.citedImages = [
+    { image: { id: 'direct-image', image_url: 'https://example.test/direct.jpg' }, citations: [direct] },
+    { image: { id: 'examined-image', image_url: 'https://example.test/examined.jpg' }, citations: [examined] },
+    { image: { id: 'conflict-image', image_url: 'https://example.test/conflict.jpg' }, citations: [conflict] },
+  ];
+  const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="engine_type" label="Engine" value="V8" presentation="citations" />);
+  expect(html).toContain('direct.jpg');
+  expect(html).not.toContain('examined.jpg');
+  expect(html).not.toContain('conflict.jpg');
+  expect(html).not.toContain('engine.current');
+});
 it('opens an appearance witness directly but never attaches its reading to replacement bytes', () => {
   fixture.provenance.data.observations = [];
   fixture.provenance.data.image_observations = [{ observation_id: 'appearance-reading', image_id: 'appearance-image',
@@ -59,6 +76,20 @@ it('opens an appearance witness directly but never attaches its reading to repla
   fixture.inventory.isLoading = true;
   expect(view()).toContain('Reading sources');
   expect(view()).not.toContain('Current image citation unavailable');
+});
+it('keeps facet-only conflict and examined photographs inspectable in the default drill', () => {
+  fixture.provenance.data.observations = [];
+  const conflict = { imageId: 'conflict-image', itemKey: 'engine.current.family', facet: 'current', status: 'conflict', relation: 'conflict_side', sideValue: 'V6', source: {} };
+  const examined = { imageId: 'examined-image', itemKey: 'engine.current.code', facet: 'current', status: 'missing', relation: 'examined', source: {} };
+  fixture.inventory.data.citations = [conflict, examined];
+  fixture.inventory.data.citedImages = [
+    { image: { id: 'conflict-image', image_url: 'https://example.test/conflict.jpg' }, citations: [conflict] },
+    { image: { id: 'examined-image', image_url: 'https://example.test/examined.jpg' }, citations: [examined] },
+  ];
+  const html = renderToStaticMarkup(<FieldEvidencePopup vehicleId="local-vehicle" field="engine_type" label="Engine" value="V8" />);
+  expect(html).toContain('conflict.jpg'); expect(html).toContain('examined.jpg');
+  expect(html).toContain('Conflicting report'); expect(html).toContain('V6');
+  expect(html).toContain('Examined source'); expect(html).not.toContain('engine.current.family');
 });
 it('preserves denied and refused source responses in the citation presentation', () => {
   fixture.claims.evidence.vin = { sources: [{ id: 'retained-claim', field_value: 'WITHHELD-CLAIM', source_type: 'manual_review', source_image_id: 'retained-image' }] };

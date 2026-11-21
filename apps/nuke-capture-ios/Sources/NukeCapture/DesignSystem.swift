@@ -26,6 +26,27 @@ enum NukeSpace {
 }
 
 /// The corner-radius scale.
+/// The activity heat ramp, from the web's `--heat-0` … `--heat-6` tokens (unified-design-system.css), light and
+/// dark. Level 0 is a day that happened with nothing recorded; the garage's day squares use 3 … 6.
+enum HeatRamp {
+    private static let light: [UInt32] = [0xebedf0, 0xd9f99d, 0xa7f3d0, 0x34d399, 0x059669, 0x047857, 0x065f46]
+    /// Dark mode: heat-0 is #2d2d30, the rest rgba(22, 130, 93, alpha).
+    private static let darkAlpha: [CGFloat] = [1, 0.18, 0.30, 0.44, 0.62, 0.78, 0.92]
+
+    static func color(_ level: Int) -> Color {
+        let i = max(0, min(6, level))
+        return Color(UIColor { trait in
+            if trait.userInterfaceStyle == .dark {
+                return i == 0 ? UIColor(red: 0x2d / 255, green: 0x2d / 255, blue: 0x30 / 255, alpha: 1)
+                    : UIColor(red: 22 / 255, green: 130 / 255, blue: 93 / 255, alpha: darkAlpha[i])
+            }
+            let v = light[i]
+            return UIColor(red: CGFloat((v >> 16) & 0xff) / 255, green: CGFloat((v >> 8) & 0xff) / 255,
+                           blue: CGFloat(v & 0xff) / 255, alpha: 1)
+        })
+    }
+}
+
 enum NukeRadius {
     /// Small chips and thumbnails.
     static let small: CGFloat = 10

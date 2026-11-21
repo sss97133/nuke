@@ -18,14 +18,24 @@
  * can be superseded, never silently overwrites a profile.
  *
  * COMPUTE: routes through the user's settings. byo_api_key+anthropic uses their own key
- * (decrypted server-side); otherwise the platform key. (A Claude *subscription* OAuth
- * token isn't a Messages-API credential, so byo_subscription uses the platform key for
- * synchronous chat — the async drain is where the subscription is spent.)
+ * (decrypted server-side) first; then the platform keys in order, NUKE_ANTHROPIC_API_KEY
+ * (the metered key AGENTS.md names) and ANTHROPIC_API_KEY (the function secret the other
+ * Claude functions read; it answered a live call on 2026-11-20). A key that answers 401/403
+ * is skipped for the next one. (A Claude *subscription* OAuth token isn't a Messages-API
+ * credential, so byo_subscription uses the platform key for synchronous chat.)
+ *
+ * ACCESS: the caller must be tied to the vehicle by the rule the vehicle readers use
+ * (vehicle_statements: vehicles.user_id / owner_id / uploaded_by, or vehicle_user_has_access),
+ * or have uploaded images of it.
+ *
+ * ERRORS: every failure answers { error: "<plain sentence>" }; the garage box and the
+ * profile chat show body.error as it is.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { floorClaudeModel, CLAUDE_FLOOR_MODEL } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,12 +58,45 @@ function json(status: number, body: unknown) {
   });
 }
 
+const CONTRIBUTOR_ROLES = ["owner", "co_owner", "restorer", "moderator", "consigner", "mechanic", "appraiser", "photographer", "sales_agent"];
+
+/** The caller holds this vehicle: the record names them, an approved title verification, an owner
+ *  permission, a current ownership, an active contributor role, or their own photos of it. */
+async function isTied(supabase: any, vehicleId: string, userId: string): Promise<boolean> {
+  const { data: v } = await supabase.from("vehicles").select("user_id, owner_id, uploaded_by")
+    .eq("id", vehicleId).is("deleted_at", null).maybeSingle();
+  if (!v) return false;
+  if ([v.user_id, v.owner_id, v.uploaded_by].includes(userId)) return true;
+  const checks = [
+    supabase.from("ownership_verifications").select("id", { count: "exact", head: true })
+      .eq("vehicle_id", vehicleId).eq("user_id", userId).eq("status", "approved"),
+    supabase.from("vehicle_user_permissions").select("id", { count: "exact", head: true })
+      .eq("vehicle_id", vehicleId).eq("user_id", userId).is("revoked_at", null)
+      .or("is_active.is.null,is_active.eq.true").in("role", ["owner", "co_owner"]),
+    supabase.from("vehicle_ownerships").select("id", { count: "exact", head: true })
+      .eq("vehicle_id", vehicleId).eq("owner_profile_id", userId).eq("is_current", true),
+    supabase.from("vehicle_contributors").select("id", { count: "exact", head: true })
+      .eq("vehicle_id", vehicleId).eq("user_id", userId)
+      .or("status.is.null,status.eq.active").in("role", CONTRIBUTOR_ROLES),
+    supabase.from("vehicle_images").select("id", { count: "exact", head: true })
+      .eq("vehicle_id", vehicleId).eq("user_id", userId),
+  ];
+  const results = await Promise.all(checks);
+  return results.some((r: any) => !r.error && (r.count ?? 0) > 0);
+}
+
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
-  if (denied) return denied;
+  if (denied) {
+    const verdict = await denied.json().catch(() => ({}));
+    return json(denied.status, {
+      error: "Sign in to talk to this car's agent.",
+      reason: typeof verdict?.reason === "string" ? verdict.reason : undefined,
+    });
+  }
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return json(405, { error: "POST only" });
+  if (req.method !== "POST") return json(405, { error: "The agent only answers POST requests." });
 
   try {
     const supabase = createClient(
@@ -62,11 +105,11 @@ Deno.serve(async (req) => {
     );
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Authentication required" });
+    if (!authHeader?.startsWith("Bearer ")) return json(401, { error: "Sign in to talk to this car's agent." });
     const { data: { user }, error: authError } = await supabase.auth.getUser(
       authHeader.replace("Bearer ", ""),
     );
-    if (authError || !user) return json(401, { error: "Invalid authentication" });
+    if (authError || !user) return json(401, { error: "Your session has ended. Sign in again to talk to this car's agent." });
 
     const body = await req.json().catch(() => ({}));
     const vehicleId = String(body.vehicle_id || "");
@@ -75,15 +118,17 @@ Deno.serve(async (req) => {
       ? body.history.slice(-12)
       : [];
     const allowWrites = body.allow_writes !== false; // default on; the user chose "it can write"
-    if (!/^[0-9a-f-]{36}$/i.test(vehicleId)) return json(400, { error: "vehicle_id must be a uuid" });
-    if (!message) return json(400, { error: "message is required" });
+    if (!/^[0-9a-f-]{36}$/i.test(vehicleId)) return json(400, { error: "That is not a vehicle id." });
+    if (!message) return json(400, { error: "Type a message first." });
 
-    // Access check: the caller must have images on this vehicle (their data).
-    const { count: owns, error: oe } = await supabase
-      .from("vehicle_images").select("id", { count: "exact", head: true })
-      .eq("vehicle_id", vehicleId).eq("user_id", user.id);
-    if (oe) return json(500, { error: "access check failed: " + oe.message });
-    if (!owns) return json(403, { error: "You don't have access to that vehicle." });
+    // Access check: the caller holds the car by one of the garage's own routes, or uploaded
+    // images of it. Not vehicle_user_has_access: its admin branch admits every vehicle (it
+    // admitted 300 of 300 sampled non-garage cars for an admin account on 2026-11-20). The
+    // images-only check refused 61 of 198 garage cars on two admin accounts; these routes
+    // admit 198 of 198 and 0 of 900 sampled non-garage cars.
+    if (!(await isTied(supabase, vehicleId, user.id))) {
+      return json(403, { error: "This car's agent answers only people who hold the car." });
+    }
 
     // ── Harness: load the vehicle's memory ───────────────────────────────────
     const { data: veh } = await supabase
@@ -115,14 +160,22 @@ Deno.serve(async (req) => {
     // ── Compute: which key + model (the settings toggle) ─────────────────────
     const { data: settings } = await supabase
       .from("user_analysis_settings").select("method, provider, model").eq("user_id", user.id).maybeSingle();
-    const model = (settings?.model && /^claude-/.test(settings.model)) ? settings.model : "claude-sonnet-4-6";
-    let apiKey = Deno.env.get("ANTHROPIC_API_KEY") || "";
-    let computeNote = "platform";
+    // A stored setting below the floor (Haiku, Claude 3.x, Sonnet 4.x) runs on the floor; stored data is untouched.
+    const model = floorClaudeModel((settings?.model && /^claude-/.test(settings.model)) ? settings.model : CLAUDE_FLOOR_MODEL);
+    // Keys in the order they are tried; a key that answers 401/403 hands over to the next.
+    const keys: Array<{ key: string; source: string }> = [];
     if (settings?.method === "byo_api_key" && settings.provider === "anthropic") {
       const { data: cred } = await supabase.rpc("get_analysis_credential", { p_user_id: user.id });
-      if (cred) { apiKey = String(cred); computeNote = "your_api_key"; }
+      if (cred) keys.push({ key: String(cred), source: "your_api_key" });
     }
-    if (!apiKey) return json(503, { error: "No Anthropic key available for chat. Set one in Settings or configure the platform key." });
+    for (const name of ["NUKE_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"]) {
+      const key = Deno.env.get(name) || "";
+      if (key && !keys.some((k) => k.key === key)) keys.push({ key, source: "platform" });
+    }
+    if (!keys.length) {
+      console.error("[vehicle-agent] no Anthropic key in the function environment");
+      return json(503, { error: "The agent has no model to answer with right now." });
+    }
 
     const system =
       `You are the persistent agent assigned to ONE vehicle: ${vehName}` +
@@ -144,15 +197,37 @@ Deno.serve(async (req) => {
     ];
 
     const t0 = Date.now();
-    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: 1500, system, messages }),
-      signal: AbortSignal.timeout(90_000),
-    });
-    if (!aiRes.ok) {
-      const detail = await aiRes.text().catch(() => "");
-      return json(502, { error: "Claude error", status: aiRes.status, detail: detail.slice(0, 300) });
+    // Above the floor (Opus 5.5, Fable) the model always thinks and thinking counts against max_tokens, so 1,500
+    // could end before the reply; the floor model runs with thinking off and keeps the 1,500 reply bound.
+    const requestBody = JSON.stringify({ model, max_tokens: model === CLAUDE_FLOOR_MODEL ? 1500 : 8000, ...(model === CLAUDE_FLOOR_MODEL ? { thinking: { type: "between_tools" } } : {}), system, messages });
+    let aiRes: Response | null = null;
+    let computeNote = "platform";
+    for (const { key, source } of keys) {
+      try {
+        aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+          body: requestBody,
+          signal: AbortSignal.timeout(90_000),
+        });
+      } catch (e) {
+        console.error(`[vehicle-agent] model call failed (${source}): ${e instanceof Error ? e.message : String(e)}`);
+        return json(504, { error: "The model took too long to answer. Try again." });
+      }
+      computeNote = source;
+      if (aiRes.status !== 401 && aiRes.status !== 403) break;
+      console.error(`[vehicle-agent] ${source} key refused with ${aiRes.status}; trying the next key`);
+    }
+    if (!aiRes || !aiRes.ok) {
+      const status = aiRes?.status ?? 0;
+      const detail = aiRes ? await aiRes.text().catch(() => "") : "";
+      console.error(`[vehicle-agent] model answered ${status}: ${detail.slice(0, 300)}`);
+      const error = status === 401 || status === 403
+        ? "The agent's model key was refused, so it cannot answer right now."
+        : status === 429 || status === 529
+          ? "The model is busy. Try again in a minute."
+          : `The model did not answer (HTTP ${status}). Try again.`;
+      return json(502, { error, status });
     }
     const aiData = await aiRes.json();
     const raw = (aiData.content || []).map((b: any) => b.text || "").join("").trim();
@@ -230,6 +305,7 @@ Deno.serve(async (req) => {
       context: { observations: (obs ?? []).length, analyzed_images: imageSummaries.length },
     });
   } catch (err) {
-    return json(500, { error: err instanceof Error ? err.message : "unexpected error" });
+    console.error(`[vehicle-agent] ${err instanceof Error ? err.message : String(err)}`);
+    return json(500, { error: "The agent hit an error and did not answer. Try again." });
   }
 });

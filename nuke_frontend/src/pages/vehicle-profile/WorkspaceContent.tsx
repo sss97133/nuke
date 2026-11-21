@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useVehicleProfile } from './VehicleProfileContext';
 import type { GalleryReadCount } from '../../components/images/ImageGallery';
@@ -107,6 +107,17 @@ export interface WorkspaceContentProps {
 
 const DEFAULT_LEFT_PCT = 38;
 
+/** The Images heading's count. Filtered, it says so: "3 of 468 · filtered to 455 V8". */
+export function galleryCount(read: { shown: number; partial: boolean; failed?: boolean } | null,
+  filter: import('./VehicleProfileContext').GalleryFilter | null, total: { shown: number; partial: boolean } | null): string {
+  if (!read) return 'Reading…';
+  if (read.failed) return 'Unavailable';
+  const base = `${read.shown}${read.partial ? ' loaded matches' : ''}`;
+  if (!filter) return base;
+  const name = filter.label || filter.field?.replace(/_/g, ' ') || filter.zone || filter.category || filter.tag || 'a filter';
+  return `${total ? `${base} of ${total.shown}${total.partial ? '+' : ''}` : base} · filtered to ${name}`;
+}
+
 const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   referenceLibraryRefreshKey,
   onAddEventClick,
@@ -151,6 +162,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     setGalleryView('GRID');
     document.getElementById('vehicle-gallery-heading')?.scrollIntoView({ block: 'start' });
   }, [setGalleryFilter]);
+  // The full count is the last unfiltered read; a filtered read says "N of total · filtered to X" at the grid itself.
+  const readNow = galleryRead && galleryRead.vehicleId === vehicle?.id && galleryRead.viewerKey === viewerKey && galleryRead.filterKey === JSON.stringify(galleryFilter || null) ? galleryRead : null;
+  const unfilteredTotal = useRef<{ vehicleId: string; shown: number; partial: boolean } | null>(null);
+  if (readNow && !galleryFilter && !readNow.failed) unfilteredTotal.current = { vehicleId: readNow.vehicleId, shown: readNow.shown, partial: readNow.partial };
+  const galleryCountText = galleryCount(readNow, galleryFilter, unfilteredTotal.current?.vehicleId === vehicle?.id ? unfilteredTotal.current : null);
   const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
   const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
 
@@ -489,18 +505,10 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
 
           {/* Gallery toolbar */}
           <div className="widget__header gallery-header" id="vehicle-gallery-heading">
-            {/* Active gallery filter chip */}
-            {galleryFilter && (
-              <div className="gallery-filter-chip">
-                <span style={{ color: 'var(--text-secondary)' }}>Filter:</span>
-                <span>{galleryFilter.label || galleryFilter.field || galleryFilter.zone || galleryFilter.category || galleryFilter.tag || 'Custom'}</span>
-                <button type="button" onClick={() => setGalleryFilter(null)}>Clear filter</button>
-              </div>
-            )}
             <div className="widget__header-left">
               <span className="widget__label">Images</span>
-              <span className="widget__count">{galleryRead?.vehicleId === vehicle.id && galleryRead.viewerKey === viewerKey && galleryRead.filterKey === JSON.stringify(galleryFilter || null)
-                ? galleryRead.failed ? 'Unavailable' : `${galleryRead.shown}${galleryRead.partial ? ' loaded matches' : ''}` : 'Reading…'}</span>
+              <span className="widget__count">{galleryCountText}</span>
+              {galleryFilter && <button type="button" className="gallery-filter-clear" onClick={() => setGalleryFilter(null)}>Clear filter</button>}
             </div>
             <div className="widget__controls">
               <div className="gallery-toolbar" role="group" aria-label="Image view">

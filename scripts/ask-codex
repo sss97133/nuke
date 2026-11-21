@@ -154,7 +154,7 @@ def main():
     command = (
         ["codex", "exec", "--profile", "bridge", "--ephemeral", "--color", "never", "-"]
         if cli == "codex" else
-        ["claude", "-p", "--model", "sonnet", "--output-format", "text",
+        ["claude", "-p", "--model", "claude-sonnet-5-5", "--output-format", "text",
          "--no-session-persistence"]
     )
     child_env = os.environ.copy()

@@ -62,6 +62,9 @@ interface DayDocumentInstall {
 interface DayDocumentLine { product?: ReceiptCatalogProduct | null; line_number: number | null; description: string | null; part_number: string | null; quantity: number | null; unit_price: number | null; amount: number | null; line_date: string | null; hours: number | null; performer: string | null; install?: DayDocumentInstall | null }
 interface DayDocumentPage { bucket: string; path: string; bytes?: number | null; page_no?: number | null }
 interface DayDocumentVendor { id?: string | null; name?: string | null; logo_url?: string | null; website?: string | null }
+/** Thumbnails load lazily, so the day view asks for every frame of a capture day up to the API's row cap. */
+const CAPTURE_DAY_PHOTO_LIMIT = 1000;
+
 export interface DayDocument { receipt_id: string; vendor: string | null; vendor_org?: DayDocumentVendor | null; document_type: string | null; document_number: string | null; pages: number | null; page?: DayDocumentPage | null; page_paths?: string[] | null; payer_as_named: string | null; subtotal: number | null; tax: number | null; total: number | null; currency: string | null; date_basis: string | null; lines: DayDocumentLine[]; recorded_payment?: { amount: number | null; date: string | null } | null; recorded_hours?: number | null; hour_entries?: number }
 
 /** The install proofs a document's lines point at: the distinct days, oldest first. */
@@ -218,7 +221,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
           .gte('taken_at', `${date}T00:00:00Z`)
           .lt('taken_at', captureEnd)
           .order('taken_at', { ascending: true })
-          .limit(120);
+          // A whole capture day: a shoot can run to several hundred frames, and a cut list reads as the day's count.
+          .limit(CAPTURE_DAY_PHOTO_LIMIT);
     Promise.resolve(query)
       .then(({ data, error }) => {
         if (cancelled) return;

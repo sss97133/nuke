@@ -266,8 +266,8 @@ Deno.serve(async (req) => {
       ['google', 'gemini-flash-lite-latest'],
       // Google (full) — may hit 10K/day quota
       ['google', 'gemini-3.1-flash-lite'],
-      // Anthropic fallback — $1/MTok input (may have no credits)
-      ['anthropic', 'claude-haiku-4-5-20251001'],
+      // Anthropic fallback — Sonnet 5.5 floor, $2/MTok input (may have no credits)
+      ['anthropic', 'claude-sonnet-5-5'],
       // OpenAI last resort — quota may be exhausted
       ['openai', 'gpt-4o-mini'],
     ];

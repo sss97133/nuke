@@ -18,7 +18,8 @@ import './vehicle-evidence-detail.css';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { withTimeout } from '../../lib/withTimeout';
-import { publicObservationData, publicObservationArtifact, OBSERVATION_PRIVACY_NOTICE } from './observationPrivacy';
+import { publicObservationData, publicObservationArtifact, publicCowlTagExtract, OBSERVATION_PRIVACY_NOTICE } from './observationPrivacy';
+import CowlTagExtract from './CowlTagExtract';
 import { readNativeListingHistory, nativeListingObservationData } from './auctionEvidenceDisplay';
 
 interface ObservationRow {
@@ -301,6 +302,7 @@ const ObservationPageContent: React.FC<{ publicViewer: boolean }> = ({ publicVie
   // Original documents and OCR labels have no verified name-publication consent.
   const sourceArtifact = publicObservationArtifact();
   const visibleData = useMemo(() => publicObservationData(obs?.structured_data ?? null), [obs]);
+  const cowlExtract = !obs?.is_superseded && !obs?.superseded_by && publicCowlTagExtract(obs?.structured_data ?? null);
 
   const vehLabel = vehicle && vehicle.id === vehicleId
     ? `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''} ${vehicle.trim ?? ''}`.replace(/\s+/g, ' ').trim()
@@ -384,11 +386,6 @@ const ObservationPageContent: React.FC<{ publicViewer: boolean }> = ({ publicVie
             >
               {obs.source_slug || obs.source_name || '—'}
             </span>
-            {obs.confidence_score != null && Number.isFinite(obs.confidence_score) && (
-              <span style={{ color: 'var(--text-secondary)', }}>
-                Stored confidence: {Math.round(obs.confidence_score * 100)}% · Verification unassessed
-              </span>
-            )}
             {obs.is_superseded && (
               <span
                 style={{
@@ -410,22 +407,32 @@ const ObservationPageContent: React.FC<{ publicViewer: boolean }> = ({ publicVie
               wordBreak: 'break-word',
             }}
           >
-            {obsTitle}
+            {cowlExtract ? 'Cowl tag' : obsTitle}
           </h1>
 
-          <p style={{ color: 'var(--text-secondary)' }}>{OBSERVATION_PRIVACY_NOTICE}</p>
+          {cowlExtract && vehicleId && obs.structured_data && <CowlTagExtract vehicleId={vehicleId} observationId={obs.id}
+            sourceImageId={typeof obs.structured_data.image_id === 'string' ? obs.structured_data.image_id : null} />}
           {obs.public_source_url && <p>Publisher report (unverified). Aggregate bid counts do not establish individual bid history.{' '}
             <a href={obs.public_source_url} target="_blank" rel="noopener noreferrer">View on Collecting Cars</a>
           </p>}
 
-          <div className="evidence-metadata"
+          <details className="evidence-metadata"
             style={{
               color: 'var(--text-secondary)',
               marginBottom: 16,
             }}
           >
-            observed_at: {formatDate(obs.observed_at)} · ingested: {formatDate(obs.ingested_at)} · id: {obs.id}
-          </div>
+            <summary>Source details</summary>
+            <p>{OBSERVATION_PRIVACY_NOTICE}</p>
+            <p>Observed {formatDate(obs.observed_at)} · Recorded {formatDate(obs.ingested_at)}</p>
+            <p>Record: <code>{obs.id}</code></p>
+            {obs.confidence_score != null && Number.isFinite(obs.confidence_score) && <p>
+              Stored confidence: {Math.round(obs.confidence_score * 100)}% · Verification unassessed
+            </p>}
+          </details>
+          {!cowlExtract && !Object.keys(visibleData).length && !obs.public_source_url && <p>
+            A public source extract is not available for this record. <Link to={`/vehicle/${vehicleId}`}>Return to vehicle evidence</Link>
+          </p>}
 
           {/* Source artifact (image or URL) */}
           {sourceArtifact && (() => {

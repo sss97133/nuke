@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-import { applyImagePropertyClaims as applyBatchClaims, projectImageProperties, PROJECTION_VERSION } from './image-property-projection.mjs';
+import { applyImagePropertyClaims as applyBatchClaims, projectImageProperties, childCarriesOnlyEnumAndPointers, PROJECTION_VERSION } from './image-property-projection.mjs';
 
 const applyImagePropertyClaims = (sb, claims, options = {}) => applyBatchClaims(sb, claims, { ...options, mode: 'legacy' });
 
@@ -439,15 +439,15 @@ test('batch source registry mismatch fails even when the returned source ID is a
 // ── project-cached: the walk over one vehicle's stored readings ─────────────────────────────────────────────────────
 // A stand-in for the database client: made-up rows in memory, the same filters the walk sends, and the edge function's
 // rule that the same claim is answered as a duplicate.
-import { projectCachedRun, instantMicros, SINGLE_SLICE } from './image-property-projection.mjs';
+import { projectCachedRun, currentReadingIds, readingIsPictureOfPicture, instantMicros, SINGLE_SLICE } from './image-property-projection.mjs';
 
 const VEHICLE = '77777777-7777-4777-8777-777777777777';
 const PROPERTY_IDS = { image_visible_rust_severity: 'aaaaaaaa-0000-4000-8000-000000000001',
   image_visible_paint_stage: 'aaaaaaaa-0000-4000-8000-000000000002', image_visible_assembly_state: 'aaaaaaaa-0000-4000-8000-000000000003' };
-function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0 } = {}) {
+function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 0, failReadingsQueryAt = 0 } = {}) {
   let n = 0;
   const id = prefix => `${prefix.repeat(8)}-0000-4000-8000-${String(++n).padStart(12, '0')}`;
-  const db = { rows: [], images: new Map(), witnesses: [], calls: { source: 0, invoke: 0, rpc: 0, prior: 0 } };
+  const db = { rows: [], images: new Map(), witnesses: [], calls: { source: 0, invoke: 0, rpc: 0, prior: 0, readings: 0 } };
   db.reading = (ingestedAt, { image = {}, data = {}, ...over } = {}) => {
     const imageId = id('c');
     db.images.set(imageId, { id: imageId, vehicle_id: VEHICLE, is_sensitive: false, is_superseded: false, is_duplicate: false,
@@ -456,7 +456,7 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
       agent_model: 'made-up-model', agent_tier: null, extraction_method: 'made_up_reader_v1', confidence: 'medium', confidence_score: 0.8,
       structured_data: { analysis_kind: 'image_deep_byok', image_id: imageId,
         state_observations: { rust_severity: 'surface', paint_state: 'aged', completeness: 'assembled' }, ...data }, ...over };
-    db.rows.push(row); return row;
+    db.rows.push(row); db.images.get(imageId).current_observation_id = row.is_superseded ? null : row.id; return row;
   };
   const newestFirst = (a, b) => { const d = instantMicros(b.ingested_at) - instantMicros(a.ingested_at); return d > 0n ? 1 : d < 0n ? -1 : (a.id < b.id ? 1 : -1); };
   const builder = table => {
@@ -466,6 +466,11 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
       if (table === 'observation_properties') return { data: f.in[1].map(key => ({ id: PROPERTY_IDS[key], property_key: key })), error: null };
       if (table === 'observation_witnesses') return { data: db.witnesses.filter(w => w.observation_id === f.eq.observation_id && w.image_id === f.eq.image_id), error: null };
       if (f.eq.id) return { data: db.rows.find(row => row.id === f.eq.id) ?? null, error: null };
+      if (f.in?.[0] === 'structured_data->>image_id') {   // every deep reading naming the photos, whatever its vehicle or currency
+        if (++db.calls.readings === failReadingsQueryAt) return { data: null, error: { message: 'made-up failure' } };
+        return { data: db.rows.filter(row => row.structured_data?.analysis_kind === f.eq['structured_data->>analysis_kind'] && f.in[1].includes(row.structured_data.image_id))
+          .map(row => ({ id: row.id, vehicle_id: row.vehicle_id, kind: row.kind, is_superseded: row.is_superseded, ingested_at: row.ingested_at, image_id: row.structured_data.image_id })), error: null };
+      }
       if (f.eq.extraction_method) {   // which claims a row already holds
         db.calls.prior++;
         return { data: db.rows.filter(row => row.extraction_method === f.eq.extraction_method && f.in[1].includes(row.structured_data.source_observation_id))
@@ -474,6 +479,7 @@ function standIn({ isPublic = () => true, failSourceQueryAt = 0, failInvokeAt = 
       if (++db.calls.source === failSourceQueryAt) return { data: null, error: { message: 'made-up failure' } };
       const keep = row => row.vehicle_id === f.eq.vehicle_id && row.kind === f.eq.kind &&
         row.structured_data.analysis_kind === f.eq['structured_data->>analysis_kind'] &&
+        (!f.in || f.in[1].includes(row.id)) && (f.eq.is_superseded === undefined || row.is_superseded === f.eq.is_superseded) &&
         (f.lt ? instantMicros(row.ingested_at) < instantMicros(f.lt)
           : instantMicros(row.ingested_at) < instantMicros(f.or.at) || (instantMicros(row.ingested_at) === instantMicros(f.or.at) && row.id < f.or.id));
       return { data: db.rows.filter(keep).sort(newestFirst).slice(0, f.limit), error: null };
@@ -542,12 +548,23 @@ test('project-cached --single: a superseded projected row is left alone and coun
   assert.deepEqual([receipt.already_projected, receipt.already_projected_superseded, receipt.inserted, receipt.failed, exitCode], [3, 1, 0, 0, 0]);
 });
 
-test('project-cached --single: asks the database whether a reading may be shown, and fails closed', async () => {
-  const privateWord = data => !JSON.stringify(data).includes('made-up private');
+test('project-cached --single: judges the child row, not the source reading prose, and fails closed', async () => {
+  // The database stand-in answers like observation_is_public's prose rule: a payment/receipt/amount word makes a row private.
+  const privateWord = data => !/(invoice|receipt|\$\s?[0-9])/i.test(JSON.stringify(data));
   let db = standIn({ isPublic: privateWord });
-  db.reading(at(1)); db.reading(at(2), { data: { agent_notes: 'made-up private note' } });
+  db.reading(at(1));
+  db.reading(at(2), { data: { agent_notes: 'made-up note: no receipt line matches this part, $12 quoted' } });
   let { receipt } = await walk(db, { apply: true, single: true });
-  assert.deepEqual([receipt.inserted, receipt.deferred], [3, { source_not_public: 1 }]);
+  assert.deepEqual([receipt.inserted, receipt.deferred], [6, {}], 'a parent whose notes mention a receipt or an amount still projects its clean child');
+  assert.equal(db.calls.rpc, 6, 'the database is asked about each child it would write');
+  for (const row of db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1')) {
+    assert.equal(JSON.stringify(row.structured_data).includes('made-up note'), false, 'no source prose reaches a child');
+  }
+  // A child that would itself carry private text is refused, by the database's verdict on the child.
+  db = standIn({ isPublic: () => false });
+  db.reading(at(1));
+  ({ receipt } = await walk(db, { apply: true, single: true }));
+  assert.deepEqual([receipt.inserted, receipt.deferred], [0, { child_not_public: 1 }]);
   db = standIn({ isPublic: () => 'error' });
   db.reading(at(1));
   ({ receipt } = await walk(db, { single: true }));
@@ -556,6 +573,71 @@ test('project-cached --single: asks the database whether a reading may be shown,
   db.reading(at(1));
   await walk(db, {});
   assert.equal(db.calls.rpc, 0, 'the batch route leaves that check to its intake');
+});
+
+test('child shape: only an enum, ids, a pointer and fixed words; any extra field or free text is refused', () => {
+  const { observation, image } = fixtures();
+  const [claim] = projectImageProperties(observation, image).claims;
+  assert.equal(childCarriesOnlyEnumAndPointers(claim), true);
+  for (const mutate of [
+    c => { c.structured_data.agent_notes = 'made-up note'; },
+    c => { c.structured_data.narrative = 'made-up text'; },
+    c => { c.structured_data.limitation = 'made-up free text'; },
+    c => { c.structured_data.source_extraction_method = 'made-up words with spaces and $5'; },
+    c => { c.structured_data[c.property_key] = 'made-up value'; },
+    c => { delete c.structured_data.source_observation_id; },
+    c => { c.raw_source_ref = 'vehicle_observations:not-the-pointer'; },
+    c => { c.kind = 'media'; },
+  ]) {
+    const copy = structuredClone(claim); mutate(copy);
+    assert.equal(childCarriesOnlyEnumAndPointers(copy), false);
+  }
+});
+
+test('intent-only clarification: released on the one-at-a-time route only, when the contract explains the flag', () => {
+  const flagged = (patch = {}) => {
+    const { observation, image } = fixtures();
+    Object.assign(observation.structured_data, { needs_clarification: true, intent: 'documentation', intent_confidence: 0.55, ...patch });
+    return { observation, image };
+  };
+  let { observation, image } = flagged();
+  assert.equal(projectImageProperties(observation, image).deferred, 'source_requires_review', 'default route holds');
+  assert.equal(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).claims.length, 3);
+  assert.equal(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).released_intent_only_clarification, true);
+  ({ observation, image } = flagged({ intent: 'unknown', intent_confidence: 0.1 }));
+  assert.equal(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).claims.length, 3);
+  // The flag beside a confirmed intent has another cause: still held, and so is a missing intent_confidence.
+  for (const patch of [{ intent_confidence: 0.9 }, { intent_confidence: undefined }, { intent: undefined, intent_confidence: undefined }, { intent_confidence: 'low' }]) {
+    ({ observation, image } = flagged(patch));
+    assert.equal(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).deferred, 'source_requires_review');
+  }
+  // Every other hold stays, flag or no flag.
+  for (const patch of [{ needs_review: true }, { attribution_doubt: 'made-up doubt' }, { scene_type: 'receipt_document' }]) {
+    ({ observation, image } = flagged(patch));
+    assert.deepEqual(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).claims, []);
+  }
+  ({ observation, image } = flagged());
+  observation.confidence = 'low';
+  assert.deepEqual(projectImageProperties(observation, image, { releaseIntentOnlyClarification: true }).claims, []);
+  ({ observation, image } = flagged());
+  for (const patch of [{ is_sensitive: true }, { is_document: true }, { image_vehicle_match_status: 'mismatch' }]) {
+    assert.deepEqual(projectImageProperties(observation, { ...image, ...patch }, { releaseIntentOnlyClarification: true }).claims, []);
+  }
+});
+
+test('project-cached --single: counts intent-only releases; the batch route still holds them', async () => {
+  const flagged = { needs_clarification: true, intent: 'inspection', intent_confidence: 0.55 };
+  let db = standIn();
+  db.reading(at(1), { data: flagged });
+  db.reading(at(2), { data: { ...flagged, intent_confidence: 0.9 } });
+  db.reading(at(3), { image: { is_sensitive: true }, data: flagged });
+  let { receipt } = await walk(db, { apply: true, single: true });
+  assert.deepEqual([receipt.inserted, receipt.released_intent_only_clarification, receipt.deferred],
+    [3, 1, { source_requires_review: 1, image_not_eligible: 1 }]);
+  db = standIn();
+  db.reading(at(1), { data: flagged });
+  ({ receipt } = await walk(db, {}));
+  assert.deepEqual([receipt.eligible_claims, receipt.deferred], [0, { source_requires_review: 1 }]);
 });
 
 test('project-cached: a photographed paper is deferred on either route', async () => {
@@ -592,4 +674,102 @@ test('project-cached: one page on the batch route keeps the receipt it always pr
   for (const key of ['inserted', 'duplicates', 'verified', 'failed', 'unattempted', 'requests']) assert.equal(receipt[key], 0, key);
   assert.deepEqual([receipt.route, receipt.eligible_claims, exitCode], ['batch', 0, 1], 'apply with nothing to do is still a failure');
   assert.equal((await walk(db, {})).exitCode, 0, 'a dry run with nothing stored is not');
+});
+
+test('project-cached --single with imageIds: only the named photos, through the same checks, and their own deferral reasons', async () => {
+  const db = standIn();
+  const one = db.reading(at(1)), other = db.reading(at(2));
+  const paper = db.reading(at(3), { data: { scene_type: 'receipt_document' } });
+  const unknown = db.reading(at(4), { data: { state_observations: { rust_severity: 'unknown', paint_state: 'unknown', completeness: 'unknown' } } });
+  const old = db.reading(at(5), { is_superseded: true });
+  const only = async (row, extra = {}) => walk(db, { apply: true, single: true, imageIds: [row.structured_data.image_id], ...extra });
+  let { receipt, exitCode } = await only(one);
+  assert.deepEqual([receipt.source_rows, receipt.inserted, receipt.verified, receipt.failed, exitCode], [1, 3, 3, 0, 0]);
+  assert.deepEqual(receipt.current_reading_ids, [one.id], 'the receipt names the reading it judged current for the photo');
+  assert.equal(db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1' && r.structured_data.image_id === other.structured_data.image_id).length, 0, 'the other photo was not touched');
+  ({ receipt } = await only(paper));
+  assert.deepEqual([receipt.eligible_claims, receipt.deferred], [0, { receipt_document: 1 }], 'the projection\'s own holds still apply');
+  ({ receipt } = await only(unknown));
+  assert.deepEqual([receipt.eligible_claims, receipt.deferred], [0, { no_known_scalar_values: 1 }]);
+  ({ receipt } = await only(old));
+  assert.equal(receipt.source_rows, 0, 'a superseded reading is not selected when photos are named');
+  ({ receipt } = await only(one));
+  assert.deepEqual([receipt.eligible_claims, receipt.already_projected, receipt.inserted], [0, 3, 0], 'a second call for the same photo sends nothing');
+  for (const bad of [[], ['not-a-uuid'], Array(101).fill(one.structured_data.image_id)]) {
+    await assert.rejects(walk(db, { imageIds: bad }), /imageIds must be 1\.\.100 uuids/);
+  }
+});
+
+test('project-cached --single with imageIds: only the reading the photo points at, never a second unsuperseded one', async () => {
+  const db = standIn();
+  const landed = db.reading(at(1));
+  const imageId = landed.structured_data.image_id;
+  // a retried intake left a second, unsuperseded reading of the same photo that the photo does not point at
+  db.rows.push({ ...landed, id: 'dddddddd-0000-4000-8000-0000000000aa', ingested_at: at(2), structured_data: { ...landed.structured_data, state_observations: { rust_severity: 'perforation', paint_state: 'bare_metal', completeness: 'stripped' } } });
+  const { receipt } = await walk(db, { apply: true, single: true, imageIds: [imageId] });
+  assert.deepEqual([receipt.source_rows, receipt.inserted], [1, 3]);
+  const keyed = db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1');
+  assert.deepEqual(keyed.map(r => r.structured_data.source_observation_id), [landed.id, landed.id, landed.id], 'every value comes from the reading the photo carries');
+  assert.ok(!keyed.some(r => r.structured_data.rust_severity === 'perforation'));
+});
+
+test('a reading whose own words say picture of a picture keys nothing new: the words the database reads as a print', async () => {
+  const db = standIn();
+  // the reviewed reader gave a vehicle scene and an assembly state to a photographed sheet of printed photos; its sentence says so
+  const print = db.reading(at(1), { data: { scene_type: 'body_exterior', narrative_one_line: 'Two printed photographs show the car masked for primer.' } });
+  const sheet = db.reading(at(2), { data: { scene_type: 'paint_booth', narrative_one_line: 'A printed sheet pairs the booth with painted panels outside.' } });
+  const label = db.reading(at(3), { data: { scene_type: 'engine_bay', narrative_one_line: 'An engine on a stand.', components_seen: [{ label: 'Album page of engine photos' }] } });
+  const screen = db.reading(at(4), { data: { scene_type: 'product_screenshot' } });
+  const reference = db.reading(at(5), { data: { scene_type: 'cross_reference' } });
+  const real = db.reading(at(6), { data: { scene_type: 'body_exterior', narrative_one_line: 'Masking paper covers the glass while the sheet metal is in primer.' } });
+  for (const row of [print, sheet, label]) {
+    const { receipt } = await walk(db, { apply: true, single: true, imageIds: [row.structured_data.image_id] });
+    assert.deepEqual([receipt.eligible_claims, receipt.inserted, receipt.deferred], [0, 0, { picture_of_picture: 1 }], row.structured_data.scene_type);
+  }
+  // a paper or screen scene alone is not this hold (no measured case of a wrong keyed value; the scene values have no
+  // registry definition yet): such a reading keys as it did before
+  for (const row of [screen, reference]) {
+    const { receipt } = await walk(db, { apply: true, single: true, imageIds: [row.structured_data.image_id] });
+    assert.deepEqual([receipt.inserted, receipt.deferred], [3, {}], row.structured_data.scene_type);
+  }
+  const { receipt } = await walk(db, { apply: true, single: true, imageIds: [real.structured_data.image_id] });
+  assert.deepEqual([receipt.inserted, receipt.deferred], [3, {}], 'masking paper and sheet metal are not a print');
+  // the same pattern as the database's photo_reading_is_print: the narrative and the first component label only
+  assert.equal(readingIsPictureOfPicture({ narrative_one_line: 'Printed 4x6 picture of the dash.' }), true);
+  assert.equal(readingIsPictureOfPicture({ narrative_one_line: 'A dash.', components_seen: [{ label: 'Gauge' }, { label: 'printed sheet' }] }), false, 'a later component label is not read, as in the database');
+  assert.equal(readingIsPictureOfPicture({ narrative_one_line: 'A part number is printed on the tag.' }), false);
+  assert.equal(readingIsPictureOfPicture(null), false);
+});
+
+test('project-cached --single with imageIds: the current reading is chosen as the database chooses it', async () => {
+  // a stamp that kept no pointer (readings made before the pointer existed): the photo's newest current reading on this vehicle
+  const db = standIn();
+  const older = db.reading(at(1));
+  const imageId = older.structured_data.image_id;
+  const newer = { ...older, id: 'dddddddd-0000-4000-8000-0000000000bb', ingested_at: at(2), structured_data: { ...older.structured_data, state_observations: { rust_severity: 'pitting', paint_state: 'primer', completeness: 'partial' } } };
+  db.rows.push(newer);
+  db.images.get(imageId).current_observation_id = null;
+  const fallback = await walk(db, { apply: true, single: true, imageIds: [imageId] });
+  assert.deepEqual([fallback.receipt.source_rows, fallback.receipt.inserted], [1, 3]);
+  assert.deepEqual([...new Set(db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1').map(r => r.structured_data.source_observation_id))], [newer.id]);
+  // a photo no deep reading names projects nothing
+  const bare = standIn(); const lone = bare.reading(at(1)); bare.rows.length = 0;
+  const none = await walk(bare, { apply: true, single: true, imageIds: [lone.structured_data.image_id] });
+  assert.deepEqual([none.receipt.source_rows, none.receipt.eligible_claims, none.receipt.reached_oldest_row, none.exitCode], [0, 0, true, 1]);
+  // the lookup failing is an error, not "no reading"
+  const broken = standIn({ failReadingsQueryAt: 1 }); const r = broken.reading(at(1));
+  await assert.rejects(walk(broken, { apply: true, single: true, imageIds: [r.structured_data.image_id] }), /current readings unavailable/);
+
+  // the rule itself, row by row
+  const I = 'cccccccc-0000-4000-8000-000000000001', A = 'dddddddd-0000-4000-8000-00000000000a', B = 'dddddddd-0000-4000-8000-00000000000b', C = 'dddddddd-0000-4000-8000-00000000000c';
+  const row = (id, second, over = {}) => ({ id, vehicle_id: VEHICLE, kind: 'condition', is_superseded: false, ingested_at: at(second), image_id: I, ...over });
+  const pick = (stamp, rows) => currentReadingIds([{ id: I, current_observation_id: stamp }], rows, VEHICLE);
+  assert.deepEqual(pick(A, [row(B, 9), row(A, 1)]), [A], 'the stamp wins over a newer reading');
+  assert.deepEqual(pick(A, [row(A, 1), row(B, 9)]), [A], 'whatever order the rows come back in');
+  assert.deepEqual(pick(A, [row(A, 9, { is_superseded: true }), row(B, 1), row(C, 2)]), [C], 'a stamp that names a superseded reading: the newest current one');
+  assert.deepEqual(pick(null, [row(B, 2), row(A, 2), row(C, 1)]), [A], 'the same instant: the lowest id');
+  assert.deepEqual(pick(null, [row(A, 1, { ingested_at: null }), row(B, 1)]), [B], 'a reading without a clock comes last');
+  assert.deepEqual(pick(null, [row(A, 5, { is_superseded: null })]), [A], 'a null flag is current, as the database counts it');
+  assert.deepEqual(pick(null, [row(A, 5, { vehicle_id: '88888888-8888-4888-8888-888888888888' }), row(B, 5, { kind: 'specification' }), row(C, 5, { image_id: 'cccccccc-0000-4000-8000-000000000002' })]), [],
+    'another vehicle\'s reading, another kind and another photo are not this photo\'s reading');
 });

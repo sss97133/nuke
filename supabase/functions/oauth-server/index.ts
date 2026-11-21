@@ -11,10 +11,19 @@
  * The browser confirms the actual user; account membership remains the resource authority.
  * Legacy self-minted JWTs are never accepted as these credentials.
  *
- * Authentication is via Supabase magic link. /oauth/authorize renders a minimal
- * email-input page; submitting it generates a Supabase magic link whose redirect
- * lands on /oauth/callback, which then redirects the user back to the OAuth
- * client's redirect_uri with an authorization code.
+ * Authentication happens on the /oauth/authorize page. With the account password (and the
+ * authenticator code when the account has one enrolled) the sign-in, the approval and the
+ * return to the client all stay in the browser that started the connection. A client that
+ * binds its callback to that browser (claude.ai does) refuses a return made anywhere else,
+ * which is what an emailed link opened from a mail app produces on a phone (measured
+ * 2026-11-18: code issued, claude.ai never called /oauth/token). The emailed link remains
+ * for accounts without a password; it lands on /oauth/callback.
+ *
+ * The page offers the same sign-ins as nuke.ag itself: a browser already signed in to nuke.ag
+ * continues as that account, and Google, Apple and GitHub sign in through the auth server and
+ * return to /oauth/callback in the same browser. A provider session starts without an email
+ * (stored as "provider:<name>") and is bound to the signed-in account's email when that
+ * account approves; an emailed-link session keeps the email it was sent to.
  *
  * @owner external-agent-write-api
  */
@@ -34,12 +43,16 @@ const REVOCATION_ENDPOINT = `${ISSUER}/oauth/revoke`;
 const RESOURCE_METADATA_ENDPOINT = `${ISSUER}/.well-known/oauth-protected-resource`;
 const LOGIN_ENDPOINT = `${ISSUER}/oauth/login`;
 const CALLBACK_ENDPOINT = `${ISSUER}/oauth/callback`;
+const SIGN_IN_PROVIDERS = ["google", "apple", "github"];
 const CALLBACK_FINISH_ENDPOINT = `${ISSUER}/oauth/callback-finish`;
 const MCP_RESOURCE = `${ISSUER}/mcp`;
 
+// Where the nuke.ag site keeps its own signed-in session in this browser (supabase-js default key).
+const SITE_SESSION_KEY = `sb-${(() => { try { return new URL(Deno.env.get("SUPABASE_URL") ?? "").hostname.split(".")[0]; } catch { return ""; } })()}-auth-token`;
+
 const SCOPES_SUPPORTED = OAUTH_SCOPES;
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;          // 1 hour
-const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
+const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days from the last refresh (set in exchange_mcp_oauth_credential)
 const CODE_TTL_SECONDS = 60 * 10;                  // 10 minutes
 const LOGIN_SESSION_TTL_SECONDS = 60 * 15;         // 15 minutes
 
@@ -82,6 +95,13 @@ function randomToken(bytes = 32): string {
   const arr = new Uint8Array(bytes);
   crypto.getRandomValues(arr);
   return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function rotationHex(label: string, presented: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode("nuke-oauth-rotation:" + projectSecretKey()), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, enc.encode(label + ":" + presented));
+  return Array.from(new Uint8Array(mac)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function sha256Hex(input: string): Promise<string> {
@@ -308,7 +328,8 @@ async function handleAuthorize(req: Request): Promise<Response> {
     h1 { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px; }
     p  { font-size: 13px; line-height: 1.5; }
     label { display: block; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; margin: 16px 0 6px; }
-    input[type=email] { width: 100%; padding: 10px; border: 2px solid #111; font-family: 'Courier New', monospace; font-size: 16px; }
+    button.alt { background: #fff; color: #111; }
+    input[type=email], input[type=password], input[type=text] { width: 100%; padding: 10px; border: 2px solid #111; font-family: 'Courier New', monospace; font-size: 16px; }
     button { margin-top: 16px; width: 100%; padding: 12px; background: #111; color: #fff; border: 2px solid #111; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
     .meta { margin-top: 16px; font-size: 10px; color: #666; }
     .pill { display: inline-block; padding: 2px 6px; border: 1px solid #ccc; font-size: 10px; font-family: 'Courier New', monospace; margin-right: 4px; }
@@ -324,14 +345,43 @@ async function handleAuthorize(req: Request): Promise<Response> {
     <div class="meta scopes">
       <span class="pill">scope</span> ${scope.split(" ").filter(Boolean).map((s) => `<code>${s.replace(/[<>&"']/g, "")}</code>`).join(" ")}
     </div>
-    <form method="post" action="${LOGIN_ENDPOINT}">
-      <label for="email">Your NUKE email</label>
-      <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@example.com" />
+    <form id="resume" method="post" action="${LOGIN_ENDPOINT}" hidden>
       <input type="hidden" name="oauth_params" value="${params2}" />
-      <button type="submit">Send magic link</button>
+      <input type="hidden" name="method" value="session" />
+      <input type="hidden" name="access_token" id="resume-token" />
+      <button type="submit">Continue as <span id="resume-who"></span></button>
+      <p class="meta">You are signed in to NUKE in this browser.</p>
     </form>
-    <p class="meta">We'll send a one-time login link. Click it to complete the connection.</p>
+    <form method="post" action="${LOGIN_ENDPOINT}">
+      <input type="hidden" name="oauth_params" value="${params2}" />
+      <button type="submit" name="method" value="google" class="alt">Continue with Google</button>
+      <button type="submit" name="method" value="apple" class="alt">Continue with Apple</button>
+      <button type="submit" name="method" value="github" class="alt">Continue with GitHub</button>
+    </form>
+    <form method="post" action="${LOGIN_ENDPOINT}">
+      <label for="email">Or your NUKE email</label>
+      <input id="email" name="email" type="email" required autocomplete="username" placeholder="you@example.com" />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" />
+      <label for="totp">Authenticator code (only if your account uses one)</label>
+      <input id="totp" name="totp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
+      <input type="hidden" name="oauth_params" value="${params2}" />
+      <button type="submit" name="method" value="password">Sign in</button>
+      <button type="submit" name="method" value="link" class="alt" formnovalidate>Email me a sign-in link instead</button>
+    </form>
+    <p class="meta">Use the sign-in you use on nuke.ag. An emailed link only works when it opens in this same browser; from a mail app on a phone it usually does not.</p>
   </div>
+  <script>
+  (() => { try {
+    const raw = localStorage.getItem(${JSON.stringify(SITE_SESSION_KEY)});
+    const s = raw && JSON.parse(raw);
+    if (s && s.access_token && s.user && s.user.email && s.expires_at * 1000 > Date.now() + 30000) {
+      document.getElementById('resume-token').value = s.access_token;
+      document.getElementById('resume-who').textContent = s.user.email;
+      document.getElementById('resume').hidden = false;
+    }
+  } catch { /* no stored session: the other sign-ins remain */ } })();
+  </script>
 </body>
 </html>`;
   return htmlResp(html);
@@ -364,19 +414,32 @@ async function handleLogin(req: Request): Promise<Response> {
   const ct = req.headers.get("content-type") ?? "";
   let email = "";
   let oauthParamsStr = "";
+  let password = "";
+  let totp = "";
+  let method = "";
+  let siteToken = "";
   if (ct.includes("application/x-www-form-urlencoded")) {
     const form = await req.formData();
     email = String(form.get("email") ?? "").trim().toLowerCase();
     oauthParamsStr = String(form.get("oauth_params") ?? "");
+    password = String(form.get("password") ?? "");
+    totp = String(form.get("totp") ?? "").replace(/\s+/g, "");
+    method = String(form.get("method") ?? "");
+    siteToken = String(form.get("access_token") ?? "");
   } else if (ct.includes("application/json")) {
     const body = await req.json();
     email = String(body?.email ?? "").trim().toLowerCase();
     oauthParamsStr = String(body?.oauth_params ?? "");
+    password = String(body?.password ?? "");
+    totp = String(body?.totp ?? "").replace(/\s+/g, "");
+    method = String(body?.method ?? "");
   } else {
     return errorPage("Unsupported Content-Type for login");
   }
 
-  if (!email || !email.includes("@")) return errorPage("Valid email required");
+  const viaProvider = SIGN_IN_PROVIDERS.includes(method);
+  const viaSite = method === "session";
+  if (!viaProvider && !viaSite && (!email || !email.includes("@"))) return errorPage("Valid email required");
   let oauthParams: Record<string, string>;
   try {
     oauthParams = JSON.parse(decodeURIComponent(oauthParamsStr));
@@ -387,10 +450,30 @@ async function handleLogin(req: Request): Promise<Response> {
   const oauthClient = await makeServiceClient().from("oauth_clients").select("redirect_uris,token_endpoint_auth_method").eq("client_id", oauthParams.client_id).maybeSingle();
   oauthParams.scope ??= DEFAULT_OAUTH_SCOPE;
   if (!validOAuthLogin(oauthParams, oauthClient.data)) return errorPage("Invalid OAuth client, redirect, scope, or PKCE challenge");
+  if (viaSite) {
+    // The account already signed in to nuke.ag in this browser. Its token is checked with the auth server.
+    const { data: u } = await makeServiceClient().auth.getUser(siteToken);
+    email = String(u?.user?.email ?? "").toLowerCase();
+    if (!u?.user?.id || !email) return errorPage("That NUKE sign-in has expired. Go back and choose another way to sign in.");
+  }
+  if (viaProvider) email = `provider:${method}`; // bound to the account's email when it approves
+  const usePassword = !viaProvider && !viaSite && method !== "link" && password.length > 0;
+  if (method === "password" && !password) return errorPage("Enter your password, or go back and choose the emailed link.");
+  // Same-browser sign-in. Nothing is stored unless the account's own credentials are accepted.
+  let passwordAccessToken = "";
+  if (usePassword) {
+    const signedIn = await passwordSignIn(email, password, totp);
+    if (!signedIn.accessToken) {
+      logEvent("oauth_login_password_refused", { email_domain: email.split("@")[1] ?? null, reason: signedIn.reason });
+      return errorPage(signedIn.message);
+    }
+    passwordAccessToken = signedIn.accessToken;
+  }
   const sessionId = randomToken(24);
   logEvent("oauth_login_session_created", {
     session_id: sessionId,
     email_domain: email.split("@")[1] ?? null,
+    method: method || "link",
     client_id: oauthParams.client_id ?? null,
     redirect_uri: oauthParams.redirect_uri ?? null,
     code_challenge_len: maskLen(oauthParams.code_challenge),
@@ -410,6 +493,24 @@ async function handleLogin(req: Request): Promise<Response> {
   if (insErr) {
     console.error("[oauth-server] login_sessions insert:", insErr.message);
     return errorPage("Could not start login session");
+  }
+
+  if (viaProvider) {
+    logEvent("oauth_login_provider_redirect", { session_id: sessionId, provider: method });
+    const u = new URL(`${getEnv("SUPABASE_URL")}/auth/v1/authorize`);
+    u.searchParams.set("provider", method);
+    u.searchParams.set("redirect_to", `${CALLBACK_ENDPOINT}?session=${sessionId}`);
+    return redirectResp(u.toString());
+  }
+  if (viaSite) {
+    logEvent("oauth_login_site_session_accepted", { session_id: sessionId });
+    const { data: named } = await supabase.from("oauth_clients").select("client_name").eq("client_id", oauthParams.client_id).maybeSingle();
+    return consentPage({ client_id: oauthParams.client_id, redirect_uri: oauthParams.redirect_uri, scope: oauthParams.scope }, sessionId, siteToken, named?.client_name);
+  }
+  if (usePassword) {
+    logEvent("oauth_login_password_accepted", { session_id: sessionId });
+    const { data: named } = await supabase.from("oauth_clients").select("client_name").eq("client_id", oauthParams.client_id).maybeSingle();
+    return consentPage({ client_id: oauthParams.client_id, redirect_uri: oauthParams.redirect_uri, scope: oauthParams.scope }, sessionId, passwordAccessToken, named?.client_name);
   }
 
   // Send the magic link. signInWithOtp is the call that emails it; redirectTo points to /oauth/callback.
@@ -436,8 +537,9 @@ async function handleLogin(req: Request): Promise<Response> {
   return htmlResp(`<!doctype html><meta charset="utf-8"><title>Check your email</title>
     <body style="font-family: Arial, sans-serif; max-width: 420px; margin: 80px auto; padding: 24px; border: 2px solid #111;">
     <h1 style="font-size: 14px; letter-spacing: 2px; text-transform: uppercase;">Check your email</h1>
-    <p style="font-size: 13px;">We sent a magic link to <strong>${email.replace(/[<>&]/g, "")}</strong>. Click it to finish connecting.</p>
-    <p style="font-size: 11px; color: #666;">The link is good for 15 minutes. You can close this window once you've clicked through.</p>
+    <p style="font-size: 13px;">We sent a sign-in link to <strong>${email.replace(/[<>&]/g, "")}</strong>.</p>
+    <p style="font-size: 13px;"><strong>Open it in this same browser.</strong> If your mail app opens links somewhere else, press and hold the link, copy it, and paste it into this browser's address bar. Otherwise the app you are connecting will refuse the connection.</p>
+    <p style="font-size: 11px; color: #666;">The link is good for 15 minutes.</p>
     </body>`);
 }
 
@@ -488,24 +590,49 @@ async function handleCallback(req: Request): Promise<Response> {
   }
 
   const { data: client } = await supabase.from('oauth_clients').select('client_name').eq('client_id',sess.client_id).maybeSingle();
+  return consentPage(sess, sessionId, accessToken, client?.client_name);
+}
+
+// Password sign-in against the account's own credentials. An account with a verified authenticator
+// factor must also present its current code; the password alone is refused for it.
+async function passwordSignIn(email: string, password: string, totp: string): Promise<{ accessToken?: string; reason?: string; message: string }> {
+  const auth = makeServiceClient().auth; // its own client: the signed-in session stays off the service client
+  const { data, error } = await auth.signInWithPassword({ email, password });
+  if (error || !data?.session?.access_token) {
+    return { reason: "credentials", message: "That email and password were not accepted. Go back and try again, or choose the emailed link." };
+  }
+  let accessToken = data.session.access_token as string;
+  const { data: factors, error: factorErr } = await auth.mfa.listFactors();
+  if (factorErr) return { reason: "factor_lookup", message: "Sign-in could not be completed. Go back and try again." };
+  const factor = (factors?.totp ?? []).find((f: { status?: string }) => f.status === "verified");
+  if (factor) {
+    if (!/^[0-9]{6}$/.test(totp)) return { reason: "totp_required", message: "This account uses an authenticator app. Go back and enter the 6-digit code with your password." };
+    const { data: verified, error: verifyErr } = await auth.mfa.challengeAndVerify({ factorId: factor.id, code: totp });
+    if (verifyErr || !verified?.access_token) return { reason: "totp_refused", message: "That authenticator code was not accepted. Go back and enter the current code." };
+    accessToken = verified.access_token;
+  }
+  return { accessToken, message: "" };
+}
+
+function consentPage(sess: { client_id: string; redirect_uri: string; scope?: string | null }, sessionId: string, accessToken: string | null, clientName?: string | null): Response {
   const escape = (value: unknown) => String(value ?? '').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]!));
   // Authentication never constitutes client consent. Even an unsolicited magic link
   // stops here and shows the stored client, redirect destination and exact permissions.
-  return htmlResp(`<!doctype html><meta charset="utf-8"><title>Approve connection</title>
-<body style="font-family:Arial;max-width:520px;margin:48px auto;padding:24px;border:2px solid #111">
-<h1>Approve this connection</h1><p><strong>${escape(client?.client_name || 'Registered client')}</strong> requests access as your account.</p>
+  return htmlResp(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Approve connection</title>
+<body style="font-family:Arial;max-width:520px;margin:24px auto;padding:20px;border:2px solid #111;overflow-wrap:anywhere">
+<h1>Approve this connection</h1><p><strong>${escape(clientName || 'Registered client')}</strong> requests access as your account.</p>
 <p>Client: ${escape(sess.client_id)}<br>Returns to: ${escape(sess.redirect_uri)}</p>
 <p>Requested permissions: <strong>${escape(sess.scope)}</strong></p>
 <p>Accounting read includes private books and original evidence. Accounting correct permits attributed corrections, preserving originals and prior interpretations. Shared books require the owner's explicit application grant. No filing, payment or SQL permission is granted.</p>
-<button id="approve" type="button">Approve these permissions</button><p id="status" role="status"></p>
+<button id="approve" type="button" style="width:100%;padding:14px;background:#111;color:#fff;border:2px solid #111;font-size:16px;cursor:pointer">Approve these permissions</button><p id="status" role="status"></p>
 <script>
 (() => {
  const frag = new URLSearchParams(location.hash.replace(/^#/,''));
  const access_token = ${JSON.stringify(accessToken).replace(/</g,'\\u003c')} || frag.get('access_token');
- history.replaceState(null,'',location.pathname + '?session=' + encodeURIComponent(${JSON.stringify(sessionId).replace(/</g,'\\u003c')}));
+ if(location.pathname.endsWith('/oauth/callback')) history.replaceState(null,'',location.pathname + '?session=' + encodeURIComponent(${JSON.stringify(sessionId).replace(/</g,'\\u003c')}));
  const button=document.getElementById('approve'), status=document.getElementById('status');
  button.addEventListener('click', async () => {
-  button.disabled=true;
+  button.disabled=true;button.style.opacity='0.5';status.textContent='Finishing…';
   if(!access_token){status.textContent='Sign-in could not be verified. Request a new connection.';return;}
   const params = new URLSearchParams({ session: ${JSON.stringify(sessionId).replace(/</g,'\\u003c')}, access_token, consent: 'approve' });
   try {
@@ -513,11 +640,10 @@ async function handleCallback(req: Request): Promise<Response> {
    const result=await res.json();
    if(res.ok && result.redirect){location.href=result.redirect;return;}
    status.textContent='Connection refused or expired. Request a new connection.';
-  } catch {status.textContent='Connection could not finish. Try again.';button.disabled=false;}
+  } catch {status.textContent='Connection could not finish. Try again.';button.disabled=false;button.style.opacity='1';}
  });
 })();
 </script></body>`);
-
 }
 
 async function handleCallbackFinish(req: Request): Promise<Response> {
@@ -535,6 +661,13 @@ async function handleCallbackFinish(req: Request): Promise<Response> {
   const { data: u } = await supabase.auth.getUser(accessToken);
   const userId = u?.user?.id;
   if (!userId) return jsonResp({ error: "could not resolve user from access_token" }, 400);
+  // A provider sign-in started without an email. Bind the session to the account that signed in and is
+  // approving; a session started with an email (link, password, site session) is never rebound.
+  const signedInEmail = String(u?.user?.email ?? "").toLowerCase();
+  if (signedInEmail) {
+    await supabase.from("oauth_login_sessions").update({ email: signedInEmail })
+      .eq("session_id", sessionId).like("email", "provider:%").is("completed_at", null);
+  }
   return finishCallback(sessionId, userId, true);
 }
 
@@ -588,8 +721,12 @@ async function exchangeCredential(body: Record<string,string>): Promise<Response
   if (!body.client_id || (refresh ? !/^nuke_refresh_[a-f0-9]{64}$/.test(body.refresh_token ?? "") : !body.code || !body.redirect_uri || !validCodeVerifier(body.code_verifier))) {
     return jsonResp({error:"invalid_grant"},400);
   }
-  const accessToken = "nuke_oauth_" + randomToken(32);
-  const refreshToken = ["nuke_refresh_", randomToken(32)].join("");
+  // A refresh derives its successor pair from the presented token with a server-held key, so two calls
+  // racing on the same token receive the same pair and the second is not turned away (the database
+  // answers a replay of the token just rotated for two minutes). The key never leaves the server, so
+  // holding an old token does not reveal the current one.
+  const accessToken = "nuke_oauth_" + (refresh ? await rotationHex("access", body.refresh_token) : randomToken(32));
+  const refreshToken = ["nuke_refresh_", refresh ? await rotationHex("refresh", body.refresh_token) : randomToken(32)].join("");
   const {data,error} = await makeServiceClient().rpc("exchange_mcp_oauth_credential", {
     p_grant_type: body.grant_type,
     p_credential: refresh ? "sha256_" + await sha256Hex(body.refresh_token) : body.code,
@@ -598,6 +735,7 @@ async function exchangeCredential(body: Record<string,string>): Promise<Response
     p_access_hash: "sha256_" + await sha256Hex(accessToken),
     p_refresh_hash: "sha256_" + await sha256Hex(refreshToken),
   });
+  logEvent("oauth_token_result", { grant_type: body.grant_type, client_id: body.client_id, ok: !error && !!data, replayed: !!data?.replayed, refused: error?.message ?? null });
   if(error || !data) return jsonResp({error:"invalid_grant"},400);
   return jsonResp({access_token:accessToken,token_type:"Bearer",expires_in:ACCESS_TOKEN_TTL_SECONDS,refresh_token:refreshToken,scope:data.scopes.join(" ")});
 }

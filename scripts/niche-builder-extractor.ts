@@ -171,12 +171,13 @@ ${markdown.slice(0, 15000)}`;
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       max_tokens: 4000,
+      output_config: { effort: "low" },
       messages: [{ role: "user", content: prompt }],
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "";
+    const text = response.content.find((b) => b.type === "text")?.text || "";
 
     // Extract JSON from response
     const jsonMatch = text.match(/\[[\s\S]*\]/);

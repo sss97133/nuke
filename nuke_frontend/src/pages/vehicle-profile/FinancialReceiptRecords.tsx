@@ -12,6 +12,8 @@ import type { DayDocument } from './VehicleDayDrawer';
 import { useVehicleWorkOrderFinancials, useVehicleReceiptRecords, type VehicleReceiptRecord } from './hooks/useBuildLedger';
 import { useVisualWork } from './hooks/useVisualWork';
 import { VisualWorkCards } from './VisualWorkCards';
+import { useBuildReconstruction, usePartEvidence } from './hooks/useBuildReconstruction';
+import { BuildRecord, SeenContext } from './BuildRecord';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
 const OriginalDocumentPreview = React.lazy(() => import('../../components/finance/SharedAccountingOriginal').then(module => ({ default: module.OriginalDocumentPreview })));
 
@@ -215,6 +217,9 @@ function ReceiptReplica({ vehicleId, receipt }: { vehicleId: string; receipt: Ve
 
 function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read: ReturnType<typeof useVehicleReceiptRecords>; work?: ReturnType<typeof useVisualWork> }) {
   const { user, loading } = useAuthContext();
+  const build = useBuildReconstruction(vehicleId);
+  const partEvidence = usePartEvidence(vehicleId, !!build.data);
+  const seenParts = React.useMemo(() => partEvidence.data ? new Map(partEvidence.data.lines.map(line => [line.item_id, line])) : null, [partEvidence.data]);
   const [vendor, setVendor] = useState('');
   const [showAll, setShowAll] = useState(false);
   const rows = (loading || read.isError ? [] : read.rows)
@@ -227,17 +232,24 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   return <section id="build-receipts" aria-label="Work and parts receipts" className="vp-receipt-section">
     <div className="vp-receipt-heading"><h3>Work & parts</h3><span>Receipt collection</span></div>
     <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
-    {work && <VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger}
+    {(rows.length > 0 || !!work?.ledger?.scenarios.length) && <nav className="vp-receipt-jump" aria-label="Work and parts sections">
+      {!!build.data?.totals.lines && <a href="#build-record">Build record</a>}
+      {!!work?.ledger?.scenarios.length && <a href="#build-estimates">Cost scenario</a>}
+      {rows.length > 0 && <a href="#build-receipt-pages">Receipts ({rows.length}{read.hasNextPage ? '+' : ''})</a>}
+      {!!work?.rows.length && <a href="#build-work-photos">Work photos</a>}
+    </nav>}
+    {build.data && <BuildRecord record={build.data} evidence={partEvidence.data} />}
+    {work && <SeenContext.Provider value={seenParts}><VisualWorkCards rows={loading ? [] : work.rows} ledger={loading ? null : work.ledger}
       components={loading ? null : work.components} renderSource={line => line.source_url_sha256 ? <ReceiptSource
       key={`${user?.id ?? 'anonymous'}:${line.source_table}:${line.source_id}:${line.source_url_sha256}`} vehicleId={vehicleId}
       expectedSourceHash={line.source_url_sha256} receipt={{ sourceTable: line.source_table, sourceId: line.source_id }} />
-      : <p>Original source unavailable in this read.</p>} />}
+      : <p>Original source unavailable in this read.</p>} /></SeenContext.Provider>}
     {work?.isError && <p role="status">Photographed work could not load. <button type="button" onClick={() => void work.refetch()}>Retry work</button></p>}
     {work?.limited && <p role="status">This view reached its work-record limit; it is not the complete work history.</p>}
     {vendors.length > 1 && <label className="vp-receipt-filter">Supplier <select value={selectedVendor} onChange={event => setVendor(event.target.value)}><option value="">All suppliers</option>{vendors.map(name => <option key={name} value={name}>{name}</option>)}</select></label>}
     {read.isLoading && <p role="status">Reading linked receipts…</p>}
     {read.isError && <p role="status">Receipt summaries could not load. <button type="button" onClick={() => void read.refetch()}>Retry receipts</button></p>}
-    {!loading && <div key={`${vehicleId}:${user?.id ?? 'anon'}`} className="vp-receipt-grid">{visible.map(receipt => <ReceiptReplica key={receipt.id} vehicleId={vehicleId} receipt={receipt} />)}</div>}
+    {!loading && <div key={`${vehicleId}:${user?.id ?? 'anon'}`} id="build-receipt-pages" className="vp-receipt-grid">{visible.map(receipt => <ReceiptReplica key={receipt.id} vehicleId={vehicleId} receipt={receipt} />)}</div>}
     {!selectedVendor && matching.length > 6 && <button type="button" className="vp-receipt-browse" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? 'Show recent receipts' : 'Browse the receipt collection'}</button>}
     {read.hasNextPage && <button type="button" className="vp-financial-action" disabled={read.isFetchingNextPage} onClick={() => void read.fetchNextPage()}>{read.isFetchingNextPage ? 'Reading more receipts…' : 'Load more receipts'}</button>}
   </section>;

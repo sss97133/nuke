@@ -278,13 +278,14 @@ Return ONLY valid JSON, no explanation.`;
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      model: 'claude-sonnet-5-5',
+      max_tokens: 4000,
+      output_config: { effort: 'low' },
       messages: [{ role: 'user', content: prompt }]
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') return null;
+    const content = response.content.find((b) => b.type === 'text');
+    if (!content) return null;
 
     // Extract JSON from response
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);

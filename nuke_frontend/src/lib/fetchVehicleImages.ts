@@ -31,6 +31,14 @@ interface FetchVehicleImagesOptions {
    * in-flight dedupe key; every coalesced caller receives the same coverage.
    */
   onLoadCoverage?: (coverage: { loaded: number; total: number }) => void;
+  /** 'newest': taken_at newest first (undated after), then created_at newest first. Default: primary, position, created. */
+  order?: 'gallery' | 'newest';
+  /** Skip this many rows of the ordered set, so a caller can read one page at a time (the garage card reel). */
+  offset?: number;
+  /** Only rows the photo reading placed at this view (ai_detected_angle), e.g. 'exterior_side'. */
+  angle?: string;
+  /** false skips the exact count when the caller needs none (a one-row lookup). Coverage then reports what loaded. */
+  count?: boolean;
 }
 
 // In-flight dedupe keyed on query shape. The identical full-set vehicle_images
@@ -58,7 +66,8 @@ export async function fetchVehicleImages<T = any>(
 ): Promise<T[]> {
   if (!vehicleId) return [];
 
-  const key = `${vehicleId}|${selectClause}|${options.includeMismatchFilter ? 1 : 0}|${options.maxRows ?? 0}|${options.timeoutMs ?? 0}`;
+  const key = `${vehicleId}|${selectClause}|${options.includeMismatchFilter ? 1 : 0}|${options.maxRows ?? 0}|${options.timeoutMs ?? 0}`
+    + `|${options.order ?? 'gallery'}|${options.offset ?? 0}|${options.angle ?? ''}|${options.count === false ? 0 : 1}`;
   const result = await coalesceImages(supabase, key, assertCurrent =>
     fetchVehicleImagesUncached<T>(vehicleId, selectClause, options, assertCurrent));
   options.onLoadCoverage?.(result.coverage);
@@ -72,6 +81,7 @@ async function fetchVehicleImagesUncached<T = any>(
   assertCurrent: () => void = () => {},
 ): Promise<ImageRead<T>> {
   const { maxRows, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  const base = Math.max(0, Math.floor(options.offset ?? 0));
   const deadline = Date.now() + Math.max(1000, timeoutMs);
   // A caller that wants only the first N rows (the hero resolver) asks for no more than that.
   let pageSize = maxRows ? Math.min(PAGE_SIZE, maxRows) : PAGE_SIZE;
@@ -84,20 +94,21 @@ async function fetchVehicleImagesUncached<T = any>(
   const columns = await vehicleImageColumnsForViewer(selectClause);
   const fetchPage = (from: number, withCount: boolean) => {
     assertCurrent();
-    const query = supabase
+    let query = supabase
       .from(source)
-      .select(columns, withCount ? { count: 'exact' } : undefined)
+      .select(columns, withCount && options.count !== false ? { count: 'exact' } : undefined)
       .eq('vehicle_id', vehicleId)
       .eq('vehicle_image_gallery_eligible', true)
       .not('is_document', 'is', true)
       .not('is_duplicate', 'is', true)
       // Superseded rows are prior versions of reattributed images — never display them.
       .not('is_superseded', 'is', true)
-      .not('image_url', 'is', null)
-      .order('is_primary', { ascending: false })
-      .order('position', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: true })
-      .range(from, from + pageSize - 1);
+      .not('image_url', 'is', null);
+    if (options.angle) query = query.eq('ai_detected_angle', options.angle);
+    query = options.order === 'newest'
+      ? query.order('taken_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).order('id', { ascending: true })
+      : query.order('is_primary', { ascending: false }).order('position', { ascending: true, nullsFirst: false }).order('created_at', { ascending: true });
+    query = query.range(base + from, base + from + pageSize - 1);
     return options.includeMismatchFilter
       ? query.or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
       : query;
@@ -125,7 +136,8 @@ async function fetchVehicleImagesUncached<T = any>(
   const first = await fetchPageBounded(0, true);
   if (first.timedOut) throw new Error('The image read timed out before its first page.');
   const rows: T[] = [...(first.data || [])];
-  const total = typeof first.count === 'number' ? first.count : rows.length;
+  // The exact count is of the whole ordered set; what is left from the offset is what this read can still collect.
+  const total = typeof first.count === 'number' ? Math.max(0, first.count - base) : rows.length;
   // The row cap is server configuration. If it gave fewer rows than asked while more exist, page by what it gives
   // instead of mistaking the short page for the last one.
   if (rows.length > 0 && rows.length < pageSize && total > rows.length) pageSize = rows.length;

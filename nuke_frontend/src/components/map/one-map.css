@@ -52,3 +52,4 @@
 .om-records { padding: 4px 0 10px 66px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
 .om-record { display: flex; justify-content: space-between; gap: 8px; color: var(--om-muted); }
 .om--focus { height: 240px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.om-focus-error { position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 9px 12px; border-radius: 8px; background: rgba(255,255,255,.94); color: #813326; font-size: 12px; }

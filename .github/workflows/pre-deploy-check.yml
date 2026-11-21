@@ -62,6 +62,11 @@ jobs:
       - name: Raw-fetch guard regression tests
         run: node --test scripts/guardrails/no-raw-fetch.test.mjs
 
+      - name: Reviewed photo intake replay and source custody
+        run: |
+          node --test scripts/lib/ingest-image-identity-payload.test.mjs
+          python3 -m unittest discover -s scripts/assays -p 'test_iphoto_census.py'
+
       - name: Edge deploy list includes importers of changed shared files
         run: node --test scripts/ci/functions-to-deploy.test.mjs
 
@@ -74,6 +79,8 @@ jobs:
           node --test scripts/guardrails/owner-voice-other-model.test.mjs
           python3 scripts/photo-pipeline/keys-dry-run/test_check_units.py
           python3 scripts/photo-pipeline/test_keys_lane.py
+          python3 -m unittest discover -s scripts/photo-pipeline -p 'test_*disposition*.py'
+          python3 scripts/photo-pipeline/test_keys_resume.py
           node scripts/guardrails/no-new-photo-reader.mjs
 
       - name: Intake status reader contracts

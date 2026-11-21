@@ -28,7 +28,7 @@ private struct ProviderOption: Identifiable {
 }
 private let providerOptions: [ProviderOption] = [
     .init(key: "openai",    label: "OpenAI · ChatGPT",  defaultModel: "gpt-4o",            icon: "bubble.left.and.text.bubble.right"),
-    .init(key: "anthropic", label: "Anthropic · Claude", defaultModel: "claude-sonnet-4-6", icon: "sparkles"),
+    .init(key: "anthropic", label: "Anthropic · Claude", defaultModel: "claude-sonnet-5-5", icon: "sparkles"),
     .init(key: "xai",       label: "xAI · Grok",         defaultModel: "grok-2",            icon: "bolt"),
     .init(key: "google",    label: "Google · Gemini",    defaultModel: "gemini-1.5-pro",    icon: "diamond"),
 ]

@@ -975,8 +975,9 @@ async function analyzeWithClaude(base64Image: string, prompt: string): Promise<I
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-sonnet-5-5',
       max_tokens: 300,
+      thinking: { type: 'between_tools' },
       messages: [{
         role: 'user',
         content: [

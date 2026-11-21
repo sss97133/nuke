@@ -50,12 +50,12 @@ const anthropic = new Anthropic({ apiKey });
 // Cost tracking
 // ---------------------------------------------------------------------------
 const COST_PER_MTOK = {
-  'claude-haiku-4-5-20251001':  { input: 0.80, output: 4.00 },
-  'claude-sonnet-4-6':          { input: 3.00, output: 15.00 },
+  'claude-sonnet-5-5':          { input: 2.00, output: 10.00 },
+  'claude-opus-5-5':            { input: 4.00, output: 20.00 },
 };
 
 function calculateCost(model, inputTokens, outputTokens) {
-  const rates = COST_PER_MTOK[model] || COST_PER_MTOK['claude-haiku-4-5-20251001'];
+  const rates = COST_PER_MTOK[model] || COST_PER_MTOK['claude-sonnet-5-5'];
   return (inputTokens / 1_000_000) * rates.input + (outputTokens / 1_000_000) * rates.output;
 }
 
@@ -131,11 +131,12 @@ async function analyzePage(page) {
     // 2. Build prompts
     const userPrompt = buildUserPrompt(page_number, page_count, pub_title, publisher_slug);
 
-    // 3. Call Haiku first
-    let model = 'claude-haiku-4-5-20251001';
+    // 3. Call Sonnet 5.5 (the floor) first
+    let model = 'claude-sonnet-5-5';
     let response = await anthropic.messages.create({
       model,
       max_tokens: 4096,
+      thinking: { type: 'between_tools' },
       messages: [{
         role: 'user',
         content: [
@@ -158,12 +159,12 @@ async function analyzePage(page) {
 
     let parsedJson = parseJsonResponse(responseText);
 
-    // 5. Escalate to Sonnet if low confidence
+    // 5. Escalate to Opus 5.5 if low confidence
     if (parsedJson.confidence != null && parsedJson.confidence < 0.6) {
-      console.log(`  [ESCALATE] Page ${page_number}: confidence ${parsedJson.confidence} < 0.6, re-analyzing with Sonnet`);
+      console.log(`  [ESCALATE] Page ${page_number}: confidence ${parsedJson.confidence} < 0.6, re-analyzing with Opus`);
       totalEscalated++;
 
-      const sonnetModel = 'claude-sonnet-4-6';
+      const sonnetModel = 'claude-opus-5-5';
       const sonnetResponse = await anthropic.messages.create({
         model: sonnetModel,
         max_tokens: 4096,

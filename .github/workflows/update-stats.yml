@@ -34,9 +34,19 @@ jobs:
         with:
           node-version: '20'
 
+      # pg is a declared dependency, but the root install pulls heavy native deps (canvas, better-sqlite3);
+      # install just the Postgres client into an isolated prefix and point the script at it with PG_MODULE.
+      - name: Install the Postgres client
+        run: npm install --no-fund --no-audit --prefix "$RUNNER_TEMP/pgdeps" pg@8.18.0
+
       - name: Measure the live database and rewrite the README block
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Read the database directly, the way supabase-deploy.yml connects. The Actions token
+          # SUPABASE_ACCESS_TOKEN lacks the database_read management scope, so it is not used here.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PG_MODULE: ${{ runner.temp }}/pgdeps/node_modules/pg/lib/index.js
         run: node scripts/data/readme-stats.mjs
 
       - name: Commit if the block changed, rebase onto a moving main, push

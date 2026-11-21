@@ -35,6 +35,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, appendFile
 import { join, extname } from 'path';
 import { homedir, tmpdir } from 'os';
 import dns from 'dns';
+import { ingestReviewedRenditions, reconcileReviewedRenditions } from './lib/ingest-image-identity-payload.mjs';
 
 // ─── DNS fix (same as iphoto-intake/hd-intake — some networks break supabase DNS) ─
 const resolver = new dns.Resolver();
@@ -52,7 +53,10 @@ dns.lookup = function (hostname, options, callback) {
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SERVICE_KEY) { console.error('Missing SUPABASE_URL / SERVICE_ROLE_KEY env'); process.exit(1); }
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+const reviewedIntake = process.argv.some(arg => arg.startsWith('--reviewed-rendition-plan='));
+const supabase = createClient(SUPABASE_URL, SERVICE_KEY, reviewedIntake ? {
+  global: { fetch: (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) }) },
+} : {});
 
 const BUCKET = 'vehicle-photos';                                  // same as iphoto-intake
 const USER_ID = process.env.NUKE_USER_ID || '0b9f107a-d124-49de-9ded-94698f63c1c4';
@@ -336,6 +340,28 @@ async function auditLabels(days) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
+  const reviewedPlan = argVal('--reviewed-rendition-plan');
+  const reconcileOutput = argVal('--reviewed-reconcile-output');
+  if (reconcileOutput && !reviewedPlan) throw new Error('--reviewed-reconcile-output requires --reviewed-rendition-plan');
+  if (reviewedPlan) {
+    if (reconcileOutput) {
+      const result = await reconcileReviewedRenditions(supabase, JSON.parse(readFileSync(reviewedPlan, 'utf8')), {
+        userId: USER_ID, readBytes: path => readFileSync(path),
+      });
+      writeFileSync(reconcileOutput, JSON.stringify(result, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+      log(JSON.stringify({ mode: 'read_only_reconciliation', sources: result.snapshot.declaredAssetCount,
+        source_scope: result.snapshot.sourceScope, uploaded: 0, admitted: 0, model_calls: 0 }));
+      return;
+    }
+    const receiptPath = argVal('--reviewed-receipt');
+    if (!DRY_RUN && !receiptPath) throw new Error('--reviewed-receipt is required for reviewed intake');
+    const result = await ingestReviewedRenditions(supabase, JSON.parse(readFileSync(reviewedPlan, 'utf8')), {
+      userId: USER_ID, readBytes: path => readFileSync(path), apply: !DRY_RUN,
+      record: async entry => appendFileSync(receiptPath, JSON.stringify({ at: new Date().toISOString(), ...entry }) + '\n', { mode: 0o600 }),
+    });
+    log(JSON.stringify(result));
+    return;
+  }
   const auditIdx = args.indexOf('--audit-labels');
   if (auditIdx >= 0) {
     await auditLabels(parseInt(args[auditIdx + 1] || '30', 10));

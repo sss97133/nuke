@@ -1,7 +1,7 @@
 // The AI policy of batch-extract-snapshots: when the model may be called, and what a row is called when it is not.
 //
 // The function parses a snapshot with a regex parser per platform. When that returns no field on content over 500
-// characters it falls back to claude-haiku (parseWithAI), and for a platform with no regex parser, or mode "ai", the
+// characters it falls back to claude-sonnet-5-5 (parseWithAI), and for a platform with no regex parser, or mode "ai", the
 // model is the parser. That spend is what kept the Barrett-Jackson and Bonhams jobs paused.
 //
 // `no_ai: true` in the request body closes every one of those doors. The model is never called, a row the regex could not

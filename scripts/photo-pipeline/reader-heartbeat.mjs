@@ -38,7 +38,13 @@ export function readingFromSummary(summaryText) {
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
   const bytes = Buffer.byteLength(JSON.stringify(parsed));
   if (bytes <= MAX_READING_BYTES) return parsed;
-  // too large to store whole: keep the counts, say what was dropped
+  // too large to store whole: the per-stage summaries go first (the top-level fields are what the flow watch reads)
+  if (parsed.stages !== undefined) {
+    const { stages: _stages, ...rest } = parsed;
+    const slim = { ...rest, stages_dropped: true };
+    if (Buffer.byteLength(JSON.stringify(slim)) <= MAX_READING_BYTES) return slim;
+  }
+  // still too large: keep the counts, say what was dropped
   const counts = Object.fromEntries(Object.entries(parsed).filter(([, v]) => typeof v === 'number' && Number.isFinite(v)));
   return { ...counts, summary_reduced: true, summary_bytes: bytes };
 }

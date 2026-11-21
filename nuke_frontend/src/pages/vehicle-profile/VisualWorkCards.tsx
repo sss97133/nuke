@@ -5,6 +5,7 @@ import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import type { ComponentEvidence, ComponentReading, CostRange, CostTotals, ExpectedAssembly, MasterCostLedger, MasterCostLine, VisualWork } from './hooks/useVisualWork';
 import { supabase } from '../../lib/supabase';
 import { receiptSupplierLabel } from './receiptSupplierLabel';
+import { Seen, SeenContext } from './BuildRecord';
 import './visual-work.css';
 
 const date = (value: string) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -68,6 +69,11 @@ function moneyTotals(values: CostTotals['currencies'] | undefined) {
   return values?.length ? values.map(v => <CostValue key={v.currency} value={v.cost} currency={v.currency} />) : 'Unpriced';
 }
 
+/** Whole-car view keeps every line one click away under the per-system table; a system view shows its lines directly. */
+function ItemsFold({ folded, count, children }: { folded: boolean; count: number; children: React.ReactNode }) {
+  return folded ? <details className="vp-ledger-all"><summary>All {count} items, unsorted by system</summary>{children}</details> : <>{children}</>;
+}
+
 /** All arithmetic, overlap selection and source qualification belong to the existing SQL work reader. */
 function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedger; works: VisualWork[];
   renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode }) {
@@ -128,10 +134,11 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
         <CatalogProductReference product={line.product} />{renderSource(line)}
       </div>)}</div>}
     </div>;
-  return <section className="vp-master-ledger" aria-label="Master cost ledger">
+  return <section id="build-estimates" className="vp-master-ledger" aria-label="Replacement cost scenario">
+    <details className="vp-ledger-fold"><summary><strong>Replacement-cost scenario</strong><small>An estimate of what it would cost to redo this work today. Not what was paid, and not this car's recorded hours.</small></summary>
     <header><div><span>Itemized build costs</span><h4>Master ledger</h4></div>
       <time dateTime={ledger.as_of}>Calculated {date(ledger.as_of)}</time></header>
-    <p className="vp-ledger-intro">{scenario.scenario === 'finish_scenario' ? 'Possible finishing work, with optional work excluded until selected.' : 'The work and materials in the reconstruction scenario for this build.'} Open an item for its calculation and source photos.</p>
+    <p className="vp-ledger-intro">{scenario.scenario === 'finish_scenario' ? 'Possible finishing work, with optional work excluded until selected.' : 'The work and materials in the reconstruction scenario for this build.'} {!selectedSystem && scenario.systems.length > 1 ? 'Open a system for its jobs, parts, calculations and source photos.' : 'Open an item for its calculation and source photos.'}</p>
     <div className="vp-ledger-controls">
       {ledger.scenarios.length > 1 && <label>Cost question<select aria-label="Cost question" value={scenario.scenario} onChange={e => { setScenarioKey(e.target.value); setSystem(''); setInspected(null); }}>
         {ledger.scenarios.map(s => <option key={s.scenario} value={s.scenario}>{s.scenario === 'finish_scenario' ? 'Possible finishing work' : 'Reproduce the observed build'}</option>)}
@@ -152,7 +159,30 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
       {coverage.partial_lines > 0 ? `${coverage.partial_lines} calculations have incomplete ranges or inputs. ` : ''}
       {coverage.duplicate_claims_folded > 0 ? `${coverage.duplicate_claims_folded} repeated references counted once. ` : ''}
       Reference and analyst estimates remain separate from documented charges in the receipts below. Vehicle sale value and current component value are not calculated here.</p>
-    <div className="vp-ledger-table-wrap"><table className="vp-ledger-table">
+    {!selectedSystem && scenario.systems.length > 1 ? <div className="vp-ledger-table-wrap"><table className="vp-ledger-table vp-ledger-systems">
+      <thead><tr><th>System</th><th>Work</th><th>Parts</th><th>On paper</th><th>Photos</th><th>Hours</th><th>Estimate</th></tr></thead>
+      <tbody>{scenario.systems.map(s => {
+        // One row per system, counted from the reader's own lines; every sum stays the reader's.
+        const own = scenario.rows.filter(r => r.system_key === s.system_key && r.status !== 'excluded');
+        const labor = own.filter(r => r.kind === 'labor');
+        const cited = works.filter(w => own.some(r => r.work_observation_ids.includes(w.observation_id)));
+        const paper = cited.flatMap(w => w.receipts).filter((r, index, all) => all.findIndex(x => x.item_id === r.item_id) === index);
+        const operations = paper.filter(r => r.relation === 'documented_operation').length;
+        const pictures = new Set(own.flatMap(r => r.source_images.map(ref => typeof ref === 'string' ? ref : ref.image_id)));
+        return <tr key={s.system_key}>
+          <td><button type="button" onClick={() => { setSystem(s.system_key); setInspected(null); }} aria-label={`Open ${systemName(s.system_key)} work and parts`}>
+            <span><strong>{systemName(s.system_key)}</strong><small>{labor.slice(0, 2).map(r => r.label).join(' · ') || 'No labor line yet'}{labor.length > 2 ? ` · +${labor.length - 2}` : ''}</small></span></button></td>
+          <td>{labor.length ? `${labor.filter(r => r.hours).length} of ${labor.length} timed` : '—'}</td>
+          <td>{own.length - labor.length || '—'}</td>
+          <td>{paper.length ? `${paper.length} receipt ${paper.length === 1 ? 'line' : 'lines'}${operations ? ` · ${operations} recorded ${operations === 1 ? 'operation' : 'operations'}` : ''}` : 'None linked'}</td>
+          <td>{pictures.size || '—'}</td>
+          <td>{s.totals.hours ? <CostValue value={s.totals.hours} /> : 'Unestimated'}</td>
+          <td>{moneyTotals(s.totals.currencies)}</td>
+        </tr>;
+      })}</tbody></table></div>
+    : null}
+    {selectedSystem && <button type="button" className="vp-ledger-back" onClick={() => { setSystem(''); setInspected(null); }}>← All systems</button>}
+    <ItemsFold folded={!selectedSystem && scenario.systems.length > 1} count={lines.length}><div className="vp-ledger-table-wrap"><table className="vp-ledger-table">
       <thead><tr><th>Work or material</th><th>Quantity</th><th>Hours</th><th>Calculated cost</th></tr></thead>
       <tbody>{lines.map(line => {
         const own = sourcesFor(line); const photo = photoOf(line.source_images?.[0]);
@@ -174,16 +204,20 @@ function MasterLedger({ ledger, works, renderSource }: { ledger: MasterCostLedge
             aria-label={`See calculation: ${line.label}`} aria-expanded={inspected === key(line)} aria-controls="vp-ledger-evidence">
             {line.status === 'excluded' ? 'Excluded' : <CostValue value={line.cost} currency={line.currency} />}</button></td>
         </tr>{inspected === key(line) && <tr><td colSpan={4}>{detailPanel}</td></tr>}</React.Fragment>;
-      })}</tbody></table></div>
+      })}</tbody></table></div></ItemsFold>
 
     {(ledger.coverage.source_read_limited || ledger.coverage.cards_without_estimates > 0) && <p className="vp-ledger-qualification">The work record still has sources without cost lines; the subtotal is incomplete.</p>}
+    </details>
   </section>;
 }
 
 function ExpectedAssemblyReferences({ assemblies }: { assemblies?: ExpectedAssembly[] }) {
   if (!assemblies?.length) return null;
-  return <section className="vp-expected-assemblies" aria-label="Catalog references">
-    <header><h4>Catalog references</h4><p>Factory parts catalog positions for this configuration. These are catalog-specified parts, not necessarily as-built or installed.</p></header>
+  const pieces = assemblies.reduce((sum, assembly) => sum + (assembly.expected_piece_count ?? 0), 0);
+  // Reference material, closed by default: the build's own work, estimates and receipts lead the section.
+  return <details className="vp-expected-assemblies" aria-label="Catalog references">
+    <summary><h4>Catalog references</h4><span>{assemblies.length} {assemblies.length === 1 ? 'assembly' : 'assemblies'} · {pieces.toLocaleString('en-US')} referenced pieces</span></summary>
+    <header><p>Factory parts catalog positions for this configuration. These are catalog-specified parts, not necessarily as-built or installed.</p></header>
     {assemblies.map(assembly => {
       const file = supabase.storage.from('reference-docs').getPublicUrl(assembly.source.retained_file.slice('reference-docs/'.length)).data.publicUrl;
       return <article key={assembly.assembly_id} aria-label={assembly.assembly_name.replaceAll('_', ' ')}>
@@ -215,7 +249,7 @@ function ExpectedAssemblyReferences({ assemblies }: { assemblies?: ExpectedAssem
       </article>;
     })}
     <p className="vp-expected-coverage">Whole-car coverage remains unknown; these references cover the assemblies named above.</p>
-  </section>;
+  </details>;
 }
 
 function ComponentSources({ evidence, renderSource }: { evidence?: ComponentEvidence | null;
@@ -275,10 +309,19 @@ function WorkPhotos({ images }: { images: VisualWork['images'] }) {
   </button>)}</div>;
 }
 
+/** A bought part's standing: what the photograph readings say when they have arrived, the plain caveat when they have not. */
+function materialLabel(seen: React.ContextType<typeof SeenContext>, itemId: string): string {
+  if (!seen) return 'Candidate material · installation not established';
+  const status = seen.get(itemId)?.status;
+  return status === 'seen' ? 'Bought part · seen on the car' : status === 'seen_in_prints_only' ? 'Bought part · seen in prints of older photographs'
+    : 'Bought part · no photograph shows it yet';
+}
+
 export function VisualWorkCards({ rows, ledger, components, renderSource }: {
   rows: VisualWork[]; ledger?: MasterCostLedger | null; components?: ComponentEvidence | null;
   renderSource: (line: VisualWork['receipts'][number]) => React.ReactNode;
 }) {
+  const seen = React.useContext(SeenContext);
   if (ledger?.scenarios.length) {
     const cited = new Set(ledger.scenarios.flatMap(s => s.rows.flatMap(r => r.work_observation_ids)));
     const remaining = rows.filter(work => !cited.has(work.observation_id));
@@ -289,16 +332,17 @@ export function VisualWorkCards({ rows, ledger, components, renderSource }: {
       for (const image of work.images) if (!images.some(seen => seen.image_id === image.image_id)) images.push(image);
       if (images.length) photographed.set(work.title, images);
     }
-    return <><ComponentSources evidence={components} renderSource={renderSource} />
-      {photographed.size > 0 && <section aria-label="Work photos"><h4>Work photos</h4><div className="vp-visual-work">
+    // The estimate leads: hours, labor and materials first, then the photographs behind them.
+    return <><MasterLedger ledger={ledger} works={rows} renderSource={renderSource} />
+      {photographed.size > 0 && <section id="build-work-photos" aria-label="Work photos"><h4>Work photos</h4><div className="vp-visual-work">
         {[...photographed].map(([title, images]) => <article key={title} aria-label={`${title} photos`}>
           <header><h4>{title}</h4></header><WorkPhotos images={images} /></article>)}</div></section>}
-      <MasterLedger ledger={ledger} works={rows} renderSource={renderSource} />
       {remaining.length > 0 && <section aria-label="Other photographed work"><h4>Other photographed work</h4>
-        <VisualWorkCards rows={remaining} renderSource={renderSource} /></section>}</>;
+        <VisualWorkCards rows={remaining} renderSource={renderSource} /></section>}
+      <ComponentSources evidence={components} renderSource={renderSource} /></>;
   }
   if (!rows.length) return <ComponentSources evidence={components} renderSource={renderSource} />;
-  return <><ComponentSources evidence={components} renderSource={renderSource} /><div className="vp-visual-work">{rows.map(work => {
+  return <><div className="vp-visual-work">{rows.map(work => {
     const documentedHours = work.receipts.filter(line => line.relation === 'documented_operation' && line.hours != null);
     const hours = documentedHours.reduce((sum, line) => sum + line.hours!, 0);
     return <article key={work.observation_id} aria-label={work.title}>
@@ -312,7 +356,8 @@ export function VisualWorkCards({ rows, ledger, components, renderSource }: {
         <div><dt>Paid value</dt><dd>Paid labor {work.paid_labor?.status === 'unreconciled' ? 'not reconciled' : 'not established by these sources'}</dd><small>Receipt charges below remain document amounts.</small></div>
       </dl>
       {work.receipts.length > 0 && <div className="vp-work-materials">{work.receipts.map(line => <div key={line.item_id}>
-        <span>{line.relation === 'candidate_material' ? 'Candidate material · installation not established' : 'Work recorded on the document'}</span>
+        <span>{line.relation === 'candidate_material' ? materialLabel(seen, line.item_id) : 'Work recorded on the document'}</span>
+        {line.relation === 'candidate_material' && <Seen itemId={line.item_id} />}
         <strong>{line.description || line.part_number || 'Receipt line'}</strong>
         <small>{[receiptSupplierLabel(line.vendor), line.part_number, line.quantity != null ? `Qty ${line.quantity}` : null, line.page_date ? date(line.page_date) : null].filter(Boolean).join(' · ')}</small>
         {line.amounts_visible ? line.amount != null && <b>{amount(line.amount, line.currency)} · line charge</b> : <small>Amount visible to owner & contributors</small>}
@@ -322,5 +367,5 @@ export function VisualWorkCards({ rows, ledger, components, renderSource }: {
       {work.receipt_links_unavailable > 0 && <p className="vp-work-note">Some cited receipt lines are no longer available in this read.</p>}
       {work.gaps.length > 0 && <div className="vp-work-open"><strong>Still to reconcile</strong><ul>{work.gaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div>}
     </article>;
-  })}</div></>;
+  })}</div><ComponentSources evidence={components} renderSource={renderSource} /></>;
 }

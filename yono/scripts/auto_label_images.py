@@ -1,9 +1,9 @@
 #!/Users/skylar/nuke/yono/.venv/bin/python3
 """
-YONO Phase 1: Auto-label vehicle images using Claude Haiku vision.
+YONO Phase 1: Auto-label vehicle images using Claude Sonnet 5.5 vision.
 
 Samples 3000 images from .image_cache/ (stratified by file size to ensure quality),
-sends each to claude-haiku-4-5 vision API with structured prompt, writes labels to
+sends each to claude-sonnet-5-5 vision API with structured prompt, writes labels to
 yono/training_labels/labels.jsonl.
 
 Resumable: already-labeled image paths are skipped on restart.
@@ -175,7 +175,7 @@ def write_error(record: dict):
 
 def label_image(client, image_path: Path, api_key: str) -> dict | None:
     """
-    Send image to Claude Haiku for condition labeling.
+    Send image to Claude Sonnet 5.5 for condition labeling.
 
     Returns label dict or None on failure.
     """
@@ -197,8 +197,9 @@ def label_image(client, image_path: Path, api_key: str) -> dict | None:
     for attempt in range(3):
         try:
             message = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-5-5",
                 max_tokens=300,
+                extra_body={"thinking": {"type": "between_tools"}},
                 system=SYSTEM_PROMPT,
                 messages=[
                     {
@@ -281,7 +282,7 @@ def label_image(client, image_path: Path, api_key: str) -> dict | None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Auto-label vehicle images with Claude Haiku vision")
+    parser = argparse.ArgumentParser(description="Auto-label vehicle images with Claude Sonnet 5.5 vision")
     parser.add_argument("--sample", type=int, default=3000, help="Number of images to label (default: 3000)")
     parser.add_argument("--workers", type=int, default=3, help="Parallel API workers (default: 3)")
     parser.add_argument("--dry-run", action="store_true", help="Sample selection only, no API calls")
@@ -334,7 +335,7 @@ def main():
 
     # Run labeling with thread pool
     print(f"\nStarting labeling with {args.workers} workers...")
-    print(f"Estimated cost: ~${len(to_label) * 0.00012:.2f} (claude-haiku-4-5)")
+    print(f"Estimated cost: ~${len(to_label) * 0.00024:.2f} (claude-sonnet-5-5; 2x the earlier Haiku 4.5 per-image estimate, same tokens at $2/$10 vs $1/$5 per MTok)")
     print()
 
     success_count = 0

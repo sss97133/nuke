@@ -16,8 +16,235 @@ become the census taker).
 Run (dry run prints, --write records):
   cd ~/nuke && dotenvx run -- /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 \
       scripts/assays/iphoto-census.py --user-id <owner uuid> [--write]
+
+Local metadata-only mode (no remote census, import of osxphotos or write):
+  python3 scripts/assays/iphoto-census.py --metadata-database /private/Photos.sqlite \
+      --snapshot-output /private/new-snapshot.json \
+      --discovery-config /private/existing-native-input.json --discovery-output /private/new-native-input.json
+The optional discovery config supplies only targetVehicleId, timezone and explicit
+seedAssetIds. Its old assets are not reused. Feed the new native input through the
+existing compiled discover-library-candidates selector, then pass its exact input
+and output to native_disposition_adapter.py with --source-snapshot new-snapshot.json.
+Do not mistake this local database boundary for full iCloud or PhotoKit permission coverage.
 """
-import argparse, collections, datetime as dt, json, os, urllib.error, urllib.parse, urllib.request
+import argparse, collections, datetime as dt, hashlib, json, math, os, sqlite3, stat, time, urllib.error, urllib.parse, urllib.request
+from pathlib import Path
+from contextlib import closing, ExitStack
+
+
+def metadata_snapshot(database, max_assets=100000):
+    """Private local metadata only: no osxphotos, pixels, cloud request or capture matching.
+
+    The local database is a source boundary, not proof of iCloud completeness or
+    the native app's PhotoKit permission scope. Hidden/deleted IDs never leave it.
+    """
+    if type(max_assets) is not int or not 1 <= max_assets <= 250000:
+        raise ValueError('max_assets must be between 1 and 250000')
+    started = time.monotonic()
+    observed = dt.datetime.now(dt.timezone.utc).isoformat()
+    db = sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True, timeout=5)
+    db.execute('PRAGMA query_only=ON')
+    db.set_progress_handler(lambda: int(time.monotonic() - started > 30), 10000)
+    def clock(value):
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            return None
+        try:
+            return (dt.datetime(2001, 1, 1, tzinfo=dt.timezone.utc) + dt.timedelta(seconds=value)).isoformat()
+        except (ValueError, OverflowError):
+            return None
+    try:
+        db.execute('BEGIN')
+        columns = {r[1] for r in db.execute('PRAGMA table_info(ZASSET)')}
+        required = {'ZUUID', 'ZKIND', 'ZHIDDEN', 'ZTRASHEDSTATE', 'ZDATECREATED', 'ZMODIFICATIONDATE', 'ZLATITUDE', 'ZLONGITUDE'}
+        if not required <= columns:
+            raise ValueError('unsupported Photos metadata schema: missing ' + ','.join(sorted(required - columns)))
+        metadata = db.execute('SELECT Z_UUID FROM Z_METADATA').fetchall()
+        if len(metadata) != 1 or not isinstance(metadata[0][0], str) or not metadata[0][0]:
+            raise ValueError('unambiguous local Photos store namespace required')
+        controls = db.execute('SELECT ZHIDDEN,ZTRASHEDSTATE,count(*) FROM ZASSET GROUP BY ZHIDDEN,ZTRASHEDSTATE').fetchall()
+        declared = sum(n for hidden, trashed, n in controls if hidden == 0 and trashed == 0)
+        if declared > max_assets:
+            raise ValueError(f'visible source count {declared} exceeds explicit bound {max_assets}')
+        assets, ids, kinds = [], set(), collections.Counter()
+        rows = db.execute('''SELECT ZUUID,ZKIND,ZDATECREATED,ZMODIFICATIONDATE,ZLATITUDE,ZLONGITUDE
+                             FROM ZASSET WHERE ZHIDDEN=0 AND ZTRASHEDSTATE=0 ORDER BY ZUUID''')
+        for sid, kind, captured, modified, lat, lon in rows:
+            if not isinstance(sid, str) or not sid or sid in ids:
+                raise ValueError('missing or duplicate source UUID')
+            if kind not in (0, 1):
+                raise ValueError(f'unsupported visible media kind {kind}; do not silently omit it')
+            ids.add(sid); kinds[kind] += 1
+            valid_gps = (type(lat) in (float, int) and type(lon) in (float, int)
+                         and math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 < lon <= 180)
+            version = ('photos_sqlite_modification_seconds:' + repr(modified)) if clock(modified) is not None else None
+            assets.append({'id': sid, 'sourceVersion': version, 'mediaKind': 'image' if kind == 0 else 'video',
+                           'captureAt': clock(captured), 'captureClockBasis': 'local_photos_database_creation_date',
+                           'latitude': lat if valid_gps else None, 'longitude': lon if valid_gps else None,
+                           'labels': [], 'exactVehicleIds': [], 'filedVehicleId': None, 'isPersonal': False})
+        if len(assets) != declared:
+            raise ValueError('source enumeration changed within snapshot')
+        identity = hashlib.sha256(json.dumps(assets, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+        return {'schemaVersion': 1, 'intendedUse': 'vehicle_gallery', 'snapshot': {
+            'snapshotId': 'local-photos:' + identity, 'sourceNamespace': 'photos_sqlite_store:' + metadata[0][0],
+            'sourceScope': 'local_photos_database', 'sourceVersionBasis': 'local_modification_hint',
+            'observedAt': observed, 'accessScope': 'sample', 'declaredAssetCount': declared,
+            'mediaCoverage': {'imagesEnumerated': True, 'videosEnumerated': True, 'knownVideosOutsideSelector': kinds[1]},
+            'enumeration': {'completeWithinLocalDatabase': True, 'photoKitPermission': 'not_measured',
+                            'iCloudCompleteness': 'not_measured', 'privacyClassification': 'not_supplied',
+                            'excludedRows': sum(n for hidden, trashed, n in controls if hidden != 0 or trashed != 0)},
+            'assets': assets}, 'sourceFacts': {}, 'candidates': [], 'priorSourceIds': []}
+    finally:
+        db.close()
+
+
+def discovery_input(snapshot, config):
+    """Use the existing native selector; no new relevance vocabulary or filing rule."""
+    for key in ('targetVehicleId', 'timeZoneIdentifier'):
+        if not isinstance(config.get(key), str) or not config[key]:
+            raise ValueError('discovery config requires ' + key)
+    assets = [a for a in snapshot['snapshot']['assets'] if a['mediaKind'] == 'image']
+    seeds = config.get('seedAssetIds', [])
+    if not isinstance(seeds, list) or any(not isinstance(x, str) for x in seeds) or len(set(seeds)) != len(seeds):
+        raise ValueError('discovery seeds must be unique source IDs')
+    if not set(seeds) <= {a['id'] for a in assets}:
+        raise ValueError('discovery seed missing from visible image snapshot')
+    return {'assets': assets, 'targetVehicleId': config['targetVehicleId'],
+            'timeZoneIdentifier': config['timeZoneIdentifier'], 'seedAssetIds': seeds}
+
+
+def write_private_json(path, value):
+    # O_EXCL preserves prior checkpoints and frozen source receipts.
+    with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as out:
+        json.dump(value, out, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        out.write('\n')
+
+
+def local_original_facts(database, snapshot, source_ids, originals_root):
+    """Hash at most 25 explicitly selected local originals; never download iCloud.
+
+    A missing local path says nothing about cloud availability. The version hint,
+    current visibility and file identity are rechecked around each byte read.
+    """
+    if (not isinstance(source_ids, list) or not 1 <= len(source_ids) <= 25
+            or any(not isinstance(s, str) for s in source_ids) or len(set(source_ids)) != len(source_ids)):
+        raise ValueError('select 1 to 25 unique source IDs')
+    meta = snapshot['snapshot']
+    if meta.get('sourceScope') != 'local_photos_database' or meta.get('sourceVersionBasis') != 'local_modification_hint':
+        raise ValueError('original facts require the exact local metadata snapshot')
+    assets = {a['id']: a for a in meta['assets']}
+    if not set(source_ids) <= set(assets):
+        raise ValueError('selected original outside visible snapshot')
+    root = Path(originals_root).resolve(strict=True)
+    if not root.is_dir():
+        raise ValueError('originals root must be a directory')
+    db_uri = Path(database).resolve().as_uri() + '?mode=ro'
+    started, total, facts = time.monotonic(), 0, {}
+    def within():
+        if time.monotonic() - started > 30:
+            raise ValueError('local original verification deadline')
+    def current(sid):
+        # A fresh read transaction observes a modification/withdrawal that
+        # committed during the file read; do not reuse the inventory transaction.
+        with closing(sqlite3.connect(db_uri, uri=True, timeout=5)) as db:
+            db.execute('PRAGMA query_only=ON')
+            db.set_progress_handler(lambda: int(time.monotonic() - started > 30), 10000)
+            db.execute('BEGIN')
+            namespace = db.execute('SELECT Z_UUID FROM Z_METADATA').fetchall()
+            if len(namespace) != 1 or 'photos_sqlite_store:' + namespace[0][0] != meta['sourceNamespace']:
+                raise ValueError('local source namespace changed')
+            rows = db.execute('''SELECT ZKIND,ZDIRECTORY,ZFILENAME,ZMODIFICATIONDATE,ZDATECREATED
+                FROM ZASSET WHERE ZUUID=? AND ZHIDDEN=0 AND ZTRASHEDSTATE=0''', (sid,)).fetchall()
+            if len(rows) != 1:
+                raise ValueError('selected source withdrawn or ambiguous')
+            return rows[0]
+    def mime(header):
+        if header.startswith(b'\xff\xd8\xff'): return 'image/jpeg'
+        if header.startswith(b'\x89PNG\r\n\x1a\n'): return 'image/png'
+        if header.startswith((b'II*\x00', b'MM\x00*')): return 'image/tiff'
+        if header[:4] == b'RIFF' and header[8:12] == b'WEBP': return 'image/webp'
+        if header[4:8] == b'ftyp':
+            if header[8:12] in (b'heic', b'heix', b'hevc', b'hevx'): return 'image/heic'
+            if header[8:12] in (b'mif1', b'msf1'): return 'image/heif'
+            if header[8:12] in (b'avif', b'avis'): return 'image/avif'
+        raise ValueError('unsupported original byte format')
+    def open_original(directory, filename):
+        # Pin both directory components without following redirects. Closing the
+        # directory descriptors after open is safe: the file descriptor is pinned,
+        # and the named directory identities are rechecked after the byte read.
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        with ExitStack() as handles:
+            root_fd = os.open(root, flags)
+            handles.callback(os.close, root_fd)
+            directory_fd = os.open(directory, flags, dir_fd=root_fd)
+            handles.callback(os.close, directory_fd)
+            root_stat, directory_stat = os.fstat(root_fd), os.fstat(directory_fd)
+            fd = os.open(filename, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
+            return fd, root_stat, directory_stat
+    for sid in source_ids:
+        within()
+        asset, before = assets[sid], current(sid)
+        kind, directory, filename, modified, captured = before
+        version = 'photos_sqlite_modification_seconds:' + repr(modified)
+        if kind != 0 or asset.get('mediaKind') != 'image' or asset.get('sourceVersion') != version:
+            raise ValueError('selected original source version changed or unsupported')
+        # Photos' original path is explicit metadata, not a filename search.
+        if (not isinstance(directory, str) or not isinstance(filename, str)
+                or Path(directory).name != directory or Path(filename).name != filename
+                or directory in ('', '.', '..') or filename in ('', '.', '..')):
+            raise ValueError('invalid original source path')
+        path = root / directory / filename
+        if not path.resolve().is_relative_to(root) or path.parent.is_symlink() or path.is_symlink():
+            raise ValueError('original source path escapes or redirects')
+        fact = {'sourceVersion': version, 'selectedForAdmission': False,
+                'localOriginalReadAt': dt.datetime.now(dt.timezone.utc).isoformat(),
+                'originalStatus': 'unverified'}
+        try:
+            fd, root_stat, directory_stat = open_original(directory, filename)
+        except FileNotFoundError:
+            fact['localOriginalStatus'] = 'not_present'
+        else:
+            with os.fdopen(fd, 'rb') as source:
+                initial = os.fstat(source.fileno())
+                if not stat.S_ISREG(initial.st_mode) or not 0 < initial.st_size <= 64 * 1024 * 1024:
+                    raise ValueError('original file outside regular-file byte bound')
+                if total + initial.st_size > 128 * 1024 * 1024:
+                    raise ValueError('original total byte bound exceeded')
+                checksum, header, size = hashlib.sha256(), b'', 0
+                while True:
+                    within()
+                    chunk = source.read(1024 * 1024)
+                    if not chunk: break
+                    if not header: header = chunk[:32]
+                    checksum.update(chunk); size += len(chunk)
+                    if size > initial.st_size: raise ValueError('original grew during read')
+                final = os.fstat(source.fileno())
+            signature = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+            if size != initial.st_size or signature(initial) != signature(final) or signature(final) != signature(path.stat(follow_symlinks=False)):
+                raise ValueError('original changed during read')
+            for named, opened in ((root, root_stat), (path.parent, directory_stat)):
+                now = named.stat(follow_symlinks=False)
+                if not stat.S_ISDIR(now.st_mode) or (now.st_dev, now.st_ino) != (opened.st_dev, opened.st_ino):
+                    raise ValueError('original directory changed or redirects during read')
+            total += size
+            fact['original'] = {'sourceVersion': version, 'sha256': checksum.hexdigest(), 'byteSize': size, 'mimeType': mime(header),
+                'readBasis': {'kind': 'local_photos_original_path', 'sourceNamespace': meta['sourceNamespace'],
+                              'relativePath': str(path.relative_to(root)), 'observedAt': fact['localOriginalReadAt']}}
+            fact['localOriginalStatus'] = 'verified'
+            fact['originalStatus'] = 'verified'
+        if current(sid) != before:
+            raise ValueError('local source changed during original read')
+        prior_facts = snapshot.get('sourceFacts', {}).get(sid, {})
+        prior = prior_facts.get('original') or prior_facts.get('lastVerifiedOriginal')
+        if (prior and fact.get('original') and prior.get('sourceVersion') == version
+                and prior.get('sha256') != fact['original']['sha256']):
+            raise ValueError('original bytes changed under the same source version')
+        if prior and not fact.get('original'):
+            # Local eviction does not reset the prior byte identity. Keep this
+            # historical fact separate: it cannot qualify current availability.
+            fact['lastVerifiedOriginal'] = prior
+        facts[sid] = fact
+    within()
+    return facts
 
 # Apple on-device scene labels that suggest a vehicle. Broad on purpose ("machine", "wheel"), so the
 # count is an upper bound, not a measure of automotive relevance.
@@ -102,8 +329,39 @@ def match(keys, rows):
     return {"captured": cap, "captured_on_a_vehicle": cap_veh, "captured_vehicle_label": cap_car}
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("--user-id", required=True); ap.add_argument("--write", action="store_true")
+    ap = argparse.ArgumentParser(); ap.add_argument("--user-id"); ap.add_argument("--write", action="store_true")
+    ap.add_argument('--metadata-database', type=Path)
+    ap.add_argument('--snapshot-output', type=Path)
+    ap.add_argument('--snapshot-input', type=Path, help='reuse a frozen local snapshot for bounded original checks')
+    ap.add_argument('--max-assets', type=int, default=100000)
+    ap.add_argument('--discovery-config', type=Path)
+    ap.add_argument('--discovery-output', type=Path)
+    ap.add_argument('--verify-local-originals', type=Path, help='JSON list of at most 25 explicitly selected source IDs')
+    ap.add_argument('--originals-root', type=Path, help='explicit local Photos originals directory; no download')
     a = ap.parse_args()
+    if a.metadata_database or a.snapshot_output or a.snapshot_input or a.discovery_config or a.discovery_output or a.verify_local_originals or a.originals_root:
+        if not a.metadata_database or not a.snapshot_output or a.write or bool(a.discovery_config) != bool(a.discovery_output):
+            ap.error('metadata mode requires database and new snapshot output, optional paired discovery config/output, and refuses --write')
+        if bool(a.verify_local_originals) != bool(a.originals_root):
+            ap.error('local original verification requires both selected IDs and originals root')
+        if a.snapshot_input and not a.verify_local_originals:
+            ap.error('snapshot reuse requires bounded original verification')
+        for output in (a.snapshot_output, a.discovery_output):
+            if output and output.exists():
+                ap.error('output already exists: ' + str(output))
+        snapshot = json.loads(a.snapshot_input.read_text()) if a.snapshot_input else metadata_snapshot(a.metadata_database, a.max_assets)
+        if a.verify_local_originals:
+            snapshot.setdefault('sourceFacts', {}).update(local_original_facts(a.metadata_database, snapshot,
+                json.loads(a.verify_local_originals.read_text()), a.originals_root))
+        discovery = discovery_input(snapshot, json.loads(a.discovery_config.read_text())) if a.discovery_config else None
+        write_private_json(a.snapshot_output, snapshot)
+        if discovery is not None:
+            write_private_json(a.discovery_output, discovery)
+        print(json.dumps({'mode': 'read_only_local_metadata', 'assets': snapshot['snapshot']['declaredAssetCount'],
+                          'sourceScope': 'local_photos_database', 'sourceProposals': 0}))
+        raise SystemExit(0)
+    if not a.user_id:
+        ap.error('--user-id is required for the existing remote census mode')
     c, by_year, keys = library_census()
     rows, failed = owner_rows(a.user_id)
     m = match(keys, rows)

@@ -219,9 +219,9 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-3-5-haiku-latest",
+          model: "claude-sonnet-5-5",
           max_tokens: 2048,
-          temperature: 0.1,
+          thinking: { type: "between_tools" }, // Sonnet 5.5 rejects non-default temperature
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -229,7 +229,7 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
         const data = await resp.json();
         if (data.stop_reason === "max_tokens") throw new Error("Anthropic output truncated");
         const content = data.content?.[0]?.text || "";
-        if (content) return { content, model: data.model || "claude-3-5-haiku-latest", usage: { input_tokens: data.usage?.input_tokens ?? null, output_tokens: data.usage?.output_tokens ?? null } };
+        if (content) return { content, model: data.model || "claude-sonnet-5-5", usage: { input_tokens: data.usage?.input_tokens ?? null, output_tokens: data.usage?.output_tokens ?? null } };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Anthropic ${resp.status}: ${errBody.slice(0, 100)}`);

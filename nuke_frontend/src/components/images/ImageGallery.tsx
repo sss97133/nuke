@@ -11,7 +11,7 @@ import ImageZoneSection, { groupImagesByZone } from './ImageZoneSection';
 import { ImageSetService } from '../../services/imageSetService';
 import { OnboardingSlideshow } from '../onboarding/OnboardingSlideshow';
 import type { GalleryFilter } from '../../pages/vehicle-profile/VehicleProfileContext';
-import { isRelatedFieldImage } from '../../pages/vehicle-profile/hooks/useVehicleImageEvidence';
+import { isRelatedFieldImage, useVehicleImageEvidence } from '../../pages/vehicle-profile/hooks/useVehicleImageEvidence';
 
 /** Profile toolbar mode: maps to viewMode + groupBySource + chronologicalMode */
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
@@ -387,6 +387,9 @@ const ImageGallery = ({
   filteredSetId = null,
   onAddToSetRequested
 }: ImageGalleryProps) => {
+  const fieldEvidence = useVehicleImageEvidence(galleryFilter?.field ? vehicleId : undefined, galleryFilter?.field);
+  const citedImageKey = (fieldEvidence.data?.citedImages || []).map(item => item.image.id).join('|');
+  const citedImageIds = useMemo(() => new Set(citedImageKey ? citedImageKey.split('|') : []), [citedImageKey]);
   const [allImages, setAllImages] = useState<any[]>([]);
   // How much of what the database admits actually loaded (fetchVehicleImages reports it). The count
   // label says "n of N" only when a cap or the deadline left rows behind; what loaded is never the whole.
@@ -505,8 +508,8 @@ const ImageGallery = ({
     if (allImages.length === 0) return;
     const filtered = galleryFilter
       ? allImages.filter((img: any) => {
-          if (galleryFilter.field && !isRelatedFieldImage(img, galleryFilter.field)) return false;
-          if (galleryFilter.imageIds && !galleryFilter.imageIds.includes(img.id)) return false;
+          if (galleryFilter.imageIds) return galleryFilter.imageIds.includes(img.id);
+          if (galleryFilter.field && !citedImageIds.has(img.id) && !isRelatedFieldImage(img, galleryFilter.field)) return false;
           if (galleryFilter.zone) {
             const zone = String(img.vehicle_zone || '').toLowerCase().trim();
             if (zone !== galleryFilter.zone.toLowerCase().trim()) return false;
@@ -539,7 +542,7 @@ const ImageGallery = ({
     setDisplayedImages(sorted.slice(0, Math.max(imagesPerPage, 50)));
     if (sorted.length > 0) setShowImages(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galleryFilter, allImages]);
+  }, [galleryFilter, allImages, citedImageIds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1389,8 +1392,8 @@ const ImageGallery = ({
   const galleryFilteredImages = useMemo(() => {
     if (!galleryFilter) return allImages;
     return allImages.filter((img: any) => {
-      if (galleryFilter.field && !isRelatedFieldImage(img, galleryFilter.field)) return false;
-      if (galleryFilter.imageIds && !galleryFilter.imageIds.includes(img.id)) return false;
+      if (galleryFilter.imageIds) return galleryFilter.imageIds.includes(img.id);
+      if (galleryFilter.field && !citedImageIds.has(img.id) && !isRelatedFieldImage(img, galleryFilter.field)) return false;
       if (galleryFilter.zone) {
         const zone = String(img.vehicle_zone || '').toLowerCase().trim();
         if (zone !== galleryFilter.zone.toLowerCase().trim()) return false;
@@ -1419,7 +1422,7 @@ const ImageGallery = ({
       }
       return true;
     });
-  }, [allImages, galleryFilter]);
+  }, [allImages, galleryFilter, citedImageIds]);
 
   const filterKey = JSON.stringify(galleryFilter || null);
   useEffect(() => {
@@ -2635,7 +2638,10 @@ const ImageGallery = ({
         textAlign: 'center',
         letterSpacing: '0.3px',
       }}>
-        No images match this filter
+        {galleryFilter.field && fieldEvidence.isPending ? 'Reading cited images…'
+          : galleryFilter.field && fieldEvidence.isError ? 'Cited images could not be read.'
+            : partialLoad ? 'No matching images in the loaded gallery. More admitted images remain.'
+              : 'No images match this filter'}
       </div>
     );
   }

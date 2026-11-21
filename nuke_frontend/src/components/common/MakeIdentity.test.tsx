@@ -2,7 +2,27 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { MakeIdentity, resolveVehicleArtwork, VehicleIdentity } from './MakeIdentity';
+import { EngineIdentity, MakeIdentity, resolveVehicleArtwork, VehicleIdentity } from './MakeIdentity';
+
+it('selects engine lettering only for a complete supported designation and preserves readable failure fallback', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'), root = createRoot(host);
+  try {
+    for (const value of ['455 V8', '455', 'SD-455 decal', 'not SD-455', 'SD-455?']) {
+      await act(async () => root.render(<EngineIdentity make="Pontiac" value={value} />));
+      expect(host.querySelector('img')).toBeNull();
+      expect(host.textContent).toBe(value);
+    }
+    await act(async () => root.render(<EngineIdentity make="Oldsmobile" value="SD-455 V8" />));
+    expect(host.querySelector('img')).toBeNull();
+    await act(async () => root.render(<EngineIdentity make="Pontiac" value="SD-455 V8" />));
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('/stacks/makes/pontiac-sd455.svg');
+    expect(host.querySelector('.sr-only')?.textContent).toBe('SD-455 V8');
+    await act(async () => host.querySelector('img')!.dispatchEvent(new Event('error')));
+    expect(host.textContent).toBe('SD-455 V8');
+    expect(host.querySelector('img')).toBeNull();
+  } finally { await act(async () => root.unmount()); }
+});
 
 it('selects the documented script and nose emblem independently across model years', () => {
   const roles = (year: number) => resolveVehicleArtwork({ year, make: 'Chevrolet', model: 'Corvette' }).map(a => a.role);
@@ -241,6 +261,33 @@ it('sets the 1973 tribute headline in cutout lettering on the page surface, keep
     await act(async () => root.render(<VehicleIdentity compact year={1973} make="Pontiac" model="Firebird" variants={[{ kind: 'trim', value: 'Trans Am' }]} />));
     expect(host.querySelector('.vehicle-identity__qualifier')).toBeNull();
     expect(marks().at(-1)).toEqual(['variant', 'mask', '/stacks/makes/pontiac-firebird-1973-canada-trans-am-cut.png']);
+  } finally { await act(async () => root.unmount()); }
+});
+
+it('keeps the sourced Trans Am lettering when the profile uses the clickable tribute marker', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const CAR = '20d21fb0-4651-4469-a0ba-e751309a1e54';
+  const host = document.createElement('div'), root = createRoot(host);
+  const onExplore = vi.fn();
+  try {
+    const starred = resolveVehicleArtwork({ year: 1973, make: 'Pontiac', model: 'Firebird', vehicleId: CAR,
+      variants: [{ kind: 'trim', value: 'Trans Am*' }] });
+    expect(starred.find(asset => asset.role === 'variant')?.file).toBe('pontiac-firebird-trans-am-style-owner-decal-cut.png');
+    await act(async () => root.render(<VehicleIdentity compact year={1973} make="Pontiac" model="Firebird" vehicleId={CAR}
+      variants={[{ kind: 'trim', value: 'Trans Am*' }]} onExplore={onExplore} />));
+    // Resolve the lazy font renderer before taking an image handle; its raster
+    // fallback replaces Suspense's initial raster when the module arrives.
+    await act(async () => { await import('./PeriodLettering'); });
+    const mark = host.querySelector('.vehicle-identity__variant .vehicle-identity__art img');
+    expect(mark?.getAttribute('src')).toBe('/stacks/makes/pontiac-firebird-trans-am-style-owner-decal-cut.png');
+    expect(host.querySelector('.vehicle-identity__qualifier')?.textContent).toBe('*');
+    expect(host.querySelector('.sr-only')?.textContent).toBe('1973 Pontiac Firebird Trans Am*');
+    const button = host.querySelector<HTMLButtonElement>('[aria-label="Explore Trans Am* in this profile"]');
+    expect(button).not.toBeNull();
+    await act(async () => button!.click());
+    expect(onExplore).toHaveBeenCalledWith('trim', 'Trans Am*');
+    await act(async () => mark?.dispatchEvent(new Event('error')));
+    expect(button?.textContent).toBe('Trans Am*');
   } finally { await act(async () => root.unmount()); }
 });
 

@@ -2,7 +2,9 @@
 /**
  * Live job-loop smoke test against PRODUCTION that never commits a row.
  *
- * Each scenario is ONE transaction sent to the Management API (the q.sh path): BEGIN, synthetic users and a vehicle
+ * Each scenario is ONE transaction run through scripts/ci/db-transport.mjs — a direct Postgres connection when
+ * one is in the environment (DATABASE_URL / SUPABASE_DB_URL / SUPABASE_DB_PASSWORD, as in CI), otherwise the
+ * Management API (the q.sh path): BEGIN, synthetic users and a vehicle
  * created inside it, the job loop through its public Sign RPCs as those users (SET LOCAL ROLE authenticated + JWT
  * claims), the open readers as anon and as a signed-in stranger, assertions collected into a temp table, then
  * ROLLBACK. The script refuses to send SQL that contains COMMIT or does not end in ROLLBACK. Afterwards a read-only
@@ -19,6 +21,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { DB_DIRECT, dbRows, closeDb } from './db-transport.mjs';
 
 const PROJECT = 'qkgaybvrernstplzjaam';
 const REST = `https://${PROJECT}.supabase.co/rest/v1`;
@@ -45,11 +48,12 @@ const SERVER_READERS = [
 ];
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-if (!token) { console.error('live-job-loop-smoke: SUPABASE_ACCESS_TOKEN is not set'); process.exit(2); }
+if (!token && !DB_DIRECT) { console.error('live-job-loop-smoke: set a database connection (DATABASE_URL / SUPABASE_DB_URL / SUPABASE_DB_PASSWORD) or SUPABASE_ACCESS_TOKEN'); process.exit(2); }
 const jsonOut = process.argv.includes('--json') ? process.argv[process.argv.indexOf('--json') + 1] : null;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function q(query, { attempt = 1 } = {}) {
+  if (DB_DIRECT) return dbRows(query); // direct Postgres (CI); same rolled-back SQL, same returned rows
   const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT}/database/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -378,4 +382,5 @@ for (const s of report.scenarios) {
 for (const c of report.read_only) console.log(`${c.ok ? 'pass' : 'FAIL'} ${c.step} ${JSON.stringify(c.detail)}`);
 console.log(`${leftover.length ? 'FAIL' : 'pass'} zero net rows: residue ${JSON.stringify(residueAfter)}; changed tables ${JSON.stringify(moved)}`);
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(report, null, 2));
+try { await closeDb(); } catch { /* ignore */ }
 process.exit(report.ok ? 0 : 1);

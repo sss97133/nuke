@@ -2,7 +2,8 @@ import { assert, assertEquals, assertRejects, assertThrows } from "jsr:@std/asse
 import { cliArgs, eligibleWorklist, exactRows, packReviews, parseStage, requireSubscription,
   subscriptionEnvironment, stageSchema, captureCommand, validateEnvelopeBatch, runBatch, sourceClockContext } from "./reviewed-image-batch.ts";
 import { admitReviewedBatch, persistReviewedBatchReceipt } from "../deep-image-analysis-byok.mjs";
-import { recordReviewedAnalysis } from "../../supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis.ts";
+import { recordReviewedAnalysis, validateReviewedAnalysis } from "../../supabase/functions/photo-pipeline-orchestrator/reviewedAnalysis.ts";
+import { admitsFrom, automaticMethod, automaticProvenance, buildEnvelope, intakeShape, thinVerdict, thinViolation } from "../photo-pipeline/deep-stage.mjs";
 
 const vehicle = "20000000-0000-4000-8000-000000000001", image = "10000000-0000-4000-8000-000000000001";
 const other = "10000000-0000-4000-8000-000000000002", now = new Date().toISOString();
@@ -319,4 +320,39 @@ else{
   } finally {
     globalThis.fetch = oldFetch; Deno.env.set("PATH", oldPath); await Deno.remove(root, { recursive: true });
   }
+});
+
+// The subscription frame reader's automatic deep reading (scripts/photo-pipeline/deep-stage.mjs): the thin envelope it builds from two
+// reads is accepted by the intake's own validator, with the provenance that tells it from the three-pass reading.
+Deno.test("an automatic deep reading's merged envelope passes the intake validator", () => {
+  const full = (state: Record<string, string>, scene = "body_exterior") => ({
+    image_id: "10000000-0000-4000-8000-000000000001", vehicle_id: "20000000-0000-4000-8000-000000000001", scene_type: scene, build_phase_guess: "final_assembly",
+    intent: "documentation", intent_confidence: 0.9, needs_clarification: false,
+    components_seen: [{ label: "Front wheel", confidence: 0.8, bbox: [100, 400, 300, 800], part_number_guess: null }], text_regions: [], damage_localized: [],
+    state_observations: { damage_callouts: [], ...state },
+    workshop_signals: { tools_visible: [], fixturing: "unknown", weld_quality: "", lighting: "natural_outdoor" }, presence: { person: false, dog: false, place_hint: null },
+    camera_pose: { method: "visual", framing: "whole car", azimuth_deg: 45, elevation_deg: null, distance_est: "about 5 meters", exif_present: null },
+    narrative_one_line: "A complete red car occupies the frame.", confidence: 0.9, context_complete: true, open_questions: [], agent_notes: "" });
+  // the same two answers, unshaped, are what the intake refuses: empty optional text and a distance it cannot parse
+  let refused = "";
+  try { validateReviewedAnalysis({ action: "record_reviewed_analysis", verdict: full({ rust_severity: "none", paint_state: "aged", completeness: "assembled" }),
+    source: { image_url: "https://example.test/a.jpg", expected_updated_at: "2026-11-01T12:00:00.123456+00:00", reviewed_url: "https://example.test/a.jpg", reviewed_sha256: "c".repeat(64), reviewed_at: "2026-11-09T19:00:00.000Z" },
+    provenance: automaticProvenance({ model: "claude-sonnet-5-5", runId: "r", durationMs: 1 }) }, Date.parse("2026-11-09T20:00:00Z")); } catch (e) { refused = (e as Error).message; }
+  assert(refused !== "", "the unshaped answer is refused by the intake");
+  const admits = admitsFrom({ automatic: { admits: { scene_type: ["engine_bay", "body_exterior"], rust_severity: ["surface"], paint_state: [] } } });
+  const merged = thinVerdict(intakeShape(full({ rust_severity: "surface", paint_state: "aged", completeness: "assembled" })),
+    intakeShape(full({ rust_severity: "surface", paint_state: "aged", completeness: "partial" })), admits);
+  assert(merged.errors.length === 0 && merged.disagreements.length === 1);
+  const envelope = buildEnvelope({ verdict: merged.verdict, row: { image_url: "https://example.test/a.jpg", updated_at: "2026-11-01T12:00:00.123456+00:00" },
+    reviewedUrl: "https://example.test/a.jpg", sha256: "c".repeat(64), reviewedAt: "2026-11-09T19:00:00.000Z",
+    provenance: automaticProvenance({ model: "claude-sonnet-5-5", runId: "claude-cli-fire-test", durationMs: 41000, method: automaticMethod(admits) }) });
+  // the thin verdict (what an automatic reading may carry) is one the intake's own validator takes
+  const checked = validateReviewedAnalysis(envelope, Date.parse("2026-11-09T20:00:00Z"));
+  assertEquals([checked.verdict.scene_type, checked.verdict.state_observations.rust_severity, checked.verdict.state_observations.paint_state, checked.verdict.state_observations.completeness],
+    ["body_exterior", "surface", "unknown", "unknown"]);
+  assertEquals([checked.verdict.components_seen.length, checked.verdict.build_phase_guess, checked.verdict.narrative_one_line],
+    [0, "unknown", "Automatic read: scene body_exterior; rust surface; paint unknown."]);
+  assertEquals(thinViolation(checked.verdict, admits), null);
+  assertEquals([checked.provenance.agent_tier, checked.provenance.agent_cost_cents, checked.provenance.extraction_method],
+    ["subscription automatic", null, automaticMethod(admits)]);
 });

@@ -237,8 +237,9 @@ Return ONLY valid JSON:
             }
             
             payload = {
-                "model": "claude-3-5-sonnet-20241022",
+                "model": "claude-sonnet-5-5",
                 "max_tokens": 1000,
+                "thinking": {"type": "between_tools"},
                 "messages": [{
                     "role": "user",
                     "content": [
@@ -352,7 +353,7 @@ Return ONLY valid JSON:
             # Build full analysis
             full_analysis = {
                 'scan_timestamp': datetime.utcnow().isoformat(),
-                'model': 'claude-3-5-sonnet',
+                'model': 'claude-sonnet-5-5',
                 'description': description,
                 'business_stage': analysis.get('business_stage'),
                 'capabilities': capabilities,

@@ -20,7 +20,7 @@ interface Turn {
   wrote?: Array<{ id: string; kind: string; content_text: string | null }>;
 }
 
-const VehicleAgentChat: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+const VehicleAgentChat: React.FC<{ vehicleId: string; defaultCollapsed?: boolean }> = ({ vehicleId, defaultCollapsed = true }) => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -43,8 +43,10 @@ const VehicleAgentChat: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
         body: { vehicle_id: vehicleId, message, history, allow_writes: allowWrites },
       });
       if (e) {
-        const msg = (e as any)?.context?.body || e.message || 'Agent error';
-        setError(typeof msg === 'string' ? msg : 'Agent error');
+        // context is the fetch Response; its body is a stream, so read the JSON the function sent.
+        let body: any = null;
+        try { body = await (e as any)?.context?.json?.(); } catch { /* not JSON, or no response */ }
+        setError(typeof body?.error === 'string' ? body.error : e.message || 'The agent did not answer.');
         setTurns((t) => [...t, { role: 'assistant', content: '(failed)' }]);
       } else {
         setTurns((t) => [...t, { role: 'assistant', content: data?.reply || '(no response)', wrote: data?.wrote }]);
@@ -61,7 +63,7 @@ const VehicleAgentChat: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
   };
 
   return (
-    <CollapsibleWidget variant="profile" title="Ask the Vehicle Agent" defaultCollapsed={true}>
+    <CollapsibleWidget variant="profile" title="Ask the Vehicle Agent" defaultCollapsed={defaultCollapsed}>
       <div style={{ fontFamily: 'Arial, sans-serif' }}>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
           Claude with this vehicle's data as context. It can record durable new facts as

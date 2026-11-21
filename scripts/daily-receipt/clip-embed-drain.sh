@@ -1,25 +1,53 @@
 #!/bin/bash
 # clip-embed-drain.sh — scheduled drainer for image_observations.embedding_clip_vitb32.
 #
-# Closes the audit's Phase-4(c) gap: the engine rows (Tier 2 PLACED) exist but ~94% lack a
-# CLIP embedding, so visual search/convergence is dark. The embedder (clip-embed-image-
-# observations.py, local CLIP ViT-B/32 on MPS, zero API cost) only ever ran once by hand.
-# This wraps it for launchd: --all drains every null-embedding active row, then exits; the
-# launchd StartInterval re-fires it so newly-PLACED rows (from the BYOK deep writer's
-# ingest_image_observation call) get embedded as coverage deepens.
+# The embedder (clip-embed-image-observations.py, local CLIP ViT-B/32 on MPS, zero API cost) fills the embedding of
+# every active image_observations row that has none, newest photo first. Those embeddings are the visual leg of
+# capture_sets_score: a phone photo is filed to a vehicle only when its set carries evidence read from the photos, and
+# in practice that is this leg (measured 2026-11-20: all of the last 12 sets that filed carried it and every photo in
+# them was embedded; the last embedding before that day was written 2026-11-09 and nothing has filed since).
 #
-# Runs in the login shell (NOT Claude Code's Bash sandbox) so it reaches Supabase + MPS.
-# mkdir-lock (macOS has no flock) prevents overlapping fires from stacking GPU work.
+# Why it stopped, so it does not stop the same way again:
+#   * it ran `python3`, and Homebrew moved python3 to 3.15, which has neither torch nor open_clip (they are installed
+#     for 3.14). The interpreter is now the first one found that can import the model's libraries.
+#   * it ran the scripts of ~/nuke, a checkout parked on another branch. It now runs the origin/main checkout the
+#     subscription reader keeps fresh (~/.worktrees/nuke-main), and falls back to ~/nuke only if that is missing.
+#   * a row whose bytes are gone stayed at the head of the batch on every fire. The embedder now remembers such rows
+#     for a day (logs/clip-embed-dead.json) and loads the model only when there is a row to embed.
+#
+# Runs in the login shell (launchd), not Claude Code's sandbox. Secrets come from ~/nuke/.env via dotenvx and are
+# never printed. mkdir-lock (macOS has no flock) keeps fires from overlapping.
 set -uo pipefail
-cd /Users/skylar/nuke || exit 1
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin:$PATH"
+ENV_FILE="$HOME/nuke/.env"
+MAIN="$HOME/.worktrees/nuke-main"
+[ -f "$MAIN/scripts/clip-embed-image-observations.py" ] || MAIN="$HOME/nuke"
 LOCK=/tmp/com.nuke.clip-embed.lock
+STAMP="$(date '+%Y-%m-%d %H:%M:%S')"
+
 if ! mkdir "$LOCK" 2>/dev/null; then
-  echo "$(date '+%H:%M:%S') clip-embed: previous drain still running ($LOCK) — skipping this fire"
+  echo "$STAMP clip-embed: previous drain still running ($LOCK); skipping this fire"
   exit 0
 fi
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
-echo "=== $(date '+%Y-%m-%d %H:%M:%S') clip-embed-drain start ==="
-/opt/homebrew/bin/dotenvx run -- /opt/homebrew/bin/python3 scripts/clip-embed-image-observations.py --all
+
+# The first interpreter that can import what the embedder needs. NUKE_CLIP_PYTHON names one outright.
+PY=""
+for c in "${NUKE_CLIP_PYTHON:-}" /opt/homebrew/bin/python3.14 /opt/homebrew/bin/python3 /opt/homebrew/bin/python3.13 \
+         /opt/homebrew/bin/python3.12 "$HOME/nuke/yono/.venv/bin/python" /usr/local/bin/python3; do
+  [ -n "$c" ] && [ -x "$c" ] || continue
+  if "$c" -c 'import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(m) for m in ("torch", "open_clip", "numpy", "requests", "PIL")) else 1)' >/dev/null 2>&1; then
+    PY="$c"; break
+  fi
+done
+if [ -z "$PY" ]; then
+  echo "$STAMP clip-embed: no python here has torch and open_clip; nothing embedded this fire (set NUKE_CLIP_PYTHON)"
+  exit 3
+fi
+
+cd "$HOME/nuke" || exit 1   # dotenvx reads the encrypted .env from here
+echo "=== $STAMP clip-embed-drain start ($PY, scripts from $MAIN) ==="
+dotenvx run -q -f "$ENV_FILE" -- "$PY" "$MAIN/scripts/clip-embed-image-observations.py" --all
 rc=$?
 echo "=== $(date '+%Y-%m-%d %H:%M:%S') clip-embed-drain done rc=$rc ==="
 exit $rc
