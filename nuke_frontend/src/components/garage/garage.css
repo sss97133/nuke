@@ -11,8 +11,8 @@
 .garage-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; font-size: var(--text-callout); }
 .garage-toolbar :is(select,input,.btn-base), .garage-sort button { box-sizing: border-box; max-width: 100%; min-height: 36px; padding: 6px 10px; color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font: inherit; }
 .garage-toolbar .btn-base { display: inline-flex; align-items: center; text-decoration: none; }
-.garage-toolbar select { width: auto; flex: 0 1 auto; max-width: 190px; }
-@media (min-width: 900px) { .garage-toolbar { flex-wrap: nowrap; } .garage-segments { flex-wrap: nowrap; } .garage-toolbar .btn-base { white-space: nowrap; } }
+.garage-page .garage-toolbar select { width: auto; flex: 0 1 auto; max-width: 190px; }
+@media (min-width: 900px) { .garage-page .garage-toolbar { flex-wrap: nowrap; } .garage-page .garage-toolbar .garage-segments { flex-wrap: nowrap; flex: none; } .garage-page .garage-toolbar .btn-base { white-space: nowrap; flex: none; } }
 .garage-toolbar .garage-search { flex: 1 1 220px; min-width: 0; width: auto; }
 .garage-sort { display: flex; gap: 4px; }
 .garage-sort button { min-width: 36px; cursor: pointer; }
