@@ -40,6 +40,8 @@
  *
  * ERRORS: every failure answers { error: "<plain sentence>" }; the garage box and the
  * profile chat show body.error as it is.
+ *
+ * Session turns are kept by record_vehicle_agent_turn (migration 20261121060000), only with the account's consent.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
