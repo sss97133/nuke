@@ -153,7 +153,7 @@ export async function readGarageActivity(
   userId: string, vehicleIds: string[], cancelled: () => boolean, now = new Date(),
 ): Promise<GarageActivityContext> {
   const warnings: string[] = [];
-  const links: OrgVehicleLinkRow[] = [];
+  const custody = new Map<string, CustodyOrg>();
   const photos: PhotoEvidence[] = [];
   const sessions: SessionEvidence[] = [];
   const sinceIso = new Date(now.getTime() - RECENT_WORK_DAYS * DAY_MS).toISOString();
@@ -163,11 +163,9 @@ export async function readGarageActivity(
     const chunk = vehicleIds.slice(offset, offset + 100);
     try {
       const [linkRes, photoRes, sessionRes] = await Promise.all([
-        supabase.from('organization_vehicles')
-          .select('vehicle_id, organization_id, relationship_type, status, auto_tagged, user_confirmed, user_rejected, end_date, service_status, organizations(business_name, name, legal_name)')
-          .in('vehicle_id', chunk)
-          .in('relationship_type', [...CUSTODY_RELATIONSHIPS])
-          .eq('status', 'active'),
+        // The custody rule lives in the database (organization_vehicles_custody): one organization per car, and a
+        // site several organizations share names none of them unless a person confirmed the link or a receipt matched.
+        supabase.rpc('organization_vehicles_custody', { p_vehicle_ids: chunk }),
         supabase.from('vehicle_images')
           .select('vehicle_id, taken_at, is_duplicate, vision_gate_status')
           .in('vehicle_id', chunk)
@@ -181,7 +179,14 @@ export async function readGarageActivity(
           .eq('user_id', userId)
           .gte('session_date', sinceIso.slice(0, 10)),
       ]);
-      if (linkRes.error) linksFailed = true; else links.push(...((linkRes.data ?? []) as unknown as OrgVehicleLinkRow[]));
+      if (linkRes.error || !Array.isArray(linkRes.data)) linksFailed = true;
+      else {
+        for (const row of linkRes.data as { vehicle_id?: unknown; organization_id?: unknown; organization_name?: unknown; relationship_type?: unknown }[]) {
+          if (typeof row.vehicle_id !== 'string' || typeof row.organization_id !== 'string' ||
+              typeof row.organization_name !== 'string' || !row.organization_name || typeof row.relationship_type !== 'string') continue;
+          custody.set(row.vehicle_id, { id: row.organization_id, name: row.organization_name, relationship_type: row.relationship_type });
+        }
+      }
       if (photoRes.error) evidenceFailed = true; else photos.push(...((photoRes.data ?? []) as PhotoEvidence[]));
       if (sessionRes.error) evidenceFailed = true; else sessions.push(...((sessionRes.data ?? []) as unknown as SessionEvidence[]));
     } catch {
@@ -191,5 +196,5 @@ export async function readGarageActivity(
   }
   if (linksFailed) warnings.push('Custody groups are unavailable. Vehicles are listed without them.');
   if (evidenceFailed) warnings.push('Recent work evidence is unavailable. Vehicles are not pulled to the top.');
-  return { custody: pickCustodyOrgs(links, now), recentWork: latestWorkEvidence(photos, sessions, now), warnings };
+  return { custody, recentWork: latestWorkEvidence(photos, sessions, now), warnings };
 }
