@@ -18,7 +18,7 @@ describe('garage card analysis lines', () => {
     expect(byKey['stage-hours'].value).toBe('20 h (10–30)');
     expect(lines.some(line => line.value === '30.5 h' || line.value === '10.5 h')).toBe(false);
     expect(byKey.amount.value).toBe('$1,200');
-    expect(byKey.amount.cite).toBe('3 receipts · 8 part lines · Jan 5, 2024 – Feb 1, 2025');
+    expect(byKey.amount.cite).toBe('3 receipts · Jan 2024 – Feb 2025');
     expect(byKey.amount.cite).not.toContain('vehicle_build_reconstruction');
     expect(byKey.amount.title).toContain('vehicle_build_reconstruction, as of Nov 20, 2026');
     expect(['paper-hours', 'reference-hours', 'stage-hours'].map(key => byKey[key].group)).toEqual(['hours', 'hours', 'hours']);
