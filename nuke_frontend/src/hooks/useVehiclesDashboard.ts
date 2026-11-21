@@ -471,6 +471,9 @@ function buildSections(vehicles: GarageVehicle[]): GarageSection[] {
 const VEHICLE_SELECT = 'id, year, make, model, normalized_model, trim, vin, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status, merged_into_vehicle_id, deleted_at, listing_kind';
 
 const EXCLUDED_STATUSES = new Set(['deleted', 'merged', 'duplicate', 'rejected']);
+// get_vehicle_contribution_days_batch: cars per call and calls in flight.
+const TIMELINE_CHUNK = 25;
+const TIMELINE_CONCURRENCY = 3;
 
 interface VehicleRow {
   id: string;
@@ -757,17 +760,44 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
             try { return await read; } catch { return { data: null, error: true }; }
           };
           const activityRead = readGarageActivity(userId!, vehicleIdArray, () => cancelled);
-          // One row per vehicle, so the reader's 500-id bound is the only paging needed.
-          const readTimelines = async () => {
-            const data: (GarageTimeline & { vehicle_id: string })[] = [];
-            for (let offset = 0; offset < vehicleIdArray.length && !cancelled; offset += 500) {
-              const result = await supabase.rpc('get_vehicle_contribution_days_batch', { p_vehicle_ids: vehicleIdArray.slice(offset, offset + 500) });
-              if (result.error || !Array.isArray(result.data)) return { data: null, error: true };
-              data.push(...result.data);
+          // The day reader is bound by cold photo reads (seconds for a large garage), so it is read
+          // in small chunks, a few at a time, most recently active cars first, and each chunk's
+          // squares are shown as it lands. Nothing else on the card waits for it.
+          const applyTimelines = (rows: unknown) => {
+            for (const t of (Array.isArray(rows) ? rows : []) as (GarageTimeline & { vehicle_id: string })[]) {
+              if (typeof t.vehicle_id === 'string' && allRows.has(t.vehicle_id) && Array.isArray(t.days) &&
+                  /^\d{4}-\d{2}-\d{2}$/.test(String(t.first_day)) && /^\d{4}-\d{2}-\d{2}$/.test(String(t.last_day))) {
+                timelines.set(t.vehicle_id, {
+                  first_day: t.first_day, last_day: t.last_day, active_days: Number(t.active_days) || 0,
+                  photos: Number(t.photos) || 0, work_days: Number(t.work_days) || 0,
+                  events: Number(t.events) || 0, documents: Number(t.documents) || 0,
+                  days: t.days.filter(w => Array.isArray(w) && /^\d{4}-\d{2}-\d{2}$/.test(String(w[0]))),
+                });
+              }
             }
-            return { data, error: null };
           };
-          const [fallbackRes, eventSummaryRes, eventWeeksRes, estimateRes, timelineRes] = await Promise.all([
+          const readTimelines = async () => {
+            const ordered = [...vehicleIdArray].sort((a, b) => (activityAt.get(b) ?? '').localeCompare(activityAt.get(a) ?? ''));
+            const chunks: string[][] = [];
+            for (let i = 0; i < ordered.length; i += TIMELINE_CHUNK) chunks.push(ordered.slice(i, i + TIMELINE_CHUNK));
+            let error = false;
+            let next = 0;
+            const worker = async () => {
+              while (next < chunks.length && !cancelled) {
+                const chunk = chunks[next++];
+                try {
+                  const result = await supabase.rpc('get_vehicle_contribution_days_batch', { p_vehicle_ids: chunk });
+                  if (result.error || !Array.isArray(result.data)) { error = true; continue; }
+                  applyTimelines(result.data);
+                  publish();
+                } catch { error = true; }
+              }
+            };
+            await Promise.all(Array.from({ length: Math.min(TIMELINE_CONCURRENCY, chunks.length) }, worker));
+            return { error };
+          };
+          const timelineRead = readTimelines();
+          const [fallbackRes, eventSummaryRes, eventWeeksRes, estimateRes] = await Promise.all([
             readCovers(),
             supabase
               .from('vehicle_event_summary')
@@ -783,7 +813,6 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
               .in('comp_method', ['class_stratified', 'class_stratified_bodied'])
               .eq('is_stale', false)
               .eq('is_circular', false),
-            readTimelines(),
           ].map(optionalRead));
           const garageActivity = await activityRead;
           if (cancelled) return;
@@ -792,18 +821,11 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
           if (fallbackRes.error) readWarnings.push('Some vehicle cover photos are unavailable.');
           if (eventSummaryRes.error) readWarnings.push('Event summaries are unavailable. Activity counts remain unknown.');
           // The event weeks stay as the timeline's fallback when the day reader is unavailable.
-          if (eventWeeksRes.error && timelineRes.error) readWarnings.push('Activity timelines are unavailable.');
-          for (const t of timelineRes.error ? [] : (timelineRes.data ?? []) as (GarageTimeline & { vehicle_id: string })[]) {
-            if (typeof t.vehicle_id === 'string' && allRows.has(t.vehicle_id) && Array.isArray(t.days) &&
-                /^\d{4}-\d{2}-\d{2}$/.test(String(t.first_day)) && /^\d{4}-\d{2}-\d{2}$/.test(String(t.last_day))) {
-              timelines.set(t.vehicle_id, {
-                first_day: t.first_day, last_day: t.last_day, active_days: Number(t.active_days) || 0,
-                photos: Number(t.photos) || 0, work_days: Number(t.work_days) || 0,
-                events: Number(t.events) || 0, documents: Number(t.documents) || 0,
-                days: t.days.filter(w => Array.isArray(w) && /^\d{4}-\d{2}-\d{2}$/.test(String(w[0]))),
-              });
-            }
-          }
+          void timelineRead.then(({ error }) => {
+            if (cancelled || !error || !eventWeeksRes.error) return;
+            readWarnings.push('Activity timelines are unavailable.');
+            publish();
+          });
           if (estimateRes.error) readWarnings.push('Recorded estimates are unavailable. Vehicle relationships remain visible.');
           for (const e of estimateRes.error ? [] : estimateRes.data ?? []) {
             if (Number.isFinite(Number(e.estimated_value)) && Number(e.estimated_value) > 0 &&

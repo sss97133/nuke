@@ -44,7 +44,8 @@ vi.mock('../lib/supabase', () => ({ supabase: {
     }
     return Promise.resolve(fixture.rpcHolds[name] ?? fixture.hold).then(() => ({
       data: fixture.fail === name ? null : name === 'get_my_garage_owner_corrections' ? fixture.rows.garage_owner_corrections ?? []
-        : name === 'get_first_image_batch' ? (fixture.rows.garage_covers ?? []).filter(row => (params as any).vehicle_ids.includes(row.vehicle_id)) : [],
+        : name === 'get_first_image_batch' ? (fixture.rows.garage_covers ?? []).filter(row => (params as any).vehicle_ids.includes(row.vehicle_id))
+        : name === 'get_vehicle_contribution_days_batch' ? (fixture.rows.garage_timelines ?? []).filter(row => (params as any).p_vehicle_ids.includes(row.vehicle_id)) : [],
       error: fixture.fail === name ? { message: 'read failed' } : null,
     }));
   },
@@ -297,6 +298,27 @@ it('publishes the roster and ready covers while an unrelated activity reader is 
     expect(state.vehicles.find(v => v.id === 'car')?.resolved_image_url).toBe('photo');
     expect(state.vehicles).toHaveLength(2);
   } finally { await act(async () => release()); }
+});
+
+it('publishes estimates before the day reader lands, then reads every car day grid in chunks', async () => {
+  seedGarage(); let release!: () => void;
+  const ids = Array.from({ length: 30 }, (_, i) => `extra${i}`);
+  fixture.rows.garage_records = ids.map(vehicle_id => ({ vehicle_id, relationship: 'profile_record' }));
+  fixture.rows.vehicles.push(...ids.map(id => ({ ...fixture.rows.vehicles[0], id })));
+  fixture.rows.garage_timelines = ['car', ...ids].map(vehicle_id => ({ vehicle_id, first_day: '2025-01-02', last_day: '2026-10-01',
+    active_days: 2, photos: 3, work_days: 0, events: 0, documents: 0, days: [['2025-01-02', 3, 0, 0, 0], ['2026-10-01', 0, 0, 1, 0]] }));
+  fixture.rpcHolds.get_vehicle_contribution_days_batch = new Promise<void>(resolve => { release = resolve; });
+  await act(async () => root.render(<Harness />));
+  try {
+    expect(state.totalEstimatedValue).toBe(12000);
+    expect(state.vehicles.find(v => v.id === 'car')?.timeline).toBeNull();
+  } finally { await act(async () => release()); }
+  const calls = fixture.calls.filter(c => c[0] === 'rpc' && c[1] === 'get_vehicle_contribution_days_batch');
+  expect(calls.length).toBeGreaterThan(1);
+  expect(calls.every(c => c[2].p_vehicle_ids.length <= 25)).toBe(true);
+  expect(calls.flatMap(c => c[2].p_vehicle_ids).sort()).toEqual(['car', 'old', ...ids].sort());
+  expect(state.vehicles.find(v => v.id === 'car')?.timeline).toMatchObject({ first_day: '2025-01-02', active_days: 2 });
+  expect(state.vehicles.filter(v => v.timeline).length).toBe(31);
 });
 
 it('retains inactive and sold history while excluding removed and non-vehicle records', async () => {
