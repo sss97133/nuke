@@ -142,3 +142,12 @@
 .garage-card-photo:hover .garage-card-step, .garage-card-step:focus-visible { opacity: 1; }
 @media (hover: none) { .garage-page .garage-vehicle-card .garage-card-step { display: none; } }
 @container (max-width: 210px) { .garage-page .garage-vehicle-card .garage-card-step { display: none; } }
+/* The reel's last frame: the readers' lines, a panel the size of a photo, glass over the car's own colours. */
+.garage-card-analysis { position: relative; flex: 0 0 100%; scroll-snap-align: start; box-sizing: border-box; padding: 12px 14px; overflow-y: auto; overscroll-behavior: contain; background: var(--surface); color: var(--text); }
+.garage-card-analysis h3 { margin: 0 0 6px; color: var(--text-secondary); }
+.garage-card-analysis ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.garage-card-analysis li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline; padding-top: 6px; border-top: 1px solid var(--border); }
+.garage-card-analysis li > :nth-child(1) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.garage-card-analysis li > :nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; }
+.garage-card-analysis li > :nth-child(3) { grid-column: 1 / -1; color: var(--text-secondary); overflow-wrap: anywhere; }
+.garage-page .garage-vehicle-card .garage-card-to-analysis, .garage-card-to-analysis { position: absolute; z-index: 3; left: 8px; bottom: 8px; min-width: 0; min-height: 0; height: 22px; padding: 0 9px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 999px; background: rgba(20, 20, 20, 0.45); -webkit-backdrop-filter: blur(12px) saturate(1.6); backdrop-filter: blur(12px) saturate(1.6); color: #fff; font: 500 var(--text-caption)/1 var(--font-family); cursor: pointer; }

@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import Link from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl as sharedOptimizeImageUrl } from '../../lib/imageOptimizer';
+import { GarageCardAnalysis, readCardAnalysis, type AnalysisLine } from '../garage/GarageCardAnalysis';
 import { appendFrames, coverDayOf, readReelPage, readReelStart, REEL_PAGE, type ReelFrame } from '../garage/garageReel';
 import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
 import '../garage/garage.css';
@@ -580,17 +581,28 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
   const reelAsked = useRef(false);
   const nextOffset = useRef(REEL_PAGE);
   const paging = useRef(false);
+  // The analysis frame is read the first time the reel nears its end, and exists only when a reader returned a line.
+  const [analysis, setAnalysis] = useState<AnalysisLine[] | null>(null);
+  const analysisAsked = useRef(false);
+  const loadAnalysis = useCallback(() => {
+    if (analysisAsked.current) return;
+    analysisAsked.current = true;
+    readCardAnalysis(vehicle.id).then(setAnalysis).catch(() => { analysisAsked.current = false; });
+  }, [vehicle.id]);
   const loadReel = useCallback(() => {
     if (reelAsked.current || (!cover && !vehicle.image_count)) return;
     reelAsked.current = true;
     readReelStart(vehicle.id)
       .then(({ sequence, page, total }) => {
+        const frames = appendFrames([], [...sequence, ...page], cover);
         setCoverDay(coverDayOf([...sequence, ...page], cover));
-        setReel(appendFrames([], [...sequence, ...page], cover));
+        setReel(frames);
         setPhotoTotal(total);
+        // A short reel is already at its end.
+        if ((cover ? 1 : 0) + frames.length <= 3) loadAnalysis();
       })
       .catch(() => { reelAsked.current = false; });
-  }, [vehicle.id, cover, vehicle.image_count]);
+  }, [vehicle.id, cover, vehicle.image_count, loadAnalysis]);
   const loadMore = useCallback(() => {
     if (paging.current || nextOffset.current >= photoTotal) return;
     paging.current = true;
@@ -604,13 +616,22 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
       .catch(() => {})
       .finally(() => { paging.current = false; });
   }, [vehicle.id, cover, photoTotal]);
-  // Frame one is the cover when there is one; the reel's photos follow it.
+  // Frame one is the cover when there is one; the reel's photos follow it; the analysis is always last.
   const photoFrames = (cover ? 1 : 0) + reel.length;
+  const hasAnalysis = !!analysis?.length;
+  const lastFrame = photoFrames - 1 + (hasAnalysis ? 1 : 0);
+  const onAnalysis = hasAnalysis && frame >= photoFrames;
   const onReelScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const at = Math.round(event.currentTarget.scrollLeft / Math.max(1, event.currentTarget.clientWidth));
     setFrame(at);
-    // Three frames from the end of what has loaded, the next page is asked for.
-    if (at >= photoFrames - 3) loadMore();
+    // Three frames from the end of what has loaded, the next page is asked for (not while the analysis shows,
+    // so a page never lands in front of it), and the analysis with it.
+    if (at >= photoFrames - 3) { if (at < photoFrames) loadMore(); loadAnalysis(); }
+  };
+  const toAnalysis = () => {
+    const node = reelRef.current;
+    // At once, so the photos passed on the way do not ask for more pages.
+    if (node) node.scrollTo({ left: photoFrames * node.clientWidth });
   };
   const step = (by: number) => {
     loadReel();
@@ -685,13 +706,15 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
                 <img src={sharedOptimizeImageUrl(url, 'medium') || url} alt="" width={600} height={450} loading="lazy" decoding="async" />
               </Link>
             ))}
+            {hasAnalysis && <GarageCardAnalysis lines={analysis!} />}
           </div>
-          {photoFrames > 1 && <>
-            {frame > 0 && <button type="button" className="garage-card-step" data-dir="back" aria-label="Previous photo" onClick={() => step(-1)}>‹</button>}
-            {frame < photoFrames - 1 && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next photo" onClick={() => step(1)}>›</button>}
-            <span className="garage-card-frame">{Math.min(frame + 1, photoFrames)} / {Math.max(photoTotal, photoFrames).toLocaleString('en-US')}</span>
+          {lastFrame > 0 && <>
+            {frame > 0 && <button type="button" className="garage-card-step" data-dir="back" aria-label="Previous frame" onClick={() => step(-1)}>‹</button>}
+            {frame < lastFrame && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next frame" onClick={() => step(1)}>›</button>}
+            {hasAnalysis && !onAnalysis && <button type="button" className="garage-card-to-analysis" onClick={toAnalysis}>Analysis</button>}
+            {!onAnalysis && photoFrames > 1 && <span className="garage-card-frame">{Math.min(frame + 1, photoFrames)} / {Math.max(photoTotal, photoFrames).toLocaleString('en-US')}</span>}
           </>}
-          {photoFrames <= 1 && (vehicle.image_count ?? 0) > 1 && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next photo" onClick={() => step(1)}>›</button>}
+          {lastFrame <= 0 && (vehicle.image_count ?? 0) > 1 && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next photo" onClick={() => step(1)}>›</button>}
 
           {/* This RPC revokes discovery membership, not an ownership period. */}
           {vehicle.relationship_source === 'discovered' && (
