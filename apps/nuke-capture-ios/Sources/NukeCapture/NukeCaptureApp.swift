@@ -96,6 +96,8 @@ struct NukeCaptureApp: App {
                     DayReceiptView(userId: dbgDayUser, date: dbgDay)
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
                     DebugProfileDeepLink()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "garage" {
+                    DebugGarageDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
                     DebugTodayDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "work" {
@@ -624,6 +626,36 @@ private struct DebugProfileDeepLink: View {
         Group {
             if ready {
                 ProfileTab(ownUserId: SupabaseService.currentUserId, onSignIn: nil)
+            } else {
+                Color(.systemBackground).overlay { ProgressView() }
+            }
+        }
+        .task {
+            let env = ProcessInfo.processInfo.environment
+            if let at = env["NUKE_DEBUG_ACCESS_TOKEN"], !at.isEmpty,
+               let rt = env["NUKE_DEBUG_REFRESH_TOKEN"], !rt.isEmpty,
+               SupabaseService.currentUserId == nil {
+                _ = try? await SupabaseService.client.auth.setSession(accessToken: at, refreshToken: rt)
+            }
+            ready = true
+        }
+    }
+}
+
+/// Screenshot-loop deep link for the garage cards.
+/// NUKE_DEBUG_SCREEN=garage → injects the session (if given), then roots on the signed-in account's GarageView.
+/// Signed out it says so instead of reading anything. DEBUG only.
+private struct DebugGarageDeepLink: View {
+    @State private var ready = false
+    var body: some View {
+        Group {
+            if ready {
+                if let userId = SupabaseService.currentUserId {
+                    NavigationStack { GarageView(userId: userId) }
+                } else {
+                    ContentUnavailableView("Signed out", systemImage: "car.side",
+                                           description: Text("The garage reads the signed-in account's vehicles."))
+                }
             } else {
                 Color(.systemBackground).overlay { ProgressView() }
             }

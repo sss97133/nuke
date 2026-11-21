@@ -95,6 +95,8 @@ enum FixtureBackend {
         // Versioned STABLE profile readers (20261116050000_profile_read_functions_v1.sql).
         // Their _v1 suffix does not match the generic _read classifier.
         "profile_vehicle_relationships_read_v1", "profile_labor_read_v1", "profile_money_read_v1",
+        // A vehicle's log book (20261120100000_vehicle_bound_statements.sql): a STABLE reader.
+        "vehicle_statements",
     ]
 
     /// Explore's anonymous market reads. Explore is the default tab, so they run in every launch that
@@ -119,6 +121,12 @@ enum FixtureBackend {
                items.contains(where: { $0.name == "taken_at" && ($0.value?.hasPrefix("lt.") ?? false) }) {
                 return dayPhotos()
             }
+        }
+        if scenario == "garage-cards", path == "/rest/v1/vehicle_images" {
+            // Only the owned car has a reel; the query names its vehicle.
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            let owned = items.contains { $0.name == "vehicle_id" && $0.value == "eq.\(GarageCardFixtures.owned)" }
+            return ok(owned ? GarageCardFixtures.reel() : "[]")
         }
         if scenario == "navigation-actors", path == "/functions/v1/universal-search" {
             return ok("""
@@ -219,6 +227,16 @@ enum FixtureBackend {
             return ok("""
             [{"session_day":"2026-10-31","gps_cell":"fixture","photo_count":1,"image_ids":["00000000-0000-4000-8000-00000000e001"],"sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
             """)
+        case "get_user_garage" where scenario == "garage-cards": return ok(GarageCardFixtures.garage())
+        case "get_my_garage_owner_corrections" where scenario == "garage-cards": return ok("[]")
+        case "my_unorganized_photo_count" where scenario == "garage-cards": return ok("37")
+        case "get_vehicle_contribution_days_batch":
+            // The garage cards' day reader: rows for the cards scenario, a successful empty answer elsewhere.
+            return ok(scenario == "garage-cards" ? GarageCardFixtures.timelines() : "[]")
+        case "vehicle_profile_read" where scenario == "garage-cards":
+            return ok(GarageCardFixtures.profileRead(args["p_vehicle_id"] as? String ?? ""))
+        case "vehicle_statements" where scenario == "garage-cards": return ok(GarageCardFixtures.statements)
+        case "vehicle_statements": return ok("null")
         case "vehicle_profile_read" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             {"vehicle_id":"\(navigationVehicleId)","viewer":"\((scenario.hasPrefix("receipt-") || scenario.hasPrefix("financial-")) ? "owner" : "anon")","read_at":"2026-10-31T12:00:00Z",
@@ -393,6 +411,8 @@ enum FixtureBackend {
             return ok(InvestmentEvidenceFixtures.saleEvents)
         case "receipt_vehicle_links" where scenario.hasPrefix("receipt-") || scenario == "financial-qualification":
             return ok(ReceiptDepthFixtures.links)
+        case "vehicles" where scenario == "garage-cards": return ok(GarageCardFixtures.metadata)
+        case "vehicle_images" where scenario == "garage-cards": return ok("[]")
         case "vehicles" where ["navigation-garage", "source-inspection", "receipt-depth", "receipt-withdrawn", "financial-qualification", "financial-evidence-withheld"].contains(scenario):
             return ok("""
             [{"id":"\(navigationVehicleId)","year":1973,"make":"Fixture","model":"Coupe","vin":"TEST1234567",

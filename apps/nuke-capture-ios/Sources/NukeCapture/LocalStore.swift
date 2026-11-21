@@ -192,6 +192,8 @@ struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
     var statementConflict: Bool? = nil
     var relationshipEvidenceIds: [String]? = nil
     var relationshipObservedAt: String? = nil
+    /// get_user_garage's activity clock (genuine activity only), the garage's order; nil when the car has none.
+    var last_activity_at: String? = nil
 
     var id: String { vehicle_id }
     var title: String {
