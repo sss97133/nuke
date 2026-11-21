@@ -19,6 +19,7 @@ import {
 } from '../lib/dealRead/batComps';
 import { buildAsks, type Ask, type AskVehicleRow, type ListingObservationRow } from '../lib/dealRead/asks';
 import { pickWriteUps, type RawWriteUpRow, type WriteUp } from '../lib/dealRead/writeUps';
+import { standingReadings } from '../lib/standingReadings';
 
 export interface DealSubject {
   id: string;
@@ -106,10 +107,10 @@ async function fetchSubject(vehicleId: string): Promise<DealSubject | null> {
 }
 
 async function fetchObservations(vehicleId: string): Promise<DealObservation[]> {
-  const { data, error } = await supabase
+  const { data, error } = await standingReadings(supabase
     .from('vehicle_observations')
     .select('id,kind,observed_at,ingested_at,source_url,source_identifier,content_text,structured_data,confidence,confidence_score,extraction_method,extraction_metadata')
-    .eq('vehicle_id', vehicleId)
+    .eq('vehicle_id', vehicleId))
     .order('observed_at', { ascending: false })
     .limit(50);
   if (error) throw error;
