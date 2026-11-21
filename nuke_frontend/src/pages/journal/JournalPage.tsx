@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { getGridImageUrl } from "../../lib/imageOptimizer";
 import { callTool } from "../../lib/mcp";
 import { readVehicleNames } from "./vehicleNames";
 
@@ -207,7 +208,8 @@ export default function JournalPage() {
                 {data.work_log.photos.map((p) => (
                   <div key={p.id} style={styles.photoCell}>
                     {p.url ? (
-                      <img src={p.url} alt={p.angle ?? "photo"} loading="lazy" style={styles.photoImg} />
+                      // A resized copy, not the original: iPhone originals are HEIC, which most browsers cannot draw.
+                      <img src={getGridImageUrl(p.url) ?? p.url} alt={p.angle ?? "photo"} loading="lazy" style={styles.photoImg} />
                     ) : (
                       <div style={{ ...styles.photoImg, display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>NO URL</div>
                     )}
