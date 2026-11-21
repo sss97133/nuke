@@ -41,10 +41,10 @@ export interface EventSummary {
   last_event_date: string | null;
 }
 
-/** One week of recorded activity: [Monday YYYY-MM-DD, photos, work sessions, events, document pages]. */
-export type GarageTimelineWeek = [string, number, number, number, number];
+/** One day of recorded activity: [YYYY-MM-DD, photos, work sessions, events, document pages]. */
+export type GarageTimelineDay = [string, number, number, number, number];
 
-/** The profile timeline's sources folded to weeks (get_vehicle_contribution_weeks_batch). */
+/** The profile timeline's sources by day (get_vehicle_contribution_days_batch). */
 export interface GarageTimeline {
   first_day: string;
   last_day: string;
@@ -53,7 +53,7 @@ export interface GarageTimeline {
   work_days: number;
   events: number;
   documents: number;
-  weeks: GarageTimelineWeek[];
+  days: GarageTimelineDay[];
 }
 
 export interface GarageVehicle {
@@ -752,7 +752,7 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
           const readTimelines = async () => {
             const data: (GarageTimeline & { vehicle_id: string })[] = [];
             for (let offset = 0; offset < vehicleIdArray.length && !cancelled; offset += 500) {
-              const result = await supabase.rpc('get_vehicle_contribution_weeks_batch', { p_vehicle_ids: vehicleIdArray.slice(offset, offset + 500) });
+              const result = await supabase.rpc('get_vehicle_contribution_days_batch', { p_vehicle_ids: vehicleIdArray.slice(offset, offset + 500) });
               if (result.error || !Array.isArray(result.data)) return { data: null, error: true };
               data.push(...result.data);
             }
@@ -781,16 +781,16 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
           setActivity(garageActivity);
           if (fallbackRes.error) readWarnings.push('Some vehicle cover photos are unavailable.');
           if (eventSummaryRes.error) readWarnings.push('Event summaries are unavailable. Activity counts remain unknown.');
-          // The event weeks stay as the timeline's fallback when the week reader is unavailable.
+          // The event weeks stay as the timeline's fallback when the day reader is unavailable.
           if (eventWeeksRes.error && timelineRes.error) readWarnings.push('Activity timelines are unavailable.');
           for (const t of timelineRes.error ? [] : (timelineRes.data ?? []) as (GarageTimeline & { vehicle_id: string })[]) {
-            if (typeof t.vehicle_id === 'string' && allRows.has(t.vehicle_id) && Array.isArray(t.weeks) &&
+            if (typeof t.vehicle_id === 'string' && allRows.has(t.vehicle_id) && Array.isArray(t.days) &&
                 /^\d{4}-\d{2}-\d{2}$/.test(String(t.first_day)) && /^\d{4}-\d{2}-\d{2}$/.test(String(t.last_day))) {
               timelines.set(t.vehicle_id, {
                 first_day: t.first_day, last_day: t.last_day, active_days: Number(t.active_days) || 0,
                 photos: Number(t.photos) || 0, work_days: Number(t.work_days) || 0,
                 events: Number(t.events) || 0, documents: Number(t.documents) || 0,
-                weeks: t.weeks.filter(w => Array.isArray(w) && /^\d{4}-\d{2}-\d{2}$/.test(String(w[0]))),
+                days: t.days.filter(w => Array.isArray(w) && /^\d{4}-\d{2}-\d{2}$/.test(String(w[0]))),
               });
             }
           }

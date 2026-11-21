@@ -71,7 +71,7 @@ it('groups current inventory together independently of title and retains past bu
   expect(rows[5].relationship_type).toBe('BUSINESS HANDLING');
 });
 it('lists cars under the year of their newest dated activity, undated cars last',async()=>{
-  const timeline=(first_day:string,last_day:string)=>({first_day,last_day,active_days:1,photos:1,work_days:0,events:0,documents:0,weeks:[[last_day,1,0,0,0]]});
+  const timeline=(first_day:string,last_day:string)=>({first_day,last_day,active_days:1,photos:1,work_days:0,events:0,documents:0,days:[[last_day,1,0,0,0]]});
   state={...state,vehicles:[
     {...vehicle,id:'this-year',timeline:timeline('2021-03-04','2026-11-02')},
     {...vehicle,id:'also-this-year',timeline:timeline('2026-01-01','2026-02-01'),inventory_status:'previous'},

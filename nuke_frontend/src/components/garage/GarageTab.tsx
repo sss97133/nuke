@@ -1,5 +1,5 @@
 /** The owner's garage, preserving recorded relationships and unresolved evidence. */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from '../PrefetchLink';
 import { Button } from '../ui/button';
 import { garageFirstDay, garageLastDay, type GarageVehicle, type VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
@@ -7,10 +7,46 @@ import { GarageVehicleCard, garageAxis } from '../vehicles/GarageVehicleCard';
 import { GarageToolbar } from './GarageToolbar';
 import './garage.css';
 
+const CARD_WIDTH_KEY = 'garage-card-width';
+const CARD_WIDTH_DEFAULT = 280;
+const CARD_WIDTH_MIN = 130;
+const CARD_WIDTH_MAX = 720;
+
 function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
   const { vehicles, isLoading, error, warnings = [], viewMode, sortMode, filterMode,
     setViewMode, setSortMode, setFilterMode, refresh, unresolvedSources = [], signedIn } = dashboard;
   const [query, setQuery] = useState('');
+  // A pinch resizes the cards (more cars or bigger cars), not the browser's magnification.
+  const pageRef = useRef<HTMLElement>(null);
+  const [cardWidth, setCardWidth] = useState(() => {
+    let saved = 0;
+    try { saved = Number(globalThis.localStorage?.getItem?.(CARD_WIDTH_KEY)); } catch { /* storage unavailable */ }
+    return saved >= CARD_WIDTH_MIN && saved <= CARD_WIDTH_MAX ? saved : CARD_WIDTH_DEFAULT;
+  });
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page) return;
+    const clamp = (width: number) => Math.round(Math.min(CARD_WIDTH_MAX, Math.max(CARD_WIDTH_MIN, width)));
+    // A trackpad pinch arrives as a wheel event with ctrlKey set.
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      setCardWidth(width => clamp(width * Math.exp(-event.deltaY * 0.01)));
+    };
+    // Safari reports the pinch as gesture events carrying a scale.
+    let base = CARD_WIDTH_DEFAULT;
+    const onGestureStart = (event: Event) => { event.preventDefault(); setCardWidth(width => (base = width)); };
+    const onGestureChange = (event: Event) => { event.preventDefault(); setCardWidth(clamp(base * ((event as any).scale || 1))); };
+    page.addEventListener('wheel', onWheel, { passive: false });
+    page.addEventListener('gesturestart', onGestureStart);
+    page.addEventListener('gesturechange', onGestureChange);
+    return () => {
+      page.removeEventListener('wheel', onWheel);
+      page.removeEventListener('gesturestart', onGestureStart);
+      page.removeEventListener('gesturechange', onGestureChange);
+    };
+  }, []);
+  useEffect(() => { try { globalThis.localStorage?.setItem?.(CARD_WIDTH_KEY, String(cardWidth)); } catch { /* private mode */ } }, [cardWidth]);
   const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matches = (text: string) => words.every(word => text.toLocaleLowerCase().includes(word));
   const visibleVehicles = vehicles.filter(vehicle => matches([
@@ -32,7 +68,7 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
   // One window and one intensity scale for every strip, taken from the whole garage.
   const axis = useMemo(() => garageAxis(vehicles), [vehicles]);
 
-  return <main className="garage-page">
+  return <main className="garage-page" ref={pageRef} style={{ '--garage-card-min': `${cardWidth}px` } as React.CSSProperties}>
     <div className="garage-heading"><div><h1>Garage</h1><p>Every car you are tied to, in the order of its recorded activity.</p></div>
       {signedIn && <div className="garage-heading-actions">
         <Link className="btn-base btn-secondary" to="/capture/ledger">Capture ledger</Link>

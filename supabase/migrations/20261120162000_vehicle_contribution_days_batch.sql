@@ -1,8 +1,8 @@
--- get_vehicle_contribution_weeks_batch(p_vehicle_ids): the profile timeline's activity
+-- get_vehicle_contribution_days_batch(p_vehicle_ids): the profile timeline's activity
 -- (photos by capture date, work sessions, timeline events, linked document pages) for many
--- vehicles in one read, folded to weeks, one row per vehicle so no row cap can cut it.
+-- vehicles in one read, by day, one row per vehicle so no row cap can cut it.
 --
--- Consumer: the garage cards' week-square timeline
+-- Consumer: the garage cards' day-square timeline
 -- (nuke_frontend/src/hooks/useVehiclesDashboard.ts). Until now those cards read
 -- get_vehicle_event_weeks_batch, which sees vehicle_events only: 129 week rows across the
 -- 138 cars of the measured garage (2026-11-20).
@@ -14,9 +14,9 @@
 SET lock_timeout = '5s';
 SET statement_timeout = '60s';
 
-CREATE OR REPLACE FUNCTION public.get_vehicle_contribution_weeks_batch(p_vehicle_ids uuid[])
+CREATE OR REPLACE FUNCTION public.get_vehicle_contribution_days_batch(p_vehicle_ids uuid[])
  RETURNS TABLE(vehicle_id uuid, first_day date, last_day date, active_days integer,
-               photos integer, work_days integer, events integer, documents integer, weeks jsonb)
+               photos integer, work_days integer, events integer, documents integer, days jsonb)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
@@ -72,7 +72,7 @@ AS $function$
     select * from d where day <= current_date + 1
   ),
   m as (
-    select dd.vehicle_id, date_trunc('week', dd.day)::date as wk,
+    select dd.vehicle_id, dd.day as wk,
            coalesce(sum(dd.n) filter (where dd.kind = 'photo'), 0)::int as p,
            coalesce(sum(dd.n) filter (where dd.kind = 'work'), 0)::int as w,
            coalesce(sum(dd.n) filter (where dd.kind = 'event'), 0)::int as e,
@@ -87,13 +87,13 @@ AS $function$
   )
   select t.vehicle_id, t.first_day, t.last_day, t.active_days,
          sum(m.p)::int as photos, t.work_days, sum(m.e)::int as events, sum(m.doc)::int as documents,
-         jsonb_agg(jsonb_build_array(m.wk, m.p, m.w, m.e, m.doc) order by m.wk) as weeks
+         jsonb_agg(jsonb_build_array(m.wk, m.p, m.w, m.e, m.doc) order by m.wk) as days
     from t join m using (vehicle_id)
    group by t.vehicle_id, t.first_day, t.last_day, t.active_days, t.work_days
 $function$;
 
-COMMENT ON FUNCTION public.get_vehicle_contribution_weeks_batch(uuid[]) IS
-  'Per-vehicle activity for up to 500 vehicles the caller may see: first and last active day, active days, totals, and weeks as [Monday date, photos, work sessions, events, document pages]. Sources of get_vehicle_contribution_days under the genuine-activity rules of compute_vehicle_activity.';
+COMMENT ON FUNCTION public.get_vehicle_contribution_days_batch(uuid[]) IS
+  'Per-vehicle activity for up to 500 vehicles the caller may see: first and last active day, active days, totals, and days as [date, photos, work sessions, events, document pages]. Sources of get_vehicle_contribution_days under the genuine-activity rules of compute_vehicle_activity.';
 
-REVOKE ALL ON FUNCTION public.get_vehicle_contribution_weeks_batch(uuid[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_vehicle_contribution_weeks_batch(uuid[]) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.get_vehicle_contribution_days_batch(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_vehicle_contribution_days_batch(uuid[]) TO anon, authenticated, service_role;

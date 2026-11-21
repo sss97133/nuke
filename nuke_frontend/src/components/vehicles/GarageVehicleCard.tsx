@@ -20,8 +20,8 @@ export interface GarageVehicleCardProps {
   axis?: GarageAxis;
 }
 
-/** The years, the intensity steps and the empty grid are the garage's, not the car's, so two cards compare. */
-export interface GarageAxis { startYear: number; years: number; steps: [number, number, number]; grid: string }
+/** The window and the intensity steps are the garage's, not the car's, so two cards compare. */
+export interface GarageAxis { start: number; end: number; weeks: number; steps: [number, number, number]; grid: string }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -251,31 +251,23 @@ function HoverData({
 }
 
 // ---------------------------------------------------------------------------
-// MiniBarcode — the car's recorded activity as week squares: one row per year,
-// the last five years, shaded on the garage's own scale.
+// MiniBarcode — the car's recorded activity as day squares, the contribution-grid
+// layout: seven rows (Monday to Sunday), one column per week, the last year,
+// shaded on the garage's own scale. Five years of days would be one-pixel squares
+// at card width, so the window is the year and the caption carries the full span.
 // ---------------------------------------------------------------------------
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthLabel = (ym: string) => `${MONTH_NAMES[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 const DAY_MS = 86_400_000;
-const CELL = 5; // one square and its gap, in viewBox units
-const TIMELINE_YEARS = 5;
+const TIMELINE_WEEKS = 53; // a year of week columns, ending with this week
 
-/** A week's place in the grid: its year (by its Thursday) and its column in that year. */
-function weekCell(weekStart: string): { year: number; col: number } | null {
-  const monday = Date.parse(`${weekStart}T00:00:00Z`);
-  if (!Number.isFinite(monday)) return null;
-  const thursday = new Date(monday + 3 * DAY_MS);
-  const year = thursday.getUTCFullYear();
-  return { year, col: Math.min(52, Math.floor((thursday.getTime() - Date.UTC(year, 0, 1)) / (7 * DAY_MS))) };
-}
-
-/** Recorded items per week: the week reader when present, otherwise the event weeks. */
-function weekTotals(vehicle: GarageVehicle): Map<string, number> {
+/** Recorded items per day: the day reader when present, otherwise the event weeks on their Monday. */
+function dayTotals(vehicle: GarageVehicle): Map<string, number> {
   const totals = new Map<string, number>();
-  if (vehicle.timeline?.weeks.length) {
-    for (const [week, photos, work, events, documents] of vehicle.timeline.weeks) {
-      totals.set(week, (Number(photos) || 0) + (Number(work) || 0) + (Number(events) || 0) + (Number(documents) || 0));
+  if (vehicle.timeline?.days.length) {
+    for (const [day, photos, work, events, documents] of vehicle.timeline.days) {
+      totals.set(day, (Number(photos) || 0) + (Number(work) || 0) + (Number(events) || 0) + (Number(documents) || 0));
     }
     return totals;
   }
@@ -286,53 +278,52 @@ function weekTotals(vehicle: GarageVehicle): Map<string, number> {
   return totals;
 }
 
-/** This year and the four before it, with steps at the quartiles of the garage's active weeks. */
+/** The window (its first Monday) and steps at the quartiles of the garage's active days. */
 export function garageAxis(vehicles: GarageVehicle[], now = new Date()): GarageAxis {
-  const startYear = now.getUTCFullYear() - TIMELINE_YEARS + 1;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const thisMonday = today - ((new Date(today).getUTCDay() + 6) % 7) * DAY_MS;
+  const start = thisMonday - (TIMELINE_WEEKS - 1) * 7 * DAY_MS;
   const totals: number[] = [];
   for (const vehicle of vehicles) {
-    for (const [week, n] of weekTotals(vehicle)) {
-      const cell = weekCell(week);
-      if (cell && n > 0 && cell.year >= startYear && cell.year <= now.getUTCFullYear()) totals.push(n);
+    for (const [day, n] of dayTotals(vehicle)) {
+      const at = Date.parse(`${day}T00:00:00Z`);
+      if (n > 0 && at >= start && at <= today) totals.push(n);
     }
   }
   totals.sort((a, b) => a - b);
   const at = (q: number) => totals.length ? totals[Math.min(totals.length - 1, Math.floor(q * totals.length))] : 1;
-  // Every week that has happened is a square; the weeks still to come this year are not drawn.
-  const thisWeek = weekCell(new Date(now.getTime() - ((now.getUTCDay() + 6) % 7) * DAY_MS).toISOString().slice(0, 10))!;
+  // Every day that has happened is a square; the rest of this week is not drawn.
   let grid = '';
-  for (let row = 0; row < TIMELINE_YEARS; row++) {
-    const last = startYear + row < thisWeek.year ? 52 : thisWeek.col;
-    for (let col = 0; col <= last; col++) grid += `M${col * CELL} ${row * CELL}h4v4h-4z`;
-  }
-  return { startYear, years: TIMELINE_YEARS, steps: [at(0.25), at(0.5), at(0.75)], grid };
+  for (let index = 0; start + index * DAY_MS <= today; index++) grid += `M${Math.floor(index / 7)} ${index % 7}h.84v.84h-.84z`;
+  return { start, end: today, weeks: TIMELINE_WEEKS, steps: [at(0.25), at(0.5), at(0.75)], grid };
 }
 
 function MiniBarcode({ vehicle, axis }: { vehicle: GarageVehicle; axis?: GarageAxis }) {
   const drawn = useMemo(() => {
     const frame = axis ?? garageAxis([vehicle]);
     const cells: { key: string; x: number; y: number; level: number; title: string }[] = [];
-    for (const [week, n] of weekTotals(vehicle)) {
-      const cell = weekCell(week);
-      if (!cell || n <= 0 || cell.year < frame.startYear || cell.year >= frame.startYear + frame.years) continue;
+    for (const [day, n] of dayTotals(vehicle)) {
+      const at = Date.parse(`${day}T00:00:00Z`);
+      if (!Number.isFinite(at) || n <= 0 || at < frame.start || at > frame.end) continue;
+      const index = Math.round((at - frame.start) / DAY_MS);
       cells.push({
-        key: week, x: cell.col * CELL, y: (cell.year - frame.startYear) * CELL,
-        // Above each quartile of the garage's active weeks the square steps up one shade.
+        key: day, x: Math.floor(index / 7), y: index % 7,
+        // Above each quartile of the garage's active days the square steps up one shade.
         level: 1 + frame.steps.filter(step => n > step).length,
-        title: `Week of ${monthLabel(week.slice(0, 7)).replace(' ', ` ${Number(week.slice(8, 10))}, `)}: ${n.toLocaleString('en-US')} recorded`,
+        title: `${monthLabel(day.slice(0, 7)).replace(' ', ` ${Number(day.slice(8, 10))}, `)}: ${n.toLocaleString('en-US')} recorded`,
       });
     }
     return { frame, cells };
   }, [vehicle, axis]);
 
   const { frame, cells } = drawn;
-  const label = `${cells.length} active ${cells.length === 1 ? 'week' : 'weeks'} recorded, ${frame.startYear} to ${frame.startYear + frame.years - 1}`;
+  const label = `${cells.length} active ${cells.length === 1 ? 'day' : 'days'} recorded in the last year`;
   return (
     <svg className="garage-barcode" role="img" aria-label={label}
-      viewBox={`0 0 ${53 * CELL - 1} ${frame.years * CELL - 1}`} preserveAspectRatio="xMinYMid meet">
+      viewBox={`0 0 ${frame.weeks - 0.16} 6.84`} preserveAspectRatio="xMinYMid meet">
       <path className="garage-barcode-grid" d={frame.grid} />
       {cells.map(cell => (
-        <rect key={cell.key} x={cell.x} y={cell.y} width={4} height={4} data-level={cell.level}><title>{cell.title}</title></rect>
+        <rect key={cell.key} x={cell.x} y={cell.y} width={0.84} height={0.84} rx={0.15} data-level={cell.level}><title>{cell.title}</title></rect>
       ))}
     </svg>
   );
