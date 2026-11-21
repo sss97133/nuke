@@ -14,14 +14,14 @@
 // minus frames under a privacy hold, minus frames whose bytes could not be fetched before (the stage ledger remembers
 // them: stage receipt_ocr, outcome blocked_input, until the URL changes). Read 2026-11-10 18:50 UTC: this reader took
 // the same 3 frames on every fire and failed all 3 with an HTTP error on the image, because nothing remembered.
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inputFingerprint, receiptForResult, recordStageReceipt } from './stage-queue.mjs';
-import { DEFAULT_MODEL } from './deep-stage.mjs';
+import { DEFAULT_MODEL, claudePrint, deepChildEnv, leanClaudeArgs } from './deep-stage.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -91,22 +91,6 @@ function parseResult(text) {
   return j;
 }
 
-// claude -p with the prompt on stdin (execFile's `input` is ignored for async calls; the CLI then waits 3 s and runs empty).
-function claudePrint(text, env) {
-  return new Promise((resolve, reject) => {
-    const child = spawn('claude', ['-p', '--output-format', 'json', '--model', model, '--allowedTools', 'Read'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
-    let out = '', err = '';
-    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('reader timed out after 240 s')); }, 240_000);
-    child.stdout.on('data', (d) => { out += d; });
-    child.stderr.on('data', (d) => { err += d; });
-    child.on('error', (e) => { clearTimeout(timer); reject(e); });
-    // a run that ends in an error (a usage limit, an API error) can exit non-zero with its JSON result on stdout
-    const hasResult = () => { try { return typeof JSON.parse(out) === 'object' && JSON.parse(out) !== null; } catch { return false; } };
-    child.on('close', (code) => { clearTimeout(timer); code === 0 || hasResult() ? resolve(out) : reject(new Error(`claude exited ${code}: ${(err || out).slice(0, 200)}`)); });
-    child.stdin.end(text);
-  });
-}
-
 async function readFrame(f, dir) {
   const ext = (f.file_name || f.image_url).toLowerCase().match(/\.(heic|heif|png|webp|jpe?g)/)?.[1] || 'jpg';
   const raw = join(dir, `${f.id}.${ext}`);
@@ -118,9 +102,12 @@ async function readFrame(f, dir) {
     img = join(dir, `${f.id}.jpg`);
     await run('sips', ['-s', 'format', 'jpeg', '-Z', '2200', raw, '--out', img]);
   }
-  const env = { ...process.env };
-  delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT; delete env.ANTHROPIC_API_KEY;
-  const stdout = await claudePrint(prompt(img), env);
+  // Lean start (leanClaudeArgs, as the frame reader's): no CLAUDE.md, memory, plugins, MCP servers or hooks, the one Read
+  // tool scoped to this page's own directory, and no session file, so a page of private paper is not copied into a
+  // transcript under ~/.claude/projects. The child runs in that directory with the subscription login and no service key
+  // or other credential in its environment (deepChildEnv): the page is not trusted (a photographed page can carry
+  // instructions). The prompt goes on stdin (execFile's `input` is ignored for async calls).
+  const stdout = await claudePrint(leanClaudeArgs({ model, readDir: dir }), prompt(img), { env: deepChildEnv(), cwd: dir });
   let outer; try { outer = JSON.parse(stdout); } catch { throw Object.assign(new Error('no JSON in the reader output'), { invalidOutput: true }); }
   if (outer.is_error) throw Object.assign(new Error(`reader error: ${String(outer.result ?? '').slice(0, 200)}`), { apiStatus: outer.api_error_status ?? null });
   const extraction = parseResult(outer.result);
@@ -171,8 +158,10 @@ if (!dry) {
     while (i < frames.length && !stop) {
       const f = frames[i++];
       const t0 = Date.now();
+      // A directory of its own for this page: the Read rule covers that directory only, and two pages are read side by side.
+      const own = realpathSync(mkdtempSync(join(dir, 'page_')));
       try {
-        const { extraction, duration_ms } = await readFrame(f, dir);
+        const { extraction, duration_ms } = await readFrame(f, own);
         summary.read++; summary.read_seconds += Math.round((duration_ms || (Date.now() - t0)) / 1000);
         const res = await land(f, extraction);
         out.push({ image_id: f.id, vehicle_id: f.vehicle_id, document_type: extraction.document_type, ...res });
@@ -188,8 +177,7 @@ if (!dry) {
         summary.errors++; out.push({ image_id: f.id, error: String(e.message || e).slice(0, 300) });
         await settle(f, resultOf(e));
         console.error(`${f.id} ERROR ${String(e.message || e).slice(0, 160)}`);
-      }
-      for (const p of [join(dir, `${f.id}.jpg`), join(dir, `${f.id}.heic`)]) if (existsSync(p)) rmSync(p, { force: true });
+      } finally { rmSync(own, { recursive: true, force: true }); }
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, conc) }, worker));

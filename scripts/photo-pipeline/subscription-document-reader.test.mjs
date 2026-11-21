@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -19,8 +19,12 @@ const run = promisify(execFile);
 const OWNER = '00000000-0000-4000-8000-0000000000aa';
 const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
 
-// `claude -p --output-format json`: the prompt arrives on stdin and names the image file.
+// `claude -p --output-format json`: the prompt arrives on stdin and names the image file. Each run records its argv, its
+// working directory and whether the service key reached it, beside HOME (the stand-in's directory).
 const FAKE_CLAUDE = `#!${process.execPath}
+const { appendFileSync } = process.getBuiltinModule('node:fs'), { join } = process.getBuiltinModule('node:path');
+appendFileSync(join(process.env.HOME, 'claude-args.jsonl'), JSON.stringify(process.argv.slice(2)) + '\\n');
+appendFileSync(join(process.env.HOME, 'claude-runs.jsonl'), JSON.stringify({ cwd: process.cwd(), service_key: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY) }) + '\\n');
 let input = '';
 process.stdin.on('data', (d) => { input += d; });
 process.stdin.on('end', () => {
@@ -32,7 +36,7 @@ process.stdin.on('end', () => {
 });
 `;
 
-async function withStandIns(frameNames, fn, { blocked = [], ledger = true } = {}) {
+async function withStandIns(frameNames, fn, { blocked = [], ledger = true, extraArgs = [] } = {}) {
   const calls = { receipts: [], lands: [], queries: [] };
   let port;
   const url = (n) => `http://127.0.0.1:${port}/img/${n}`;
@@ -65,12 +69,13 @@ async function withStandIns(frameNames, fn, { blocked = [], ledger = true } = {}
   const bin = mkdtempSync(join(tmpdir(), 'doc-reader-bin-'));
   writeFileSync(join(bin, 'claude'), FAKE_CLAUDE); chmodSync(join(bin, 'claude'), 0o755);
   try {
-    const result = await run(process.execPath, [join(here, 'subscription-document-reader.mjs'), '--owner', OWNER, '--concurrency', '1', '--limit', '20'], {
+    const result = await run(process.execPath, [join(here, 'subscription-document-reader.mjs'), '--owner', OWNER, '--concurrency', '1', '--limit', '20', ...extraArgs], {
       // PATH holds only the stand-in, which runs under this node by absolute path: a real `claude` is never reached
       env: { PATH: bin, HOME: bin, SUPABASE_URL: `http://127.0.0.1:${port}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key' },
     }).then((r) => ({ code: 0, ...r }), (e) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }));
     let summary = null; try { summary = JSON.parse(result.stdout.trim().split('\n').pop()); } catch { /* failed before its summary */ }
-    await fn({ calls, summary, url, result });
+    const lines = (f) => (existsSync(join(bin, f)) ? readFileSync(join(bin, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
+    await fn({ calls, summary, url, result, claudeArgs: lines('claude-args.jsonl'), claudeRuns: lines('claude-runs.jsonl') });
   } finally {
     server.close();
     rmSync(bin, { recursive: true, force: true });
@@ -105,4 +110,30 @@ test('with no ledger the reader works as before, with no memory', async () => {
     assert.deepEqual([summary.frames, summary.read, summary.errors], [2, 1, 1]);
     assert.deepEqual(summary.error_classes, { image_http_error: 1 });
   }, { ledger: false });
+});
+
+test('every read starts lean: no session file, the Read tool scoped to the page\'s own directory, the exact model id', async () => {
+  await withStandIns(['a-ok.jpg', 'b-ok.jpg'], ({ claudeArgs, claudeRuns, calls }) => {
+    assert.equal(claudeArgs.length, 2);
+    assert.deepEqual(calls.lands.map((l) => l.image_id), ['a-ok.jpg', 'b-ok.jpg']);
+    claudeArgs.forEach((argv, i) => {
+      for (const flag of ['-p', '--safe-mode', '--strict-mcp-config', '--no-session-persistence']) assert.ok(argv.includes(flag), flag);
+      assert.equal(argv[argv.indexOf('--model') + 1], 'claude-sonnet-5-5');
+      assert.equal(argv[argv.indexOf('--output-format') + 1], 'json');
+      assert.equal(argv[argv.indexOf('--tools') + 1], 'Read');
+      assert.ok(!argv.includes('--json-schema') && !argv.includes('--bare'));
+      // the page is not trusted: the one tool opens files under this page's directory only, no settings file widens that,
+      // and the child starts there without the service key
+      const r = claudeRuns[i];
+      assert.match(r.cwd, /\/nuke-docread-[^/]+\/page_[^/]+$/);
+      assert.equal(argv[argv.indexOf('--allowedTools') + 1], `Read(/${r.cwd}/**)`);
+      assert.equal(argv[argv.indexOf('--setting-sources') + 1], '');
+      assert.equal(r.service_key, false);
+    });
+    assert.notEqual(claudeRuns[0].cwd, claudeRuns[1].cwd, 'each page has its own directory');
+  });
+  await withStandIns(['a-ok.jpg'], ({ claudeArgs, calls }) => {
+    assert.equal(claudeArgs[0][claudeArgs[0].indexOf('--model') + 1], 'sonnet', '--model still overrides');
+    assert.equal(calls.lands[0].reader, 'claude-cli sonnet subscription');
+  }, { extraArgs: ['--model', 'sonnet'] });
 });
