@@ -20,7 +20,7 @@ interface Turn {
   wrote?: Array<{ id: string; kind: string; content_text: string | null }>;
 }
 
-const VehicleAgentChat: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+const VehicleAgentChat: React.FC<{ vehicleId: string; defaultCollapsed?: boolean }> = ({ vehicleId, defaultCollapsed = true }) => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,7 +61,7 @@ const VehicleAgentChat: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
   };
 
   return (
-    <CollapsibleWidget variant="profile" title="Ask the Vehicle Agent" defaultCollapsed={true}>
+    <CollapsibleWidget variant="profile" title="Ask the Vehicle Agent" defaultCollapsed={defaultCollapsed}>
       <div style={{ fontFamily: 'Arial, sans-serif' }}>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
           Claude with this vehicle's data as context. It can record durable new facts as
