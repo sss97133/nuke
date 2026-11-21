@@ -144,11 +144,10 @@ describe('grid card', () => {
     expect(host.querySelector('.garage-card-frame')?.textContent).toBe('19 / 20');
   });
 
-  it('leaves the photo count to the photo, lists the rest, and links the papers to their pages', async () => {
+  it('leaves the photo count to the photo and lists the rest', async () => {
     await render(<GarageVehicleCard vehicle={car([day('2026-11-01', 3)])} />);
     const counts = host.querySelector('.garage-card-counts')!;
     expect(counts.textContent).toBe('3 work days2 events1 paper');
-    expect(counts.querySelector('a')?.getAttribute('href')).toBe('/vehicle/synthetic-car#build-receipt-pages');
     expect(host.querySelector('.garage-card-frame')?.textContent).toBe('1 / 40');
     await render(<GarageVehicleCard vehicle={car([day('2026-11-01', 3)], { resolved_image_url: null, image_count: 3 })} />);
     expect(host.querySelector('.garage-card-counts')?.textContent).toContain('40 photos');

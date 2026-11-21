@@ -640,9 +640,10 @@ function recordSpan(vehicle: GarageVehicle): string | null {
 }
 
 /**
- * Counts that exist; a zero is left out instead of printed. `to` is the page that lists those records: the papers
- * are the profile's receipt pages. Work days and events have no list of their own (the profile shows them only as
- * days on its timeline), so they stay text. `photos: false` leaves the photo count to the photo's own counter.
+ * Counts that exist; a zero is left out instead of printed. `to`, when set, is a page that lists those records. None
+ * has one yet: work days and events show only as days on the profile timeline, and the profile's receipt pages
+ * (#build-receipt-pages) load after the page, so a link to them lands short. `photos: false` leaves the photo count
+ * to the photo's own counter.
  */
 interface RecordCount { key: string; text: string; to?: string; title?: string }
 function recordItems(vehicle: GarageVehicle, photos = true): RecordCount[] {
@@ -653,10 +654,7 @@ function recordItems(vehicle: GarageVehicle, photos = true): RecordCount[] {
     photos && photoTotal > 0 ? { key: 'photos', text: plural(photoTotal, 'photo', 'photos') } : null,
     t && t.work_days > 0 ? { key: 'work', text: plural(t.work_days, 'work day', 'work days') } : null,
     t && t.events > 0 ? { key: 'events', text: plural(t.events, 'event', 'events') } : null,
-    t && t.documents > 0 ? {
-      key: 'papers', text: plural(t.documents, 'paper', 'papers'),
-      to: `/vehicle/${vehicle.id}#build-receipt-pages`, title: 'Open this car’s receipt pages',
-    } : null,
+    t && t.documents > 0 ? { key: 'papers', text: plural(t.documents, 'paper', 'papers') } : null,
   ];
   return items.filter((item): item is RecordCount => item !== null);
 }
