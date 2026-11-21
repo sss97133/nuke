@@ -108,7 +108,13 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
             <div className={`garage-vehicles garage-view-${viewMode.toLowerCase()}`}>
               {section.vehicles.map(vehicle => <div key={vehicle.id} className="garage-card-slot"
                 data-drop={dropOn === vehicle.id || undefined} data-merge-pick={merge && !merge.duplicate && merge.keeper.id !== vehicle.id || undefined}
-                onContextMenu={event => { if (!signedIn) return; event.preventDefault(); setMenu({ vehicle, x: event.clientX, y: event.clientY }); }}
+                onContextMenu={event => {
+                  if (!signedIn) return;
+                  event.preventDefault();
+                  // The bubble opens on the card, at the click, pulled in so it stays inside the card's width.
+                  const box = event.currentTarget.getBoundingClientRect();
+                  setMenu({ vehicle, x: Math.min(event.clientX - box.left, Math.max(4, box.width - 248)), y: event.clientY - box.top });
+                }}
                 onClickCapture={event => {
                   // While a merge is being set up, a press on a card names the duplicate instead of opening it.
                   if (!merge || merge.duplicate || merge.keeper.id === vehicle.id) return;
@@ -117,14 +123,18 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
                 onDragOver={event => { if (!signedIn || !hasFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDropOn(vehicle.id); }}
                 onDragLeave={() => setDropOn(current => current === vehicle.id ? null : current)}
                 onDrop={event => { if (!signedIn || !hasFiles(event)) return; event.preventDefault(); event.stopPropagation(); setDropOn(null); addFilesToVehicle(vehicle, [...event.dataTransfer.files]); }}>
-                <GarageVehicleCard vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} />
+                <GarageVehicleCard vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} actions={signedIn ? [
+                  { label: 'Agent', onPress: () => setSheet({ kind: 'agent', vehicle }) },
+                  { label: 'Log book', onPress: () => setSheet({ kind: 'log', vehicle }) },
+                  { label: 'Merge', onPress: () => setMerge({ keeper: vehicle, duplicate: null }) },
+                ] : undefined} />
+                {menu?.vehicle.id === vehicle.id && <GarageCardMenu vehicle={vehicle} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onSheet={setSheet} onMerge={keeper => setMerge({ keeper, duplicate: null })} />}
+                {sheet?.vehicle.id === vehicle.id && <GarageSheetPanel key={sheet.kind} sheet={sheet} onClose={() => setSheet(null)} />}
               </div>)}
             </div>
           </section>)}
         </div>
       </>}
-    {menu && <GarageCardMenu vehicle={menu.vehicle} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onSheet={setSheet} onMerge={keeper => setMerge({ keeper, duplicate: null })} />}
-    {sheet && <GarageSheetPanel key={`${sheet.kind}-${sheet.vehicle.id}`} sheet={sheet} onClose={() => setSheet(null)} />}
     {merge && <GarageMergeBar keeper={merge.keeper} duplicate={merge.duplicate} viewerId={dashboard.viewerId} onCancel={() => setMerge(null)} onDone={() => { setMerge(null); refresh(); }} />}
   </main>;
 }

@@ -39,18 +39,16 @@ export function GarageCardMenu({ vehicle, x, y, onClose, onSheet, onMerge }: {
     const key = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     document.addEventListener('pointerdown', away);
     document.addEventListener('keydown', key);
-    window.addEventListener('scroll', onClose, { passive: true });
     ref.current?.querySelector('button')?.focus();
     return () => {
       document.removeEventListener('pointerdown', away);
       document.removeEventListener('keydown', key);
-      window.removeEventListener('scroll', onClose);
     };
   }, [onClose]);
   const pick = (action: () => void) => () => { action(); onClose(); };
-  // Keep the menu on screen near the click.
-  const left = Math.min(x, (globalThis.innerWidth || 1200) - 260);
-  const top = Math.min(y, (globalThis.innerHeight || 800) - 320);
+  // x and y are measured inside the card; the bubble opens on the card at the click.
+  const left = Math.max(4, x);
+  const top = Math.max(4, y);
   return <div ref={ref} className="garage-menu" role="menu" aria-label={`Actions for ${vehicleName(vehicle)}`} style={{ left, top }}>
     <p className="garage-menu-title">{vehicleName(vehicle)}</p>
     <button type="button" role="menuitem" onClick={pick(() => onSheet({ kind: 'agent', vehicle }))}>Ask this car's agent</button>

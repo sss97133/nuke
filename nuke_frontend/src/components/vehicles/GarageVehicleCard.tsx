@@ -16,8 +16,10 @@ export interface GarageVehicleCardProps {
   vehicle: GarageVehicle;
   viewMode?: ViewMode;
   onRefresh?: () => void;
-  /** First and last month (YYYY-MM) every card's strip spans, so the strips line up down the page. */
+  /** The window and scale every card's timeline shares. */
   axis?: GarageAxis;
+  /** Card buttons, in priority order; the lane shows as many as the card's width holds. */
+  actions?: { label: string; onPress: () => void }[];
 }
 
 /** The window and the intensity steps are the garage's, not the car's, so two cards compare. */
@@ -509,7 +511,58 @@ function recordCounts(vehicle: GarageVehicle): string[] {
   ].filter((part): part is string => part !== null);
 }
 
-function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefresh?: () => void; axis?: GarageAxis }) {
+/** The profile header's own read, so a card and its profile state the same price and configuration. */
+interface CardHeader { price: number | null; priceLabel: string | null; facets: { dimension: string; label: string }[] }
+const headerReads = new Map<string, Promise<CardHeader | null>>();
+function readCardHeader(vehicleId: string): Promise<CardHeader | null> {
+  let read = headerReads.get(vehicleId);
+  if (!read) {
+    read = Promise.resolve(supabase.rpc('vehicle_profile_read', { p_vehicle_id: vehicleId })).then(({ data, error }) => {
+      const sections: any[] = !error && Array.isArray((data as any)?.sections) ? (data as any).sections : [];
+      const masthead = sections.find(section => section?.kind === 'masthead');
+      const strip = sections.find(section => section?.kind === 'strip');
+      if (!masthead && !strip) return null;
+      return {
+        price: Number.isFinite(Number(masthead?.price)) && Number(masthead?.price) > 0 ? Number(masthead.price) : null,
+        priceLabel: typeof masthead?.priceLabel === 'string' ? masthead.priceLabel : null,
+        facets: (Array.isArray(strip?.facets) ? strip.facets : [])
+          .filter((facet: any) => typeof facet?.label === 'string' && facet.label && facet.dimension !== 'body_style')
+          .map((facet: any) => ({ dimension: String(facet.dimension), label: facet.label as string })),
+      };
+    }).catch(() => null);
+    headerReads.set(vehicleId, read);
+  }
+  return read;
+}
+
+/** "Active 19d ago" from the car's newest dated activity. */
+function activeAgo(vehicle: GarageVehicle, now = Date.now()): string | null {
+  const day = vehicle.last_activity_at?.slice(0, 10) ?? vehicle.timeline?.last_day ?? null;
+  const at = day ? Date.parse(`${day}T12:00:00Z`) : NaN;
+  if (!Number.isFinite(at)) return null;
+  const days = Math.max(0, Math.round((now - at) / DAY_MS));
+  return days === 0 ? 'Active today' : days < 60 ? `Active ${days}d ago` : days < 730 ? `Active ${Math.round(days / 30)}mo ago` : `Active ${Math.round(days / 365)}y ago`;
+}
+
+function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageVehicle; onRefresh?: () => void; axis?: GarageAxis; actions?: { label: string; onPress: () => void }[] }) {
+  // The header read is asked for once the card is on screen.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [header, setHeader] = useState<CardHeader | null>(null);
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    let live = true;
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      void readCardHeader(vehicle.id).then(read => { if (live) setHeader(read); });
+    }, { rootMargin: '200px' });
+    observer.observe(node);
+    return () => { live = false; observer.disconnect(); };
+  }, [vehicle.id]);
+  const price = header?.price ?? vehicle.estimated_value;
+  const priceTitle = header?.price != null ? header.priceLabel ?? 'Price on the profile' : estimateTooltip(vehicle);
+  const active = activeAgo(vehicle);
   const [vinCopied, setVinCopied] = useState(false);
   // The car's other photos load the first time the pointer or a finger reaches the cover;
   // the reel is a native scroll-snap strip, so a two-finger swipe flips through them.
@@ -550,7 +603,7 @@ function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefr
   const counts = recordCounts(vehicle);
 
   return (
-    <div className="garage-vehicle-card">
+    <div className="garage-vehicle-card" ref={cardRef}>
       <article className="garage-card">
         <div className="garage-card-photo" onPointerEnter={loadReel} onTouchStart={loadReel}>
           <div className="garage-card-reel"
@@ -625,10 +678,20 @@ function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefr
         </div>
 
         <div className="garage-card-body">
-          <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title">
-            {name || 'Unknown vehicle'}
-          </Link>
-          <p className="garage-card-relationship" title={relationshipTooltip(vehicle)}>{relationship}</p>
+          {/* Year, make and model lead from the left; the price holds the right edge. */}
+          <div className="garage-card-head">
+            <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title">
+              {name || 'Unknown vehicle'}
+            </Link>
+            {price != null && <span className="garage-card-price" title={priceTitle}>{formatCurrency(price)}</span>}
+          </div>
+          {/* One lane, most important first; what the card's width cannot hold drops off the end. */}
+          <div className="garage-card-lane">
+            <span title={relationshipTooltip(vehicle)}>{relationship}</span>
+            {active && <span>{active}</span>}
+            {(header?.facets ?? []).map(facet => <span key={facet.dimension}>{facet.label}</span>)}
+            {actions.map(action => <button key={action.label} type="button" onClick={action.onPress}>{action.label}</button>)}
+          </div>
 
           <MiniBarcode vehicle={vehicle} axis={axis} />
           {(span || counts.length > 0) && (
@@ -638,19 +701,12 @@ function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefr
             </p>
           )}
 
-          {(vehicle.vin || vehicle.estimated_value != null) && (
+          {vehicle.vin && (
             <div className="garage-card-foot">
-              {vehicle.vin ? (
-                <button type="button" className="garage-card-vin" onClick={copyVin}
-                  title="Copy VIN" aria-label={`Copy VIN ${vehicle.vin}`}>
-                  {vinCopied ? 'Copied' : truncateVin(vehicle.vin)}
-                </button>
-              ) : <span />}
-              {vehicle.estimated_value != null && (
-                <span className="garage-card-estimate" title={estimateTooltip(vehicle)}>
-                  {formatCurrency(vehicle.estimated_value)}
-                </span>
-              )}
+              <button type="button" className="garage-card-vin" onClick={copyVin}
+                title="Copy VIN" aria-label={`Copy VIN ${vehicle.vin}`}>
+                {vinCopied ? 'Copied' : truncateVin(vehicle.vin)}
+              </button>
             </div>
           )}
         </div>
@@ -864,10 +920,11 @@ export function GarageVehicleCard({
   viewMode = 'GRID',
   onRefresh,
   axis,
+  actions,
 }: GarageVehicleCardProps) {
   if (viewMode === 'LIST') return <ListCard vehicle={vehicle} axis={axis} />;
   if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} />;
-  return <GridCard vehicle={vehicle} onRefresh={onRefresh} axis={axis} />;
+  return <GridCard vehicle={vehicle} onRefresh={onRefresh} axis={axis} actions={actions} />;
 }
 
 export default GarageVehicleCard;
