@@ -6,6 +6,8 @@
  * POST { receipt_id?: string, data_v2?: object, raw_json?: object, vendor_name?, card_last4? }
  *   → { scope_type, scope_id, method, confidence, reasons[] }
  *
+ * Caller: the service key only. Anyone else is refused before the body is read.
+ *
  * Rule order (deterministic-first; LLM only as fallback):
  *   1. attribution.primary_entity block already present in raw_json
  *   2. payment_card_attribution lookup by card_last4
@@ -16,6 +18,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { isServiceCaller, requireWriteAuth, writeAuthResponse } from "../_shared/writeGuard.ts";
 
 const NUKE_LTD_ID = "f32ea08c-c2c5-4ca9-896d-cb99ce6c7bfb";
 const VIVA_ID = "c433d27e-2159-4f8c-b4ae-32a5e44a77cf";
@@ -216,6 +219,13 @@ async function classify(rawJson: any, dataV2: any, supabaseUrl: string, serviceK
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // The caller is judged before the method and the body: only the service key passes. This function reads
+  // the card attribution table and receipts with the service role and can call a paid model.
+  const denied = await requireWriteAuth(req, { headers: corsHeaders });
+  if (denied) return denied;
+  if (!(await isServiceCaller(req))) {
+    return writeAuthResponse({ status: 403, reason: "service key required" }, corsHeaders);
+  }
   if (req.method !== "POST") return new Response("method", { status: 405, headers: corsHeaders });
 
   try {

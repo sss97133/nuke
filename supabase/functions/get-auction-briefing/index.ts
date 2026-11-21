@@ -15,11 +15,13 @@
  * POST /functions/v1/get-auction-briefing
  * Body: { "vehicle_id": "uuid" } OR { "listing_url": "https://..." }
  *
- * Deploy: supabase functions deploy get-auction-briefing --no-verify-jwt
+ * Caller: the service key only. The briefing is read with the service role, so it covers vehicles that
+ * are not public; anyone else is refused before the body is read. CI deploys this folder.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { isServiceCaller, requireWriteAuth, writeAuthResponse } from "../_shared/writeGuard.ts";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -31,6 +33,12 @@ function json(data: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  // The caller is judged before the body is read: only the service key passes.
+  const denied = await requireWriteAuth(req, { headers: corsHeaders });
+  if (denied) return denied;
+  if (!(await isServiceCaller(req))) {
+    return writeAuthResponse({ status: 403, reason: "service key required" }, corsHeaders);
   }
 
   try {

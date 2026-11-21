@@ -8,14 +8,14 @@
  *
  * POST /functions/v1/document-pipeline-status
  * { "mode": "brief" | "detailed" | "errors" | "cost" }
+ *
+ * Caller: the service key only. The answer carries OCR spend and error text, and each call runs about
+ * fifteen exact counts; anyone else is refused before the body is read.
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "../_shared/cors.ts";
+import { isServiceCaller, requireWriteAuth, writeAuthResponse } from "../_shared/writeGuard.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -217,6 +217,12 @@ async function getTopErrors(): Promise<any[]> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  // The caller is judged before the body is read: only the service key passes.
+  const denied = await requireWriteAuth(req, { headers: corsHeaders });
+  if (denied) return denied;
+  if (!(await isServiceCaller(req))) {
+    return writeAuthResponse({ status: 403, reason: "service key required" }, corsHeaders);
   }
 
   const startTime = Date.now();

@@ -20,8 +20,13 @@
 //
 // POST { mode: 'conflicts' | 'nomatch', limit?: number, dry?: boolean }
 // GOOGLE_PLACES_API_KEY is already a project secret.
+//
+// Caller: the service key only. A run spends Google lookups and writes organizations, and CI deploys this
+// folder with the gateway's token check off, so the handler judges the caller itself, on every method.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
+import { isServiceCaller, requireWriteAuth, writeAuthResponse } from "../_shared/writeGuard.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -96,6 +101,15 @@ async function googlePlace(name: string): Promise<Hit | null> {
 }
 
 Deno.serve(async (req) => {
+  // The guard never judges OPTIONS, so a preflight is answered here and goes no further.
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+  const denied = await requireWriteAuth(req, { headers: corsHeaders });
+  if (denied) return denied;
+  if (!(await isServiceCaller(req))) {
+    return writeAuthResponse({ status: 403, reason: "service key required" }, corsHeaders);
+  }
   try {
     if (!PLACES_KEY) {
       return new Response(JSON.stringify({ configured: false, note: "GOOGLE_PLACES_API_KEY missing" }),
