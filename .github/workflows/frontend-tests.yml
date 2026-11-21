@@ -991,6 +991,7 @@ jobs:
         run: |
           deno test --allow-read supabase/functions/mcp-connector/oauth_test.ts
           deno test --allow-read supabase/functions/mcp-connector/surface_test.ts
+          deno test --allow-read supabase/functions/mcp-connector/query_library_test.ts
           deno test --allow-read supabase/functions/mcp-connector/advisor_evidence_test.ts
           deno test --allow-read supabase/functions/mcp-connector/advisor_surface_test.ts
           deno test --allow-read --allow-net supabase/functions/mcp-connector/advisor_live_e2e_test.ts

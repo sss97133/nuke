@@ -2261,10 +2261,18 @@ async function handleQueryMarketHistory(args: Record<string, unknown>): Promise<
 
 // ── Reference Library ───────────────────────────────────────────────────────
 
+// The reference library is these four tables, the ones the tool's schema lists. `type` chooses among
+// them; it is never a table name the caller supplies. Keep this list and the schema's enum the same.
+const LIBRARY_TYPES = ["paint_codes", "condition_knowledge", "condition_taxonomy", "vehicle_nomenclature"];
+const LIBRARY_MAX_LIMIT = 100;
+
 async function handleQueryLibrary(args: Record<string, unknown>): Promise<ToolResult> {
-  const supabase = sb();
   const type = String(args.type);
-  const limit = Number(args.limit) || 25;
+  if (!LIBRARY_TYPES.includes(type)) {
+    return toolErr(`Unknown library type. Use one of: ${LIBRARY_TYPES.join(", ")}`);
+  }
+  const limit = Math.min(Math.max(Math.trunc(Number(args.limit)) || 25, 1), LIBRARY_MAX_LIMIT);
+  const supabase = sb();
 
   let query = supabase.from(type as any).select("*").limit(limit);
 
