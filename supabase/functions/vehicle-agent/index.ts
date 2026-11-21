@@ -13,6 +13,13 @@
  *   A confirm: { vehicle_id: uuid, confirm: <token from a proposal>, speaker_role?: string }
  *              → { confirmed: { id, writer, record_id, replay } }
  *
+ * RECORDS (records.ts): each turn also reads the car's own record through the site's sanctioned readers
+ * (vehicle_build_reconstruction, vehicle_profile_read, vehicle_testimony_summary, vehicle_open_questions,
+ * get_vehicle_day_depth, work_sessions, vehicle_statements), called with the person's own session, never the service
+ * key, so each reader's privacy rule decides what this viewer sees. The reads run in parallel with the memory loads,
+ * each bounded at 4 s; a reader that fails is named as unread in the digest and never fails the turn. The digest goes
+ * into the model's context above the observations, each figure under its reader's name and as-of time.
+ *
  * SCOPE (scope.ts): everything is pinned to the request's vehicle_id; the model never supplies a vehicle, and a
  * proposal naming another vehicle is refused, so agents open on two cards cannot touch each other's car.
  *
@@ -52,6 +59,7 @@ import {
   isUuid, normalizeProposals, PROPOSAL_TTL_MS, signProposal, speakerRole, splitReply, verifyProposal,
   type ObservationArgs, type SignedPayload, type StatementArgs,
 } from "./scope.ts";
+import { buildRecordsDigest, readAll, readSummary, RECORD_READERS, type RecordReads } from "./records.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -242,25 +250,59 @@ Deno.serve(async (req) => {
       return await confirmProposal(supabase, req.headers.get("Authorization")!, user.id, vehicleId, body, signingSecret);
     }
 
+    // ── The car's record, read as the person asking ──────────────────────────
+    // Started first so the slowest reader (vehicle_build_reconstruction, ~2 s) overlaps the memory loads below.
+    // The person's own session, so each reader's privacy rule decides; every read takes the request's vehicle_id only.
+    const readsFetchedAt = new Date().toISOString();
+    let recordsRead: Promise<RecordReads>;
+    try {
+      const publishable = projectPublishableKey();
+      if (!publishable) throw new Error("no publishable key in the function environment");
+      const asCaller = createClient(Deno.env.get("SUPABASE_URL")!, publishable, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const rpc = (fn: string) => (signal: AbortSignal) => asCaller.rpc(fn, { p_vehicle_id: vehicleId }).abortSignal(signal);
+      recordsRead = readAll({
+        vehicle_build_reconstruction: rpc("vehicle_build_reconstruction"),
+        vehicle_profile_read: rpc("vehicle_profile_read"),
+        vehicle_testimony_summary: rpc("vehicle_testimony_summary"),
+        vehicle_open_questions: rpc("vehicle_open_questions"),
+        get_vehicle_day_depth: rpc("get_vehicle_day_depth"),
+        vehicle_statements: rpc("vehicle_statements"),
+        // Times and confirmation only; the money columns on this table are not read.
+        work_sessions: (signal) => asCaller.from("work_sessions")
+          .select("session_date, duration_minutes, owner_confirmed_at")
+          .eq("vehicle_id", vehicleId).order("session_date", { ascending: true }).limit(1000).abortSignal(signal),
+      });
+    } catch (e) {
+      recordsRead = Promise.reject(e);
+    }
+    // A failure here never fails the turn: every reader is then named as unread in the digest.
+    recordsRead = recordsRead.catch((e) => {
+      const detail = e instanceof Error ? e.message : String(e);
+      console.error(`[vehicle-agent] records not read: ${detail}`);
+      return Object.fromEntries(RECORD_READERS.map((r) => [r, { status: "error", ms: 0, detail }])) as RecordReads;
+    });
+
     // ── Harness: load the vehicle's memory ───────────────────────────────────
-    const { data: veh } = await supabase
-      .from("vehicles").select("year, make, model, trim, vin, color").eq("id", vehicleId).maybeSingle();
-
-    const { data: obs } = await supabase
-      .from("vehicle_observations")
-      .select("kind, observed_at, content_text, structured_data, confidence")
-      .eq("vehicle_id", vehicleId)
-      .or("is_superseded.is.null,is_superseded.eq.false")
-      .order("observed_at", { ascending: false })
-      .limit(60);
-
-    const { data: imgs } = await supabase
-      .from("vehicle_images")
-      .select("id, taken_at, ai_scan_metadata")
-      .eq("vehicle_id", vehicleId)
-      .not("ai_scan_metadata->byok_deep_analysis", "is", null)
-      .order("taken_at", { ascending: false })
-      .limit(20);
+    const [{ data: veh }, { data: obs }, { data: imgs }] = await Promise.all([
+      supabase.from("vehicles").select("year, make, model, trim, vin, color").eq("id", vehicleId).maybeSingle(),
+      supabase
+        .from("vehicle_observations")
+        .select("kind, observed_at, content_text, structured_data, confidence")
+        .eq("vehicle_id", vehicleId)
+        .or("is_superseded.is.null,is_superseded.eq.false")
+        .order("observed_at", { ascending: false })
+        .limit(60),
+      supabase
+        .from("vehicle_images")
+        .select("id, taken_at, ai_scan_metadata")
+        .eq("vehicle_id", vehicleId)
+        .not("ai_scan_metadata->byok_deep_analysis", "is", null)
+        .order("taken_at", { ascending: false })
+        .limit(20),
+    ]);
 
     const imageSummaries = (imgs || []).map((r: any) => {
       const d = r.ai_scan_metadata?.byok_deep_analysis ?? {};
@@ -289,12 +331,22 @@ Deno.serve(async (req) => {
       return json(503, { error: "The agent has no model to answer with right now." });
     }
 
+    const records = await recordsRead;
+    const recordsStatus = readSummary(records);
+    console.log(`[vehicle-agent] records ${Object.entries(recordsStatus).map(([k, r]) => `${k}=${r.status}:${r.ms}ms`).join(" ")}`);
+    for (const [name, r] of Object.entries(records)) {
+      if (r && r.status !== "ok") console.warn(`[vehicle-agent] reader ${name} ${r.status}${r.detail ? `: ${r.detail}` : ""}`);
+    }
+    const recordsDigest = buildRecordsDigest(records, { fetchedAt: readsFetchedAt });
+
     const system =
       `You are the persistent agent assigned to ONE vehicle: ${vehName}` +
       (veh?.vin ? ` (VIN ${veh.vin})` : "") + `.\n` +
       `You reason ONLY from this vehicle's own data, provided below as your memory. Do not invent facts. ` +
-      `If the data doesn't say, say so. Be concrete and concise.\n\n` +
-      `=== OBSERVATIONS (most recent first) ===\n${JSON.stringify(obs ?? [], null, 0).slice(0, 12000)}\n\n` +
+      `If the data doesn't say, say so. Be concrete and concise. For counts, dates, hours and amounts, answer from ` +
+      `THIS CAR'S RECORDS and name the reader and its as-of time.\n\n` +
+      `=== THIS CAR'S RECORDS ===\n${recordsDigest}\n\n` +
+      `=== OBSERVATIONS (most recent first; only the latest ${(obs ?? []).length}, not all of them) ===\n${JSON.stringify(obs ?? [], null, 0).slice(0, 12000)}\n\n` +
       `=== DEEP-ANALYZED IMAGES ===\n${JSON.stringify(imageSummaries, null, 0).slice(0, 8000)}\n\n` +
       (allowWrites
         ? `You cannot write anything yourself. If — and only if — this exchange establishes a DURABLE new fact about ` +
@@ -308,7 +360,8 @@ Deno.serve(async (req) => {
           `when that message itself states something about this car (not for a question). target_key/target_value ` +
           `(lower_snake_case key, short value) are optional. ingest_observation records a finding of yours from this ` +
           `car's data, in your own voice. At most ${3} proposals. Never name another vehicle or any id: everything ` +
-          `applies to this car only. Most replies need NO json block.`
+          `applies to this car only. Figures in THIS CAR'S RECORDS are already in the database: never propose them ` +
+          `as a record. Most replies need NO json block.`
         : `Writing is disabled for this conversation; answer only.`);
 
     const messages = [
@@ -390,7 +443,10 @@ Deno.serve(async (req) => {
       // Nothing is written during a turn any more; kept for the profile chat and the iOS app, which read it.
       wrote: [],
       compute: { model, source: computeNote, duration_ms: durationMs },
-      context: { observations: (obs ?? []).length, analyzed_images: imageSummaries.length },
+      context: {
+        observations: (obs ?? []).length, analyzed_images: imageSummaries.length,
+        records: recordsStatus, records_digest_chars: recordsDigest.length,
+      },
     });
   } catch (err) {
     console.error(`[vehicle-agent] ${err instanceof Error ? err.message : String(err)}`);
