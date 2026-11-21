@@ -1,5 +1,6 @@
 -- Contract: the row the intake really inserts for an automatic ("thin") photo reading passes guard_reviewed_image_analysis of
--- 20261120140000_image_reading_tiers.sql, and project_reviewed_image_analysis then stamps the photo.
+-- 20261120140000_image_reading_tiers.sql, and project_reviewed_image_analysis then lands it as an observation only: the photo row is
+-- left exactly as the reader snapshotted it and no search row is placed.
 -- The rows are not typed here. supabase/sql/fixtures/thin_real_rows.json holds the INSERT the actual ingest-observation handler makes
 -- when the Mac reader's own envelope (scripts/photo-pipeline/deep-stage.mjs buildEnvelope + automaticProvenance) goes through the actual
 -- producer (reviewedAnalysis.ts recordReviewedAnalysis), for the 4 accepted verdicts of
@@ -71,8 +72,8 @@ BEGIN
  RETURN oid;
 END $$;
 
--- (a) both helpers say null, (b) the real trigger lets the insert land, (c) the projection succeeds and stamps the photo
-DO $$ DECLARE c record; adm jsonb; oid uuid; res jsonb; stamp jsonb; r jsonb; d text; n int := 0; BEGIN
+-- (a) both helpers say null, (b) the real trigger lets the insert land, (c) the projection succeeds and writes nothing on the photo
+DO $$ DECLARE c record; adm jsonb; oid uuid; res jsonb; before_photo text; r jsonb; d text; n int := 0; BEGIN
  SELECT config_value->'automatic'->'admits' INTO adm FROM platform_config WHERE config_key='image_reading_tiers';
  FOR c IN SELECT * FROM tr_case ORDER BY n LOOP
    r := c.r;
@@ -91,14 +92,24 @@ DO $$ DECLARE c record; adm jsonb; oid uuid; res jsonb; stamp jsonb; r jsonb; d 
    ASSERT EXISTS(SELECT 1 FROM observation_witnesses w WHERE w.observation_id=oid AND w.image_id=c.image_id AND w.witness_role='derived'),
      'case '||c.n||': the witness trigger placed the derived witness the projection needs';
    ASSERT (SELECT extraction_metadata ? 'prior_analysis' FROM vehicle_observations WHERE id=oid), 'case '||c.n||': the guard added prior_analysis';
+   SELECT to_jsonb(vi)::text INTO before_photo FROM vehicle_images vi WHERE vi.id=c.image_id;
    res := project_reviewed_image_analysis(oid);
    ASSERT res->>'success'='true' AND res->>'observation_id'=oid::text AND res->>'image_id'=c.image_id::text
-     AND res->>'vehicle_id'='20000000-0000-4000-8000-000000000101' AND res->>'image_observation_id' IS NOT NULL
+     AND res->>'vehicle_id'='20000000-0000-4000-8000-000000000101' AND res->>'thin_tier'='true'
+     AND res->'image_observation_id'='null'::jsonb AND res->>'superseded_readings'='0'
      AND res#>>'{cover,reason}'='thin_tier_reading', 'case '||c.n||': projection result '||res::text;
-   SELECT ai_scan_metadata->'byok_deep_analysis' INTO stamp FROM vehicle_images WHERE id=c.image_id;
-   ASSERT stamp IS NOT NULL AND stamp->>'observation_id'=oid::text AND stamp->>'agent_tier'='subscription automatic'
-     AND stamp->>'scene_type'=r#>>'{structured_data,scene_type}' AND stamp->>'prompt_version'='reviewed_image_analysis_v1'
-     AND stamp->>'source_identifier'=r->>'source_identifier', 'case '||c.n||': stamp '||stamp::text;
+   -- containment: the photo row is byte for byte what it was (no stamp; updated_at is still the instant the reader snapshotted),
+   -- and no search row exists
+   ASSERT (SELECT to_jsonb(vi)::text = before_photo FROM vehicle_images vi WHERE vi.id=c.image_id), 'case '||c.n||': the photo row is untouched';
+   ASSERT (SELECT NOT (ai_scan_metadata ? 'byok_deep_analysis') AND updated_at = c.expected_updated_at::timestamptz FROM vehicle_images WHERE id=c.image_id),
+     'case '||c.n||': no stamp, and the photo is still at the instant the reader snapshotted';
+   ASSERT NOT EXISTS(SELECT 1 FROM image_observations io WHERE io.image_id=c.image_id), 'case '||c.n||': no search row';
+   -- the reading is there to be keyed: current, tier and scene as posted
+   ASSERT (SELECT NOT is_superseded AND agent_tier='subscription automatic' AND structured_data->>'scene_type'=r#>>'{structured_data,scene_type}'
+             AND structured_data->>'analysis_kind'='image_deep_byok' FROM vehicle_observations WHERE id=oid), 'case '||c.n||': the stored reading';
+   -- a second call (the reader finishing a landing it could not confirm) answers the same and changes nothing
+   ASSERT project_reviewed_image_analysis(oid) = res, 'case '||c.n||': a second projection answers the same';
+   ASSERT (SELECT to_jsonb(vi)::text = before_photo FROM vehicle_images vi WHERE vi.id=c.image_id), 'case '||c.n||': and still writes nothing on the photo';
    n := n + 1;
    RAISE NOTICE 'PASS: real thin row % lands and projects (scene %, observation %)', c.n, r#>>'{structured_data,scene_type}', oid;
  END LOOP;

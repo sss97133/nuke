@@ -1,4 +1,4 @@
--- Shared setup of the reviewed-analysis contracts (test_reviewed_image_analysis.sql, test_image_reading_tiers.sql): roles, the tables the
+-- Shared setup of the reviewed-analysis contracts (test_reviewed_image_analysis.sql, test_image_reading_tiers.sql, test_thin_real_row.sql): roles, the tables the
 -- intake and its triggers read, the real ingest_image_observation, and the migrations through 20261109213000. Included with \ir; an empty
 -- disposable database, checked by the including contract.
 DO $$ BEGIN
@@ -23,7 +23,8 @@ CREATE TABLE vehicle_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  source_id uuid,source_url text,source_identifier text UNIQUE,observed_at timestamptz NOT NULL,
  content_text text,confidence_score numeric,agent_model text,agent_tier text,extraction_method text,extractor_id uuid,
  raw_source_ref text,structured_data jsonb,extraction_metadata jsonb,analysis_deferred boolean,
- property_id uuid,is_superseded boolean DEFAULT false,submitted_by_user_id uuid);
+ property_id uuid,is_superseded boolean DEFAULT false,submitted_by_user_id uuid,
+ ingested_at timestamptz DEFAULT now());
 CREATE TABLE observation_witnesses(id uuid DEFAULT gen_random_uuid(),observation_id uuid,image_id uuid,
  witness_role text,capture_method text,image_timestamp timestamptz,attestation_notes text,
  added_by_user_id uuid,added_by_agent_key text,UNIQUE(observation_id,image_id,witness_role));

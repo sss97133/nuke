@@ -811,40 +811,56 @@ SELECT pg_temp.ok(has_function_privilege('service_role', 'public.assay_photo_rea
 -- ===== 9b. reading tiers: a thin-tier (automatic) reading is closed by a receipt, a reviewed-tier reading by existing
 -- 20261120140000 lists the tiers in platform_config 'image_reading_tiers'. This migration stands alone: with no such row only the
 -- reader's own literal tier, 'subscription automatic', is thin; with the row, the tier it names as automatic.tier is thin and no other.
+-- A thin reading is its observation alone: the intake stamps only a reading that is not thin and refuses a thin one over any stamp
+-- (20261120140000). So a photo with a stamp is read, whatever tier the stamp names, and a thin reading is a photo with a current
+-- automatic-tier observation and no stamp.
 DELETE FROM image_stage_work; DELETE FROM image_stage_receipts; DELETE FROM public.observation_witnesses; DELETE FROM public.vehicle_observations;
 DELETE FROM public.image_observations; DELETE FROM public.vehicle_images;
 SELECT pg_temp.scope('{"enabled": true, "user_ids": ["00000000-0000-4000-8000-0000000000a1"], "vehicle_ids": ["00000000-0000-4000-8000-0000000000b1"]}');
--- a reading with its stamp and observation, by tier (the stamp and the observation carry the tier the intake wrote)
+-- a reading as the intake leaves it, by tier: the automatic tier is its observation alone (no stamp on the photo); any other tier is
+-- stamped, and the stamp and the observation carry the tier the intake wrote
 CREATE FUNCTION pg_temp.tiered(n int, tier text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM pg_temp.mk(n, meta => jsonb_set(pg_temp.reading(n), '{byok_deep_analysis,agent_tier}', to_jsonb(tier)));
+  IF tier = 'subscription automatic' THEN PERFORM pg_temp.mk(n);
+  ELSE PERFORM pg_temp.mk(n, meta => jsonb_set(pg_temp.reading(n), '{byok_deep_analysis,agent_tier}', to_jsonb(tier)));
+  END IF;
   INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, agent_tier)
   VALUES (pg_temp.obs(n), pg_temp.v1(), 'condition', jsonb_build_object('analysis_kind', 'image_deep_byok', 'image_id', pg_temp.img(n)), tier);
 END $$;
-SELECT pg_temp.tiered(401, 'subscription automatic');          -- thin
+SELECT pg_temp.tiered(401, 'subscription automatic');          -- thin: an observation, no stamp
 SELECT pg_temp.tiered(402, 'caller-byok subscription');        -- reviewed
 SELECT pg_temp.tiered(403, 'a tier nobody listed');            -- unlisted
 SELECT pg_temp.mk(404, meta => pg_temp.reading(404)); SELECT pg_temp.parent(404);   -- no tier at all: a legacy reading
-SELECT pg_temp.mk(405, meta => jsonb_set(pg_temp.reading(405), '{byok_deep_analysis,agent_tier}', '"subscription automatic"'));   -- a thin stamp, no observation
+SELECT pg_temp.tiered(405, 'subscription automatic');          -- thin, like 401 (it keeps only its version-1 receipt below)
 SELECT pg_temp.mk(406, meta => '{"classification":{"image_type":"exterior","confidence":0.9,"classifier_ok":true},"byok_deep_analysis":{"scene_type":"exterior"}}');  -- a legacy stamp, no observation
+-- a stamp that names the automatic tier, without (407) and with (408, already keyed) an automatic-tier observation behind it. The
+-- intake never writes one, so the stamp is someone's reading: the photo is read and is not offered to the automatic reader
+SELECT pg_temp.mk(407, meta => jsonb_set(pg_temp.reading(407), '{byok_deep_analysis,agent_tier}', '"subscription automatic"'));
+SELECT pg_temp.mk(408, meta => jsonb_set(pg_temp.reading(408), '{byok_deep_analysis,agent_tier}', '"subscription automatic"'));
+INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, agent_tier)
+VALUES (pg_temp.obs(408), pg_temp.v1(), 'condition', jsonb_build_object('analysis_kind', 'image_deep_byok', 'image_id', pg_temp.img(408)), 'subscription automatic');
+SELECT pg_temp.child(408);
 SELECT pg_temp.ok(NOT EXISTS (SELECT 1 FROM platform_config WHERE config_key = 'image_reading_tiers'), 'no tier row in this fixture: the migration stands alone');
 SELECT pg_temp.ok(pg_temp.has_gap(401, 'deep_reading') AND NOT pg_temp.has_gap(402, 'deep_reading') AND NOT pg_temp.has_gap(403, 'deep_reading')
-  AND NOT pg_temp.has_gap(404, 'deep_reading') AND pg_temp.has_gap(405, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading'),
-  'no tier row: only the literal automatic tier is thin (a thin reading with no receipt is a gap, whatever else is not)');
+  AND NOT pg_temp.has_gap(404, 'deep_reading') AND pg_temp.has_gap(405, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading')
+  AND NOT pg_temp.has_gap(407, 'deep_reading') AND NOT pg_temp.has_gap(408, 'deep_reading'),
+  'no tier row: only an unstamped reading of the literal automatic tier is thin (with no receipt it is a gap, whatever else is not)');
 SELECT pg_temp.ok(image_stage_reading_is_thin('subscription automatic') AND NOT image_stage_reading_is_thin('caller-byok subscription')
   AND NOT image_stage_reading_is_thin(NULL) AND NOT image_stage_reading_is_thin(''), 'the stage helper: literal fallback, no tier = reviewed');
 INSERT INTO platform_config (config_key, config_value) VALUES ('image_reading_tiers', '{"reviewed_tiers": ["caller-byok subscription"], "automatic": {"tier": "subscription automatic"}}');
 SELECT pg_temp.ok(pg_temp.has_gap(401, 'deep_reading') AND NOT pg_temp.has_gap(402, 'deep_reading') AND NOT pg_temp.has_gap(403, 'deep_reading')
-  AND NOT pg_temp.has_gap(404, 'deep_reading') AND pg_temp.has_gap(405, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading'),
-  'with the tier row: only the automatic tier is thin; a listed tier, a tier nobody listed and no tier at all are not (the intake never displaces them)');
+  AND NOT pg_temp.has_gap(404, 'deep_reading') AND pg_temp.has_gap(405, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading')
+  AND NOT pg_temp.has_gap(407, 'deep_reading') AND NOT pg_temp.has_gap(408, 'deep_reading'),
+  'with the tier row: only an unstamped automatic-tier reading is thin; a listed tier, a tier nobody listed, no tier at all and any stamp are not (the intake never displaces them)');
 -- keyed_values keeps its rule: the parent is the current reading, whatever its tier
 SELECT pg_temp.ok(pg_temp.has_gap(401, 'keyed_values') AND pg_temp.has_gap(402, 'keyed_values') AND pg_temp.has_gap(403, 'keyed_values'),
   'keyed_values: a current reading of any tier is a parent');
 -- levels follow the gap finder
 SELECT pg_temp.ok((SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(401)) = 'unqueued'
   AND (SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(402)) = 'done'
-  AND (SELECT deep_read FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(401)),
-  'levels: a thin reading is a reading (deep_read) but not done for the stage; a reviewed one is done');
+  AND (SELECT deep_read FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(401))
+  AND (SELECT bool_and(deep_state = 'done' AND deep_read) AND count(*) = 2 FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id IN (pg_temp.img(407), pg_temp.img(408))),
+  'levels: an unstamped thin reading is a reading (deep_read) but not done for the stage; a reviewed one is done, and so is any stamped photo');
 -- a succeeded deep_reading receipt at the stage's version closes a thin reading
 INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome) VALUES
   (pg_temp.img(401), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'succeeded'), (pg_temp.img(402), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'succeeded'),
@@ -855,8 +871,9 @@ SELECT pg_temp.ok((SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp
 -- raising the stage's version offers every thin-read photo again and none of the reviewed ones
 UPDATE image_pipeline_stages SET required_version = 2 WHERE stage = 'deep_reading';
 SELECT pg_temp.ok(pg_temp.has_gap(401, 'deep_reading') AND NOT pg_temp.has_gap(403, 'deep_reading') AND pg_temp.has_gap(405, 'deep_reading')
-  AND NOT pg_temp.has_gap(402, 'deep_reading') AND NOT pg_temp.has_gap(404, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading'),
-  'raising the stage version: thin-read photos are offered again, reviewed ones are not');
+  AND NOT pg_temp.has_gap(402, 'deep_reading') AND NOT pg_temp.has_gap(404, 'deep_reading') AND NOT pg_temp.has_gap(406, 'deep_reading')
+  AND NOT pg_temp.has_gap(407, 'deep_reading') AND NOT pg_temp.has_gap(408, 'deep_reading'),
+  'raising the stage version: thin-read photos are offered again, reviewed and stamped ones are not');
 SELECT pg_temp.ok((SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(401)) = 'unqueued'
   AND (SELECT deep_state FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(402)) = 'done', 'levels: the same after the raise');
 SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(401)]) WHERE stage = 'deep_reading') = 'outdated', 'the reason is outdated');
@@ -902,7 +919,8 @@ SELECT pg_temp.ok((SELECT count(*) FROM image_stage_gaps(ARRAY[pg_temp.img(420),
   'raising the stage version offers all four again, as outdated');
 SELECT pg_temp.ok(ARRAY[pg_temp.deep_is(420), pg_temp.deep_is(421), pg_temp.deep_is(422), pg_temp.deep_is(423)] = ARRAY['unqueued/-', 'unqueued/-', 'unqueued/-', 'unqueued/-'],
   'levels: a receipt of any outcome from before the raise is an unqueued gap (not given_up, not closed_no_value)');
--- nine: the four above, the four closed without a value (410-413) and the thin stamp read at version 1 (405); 401 holds a version-2 receipt
+-- nine: the four above, the four closed without a value (410-413) and the thin reading whose receipt is version 1 (405); 401 holds a
+-- version-2 receipt, and the stamped photos (402-404, 406-408) are never offered
 SELECT pg_temp.ok(pg_temp.gaps_the_levels_agree_on('deep_reading') = 9, 'deep_reading after the raise: the levels'' unqueued photos are exactly the gap finder''s nine gaps');
 UPDATE image_pipeline_stages SET required_version = 1 WHERE stage = 'deep_reading';
 -- the same for keyed_values. 430: a reading with nothing to key (closed). 431: a reading whose projection failed.
@@ -914,18 +932,19 @@ INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, o
 SELECT pg_temp.ok(NOT pg_temp.has_gap(430, 'keyed_values') AND NOT pg_temp.has_gap(431, 'keyed_values')
   AND ARRAY[pg_temp.keyed_is(430), pg_temp.keyed_is(431)] = ARRAY['closed_no_value/no_known_scalar_values', 'given_up/projection_failed'],
   'keyed_values at the stage''s version: closed and given up are final');
--- five readings nobody has keyed yet: 401-404 and 420
-SELECT pg_temp.ok(pg_temp.gaps_the_levels_agree_on('keyed_values') = 5, 'keyed_values at version 1: the levels'' unqueued photos are exactly the gap finder''s five gaps');
+-- six readings nobody has keyed yet: 401-405 and 420 (408 is keyed; 406 and 407 hold no observation to key from)
+SELECT pg_temp.ok(pg_temp.gaps_the_levels_agree_on('keyed_values') = 6, 'keyed_values at version 1: the levels'' unqueued photos are exactly the gap finder''s six gaps');
 UPDATE image_pipeline_stages SET required_version = 2 WHERE stage = 'keyed_values';
 SELECT pg_temp.ok((SELECT count(*) FROM image_stage_gaps(ARRAY[pg_temp.img(430), pg_temp.img(431)]) WHERE stage = 'keyed_values' AND reason = 'outdated') = 2,
   'raising the keyed_values version offers both again, as outdated');
 SELECT pg_temp.ok(ARRAY[pg_temp.keyed_is(430), pg_temp.keyed_is(431)] = ARRAY['unqueued/-', 'unqueued/-'], 'levels: the same for keyed_values after a raise');
-SELECT pg_temp.ok(pg_temp.gaps_the_levels_agree_on('keyed_values') = 7, 'keyed_values after the raise: the same five and the two offered again');
+SELECT pg_temp.ok(pg_temp.gaps_the_levels_agree_on('keyed_values') = 8, 'keyed_values after the raise: the same six and the two offered again');
 UPDATE image_pipeline_stages SET required_version = 1 WHERE stage = 'keyed_values';
--- An automatic reading that was keyed is replaced by a reading that lands later. project_reviewed_image_analysis (20261120140000, Rule 3)
--- leaves exactly this: the automatic reading and its keyed children superseded, a new current reading, and the photo's stamp pointing at
--- it with its tier (that migration's own contract proves it writes this). keyed_values must then be due again for the new reading,
--- whether the earlier receipt keyed a value (440) or closed with nothing to key (441).
+-- An automatic reading that was keyed is replaced by a reviewed reading that lands later. project_reviewed_image_analysis
+-- (20261120140000, Rule 3) leaves exactly this: the automatic reading and its keyed children superseded, a new current reading, and
+-- the photo stamped for the first time, the stamp pointing at the new reading with its tier (that migration's own contract proves it
+-- writes this). keyed_values must then be due again for the new reading, whether the earlier receipt keyed a value (440) or closed
+-- with nothing to key (441).
 SELECT pg_temp.tiered(440, 'subscription automatic'); SELECT pg_temp.child(440); SELECT pg_temp.tiered(441, 'subscription automatic');
 UPDATE public.vehicle_observations SET ingested_at = now() - interval '3 hours' WHERE id IN (pg_temp.obs(440), pg_temp.obs(441));
 INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, detail, observed_at) VALUES
@@ -946,8 +965,9 @@ BEGIN
    WHERE id = pg_temp.obs(n)
       OR (structured_data ->> 'analysis_kind' = 'image_property_projection' AND structured_data ->> 'image_id' = pg_temp.img(n)::text
           AND structured_data ->> 'source_observation_id' = pg_temp.obs(n)::text);
+  -- the stamp the reviewed landing writes (the automatic reading before it left none)
   UPDATE public.vehicle_images
-     SET ai_scan_metadata = jsonb_set(jsonb_set(ai_scan_metadata, '{byok_deep_analysis,observation_id}', to_jsonb(nid)), '{byok_deep_analysis,agent_tier}', to_jsonb(tier))
+     SET ai_scan_metadata = ai_scan_metadata || jsonb_build_object('byok_deep_analysis', jsonb_build_object('scene_type', 'exterior', 'observation_id', nid, 'agent_tier', tier))
    WHERE id = pg_temp.img(n);
   RETURN nid;
 END $$;
@@ -956,18 +976,18 @@ SELECT pg_temp.replaced_by(441, 'caller-byok subscription') AS new441 \gset
 SELECT pg_temp.ok((SELECT count(*) FROM image_stage_gaps(ARRAY[pg_temp.img(440), pg_temp.img(441)]) WHERE stage = 'keyed_values' AND reason = 'outdated') = 2
   AND NOT pg_temp.has_gap(440, 'deep_reading') AND NOT pg_temp.has_gap(441, 'deep_reading'),
   'after the replacement keyed_values is due again for both photos (outdated); deep_reading stays closed by the reviewed reading');
--- The stamp's landing is the event that makes it due: the photo's own update (photo_land_trigger) queued keyed_values in the same
--- statement, with no wait for the reconciler's pass. Nothing was queued for deep_reading.
+-- A reviewed reading's stamp landing is the event that makes it due: the photo's own update (photo_land_trigger) queued keyed_values
+-- in the same statement, with no wait for the reconciler's pass. Nothing was queued for deep_reading.
 SELECT pg_temp.ok(pg_temp.open_items(440, 'keyed_values') = 1 AND pg_temp.open_items(441, 'keyed_values') = 1
   AND pg_temp.open_items(440, 'deep_reading') = 0 AND pg_temp.open_items(441, 'deep_reading') = 0,
   'the new reading''s stamp landing queued keyed_values for both photos at once, and nothing else');
 SELECT pg_temp.ok(ARRAY[pg_temp.deep_is(440), pg_temp.keyed_is(440), pg_temp.deep_is(441), pg_temp.keyed_is(441)] = ARRAY['done/-', 'queued/-', 'done/-', 'queued/-']
   AND (SELECT (keyed, keyed_automatic, obs_id) = (false, false, :'new440'::uuid) FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(440)),
   'levels: both queued for keyed_values; the superseded keyed value no longer counts and the reading is the new one');
--- every keyed_values gap of the vehicle is either queued (these two) or unqueued (the five readings nobody has keyed) in the levels
-SELECT pg_temp.ok((SELECT count(*) FROM image_stage_gaps(ARRAY(SELECT id FROM public.vehicle_images WHERE vehicle_id = pg_temp.v1())) WHERE stage = 'keyed_values') = 7
-  AND (SELECT (count(*) FILTER (WHERE keyed_state = 'unqueued'), count(*) FILTER (WHERE keyed_state = 'queued')) = (5, 2) FROM image_stage_photo_levels(NULL, pg_temp.v1())),
-  'after the replacement: seven keyed_values gaps, five unqueued and these two queued');
+-- every keyed_values gap of the vehicle is either queued (these two) or unqueued (the six readings nobody has keyed) in the levels
+SELECT pg_temp.ok((SELECT count(*) FROM image_stage_gaps(ARRAY(SELECT id FROM public.vehicle_images WHERE vehicle_id = pg_temp.v1())) WHERE stage = 'keyed_values') = 8
+  AND (SELECT (count(*) FILTER (WHERE keyed_state = 'unqueued'), count(*) FILTER (WHERE keyed_state = 'queued')) = (6, 2) FROM image_stage_photo_levels(NULL, pg_temp.v1())),
+  'after the replacement: eight keyed_values gaps, six unqueued and these two queued');
 -- asking again queues nothing more (one open item per gap), and a receipt for the new reading closes it
 SELECT pg_temp.ok(public.enqueue_image_stage_work(ARRAY[pg_temp.img(440), pg_temp.img(441)]) = 0 AND pg_temp.open_items(440, 'keyed_values') = 1 AND pg_temp.open_items(441, 'keyed_values') = 1,
   'a second enqueue adds nothing');
@@ -984,6 +1004,53 @@ SELECT pg_temp.ok(NOT pg_temp.has_gap(440, 'keyed_values') AND NOT pg_temp.has_g
   AND ARRAY[pg_temp.keyed_is(440), pg_temp.keyed_is(441)] = ARRAY['done/-', 'closed_no_value/no_known_scalar_values']
   AND (SELECT (keyed, keyed_automatic) = (true, true) FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(440)),
   'a receipt for the new reading closes keyed_values again: 440 keyed from the new reading, 441 closed with nothing to key');
+-- An automatic reading's landing writes nothing on the photo (it is its observation alone), so the photo's update trigger never fires
+-- for it. keyed_values comes due through the reader's deep_reading receipt: record_image_stage_receipt asks the gap finder about the
+-- photo again in the same call. 450, in the reader's order of events: queued, read and posted, receipt.
+SELECT pg_temp.mk(450);
+SELECT pg_temp.ok(public.enqueue_image_stage_work(ARRAY[pg_temp.img(450)]) = 1 AND pg_temp.open_items(450, 'deep_reading') = 1 AND pg_temp.open_items(450, 'keyed_values') = 0,
+  'a filed, first-read photo in scope with no reading: deep_reading is queued; keyed_values has no reading to key from');
+INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, agent_tier)
+VALUES (pg_temp.obs(450), pg_temp.v1(), 'condition', jsonb_build_object('analysis_kind', 'image_deep_byok', 'image_id', pg_temp.img(450)), 'subscription automatic');
+SELECT pg_temp.ok(pg_temp.open_items(450, 'keyed_values') = 0 AND pg_temp.has_gap(450, 'keyed_values') AND pg_temp.has_gap(450, 'deep_reading')
+  AND ARRAY[pg_temp.deep_is(450), pg_temp.keyed_is(450)] = ARRAY['queued/-', 'unqueued/-'],
+  'the reading is posted and nothing of the photo changed: nothing new is queued; keyed_values is a gap nobody has queued, deep_reading is open until its receipt');
+SELECT public.record_image_stage_receipt(pg_temp.img(450), 'deep_reading', 1, 'succeeded');
+SELECT pg_temp.ok(pg_temp.open_items(450, 'deep_reading') = 0 AND pg_temp.open_items(450, 'keyed_values') = 1 AND NOT pg_temp.has_gap(450, 'deep_reading'),
+  'the deep_reading receipt closes its stage and queues keyed_values in the same call, with no wait for the reconciler''s pass');
+SELECT pg_temp.ok(ARRAY[pg_temp.deep_is(450), pg_temp.keyed_is(450)] = ARRAY['done/-', 'queued/-']
+  AND (SELECT (deep_read, deep_automatic, obs_id) = (true, true, pg_temp.obs(450)) FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(450)),
+  'levels: read automatically, keyed_values queued, and the reading is the observation');
+-- 451: an automatic reading keyed two hours ago is read again by the automatic reader (the stage's version was raised for a new
+-- method). The new observation supersedes the old one and its keyed child (Rule 3) and nothing of the photo changes; the new
+-- deep_reading receipt queues keyed_values for the new reading.
+SELECT pg_temp.tiered(451, 'subscription automatic'); SELECT pg_temp.child(451);
+UPDATE public.vehicle_observations SET ingested_at = now() - interval '3 hours' WHERE id = pg_temp.obs(451);
+INSERT INTO image_stage_receipts (image_id, stage, producer, producer_version, outcome, detail, observed_at) VALUES
+  (pg_temp.img(451), 'deep_reading', 'photo-pipeline-orchestrator', 1, 'succeeded', '{}', now() - interval '3 hours'),
+  (pg_temp.img(451), 'keyed_values', 'ingest-observation-batch', 1, 'succeeded', '{}', now() - interval '2 hours');
+SELECT pg_temp.ok(NOT pg_temp.has_gap(451, 'deep_reading') AND NOT pg_temp.has_gap(451, 'keyed_values') AND ARRAY[pg_temp.deep_is(451), pg_temp.keyed_is(451)] = ARRAY['done/-', 'done/-'],
+  'an automatic reading, read and keyed: both stages closed');
+UPDATE image_pipeline_stages SET required_version = 2 WHERE stage = 'deep_reading';
+SELECT pg_temp.ok((SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(451)]) WHERE stage = 'deep_reading') = 'outdated' AND NOT pg_temp.has_gap(451, 'keyed_values'),
+  'the stage version is raised: the photo is offered to the automatic reader again; its keyed value stands meanwhile');
+DO $$ DECLARE nid uuid := gen_random_uuid(); BEGIN
+  INSERT INTO public.vehicle_observations (id, vehicle_id, kind, structured_data, agent_tier)
+  VALUES (nid, pg_temp.v1(), 'condition', jsonb_build_object('analysis_kind', 'image_deep_byok', 'image_id', pg_temp.img(451)), 'subscription automatic');
+  UPDATE public.vehicle_observations SET is_superseded = true
+   WHERE id = pg_temp.obs(451)
+      OR (structured_data ->> 'analysis_kind' = 'image_property_projection' AND structured_data ->> 'image_id' = pg_temp.img(451)::text
+          AND structured_data ->> 'source_observation_id' = pg_temp.obs(451)::text);
+END $$;
+SELECT pg_temp.ok(pg_temp.open_items(451, 'keyed_values') = 0 AND pg_temp.open_items(451, 'deep_reading') = 0,
+  'the new automatic reading landed and replaced the old one: no photo update, so nothing is queued by the landing itself');
+SELECT public.record_image_stage_receipt(pg_temp.img(451), 'deep_reading', 2, 'succeeded');
+SELECT pg_temp.ok(pg_temp.open_items(451, 'keyed_values') = 1 AND NOT pg_temp.has_gap(451, 'deep_reading')
+  AND (SELECT reason FROM image_stage_gaps(ARRAY[pg_temp.img(451)]) WHERE stage = 'keyed_values') = 'outdated'
+  AND ARRAY[pg_temp.deep_is(451), pg_temp.keyed_is(451)] = ARRAY['done/-', 'queued/-']
+  AND (SELECT (keyed, obs_id <> pg_temp.obs(451)) = (false, true) FROM image_stage_photo_levels(NULL, pg_temp.v1()) WHERE image_id = pg_temp.img(451)),
+  'the new reading''s deep_reading receipt queues keyed_values for it; the superseded keyed value no longer counts');
+UPDATE image_pipeline_stages SET required_version = 1 WHERE stage = 'deep_reading';
 DELETE FROM image_stage_work; DELETE FROM image_stage_receipts; DELETE FROM public.observation_witnesses; DELETE FROM public.vehicle_observations;
 DELETE FROM public.vehicle_images; DELETE FROM platform_config WHERE config_key = 'image_reading_tiers';
 

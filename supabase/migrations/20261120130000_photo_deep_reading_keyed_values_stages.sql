@@ -17,10 +17,11 @@
 --    gap, so work for a stage that is not required is dropped at claim. The canary is bounded by the scope row.
 --    New column backfill_daily_cap (null = none; deep_reading 150).
 -- 2. image_stage_gaps: the two applies_when values, the shared eligibility (image_stage_photo_block), the scope
---    (image_stage_scope_ok), and what satisfies a stage without a receipt: a deep reading of a reviewed tier
---    (byok_deep_analysis with a scene_type) satisfies deep_reading outright; a thin-tier (automatic) reading goes through the
---    receipt logic (image_stage_reading_is_thin; the tiers are listed by 20261120140000) so raising the stage's version offers
---    it again; a current projected child for the photo's current
+--    (image_stage_scope_ok), and what satisfies a stage without a receipt: a stamp on the photo (byok_deep_analysis with a
+--    scene_type; the intake stamps only a reading that is not thin) or a current reading that is not thin tier satisfies
+--    deep_reading outright; a thin-tier (automatic) reading, which is its observation alone, goes through the receipt logic
+--    (image_stage_reading_is_thin; the tiers are listed by 20261120140000) so raising the stage's version offers it again; a
+--    current projected child for the photo's current
 --    reading satisfies keyed_values (looked up in vehicle_observations by the existing idx_vobs_image_id_analysis). A
 --    keyed_values receipt older than the current reading's parent observation does not close the stage for it.
 -- 3. enqueue_image_stage_work(uuid[], text): work is created by the event that makes it due. Called from
@@ -47,7 +48,7 @@ do $guard$
 declare r record;
 begin
   for r in select * from (values
-      ('public.image_stage_gaps(uuid[])', '2190aee1bc568d23a95dcf5f4fd76687', '6d2369e5a0d39198b1c4f7a750781ecb'),
+      ('public.image_stage_gaps(uuid[])', '2190aee1bc568d23a95dcf5f4fd76687', '2603ca428eceb41a6f08513326f57008'),
       ('public.image_stage_legacy_evidence(text,jsonb,jsonb,text)', '0ff666f6cc4fc8611737cf73e9c37b29', 'fbba96e6a73479b341a067bd8b59fbd9'),
       ('public.image_stage_legacy_version(text,jsonb)', 'f21e15d0a93aad124a1d078de9e8a053', '14983fe5d168ca3606b4907c47de9da1'),
       ('public.photo_land_trigger()', '307261071b2aa3fef7a83297d63a9638', 'bdb3b709bfdee1138fe76e68457a8650'),
@@ -79,7 +80,7 @@ comment on column public.image_pipeline_stages.backfill_daily_cap is
 
 insert into public.image_pipeline_stages (stage, producer, required_version, required, applies_when, max_attempts, backfill_daily_cap, description) values
   ('deep_reading', 'photo-pipeline-orchestrator', 1, true, 'filed_for_reading', 6, 150,
-   'Deep reading of one filed, approved, first-read photo: scene, components and state_observations, stamped as ai_scan_metadata.byok_deep_analysis by the reviewed-analysis intake. Satisfied outright by a reading of a reviewed tier that carries a scene_type; a thin-tier (automatic) reading satisfies it only through a succeeded receipt at the stage''s version, so raising the version offers it again. In scope only per platform_config image_stage_deep_reading.'),
+   'Deep reading of one filed, approved, first-read photo: scene, components and state_observations, through the reviewed-analysis intake. A reviewed reading is stamped on the photo (ai_scan_metadata.byok_deep_analysis) and satisfies the stage outright, as does any stamp with a scene_type or any current reading that is not thin tier. A thin-tier (automatic) reading is its observation alone (no stamp) and satisfies the stage only through a succeeded receipt at the stage''s version, so raising the version offers it again. In scope only per platform_config image_stage_deep_reading.'),
   ('keyed_values', 'ingest-observation-batch', 1, true, 'deep_reading_landed', 6, NULL,
    'Keyed values for a photo whose deep reading landed: the reading''s rust, paint and assembly state projected as registered properties with the photo as witness. Satisfied by a current projected child for the photo''s current reading; closed with a policy_skip receipt naming the projection''s deferral reason when the reading yields none.')
 on conflict (stage) do update set producer = excluded.producer, required_version = excluded.required_version,
@@ -273,11 +274,14 @@ AS $function$
   left join lateral (select p.id, p.ingested_at from public.image_stage_reading_parent(v.id, v.vehicle_id, public.image_stage_reading_observation_id(v.ai_scan_metadata)) p
                       where s.applies_when in ('filed_for_reading', 'deep_reading_landed')) kp on true
   -- What the reading is and who made it (reading tiers, 20261120140000): a reading satisfies deep_reading outright only when it is
-  -- not thin tier. rd.le = a reading exists (the stamp); rd.thin = its tier is thin (the observation's agent_tier, else the stamp's;
-  -- no tier at all = a legacy reading = reviewed). ev = the stamp as evidence for this stage, a thin reading not counting for deep_reading.
+  -- not thin tier. rd.le = the photo carries a stamp with a scene. A stamp is never a thin reading's (the intake stamps only a
+  -- reading that is not thin, and refuses a thin one over any stamp), so a stamped photo is read, whoever stamped it. rd.thin = no
+  -- such stamp, and the reading the photo holds as an observation is thin tier (no tier at all = a legacy reading = reviewed).
   left join lateral (select public.image_stage_legacy_evidence(s.stage, v.ai_scan_metadata, v.exif_data, s.contract) as le,
-                            case when s.applies_when = 'filed_for_reading' then public.image_stage_reading_is_thin(
-                              coalesce((select o.agent_tier from public.vehicle_observations o where o.id = kp.id), v.ai_scan_metadata #>> '{byok_deep_analysis,agent_tier}')) else false end as thin) rd on true
+                            case when s.applies_when = 'filed_for_reading'
+                                      and not public.image_stage_legacy_evidence(s.stage, v.ai_scan_metadata, v.exif_data, s.contract)
+                                 then public.image_stage_reading_is_thin((select o.agent_tier from public.vehicle_observations o where o.id = kp.id))
+                                 else false end as thin) rd on true
   -- the newest receipt of this stage whatever its outcome (image_stage_current prefers a closing one)
   left join lateral (select r.outcome, r.observed_at, r.retry_after, r.attempt from public.image_stage_receipts r
                       where s.applies_when = 'deep_reading_landed' and r.image_id = v.id and r.stage = s.stage and r.producer_version >= s.required_version
@@ -624,7 +628,6 @@ language sql stable set search_path to '' as $$
            v.vision_gate_status::text as gate, v.image_vehicle_match_status as match_status,
            public.image_stage_legacy_evidence('deep_reading', v.ai_scan_metadata, null, null) as has_reading,
            public.image_stage_reading_observation_id(v.ai_scan_metadata) as stamp_obs,
-           v.ai_scan_metadata #>> '{byok_deep_analysis,agent_tier}' as stamp_tier,
            public.image_stage_photo_block(v.vehicle_id, v.vision_gate_status::text, v.is_document, v.doc_flag, v.image_vehicle_match_status,
                                           v.is_sensitive, v.is_duplicate, v.is_superseded, v.is_external, v.image_url, v.ai_processing_status) as block
       from public.vehicle_images v
@@ -635,7 +638,6 @@ language sql stable set search_path to '' as $$
            v.vision_gate_status::text, v.image_vehicle_match_status,
            public.image_stage_legacy_evidence('deep_reading', v.ai_scan_metadata, null, null),
            public.image_stage_reading_observation_id(v.ai_scan_metadata),
-           v.ai_scan_metadata #>> '{byok_deep_analysis,agent_tier}',
            public.image_stage_photo_block(v.vehicle_id, v.vision_gate_status::text, v.is_document, v.doc_flag, v.image_vehicle_match_status,
                                           v.is_sensitive, v.is_duplicate, v.is_superseded, v.is_external, v.image_url, v.ai_processing_status)
       from public.vehicle_images v
@@ -646,7 +648,6 @@ language sql stable set search_path to '' as $$
            v.vision_gate_status::text, v.image_vehicle_match_status,
            public.image_stage_legacy_evidence('deep_reading', v.ai_scan_metadata, null, null),
            public.image_stage_reading_observation_id(v.ai_scan_metadata),
-           v.ai_scan_metadata #>> '{byok_deep_analysis,agent_tier}',
            public.image_stage_photo_block(v.vehicle_id, v.vision_gate_status::text, v.is_document, v.doc_flag, v.image_vehicle_match_status,
                                           v.is_sensitive, v.is_duplicate, v.is_superseded, v.is_external, v.image_url, v.ai_processing_status)
       from public.vehicle_images v
@@ -699,9 +700,10 @@ language sql stable set search_path to '' as $$
     select r.*, (r.kr_outcome in ('succeeded', 'policy_skip') and r.par_at > r.kr_at) as kr_stale,
            (r.has_reading or r.par_id is not null) as deep_read_z,
            -- a thin-tier (automatic) reading is done for deep_reading only through a closing receipt at the stage's version, as the
-           -- gap finder reads it (image_stage_reading_is_thin; a reading with no tier at all is a legacy one, reviewed)
-           ((r.has_reading or r.par_id is not null)
-            and public.image_stage_reading_is_thin(coalesce(r.par_tier, r.stamp_tier))
+           -- gap finder reads it (image_stage_reading_is_thin; a reading with no tier at all is a legacy one, reviewed). A stamped
+           -- photo (has_reading) is never thin: the intake stamps only a reading that is not thin
+           (not r.has_reading and r.par_id is not null
+            and public.image_stage_reading_is_thin(r.par_tier)
             and not (r.rd_outcome in ('succeeded', 'policy_skip') and r.rd_ver >= r.deep_req)) as thin_open
       from raw r
   )

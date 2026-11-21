@@ -1,6 +1,7 @@
 -- Contract for 20261120140000_image_reading_tiers.sql, on a fresh disposable database: a reading whose agent_tier is not a reviewed
 -- tier (a thin one: the automatic reader, or any tier nobody listed) may carry only the closed values the database admits for it and
--- never displaces a reviewed reading; a reading that lands replaces the thin reading before it and that reading's keyed children;
+-- never displaces a reviewed reading; it is stored as its observation alone (the photo row, the search rows and the cover are left
+-- exactly as they were); a reading that lands replaces the thin reading before it and that reading's keyed children;
 -- a reviewed-tier reading is checked exactly as before. The verdicts below are the shared examples of the reader's fixture
 -- (scripts/photo-pipeline/fixtures/automatic-thin-verdicts.json on PR 3609), embedded as literals: 4 accepted, 26 refused.
 -- Synthetic images; no network, no model calls. The production triggers on vehicle_observations that are not part of the intake
@@ -17,6 +18,10 @@ END $$;
 -- the columns supersede_observation writes (the fixture's table has the intake's columns only)
 ALTER TABLE vehicle_observations ADD COLUMN superseded_by uuid REFERENCES vehicle_observations(id),
   ADD COLUMN superseded_at timestamptz, ADD COLUMN lineage_chain uuid[];
+-- The ledger's own clock (ingested_at) orders two automatic readings of one photo (Rule 3). Production's default is now(), one value
+-- per transaction, and every reading is posted in a transaction of its own. The blocks below post several readings in one
+-- transaction, so here the default is clock_timestamp(): each reading gets the instant it was posted.
+ALTER TABLE vehicle_observations ALTER COLUMN ingested_at SET DEFAULT clock_timestamp();
 CREATE TABLE platform_config (config_key text PRIMARY KEY, config_value jsonb, description text);
 
 INSERT INTO observation_sources(slug) VALUES('photo_pipeline');
@@ -32,8 +37,9 @@ BEGIN
  RETURN id;
 END $$;
 -- The reading as the intake stores it: the verdict plus the keys the intake adds, with the review envelope the guard checks.
-CREATE FUNCTION tt_obs(p_image uuid, p_tier text, p_verdict jsonb, p_prov jsonb DEFAULT '{}', p_extra jsonb DEFAULT '{}', p_raw jsonb DEFAULT '{}') RETURNS uuid LANGUAGE plpgsql AS $$
-DECLARE i vehicle_images%ROWTYPE; v jsonb; oid uuid; h text := md5(random()::text || clock_timestamp()::text) || md5(random()::text); reviewed timestamptz := clock_timestamp();
+-- p_reviewed: when the reader says it read the photo (default: this instant).
+CREATE FUNCTION tt_obs(p_image uuid, p_tier text, p_verdict jsonb, p_prov jsonb DEFAULT '{}', p_extra jsonb DEFAULT '{}', p_raw jsonb DEFAULT '{}', p_reviewed timestamptz DEFAULT NULL) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE i vehicle_images%ROWTYPE; v jsonb; oid uuid; h text := md5(random()::text || clock_timestamp()::text) || md5(random()::text); reviewed timestamptz := coalesce(p_reviewed, clock_timestamp());
 BEGIN
  SELECT * INTO i FROM vehicle_images WHERE id=p_image;
  v := p_verdict || jsonb_build_object('image_id',i.id,'vehicle_id',i.vehicle_id,'analysis_kind','image_deep_byok','witness_image_id',i.id,'is_inferred',true) || p_raw;
@@ -1473,21 +1479,33 @@ DO $$ DECLARE cfg jsonb; BEGIN
 END $$;
 
 -- ===== Rule 1: the shared examples
-DO $$ DECLARE a jsonb; n int := 0; img uuid; oid uuid; r jsonb; before_cover text; BEGIN
+DO $$ DECLARE a jsonb; n int := 0; img uuid; oid uuid; r jsonb; before_cover text; before_photo text; BEGIN
  FOR a IN SELECT jsonb_array_elements(tt_accepted()) LOOP
    n := n + 1;
    img := tt_image();
    SELECT primary_image_url INTO before_cover FROM vehicles WHERE id='20000000-0000-4000-8000-000000000101';
+   SELECT to_jsonb(vi)::text INTO before_photo FROM vehicle_images vi WHERE vi.id=img;
    -- the thin shape alone is not enough: the placeholder ids are replaced by tt_obs
    ASSERT image_reading_thin_violation(a || jsonb_build_object('image_id',img,'vehicle_id','20000000-0000-4000-8000-000000000101','analysis_kind','image_deep_byok','witness_image_id',img,'is_inferred',true),
      (SELECT config_value->'automatic'->'admits' FROM platform_config WHERE config_key='image_reading_tiers')) IS NULL, 'accepted example '||n||' passes the helper';
    oid := tt_obs(img,'subscription automatic',a);
    r := project_reviewed_image_analysis(oid);
-   ASSERT r->>'success'='true' AND r#>>'{cover,reason}'='thin_tier_reading', 'accepted example '||n||' lands: '||r::text;
+   ASSERT r->>'success'='true' AND r#>>'{cover,reason}'='thin_tier_reading' AND r->>'thin_tier'='true'
+     AND r->'image_observation_id'='null'::jsonb AND r->'search_vehicle_id'='null'::jsonb AND r->'projection_duplicate'='null'::jsonb
+     AND r->>'superseded_readings'='0' AND r->>'observation_id'=oid::text, 'accepted example '||n||' lands as a thin reading: '||r::text;
    ASSERT (SELECT primary_image_url IS NOT DISTINCT FROM before_cover FROM vehicles WHERE id='20000000-0000-4000-8000-000000000101'), 'a thin reading does not move the cover';
+   -- containment: the whole photo row is byte for byte what it was (no stamp, the same updated_at, nothing else), no search row
+   -- exists and nothing is queued for attribution
+   ASSERT (SELECT to_jsonb(vi)::text = before_photo FROM vehicle_images vi WHERE vi.id=img), 'accepted example '||n||': the photo row is untouched by a thin landing';
+   ASSERT (SELECT NOT (ai_scan_metadata ? 'byok_deep_analysis') FROM vehicle_images WHERE id=img), 'accepted example '||n||': no stamp';
+   ASSERT NOT EXISTS(SELECT FROM image_observations WHERE image_id=img), 'accepted example '||n||': a thin reading places no search row';
+   ASSERT NOT EXISTS(SELECT FROM vehicle_image_attribution_queue WHERE image_id=img), 'accepted example '||n||': and queues no attribution';
+   -- what does exist: the observation, current, and its witness
+   ASSERT (SELECT count(*)=1 FROM vehicle_observations WHERE structured_data->>'image_id'=img::text) AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=oid)
+     AND EXISTS(SELECT FROM observation_witnesses WHERE observation_id=oid AND image_id=img AND witness_role='derived'), 'accepted example '||n||': the observation and its witness';
  END LOOP;
  ASSERT n = 4, 'four accepted examples, saw '||n;
- RAISE NOTICE 'PASS: 4 accepted examples land, no cover recompute';
+ RAISE NOTICE 'PASS: 4 accepted examples land as an observation and its witness; the photo row, the search rows and the cover are untouched';
 END $$;
 DO $$ DECLARE a jsonb; n int := 0; img uuid; BEGIN
  FOR a IN SELECT jsonb_array_elements(tt_refused()) LOOP
@@ -1526,17 +1544,22 @@ DO $$ DECLARE img uuid; oid uuid; r jsonb; BEGIN
  ASSERT (SELECT ai_scan_metadata#>>'{byok_deep_analysis,agent_tier}'='caller-byok subscription' AND ai_scan_metadata#>>'{byok_deep_analysis,build_phase_guess}'='final_assembly' FROM vehicle_images WHERE id=img), 'rich stamp';
  RAISE NOTICE 'PASS: a reviewed-tier reading lands as before';
 END $$;
--- what a thin stamp does to a cover (the reason the projection skips the call): a frame with a stamp is scored, a frame without is not
+-- why a thin reading is not stamped: a stamp alone moves a frame to the scored cover tier for every caller of
+-- recompute_vehicle_primary_image. After a thin landing a later recompute by anyone sees what it saw before; a reviewed stamp is scored.
 DO $$ DECLARE img uuid; r1 jsonb; r2 jsonb; oid uuid; BEGIN
  img := tt_image('20000000-0000-4000-8000-000000000102','{}','confirmed');
  r1 := recompute_vehicle_primary_image('20000000-0000-4000-8000-000000000102');
  ASSERT r1->>'tier'='confirmed_any', r1::text;
  oid := tt_obs(img,'subscription automatic',(SELECT jsonb_array_elements(tt_accepted()) LIMIT 1));
  r2 := project_reviewed_image_analysis(oid);
- ASSERT r2#>>'{cover,reason}'='thin_tier_reading', 'projection skipped the recompute';
+ ASSERT r2#>>'{cover,reason}'='thin_tier_reading', 'the projection recomputed no cover';
  r2 := recompute_vehicle_primary_image('20000000-0000-4000-8000-000000000102');
- ASSERT r2->>'tier'='hero_score', 'any later recompute scores the thin stamp: '||r2::text;
- RAISE NOTICE 'PASS: documented: the thin stamp alone moves a frame to the hero_score tier for any other caller of recompute_vehicle_primary_image';
+ ASSERT r2->>'tier'='confirmed_any', 'a later recompute by anyone still sees an unscored frame: '||r2::text;
+ -- the same frame once a reviewed reading lands on it (the landing supersedes the thin reading and stamps the photo)
+ PERFORM project_reviewed_image_analysis(tt_obs(img,'caller-byok subscription',tt_rich()));
+ r2 := recompute_vehicle_primary_image('20000000-0000-4000-8000-000000000102');
+ ASSERT r2->>'tier'='hero_score', 'a reviewed stamp is what moves a frame to the scored tier: '||r2::text;
+ RAISE NOTICE 'PASS: a thin landing leaves the cover choice as it was for every later caller; a reviewed stamp is scored';
 END $$;
 
 -- ===== Rule 2: a thin reading never displaces a reviewed one
@@ -1559,12 +1582,44 @@ DO $$ DECLARE img uuid; oid uuid; thin jsonb := (SELECT jsonb_array_elements(tt_
  img := tt_image('20000000-0000-4000-8000-000000000101','{"byok_deep_analysis":{"scene_type":"body_exterior","agent_tier":"caller-byok"}}');
  BEGIN PERFORM tt_obs(img,'subscription automatic',thin); RAISE EXCEPTION 'thin over a caller-byok stamp unexpectedly landed';
  EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
- -- over a thin stamp: allowed
+ -- over a stamp that names the automatic tier: refused too. The intake never stamps a thin reading, so a stamp is someone else's
+ -- reading whatever tier it names
  img := tt_image('20000000-0000-4000-8000-000000000101','{"byok_deep_analysis":{"scene_type":"body_exterior","agent_tier":"subscription automatic"}}');
+ BEGIN PERFORM tt_obs(img,'subscription automatic',thin); RAISE EXCEPTION 'thin over a stamp unexpectedly landed';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
+ -- a stamp key that holds no object is not a reading: the thin reading lands, and the key is left as it was
+ img := tt_image('20000000-0000-4000-8000-000000000101','{"byok_deep_analysis":null}');
  oid := tt_obs(img,'subscription automatic',thin);
- ASSERT oid IS NOT NULL, 'thin over a thin stamp lands';
- -- the reviewed tier lands over a thin one (the other direction is Rule 3)
- RAISE NOTICE 'PASS: thin over reviewed refused (cache, observation, legacy stamp, listed stamp); thin over thin allowed';
+ ASSERT oid IS NOT NULL AND (project_reviewed_image_analysis(oid)->>'success')='true', 'thin over a null stamp key lands';
+ ASSERT (SELECT ai_scan_metadata='{"byok_deep_analysis":null}'::jsonb FROM vehicle_images WHERE id=img), 'and leaves the key as it was';
+ -- over its own kind (an automatic reading, which is an observation only): allowed; the newer replaces the older (Rule 3)
+ img := tt_image();
+ PERFORM project_reviewed_image_analysis(tt_obs(img,'subscription automatic',thin));
+ oid := tt_obs(img,'subscription automatic',thin);
+ ASSERT oid IS NOT NULL, 'thin over thin lands';
+ RAISE NOTICE 'PASS: thin over reviewed refused (cache, observation, legacy stamp, listed stamp, any stamp at all); thin over thin allowed';
+END $$;
+-- Rule 2 holds at the projection too: the insert was admitted when nothing stood, and a reading landed before the thin one was projected
+DO $$ DECLARE img uuid; t1 uuid; rv uuid; before_photo text; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); BEGIN
+ -- a reviewed observation posted in between (not projected yet, so no stamp)
+ img := tt_image();
+ t1 := tt_obs(img,'subscription automatic',thin);
+ rv := tt_obs(img,'caller-byok subscription',tt_rich());
+ BEGIN PERFORM project_reviewed_image_analysis(t1); RAISE EXCEPTION 'a thin reading projected beside a reviewed observation';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=rv), 'the reviewed reading is untouched by the refused thin projection';
+ -- the reviewed reading then lands and replaces the thin one that never did
+ PERFORM project_reviewed_image_analysis(rv);
+ ASSERT (SELECT is_superseded AND superseded_by=rv FROM vehicle_observations WHERE id=t1), 'the reviewed landing supersedes the thin reading that never landed';
+ -- a stamp written in between by a producer outside this intake
+ img := tt_image();
+ t1 := tt_obs(img,'subscription automatic',thin);
+ UPDATE vehicle_images SET ai_scan_metadata=ai_scan_metadata||'{"byok_deep_analysis":{"scene_type":"engine_bay","agent_tier":"caller-byok"}}' WHERE id=img;
+ SELECT to_jsonb(vi)::text INTO before_photo FROM vehicle_images vi WHERE vi.id=img;
+ BEGIN PERFORM project_reviewed_image_analysis(t1); RAISE EXCEPTION 'a thin reading projected over a stamp';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
+ ASSERT (SELECT to_jsonb(vi)::text = before_photo FROM vehicle_images vi WHERE vi.id=img), 'and the stamp is as its writer left it';
+ RAISE NOTICE 'PASS: Rule 2 at the projection: a thin reading does not land beside a reading posted or stamped since its insert';
 END $$;
 
 -- ===== Rule 3: a reading that lands replaces the thin reading before it and its keyed children
@@ -1579,7 +1634,7 @@ BEGIN
  RETURNING id INTO cid;
  RETURN cid;
 END $$;
-DO $$ DECLARE img uuid; t1 uuid; c1 uuid; rv uuid; t_at timestamptz; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); BEGIN
+DO $$ DECLARE img uuid; t1 uuid; c1 uuid; rv uuid; r jsonb; t_at timestamptz; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); BEGIN
  -- a reviewed reading lands over a thin one
  img := tt_image();
  t1 := tt_obs(img,'subscription automatic',thin); PERFORM project_reviewed_image_analysis(t1);
@@ -1588,20 +1643,36 @@ DO $$ DECLARE img uuid; t1 uuid; c1 uuid; rv uuid; t_at timestamptz; thin jsonb 
  ASSERT (SELECT is_superseded AND superseded_by=rv AND superseded_at IS NOT NULL AND lineage_chain=ARRAY[rv] FROM vehicle_observations WHERE id=t1), 'the thin reading is superseded by the reviewed one';
  ASSERT (SELECT is_superseded AND superseded_by=rv AND superseded_at IS NOT NULL AND lineage_chain=ARRAY[rv] FROM vehicle_observations WHERE id=c1), 'its keyed child is superseded with it';
  ASSERT (SELECT NOT is_superseded AND superseded_by IS NULL FROM vehicle_observations WHERE id=rv), 'the new reading is current';
- ASSERT (SELECT ai_scan_metadata#>>'{byok_deep_analysis,observation_id}'=rv::text FROM vehicle_images WHERE id=img), 'the cache names the new reading';
+ ASSERT (SELECT ai_scan_metadata#>>'{byok_deep_analysis,observation_id}'=rv::text AND ai_scan_metadata#>>'{byok_deep_analysis,agent_tier}'='caller-byok subscription' FROM vehicle_images WHERE id=img),
+   'the reviewed reading is stamped on the photo, as before';
+ ASSERT EXISTS(SELECT FROM image_observations WHERE image_id=img AND is_active AND observed_by='caller-byok' AND agent_version='reviewed_image_analysis_v1'),
+   'and it places its search row, as before';
  ASSERT (SELECT count(*)=1 FROM vehicle_observations WHERE structured_data->>'image_id'=img::text AND structured_data->>'analysis_kind'='image_deep_byok' AND NOT is_superseded), 'one current reading';
+ -- replay of the reviewed reading: a projection_duplicate, as before, and it supersedes nothing twice
+ ASSERT (project_reviewed_image_analysis(rv)->>'projection_duplicate')='true', 'replay of a reviewed reading is a projection_duplicate';
+ ASSERT (SELECT lineage_chain=ARRAY[rv] FROM vehicle_observations WHERE id=t1) AND (SELECT lineage_chain=ARRAY[rv] FROM vehicle_observations WHERE id=c1), 'a reviewed replay supersedes nothing twice';
  -- a newer thin reading replaces the older thin one (and its child)
  img := tt_image();
  t1 := tt_obs(img,'subscription automatic',thin); PERFORM project_reviewed_image_analysis(t1);
  c1 := tt_child(img,t1);
- rv := tt_obs(img,'subscription automatic',(SELECT jsonb_array_elements(tt_accepted()) OFFSET 2 LIMIT 1)); PERFORM project_reviewed_image_analysis(rv);
+ rv := tt_obs(img,'subscription automatic',(SELECT jsonb_array_elements(tt_accepted()) OFFSET 2 LIMIT 1));
+ r := project_reviewed_image_analysis(rv);
+ ASSERT r->>'thin_tier'='true' AND r->>'superseded_readings'='1', 'thin over thin: the answer counts the reading it replaced: '||r::text;
  ASSERT (SELECT is_superseded AND superseded_by=rv FROM vehicle_observations WHERE id=t1) AND (SELECT is_superseded AND superseded_by=rv FROM vehicle_observations WHERE id=c1), 'thin over thin: previous reading and child superseded';
  ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=rv), 'the newer thin reading is current';
- -- replay of the same observation: supersedes nothing twice, never itself
+ ASSERT (SELECT NOT (ai_scan_metadata ? 'byok_deep_analysis') FROM vehicle_images WHERE id=img) AND NOT EXISTS(SELECT FROM image_observations WHERE image_id=img),
+   'thin over thin: still no stamp and no search row';
+ -- the same thin observation projected again (the reader finishing a landing it could not confirm): it supersedes nothing twice and
+ -- never itself, and it does not matter that the photo row has moved since the reading was made (nothing of the photo is written,
+ -- so no updated_at is held)
  SELECT superseded_at INTO t_at FROM vehicle_observations WHERE id=t1;
- ASSERT (project_reviewed_image_analysis(rv)->>'projection_duplicate')='true', 'replay is a projection_duplicate';
- ASSERT (SELECT NOT is_superseded AND superseded_by IS NULL FROM vehicle_observations WHERE id=rv), 'a replay does not supersede the reading itself';
- ASSERT (SELECT superseded_at=t_at AND lineage_chain=ARRAY[rv] FROM vehicle_observations WHERE id=t1), 'a replay supersedes nothing twice';
+ UPDATE vehicle_images SET file_name='touched-since.jpg' WHERE id=img;
+ ASSERT (SELECT vi.updated_at > (o.extraction_metadata#>>'{reviewed_image,expected_updated_at}')::timestamptz FROM vehicle_images vi, vehicle_observations o WHERE vi.id=img AND o.id=rv),
+   'fixture: the photo row moved after the reading was made';
+ r := project_reviewed_image_analysis(rv);
+ ASSERT r->>'success'='true' AND r->>'thin_tier'='true' AND r->>'superseded_readings'='0', 'a second projection of a thin reading succeeds and does nothing: '||r::text;
+ ASSERT (SELECT NOT is_superseded AND superseded_by IS NULL FROM vehicle_observations WHERE id=rv), 'a second projection does not supersede the reading itself';
+ ASSERT (SELECT superseded_at=t_at AND lineage_chain=ARRAY[rv] FROM vehicle_observations WHERE id=t1), 'a second projection supersedes nothing twice';
  -- reviewed over reviewed stays as today: the previous reviewed reading and its child are untouched
  img := tt_image();
  t1 := tt_obs(img,'caller-byok subscription',tt_rich()); PERFORM project_reviewed_image_analysis(t1);
@@ -1609,7 +1680,7 @@ DO $$ DECLARE img uuid; t1 uuid; c1 uuid; rv uuid; t_at timestamptz; thin jsonb 
  rv := tt_obs(img,'caller-byok subscription',tt_rich('engine_bay')); PERFORM project_reviewed_image_analysis(rv);
  ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=t1) AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=c1), 'a previous reviewed reading is left alone';
  -- a thin reading landing over a reading with no tier (legacy observation) cannot happen (Rule 2); a reading of another producer is not this intake's to supersede
- RAISE NOTICE 'PASS: a landing reading supersedes the thin reading and its children, replay is idempotent, reviewed over reviewed unchanged';
+ RAISE NOTICE 'PASS: a landing reading supersedes the thin reading and its children; a thin reading projects twice to the same state; reviewed replay and reviewed over reviewed unchanged';
 END $$;
 -- a refused projection undoes the supersession (same transaction): the search placement fails after the supersession ran
 CREATE FUNCTION tt_refuse_search() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN
@@ -1626,7 +1697,7 @@ DO $$ DECLARE img uuid; t1 uuid; c1 uuid; rv uuid; BEGIN
  PERFORM set_config('tt.refuse','false',true);
  ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=t1) AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=c1),
    'a refused projection leaves the thin reading and its child current';
- ASSERT (SELECT ai_scan_metadata#>>'{byok_deep_analysis,observation_id}'=t1::text FROM vehicle_images WHERE id=img), 'and the cache is unchanged';
+ ASSERT (SELECT NOT (ai_scan_metadata ? 'byok_deep_analysis') FROM vehicle_images WHERE id=img), 'and the photo is still unstamped';
  RAISE NOTICE 'PASS: refused projection supersedes nothing';
 END $$;
 
@@ -1711,21 +1782,68 @@ DO $$ DECLARE img uuid; img2 uuid; r_int uuid; r_rv uuid; thin jsonb := (SELECT 
  UPDATE platform_config SET config_value=cfg WHERE config_key='image_reading_tiers';
  RAISE NOTICE 'PASS: stored readings are protected unless positively the automatic tier (unlisted tier, emptied list, no automatic tier)';
 END $$;
--- two thin readings posted before either is projected: the older never supersedes the newer
-DO $$ DECLARE img uuid; a uuid; b uuid; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1); BEGIN
+-- Thin readings replace each other in the ledger's own order and in no other: "newer" means posted later (ingested_at; at one
+-- instant the lowest id), the order image_stage_reading_parent uses to name a photo's current reading. Whatever order they are
+-- projected in, the newest posted stands alone at the end and nothing is superseded by an older reading.
+DO $$ DECLARE img uuid; a uuid; b uuid; c uuid; lo uuid; hi uuid; r jsonb; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1);
+  thin2 jsonb := (SELECT jsonb_array_elements(tt_accepted()) OFFSET 1 LIMIT 1); BEGIN
+ -- two readings posted before either is projected; the older is projected first: it supersedes nothing, then the newer replaces it
  img := tt_image();
- a := tt_obs(img,'subscription automatic',thin); b := tt_obs(img,'subscription automatic',(SELECT jsonb_array_elements(tt_accepted()) OFFSET 1 LIMIT 1));
+ a := tt_obs(img,'subscription automatic',thin); b := tt_obs(img,'subscription automatic',thin2);
+ ASSERT (SELECT x.ingested_at < y.ingested_at FROM vehicle_observations x, vehicle_observations y WHERE x.id=a AND y.id=b), 'fixture: a was posted before b';
  PERFORM project_reviewed_image_analysis(a);
  ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=b), 'the older thin reading did not supersede the newer, unprojected one';
- ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=a), 'the older reading is current';
- -- the other order: the newer lands first and replaces the older one
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=a), 'the older reading is current until the newer one lands';
+ PERFORM project_reviewed_image_analysis(b);
+ ASSERT (SELECT is_superseded AND superseded_by=b FROM vehicle_observations WHERE id=a) AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=b),
+   'then the newer one lands and stands alone';
+ -- the other order: the newer lands first and replaces the older one, which can then no longer be projected
  img := tt_image();
- a := tt_obs(img,'subscription automatic',thin); b := tt_obs(img,'subscription automatic',(SELECT jsonb_array_elements(tt_accepted()) OFFSET 1 LIMIT 1));
+ a := tt_obs(img,'subscription automatic',thin); b := tt_obs(img,'subscription automatic',thin2);
  PERFORM project_reviewed_image_analysis(b);
  ASSERT (SELECT is_superseded AND superseded_by=b FROM vehicle_observations WHERE id=a), 'the newer thin reading replaces the older, unprojected one';
  BEGIN PERFORM project_reviewed_image_analysis(a); RAISE EXCEPTION 'the superseded older reading projected';
  EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='review_observation_not_eligible', SQLERRM; END;
- RAISE NOTICE 'PASS: two unprojected thin readings: the older never supersedes the newer';
+ -- a reading made earlier by the reader's clock but posted later is the newer one in the ledger: it replaces the reading posted
+ -- before it, and that reading's keyed child (until it lands, both readings and the child are current)
+ img := tt_image();
+ a := tt_obs(img,'subscription automatic',thin); PERFORM project_reviewed_image_analysis(a);
+ c := tt_child(img,a);
+ b := tt_obs(img,'subscription automatic',thin2, p_reviewed => clock_timestamp() - interval '10 minutes');
+ ASSERT (SELECT y.observed_at < x.observed_at AND y.ingested_at > x.ingested_at FROM vehicle_observations x, vehicle_observations y WHERE x.id=a AND y.id=b), 'fixture: read earlier, posted later';
+ ASSERT (SELECT count(*)=2 FROM vehicle_observations WHERE structured_data->>'image_id'=img::text AND structured_data->>'analysis_kind'='image_deep_byok' AND NOT is_superseded)
+   AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=c), 'posted and not yet landed: two current readings and the first one''s child';
+ r := project_reviewed_image_analysis(b);
+ ASSERT r->>'superseded_readings'='1', r::text;
+ ASSERT (SELECT is_superseded AND superseded_by=b FROM vehicle_observations WHERE id=a) AND (SELECT is_superseded AND superseded_by=b FROM vehicle_observations WHERE id=c)
+   AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=b), 'the reading posted last replaces the one before it and its child, whatever the reader''s clock said';
+ -- the same instant in the ledger: the lowest id is the newer, in either projection order
+ FOR k IN 1..2 LOOP
+   img := tt_image();
+   a := tt_obs(img,'subscription automatic',thin); b := tt_obs(img,'subscription automatic',thin2);
+   UPDATE vehicle_observations SET ingested_at='2026-11-20 12:00:00+00' WHERE id IN (a,b);
+   lo := least(a,b); hi := greatest(a,b);
+   IF k = 1 THEN
+     PERFORM project_reviewed_image_analysis(hi);
+     ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=lo), 'tie: the higher id supersedes nothing';
+     PERFORM project_reviewed_image_analysis(lo);
+   ELSE
+     PERFORM project_reviewed_image_analysis(lo);
+     BEGIN PERFORM project_reviewed_image_analysis(hi); RAISE EXCEPTION 'the superseded reading projected';
+     EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='review_observation_not_eligible', SQLERRM; END;
+   END IF;
+   ASSERT (SELECT is_superseded AND superseded_by=lo FROM vehicle_observations WHERE id=hi) AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=lo),
+     'tie at one instant, order '||k||': the lowest id stands and the other is superseded by it';
+ END LOOP;
+ -- a reading with no ledger clock at all is the oldest
+ img := tt_image();
+ a := tt_obs(img,'subscription automatic',thin); b := tt_obs(img,'subscription automatic',thin2);
+ UPDATE vehicle_observations SET ingested_at=NULL WHERE id=b;
+ PERFORM project_reviewed_image_analysis(b);
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=a), 'a reading with no ledger clock supersedes nothing that has one';
+ PERFORM project_reviewed_image_analysis(a);
+ ASSERT (SELECT is_superseded AND superseded_by=a FROM vehicle_observations WHERE id=b) AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=a), 'and is replaced by the one that has';
+ RAISE NOTICE 'PASS: thin readings replace each other in the ledger''s order only: the newest posted stands alone, in any projection order';
 END $$;
 
 -- ===== the config row is what keeps a reviewed producer working
@@ -1740,7 +1858,10 @@ DO $$ DECLARE img uuid; img_r uuid; img_t uuid; t1 uuid; c1 uuid; t2 uuid; thin 
  -- nothing stored is displaced without a tier list: Rule 2 refuses, Rule 3 supersedes nothing
  BEGIN PERFORM tt_obs(img_r,'subscription automatic',thin); RAISE EXCEPTION 'thin over a stored reading unexpectedly landed without the row';
  EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
- PERFORM project_reviewed_image_analysis(t2);
+ -- t2 was posted while the row existed. Without the row nothing stored is positively automatic, so t1 is protected and t2 does not
+ -- land beside it
+ BEGIN PERFORM project_reviewed_image_analysis(t2); RAISE EXCEPTION 'a thin reading landed over a stored reading without the row';
+ EXCEPTION WHEN check_violation THEN ASSERT SQLERRM='thin_review_over_reviewed', SQLERRM; END;
  ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=t1) AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=c1),
    'without the row a landing reading supersedes no stored reading and no child';
  img := tt_image();
@@ -1803,7 +1924,7 @@ END $$;
 -- and the migration applies again on the restored bodies
 \ir ../migrations/20261120140000_image_reading_tiers.sql
 DO $$ BEGIN
- ASSERT (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.guard_reviewed_image_analysis()'::regprocedure)='d6b512f7468e03685a871ff61d1873c5', 'guard body is the migration''s';
- ASSERT (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.project_reviewed_image_analysis(uuid)'::regprocedure)='258d31ac9240fef4138226a9a0a7d506', 'projection body is the migration''s';
+ ASSERT (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.guard_reviewed_image_analysis()'::regprocedure)='d3b859b91864aedd4c7e2146a188ea60', 'guard body is the migration''s';
+ ASSERT (SELECT md5(prosrc) FROM pg_proc WHERE oid='public.project_reviewed_image_analysis(uuid)'::regprocedure)='9e53ed7082465cc63f5f937fe224a54d', 'projection body is the migration''s';
  RAISE NOTICE 'PASS: migration applies again after the revert';
 END $$;
