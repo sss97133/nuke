@@ -17,7 +17,7 @@
   <array>
     <string>/bin/bash</string>
     <string>-c</string>
-    <string>set -uo pipefail; D="$HOME/Library/Caches/nuke-family-price-index-runner"; mkdir -p "$D" "$HOME/nuke-logs/family-price-index"; git fetch -q origin main || exit 1; git show origin/main:scripts/market/family-price-index.py &gt; "$D/family-price-index.py" || exit 1; echo "$(date -u +%FT%TZ) $(git rev-parse --short origin/main)"; exec dotenvx run -q -- python3 "$D/family-price-index.py"</string>
+    <string>set -uo pipefail; D="$HOME/Library/Caches/nuke-family-price-index-runner"; mkdir -p "$D" "$HOME/nuke-logs/family-price-index"; git fetch -q origin main || exit 1; git show origin/main:scripts/market/family-price-index.py &gt; "$D/family-price-index.py" || exit 1; echo "$(date -u +%FT%TZ) $(git rev-parse --short origin/main)"; exec dotenvx run -q -- /opt/homebrew/bin/python3.14 "$D/family-price-index.py"</string>
   </array>
   <key>WorkingDirectory</key><string>/Users/skylar/nuke</string>
   <key>EnvironmentVariables</key>
