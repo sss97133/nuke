@@ -110,6 +110,9 @@ Noted drift:
   CI deploys every function with the gateway's token check off, so a function that was deployed by hand with the
   check on (`geo-cross-check`) is protected by its handler alone once it is recovered: the caller check ships in
   the same merge as the source, never after.
+- 2026-11-21: `fb-photo-upload` and `upload-fb-image` are back the same way (deployed versions 37 and 36), each
+  answering the service key only, so 107 remain. The caller of the first is
+  `scripts/photos/upload-listing-photos.mjs`, which sends the project secret key.
 
 ## Fleet Rules (workflows / crons / daemons)
 
