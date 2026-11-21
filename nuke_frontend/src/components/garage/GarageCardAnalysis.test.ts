@@ -18,7 +18,7 @@ describe('garage card analysis lines', () => {
     expect(byKey['stage-hours'].value).toBe('20 h (10–30)');
     expect(lines.some(line => line.value === '30.5 h' || line.value === '10.5 h')).toBe(false);
     expect(byKey.amount.value).toBe('$1,200');
-    expect(byKey.amount.cite).toBe('3 receipts · Jan 2024 – Feb 2025');
+    expect([byKey.amount.label, byKey.amount.cite]).toEqual(['On 3 receipts', 'Jan 2024 – Feb 2025']);
     expect(byKey.amount.cite).not.toContain('vehicle_build_reconstruction');
     expect(byKey.amount.title).toContain('vehicle_build_reconstruction, as of Nov 20, 2026');
     expect(['paper-hours', 'reference-hours', 'stage-hours'].map(key => byKey[key].group)).toEqual(['hours', 'hours', 'hours']);
@@ -67,8 +67,8 @@ describe('garage card analysis lines', () => {
     const [line] = analysisLines({ classPrice: { vehicle_id: 'car', status: 'priced', value: '46200', value_low: '35100',
       value_high: '76850', n: 35, subject_class: 'build', computed_at: '2026-11-21T08:00:00Z',
       basis: 'median of 35 sold comps of the same build class (build) in the 1973 Pontiac Firebird cohort' } });
-    expect([line.key, line.label, line.value, line.cite]).toEqual(['class-value', 'Class value', '$46,200',
-      '$35,100 – $76,850 · 35 sold comps of the same build class']);
+    expect([line.key, line.label, line.value, line.cite]).toEqual(['class-value', 'Class value · 35 comps', '$46,200',
+      '$35,100 – $76,850']);
     expect(line.title).toBe('median of 35 sold comps of the same build class (build) in the 1973 Pontiac Firebird cohort. '
       + 'computed Nov 21, 2026. get_vehicle_class_prices');
   });
