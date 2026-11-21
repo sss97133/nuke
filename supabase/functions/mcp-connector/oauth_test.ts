@@ -14,6 +14,7 @@ const slice = (from: string, to?: string) => {
 const handlerNames = [...source.matchAll(/^  (\w+): handle\w+,$/gm)].map((m) => m[1]);
 const entry = slice("Deno.serve(async (req: Request)");
 const moduleSource = `
+import { AsyncLocalStorage } from "node:async_hooks";
 const ACCOUNTING_TOOLS = [];
 const OWNER_STATEMENT_TOOLS = [];
 type CallerContext = { userId?: string; scopes?: string[]; oauthToken?: string };

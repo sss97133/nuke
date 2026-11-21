@@ -14,7 +14,8 @@ import {
   scopeAllowsWriteTier,
   type WriteTier,
 } from "../_shared/scopeGrammar.ts";
-import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { requireAdminOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import {
   checkAdvisorRateLimit,
@@ -154,9 +155,56 @@ async function authenticate(req: Request): Promise<AuthResult> {
   return { ok: false, error: "Missing authentication. Provide X-API-Key or Authorization header.", status: 401 };
 }
 
+// ── Caller scope ────────────────────────────────────────────────────────────
+// A caller without owner rights reads what a logged-out visitor reads. Each tool call runs inside one scope, decided
+// once per request:
+//   privileged — the service key, or a signed-in user with an active admin_users row;
+//   writer     — this call passed its write tier (WRITE_TIERS below), which is that tool's authorization to write;
+//   neither    — a visitor: no credential, an agent key, or a signed-in user who is not an admin.
+// A visitor reads through the publishable key with no session (sb() below), so the database's logged-out policies and
+// column grants decide what comes back. No scope at all is a visitor.
+interface CallerScope {
+  privileged: boolean;
+  writer?: boolean;
+}
+const callerScope = new AsyncLocalStorage<CallerScope>();
+
+/** True when this call reads and writes as the service: a privileged caller, or a tool call that passed its write tier. */
+function actsAsService(): boolean {
+  const scope = callerScope.getStore();
+  return scope?.privileged === true || scope?.writer === true;
+}
+
+/** Privileged: the service key, or a user id with an active admin_users row. Any lookup failure is not privileged. */
+async function isPrivilegedCaller(userId: string | undefined): Promise<boolean> {
+  if (userId === "service-role") return true;
+  if (!userId || !/^[0-9a-f-]{36}$/i.test(userId)) return false;
+  try {
+    const { data, error } = await getSupabase()
+      .from("admin_users")
+      .select("user_id")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .limit(1);
+    return !error && Array.isArray(data) && data[0]?.user_id === userId;
+  } catch {
+    return false;
+  }
+}
+
+// Edge functions a visitor may reach through the service key: they write nothing and return public market data.
+// Every other target, and every other path, needs a privileged caller or a call that passed its write tier.
+const VISITOR_EDGE_TARGETS = new Set(["api-v1-valuations", "api-v1-comps"]);
+
+function assertEdgeTargetAllowed(target: string): void {
+  if (actsAsService() || VISITOR_EDGE_TARGETS.has(target)) return;
+  throw new Error(`${target} is available to a signed-in owner or admin only. Sign in at https://nuke.ag and reconnect.`);
+}
+
 // ── Edge Function Proxy ─────────────────────────────────────────────────────
 
 async function callEdgeFn(name: string, body: Record<string, unknown>): Promise<unknown> {
+  assertEdgeTargetAllowed(name);
   const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
@@ -178,6 +226,7 @@ async function callEdgeApi(
   method: "GET" | "POST" = "GET",
   body?: Record<string, unknown>,
 ): Promise<unknown> {
+  assertEdgeTargetAllowed(path.startsWith("/") ? `api-v1-${endpoint}${path.split("?")[0]}` : `api-v1-${endpoint}`);
   const url = `${SUPABASE_URL}/functions/v1/api-v1-${endpoint}${path}`;
   const res = await fetch(url, {
     method,
@@ -1294,19 +1343,90 @@ const TOOLS: ToolDef[] = [
 // TOOL HANDLERS
 // =============================================================================
 
-const sb = () => getSupabase();
+const sb = () => scopedSupabase();
+
+// Every tool reads through sb(). It is the service client only when this call acts as the service (see callerScope);
+// otherwise it is the publishable key with no session, so a visitor gets exactly what the database's logged-out policies
+// and column grants give. No scope, or no publishable key, never falls back to the service client.
+function scopedSupabase() {
+  if (actsAsService()) return getSupabase();
+  const key = projectPublishableKey();
+  if (!key) throw new Error("Reads without owner rights are unavailable: this server has no publishable key.");
+  return createClient(SUPABASE_URL, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+/** A visitor reads with the publishable key; the tools below give it select lists made only of granted columns. */
+const readsAsVisitor = () => !actsAsService();
+// The select list for this call: the visitor's granted columns, or the list a privileged caller has always read. Typed
+// as "*" so the rows keep the loose typing the tools were written against.
+const columnsFor = (visitorColumns: string, columns: string) => (readsAsVisitor() ? visitorColumns : columns) as "*";
+
+// A visitor asks the database whether it may see the vehicle before any read keyed by it: a vehicle the logged-out
+// reader cannot see answers "Vehicle not found". Returns the error to send, or null when the vehicle is visible.
+async function visitorVehicleGate(vehicleId: unknown): Promise<ToolResult | null> {
+  if (!readsAsVisitor()) return null;
+  const vid = String(vehicleId ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(vid)) return toolErr("Vehicle not found");
+  const { data, error } = await sb().from("vehicles").select("id").eq("id", vid).limit(1);
+  return !error && Array.isArray(data) && data.length === 1 ? null : toolErr("Vehicle not found");
+}
+
+// Columns of vehicles the logged-out reader is granted, for the tools that read a whole vehicle row.
+const VISITOR_VEHICLE_COLUMNS =
+  "id, vin, year, make, model, trim, series, body_style, canonical_platform, engine_type, engine_displacement, " +
+  "horsepower, torque, transmission, drivetrain, color, interior_color, mileage, description, highlights, equipment, " +
+  "modifications, known_flaws, recent_service_history, title_status, documents_on_hand, nuke_estimate, " +
+  "nuke_estimate_confidence, deal_score, heat_score, status, auction_status, reserve_status, data_quality_score, " +
+  "image_count, observation_count, location, city, state, country, listing_url, bat_auction_url, bat_seller, " +
+  "primary_image_url, sale_price, asking_price, is_public, created_at, updated_at";
+// Photo rows for a visitor carry no EXIF, coordinates or storage path.
+const VISITOR_IMAGE_COLUMNS =
+  "id, image_url, thumbnail_url, medium_url, large_url, angle, condition_score, photo_quality_score, " +
+  "ai_processing_status, damage_flags, modification_flags, fabrication_stage, vision_analyzed_at, created_at, " +
+  "taken_at, camera_pose, caption";
+const VISITOR_IMAGE_SUMMARY_COLUMNS =
+  "url:image_url, angle, condition_score, photo_quality_score, ai_processing_status, damage_flags, modification_flags";
+
+// A visitor's vehicle lists. Under the logged-out policy on vehicles the planner cannot use an index for ilike, text
+// search or a sorted scan, and such a read runs into the statement timeout. So for a visitor the service client only
+// finds candidate ids, with the tool's own filters, sort and range narrowed to public vehicles; the rows are then read
+// through sb() by id, so the database's logged-out policy and column grants still decide every row and column returned.
+// The ids never reach the caller, and no count derived from them is returned.
+const vehicleListClient = () => (readsAsVisitor() ? getSupabase() : sb());
+async function visitorVehicleRows(
+  candidates: { data: unknown; error: { message: string } | null },
+  columns: string,
+): Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }> {
+  if (candidates.error) return { data: null, error: candidates.error };
+  const ids = ((candidates.data ?? []) as Array<{ id: string }>).map((c) => c.id);
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const { data, error } = await sb().from("vehicles").select(columns as "*").in("id", ids.slice(i, i + 50));
+    if (error) return { data: null, error };
+    rows.push(...((data ?? []) as Record<string, unknown>[]));
+  }
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return { data: ids.map((id) => byId.get(id)).filter((r): r is Record<string, unknown> => Boolean(r)), error: null };
+}
 
 // ── Schema Discovery ────────────────────────────────────────────────────────
 
 async function handleDescribePlatform(): Promise<ToolResult> {
   const supabase = sb();
+  // A visitor's counts run under the logged-out policies; an exact count of those tables would not finish in time.
+  // Photos are not counted for a visitor at all (the count is reported as unknown).
+  const count = readsAsVisitor() ? "estimated" : "exact";
   const [vehicles, images, observations, sources, orgs, events] = await Promise.all([
-    supabase.from("vehicles").select("id", { count: "exact", head: true }),
-    supabase.from("vehicle_images").select("id", { count: "exact", head: true }),
-    supabase.from("vehicle_observations").select("id", { count: "exact", head: true }),
-    supabase.from("observation_sources").select("id", { count: "exact", head: true }),
-    supabase.from("organizations").select("id", { count: "exact", head: true }),
-    supabase.from("vehicle_events").select("id", { count: "exact", head: true }),
+    supabase.from("vehicles").select("id", { count, head: true }),
+    readsAsVisitor()
+      ? Promise.resolve({ count: null })
+      : supabase.from("vehicle_images").select("id", { count, head: true }),
+    supabase.from("vehicle_observations").select("id", { count, head: true }),
+    supabase.from("observation_sources").select("id", { count, head: true }),
+    supabase.from("organizations").select("id", { count, head: true }),
+    supabase.from("vehicle_events").select("id", { count, head: true }),
   ]);
 
   return toolOk({
@@ -1317,7 +1437,7 @@ async function handleDescribePlatform(): Promise<ToolResult> {
       "Every data point is source-attributed, confidence-scored, and traceable.",
     stats: {
       vehicles: vehicles.count ?? 0,
-      images: images.count ?? 0,
+      images: images.count ?? (readsAsVisitor() ? null : 0),
       observations: observations.count ?? 0,
       observation_sources: sources.count ?? 0,
       organizations: orgs.count ?? 0,
@@ -1381,7 +1501,11 @@ async function handleDescribeSchema(args: Record<string, unknown>): Promise<Tool
     const tables = layerTables[args.layer as string] || [];
     const results = [];
     for (const t of tables) {
-      const { count } = await supabase.from(t as any).select("id", { count: "exact", head: true });
+      if (readsAsVisitor() && t === "vehicle_images") {
+        results.push({ table: t, row_count: "unknown" });
+        continue;
+      }
+      const { count } = await supabase.from(t as any).select("id", { count: readsAsVisitor() ? "estimated" : "exact", head: true });
       results.push({ table: t, row_count: count ?? "unknown" });
     }
     return toolOk({ layer: args.layer, tables: results });
@@ -1420,16 +1544,19 @@ async function handleSearchVehicles(args: Record<string, unknown>): Promise<Tool
   const tokens = queryStr.split(/\s+/).filter(Boolean);
   const tsq = tokens.map((t) => t.replace(/[^a-zA-Z0-9]/g, "")).filter(Boolean).join(" & ");
 
-  let query = supabase
+  const columns = "id, year, make, model, trim, sale_price, mileage, primary_image_url, listing_url, nuke_estimate, location, auction_source";
+  const visitor = readsAsVisitor();
+  let query = vehicleListClient()
     .from("vehicles")
-    .select("id, year, make, model, trim, sale_price, mileage, primary_image_url, listing_url, nuke_estimate, location, auction_source")
+    .select((visitor ? "id" : columns) as "*")
     .limit(limit);
+  if (visitor) query = query.eq("is_public", true);
 
   if (tsq) {
     query = query.textSearch("search_vector", tsq, { type: "plain", config: "english" });
   }
 
-  const { data, error } = await query;
+  const { data, error } = visitor ? await visitorVehicleRows(await query, columns) : await query;
   if (error) return toolErr(error.message);
   return toolOk({ results: data || [], count: data?.length ?? 0 });
 }
@@ -1439,16 +1566,17 @@ async function handleSearchVehiclesAdvanced(args: Record<string, unknown>): Prom
   const limit = Math.min(Math.max(Number(args.limit) || 50, 1), 200);
   const page = Math.max(Number(args.page) || 1, 1);
   const offset = (page - 1) * limit;
+  const columns = "id, vin, year, make, model, trim, color, interior_color, sale_price, asking_price, " +
+    "mileage, transmission, engine_type, body_style, status, primary_image_url, " +
+    "listing_url, nuke_estimate, nuke_estimate_confidence, deal_score, location, " +
+    "city, state, country, created_at";
+  const visitor = readsAsVisitor();
 
-  let query = supabase
-    .from("vehicles")
-    .select(
-      "id, vin, year, make, model, trim, color, interior_color, sale_price, asking_price, " +
-      "mileage, transmission, engine_type, body_style, status, primary_image_url, " +
-      "listing_url, nuke_estimate, nuke_estimate_confidence, deal_score, location, " +
-      "city, state, country, created_at",
-      { count: "estimated" }
-    );
+  let query = visitor
+    ? vehicleListClient().from("vehicles").select("id").eq("is_public", true)
+    : supabase
+      .from("vehicles")
+      .select(columns, { count: "estimated" });
 
   // Full-text search (only when q is provided — avoid searching for "undefined")
   if (args.q) {
@@ -1474,7 +1602,10 @@ async function handleSearchVehiclesAdvanced(args: Record<string, unknown>): Prom
 
   query = (query as any).range(offset, offset + limit - 1);
 
-  const { data, count, error } = await query;
+  const candidates = visitor ? await query : null;
+  const { data, count, error } = visitor
+    ? { ...(await visitorVehicleRows(candidates!, columns)), count: null }
+    : await query;
   if (error) return toolErr(error.message);
 
   const results = (data || []).map((v: Record<string, unknown>) =>
@@ -1486,7 +1617,7 @@ async function handleSearchVehiclesAdvanced(args: Record<string, unknown>): Prom
     total_count: count ?? results.length,
     page,
     limit,
-    has_more: (count ?? 0) > offset + limit,
+    has_more: visitor ? (candidates?.data?.length ?? 0) === limit : (count ?? 0) > offset + limit,
   });
 }
 
@@ -1516,12 +1647,18 @@ async function handleDecodeVin(args: Record<string, unknown>): Promise<ToolResul
 
   // 2. Check local Nuke DB
   const supabase = sb();
-  const { data: vehicle } = await supabase
-    .from("vehicles")
-    .select("id, vin, year, make, model, trim, status, sale_price, primary_image_url, listing_url")
-    .ilike("vin", vin)
-    .limit(1)
-    .maybeSingle();
+  const columns = "id, vin, year, make, model, trim, status, sale_price, primary_image_url, listing_url";
+  const { data: vehicle } = readsAsVisitor()
+    ? await visitorVehicleRows(
+      await vehicleListClient().from("vehicles").select("id").eq("is_public", true).ilike("vin", vin).limit(1),
+      columns,
+    ).then((r) => ({ data: r.data?.[0] ?? null }))
+    : await supabase
+      .from("vehicles")
+      .select(columns)
+      .ilike("vin", vin)
+      .limit(1)
+      .maybeSingle();
 
   if (!nhtsaDecode && !vehicle) {
     return toolErr(`VIN ${vin} not found in NHTSA or Nuke database`);
@@ -1565,17 +1702,19 @@ async function handleDecodeVin(args: Record<string, unknown>): Promise<ToolResul
 async function handleBrowseInventory(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
   const limit = Math.min(Number(args.limit) || 25, 100);
+  const columns = "id, vin, year, make, model, trim, body_style, " +
+    "sale_price, asking_price, nuke_estimate, deal_score, " +
+    "mileage, exterior_color:color, transmission, engine_type, " +
+    "status, city, state, location, country, " +
+    "primary_image_url, listing_url, " +
+    "created_at";
+  const visitor = readsAsVisitor();
 
-  let query = supabase
-    .from("vehicles")
-    .select(
-      "id, vin, year, make, model, trim, body_style, " +
-      "sale_price, asking_price, nuke_estimate, deal_score, " +
-      "mileage, exterior_color:color, transmission, engine_type, " +
-      "status, city, state, location, country, " +
-      "primary_image_url, listing_url, " +
-      "created_at"
-    );
+  let query = visitor
+    ? vehicleListClient().from("vehicles").select("id" as "*").eq("is_public", true)
+    : supabase
+      .from("vehicles")
+      .select(columns as "*");
 
   // Location filter — match on city, state, or location
   if (args.location) {
@@ -1630,7 +1769,9 @@ async function handleBrowseInventory(args: Record<string, unknown>): Promise<Too
   const [sortCol, sortAsc] = sortMap[String(args.sort)] || sortMap.newest;
   query = query.order(sortCol, { ascending: sortAsc, nullsFirst: false });
 
-  const { data, error, count } = await query.limit(limit);
+  const { data, error } = visitor
+    ? await visitorVehicleRows(await query.limit(limit), columns)
+    : await query.limit(limit);
   if (error) return toolErr(error.message);
 
   return toolOk({
@@ -1654,10 +1795,12 @@ async function handleBrowseInventory(args: Record<string, unknown>): Promise<Too
 async function handleVehicle(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
   const vid = String(args.vehicle_id);
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return hidden;
 
   const { data: vehicle, error } = await supabase
     .from("vehicles")
-    .select("*")
+    .select(columnsFor(VISITOR_VEHICLE_COLUMNS, "*"))
     .eq("id", vid)
     .single();
 
@@ -1700,6 +1843,8 @@ async function priceFacts(supabase: ReturnType<typeof sb>, vid: string) {
 async function handleGetVehicle(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
   const vid = String(args.vehicle_id);
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return hidden;
 
   const { data: vehicle, error } = await supabase
     .from("vehicles")
@@ -1736,13 +1881,15 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
   const includeEvents = args.include_events !== false;
   const includeImages = args.include_images !== false;
   const includeSignals = args.include_signals !== false;
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return hidden;
 
   // Parallel fetches across all layers
   const promises: Promise<any>[] = [
     // Layer 1: Identity + core fields
     supabase
       .from("vehicles")
-      .select("*")
+      .select(columnsFor(VISITOR_VEHICLE_COLUMNS, "*"))
       .eq("id", vid)
       .single(),
   ];
@@ -1782,7 +1929,10 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
     promises.push(
       supabase
         .from("vehicle_images")
-        .select("id, url, angle, condition_score, photo_quality_score, ai_processing_status, damage_flags, modification_flags")
+        .select(columnsFor(
+          `id, ${VISITOR_IMAGE_SUMMARY_COLUMNS}`,
+          "id, url, angle, condition_score, photo_quality_score, ai_processing_status, damage_flags, modification_flags",
+        ))
         .eq("vehicle_id", vid)
         .order("created_at", { ascending: false })
         .limit(50),
@@ -2063,6 +2213,8 @@ async function handleQueryFieldEvidence(args: Record<string, unknown>): Promise<
   const supabase = sb();
   const vid = String(args.vehicle_id);
   const field = String(args.field_name);
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return hidden;
 
   const { data: evidence, error } = await supabase
     .from("vehicle_field_evidence")
@@ -2128,6 +2280,8 @@ async function handleQueryObservations(args: Record<string, unknown>): Promise<T
   const vid = String(args.vehicle_id);
   const limit = Math.min(Number(args.limit) || 50, 200);
   const offset = Number(args.offset) || 0;
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return hidden;
 
   let query = supabase
     .from("vehicle_observations")
@@ -2187,7 +2341,27 @@ async function handleQueryObservations(args: Record<string, unknown>): Promise<T
 
 // ── Market Intelligence ─────────────────────────────────────────────────────
 
+// The valuation and comps proxies read with the service key, so for a visitor the vehicle they are keyed by must first
+// be one the logged-out reader can see (resolved through sb(), a VIN included).
+async function visitorVehicleArgs(
+  args: Record<string, unknown>,
+): Promise<{ hidden: ToolResult } | { args: Record<string, unknown> }> {
+  if (!readsAsVisitor() || (!args.vehicle_id && !args.vin)) return { args };
+  let vid = args.vehicle_id;
+  if (!vid) {
+    const { data } = await sb().from("vehicles").select("id").eq("vin", String(args.vin).trim().toUpperCase()).limit(1);
+    vid = Array.isArray(data) ? data[0]?.id : undefined;
+  }
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return { hidden };
+  const { vin: _vin, ...rest } = args;
+  return { args: { ...rest, vehicle_id: vid } };
+}
+
 async function handleGetValuation(args: Record<string, unknown>): Promise<ToolResult> {
+  const gated = await visitorVehicleArgs(args);
+  if ("hidden" in gated) return gated.hidden;
+  args = gated.args;
   const params = new URLSearchParams();
   if (args.vehicle_id) params.set("vehicle_id", String(args.vehicle_id));
   if (args.vin) params.set("vin", String(args.vin));
@@ -2204,6 +2378,9 @@ async function handleComputeValuation(args: Record<string, unknown>): Promise<To
 }
 
 async function handleGetComps(args: Record<string, unknown>): Promise<ToolResult> {
+  const gated = await visitorVehicleArgs(args);
+  if ("hidden" in gated) return gated.hidden;
+  args = gated.args;
   const body: Record<string, unknown> = {};
   for (const k of ["make", "model", "year", "year_range", "vehicle_id", "vin", "limit"]) {
     if (args[k] !== undefined) body[k] = args[k];
@@ -2235,17 +2412,23 @@ async function handleQueryMarketHistory(args: Record<string, unknown>): Promise<
     .limit(limit);
 
   if (args.vehicle_id) {
+    const hidden = await visitorVehicleGate(args.vehicle_id);
+    if (hidden) return hidden;
     query = query.eq("vehicle_id", args.vehicle_id);
   } else {
     // Cohort query: join through vehicles table
     if (args.make || args.model || args.year_from || args.year_to) {
       // For cohort, we need to get vehicle IDs first
-      let vQuery = supabase.from("vehicles").select("id");
+      let vQuery = vehicleListClient().from("vehicles").select("id");
+      if (readsAsVisitor()) vQuery = vQuery.eq("is_public", true);
       if (args.make) vQuery = vQuery.ilike("make", String(args.make));
       if (args.model) vQuery = vQuery.ilike("model", `%${args.model}%`);
       if (args.year_from) vQuery = vQuery.gte("year", args.year_from);
       if (args.year_to) vQuery = vQuery.lte("year", args.year_to);
-      const { data: vehicleIds } = await vQuery.limit(50);  // Cap at 50 to stay within PostgREST URL length limit
+      const cohort = await vQuery.limit(50);  // Cap at 50 to stay within PostgREST URL length limit
+      const { data: vehicleIds } = readsAsVisitor()
+        ? await visitorVehicleRows(cohort, "id")
+        : cohort;
       if (vehicleIds?.length) {
         query = query.in("vehicle_id", vehicleIds.map((v: any) => v.id));
       } else {
@@ -2261,10 +2444,16 @@ async function handleQueryMarketHistory(args: Record<string, unknown>): Promise<
 
 // ── Reference Library ───────────────────────────────────────────────────────
 
+const LIBRARY_TYPES = new Set(["paint_codes", "condition_knowledge", "condition_taxonomy", "vehicle_nomenclature"]);
+
 async function handleQueryLibrary(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
   const type = String(args.type);
-  const limit = Number(args.limit) || 25;
+  // Only the four reference tables the tool schema documents, at most 100 rows, for every caller.
+  if (!LIBRARY_TYPES.has(type)) {
+    return toolErr(`type must be one of ${[...LIBRARY_TYPES].join(", ")}`);
+  }
+  const limit = Math.min(Math.max(Number(args.limit) || 25, 1), 100);
 
   let query = supabase.from(type as any).select("*").limit(limit);
 
@@ -2354,6 +2543,7 @@ async function handleAnalyzeImage(args: Record<string, unknown>): Promise<ToolRe
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
     try {
+      assertEdgeTargetAllowed("api-v1-vision/analyze");
       const res = await fetch(`${SUPABASE_URL}/functions/v1/api-v1-vision/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
@@ -2406,6 +2596,9 @@ async function handleQueryVehicleImages(args: Record<string, unknown>): Promise<
   const supabase = sb();
   const vid = String(args.vehicle_id);
   const limit = Math.min(Number(args.limit) || 20, 100);
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return hidden;
+  const visitor = readsAsVisitor();
 
   // NOTE: vehicle_images has NO `url` column. Real columns are image_url / large_url /
   // medium_url / thumbnail_url / safe_preview_url / source_url / storage_path. Selecting a
@@ -2419,7 +2612,10 @@ async function handleQueryVehicleImages(args: Record<string, unknown>): Promise<
   // exif_data here is the stored best-effort and is labeled as such in the response.
   let query = supabase
     .from("vehicle_images")
-    .select("id, image_url, thumbnail_url, medium_url, large_url, storage_path, angle, condition_score, photo_quality_score, ai_processing_status, damage_flags, modification_flags, fabrication_stage, vision_analyzed_at, created_at, exif_data, taken_at, latitude, longitude, camera_pose, caption")
+    .select(columnsFor(
+      VISITOR_IMAGE_COLUMNS,
+      "id, image_url, thumbnail_url, medium_url, large_url, storage_path, angle, condition_score, photo_quality_score, ai_processing_status, damage_flags, modification_flags, fabrication_stage, vision_analyzed_at, created_at, exif_data, taken_at, latitude, longitude, camera_pose, caption",
+    ))
     .eq("vehicle_id", vid)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -2435,6 +2631,14 @@ async function handleQueryVehicleImages(args: Record<string, unknown>): Promise<
   // and split out a labeled exif block so the caller knows it's stored best-effort, not exiftool ground-truth.
   const images = (data || []).map((r) => {
     const row = r as Record<string, unknown>;
+    // A visitor's photo rows carry no EXIF, coordinates or storage path: only the capture time and pose.
+    if (visitor) {
+      return {
+        ...row,
+        url: (row.image_url as string) ?? null,
+        exif: { source: "stored_best_effort", taken_at: row.taken_at ?? null, camera_pose: row.camera_pose ?? null },
+      };
+    }
     return {
       ...row,
       url: (row.image_url as string) ?? null,
@@ -2470,6 +2674,8 @@ async function handleQueryVehicleImages(args: Record<string, unknown>): Promise<
 async function handleGetVehicleWiki(args: Record<string, unknown>): Promise<ToolResult> {
   const vid = String(args.vehicle_id ?? "");
   if (!vid) return toolErr("vehicle_id is required");
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return hidden;
   const { data, error } = await sb().rpc("vehicle_wiki", { p_vehicle_id: vid });
   if (error) return toolErr(`vehicle_wiki failed: ${error.message}`);
   return toolOk(data);
@@ -3928,8 +4134,14 @@ async function handleGetOrganization(args: Record<string, unknown>): Promise<Too
   const oid = String(args.org_id);
 
   const [org, vehicleCount, locations] = await Promise.all([
-    supabase.from("organizations").select("*").eq("id", oid).single(),
-    supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("selling_organization_id", oid),
+    supabase.from("organizations").select(columnsFor(
+      "id, name, slug, business_type, website, city, state, country, description, created_at",
+      "*",
+    )).eq("id", oid).single(),
+    // A visitor's count of an organization's vehicles cannot finish under the logged-out policy: it is reported unknown.
+    readsAsVisitor()
+      ? Promise.resolve({ count: null })
+      : supabase.from("vehicles").select("id", { count: "exact", head: true }).eq("selling_organization_id", oid),
     supabase.from("organization_locations").select("*").eq("organization_id", oid),
   ]);
 
@@ -3937,7 +4149,7 @@ async function handleGetOrganization(args: Record<string, unknown>): Promise<Too
   const { tax_id: _taxId, business_license: _businessLicense, ...publicOrg } = org.data;
   return toolOk({
     ...publicOrg,
-    vehicle_count: vehicleCount.count ?? 0,
+    vehicle_count: vehicleCount.count ?? (readsAsVisitor() ? null : 0),
     locations: locations.data || [],
   });
 }
@@ -4071,6 +4283,7 @@ async function handleSubmitVehicleEvent(args: Record<string, unknown>): Promise<
   };
 
   // Call api-v1-events internally with service-role auth.
+  assertEdgeTargetAllowed("api-v1-events");
   const res = await fetch(`${SUPABASE_URL}/functions/v1/api-v1-events`, {
     method: "POST",
     headers: {
@@ -4743,6 +4956,8 @@ async function handleGetAuctionReadiness(
     vehicleId = data.id;
   }
   if (!vehicleId) return toolErr("Provide vehicle_id or vin");
+  const hidden = await visitorVehicleGate(vehicleId);
+  if (hidden) return hidden;
 
   const { data: cached } = await supabase
     .from("auction_readiness")
@@ -4759,8 +4974,9 @@ async function handleGetAuctionReadiness(
     return toolOk({ ...cached, vehicle: v });
   }
 
+  // A stale or missing score is recomputed; only a call that acts as the service stores it.
   const { data: result, error } = await supabase.rpc(
-    "persist_auction_readiness",
+    readsAsVisitor() ? "compute_auction_readiness" : "persist_auction_readiness",
     { p_vehicle_id: vehicleId },
   );
   if (error) return toolErr(error.message);
@@ -4780,6 +4996,8 @@ async function handleGetCoachingPlan(
   const supabase = sb();
   const vehicleId = args.vehicle_id as string;
   if (!vehicleId) return toolErr("vehicle_id required");
+  const hidden = await visitorVehicleGate(vehicleId);
+  if (hidden) return hidden;
 
   let { data: ars } = await supabase
     .from("auction_readiness")
@@ -4787,7 +5005,10 @@ async function handleGetCoachingPlan(
     .eq("vehicle_id", vehicleId)
     .single();
 
-  if (!ars) {
+  if (!ars && readsAsVisitor()) {
+    // A visitor gets the score computed, never stored.
+    ars = (await supabase.rpc("compute_auction_readiness", { p_vehicle_id: vehicleId })).data;
+  } else if (!ars) {
     await supabase.rpc("persist_auction_readiness", {
       p_vehicle_id: vehicleId,
     });
@@ -4849,6 +5070,8 @@ async function handlePrepareListing(
   const vehicleId = args.vehicle_id as string;
   const platform = (args.platform as string) || "bat";
   if (!vehicleId) return toolErr("vehicle_id required");
+  const hidden = await visitorVehicleGate(vehicleId);
+  if (hidden) return hidden;
 
   let { data: ars } = await supabase
     .from("auction_readiness")
@@ -4856,7 +5079,10 @@ async function handlePrepareListing(
     .eq("vehicle_id", vehicleId)
     .single();
 
-  if (!ars) {
+  if (!ars && readsAsVisitor()) {
+    // A visitor gets the score computed, never stored.
+    ars = (await supabase.rpc("compute_auction_readiness", { p_vehicle_id: vehicleId })).data;
+  } else if (!ars) {
     await supabase.rpc("persist_auction_readiness", {
       p_vehicle_id: vehicleId,
     });
@@ -5130,6 +5356,7 @@ async function handleCreateProfile(args: Record<string, unknown>): Promise<ToolR
   }
 
   // Try to create user via Auth Admin API
+  assertEdgeTargetAllowed("auth-admin-users");
   const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: "POST",
     headers: {
@@ -5222,9 +5449,14 @@ async function handleGetProfile(args: Record<string, unknown>): Promise<ToolResu
   const userId = args.user_id ? String(args.user_id) : null;
 
   if (!email && !userId) return toolErr("Provide email or user_id");
+  // Finding a person by email address is for a privileged caller only; a visitor reads public profiles by id.
+  if (!userId && readsAsVisitor()) return toolErr("Looking up a profile by email requires an admin sign-in. Pass user_id instead.");
 
   // Look up profile
-  let query = supabase.from("profiles").select("id, email, full_name, avatar_url, location, bio, website, user_type, onboarded_via, created_at");
+  let query = supabase.from("profiles").select(columnsFor(
+    "id, full_name, avatar_url, location, bio, website, user_type, created_at",
+    "id, email, full_name, avatar_url, location, bio, website, user_type, onboarded_via, created_at",
+  ));
   if (userId) {
     query = query.eq("id", userId);
   } else if (email) {
@@ -5619,7 +5851,8 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
     return toolErr("Provide vehicle_id or listing_url");
   }
 
-  const supabase = getSupabase();
+  const supabase = sb();
+  const visitor = readsAsVisitor();
 
   // Resolve vehicle_id from listing_url if needed
   let vid = vehicleId;
@@ -5645,6 +5878,8 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
     }
     if (!vid) return toolErr("No vehicle found for this listing URL");
   }
+  const hidden = await visitorVehicleGate(vid);
+  if (hidden) return hidden;
 
   // Run all queries in parallel
   const [
@@ -5660,7 +5895,7 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
     valuationRes,
   ] = await Promise.all([
     // 1. Vehicle identity + specs + valuation
-    supabase.from("vehicles").select("*").eq("id", vid).single(),
+    supabase.from("vehicles").select(columnsFor(VISITOR_VEHICLE_COLUMNS, "*")).eq("id", vid).single(),
 
     // 2. BaT listings for this vehicle (active first)
     supabase.from("bat_listings")
@@ -5677,14 +5912,20 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
 
     // 5. Market history (all events for this vehicle)
     supabase.from("vehicle_events")
-      .select("source_platform, event_type, source_url, sale_price, asking_price, auction_end_date, created_at")
+      .select(columnsFor(
+        "source_platform, event_type, source_url, sale_price:final_price, auction_end_date:ended_at, created_at",
+        "source_platform, event_type, source_url, sale_price, asking_price, auction_end_date, created_at",
+      ))
       .eq("vehicle_id", vid)
       .order("created_at", { ascending: false })
       .limit(20),
 
     // 6. Images summary (condition scores)
     supabase.from("vehicle_images")
-      .select("url, angle, condition_score, photo_quality_score, damage_flags, modification_flags, ai_processing_status")
+      .select(columnsFor(
+        VISITOR_IMAGE_SUMMARY_COLUMNS,
+        "url, angle, condition_score, photo_quality_score, damage_flags, modification_flags, ai_processing_status",
+      ))
       .eq("vehicle_id", vid)
       .order("condition_score", { ascending: false, nullsFirst: false })
       .limit(20),
@@ -5711,11 +5952,17 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
       .limit(20),
 
     // 10. Cached valuation
-    supabase.from("vehicle_valuations")
-      .select("estimated_value, confidence, value_range_low, value_range_high, deal_score, heat_score, price_tier, methodology")
-      .eq("vehicle_id", vid)
-      .order("computed_at", { ascending: false })
-      .limit(1),
+    visitor
+      ? supabase.from("vehicle_valuations")
+        .select("estimated_value, confidence:confidence_score, methodology, valuation_date")
+        .eq("vehicle_id", vid)
+        .order("valuation_date", { ascending: false })
+        .limit(1)
+      : supabase.from("vehicle_valuations")
+        .select("estimated_value, confidence, value_range_low, value_range_high, deal_score, heat_score, price_tier, methodology")
+        .eq("vehicle_id", vid)
+        .order("computed_at", { ascending: false })
+        .limit(1),
   ]);
 
   const vehicle = vehicleRes.data;
@@ -5994,8 +6241,10 @@ async function handleProposeAttribute(args: Record<string, unknown>): Promise<To
 
 // ── Owner statements (private, unsigned, speaker from this request's OAuth token) ──
 
+// These RPCs are not granted to the logged-out reader: each one finds the speaker from the OAuth token this request
+// presented and returns or writes only that speaker's rows, so they are called with the service client for every caller.
 const ownerStatementRpc = async (fn: string, params: Record<string, unknown>) => {
-  const { data, error } = await sb().rpc(fn, params);
+  const { data, error } = await getSupabase().rpc(fn, params);
   return { data, error: error ? { code: error.code, message: error.message } : null };
 };
 function handleRecordOwnerStatement(args: Record<string, unknown>, caller?: CallerContext): Promise<ToolResult> {
@@ -6268,6 +6517,8 @@ Deno.serve(async (req: Request) => {
     // If a key/bearer is presented, still validate it (bad key fails fast).
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
+    // The advisor's own reads are unchanged here; its edge-function proxy follows the same caller scope as /mcp.
+    let advisorScope: CallerScope = { privileged: false };
     if (authHeader || apiKey) {
       const auth = await authenticate(req);
       if (!auth.ok) {
@@ -6283,9 +6534,10 @@ Deno.serve(async (req: Request) => {
           },
         );
       }
+      advisorScope = { privileged: await isPrivilegedCaller(auth.userId) };
     }
 
-    const response = await handleAdvisorJsonRpc(body);
+    const response = await callerScope.run(advisorScope, () => handleAdvisorJsonRpc(body));
     if (response === null) {
       return new Response(null, { status: 202, headers: CORS });
     }
@@ -6333,6 +6585,7 @@ Deno.serve(async (req: Request) => {
     submit_vehicle_event: "observations",
     ingest_photos: "observations",
     record_owner_statement: "observations",
+    propose_attribute: "observations",
     create_profile: "canonical",
     link_account: "canonical",
     verify_account_link: "canonical",
@@ -6344,14 +6597,24 @@ Deno.serve(async (req: Request) => {
   const ADMIN_OR_SERVICE_TOOLS = new Set(["execute_sql"]);
   // Read tools that return one person's private rows: no anonymous call, so a client without a token is sent to log in.
   const SIGN_IN_READ_TOOLS = new Set(["read_owner_statements"]);
+  // Tools that write through the service, or return one account's books: a client without a token is sent to log in,
+  // and a signed-in caller who is not privileged (the service key or an active admin) is refused.
+  const PRIVILEGED_TOOLS = new Set([
+    "confirm_work_session", "project_invoice", "project_work_log", "project_money_flow",
+    "compute_valuation", "identify_vehicle_image", "extract_listing", "analyze_image",
+  ]);
   // Who called, for the handlers that act as the caller. Set only from a credential this request presented.
   let caller: CallerContext | undefined;
+  // What this call reads and writes as (see callerScope). Without a credential it stays a visitor.
+  let scope: CallerScope = { privileged: false };
   if (body.method === "tools/call") {
     const toolName = body?.params?.name as string | undefined;
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
     const requiredTier: WriteTier | undefined = toolName ? WRITE_TIERS[toolName] : undefined;
-    const isWrite = Boolean(requiredTier) || (typeof toolName === "string" && SIGN_IN_READ_TOOLS.has(toolName));
+    const privilegedOnly = typeof toolName === "string" && PRIVILEGED_TOOLS.has(toolName);
+    const isWrite = Boolean(requiredTier) || privilegedOnly ||
+      (typeof toolName === "string" && SIGN_IN_READ_TOOLS.has(toolName));
     const adminOrService = typeof toolName === "string" && ADMIN_OR_SERVICE_TOOLS.has(toolName);
 
     if (adminOrService) {
@@ -6359,6 +6622,7 @@ Deno.serve(async (req: Request) => {
       const denied = (await requireWriteAuth(req, { headers: CORS })) ??
         (await requireAdminOrService(req, { headers: CORS }));
       if (denied) return denied;
+      scope = { privileged: true };
     } else if (authHeader || apiKey) {
       // If auth is provided, always validate it (so a bad key fails fast even on read tools).
       const auth = await authenticate(req);
@@ -6386,6 +6650,13 @@ Deno.serve(async (req: Request) => {
         );
       }
       caller = { userId: auth.userId, scopes: auth.scopes, oauthToken: auth.oauthToken };
+      scope = { privileged: await isPrivilegedCaller(auth.userId), writer: Boolean(requiredTier) };
+      if (privilegedOnly && !scope.privileged) {
+        return new Response(
+          JSON.stringify(rpcError(body.id, -32003, `Tool '${toolName}' is available to the service key or an active admin only.`)),
+          { status: 403, headers: { ...CORS, "Content-Type": "application/json" } },
+        );
+      }
     } else if (isWrite) {
       // No auth + write tool → trigger OAuth flow via 401 + WWW-Authenticate.
       return new Response(
@@ -6402,8 +6673,8 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // Route to MCP handler (full catalog or ChatGPT allowlist — not advisor)
-  const response = await handleJsonRpc(body, isChatGptSurface(req), caller);
+  // Route to MCP handler (full catalog or ChatGPT allowlist — not advisor), inside this call's scope.
+  const response = await callerScope.run(scope, () => handleJsonRpc(body, isChatGptSurface(req), caller));
 
   // Notifications get 202 (no body)
   if (response === null) {
