@@ -16,6 +16,8 @@ on:
       - 'nuke_frontend/src/pages/orgs/**'
       - 'nuke_frontend/src/pages/provider-setup/**'
       - 'nuke_frontend/src/pages/WorkOrderStatement.tsx'
+      - 'nuke_frontend/src/pages/CaptureLedger.tsx'
+      - 'nuke_frontend/src/pages/capture-ledger.css'
       - 'nuke_frontend/src/kit/**'
       - 'nuke_frontend/src/components/layout/**'
       - 'nuke_frontend/e2e/**'
@@ -44,4 +46,4 @@ jobs:
         working-directory: ./nuke_frontend
         env:
           NODE_PATH: /tmp/pw/node_modules
-        run: node --test --test-reporter=spec e2e/jobs.e2e.mjs e2e/a11y.e2e.mjs e2e/activity.e2e.mjs
+        run: node --test --test-reporter=spec e2e/jobs.e2e.mjs e2e/a11y.e2e.mjs e2e/activity.e2e.mjs e2e/captureLedgerAsk.e2e.mjs
