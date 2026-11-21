@@ -185,8 +185,8 @@ export async function readCardAnalysis(vehicleId: string, classPrice?: ClassPric
 export function GarageCardAnalysis({ lines }: { lines: AnalysisLine[] }) {
   if (!lines.length) return null;
   const of = (group: AnalysisGroup) => lines.filter(line => line.group === group);
-  const cells = (group: AnalysisGroup, cite: boolean) => {
-    const rows = of(group);
+  const cells = (group: AnalysisGroup, cite: boolean, ...more: AnalysisGroup[]) => {
+    const rows = [group, ...more].flatMap(of);
     return rows.length ? <dl className={`garage-analysis-${group}`}>
       {rows.map(line => <div key={line.key} title={[line.cite, line.title].filter(Boolean).join('. ')}>
         <dt>{line.label}</dt>
@@ -198,9 +198,9 @@ export function GarageCardAnalysis({ lines }: { lines: AnalysisLine[] }) {
   const record = of('record');
   return <div className="garage-card-analysis" role="group" aria-label="Analysis">
     {cells('money', true)}
-    {cells('hours', false)}
-    {cells('work', false)}
-    {cells('market', true)}
+    {/* Hour lenses and logged work share one wrapping strip: each keeps its own name and none is added to another. */}
+    {cells('hours', false, 'work')}
+    {cells('market', false)}
     {record.length > 0 && <p className="garage-analysis-record">
       {record.map((line, i) => <span key={line.key} title={line.title}>{i > 0 && ' · '}{line.label} {line.value}</span>)}
     </p>}
