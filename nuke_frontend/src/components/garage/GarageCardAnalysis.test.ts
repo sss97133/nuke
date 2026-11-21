@@ -17,13 +17,17 @@ describe('garage card analysis lines', () => {
     expect(byKey['reference-hours'].value).toBe('6 h');
     expect(byKey['stage-hours'].value).toBe('20 h (10–30)');
     expect(lines.some(line => line.value === '30.5 h' || line.value === '10.5 h')).toBe(false);
-    expect(byKey.receipts.cite).toContain('vehicle_build_reconstruction');
-    expect(byKey.receipts.cite).toContain('Nov 20, 2026');
     expect(byKey.amount.value).toBe('$1,200');
+    expect(byKey.amount.cite).toBe('3 receipts · Jan 2024 – Feb 2025');
+    expect(byKey.amount.cite).not.toContain('vehicle_build_reconstruction');
+    expect(byKey.amount.title).toContain('vehicle_build_reconstruction, as of Nov 20, 2026');
+    expect(['paper-hours', 'reference-hours', 'stage-hours'].map(key => byKey[key].group)).toEqual(['hours', 'hours', 'hours']);
   });
 
   it('states an amount only when the reader says amounts are visible', () => {
-    expect(analysisLines({ build: build({}, false) }).some(line => line.key === 'amount')).toBe(false);
+    const lines = analysisLines({ build: build({}, false) });
+    expect(lines.some(line => line.key === 'amount')).toBe(false);
+    expect(lines.find(line => line.key === 'receipts')?.group).toBe('record');
   });
 
   it('splits owner-confirmed from inferred work and cites the sessions', () => {
@@ -33,7 +37,7 @@ describe('garage card analysis lines', () => {
       { session_date: '2025-10-08', duration_minutes: null, owner_confirmed_at: null },
     ] });
     expect(lines.map(line => [line.key, line.value])).toEqual([['work-confirmed', '0.5 h'], ['work-inferred', '2 h']]);
-    expect(lines[1].cite).toBe('work_sessions · 1 of 2 sessions timed · Oct 6, 2025 – Oct 8, 2025');
+    expect(lines[1].cite).toBe('1 of 2 sessions timed · Oct 6, 2025 – Oct 8, 2025');
   });
 
   it('leaves out a reader with nothing to say, and a car with no lines has none', () => {
@@ -54,7 +58,24 @@ describe('garage card analysis lines', () => {
       testimony: { total: 12, by_kind: { condition: 9, work_record: 3 }, first_observed: '2020-10-05T12:00:00Z', last_observed: '2026-11-18T00:00:00Z' },
       depth: [{ day: '2025-10-06', photos: 10, seen: 8, placed: 7 }, { day: '2026-11-02', photos: 5, seen: 5, placed: 5 }],
     });
-    expect(lines.map(line => line.value)).toEqual(['12 · condition 9 · work record 3', '13 of 15 photos']);
-    expect(lines[1].cite).toBe('get_vehicle_day_depth · 2 days · Oct 6, 2025 – Nov 2, 2026');
+    expect(lines.map(line => line.value)).toEqual(['12', '13 of 15']);
+    expect(lines[0].title).toContain('condition 9 · work record 3');
+    expect(lines[1].title).toBe('2 days · Oct 6, 2025 – Nov 2, 2026 · get_vehicle_day_depth');
+  });
+
+  it('states the stored class value with its band and comp count, the computed date in the tooltip', () => {
+    const [line] = analysisLines({ classPrice: { vehicle_id: 'car', status: 'priced', value: '46200', value_low: '35100',
+      value_high: '76850', n: 35, subject_class: 'build', computed_at: '2026-11-21T08:00:00Z',
+      basis: 'median of 35 sold comps of the same build class (build) in the 1973 Pontiac Firebird cohort' } });
+    expect([line.key, line.label, line.value, line.cite]).toEqual(['class-value', 'Class value', '$46,200',
+      '$35,100 – $76,850 · 35 sold comps of the same build class']);
+    expect(line.title).toBe('median of 35 sold comps of the same build class (build) in the 1973 Pontiac Firebird cohort. '
+      + 'computed Nov 21, 2026. get_vehicle_class_prices');
+  });
+
+  it('leaves the line out when the stored price is blocked or absent, never falling back to another estimate', () => {
+    expect(analysisLines({ classPrice: { vehicle_id: 'car', status: 'blocked', blocked_reason: 'cohort not yet classified (40 of 6281)',
+      computed_at: '2026-11-21T08:00:00Z' } })).toEqual([]);
+    expect(analysisLines({ classPrice: null })).toEqual([]);
   });
 });

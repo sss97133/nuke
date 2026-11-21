@@ -7,15 +7,32 @@
  * The DB is the memory; this function is the ephemeral reconstitution of it.
  *
  * POST /functions/v1/vehicle-agent
- *   { vehicle_id: uuid, message: string,
- *     history?: [{role:'user'|'assistant', content:string}], allow_writes?: boolean }
+ *   A turn:    { vehicle_id: uuid, message: string, history?: [{role, content}], allow_writes?: boolean,
+ *                propose?: boolean (the caller renders Confirm / Dismiss), conversation_ref?: uuid }
+ *              → { reply, proposals: [{ id, writer, summary, token }], logged, wrote: [], compute, context }
+ *   A confirm: { vehicle_id: uuid, confirm: <token from a proposal>, speaker_role?: string }
+ *              → { confirmed: { id, writer, record_id, replay } }
  *
- * WRITES (on behalf of the user, fully backtrackable): when the agent establishes a
- * durable new fact and writes are allowed, it appends provenance-stamped rows to
- * vehicle_observations — rank='normal' (never outranks verified/human/source data),
- * submitted_by_user_id = the caller, agent_model + extracted_by='vehicle-agent'. The
- * append-only superseding model means these are additive and reversible: a wrong call
- * can be superseded, never silently overwrites a profile.
+ * RECORDS (records.ts): each turn also reads the car's own record through the site's sanctioned readers
+ * (vehicle_build_reconstruction, vehicle_profile_read, vehicle_testimony_summary, vehicle_open_questions,
+ * get_vehicle_day_depth, work_sessions, vehicle_statements), called with the person's own session, never the service
+ * key, so each reader's privacy rule decides what this viewer sees. The reads run in parallel with the memory loads,
+ * each bounded at 4 s; a reader that fails is named as unread in the digest and never fails the turn. The digest goes
+ * into the model's context above the observations, each figure under its reader's name and as-of time.
+ *
+ * SCOPE (scope.ts): everything is pinned to the request's vehicle_id; the model never supplies a vehicle, and a
+ * proposal naming another vehicle is refused, so agents open on two cards cannot touch each other's car.
+ *
+ * WRITES are propose-then-confirm. With allow_writes and propose the model may only PROPOSE (nothing is written during a turn).
+ * Each proposal is signed by this function and shown in the card with Confirm / Dismiss; Confirm sends the token back,
+ * and only then, after re-checking the signature, account, vehicle, tie and the writer allow-list, does a writer run:
+ *   record_vehicle_statement — the person's own latest message, stored whole as their claim, called with their session;
+ *   ingest-observation       — the agent's finding (source agent-submission, rank normal), on behalf of the person.
+ * Until 2026-11-20 the agent wrote up to five observations per turn directly, with allow_writes on by default.
+ *
+ * SESSIONS: when the person has turned on "keep this car's agent sessions" for this car (user_consents scope
+ * vehicle_agent_log, set by set_vehicle_agent_log_consent), each completed turn is stored by record_vehicle_agent_turn,
+ * which reads that consent itself and stores nothing without it. Off by default. A failed store never fails the turn.
  *
  * COMPUTE: routes through the user's settings. byo_api_key+anthropic uses their own key
  * (decrypted server-side) first; then the platform keys in order, NUKE_ANTHROPIC_API_KEY
@@ -30,26 +47,25 @@
  *
  * ERRORS: every failure answers { error: "<plain sentence>" }; the garage box and the
  * profile chat show body.error as it is.
+ *
+ * Session turns are kept by record_vehicle_agent_turn (migration 20261121060000), only with the account's consent.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
-import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { floorClaudeModel, CLAUDE_FLOOR_MODEL } from "../_shared/llmProvider.ts";
+import {
+  isUuid, normalizeProposals, PROPOSAL_TTL_MS, signProposal, speakerRole, splitReply, verifyProposal,
+  type ObservationArgs, type SignedPayload, type StatementArgs,
+} from "./scope.ts";
+import { buildRecordsDigest, readAll, readSummary, RECORD_READERS, type RecordReads } from "./records.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-// The agent may only emit these kinds, and only at rank 'normal'. Keeps it from minting
-// listings/sales/bids (source-of-record kinds) or outranking verified data.
-const ALLOWED_KINDS = new Set([
-  "condition", "specification", "valuation", "provenance",
-  "expert_opinion", "work_record", "ownership", "activity", "sighting",
-]);
-const CONFIDENCE = new Set(["verified", "high", "medium", "low", "inferred"]);
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -85,6 +101,100 @@ async function isTied(supabase: any, vehicleId: string, userId: string): Promise
   return results.some((r: any) => !r.error && (r.count ?? 0) > 0);
 }
 
+/** Plain sentences for the statement writer's refusals; anything else is shown as the writer said it. */
+function statementRefusal(message: string): string {
+  if (/no access to this vehicle/.test(message)) {
+    return "The log book takes words only from people the car's record names or who hold access to it, so this was not kept.";
+  }
+  if (/requires the vehicle record to name the speaker as owner/.test(message)) {
+    return "The car's record does not name you as its owner, so this was not kept as an owner's word.";
+  }
+  if (/too many statements/.test(message)) return "Too many notes in the last hour. Try again later.";
+  if (/identified, current vehicle/.test(message)) return "This car was merged or removed, so its log book cannot take notes.";
+  return message;
+}
+
+/**
+ * Confirm: the person pressed Confirm on a proposal this function signed. Verify it, re-check the tie (done by the
+ * caller), the pin and the allow-list, then run the one writer it names. The model is not called.
+ */
+async function confirmProposal(
+  service: any, authHeader: string, userId: string, vehicleId: string, body: any, secret: string,
+): Promise<Response> {
+  const verified = await verifyProposal(body.confirm, secret, { userId, vehicleId, now: Date.now() });
+  if (!verified.ok) {
+    console.warn(`[vehicle-agent] confirm refused: ${verified.reason}`);
+    return json(400, { error: `That proposal cannot be confirmed (${verified.reason}). Ask the agent again.` });
+  }
+  const proposal = verified.value;
+
+  if (proposal.writer === "record_vehicle_statement") {
+    const args = proposal.args as StatementArgs;
+    const { data: veh } = await service.from("vehicles").select("owner_id").eq("id", vehicleId).maybeSingle();
+    const role = speakerRole(body.speaker_role, veh?.owner_id === userId);
+    if (!role.ok) return json(400, { error: `Not kept: ${role.reason}.` });
+    // The writer takes the speaker from authentication only, so it runs with the person's own session.
+    const asPerson = createClient(Deno.env.get("SUPABASE_URL")!, projectPublishableKey()!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data, error } = await asPerson.rpc("record_vehicle_statement", {
+      p_request_id: proposal.id, p_vehicle_id: vehicleId, p_statement: args.statement,
+      p_speaker_role: role.value, p_statement_kind: args.statement_kind,
+      p_said_at_basis: "typed to the car's agent in the garage, confirmed by the speaker at the recorded time",
+      p_recording_agent: "vehicle-agent (proposed; confirmed by the speaker)",
+      p_target_key: args.target_key, p_target_value: args.target_value,
+      p_conversation_ref: isUuid(body.conversation_ref) ? body.conversation_ref : null,
+    });
+    if (error) return json(400, { error: statementRefusal(error.message) });
+    return json(200, { confirmed: { id: proposal.id, writer: proposal.writer, record_id: data?.statement_id ?? null, replay: !!data?.replay } });
+  }
+
+  // ingest_observation: the agent's own finding, on behalf of the person, through the canonical rail.
+  const args = proposal.args as ObservationArgs;
+  // observed_at is when the agent made the finding (the proposal's issue time), so every field the intake hashes is
+  // fixed by the signed proposal and a second press of Confirm lands on the same content_hash, not a second row.
+  const proposedAt = new Date(proposal.exp - PROPOSAL_TTL_MS).toISOString();
+  try {
+    const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest-observation`, { // guardrail-allow: raw-fetch — internal /functions/v1/ingest-observation call (URL built from SUPABASE_URL)
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({
+        source_slug: "agent-submission",
+        kind: args.kind,
+        observed_at: proposedAt,
+        vehicle_id: vehicleId,
+        source_identifier: `vehicle-agent:${vehicleId}:${proposal.id}`,
+        content_text: args.summary,
+        structured_data: args.fields,
+        rank: "normal",
+        agent_tier: "interactive",
+        agent_model: proposal.model,
+        extraction_method: "interactive_agent",
+        observer_raw: {
+          extracted_by: "vehicle-agent",
+          on_behalf_of: userId,
+          submitted_by_user_id: userId,
+          self_assessed_confidence: args.confidence,
+          proposal_id: proposal.id,
+        },
+        extraction_metadata: {
+          surface: "vehicle-agent", on_behalf_of: userId, proposal_id: proposal.id,
+          confirmed_by_user_at: new Date().toISOString(),
+        },
+      }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || out?.error || !out?.observation_id) {
+      console.error(`[vehicle-agent] ingest refused: ${out?.error || res.status}`);
+      return json(502, { error: `Not recorded: ${out?.error || `the observation writer answered ${res.status}`}.` });
+    }
+    return json(200, { confirmed: { id: proposal.id, writer: proposal.writer, record_id: out.observation_id, replay: !!out.duplicate } });
+  } catch (e) {
+    console.error(`[vehicle-agent] ingest failed: ${e instanceof Error ? e.message : String(e)}`);
+    return json(502, { error: "Not recorded: the observation writer did not answer. Try again." });
+  }
+}
+
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
@@ -117,9 +227,12 @@ Deno.serve(async (req) => {
     const history: Array<{ role: string; content: string }> = Array.isArray(body.history)
       ? body.history.slice(-12)
       : [];
-    const allowWrites = body.allow_writes !== false; // default on; the user chose "it can write"
-    if (!/^[0-9a-f-]{36}$/i.test(vehicleId)) return json(400, { error: "That is not a vehicle id." });
-    if (!message) return json(400, { error: "Type a message first." });
+    // Lets the model PROPOSE; nothing is written without a Confirm. Only a caller that renders Confirm / Dismiss (the
+    // garage agent box sends propose: true) is offered proposals; the profile chat and the iOS app get answers only.
+    const allowWrites = body.allow_writes !== false && body.propose === true;
+    if (!isUuid(vehicleId)) return json(400, { error: "That is not a vehicle id." });
+    const confirming = body.confirm !== undefined;
+    if (!confirming && !message) return json(400, { error: "Type a message first." });
 
     // Access check: the caller holds the car by one of the garage's own routes, or uploaded
     // images of it. Not vehicle_user_has_access: its admin branch admits every vehicle (it
@@ -130,25 +243,66 @@ Deno.serve(async (req) => {
       return json(403, { error: "This car's agent answers only people who hold the car." });
     }
 
+    // Proposals are signed with a key derived from the function's own secret key (scope.ts); no new secret.
+    const signingSecret = projectSecretKey() ?? "";
+    if (!signingSecret) return json(503, { error: "The agent cannot sign its proposals right now." });
+    if (confirming) {
+      return await confirmProposal(supabase, req.headers.get("Authorization")!, user.id, vehicleId, body, signingSecret);
+    }
+
+    // ── The car's record, read as the person asking ──────────────────────────
+    // Started first so the slowest reader (vehicle_build_reconstruction, ~2 s) overlaps the memory loads below.
+    // The person's own session, so each reader's privacy rule decides; every read takes the request's vehicle_id only.
+    const readsFetchedAt = new Date().toISOString();
+    let recordsRead: Promise<RecordReads>;
+    try {
+      const publishable = projectPublishableKey();
+      if (!publishable) throw new Error("no publishable key in the function environment");
+      const asCaller = createClient(Deno.env.get("SUPABASE_URL")!, publishable, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const rpc = (fn: string) => (signal: AbortSignal) => asCaller.rpc(fn, { p_vehicle_id: vehicleId }).abortSignal(signal);
+      recordsRead = readAll({
+        vehicle_build_reconstruction: rpc("vehicle_build_reconstruction"),
+        vehicle_profile_read: rpc("vehicle_profile_read"),
+        vehicle_testimony_summary: rpc("vehicle_testimony_summary"),
+        vehicle_open_questions: rpc("vehicle_open_questions"),
+        get_vehicle_day_depth: rpc("get_vehicle_day_depth"),
+        vehicle_statements: rpc("vehicle_statements"),
+        // Times and confirmation only; the money columns on this table are not read.
+        work_sessions: (signal) => asCaller.from("work_sessions")
+          .select("session_date, duration_minutes, owner_confirmed_at")
+          .eq("vehicle_id", vehicleId).order("session_date", { ascending: true }).limit(1000).abortSignal(signal),
+      });
+    } catch (e) {
+      recordsRead = Promise.reject(e);
+    }
+    // A failure here never fails the turn: every reader is then named as unread in the digest.
+    recordsRead = recordsRead.catch((e) => {
+      const detail = e instanceof Error ? e.message : String(e);
+      console.error(`[vehicle-agent] records not read: ${detail}`);
+      return Object.fromEntries(RECORD_READERS.map((r) => [r, { status: "error", ms: 0, detail }])) as RecordReads;
+    });
+
     // ── Harness: load the vehicle's memory ───────────────────────────────────
-    const { data: veh } = await supabase
-      .from("vehicles").select("year, make, model, trim, vin, color").eq("id", vehicleId).maybeSingle();
-
-    const { data: obs } = await supabase
-      .from("vehicle_observations")
-      .select("kind, observed_at, content_text, structured_data, confidence")
-      .eq("vehicle_id", vehicleId)
-      .or("is_superseded.is.null,is_superseded.eq.false")
-      .order("observed_at", { ascending: false })
-      .limit(60);
-
-    const { data: imgs } = await supabase
-      .from("vehicle_images")
-      .select("id, taken_at, ai_scan_metadata")
-      .eq("vehicle_id", vehicleId)
-      .not("ai_scan_metadata->byok_deep_analysis", "is", null)
-      .order("taken_at", { ascending: false })
-      .limit(20);
+    const [{ data: veh }, { data: obs }, { data: imgs }] = await Promise.all([
+      supabase.from("vehicles").select("year, make, model, trim, vin, color").eq("id", vehicleId).maybeSingle(),
+      supabase
+        .from("vehicle_observations")
+        .select("kind, observed_at, content_text, structured_data, confidence")
+        .eq("vehicle_id", vehicleId)
+        .or("is_superseded.is.null,is_superseded.eq.false")
+        .order("observed_at", { ascending: false })
+        .limit(60),
+      supabase
+        .from("vehicle_images")
+        .select("id, taken_at, ai_scan_metadata")
+        .eq("vehicle_id", vehicleId)
+        .not("ai_scan_metadata->byok_deep_analysis", "is", null)
+        .order("taken_at", { ascending: false })
+        .limit(20),
+    ]);
 
     const imageSummaries = (imgs || []).map((r: any) => {
       const d = r.ai_scan_metadata?.byok_deep_analysis ?? {};
@@ -177,18 +331,41 @@ Deno.serve(async (req) => {
       return json(503, { error: "The agent has no model to answer with right now." });
     }
 
+    const records = await recordsRead;
+    const recordsStatus = readSummary(records);
+    console.log(`[vehicle-agent] records ${Object.entries(recordsStatus).map(([k, r]) => `${k}=${r.status}:${r.ms}ms`).join(" ")}`);
+    for (const [name, r] of Object.entries(records)) {
+      if (r && r.status !== "ok") console.warn(`[vehicle-agent] reader ${name} ${r.status}${r.detail ? `: ${r.detail}` : ""}`);
+    }
+    const recordsDigest = buildRecordsDigest(records, { fetchedAt: readsFetchedAt });
+
     const system =
       `You are the persistent agent assigned to ONE vehicle: ${vehName}` +
       (veh?.vin ? ` (VIN ${veh.vin})` : "") + `.\n` +
       `You reason ONLY from this vehicle's own data, provided below as your memory. Do not invent facts. ` +
-      `If the data doesn't say, say so. Be concrete and concise.\n\n` +
-      `=== OBSERVATIONS (most recent first) ===\n${JSON.stringify(obs ?? [], null, 0).slice(0, 12000)}\n\n` +
+      `If the data doesn't say, say so. For counts, dates, hours and amounts, answer from THIS CAR'S RECORDS.\n` +
+      `How to answer: the answer goes first, in one or two short sentences of plain words, the way you would tell a ` +
+      `mechanic standing at the car. Write dates as "Sep 10, 2025". After the answer, one short line that begins ` +
+      `"Source:" and says in plain words where the figure comes from and what it counts (for example "Source: the ` +
+      `receipts filed to this car, counted today"); never print a reader's function name, an id or a UTC timestamp. ` +
+      `Add a caveat only when it changes what the number means. No headings, no bullet lists unless asked.\n\n` +
+      `=== THIS CAR'S RECORDS ===\n${recordsDigest}\n\n` +
+      `=== OBSERVATIONS (most recent first; only the latest ${(obs ?? []).length}, not all of them) ===\n${JSON.stringify(obs ?? [], null, 0).slice(0, 12000)}\n\n` +
       `=== DEEP-ANALYZED IMAGES ===\n${JSON.stringify(imageSummaries, null, 0).slice(0, 8000)}\n\n` +
       (allowWrites
-        ? `If — and only if — this exchange establishes a DURABLE new fact about the vehicle that isn't ` +
-          `already in the observations, you may record it. To do so, end your reply with a fenced json block:\n` +
-          "```json\n{\"observations\":[{\"kind\":\"condition|specification|valuation|provenance|expert_opinion|work_record|ownership|activity|sighting\",\"summary\":\"...\",\"fields\":{},\"confidence\":\"high|medium|low|inferred\"}]}\n```\n" +
-          `Only record things you are confident about and that the user's message or the data supports. Most replies need NO json block.`
+        ? `You cannot write anything yourself. If — and only if — this exchange establishes a DURABLE new fact about ` +
+          `this vehicle that isn't already in the observations, you may PROPOSE a record; the person sees it with ` +
+          `Confirm / Dismiss and nothing is stored unless they confirm. End your reply with a fenced json block:\n` +
+          "```json\n{\"proposals\":[\n" +
+          "  {\"writer\":\"record_vehicle_statement\",\"statement_kind\":\"assertion|recollection|estimate\",\"target_key\":null,\"target_value\":null},\n" +
+          "  {\"writer\":\"ingest_observation\",\"kind\":\"condition|specification|valuation|provenance|expert_opinion|work_record|ownership|activity|sighting\",\"summary\":\"...\",\"fields\":{},\"confidence\":\"high|medium|low|inferred\"}\n" +
+          "]}\n```\n" +
+          `record_vehicle_statement keeps the person's latest message, word for word, as their own claim: propose it only ` +
+          `when that message itself states something about this car (not for a question). target_key/target_value ` +
+          `(lower_snake_case key, short value) are optional. ingest_observation records a finding of yours from this ` +
+          `car's data, in your own voice. At most ${3} proposals. Never name another vehicle or any id: everything ` +
+          `applies to this car only. Figures in THIS CAR'S RECORDS are already in the database: never propose them ` +
+          `as a record. Most replies need NO json block.`
         : `Writing is disabled for this conversation; answer only.`);
 
     const messages = [
@@ -233,76 +410,47 @@ Deno.serve(async (req) => {
     const raw = (aiData.content || []).map((b: any) => b.text || "").join("").trim();
     const durationMs = Date.now() - t0;
 
-    // Split prose from an optional trailing json block of observations to record.
-    let reply = raw;
-    let proposed: any[] = [];
-    const m = raw.match(/```json\s*([\s\S]*?)```\s*$/);
-    if (m) {
-      reply = raw.slice(0, m.index).trim();
-      try { proposed = JSON.parse(m[1]).observations || []; } catch { /* ignore malformed */ }
+    // Split prose from an optional trailing json block of proposals; validate, pin and sign them.
+    const { reply: prose, block } = splitReply(raw);
+    let reply = prose;
+    const proposals: Array<{ id: string; writer: string; summary: string; token: string }> = [];
+    if (allowWrites && block) {
+      const { proposals: checked, refused } = normalizeProposals(block, { vehicleId, userMessage: message });
+      if (refused.length) console.warn(`[vehicle-agent] refused ${refused.length} proposal(s): ${refused.map((r) => r.reason).join("; ")}`);
+      const exp = Date.now() + PROPOSAL_TTL_MS;
+      for (const proposal of checked) {
+        const payload = { ...proposal, v: 1, id: crypto.randomUUID(), user_id: user.id, vehicle_id: vehicleId, model, exp } as SignedPayload;
+        proposals.push({ id: payload.id, writer: payload.writer, summary: payload.summary, token: await signProposal(payload, signingSecret) });
+      }
     }
+    if (!reply) reply = proposals.length ? "Here is what I can record." : "(no response)";
 
-    // ── Provenance-stamped writes, on behalf of the user ─────────────────────
-    // Route through the canonical `ingest-observation` rail (dedup + confidence +
-    // trust scoring), NEVER a raw INSERT into vehicle_observations — that bypasses
-    // the testimony invariants (.claude/rules/agent-trust-invariants.md). Same
-    // pattern as the sibling agent-chat fn. source_slug='agent-submission' is the
-    // machine-agent voice (0.55 base trust); it now supports the full kind set this
-    // fn emits (migration 20260715170000).
-    const wrote: any[] = [];
-    if (allowWrites && Array.isArray(proposed) && proposed.length) {
-      const now = new Date().toISOString();
-      const ingestUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest-observation`;
-      const serviceKey = projectSecretKey() ?? "";
-      const toWrite = proposed.filter((o) => o && ALLOWED_KINDS.has(o.kind)).slice(0, 5);
-      for (let i = 0; i < toWrite.length; i++) {
-        const o = toWrite[i];
-        try {
-          const res = await fetch(ingestUrl, { // guardrail-allow: raw-fetch — internal /functions/v1/ingest-observation call (ingestUrl built from SUPABASE_URL)
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-            body: JSON.stringify({
-              source_slug: "agent-submission",
-              kind: o.kind,
-              observed_at: now,
-              vehicle_id: vehicleId,
-              // Distinct per row so same-turn observations never collapse on the dedup hash.
-              source_identifier: `vehicle-agent:${vehicleId}:${now}:${i}`,
-              content_text: typeof o.summary === "string" ? o.summary : null,
-              structured_data: o.fields && typeof o.fields === "object" ? o.fields : {},
-              rank: "normal",
-              agent_tier: "interactive",
-              agent_model: model,
-              agent_duration_ms: durationMs,
-              extraction_method: "interactive_agent",
-              // Preserve the attribution + self-assessed confidence the raw path carried;
-              // ingest-observation computes its own confidence_score from source trust.
-              observer_raw: {
-                extracted_by: "vehicle-agent",
-                on_behalf_of: user.id,
-                submitted_by_user_id: user.id,
-                self_assessed_confidence: CONFIDENCE.has(o.confidence) ? o.confidence : "low",
-              },
-              extraction_metadata: { surface: "vehicle-agent", on_behalf_of: user.id },
-            }),
-          });
-          const body = await res.json().catch(() => ({}));
-          if (!res.ok || body?.error) {
-            reply += `\n\n_(Note: I couldn't save the observation: ${body?.error || res.status})_`;
-          } else if (body?.observation_id) {
-            wrote.push({ id: body.observation_id, kind: o.kind, content_text: o.summary ?? null, duplicate: !!body.duplicate });
-          }
-        } catch (e) {
-          reply += `\n\n_(Note: I couldn't save the observation: ${e instanceof Error ? e.message : "ingest failed"})_`;
-        }
+    // ── The session, kept only with the person's consent for this car (checked inside the writer) ──
+    let logged = false;
+    if (isUuid(body.conversation_ref)) {
+      try {
+        const { data: kept, error: keepError } = await supabase.rpc("record_vehicle_agent_turn", {
+          p_user_id: user.id, p_vehicle_id: vehicleId, p_conversation_ref: body.conversation_ref,
+          p_turn_id: crypto.randomUUID(), p_message: message, p_reply: reply, p_model: model,
+        });
+        if (keepError) console.error(`[vehicle-agent] session not kept: ${keepError.message}`);
+        logged = kept?.stored === true;
+      } catch (e) {
+        console.error(`[vehicle-agent] session not kept: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
     return json(200, {
-      reply: reply || "(no response)",
-      wrote,
-      compute: { model, source: computeNote },
-      context: { observations: (obs ?? []).length, analyzed_images: imageSummaries.length },
+      reply,
+      proposals,
+      logged,
+      // Nothing is written during a turn any more; kept for the profile chat and the iOS app, which read it.
+      wrote: [],
+      compute: { model, source: computeNote, duration_ms: durationMs },
+      context: {
+        observations: (obs ?? []).length, analyzed_images: imageSummaries.length,
+        records: recordsStatus, records_digest_chars: recordsDigest.length,
+      },
     });
   } catch (err) {
     console.error(`[vehicle-agent] ${err instanceof Error ? err.message : String(err)}`);

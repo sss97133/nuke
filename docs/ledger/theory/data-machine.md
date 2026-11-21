@@ -89,8 +89,10 @@ Rules for every agent and every reader. Each names its mechanism or says that no
    yet, and what runs today is close to the mode this rule warns about, by upload date:
    `reconcile_image_stages` walks the account's library by `created_at` (newest uploads in the live
    lane, oldest by cursor in the backfill), `claim_image_stage_work` hands out at most 25 a claim, and
-   a work item carries no vehicle, job or worth. The pace is settings, not a slow reader: the launchd
-   interval (600 s), and `--limit 20 --concurrency 2` in `scripts/photo-pipeline/subscription-reader-batch.sh`.
+   a work item carries no vehicle, job or worth. The pace is settings, not a slow reader: a full fire
+   every ten minutes with `--limit 20 --concurrency 2` in `scripts/photo-pipeline/subscription-reader-batch.sh`
+   (since 2026-11-20 a fast fire each minute between runs the first read of a newly landed photo, up to
+   `first_reads_per_hour` in `platform_config` `image_stage_reconciler`, 360 when the row names none).
    Each of those reads lands a description, a colour, text and sometimes an angle, and nothing keyed. A
    request to read faster, or to read everything oldest first, is answered with those facts and one
    question back to the owner: which vehicle or job first, and what budget on his subscription. Raising

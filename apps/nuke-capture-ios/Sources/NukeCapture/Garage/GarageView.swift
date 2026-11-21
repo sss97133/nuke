@@ -1,13 +1,14 @@
-// GarageView.swift — searchable account vehicles as cards in the order of their recorded activity, followed by
-// photos waiting for a vehicle. The phone's copy of the web garage (PR #3612): one list, newest dated activity
-// first, year headings, undated cars last; the relationship is the first item on the card's lane, not a section.
+// GarageView.swift — searchable account vehicles as cards in the order of their recorded activity. The phone's
+// copy of the web garage (PR #3612): one list, newest dated activity first, year headings, undated cars last;
+// the relationship is the first item on the card's lane, not a section.
 // Relationship and work controls remain under Garage details (the card's menu).
 //
 // Reads: get_user_garage + get_my_garage_owner_corrections (GarageReaders.ownGarage, shared with ProfileView),
 // get_vehicle_contribution_days_batch (every card's day squares, one window and scale for the garage) and
 // my_unorganized_photo_count. Each card reads its own header and reel (GarageCard). Each car opens VehicleDetailView.
 //
-// The top of the list is "Today in your garage" (GarageActivityViews).
+// The top of the list is "Today in your garage" (GarageActivityViews), then one compact group of utility rows
+// (photos with no vehicle, Organize photos, Identity pending) so they stay reachable above a long run of cards.
 
 import SwiftUI
 
@@ -53,6 +54,7 @@ struct GarageView: View {
             if !isSearching {
                 GarageActivitySections(store: activity, retry: { refreshActivity() },
                                        open: { openRoute = GarageRoute(id: $0, fromCard: false) })
+                utilitySection
             }
             if let garage {
                 let matches = GarageSections.matching(garage.vehicles, query: query)
@@ -70,9 +72,6 @@ struct GarageView: View {
                         }
                     }
                 }
-                if !isSearching && !garage.unresolved.isEmpty {
-                    unresolvedSection(garage.unresolved)
-                }
                 Section {} footer: {
                     if isSearching { Text("\(matches.count) matches in the \(garage.vehicles.count) vehicle records loaded for your account.") }
                     Text(GarageSections(garage.vehicles).coverage(readAt: readAt, cachedAt: cachedAt))
@@ -84,19 +83,6 @@ struct GarageView: View {
                 }
             } else {
                 Section { ProgressView().frame(maxWidth: .infinity) }
-            }
-
-            if !isSearching {
-                Section {
-                    UnorganizedPhotosRow(load: photos)
-                    NavigationLink { SessionConfirmView() } label: {
-                        Label("Organize photos", systemImage: "checklist")
-                    }
-                } header: {
-                    Text("Photos to organize")
-                } footer: {
-                    Text(GarageCopy.organizeScope)
-                }
             }
         }
         .navigationTitle("Garage")
@@ -144,17 +130,31 @@ struct GarageView: View {
             }
     }
 
-    private func unresolvedSection(_ unresolved: [GarageUnresolvedSource]) -> some View {
+    /// Photos waiting for a vehicle and account-stated vehicles still waiting for identity: small rows above the
+    /// cards, so a garage of any size keeps them one glance away. Identity pending stays folded until opened.
+    private var utilitySection: some View {
         Section {
-            ForEach(unresolved) { source in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(source.label).font(.subheadline)
-                    Text("Account stated · photo evidence still needs to identify this vehicle")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+            UnorganizedPhotosRow(load: photos)
+            NavigationLink { SessionConfirmView() } label: {
+                Label("Organize photos", systemImage: "checklist")
             }
-        } header: {
-            Text("Identity pending · \(unresolved.count)")
+            .accessibilityIdentifier("garage.organize")
+            if let unresolved = garage?.unresolved, !unresolved.isEmpty {
+                DisclosureGroup {
+                    ForEach(unresolved) { source in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(source.label).font(.subheadline)
+                            Text("Account stated · photo evidence still needs to identify this vehicle")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                } label: {
+                    Label("Identity pending · \(unresolved.count)", systemImage: "questionmark.circle")
+                }
+                .accessibilityIdentifier("garage.identityPending")
+            }
+        } footer: {
+            Text(GarageCopy.organizeScope)
         }
     }
 

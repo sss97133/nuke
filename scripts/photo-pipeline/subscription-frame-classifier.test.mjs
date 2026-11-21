@@ -22,6 +22,11 @@ const TIERS = { reviewed_tiers: ['caller-byok subscription'], automatic: { tier:
 const run = promisify(execFile);
 const OWNER = '00000000-0000-4000-8000-0000000000aa';
 const md5 = (t) => createHash('md5').update(t, 'utf8').digest('hex');
+// The launchd wrapper (subscription-reader-batch.sh) reads the summary line with these two patterns, as grep -E text: how many
+// photos the fire claimed, and whether the first reads ended clean (not stopped). They are anchored at the start of the line,
+// ahead of anything a model wrote. A change to the summary's leading keys must change the wrapper's patterns with it.
+const SUMMARY_HEAD = /^\{"cli":"[a-z_]+","frames":[0-9]+,/;
+const SUMMARY_CLEAN = /^\{"cli":"[a-z_]+","frames":[0-9]+,"source":"[a-z-]+","read":[0-9]+,"accepted":[0-9]+,"classifier_rejected":[0-9]+,"errors":[0-9]+,"error_classes":\{[^}]*\},"receipts":[0-9]+,"receipt_errors":[0-9]+,"stopped":null,/;
 
 // `claude -p --output-format json`: the prompt arrives on stdin and names the image file; the file name picks the answer.
 const FAKE_CLAUDE = `#!${process.execPath}
@@ -55,8 +60,8 @@ const FAKE_SUPABASE_JS = `exports.createClient = () => ({
     then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; },
 });`;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, own = {}, projections = {}, extraArgs = [], supabaseJs = false, failClaims = [], failClaimsAfter = {}, oldCli = false } = {}) {
-  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], standing: [], own: [], projected: [], tiers: 0 };
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, own = {}, projections = {}, extraArgs = [], supabaseJs = false, failClaims = [], failClaimsAfter = {}, oldCli = false, queued = 0, readLastHour = 0 } = {}) {
+  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], standing: [], own: [], projected: [], tiers: 0, probes: [], prompts: 0 };
   const cursor = {};   // each stage hands out its photos once, at most p_limit a call, like the database
   const claimCount = {};   // failClaimsAfter: { stage: n } answers that stage's first n claims and fails the ones after
   let port;
@@ -100,6 +105,16 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         calls.status.push(decodeURIComponent(req.url));
         return json(200, statusFrames.map((n) => ({ id: n, vehicle_id: null, user_id: OWNER, image_url: `http://127.0.0.1:${port}/img/${n}`, file_name: null, taken_at: null, ai_processing_status: 'failed' })));
       }
+      // --probe: how many first reads were written in the last hour (HEAD with count=exact; the answer is in Content-Range)
+      if (req.url.startsWith('/rest/v1/image_stage_receipts')) {
+        calls.probes.push(`${req.method} ${decodeURIComponent(req.url)} ${req.headers.prefer}`);
+        return res.writeHead(200, { 'Content-Range': `0-0/${readLastHour}` }).end();
+      }
+      // --probe: how many first reads are queued and due (a question; nothing is claimed)
+      if (req.url.startsWith('/rest/v1/image_stage_work')) {
+        calls.probes.push(decodeURIComponent(req.url));
+        return queued === 'error' ? json(503, { code: 'PGRST002' }) : json(200, Array.from({ length: queued }, (_, i) => ({ id: i + 1 })));
+      }
       if (req.url === '/rest/v1/rpc/claim_image_stage_work') {
         const claim = JSON.parse(data); calls.claims.push(claim);
         claimCount[claim.p_stage] = (claimCount[claim.p_stage] ?? 0) + 1;
@@ -114,7 +129,7 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
       }
       if (req.url === '/functions/v1/photo-pipeline-orchestrator') {
         const body = JSON.parse(data);
-        if (body.action === 'classifier_prompt') return json(200, { prompt: 'Classify the photo.', prompt_version: 'v98' });
+        if (body.action === 'classifier_prompt') { calls.prompts++; return json(200, { prompt: 'Classify the photo.', prompt_version: 'v98' }); }
         calls.readings.push(body);
         if (body.classification_raw?.image_type === 'nonsense') return json(200, { success: false, classifier_ok: false, error_class: 'classifier_response_invalid', requeued: true });
         return json(200, { success: true, classifier_ok: true });
@@ -153,7 +168,7 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
 
 test('every started photo gets one typed receipt with the URL fingerprint; a spent subscription ends the batch', async () => {
   const frames = ['a-ok.jpg', 'b-gone.jpg', 'c-corrupt.png', 'd-garbage.jpg', 'e-refused.jpg', 'f-limit.jpg', 'g-never-started.jpg'];
-  await withStandIns(frames, ({ calls, summary, port }) => {
+  await withStandIns(frames, ({ calls, summary, port, result }) => {
     assert.deepEqual(calls.claims, [{ p_stage: 'classifier', p_limit: 20, p_lease_seconds: 6000, p_user_id: OWNER }, { p_stage: 'keyed_values', p_limit: 25, p_lease_seconds: 1800, p_user_id: OWNER }],
       'the first-read claim is owner-scoped and leased for the whole batch (20 photos one at a time, 300 s each); the spent subscription skips the deep readings, and keyed values (no model call) still run');
     assert.equal(summary.stages.deep_reading.skipped, 'first_read_fault', 'phase skipped on a batch-level fault, and the heartbeat says so');
@@ -177,6 +192,8 @@ test('every started photo gets one typed receipt with the URL fingerprint; a spe
     assert.equal(calls.readings[0].reader, 'claude-cli claude-sonnet-5-5 subscription');
     assert.deepEqual([summary.source, summary.frames, summary.receipts, summary.receipt_errors, summary.accepted, summary.stopped],
       ['stage-queue', 7, 6, 0, 1, 'reader_usage_limit'], 'the summary counts receipts and names why the batch stopped');
+    assert.match(result.stdout.trim().split('\n').pop(), SUMMARY_HEAD, 'the leading shape subscription-reader-batch.sh reads');
+    assert.doesNotMatch(result.stdout.trim().split('\n').pop(), SUMMARY_CLEAN, 'a stopped batch is not a clean one');
     assert.deepEqual(summary.error_classes, { image_http_error: 1, image_unreadable: 1, reader_output_invalid: 1, classifier_response_invalid: 1, reader_usage_limit: 1 },
       'the summary (the heartbeat reading) says why frames failed, in fixed words');
   });
@@ -239,8 +256,10 @@ test('no converter on the machine stops the batch instead of blocking every non-
 });
 
 test('every model call starts lean and asks for the exact model id', async () => {
-  await withStandIns(['a-ok.jpg'], ({ claudeArgs, claudeRuns }) => {
+  await withStandIns(['a-ok.jpg'], ({ claudeArgs, claudeRuns, result }) => {
     assert.equal(claudeArgs.length, 1);
+    const line = result.stdout.trim().split('\n').pop();
+    assert.match(line, SUMMARY_HEAD); assert.match(line, SUMMARY_CLEAN, 'a batch that ended clean, as subscription-reader-batch.sh reads it');
     const argv = claudeArgs[0];
     for (const flag of ['-p', '--safe-mode', '--strict-mcp-config', '--no-session-persistence']) assert.ok(argv.includes(flag), flag);
     assert.equal(argv[argv.indexOf('--model') + 1], 'claude-sonnet-5-5');
@@ -361,6 +380,39 @@ test('keyed values: claimed per photo, one receipt each, no model call', async (
     assert.deepEqual(calls.claims.map((c) => c.p_stage), ['classifier']);
     assert.deepEqual([summary.stages.deep_reading.skipped, summary.stages.keyed_values.skipped], ['off', 'off']);
   }, { extraArgs: ['--deep-limit', '0', '--keyed-limit', '0'] });
+});
+
+test('a fast fire\'s limits: --deep-limit 0 and --keyed-limit 0 claim first reads only, and both later stages say off', async () => {
+  await withStandIns(['a-ok.jpg', 'b-ok.jpg', 'c-ok.jpg'], ({ calls, summary, result }) => {
+    assert.deepEqual(calls.claims, [{ p_stage: 'classifier', p_limit: 2, p_lease_seconds: 900, p_user_id: OWNER }], 'one claim, for first reads, of the size asked (the lease has a 15-minute floor); nothing else is claimed');
+    assert.deepEqual([summary.frames, summary.accepted, summary.stopped], [2, 2, null]);
+    assert.deepEqual([summary.stages.deep_reading.skipped, summary.stages.keyed_values.skipped], ['off', 'off']);
+    assert.deepEqual([summary.stages.deep_reading.claimed, summary.stages.keyed_values.claimed], [0, 0]);
+    assert.match(result.stdout.trim().split('\n').pop(), SUMMARY_CLEAN);
+  }, { extraArgs: ['--limit', '2', '--deep-limit', '0', '--keyed-limit', '0'], deepFrames: ['d-ok.jpg'], keyedFrames: ['k-ok.jpg'] });
+});
+
+test('--probe says how many first reads a fire may start and does nothing else', async () => {
+  await withStandIns(['a-ok.jpg'], ({ calls, summary, result, claudeArgs }) => {
+    assert.equal(result.code, 0);
+    assert.deepEqual(summary, { probe: true, queued: 3, read_last_hour: 12, per_hour: 360, start: 3 });
+    assert.equal(calls.probes.length, 2);
+    assert.equal(calls.probes.some((q) => /image_stage_work\?select=id&stage=eq\.classifier&lane=eq\.live&status=eq\.queued&or=\(not_before\.is\.null,not_before\.lte\."\d{4}-\d\d-\d\dT[\d:.]+Z"\)&limit=25$/.test(q)), true, 'queued and due');
+    assert.equal(calls.probes.some((q) => /^HEAD \/rest\/v1\/image_stage_receipts\?select=id&stage=eq\.classifier&detail->>reader=like\.claude-cli\*&observed_at=gte\.\d{4}-\d\d-\d\dT[\d:.]+Z&limit=1 count=exact$/.test(q)), true, 'reads of the last hour, counted');
+    assert.deepEqual([calls.claims.length, calls.prompts, calls.readings.length, calls.receipts.length, claudeArgs.length], [0, 0, 0, 0, 0],
+      'nothing is claimed, no checklist is fetched, the CLI is not started, nothing is written');
+  }, { extraArgs: ['--probe'], queued: 3, readLastHour: 12 });
+  await withStandIns([], ({ summary, result }) => {
+    assert.equal(result.code, 0);
+    assert.deepEqual(summary, { probe: true, queued: 0, read_last_hour: 0, per_hour: 360, start: 0 });
+  }, { extraArgs: ['--probe'] });
+  await withStandIns([], ({ summary }) => {
+    assert.deepEqual(summary, { probe: true, queued: 5, read_last_hour: 9, per_hour: 10, start: 1 }, 'the ceiling the database names');
+  }, { extraArgs: ['--probe'], queued: 5, readLastHour: 9, config: { enabled: true, user_ids: [OWNER], first_reads_per_hour: 10 } });
+  await withStandIns([], ({ summary, result }) => {
+    assert.notEqual(result.code, 0, 'a probe that cannot reach the queue fails; it does not answer zero');
+    assert.equal(summary, null);
+  }, { extraArgs: ['--probe'], queued: 'error' });
 });
 
 test('the stages run only from the ledger: the status worklist has no stage', async () => {

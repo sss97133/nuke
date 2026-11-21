@@ -4,7 +4,7 @@ import XCTest
 final class NavigationUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
-    /// Scrolls the list until `element` is on screen; the garage cards are tall, so rows below them start off screen.
+    /// Scrolls the list until `element` is on screen; the activity feed above the garage rows can be tall.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, swipes: Int = 8) -> Bool {
         for _ in 0..<swipes {
             if element.waitForExistence(timeout: 2) && element.isHittable { return true }
@@ -163,7 +163,7 @@ final class NavigationUITests: XCTestCase {
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
         let organize = app.buttons["Organize photos"].firstMatch
-        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits below the garage cards"); organize.tap()
+        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits above the garage cards"); organize.tap()
         let day = app.staticTexts["2026-10-31"].firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
         let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
@@ -186,7 +186,7 @@ final class NavigationUITests: XCTestCase {
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
         let organize = app.buttons["Organize photos"].firstMatch
-        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits below the garage cards"); organize.tap()
+        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits above the garage cards"); organize.tap()
         let day = app.staticTexts["2026-10-31"].firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
         let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
@@ -212,7 +212,7 @@ final class NavigationUITests: XCTestCase {
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
         let organize = app.buttons["Organize photos"].firstMatch
-        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits below the garage cards"); organize.tap()
+        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits above the garage cards"); organize.tap()
         let day = app.staticTexts["2026-10-31"].firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 10)); day.tap()
         let inspect = app.buttons["session.source.inspect.00000000-0000-4000-8000-00000000e001"]
@@ -268,8 +268,20 @@ final class NavigationUITests: XCTestCase {
         app.launch()
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
+        // The utility rows sit above the first card, so a long garage never buries them.
+        let organize = app.buttons["Organize photos"].firstMatch
+        XCTAssertTrue(reveal(organize, in: app), "Organize photos sits above the garage cards")
+        let pending = app.descendants(matching: .any).matching(identifier: "garage.identityPending").firstMatch
+        XCTAssertTrue(pending.waitForExistence(timeout: 5), "an account-stated vehicle with no identity shows its row")
+        XCTAssertTrue(app.staticTexts["Photos with no vehicle"].firstMatch.exists)
         let first = app.staticTexts["1973 Fixture Coupe Formula"].firstMatch
-        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        // The list is lazy: a card not yet drawn is further down; one that is drawn must sit below both rows.
+        if first.exists {
+            XCTAssertGreaterThan(first.frame.minY, organize.frame.maxY, "Organize photos precedes the first card")
+            XCTAssertGreaterThan(first.frame.minY, pending.frame.maxY, "Identity pending precedes the first card")
+        }
+        let rows = XCTAttachment(screenshot: app.screenshot()); rows.name = "garage-utility-rows"; rows.lifetime = .keepAlways; add(rows)
+        XCTAssertTrue(reveal(first, in: app))
         XCTAssertTrue(app.buttons["Last recorded sale, $41,500"].waitForExistence(timeout: 10), "the masthead's recorded sale is the card's price")
         for value in ["$99,999", "$45,000"] {
             XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch.exists,
@@ -278,6 +290,13 @@ final class NavigationUITests: XCTestCase {
         // The first drag loads the reel (cover first, then the others once each); the pager counts them.
         let photo = app.descendants(matching: .any).matching(identifier: "garage.card.photo.00000000-0000-4000-8000-00000000c101").firstMatch
         XCTAssertTrue(photo.waitForExistence(timeout: 5))
+        // The utility rows sit above the cards, so bring the whole photo between the bars before paging it.
+        let screen = app.windows.firstMatch.frame
+        for _ in 0..<8 where !(photo.frame.minY > screen.minY + 120 && photo.frame.maxY < screen.maxY - 100) {
+            let down = photo.frame.minY <= screen.minY + 120
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.35 : 0.6))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.55 : 0.4)))
+        }
         photo.swipeLeft()
         if !app.staticTexts["2 / 3"].waitForExistence(timeout: 5) { photo.swipeLeft() }
         XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5), "the reel pages through the car's photos")

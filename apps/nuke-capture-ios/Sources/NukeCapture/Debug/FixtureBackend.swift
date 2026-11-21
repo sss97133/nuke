@@ -228,7 +228,7 @@ enum FixtureBackend {
             [{"session_day":"2026-10-31","gps_cell":"fixture","photo_count":1,"image_ids":["00000000-0000-4000-8000-00000000e001"],"sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
             """)
         case "get_user_garage" where scenario == "garage-cards": return ok(GarageCardFixtures.garage())
-        case "get_my_garage_owner_corrections" where scenario == "garage-cards": return ok("[]")
+        case "get_my_garage_owner_corrections" where scenario == "garage-cards": return ok(GarageCardFixtures.corrections)
         case "my_unorganized_photo_count" where scenario == "garage-cards": return ok("37")
         case "get_vehicle_contribution_days_batch":
             // The garage cards' day reader: rows for the cards scenario, a successful empty answer elsewhere.
