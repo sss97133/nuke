@@ -46,6 +46,11 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 const span = (first: string | null | undefined, last: string | null | undefined) =>
   first && last ? (day(first) === day(last) ? day(first) : `${day(first)} – ${day(last)}`) : null;
 const words = (key: string) => key.replace(/_/g, ' ');
+/** A month and year, for a span that has to fit one line of the frame; the full days stay in the tooltip. */
+const month = (iso: string) => { const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }); };
+const monthSpan = (first: string | null | undefined, last: string | null | undefined) =>
+  first && last ? (month(first) === month(last) ? month(first) : `${month(first)} – ${month(last)}`) : null;
 
 /** Owner-confirmed or inferred work: the sessions, the hours they record, and their days. One group, never both summed. */
 function workLine(key: string, label: string, rows: WorkSessionRow[]): AnalysisLine | null {
@@ -81,9 +86,8 @@ export function analysisLines(reads: CardAnalysisReads): AnalysisLine[] {
   const build = reads.build;
   const t = build?.totals;
   if (build && t && t.lines > 0) {
-    const title = [build.rule, `vehicle_build_reconstruction, as of ${day(build.as_of)}`].filter(Boolean).join(' ');
-    const paperDays = span(t.first_day, t.last_day);
-    const paper = [plural(t.receipts, 'receipt'), plural(t.part_lines, 'part line'), paperDays].filter(Boolean).join(' · ');
+    const title = [plural(t.part_lines, 'part line'), span(t.first_day, t.last_day), build.rule, `vehicle_build_reconstruction, as of ${day(build.as_of)}`].filter(Boolean).join('. ');
+    const paper = [plural(t.receipts, 'receipt'), monthSpan(t.first_day, t.last_day)].filter(Boolean).join(' · ');
     if (build.amounts_visible && num(t.recorded_amount) != null) {
       lines.push({ key: 'amount', group: 'money', label: 'On receipts', value: usd(num(t.recorded_amount)!), cite: paper, title });
     } else {
@@ -154,7 +158,7 @@ export async function readCardAnalysis(vehicleId: string): Promise<AnalysisLine[
     const index = await settle(supabase.rpc('family_price_index_read', { p_brand: placed.brand, p_family_key: placed.family_key }), parseFamilyIndex);
     return index ? { brand: placed.brand, index } : null;
   };
-  const [build, sessions, testimony, depth, questions, familyRead, classPrice, estimate] = await Promise.all([
+  const [build, sessions, testimony, depth, questions, familyRead, estimate] = await Promise.all([
     settle(supabase.rpc('vehicle_build_reconstruction', id),
       data => (data as BuildReconstruction | null)?.version === 1 && (data as BuildReconstruction).totals ? data as BuildReconstruction : null),
     settle(supabase.from('work_sessions').select('session_date, duration_minutes, owner_confirmed_at').eq('vehicle_id', vehicleId).limit(1000),
@@ -163,14 +167,14 @@ export async function readCardAnalysis(vehicleId: string): Promise<AnalysisLine[
     settle(supabase.rpc('get_vehicle_day_depth', id), data => Array.isArray(data) ? data as DayDepthRow[] : null),
     settle(supabase.rpc('vehicle_open_questions', id), data => data && typeof data === 'object' ? data as OpenQuestions : null),
     family().catch(() => null),
-    settle(supabase.rpc('get_class_stratified_price', id), data => data && typeof data === 'object' ? data as ClassPrice : null),
-    // The same stored estimate the card's price reads, so the frame and the card head never disagree.
+    // The stored build-class estimate, the same row the card's price reads. The live reader (get_class_stratified_price)
+    // is not called from the browser: measured 2026-11-20 as a signed-in user it ran 15 s and answered 500.
     settle(supabase.from('nuke_estimates').select('estimated_value, value_low, value_high, calculated_at').eq('vehicle_id', vehicleId)
       .in('comp_method', ['class_stratified', 'class_stratified_bodied']).eq('is_stale', false).eq('is_circular', false)
       .order('calculated_at', { ascending: false }).limit(1),
       data => Array.isArray(data) && data[0] ? data[0] as StoredEstimate : null),
   ]);
-  return analysisLines({ build, sessions, testimony, depth, questions, family: familyRead, classPrice, estimate });
+  return analysisLines({ build, sessions, testimony, depth, questions, family: familyRead, estimate });
 }
 
 /**
