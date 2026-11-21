@@ -84,7 +84,7 @@ export function analysisLines(reads: CardAnalysisReads): AnalysisLine[] {
   if (reads.family) {
     const { brand, index } = reads.family;
     lines.push({
-      key: 'family', label: 'Same car, same miles', value: answerOf(index),
+      key: 'family', label: 'Family price, same car and miles', value: answerOf(index),
       cite: ['family_price_index_read', `${brand} family`, evidenceOf({ ...index, stale: false }), index.fittedAt ? `fitted ${day(index.fittedAt)}` : null]
         .filter(Boolean).join(' · '),
     });

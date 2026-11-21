@@ -16,7 +16,7 @@ SET LOCAL lock_timeout = '3s';
 
 DO $guard$
 BEGIN
-  IF encode(extensions.digest(pg_get_functiondef('public.get_first_image_batch(uuid[])'::regprocedure), 'sha256'), 'base64')
+  IF encode(digest(pg_get_functiondef('public.get_first_image_batch(uuid[])'::regprocedure), 'sha256'), 'base64')
       <> 'lPl2ECJftKAkaYeatu2a+kQQggERNDO8ljBzLPeh8I8=' THEN
     RAISE EXCEPTION 'get_first_image_batch changed since the reviewed live definition';
   END IF;
