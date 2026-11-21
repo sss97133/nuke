@@ -19,7 +19,10 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
   const [query, setQuery] = useState('');
   // A two-finger click on a card opens its actions; files dropped on a card go to that car.
   const [menu, setMenu] = useState<{ vehicle: GarageVehicle; x: number; y: number } | null>(null);
-  const [sheet, setSheet] = useState<GarageSheet | null>(null);
+  // Any number of cars can have their agent or log book open at once; each stays on its own card.
+  const [sheets, setSheets] = useState<Record<string, GarageSheet['kind']>>({});
+  const setSheet = (sheet: GarageSheet) => setSheets(current => ({ ...current, [sheet.vehicle.id]: sheet.kind }));
+  const closeSheet = (id: string) => setSheets(current => { const next = { ...current }; delete next[id]; return next; });
   const [merge, setMerge] = useState<{ keeper: GarageVehicle; duplicate: GarageVehicle | null } | null>(null);
   const [dropOn, setDropOn] = useState<string | null>(null);
   const hasFiles = (event: React.DragEvent) => [...event.dataTransfer.types].includes('Files');
@@ -123,13 +126,11 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
                 onDragOver={event => { if (!signedIn || !hasFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDropOn(vehicle.id); }}
                 onDragLeave={() => setDropOn(current => current === vehicle.id ? null : current)}
                 onDrop={event => { if (!signedIn || !hasFiles(event)) return; event.preventDefault(); event.stopPropagation(); setDropOn(null); addFilesToVehicle(vehicle, [...event.dataTransfer.files]); }}>
-                <GarageVehicleCard vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} actions={signedIn ? [
-                  { label: 'Agent', onPress: () => setSheet({ kind: 'agent', vehicle }) },
-                  { label: 'Log book', onPress: () => setSheet({ kind: 'log', vehicle }) },
-                  { label: 'Merge', onPress: () => setMerge({ keeper: vehicle, duplicate: null }) },
-                ] : undefined} />
+                <GarageVehicleCard vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} />
+                {signedIn && !sheets[vehicle.id] && <button type="button" className="garage-card-corner" aria-label={`Open the agent for ${[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')}`}
+                  title="Open this car's agent" onClick={() => setSheet({ kind: 'agent', vehicle })} />}
                 {menu?.vehicle.id === vehicle.id && <GarageCardMenu vehicle={vehicle} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onSheet={setSheet} onMerge={keeper => setMerge({ keeper, duplicate: null })} />}
-                {sheet?.vehicle.id === vehicle.id && <GarageSheetPanel key={sheet.kind} sheet={sheet} onClose={() => setSheet(null)} />}
+                {sheets[vehicle.id] && <GarageSheetPanel key={sheets[vehicle.id]} sheet={{ kind: sheets[vehicle.id], vehicle }} onClose={() => closeSheet(vehicle.id)} />}
               </div>)}
             </div>
           </section>)}

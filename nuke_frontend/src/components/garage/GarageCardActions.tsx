@@ -124,13 +124,8 @@ function LogBook({ vehicle }: { vehicle: GarageVehicle }) {
 }
 
 export function GarageSheetPanel({ sheet, onClose }: { sheet: GarageSheet; onClose: () => void }) {
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', key);
-    return () => document.removeEventListener('keydown', key);
-  }, [onClose]);
   const { vehicle, kind } = sheet;
-  return <aside className="garage-sheet" role="dialog" aria-label={`${kind === 'agent' ? 'Agent' : 'Log book'} for ${vehicleName(vehicle)}`}>
+  return <aside className="garage-sheet" onKeyDown={event => { if (event.key === 'Escape') onClose(); }} role="dialog" aria-label={`${kind === 'agent' ? 'Agent' : 'Log book'} for ${vehicleName(vehicle)}`}>
     <header>
       <div><h2>{kind === 'agent' ? 'Agent' : 'Log book'}</h2><p>{vehicleName(vehicle)}{vehicle.vin ? ` · ${vehicle.vin}` : ''}</p></div>
       <Button variant="secondary" type="button" onClick={onClose}>Close</Button>

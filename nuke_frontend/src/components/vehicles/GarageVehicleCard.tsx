@@ -701,14 +701,14 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
             </p>
           )}
 
-          {vehicle.vin && (
-            <div className="garage-card-foot">
-              <button type="button" className="garage-card-vin" onClick={copyVin}
+          <div className="garage-card-foot">
+            {vehicle.vin
+              ? <button type="button" className="garage-card-vin" onClick={copyVin}
                 title="Copy VIN" aria-label={`Copy VIN ${vehicle.vin}`}>
                 {vinCopied ? 'Copied' : truncateVin(vehicle.vin)}
               </button>
-            </div>
-          )}
+              : <span className="garage-card-vin-none">No VIN recorded</span>}
+          </div>
         </div>
       </article>
     </div>
