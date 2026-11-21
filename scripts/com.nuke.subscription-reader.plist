@@ -9,9 +9,10 @@
          Each fire: a bounded batch of photographed documents through receipt-photo-ocr and a bounded batch of
          unclassified photos through photo-pipeline-orchestrator, both read with `claude -p` under the owner's Claude
          Code login on this Mac. Runs in the login shell (full network, outside Claude Code's sandbox). The wrapper
-         refreshes ~/.worktrees/nuke-main from origin/main each fire and writes a heartbeat row per reader to
+         refreshes ~/.worktrees/nuke-main from origin/main each full fire and writes a heartbeat row per reader to
          job_assay_readings. Install: cp scripts/com.nuke.subscription-reader.plist ~/Library/LaunchAgents/ &&
-         launchctl load ~/Library/LaunchAgents/com.nuke.subscription-reader.plist -->
+         launchctl bootout gui/$(id -u)/com.nuke.subscription-reader; launchctl bootstrap gui/$(id -u)
+         ~/Library/LaunchAgents/com.nuke.subscription-reader.plist -->
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
@@ -20,10 +21,13 @@
         <string>20</string>
     </array>
 
-    <!-- 10 min between fires: 40 reads a fire at ~10-40 s each keeps each fire under the interval; the wrapper skips a
-         fire while a reader is still running. -->
+    <!-- One minute between fires (2026-11-20; it was ten). The wrapper decides what a fire is: a full fire (documents,
+         frames, every stage, a heartbeat each) when the last one started about ten minutes ago, and otherwise a fast
+         fire, which asks the stage ledger whether a newly landed photo is waiting for its first read and starts the
+         reader only then. A minute with nothing to read costs three small requests and writes nothing. launchd runs
+         one instance of a job, so a fire that is still reading is never joined by a second. -->
     <key>StartInterval</key>
-    <integer>600</integer>
+    <integer>60</integer>
 
     <key>StandardOutPath</key>
     <string>/Users/skylar/nuke/logs/subscription-reader.log</string>

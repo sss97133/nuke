@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { claimStageWork, claimStageWorkUpTo, inputFingerprint, receiptForDeepResult, receiptForKeyedResult, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
+import { claimStageWork, claimStageWorkUpTo, FIRST_READS_PER_HOUR, firstReadAllowance, firstReadsSinceQuery, inputFingerprint, queuedFirstReads, queuedFirstReadsQuery, receiptForDeepResult, receiptForKeyedResult, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
 
 const ctx = { reader: 'claude-cli claude-sonnet-5-5 subscription', promptVersion: 'v98' };
 
@@ -18,6 +18,41 @@ test('the ledger is used only when the reconciler is on and names this owner', a
   assert.equal(await stageQueueEnabled(async () => [], 'u1'), false, 'no config row (ledger not deployed): off');
   // a failed read is not "off": the fire must fail loudly instead of reading the unqueued worklist
   await assert.rejects(stageQueueEnabled(async () => { throw new Error('platform_config: 503 PGRST002'); }, 'u1'), /503/);
+});
+
+test('the queue is asked how many first reads are due without claiming any', async () => {
+  const asked = [];
+  const rest = (rows) => async (q) => { asked.push(q); return rows; };
+  const now = new Date('2026-11-21T04:00:00.000Z');
+  assert.equal(await queuedFirstReads(rest([{ id: 1 }, { id: 2 }, { id: 3 }]), { now }), 3);
+  assert.equal(asked[0], 'image_stage_work?select=id&stage=eq.classifier&lane=eq.live&status=eq.queued&or=(not_before.is.null,not_before.lte.%222026-11-21T04:00:00.000Z%22)&limit=25',
+    'newly landed photos (the live lane) queued past their retry pause; the timestamp is quoted for PostgREST; at most 25 rows come back');
+  assert.equal(await queuedFirstReads(rest([])), 0, 'nothing queued');
+  assert.equal(await queuedFirstReads(rest(null)), 0, 'an empty answer is nothing queued');
+  assert.equal(queuedFirstReadsQuery('T', 'deep_reading').includes('stage=eq.deep_reading'), true);
+  await assert.rejects(queuedFirstReads(async () => { throw new Error('503'); }), /503/, 'a failed request is an error, never "nothing queued"');
+});
+
+test('what a fast fire may start: queued first reads held to the hourly ceiling, which the database can name', async () => {
+  const now = new Date('2026-11-21T04:00:00.000Z');
+  const world = ({ queued, read, cfg }) => {
+    const asked = [];
+    return { asked,
+      rest: async (q) => { asked.push(q); return q.startsWith('platform_config') ? (cfg === undefined ? [] : [{ config_value: cfg }]) : Array.from({ length: queued }, (_, i) => ({ id: i })); },
+      count: async (q) => { asked.push(q); return read; } };
+  };
+  const w = world({ queued: 6, read: 40, cfg: { enabled: true } });
+  assert.deepEqual(await firstReadAllowance({ ...w, now }), { queued: 6, read_last_hour: 40, per_hour: FIRST_READS_PER_HOUR, start: 6 }, 'under the ceiling: everything queued may start');
+  assert.equal(w.asked.includes(firstReadsSinceQuery('2026-11-21T03:00:00.000Z')), true, 'reads are counted over the hour before now');
+  assert.equal(firstReadsSinceQuery('2026-11-21T03:00:00.000Z'), 'image_stage_receipts?select=id&stage=eq.classifier&detail-%3E%3Ereader=like.claude-cli*&observed_at=gte.2026-11-21T03%3A00%3A00.000Z&limit=1',
+    'only the readers that spend the subscription count against its ceiling');
+  assert.equal((await firstReadAllowance({ ...world({ queued: 25, read: FIRST_READS_PER_HOUR - 4, cfg: {} }), now })).start, 4, 'near the ceiling: only the room that is left');
+  assert.equal((await firstReadAllowance({ ...world({ queued: 25, read: FIRST_READS_PER_HOUR + 80, cfg: {} }), now })).start, 0, 'past the ceiling: nothing starts, the photos stay queued');
+  assert.deepEqual(await firstReadAllowance({ ...world({ queued: 25, read: 10, cfg: { first_reads_per_hour: 12 } }), now }), { queued: 25, read_last_hour: 10, per_hour: 12, start: 2 }, 'the database names the ceiling');
+  assert.equal((await firstReadAllowance({ ...world({ queued: 5, read: 0, cfg: { first_reads_per_hour: 0 } }), now })).start, 0, 'a ceiling of zero in the database stops fast fires');
+  assert.equal((await firstReadAllowance({ ...world({ queued: 5, read: 0, cfg: { first_reads_per_hour: 'many' } }), now })).per_hour, FIRST_READS_PER_HOUR, 'a value that is not a number is not a ceiling');
+  assert.equal((await firstReadAllowance({ ...world({ queued: 5, read: 0, cfg: undefined }), now })).start, 5, 'no config row: the default ceiling');
+  await assert.rejects(firstReadAllowance({ rest: w.rest, count: async () => { throw new Error('503'); }, now }), /503/, 'a count that fails is an error, never "nothing to read"');
 });
 
 test('a claim is bounded, owner-scoped and tolerant of an empty answer', async () => {

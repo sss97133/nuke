@@ -35,6 +35,54 @@ export async function stageQueueEnabled(rest, owner) {
   return Array.isArray(cfg.user_ids) ? cfg.user_ids.includes(owner) : true;
 }
 
+/**
+ * The newly landed photos whose first read is waiting right now: queued in the live lane (the photo insert trigger and the
+ * reconciler's recent-photo pass put them there) and past any retry pause (not_before). The backfill lane is left out on
+ * purpose: older photos keep the pace of the full fires. The timestamp is quoted because PostgREST reads `.` and `:`
+ * inside an or=() list as its own punctuation.
+ */
+export const queuedFirstReadsQuery = (nowIso, stage = STAGE) =>
+  `image_stage_work?select=id&stage=eq.${stage}&lane=eq.live&status=eq.queued&or=(not_before.is.null,not_before.lte.%22${nowIso}%22)&limit=25`;
+
+/** How many newly landed photos have a first read queued and due, up to 25. A question, never a claim. */
+export async function queuedFirstReads(rest, { now = new Date() } = {}) {
+  const rows = await rest(queuedFirstReadsQuery(now.toISOString()));
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
+/**
+ * First reads a reader may start in an hour when the database names no number. Every first read is one model call on the
+ * owner's subscription, so a dump of thousands of photos must not take the hour's compute from him: past the ceiling
+ * the photos stay queued and are read as the hour moves on. The database's number is
+ * platform_config image_stage_reconciler.first_reads_per_hour.
+ */
+export const FIRST_READS_PER_HOUR = 360;
+/**
+ * The first-read receipts the subscription readers have written since `sinceIso` (asked with count=exact; one row is
+ * enough). Every receipt is one attempt, and the reader name in its detail starts with "claude-cli" for every reader
+ * that spends the owner's subscription; a paid provider's reads are not counted against this ceiling.
+ */
+export const firstReadsSinceQuery = (sinceIso, stage = STAGE) =>
+  `image_stage_receipts?select=id&stage=eq.${stage}&detail-%3E%3Ereader=like.claude-cli*&observed_at=gte.${encodeURIComponent(sinceIso)}&limit=1`;
+
+/**
+ * What a fast fire may start right now: the first reads that are queued and due, held to the hourly ceiling. Three
+ * questions and no claim. The launchd wrapper asks this every minute and starts the reader only when `start` is above
+ * zero, so a minute with nothing to read costs these requests: no checklist call, no CLI, no log line, no file.
+ * `rest(query)` answers rows; `count(query)` answers how many rows match. An error from either is thrown: a probe that
+ * cannot see the queue must not answer "nothing to read".
+ */
+export async function firstReadAllowance({ rest, count, now = new Date() }) {
+  const [queued, readLastHour, cfgRows] = await Promise.all([
+    queuedFirstReads(rest, { now }),
+    count(firstReadsSinceQuery(new Date(now.getTime() - 3_600_000).toISOString())),
+    rest('platform_config?select=config_value&config_key=eq.image_stage_reconciler'),
+  ]);
+  const named = Number((Array.isArray(cfgRows) ? cfgRows[0]?.config_value : null)?.first_reads_per_hour);
+  const perHour = Number.isFinite(named) && named >= 0 ? Math.trunc(named) : FIRST_READS_PER_HOUR;
+  return { queued, read_last_hour: readLastHour, per_hour: perHour, start: Math.max(0, Math.min(queued, perHour - readLastHour)) };
+}
+
 /** Claim up to `limit` photos for a stage (at most 25 a call). Returns [] when nothing is due. */
 export async function claimStageWork(rpc, { stage = STAGE, limit = 20, leaseSeconds = 900, userId = null } = {}) {
   const rows = await rpc('claim_image_stage_work', { p_stage: stage, p_limit: Math.min(Math.max(limit, 1), 25), p_lease_seconds: leaseSeconds, p_user_id: userId });

@@ -18,7 +18,7 @@
 //   keyed_values   (--keyed-limit, default 60)  the sanctioned projection of that photo's current reading; no model call
 // A stage the database does not hold yet claims nothing: a quiet no-op. Every model call starts lean (leanClaudeArgs).
 //
-//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model claude-sonnet-5-5] [--status failed,pending] [--source auto|stage-queue|status] [--deep-limit 20] [--keyed-limit 60] [--dry-run] [--out receipt.json]
+//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-frame-classifier.mjs --owner <uuid> [--probe] [--limit N] [--concurrency 2] [--model claude-sonnet-5-5] [--status failed,pending] [--source auto|stage-queue|status] [--deep-limit 20] [--keyed-limit 60] [--dry-run] [--out receipt.json]
 //   ... --stage-dry-run --image-ids <uuid,uuid> [--stages deep_reading,keyed_values]   reads those photos twice and prints, per photo, validity, seconds, tokens, the agreement
 //                                                 and the exact envelope it would post, plus the keyed projection as a dry run; claims and writes nothing
 import { execFile, spawn } from 'node:child_process';
@@ -29,7 +29,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
+import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, firstReadAllowance, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
 import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, REFUSAL_STREAK_STOP, admitsFrom, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, projectionAnswer, subscriptionEnv, refusalStreak } from './deep-stage.mjs';
 const run = promisify(execFile);
 
@@ -98,6 +98,20 @@ const contractText = () => readFileSync(join(here, '..', 'daily-receipt', 'byok-
 async function readAdmits() {
   const rows = await rest('platform_config?select=config_value&config_key=eq.image_reading_tiers');
   return admitsFrom(Array.isArray(rows) ? rows[0]?.config_value : null);
+}
+
+// --probe: say how many first reads a fire may start now (queued and due, held to the hourly ceiling), and exit. Nothing
+// is claimed, no checklist is fetched, the CLI is not started. The launchd wrapper asks this every minute and starts a
+// real fire only when `start` is above zero.
+if (args.probe === true) {
+  const count = async (q) => {
+    const r = await fetch(`${URL_}/rest/v1/${q}`, { method: 'HEAD', headers: { ...H, Prefer: 'count=exact' }, signal: AbortSignal.timeout(20_000) });
+    const total = Number((r.headers.get('content-range') || '').split('/')[1]);
+    if (!r.ok || !Number.isFinite(total)) throw new Error(`${q.slice(0, 60)}: ${r.status}, no count in the answer`);
+    return total;
+  };
+  console.log(JSON.stringify({ probe: true, ...(await firstReadAllowance({ rest, count })) }));
+  process.exit(0);
 }
 
 // Dry run of the new stages on named photos: reads and prints, claims nothing, writes nothing.

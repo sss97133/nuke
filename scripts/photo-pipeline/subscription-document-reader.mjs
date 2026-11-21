@@ -7,7 +7,7 @@
 // result through the existing writers (private copy, capture_document_pages, land_document_pages, the observation bridge).
 // Nothing here writes to the database; the function's writers do.
 //
-//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-document-reader.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model sonnet] [--dry-run] [--out receipt.json]
+//   dotenvx run -q -f ~/nuke/.env -- node scripts/photo-pipeline/subscription-document-reader.mjs --owner <uuid> [--limit N] [--concurrency 2] [--model claude-sonnet-5-5] [--dry-run] [--out receipt.json]
 //
 // Work list: the owner's frames whose pipeline classification named a document type (ai_scan_metadata.classification.v2
 // .document_type) or whose route hit the missing function, minus frames that already have a capture_document_pages row,
@@ -21,6 +21,7 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inputFingerprint, receiptForResult, recordStageReceipt } from './stage-queue.mjs';
+import { DEFAULT_MODEL } from './deep-stage.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -31,7 +32,8 @@ if (process.env.ANTHROPIC_API_KEY) { console.error('refusing: ANTHROPIC_API_KEY 
 const OWNER = args.owner;
 const limit = args.limit && args.limit !== true ? Number(args.limit) : 500;
 const conc = args.concurrency && args.concurrency !== true ? Number(args.concurrency) : 2;
-const model = args.model && args.model !== true ? String(args.model) : 'sonnet';
+// The full model name, not the 'sonnet' alias: an older CLI on the PATH resolved the alias to an older model (2026-11-20).
+const model = args.model && args.model !== true ? String(args.model) : DEFAULT_MODEL;
 const dry = args['dry-run'] === true;
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 
