@@ -180,12 +180,16 @@ export const automaticMethod = (admits = NO_ADMITS) => `${AUTOMATIC_METHOD}; adm
 
 /**
  * How many photos in a row the intake has refused to write. A refusal costs two reads, and the database's rule for this
- * reader's tier (guard_reviewed_image_analysis) answers the same for every photo when it and the reader differ, so the
- * stage stops for the fire at REFUSAL_STREAK_STOP. A success resets the count; any other outcome leaves it.
+ * reader's tier (guard_reviewed_image_analysis, project_reviewed_image_analysis) answers the same for every photo when it
+ * and the reader differ, so the stage stops for the fire at REFUSAL_STREAK_STOP. Counted: the observation was not written,
+ * the projection refused it without a word or called it not eligible, and a reading refused as standing over someone
+ * else's AFTER it was read (the reader's own checks should have held that photo before any read: one is a race, three in
+ * a row means those checks are blind). A success resets the count; any other outcome leaves it.
  */
 export const REFUSAL_STREAK_STOP = 3;
 export function refusalStreak(streak, receipt) {
-  if (['review_observation_not_persisted', 'review_projection_refused'].includes(receipt?.error_class)) return streak + 1;
+  if (['review_observation_not_persisted', 'review_projection_refused', 'review_observation_not_eligible'].includes(receipt?.error_class)) return streak + 1;
+  if (receipt?.detail?.intake_error === 'thin_review_over_reviewed') return streak + 1;
   return receipt?.outcome === 'succeeded' ? 0 : streak;
 }
 
@@ -322,6 +326,79 @@ export function standingReadingHold(readings) {
     ? 'already_read' : null;
 }
 
+/**
+ * This reader's own current reading of the photo, asked of the observations: an automatic reading is its observation
+ * alone and is never written on the photo (migration 20261120140000), so the photo's stamp cannot answer this. The
+ * query picks the reading the database's image_stage_reading_parent picks for a photo with no stamp, once
+ * standingReadingQuery has shown no reading of another tier stands: on the photo's present vehicle, a condition
+ * reading, not superseded, newest by ingested_at (a missing clock last), ties to the lowest id.
+ */
+export const ownReadingQuery = (imageId, vehicleId) =>
+  `vehicle_observations?select=id,ingested_at,extraction_method,method:extraction_metadata->reviewer_provenance->>extraction_method` +
+  `&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${imageId}` +
+  `&vehicle_id=eq.${vehicleId}&kind=eq.condition&is_superseded=not.is.true&agent_tier=eq.${AUTOMATIC_TIER}` +
+  `&order=ingested_at.desc.nullslast,id.asc&limit=1`;
+/**
+ * The row of ownReadingQuery when it is a reading this reader would post again unchanged: made through the same intake by
+ * the same method (reader version and admitted set). A reading by another method is not it: the photo is read again and
+ * the new reading's landing supersedes the old one.
+ */
+export function ownReading(rows, method) {
+  const r = Array.isArray(rows) ? rows[0] : null;
+  if (!r || typeof r.id !== 'string' || r.extraction_method !== 'reviewed_image_analysis_v1') return null;
+  return typeof method === 'string' && method !== '' && r.method === method ? { id: r.id } : null;
+}
+
+/**
+ * What finishing the landing of this reader's own stored reading means for the photo. A landing is the insert and then
+ * the intake's projection (project_reviewed_image_analysis), which for an automatic reading supersedes the older automatic
+ * readings of the photo and writes nothing else, and is safe to call again. A fire that ended between the two, or between
+ * the post and its receipt, leaves a reading that only needs that call.
+ *   answer  projectionAnswer(): { http: 200, success, observation_id, thin_tier, superseded_readings } | { http, error }
+ *   landed                      the projection answers for this reading and says thin_tier (stored as its observation
+ *                               alone): the photo is read by this method, the stage closes, no read spent
+ *   thin_review_over_reviewed   a reading that is not this reader's stands now: the photo is read, by someone else
+ *   review_source_changed       the stored reading is of a source the photo no longer has (its URL changed, or the
+ *                               reading's witness is missing), so it can never land: read the photo again; the new
+ *                               reading's landing supersedes the stored one
+ *   anything else               typed like any answer of the intake (retried later, or retired, by its word); no read
+ *                               spent. That includes a success that is not this reading's or does not say thin_tier.
+ * Returns { reread: true } or { result } for receiptForDeepResult.
+ */
+export function finishedLanding(answer, own) {
+  const a = answer !== null && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
+  if (a.http === 200 && a.success === true && a.observation_id === own.id && a.thin_tier === true) {
+    return { result: { policy: 'already_read_same_method',
+      detail: { observation_id: own.id, landing_finished: true, ...(Number.isInteger(a.superseded_readings) ? { superseded_readings: a.superseded_readings } : {}) } } };
+  }
+  const word = typeof a.error === 'string' && a.error ? a.error : null;
+  if (word === 'thin_review_over_reviewed') return { result: { policy: 'already_read' } };
+  if (word === 'review_source_changed') return { reread: true };
+  return { result: { intake: { http: Number.isInteger(a.http) && a.http >= 400 ? a.http : 503, success: false, error: word ?? 'review_source_unavailable' } } };
+}
+
+/**
+ * The words project_reviewed_image_analysis raises (migration 20261120140000), the list the orchestrator passes on by
+ * name (reviewedAnalysis.ts PROJECTION_REFUSALS; reviewedIntakeChain_test.ts holds the two lists equal).
+ */
+export const PROJECTION_WORDS = Object.freeze(['thin_review_over_reviewed', 'review_observation_not_eligible', 'review_source_changed',
+  'review_source_withdrawn', 'review_source_previously_withdrawn', 'review_source_changed_during_projection',
+  'review_search_projection_not_persisted']);
+
+/**
+ * The answer of a direct call of the projection (PostgREST rpc/project_reviewed_image_analysis), as finishedLanding takes
+ * it. A raised exception arrives as { code, message } with the word as the message: only the projection's own words are
+ * passed on, any other refusal is review_projection_refused. A key the database will not take is the intake's
+ * review_requires_service_role; a server fault or a timeout is not a refusal, it is the source being unavailable.
+ */
+export function projectionAnswer(status, body) {
+  const b = body !== null && typeof body === 'object' && !Array.isArray(body) ? body : {};
+  if (status >= 200 && status < 300) return { ...b, http: status };
+  if (status === 401 || status === 403) return { http: status, error: 'review_requires_service_role' };
+  if (!Number.isInteger(status) || status >= 500) return { http: Number.isInteger(status) ? status : 0, error: 'review_source_unavailable' };
+  return { http: status, error: PROJECTION_WORDS.includes(b.message) ? b.message : 'review_projection_refused' };
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // The envelope
 
@@ -348,10 +425,10 @@ export function buildEnvelope({ verdict, row, reviewedUrl, sha256, reviewedAt, p
 
 /**
  * Why a photo that was claimed must not be read now, or null. Mirrors what the intake itself refuses
- * (reviewedAnalysis.ts, project_reviewed_image_analysis) plus what it cannot take (a URL that is not https).
- * `method` is this fire's method string (automaticMethod): it decides whether the reader's own earlier reading stands.
+ * (reviewedAnalysis.ts, guard_reviewed_image_analysis, project_reviewed_image_analysis) plus what it cannot take (a URL
+ * that is not https). `row.deep_stamp` is the photo's ai_scan_metadata.byok_deep_analysis.
  */
-export function eligibilityHold(row, { method = null } = {}) {
+export function eligibilityHold(row) {
   if (!row) return 'photo_not_found';
   if (!row.vehicle_id) return 'unfiled';
   if (row.is_sensitive) return 'sensitive';
@@ -362,14 +439,10 @@ export function eligibilityHold(row, { method = null } = {}) {
   if (['mismatch', 'unrelated'].includes(row.image_vehicle_match_status)) return 'vehicle_mismatch';
   if (row.is_external) return 'external';
   if (!/^https:\/\//.test(row.image_url ?? '')) return 'image_url_not_https';
-  if (typeof row.deep_scene === 'string' && row.deep_scene) {
-    // A reading made by anyone else is final for this reader (the intake refuses a thin reading over a reviewed one, and
-    // another producer's thin reading is not this reader's to replace). Its own earlier reading is replaced only when
-    // the method changed (a new reader version, or the database admits a different set); the same method means the
-    // photo is read and only its receipt is missing.
-    if (row.deep_tier !== AUTOMATIC_TIER) return 'already_read';
-    if (!method || row.deep_method === method) return 'already_read_same_method';
-  }
+  // A stamp on the photo is never this reader's: the intake stamps only a reading that is not automatic, and refuses an
+  // automatic reading over any stamp object, whatever it holds (guard Rule 2). The photo is read, by someone else. This
+  // reader's own earlier reading is found in the observations instead (ownReadingQuery).
+  if (row.deep_stamp !== null && typeof row.deep_stamp === 'object' && !Array.isArray(row.deep_stamp)) return 'already_read';
   return null;
 }
 
@@ -507,6 +580,7 @@ export function deepDetail({ model, runId, reads, agreement, seconds, admits = n
  *   deps.rest    PostgREST read (query string) -> rows
  *   deps.ask(argv, text, cwd) -> CLI stdout (claudePrint with the subscription environment)
  *   deps.orchestrator(body) -> { http, ... }
+ *   deps.project(observationId) -> { http, ... }   the intake's projection of a reading already stored (finishedLanding)
  *   deps.fetchBytes(url) -> { ok, status, bytes }
  *   deps.convert(path) -> path of a JPEG   (sips)
  *
@@ -521,21 +595,30 @@ export async function deepReadFrame(frame, deps, { dir, contract, model, runId, 
   // the row as it is now, immediately before the download: its clock is the compare-and-set token the intake checks
   let row;
   try {
-    const rows = await deps.rest(`vehicle_images?select=id,vehicle_id,image_url,updated_at,is_external,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status,file_name,deep_scene:ai_scan_metadata->byok_deep_analysis->>scene_type,deep_tier:ai_scan_metadata->byok_deep_analysis->>agent_tier,deep_method:ai_scan_metadata->byok_deep_analysis->>extraction_method&id=eq.${frame.id}`);
+    const rows = await deps.rest(`vehicle_images?select=id,vehicle_id,image_url,updated_at,is_external,is_sensitive,is_superseded,is_duplicate,is_document,doc_flag,vision_gate_status,image_vehicle_match_status,file_name,deep_stamp:ai_scan_metadata->byok_deep_analysis&id=eq.${frame.id}`);
     row = Array.isArray(rows) ? rows[0] : null;
   } catch { return typed({ intake: { http: 503, error: 'review_source_unavailable' } }); }
   const method = automaticMethod(admits);
-  let hold = eligibilityHold(row, { method });
-  // the stamp says the photo is free: ask the observations too (a reviewed reading whose stamp is missing or stale)
-  let standing = null;
+  let hold = eligibilityHold(row);
+  // No stamp on the photo: ask the observations. First whether a reading that is not this reader's stands (a reviewed
+  // reading whose stamp is missing or stale), then for this reader's own reading, which is never stamped.
+  let stored = null;
   if (!hold) {
     try {
-      standing = standingReadingHold(await deps.rest(standingReadingQuery(row.id)));
+      hold = standingReadingHold(await deps.rest(standingReadingQuery(row.id)));
+      if (!hold) stored = ownReading(await deps.rest(ownReadingQuery(row.id, row.vehicle_id)), method);
     } catch { return typed({ intake: { http: 503, error: 'review_source_unavailable' } }); }
-    hold = standing;
   }
-  // a dry run may read a photo that already holds a reading (it posts nothing); a real one never does
-  if (hold && !((hold === 'already_read' || hold === 'already_read_same_method') && !post)) return typed({ policy: hold });
+  // a dry run may read a photo that already holds a reading (it posts nothing and finishes no landing); a real one never does
+  if (hold && !(hold === 'already_read' && !post)) return typed({ policy: hold });
+  if (stored && post) {
+    // Its own reading by this method already stands, so the photo is read: finish that reading's landing and close the
+    // stage, with no read spent. Only a stored reading that can never land sends the photo on to be read again.
+    let answer;
+    try { answer = await deps.project(stored.id); } catch { answer = { http: 0 }; }
+    const done = finishedLanding(answer, stored);
+    if (!done.reread) return typed(done.result);
+  }
   if (typeof row.updated_at !== 'string' || !Number.isFinite(Date.parse(row.updated_at))) return typed({ policy: 'row_clock_missing' });
 
   let img, bytes, ext;

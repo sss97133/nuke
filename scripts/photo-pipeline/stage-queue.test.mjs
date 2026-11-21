@@ -183,10 +183,17 @@ test('deep reading: every answer the intake can give is a typed receipt', () => 
   const of = (result) => { const r = receiptForDeepResult(result, dctx); return [r.outcome, r.error_class ?? r.detail.skipped ?? null, r.retry_after_seconds ?? null, r.stop === true]; };
   assert.deepEqual(of({ intake: { http: 200, success: true, observation_id: 'o1' } }), ['succeeded', null, null, false]);
   assert.equal(receiptForDeepResult({ intake: { http: 200, success: true, observation_id: 'o1' } }, dctx).detail.observation_id, 'o1');
+  // an automatic reading lands as its observation alone (no placement on the photo): the receipt says so, and how many older readings it replaced
+  const thin = receiptForDeepResult({ intake: { http: 200, success: true, observation_id: 'o1', image_observation_id: null, thin_tier: true, superseded_readings: 1 } }, dctx);
+  assert.deepEqual([thin.outcome, thin.detail.observation_id, thin.detail.thin_tier, thin.detail.superseded_readings], ['succeeded', 'o1', true, 1]);
+  const placed = receiptForDeepResult({ intake: { http: 200, success: true, observation_id: 'o1', image_observation_id: 'p1', thin_tier: 'yes', superseded_readings: '1' } }, dctx);
+  assert.deepEqual(['thin_tier' in placed.detail, 'superseded_readings' in placed.detail], [false, false], 'only the projection\'s own boolean and count are kept');
   // the source changed during the read: retried in about two minutes
   for (const code of ['review_source_changed', 'review_source_changed_during_projection', 'review_projection_not_persisted']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['unavailable', code, 120, false]);
-  // two reads are spent per attempt: a refusal with no reason the reader can see, and a withdrawal, wait an hour
-  for (const code of ['review_projection_refused', 'review_source_withdrawn']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['unavailable', code, 3600, false]);
+  // a refusal with no reason the reader can see, a stored reading the projection calls not eligible, and a withdrawal wait an hour
+  for (const code of ['review_projection_refused', 'review_observation_not_eligible', 'review_source_withdrawn']) assert.deepEqual(of({ intake: { http: 409, success: false, error: code } }), ['unavailable', code, 3600, false]);
+  // a word of the projection the reader has no rule of its own for keeps its name and is retried
+  assert.deepEqual(of({ intake: { http: 409, success: false, error: 'review_search_projection_not_persisted' } }), ['unavailable', 'review_search_projection_not_persisted', 900, false]);
   // withdrawn or not eligible: closed with its reason
   assert.deepEqual(of({ intake: { http: 409, success: false, error: 'review_source_previously_withdrawn' } }), ['policy_skip', 'review_source_previously_withdrawn', null, false]);
   assert.deepEqual(of({ policy: 'document' }), ['policy_skip', 'document', null, false]);
@@ -200,8 +207,11 @@ test('deep reading: every answer the intake can give is a typed receipt', () => 
   for (const [http, code] of [[503, 'review_source_unavailable'], [500, 'review_persistence_failed']]) assert.deepEqual(of({ intake: { http, success: false, error: code } }), ['unavailable', code, 900, false]);
   // not written (the ingest failed, or the database's rule for the reader's tier refused the row): an hour, each attempt spends two reads
   assert.deepEqual(of({ intake: { http: 502, success: false, error: 'review_observation_not_persisted' } }), ['unavailable', 'review_observation_not_persisted', 3600, false]);
-  // the reader's own reading by the same method is already on the photo: the stage is done, no read was spent
+  // the reader's own reading by the same method already stands (found in the observations; its landing was finished): the
+  // stage is done, no read was spent, and the receipt names the reading
   assert.deepEqual([receiptForDeepResult({ policy: 'already_read_same_method' }, dctx).outcome, receiptForDeepResult({ policy: 'already_read_same_method' }, dctx).detail.already_read], ['succeeded', 'same_method']);
+  const finished = receiptForDeepResult({ policy: 'already_read_same_method', detail: { observation_id: 'o9', landing_finished: true, superseded_readings: 0 } }, dctx);
+  assert.deepEqual([finished.outcome, finished.detail.already_read, finished.detail.observation_id, finished.detail.landing_finished, finished.detail.superseded_readings], ['succeeded', 'same_method', 'o9', true, 0]);
   assert.deepEqual(of({ intake: { http: 0, error: 'orchestrator_request_error' } }), ['unavailable', 'orchestrator_request_error', 900, false]);
   // the service key was refused: the batch stops
   assert.deepEqual(of({ intake: { http: 403, success: false, error: 'review_requires_service_role' } }), ['unavailable', 'orchestrator_unauthorized', 900, true]);
@@ -235,4 +245,16 @@ test('keyed values: the number written, or the projection\'s own reason', () => 
   assert.deepEqual(of({ ...base, eligible_claims: 3, inserted: 1, unattempted: 2, failed: 1, reason: 'run_budget_exhausted' }), ['unavailable', 'projection_failed', 1], 'a partial landing is retried; the rest is landed next time');
   assert.deepEqual(of(null, 'project-cached: source query failed'), ['unavailable', 'projection_error', null]);
   assert.equal(receiptForKeyedResult({ projection: { ...base, failed: 1 } }, kctx).retry_after_seconds, 900);
+  // every receipt of a projection that ran names the reading it is about, whatever the outcome: a receipt is never
+  // taken as the answer for a later reading of the same photo
+  const named = { ...base, current_reading_ids: ['30000000-0000-4000-8000-000000000009'] };
+  for (const projection of [{ ...named, eligible_claims: 3, inserted: 3 }, { ...named, already_projected: 3 }, { ...named, deferred: { receipt_document: 1 } },
+    { ...named, deferred: { privacy_check_unavailable: 1 } }, { ...named, source_rows: 0 }, { ...named, eligible_claims: 3, failed: 1, reason: 'ingest_failed' }]) {
+    assert.equal(receiptForKeyedResult({ projection }, kctx).detail.source_observation_id, '30000000-0000-4000-8000-000000000009', JSON.stringify(projection));
+  }
+  // no current reading, more than one, or a projection that never ran: no reading is named
+  for (const projection of [base, { ...base, current_reading_ids: [] }, { ...base, current_reading_ids: ['a', 'b'] }, { ...base, current_reading_ids: [5] }, { ...base, current_reading_ids: 'a' }]) {
+    assert.ok(!('source_observation_id' in receiptForKeyedResult({ projection }, kctx).detail), JSON.stringify(projection));
+  }
+  assert.ok(!('source_observation_id' in receiptForKeyedResult({ error: 'boom' }, kctx).detail));
 });

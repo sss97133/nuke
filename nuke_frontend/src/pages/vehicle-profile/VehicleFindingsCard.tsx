@@ -35,8 +35,7 @@ export function imageAnalysisPopulations(images: GalleryAnalysisRead['images']) 
     if (subject) { classified.push(image.id); add(subjects, subject, image.id); }
     if (hasDetail) {
       detailed.push(image.id);
-      // an automatic two-pass reading carries the same prompt_version; it is a detailed read, not a cited review
-      if (deep?.prompt_version === 'reviewed_image_analysis_v1' && deep?.agent_tier !== 'subscription automatic'
+      if (deep?.prompt_version === 'reviewed_image_analysis_v1'
         && typeof deep.observation_id === 'string'
         && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deep.observation_id)) reviewed.push(image.id);
       // One membership per image per dimension. Legacy and nested fields are not separate photos.

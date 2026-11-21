@@ -30,7 +30,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEEP_STAGE, KEYED_STAGE, claimStageWork, claimStageWorkUpTo, inputFingerprint, receiptForResult, recordStageReceipt, stageQueueEnabled } from './stage-queue.mjs';
-import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, REFUSAL_STREAK_STOP, admitsFrom, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, subscriptionEnv, refusalStreak } from './deep-stage.mjs';
+import { DEEP_BUDGET_MS, DEEP_READ_TIMEOUT_MS, DEFAULT_MODEL, REFUSAL_STREAK_STOP, admitsFrom, claimAndWork, claudePrint, cliSupportsLean, countReceipt, deepChildEnv, deepReadFrame, keyedValuesForFrame, leanClaudeArgs, legacyClaudeArgs, newRunId, newStageSummary, pool, projectionAnswer, subscriptionEnv, refusalStreak } from './deep-stage.mjs';
 const run = promisify(execFile);
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -68,6 +68,15 @@ async function orchestrator(body, timeoutMs = 0) {
   return { http: r.status, ...j };
 }
 
+// The intake's projection of a reading this reader already stored (deep-stage.mjs finishedLanding). The same SQL function
+// the orchestrator calls after its insert; calling it again is safe.
+async function projectReading(observationId) {
+  const r = await fetch(`${URL_}/rest/v1/rpc/project_reviewed_image_analysis`, { method: 'POST', headers: H, body: JSON.stringify({ p_observation_id: observationId }), signal: AbortSignal.timeout(30_000) });
+  const text = await r.text();
+  let j = null; try { j = JSON.parse(text); } catch { /* not JSON: an empty body or an error page */ }
+  return projectionAnswer(r.status, j);
+}
+
 async function supabaseClient() {
   // The reader runs from a checkout of origin/main that has no node_modules; the project's own checkout does (the
   // wrapper starts this script with it as the working directory), so the client is resolved from there.
@@ -81,6 +90,7 @@ const deepDeps = (dir) => ({
   convert: async (raw) => { const out = raw.replace(/\.[^.]+$/, '') + '.jpg'; await run('sips', ['-s', 'format', 'jpeg', '-Z', '1600', raw, '--out', out]); return out; },
   ask: (argv, text, cwd, signal) => claudePrint(argv, text, { env: deepChildEnv(), cwd, signal, timeoutMs: DEEP_READ_TIMEOUT_MS }),
   orchestrator: (body) => orchestrator(body, 120_000),
+  project: projectReading,
 });
 const contractText = () => readFileSync(join(here, '..', 'daily-receipt', 'byok-vision-prompt.md'), 'utf8');
 // Which closed values the database admits from this reader (platform_config image_reading_tiers; contract-tiers Rule 1).

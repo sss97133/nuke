@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { AUTOMATIC_TIER, admitsFrom, automaticMethod, standingReadingQuery } from './deep-stage.mjs';
+import { admitsFrom, automaticMethod, ownReadingQuery, standingReadingQuery } from './deep-stage.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // the database's row for this reader, with the admitted set of the shared cases
@@ -55,8 +55,8 @@ const FAKE_SUPABASE_JS = `exports.createClient = () => ({
     then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej) }; return b; },
 });`;
 
-async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, extraArgs = [], supabaseJs = false, failClaims = [], failClaimsAfter = {}, oldCli = false } = {}) {
-  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], standing: [], tiers: 0 };
+async function withStandIns(frameNames, fn, { sips = true, claude = true, config = { enabled: true, user_ids: [OWNER] }, tiers = TIERS, failFirstReceipt = false, statusFrames = [], deepFrames = [], keyedFrames = [], rows = {}, standing = {}, own = {}, projections = {}, extraArgs = [], supabaseJs = false, failClaims = [], failClaimsAfter = {}, oldCli = false } = {}) {
+  const calls = { receipts: [], claims: [], readings: [], status: [], receiptAttempts: 0, snapshots: [], snapshotQueries: [], standing: [], own: [], projected: [], tiers: 0 };
   const cursor = {};   // each stage hands out its photos once, at most p_limit a call, like the database
   const claimCount = {};   // failClaimsAfter: { stage: n } answers that stage's first n claims and fails the ones after
   let port;
@@ -75,15 +75,26 @@ async function withStandIns(frameNames, fn, { sips = true, claude = true, config
         return tiers === 'error' ? json(503, { code: 'PGRST002' }) : json(200, tiers ? [{ config_value: tiers }] : []);
       }
       if (req.url.startsWith('/rest/v1/platform_config')) return config === 'error' ? json(503, { code: 'PGRST002' }) : json(200, config ? [{ config_value: config }] : []);
-      // the photo's deep readings, asked of the observations themselves once the stamp says the photo is free
+      // the photo's deep readings, asked of the observations themselves once the photo row shows no stamp: first the readings
+      // that are not this reader's (standing), then this reader's own newest one (own), told apart by the tier filter
       if (req.url.startsWith('/rest/v1/vehicle_observations')) {
-        const q = decodeURIComponent(req.url); calls.standing.push(q);
-        return json(200, standing[q.match(/structured_data->>image_id=eq\.([^&]+)/)?.[1]] ?? []);
+        const q = decodeURIComponent(req.url), id = q.match(/structured_data->>image_id=eq\.([^&]+)/)?.[1];
+        if (q.includes('&agent_tier=eq.subscription automatic&')) { calls.own.push(q); return json(200, own[id] ?? []); }
+        calls.standing.push(q);
+        return json(200, standing[id] ?? []);
+      }
+      // the intake's projection of a reading already stored (finishing its landing); a raised exception is PostgREST's { code, message }
+      if (req.url === '/rest/v1/rpc/project_reviewed_image_analysis') {
+        const observationId = JSON.parse(data).p_observation_id; calls.projected.push(observationId);
+        const refuse = projections[observationId];
+        if (refuse) return json(400, { code: '23514', details: null, hint: null, message: refuse });
+        return json(200, { success: true, observation_id: observationId, image_id: 'x', vehicle_id: 'y', projection_duplicate: null, image_observation_id: null, search_vehicle_id: null,
+          cover: { changed: false, reason: 'thin_tier_reading' }, thin_tier: true, superseded_readings: 0, model_calls: 0 });
       }
       if (req.url.startsWith('/rest/v1/vehicle_images') && /[?&]id=eq\./.test(req.url)) {
         const id = req.url.match(/id=eq\.([^&]+)/)[1]; calls.snapshots.push(id); calls.snapshotQueries.push(req.url);
         return json(200, [{ id, vehicle_id: '00000000-0000-4000-8000-0000000000cc', image_url: `https://example.test/${id}`, updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null,
-          deep_scene: null, is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, doc_flag: null, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...(rows[id] ?? {}) }]);
+          deep_stamp: null, is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, doc_flag: null, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...(rows[id] ?? {}) }]);
       }
       if (req.url.startsWith('/rest/v1/vehicle_images')) {
         calls.status.push(decodeURIComponent(req.url));
@@ -273,7 +284,7 @@ test('a database without the new stages: both claim nothing, the fire is clean, 
 });
 
 test('deep readings: claimed with a lease that covers the batch; a photo that no longer satisfies the intake is closed as a policy skip with no read', async () => {
-  const gone = { 'a-document.jpg': { is_document: true }, 'b-unfiled.jpg': { vehicle_id: null }, 'c-http.jpg': { image_url: 'http://example.test/c.jpg' }, 'd-read.jpg': { deep_scene: 'engine_bay' } };
+  const gone = { 'a-document.jpg': { is_document: true }, 'b-unfiled.jpg': { vehicle_id: null }, 'c-http.jpg': { image_url: 'http://example.test/c.jpg' }, 'd-read.jpg': { deep_stamp: { scene_type: 'engine_bay', agent_tier: 'caller-byok subscription' } } };
   await withStandIns([], ({ calls, summary, claudeArgs }) => {
     const deep = calls.claims.find((c) => c.p_stage === 'deep_reading');
     assert.deepEqual(deep, { p_stage: 'deep_reading', p_limit: 2, p_lease_seconds: 1200, p_user_id: OWNER },
@@ -302,20 +313,31 @@ test('deep readings wait for the database to say what this reader may post: no r
   }
 });
 
-test('deep readings: the reader\'s own reading by the same method closes the stage without a read; by an older method it is read again', async () => {
+test('deep readings: the reader\'s own stored reading by the same method has its landing finished and closes the stage without a read; a stamp or a standing reading is someone else\'s', async () => {
   const method = automaticMethod(admitsFrom(TIERS));
+  const VEHICLE = '00000000-0000-4000-8000-0000000000cc', MINE = '30000000-0000-4000-8000-000000000007', BLOCKED = '30000000-0000-4000-8000-000000000008';
+  const stored = (id) => [{ id, ingested_at: '2026-11-20T18:01:00+00:00', extraction_method: 'reviewed_image_analysis_v1', method }];
   await withStandIns([], ({ calls, summary, claudeArgs }) => {
     const got = calls.receipts.filter((r) => r.p_stage === 'deep_reading').map((r) => [r.p_image_id, r.p_outcome, r.p_detail.already_read ?? null, r.p_detail.skipped ?? null]);
-    assert.deepEqual(got, [['a-mine.jpg', 'succeeded', 'same_method', null], ['b-reviewed.jpg', 'policy_skip', null, 'already_read'], ['c-standing.jpg', 'policy_skip', null, 'already_read']]);
+    assert.deepEqual(got, [['a-mine.jpg', 'succeeded', 'same_method', null], ['b-reviewed.jpg', 'policy_skip', null, 'already_read'], ['c-standing.jpg', 'policy_skip', null, 'already_read'],
+      ['d-overtaken.jpg', 'policy_skip', null, 'already_read']]);
     assert.equal(claudeArgs.length, 0, 'no read was spent on any of them');
-    assert.deepEqual([summary.stages.deep_reading.succeeded, summary.stages.deep_reading.policy_skip], [1, 2]);
-    // only the photo whose stamp is free is asked about; the question is the guard's own (same filter, same index)
-    assert.deepEqual(calls.standing.map((u) => decodeURIComponent(u)), [`/rest/v1/${standingReadingQuery('c-standing.jpg')}`]);
-    assert.match(decodeURIComponent(calls.snapshotQueries[0]), /deep_tier:ai_scan_metadata->byok_deep_analysis->>agent_tier,deep_method:ai_scan_metadata->byok_deep_analysis->>extraction_method/);
-  }, { deepFrames: ['a-mine.jpg', 'b-reviewed.jpg', 'c-standing.jpg'], extraArgs: ['--deep-limit', '3'],
+    assert.deepEqual([summary.stages.deep_reading.succeeded, summary.stages.deep_reading.policy_skip, summary.stages.deep_reading.stopped ?? null], [1, 3, null]);
+    // a: the stored reading's landing was finished through the intake's own projection, by its id, and the receipt names it
+    const mine = calls.receipts.find((r) => r.p_image_id === 'a-mine.jpg');
+    assert.deepEqual([mine.p_detail.observation_id, mine.p_detail.landing_finished, mine.p_detail.superseded_readings], [MINE, true, 0]);
+    // d: the projection found a reading that is not this reader's standing by then: the photo is read, by someone else
+    assert.deepEqual(calls.projected, [MINE, BLOCKED]);
+    // a stamped photo (b) is asked nothing more; the others are asked the guard's own question, then for the reader's own reading
+    assert.deepEqual(calls.standing, ['a-mine.jpg', 'c-standing.jpg', 'd-overtaken.jpg'].map((id) => `/rest/v1/${standingReadingQuery(id)}`));
+    assert.deepEqual(calls.own, ['a-mine.jpg', 'd-overtaken.jpg'].map((id) => `/rest/v1/${ownReadingQuery(id, VEHICLE)}`), 'c: a standing reading ends the questions');
+    assert.match(decodeURIComponent(calls.snapshotQueries[0]), /,file_name,deep_stamp:ai_scan_metadata->byok_deep_analysis&id=eq\.a-mine\.jpg$/);
+  }, { deepFrames: ['a-mine.jpg', 'b-reviewed.jpg', 'c-standing.jpg', 'd-overtaken.jpg'], extraArgs: ['--deep-limit', '4'],
     // c: no stamp on the photo, yet a reviewed reading of it is current (its stamp is missing): found by the observation
     standing: { 'c-standing.jpg': [{ id: '30000000-0000-4000-8000-000000000009', kind: 'condition', is_superseded: false, agent_tier: 'caller-byok subscription' }] },
-    rows: { 'a-mine.jpg': { deep_scene: 'undercarriage', deep_tier: AUTOMATIC_TIER, deep_method: method }, 'b-reviewed.jpg': { deep_scene: 'undercarriage', deep_tier: 'caller-byok subscription', deep_method: 'three passes' } } });
+    own: { 'a-mine.jpg': stored(MINE), 'd-overtaken.jpg': stored(BLOCKED) },
+    projections: { [BLOCKED]: 'thin_review_over_reviewed' },
+    rows: { 'b-reviewed.jpg': { deep_stamp: { scene_type: 'undercarriage', agent_tier: 'caller-byok subscription', extraction_method: 'three passes' } } } });
 });
 
 const K1 = 'aaaaaaaa-0000-4000-8000-000000000001', K2 = 'aaaaaaaa-0000-4000-8000-000000000002';

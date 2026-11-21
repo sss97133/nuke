@@ -450,7 +450,10 @@ export async function projectCachedRun(sb, { vehicleId, limit = 100, pages = 1, 
     cursor = { at: tail.ingested_at, id: tail.id };
   }
   const summed = single || pages > 1;
+  // imageIds: the readings this call judged current for the named photos (ids only), so its caller can say which reading
+  // its answer is about
   const receipt = { mode: apply ? 'apply' : 'dry_run', route: single ? 'single' : 'batch', vehicle_id: vehicleId,
+    ...(currentIds ? { current_reading_ids: currentIds } : {}),
     ...counts, window_limit: limit, window_before: before, pages_walked: walked, reached_oldest_row: reachedOldest,
     full_history_verified: false, model_calls: 0, deferred, ...(single ? held : {}),
     ...(apply && !summed ? last : {}),

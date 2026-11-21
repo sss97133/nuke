@@ -14,6 +14,7 @@ import {
   AUTOMATIC_METHOD, AUTOMATIC_NOTES, AUTOMATIC_TIER, DEFAULT_MODEL, OPEN_QUESTION_PATTERNS, STATE_STANDARD, admitsFingerprint, admitsFrom, automaticMethod, automaticProvenance, buildEnvelope, countReceipt, deepPrompt, deepReadFrame,
   PRINT_WORDS, REFUSAL_STREAK_STOP, refusalStreak, saysPictureOfPicture, thinNarrative, thinVerdict, thinViolation,
   cliStats, claimAndWork, deepChildEnv, eligibilityHold, intakeShape, keyedValuesForFrame, leanClaudeArgs, newRunId, newStageSummary, readOnce, subscriptionEnv, verdictFromCliOutput, QUESTION_TOKENS, standingReadingHold, standingReadingQuery,
+  PROJECTION_WORDS, finishedLanding, ownReading, ownReadingQuery, projectionAnswer,
 } from './deep-stage.mjs';
 
 const IMAGE = '10000000-0000-4000-8000-000000000001', VEHICLE = '20000000-0000-4000-8000-000000000001';
@@ -217,6 +218,12 @@ test('an intake that keeps refusing stops the stage for the fire: a refusal coun
   assert.equal(n, REFUSAL_STREAK_STOP);
   assert.equal(refusalStreak(2, { outcome: 'succeeded' }), 0);
   assert.equal(refusalStreak(0, null), 0);
+  // the projection calling a stored reading not eligible counts too
+  assert.equal(refusalStreak(1, { outcome: 'unavailable', error_class: 'review_observation_not_eligible' }), 2);
+  // a reading refused as standing over someone else's AFTER two reads were spent counts (the reader's own checks should
+  // have held the photo first); the same answer found before any read (a hold, or finishing a stored landing) does not
+  assert.equal(refusalStreak(1, { outcome: 'policy_skip', detail: { skipped: 'already_read', intake_error: 'thin_review_over_reviewed' } }), 2);
+  assert.equal(refusalStreak(1, { outcome: 'policy_skip', detail: { skipped: 'already_read' } }), 1);
 });
 
 test('a thin verdict that cannot be the thin shape is reported, not posted', () => {
@@ -254,15 +261,16 @@ test('a photo that no longer satisfies the intake is not read', () => {
   for (const [over, why] of [[{ vehicle_id: null }, 'unfiled'], [{ is_external: true }, 'external'], [{ vision_gate_status: 'pending' }, 'gate_not_approved'],
     [{ is_document: true }, 'document'], [{ doc_flag: true }, 'document'], [{ is_sensitive: true }, 'sensitive'], [{ is_duplicate: true }, 'duplicate'], [{ is_superseded: true }, 'superseded'],
     [{ image_vehicle_match_status: 'mismatch' }, 'vehicle_mismatch'], [{ image_vehicle_match_status: 'unrelated' }, 'vehicle_mismatch'],
-    [{ image_url: 'http://example.test/a.jpg' }, 'image_url_not_https'], [{ deep_scene: 'engine_bay' }, 'already_read'],
-    [{ deep_scene: 'engine_bay', deep_tier: 'caller-byok subscription' }, 'already_read'], [{ deep_scene: 'engine_bay', deep_tier: 'some other thin reader' }, 'already_read']]) {
+    [{ image_url: 'http://example.test/a.jpg' }, 'image_url_not_https'],
+    // a stamp on the photo is someone else's reading, whatever it holds: the intake refuses an automatic reading over any stamp object
+    [{ deep_stamp: { scene_type: 'engine_bay' } }, 'already_read'], [{ deep_stamp: { scene_type: 'engine_bay', agent_tier: 'caller-byok subscription' } }, 'already_read'],
+    [{ deep_stamp: {} }, 'already_read'], [{ deep_stamp: { observation_id: null } }, 'already_read'],
+    // even one that names this reader's tier and method: this reader never stamps, so it did not write it
+    [{ deep_stamp: { scene_type: 'engine_bay', agent_tier: AUTOMATIC_TIER, extraction_method: automaticMethod(ADMITS) } }, 'already_read']]) {
     assert.equal(eligibilityHold({ ...ok, ...over }), why, JSON.stringify(over));
   }
-  // its own earlier reading: the same method means read (only the receipt is missing); another method means read again
-  const mine = { ...ok, deep_scene: 'engine_bay', deep_tier: AUTOMATIC_TIER, deep_method: automaticMethod(ADMITS) };
-  assert.equal(eligibilityHold(mine, { method: automaticMethod(ADMITS) }), 'already_read_same_method');
-  assert.equal(eligibilityHold(mine, { method: automaticMethod({ ...ADMITS, rust_severity: ['surface', 'none'] }) }), null);
-  assert.equal(eligibilityHold(mine), 'already_read_same_method', 'no method given: never read again');
+  // what is not a stamp object does not hold the photo (the intake's rule reads the same: jsonb_typeof = 'object')
+  for (const notAStamp of [null, undefined, 'engine_bay', [], 0, false]) assert.equal(eligibilityHold({ ...ok, deep_stamp: notAStamp }), null, JSON.stringify(notAStamp));
   assert.equal(eligibilityHold(null), 'photo_not_found');
 });
 
@@ -298,15 +306,20 @@ test('a failed read is tried once more; a fault that is the batch\'s is not', as
 
 // --- a whole photo, with stand-ins ---------------------------------------------------------------------------------
 
-function frameDeps({ row = {}, answers = [], orchestrator = async () => ({ http: 200, success: true, observation_id: '30000000-0000-4000-8000-000000000001' }), download = { ok: true, status: 200 }, snapshotFails = false, readings = [], readingsFail = false } = {}) {
-  const calls = { rest: [], ask: [], orchestrator: [], order: [] };
-  const base = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg', updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null, deep_scene: null,
+// readings: what the standing-reading question returns (readings of the photo that are not this reader's);
+// own: what the own-reading question returns (this reader's newest current reading); project: the intake's projection of a stored reading
+function frameDeps({ row = {}, answers = [], orchestrator = async () => ({ http: 200, success: true, observation_id: '30000000-0000-4000-8000-000000000001' }), download = { ok: true, status: 200 }, snapshotFails = false, readings = [], readingsFail = false,
+  own = [], ownFails = false, project = async (id) => ({ http: 200, success: true, observation_id: id, thin_tier: true, superseded_readings: 0 }) } = {}) {
+  const calls = { rest: [], ask: [], orchestrator: [], project: [], order: [] };
+  const base = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test/a.jpg', updated_at: '2026-11-20T18:00:00.123456+00:00', file_name: null, deep_stamp: null,
     is_sensitive: false, is_superseded: false, is_duplicate: false, is_document: false, doc_flag: null, vision_gate_status: 'approved', image_vehicle_match_status: 'match', ...row };
   let n = 0;
   return { calls, deps: {
     rest: async (q) => {
       calls.rest.push(q);
-      // the photo's deep readings, asked of the observations themselves after the stamp says the photo is free
+      // the photo's deep readings, asked of the observations themselves after the photo row shows no stamp: first the
+      // readings that are not this reader's, then this reader's own (told apart as the database would, by the tier filter)
+      if (q.startsWith('vehicle_observations?') && q.includes(`&agent_tier=eq.${AUTOMATIC_TIER}&`)) { calls.order.push('own'); if (ownFails) throw new Error('503'); return own; }
       if (q.startsWith('vehicle_observations?')) { calls.order.push('standing'); if (readingsFail) throw new Error('503'); return readings; }
       calls.order.push('snapshot'); if (snapshotFails) throw new Error('503'); return [base];
     },
@@ -314,6 +327,7 @@ function frameDeps({ row = {}, answers = [], orchestrator = async () => ({ http:
     convert: async (raw) => raw.replace(/\.[^.]+$/, '.jpg'),
     ask: async (argv, text, cwd) => { calls.order.push('read'); calls.ask.push({ argv, text, cwd }); const a = answers[n++ % answers.length]; if (a instanceof Error) throw a; return typeof a === 'function' ? a() : a; },
     orchestrator: async (body) => { calls.order.push('post'); calls.orchestrator.push(body); return orchestrator(body); },
+    project: async (id) => { calls.order.push('project'); calls.project.push(id); return project(id); },
   } };
 }
 const opts = (dir, extra = {}) => ({ dir, contract: 'CONTRACT TEXT', model: DEFAULT_MODEL, runId: 'claude-cli-fire-test', reader: 'claude-cli claude-sonnet-5-5 subscription', now: () => new Date('2026-11-20T18:05:00Z'), admits: ADMITS, ...extra });
@@ -323,7 +337,8 @@ const frame = { id: IMAGE, vehicle_id: VEHICLE, image_url: 'https://example.test
 test('two agreeing reads: the row is snapshotted before the download, both reads use the lean call, the envelope is posted, the receipt succeeds with the cost in its detail', () => withDir(async (dir) => {
   const { deps, calls } = frameDeps({ answers: [cli(verdict()), cli(verdict())] });
   const r = await deepReadFrame(frame, deps, opts(dir));
-  assert.deepEqual(calls.order, ['snapshot', 'standing', 'download', 'read', 'read', 'post'], 'snapshot, the standing-reading check, then bytes, both reads, the intake');
+  assert.deepEqual(calls.order, ['snapshot', 'standing', 'own', 'download', 'read', 'read', 'post'], 'snapshot, the standing-reading check, the own-reading check, then bytes, both reads, the intake');
+  assert.equal(calls.project.length, 0, 'no stored reading of its own: nothing to finish');
   // the standing-reading question is filtered by the database: one current condition reading that is not this reader's own
   assert.equal(calls.rest[1], standingReadingQuery(IMAGE));
   assert.equal(standingReadingQuery(IMAGE), `vehicle_observations?select=id,kind,is_superseded,agent_tier&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${IMAGE}&kind=eq.condition&is_superseded=not.is.true&or=(agent_tier.is.null,agent_tier.neq.subscription automatic)&limit=1`);
@@ -388,19 +403,103 @@ test('two reads that agree on an admitted value post it', () => withDir(async (d
   assert.deepEqual(r.receipt.detail.posted, { scene_type: 'undercarriage', rust_severity: 'surface', paint_state: 'unknown' });
 }));
 
-test('the reader\'s own earlier reading: the same method closes the stage without a read; another method reads again; anyone else\'s reading is final', () => withDir(async (dir) => {
+// This reader's own reading is its observation alone (the intake never stamps an automatic reading), so it is found in the
+// observations: the newest current automatic reading of the photo on its present vehicle.
+const OWN = '30000000-0000-4000-8000-000000000007';
+const mine = (over = {}) => ({ id: OWN, ingested_at: '2026-11-20T18:01:00+00:00', extraction_method: 'reviewed_image_analysis_v1', method: automaticMethod(ADMITS), ...over });
+
+test('the reader\'s own earlier reading is found in the observations: the same method finishes its landing without a read; another method reads again; a stamp is someone else\'s', () => withDir(async (dir) => {
   const one = () => cli(verdict({ scene_type: 'undercarriage' }, { rust_severity: 'surface' }));
-  const same = frameDeps({ row: { deep_scene: 'undercarriage', deep_tier: AUTOMATIC_TIER, deep_method: automaticMethod(ADMITS) }, answers: [one(), one()] });
+  // the same method: the stored reading's landing is finished (the intake's projection, by its id) and the stage closes: no read, no post
+  const same = frameDeps({ own: [mine()], answers: [one(), one()], project: async (id) => ({ http: 200, success: true, observation_id: id, thin_tier: true, superseded_readings: 1 }) });
   const a = await deepReadFrame(frame, same.deps, opts(dir));
-  assert.deepEqual([a.receipt.outcome, a.receipt.detail.already_read, same.calls.ask.length, same.calls.orchestrator.length], ['succeeded', 'same_method', 0, 0]);
-  const older = frameDeps({ row: { deep_scene: 'undercarriage', deep_tier: AUTOMATIC_TIER, deep_method: 'claude-cli two passes; v1' }, answers: [one(), one()] });
-  const b = await deepReadFrame(frame, older.deps, opts(dir));
-  assert.deepEqual([b.receipt.outcome, older.calls.ask.length, older.calls.orchestrator.length], ['succeeded', 2, 1]);
-  const reviewed = frameDeps({ row: { deep_scene: 'undercarriage', deep_tier: 'caller-byok subscription' }, answers: [one(), one()] });
+  assert.deepEqual([a.receipt.outcome, a.receipt.detail.already_read, a.receipt.detail.observation_id, a.receipt.detail.landing_finished, a.receipt.detail.superseded_readings],
+    ['succeeded', 'same_method', OWN, true, 1]);
+  assert.deepEqual([same.calls.order, same.calls.project, same.calls.ask.length, same.calls.orchestrator.length], [['snapshot', 'standing', 'own', 'project'], [OWN], 0, 0]);
+  // the question, as the database's image_stage_reading_parent picks a photo's reading when it has no stamp
+  assert.equal(same.calls.rest[2], ownReadingQuery(IMAGE, VEHICLE));
+  assert.equal(ownReadingQuery(IMAGE, VEHICLE), `vehicle_observations?select=id,ingested_at,extraction_method,method:extraction_metadata->reviewer_provenance->>extraction_method&structured_data->>analysis_kind=eq.image_deep_byok&structured_data->>image_id=eq.${IMAGE}&vehicle_id=eq.${VEHICLE}&kind=eq.condition&is_superseded=not.is.true&agent_tier=eq.subscription automatic&order=ingested_at.desc.nullslast,id.asc&limit=1`);
+  // a reading by another method (an older reader version, or another admitted set): read again and posted; that landing supersedes it
+  for (const other of ['claude-cli two passes; v1', automaticMethod({ ...ADMITS, rust_severity: ['surface', 'none'] })]) {
+    const older = frameDeps({ own: [mine({ method: other })], answers: [one(), one()] });
+    const b = await deepReadFrame(frame, older.deps, opts(dir));
+    assert.deepEqual([b.receipt.outcome, older.calls.ask.length, older.calls.orchestrator.length, older.calls.project.length], ['succeeded', 2, 1, 0], other);
+  }
+  // the photo row is asked for its whole stamp, and a stamp is someone else's reading: nothing more is asked or read
+  assert.match(same.calls.rest[0], /,file_name,deep_stamp:ai_scan_metadata->byok_deep_analysis&id=eq\./);
+  const reviewed = frameDeps({ row: { deep_stamp: { scene_type: 'undercarriage', agent_tier: 'caller-byok subscription' } }, own: [mine()], answers: [one(), one()] });
   const c = await deepReadFrame(frame, reviewed.deps, opts(dir));
-  assert.deepEqual([c.receipt.outcome, c.receipt.detail.skipped, reviewed.calls.ask.length], ['policy_skip', 'already_read', 0]);
-  assert.match(same.calls.rest[0], /deep_tier:ai_scan_metadata->byok_deep_analysis->>agent_tier,deep_method:ai_scan_metadata->byok_deep_analysis->>extraction_method/);
+  assert.deepEqual([c.receipt.outcome, c.receipt.detail.skipped, reviewed.calls.ask.length, reviewed.calls.order], ['policy_skip', 'already_read', 0, ['snapshot']]);
+  // which row is the reader's own reading by this method
+  const m = automaticMethod(ADMITS);
+  assert.deepEqual(ownReading([mine()], m), { id: OWN });
+  for (const [rows, why] of [[[mine({ method: 'another' })], 'another method'], [[mine({ method: null })], 'no method on the row'], [[mine({ extraction_method: 'something_else' })], 'not this intake'],
+    [[mine({ id: null })], 'no id'], [[], 'no row'], [null, 'no answer'], [[null], 'an empty row']]) assert.equal(ownReading(rows, m), null, why);
+  assert.equal(ownReading([mine()], null), null, 'no method to compare: not the same');
+  assert.equal(ownReading([mine({ method: '' })], ''), null, 'an empty method is no method');
 }));
+
+test('finishing a stored reading\'s landing: every answer has an end, no answer but "can never land" spends a read, and a dry run never calls it', () => withDir(async (dir) => {
+  const run = async (project, extra = {}, more = {}) => { const f = frameDeps({ own: [mine()], answers: [cli(verdict())], project, ...more }); return { r: await deepReadFrame(frame, f.deps, opts(dir, extra)), calls: f.calls }; };
+  // a reading that is not this reader's stands now: the photo is read, by someone else. No read spent, and the stop streak does not count it
+  let { r, calls } = await run(async () => ({ http: 400, error: 'thin_review_over_reviewed' }));
+  assert.deepEqual([r.receipt.outcome, r.receipt.detail.skipped, r.receipt.detail.intake_error ?? null, calls.ask.length, calls.orchestrator.length, refusalStreak(0, r.receipt)], ['policy_skip', 'already_read', null, 0, 0, 0]);
+  // the stored reading is of a source the photo no longer has: it can never land, so the photo is read again and posted
+  ({ r, calls } = await run(async () => ({ http: 400, error: 'review_source_changed' })));
+  assert.deepEqual([r.receipt.outcome, calls.order], ['succeeded', ['snapshot', 'standing', 'own', 'project', 'download', 'read', 'read', 'post']]);
+  // every other answer is typed like an answer of the intake, and none spends a read or posts
+  for (const [answer, want] of [
+    [{ http: 400, error: 'review_source_withdrawn' }, ['unavailable', 'review_source_withdrawn', 3600, false]],
+    [{ http: 400, error: 'review_source_previously_withdrawn' }, ['policy_skip', 'review_source_previously_withdrawn', null, false]],
+    [{ http: 400, error: 'review_observation_not_eligible' }, ['unavailable', 'review_observation_not_eligible', 3600, false]],
+    [{ http: 400, error: 'review_projection_refused' }, ['unavailable', 'review_projection_refused', 3600, false]],
+    [{ http: 500, error: 'review_source_unavailable' }, ['unavailable', 'review_source_unavailable', 900, false]],
+    [{ http: 403, error: 'review_requires_service_role' }, ['unavailable', 'orchestrator_unauthorized', 900, true]],
+    // an answer that is not about this reading, or does not say the reading is stored as its observation alone, is no landing
+    [{ http: 200, success: true, observation_id: '30000000-0000-4000-8000-0000000000ff', thin_tier: true }, ['unavailable', 'review_source_unavailable', 900, false]],
+    [{ http: 200, success: true, observation_id: OWN }, ['unavailable', 'review_source_unavailable', 900, false]],
+    [{ http: 200, success: true, observation_id: OWN, thin_tier: 'true' }, ['unavailable', 'review_source_unavailable', 900, false]],
+    [{ http: 200, success: false, observation_id: OWN, thin_tier: true }, ['unavailable', 'review_source_unavailable', 900, false]],
+    [{ http: 200 }, ['unavailable', 'review_source_unavailable', 900, false]], [null, ['unavailable', 'review_source_unavailable', 900, false]],
+  ]) {
+    ({ r, calls } = await run(async () => answer));
+    assert.deepEqual([r.receipt.outcome, r.receipt.error_class ?? r.receipt.detail.skipped ?? null, r.receipt.retry_after_seconds ?? null, r.receipt.stop ?? false], want, JSON.stringify(answer));
+    assert.deepEqual([calls.ask.length, calls.orchestrator.length, calls.project], [0, 0, [OWN]], JSON.stringify(answer));
+  }
+  // the call itself fails: nothing is read, the photo is retried, the batch goes on
+  ({ r, calls } = await run(async () => { throw new Error('network'); }));
+  assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.stop, calls.ask.length, calls.orchestrator.length], ['unavailable', 'review_source_unavailable', false, 0, 0]);
+  // the own-reading question could not be asked: nothing is read and nothing is finished
+  ({ r, calls } = await run(async () => ({ http: 200 }), {}, { ownFails: true }));
+  assert.deepEqual([r.receipt.outcome, r.receipt.error_class, r.stop, calls.ask.length, calls.project.length, calls.order], ['unavailable', 'review_source_unavailable', false, 0, 0, ['snapshot', 'standing', 'own']]);
+  // a dry run writes nothing: it never finishes a landing; it reads the photo and posts nothing
+  ({ r, calls } = await run(async (id) => ({ http: 200, success: true, observation_id: id, thin_tier: true }), { post: false }));
+  assert.deepEqual([r.valid, r.receipt, calls.project.length, calls.ask.length, calls.orchestrator.length], [true, null, 0, 2, 0]);
+  // the pure mapping: a landing is this reading's own success that says thin_tier
+  assert.deepEqual(finishedLanding({ http: 200, success: true, observation_id: OWN, thin_tier: true, superseded_readings: 2 }, { id: OWN }),
+    { result: { policy: 'already_read_same_method', detail: { observation_id: OWN, landing_finished: true, superseded_readings: 2 } } });
+  assert.deepEqual(finishedLanding({ http: 400, error: 'review_source_changed' }, { id: OWN }), { reread: true });
+  assert.deepEqual(finishedLanding({ http: 0 }, { id: OWN }), { result: { intake: { http: 503, success: false, error: 'review_source_unavailable' } } });
+  assert.deepEqual(finishedLanding([], { id: OWN }), { result: { intake: { http: 503, success: false, error: 'review_source_unavailable' } } });
+}));
+
+test('a direct call of the projection: its own words are passed on, a bad key and a server fault are named for what they are', () => {
+  const landed = { success: true, observation_id: OWN, thin_tier: true, superseded_readings: 0, http: 999 };
+  assert.deepEqual(projectionAnswer(200, landed), { ...landed, http: 200 }, 'the status is the transport\'s, not the body\'s');
+  for (const word of PROJECTION_WORDS) assert.deepEqual(projectionAnswer(400, { code: '23514', details: null, hint: null, message: word }), { http: 400, error: word }, word);
+  assert.deepEqual([...PROJECTION_WORDS].sort(), ['review_observation_not_eligible', 'review_search_projection_not_persisted', 'review_source_changed', 'review_source_changed_during_projection',
+    'review_source_previously_withdrawn', 'review_source_withdrawn', 'thin_review_over_reviewed']);
+  // anything else the database says is a refusal without a word; nothing of its text is passed on
+  for (const body of [{ message: 'review_requires_service_role' }, { message: 'invalid_review_observation' }, { message: 'thin_review_over_reviewed ' }, { message: 'new row violates check constraint' },
+    { details: 'thin_review_over_reviewed' }, { message: 5 }, null, 'thin_review_over_reviewed', ['thin_review_over_reviewed']]) {
+    assert.deepEqual(projectionAnswer(400, body), { http: 400, error: 'review_projection_refused' }, JSON.stringify(body));
+    assert.deepEqual(projectionAnswer(409, body), { http: 409, error: 'review_projection_refused' }, JSON.stringify(body));
+  }
+  for (const status of [401, 403]) assert.deepEqual(projectionAnswer(status, { message: 'thin_review_over_reviewed' }), { http: status, error: 'review_requires_service_role' });
+  for (const status of [500, 502, 503, 504]) assert.deepEqual(projectionAnswer(status, { code: '57014', message: 'canceling statement due to statement timeout' }), { http: status, error: 'review_source_unavailable' });
+  assert.deepEqual(projectionAnswer(undefined, null), { http: 0, error: 'review_source_unavailable' });
+  assert.deepEqual(projectionAnswer(200, null), { http: 200 }, 'a success with no body is not a landing (finishedLanding refuses it)');
+});
 
 test('fewer than two valid reads posts nothing and the receipt is a retryable one', () => withDir(async (dir) => {
   // the second read is invalid twice (original and the one retry)
@@ -489,7 +588,7 @@ test('the words a question may name are the grammar\'s closed values, the list t
 });
 
 test('a photo that moved or left is a policy skip and spends no read; bytes that will not download are the download receipts', () => withDir(async (dir) => {
-  for (const [row, why] of [[{ is_document: true }, 'document'], [{ vehicle_id: null }, 'unfiled'], [{ is_external: true }, 'external'], [{ is_sensitive: true }, 'sensitive'], [{ deep_scene: 'body_exterior' }, 'already_read']]) {
+  for (const [row, why] of [[{ is_document: true }, 'document'], [{ vehicle_id: null }, 'unfiled'], [{ is_external: true }, 'external'], [{ is_sensitive: true }, 'sensitive'], [{ deep_stamp: { scene_type: 'body_exterior' } }, 'already_read']]) {
     const { deps, calls } = frameDeps({ row, answers: [cli(verdict())] });
     const r = await deepReadFrame(frame, deps, opts(dir));
     assert.deepEqual([r.receipt.outcome, r.receipt.detail.skipped, calls.order], ['policy_skip', why, ['snapshot']], why);
@@ -511,11 +610,18 @@ test('every answer of the intake becomes a typed receipt', () => withDir(async (
   const run = async (intake) => (await deepReadFrame(frame, frameDeps({ answers: [cli(verdict())], orchestrator: async () => intake }).deps, opts(dir)));
   const row = async (intake) => { const r = (await run(intake)).receipt; return [r.outcome, r.error_class ?? r.detail.skipped ?? null, r.retry_after_seconds ?? null, r.stop ?? false]; };
   assert.deepEqual(await row({ http: 200, success: true, observation_id: 'o' }), ['succeeded', null, null, false]);
-  for (const code of ['review_source_changed', 'review_projection_not_persisted']) {
+  // an automatic reading lands as its observation alone, and the receipt says so and how many older readings it replaced
+  const thin = (await run({ http: 200, success: true, observation_id: 'o', image_observation_id: null, thin_tier: true, superseded_readings: 2, model_calls: 0 })).receipt;
+  assert.deepEqual([thin.outcome, thin.detail.observation_id, thin.detail.thin_tier, thin.detail.superseded_readings], ['succeeded', 'o', true, 2]);
+  const placed = (await run({ http: 200, success: true, observation_id: 'o', image_observation_id: 'p' })).receipt;
+  assert.deepEqual(['thin_tier' in placed.detail, 'superseded_readings' in placed.detail], [false, false]);
+  for (const code of ['review_source_changed', 'review_source_changed_during_projection', 'review_projection_not_persisted']) {
     assert.deepEqual(await row({ http: 409, success: false, error: code }), ['unavailable', code, 120, false], code);
   }
-  // each attempt costs two reads: a refusal the reader cannot see the reason for waits an hour, and so does a withdrawal
-  for (const code of ['review_projection_refused', 'review_source_withdrawn']) assert.deepEqual(await row({ http: 409, success: false, error: code }), ['unavailable', code, 3600, false], code);
+  // a refusal the reader cannot see the reason for waits an hour, and so do a reading called not eligible and a withdrawal
+  for (const code of ['review_projection_refused', 'review_observation_not_eligible', 'review_source_withdrawn']) assert.deepEqual(await row({ http: 409, success: false, error: code }), ['unavailable', code, 3600, false], code);
+  // a word of the projection the reader has no rule for is kept as the receipt's class and retried
+  assert.deepEqual(await row({ http: 409, success: false, error: 'review_search_projection_not_persisted' }), ['unavailable', 'review_search_projection_not_persisted', 900, false]);
   assert.deepEqual(await row({ http: 409, success: false, error: 'review_source_previously_withdrawn' }), ['policy_skip', 'review_source_previously_withdrawn', null, false]);
   for (const code of ['invalid_review_envelope', 'invalid_review_verdict', 'invalid_review_camera', 'invalid_review_regions', 'invalid_review_source', 'review_too_large']) {
     assert.deepEqual(await row({ http: 400, success: false, error: code }), ['unavailable', 'reader_output_invalid', 1800, false], code);
@@ -532,9 +638,10 @@ test('every answer of the intake becomes a typed receipt', () => withDir(async (
 }));
 
 test('a dry run does everything but the post, may read a photo that already holds a reading, and hands back the exact envelope', () => withDir(async (dir) => {
-  const { deps, calls } = frameDeps({ row: { deep_scene: 'engine_bay' }, answers: [cli(verdict()), cli(verdict())] });
+  const { deps, calls } = frameDeps({ row: { deep_stamp: { scene_type: 'engine_bay' } }, answers: [cli(verdict()), cli(verdict())] });
   const r = await deepReadFrame(frame, deps, opts(dir, { post: false }));
   assert.equal(calls.orchestrator.length, 0);
+  assert.equal(calls.project.length, 0);
   assert.equal(r.valid, true);
   assert.equal(r.receipt, null);
   assert.equal(r.envelope.action, 'record_reviewed_analysis');
@@ -561,10 +668,13 @@ test('keyed values call the sanctioned projection for exactly this photo\'s curr
   assert.ok(queries.some((q) => q[2] === 'vehicle_id' && q[3] === VEHICLE));
   assert.deepEqual([r.receipt.outcome, r.receipt.error_class], ['unavailable', 'reading_not_found']);
   assert.equal(r.projection.model_calls, 0);
+  // the receipt names the reading the projection judged current, so it answers for that reading only
+  assert.deepEqual([r.projection.current_reading_ids, r.receipt.detail.source_observation_id], [[OBS], OBS]);
   // a photo no reading names: nothing is walked
   const empty = (rows) => { const b = { select: () => b, eq: () => b, in: () => b, limit: () => b, abortSignal: () => b, then: (res, rej) => Promise.resolve({ data: rows, error: null }).then(res, rej) }; return b; };
   const none = await keyedValuesForFrame({ id: IMAGE, vehicle_id: VEHICLE }, { sb: { from: (t) => empty(t === 'vehicle_images' ? [{ id: IMAGE, current_observation_id: null }] : []) }, reader: 'r' });
   assert.deepEqual([none.receipt.error_class, none.projection.source_rows, none.projection.pages_walked], ['reading_not_found', 0, 0]);
+  assert.deepEqual([none.projection.current_reading_ids, 'source_observation_id' in none.receipt.detail], [[], false]);
   // the projection could not even read: retried later, never thrown at the fire
   const down = await keyedValuesForFrame({ id: IMAGE, vehicle_id: VEHICLE }, { sb: { from: () => { throw new Error('boom'); } }, reader: 'r' });
   assert.deepEqual([down.receipt.outcome, down.receipt.error_class], ['unavailable', 'projection_error']);

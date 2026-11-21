@@ -685,6 +685,7 @@ test('project-cached --single with imageIds: only the named photos, through the 
   const only = async (row, extra = {}) => walk(db, { apply: true, single: true, imageIds: [row.structured_data.image_id], ...extra });
   let { receipt, exitCode } = await only(one);
   assert.deepEqual([receipt.source_rows, receipt.inserted, receipt.verified, receipt.failed, exitCode], [1, 3, 3, 0, 0]);
+  assert.deepEqual(receipt.current_reading_ids, [one.id], 'the receipt names the reading it judged current for the photo');
   assert.equal(db.rows.filter(r => r.extraction_method === 'cached_byok_property_projection_v1' && r.structured_data.image_id === other.structured_data.image_id).length, 0, 'the other photo was not touched');
   ({ receipt } = await only(paper));
   assert.deepEqual([receipt.eligible_claims, receipt.deferred], [0, { receipt_document: 1 }], 'the projection\'s own holds still apply');

@@ -14,7 +14,7 @@ const observationId = "30000000-0000-4000-8000-000000000001";
 const updated = "2026-11-01T12:00:00.123456Z";
 const sourceUrl = `${project}/image.jpg`;
 const calls: string[] = [];
-let intakeBody: any, rejectProjection = false;
+let intakeBody: any, rejectProjection = false, projectionReply: (() => Response) | null = null;
 function assert(value: unknown): asserts value { if (!value) throw new Error("assertion failed"); }
 globalThis.fetch = (async (input, init) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
@@ -32,6 +32,7 @@ globalThis.fetch = (async (input, init) => {
   }
   if (url.pathname === "/rest/v1/rpc/project_reviewed_image_analysis") {
     assert(JSON.parse(String(init?.body)).p_observation_id === observationId);
+    if (projectionReply) return projectionReply();
     return rejectProjection ? Response.json({ message: "source withdrawn", code: "23514" }, { status: 400 }) :
       Response.json({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId,
         image_observation_id: "50000000-0000-4000-8000-000000000001" });
@@ -89,4 +90,29 @@ Deno.test("actual projection rejection returns failure without normal pipeline s
   const response = await handler(request()), result = await response.json();
   assert(response.status === 409 && result.error === "review_projection_refused" && result.model_calls === 0);
   assert(calls.length === 3 && !calls.some(c => c.startsWith("PATCH")));
+});
+// The database's own words reach the caller through the real handler and the real client: PostgREST answers a raised
+// exception as { code, message } with the word as the message.
+for (const word of ["thin_review_over_reviewed", "review_source_changed", "review_source_previously_withdrawn"]) {
+  Deno.test(`actual projection refusal ${word} is passed on by name`, async () => {
+    calls.length = 0; rejectProjection = false;
+    projectionReply = () => Response.json({ code: "23514", details: null, hint: null, message: word }, { status: 400 });
+    try {
+      const response = await handler(request()), result = await response.json();
+      assert(response.status === 409 && result.success === false && result.error === word && result.model_calls === 0);
+      assert(calls.length === 3 && !calls.some(c => c.startsWith("PATCH")));
+    } finally { projectionReply = null; }
+  });
+}
+Deno.test("actual automatic reading is answered as landed with no placement", async () => {
+  calls.length = 0; rejectProjection = false;
+  projectionReply = () => Response.json({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId,
+    projection_duplicate: null, image_observation_id: null, search_vehicle_id: null,
+    cover: { vehicle_id: vehicleId, changed: false, reason: "thin_tier_reading" }, thin_tier: true, superseded_readings: 0, model_calls: 0 });
+  try {
+    const response = await handler(request()), result = await response.json();
+    assert(response.status === 200 && result.success === true && result.thin_tier === true && result.image_observation_id === null);
+    assert(result.superseded_readings === 0 && result.model_calls === 0 && result.observation_duplicate === false);
+    assert(calls.join("|") === "GET /rest/v1/vehicle_images|POST /functions/v1/ingest-observation|POST /rest/v1/rpc/project_reviewed_image_analysis");
+  } finally { projectionReply = null; }
 });

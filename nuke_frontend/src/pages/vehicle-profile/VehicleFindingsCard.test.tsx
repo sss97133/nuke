@@ -83,13 +83,6 @@ it('retains legacy deep records without counting overlapping fields twice', () =
 it('does not count empty metadata or unrelated completion clocks as analysis', () => {
   expect(imageAnalysisPopulations([{ id: 'empty', ai_scan_metadata: { classification: {}, byok_deep_analysis: {}, vision_analyzed_at: '2026-11-09' } }]).unread).toEqual(['empty']);
 });
-it('counts an automatic two-pass reading as detailed, never as a cited review', () => {
-  const id = '11111111-1111-4111-8111-111111111111';
-  const mk = (name: string, agent_tier: string) => ({ id: name, ai_scan_metadata: { byok_deep_analysis: { scene_type: 'body_exterior', prompt_version: 'reviewed_image_analysis_v1', observation_id: id, agent_tier } } });
-  const result = imageAnalysisPopulations([mk('auto', 'subscription automatic'), mk('cited', 'interactive subscription session')]);
-  expect(result.detailed.sort()).toEqual(['auto', 'cited']);
-  expect(result.reviewed).toEqual(['cited']);
-});
 it('separates source-cited current reviews from legacy and incomplete analysis', async () => {
   read.images = [
     { id: 'reviewed', ai_scan_metadata: { byok_deep_analysis: { scene_type: 'body_interior', prompt_version: 'reviewed_image_analysis_v1', observation_id: '11111111-1111-4111-8111-111111111111' } } },

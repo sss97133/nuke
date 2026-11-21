@@ -1,4 +1,4 @@
-import { intakeRefusalWord, recordReviewedAnalysis, validateReviewedAnalysis, REVIEW_METHOD, type ReviewedAnalysisDeps } from "./reviewedAnalysis.ts";
+import { intakeRefusalWord, projectionRefusalWord, recordReviewedAnalysis, validateReviewedAnalysis, REVIEW_METHOD, type ReviewedAnalysisDeps } from "./reviewedAnalysis.ts";
 
 function assert(v: unknown, message = "assertion failed"): asserts v { if (!v) throw new Error(message); }
 const imageId = "10000000-0000-4000-8000-000000000001";
@@ -91,6 +91,40 @@ Deno.test("wrong observation/subject response cannot claim success", async () =>
 Deno.test("a cache-only projector cannot report completed reviewed analysis", async () => {
   const f = fixture(); f.deps.project = async () => ({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId });
   await refuses(() => recordReviewedAnalysis(packet(), f.deps), "review_projection_not_persisted");
+});
+// An automatic reading is its observation alone: the projection (migration 20261120140000) answers thin_tier with a null
+// placement. This is the answer supabase/sql/test_thin_real_row.sql pins on a real Postgres.
+const thinAnswer = (): any => ({ success: true, observation_id: observationId, image_id: imageId, vehicle_id: vehicleId,
+  projection_duplicate: null, image_observation_id: null, search_vehicle_id: null,
+  cover: { vehicle_id: vehicleId, changed: false, reason: "thin_tier_reading" }, thin_tier: true, superseded_readings: 1, model_calls: 0 });
+Deno.test("an automatic reading lands without a placement when the projection says thin_tier", async () => {
+  const f = fixture(); f.deps.project = async () => { f.effects.push("project"); return thinAnswer(); };
+  const out = await recordReviewedAnalysis(packet(), f.deps);
+  assert(f.effects.join(",") === "read,ingest,project");
+  assert(out.thin_tier === true && out.image_observation_id === null && out.superseded_readings === 1 && out.model_calls === 0);
+});
+for (const [name, change] of [
+  ["a placement that is not an id", (a: any) => { a.image_observation_id = "placed"; }],
+  ["no placement key", (a: any) => { delete a.image_observation_id; }],
+  ["thin_tier that is not the boolean true", (a: any) => { a.thin_tier = "true"; }],
+  ["no thin_tier", (a: any) => { delete a.thin_tier; }],
+  ["another photo", (a: any) => { a.image_id = "10000000-0000-4000-8000-000000000002"; }],
+] as Array<[string, (a: any) => void]>) {
+  Deno.test(`a thin answer with ${name} cannot claim success`, async () => {
+    const f = fixture(); f.deps.project = async () => { const a = thinAnswer(); change(a); return a; };
+    await refuses(() => recordReviewedAnalysis(packet(), f.deps), "review_projection_not_persisted");
+  });
+}
+Deno.test("the projection's own refusal words are passed on by name, and nothing else is", () => {
+  for (const word of ["thin_review_over_reviewed", "review_observation_not_eligible", "review_source_changed", "review_source_withdrawn",
+    "review_source_previously_withdrawn", "review_source_changed_during_projection", "review_search_projection_not_persisted"]) {
+    assert(projectionRefusalWord({ code: "23514", message: word }) === word, word);
+  }
+  for (const other of [{ message: "review_requires_service_role" }, { message: "canceling statement due to statement timeout" },
+    { message: "thin_review_over_reviewed " }, { message: "x thin_review_over_reviewed" }, { details: "thin_review_over_reviewed" },
+    { message: 5 }, null, undefined, "thin_review_over_reviewed", ["thin_review_over_reviewed"]]) {
+    assert(projectionRefusalWord(other) === null, JSON.stringify(other));
+  }
 });
 Deno.test("stable material review identity survives own CAS token change only", async () => {
   const f = fixture(); await recordReviewedAnalysis(packet(), f.deps); const identifier = f.received.source_identifier;

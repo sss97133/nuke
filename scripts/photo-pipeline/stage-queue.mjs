@@ -162,19 +162,25 @@ export async function recordStageReceipt(rpc, { imageId, stage = STAGE, version,
  *                                             not get two valid reads of the photo is { reader: { invalidOutput: true } }
  *   { policy: 'document' }                    the row no longer satisfies what the intake requires: no read was spent
  *   { intake: { http, success, error, ... } } the photo-pipeline-orchestrator's answer to record_reviewed_analysis
- * The intake's own words (reviewedAnalysis.ts; the SQL function project_reviewed_image_analysis behind it answers only
- * 'review_projection_refused'): review_requires_service_role 403; invalid_review_envelope|identity|verdict|state|presence|
- * workshop|camera|regions|flags|notes|lists|source|provenance 400 and review_too_large 400; review_source_changed 409;
- * review_source_withdrawn 409; review_projection_refused 409; review_projection_not_persisted 409;
- * review_source_unavailable 503; review_observation_not_persisted 502; review_persistence_failed 500; and the intake
- * guard's two words for an automatic reading, thin_review_over_reviewed 409 and thin_review_asserts_unchecked_field 409.
+ * The intake's own words (reviewedAnalysis.ts): review_requires_service_role 403; invalid_review_envelope|identity|verdict|
+ * state|presence|workshop|camera|regions|flags|notes|lists|source|provenance 400 and review_too_large 400;
+ * review_source_changed 409; review_source_withdrawn 409; review_projection_not_persisted 409;
+ * review_source_unavailable 503; review_observation_not_persisted 502; review_persistence_failed 500; the intake guard's
+ * two words for an automatic reading, thin_review_over_reviewed 409 and thin_review_asserts_unchecked_field 409; and the
+ * words the SQL function project_reviewed_image_analysis raises, passed on by name, all 409 (deep-stage.mjs
+ * PROJECTION_WORDS): thin_review_over_reviewed, review_observation_not_eligible, review_source_changed,
+ * review_source_withdrawn, review_source_previously_withdrawn, review_source_changed_during_projection,
+ * review_search_projection_not_persisted. Any other failure of that function is review_projection_refused 409.
+ * The same shape carries the answer of finishing a stored reading's landing (deep-stage.mjs finishedLanding), where no
+ * read was spent.
  */
 export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   const detail = { reader: reader ?? null, prompt_version: promptVersion ?? null, ...(result.detail ?? {}) };
   // a hold that can lift (the approval gate has not passed yet) is a pause, not a retirement: image_stage_gaps never reopens a policy_skip
   if (result.policy && TRANSIENT_HOLDS.includes(result.policy)) return { outcome: 'unavailable', error_class: String(result.policy).slice(0, 48), retry_after_seconds: 3600, detail: { ...detail, held: String(result.policy).slice(0, 60) } };
-  // this reader's own reading, made by the same method, is already on the photo and only its receipt is missing (a fire
-  // that ended between the post and the receipt): the stage is done, and no read is spent finding that out
+  // this reader's own reading, made by the same method, already stands for the photo (found in the observations: an
+  // automatic reading is never stamped on the photo) and its landing has been finished; only its receipt was missing (a
+  // fire that ended between the post and the receipt): the stage is done, and no read is spent finding that out
   if (result.policy === 'already_read_same_method') return { outcome: 'succeeded', detail: { ...detail, already_read: 'same_method' } };
   if (result.policy) return { outcome: 'policy_skip', detail: { ...detail, skipped: String(result.policy).slice(0, 60) } };
   if (!result.intake) {
@@ -185,7 +191,10 @@ export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   const code = String(o.error ?? o.error_class ?? '');
   const d = { ...detail, intake_http: o.http ?? null, ...(code ? { intake_error: code.slice(0, 60) } : {}) };
   if (o.http === 200 && o.success !== false) {
-    return { outcome: 'succeeded', detail: { ...d, ...(typeof o.observation_id === 'string' ? { observation_id: o.observation_id } : {}) } };
+    // thin_tier: the reading is stored as its observation alone (an automatic reading: no stamp on the photo);
+    // superseded_readings: how many older automatic readings of the photo this landing replaced
+    return { outcome: 'succeeded', detail: { ...d, ...(typeof o.observation_id === 'string' ? { observation_id: o.observation_id } : {}),
+      ...(o.thin_tier === true ? { thin_tier: true } : {}), ...(Number.isInteger(o.superseded_readings) ? { superseded_readings: o.superseded_readings } : {}) } };
   }
   // withdrawn once before: permanent for this photo
   if (code === 'review_source_previously_withdrawn') return { outcome: 'policy_skip', detail: { ...d, skipped: code } };
@@ -196,9 +205,10 @@ export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
   if (['review_source_changed', 'review_source_changed_during_projection', 'review_projection_not_persisted'].includes(code)) {
     return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 120, detail: d };
   }
-  // the database refused to place a valid reading on this photo (SQL-side rules the reader cannot see, e.g. a withdrawal on
-  // record). Each attempt spends two reads, so wait an hour between attempts rather than two minutes.
-  if (code === 'review_projection_refused') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
+  // the database refused to land a valid reading of this photo without one of its words (a rule the reader cannot see), or
+  // called the stored reading not eligible (superseded in between, or not a reading of this intake). The reading is
+  // stored, so the next attempt only asks again and spends no read; an hour between attempts all the same.
+  if (code === 'review_projection_refused' || code === 'review_observation_not_eligible') return { outcome: 'unavailable', error_class: code, http_status: o.http ?? null, retry_after_seconds: 3600, detail: d };
   // the database's own words for an automatic reading it will not store (guard_reviewed_image_analysis, migration
   // 20261120140000), passed on by the orchestrator. A reading that is not this reader's already stands on the photo
   // (a reviewed landing won the race, or one the reader's own check could not see): the photo is read, by someone better.
@@ -229,11 +239,16 @@ export function receiptForDeepResult(result, { reader, promptVersion } = {}) {
  *   { projection: receipt }   succeeded with the number of values written (or already there), or policy_skip with the
  *                             projection's own deferral reason (receipt_document, no_known_scalar_values, source_requires_review ...)
  *   { error: 'text' }         the projection could not run: retried later
+ * Every receipt of a projection that ran names the reading it is about (detail.source_observation_id: the photo's
+ * current reading as the projection chose it), so a receipt is never taken as the answer for a later reading of the photo.
  */
 export function receiptForKeyedResult(result, { reader, promptVersion } = {}) {
-  const detail = { reader: reader ?? null, prompt_version: promptVersion ?? null };
-  if (result.error) return { outcome: 'unavailable', error_class: 'projection_error', retry_after_seconds: 900, detail: { ...detail, error: String(result.error).slice(0, 160) } };
+  const base = { reader: reader ?? null, prompt_version: promptVersion ?? null };
+  if (result.error) return { outcome: 'unavailable', error_class: 'projection_error', retry_after_seconds: 900, detail: { ...base, error: String(result.error).slice(0, 160) } };
   const p = result.projection ?? {};
+  // one photo is asked for at a time, so there is one current reading or none
+  const ids = Array.isArray(p.current_reading_ids) ? p.current_reading_ids : [];
+  const detail = { ...base, ...(ids.length === 1 && typeof ids[0] === 'string' ? { source_observation_id: ids[0] } : {}) };
   const deferred = p.deferred && typeof p.deferred === 'object' ? p.deferred : {};
   const counts = { values: (p.inserted || 0) + (p.duplicates || 0), inserted: p.inserted || 0, duplicates: p.duplicates || 0, already_projected: p.already_projected || 0 };
   if (p.failed > 0 || p.reason) {
