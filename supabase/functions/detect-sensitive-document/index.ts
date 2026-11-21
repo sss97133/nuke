@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { requireOwnerOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { parseVerdict, toModelImageUrl } from './verdict.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -180,6 +181,10 @@ async function analyzeDocument(imageUrl: string): Promise<DocumentDetectionResul
 
   let lastError: Error | null = null;
 
+  // One address for every provider: a public-storage photo is asked for as a 1,600 px JPEG render, because
+  // a model cannot read an iOS HEIC original (measured 2026-11-20).
+  const modelUrl = toModelImageUrl(imageUrl);
+
   for (const provider of providers) {
     try {
       console.log(`🔄 Trying ${provider.name}...`);
@@ -187,7 +192,7 @@ async function analyzeDocument(imageUrl: string): Promise<DocumentDetectionResul
       // 45 second timeout per provider: a Sonnet 5.5 read of one image with up to 1,500 output tokens does not
       // finish in 10 (measured 13 to 26 s for 2,000 to 3,800 output tokens on text, 2026-11-20).
       const result = await Promise.race([
-        provider.fn(imageUrl),
+        provider.fn(modelUrl),
         new Promise<never>((_, reject) => 
           setTimeout(() => reject(new Error('Provider timeout')), 45000)
         )
@@ -294,32 +299,8 @@ Return JSON:
   }
 
   const data = await response.json();
-  const content = data.choices[0]?.message?.content;
-  
-  if (!content) {
-    return {
-      is_sensitive: false,
-      document_type: null,
-      confidence: 0,
-      extracted_data: {},
-      raw_text: ''
-    };
-  }
-
-  let result;
-  try {
-    result = JSON.parse(content);
-  } catch {
-    return { is_sensitive: false, document_type: null, confidence: 0, extracted_data: {}, raw_text: '' };
-  }
-
-  return {
-    is_sensitive: result.is_sensitive || false,
-    document_type: result.document_type || null,
-    confidence: result.confidence || 0,
-    extracted_data: result.extracted_data || {},
-    raw_text: result.raw_text || ''
-  };
+  // Empty, non-JSON or verdict-less is a failed read, not "not sensitive": throw so Anthropic is tried.
+  return parseVerdict(data.choices?.[0]?.message?.content, 'OpenAI', `finish_reason ${data.choices?.[0]?.finish_reason ?? 'unknown'}`);
 }
 
 /**
@@ -333,13 +314,8 @@ async function analyzeWithAnthropic(imageUrl: string): Promise<Omit<DocumentDete
   }
 
   // The image goes by address, not as base64: spreading a multi-megabyte photo into String.fromCharCode overflowed
-  // the stack, so that route failed on any full-size photo before the model was asked. A photo in public storage
-  // is asked for as a 1,600 px render (the address heic_render_url() builds): the model cannot read a HEIC
-  // original (400 "file format is invalid or unsupported", measured 2026-11-20) and reads the render in 3 to 8 s.
-  const modelUrl = imageUrl.includes('/storage/v1/object/public/') && !imageUrl.includes('?')
-    ? imageUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') +
-      '?width=1600&height=1600&resize=contain&quality=80'
-    : imageUrl;
+  // the stack. imageUrl is already the model address (analyzeDocument renders it once for both providers).
+  const modelUrl = imageUrl;
 
   const prompt = `Analyze this image for sensitive vehicle documents.
 
@@ -398,24 +374,5 @@ Return ONLY valid JSON:
     throw new Error(`Anthropic returned no text (stop_reason ${data.stop_reason ?? 'unknown'})`);
   }
 
-  // Extract JSON from response (Claude sometimes wraps in markdown)
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  let result;
-  try {
-    result = JSON.parse(jsonMatch ? jsonMatch[0] : content);
-  } catch {
-    throw new Error(`Anthropic answer was not JSON (stop_reason ${data.stop_reason ?? 'unknown'})`);
-  }
-  if (typeof result?.is_sensitive !== 'boolean') {
-    throw new Error('Anthropic answer has no is_sensitive verdict');
-  }
-
-  return {
-    is_sensitive: result.is_sensitive || false,
-    document_type: result.document_type || null,
-    confidence: result.confidence || 0,
-    extracted_data: result.extracted_data || {},
-    raw_text: result.raw_text || ''
-  };
+  return parseVerdict(content, 'Anthropic', `stop_reason ${data.stop_reason ?? 'unknown'}`);
 }
-
