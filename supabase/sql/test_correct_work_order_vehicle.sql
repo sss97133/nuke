@@ -3,7 +3,7 @@
 --   createdb dm_refinement_wo_vehicle
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_wo_vehicle -f supabase/sql/test_correct_work_order_vehicle.sql
 -- Proof: the service role moves a work order for an actor tied to both vehicles, writing one journal row (old/new vehicle,
--- reason, evidence, actor, the metadata keys as they were) and rewriting only vehicle_id and the four metadata keys; the
+-- reason, evidence, actor, the metadata keys as they were) and rewriting only vehicle_id and the four vehicle metadata keys; the
 -- undo is the same call pointed back and names the first row; anon, other roles, a signed-in caller acting as someone else
 -- or unable to edit both vehicles, and an actor not tied to both are refused; a blank reason, empty evidence, a no-op move,
 -- a missing / merged / deleted target, a requested job, a parent/child pair and every class of row bound to the current
@@ -238,6 +238,10 @@ SELECT pg_temp.ok('a signed-in user acting in someone else''s name is refused',
   pg_temp.raises(format('SELECT correct_work_order_vehicle(%L, %L, %L, %L, %L)', :W1, '00000000-0000-0000-0000-0000000000a1', 'a reason long enough', :EV, :OWNER)) = '42501');
 SELECT pg_temp.ok('a signed-in user who edits neither vehicle is refused',
   pg_temp.raises(format('SELECT correct_work_order_vehicle(%L, %L, %L, %L, %L)', :W1, '00000000-0000-0000-0000-0000000000a1', 'a reason long enough', :EV, :OTHER)) = '42501');
+SELECT pg_temp.ok('a signed-in stranger learns nothing: a missing work order, a no-op and a dead target all answer 42501',
+  pg_temp.raises(format('SELECT correct_work_order_vehicle(%L, %L, %L, %L, %L)', '00000000-0000-0000-0000-000000000999', '00000000-0000-0000-0000-0000000000a4', 'a reason long enough', :EV, :OTHER)) = '42501'
+  AND pg_temp.raises(format('SELECT correct_work_order_vehicle(%L, %L, %L, %L, %L)', :W1, '00000000-0000-0000-0000-0000000000a2', 'a reason long enough', :EV, :OTHER)) = '42501'
+  AND pg_temp.raises(format('SELECT correct_work_order_vehicle(%L, %L, %L, %L, %L)', :W1, '00000000-0000-0000-0000-0000000000b2', 'a reason long enough', :EV, :OTHER)) = '42501');
 SELECT set_config('test.uid', '00000000-0000-0000-0000-00000000f001', false);
 SELECT pg_temp.ok('a signed-in user who edits the target but only has access to the current vehicle is refused',
   pg_temp.raises(format('SELECT correct_work_order_vehicle(%L, %L, %L, %L, %L)', :W1, '00000000-0000-0000-0000-0000000000a1', 'a reason long enough', :EV, :OWNER)) = '42501');
@@ -302,9 +306,10 @@ SELECT pg_temp.ok('one journal row: old/new vehicle, trimmed reason, evidence, a
          AND c.metadata_before = jsonb_build_object('vehicle_id_old', '00000000-0000-0000-0000-0000000000a1',
            'vehicle_id_new', '00000000-0000-0000-0000-0000000000a2', 'vehicle_id_corrected_at', '2026-04-29', 'correction_source', 'session_verbal')
        FROM work_order_scalar_corrections c, pg_temp.first f WHERE c.column_name = 'vehicle_id'));
-SELECT pg_temp.ok('metadata keys describe the new move and point at the journal; other keys kept',
+SELECT pg_temp.ok('vehicle metadata keys describe the new move and point at the journal; correction_source and other keys kept',
   (SELECT w.metadata ->> 'vehicle_id_old' = '00000000-0000-0000-0000-0000000000a2' AND w.metadata ->> 'vehicle_id_new' = '00000000-0000-0000-0000-0000000000a1'
-          AND w.metadata ->> 'correction_source' = 'work_order_scalar_corrections:' || (f.r ->> 'correction_id')
+          AND w.metadata ->> 'vehicle_id_correction_ref' = 'work_order_scalar_corrections:' || (f.r ->> 'correction_id')
+          AND w.metadata ->> 'correction_source' = 'session_verbal'
           AND w.metadata ->> 'vehicle_id_corrected_at' ~ '^\d{4}-\d\d-\d\dT' AND w.metadata ->> 'job_ref' = 'kept'
      FROM work_orders w, pg_temp.first f WHERE w.id = :W1));
 SELECT pg_temp.ok('only vehicle_id, metadata and updated_at changed; the estimate trigger left the totals as they were',
@@ -324,7 +329,7 @@ SELECT pg_temp.ok('the undo moves it back and its row names the first correction
   AND (SELECT (u.r ->> 'reverses_correction_id') = (f.r ->> 'correction_id') FROM pg_temp.undo u, pg_temp.first f)
   AND (SELECT c.reverses_correction_id = (f.r ->> 'correction_id')::uuid AND c.old_ref = '00000000-0000-0000-0000-0000000000a1'
          AND c.new_ref = '00000000-0000-0000-0000-0000000000a2'
-         AND c.metadata_before ->> 'correction_source' = 'work_order_scalar_corrections:' || (f.r ->> 'correction_id')
+         AND c.metadata_before ->> 'vehicle_id_correction_ref' = 'work_order_scalar_corrections:' || (f.r ->> 'correction_id')
        FROM work_order_scalar_corrections c, pg_temp.undo u, pg_temp.first f WHERE c.id = (u.r ->> 'correction_id')::uuid)
   AND (SELECT count(*) FROM work_order_scalar_corrections WHERE column_name = 'vehicle_id') = 2);
 SELECT pg_temp.ok('a move to a third vehicle is not an undo',

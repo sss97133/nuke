@@ -8,8 +8,9 @@
 --   actor_user_id           the person the correction is made for
 --   writer                  'correct_work_order_vehicle'
 --   reverses_correction_id  set when this move is the exact reverse of the latest move (the undo)
---   metadata_before         the work order's vehicle_id_old / vehicle_id_new / vehicle_id_corrected_at / correction_source
---                           keys as they were, since the writer rewrites them to describe the new move
+--   metadata_before         the work order's vehicle_id_old / vehicle_id_new / vehicle_id_corrected_at /
+--                           vehicle_id_correction_ref keys as they were (and correction_source, read only), since the
+--                           writer rewrites the four vehicle keys to describe the new move
 -- The 21 existing totals rows keep passing the widened checks; migration_version on a vehicle row is this migration's
 -- version (the code that made the change). The table stays service-read-only and append-only.
 --
@@ -36,9 +37,12 @@
 --     work_order_evidence_images, work_order_resource_specifications / _fulfillments / _attestations, project_economics,
 --     purchase_orders, generated_invoices, supplier_invites, facility_reservations, actor_capability_basis, and the views
 --     work_order_receipt_unified (wo.vehicle_id) and vehicle_timeline_events (timeline_events, refused above).
---   - Writes one journal row, then updates work_orders.vehicle_id and the four metadata keys
---     (correction_source = 'work_order_scalar_corrections:<id>'), and raises if any other column changed in the update
+--   - Writes one journal row, then updates work_orders.vehicle_id and the four vehicle metadata keys
+--     (vehicle_id_correction_ref = 'work_order_scalar_corrections:<id>'). It never writes correction_source, which hand
+--     corrections used for other keys too. It raises if any other column changed in the update
 --     (calculate_work_order_estimate runs on every UPDATE).
+--   - Undo window: the undo is refused like any move once a quote, invoice, payment or other signed row lands on the
+--     work order, so check the move before issuing any of those.
 --   - Undo: call it again pointing back. When the latest vehicle move of the work order is the exact reverse, the new row's
 --     reverses_correction_id names it.
 -- Contract test: supabase/sql/test_correct_work_order_vehicle.sql (PG17).
@@ -86,7 +90,8 @@ AS $function$
 DECLARE
   c_writer CONSTANT text := 'correct_work_order_vehicle';
   c_version CONSTANT text := '20261121233000';
-  c_meta_keys CONSTANT text[] := ARRAY['vehicle_id_old', 'vehicle_id_new', 'vehicle_id_corrected_at', 'correction_source'];
+  c_meta_keys CONSTANT text[] := ARRAY['vehicle_id_old', 'vehicle_id_new', 'vehicle_id_corrected_at', 'vehicle_id_correction_ref',
+    'correction_source'];
   -- Lifecycle writers key their Sign observations '<kind>:' || work order id (live pg_proc, 2026-11-21).
   c_sign_kinds CONSTANT text[] := ARRAY['work_order_quote', 'work_order_quote_issue', 'work_order_change_order',
     'work_order_invoice', 'work_order_lifecycle', 'work_order_part_approval', 'work_order_evidence',
@@ -127,9 +132,19 @@ BEGIN
 
   SELECT * INTO v_old FROM public.work_orders WHERE id = p_work_order_id FOR UPDATE;
   IF NOT FOUND THEN
+    IF v_role = 'authenticated' THEN
+      RAISE EXCEPTION '%: you must be the actor and able to edit both vehicles', c_writer USING ERRCODE = '42501';
+    END IF;
     RAISE EXCEPTION '%: work order % not found', c_writer, p_work_order_id USING ERRCODE = 'P0002';
   END IF;
   v_from := v_old.vehicle_id;
+  -- The caller check comes before any answer that would reveal the work order's vehicle or the target's state.
+  IF v_role = 'authenticated' THEN
+    IF v_uid IS NULL OR p_actor IS DISTINCT FROM v_uid OR v_from IS NULL
+       OR NOT public.user_can_edit_vehicle(v_from, v_uid) OR NOT public.user_can_edit_vehicle(p_to_vehicle_id, v_uid) THEN
+      RAISE EXCEPTION '%: you must be the actor and able to edit both vehicles', c_writer USING ERRCODE = '42501';
+    END IF;
+  END IF;
   IF v_from IS NULL THEN
     RAISE EXCEPTION '%: work order % has no vehicle; this writer moves, it does not attach', c_writer, p_work_order_id
       USING ERRCODE = '22023';
@@ -142,13 +157,8 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION '%: target vehicle % is missing, merged or deleted', c_writer, p_to_vehicle_id USING ERRCODE = '22023';
   END IF;
-
-  IF v_role = 'authenticated' THEN
-    IF v_uid IS NULL OR p_actor IS DISTINCT FROM v_uid
-       OR NOT public.user_can_edit_vehicle(v_from, v_uid) OR NOT public.user_can_edit_vehicle(p_to_vehicle_id, v_uid) THEN
-      RAISE EXCEPTION '%: you must be the actor and able to edit both vehicles', c_writer USING ERRCODE = '42501';
-    END IF;
-  ELSIF NOT public.vehicle_user_has_access(v_from, p_actor) OR NOT public.vehicle_user_has_access(p_to_vehicle_id, p_actor) THEN
+  IF v_role = 'service_role' AND (NOT public.vehicle_user_has_access(v_from, p_actor)
+      OR NOT public.vehicle_user_has_access(p_to_vehicle_id, p_actor)) THEN
     RAISE EXCEPTION '%: actor % is not tied to both vehicles', c_writer, p_actor USING ERRCODE = '42501';
   END IF;
 
@@ -211,7 +221,7 @@ BEGIN
          metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
            'vehicle_id_old', v_from, 'vehicle_id_new', p_to_vehicle_id,
            'vehicle_id_corrected_at', to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-           'correction_source', 'work_order_scalar_corrections:' || v_id::text)
+           'vehicle_id_correction_ref', 'work_order_scalar_corrections:' || v_id::text)
    WHERE id = p_work_order_id
   RETURNING * INTO v_new;
 
@@ -230,7 +240,7 @@ REVOKE ALL ON FUNCTION public.correct_work_order_vehicle(uuid, uuid, text, jsonb
 GRANT EXECUTE ON FUNCTION public.correct_work_order_vehicle(uuid, uuid, text, jsonb, uuid) TO authenticated, service_role;
 
 COMMENT ON FUNCTION public.correct_work_order_vehicle(uuid, uuid, text, jsonb, uuid) IS
-  'Moves a work order to another live vehicle with a reason, cited evidence and an actor; journals old/new vehicle in work_order_scalar_corrections (append-only) and rewrites the metadata vehicle_id_old/new/corrected_at/correction_source keys. Undo = call it again pointing back (reverses_correction_id). Refuses requested jobs, parent/child work orders and work orders with rows carrying their own vehicle copy or signed history. Service role for an actor tied to both vehicles, or the signed-in actor who can edit both.';
+  'Moves a work order to another live vehicle with a reason, cited evidence and an actor; journals old/new vehicle in work_order_scalar_corrections (append-only) and rewrites the metadata vehicle_id_old/new/corrected_at/correction_ref keys (never correction_source). Undo = call it again pointing back (reverses_correction_id). Refuses requested jobs, parent/child work orders and work orders with rows carrying their own vehicle copy or signed history. Service role for an actor tied to both vehicles, or the signed-in actor who can edit both.';
 
 UPDATE public.pipeline_registry
    SET description = 'Audit rows of scalar corrections to work_orders: totals by the reviewed migration 20261020000500; vehicle moves by correct_work_order_vehicle (20261121233000).',
