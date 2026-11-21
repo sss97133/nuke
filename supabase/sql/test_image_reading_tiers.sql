@@ -1845,6 +1845,37 @@ DO $$ DECLARE img uuid; a uuid; b uuid; c uuid; lo uuid; hi uuid; r jsonb; thin 
  ASSERT (SELECT is_superseded AND superseded_by=a FROM vehicle_observations WHERE id=b) AND (SELECT NOT is_superseded FROM vehicle_observations WHERE id=a), 'and is replaced by the one that has';
  RAISE NOTICE 'PASS: thin readings replace each other in the ledger''s order only: the newest posted stands alone, in any projection order';
 END $$;
+-- Rule 3 replaces only the keyed children of the readings it replaces. The landing reading's own child, and the child of a reading
+-- that is not automatic, stay current even when another reading of the photo is superseded in the same projection.
+DO $$ DECLARE img uuid; a uuid; b uuid; x uuid; rv uuid; ca uuid; cb uuid; cx uuid; crv uuid; r jsonb; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) LIMIT 1);
+  thin2 jsonb := (SELECT jsonb_array_elements(tt_accepted()) OFFSET 1 LIMIT 1); BEGIN
+ -- thin over thin, and the newer reading was keyed before its landing finished
+ img := tt_image();
+ a := tt_obs(img,'subscription automatic',thin); PERFORM project_reviewed_image_analysis(a);
+ ca := tt_child(img,a);
+ b := tt_obs(img,'subscription automatic',thin2);
+ cb := tt_child(img,b);
+ r := project_reviewed_image_analysis(b);
+ ASSERT r->>'superseded_readings'='1', r::text;
+ ASSERT (SELECT is_superseded AND superseded_by=b FROM vehicle_observations WHERE id=a) AND (SELECT is_superseded AND superseded_by=b FROM vehicle_observations WHERE id=ca),
+   'the replaced reading and its child are superseded';
+ ASSERT (SELECT NOT is_superseded AND superseded_by IS NULL AND lineage_chain IS NULL FROM vehicle_observations WHERE id=cb), 'the landing reading''s own child stays current';
+ -- a reviewed reading lands on a photo that holds an automatic reading and a reviewed reading posted but not yet projected, each keyed
+ img := tt_image();
+ a := tt_obs(img,'subscription automatic',thin); PERFORM project_reviewed_image_analysis(a);
+ ca := tt_child(img,a);
+ x := tt_obs(img,'caller-byok subscription',tt_rich());
+ cx := tt_child(img,x);
+ rv := tt_obs(img,'caller-byok subscription',tt_rich('engine_bay'));
+ crv := tt_child(img,rv);
+ PERFORM project_reviewed_image_analysis(rv);
+ ASSERT (SELECT is_superseded AND superseded_by=rv FROM vehicle_observations WHERE id=a) AND (SELECT is_superseded AND superseded_by=rv FROM vehicle_observations WHERE id=ca),
+   'the automatic reading and its child are superseded by the reviewed landing';
+ ASSERT (SELECT NOT is_superseded FROM vehicle_observations WHERE id=x) AND (SELECT NOT is_superseded AND superseded_by IS NULL FROM vehicle_observations WHERE id=cx),
+   'a reviewed reading posted beside it, and that reading''s child, are left alone';
+ ASSERT (SELECT NOT is_superseded AND superseded_by IS NULL FROM vehicle_observations WHERE id=crv), 'the landing reviewed reading''s own child stays current';
+ RAISE NOTICE 'PASS: Rule 3 supersedes only the children of the readings it replaces';
+END $$;
 
 -- ===== the config row is what keeps a reviewed producer working
 DO $$ DECLARE img uuid; img_r uuid; img_t uuid; t1 uuid; c1 uuid; t2 uuid; thin jsonb := (SELECT jsonb_array_elements(tt_accepted()) OFFSET 1 LIMIT 1); BEGIN
