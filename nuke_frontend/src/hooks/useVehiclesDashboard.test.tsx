@@ -50,7 +50,7 @@ vi.mock('../lib/supabase', () => ({ supabase: {
   },
 } }));
 
-import { resolveGarageRelationships, useVehiclesDashboard } from './useVehiclesDashboard';
+import { includeGarageRecords, resolveGarageRelationships, useVehiclesDashboard } from './useVehiclesDashboard';
 import { GarageVehicleCard } from '../components/vehicles/GarageVehicleCard';
 import GarageTab from '../components/garage/GarageTab';
 
@@ -528,4 +528,15 @@ it('loads the garage when direct purchase-price reads are denied', async () => {
   expect(state.vehicles).toHaveLength(2);
   expect(state.vehicles.every(vehicle => vehicle.purchase_price === null)).toBe(true);
   expect(state.vehicles[0].estimated_value).toBe(12000);
+});
+
+it('labels a garage record with the relationship get_user_garage states, keeping owner-only rows under review', () => {
+  const relationships = new Map();
+  includeGarageRecords(relationships, ['consigned', 'previously_owned', 'documenting', 'contributor', 'profile_record', 'owner']
+    .map(relationship => ({ vehicle_id: relationship, relationship })));
+  expect(Object.fromEntries([...relationships].map(([id, rel]) => [id, [rel.type, rel.source]]))).toEqual({
+    consigned: ['CONSIGNED', 'account_record'], previously_owned: ['PREVIOUSLY OWNED', 'account_record'],
+    documenting: ['DOCUMENTING', 'account_record'], contributor: ['CONTRIBUTOR', 'contributor'],
+    profile_record: ['PROFILE RECORD', 'profile_record'], owner: ['RELATIONSHIP REVIEW', 'account_record'],
+  });
 });

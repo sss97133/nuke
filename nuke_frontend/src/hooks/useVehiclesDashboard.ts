@@ -27,7 +27,8 @@ export type RelationshipType =
   | 'RELATIONSHIP REVIEW'
   | 'OWNERSHIP CLAIM'
   | 'PROFILE RECORD'
-  | 'CONTRIBUTOR';
+  | 'CONTRIBUTOR'
+  | 'DOCUMENTING';
 
 export type ViewMode = 'GRID' | 'LIST' | 'COMPACT';
 export type SortMode = 'RECENT' | 'FIRST' | 'VALUE' | 'HEALTH' | 'NAME';
@@ -178,6 +179,7 @@ const RELATIONSHIP_PRIORITY: RelationshipType[] = [
   'RELATIONSHIP REVIEW',
   'PROFILE RECORD',
   'CONTRIBUTOR',
+  'DOCUMENTING',
   'SALES REPRESENTATIVE',
   'BUSINESS HANDLING',
   'OWNERSHIP CLAIM',
@@ -222,9 +224,16 @@ interface GarageRelationship {
 
 interface GarageRecord { vehicle_id: string; relationship: string; last_activity_at?: string | null }
 
+/** What get_user_garage says the account is to the car, in the garage's words. Its 'owner' outside the
+ * period/verification fold stays under review: a permission row is not title, and it would count toward the total. */
+const RECORD_RELATIONSHIPS: Record<string, RelationshipType> = {
+  profile_record: 'PROFILE RECORD', contributor: 'CONTRIBUTOR',
+  consigned: 'CONSIGNED', previously_owned: 'PREVIOUSLY OWNED', documenting: 'DOCUMENTING',
+};
+
 /** Account membership is broader than ownership. Keep the period/verification
  * fold authoritative while making contributed and created profiles findable. */
-function includeGarageRecords(
+export function includeGarageRecords(
   relationships: Map<string, GarageRelationship>, records: GarageRecord[],
   terminalId: (id: string) => string = id => id,
 ) {
@@ -234,7 +243,7 @@ function includeGarageRecords(
     const created = record.relationship === 'profile_record';
     const contributed = record.relationship === 'contributor';
     relationships.set(id, {
-      type: created ? 'PROFILE RECORD' : contributed ? 'CONTRIBUTOR' : 'RELATIONSHIP REVIEW',
+      type: RECORD_RELATIONSHIPS[record.relationship] ?? 'RELATIONSHIP REVIEW',
       source: created ? 'profile_record' : contributed ? 'contributor' : 'account_record',
       start_date: null, end_date: null,
     });
