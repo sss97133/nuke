@@ -4,14 +4,12 @@
  * already exists (vehicle-agent, record_vehicle_statement, the upload queue,
  * merge_duplicate_vehicles) and happens only on an explicit press.
  */
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from '../PrefetchLink';
 import { Button } from '../ui/button';
 import { supabase } from '../../lib/supabase';
 import { uploadQueue } from '../../services/globalUploadQueue';
 import type { GarageVehicle } from '../../hooks/useVehiclesDashboard';
-
-const VehicleAgentChat = React.lazy(() => import('../../pages/vehicle-profile/VehicleAgentChat'));
 
 export const vehicleName = (vehicle: GarageVehicle) =>
   [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'this vehicle';
@@ -123,16 +121,54 @@ function LogBook({ vehicle }: { vehicle: GarageVehicle }) {
   </div>;
 }
 
+interface Turn { role: 'user' | 'assistant'; content: string; wrote?: number }
+
+/** The car's agent: a text box. The exchange appears above it once there is one. */
+function AgentBox({ vehicle }: { vehicle: GarageVehicle }) {
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const end = useRef<HTMLDivElement>(null);
+  useEffect(() => { end.current?.scrollIntoView?.({ block: 'nearest' }); }, [turns, busy]);
+  const send = async () => {
+    const message = input.trim();
+    if (!message || busy) return;
+    setBusy(true); setError(null); setInput('');
+    const history = turns.map(({ role, content }) => ({ role, content }));
+    setTurns(current => [...current, { role: 'user', content: message }]);
+    try {
+      const { data, error: failed } = await supabase.functions.invoke('vehicle-agent', {
+        body: { vehicle_id: vehicle.id, message, history, allow_writes: true },
+      });
+      if (failed) {
+        const body = await (failed as any)?.context?.json?.().catch(() => null);
+        setError(body?.error ?? failed.message ?? 'The agent did not answer.');
+      } else setTurns(current => [...current, { role: 'assistant', content: data?.reply || 'No answer.', wrote: data?.wrote?.length }]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The agent did not answer.');
+    } finally { setBusy(false); }
+  };
+  return <>
+    {(turns.length > 0 || busy || error) && <div className="garage-agent-turns">
+      {turns.map((turn, index) => <p key={index} data-role={turn.role}>{turn.content}{turn.wrote ? <small> · {turn.wrote} recorded</small> : null}</p>)}
+      {busy && <p data-role="assistant">…</p>}
+      {error && <p role="alert">{error}</p>}
+      <div ref={end} />
+    </div>}
+    <textarea className="garage-agent-input" rows={1} autoFocus value={input} placeholder={`Ask about ${vehicleName(vehicle)}`}
+      aria-label={`Ask the agent about ${vehicleName(vehicle)}`}
+      onChange={event => setInput(event.target.value)}
+      onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} />
+  </>;
+}
+
 export function GarageSheetPanel({ sheet, onClose }: { sheet: GarageSheet; onClose: () => void }) {
   const { vehicle, kind } = sheet;
-  return <aside className="garage-sheet" onKeyDown={event => { if (event.key === 'Escape') onClose(); }} role="dialog" aria-label={`${kind === 'agent' ? 'Agent' : 'Log book'} for ${vehicleName(vehicle)}`}>
-    <header>
-      <div><h2>{kind === 'agent' ? 'Agent' : 'Log book'}</h2><p>{vehicleName(vehicle)}{vehicle.vin ? ` · ${vehicle.vin}` : ''}</p></div>
-      <Button variant="secondary" type="button" onClick={onClose}>Close</Button>
-    </header>
-    {kind === 'agent'
-      ? <Suspense fallback={<p className="garage-sheet-note">Opening the agent…</p>}><VehicleAgentChat vehicleId={vehicle.id} defaultCollapsed={false} /></Suspense>
-      : <LogBook vehicle={vehicle} />}
+  return <aside className="garage-sheet" data-kind={kind} onKeyDown={event => { if (event.key === 'Escape') onClose(); }}
+    role="dialog" aria-label={`${kind === 'agent' ? 'Agent' : 'Log book'} for ${vehicleName(vehicle)}`}>
+    <button type="button" className="garage-sheet-close" aria-label="Close" onClick={onClose}>×</button>
+    {kind === 'agent' ? <AgentBox vehicle={vehicle} /> : <LogBook vehicle={vehicle} />}
   </aside>;
 }
 

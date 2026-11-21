@@ -300,7 +300,7 @@ export function garageAxis(vehicles: GarageVehicle[], now = new Date()): GarageA
   return { start, end: today, weeks: TIMELINE_WEEKS, steps: [at(0.25), at(0.5), at(0.75)], grid };
 }
 
-function MiniBarcode({ vehicle, axis }: { vehicle: GarageVehicle; axis?: GarageAxis }) {
+function MiniBarcode({ vehicle, axis, litDay }: { vehicle: GarageVehicle; axis?: GarageAxis; litDay?: string | null }) {
   const drawn = useMemo(() => {
     const frame = axis ?? garageAxis([vehicle]);
     const cells: { key: string; x: number; y: number; level: number; title: string }[] = [];
@@ -319,6 +319,9 @@ function MiniBarcode({ vehicle, axis }: { vehicle: GarageVehicle; axis?: GarageA
   }, [vehicle, axis]);
 
   const { frame, cells } = drawn;
+  // The day of the photo showing in the card's viewer, when it falls inside the window.
+  const litAt = litDay ? Date.parse(`${litDay}T00:00:00Z`) : NaN;
+  const litIndex = Number.isFinite(litAt) && litAt >= frame.start && litAt <= frame.end ? Math.round((litAt - frame.start) / DAY_MS) : null;
   const label = `${cells.length} active ${cells.length === 1 ? 'day' : 'days'} recorded in the last year`;
   return (
     <svg className="garage-barcode" role="img" aria-label={label}
@@ -327,6 +330,7 @@ function MiniBarcode({ vehicle, axis }: { vehicle: GarageVehicle; axis?: GarageA
       {cells.map(cell => (
         <rect key={cell.key} x={cell.x} y={cell.y} width={0.84} height={0.84} rx={0.15} data-level={cell.level}><title>{cell.title}</title></rect>
       ))}
+      {litIndex != null && <rect className="garage-barcode-lit" x={Math.floor(litIndex / 7) - 0.08} y={(litIndex % 7) - 0.08} width={1} height={1} rx={0.2} />}
     </svg>
   );
 }
@@ -566,16 +570,22 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
   const [vinCopied, setVinCopied] = useState(false);
   // The car's other photos load the first time the pointer or a finger reaches the cover;
   // the reel is a native scroll-snap strip, so a two-finger swipe flips through them.
-  const [reel, setReel] = useState<string[]>([]);
+  const [reel, setReel] = useState<{ url: string; day: string | null }[]>([]);
+  const [coverDay, setCoverDay] = useState<string | null>(null);
   const [frame, setFrame] = useState(0);
   const reelAsked = useRef(false);
   const loadReel = useCallback(() => {
     if (reelAsked.current || !vehicle.resolved_image_url) return;
     reelAsked.current = true;
     // The shared gallery reader: the display gate, and the public source for a signed-out visitor.
-    fetchVehicleImages<{ image_url: string; is_sensitive: boolean | null }>(vehicle.id, 'image_url, is_sensitive', { maxRows: 12, includeMismatchFilter: true })
-      .then(rows => setReel([...new Set(rows.filter(row => !row.is_sensitive).map(row => row.image_url))]
-        .filter(url => typeof url === 'string' && url && url !== vehicle.resolved_image_url)))
+    fetchVehicleImages<{ image_url: string; is_sensitive: boolean | null; taken_at: string | null }>(vehicle.id, 'image_url, is_sensitive, taken_at', { maxRows: 12, includeMismatchFilter: true })
+      .then(rows => {
+        const seen = new Set<string>();
+        const shown = rows.filter(row => !row.is_sensitive && typeof row.image_url === 'string' && row.image_url && !seen.has(row.image_url) && seen.add(row.image_url))
+          .map(row => ({ url: row.image_url, day: row.taken_at ? row.taken_at.slice(0, 10) : null }));
+        setCoverDay(shown.find(row => row.url === vehicle.resolved_image_url)?.day ?? null);
+        setReel(shown.filter(row => row.url !== vehicle.resolved_image_url));
+      })
       .catch(() => { reelAsked.current = false; });
   }, [vehicle.id, vehicle.resolved_image_url]);
   const title = formatVehicleTitle(vehicle);
@@ -642,7 +652,7 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
                 !vehicle.image_count && <span className="garage-card-photo-empty">No photo yet</span>
               )}
             </Link>
-            {reel.map(url => (
+            {reel.map(({ url }) => (
               <Link key={url} to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
                 <img src={sharedOptimizeImageUrl(url, 'medium') || url} alt="" width={600} height={450} loading="lazy" decoding="async" />
               </Link>
@@ -687,13 +697,13 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
           </div>
           {/* One lane, most important first; what the card's width cannot hold drops off the end. */}
           <div className="garage-card-lane">
-            <span title={relationshipTooltip(vehicle)}>{relationship}</span>
-            {active && <span>{active}</span>}
-            {(header?.facets ?? []).map(facet => <span key={facet.dimension}>{facet.label}</span>)}
+            <Link to={`/vehicle/${vehicle.id}`} title={relationshipTooltip(vehicle)}>{relationship}</Link>
+            {active && <Link to={`/vehicle/${vehicle.id}`} title="Open this car's timeline">{active}</Link>}
+            {(header?.facets ?? []).map(facet => <Link key={facet.dimension} to={`/search?q=${encodeURIComponent(facet.label)}`} title={`Find other vehicles: ${facet.label}`}>{facet.label}</Link>)}
             {actions.map(action => <button key={action.label} type="button" onClick={action.onPress}>{action.label}</button>)}
           </div>
 
-          <MiniBarcode vehicle={vehicle} axis={axis} />
+          <MiniBarcode vehicle={vehicle} axis={axis} litDay={frame === 0 ? coverDay : reel[frame - 1]?.day} />
           {(span || counts.length > 0) && (
             <p className="garage-card-record">
               {span && <span className="garage-card-span">{span}</span>}

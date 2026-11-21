@@ -50,7 +50,7 @@
 /* Grid card: photo, car, timeline, facts on record. */
 .garage-view-grid { gap: 16px; }
 .garage-card { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1); }
-.garage-vehicle-card:hover .garage-card, .garage-vehicle-card:focus-within .garage-card { border-color: var(--border-focus); }
+.garage-vehicle-card:hover .garage-card, .garage-vehicle-card:focus-within .garage-card { border-color: color-mix(in srgb, var(--text) 28%, transparent); }
 .garage-card-photo { position: relative; aspect-ratio: 4 / 3; background: var(--bg); overflow: hidden; display: flex; align-items: center; justify-content: center; }
 .garage-card-reel { position: absolute; inset: 0; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
 .garage-card-reel::-webkit-scrollbar { display: none; }
@@ -92,16 +92,30 @@
 .garage-card-slot { position: relative; min-width: 0; border-radius: var(--radius-lg); }
 .garage-card-slot[data-drop] { outline: 2px dashed var(--accent); outline-offset: 3px; }
 .garage-card-slot[data-merge-pick] { cursor: copy; outline: 1px dashed var(--border-focus); outline-offset: 3px; }
-.garage-menu { position: absolute; z-index: 30; width: 244px; padding: 6px; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
+.garage-menu { position: absolute; z-index: 30; width: 244px; padding: 6px; display: flex; flex-direction: column; border-radius: 16px; }
 .garage-menu-title { margin: 0; padding: 6px 10px 8px; color: var(--text-secondary); font-size: var(--text-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .garage-menu :is(button, a) { min-height: 36px; padding: 6px 10px; display: flex; align-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text); font: var(--text-callout)/1.3 var(--font-family); text-align: left; text-decoration: none; cursor: pointer; }
 .garage-menu :is(button, a):is(:hover, :focus-visible) { background: var(--bg); outline: none; }
-.garage-sheet { position: absolute; z-index: 20; right: 8px; bottom: 8px; width: min(360px, calc(100% - 16px)); max-height: min(440px, calc(100% - 16px)); overflow-y: auto; box-sizing: border-box; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); border: 1px solid var(--border-focus); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); }
-.garage-sheet header h2 { font-size: 16px; }
-/* A folded corner that shows on roll-over and opens the car's agent. */
-.garage-page .garage-card-corner { position: absolute; z-index: 10; right: 0; bottom: 0; width: 34px; height: 34px; min-width: 0; min-height: 0; padding: 0; border: 0; border-bottom-right-radius: var(--radius-lg); background: linear-gradient(135deg, transparent 50%, var(--accent) 50%); opacity: 0; cursor: pointer; transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+/* Glass, on the card: clear while the pointer is on it, fainter once it leaves. */
+.garage-sheet, .garage-menu { background: color-mix(in srgb, var(--surface) 58%, transparent); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); border: 1px solid color-mix(in srgb, var(--text) 16%, transparent); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+.garage-sheet { position: absolute; z-index: 20; right: 8px; bottom: 8px; width: min(340px, calc(100% - 16px)); max-height: min(380px, calc(100% - 16px)); box-sizing: border-box; padding: 8px; display: flex; flex-direction: column; gap: 8px; border-radius: 18px; opacity: 0.5; transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+.garage-sheet:is(:hover, :focus-within) { opacity: 1; }
+.garage-sheet[data-kind='log'] { overflow-y: auto; padding: 12px 12px 12px; }
+.garage-page .garage-sheet-close { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; min-width: 0; min-height: 0; padding: 0; border: 1px solid color-mix(in srgb, var(--text) 16%, transparent); border-radius: 50%; background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--text-secondary); font: 14px/1 var(--font-family); cursor: pointer; opacity: 0; transition: opacity 180ms; }
+.garage-sheet:is(:hover, :focus-within) .garage-sheet-close { opacity: 1; }
+.garage-agent-turns { min-height: 0; overflow-y: auto; padding: 4px 6px; display: flex; flex-direction: column; gap: 8px; font-size: var(--text-callout); line-height: 1.4; }
+.garage-agent-turns p { margin: 0; white-space: pre-wrap; }
+.garage-agent-turns p[data-role='user'] { align-self: flex-end; max-width: 88%; padding: 6px 10px; border-radius: 14px; background: color-mix(in srgb, var(--text) 12%, transparent); }
+.garage-agent-turns small { color: var(--text-secondary); }
+.garage-page .garage-agent-input { box-sizing: border-box; width: 100%; min-height: 36px; max-height: 120px; padding: 8px 12px; resize: none; color: var(--text); border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--bg) 45%, transparent); font: var(--text-callout)/1.4 var(--font-family); outline: none; }
+.garage-page .garage-agent-input:focus { border-color: color-mix(in srgb, var(--text) 34%, transparent); }
+/* A folded glass corner that shows on roll-over and opens the car's agent. */
+.garage-page .garage-card-corner { position: absolute; z-index: 10; right: 0; bottom: 0; width: 30px; height: 30px; min-width: 0; min-height: 0; padding: 0; border: 0; border-bottom-right-radius: var(--radius-lg); background: linear-gradient(135deg, transparent 50%, color-mix(in srgb, var(--text) 30%, transparent) 50%); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); clip-path: polygon(100% 0, 100% 100%, 0 100%); opacity: 0; cursor: pointer; transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1); }
 .garage-card-slot:hover .garage-card-corner, .garage-card-corner:focus-visible { opacity: 1; }
-@media (hover: none) { .garage-page .garage-card-corner { opacity: 0.7; } }
+@media (hover: none) { .garage-page .garage-card-corner { opacity: 0.6; } }
+.garage-barcode-lit { fill: none; stroke: var(--text); stroke-width: 0.16; }
+.garage-card-lane a { color: inherit; text-decoration: none; }
+.garage-card-lane a:hover { color: var(--text); text-decoration: underline; }
 .garage-card-vin-none { color: var(--text-secondary); font-size: var(--text-caption); }
 .garage-sheet header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .garage-sheet header h2 { margin: 0; }
