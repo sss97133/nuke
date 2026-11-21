@@ -25,6 +25,9 @@ let mine: ReturnType<typeof ownRows>;
 let vehiclesReply: (() => Promise<Response>) | null = null;
 // how many get_capture_ledger reads answer before the rest fail (the totals re-read after a File)
 let ledgerOk = Infinity;
+// when set, the readers also send the three settled states: their counts on the first day and in the totals, and one
+// frame of each in the day (otherwise the keys are absent, as from the reader before them)
+let settled = false;
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const firebird = { vehicle_id: '00000000-0000-0000-0000-0000000000b1', name: '1973 Pontiac Firebird' };
 const mustang = { vehicle_id: '00000000-0000-0000-0000-0000000000b2', name: '1966 Ford Mustang' };
@@ -47,6 +50,16 @@ const ledger = () => ({ generated_at: '2026-11-07T20:00:00Z', tz: 'UTC', days_to
       vehicles: [], held_reasons: {}, skip_reasons: {} },
   ],
   totals: { taken: 5, on_vehicle: 2, unverified: 0, waiting: 0, held: 1, pulled: 0, private: 1, unsorted: 0, failed: 1, skipped: 2 } });
+const settledLedger = () => { const l = ledger(); const keys = { no_file: 3, non_vehicle: 2, junk: 1 };
+  // the six settled photos are among the photos taken
+  return { ...l, days: [{ ...l.days[0], ...keys, taken: l.days[0].taken + 6 }, l.days[1]], totals: { ...l.totals, ...keys, taken: l.totals.taken + 6 } }; };
+// made-up rows in the reader's shapes: no picture sent (its thumb is the empty address the record holds, as the
+// reader sends it), a reviewed non-vehicle photo, and a test address
+const settledFrames = [
+  { image_id: 'f7', taken_at: '2026-11-04T18:30:00Z', state: 'no_file', reason: 'empty_url_relay', vehicle_id: null, vehicle: null, source: 'capture_relay_ios', file_name: 'IMG_5290.heic', thumb: '', set_key: null, candidates: null },
+  { image_id: 'f8', taken_at: '2026-11-04T18:31:00Z', state: 'non_vehicle', reason: 'reviewed_non_vehicle', vehicle_id: null, vehicle: null, source: 'capture_relay_ios', file_name: 'IMG_5291.heic', thumb: 'https://photos.test/f8.jpg', set_key: null, candidates: null },
+  { image_id: 'f9', taken_at: '2026-11-04T18:32:00Z', state: 'junk', reason: 'placeholder_url', vehicle_id: null, vehicle: null, source: 'capture_relay_ios', file_name: 'IMG_5292.heic', thumb: 'https://placeholder.test/x.jpg', set_key: null, candidates: null },
+];
 // Made-up photos. Set A (f2, f4) and set B (f5) are held sets; f6 is held with no set; a filed photo reads as on_vehicle.
 // Set B's closest cars: his Mustang with no name from the reader, and a Toyota that is not one of his vehicles.
 const setA = [{ vehicle_id: firebird.vehicle_id, name: firebird.name, score: 1.92 }, { vehicle_id: mustang.vehicle_id, name: mustang.name, score: 0.4 }];
@@ -64,6 +77,7 @@ const day = () => ({ day: '2026-11-04', tz: 'UTC',
     held('f4', '2026-11-04T18:03:00Z', 'ios:a:A', 'no_clear_lead', setA, null),
     held('f5', '2026-11-04T18:10:00Z', 'ios:b:B', 'score_below_threshold', setB, 'https://photos.test/f5.jpg'),
     held('f6', '2026-11-04T18:20:00Z', null, 'priors_only', null, 'https://photos.test/f6.jpg'),
+    ...(settled ? settledFrames : []),
   ],
   skipped: [{ asset_id: 'S1', reason: 'no_location', taken_at: '2026-11-04T19:00:00Z', decided_at: '2026-11-04T19:00:05Z', device: 'iPhone' }] });
 
@@ -71,7 +85,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-07T20:30:00Z'));
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network forbidden'); }));
-  requests = []; rescan = null; filed = new Map(); garageFails = false; ledgerOk = Infinity; mine = ownRows(); vehiclesReply = null;
+  requests = []; rescan = null; filed = new Map(); garageFails = false; ledgerOk = Infinity; mine = ownRows(); vehiclesReply = null; settled = false;
   fixture.user = { id: '00000000-0000-0000-0000-0000000000a1' };
   attributeReply = ids => json(ids.length);
   fixture.client = createClient('https://capture-ledger.test', 'synthetic-anon', {
@@ -86,7 +100,7 @@ beforeEach(() => {
       if (method !== 'GET' && method !== 'HEAD' && !(method === 'POST' && allowedRpc.some(name => endpoint === `rpc/${name}`))) {
         return json({ code: '42501', message: 'Synthetic transport denies every write and function' }, 403);
       }
-      if (endpoint === 'rpc/get_capture_ledger') return ledgerOk-- > 0 ? json(ledger()) : json({ code: '57014', message: 'synthetic totals failure' }, 500);
+      if (endpoint === 'rpc/get_capture_ledger') return ledgerOk-- > 0 ? json(settled ? settledLedger() : ledger()) : json({ code: '57014', message: 'synthetic totals failure' }, 500);
       if (endpoint === 'rpc/get_capture_ledger_day') return json(body?.p_day === '2026-11-04' ? day() : { day: body?.p_day, tz: 'UTC', frames: [], skipped: [] });
       if (endpoint === 'vehicles' && method === 'GET') {
         if (vehiclesReply) return vehiclesReply();
@@ -535,4 +549,107 @@ it('a row thumbnail is drawn through the render endpoint, not the original file'
   // a thumbnail outside storage is drawn as it is; a missing one keeps its icon
   expect(host.querySelector('.cl-frame--held img.cl-frame__thumb')?.getAttribute('src')).toBe('https://photos.test/f6.jpg');
   expect(host.querySelector('.cl-frame--private svg')).not.toBeNull();
+});
+
+// ---- photos nothing more happens to: the picture stayed on the phone, not a vehicle photo, not a photo ----
+it('words: a picture kept on the phone names only a reason the phone reports; the other two name none', () => {
+  const base = { image_id: 'x', taken_at: '2026-11-04T18:00:00Z', vehicle_id: null, vehicle: null, source: 'capture_relay_ios', file_name: 'IMG_7.heic', thumb: null, set_key: null, candidates: null } as const;
+  expect(stageLabel({ ...base, state: 'no_file', reason: 'empty_url_relay' })).toBe('Picture kept on the phone');
+  expect(stageLabel({ ...base, state: 'no_file', reason: null })).toBe('Picture kept on the phone');
+  expect(stageLabel({ ...base, state: 'no_file', reason: 'some_new_token' })).toBe('Picture kept on the phone');
+  expect(stageLabel({ ...base, state: 'no_file', reason: 'constructor' })).toBe('Picture kept on the phone');
+  expect(stageLabel({ ...base, state: 'no_file', reason: 'off_site' })).toBe('Picture kept on the phone: outside a work site');
+  expect(stageLabel({ ...base, state: 'no_file', reason: 'no_location' })).toBe('Picture kept on the phone: no location on the photo');
+  expect(liveLine({ ...base, state: 'no_file', reason: 'empty_url_relay' })).toMatch(/^IMG_7 · \d{1,2}:\d{2} [AP]M · only the time and rough place were sent$/);
+  expect(stageLabel({ ...base, state: 'non_vehicle', reason: 'reviewed_non_vehicle' })).toBe('Not a vehicle photo');
+  expect(stageLabel({ ...base, state: 'non_vehicle', reason: 'ok' })).toBe('Not a vehicle photo');
+  expect(liveLine({ ...base, state: 'non_vehicle', reason: 'ok' })).toMatch(/^IMG_7 · .+ · checked: no vehicle in it$/);
+  expect(stageLabel({ ...base, state: 'junk', reason: 'placeholder_url' })).toBe('Not a photo');
+  expect(liveLine({ ...base, state: 'junk', reason: 'placeholder_url' })).toMatch(/^IMG_7 · .+ · no stored picture$/);
+  const t = { taken: 9, on_vehicle: 0, unverified: 0, waiting: 0, held: 0, pulled: 0, private: 0, unsorted: 0, failed: 1, skipped: 1 };
+  expect(summaryLine({ ...t, no_file: 3, non_vehicle: 2, junk: 1 }, [])).toBe('9 photos · 1 skipped on the phone · 3 kept on the phone · 2 not vehicle photos · 1 not a photo · 1 failed');
+  expect(summaryLine({ ...t, no_file: 1, non_vehicle: 1, junk: 2 }, [])).toBe('9 photos · 1 skipped on the phone · 1 kept on the phone · 1 not a vehicle photo · 2 not photos · 1 failed');
+  // a zero or a missing key adds nothing
+  expect(summaryLine({ ...t, no_file: 0 }, [])).toBe('9 photos · 1 skipped on the phone · 1 failed');
+});
+it('a day with the three counts shows them in its pills and the summary; their rows have their own words and no picture where none was sent', async () => {
+  settled = true;
+  const text = await show();
+  expect(text).toContain('11 photos · 2 on 1973 Pontiac Firebird · 1 held · 1 kept private · 2 skipped on the phone · 3 kept on the phone · 2 not vehicle photos · 1 not a photo · 1 failed');
+  const pills = [...host.querySelectorAll('.cl-day')[0].querySelectorAll('.cl-pill')].map(p => p.textContent);
+  expect(pills).toEqual(['2 on 1973 Pontiac Firebird', '1 held', '1 private', '2 skipped', '3 kept on the phone', '2 not vehicle photos', '1 not a photo']);
+  expect([...host.querySelectorAll('.cl-day')[1].querySelectorAll('.cl-pill')].map(p => p.textContent)).toEqual(['1 failed']);
+  await act(async () => button('Wed, Nov 4, 2026')!.click());
+  await settle();
+  const row = (state: string) => host.querySelector<HTMLElement>(`.cl-frame--${state}`)!;
+  expect(row('no_file').querySelector('.k-body')?.textContent).toBe('Picture kept on the phone');
+  expect(row('no_file').textContent).toContain('IMG_5290 ·');
+  expect(row('no_file').textContent).toContain('only the time and rough place were sent');
+  expect(row('non_vehicle').querySelector('.k-body')?.textContent).toBe('Not a vehicle photo');
+  expect(row('junk').querySelector('.k-body')?.textContent).toBe('Not a photo');
+  // no picture was sent, and an address that is not a stored picture is not one: the placeholder; a reviewed photo keeps its picture
+  expect(row('no_file').querySelector('img')).toBeNull();
+  expect(row('junk').querySelector('img')).toBeNull();
+  expect(row('non_vehicle').querySelector('img')?.getAttribute('src')).toBe('https://photos.test/f8.jpg');
+  // nothing more happens to them: an empty circle, never the pending dots or the upload arrow, in the row and on the placeholder
+  const circle = '<circle cx="12" cy="12" r="9.5"></circle>';
+  for (const s of ['no_file', 'non_vehicle', 'junk']) expect(row(s).querySelector('svg.cl-frame__icon')?.innerHTML).toBe(circle);
+  for (const s of ['no_file', 'junk']) expect(row(s).querySelector('.cl-frame__thumb svg')?.innerHTML).toBe(circle);
+  expect(host.textContent).not.toMatch(/Not sorted yet|empty_url_relay|empty url relay|placeholder_url|reviewed_non_vehicle/);
+});
+
+// ---- a pick the filter hides is cleared ----
+const typeFilter = async (list: Element, q: string) => act(async () => {
+  const filter = list.querySelector<HTMLInputElement>('input')!;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(filter, q);
+  filter.dispatchEvent(new Event('input', { bubbles: true }));
+});
+it('a car picked from his list that the filter then hides is no longer picked; clearing the filter brings no confirm line back', async () => {
+  await openDay();
+  const a = blocks()[0];
+  await act(async () => within(a, 'Another vehicle')!.click());
+  const list = a.querySelector('.cl-ask__all')!;
+  await typeFilter(list, 'k10');
+  await act(async () => within(list, '1979 Chevrolet K10')!.click());
+  expect(a.querySelector('.cl-ask__confirm [role="status"]')?.textContent).toBe('File 2 photos to 1979 Chevrolet K10?');
+  // a filter that still shows the car keeps the pick
+  await typeFilter(list, 'chevrolet');
+  expect(a.querySelector('.cl-ask__confirm [role="status"]')?.textContent).toBe('File 2 photos to 1979 Chevrolet K10?');
+  await typeFilter(list, 'ford');
+  expect(choices(list)).toEqual(['1966 Ford Mustang']);
+  expect(a.querySelector('.cl-ask__confirm')).toBeNull();
+  await typeFilter(list, '');
+  expect(choices(list)).toEqual(['1973 Pontiac Firebird', '1979 Chevrolet K10', '1966 Ford Mustang']);
+  expect(a.querySelector('.cl-ask__confirm')).toBeNull();
+  expect(a.querySelectorAll('.cl-ask__choice[aria-pressed="true"]')).toHaveLength(0);
+  // the Mustang is also a closest match, so a pick from the list checks both its rows; the one change of filter that
+  // hides it clears the pick at once (the check is on the filter he just typed, not the one before)
+  await act(async () => within(list, '1966 Ford Mustang')!.click());
+  expect(a.querySelectorAll('.cl-ask__choice[aria-pressed="true"]')).toHaveLength(2);
+  await typeFilter(list, 'k10');
+  expect(a.querySelectorAll('.cl-ask__choice[aria-pressed="true"]')).toHaveLength(0);
+  await typeFilter(list, '');
+  // closing the list takes a pick made there with it too
+  await act(async () => within(list, '1966 Ford Mustang')!.click());
+  expect(a.querySelectorAll('.cl-ask__confirm')).toHaveLength(1);
+  await act(async () => within(a, 'Another vehicle')!.click());
+  await act(async () => within(a, 'Another vehicle')!.click());
+  expect(a.querySelector('.cl-ask__confirm')).toBeNull();
+  expect(a.querySelectorAll('.cl-ask__choice[aria-pressed="true"]')).toHaveLength(0);
+  expect(writes()).toHaveLength(0);
+});
+it('a car picked under "Closest matches" stays picked whatever the filter hides', async () => {
+  await openDay();
+  const a = blocks()[0];
+  await act(async () => within(a, '1973 Pontiac Firebird')!.click());
+  await act(async () => within(a, 'Another vehicle')!.click());
+  const list = a.querySelector('.cl-ask__all')!;
+  await typeFilter(list, 'ford');
+  expect(choices(list)).toEqual(['1966 Ford Mustang']);
+  expect(a.querySelector('.cl-ask__confirm [role="status"]')?.textContent).toBe('File 2 photos to 1973 Pontiac Firebird?');
+  await act(async () => within(a, 'Another vehicle')!.click());
+  expect(a.querySelector('.cl-ask__confirm [role="status"]')?.textContent).toBe('File 2 photos to 1973 Pontiac Firebird?');
+  await tapFile(a);
+  await settle();
+  expect(writes()[0].body).toEqual({ p_image_ids: ['f2', 'f4'], p_vehicle_id: firebird.vehicle_id, p_reason: 'owner_ledger_answer' });
 });

@@ -20,7 +20,10 @@ export const COLOURS = {
   'car-11': [150, 110, 70], 'car-12': [90, 120, 40], 'car-13': [210, 90, 140], 'car-14': [70, 70, 110],
   'f-01': [180, 50, 45], 'f-02': [170, 45, 40], 'f-03': [190, 60, 50], 'f-04': [100, 100, 100], 'f-05': [160, 40, 38], 'f-06': [200, 70, 60],
   'f-07': [60, 110, 170], 'f-08': [80, 130, 180], 'f-09': [140, 140, 60], 'f-10': [40, 120, 60], 'f-11': [50, 130, 70], 'f-12': [60, 140, 80],
+  'f-14': [235, 235, 225],
 };
+// A junk frame's thumb as the reader sends it: a test address, not a stored picture. Nothing may ask for it.
+export const JUNK_THUMB = 'https://placeholder.e2e.test/test-trigger.jpg';
 
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 const crc32 = (buf) => { let c = 0xffffffff; for (const b of buf) c = CRC[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
@@ -107,20 +110,26 @@ export function dayFixture(filed = null, candidates = CANDIDATES) {
       frame(8, '19:00', 'unsorted', { reason: 'not_scored' }),
       frame(9, '21:00', 'held', { reason: 'no_clear_lead', set_key: SET_B, candidates: null }),
       frame(10, '21:02', 'held', { reason: 'no_clear_lead', set_key: SET_B, candidates: null }),
+      // nothing more happens to these: the picture stayed on the phone (its thumb a blank address: the reader passes on
+      // the empty address the record holds), a reviewed non-vehicle photo, a test address
+      frame(13, '22:00', 'no_file', { reason: 'empty_url_relay', thumb: ' ' }),
+      frame(14, '22:05', 'non_vehicle', { reason: 'reviewed_non_vehicle' }),
+      frame(15, '22:10', 'junk', { reason: 'placeholder_url', thumb: JUNK_THUMB }),
     ],
     skipped: [],
   };
 }
 
-const zero = { taken: 0, on_vehicle: 0, unverified: 0, waiting: 0, held: 0, pulled: 0, private: 0, unsorted: 0, failed: 0, duplicate: 0, skipped: 0 };
+const zero = { taken: 0, on_vehicle: 0, unverified: 0, waiting: 0, held: 0, pulled: 0, private: 0, unsorted: 0, failed: 0, duplicate: 0, skipped: 0,
+  no_file: 0, non_vehicle: 0, junk: 0 };
 /** get_capture_ledger: two days, totals following what set A has filed. */
 export function ledgerFixture(filed = null) {
   const moved = filed ? filed.ids.length : 0;
-  const day1 = { ...zero, day: DAY, taken: 12, on_vehicle: 3 + moved, held: 8 - moved, unsorted: 1,
+  const day1 = { ...zero, day: DAY, taken: 15, on_vehicle: 3 + moved, held: 8 - moved, unsorted: 1, no_file: 1, non_vehicle: 1, junk: 1,
     vehicles: [{ vehicle_id: CAR[4].id, name: nameOf(CAR[4]), n: 3 }, ...(filed ? [{ vehicle_id: filed.vehicle.id, name: nameOf(filed.vehicle), n: moved }] : [])]
       .sort((a, b) => b.n - a.n),
     held_reasons: { ...(8 - moved - 2 > 0 ? { score_below_threshold: 8 - moved - 2 } : {}), no_clear_lead: 2 }, skip_reasons: {} };
-  const day2 = { ...zero, day: DAY_BEFORE, taken: 5, on_vehicle: 5, vehicles: [{ vehicle_id: CAR[5].id, name: nameOf(CAR[5]), n: 5 }], held_reasons: {}, skip_reasons: {} };
+  const day2 = { ...zero, day: DAY_BEFORE, taken: 10, on_vehicle: 5, no_file: 3, non_vehicle: 2, vehicles: [{ vehicle_id: CAR[5].id, name: nameOf(CAR[5]), n: 5 }], held_reasons: {}, skip_reasons: {} };
   const totals = Object.fromEntries(Object.keys(zero).map(k => [k, (day1[k] ?? 0) + (day2[k] ?? 0)]));
   return { generated_at: '2026-11-21T18:00:00Z', tz: TZ, days: [day1, day2], days_total: 2, totals, rescan: null,
     last_rescan: { id: '00000000-0000-4000-e000-000000000001', requested_at: '2026-11-20T15:00:00Z', acked_at: '2026-11-20T15:01:00Z', device: 'E2E phone',

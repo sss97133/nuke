@@ -4,7 +4,9 @@
 // picked car and the reason; after a successful File the day and the totals are read again. A partial answer and a
 // refusal (42501) show their lines, on screen and clear of the phone's tab bar. His vehicles are read the phone's way
 // (the vehicles table, five columns, his by user or owner), live records only; a closest car that is not one of them is a muted line, and
-// with no closest car to tap the list of his vehicles opens by default, without scrolling. Screenshots go to E2E_SHOTS_DIR when it is set (none otherwise), at a 390x844
+// with no closest car to tap the list of his vehicles opens by default, without scrolling. A car picked from that list
+// and then hidden by the filter is no longer picked. A photo whose picture stayed on the phone, a reviewed non-vehicle
+// photo and a test address read in their own words, in the rows, the day's pills and the summary. Screenshots go to E2E_SHOTS_DIR when it is set (none otherwise), at a 390x844
 // phone (touch) and a 1280x900 desktop, light and dark.
 // Run: NODE_PATH=/tmp/pw/node_modules node --test e2e/captureLedgerAsk.e2e.mjs
 import { after, before, describe, it } from 'node:test';
@@ -15,7 +17,7 @@ import path from 'node:path';
 import { startDevServer } from './devServer.mjs';
 import { MOCK_HOST, mockSupabase, persona } from './mockSupabase.mjs';
 import {
-  CANDIDATES_MIXED, CANDIDATES_NONE_MINE, CAR, COLOURS, DAY, NOT_MINE, OWNER_ID, SCORES, SET_A, SET_A_IDS, SET_B, TZ, VEHICLES, dayFixture,
+  CANDIDATES_MIXED, CANDIDATES_NONE_MINE, CAR, COLOURS, DAY, JUNK_THUMB, NOT_MINE, OWNER_ID, SCORES, SET_A, SET_A_IDS, SET_B, TZ, VEHICLES, dayFixture,
   ledgerFixture, nameOfCar, solidPng,
 } from './captureLedgerAskFixtures.mjs';
 
@@ -145,7 +147,8 @@ async function noRawOnScreen(page) {
   const text = await page.locator('.cl-page').innerText();
   for (const s of SCORES) assert.ok(!text.includes(String(s)) && !text.includes(s.toFixed(1) + ' '), `score ${s} on screen`);
   for (const k of [SET_A, SET_B, ...SET_A_IDS, ...VEHICLES.map(c => c.id), ...NOT_MINE.map(c => c.vehicle_id)]) assert.ok(!text.includes(k), `raw key ${k} on screen`);
-  for (const w of ['score_below_threshold', 'no_clear_lead', 'not_scored', 'owner_ledger_answer', 'attribute_image_session']) assert.ok(!text.includes(w), `${w} on screen`);
+  for (const w of ['score_below_threshold', 'no_clear_lead', 'not_scored', 'owner_ledger_answer', 'attribute_image_session', 'empty_url_relay',
+    'empty url relay', 'placeholder_url', 'reviewed_non_vehicle', 'no_file', 'non_vehicle']) assert.ok(!text.includes(w), `${w} on screen`);
 }
 
 /** The element is fully on screen: below the top edge and above the phone's fixed tab bar (when it shows). Polls for up
@@ -197,9 +200,9 @@ for (const width of [390, 1280]) {
       assert.match(rowSrc, /\/storage\/v1\/render\/image\/public\/.*\?width=150&quality=75&resize=contain$/);
       // the questions come first in the day, ahead of the photos already filed
       const order = await page.locator('.cl-frames > li').evaluateAll(lis => lis.map(li => li.querySelector('section.cl-ask') ? 'ask' : 'row'));
-      assert.deepEqual(order, ['ask', 'ask', 'row', 'row', 'row', 'row']);
-      // the unsorted frame and the three filed frames are plain rows
-      assert.equal(await page.locator('.cl-frame').count(), 4);
+      assert.deepEqual(order, ['ask', 'ask', 'row', 'row', 'row', 'row', 'row', 'row', 'row']);
+      // the unsorted frame, the three filed frames and the three settled ones are plain rows
+      assert.equal(await page.locator('.cl-frame').count(), 7);
       await noRawOnScreen(page);
       await measure(page, '01-day-open', width);
       await shot(page, '01-day-open', width);
@@ -375,6 +378,77 @@ for (const width of [390, 1280]) {
       await file.click();
       assert.ok(await waitFor(() => writes.length > 0), 'File sent nothing');
       assert.deepEqual(writes[0].args, { p_image_ids: SET_A_IDS, p_vehicle_id: CAR[5].id, p_reason: 'owner_ledger_answer' });
+      await ctx.close();
+    });
+
+    it('a car picked from his list that the filter then hides is no longer picked, and clearing the filter brings nothing back', async () => {
+      const { ctx, page, writes } = await open(width);
+      await openDay(page);
+      await setA(page).getByRole('button', { name: /Another vehicle/ }).click();
+      const filter = setA(page).getByRole('searchbox', { name: /Find a vehicle/ });
+      await filter.fill('chevelle');
+      await setA(page).locator('.cl-ask__all').getByRole('button', { name: nameOfCar(CAR[7]), exact: true }).click();
+      const confirm = setA(page).locator('.cl-ask__confirm');
+      await confirm.getByText(`File 6 photos to ${nameOfCar(CAR[7])}?`).waitFor();
+      await filter.fill('ford');
+      await page.waitForTimeout(200);
+      assert.equal(await confirm.count(), 0, 'the confirm line outlived its row');
+      await filter.fill('');
+      await page.waitForTimeout(200);
+      assert.equal(await setA(page).locator('.cl-ask__all .cl-ask__choice').count(), 14);
+      assert.equal(await confirm.count(), 0, 'clearing the filter brought a hidden pick back');
+      assert.equal(await setA(page).locator('.cl-ask__choice[aria-pressed=true]').count(), 0);
+      // a closest match picked from the list is checked in both its rows; the one filter change that hides it clears it
+      await setA(page).locator('.cl-ask__all').getByRole('button', { name: nameOfCar(CAR[2]), exact: true }).click();
+      await confirm.getByText(`File 6 photos to ${nameOfCar(CAR[2])}?`).waitFor();
+      assert.equal(await setA(page).locator('.cl-ask__choice[aria-pressed=true]').count(), 2);
+      await filter.fill('ford');
+      await page.waitForTimeout(200);
+      assert.equal(await setA(page).locator('.cl-ask__choice[aria-pressed=true]').count(), 0, 'a hidden pick is still checked under Closest matches');
+      assert.equal(await confirm.count(), 0);
+      assert.deepEqual(writes, []);
+      await ctx.close();
+    });
+
+    it('a picture kept on the phone, a non-vehicle photo and a test address read in their own words', async () => {
+      const { ctx, page } = await open(width);
+      const asked = [];
+      page.on('request', (r) => { if (r.url().startsWith(new URL(JUNK_THUMB).origin)) asked.push(r.url()); });
+      await page.locator('.cl-bar').waitFor();
+      const summary = await page.locator('.cl-bar__summary .k-body').innerText();
+      assert.match(summary, / · 4 kept on the phone · 3 not vehicle photos · 1 not a photo$/);
+      const pills = (d) => page.locator('.cl-day').nth(d).locator('.cl-pill').allInnerTexts();
+      assert.deepEqual((await pills(0)).slice(-3), ['1 kept on the phone', '1 not a vehicle photo', '1 not a photo']);
+      assert.deepEqual((await pills(1)).slice(-2), ['3 kept on the phone', '2 not vehicle photos']);
+      await measure(page, '10-settled-pills', width);
+      await shot(page, '10-settled-pills', width);
+      await openDay(page);
+      const row = (state) => page.locator(`.cl-frame--${state}`);
+      assert.equal(await row('no_file').locator('.k-body').innerText(), 'Picture kept on the phone');
+      assert.match(await row('no_file').locator('.k-caption').innerText(), /^IMG_4113 · 2:00 PM · only the time and rough place were sent$/);
+      assert.equal(await row('non_vehicle').locator('.k-body').innerText(), 'Not a vehicle photo');
+      assert.match(await row('non_vehicle').locator('.k-caption').innerText(), /^IMG_4114 · 2:05 PM · checked: no vehicle in it$/);
+      assert.equal(await row('junk').locator('.k-body').innerText(), 'Not a photo');
+      assert.match(await row('junk').locator('.k-caption').innerText(), /^IMG_4115 · 2:10 PM · no stored picture$/);
+      // no picture was sent, and an address that is not a stored picture is not one: the placeholder; the reviewed photo keeps its picture
+      assert.equal(await row('no_file').locator('img').count(), 0);
+      assert.equal(await row('junk').locator('img').count(), 0);
+      assert.equal(await row('non_vehicle').locator('img').count(), 1);
+      // an empty circle (no dots, no arrow) on the placeholder and as the row's icon
+      for (const sel of ['.cl-frame--no_file .cl-frame__thumb svg', '.cl-frame--junk .cl-frame__thumb svg', '.cl-frame--no_file svg.cl-frame__icon'])
+        assert.equal(await page.locator(sel).innerHTML(), '<circle cx="12" cy="12" r="9.5"></circle>', sel);
+      // only the fixture's one unscored frame reads "Not sorted yet"
+      assert.deepEqual(await page.locator('.cl-frame .k-body').filter({ hasText: /^Not sorted yet$/ }).count(), 1);
+      await noRawOnScreen(page);
+      await row('junk').scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollBy(0, 160));
+      await page.waitForTimeout(300);
+      await assertOnScreen(page, '.cl-frame--no_file', 'the kept-on-the-phone row');
+      await assertOnScreen(page, '.cl-frame--junk', 'the not-a-photo row');
+      const m = await measure(page, '10-settled-rows', width, { no_file: '.cl-frame--no_file', junk: '.cl-frame--junk' });
+      assert.equal(m.sideways, false, 'the page scrolls sideways');
+      await shot(page, '10-settled-rows', width);
+      assert.deepEqual(asked, [], 'the test address was asked for');
       await ctx.close();
     });
 
