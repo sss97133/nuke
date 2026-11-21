@@ -45,7 +45,8 @@ vi.mock('../lib/supabase', () => ({ supabase: {
     return Promise.resolve(fixture.rpcHolds[name] ?? fixture.hold).then(() => ({
       data: fixture.fail === name ? null : name === 'get_my_garage_owner_corrections' ? fixture.rows.garage_owner_corrections ?? []
         : name === 'get_first_image_batch' ? (fixture.rows.garage_covers ?? []).filter(row => (params as any).vehicle_ids.includes(row.vehicle_id))
-        : name === 'get_vehicle_contribution_days_batch' ? (fixture.rows.garage_timelines ?? []).filter(row => (params as any).p_vehicle_ids.includes(row.vehicle_id)) : [],
+        : name === 'get_vehicle_contribution_days_batch' ? (fixture.rows.garage_timelines ?? []).filter(row => (params as any).p_vehicle_ids.includes(row.vehicle_id))
+        : name === 'get_vehicle_class_prices' ? (fixture.rows.vehicle_class_prices ?? []).filter(row => (params as any).p_vehicle_ids.includes(row.vehicle_id)) : [],
       error: fixture.fail === name ? { message: 'read failed' } : null,
     }));
   },
@@ -163,8 +164,9 @@ function seedGarage() {
   fixture.rows.vehicles = ['car', 'old'].map(id => ({ id, year: 1970, make: 'Example', model: 'Car', status: 'active',
     current_value: 999999, purchase_price: 5000, image_count: 4, primary_image_url: 'photo',
     created_at: '2025-01-01', updated_at: '2026-01-01' }));
-  fixture.rows.nuke_estimates = ['car', 'old'].map(vehicle_id => ({ vehicle_id, estimated_value: 12000,
-    calculated_at: '2026-10-06T00:00:00Z', comp_method: 'class_stratified', is_stale: false, is_circular: false }));
+  fixture.rows.vehicle_class_prices = ['car', 'old'].map(vehicle_id => ({ vehicle_id, status: 'priced', value: 12000,
+    value_low: 10000, value_high: 14000, n: 6, subject_class: 'build', basis: 'median of 6 sold comps of the same build class',
+    blocked_reason: null, computed_at: '2026-10-06T00:00:00Z' }));
   fixture.rows.garage_covers = ['car', 'old'].map(vehicle_id => ({ vehicle_id, image_url: 'photo' }));
 }
 
@@ -348,12 +350,12 @@ it('refuses broken and cyclic merge chains instead of displaying a misleading em
   await act(async()=>state.refresh());expect(state.error).toContain('vehicle identities unavailable');
 });
 
-it('withholds stale, circular, unqualified and invalid estimates without falling back to paid price', async () => {
+it('withholds blocked and invalid class prices without falling back to paid price', async () => {
   seedGarage();
-  const estimate = { ...fixture.rows.nuke_estimates[0] };
-  for (const change of [{ is_stale: true }, { is_circular: true }, { comp_method: 'canonical' },
-    { estimated_value: 0 }, { estimated_value: null }, { calculated_at: null }]) {
-    fixture.rows.nuke_estimates = [{ ...estimate, ...change }];
+  const estimate = { ...fixture.rows.vehicle_class_prices[0] };
+  for (const change of [{ status: 'blocked', value: null, blocked_reason: 'cohort not yet classified (1 of 15)' },
+    { value: 0 }, { value: null }, { computed_at: null }, { status: 'pending' }]) {
+    fixture.rows.vehicle_class_prices = [{ ...estimate, ...change }];
     await act(async () => { root.render(<Harness />); state?.refresh(); });
     expect(state.vehicles.find(v => v.id === 'car')?.estimated_value).toBeNull();
     expect(state.totalEstimatedValue).toBe(0);
@@ -370,7 +372,7 @@ it('surfaces relationship and vehicle read failures instead of showing an empty 
 });
 
 it('shows the recorded period and unknown estimate without a scalar-value action or ineffective period eject', async () => {
-  seedGarage(); fixture.rows.nuke_estimates = [];
+  seedGarage(); fixture.rows.vehicle_class_prices = [];
   await act(async () => root.render(<Harness />));
   const vehicle = state.vehicles.find(v => v.id === 'old')!;
   await act(async () => root.render(<MemoryRouter><GarageVehicleCard vehicle={vehicle} /></MemoryRouter>));
@@ -490,7 +492,7 @@ it.each(['records', 'error'])('withholds prior viewer %s throughout the next vie
   fixture.rows.garage_owner_corrections = [{ id: 'private-source', vehicle_id: null, observed_at: '2026-10-08',
     correction: { unresolved_vehicle: { label: 'Private prior viewer source', stated_roles: ['shared_interest'] } },
     source_excerpt: 'Synthetic prior viewer testimony.' }];
-  fixture.fail = prior === 'records' ? 'nuke_estimates' : 'vehicle_ownerships';
+  fixture.fail = prior === 'records' ? 'get_vehicle_class_prices' : 'vehicle_ownerships';
   await act(async () => root.render(<Harness />));
   if (prior === 'records') {
     expect(state.vehicles).toHaveLength(2); expect(state.unresolvedSources).toHaveLength(1); expect(state.warnings).not.toEqual([]);
@@ -514,7 +516,7 @@ it.each(['records', 'error'])('withholds prior viewer %s throughout the next vie
 });
 
 it('retains known vehicle relationships when optional estimates fail and reports unavailable coverage', async () => {
-  seedGarage(); fixture.fail = 'nuke_estimates';
+  seedGarage(); fixture.fail = 'get_vehicle_class_prices';
   await act(async () => root.render(<Harness />));
   expect(state.error).toBeNull(); expect(state.vehicles).toHaveLength(2);
   expect(state.vehicles.every(v => v.estimated_value === null)).toBe(true);
@@ -563,15 +565,35 @@ it('labels a garage record with the relationship get_user_garage states, keeping
   });
 });
 
-it('shows a fresh body-held class estimate and the newer of two class estimates, never a class-blind or stale one', async () => {
+it('shows the stored class price, keeps each car\'s reader row for the frame and never reads nuke_estimates', async () => {
   seedGarage();
   fixture.rows.nuke_estimates = [
-    { vehicle_id: 'car', estimated_value: 20000, calculated_at: '2026-07-10T05:00:00Z', comp_method: 'class_stratified_bodied', is_stale: false, is_circular: false },
-    { vehicle_id: 'car', estimated_value: 15000, calculated_at: '2026-06-17T15:00:00Z', comp_method: 'class_stratified', is_stale: false, is_circular: false },
-    { vehicle_id: 'old', estimated_value: 9000, calculated_at: '2026-10-06T00:00:00Z', comp_method: 'canonical', is_stale: false, is_circular: false },
-    { vehicle_id: 'old', estimated_value: 8000, calculated_at: '2026-10-06T00:00:00Z', comp_method: 'class_stratified_bodied', is_stale: true, is_circular: false },
+    { vehicle_id: 'car', estimated_value: 112200, calculated_at: '2026-06-17T15:00:00Z', comp_method: 'class_stratified', is_stale: true, is_circular: false },
+    { vehicle_id: 'old', estimated_value: 38500, calculated_at: '2026-07-10T05:00:00Z', comp_method: 'class_stratified_bodied', is_stale: false, is_circular: false },
+  ];
+  fixture.rows.vehicle_class_prices = [
+    { ...fixture.rows.vehicle_class_prices[0], value: 30500, value_low: 21500, value_high: 39800, n: 24, computed_at: '2026-11-21T08:00:00Z' },
+    { vehicle_id: 'old', status: 'blocked', value: null, value_low: null, value_high: null, n: null, subject_class: null, basis: null,
+      blocked_reason: 'subject build class unknown: no text or paper signal yet (needs vision); not a stock verdict', computed_at: '2026-11-21T08:00:00Z' },
   ];
   await act(async () => root.render(<Harness />));
-  expect(state.vehicles.find(v => v.id === 'car')).toMatchObject({ estimated_value: 20000, estimate_calculated_at: '2026-07-10T05:00:00Z' });
-  expect(state.vehicles.find(v => v.id === 'old')?.estimated_value).toBeNull();
+  expect(state.vehicles.find(v => v.id === 'car')).toMatchObject({ estimated_value: 30500, estimate_calculated_at: '2026-11-21T08:00:00Z',
+    class_price: { status: 'priced', value: 30500, value_low: 21500, value_high: 39800, n: 24 } });
+  expect(state.vehicles.find(v => v.id === 'old')).toMatchObject({ estimated_value: null, class_price: { status: 'blocked' } });
+  expect(fixture.calls.some(call => call[0] === 'nuke_estimates')).toBe(false);
+  const reads = fixture.calls.filter(call => call[0] === 'rpc' && call[1] === 'get_vehicle_class_prices');
+  expect(reads.flatMap(call => call[2].p_vehicle_ids).sort()).toEqual(['car', 'old']);
+});
+
+it('reads class prices in chunks the reader accepts and marks a car with no row as read, not unknown', async () => {
+  seedGarage();
+  const ids = Array.from({ length: 450 }, (_, i) => `extra${String(i).padStart(3, '0')}`);
+  fixture.rows.garage_records = ids.map(vehicle_id => ({ vehicle_id, relationship: 'contributor' }));
+  fixture.rows.vehicles.push(...ids.map(id => ({ ...fixture.rows.vehicles[0], id })));
+  await act(async () => root.render(<Harness />));
+  const reads = fixture.calls.filter(call => call[0] === 'rpc' && call[1] === 'get_vehicle_class_prices');
+  expect(reads.length).toBe(3);
+  expect(reads.every(call => call[2].p_vehicle_ids.length <= 200)).toBe(true);
+  expect(state.vehicles.find(v => v.id === 'extra000')?.class_price).toBeNull();
+  expect(state.vehicles.find(v => v.id === 'car')?.class_price?.status).toBe('priced');
 });
