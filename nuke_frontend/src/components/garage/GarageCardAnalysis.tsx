@@ -154,7 +154,7 @@ export async function readCardAnalysis(vehicleId: string): Promise<AnalysisLine[
     const index = await settle(supabase.rpc('family_price_index_read', { p_brand: placed.brand, p_family_key: placed.family_key }), parseFamilyIndex);
     return index ? { brand: placed.brand, index } : null;
   };
-  const [build, sessions, testimony, depth, questions, familyRead, classPrice, estimate] = await Promise.all([
+  const [build, sessions, testimony, depth, questions, familyRead, estimate] = await Promise.all([
     settle(supabase.rpc('vehicle_build_reconstruction', id),
       data => (data as BuildReconstruction | null)?.version === 1 && (data as BuildReconstruction).totals ? data as BuildReconstruction : null),
     settle(supabase.from('work_sessions').select('session_date, duration_minutes, owner_confirmed_at').eq('vehicle_id', vehicleId).limit(1000),
@@ -163,14 +163,14 @@ export async function readCardAnalysis(vehicleId: string): Promise<AnalysisLine[
     settle(supabase.rpc('get_vehicle_day_depth', id), data => Array.isArray(data) ? data as DayDepthRow[] : null),
     settle(supabase.rpc('vehicle_open_questions', id), data => data && typeof data === 'object' ? data as OpenQuestions : null),
     family().catch(() => null),
-    settle(supabase.rpc('get_class_stratified_price', id), data => data && typeof data === 'object' ? data as ClassPrice : null),
-    // The same stored estimate the card's price reads, so the frame and the card head never disagree.
+    // The stored build-class estimate, the same row the card's price reads. The live reader (get_class_stratified_price)
+    // is not called from the browser: measured 2026-11-20 as a signed-in user it ran 15 s and answered 500.
     settle(supabase.from('nuke_estimates').select('estimated_value, value_low, value_high, calculated_at').eq('vehicle_id', vehicleId)
       .in('comp_method', ['class_stratified', 'class_stratified_bodied']).eq('is_stale', false).eq('is_circular', false)
       .order('calculated_at', { ascending: false }).limit(1),
       data => Array.isArray(data) && data[0] ? data[0] as StoredEstimate : null),
   ]);
-  return analysisLines({ build, sessions, testimony, depth, questions, family: familyRead, classPrice, estimate });
+  return analysisLines({ build, sessions, testimony, depth, questions, family: familyRead, estimate });
 }
 
 /**
