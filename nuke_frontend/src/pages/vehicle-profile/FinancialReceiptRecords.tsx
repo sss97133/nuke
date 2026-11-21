@@ -229,6 +229,15 @@ function ReceiptCollection({ vehicleId, read, work }: { vehicleId: string; read:
   const selectedVendor = vendors.includes(vendor) ? vendor : '';
   const matching = selectedVendor ? rows.filter(receipt => receipt.vendor === selectedVendor) : rows;
   const visible = showAll || selectedVendor ? matching : matching.slice(0, 6);
+  // A link to #build-receipt-pages (a garage card's paper count) lands here once the receipts render: the section
+  // loads after the page, so the browser's own jump to the anchor has already missed it.
+  const landed = useRef(false);
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (landed.current || !rows.length || (hash !== '#build-receipt-pages' && hash !== '#build-receipts')) return;
+    landed.current = true;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [rows.length]);
   return <section id="build-receipts" aria-label="Work and parts receipts" className="vp-receipt-section">
     <div className="vp-receipt-heading"><h3>Work & parts</h3><span>Receipt collection</span></div>
     <p className="vp-receipt-intro">Parts, dated work and the original paper.</p>
