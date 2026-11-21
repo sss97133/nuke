@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { garageFirstDay, garageLastDay, type GarageVehicle, type VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
 import { GarageVehicleCard, garageAxis } from '../vehicles/GarageVehicleCard';
 import { GarageToolbar } from './GarageToolbar';
+import { addFilesToVehicle, GarageCardMenu, GarageMergeBar, GarageSheetPanel, type GarageSheet } from './GarageCardActions';
 import './garage.css';
 
 const CARD_WIDTH_KEY = 'garage-card-width';
@@ -16,6 +17,12 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
   const { vehicles, isLoading, error, warnings = [], viewMode, sortMode, filterMode,
     setViewMode, setSortMode, setFilterMode, refresh, unresolvedSources = [], signedIn } = dashboard;
   const [query, setQuery] = useState('');
+  // A two-finger click on a card opens its actions; files dropped on a card go to that car.
+  const [menu, setMenu] = useState<{ vehicle: GarageVehicle; x: number; y: number } | null>(null);
+  const [sheet, setSheet] = useState<GarageSheet | null>(null);
+  const [merge, setMerge] = useState<{ keeper: GarageVehicle; duplicate: GarageVehicle | null } | null>(null);
+  const [dropOn, setDropOn] = useState<string | null>(null);
+  const hasFiles = (event: React.DragEvent) => [...event.dataTransfer.types].includes('Files');
   // A pinch resizes the cards (more cars or bigger cars), not the browser's magnification.
   const pageRef = useRef<HTMLElement>(null);
   const [cardWidth, setCardWidth] = useState(() => {
@@ -99,11 +106,26 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
           {groups.map(section => <section key={section.key} aria-label={section.label ?? 'Vehicles'}>
             {section.label && <h2 className="garage-section-heading">{section.label} <span>{section.vehicles.length}</span></h2>}
             <div className={`garage-vehicles garage-view-${viewMode.toLowerCase()}`}>
-              {section.vehicles.map(vehicle => <GarageVehicleCard key={vehicle.id} vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} />)}
+              {section.vehicles.map(vehicle => <div key={vehicle.id} className="garage-card-slot"
+                data-drop={dropOn === vehicle.id || undefined} data-merge-pick={merge && !merge.duplicate && merge.keeper.id !== vehicle.id || undefined}
+                onContextMenu={event => { if (!signedIn) return; event.preventDefault(); setMenu({ vehicle, x: event.clientX, y: event.clientY }); }}
+                onClickCapture={event => {
+                  // While a merge is being set up, a press on a card names the duplicate instead of opening it.
+                  if (!merge || merge.duplicate || merge.keeper.id === vehicle.id) return;
+                  event.preventDefault(); event.stopPropagation(); setMerge({ keeper: merge.keeper, duplicate: vehicle });
+                }}
+                onDragOver={event => { if (!signedIn || !hasFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; setDropOn(vehicle.id); }}
+                onDragLeave={() => setDropOn(current => current === vehicle.id ? null : current)}
+                onDrop={event => { if (!signedIn || !hasFiles(event)) return; event.preventDefault(); event.stopPropagation(); setDropOn(null); addFilesToVehicle(vehicle, [...event.dataTransfer.files]); }}>
+                <GarageVehicleCard vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} />
+              </div>)}
             </div>
           </section>)}
         </div>
       </>}
+    {menu && <GarageCardMenu vehicle={menu.vehicle} x={menu.x} y={menu.y} onClose={() => setMenu(null)} onSheet={setSheet} onMerge={keeper => setMerge({ keeper, duplicate: null })} />}
+    {sheet && <GarageSheetPanel key={`${sheet.kind}-${sheet.vehicle.id}`} sheet={sheet} onClose={() => setSheet(null)} />}
+    {merge && <GarageMergeBar keeper={merge.keeper} duplicate={merge.duplicate} viewerId={dashboard.viewerId} onCancel={() => setMerge(null)} onDone={() => { setMerge(null); refresh(); }} />}
   </main>;
 }
 
