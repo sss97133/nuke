@@ -5,16 +5,18 @@
 --
 -- What was wrong: f_ask_active was "sale_status is not terminal", so any vehicles.asking_price became the headline
 -- "Asking" with no listing, no clock and no for-sale mark. Measured on the 138 garage vehicles of the class price store
--- (scripts/data/q.sh): 10 cards headline "asking"; none has a listing URL or a listing date; 6 of them are also marked
+-- (scripts/data/q.sh): 10 cards headline "asking"; none has a listing URL or a listing date (2 have a discovery URL); 6 of them are also marked
 -- not for sale (is_for_sale = false), among them a truck whose asking amount came from a bulk profile import
 -- (profile_origin dropbox_import, description written at import). Two of the 10 are Craigslist rows, which the profile
 -- reader labels "currency unrecorded".
--- Rule (ask_needs_offer_v1): the ask is the current offer only with a source URL, a listing clock (posted, updated or
--- the native seller quote's observed_at), or is_for_sale = true. Otherwise the amount stays in ask_amount / ask_as_of
--- and the headline falls through to bid, then estimate, as before; vehicle_profile_read shows no headline price then
--- and the garage card falls back to the class price when one is stored.
--- Effect: on the 138, 6 cards lose "asking" (4 keep it: marked for sale). Fleet-wide, a 3% TABLESAMPLE of vehicles with
--- a non-terminal asking price found 120 of 6,978 affected, about 1.7% (estimate, about 4,000 vehicles).
+-- Rule (ask_needs_offer_v1): the ask is the current offer only with a source URL, the discovery URL a scraped
+-- classified was found at, a listing clock (posted, updated or the native seller quote's observed_at), or
+-- is_for_sale = true. Otherwise the amount stays in ask_amount / ask_as_of and the headline falls through to bid, then
+-- estimate, as before; vehicle_profile_read shows no headline price then and the garage card falls back to the class
+-- price when one is stored.
+-- Effect: on the 138, 4 cards lose "asking"; 6 keep it (4 marked for sale, 2 Craigslist rows with a discovery URL).
+-- Fleet-wide, a 3% block sample of 7,179 vehicles with a non-terminal asking price found 14 affected, about 0.2%
+-- (estimate, a few hundred vehicles; without the discovery URL it was 113).
 -- Body: the live definition (20261031074000_native_listing_profile_evidence.sql and later) with is_for_sale selected
 -- and the one condition added. Signature, columns and grants unchanged.
 
@@ -32,7 +34,7 @@ AS $function$
   WITH v AS MATERIALIZED (
     SELECT v.id, v.sale_status, v.auction_outcome, v.reserve_status,
            CASE WHEN public.vehicle_sale_price_untrusted_read(v.id) THEN NULL ELSE coalesce(v.sale_price_usd, v.sale_price) END AS sale_price, v.bat_sold_price, v.sold_price, v.winning_bid, v.high_bid,
-           v.asking_price, v.is_for_sale, v.sale_date, v.bat_sale_date, v.listing_updated_at, v.listing_posted_at,
+           v.asking_price, v.is_for_sale, v.discovery_url, v.sale_date, v.bat_sale_date, v.listing_updated_at, v.listing_posted_at,
            v.nuke_estimate, v.nuke_estimate_confidence, v.valuation_calculated_at,
            v.canonical_outcome, v.canonical_platform,
            COALESCE(v.listing_url, v.bat_auction_url, v.platform_url) AS source_url,
@@ -67,9 +69,11 @@ AS $function$
       NULLIF(v.nuke_estimate, 0) AS f_estimate,
       COALESCE(v.sale_status = 'auction_live', false) AS f_live,
       COALESCE(v.sale_status, '') NOT IN ('sold', 'ended', 'not_sold', 'unsold', 'bid_to', 'auction_live', 'upcoming')
-        -- ask_needs_offer_v1: an asking price is the current offer only with a listing behind it (a source URL or a
-        -- listing clock) or the record marking the car for sale; an unsourced, undated amount stays ask_amount only.
-        AND (v.source_url IS NOT NULL OR v.listing_posted_at IS NOT NULL OR v.listing_updated_at IS NOT NULL
+        -- ask_needs_offer_v1: an asking price is the current offer only with a listing behind it (a source URL, the
+        -- discovery URL a scraped classified was found at, or a listing clock) or the record marking the car for sale;
+        -- an unsourced, undated amount stays ask_amount only.
+        AND (v.source_url IS NOT NULL OR v.discovery_url IS NOT NULL
+             OR v.listing_posted_at IS NOT NULL OR v.listing_updated_at IS NOT NULL
              OR native_ask.observed_at IS NOT NULL OR COALESCE(v.is_for_sale, false))
         AS f_ask_active
     FROM dated v
