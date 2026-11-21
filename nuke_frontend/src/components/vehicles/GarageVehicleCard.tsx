@@ -589,8 +589,9 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
   const loadAnalysis = useCallback(() => {
     if (analysisAsked.current) return;
     analysisAsked.current = true;
-    readCardAnalysis(vehicle.id).then(setAnalysis).catch(() => { analysisAsked.current = false; });
-  }, [vehicle.id]);
+    // The garage already read this car's class price; the frame reuses that row instead of asking again.
+    readCardAnalysis(vehicle.id, vehicle.class_price).then(setAnalysis).catch(() => { analysisAsked.current = false; });
+  }, [vehicle.id, vehicle.class_price]);
   const loadReel = useCallback(() => {
     if (reelAsked.current || (!cover && !vehicle.image_count)) return;
     reelAsked.current = true;

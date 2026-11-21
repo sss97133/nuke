@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { readGarageActivity, type CustodyOrg, type GarageActivityContext } from './garageCustody';
 import { applyGarageOwnerCorrections, unresolvedGarageSources, type GarageOwnerCorrection, type UnresolvedGarageSource } from './garageOwnerCorrections';
+import type { ClassPrice } from '../components/garage/GarageCardAnalysis';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,6 +88,8 @@ export interface GarageVehicle {
   ownership_start_date?: string | null;
   ownership_end_date?: string | null;
   estimate_calculated_at?: string | null;
+  /** This car's get_vehicle_class_prices row (priced or blocked); null when the reader has none; absent when not read. */
+  class_price?: ClassPrice | null;
   permission_role?: string;
   event_weeks: string[] | null;
   event_summary: EventSummary | null;
@@ -474,6 +477,8 @@ const EXCLUDED_STATUSES = new Set(['deleted', 'merged', 'duplicate', 'rejected']
 // get_vehicle_contribution_days_batch: cars per call and calls in flight.
 const TIMELINE_CHUNK = 25;
 const TIMELINE_CONCURRENCY = 3;
+/** get_vehicle_class_prices takes at most 500 ids a call. */
+const CLASS_PRICE_CHUNK = 200;
 
 interface VehicleRow {
   id: string;
@@ -506,6 +511,7 @@ function rowToGarageVehicle(
   event_summary?: EventSummary | null,
   timeline?: GarageTimeline | null,
   last_activity_at?: string | null,
+  class_price?: ClassPrice | null,
 ): GarageVehicle {
   const estimated_value = estimate?.estimated_value ?? null;
 
@@ -539,6 +545,7 @@ function rowToGarageVehicle(
     ownership_start_date: relationship.start_date,
     ownership_end_date: relationship.end_date,
     estimate_calculated_at: estimate?.calculated_at ?? null,
+    ...(class_price !== undefined ? { class_price } : {}),
     permission_role: relationship.role,
     event_weeks: event_weeks ?? null,
     event_summary: event_summary ?? null,
@@ -705,6 +712,7 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
           if (at && at > (activityAt.get(id) ?? '')) activityAt.set(id, at);
         }
         const estimates = new Map<string, { estimated_value: number; calculated_at: string }>();
+        const classPrices = new Map<string, ClassPrice | null>();
         const readWarnings: string[] = [];
         const unreadable = [...relMap.keys()].filter(id => !allRows.has(id));
         if (unreadable.length) readWarnings.push(`${unreadable.length} related vehicle records could not be read.`);
@@ -715,7 +723,8 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
             const rel = relMap.get(id);
             if (!rel || row.deleted_at || row.listing_kind === 'non_vehicle_item' ||
                 (row.status && EXCLUDED_STATUSES.has(row.status))) continue;
-            garage.push(rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id), timelines.get(id), activityAt.get(id)));
+            garage.push(rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id), timelines.get(id), activityAt.get(id),
+              classPrices.has(id) ? classPrices.get(id) : undefined));
           }
           setWarnings([...readWarnings]);
           setRawVehicles(applyGarageOwnerCorrections(garage, corrections));
@@ -799,6 +808,16 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
             return { error };
           };
           const timelineRead = readTimelines();
+          // The stored class price (vehicle_class_price) of each car the account is tied to, in chunks the reader accepts.
+          const readClassPrices = async () => {
+            const data: ClassPrice[] = [];
+            for (let offset = 0; offset < vehicleIdArray.length; offset += CLASS_PRICE_CHUNK) {
+              const result = await supabase.rpc('get_vehicle_class_prices', { p_vehicle_ids: vehicleIdArray.slice(offset, offset + CLASS_PRICE_CHUNK) });
+              if (result.error || !Array.isArray(result.data)) return { data: null, error: result.error ?? true };
+              data.push(...result.data as ClassPrice[]);
+            }
+            return { data, error: null };
+          };
           const [fallbackRes, eventSummaryRes, eventWeeksRes, estimateRes] = await Promise.all([
             readCovers(),
             supabase
@@ -806,15 +825,9 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
               .select('vehicle_id, total_events, times_sold, platform_list, first_event_date, last_event_date')
               .in('vehicle_id', vehicleIdArray),
             supabase.rpc('get_vehicle_event_weeks_batch', { vehicle_ids: vehicleIdArray }),
-            // Build-class estimates only: class_stratified, and class_stratified_bodied (the same
-            // build-class anchor over a comp pool also held to the car's body class). Fresh and
-            // non-circular only. Never replace absent evidence with legacy value or purchase price.
-            supabase.from('nuke_estimates')
-              .select('vehicle_id, estimated_value, calculated_at')
-              .in('vehicle_id', vehicleIdArray)
-              .in('comp_method', ['class_stratified', 'class_stratified_bodied'])
-              .eq('is_stale', false)
-              .eq('is_circular', false),
+            // The class price only: the median of the same build class's sold comps, stored per car. Never replace
+            // absent evidence with a legacy value, an old nuke_estimates row or the purchase price.
+            readClassPrices(),
           ].map(optionalRead));
           const garageActivity = await activityRead;
           if (cancelled) return;
@@ -829,12 +842,15 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
             publish();
           });
           if (estimateRes.error) readWarnings.push('Recorded estimates are unavailable. Vehicle relationships remain visible.');
-          for (const e of estimateRes.error ? [] : estimateRes.data ?? []) {
-            if (Number.isFinite(Number(e.estimated_value)) && Number(e.estimated_value) > 0 &&
-                e.calculated_at && Number.isFinite(Date.parse(e.calculated_at)) &&
-                // A car with both kinds shows the newer one.
-                !(Date.parse(estimates.get(e.vehicle_id)?.calculated_at ?? '') >= Date.parse(e.calculated_at))) {
-              estimates.set(e.vehicle_id, { estimated_value: Number(e.estimated_value), calculated_at: e.calculated_at });
+          if (!estimateRes.error) {
+            for (const id of vehicleIdArray) classPrices.set(id, null);
+            for (const row of (estimateRes.data ?? []) as ClassPrice[]) {
+              if (!row?.vehicle_id || !allRows.has(row.vehicle_id)) continue;
+              classPrices.set(row.vehicle_id, row);
+              if (row.status === 'priced' && Number.isFinite(Number(row.value)) && Number(row.value) > 0 &&
+                  row.computed_at && Number.isFinite(Date.parse(row.computed_at))) {
+                estimates.set(row.vehicle_id, { estimated_value: Number(row.value), calculated_at: row.computed_at });
+              }
             }
           }
 

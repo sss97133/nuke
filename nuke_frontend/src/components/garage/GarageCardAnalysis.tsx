@@ -15,11 +15,13 @@ export type AnalysisGroup = 'money' | 'hours' | 'work' | 'market' | 'record';
 /** `cite` is the evidence in plain words; `title` (the tooltip) carries the reader's name and rule. */
 export interface AnalysisLine { key: string; group: AnalysisGroup; label: string; value: string; cite: string; title?: string }
 
-/** `get_class_stratified_price`: the median of priced comps of this car's own build class in its year/make/model cohort. */
-export interface ClassPrice { comp_method?: string | null; value?: number | string | null; value_low?: number | string | null;
-  value_high?: number | string | null; basis?: string | null; note?: string | null; n_class_matched_priced?: number | string | null }
-/** The stored build-class estimate the card's price already reads, shown when the live reader has no band. */
-export interface StoredEstimate { estimated_value: number | string | null; value_low?: number | string | null; value_high?: number | string | null; calculated_at?: string | null }
+/**
+ * One row of `get_vehicle_class_prices`: the stored class price (vehicle_class_price), the median, p25 and p75 of the sold
+ * comps of this car's own build class in its year/make/model cohort, or the reason it is not priced.
+ */
+export interface ClassPrice { vehicle_id?: string; status?: string | null; value?: number | string | null; value_low?: number | string | null;
+  value_high?: number | string | null; n?: number | string | null; subject_class?: string | null; basis?: string | null;
+  blocked_reason?: string | null; computed_at?: string | null }
 
 export interface WorkSessionRow { session_date: string | null; duration_minutes: number | null; owner_confirmed_at: string | null }
 export interface TestimonySummary { total: number; by_kind?: Record<string, number> | null; first_observed?: string | null; last_observed?: string | null }
@@ -34,7 +36,6 @@ export interface CardAnalysisReads {
   family?: { brand: string; index: FamilyIndex } | null;
   questions?: OpenQuestions | null;
   classPrice?: ClassPrice | null;
-  estimate?: StoredEstimate | null;
 }
 
 const num = (value: unknown): number | null => {
@@ -72,16 +73,11 @@ export function analysisLines(reads: CardAnalysisReads): AnalysisLine[] {
   const lines: (AnalysisLine | null)[] = [];
   const band = (low: unknown, high: unknown) => num(low) != null && num(high) != null ? `${usd(num(low)!)} – ${usd(num(high)!)}` : null;
   const cp = reads.classPrice;
-  if (cp && cp.comp_method && cp.comp_method !== 'blocked' && num(cp.value) != null) {
-    const n = num(cp.n_class_matched_priced);
+  if (cp && cp.status === 'priced' && num(cp.value) != null) {
+    const n = num(cp.n);
     lines.push({ key: 'class-value', group: 'money', label: 'Class value', value: usd(num(cp.value)!),
       cite: [band(cp.value_low, cp.value_high), n != null ? `${plural(n, 'sold comp')} of the same build class` : null].filter(Boolean).join(' · '),
-      title: [cp.basis, cp.note, 'get_class_stratified_price'].filter(Boolean).join('. ') });
-  } else if (reads.estimate && num(reads.estimate.estimated_value) != null) {
-    const e = reads.estimate;
-    lines.push({ key: 'class-value', group: 'money', label: 'Class estimate', value: usd(num(e.estimated_value)!),
-      cite: [band(e.value_low, e.value_high), e.calculated_at ? `computed ${day(e.calculated_at)}` : null].filter(Boolean).join(' · '),
-      title: 'Stored build-class estimate (nuke_estimates)' });
+      title: [cp.basis, cp.computed_at ? `computed ${day(cp.computed_at)}` : null, 'get_vehicle_class_prices'].filter(Boolean).join('. ') });
   }
   const build = reads.build;
   const t = build?.totals;
@@ -144,8 +140,12 @@ export function analysisLines(reads: CardAnalysisReads): AnalysisLine[] {
   return lines.filter((line): line is AnalysisLine => line !== null);
 }
 
-/** Every reader the frame cites, read once per card. A failed reader leaves its lines out; it never fails the frame. */
-export async function readCardAnalysis(vehicleId: string): Promise<AnalysisLine[]> {
+/**
+ * Every reader the frame cites, read once per card. A failed reader leaves its lines out; it never fails the frame.
+ * `classPrice` is the garage's own row from get_vehicle_class_prices (null when the reader has none for this car); left
+ * undefined, the frame reads it for this one car.
+ */
+export async function readCardAnalysis(vehicleId: string, classPrice?: ClassPrice | null): Promise<AnalysisLine[]> {
   const settle = async <T,>(read: PromiseLike<{ data: unknown; error: unknown }>, parse: (data: unknown) => T | null): Promise<T | null> => {
     try { const { data, error } = await read; return error ? null : parse(data); } catch { return null; }
   };
@@ -158,7 +158,7 @@ export async function readCardAnalysis(vehicleId: string): Promise<AnalysisLine[
     const index = await settle(supabase.rpc('family_price_index_read', { p_brand: placed.brand, p_family_key: placed.family_key }), parseFamilyIndex);
     return index ? { brand: placed.brand, index } : null;
   };
-  const [build, sessions, testimony, depth, questions, familyRead, estimate] = await Promise.all([
+  const [build, sessions, testimony, depth, questions, familyRead, storedClass] = await Promise.all([
     settle(supabase.rpc('vehicle_build_reconstruction', id),
       data => (data as BuildReconstruction | null)?.version === 1 && (data as BuildReconstruction).totals ? data as BuildReconstruction : null),
     settle(supabase.from('work_sessions').select('session_date, duration_minutes, owner_confirmed_at').eq('vehicle_id', vehicleId).limit(1000),
@@ -167,14 +167,14 @@ export async function readCardAnalysis(vehicleId: string): Promise<AnalysisLine[
     settle(supabase.rpc('get_vehicle_day_depth', id), data => Array.isArray(data) ? data as DayDepthRow[] : null),
     settle(supabase.rpc('vehicle_open_questions', id), data => data && typeof data === 'object' ? data as OpenQuestions : null),
     family().catch(() => null),
-    // The stored build-class estimate, the same row the card's price reads. The live reader (get_class_stratified_price)
-    // is not called from the browser: measured 2026-11-20 as a signed-in user it ran 15 s and answered 500.
-    settle(supabase.from('nuke_estimates').select('estimated_value, value_low, value_high, calculated_at').eq('vehicle_id', vehicleId)
-      .in('comp_method', ['class_stratified', 'class_stratified_bodied']).eq('is_stale', false).eq('is_circular', false)
-      .order('calculated_at', { ascending: false }).limit(1),
-      data => Array.isArray(data) && data[0] ? data[0] as StoredEstimate : null),
+    // The stored class price, the same row the card's price reads (vehicle_class_price, written by
+    // refresh_vehicle_class_price). The inline reader (get_class_stratified_price) is never called from the browser:
+    // measured 2026-11-20 as a signed-in user it ran 15 s and answered 500.
+    classPrice !== undefined ? Promise.resolve(classPrice)
+      : settle(supabase.rpc('get_vehicle_class_prices', { p_vehicle_ids: [vehicleId] }),
+        data => Array.isArray(data) ? (data as ClassPrice[]).find(row => row?.vehicle_id === vehicleId) ?? null : null),
   ]);
-  return analysisLines({ build, sessions, testimony, depth, questions, family: familyRead, estimate });
+  return analysisLines({ build, sessions, testimony, depth, questions, family: familyRead, classPrice: storedClass });
 }
 
 /**

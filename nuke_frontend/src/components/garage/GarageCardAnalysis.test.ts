@@ -63,16 +63,19 @@ describe('garage card analysis lines', () => {
     expect(lines[1].title).toBe('2 days · Oct 6, 2025 – Nov 2, 2026 · get_vehicle_day_depth');
   });
 
-  it('states the class value with its band and comp count, and nothing when the reader is blocked', () => {
-    const [line] = analysisLines({ classPrice: { comp_method: 'class_stratified', value: 46200, value_low: 35100, value_high: 76850,
-      n_class_matched_priced: 35, basis: 'median of 35 class-matched comps' } });
-    expect([line.label, line.value, line.cite]).toEqual(['Class value', '$46,200', '$35,100 – $76,850 · 35 sold comps of the same build class']);
-    expect(analysisLines({ classPrice: { comp_method: 'blocked' } })).toEqual([]);
+  it('states the stored class value with its band and comp count, the computed date in the tooltip', () => {
+    const [line] = analysisLines({ classPrice: { vehicle_id: 'car', status: 'priced', value: '46200', value_low: '35100',
+      value_high: '76850', n: 35, subject_class: 'build', computed_at: '2026-11-21T08:00:00Z',
+      basis: 'median of 35 sold comps of the same build class (build) in the 1973 Pontiac Firebird cohort' } });
+    expect([line.key, line.label, line.value, line.cite]).toEqual(['class-value', 'Class value', '$46,200',
+      '$35,100 – $76,850 · 35 sold comps of the same build class']);
+    expect(line.title).toBe('median of 35 sold comps of the same build class (build) in the 1973 Pontiac Firebird cohort. '
+      + 'computed Nov 21, 2026. get_vehicle_class_prices');
   });
 
-  it('falls back to the stored estimate the card price reads, dated, when the live reader has no band', () => {
-    const [line] = analysisLines({ classPrice: { comp_method: 'blocked' },
-      estimate: { estimated_value: '38500.00', value_low: '33880.00', value_high: '43120.00', calculated_at: '2026-07-10T05:00:47Z' } });
-    expect([line.label, line.value, line.cite]).toEqual(['Class estimate', '$38,500', '$33,880 – $43,120 · computed Jul 10, 2026']);
+  it('leaves the line out when the stored price is blocked or absent, never falling back to another estimate', () => {
+    expect(analysisLines({ classPrice: { vehicle_id: 'car', status: 'blocked', blocked_reason: 'cohort not yet classified (40 of 6281)',
+      computed_at: '2026-11-21T08:00:00Z' } })).toEqual([]);
+    expect(analysisLines({ classPrice: null })).toEqual([]);
   });
 });
