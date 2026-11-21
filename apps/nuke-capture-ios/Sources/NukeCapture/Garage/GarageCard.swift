@@ -38,17 +38,16 @@ struct GarageCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 head
                 lane
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onOpen)
                 grid
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onOpen)
                 record
                 foot
             }
             .padding(.horizontal, 14)
             .padding(.top, 12)
             .padding(.bottom, 14)
+            // The whole card opens the profile; the price and VIN buttons keep their own taps.
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onOpen)
         }
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: NukeRadius.card))
         .clipShape(RoundedRectangle(cornerRadius: NukeRadius.card))

@@ -305,8 +305,21 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["2026-11-18 · owner · recollection"].waitForExistence(timeout: 5))
         let sheet = XCTAttachment(screenshot: app.screenshot()); sheet.name = "garage-log-book"; sheet.lifetime = .keepAlways; add(sheet)
         app.buttons["Done"].firstMatch.tap()
-        XCTAssertTrue(first.waitForExistence(timeout: 5)); first.tap()
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
         let profile = app.descendants(matching: .any).matching(identifier: "garage.vehicle.profile.00000000-0000-4000-8000-00000000c101").firstMatch
+        // The VIN keeps its own tap (copy); anywhere else on the card, here the record line, opens the profile.
+        let vin = app.buttons["Copy VIN FX87X3N100001"].firstMatch
+        let record = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Mar 2021")).firstMatch
+        for _ in 0..<6 where !(vin.exists && vin.isHittable && record.isHittable) {
+            let list = app.collectionViews.firstMatch
+            list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+                .press(forDuration: 0.05, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        }
+        XCTAssertTrue(vin.isHittable, "the owned card's VIN. " + app.debugDescription.components(separatedBy: "\n")
+            .filter { $0.contains("VIN") || $0.contains("Mar 2021") || $0.contains("FX87") }.joined(separator: " | "))
+        vin.tap()
+        XCTAssertFalse(profile.waitForExistence(timeout: 2), "copying the VIN does not open the profile")
+        XCTAssertTrue(record.isHittable, "the owned card's record line"); record.tap()
         XCTAssertTrue(profile.waitForExistence(timeout: 10), "a card opens the actual vehicle profile")
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes", "reading the garage and its log book writes nothing")
     }
