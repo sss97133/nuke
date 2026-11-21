@@ -757,7 +757,7 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
             </Link>
             {price != null && <span className="garage-card-price" title={priceTitle}>
               {/* A class figure is a fallback from comps, never this car's price: it carries its name in the head. */}
-              {header?.price == null && <small>class median</small>}{formatCurrency(price)}</span>}
+              <small>{header?.price == null ? 'class median' : (header.priceLabel ?? 'recorded price').replace(/^Last recorded sale$/i, 'last sale').toLowerCase()}</small>{formatCurrency(price)}</span>}
           </div>
           {/* One lane, most important first; what the card's width cannot hold drops off the end. */}
           <div className="garage-card-lane">
