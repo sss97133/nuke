@@ -173,3 +173,23 @@ describe('gallery database admission', () => {
     expect(inventory.images[0].vision_gate_status).toBe('pending');
   });
 });
+
+describe('reel reads: newest first, a page from an offset, one view', () => {
+  it('orders by the taken clock, cuts the page at the offset and filters the view, keyed apart', async () => {
+    const page = Array.from({ length: 12 }, (_, index) => photo(index));
+    transport.fetch.mockResolvedValueOnce(response(page, 40)).mockResolvedValueOnce(response([photo(20)]));
+    const coverage = vi.fn();
+    await fetchVehicleImages(vehicleId, 'id,image_url', { order: 'newest', maxRows: 12, offset: 24, onLoadCoverage: coverage });
+    await fetchVehicleImages(vehicleId, 'id,image_url', { order: 'newest', maxRows: 1, angle: 'exterior_side', count: false });
+    const [paged, view] = requests();
+    expectCanonicalAdmission(paged);
+    expect(paged.searchParams.get('order')).toBe('taken_at.desc.nullslast,created_at.desc,id.asc');
+    expect(paged.searchParams.get('offset')).toBe('24');
+    expect(paged.searchParams.get('limit')).toBe('12');
+    // The exact count is of the whole set; the read reports what is left from its offset.
+    expect(coverage).toHaveBeenCalledWith({ loaded: 12, total: 16 });
+    expect(view.searchParams.get('ai_detected_angle')).toBe('eq.exterior_side');
+    expect(view.searchParams.get('limit')).toBe('1');
+    expect(transport.fetch).toHaveBeenCalledTimes(2);
+  });
+});
