@@ -443,9 +443,9 @@ function statementsSection(data: unknown, fetchedAt: string, detail: number): st
 
 const INTRO =
   "These figures were read just now through the site's own readers, as the person asking, so each reader's privacy " +
-  "rule decided what is shown. They cover all of this car's records, unlike the OBSERVATIONS list below. Cite the " +
-  "reader name and as-of time with any figure you give, use the reader's own words for what a number is, and never " +
-  "combine figures the digest keeps apart.";
+  "rule decided what is shown. They cover all of this car's records, unlike the OBSERVATIONS list below. Say " +
+  "where any figure you give comes from in plain words (the bracketed reader names are for your own bookkeeping, not " +
+  "for the reply), keep the reader's meaning for what a number is, and never combine figures the digest keeps apart.";
 
 /** The digest text for the model, within `maxChars`, from whatever the readers returned. */
 export function buildRecordsDigest(reads: RecordReads, ctx: { fetchedAt: string; maxChars?: number }): string {
