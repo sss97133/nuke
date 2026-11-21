@@ -64,22 +64,28 @@ it('groups current inventory together independently of title and retains past bu
     {id:'unresolved-role',relationship_type:'CONSIGNED'},
   ] as GarageVehicle[];
   state={...state,vehicles:rows};await mount();
-  const current=host.querySelector('section[aria-label="Current vehicles"]')!;
-  const previous=host.querySelector('section[aria-label="Previous vehicles"]')!;
-  expect([...current.querySelectorAll('a')].map(a=>a.textContent)).toEqual(['titled','owner','disputed','pending']);
-  expect([...previous.querySelectorAll('a')].map(a=>a.textContent)).toEqual(['sold','business','represented']);
-  expect(host.querySelector('section[aria-label="Other vehicle relationships"]')?.textContent).toContain('unresolved-role');
-  expect([...host.querySelectorAll('.garage-section-heading')].map(h=>h.textContent)).toEqual([
-    'Current vehicles 4','Previous vehicles 3','Other vehicle relationships 1',
-  ]);
+  // One list in the reader's order: relationship is a card label, never a section.
+  expect([...host.querySelectorAll('.garage-sections section')].map(el=>el.getAttribute('aria-label'))).toEqual(['No dated activity']);
+  expect([...host.querySelectorAll('.garage-sections a')].map(a=>a.textContent)).toEqual(rows.map(row=>row.id));
   expect(rows[2].relationship_type).toBe('CLAIMED INTEREST');
   expect(rows[5].relationship_type).toBe('BUSINESS HANDLING');
 });
-it('honors explicit inventory status without assuming missing dates mean current ownership',async()=>{
-  state={...state,vehicles:[{...vehicle,inventory_status:'previous'},{...vehicle,id:'unknown',inventory_status:'unknown'}]};
-  await mount();expect(host.querySelector('section[aria-label="Current vehicles"]')).toBeNull();
-  expect(host.querySelector('section[aria-label="Previous vehicles"]')?.textContent).toContain('synthetic-car');
-  expect(host.querySelector('section[aria-label="Other vehicle relationships"]')?.textContent).toContain('unknown');
+it('lists cars under the year of their newest dated activity, undated cars last',async()=>{
+  const timeline=(first_day:string,last_day:string)=>({first_day,last_day,active_days:1,photos:1,work_days:0,events:0,documents:0,months:[[last_day.slice(0,7),1,0,0,0]]});
+  state={...state,vehicles:[
+    {...vehicle,id:'this-year',timeline:timeline('2021-03-04','2026-11-02')},
+    {...vehicle,id:'also-this-year',timeline:timeline('2026-01-01','2026-02-01'),inventory_status:'previous'},
+    {...vehicle,id:'older',timeline:timeline('2019-05-01','2024-06-01')},
+    {...vehicle,id:'undated'},
+  ] as GarageVehicle[]};
+  await mount();
+  expect([...host.querySelectorAll('.garage-section-heading')].map(h=>h.textContent)).toEqual(['2026 2','2024 1','No dated activity 1']);
+  expect([...host.querySelectorAll('.garage-sections a')].map(a=>a.textContent)).toEqual(['this-year','also-this-year','older','undated']);
+  state={...state,sortMode:'FIRST'};await mount();
+  expect([...host.querySelectorAll('.garage-section-heading')].map(h=>h.textContent)[0]).toBe('2021 1');
+  state={...state,sortMode:'NAME'};await mount();
+  expect(host.querySelectorAll('.garage-section-heading')).toHaveLength(0);
+  expect(host.querySelectorAll('.garage-sections a')).toHaveLength(4);
 });
 it('finds a zero-photo profile by vehicle and VIN while retaining the loaded-record denominator',async()=>{
   state={...state,loadedVehicleCount:2,vehicles:[
@@ -106,19 +112,15 @@ it('preserves search within a viewer and resets it when the account changes',asy
   expect(host.querySelector('a[href="/vehicle/synthetic-car"]')).toBeNull();
 });
 
-it('shows recently worked cars first and groups org-held cars together', async()=>{
+it('keeps org-held and recently worked cars in the one list instead of pulling them into groups', async()=>{
   const ernie={id:'ernie',name:"Ernie's Upholstery",relationship_type:'work_location'};
   const recent=new Date(Date.now()-24*60*60*1000).toISOString();
   const rows=[
     {id:'own',relationship_type:'OWNER'},
     {id:'blue',relationship_type:'CONTRIBUTOR',custody_org:ernie},
-    {id:'green',relationship_type:'CONTRIBUTOR',custody_org:ernie},
     {id:'ghia',relationship_type:'CONTRIBUTOR',custody_org:ernie,recent_work_at:recent},
   ] as GarageVehicle[];
   state={...state,vehicles:rows};await mount();
-  const sections=[...host.querySelectorAll('.garage-sections section[aria-label]')];
-  expect(sections.map(el=>el.getAttribute('aria-label'))).toEqual(['Worked on this week',"At Ernie's Upholstery",'Current vehicles']);
-  expect([...sections[0].querySelectorAll('a')].map(a=>a.textContent)).toEqual(['ghia']);
-  expect([...sections[1].querySelectorAll('a')].map(a=>a.textContent)).toEqual(['blue','green']);
-  expect([...sections[2].querySelectorAll('a')].map(a=>a.textContent)).toEqual(['own']);
+  expect(host.querySelectorAll('.garage-sections section')).toHaveLength(1);
+  expect([...host.querySelectorAll('.garage-sections a')].map(a=>a.textContent)).toEqual(['own','blue','ghia']);
 });

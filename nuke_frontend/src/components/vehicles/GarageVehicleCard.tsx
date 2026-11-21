@@ -1,10 +1,11 @@
-/** Garage cards preserve recorded relationships, evidence and estimate coverage. */
+/** Garage cards: the photo, the car, its activity timeline, and the facts on record. */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import Link from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl as sharedOptimizeImageUrl } from '../../lib/imageOptimizer';
 import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
+import '../garage/garage.css';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -14,7 +15,11 @@ export interface GarageVehicleCardProps {
   vehicle: GarageVehicle;
   viewMode?: ViewMode;
   onRefresh?: () => void;
+  /** First and last month (YYYY-MM) every card's strip spans, so the strips line up down the page. */
+  axis?: GarageAxis;
 }
+
+export interface GarageAxis { start: string; end: string }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -164,11 +169,10 @@ const TOOLTIP_STYLE: React.CSSProperties = {
 // ---------------------------------------------------------------------------
 
 const BARCODE_COLORS: Record<number, string> = {
-  0: 'var(--bg, #f5f5f5)',
-  1: 'var(--success-dim, rgba(22, 130, 93, 0.1))',
-  2: 'var(--success, #16825d)',
-  3: 'var(--success, #16825d)',
-  4: 'var(--accent, #2a2a2a)',
+  1: 'var(--heat-3, #34d399)',
+  2: 'var(--heat-4, #059669)',
+  3: 'var(--heat-5, #047857)',
+  4: 'var(--heat-6, #065f46)',
 };
 
 // ---------------------------------------------------------------------------
@@ -256,96 +260,62 @@ function HoverData({
 }
 
 // ---------------------------------------------------------------------------
-// MiniBarcode — compressed timeline strip under image
+// MiniBarcode — the car's activity by month. A strip in the grid card, a sliver
+// over the thumbnail in the list card.
 // ---------------------------------------------------------------------------
 
-function MiniBarcode({ eventWeeks }: { eventWeeks: string[] | null }) {
-  const bars = useMemo(() => {
-    if (!eventWeeks || eventWeeks.length === 0) return null;
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthIndex = (ym: string) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
+const monthLabel = (ym: string) => `${MONTH_NAMES[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 
-    // Count events per week bucket
-    const weekCounts = new Map<string, number>();
-    for (const w of eventWeeks) {
-      const key = w.slice(0, 10); // YYYY-MM-DD
-      weekCounts.set(key, (weekCounts.get(key) || 0) + 1);
+/** Recorded items per month: the month reader when present, otherwise the event weeks. */
+function monthTotals(vehicle: GarageVehicle): Map<string, number> {
+  const totals = new Map<string, number>();
+  if (vehicle.timeline?.months.length) {
+    for (const [ym, photos, work, events, documents] of vehicle.timeline.months) {
+      totals.set(ym, (Number(photos) || 0) + (Number(work) || 0) + (Number(events) || 0) + (Number(documents) || 0));
     }
-
-    const sorted = [...weekCounts.keys()].sort();
-    if (sorted.length === 0) return null;
-
-    const earliest = new Date(sorted[0] + 'T00:00:00');
-    const latest = new Date(sorted[sorted.length - 1] + 'T00:00:00');
-
-    // Build all weeks from earliest to latest
-    const allWeeks: { key: string; level: number }[] = [];
-    const cur = new Date(earliest);
-    while (cur <= latest) {
-      const key = cur.toISOString().slice(0, 10);
-      const count = weekCounts.get(key) || 0;
-      const level = count === 0 ? 0 : count >= 4 ? 4 : count >= 3 ? 3 : count >= 2 ? 2 : 1;
-      allWeeks.push({ key, level });
-      cur.setDate(cur.getDate() + 7);
-    }
-
-    // If too many weeks (>200), group by month
-    if (allWeeks.length > 200) {
-      const monthMap = new Map<string, number>();
-      for (const w of allWeeks) {
-        const monthKey = w.key.slice(0, 7); // YYYY-MM
-        monthMap.set(monthKey, Math.max(monthMap.get(monthKey) || 0, w.level));
-      }
-      return [...monthMap.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, level]) => ({ key, level }));
-    }
-
-    return allWeeks;
-  }, [eventWeeks]);
-
-  if (!bars || bars.length === 0) {
-    // Empty barcode — subtle indicator that no events exist
-    return (
-      <div
-        style={{
-          width: '100%',
-          height: '3%',
-          minHeight: 3,
-          maxHeight: 6,
-          backgroundColor: 'var(--bg, #f5f5f5)',
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-        }}
-      />
-    );
+    return totals;
   }
+  for (const week of vehicle.event_weeks ?? []) {
+    const ym = week.slice(0, 7);
+    if (/^\d{4}-\d{2}$/.test(ym)) totals.set(ym, (totals.get(ym) || 0) + 1);
+  }
+  return totals;
+}
+
+/** The same thresholds on every card, so two strips can be compared. */
+const monthLevel = (n: number) => (n >= 60 ? 4 : n >= 20 ? 3 : n >= 5 ? 2 : 1);
+
+function MiniBarcode({ vehicle, axis, variant }: { vehicle: GarageVehicle; axis?: GarageAxis; variant: 'strip' | 'overlay' }) {
+  const strip = useMemo(() => {
+    const totals = monthTotals(vehicle);
+    const active = [...totals.entries()].filter(([, n]) => n > 0).sort(([a], [b]) => a.localeCompare(b));
+    if (active.length === 0) return null;
+    const first = Math.min(monthIndex(active[0][0]), axis ? monthIndex(axis.start) : Infinity);
+    const last = Math.max(monthIndex(active[active.length - 1][0]), axis ? monthIndex(axis.end) : -Infinity);
+    const years: number[] = [];
+    for (let m = Math.ceil(first / 12) * 12; m <= last; m += 12) if (m > first) years.push(m - first);
+    return {
+      span: last - first + 1,
+      years,
+      bars: active.map(([ym, n]) => ({ ym, x: monthIndex(ym) - first, level: monthLevel(n), n })),
+      label: `Recorded activity by month: ${active.length} active ${active.length === 1 ? 'month' : 'months'}, ${monthLabel(active[0][0])} to ${monthLabel(active[active.length - 1][0])}`,
+    };
+  }, [vehicle, axis]);
+
+  if (!strip) return variant === 'strip' ? null : <div className="garage-barcode garage-barcode-overlay" />;
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '3%',
-        minHeight: 3,
-        maxHeight: 6,
-        display: 'flex',
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        backgroundColor: 'var(--bg, #f5f5f5)',
-      }}
-      title={`${bars.filter(b => b.level > 0).length} active periods`}
-    >
-      {bars.map((bar) => (
-        <div
-          key={bar.key}
-          style={{
-            flex: 1,
-            height: '100%',
-            backgroundColor: BARCODE_COLORS[bar.level],
-            minWidth: 1,
-          }}
-        />
-      ))}
+    <div className={`garage-barcode garage-barcode-${variant}`} role="img" aria-label={strip.label} title={strip.label}>
+      <svg viewBox={`0 0 ${strip.span} 4`} preserveAspectRatio="none" width="100%" height="100%" aria-hidden="true">
+        {variant === 'strip' && strip.years.map(x => <rect key={`y${x}`} className="garage-barcode-year" x={x} y={0} width={0.12} height={4} />)}
+        {strip.bars.map(bar => (
+          <rect key={bar.ym} x={bar.x + 0.08} width={0.84}
+            y={variant === 'strip' ? 4 - bar.level : 0} height={variant === 'strip' ? bar.level : 4}
+            style={{ fill: BARCODE_COLORS[bar.level] }} />
+        ))}
+      </svg>
     </div>
   );
 }
@@ -500,15 +470,43 @@ function ActionStrip({
 }
 
 // ---------------------------------------------------------------------------
-// Grid card (full detail)
+// Grid card: the photo, the car, its timeline, and only the facts on record
 // ---------------------------------------------------------------------------
 
-function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: () => void }) {
-  const [hovered, setHovered] = useState(false);
+const sentence = (text: string) => text.charAt(0) + text.slice(1).toLowerCase();
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
+
+/** "Mar 2021 – Nov 2026", or one month when the record sits inside it. */
+function recordSpan(vehicle: GarageVehicle): string | null {
+  const first = vehicle.timeline?.first_day ?? vehicle.event_summary?.first_event_date ?? null;
+  const last = vehicle.timeline?.last_day ?? vehicle.event_summary?.last_event_date ?? null;
+  if (!first || !last) return null;
+  const from = monthLabel(first.slice(0, 7));
+  const to = monthLabel(last.slice(0, 7));
+  return from === to ? from : `${from} – ${to}`;
+}
+
+/** Counts that exist; a zero is left out instead of printed. */
+function recordCounts(vehicle: GarageVehicle): string[] {
+  const t = vehicle.timeline;
+  if (!t) return vehicle.image_count ? [plural(vehicle.image_count, 'photo', 'photos')] : [];
+  // image_count also holds undated photos, so it is the photo total when it is larger.
+  const photos = Math.max(t.photos, vehicle.image_count ?? 0);
+  return [
+    photos > 0 ? plural(photos, 'photo', 'photos') : null,
+    t.work_days > 0 ? plural(t.work_days, 'work day', 'work days') : null,
+    t.events > 0 ? plural(t.events, 'event', 'events') : null,
+    t.documents > 0 ? plural(t.documents, 'paper', 'papers') : null,
+  ].filter((part): part is string => part !== null);
+}
+
+function GridCard({ vehicle, onRefresh, axis }: { vehicle: GarageVehicle; onRefresh?: () => void; axis?: GarageAxis }) {
   const [vinCopied, setVinCopied] = useState(false);
   const title = formatVehicleTitle(vehicle);
+  const name = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim && vehicle.trim !== vehicle.model ? vehicle.trim : null]
+    .filter(Boolean).join(' ');
 
-  const copyVin = useCallback((e: React.MouseEvent) => {
+  const copyVin = useCallback(() => {
     if (vehicle.vin) {
       navigator.clipboard.writeText(vehicle.vin);
       setVinCopied(true);
@@ -516,53 +514,30 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
     }
   }, [vehicle.vin]);
 
-
-
-  const yearAge = vehicle.year ? `${new Date().getFullYear() - vehicle.year} YEARS OLD` : '';
-  const valueTooltip = estimateTooltip(vehicle);
-  const deltaTooltip = vehicle.value_delta != null && vehicle.purchase_price != null
-    ? `${formatCurrency(vehicle.purchase_price)} → ${formatCurrency(vehicle.estimated_value!)}`
-    : '';
-
-
+  const period = ownershipPeriod(vehicle);
+  const relationship = [
+    sentence(vehicle.relationship_type),
+    vehicle.custody_org ? `at ${vehicle.custody_org.name}` : null,
+    /\d{4}-\d{2}-\d{2}/.test(period) ? period : null,
+  ].filter(Boolean).join(' · ');
+  const span = recordSpan(vehicle);
+  const counts = recordCounts(vehicle);
 
   return (
-    <div
-      className="garage-vehicle-card"
-      style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <article style={{ ...BASE, ...(hovered ? BASE_HOVER : {}) }}>
-        {/* Image 16:9 + mini barcode */}
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            paddingBottom: '56.25%',
-            backgroundColor: 'var(--bg, #f5f5f5)',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
+    <div className="garage-vehicle-card">
+      <article className="garage-card">
+        <div className="garage-card-photo">
           <Link to={`/vehicle/${vehicle.id}`} className="garage-card-image-link" aria-hidden="true" tabIndex={-1} />
           {vehicle.resolved_image_url ? (
             <img
               key={vehicle.resolved_image_url}
-              src={optimizeImageUrl(vehicle.resolved_image_url)}
+              src={sharedOptimizeImageUrl(vehicle.resolved_image_url, 'medium') || vehicle.resolved_image_url}
               alt={title}
-              width={400}
-              height={225}
+              width={600}
+              height={450}
               loading="lazy"
               decoding="async"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                display: 'block',
-              }}
+              style={{ display: 'block' }}
               onError={(e) => {
                 // Two-stage fallback. The optimized src routes through the Supabase
                 // /render/image transform endpoint — a single sitewide point of failure
@@ -582,48 +557,14 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
               }}
             />
           ) : (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <img
-                src="/nuke.png"
-                alt="No image"
-                width={48}
-                height={48}
-                loading="lazy"
-                decoding="async"
-                style={{ width: 48, height: 48, opacity: 0.3, objectFit: 'contain' }}
-              />
-            </div>
+            <span className="garage-card-photo-empty">No photo yet</span>
           )}
-
-          {/* Relationship badge — top-left, solid bg */}
-          <HoverData
-            tooltip={relationshipTooltip(vehicle)}
-            style={{ position: 'absolute', top: 6, left: 6, zIndex: 2 }}
-          >
-            <div
-              style={{
-                backgroundColor: 'var(--surface, #ebebeb)',
-                border: '1px solid var(--border)', padding: '1px 4px',
-              }}
-            >
-              <span style={{ ...LABEL, fontSize: 'var(--text-caption)', color: 'var(--text-secondary, #666666)' }}>
-                {vehicle.relationship_type}
-              </span>
-            </div>
-          </HoverData>
 
           {/* This RPC revokes discovery membership, not an ownership period. */}
           {vehicle.relationship_source === 'discovered' && (
             <button
               type="button"
+              className="garage-card-eject"
               title="Remove from garage"
               aria-label="Remove discovery from garage"
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -642,149 +583,40 @@ function GridCard({ vehicle, onRefresh }: { vehicle: GarageVehicle; onRefresh?: 
                 }
                 onRefresh?.();
               }}
-              style={{
-                position: 'absolute',
-                zIndex: 2,
-                top: 6,
-                right: 6,
-                width: 44,
-                height: 44,
-                padding: 0,
-                fontFamily: FONT_MONO,
-                fontSize: '12px',
-                fontWeight: 700,
-                lineHeight: 1,
-                cursor: 'pointer',
-                backgroundColor: 'var(--surface, #ebebeb)',
-                color: 'var(--text-secondary, #666666)',
-                border: '1px solid var(--border)',
-
-              }}
             >×</button>
           )}
-
-          {/* Mini timeline barcode */}
-          <MiniBarcode eventWeeks={vehicle.event_weeks} />
         </div>
 
-        {/* Body */}
-        <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1, overflow: 'visible' }}>
-          {/* Title — each part hoverable */}
-          <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title"
-            style={{
-              fontSize: 'var(--text-callout)',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              color: 'var(--text, #2a2a2a)',
-              lineHeight: 1.2,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: 'flex',
-              gap: 4,
-            }}
-          >
-            {vehicle.year ? (
-              <HoverData tooltip={`${vehicle.year} MODEL YEAR | ${yearAge}`}>{String(vehicle.year)}</HoverData>
-            ) : null}
-            {vehicle.make ? (
-              <HoverData tooltip={`MANUFACTURER: ${vehicle.make.toUpperCase()}`}>{vehicle.make.toUpperCase()}</HoverData>
-            ) : null}
-            {vehicle.model ? (
-              <HoverData tooltip={`MODEL: ${vehicle.model.toUpperCase()}${vehicle.trim ? ' ' + vehicle.trim.toUpperCase() : ''}`}>{vehicle.model.toUpperCase()}</HoverData>
-            ) : null}
-            {vehicle.trim && vehicle.model !== vehicle.trim ? (
-              <HoverData tooltip={`TRIM: ${vehicle.trim.toUpperCase()}`}>{vehicle.trim.toUpperCase()}</HoverData>
-            ) : null}
-            {!title && <span>UNKNOWN VEHICLE</span>}
+        <div className="garage-card-body">
+          <Link to={`/vehicle/${vehicle.id}`} aria-label={`Open ${title || 'vehicle record'}`} className="garage-card-title">
+            {name || 'Unknown vehicle'}
           </Link>
+          <p className="garage-card-relationship" title={relationshipTooltip(vehicle)}>{relationship}</p>
 
-          <span style={{ ...MONO, ...LABEL }} title={relationshipTooltip(vehicle)}>
-            {ownershipPeriod(vehicle)}
-          </span>
-          <span style={LABEL}>Source: {relationshipSource(vehicle)}</span>
+          <MiniBarcode vehicle={vehicle} axis={axis} variant="strip" />
+          {(span || counts.length > 0) && (
+            <p className="garage-card-record">
+              {span && <span className="garage-card-span">{span}</span>}
+              {counts.length > 0 && <span>{counts.join(' · ')}</span>}
+            </p>
+          )}
 
-          {/* VIN + missing tags */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-            {vehicle.vin ? (
-              <HoverData
-                tooltip={vinCopied ? 'COPIED!' : `${vehicle.vin} | CLICK TO COPY`}
-                onClick={copyVin}
-              >
-                <span
-                  style={{
-                    ...MONO,
-                    fontSize: 'var(--text-caption)',
-                    color: vinCopied ? 'var(--success, #16825d)' : 'var(--text-secondary, #666666)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: 130,
-                    transition: 'color 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                  }}
-                >
-                  {vinCopied ? 'COPIED' : truncateVin(vehicle.vin)}
+          {(vehicle.vin || vehicle.estimated_value != null) && (
+            <div className="garage-card-foot">
+              {vehicle.vin ? (
+                <button type="button" className="garage-card-vin" onClick={copyVin}
+                  title="Copy VIN" aria-label={`Copy VIN ${vehicle.vin}`}>
+                  {vinCopied ? 'Copied' : truncateVin(vehicle.vin)}
+                </button>
+              ) : <span />}
+              {vehicle.estimated_value != null && (
+                <span className="garage-card-estimate" title={estimateTooltip(vehicle)}>
+                  {formatCurrency(vehicle.estimated_value)}
                 </span>
-              </HoverData>
-            ) : (
-              <HoverData tooltip="VIN NOT YET RECORDED">
-                <MissingTag label="NO VIN" />
-              </HoverData>
-            )}
-            {vehicle.estimated_value == null && (
-              <HoverData tooltip="CURRENT BUILD-CLASS ESTIMATE UNAVAILABLE">
-                <MissingTag label="NOT ESTIMATED" />
-              </HoverData>
-            )}
-          </div>
-
-          {/* Divider */}
-          <div style={{ borderTop: '1px solid var(--border, #bdbdbd)' }} />
-
-          {/* Data rows */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {/* Value */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <HoverData tooltip={valueTooltip}>
-                <span style={LABEL}>Estimate</span>
-                {vehicle.estimated_value != null ? (
-                  <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, color: 'var(--text, #2a2a2a)', marginLeft: 4 }}>
-                    {formatCurrency(vehicle.estimated_value)}
-                  </span>
-                ) : (
-                  <span style={{ ...MONO, fontSize: 'var(--text-callout)', color: 'var(--text-secondary, #666666)', marginLeft: 4 }}>—</span>
-                )}
-              </HoverData>
-              {vehicle.value_delta != null && vehicle.value_delta !== 0 && (
-                <HoverData tooltip={deltaTooltip}>
-                  <span
-                    style={{
-                      ...MONO,
-                      fontSize: 'var(--text-caption)',
-                      color: vehicle.value_delta > 0 ? 'var(--success, #16825d)' : 'var(--error, #d13438)',
-                    }}
-                  >
-                    {vehicle.value_delta > 0 ? '+' : ''}{formatCurrency(vehicle.value_delta)}
-                  </span>
-                </HoverData>
               )}
             </div>
-
-            {/* Counts */}
-            <div style={{ display: 'flex', gap: 12 }}>
-              <HoverData tooltip={vehicle.view_count == null ? 'View count unavailable' : `${vehicle.view_count} recorded views`}>
-                <span style={LABEL}>VIEWS</span>
-                <span style={{ ...MONO, fontSize: 'var(--text-callout)', fontWeight: 700, marginLeft: 3 }}>{vehicle.view_count ?? '—'}</span>
-              </HoverData>
-            </div>
-
-            {/* Health bar */}
-            <HealthBar score={vehicle.health_score} vehicle={vehicle} />
-          </div>
+          )}
         </div>
-
-        <ActionStrip vehicle={vehicle} />
       </article>
     </div>
   );
@@ -844,7 +676,7 @@ function ListCard({ vehicle }: { vehicle: GarageVehicle }) {
               <span style={{ ...LABEL, fontSize: 'var(--text-caption)' }}>NO IMAGE</span>
             </div>
           )}
-          <MiniBarcode eventWeeks={vehicle.event_weeks} />
+          <MiniBarcode vehicle={vehicle} variant="overlay" />
         </div>
 
         {/* Content */}
@@ -1000,10 +832,11 @@ export function GarageVehicleCard({
   vehicle,
   viewMode = 'GRID',
   onRefresh,
+  axis,
 }: GarageVehicleCardProps) {
   if (viewMode === 'LIST') return <ListCard vehicle={vehicle} />;
   if (viewMode === 'COMPACT') return <CompactCard vehicle={vehicle} />;
-  return <GridCard vehicle={vehicle} onRefresh={onRefresh} />;
+  return <GridCard vehicle={vehicle} onRefresh={onRefresh} axis={axis} />;
 }
 
 export default GarageVehicleCard;

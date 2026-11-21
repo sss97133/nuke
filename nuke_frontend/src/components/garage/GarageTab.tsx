@@ -2,8 +2,7 @@
 import React, { useState } from 'react';
 import Link from '../PrefetchLink';
 import { Button } from '../ui/button';
-import type { VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
-import { bucketGarage, RECENT_WORK_DAYS } from '../../hooks/garageCustody';
+import { garageFirstDay, garageLastDay, type GarageVehicle, type VehiclesDashboardState } from '../../hooks/useVehiclesDashboard';
 import { GarageVehicleCard } from '../vehicles/GarageVehicleCard';
 import { GarageToolbar } from './GarageToolbar';
 import './garage.css';
@@ -19,27 +18,27 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
   ].filter(value => value != null).join(' ')));
   const visibleSources = unresolvedSources.filter(source => matches([source.label, ...source.stated_roles].join(' ')));
   const filtered = filterMode !== 'ALL' || words.length > 0;
-  // Cars worked on this week lead; cars held by an organization sit together under it;
-  // everything else keeps the relationship-status groups.
-  const buckets = bucketGarage(visibleVehicles);
-  const statusGroups = [
-    { key: 'current', label: 'Current vehicles' },
-    { key: 'previous', label: 'Previous vehicles' },
-    { key: 'unknown', label: 'Other vehicle relationships' },
-  ].map(group => ({ ...group, vehicles: buckets.rest.filter(vehicle => {
-    const status = vehicle.inventory_status ??
-      (['VERIFIED OWNER', 'OWNER', 'CO-OWNER'].includes(vehicle.relationship_type) ? 'current'
-        : vehicle.relationship_type === 'PREVIOUSLY OWNED' ? 'previous' : 'unknown');
-    return status === group.key;
-  }) }));
-  const groups = [
-    { key: 'recent', label: 'Worked on this week', note: `Photos or work sessions in the last ${RECENT_WORK_DAYS} days`, vehicles: buckets.recent },
-    ...buckets.orgGroups.map(({ org, vehicles }) => ({ key: `org-${org.id}`, label: `At ${org.name}`, note: undefined as string | undefined, vehicles })),
-    ...statusGroups.map(group => ({ ...group, note: undefined as string | undefined })),
-  ].filter(group => group.vehicles.length > 0);
+  // One list in date order. A year heading marks where the order crosses a year;
+  // a car with no dated activity comes after the dated ones. Custody and relationship
+  // are labels on the card, not sections.
+  const dayOf = sortMode === 'FIRST' ? garageFirstDay : sortMode === 'RECENT' ? garageLastDay : null;
+  const groups: { key: string; label: string | null; vehicles: GarageVehicle[] }[] = [];
+  for (const vehicle of visibleVehicles) {
+    const key = dayOf ? dayOf(vehicle)?.slice(0, 4) ?? 'undated' : 'all';
+    const last = groups[groups.length - 1];
+    if (last?.key === key) last.vehicles.push(vehicle);
+    else groups.push({ key, label: !dayOf ? null : key === 'undated' ? 'No dated activity' : key, vehicles: [vehicle] });
+  }
+  // Every strip spans the same months: the last three years, or less when the garage is younger.
+  // A car whose record starts earlier stretches its own strip back to its first month.
+  const firstMonths = vehicles.flatMap(vehicle => vehicle.timeline?.first_day ? [vehicle.timeline.first_day.slice(0, 7)] : []).sort();
+  const today = new Date();
+  const monthsBack = (n: number) => new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - n, 1)).toISOString().slice(0, 7);
+  const axis = firstMonths.length
+    ? { start: firstMonths[0] > monthsBack(35) ? firstMonths[0] : monthsBack(35), end: monthsBack(0) } : undefined;
 
   return <main className="garage-page">
-    <div className="garage-heading"><div><h1>Garage</h1><p>Your vehicle relationships and the evidence recorded for them.</p></div>
+    <div className="garage-heading"><div><h1>Garage</h1><p>Every car you are tied to, in the order of its recorded activity.</p></div>
       {signedIn && <div className="garage-heading-actions">
         <Link className="btn-base btn-secondary" to="/capture/ledger">Capture ledger</Link>
         <Button variant="secondary" type="button" disabled={isLoading} onClick={refresh}>{isLoading ? 'Reading garage…' : 'Refresh garage'}</Button>
@@ -66,11 +65,10 @@ function GarageContent({ dashboard }: { dashboard: VehiclesDashboardState }) {
         </section>}
         {vehicles.length > 0 && <p className="garage-relationship-note">Relationships reflect recorded ownership and account statements. Relationship changes are not available from this page.</p>}
         <div className="garage-sections">
-          {groups.map(section => <section key={section.key} aria-label={section.label}>
-            <h2 className="garage-section-heading">{section.label} <span>{section.vehicles.length}</span></h2>
-            {section.note && <p className="garage-section-note">{section.note}</p>}
+          {groups.map(section => <section key={section.key} aria-label={section.label ?? 'Vehicles'}>
+            {section.label && <h2 className="garage-section-heading">{section.label} <span>{section.vehicles.length}</span></h2>}
             <div className={`garage-vehicles garage-view-${viewMode.toLowerCase()}`}>
-              {section.vehicles.map(vehicle => <GarageVehicleCard key={vehicle.id} vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} />)}
+              {section.vehicles.map(vehicle => <GarageVehicleCard key={vehicle.id} vehicle={vehicle} viewMode={viewMode} onRefresh={refresh} axis={axis} />)}
             </div>
           </section>)}
         </div>
