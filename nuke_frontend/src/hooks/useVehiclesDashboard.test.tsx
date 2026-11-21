@@ -540,3 +540,16 @@ it('labels a garage record with the relationship get_user_garage states, keeping
     profile_record: ['PROFILE RECORD', 'profile_record'], owner: ['RELATIONSHIP REVIEW', 'account_record'],
   });
 });
+
+it('shows a fresh body-held class estimate and the newer of two class estimates, never a class-blind or stale one', async () => {
+  seedGarage();
+  fixture.rows.nuke_estimates = [
+    { vehicle_id: 'car', estimated_value: 20000, calculated_at: '2026-07-10T05:00:00Z', comp_method: 'class_stratified_bodied', is_stale: false, is_circular: false },
+    { vehicle_id: 'car', estimated_value: 15000, calculated_at: '2026-06-17T15:00:00Z', comp_method: 'class_stratified', is_stale: false, is_circular: false },
+    { vehicle_id: 'old', estimated_value: 9000, calculated_at: '2026-10-06T00:00:00Z', comp_method: 'canonical', is_stale: false, is_circular: false },
+    { vehicle_id: 'old', estimated_value: 8000, calculated_at: '2026-10-06T00:00:00Z', comp_method: 'class_stratified_bodied', is_stale: true, is_circular: false },
+  ];
+  await act(async () => root.render(<Harness />));
+  expect(state.vehicles.find(v => v.id === 'car')).toMatchObject({ estimated_value: 20000, estimate_calculated_at: '2026-07-10T05:00:00Z' });
+  expect(state.vehicles.find(v => v.id === 'old')?.estimated_value).toBeNull();
+});

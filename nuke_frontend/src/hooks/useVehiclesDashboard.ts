@@ -774,12 +774,13 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
               .select('vehicle_id, total_events, times_sold, platform_list, first_event_date, last_event_date')
               .in('vehicle_id', vehicleIdArray),
             supabase.rpc('get_vehicle_event_weeks_batch', { vehicle_ids: vehicleIdArray }),
-            // Preserve get_user_garage's existing build-class admission policy.
-            // Never replace absent evidence with legacy value or purchase price.
+            // Build-class estimates only: class_stratified, and class_stratified_bodied (the same
+            // build-class anchor over a comp pool also held to the car's body class). Fresh and
+            // non-circular only. Never replace absent evidence with legacy value or purchase price.
             supabase.from('nuke_estimates')
               .select('vehicle_id, estimated_value, calculated_at')
               .in('vehicle_id', vehicleIdArray)
-              .eq('comp_method', 'class_stratified')
+              .in('comp_method', ['class_stratified', 'class_stratified_bodied'])
               .eq('is_stale', false)
               .eq('is_circular', false),
             readTimelines(),
@@ -806,7 +807,9 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
           if (estimateRes.error) readWarnings.push('Recorded estimates are unavailable. Vehicle relationships remain visible.');
           for (const e of estimateRes.error ? [] : estimateRes.data ?? []) {
             if (Number.isFinite(Number(e.estimated_value)) && Number(e.estimated_value) > 0 &&
-                e.calculated_at && Number.isFinite(Date.parse(e.calculated_at))) {
+                e.calculated_at && Number.isFinite(Date.parse(e.calculated_at)) &&
+                // A car with both kinds shows the newer one.
+                !(Date.parse(estimates.get(e.vehicle_id)?.calculated_at ?? '') >= Date.parse(e.calculated_at))) {
               estimates.set(e.vehicle_id, { estimated_value: Number(e.estimated_value), calculated_at: e.calculated_at });
             }
           }
