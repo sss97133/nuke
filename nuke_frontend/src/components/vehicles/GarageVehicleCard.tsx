@@ -583,7 +583,7 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
   const reelAsked = useRef(false);
   const nextOffset = useRef(REEL_PAGE);
   const paging = useRef(false);
-  // The analysis frame is read the first time the reel nears its end, and exists only when a reader returned a line.
+  // The analysis frame is read when the reel is first asked for, and exists only when a reader returned a line.
   const [analysis, setAnalysis] = useState<AnalysisLine[] | null>(null);
   const analysisAsked = useRef(false);
   const loadAnalysis = useCallback(() => {
@@ -594,6 +594,8 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
   const loadReel = useCallback(() => {
     if (reelAsked.current || (!cover && !vehicle.image_count)) return;
     reelAsked.current = true;
+    // Asked for with the reel, so the Analysis chip is there however many photos sit in front of the frame.
+    loadAnalysis();
     readReelStart(vehicle.id)
       .then(({ sequence, page, total }) => {
         const frames = appendFrames([], [...sequence, ...page], cover);
