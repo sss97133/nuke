@@ -23,11 +23,11 @@ UPDATE vehicle_observations SET is_superseded=false WHERE id='00000000-0000-0000
 CREATE TEMP TABLE source_before_binding AS SELECT structured_data,content_hash,observed_at,ingested_at FROM vehicle_observations
   WHERE id='00000000-0000-0000-0000-000000000070';
 SELECT relink_testimony('observation','00000000-0000-0000-0000-000000000070',NULL,'exact organization UUID',NULL,
-  '{"organization_subject_id":"00000000-0000-0000-0000-000000000050"}');
+  '{"organization_subject_id":"00000000-0000-0000-0000-000000000050"}'::jsonb);
 CREATE TEMP TABLE context_first_binding AS SELECT context_bound_at FROM vehicle_observations
   WHERE id='00000000-0000-0000-0000-000000000070';
 SELECT relink_testimony('observation','00000000-0000-0000-0000-000000000070',NULL,'same typed context retry',NULL,
-  '{"organization_subject_id":"00000000-0000-0000-0000-000000000050"}');
+  '{"organization_subject_id":"00000000-0000-0000-0000-000000000050"}'::jsonb);
 DO $$ BEGIN
   IF (SELECT context_bound_at FROM context_first_binding) IS NULL OR
     (SELECT context_bound_at FROM vehicle_observations WHERE id='00000000-0000-0000-0000-000000000070') IS DISTINCT FROM
@@ -53,9 +53,9 @@ VALUES('00000000-0000-0000-0000-000000000085','media','youtube:c9fxArnD3IY:scree
 CREATE TEMP TABLE legacy_context_before AS SELECT to_jsonb(o)-'citation_publication_id'-'auction_event_id'-'context_bound_at' AS payload
   FROM vehicle_observations o WHERE id='00000000-0000-0000-0000-000000000085';
 SELECT pg_temp.rejects($a$SELECT relink_testimony('observation','00000000-0000-0000-0000-000000000085',NULL,'foreign video attempt',NULL,
-  '{"publication_id":"00000000-0000-0000-0000-000000000011","auction_event_id":"00000000-0000-0000-0000-000000000020"}')$a$,'23514');
+  '{"publication_id":"00000000-0000-0000-0000-000000000011","auction_event_id":"00000000-0000-0000-0000-000000000020"}'::jsonb)$a$,'23514');
 SELECT relink_testimony('observation','00000000-0000-0000-0000-000000000085',NULL,'legacy source context',NULL,
-  '{"publication_id":"00000000-0000-0000-0000-000000000010","auction_event_id":"00000000-0000-0000-0000-000000000020"}');
+  '{"publication_id":"00000000-0000-0000-0000-000000000010","auction_event_id":"00000000-0000-0000-0000-000000000020"}'::jsonb);
 DO $$ DECLARE c jsonb; BEGIN
   SELECT broadcast_media_contribution(o) INTO c FROM vehicle_observations o WHERE id='00000000-0000-0000-0000-000000000085';
   IF (c->>'n')::integer<>1 OR (c->>'t')::numeric<>2546 THEN RAISE EXCEPTION 'legacy nominal source offset not projected'; END IF;
@@ -122,7 +122,7 @@ DO $$ BEGIN
   IF has_function_privilege('authenticated','public.drain_broadcast_profile_queue(integer)','EXECUTE') THEN RAISE EXCEPTION 'untrusted scheduled writer executable'; END IF;
 END $$;
 SELECT set_config('test.auth_role','authenticated',false);
-SELECT pg_temp.rejects($a$SELECT relink_testimony('observation','00000000-0000-0000-0000-000000000070',NULL,'untrusted context writer',NULL,'{}')$a$,'42501');
+SELECT pg_temp.rejects($a$SELECT relink_testimony('observation','00000000-0000-0000-0000-000000000070',NULL,'untrusted context writer',NULL,'{}'::jsonb)$a$,'42501');
 SELECT set_config('test.auth_role','',false);
 
 -- Larger-than-budget events keep their complete foreground state and pending work flag.
