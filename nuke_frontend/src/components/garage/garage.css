@@ -131,3 +131,7 @@
 .garage-merge { position: fixed; z-index: 950; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(640px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); border: 1px solid var(--border-focus); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
 .garage-merge p { margin: 0; flex: 1 1 280px; }
 .garage-merge > div { display: flex; gap: 8px; }
+/* Roll-over: an active day and a lane item answer the pointer at once. */
+.garage-barcode rect[data-level] { cursor: default; transition: transform 120ms; transform-box: fill-box; transform-origin: center; }
+.garage-barcode rect[data-level]:hover { stroke: var(--text); stroke-width: 0.14; transform: scale(1.5); }
+.garage-card .garage-card-title:hover { text-decoration: underline; }
