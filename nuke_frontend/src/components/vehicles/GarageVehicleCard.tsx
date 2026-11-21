@@ -573,7 +573,9 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
   // The car's other photos load the first time the pointer or a finger reaches the photo; the reel is a
   // native scroll-snap strip (a two-finger swipe flips it) with arrows for a mouse. Order: garageReel.ts.
   const cover = vehicle.resolved_image_url;
-  const [reel, setReel] = useState<ReelFrame[]>([]);
+  const [loadedReel, setReel] = useState<ReelFrame[]>([]);
+  // A cover that arrives after the reel loaded is not shown twice.
+  const reel = useMemo(() => cover ? loadedReel.filter(item => item.url !== cover) : loadedReel, [loadedReel, cover]);
   const [photoTotal, setPhotoTotal] = useState(0);
   const [coverDay, setCoverDay] = useState<string | null>(null);
   const [frame, setFrame] = useState(0);
@@ -670,8 +672,8 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
             {(cover || !vehicle.image_count) && <Link to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
               {cover ? (
                 <img
-                  key={vehicle.resolved_image_url}
-                  src={sharedOptimizeImageUrl(vehicle.resolved_image_url, 'medium') || vehicle.resolved_image_url}
+                  key={cover}
+                  src={sharedOptimizeImageUrl(cover, 'medium') || cover}
                   alt={title}
                   width={600}
                   height={450}
