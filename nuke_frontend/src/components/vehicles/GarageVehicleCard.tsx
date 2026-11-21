@@ -527,7 +527,8 @@ function readCardHeader(vehicleId: string): Promise<CardHeader | null> {
       const strip = sections.find(section => section?.kind === 'strip');
       if (!masthead && !strip) return null;
       return {
-        price: Number.isFinite(Number(masthead?.price)) && Number(masthead?.price) > 0 ? Number(masthead.price) : null,
+        // The read ships the price as a claim ({ value, unit, source, observed_at }).
+        price: (amount => Number.isFinite(amount) && amount > 0 ? amount : null)(Number(masthead?.price?.value ?? masthead?.price)),
         priceLabel: typeof masthead?.priceLabel === 'string' ? masthead.priceLabel : null,
         facets: (Array.isArray(strip?.facets) ? strip.facets : [])
           .filter((facet: any) => typeof facet?.label === 'string' && facet.label && facet.dimension !== 'body_style')
