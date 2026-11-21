@@ -126,7 +126,7 @@ it('keeps org-held and recently worked cars in the one list instead of pulling t
 });
 
 it('sums the loaded garage above the cards, and a total orders the cars by what it counts', async()=>{
-  const day=(d:string,photos:number)=>[d,photos,1,0,2];
+  const day=(d:string,photos:number):[string,number,number,number,number]=>[d,photos,1,0,2];
   state={...state,setSortReversed:vi.fn(),sortReversed:false,vehicles:[
     {...vehicle,id:'a',vin:'VIN0000000000001',image_count:10,class_price:{status:'priced',value:20000},timeline:{first_day:'2026-01-02',last_day:'2026-01-03',active_days:2,photos:7,work_days:2,events:0,documents:4,days:[day('2026-01-02',3),day('2026-01-03',4)]}},
     {...vehicle,id:'b',vin:null,image_count:5,class_price:{status:'blocked',value:null},timeline:null},
