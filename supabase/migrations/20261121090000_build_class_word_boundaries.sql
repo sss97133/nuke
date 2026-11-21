@@ -3,11 +3,11 @@
 -- Why. nuke_build_class_rule (20261121073000, verbatim from nuke_build_class v2, 20260623100000) wrote two of its terms
 -- with '\b', which in a PostgreSQL regular expression is a backspace character, not a word boundary ('\y'):
 -- '\b(built|modified|upgraded|swapped|custom)\b' and '\b(stock|factory)\b'. Neither has ever matched a description:
--- over the 18,923 vehicles measured 2026-11-20 (the owner's 138 garage cars and the 11 cohorts of the 13 priced ones),
--- both terms matched 0 times. Every other term in the rule is unaffected ('\d' is a digit, as intended).
+-- over the 18,897 distinct vehicles measured 2026-11-20 (the owner's 138 garage cars and the 11 cohorts of the 13 priced
+-- ones), both terms matched 0 times. Every other term in the rule is unaffected ('\d' is a digit, as intended).
 --
--- Not a straight '\b' -> '\y' swap. Measured read-only over the same 18,923 vehicles, the plain swap moves 1,410 of the
--- first 13,279 cohort members, and a read of 20 of them found 9 wrong, 6 thin, 5 right: "stock #: 20231", "status: in
+-- Not a straight '\b' -> '\y' swap. Measured read-only (on 45-character windows around the words) over the first
+-- 13,279 cohort members, the plain swap moves 1,410, and a read of 20 random moves found 9 wrong, 6 thin, 5 right: "stock #: 20231", "status: in
 -- stock", "built at the San Jose plant", "factory air", "factory a/c", "Custom" as a trim name ("C10 Custom", "Mustang
 -- Custom Fastback"). "factory" alone appears in 2,281 of 14,031 members' text and is almost always a production fact
 -- ("built at the factory", "factory rated", "factory warranty"); bare "stock" is mostly a dealer stock number. Under the
@@ -17,8 +17,8 @@
 --   documented_build: $5,000 or more of current receipts, or 20 or more work sessions.
 --   modified: an engine or transmission swap, three or more build signals, or more build signals than stock signals.
 --     The fixed build signal: the words modified, upgraded or swapped (not "not/never (been) modified", "un-/non-modified",
---     "a modified version of", "manufacturing modified"), or a built engine ("built 289", "built motor", "built small
---     block", "stroker"), or "fully/professionally/kit-built", or "custom build".
+--     "a modified version of", "manufacturing modified"), or a built engine ("built 289", "built 289ci", "built motor",
+--     "built small block", "built stroker"; not a production count such as "built 607,568"), or "fully/professionally/kit-built", or "custom build".
 --   stock: at least one stock signal and no more build signals than stock signals. The fixed stock signal: "completely,
 --     totally, entirely or 100% stock". "stock" and "factory" alone never count; "unknown" is the answer when the paper is
 --     thin.
@@ -27,10 +27,12 @@
 -- Measured 2026-11-20 (read-only, this exact expression inline over full text, both rules on the same rows):
 --   garage (138 cars): 2 unknown -> build (both "kit-built 1932 Ford"; neither has a registered cohort), 136 unchanged.
 --     The fix unblocks no garage price: of the 96 still unknown, 49 have no text and 47 a short note with no signal.
---   cohort members of the 13 priced cars (18,780 distinct): 18,493 unchanged; unknown -> build 215, stock -> build 67,
---     unknown -> stock 3, build -> stock 2. A read of 41 of the moves: 33 right, 4 borderline, 4 wrong (an "upgraded
---     am/fm/cassette", "upgraded with two new mufflers", "hasn't been over-modified", "take this one back to 100% stock").
---   price moves of the 13 priced cars: medians move -3.4% (1967 Camaro, stock, n 114 -> 108) to +11.3% (1985 Suburban, n 6 -> 8); the PR has each.
+--   cohort members of the 13 priced cars (18,780 distinct): 18,495 unchanged; unknown -> build 214, stock -> build 66,
+--     unknown -> stock 3, build -> stock 2. Read: 12 random unknown -> build (8 right, 2 borderline, 2 wrong: "upgraded
+--     am/fm/cassette", "upgraded with two new mufflers"), 12 random stock -> build (10 right, 1 borderline, 1 wrong:
+--     "hasn't been over-modified"), all 5 into stock (3 right, 1 borderline, 1 wrong: "take this one back to 100% stock").
+--   price moves of the 13 priced cars: medians -3.4% (1967 Camaro, stock, n 114 -> 108) to +11.3% (1985 Suburban,
+--     n 6 -> 8); the PR has each.
 --
 -- Version bump. classify_vehicle_build_class writes method_version 'v4_store_word_terms' and refresh_vehicle_class_price
 -- treats any other version as out of date (c_class), so every v3_store_text_paper row is reclassified by the next refresh
@@ -84,7 +86,7 @@ AS $function$
       -- word terms ('\y' is the word boundary): said to be modified, upgraded or swapped, a built engine, a built car
       + (regexp_replace(i.x, '\y(not|never)( been)? modified\y|\y(un|non)-modified\y|\ymodified version\y|\ymanufacturing modified\y', '', 'g')
            ~* '\y(modified|upgraded|swapped)\y'
-         OR i.x ~* '\ybuilt (engine|motor|small[- ]block|big[- ]block|stroker)\y|\ybuilt \d{3}([^0-9]|$)|\y(fully|professionally|kit)[- ]built\y|\ycustom[- ]build\y')::int AS b,
+         OR i.x ~* '\ybuilt (engine|motor|small[- ]block|big[- ]block|stroker)\y|\ybuilt \d{3}(?!,?\d)|\y(fully|professionally|kit)[- ]built\y|\ycustom[- ]build\y')::int AS b,
       (i.x ~* 'original owner|numbers[- ]?matching|matching numbers|all[- ]?original|unrestored|survivor|factory original|as[- ]?delivered|bone[- ]?stock|untouched')::int
       + (i.x ~* 'original .{0,12}(paint|engine|drivetrain|interior|miles)|date[- ]?code|window sticker|build sheet')::int
       -- "stock" and "factory" alone are a stock number, "in stock", a production fact or a factory option: not counted
