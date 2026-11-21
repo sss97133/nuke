@@ -75,8 +75,8 @@ export function analysisLines(reads: CardAnalysisReads): AnalysisLine[] {
   const cp = reads.classPrice;
   if (cp && cp.status === 'priced' && num(cp.value) != null) {
     const n = num(cp.n);
-    lines.push({ key: 'class-value', group: 'money', label: 'Class value', value: usd(num(cp.value)!),
-      cite: [band(cp.value_low, cp.value_high), n != null ? `${plural(n, 'sold comp')} of the same build class` : null].filter(Boolean).join(' · '),
+    lines.push({ key: 'class-value', group: 'money', label: n != null ? `Class value · ${plural(n, 'comp')}` : 'Class value', value: usd(num(cp.value)!),
+      cite: band(cp.value_low, cp.value_high) ?? '',
       title: [cp.basis, cp.computed_at ? `computed ${day(cp.computed_at)}` : null, 'get_vehicle_class_prices'].filter(Boolean).join('. ') });
   }
   const build = reads.build;
@@ -85,7 +85,8 @@ export function analysisLines(reads: CardAnalysisReads): AnalysisLine[] {
     const title = [plural(t.part_lines, 'part line'), span(t.first_day, t.last_day), build.rule, `vehicle_build_reconstruction, as of ${day(build.as_of)}`].filter(Boolean).join('. ');
     const paper = [plural(t.receipts, 'receipt'), monthSpan(t.first_day, t.last_day)].filter(Boolean).join(' · ');
     if (build.amounts_visible && num(t.recorded_amount) != null) {
-      lines.push({ key: 'amount', group: 'money', label: 'On receipts', value: usd(num(t.recorded_amount)!), cite: paper, title });
+      lines.push({ key: 'amount', group: 'money', label: `On ${plural(t.receipts, 'receipt')}`, value: usd(num(t.recorded_amount)!),
+        cite: monthSpan(t.first_day, t.last_day) ?? '', title });
     } else {
       lines.push({ key: 'receipts', group: 'record', label: 'Receipts', value: paper, cite: '', title });
     }
