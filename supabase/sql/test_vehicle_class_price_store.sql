@@ -10,6 +10,9 @@
 -- class price queue own cron (20261121170000): the controller restored byte for byte to its four slices; the job's command
 -- run as pg_cron sends it (one query string): a cancelled refresh keeps its committed claim mark (attempt, error, back of
 -- the line), leaves the stored price and the other queue rows intact, is not re-claimed within 5 minutes, waits a day after 3.
+-- build_class_v6 (20261121200000): the rule reads the model year (four arguments; three = no year); a rebuilt engine is not
+-- a swap, a bare fuel-injection term counts only before 1987, named aftermarket systems, installed engines and LS swaps
+-- count; the store and the caller's view pass the year; callers differ only by named literals; a drifted rule is refused.
 \set ON_ERROR_STOP on
 CREATE ROLE anon;
 CREATE ROLE authenticated;
@@ -1256,6 +1259,155 @@ AS $function$ BEGIN queue := 'drifted'; RETURN NEXT; END; $function$;
 SELECT public.assert((SELECT array_agg(queue) FROM public.drain_vehicle_derived_queues()) = ARRAY['drifted'],
   'own job: a drifted controller is refused, not overwritten');
 
+-- build_class_v6 (20261121200000): a rebuilt engine is not a swap, factory fuel injection is not a build ---------------
+SELECT set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+SELECT public.assert((public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000))->>'status' = 'priced',
+  'before v6: S is priced');
+RESET ROLE;
+SELECT set_config('fixture.role', '', false);
+CREATE TEMP TABLE v6_src_before AS SELECT oid, prosrc, proconfig, prosecdef, provolatile, proacl FROM pg_proc
+  WHERE oid IN ('public.classify_vehicle_build_class(uuid[])'::regprocedure,
+                'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure,
+                'public.nuke_build_class(uuid)'::regprocedure);
+CREATE TEMP TABLE v6_rule3_acl AS SELECT proacl FROM pg_proc WHERE oid = 'public.nuke_build_class_rule(numeric,integer,text)'::regprocedure;
+SELECT public.assert((SELECT count(*) FROM public.vehicle_build_class WHERE method_version = 'v5_store_term_context') > 0,
+  'before v6: the store holds v5 rows');
+
+\ir ../migrations/20261121200000_build_class_rebuild_factory_efi.sql
+-- Idempotent: a second apply (as the deploy does on merge) changes nothing.
+\ir ../migrations/20261121200000_build_class_rebuild_factory_efi.sql
+
+-- The callers changed only by their named literals (settings, definer, volatility and grants too).
+SELECT public.assert((SELECT bool_and(
+      replace(replace(replace(replace(p.prosrc,
+        '''v6_store_rebuild_factory_efi''', '''v5_store_term_context'''),
+        'SELECT v.id, v.year, v.is_modified,', 'SELECT v.id, v.is_modified,'),
+        'inp.txt, inp.year)', 'inp.txt)'),
+        'v_text, (SELECT year FROM vehicles WHERE id = p_vehicle_id))', 'v_text)') = b.prosrc
+    AND p.prosrc <> b.prosrc AND p.proconfig IS NOT DISTINCT FROM b.proconfig AND p.prosecdef = b.prosecdef
+    AND p.provolatile = b.provolatile AND p.proacl IS NOT DISTINCT FROM b.proacl) = true
+    AND count(*) = 3 FROM v6_src_before b JOIN pg_proc p ON p.oid = b.oid),
+  'classify, refresh and nuke_build_class differ from their v5 bodies only by the named literals');
+SELECT public.assert((SELECT substring(prosrc FROM 'c_class\s+constant text := ''([^'']+)''') FROM pg_proc
+    WHERE oid = 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure) = 'v6_store_rebuild_factory_efi',
+  'refresh c_class is the version the classifier writes');
+SELECT public.assert(has_function_privilege('anon', 'public.nuke_build_class_rule(numeric,integer,text)', 'EXECUTE')
+  AND has_function_privilege('anon', 'public.nuke_build_class_rule(numeric,integer,text,integer)', 'EXECUTE')
+  AND (SELECT proacl FROM pg_proc WHERE oid = 'public.nuke_build_class_rule(numeric,integer,text)'::regprocedure)
+      IS NOT DISTINCT FROM (SELECT proacl FROM v6_rule3_acl)
+  AND (SELECT provolatile = 'i' AND proparallel = 's' FROM pg_proc
+        WHERE oid = 'public.nuke_build_class_rule(numeric,integer,text,integer)'::regprocedure), 'anon runs both rule forms');
+
+-- Every earlier rule case answers as before, with no year and with an early year.
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM (SELECT txt, expected FROM rule_cases UNION ALL SELECT txt, expected FROM rule_cases_v5) c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected
+     OR public.nuke_build_class_rule(0, 0, c.txt, 1966)->>'build_class' IS DISTINCT FROM c.expected),
+  'v4 and v5 rule cases under v6');
+-- Each fixed case (no receipts, no sessions): text and model year.
+CREATE TEMP TABLE rule_cases_v6(txt text, yr int, expected text, why text);
+INSERT INTO rule_cases_v6 VALUES
+ -- a rebuild is the same engine made new
+ ('the original engine was rebuilt in 2015', 1967, 'stock', 'rebuilt original engine: the original engine is a stock signal'),
+ ('freshly rebuilt engine and new brakes', 1967, 'unknown', 'rebuilt engine'),
+ ('rebuilt 350 v8 with new gaskets', 1972, 'unknown', 'rebuilt 350'),
+ ('engine rebuild completed 3,000 miles ago', 1966, 'unknown', 'engine rebuild'),
+ ('rebuilt th350 transmission', 1972, 'unknown', 'rebuilt transmission'),
+ ('numbers matching 327, engine rebuilt', 1967, 'stock', 'a rebuilt numbers-matching engine stays stock'),
+ -- a swap still counts
+ ('engine swap to a 383', 1967, 'modified', 'engine swap'),
+ ('350 swapped in from a 1979 truck', 1972, 'modified', '350 swapped in'),
+ ('ls swap', 1972, 'modified', 'LS swap, bare'),
+ ('ls swapped with a 6-speed', 1985, 'modified', 'LS swapped'),
+ ('a crate engine was installed', 1970, 'modified', 'crate engine'),
+ ('the engine was replaced with a 400', 1974, 'modified', 'replaced engine'),
+ ('rebuilt 350 replaced the original 307 engine', 1972, 'modified', 'a rebuilt engine that replaced the original'),
+ ('in 2023 a 383ci v8 was installed', 1966, 'modified', 'an engine installed'),
+ ('the 5.3-liter l83 v8 was installed in 2022', 1979, 'modified', 'an LS engine installed'),
+ ('a tremec five-speed manual transmission has been installed', 1966, 'modified', 'a gearbox installed'),
+ ('the transmission was fitted with new parts', 1966, 'unknown', 'fitted with parts is not a swap'),
+ ('a new geared starter motor was fitted', 1966, 'unknown', 'a starter motor is not an engine'),
+ -- a rebuild that changed the engine is a build signal (not a swap)
+ ('the 289 was rebuilt and stroked to 331', 1965, 'modified', 'a stroked rebuild'),
+ ('383 stroker', 1970, 'modified', 'a stroker'),
+ ('the engine was rebuilt to high-performance specifications', 1971, 'modified', 'a high-performance rebuild'),
+ ('302 rebuilt and bored out to 306ci', 1971, 'modified', 'bored to a new displacement'),
+ ('289 v8 rebuilt and bored .030 over', 1965, 'unknown', 'an overbore is part of a rebuild'),
+ ('rebuilt 327/275 hp v-8 engine', 1967, 'unknown', 'a factory rating is not a build'),
+ -- factory fuel injection from model year 1987
+ ('fuel injected 350', 1988, 'unknown', 'factory TBI on a 1988 truck'),
+ ('fuel-injected 5.7 liter v8', 1995, 'unknown', 'factory injection, 1995'),
+ ('fuel injection, 4-speed automatic', 1987, 'unknown', 'the first factory TBI year'),
+ ('tbi 350 and 4l60', 1989, 'unknown', 'TBI'),
+ ('efi 5.0', 1990, 'unknown', 'EFI'),
+ -- the bare term still counts before 1987, or with no year
+ ('fuel injected 350', 1972, 'modified', 'fuel injection on a carbureted-era car'),
+ ('fuel injected 350', 1986, 'modified', 'the year before the cutoff'),
+ ('fuel injected 350', NULL, 'modified', 'unknown year: as before'),
+ -- named aftermarket systems and conversions count at any year
+ ('holley sniper efi', 1972, 'modified', 'Holley Sniper EFI'),
+ ('holley sniper efi', 1995, 'modified', 'Holley Sniper EFI on a 1995'),
+ ('efi conversion', 1972, 'modified', 'EFI conversion'),
+ ('efi conversion', 1988, 'modified', 'EFI conversion after 1987'),
+ ('converted to fuel injection', 1990, 'modified', 'converted to fuel injection'),
+ ('fitech efi system', 1979, 'modified', 'FiTech'),
+ ('tbi swap', 1983, 'modified', 'TBI swap'),
+ ('ls swap with fuel injection', 1995, 'modified', 'LS swap after 1987');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases_v6 c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt, c.yr)->>'build_class' IS DISTINCT FROM c.expected),
+  'v6 rule cases: ' || coalesce((SELECT string_agg(format('%s [%s, %s] got %s want %s', c.why, c.txt, c.yr,
+      public.nuke_build_class_rule(0, 0, c.txt, c.yr)->>'build_class', c.expected), '; ')
+    FROM rule_cases_v6 c WHERE public.nuke_build_class_rule(0, 0, c.txt, c.yr)->>'build_class' IS DISTINCT FROM c.expected), ''));
+-- The three-argument form is the four-argument form with no year.
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases_v6 c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt) IS DISTINCT FROM public.nuke_build_class_rule(0, 0, c.txt, NULL)),
+  'three arguments = no year');
+SELECT public.assert(public.nuke_build_class_rule(5000, 0, 'fuel injected', 1995)->>'build_class' = 'documented_build', 'paper first');
+
+-- The store and the caller's view read the vehicle's year: the same text, two years, two classes.
+INSERT INTO public.vehicles(id, year, make, model, description) VALUES
+ ('a0000000-0000-4000-8000-000000000051', 1995, 'Fixture', 'Van', 'fuel injected 350, rebuilt engine'),     -- Y1
+ ('a0000000-0000-4000-8000-000000000052', 1972, 'Fixture', 'Van', 'fuel injected 350, rebuilt engine');     -- Y2
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+SELECT public.assert(public.classify_vehicle_build_class(ARRAY['a0000000-0000-4000-8000-000000000051',
+  'a0000000-0000-4000-8000-000000000052']::uuid[]) = 2, 'Y1 and Y2 classified');
+RESET ROLE;
+SELECT set_config('fixture.role', '', false);
+SELECT public.assert((SELECT string_agg(build_class || '/' || method_version, ',' ORDER BY vehicle_id) FROM public.vehicle_build_class
+    WHERE vehicle_id IN ('a0000000-0000-4000-8000-000000000051', 'a0000000-0000-4000-8000-000000000052'))
+  = 'unknown/v6_store_rebuild_factory_efi,modified/v6_store_rebuild_factory_efi', 'the store reads the year');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_build_class b
+    WHERE b.vehicle_id IN ('a0000000-0000-4000-8000-000000000051', 'a0000000-0000-4000-8000-000000000052')
+      AND public.nuke_build_class(b.vehicle_id)->>'build_class' IS DISTINCT FROM b.build_class), 'the caller''s view agrees with the store');
+
+-- Reclassification after the bump: every v5 member is out of date; a full refresh puts the cohort on v6.
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+DO $$ DECLARE r jsonb; n_members int;
+BEGIN
+  SELECT count(*) - 1 INTO n_members FROM public.cohort_members('50000000-0000-4000-8000-000000000001');
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND (r->>'complete')::boolean AND (r->>'classified_this_call')::int = n_members,
+    'the v6 bump reclassifies the whole cohort: ' || r::text);
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.cohort_members('50000000-0000-4000-8000-000000000001') m
+    JOIN public.vehicle_build_class b ON b.vehicle_id = m.vehicle_id WHERE b.method_version <> 'v6_store_rebuild_factory_efi'),
+    'every cohort member is on v6');
+END $$;
+RESET ROLE;
+SELECT set_config('fixture.role', '', false);
+
+-- The guard: a four-argument rule that drifted is not replaced (the migration rolls back).
+CREATE OR REPLACE FUNCTION public.nuke_build_class_rule(p_receipts numeric, p_sessions integer, p_text text, p_year integer)
+ RETURNS jsonb LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path TO pg_catalog, pg_temp
+AS $function$ SELECT '{"build_class": "drifted"}'::jsonb $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261121200000_build_class_rebuild_factory_efi.sql
+\set ON_ERROR_STOP on
+SELECT public.assert(public.nuke_build_class_rule(0, 0, 'lifted', 1972)->>'build_class' = 'drifted',
+  'a drifted v6 rule is refused, not overwritten');
+
 -- The guard: a rule body that drifted is not replaced (the migration rolls back).
 CREATE OR REPLACE FUNCTION public.nuke_build_class_rule(p_receipts numeric, p_sessions integer, p_text text)
  RETURNS jsonb LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path TO pg_catalog, pg_temp
@@ -1266,4 +1418,4 @@ AS $function$ SELECT '{"build_class": "drifted"}'::jsonb $function$;
 SELECT public.assert(public.nuke_build_class_rule(0, 0, 'lifted')->>'build_class' = 'drifted',
   'a drifted rule is refused, not overwritten');
 
-SELECT 'vehicle_class_price store, refresh, tied reader, garage value, classifier parity, cohort resolution and registration, never blank, refresh queue, v5 terms and version bump, own cron job: PASS' AS result;
+SELECT 'vehicle_class_price store, refresh, tied reader, garage value, classifier parity, cohort resolution and registration, never blank, refresh queue, v5 terms and version bump, own cron job, v6 rebuild/factory-injection terms and model year: PASS' AS result;
