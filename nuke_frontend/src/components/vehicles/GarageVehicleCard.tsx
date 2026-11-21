@@ -623,7 +623,8 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
   }, [vehicle.id, cover, photoTotal]);
   // Frame one is the cover when there is one; the reel's photos follow it; the analysis is always last.
   const photoFrames = (cover ? 1 : 0) + reel.length;
-  const hasAnalysis = !!analysis?.length;
+  // A frame needs something to say: counts of questions and observations alone are a record, not an analysis.
+  const hasAnalysis = !!analysis?.some(line => line.group !== 'record');
   const lastFrame = photoFrames - 1 + (hasAnalysis ? 1 : 0);
   const onAnalysis = hasAnalysis && frame >= photoFrames;
   const onReelScroll = (event: React.UIEvent<HTMLDivElement>) => {
