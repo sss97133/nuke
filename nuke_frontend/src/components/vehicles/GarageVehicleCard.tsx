@@ -714,7 +714,7 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
             {hasAnalysis && <GarageCardAnalysis lines={analysis!} />}
           </div>
           {lastFrame > 0 && <>
-            {frame > 0 && <button type="button" className="garage-card-step" data-dir="back" aria-label="Previous frame" onClick={() => step(-1)}>‹</button>}
+            {frame > 0 && <button type="button" className="garage-card-step" data-dir="back" data-on={onAnalysis ? 'analysis' : undefined} aria-label="Previous frame" onClick={() => step(-1)}>‹</button>}
             {frame < lastFrame && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next frame" onClick={() => step(1)}>›</button>}
             {hasAnalysis && !onAnalysis && <button type="button" className="garage-card-to-analysis" onClick={toAnalysis}>Analysis</button>}
             {!onAnalysis && photoFrames > 1 && <span className="garage-card-frame">{Math.min(frame + 1, photoFrames)} / {Math.max(photoTotal, photoFrames).toLocaleString('en-US')}</span>}

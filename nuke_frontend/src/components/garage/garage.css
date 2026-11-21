@@ -142,6 +142,8 @@
 .garage-card-step[data-dir='back'] { left: 8px; }
 .garage-card-step[data-dir='next'] { right: 8px; }
 .garage-card-photo:hover .garage-card-step, .garage-card-step:focus-visible { opacity: 1; }
+/* On the analysis frame the back arrow would sit on the figures, so it shows only under the pointer itself. */
+.garage-card-photo:hover .garage-card-step[data-on='analysis']:not(:hover):not(:focus-visible) { opacity: 0; }
 @media (hover: none) { .garage-page .garage-vehicle-card .garage-card-step { display: none; } }
 @container (max-width: 210px) { .garage-page .garage-vehicle-card .garage-card-step { display: none; } }
 /* The reel's last frame: the readers' lines, a panel the size of a photo, glass over the car's own colours. */
