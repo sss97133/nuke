@@ -17,13 +17,17 @@ describe('garage card analysis lines', () => {
     expect(byKey['reference-hours'].value).toBe('6 h');
     expect(byKey['stage-hours'].value).toBe('20 h (10–30)');
     expect(lines.some(line => line.value === '30.5 h' || line.value === '10.5 h')).toBe(false);
-    expect(byKey.receipts.cite).toContain('vehicle_build_reconstruction');
-    expect(byKey.receipts.cite).toContain('Nov 20, 2026');
     expect(byKey.amount.value).toBe('$1,200');
+    expect(byKey.amount.cite).toBe('3 receipts · 8 part lines · Jan 5, 2024 – Feb 1, 2025');
+    expect(byKey.amount.cite).not.toContain('vehicle_build_reconstruction');
+    expect(byKey.amount.title).toContain('vehicle_build_reconstruction, as of Nov 20, 2026');
+    expect(['paper-hours', 'reference-hours', 'stage-hours'].map(key => byKey[key].group)).toEqual(['hours', 'hours', 'hours']);
   });
 
   it('states an amount only when the reader says amounts are visible', () => {
-    expect(analysisLines({ build: build({}, false) }).some(line => line.key === 'amount')).toBe(false);
+    const lines = analysisLines({ build: build({}, false) });
+    expect(lines.some(line => line.key === 'amount')).toBe(false);
+    expect(lines.find(line => line.key === 'receipts')?.group).toBe('record');
   });
 
   it('splits owner-confirmed from inferred work and cites the sessions', () => {
@@ -33,7 +37,7 @@ describe('garage card analysis lines', () => {
       { session_date: '2025-10-08', duration_minutes: null, owner_confirmed_at: null },
     ] });
     expect(lines.map(line => [line.key, line.value])).toEqual([['work-confirmed', '0.5 h'], ['work-inferred', '2 h']]);
-    expect(lines[1].cite).toBe('work_sessions · 1 of 2 sessions timed · Oct 6, 2025 – Oct 8, 2025');
+    expect(lines[1].cite).toBe('1 of 2 sessions timed · Oct 6, 2025 – Oct 8, 2025');
   });
 
   it('leaves out a reader with nothing to say, and a car with no lines has none', () => {
@@ -54,7 +58,21 @@ describe('garage card analysis lines', () => {
       testimony: { total: 12, by_kind: { condition: 9, work_record: 3 }, first_observed: '2020-10-05T12:00:00Z', last_observed: '2026-11-18T00:00:00Z' },
       depth: [{ day: '2025-10-06', photos: 10, seen: 8, placed: 7 }, { day: '2026-11-02', photos: 5, seen: 5, placed: 5 }],
     });
-    expect(lines.map(line => line.value)).toEqual(['12 · condition 9 · work record 3', '13 of 15 photos']);
-    expect(lines[1].cite).toBe('get_vehicle_day_depth · 2 days · Oct 6, 2025 – Nov 2, 2026');
+    expect(lines.map(line => line.value)).toEqual(['12', '13 of 15']);
+    expect(lines[0].title).toContain('condition 9 · work record 3');
+    expect(lines[1].title).toBe('2 days · Oct 6, 2025 – Nov 2, 2026 · get_vehicle_day_depth');
+  });
+
+  it('states the class value with its band and comp count, and nothing when the reader is blocked', () => {
+    const [line] = analysisLines({ classPrice: { comp_method: 'class_stratified', value: 46200, value_low: 35100, value_high: 76850,
+      n_class_matched_priced: 35, basis: 'median of 35 class-matched comps' } });
+    expect([line.label, line.value, line.cite]).toEqual(['Class value', '$46,200', '$35,100 – $76,850 · 35 sold comps of the same build class']);
+    expect(analysisLines({ classPrice: { comp_method: 'blocked' } })).toEqual([]);
+  });
+
+  it('falls back to the stored estimate the card price reads, dated, when the live reader has no band', () => {
+    const [line] = analysisLines({ classPrice: { comp_method: 'blocked' },
+      estimate: { estimated_value: '38500.00', value_low: '33880.00', value_high: '43120.00', calculated_at: '2026-07-10T05:00:47Z' } });
+    expect([line.label, line.value, line.cite]).toEqual(['Class estimate', '$38,500', '$33,880 – $43,120 · computed Jul 10, 2026']);
   });
 });
