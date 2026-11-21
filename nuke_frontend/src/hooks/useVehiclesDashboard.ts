@@ -760,11 +760,13 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
             try { return await read; } catch { return { data: null, error: true }; }
           };
           const activityRead = readGarageActivity(userId!, vehicleIdArray, () => cancelled);
-          // The day reader is bound by cold photo reads (seconds for a large garage), so it is read
-          // in small chunks, a few at a time, most recently active cars first, and each chunk's
-          // squares are shown as it lands. Nothing else on the card waits for it.
-          const applyTimelines = (rows: unknown) => {
-            for (const t of (Array.isArray(rows) ? rows : []) as (GarageTimeline & { vehicle_id: string })[]) {
+          // The day reader is bound by cold photo reads (seconds for a large garage), so it runs
+          // beside the other reads instead of holding them, in small chunks a few at a time (no one
+          // call carries the whole garage into the statement timeout). The squares are applied
+          // together once every chunk is in: every strip shares one window and intensity scale
+          // (garageAxis), which would re-shade as each chunk landed.
+          const applyTimelines = (rows: (GarageTimeline & { vehicle_id: string })[]) => {
+            for (const t of rows) {
               if (typeof t.vehicle_id === 'string' && allRows.has(t.vehicle_id) && Array.isArray(t.days) &&
                   /^\d{4}-\d{2}-\d{2}$/.test(String(t.first_day)) && /^\d{4}-\d{2}-\d{2}$/.test(String(t.last_day))) {
                 timelines.set(t.vehicle_id, {
@@ -777,9 +779,9 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
             }
           };
           const readTimelines = async () => {
-            const ordered = [...vehicleIdArray].sort((a, b) => (activityAt.get(b) ?? '').localeCompare(activityAt.get(a) ?? ''));
             const chunks: string[][] = [];
-            for (let i = 0; i < ordered.length; i += TIMELINE_CHUNK) chunks.push(ordered.slice(i, i + TIMELINE_CHUNK));
+            for (let i = 0; i < vehicleIdArray.length; i += TIMELINE_CHUNK) chunks.push(vehicleIdArray.slice(i, i + TIMELINE_CHUNK));
+            const rows: (GarageTimeline & { vehicle_id: string })[] = [];
             let error = false;
             let next = 0;
             const worker = async () => {
@@ -788,12 +790,12 @@ export function useVehiclesDashboard(userId: string | undefined | null, scope: '
                 try {
                   const result = await supabase.rpc('get_vehicle_contribution_days_batch', { p_vehicle_ids: chunk });
                   if (result.error || !Array.isArray(result.data)) { error = true; continue; }
-                  applyTimelines(result.data);
-                  publish();
+                  rows.push(...result.data);
                 } catch { error = true; }
               }
             };
             await Promise.all(Array.from({ length: Math.min(TIMELINE_CONCURRENCY, chunks.length) }, worker));
+            if (!cancelled && rows.length) { applyTimelines(rows); publish(); }
             return { error };
           };
           const timelineRead = readTimelines();

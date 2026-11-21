@@ -300,7 +300,7 @@ it('publishes the roster and ready covers while an unrelated activity reader is 
   } finally { await act(async () => release()); }
 });
 
-it('publishes estimates before the day reader lands, then reads every car day grid in chunks', async () => {
+it('publishes estimates before the day reader lands, then applies every chunk of day grids together', async () => {
   seedGarage(); let release!: () => void;
   const ids = Array.from({ length: 30 }, (_, i) => `extra${i}`);
   fixture.rows.garage_records = ids.map(vehicle_id => ({ vehicle_id, relationship: 'profile_record' }));
