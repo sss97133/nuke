@@ -894,9 +894,27 @@ SELECT public.drain_vehicle_class_price_queue(1, 5000);
 SELECT public.assert((SELECT attempts = 2 FROM public.vehicle_class_price_recompute_queue
   WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'second attempt');
 SELECT public.drain_vehicle_class_price_queue(1, 5000);
-SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'dropped after the third');
+SELECT public.assert((SELECT attempts = 3 AND last_error = 'synthetic price failure' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'kept with its error after the third');
+SELECT public.assert((SELECT processed = 0 AND errored = 0 FROM public.drain_vehicle_class_price_queue(1, 5000)),
+  'a thrice-failed id is not claimed again within the day');
 RESET ROLE;
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '25 hours'
+ WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002';
+SET ROLE service_role;
+SELECT public.assert((SELECT errored = 1 FROM public.drain_vehicle_class_price_queue(1, 5000)), 'a day later it is tried again');
+SELECT public.assert((SELECT attempts = 4 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'and waits another day');
+RESET ROLE;
+-- New paper resets the count: the receipt trigger requeues it at attempts 0, and the fixed refresh then completes.
 SELECT set_config('fixture.fail_vehicle', '', false);
+INSERT INTO public.receipts(vehicle_id, user_id, total_amount) VALUES ('d0000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 10);
+SELECT public.assert((SELECT attempts = 0 AND reason = 'receipt' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000002'), 'new paper resets attempts');
+SET ROLE service_role;
+SELECT public.assert((SELECT processed = 1 AND errored = 0 FROM public.drain_vehicle_class_price_queue(1, 5000)), 'refreshed');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'and dequeued');
+RESET ROLE;
 
 -- The daily top-up: a stored row older than 24 h is refreshed; a row whose vehicle is gone is not queued.
 UPDATE public.vehicle_class_price SET computed_at = now() - interval '25 hours' WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000003';

@@ -30,7 +30,9 @@
 --      reason. The subject must be a member of its resolved cohort, or the row says so.
 --   4. vehicle_class_price_recompute_queue (the vehicle_*_recompute_queue shape) and drain_vehicle_class_price_queue:
 --      claims by DELETE ... RETURNING (as the siblings do), refreshes one vehicle at a time under a clock budget, puts back
---      ids that come back incomplete or not reached, retries an error up to 3 times. Each call first tops the queue up
+--      ids that come back incomplete or not reached, keeps a failing id with its error (retried twice at once, then
+--      daily), and classifies cohort members in chunks of 50 (the refresh checks its clock only between chunks; the rule
+--      ran about 6 ms a member on long listing text, read 2026-11-20). Each call first tops the queue up
 --      with up to 50 stored rows older than 24 hours (the daily sweep, which also catches description, year, make and
 --      model edits: no trigger on vehicles).
 --   5. Enqueue: enqueue_vehicle_class_price_on_paper(), a definer trigger function on receipts (insert, delete, update of
@@ -415,6 +417,8 @@ BEGIN
   FOR r IN
     DELETE FROM vehicle_class_price_recompute_queue
      WHERE vehicle_id IN (SELECT q.vehicle_id FROM vehicle_class_price_recompute_queue q
+                           -- an id that failed 3 times waits a day before its next try (new paper resets attempts)
+                           WHERE q.attempts < 3 OR q.queued_at < now() - interval '24 hours'
                            ORDER BY q.queued_at LIMIT v_batch FOR UPDATE SKIP LOCKED)
     RETURNING vehicle_id, attempts, reason
   LOOP
@@ -425,7 +429,9 @@ BEGIN
       CONTINUE;
     END IF;
     BEGIN
-      v_res := public.refresh_vehicle_class_price(r.vehicle_id, v_left);
+      -- Chunks of 50 members: the refresh checks its clock only between chunks, and the rule runs about 6 ms a member
+      -- on long listing text (100 members of the 1971 Chevrolet C10 cohort in 690 ms, read 2026-11-20; slower under load).
+      v_res := public.refresh_vehicle_class_price(r.vehicle_id, v_left, 50);
       processed := processed + 1;
       -- Incomplete (cohort not yet classified): stays queued, behind the others; its classified members are kept.
       IF NOT coalesce((v_res->>'complete')::boolean, false) THEN
@@ -436,12 +442,12 @@ BEGIN
       WHEN query_canceled THEN RAISE;
       WHEN OTHERS THEN
         errored := errored + 1;
-        IF r.attempts + 1 < 3 THEN
-          INSERT INTO vehicle_class_price_recompute_queue (vehicle_id, queued_at, attempts, last_error, reason)
-          VALUES (r.vehicle_id, now(), r.attempts + 1, SQLERRM, 'error')
-          ON CONFLICT (vehicle_id) DO UPDATE SET attempts = EXCLUDED.attempts, last_error = EXCLUDED.last_error;
-        ELSE
-          RAISE WARNING 'class price refresh of % failed 3 times, dropped until the daily top-up: %', r.vehicle_id, SQLERRM;
+        -- Kept with its error: retried at once twice, then once a day (the claim skips it meanwhile).
+        INSERT INTO vehicle_class_price_recompute_queue (vehicle_id, queued_at, attempts, last_error, reason)
+        VALUES (r.vehicle_id, now(), least(r.attempts + 1, 32767), SQLERRM, 'error')
+        ON CONFLICT (vehicle_id) DO UPDATE SET attempts = EXCLUDED.attempts, last_error = EXCLUDED.last_error;
+        IF r.attempts + 1 >= 3 THEN
+          RAISE WARNING 'class price refresh of % failed % times; next try in 24 h: %', r.vehicle_id, r.attempts + 1, SQLERRM;
         END IF;
     END;
   END LOOP;
@@ -451,8 +457,8 @@ $function$;
 COMMENT ON FUNCTION public.drain_vehicle_class_price_queue(integer, integer) IS
   'Drains vehicle_class_price_recompute_queue: tops it up with stored class prices older than 24 h (50 a call), claims the '
   'oldest p_batch_size ids (DELETE ... RETURNING, SKIP LOCKED) and runs refresh_vehicle_class_price on each under '
-  'p_budget_ms (at most 20 s); incomplete and not-reached ids go back, an error is retried up to 3 times. Called by '
-  'drain_vehicle_derived_queues.';
+  'p_budget_ms (at most 20 s, cohort members in chunks of 50); incomplete and not-reached ids go back; a failing id is '
+  'kept with its error and retried twice at once, then once a day. Called by drain_vehicle_derived_queues.';
 REVOKE ALL ON FUNCTION public.drain_vehicle_class_price_queue(integer, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.drain_vehicle_class_price_queue(integer, integer) TO service_role;
 
