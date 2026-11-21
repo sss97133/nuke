@@ -8,7 +8,7 @@ Read-only, citation-first MCP surface for physical assets (vehicles first). Any 
 
 ## One-line install
 
-Remote Streamable HTTP (no API key required for reads):
+Remote Streamable HTTP. Listing the tools needs no credential; calling one needs a signed-in administrator's credential for now (the gate is in `index.ts`: `PUBLIC_TOOLS` and `isPrivilegedCaller`):
 
 ### Claude Code
 
@@ -77,7 +77,7 @@ ChatGPT / Grok Bot / other agents: add a custom MCP connector pointing at `https
 | `value_asset` | Value range from recent same-asset sale and comps (confidence capped at 0.6) |
 | `evaluate_listing` | **Hero tool** — listing URL → verdict, value range, prior sales/relists, top comps, red flags |
 
-History, coverage, and field provenance are folded into `get_asset` / response metadata. No `find_listings`, write, admin, shop, SQL, or legacy catalog tools on this surface. Anonymous reads allowed; best-effort per-IP rate limit.
+History, coverage, and field provenance are folded into `get_asset` / response metadata. No `find_listings`, write, admin, shop, SQL, or legacy catalog tools on this surface. A tool call answers only the service key or an active admin for now: the handlers read through the service client, and each tool reopens to visitors once it is shown to return only what a logged-out visitor may read. Requests without a credential get a best-effort per-IP rate limit.
 
 ## Evidence envelope
 
