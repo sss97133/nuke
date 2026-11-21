@@ -2,10 +2,16 @@
 // One read (get_capture_ledger) draws the days; opening a day reads it once (get_capture_ledger_day). The words and
 // the row shape are the capture app's ingest bar (CaptureIngestBar.swift, CaptureIngestStatus.swift), so a photo reads
 // the same on the phone and here. "Re-scan my library" writes a request the phone claims the next time it runs.
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+// A held set (photos taken together that the matcher could not place) asks "Which vehicle?" in the words of the app's
+// vehicle picker (SessionConfirmView.swift), first in its day. Picking a car writes nothing; only the File tap on the
+// confirm line files the photos left in (attribute_image_session), then the day and the totals are read again.
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Text } from '../kit';
+import { useAuth } from '../hooks/useAuth';
+import { optimizeImageUrl } from '../lib/imageOptimizer';
+import { getVehiclePrimaryName } from '../utils/vehicleDisplayName';
+import { Text, plural } from '../kit';
 import './capture-ledger.css';
 
 type State = 'on_vehicle' | 'unverified' | 'duplicate' | 'waiting' | 'held' | 'pulled' | 'private' | 'unsorted' | 'failed';
@@ -19,13 +25,21 @@ type Frame = { image_id: string; taken_at: string; state: State; reason: string 
   source: string | null; file_name: string | null; thumb: string | null; set_key: string | null; candidates: { vehicle_id: string; name: string | null; score: number | null }[] | null };
 type Skip = { asset_id: string; reason: string; taken_at: string | null; decided_at: string; device: string | null };
 type Day = { day: string; frames: Frame[]; skipped: Skip[] };
+// His vehicles, read the way the phone's picker reads them (AttributionEngine.swift loadConfirmData): the vehicles he
+// created or owns, unresolved records left out, last updated first. Unlike the phone, records that were removed or
+// merged into another are left out too: the filing writer would take photos onto them. These five columns only:
+// vehicles grants SELECT column by column, and one column more fails the whole read.
+type OwnCar = { id: string; year: number | null; make: string | null; model: string | null; primary_image_url: string | null };
+// null: signed out, so nothing can be filed from here
+type Garage = OwnCar[] | 'loading' | 'error' | null;
+// undefined: the tap was ignored (this set is already being filed); null: filed; a string: the error to show.
+type FileSet = (key: string, ids: string[], vehicleId: string, label: string) => Promise<string | null | undefined>;
 
 const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles'; } catch { return 'America/Los_Angeles'; } })();
 const WINDOW_DAYS = 365;
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 const shiftDays = (iso: string, n: number) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return isoDate(d); };
 const n = (v: number) => v.toLocaleString('en-US');
-const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
 const dayLabel = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 const relative = (iso: string, now: number) => {
@@ -63,7 +77,8 @@ export function stageLabel(f: Frame): string {
 export function liveLine(f: Frame): string {
   const name = shortName(f);
   if (f.state === 'held' && f.candidates?.length) {
-    const top = f.candidates.slice(0, 2).map(c => `${c.name ?? 'a vehicle'}${c.score != null ? ` ${Number(c.score).toFixed(1)}` : ''}`).join(', ');
+    // the names only: a matcher score means nothing to the owner
+    const top = f.candidates.slice(0, 2).map(c => c.name ?? 'a vehicle').join(', ');
     return `${name} · closest: ${top}`;
   }
   if (f.state === 'waiting') return `${name} · a viewed sample decides the set`;
@@ -97,14 +112,46 @@ const rescanLine = (l: Ledger, now: number): string => {
   }
   return 'Re-detects your work sites and re-confirms what uploads. Already-uploaded photos are not sent again.';
 };
+// A day's rows: the held frames of each set folded into one question, the questions first (they are the only rows
+// waiting on his hand), then every other row in the reader's time order. The reader already orders frames by taken_at.
+export type DayItem = { kind: 'frame'; f: Frame } | { kind: 'set'; key: string; frames: Frame[] };
+export function dayItems(frames: Frame[]): DayItem[] {
+  const sets = new Map<string, Frame[]>();
+  const rows: DayItem[] = [];
+  for (const f of frames) {
+    if (f.state !== 'held' || !f.set_key) { rows.push({ kind: 'frame', f }); continue; }
+    const set = sets.get(f.set_key);
+    if (set) set.push(f); else sets.set(f.set_key, [f]);
+  }
+  return [...[...sets].map(([key, fs]): DayItem => ({ kind: 'set', key, frames: fs })), ...rows];
+}
+const carLabel = (c: Pick<OwnCar, 'year' | 'make' | 'model'>) =>
+  getVehiclePrimaryName({ year: c.year ?? 0, make: c.make ?? '', model: c.model ?? undefined }) || 'Vehicle';
+// The result line after File. `still`: how many of the photos sent still ask below (null when the day could not be read again).
+export function filedLine(filed: number, sent: number, car: string, still: number | null = null): string {
+  if (filed >= sent) return `Filed ${plural(filed, 'photo')} to ${car}.`;
+  const head = `Filed ${n(filed)} of ${n(sent)} to ${car}.`;
+  if (still === null) return `${head} The others were already filed or couldn't be filed.`;
+  const gone = sent - filed - still;
+  return [head, still > 0 ? `${plural(still, 'photo')} still ${still === 1 ? 'waits' : 'wait'} below.` : '',
+    gone > 0 ? `${n(gone)} ${gone === 1 ? 'was' : 'were'} already filed or couldn't be filed.` : ''].filter(Boolean).join(' ');
+}
+// What the block says when File did not file. The writer's own text is never shown: a refusal (42501) is permanent for
+// that car, anything else (a dropped connection, a timeout) is worth another tap, and nothing moved is the phone's words.
+export const FILE_REFUSED = "You can't file photos onto this vehicle. Pick one you own or can edit.";
+export const FILE_FAILED = "Couldn't file these just now. They're still waiting here. Try again.";
+export const NONE_MOVED = 'No photos were moved. Try again, or pick another vehicle.';
+// The closest records he cannot file onto, on one line: merged into another record, removed, or not tied to his account.
+export const notLinkedLine = (names: string[]) => `Closest, but can't take photos (merged, removed or not linked to your account): ${names.join(', ')}.`;
 
-const Icon = ({ kind, className }: { kind: 'up' | 'warn' | 'check' | 'check-fill' | 'dots' | 'chevron' | 'lock'; className?: string }) => {
+const Icon = ({ kind, className }: { kind: 'up' | 'warn' | 'check' | 'check-fill' | 'circle' | 'dots' | 'chevron' | 'lock'; className?: string }) => {
   const common = { className, viewBox: '0 0 24 24', width: 24, height: 24, 'aria-hidden': true as const, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   switch (kind) {
     case 'up': return <svg {...common}><circle cx="12" cy="12" r="9.5" /><path d="M12 16V8m-4 4 4-4 4 4" /></svg>;
     case 'warn': return <svg {...common}><path d="M12 3 2.5 20h19L12 3z" /><path d="M12 9v5m0 3h.01" /></svg>;
     case 'check': return <svg {...common}><circle cx="12" cy="12" r="9.5" /><path d="m8 12.5 2.5 2.5L16 9.5" /></svg>;
     case 'check-fill': return <svg {...common} fill="currentColor" stroke="var(--surface)"><circle cx="12" cy="12" r="10" stroke="none" /><path d="m8 12.5 2.5 2.5L16 9.5" /></svg>;
+    case 'circle': return <svg {...common}><circle cx="12" cy="12" r="9.5" /></svg>;
     case 'lock': return <svg {...common}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;
     case 'chevron': return <svg {...common}><path d="m6 9 6 6 6-6" /></svg>;
     default: return <svg {...common}><circle cx="12" cy="12" r="9.5" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></svg>;
@@ -130,7 +177,7 @@ function DayPills({ d }: { d: DayRow }) {
 
 function FrameRow({ f }: { f: Frame }) {
   return <li><div className={`cl-frame cl-frame--${f.state}`}>
-    {f.thumb ? <img className="cl-frame__thumb" src={f.thumb} alt="" width={56} height={56} loading="lazy" decoding="async" />
+    {f.thumb ? <img className="cl-frame__thumb" src={optimizeImageUrl(f.thumb, 'thumbnail') ?? f.thumb} alt="" width={56} height={56} loading="lazy" decoding="async" />
       : <span className="cl-frame__thumb" aria-hidden="true"><Icon kind={f.state === 'private' ? 'lock' : 'dots'} /></span>}
     <Icon kind={frameIcon(f.state)} className="cl-frame__icon" />
     <span className="cl-frame__text"><Text role="body">{stageLabel(f)}</Text><Text role="caption">{liveLine(f)}</Text></span>
@@ -146,6 +193,127 @@ function SkipRow({ s }: { s: Skip }) {
   </div></li>;
 }
 
+// One choice: the car's picture and its name, and a check when it is the picked car. Never a score.
+function CarChoice({ label, picture, selected, disabled, onPick }: { label: string; picture: string | null; selected: boolean; disabled: boolean; onPick: (el: HTMLButtonElement) => void }) {
+  const src = optimizeImageUrl(picture, 'thumbnail');
+  return <button type="button" className="cl-ask__choice" aria-pressed={selected} disabled={disabled} onClick={e => onPick(e.currentTarget)}>
+    {src ? <img className="cl-frame__thumb" src={src} alt="" width={72} height={72} loading="lazy" decoding="async" />
+      : <span className="cl-frame__thumb" aria-hidden="true"><Icon kind="dots" /></span>}
+    <Text role="body">{label}</Text>
+    {selected && <Icon kind="check-fill" className="cl-ask__check" />}
+  </button>;
+}
+// In view, clear of the fixed header and the phone's tab bar (scroll-margin in the CSS). jsdom has no scrollIntoView.
+const reveal = (el: Element | null | undefined) => el?.scrollIntoView?.({ block: 'nearest' });
+export const ARM_MS = 400;
+
+// "Which vehicle?" for one held set: the photos (each one can be left out), the matcher's closest cars in its order,
+// and every one of his vehicles behind "Another vehicle". A pick only opens the confirm line beside it; File writes.
+// A closest car that is not one of his vehicles is a line, not a choice: the writer would refuse it. Until his vehicles
+// are read no closest car can be tapped; when they could not be read, every named closest car is offered.
+function HeldSet({ setKey, frames, garage, filing, onFile, onRetryGarage }: { setKey: string; frames: Frame[]; garage: Garage; filing: boolean; onFile: FileSet; onRetryGarage: () => void }) {
+  const headingId = useId();
+  const box = useRef<HTMLElement>(null);
+  const pickedEl = useRef<HTMLButtonElement | null>(null);
+  const [out, setOut] = useState<ReadonlySet<string>>(() => new Set());
+  const [picked, setPicked] = useState<{ id: string; label: string; where: 'closest' | 'all' } | null>(null);
+  // null: the list's default, open when no closest car can be tapped; true or false once he opens or closes it
+  const [all, setAll] = useState<boolean | null>(null);
+  const [query, setQuery] = useState('');
+  const [failure, setFailure] = useState<string | null>(null);
+  const [armed, setArmed] = useState(false);
+  const cars = Array.isArray(garage) ? garage : null;
+  const byId = useMemo(() => new Map((cars ?? []).map(c => [c.id, c])), [cars]);
+  const candidates = useMemo(() => {
+    const seen = new Set<string>();
+    return (frames.find(f => f.candidates?.length)?.candidates ?? []).filter(c => c.vehicle_id && !seen.has(c.vehicle_id) && Boolean(seen.add(c.vehicle_id)));
+  }, [frames]);
+  // what each closest car becomes: a choice (his, or any named one when his vehicles could not be read), a line saying
+  // it cannot take the photos (named and not his), or nothing (still reading, signed out, or not his and nameless)
+  const tappable = useMemo(() => cars ? candidates.filter(c => byId.has(c.vehicle_id)).map(c => ({ id: c.vehicle_id, label: c.name || carLabel(byId.get(c.vehicle_id)!), picture: byId.get(c.vehicle_id)!.primary_image_url }))
+    : garage === 'error' ? candidates.filter(c => c.name).map(c => ({ id: c.vehicle_id, label: c.name!, picture: null })) : [], [candidates, cars, byId, garage]);
+  const notMine = cars ? candidates.filter(c => !byId.has(c.vehicle_id) && c.name).map(c => ({ id: c.vehicle_id, name: c.name! })) : [];
+  const listOpen = all ?? Boolean(cars && tappable.length === 0);
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return !cars ? [] : q ? cars.filter(c => carLabel(c).toLowerCase().includes(q)) : cars;
+  }, [cars, query]);
+  const included = frames.filter(f => !out.has(f.image_id));
+  const first = frames[0], last = frames[frames.length - 1];
+  const span = timeLabel(first.taken_at) === timeLabel(last.taken_at) ? timeLabel(first.taken_at) : `${timeLabel(first.taken_at)} to ${timeLabel(last.taken_at)}`;
+  const toggle = (id: string) => setOut(prev => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next; });
+  const pick = (id: string, label: string, where: 'closest' | 'all', el: HTMLButtonElement) => { pickedEl.current = el; setFailure(null); setPicked({ id, label, where }); };
+  // A pick opens the confirm line and brings it into view. File stays off for a moment after each pick, so the second
+  // tap of a double tap (or a held Enter) that lands on it once the line scrolls in is not taken as his File (Sign).
+  useEffect(() => {
+    if (!picked) return;
+    reveal(box.current?.querySelector('.cl-ask__confirm'));
+    setArmed(false);
+    const t = setTimeout(() => setArmed(true), ARM_MS);
+    return () => clearTimeout(t);
+  }, [picked]);
+  useEffect(() => { if (failure) reveal(box.current?.querySelector('.cl-ask__failure')); }, [failure]);
+  // The list opens below the button: bring its filter into view (not focused, so a phone keeps its keyboard down). Only
+  // when he opened it: a list open by default stays where it is, so opening the day never scrolls the question away.
+  useEffect(() => { if (all) reveal(box.current?.querySelector('.cl-ask__filter')); }, [all, garage]);
+  const cancel = () => { setPicked(null); setFailure(null); pickedEl.current?.focus({ preventScroll: true }); };
+  const file = async () => {
+    if (!picked || included.length === 0) return;
+    setFailure(null);
+    const result = await onFile(setKey, included.map(f => f.image_id), picked.id, picked.label);
+    if (result === undefined) return;
+    if (result) { setFailure(result); return; }
+    // filed: what is still held asks again from the start, every photo in, the list back to its default
+    setPicked(null); setOut(new Set()); setAll(null); setQuery('');
+  };
+  const confirm = (id: string, where: 'closest' | 'all') => picked?.id === id && picked.where === where && <div className="cl-ask__confirm">
+    <p role="status"><Text role="body">{included.length ? `File ${plural(included.length, 'photo')} to ${picked.label}?` : 'Every photo is left out. Tap one to put it back.'}</Text></p>
+    <span className="cl-ask__actions">
+      <button type="button" className="cl-rescan__button" disabled={filing || !armed || included.length === 0 || failure === FILE_REFUSED} aria-busy={filing} onClick={() => void file()}><Text role="label">{filing ? 'Filing…' : 'File'}</Text></button>
+      <button type="button" className="cl-more cl-more--inline" disabled={filing} onClick={cancel}><Text role="label">Cancel</Text></button>
+    </span>
+    {failure && <p role="alert" className="cl-ask__failure"><Icon kind="warn" /><Text role="body">{failure}</Text></p>}
+  </div>;
+
+  return <li><section className="cl-ask" aria-labelledby={headingId} ref={box}>
+    <div className="cl-ask__head">
+      <Icon kind="dots" className="cl-frame__icon" />
+      <span className="cl-frame__text"><Text role="measure" as="h2" id={headingId}>Which vehicle?</Text>
+        <Text role="caption">{`${plural(frames.length, 'photo')} · ${span} · ${stageLabel(first)}`}</Text></span>
+    </div>
+    <p className="cl-ask__hint"><Text role="caption">Every photo is in. Tap one to leave it out.</Text></p>
+    <div className="cl-ask__photos">
+      {frames.map(f => { const left = out.has(f.image_id); const src = optimizeImageUrl(f.thumb, 'small'); return <button key={f.image_id} type="button"
+        className={`cl-ask__photo${left ? ' cl-ask__photo--out' : ''}`} aria-pressed={!left} aria-label={`${shortName(f)}, ${timeLabel(f.taken_at)}`} disabled={filing} onClick={() => toggle(f.image_id)}>
+        {src ? <img src={src} alt="" width={160} height={160} loading="lazy" decoding="async" />
+          : <span className="cl-frame__thumb" aria-hidden="true"><Icon kind="dots" /></span>}
+        <Icon kind={left ? 'circle' : 'check-fill'} className="cl-ask__mark" />
+      </button>; })}
+    </div>
+    {(tappable.length > 0 || notMine.length > 0) && <p className="cl-ask__hint"><Text role="label">Closest matches</Text></p>}
+    {garage === 'loading' && <p className="cl-ask__hint" role="status"><Text role="caption">Reading your vehicles…</Text></p>}
+    <ul className="cl-ask__choices">
+      {tappable.map(c => <li key={c.id}>
+        <CarChoice label={c.label} picture={c.picture} selected={picked?.id === c.id} disabled={filing} onPick={el => pick(c.id, c.label, 'closest', el)} />
+        {confirm(c.id, 'closest')}
+      </li>)}
+      {notMine.length > 0 && <li><p className="cl-ask__hint"><Text role="caption">{notLinkedLine(notMine.map(c => c.name))}</Text></p></li>}
+      {garage !== 'error' && garage !== null && <li><button type="button" className="cl-ask__choice cl-ask__more" aria-expanded={listOpen} disabled={filing} onClick={() => setAll(!listOpen)}>
+        <Text role="body">Another vehicle</Text><Icon kind="chevron" className="cl-ask__chevron" /></button></li>}
+    </ul>
+    {garage === 'error' && <div className="cl-ask__retry"><p><Text role="caption">{tappable.length ? "Couldn't read your other vehicles. Pick from the closest matches, or try again." : "Couldn't read your vehicles. Try again."}</Text></p>
+      <button type="button" className="cl-more cl-more--inline" disabled={filing} onClick={onRetryGarage}><Text role="label">Try again</Text></button></div>}
+    {listOpen && cars && <div className="cl-ask__all">
+      <input className="form-input cl-ask__filter" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Year, make or model" aria-label="Find a vehicle: year, make or model" disabled={filing} />
+      {shown.length === 0 ? <p className="cl-ask__hint"><Text role="caption">No vehicle matches. If it's not here, </Text><Link className="cl-ask__add" to="/vehicle/add"><Text role="caption">add it</Text></Link><Text role="caption"> first.</Text></p>
+        : <ul className="cl-ask__choices">{shown.map(c => { const label = carLabel(c); return <li key={c.id}>
+          <CarChoice label={label} picture={c.primary_image_url} selected={picked?.id === c.id} disabled={filing} onPick={el => pick(c.id, label, 'all', el)} />
+          {confirm(c.id, 'all')}
+        </li>; })}</ul>}
+    </div>}
+  </section></li>;
+}
+
 export default function CaptureLedger() {
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [earlier, setEarlier] = useState<DayRow[]>([]);
@@ -156,6 +324,14 @@ export default function CaptureLedger() {
   const [days, setDays] = useState<Record<string, Day | 'loading' | 'error'>>({});
   const [asking, setAsking] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const { user } = useAuth();
+  const [garage, setGarage] = useState<Garage>(null);
+  const garageAsked = useRef(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [filing, setFiling] = useState<Record<string, boolean>>({});
+  const filingNow = useRef(new Set<string>());
+  const noteToShow = useRef<string | null>(null);
+  const noteEls = useRef(new Map<string, HTMLDivElement>());
 
   const read = useCallback(async () => {
     setLoading(true); setError(null);
@@ -181,6 +357,72 @@ export default function CaptureLedger() {
     setDays(prev => ({ ...prev, [day]: e ? 'error' : (data as Day) }));
   }, [days]);
 
+  // His vehicles, read the first time an opened day holds a set that asks "Which vehicle?", and again on "Try again".
+  // The phone's picker read (AttributionEngine.swift loadConfirmData) without removed or merged-away records: every
+  // car offered is a live record the filing writer takes.
+  const userId = user?.id ?? null;
+  const loadGarage = useCallback(async () => {
+    if (!userId) return;
+    garageAsked.current = true; setGarage('loading');
+    const { data, error: e } = await supabase.from('vehicles').select('id, year, make, model, primary_image_url')
+      .or(`user_id.eq.${userId},owner_id.eq.${userId}`).neq('make', 'UNRESOLVED')
+      .is('deleted_at', null).is('merged_into_vehicle_id', null).order('updated_at', { ascending: false });
+    setGarage(e || !Array.isArray(data) ? 'error' : (data as OwnCar[]));
+  }, [userId]);
+  useEffect(() => {
+    if (garageAsked.current || !userId || !open) return;
+    const d = days[open];
+    if (!d || typeof d === 'string' || !d.frames.some(f => f.state === 'held' && f.set_key)) return;
+    void loadGarage();
+  }, [open, days, userId, loadGarage]);
+
+  // After File: the day again (null when that read fails, keeping what is shown), and the totals without emptying the
+  // page when that read fails (read() would).
+  const rereadDay = useCallback(async (day: string): Promise<Day | null> => {
+    const { data, error: e } = await supabase.rpc('get_capture_ledger_day', { p_day: day, p_tz: TZ });
+    if (e || !data) return null;
+    setDays(prev => ({ ...prev, [day]: data as Day }));
+    return data as Day;
+  }, []);
+  const refreshTotals = useCallback(async () => {
+    const { data, error: e } = await supabase.rpc('get_capture_ledger', { p_tz: TZ, p_from: from, p_to: null, p_limit: 400 });
+    if (!e && data) { setLedger(data as Ledger); setNow(Date.now()); }
+  }, [from]);
+
+  // The one write on a held set, at the File tap: the photos left in, onto the car he picked. Then the day and the
+  // totals are read again so the photos show as added and the pills follow. One File per day at a time: a second tap,
+  // or another set of the same day, sends nothing until it is back, so two day reads never race.
+  const fileSet = useCallback(async (day: string, key: string, ids: string[], vehicleId: string, label: string): Promise<string | null | undefined> => {
+    if (filingNow.current.has(day)) return undefined;
+    filingNow.current.add(day); setFiling(prev => ({ ...prev, [day]: true }));
+    try {
+      const { data, error: e } = await supabase.rpc('attribute_image_session', { p_image_ids: ids, p_vehicle_id: vehicleId, p_reason: 'owner_ledger_answer' });
+      if (e) {
+        if (e.code === '42501') return FILE_REFUSED;
+        // the write may have landed before the connection dropped: read the day again so filed photos stop asking
+        await rereadDay(day);
+        return FILE_FAILED;
+      }
+      const filed = Number(data) || 0;
+      const [fresh] = await Promise.all([rereadDay(day), filed > 0 ? refreshTotals() : null]);
+      if (filed === 0) return NONE_MOVED;
+      const still = fresh ? fresh.frames.filter(f => f.state === 'held' && f.set_key === key && ids.includes(f.image_id)).length : null;
+      noteToShow.current = day;
+      setNotes(prev => ({ ...prev, [day]: `${filedLine(filed, ids.length, label, still)}${fresh ? '' : " This day couldn't be read again; reload to see them."}` }));
+      return null;
+    } finally {
+      filingNow.current.delete(day);
+      setFiling(prev => { const next = { ...prev }; delete next[day]; return next; });
+    }
+  }, [rereadDay, refreshTotals]);
+  // The result line is where he looks next: in view and focused, so a screen reader reads it and Tab goes on from it.
+  useEffect(() => {
+    const day = noteToShow.current; if (!day) return;
+    noteToShow.current = null;
+    const el = noteEls.current.get(day);
+    reveal(el); el?.focus({ preventScroll: true });
+  }, [notes]);
+
   const askRescan = useCallback(async () => {
     setAsking(true);
     const { data, error: e } = await supabase.rpc('request_capture_rescan', { p_from: null, p_source: 'web' });
@@ -196,7 +438,7 @@ export default function CaptureLedger() {
   }, [rows]);
   const anyFailed = (ledger?.totals.failed ?? 0) > 0;
 
-  return <main className="cl-page">
+  return <div className="cl-page">
     <div className="cl-heading"><div><Text role="entity" as="h1">Capture ledger</Text>
       <p><Text role="caption">Every photo you took, by day: what the phone kept, what landed on a vehicle, and what is still waiting.</Text></p></div>
       <Link className="cl-frame__open" to="/?tab=garage"><Text role="label">Garage</Text></Link>
@@ -223,10 +465,15 @@ export default function CaptureLedger() {
         {expanded && <div id={`cl-day-${d.day}`}>
           {detail === 'loading' || !detail ? <div className="cl-notice" role="status"><Text role="caption">Reading the day…</Text></div>
             : detail === 'error' ? <div className="cl-notice" role="alert"><Text role="caption">Couldn't read this day just now.</Text></div>
-            : <ul className="cl-frames">{detail.frames.map(f => <FrameRow key={f.image_id} f={f} />)}{detail.skipped.map(s => <SkipRow key={s.asset_id} s={s} />)}</ul>}
+            : <><div className={notes[d.day] ? 'cl-notice cl-filed' : 'cl-filed'} role="status" tabIndex={-1}
+                ref={el => { if (el) noteEls.current.set(d.day, el); else noteEls.current.delete(d.day); }}>{notes[d.day] && <><Icon kind="check" className="cl-filed__icon" /><Text role="body">{notes[d.day]}</Text></>}</div>
+              <ul className="cl-frames">{dayItems(detail.frames).map(item => item.kind === 'frame' ? <FrameRow key={item.f.image_id} f={item.f} />
+                : <HeldSet key={`set-${item.key}`} setKey={item.key} frames={item.frames} garage={userId ? garage ?? 'loading' : null} filing={Boolean(filing[d.day])}
+                    onFile={(key, ids, vehicleId, label) => fileSet(d.day, key, ids, vehicleId, label)} onRetryGarage={() => void loadGarage()} />)}
+                {detail.skipped.map(s => <SkipRow key={s.asset_id} s={s} />)}</ul></>}
         </div>}
       </li>; })}
     </ol>}
     {ledger && <button type="button" className="cl-more" onClick={showEarlier} disabled={loading}><Text role="label">{loading ? 'Reading…' : `Show the year before ${dayLabel(from)}`}</Text></button>}
-  </main>;
+  </div>;
 }
