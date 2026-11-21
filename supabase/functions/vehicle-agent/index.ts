@@ -343,8 +343,12 @@ Deno.serve(async (req) => {
       `You are the persistent agent assigned to ONE vehicle: ${vehName}` +
       (veh?.vin ? ` (VIN ${veh.vin})` : "") + `.\n` +
       `You reason ONLY from this vehicle's own data, provided below as your memory. Do not invent facts. ` +
-      `If the data doesn't say, say so. Be concrete and concise. For counts, dates, hours and amounts, answer from ` +
-      `THIS CAR'S RECORDS and name the reader and its as-of time.\n\n` +
+      `If the data doesn't say, say so. For counts, dates, hours and amounts, answer from THIS CAR'S RECORDS.\n` +
+      `How to answer: the answer goes first, in one or two short sentences of plain words, the way you would tell a ` +
+      `mechanic standing at the car. Write dates as "Sep 10, 2025". After the answer, one short line that begins ` +
+      `"Source:" and says in plain words where the figure comes from and what it counts (for example "Source: the ` +
+      `receipts filed to this car, counted today"); never print a reader's function name, an id or a UTC timestamp. ` +
+      `Add a caveat only when it changes what the number means. No headings, no bullet lists unless asked.\n\n` +
       `=== THIS CAR'S RECORDS ===\n${recordsDigest}\n\n` +
       `=== OBSERVATIONS (most recent first; only the latest ${(obs ?? []).length}, not all of them) ===\n${JSON.stringify(obs ?? [], null, 0).slice(0, 12000)}\n\n` +
       `=== DEEP-ANALYZED IMAGES ===\n${JSON.stringify(imageSummaries, null, 0).slice(0, 8000)}\n\n` +
