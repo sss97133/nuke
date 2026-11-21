@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import { standingReadings } from '../../lib/standingReadings';
 
 type ComponentSeen = { label: string; confidence?: number; part_number_guess?: string | null };
 
@@ -58,12 +59,12 @@ const AnalysisStreamPage: React.FC = () => {
     setLoadError(null);
 
     (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await standingReadings(supabase
         .from('vehicle_observations')
         .select('id, observed_at, ingested_at, confidence, confidence_score, content_text, structured_data')
         .eq('vehicle_id', vehicleId)
         .eq('kind', 'condition')
-        .contains('structured_data', { analysis_kind: 'image_deep_byok' })
+        .contains('structured_data', { analysis_kind: 'image_deep_byok' }))
         .order('ingested_at', { ascending: false })
         .limit(PAGE_SIZE);
       if (cancelled) return;
@@ -85,12 +86,12 @@ const AnalysisStreamPage: React.FC = () => {
     // supabase_realtime publication on 2026-11-09: decoding every observation write cost ~460 s/h of database time).
     const poll = window.setInterval(async () => {
       if (cancelled || document.visibilityState !== 'visible') return;
-      const { data, error } = await supabase
+      const { data, error } = await standingReadings(supabase
         .from('vehicle_observations')
         .select('id, observed_at, ingested_at, confidence, confidence_score, content_text, structured_data')
         .eq('vehicle_id', vehicleId)
         .eq('kind', 'condition')
-        .contains('structured_data', { analysis_kind: 'image_deep_byok' })
+        .contains('structured_data', { analysis_kind: 'image_deep_byok' }))
         .order('ingested_at', { ascending: false })
         .limit(PAGE_SIZE);
       if (cancelled) return;
