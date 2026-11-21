@@ -308,4 +308,100 @@ SELECT public.assert((SELECT count(*) = 0 FROM public.get_vehicle_class_prices(A
   'a signed-in role without a user id gets no row');
 RESET ROLE;
 
+-- build_class_v4 (20261121090000): word boundaries in the rule, and a class version bump the refresh acts on ----------
+SELECT set_config('fixture.role', '', false), set_config('fixture.uid', '', false);
+\ir ../migrations/20261121090000_build_class_word_boundaries.sql
+-- Idempotent.
+\ir ../migrations/20261121090000_build_class_word_boundaries.sql
+
+-- The bug: '\b' is a backspace in a PostgreSQL regular expression, '\y' the word boundary.
+SELECT public.assert(NOT ('it is built' ~* '\b(built)\b') AND ('it is built' ~* '\y(built)\y'), '\b is not a word boundary, \y is');
+
+-- Each fixed term, and the ambiguous phrases that must not decide a class (no receipts, no sessions, text only).
+CREATE TEMP TABLE rule_cases(txt text, expected text, why text);
+INSERT INTO rule_cases VALUES
+ -- build words, now matched
+ ('this car has been modified with a cam', 'modified', 'modified'),
+ ('engine upgraded to a 302', 'modified', 'upgraded'),
+ ('the 4-bolt wheels were swapped for 5-bolt', 'modified', 'swapped'),
+ ('built 289 with aluminum heads', 'modified', 'a built engine by displacement'),
+ ('built 289ci v8', 'modified', 'a built engine, displacement run into ci'),
+ ('a built motor and 4 speed', 'modified', 'built motor'),
+ ('built small block ford', 'modified', 'built small block'),
+ ('professionally built by a shop', 'modified', 'professionally built'),
+ ('fully built c4 automatic', 'modified', 'fully built'),
+ ('kit-built 1932 ford coupe', 'modified', 'kit-built'),
+ ('a custom build with a shaved dash', 'modified', 'custom build'),
+ -- stock words, now matched
+ ('same owner since 1984. completely stock', 'stock', 'completely stock'),
+ ('said to remain totally stock', 'stock', 'totally stock'),
+ ('100% stock or oem parts', 'stock', '100% stock'),
+ ('numbers matching, upgraded brakes', 'stock', 'one stock and one build signal: the tie stays stock'),
+ -- ambiguous: never a class on their own
+ ('mustang stock #: 20231', 'unknown', 'a dealer stock number'),
+ ('stock number 10716', 'unknown', 'a stock number'),
+ ('inventory id: inv_026. status: in stock', 'unknown', 'in stock'),
+ ('bought with money from the stock market', 'unknown', 'the stock market'),
+ ('the stock air cleaner', 'unknown', 'a stock part'),
+ ('was built in 1973', 'unknown', 'built in a year'),
+ ('built at the san jose plant', 'unknown', 'built at a plant'),
+ ('one of 500 built', 'unknown', 'production count'),
+ ('built 1965 mustang', 'unknown', 'a year after built is not a displacement'),
+ ('factory built', 'unknown', 'factory built'),
+ ('factory air and power steering', 'unknown', 'a factory option'),
+ ('factory a/c', 'unknown', 'a factory option'),
+ ('it has a factory warranty', 'unknown', 'factory alone'),
+ ('1971 chevrolet c10 custom deluxe', 'unknown', 'Custom as a trim name'),
+ ('mustang custom fastback', 'unknown', 'Custom as a trim name'),
+ ('has never been modified', 'unknown', 'negated modified'),
+ ('it was not modified', 'unknown', 'negated modified'),
+ ('an un-modified example', 'unknown', 'un-modified'),
+ ('a non-modified car', 'unknown', 'non-modified'),
+ ('powered by a modified version of the 289', 'unknown', 'a modified version of (history)'),
+ ('shelby began manufacturing modified mustangs', 'unknown', 'manufacturing modified (history)'),
+ (E'\bstock\b', 'unknown', 'a literal backspace no longer counts as a stock signal'),
+ (E'\bmodified\b', 'modified', 'still a word');
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM rule_cases c
+  WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected),
+  'rule cases: ' || coalesce((SELECT string_agg(format('%s [%s] got %s want %s', c.why, c.txt,
+      public.nuke_build_class_rule(0, 0, c.txt)->>'build_class', c.expected), '; ')
+    FROM rule_cases c WHERE public.nuke_build_class_rule(0, 0, c.txt)->>'build_class' IS DISTINCT FROM c.expected), ''));
+-- Paper still wins over words: $5,000 of receipts is a documented build whatever the text says.
+SELECT public.assert(public.nuke_build_class_rule(5000, 0, 'completely stock')->>'build_class' = 'documented_build', 'paper first');
+-- Every pre-existing fixture keeps its class (none of their texts uses a fixed word).
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM class_before b
+  WHERE b.j->>'build_class' IS DISTINCT FROM public.nuke_build_class(b.id)->>'build_class'), 'fixture classes unchanged');
+
+-- Grants as 20261121073000 set them.
+SELECT public.assert(has_function_privilege('anon', 'public.nuke_build_class_rule(numeric,integer,text)', 'EXECUTE'), 'anon runs the rule');
+SELECT public.assert(NOT has_function_privilege('authenticated', 'public.classify_vehicle_build_class(uuid[])', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)', 'EXECUTE'),
+  'writers stay service role only');
+
+-- The bump: the version the refresh treats as current is the version the writer writes.
+SELECT public.assert((SELECT substring(prosrc FROM 'c_class\s+constant text := ''([^'']+)''') FROM pg_proc
+    WHERE oid = 'public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure) = 'v4_store_word_terms'
+  AND (SELECT prosrc LIKE '%''v4_store_word_terms''%' AND prosrc NOT LIKE '%v3_store_text_paper%' FROM pg_proc
+    WHERE oid = 'public.classify_vehicle_build_class(uuid[])'::regprocedure),
+  'refresh c_class and the classifier''s method literal are the same new version');
+SET ROLE service_role;
+SELECT set_config('fixture.role', 'service_role', false);
+DO $$ DECLARE r jsonb;
+BEGIN
+  PERFORM public.assert((SELECT count(*) FROM public.vehicle_build_class WHERE method_version = 'v3_store_text_paper') >= 14,
+    'before: the cohort holds v3 rows');
+  -- Every v3 member is out of date: the refresh reclassifies all 14 (the subject is always reclassified) and reprices.
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000', 5000);
+  PERFORM public.assert(r->>'status' = 'priced' AND (r->>'complete')::boolean AND (r->>'classified_this_call')::int = 14
+    AND r->>'value' = '35000' AND r->>'n' = '6', 'the bump reclassifies the whole cohort: ' || r::text);
+  PERFORM public.assert(NOT EXISTS (SELECT 1 FROM public.cohort_members('50000000-0000-4000-8000-000000000001') m
+    JOIN public.vehicle_build_class b ON b.vehicle_id = m.vehicle_id WHERE b.method_version <> 'v4_store_word_terms'),
+    'every cohort member is on v4');
+  -- And a second refresh finds nothing out of date.
+  r := public.refresh_vehicle_class_price('a0000000-0000-4000-8000-000000000000');
+  PERFORM public.assert((r->>'classified_this_call')::int = 0 AND r->>'status' = 'priced', 'v4 rows are current');
+END $$;
+RESET ROLE;
+
 SELECT 'vehicle_class_price store, refresh, tied reader, garage value and classifier parity: PASS' AS result;
