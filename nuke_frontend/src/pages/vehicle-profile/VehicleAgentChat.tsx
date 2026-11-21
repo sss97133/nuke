@@ -44,7 +44,8 @@ const VehicleAgentChat: React.FC<{ vehicleId: string; defaultCollapsed?: boolean
       });
       if (e) {
         // context is the fetch Response; its body is a stream, so read the JSON the function sent.
-        const body = await (e as any)?.context?.json?.().catch(() => null);
+        let body: any = null;
+        try { body = await (e as any)?.context?.json?.(); } catch { /* not JSON, or no response */ }
         setError(typeof body?.error === 'string' ? body.error : e.message || 'The agent did not answer.');
         setTurns((t) => [...t, { role: 'assistant', content: '(failed)' }]);
       } else {
