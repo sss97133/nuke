@@ -7,6 +7,9 @@
 -- class_price_v2 (20261121110000): cohort resolution (exact, else the canonical name as a whole word) with its refusals,
 -- registration through register_make_model_subject, never blanking a stored price, and the refresh queue (enqueue from
 -- receipts and work sessions, drain, incomplete stays queued, errors retried, daily top-up, the controller's fifth row).
+-- class price queue own cron (20261121170000): the controller restored byte for byte to its four slices; the job's command
+-- run as pg_cron sends it (one query string): a cancelled refresh keeps its committed claim mark (attempt, error, back of
+-- the line), leaves the stored price and the other queue rows intact, is not re-claimed within 5 minutes, waits a day after 3.
 \set ON_ERROR_STOP on
 CREATE ROLE anon;
 CREATE ROLE authenticated;
@@ -1068,6 +1071,190 @@ BEGIN
   PERFORM public.assert((r->>'classified_this_call')::int = 0 AND r->>'status' = 'priced', 'v5 rows are current');
 END $$;
 RESET ROLE;
+SELECT set_config('fixture.role', '', false);
+
+-- class price queue on its own cron statement (20261121170000) -------------------------------------------------------
+-- The controller as 20261121110000 left it (the guard test above swapped in a drifted body on purpose).
+DO $$ BEGIN EXECUTE (SELECT d FROM bodies_after WHERE fn LIKE 'drain_vehicle_derived_queues(%'); END $$;
+SELECT public.assert(md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure))
+  = '2bf3f88d02acaa3244e4312893d18fd9', 'before: the five-slice controller, as live'); -- gitleaks:allow (function fingerprint, not a secret)
+-- pg_cron's job table and schedule(), reduced: schedule upserts by name as pg_cron 1.6 does.
+CREATE SCHEMA cron;
+CREATE TABLE cron.job(jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, active boolean DEFAULT true);
+CREATE FUNCTION cron.schedule(p_name text, p_schedule text, p_command text) RETURNS bigint LANGUAGE sql AS $$
+  INSERT INTO cron.job(jobname, schedule, command) VALUES (p_name, p_schedule, p_command)
+  ON CONFLICT (jobname) DO UPDATE SET schedule = EXCLUDED.schedule, command = EXCLUDED.command RETURNING jobid $$;
+
+\ir ../migrations/20261121170000_class_price_queue_own_cron.sql
+CREATE TEMP TABLE own_job_bodies AS SELECT p.oid, pg_get_functiondef(p.oid) AS d FROM pg_proc p
+  WHERE p.proname IN ('drain_vehicle_derived_queues', 'drain_vehicle_class_price_queue', 'top_up_vehicle_class_price_queue',
+                      'claim_vehicle_class_price_queue_id', 'refresh_claimed_vehicle_class_price', 'refresh_vehicle_class_price');
+-- Idempotent: a second apply (as the deploy does on merge) passes its guard and changes nothing.
+\ir ../migrations/20261121170000_class_price_queue_own_cron.sql
+SELECT public.assert((SELECT count(*) = 6 AND bool_and(b.d = pg_get_functiondef(b.oid)) FROM own_job_bodies b),
+  're-apply leaves the bodies as they were');
+
+-- The controller is byte-identical to its body before 20261121110000.
+SELECT public.assert((SELECT pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure) = d FROM drain_pre),
+  'controller restored byte for byte');
+SELECT public.assert(md5(pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure))
+  = 'f2e15e76d18ecfdd966451635b0fa677', 'controller md5 is the pre-20261121110000 body'); -- gitleaks:allow (function fingerprint, not a secret)
+SELECT public.assert(md5(pg_get_functiondef('public.refresh_vehicle_class_price(uuid,integer,integer,interval)'::regprocedure))
+  = '3bb0a0f6c048f71bb4deda69adcdd993', 'refresh_vehicle_class_price untouched'); -- gitleaks:allow (function fingerprint, not a secret)
+
+-- The job: one row, odd minutes, both statements with their own timeouts, the claim committed before the refresh.
+SELECT public.assert((SELECT count(*) FROM cron.job WHERE jobname = 'drain-class-price-queue') = 1, 'one job, after two applies');
+SELECT public.assert((SELECT schedule = '1-59/2 * * * *'
+    AND command ~ $re$^SELECT set_config\('app\.writer', 'drain-class-price-queue', false\); SET statement_timeout = '15s'; $re$
+    AND command ~ $re$claim_vehicle_class_price_queue_id\(\)::text, ''\), false\); COMMIT; SET statement_timeout = '55s'; SELECT public\.refresh_claimed_vehicle_class_price\($re$
+  FROM cron.job WHERE jobname = 'drain-class-price-queue'), 'job schedule and command');
+
+-- The controller no longer touches the class price queue: four rows, the existing slices called, the queued id stays.
+DELETE FROM public.vehicle_class_price_recompute_queue;
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('a0000000-0000-4000-8000-000000000000', 'receipt');
+DELETE FROM public.fixture_drain_calls;
+SET ROLE service_role;
+CREATE TEMP TABLE ctl4 AS SELECT * FROM public.drain_vehicle_derived_queues(false, 30);
+RESET ROLE;
+SELECT public.assert((SELECT array_agg(queue || ':' || skipped) FROM ctl4)
+  = ARRAY['metric:false', 'stats:false', 'value:true', 'completion:false'], 'controller: the four slices only');
+SELECT public.assert((SELECT array_agg(fn ORDER BY id) FROM public.fixture_drain_calls) = ARRAY['metric', 'stats', 'completion'],
+  'the existing slices are called as before');
+SELECT public.assert((SELECT reason = 'receipt' AND attempts = 0 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'), 'the class price queue is left to its own job');
+
+-- A slow refresh. S is priced; its refresh sleeps 3 s before writing the price. The job's command runs as cron sends it
+-- (one query string, \gexec), with the refresh statement's 55 s timeout lowered to 1 s so the cancel happens here.
+CREATE FUNCTION public.fixture_sleep_price() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN IF NEW.vehicle_id::text = current_setting('fixture.sleep_vehicle', true) THEN PERFORM pg_sleep(3); END IF; RETURN NEW; END $$;
+CREATE TRIGGER fixture_sleep_price BEFORE INSERT ON public.vehicle_class_price FOR EACH ROW EXECUTE FUNCTION public.fixture_sleep_price();
+CREATE TEMP TABLE s_price_before AS SELECT * FROM public.vehicle_class_price WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+SELECT public.assert((SELECT count(*) = 1 AND bool_and(status = 'priced') FROM s_price_before), 'S starts priced');
+CREATE TEMP TABLE others_price_before AS SELECT * FROM public.vehicle_class_price
+  WHERE vehicle_id IN ('d0000000-0000-4000-8000-000000000005', 'f0000000-0000-4000-8000-000000000000');
+DELETE FROM public.vehicle_class_price_recompute_queue;
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, queued_at, reason) VALUES
+ ('a0000000-0000-4000-8000-000000000000', now() - interval '3 minutes', 'receipt'),
+ ('d0000000-0000-4000-8000-000000000005', now() - interval '2 minutes', 'work_session'),
+ ('f0000000-0000-4000-8000-000000000000', now() - interval '1 minute', 'receipt');
+SELECT set_config('fixture.sleep_vehicle', 'a0000000-0000-4000-8000-000000000000', false);
+\set ON_ERROR_STOP off
+SELECT replace(command, $q$statement_timeout = '55s'$q$, $q$statement_timeout = '1s'$q$) FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+\set ON_ERROR_STOP on
+RESET statement_timeout; RESET lock_timeout;
+-- Cancelled: the mark is the attempt, with its error, at the back of the line; nothing else moved.
+SELECT public.assert((SELECT attempts = 1 AND reason = 'running' AND last_error LIKE 'refresh started % (queued as receipt) and did not finish%'
+    AND queued_at > now() - interval '1 minute'
+  FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'),
+  'cancelled: attempt and error recorded: ' || (SELECT row_to_json(q)::text FROM public.vehicle_class_price_recompute_queue q
+    WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'));
+SELECT public.assert((SELECT (c.*)::text = (b.*)::text FROM public.vehicle_class_price c, s_price_before b
+  WHERE c.vehicle_id = b.vehicle_id), 'cancelled: S''s stored price is untouched');
+SELECT public.assert((SELECT array_agg(vehicle_id::text || ':' || reason || ':' || attempts ORDER BY queued_at)
+    FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id <> 'a0000000-0000-4000-8000-000000000000')
+  = ARRAY['d0000000-0000-4000-8000-000000000005:work_session:0', 'f0000000-0000-4000-8000-000000000000:receipt:0'],
+  'cancelled: the other queue rows are intact');
+-- The next runs (real command, 55 s) take the others first; S's mark is under 5 minutes old, so it is not claimed again.
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'the job drained the next vehicle');
+SELECT public.assert((SELECT c.status = 'priced' AND c.computed_at > b.computed_at FROM public.vehicle_class_price c, others_price_before b
+  WHERE c.vehicle_id = b.vehicle_id AND c.vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'and refreshed its price');
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'and the one after');
+CREATE TEMP TABLE s_mark AS SELECT * FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert((SELECT (q.*)::text = (m.*)::text FROM public.vehicle_class_price_recompute_queue q, s_mark m
+  WHERE q.vehicle_id = m.vehicle_id), 'a running mark under 5 minutes old is not claimed (overlap guard)');
+-- Backed off: two more cancelled tries (each after 5 minutes), then it waits a day; nothing loops.
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '6 minutes'
+ WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+\set ON_ERROR_STOP off
+SELECT replace(command, $q$statement_timeout = '55s'$q$, $q$statement_timeout = '1s'$q$) FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+\set ON_ERROR_STOP on
+RESET statement_timeout; RESET lock_timeout;
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '6 minutes'
+ WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+\set ON_ERROR_STOP off
+SELECT replace(command, $q$statement_timeout = '55s'$q$, $q$statement_timeout = '1s'$q$) FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+\set ON_ERROR_STOP on
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert((SELECT attempts = 3 AND reason = 'running' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000'), 'three cancelled attempts recorded');
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '23 hours'
+ WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+SELECT public.assert(public.claim_vehicle_class_price_queue_id() IS NULL, 'after three, not claimed within the day');
+SELECT public.assert((SELECT (c.*)::text = (b.*)::text FROM public.vehicle_class_price c, s_price_before b
+  WHERE c.vehicle_id = b.vehicle_id), 'S''s stored price is still untouched');
+-- A day later it is tried again; fast now, it completes and leaves the queue.
+SELECT set_config('fixture.sleep_vehicle', '', false);
+UPDATE public.vehicle_class_price_recompute_queue SET queued_at = now() - interval '25 hours'
+ WHERE vehicle_id = 'a0000000-0000-4000-8000-000000000000';
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'S refreshed a day later: queue empty');
+SELECT public.assert((SELECT c.status = 'priced' AND c.value = b.value AND c.computed_at > b.computed_at
+  FROM public.vehicle_class_price c, s_price_before b WHERE c.vehicle_id = b.vehicle_id), 'S priced again, same value');
+
+-- An error in the refresh: kept with its message and the attempt; the run itself succeeds.
+SELECT set_config('fixture.fail_vehicle', 'd0000000-0000-4000-8000-000000000005', false);
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('d0000000-0000-4000-8000-000000000005', 'receipt');
+SELECT command FROM cron.job WHERE jobname = 'drain-class-price-queue' \gexec
+RESET statement_timeout; RESET lock_timeout;
+SELECT set_config('fixture.fail_vehicle', '', false);
+SELECT public.assert((SELECT attempts = 1 AND reason = 'error' AND last_error = 'synthetic price failure'
+  FROM public.vehicle_class_price_recompute_queue WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'error kept with its attempt');
+DELETE FROM public.vehicle_class_price_recompute_queue;
+
+-- Incomplete is progress: back in line, the attempt taken back, the stored price kept.
+INSERT INTO public.vehicles(id, year, make, model, description) VALUES ('f0000000-0000-4000-8000-000000000007', 1975, 'Truckco', 'K20', 'lifted');
+CREATE TEMP TABLE z_price_before AS SELECT * FROM public.vehicle_class_price WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000';
+INSERT INTO public.vehicle_class_price_recompute_queue(vehicle_id, reason) VALUES ('f0000000-0000-4000-8000-000000000000', 'receipt');
+SELECT public.assert(public.claim_vehicle_class_price_queue_id() = 'f0000000-0000-4000-8000-000000000000', 'claimed');
+SELECT set_config('fixture.slow_classify', 'on', false);
+SELECT public.assert(public.refresh_claimed_vehicle_class_price('f0000000-0000-4000-8000-000000000000', 1000)->>'outcome' = 'incomplete',
+  'a 1 s budget leaves the new member unclassified');
+SELECT set_config('fixture.slow_classify', 'off', false);
+SELECT public.assert((SELECT attempts = 0 AND reason = 'incomplete' AND last_error IS NULL FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'incomplete: queued, attempt taken back');
+SELECT public.assert((SELECT (c.*)::text = (b.*)::text FROM public.vehicle_class_price c, z_price_before b
+  WHERE c.vehicle_id = b.vehicle_id), 'incomplete: the stored price is kept (never blank)');
+-- Paper during a refresh: the trigger re-queues the id, so the finished refresh does not dequeue it.
+SELECT public.assert(public.claim_vehicle_class_price_queue_id() = 'f0000000-0000-4000-8000-000000000000', 'claimed again');
+INSERT INTO public.work_sessions(vehicle_id, session_type) VALUES ('f0000000-0000-4000-8000-000000000000', 'repair');
+SELECT public.assert((public.refresh_claimed_vehicle_class_price('f0000000-0000-4000-8000-000000000000'))->>'dequeued' = 'false',
+  'complete, but new paper keeps it queued');
+SELECT public.assert((SELECT reason = 'work_session' AND attempts = 0 FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'f0000000-0000-4000-8000-000000000000'), 'the paper''s enqueue survives');
+-- The by-hand drain goes through the same claim and refresh.
+SET ROLE service_role;
+SELECT public.assert((SELECT processed = 1 AND errored = 0 FROM public.drain_vehicle_class_price_queue(5, 5000)), 'by-hand drain');
+RESET ROLE;
+SELECT public.assert(NOT EXISTS (SELECT 1 FROM public.vehicle_class_price_recompute_queue), 'by-hand drain dequeued it');
+-- The daily top-up runs from the claim.
+UPDATE public.vehicle_class_price SET computed_at = now() - interval '25 hours' WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005';
+SELECT public.assert(public.claim_vehicle_class_price_queue_id() = 'd0000000-0000-4000-8000-000000000005', 'the claim tops up stale rows');
+SELECT public.assert((SELECT last_error LIKE '%(queued as stale)%' FROM public.vehicle_class_price_recompute_queue
+  WHERE vehicle_id = 'd0000000-0000-4000-8000-000000000005'), 'queued as stale');
+DELETE FROM public.vehicle_class_price_recompute_queue;
+SELECT public.assert(NOT has_function_privilege('anon', 'public.claim_vehicle_class_price_queue_id(uuid[])', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.refresh_claimed_vehicle_class_price(uuid,integer)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.top_up_vehicle_class_price_queue(integer)', 'EXECUTE')
+  AND has_function_privilege('service_role', 'public.refresh_claimed_vehicle_class_price(uuid,integer)', 'EXECUTE'), 'own job grants');
+
+-- The guard: a controller that drifted again is not replaced (the migration rolls back).
+CREATE OR REPLACE FUNCTION public.drain_vehicle_derived_queues(p_include_value boolean DEFAULT false, p_budget_seconds integer DEFAULT 45)
+ RETURNS TABLE(queue text, processed integer, errored integer, skipped boolean) LANGUAGE plpgsql
+AS $function$ BEGIN queue := 'drifted'; RETURN NEXT; END; $function$;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261121170000_class_price_queue_own_cron.sql
+\set ON_ERROR_STOP on
+SELECT public.assert((SELECT array_agg(queue) FROM public.drain_vehicle_derived_queues()) = ARRAY['drifted'],
+  'own job: a drifted controller is refused, not overwritten');
 
 -- The guard: a rule body that drifted is not replaced (the migration rolls back).
 CREATE OR REPLACE FUNCTION public.nuke_build_class_rule(p_receipts numeric, p_sessions integer, p_text text)
@@ -1079,4 +1266,4 @@ AS $function$ SELECT '{"build_class": "drifted"}'::jsonb $function$;
 SELECT public.assert(public.nuke_build_class_rule(0, 0, 'lifted')->>'build_class' = 'drifted',
   'a drifted rule is refused, not overwritten');
 
-SELECT 'vehicle_class_price store, refresh, tied reader, garage value, classifier parity, cohort resolution and registration, never blank, refresh queue, v5 terms and version bump: PASS' AS result;
+SELECT 'vehicle_class_price store, refresh, tied reader, garage value, classifier parity, cohort resolution and registration, never blank, refresh queue, v5 terms and version bump, own cron job: PASS' AS result;
