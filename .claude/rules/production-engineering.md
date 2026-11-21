@@ -102,6 +102,9 @@ Noted drift:
   (`deployed`, `fn_dirs`); refresh it with `npm run ledger:facts`. Do not
   sweep them: `docs/ledger/CAPABILITY_MAP.md` marks the ones whose source
   must be recovered from git history before anything is touched.
+- 2026-11-21: `ingest-artifact` and `ingest-video-frame` (both never on main) are back in the repository,
+  recovered from their deployed bundles (versions 36 and 35) with the write guard added, so 113 remain.
+  A function recovered this way goes through `scripts/guardrails/check-write-guard.mjs` like any other.
 
 ## Fleet Rules (workflows / crons / daemons)
 
