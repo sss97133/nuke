@@ -1,5 +1,5 @@
 -- Disposable synthetic contract; never production. Every id and sentence below is invented.
--- vehicle_agent_sessions_v1 (20261121043000): a garage agent turn is kept only with the account's consent for that car;
+-- vehicle_agent_sessions_v1 (20261121060000): a garage agent turn is kept only with the account's consent for that car;
 -- only the service role writes it; each account reads only its own sessions; anon reaches none of it.
 \set ON_ERROR_STOP on
 CREATE ROLE anon;
@@ -41,9 +41,9 @@ GRANT ALL ON public.vehicle_agents, public.vehicle_agent_messages TO anon, authe
 INSERT INTO auth.users VALUES ('10000000-0000-4000-8000-000000000001'), ('10000000-0000-4000-8000-000000000002');
 INSERT INTO public.vehicles VALUES ('30000000-0000-4000-8000-000000000001', NULL), ('30000000-0000-4000-8000-000000000002', NULL);
 
-\ir ../migrations/20261121043000_vehicle_agent_sessions.sql
+\ir ../migrations/20261121060000_vehicle_agent_sessions.sql
 -- Idempotent: a second apply changes nothing.
-\ir ../migrations/20261121043000_vehicle_agent_sessions.sql
+\ir ../migrations/20261121060000_vehicle_agent_sessions.sql
 
 CREATE FUNCTION public.assert(ok boolean, message text) RETURNS void LANGUAGE plpgsql AS $$
   BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'FAIL: %', message; END IF; END $$;
