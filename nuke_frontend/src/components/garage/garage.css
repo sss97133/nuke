@@ -189,6 +189,9 @@
 .garage-card-analysis dl.garage-analysis-hours { display: flex; flex-wrap: wrap; gap: 6px 18px; }
 .garage-analysis-record { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .garage-analysis-record { margin: auto 0 0; color: var(--text-secondary); font-size: var(--text-caption); line-height: 1.4; }
+/* Three money figures (class value, spent, quoted) share the row: a tighter row keeps each figure whole on a 280px card. */
+.garage-card-analysis dl.garage-analysis-money:has(> div:nth-child(3)) { column-gap: 8px; }
+.garage-analysis-money:has(> div:nth-child(3)) dd:not(.garage-analysis-cite) { font-size: var(--text-callout); }
 .garage-page .garage-vehicle-card .garage-card-to-analysis, .garage-card-to-analysis { position: absolute; z-index: 3; left: 8px; bottom: 8px; min-width: 0; min-height: 0; height: 22px; padding: 0 9px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 999px; background: rgba(20, 20, 20, 0.45); -webkit-backdrop-filter: blur(12px) saturate(1.6); backdrop-filter: blur(12px) saturate(1.6); color: #fff; font: 500 var(--text-caption)/1 var(--font-family); cursor: pointer; }
 /* The agent's proposals and the keep-sessions switch: glass, quiet, no accent colour. */
 .garage-agent-proposal { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--bg) 35%, transparent); font-size: var(--text-caption); }

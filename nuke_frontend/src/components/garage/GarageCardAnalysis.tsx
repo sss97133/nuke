@@ -10,7 +10,7 @@ import { day, plural } from '../../kit';
 import { answerOf, evidenceOf, parseFamilyIndex, type FamilyIndex } from '../../pages/market/FamilyPriceIndex';
 import type { BuildReconstruction } from '../../pages/vehicle-profile/hooks/useBuildReconstruction';
 
-/** Where a line sits on the frame: the two money figures, the hour lenses, logged work, the market, the record. */
+/** Where a line sits on the frame: the money figures (spent and quoted apart), the hour lenses, logged work, the market, the record. */
 export type AnalysisGroup = 'money' | 'hours' | 'work' | 'market' | 'record';
 /** `cite` is the evidence in plain words; `title` (the tooltip) carries the reader's name and rule. */
 export interface AnalysisLine { key: string; group: AnalysisGroup; label: string; value: string; cite: string; title?: string }
@@ -27,6 +27,16 @@ export interface WorkSessionRow { session_date: string | null; duration_minutes:
 export interface TestimonySummary { total: number; by_kind?: Record<string, number> | null; first_observed?: string | null; last_observed?: string | null }
 export interface DayDepthRow { day: string; photos: number; seen: number; placed: number }
 export interface OpenQuestions { as_of?: string | null; counts?: { open?: number; answered?: number; questions?: number } | null }
+
+/**
+ * vehicle_build_reconstruction's `quoted` lens: estimates, quotes and agreements linked to the car (receipt_doc_kind quote).
+ * Quoted money is never spent money, so it is its own line and never added to the receipts. `amount` is null when several
+ * options stand with none accepted, when there are several quote documents, or for a viewer who may not see amounts.
+ */
+export interface QuotedRead {
+  documents: number | string; first_day?: string | null; last_day?: string | null; amount?: number | string | null;
+  amount_basis?: string | null; rule?: string | null; quotes?: { options?: unknown[] | null }[] | null;
+}
 
 export interface CardAnalysisReads {
   build?: BuildReconstruction | null;
@@ -105,6 +115,24 @@ export function analysisLines(reads: CardAnalysisReads): AnalysisLine[] {
         cite: `${plural(stage.stages, 'stage')}${t.stage_images ? ` in ${plural(t.stage_images, 'photo')}` : ''}`, title });
     }
   }
+  // Beside the receipts line, in its group: a quote is stated as quoted, never summed into what was spent.
+  const quoted = (build as (BuildReconstruction & { quoted?: QuotedRead | null }) | null | undefined)?.quoted;
+  const quotes = num(quoted?.documents);
+  if (build && quoted && quotes != null && quotes > 0) {
+    const options = quotes === 1 && Array.isArray(quoted.quotes?.[0]?.options) ? quoted.quotes![0].options!.length : 0;
+    const amount = build.amounts_visible ? num(quoted.amount) : null;
+    const count = quotes > 1 ? plural(quotes, 'quote') : options > 1 ? `${options} options` : plural(1, 'quote');
+    const title = [quoted.rule, `vehicle_build_reconstruction, as of ${day(build.as_of)}`].filter(Boolean).join('. ');
+    const months = monthSpan(quoted.first_day, quoted.last_day);
+    if (build.amounts_visible) {
+      // a stated amount among several options is the one the paper marks accepted (the reader states none otherwise)
+      const note = amount != null && options > 1 ? `accepted of ${options}` : null;
+      lines.push({ key: 'quoted', group: 'money', label: 'Quoted', value: amount != null ? usd(amount) : count,
+        cite: [months, note].filter(Boolean).join(' · '), title });
+    } else {
+      lines.push({ key: 'quoted', group: 'record', label: 'Quoted', value: [count, months].filter(Boolean).join(' · '), cite: '', title });
+    }
+  }
   const sessions = reads.sessions ?? [];
   lines.push(workLine('work-confirmed', 'Confirmed work', sessions.filter(row => row.owner_confirmed_at)));
   lines.push(workLine('work-inferred', 'Inferred work', sessions.filter(row => !row.owner_confirmed_at)));
@@ -179,7 +207,7 @@ export async function readCardAnalysis(vehicleId: string, classPrice?: ClassPric
 }
 
 /**
- * The frame, laid out like a receipt the size of a photo: the two money figures on top, the hour lenses side by
+ * The frame, laid out like a receipt the size of a photo: the money figures on top (spent and quoted apart), the hour lenses side by
  * side (three readings, never added), logged work, the market line, then the record in one closing line.
  */
 export function GarageCardAnalysis({ lines }: { lines: AnalysisLine[] }) {
