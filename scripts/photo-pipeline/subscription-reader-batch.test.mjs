@@ -26,6 +26,7 @@ exec "$@"
 //   FAKE_START    what the probe answers: one number, or a comma list answered one per probe (the last one repeats)
 //   FAKE_FRAMES   photos the reader claims: a number, or "limit" for as many as --limit asked for (default 0)
 //   FAKE_STOPPED  why the first reads stopped (default: they did not)
+//   FAKE_RELANDED pages the document reader landed again without reading a new one (default 0)
 const FAKE_NODE = `#!/bin/bash
 script="$(basename "$1")"; shift
 printf '%s|%s|%s\\n' "$script" "$*" "\${PATH%%:*}" >> "$HOME/node-calls.log"
@@ -45,7 +46,7 @@ case "$script" in
     echo "{\\"cli\\":\\"lean\\",\\"frames\\":$frames,\\"source\\":\\"stage-queue\\",\\"read\\":$frames,\\"accepted\\":$frames,\\"classifier_rejected\\":0,\\"errors\\":0,\\"error_classes\\":{},\\"receipts\\":$frames,\\"receipt_errors\\":0,\\"stopped\\":$stopped,\\"by_type\\":{},\\"read_seconds\\":1,\\"stages\\":{\\"deep_reading\\":{\\"claimed\\":\${FAKE_DEEP:-0},\\"stopped\\":null}}}" ;;
   subscription-document-reader.mjs)
     out="$(arg --out "$@")"; [ -n "$out" ] && echo '{}' > "$out"
-    echo '{"frames":0,"read":0}' ;;
+    echo "{\\"frames\\":0,\\"read\\":0,\\"page\\":0,\\"landed\\":0,\\"waiting_no_vehicle\\":0,\\"vehicle_document\\":0,\\"errors\\":0,\\"error_classes\\":{},\\"receipts\\":0,\\"receipt_errors\\":0,\\"stopped\\":null,\\"by_type\\":{},\\"read_seconds\\":0,\\"to_land\\":\${FAKE_RELANDED:-0},\\"relanded\\":\${FAKE_RELANDED:-0},\\"reland_vehicle_document\\":0,\\"reland_errors\\":0}" ;;
   reader-heartbeat.mjs) echo "heartbeat $READER_NAME HTTP 200" ;;
 esac
 `;
@@ -167,6 +168,7 @@ test('a full fire whose first reads stopped puts the fast fires on hold', async 
   await withHome(async ({ fire }) => {
     const r = await fire({ FAKE_FRAMES: '20', FAKE_STOPPED: 'reader_usage_limit' });
     assert.deepEqual([r.scripts, r.hold], [FULL, true]);
+    assert.match(r.stdout, /the frame reader did not end clean; fast fires wait for a clean full fire/, 'the hold is never silent');
     const fast = await fire({ FAKE_START: '5' });
     assert.equal(fast.calls.length, 0, 'with the subscription spent the readers run as often as before fast fires: once a full fire');
   });
@@ -183,10 +185,15 @@ test('while a reader is running a fast fire is silent, and a full fire that is d
   });
 });
 
-test('a full fire that read deeply keeps the frame reader\'s receipt file', async () => {
+test('a fire keeps its receipt file whenever its summary counts any work', async () => {
   await withHome(async ({ fire }) => {
     const r = await fire({ FAKE_DEEP: '2' });
-    assert.equal(r.receipts.length, 1);
+    assert.equal(r.receipts.length, 1, 'frames claimed for a deep reading');
     assert.match(r.receipts[0], /^subscription-frame-classifier-/);
+  });
+  await withHome(async ({ fire }) => {
+    const r = await fire({ FAKE_RELANDED: '3' });
+    assert.equal(r.receipts.length, 1, 'a document fire that read no new page but landed three again');
+    assert.match(r.receipts[0], /^subscription-document-reader-/);
   });
 });

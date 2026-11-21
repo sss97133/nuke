@@ -382,6 +382,16 @@ test('keyed values: claimed per photo, one receipt each, no model call', async (
   }, { extraArgs: ['--deep-limit', '0', '--keyed-limit', '0'] });
 });
 
+test('a fast fire\'s limits: --deep-limit 0 and --keyed-limit 0 claim first reads only, and both later stages say off', async () => {
+  await withStandIns(['a-ok.jpg', 'b-ok.jpg', 'c-ok.jpg'], ({ calls, summary, result }) => {
+    assert.deepEqual(calls.claims, [{ p_stage: 'classifier', p_limit: 2, p_lease_seconds: 900, p_user_id: OWNER }], 'one claim, for first reads, of the size asked (the lease has a 15-minute floor); nothing else is claimed');
+    assert.deepEqual([summary.frames, summary.accepted, summary.stopped], [2, 2, null]);
+    assert.deepEqual([summary.stages.deep_reading.skipped, summary.stages.keyed_values.skipped], ['off', 'off']);
+    assert.deepEqual([summary.stages.deep_reading.claimed, summary.stages.keyed_values.claimed], [0, 0]);
+    assert.match(result.stdout.trim().split('\n').pop(), SUMMARY_CLEAN);
+  }, { extraArgs: ['--limit', '2', '--deep-limit', '0', '--keyed-limit', '0'], deepFrames: ['d-ok.jpg'], keyedFrames: ['k-ok.jpg'] });
+});
+
 test('--probe says how many first reads a fire may start and does nothing else', async () => {
   await withStandIns(['a-ok.jpg'], ({ calls, summary, result, claudeArgs }) => {
     assert.equal(result.code, 0);

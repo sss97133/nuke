@@ -73,8 +73,11 @@ run_reader() { # name script args...
   LAST_FRAMES="$(printf '%s' "$summary" | sed -n 's/^{"cli":"[a-z_]*","frames":\([0-9][0-9]*\),.*/\1/p')"; LAST_FRAMES="${LAST_FRAMES:-0}"
   LAST_CLEAN=0
   if [ "$rc" -eq 0 ] && printf '%s' "$summary" | grep -Eq '^\{"cli":"[a-z_]+","frames":[0-9]+,"source":"[a-z-]+","read":[0-9]+,"accepted":[0-9]+,"classifier_rejected":[0-9]+,"errors":[0-9]+,"error_classes":\{[^}]*\},"receipts":[0-9]+,"receipt_errors":[0-9]+,"stopped":null,'; then LAST_CLEAN=1; fi
-  # a fire that read nothing leaves no receipt file behind (2,107 such files had piled up by 2026-11-20)
-  if [ "$rc" -eq 0 ] && printf '%s' "$summary" | grep -q '"frames":0' && ! printf '%s' "$summary" | grep -Eq '"claimed":[1-9]'; then rm -f "$out"; fi
+  # A fire that did nothing leaves no receipt file behind: it claimed no frame and every count of work in its summary
+  # is zero (a document fire that only re-landed pages keeps its file). On 2026-11-20, 352 of the 1,059 frame files and
+  # 840 of the 1,053 document files in ~/nuke/logs held no rows.
+  if [ "$rc" -eq 0 ] && printf '%s' "$summary" | grep -q '"frames":0,' \
+     && ! printf '%s' "$summary" | grep -Eq '"(claimed|landed|to_land|relanded|reland_vehicle_document|reland_errors|errors|receipt_errors)":[1-9]'; then rm -f "$out"; fi
   # 4. heartbeat: record_reader_heartbeat (service role only) upserts one job_assay_readings row per reader; the cron job
   #    subscription-reader-watch fails when either row is older than 40 minutes, so v_job_health shows a silent reader.
   #    The summary is model-derived text (by_type keys are read off photographed documents). It travels in the
@@ -117,5 +120,8 @@ fi
 #    need the newer CLI for it, so both search ~/.local/bin first.
 READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-document-reader "$MAIN/scripts/photo-pipeline/subscription-document-reader.mjs" --limit "$DOCS_LIMIT" --concurrency 2
 READER_PATH_FIRST="$HOME/.local/bin" run_reader subscription-frame-classifier "$FRAME_READER" --limit "$FRAMES_LIMIT" --concurrency 2 --status failed,pending --deep-limit "$DEEP_LIMIT" --keyed-limit "$KEYED_LIMIT"
-# fast fires run only after a full fire whose first reads ended clean
-if [ "$LAST_CLEAN" -eq 1 ]; then rm -f "$FAST_HOLD"; else date +%s > "$FAST_HOLD"; fi
+# fast fires run only after a full fire whose first reads ended clean; a full fire that holds them says so
+if [ "$LAST_CLEAN" -eq 1 ]; then rm -f "$FAST_HOLD"; else
+  date +%s > "$FAST_HOLD"
+  echo "$STAMP the frame reader did not end clean; fast fires wait for a clean full fire"
+fi
