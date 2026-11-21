@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import Link from '../PrefetchLink';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl as sharedOptimizeImageUrl } from '../../lib/imageOptimizer';
-import { fetchVehicleImages } from '../../lib/fetchVehicleImages';
+import { appendFrames, coverDayOf, readReelPage, readReelStart, REEL_PAGE, type ReelFrame } from '../garage/garageReel';
 import type { GarageVehicle, RelationshipType, ViewMode } from '../../hooks/useVehiclesDashboard';
 import '../garage/garage.css';
 
@@ -569,26 +569,54 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
   const priceTitle = header?.price != null ? header.priceLabel ?? 'Price on the profile' : estimateTooltip(vehicle);
   const active = activeAgo(vehicle);
   const [vinCopied, setVinCopied] = useState(false);
-  // The car's other photos load the first time the pointer or a finger reaches the cover;
-  // the reel is a native scroll-snap strip, so a two-finger swipe flips through them.
-  const [reel, setReel] = useState<{ url: string; day: string | null }[]>([]);
+  // The car's other photos load the first time the pointer or a finger reaches the photo; the reel is a
+  // native scroll-snap strip (a two-finger swipe flips it) with arrows for a mouse. Order: garageReel.ts.
+  const cover = vehicle.resolved_image_url;
+  const [reel, setReel] = useState<ReelFrame[]>([]);
+  const [photoTotal, setPhotoTotal] = useState(0);
   const [coverDay, setCoverDay] = useState<string | null>(null);
   const [frame, setFrame] = useState(0);
+  const reelRef = useRef<HTMLDivElement>(null);
   const reelAsked = useRef(false);
+  const nextOffset = useRef(REEL_PAGE);
+  const paging = useRef(false);
   const loadReel = useCallback(() => {
-    if (reelAsked.current || !vehicle.resolved_image_url) return;
+    if (reelAsked.current || (!cover && !vehicle.image_count)) return;
     reelAsked.current = true;
-    // The shared gallery reader: the display gate, and the public source for a signed-out visitor.
-    fetchVehicleImages<{ image_url: string; is_sensitive: boolean | null; taken_at: string | null }>(vehicle.id, 'image_url, is_sensitive, taken_at', { maxRows: 12, includeMismatchFilter: true })
-      .then(rows => {
-        const seen = new Set<string>();
-        const shown = rows.filter(row => !row.is_sensitive && typeof row.image_url === 'string' && row.image_url && !seen.has(row.image_url) && seen.add(row.image_url))
-          .map(row => ({ url: row.image_url, day: row.taken_at ? row.taken_at.slice(0, 10) : null }));
-        setCoverDay(shown.find(row => row.url === vehicle.resolved_image_url)?.day ?? null);
-        setReel(shown.filter(row => row.url !== vehicle.resolved_image_url));
+    readReelStart(vehicle.id)
+      .then(({ sequence, page, total }) => {
+        setCoverDay(coverDayOf([...sequence, ...page], cover));
+        setReel(appendFrames([], [...sequence, ...page], cover));
+        setPhotoTotal(total);
       })
       .catch(() => { reelAsked.current = false; });
-  }, [vehicle.id, vehicle.resolved_image_url]);
+  }, [vehicle.id, cover, vehicle.image_count]);
+  const loadMore = useCallback(() => {
+    if (paging.current || nextOffset.current >= photoTotal) return;
+    paging.current = true;
+    const offset = nextOffset.current;
+    readReelPage(vehicle.id, offset)
+      .then(rows => {
+        nextOffset.current = offset + REEL_PAGE;
+        setCoverDay(day => day ?? coverDayOf(rows, cover));
+        setReel(frames => appendFrames(frames, rows, cover));
+      })
+      .catch(() => {})
+      .finally(() => { paging.current = false; });
+  }, [vehicle.id, cover, photoTotal]);
+  // Frame one is the cover when there is one; the reel's photos follow it.
+  const photoFrames = (cover ? 1 : 0) + reel.length;
+  const onReelScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const at = Math.round(event.currentTarget.scrollLeft / Math.max(1, event.currentTarget.clientWidth));
+    setFrame(at);
+    // Three frames from the end of what has loaded, the next page is asked for.
+    if (at >= photoFrames - 3) loadMore();
+  };
+  const step = (by: number) => {
+    loadReel();
+    const node = reelRef.current;
+    if (node) node.scrollBy({ left: by * node.clientWidth, behavior: 'smooth' });
+  };
   const title = formatVehicleTitle(vehicle);
   const name = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim && vehicle.trim !== vehicle.model ? vehicle.trim : null]
     .filter(Boolean).join(' ');
@@ -617,10 +645,9 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
     <div className="garage-vehicle-card" ref={cardRef}>
       <article className="garage-card">
         <div className="garage-card-photo" onPointerEnter={loadReel} onTouchStart={loadReel}>
-          <div className="garage-card-reel"
-            onScroll={event => setFrame(Math.round(event.currentTarget.scrollLeft / Math.max(1, event.currentTarget.clientWidth)))}>
-            <Link to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
-              {vehicle.resolved_image_url ? (
+          <div className="garage-card-reel" ref={reelRef} onScroll={onReelScroll}>
+            {(cover || !vehicle.image_count) && <Link to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
+              {cover ? (
                 <img
                   key={vehicle.resolved_image_url}
                   src={sharedOptimizeImageUrl(vehicle.resolved_image_url, 'medium') || vehicle.resolved_image_url}
@@ -650,16 +677,21 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
                 />
               ) : (
                 // The cover arrives after the roster; only a car with no photos says so.
-                !vehicle.image_count && <span className="garage-card-photo-empty">No photo yet</span>
+                <span className="garage-card-photo-empty">No photo yet</span>
               )}
-            </Link>
+            </Link>}
             {reel.map(({ url }) => (
               <Link key={url} to={`/vehicle/${vehicle.id}`} aria-hidden="true" tabIndex={-1}>
                 <img src={sharedOptimizeImageUrl(url, 'medium') || url} alt="" width={600} height={450} loading="lazy" decoding="async" />
               </Link>
             ))}
           </div>
-          {reel.length > 0 && <span className="garage-card-frame">{frame + 1} / {reel.length + 1}</span>}
+          {photoFrames > 1 && <>
+            {frame > 0 && <button type="button" className="garage-card-step" data-dir="back" aria-label="Previous photo" onClick={() => step(-1)}>‹</button>}
+            {frame < photoFrames - 1 && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next photo" onClick={() => step(1)}>›</button>}
+            <span className="garage-card-frame">{Math.min(frame + 1, photoFrames)} / {Math.max(photoTotal, photoFrames).toLocaleString('en-US')}</span>
+          </>}
+          {photoFrames <= 1 && (vehicle.image_count ?? 0) > 1 && <button type="button" className="garage-card-step" data-dir="next" aria-label="Next photo" onClick={() => step(1)}>›</button>}
 
           {/* This RPC revokes discovery membership, not an ownership period. */}
           {vehicle.relationship_source === 'discovered' && (
@@ -704,7 +736,7 @@ function GridCard({ vehicle, onRefresh, axis, actions = [] }: { vehicle: GarageV
             {actions.map(action => <button key={action.label} type="button" onClick={action.onPress}>{action.label}</button>)}
           </div>
 
-          <MiniBarcode vehicle={vehicle} axis={axis} litDay={frame === 0 ? coverDay : reel[frame - 1]?.day} />
+          <MiniBarcode vehicle={vehicle} axis={axis} litDay={cover ? (frame === 0 ? coverDay : reel[frame - 1]?.day) : reel[frame]?.day} />
           {(span || counts.length > 0) && (
             <p className="garage-card-record">
               {span && <span className="garage-card-span">{span}</span>}
