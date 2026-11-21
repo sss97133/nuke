@@ -37,7 +37,7 @@ function formatVehicleTitle(v: GarageVehicle): string {
     .toUpperCase();
 }
 
-function formatCurrency(n: number): string {
+export function formatCurrency(n: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -301,7 +301,7 @@ export function garageAxis(vehicles: GarageVehicle[], now = new Date()): GarageA
   return { start, end: today, weeks: TIMELINE_WEEKS, steps: [at(0.25), at(0.5), at(0.75)], grid };
 }
 
-function MiniBarcode({ vehicle, axis, litDay }: { vehicle: GarageVehicle; axis?: GarageAxis; litDay?: string | null }) {
+export function MiniBarcode({ vehicle, axis, litDay }: { vehicle: GarageVehicle; axis?: GarageAxis; litDay?: string | null }) {
   const drawn = useMemo(() => {
     const frame = axis ?? garageAxis([vehicle]);
     const cells: { key: string; x: number; y: number; level: number; title: string }[] = [];

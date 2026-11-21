@@ -1,3 +1,4 @@
+import { sortVehicles } from './useVehiclesDashboard';
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -596,4 +597,14 @@ it('reads class prices in chunks the reader accepts and marks a car with no row 
   expect(reads.every(call => call[2].p_vehicle_ids.length <= 200)).toBe(true);
   expect(state.vehicles.find(v => v.id === 'extra000')?.class_price).toBeNull();
   expect(state.vehicles.find(v => v.id === 'car')?.class_price?.status).toBe('priced');
+});
+
+it('orders by any recorded measure, reversible, with cars that lack it last either way', ()=>{
+  const car=(id:string,extra:any)=>({id,year:null,make:null,model:null,created_at:'',...extra}) as any;
+  const cars=[car('none',{}),car('few',{image_count:2,year:1990,class_price:{value:'100'}}),car('many',{image_count:9,year:1970,class_price:{value:500}})];
+  const order=(mode:any,reversed=false)=>[...cars].sort((a,b)=>sortVehicles(a,b,mode,reversed)).map(v=>v.id);
+  expect(order('PHOTOS')).toEqual(['many','few','none']);
+  expect(order('PHOTOS',true)).toEqual(['few','many','none']);
+  expect(order('YEAR')).toEqual(['few','many','none']);
+  expect(order('CLASS',true)).toEqual(['few','many','none']);
 });
