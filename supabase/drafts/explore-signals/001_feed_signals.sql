@@ -17,17 +17,18 @@ CREATE TABLE IF NOT EXISTS public.feed_signals (
   at           timestamptz NOT NULL,                       -- when it happened on the phone
   received_at  timestamptz NOT NULL DEFAULT now(),         -- when Nuke learned it
   surface      text        NOT NULL DEFAULT 'explore_browse',
-  item_id      text        NOT NULL,                       -- "ask:<event_id>" | "live:<lot id>"
+  item_id      text        NOT NULL,                       -- "ask:<event_id>" | "live:<lot id>" | "browse-tuning"
   vehicle_id   uuid,
   source       text,
   kind         text        NOT NULL CHECK (kind IN ('impression','dwell','page','photo','open_listing','open_profile',
-                                                    'press','choice','follow','share','comment_open')),
+                                                    'press','choice','follow','share','comment_open','tune')),
   page_kind    text        CHECK (page_kind IN ('photos','location','analytics','listing')),
   page_index   smallint    CHECK (page_index BETWEEN 0 AND 100),
   photo_index  smallint    CHECK (photo_index BETWEEN 0 AND 1000),
   dwell_ms     integer     CHECK (dwell_ms BETWEEN 0 AND 3600000),
   choice       text        CHECK (choice IN ('more','less','hide')),
   position     integer     CHECK (position BETWEEN 0 AND 100000),
+  tuned        text        CHECK (tuned ~ '^[a-z,]{0,80}$'),             -- kind tune: names of filters changed, never values
   client       text        NOT NULL DEFAULT 'ios',
   PRIMARY KEY (user_id, id)
 );
@@ -55,12 +56,12 @@ BEGIN
   IF v_n > 200 THEN RETURN jsonb_build_object('ok', false, 'error', 'too_many', 'max', 200); END IF;
 
   INSERT INTO feed_signals (id, user_id, session_id, at, item_id, vehicle_id, source, kind, page_kind,
-                            page_index, photo_index, dwell_ms, choice, position)
+                            page_index, photo_index, dwell_ms, choice, position, tuned)
   SELECT (e->>'id')::uuid, v_uid, nullif(e->>'session_id','')::uuid,
          least((e->>'at')::timestamptz, now() + interval '5 minutes'),
          e->>'item_id', nullif(e->>'vehicle_id','')::uuid, e->>'source', e->>'kind', e->>'page_kind',
          (e->>'page_index')::smallint, (e->>'photo_index')::smallint, (e->>'dwell_ms')::int, e->>'choice',
-         (e->>'position')::int
+         (e->>'position')::int, e->>'tuned'
     FROM jsonb_array_elements(p_events) e
   ON CONFLICT (user_id, id) DO NOTHING;
   GET DIAGNOSTICS v_ok = ROW_COUNT;
