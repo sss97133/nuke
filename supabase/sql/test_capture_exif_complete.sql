@@ -1,4 +1,4 @@
--- Contract: 20261122190000_capture_exif_complete. capture_exif_complete_v1 adds the camera fields and the handset session
+-- Contract: 20261122210000_capture_exif_complete. capture_exif_complete_v1 adds the camera fields and the handset session
 -- read from a photo's own file to its existing exif_data, never overwrites a key, never writes a clock or GPS, skips
 -- other owners' rows, rows without a stored picture, privacy-excluded, sensitive and personal rows, marks every row it
 -- examines once, and capture_exif_complete_revert_v1 removes exactly what a run added.
@@ -40,7 +40,7 @@ INSERT INTO vehicle_images (id, user_id, image_url, taken_at, exif_data, is_sens
 INSERT INTO capture_privacy_promote_exclude VALUES ('a0000000-0000-4000-8000-000000000006', 'fixture');
 CREATE TEMP TABLE t_before AS SELECT id, taken_at, exif_data FROM vehicle_images;
 
-\ir ../migrations/20261122190000_capture_exif_complete.sql
+\ir ../migrations/20261122210000_capture_exif_complete.sql
 SELECT t_assert(NOT has_function_privilege('authenticated', 'public.capture_exif_complete_v1(uuid,uuid,uuid,jsonb,boolean)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.capture_exif_complete_revert_v1(uuid,uuid)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.capture_exif_complete_v1(uuid,uuid,uuid,jsonb,boolean)', 'EXECUTE'),
@@ -94,8 +94,8 @@ SELECT t_assert((SELECT (r ->> 'reverted')::int = 3 FROM t_rev)
   AND (SELECT count(*) FROM vehicle_images v JOIN t_before b USING (id) WHERE v.exif_data IS DISTINCT FROM b.exif_data) = 0,
   'revert: every row is back to what it held');
 
-\ir ../migrations/20261122190000_capture_exif_complete.sql
+\ir ../migrations/20261122210000_capture_exif_complete.sql
 SELECT t_assert(to_regprocedure('public.capture_exif_complete_v1(uuid,uuid,uuid,jsonb,boolean)') IS NOT NULL, 'replay: the migration re-applies');
-\ir revert_20261122190000_capture_exif_complete.sql
+\ir revert_20261122210000_capture_exif_complete.sql
 SELECT t_assert(to_regprocedure('public.capture_exif_complete_v1(uuid,uuid,uuid,jsonb,boolean)') IS NULL
   AND to_regprocedure('public.capture_exif_complete_revert_v1(uuid,uuid)') IS NULL, 'revert file: functions dropped');

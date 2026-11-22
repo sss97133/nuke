@@ -17,7 +17,7 @@
 -- No new table, no new column: the fields go to the existing exif_data column.
 -- Revert a run: capture_exif_complete_revert_v1(user, run) removes exactly the keys that run added and its marker.
 -- Contract: supabase/sql/test_capture_exif_complete.sql
--- Revert of this file: supabase/sql/revert_20261122190000_capture_exif_complete.sql
+-- Revert of this file: supabase/sql/revert_20261122210000_capture_exif_complete.sql
 
 begin;
 set local lock_timeout = '3s';
