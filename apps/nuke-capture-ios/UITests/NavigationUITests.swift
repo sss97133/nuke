@@ -319,6 +319,11 @@ final class NavigationUITests: XCTestCase {
         for _ in 0..<14 where !(first.exists && first.isHittable) { app.swipeDown() }
         first.press(forDuration: 1.2)
         let log = app.buttons["Log book"].firstMatch
+        // On a loaded CI simulator the first press can land while the list is still settling; press once more.
+        if !log.waitForExistence(timeout: 5) {
+            for _ in 0..<4 where !(first.exists && first.isHittable && first.frame.minY > 0) { app.swipeDown() }
+            first.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).press(forDuration: 1.5)
+        }
         XCTAssertTrue(log.waitForExistence(timeout: 5)); log.tap()
         XCTAssertTrue(app.staticTexts["Fixture note: rear end rebuilt over the winter."].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["2026-11-18 · owner · recollection"].waitForExistence(timeout: 5))
