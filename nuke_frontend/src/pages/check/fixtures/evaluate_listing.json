@@ -1,0 +1,1252 @@
+{
+ "sold": {
+  "isError": false,
+  "structuredContent": {
+   "asset_type": "vehicle",
+   "asset_id": "3b2a6c4c-0e86-4134-baad-cbda13d730a4",
+   "tool": "evaluate_listing",
+   "as_of": "2026-11-22T18:03:07.992Z",
+   "verdict": "1970 Porsche 911T Targa: similar cars sold $60,649\u2013$86,557 (confidence 0.44) \u00b7 sold $73,411 on 2026-11-21 \u2014 inside what similar cars sold for \u00b7 6 red flag(s)",
+   "value": {
+    "low": 60649,
+    "high": 86557,
+    "confidence": 0.44,
+    "basis": "Nuke's value for this car from comparable sales",
+    "n": 15,
+    "subject_variant": "base",
+    "flags": [
+     "This car's own sale is not used to value it.",
+     "Value comes from comparable sales.",
+     "Comparable sales are adjusted for date, venue and mileage."
+    ],
+    "price_basis": "hammer"
+   },
+   "prior_sales": [],
+   "comps": [
+    {
+     "year": 1970,
+     "make": "Porsche",
+     "model": "911T Targa 5-Speed",
+     "sale_price": 51500,
+     "sold_date": "2025-09-11",
+     "listing_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-38",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1970,
+     "make": "Porsche",
+     "model": "911T Targa",
+     "sale_price": 107000,
+     "sold_date": "2023-10-01",
+     "listing_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-32",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1970,
+     "make": "Porsche",
+     "model": "911T Targa",
+     "sale_price": 62500,
+     "sold_date": "2020-09-25",
+     "listing_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-16",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1970,
+     "make": "Porsche",
+     "model": "911T Targa",
+     "sale_price": 46500,
+     "sold_date": "2018-06-15",
+     "listing_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-6",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1970,
+     "make": "Porsche",
+     "model": "911T",
+     "sale_price": 33000,
+     "sold_date": "2019-02-28",
+     "listing_url": "https://bringatrailer.com/listing/1970-porsche-911t-17",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1970,
+     "make": "Porsche",
+     "model": "911T Targa",
+     "sale_price": 81911,
+     "sold_date": "2022-02-14",
+     "listing_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-24",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1970,
+     "make": "Porsche",
+     "model": "911T Targa",
+     "sale_price": 41000,
+     "sold_date": "2020-07-24",
+     "listing_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-15",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1970,
+     "make": "Porsche",
+     "model": "911T Targa",
+     "sale_price": 48888,
+     "sold_date": "2018-08-06",
+     "listing_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-7",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1971,
+     "make": "Porsche",
+     "model": "911T Targa 5-Speed",
+     "sale_price": 63333,
+     "sold_date": "2026-04-15",
+     "listing_url": "https://bringatrailer.com/listing/1971-porsche-911t-targa-61",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1971,
+     "make": "Porsche",
+     "model": "911T Targa",
+     "sale_price": 78500,
+     "sold_date": "2025-12-19",
+     "listing_url": "https://bringatrailer.com/listing/1971-porsche-911t-targa-56/",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    }
+   ],
+   "red_flags": [
+    "This car's own sale is not used to value it.",
+    "Value comes from comparable sales.",
+    "Comparable sales are adjusted for date, venue and mileage.",
+    "Missing: Service records",
+    "Missing: Underbody inspection"
+   ],
+   "matched_asset_id": "3b2a6c4c-0e86-4134-baad-cbda13d730a4",
+   "listing": {
+    "url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-44/",
+    "title": "1970 Porsche 911T Targa 5-Speed",
+    "ask": null,
+    "listing_kind": "auction_ended",
+    "current_bid": null,
+    "auction_end_at": "2026-11-21T19:43:10.000Z",
+    "year": 1970,
+    "make": "Porsche",
+    "model": "911T Targa",
+    "mileage": 61000,
+    "transmission": "manual",
+    "photo_count": 24,
+    "price_kind": "sold",
+    "price": 73411,
+    "price_label": "sold $73,411 on 2026-11-21",
+    "price_basis": "hammer",
+    "price_basis_note": "BaT publishes the winning / high bid; the buyer fee is charged on top (hammer basis)",
+    "currency": "USD",
+    "sold_price": 73411,
+    "high_bid": null,
+    "end_at": "2026-11-21T19:43:10.000Z",
+    "mileage_tmu": false,
+    "mileage_km": 98000,
+    "mileage_text": "98k Kilometers (~61k Miles) Shown",
+    "mileage_source": "page_listing_details"
+   },
+   "subject_sale": {
+    "amount": 73411,
+    "on": "2026-11-21",
+    "source_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-44",
+    "note": "This listing's own result; not used as evidence for its own value"
+   },
+   "all_in": {
+    "status": "recorded",
+    "label": "what the buyer paid all-in (winning bid + buyer fee + estimated transport and paperwork)",
+    "currency": "USD",
+    "price": 73411,
+    "price_kind": "sold",
+    "price_basis": "hammer",
+    "price_citation": {
+     "source_name": "bat",
+     "source_url": "https://bringatrailer.com/listing/1970-porsche-911t-targa-44/"
+    },
+    "buyer_fee": {
+     "amount": 3671,
+     "rate": 0.05,
+     "min": 250,
+     "cap": 7500,
+     "currency": "USD",
+     "citation": {
+      "source_name": "the platform's published buyer-fee schedule",
+      "fee_schedule_id": 2,
+      "source_url": "https://bringatrailer.com/policies/",
+      "valid_from": "2024-01-30T06:00:00+00:00",
+      "valid_to": null
+     }
+    },
+    "transport": {
+     "amount": 1800,
+     "estimate": true,
+     "citation": {
+      "source_url": "https://www.roadrunnerautotransport.com/",
+      "note": "enclosed national average, same as budget_options"
+     }
+    },
+    "paperwork": {
+     "amount": 600,
+     "estimate": true,
+     "citation": {
+      "source_name": "budget_options assumption",
+      "note": "title/registration estimate"
+     }
+    },
+    "total": 79482,
+    "total_note": null
+   },
+   "position": {
+    "status": "recorded",
+    "price": 73411,
+    "price_kind": "sold",
+    "percentile": 70,
+    "n": 10,
+    "min": 33000,
+    "median": 57000,
+    "max": 107000,
+    "note": "sold price is above 7 of 10 comparable sales shown"
+   },
+   "trend": {
+    "window_recent": {
+     "from": "2025-11-22",
+     "to": "2026-11-22",
+     "n": 6,
+     "median": 80750
+    },
+    "window_prior": {
+     "from": "2024-11-22",
+     "to": "2025-11-22",
+     "n": 4,
+     "median": 86000
+    },
+    "change_pct": -6.1,
+    "direction": "down",
+    "status": "recorded",
+    "note": "Median of variant-matched, junk-filtered sold comps (hammer basis); same cohort as the comps shown",
+    "price_basis": "hammer"
+   },
+   "ingest": null,
+   "stored_bid": null
+  }
+ },
+ "rnm": {
+  "isError": false,
+  "structuredContent": {
+   "asset_type": "vehicle",
+   "asset_id": "846bad5e-d337-42f8-98be-a7c4d3653a54",
+   "tool": "evaluate_listing",
+   "as_of": "2026-11-22T18:04:44.963Z",
+   "verdict": "1996 Cadillac Fleetwood Brougham: similar cars sold $9,775\u2013$21,699 (confidence 0.34) \u00b7 bid to $15,000 on 2026-11-21, reserve not met (no sale) \u2014 high bid inside what similar cars sold for \u00b7 5 red flag(s)",
+   "value": {
+    "low": 9775,
+    "high": 21699,
+    "confidence": 0.34,
+    "basis": "Nuke's value for this car from comparable sales",
+    "n": 15,
+    "subject_variant": "base",
+    "flags": [
+     "Value comes from comparable sales.",
+     "Comparable sales are adjusted for date, venue and mileage."
+    ],
+    "price_basis": "hammer"
+   },
+   "prior_sales": [],
+   "comps": [
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood Brougham",
+     "sale_price": 21250,
+     "sold_date": "2025-06-17",
+     "listing_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-brougham-2",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood Brougham",
+     "sale_price": 30000,
+     "sold_date": "2025-05-20",
+     "listing_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-23",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood Brougham",
+     "sale_price": 10400,
+     "sold_date": "2025-10-19",
+     "listing_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-brougham-5",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood",
+     "sale_price": 10600,
+     "sold_date": "2024-01-25",
+     "listing_url": "https://carsandbids.com/auctions/rGOy0j8E/1996-cadillac-fleetwood-brougham",
+     "platform": "cars_and_bids",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood",
+     "sale_price": 17500,
+     "sold_date": "2023-11-10",
+     "listing_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-18",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood",
+     "sale_price": 8500,
+     "sold_date": "2018-04-17",
+     "listing_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1995,
+     "make": "Cadillac",
+     "model": "Fleetwood Brougham",
+     "sale_price": 31000,
+     "sold_date": "2026-02-20",
+     "listing_url": "https://bringatrailer.com/listing/1995-cadillac-fleetwood-brougham-9",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood Brougham",
+     "sale_price": 12500,
+     "sold_date": "2024-02-08",
+     "listing_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-20",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood Brougham",
+     "sale_price": 8900,
+     "sold_date": "2025-03-31",
+     "listing_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-brougham",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1996,
+     "make": "Cadillac",
+     "model": "Fleetwood Brougham",
+     "sale_price": 9000,
+     "sold_date": "2025-09-15",
+     "listing_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-brougham-4",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    }
+   ],
+   "red_flags": [
+    "Value comes from comparable sales.",
+    "Comparable sales are adjusted for date, venue and mileage.",
+    "Missing: Service records",
+    "Missing: Underbody inspection"
+   ],
+   "matched_asset_id": "846bad5e-d337-42f8-98be-a7c4d3653a54",
+   "listing": {
+    "url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-brougham-12/",
+    "title": "Single-Family-Owned, 33k-Mile 1996 Cadillac Fleetwood Brougham",
+    "ask": null,
+    "listing_kind": "auction_ended",
+    "current_bid": null,
+    "auction_end_at": "2026-11-21T19:21:18.000Z",
+    "year": 1996,
+    "make": "Cadillac",
+    "model": "Fleetwood Brougham",
+    "mileage": 33000,
+    "transmission": "4-Speed Automatic",
+    "photo_count": 24,
+    "price_kind": "high_bid_reserve_not_met",
+    "price": 15000,
+    "price_label": "bid to $15,000 on 2026-11-21, reserve not met (no sale)",
+    "price_basis": "hammer",
+    "price_basis_note": "BaT publishes the winning / high bid; the buyer fee is charged on top (hammer basis)",
+    "currency": "USD",
+    "sold_price": null,
+    "high_bid": 15000,
+    "end_at": "2026-11-21T19:21:18.000Z",
+    "mileage_tmu": false,
+    "mileage_km": null,
+    "mileage_text": "33k Miles",
+    "mileage_source": "page_listing_details"
+   },
+   "subject_sale": null,
+   "all_in": {
+    "status": "recorded",
+    "label": "all-in had the car sold at its high bid (it did not sell)",
+    "currency": "USD",
+    "price": 15000,
+    "price_kind": "high_bid_reserve_not_met",
+    "price_basis": "hammer",
+    "price_citation": {
+     "source_name": "bat",
+     "source_url": "https://bringatrailer.com/listing/1996-cadillac-fleetwood-brougham-12/"
+    },
+    "buyer_fee": {
+     "amount": 750,
+     "rate": 0.05,
+     "min": 250,
+     "cap": 7500,
+     "currency": "USD",
+     "citation": {
+      "source_name": "the platform's published buyer-fee schedule",
+      "fee_schedule_id": 2,
+      "source_url": "https://bringatrailer.com/policies/",
+      "valid_from": "2024-01-30T06:00:00+00:00",
+      "valid_to": null
+     }
+    },
+    "transport": {
+     "amount": 1800,
+     "estimate": true,
+     "citation": {
+      "source_url": "https://www.roadrunnerautotransport.com/",
+      "note": "enclosed national average, same as budget_options"
+     }
+    },
+    "paperwork": {
+     "amount": 600,
+     "estimate": true,
+     "citation": {
+      "source_name": "budget_options assumption",
+      "note": "title/registration estimate"
+     }
+    },
+    "total": 18150,
+    "total_note": null
+   },
+   "position": {
+    "status": "recorded",
+    "price": 15000,
+    "price_kind": "high_bid_reserve_not_met",
+    "percentile": 60,
+    "n": 10,
+    "min": 8500,
+    "median": 11550,
+    "max": 31000,
+    "note": "high bid (no sale) is above 6 of 10 comparable sales shown"
+   },
+   "trend": {
+    "window_recent": {
+     "from": "2025-11-22",
+     "to": "2026-11-22",
+     "n": 7,
+     "median": 14000
+    },
+    "window_prior": {
+     "from": "2024-11-22",
+     "to": "2025-11-22",
+     "n": 9,
+     "median": 14300
+    },
+    "change_pct": -2.1,
+    "direction": "flat",
+    "status": "recorded",
+    "note": "Median of variant-matched, junk-filtered sold comps (hammer basis); same cohort as the comps shown",
+    "price_basis": "hammer"
+   },
+   "ingest": null,
+   "stored_bid": null
+  }
+ },
+ "live": {
+  "isError": false,
+  "structuredContent": {
+   "asset_type": "vehicle",
+   "asset_id": "5373feed-36a1-4031-b32c-23435e447b54",
+   "tool": "evaluate_listing",
+   "as_of": "2026-11-22T18:05:31.769Z",
+   "verdict": "1937 Chevrolet Master Deluxe 2-Door Sedan w/Fuel-Injected 350: similar cars sold $29,700\u2013$34,100 (confidence 0.50) \u00b7 auction live, current bid $13,777 \u2014 below what similar cars sold for so far, ends 2026-11-23 \u00b7 7 red flag(s)",
+   "value": {
+    "low": 29700,
+    "high": 34100,
+    "confidence": 0.5,
+    "basis": "Nuke's value for this car from comparable sales",
+    "n": 14,
+    "subject_variant": "base",
+    "flags": [
+     "Value comes from comparable sales.",
+     "Comparable sales are adjusted for date, venue and mileage.",
+     "Value range comes from the last 12 months of similar sales."
+    ],
+    "price_basis": "hammer"
+   },
+   "prior_sales": [],
+   "comps": [
+    {
+     "year": 1936,
+     "make": "Chevrolet",
+     "model": "Master Deluxe",
+     "sale_price": 29700,
+     "sold_date": "2026-06-06",
+     "listing_url": "https://www.mecum.com/lots/1172769/1936-chevrolet-master-deluxe-custom-sedan",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1939,
+     "make": "Chevrolet",
+     "model": "Master Deluxe",
+     "sale_price": 31900,
+     "sold_date": "2026-03-18",
+     "listing_url": "https://www.mecum.com/lots/1169676/1939-chevrolet-master-deluxe-coupe/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1939,
+     "make": "Chevrolet",
+     "model": "Master Deluxe",
+     "sale_price": 40700,
+     "sold_date": "2025-12-06",
+     "listing_url": "https://www.mecum.com/lots/1162181/1939-chevrolet-master-deluxe-sedan/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1935,
+     "make": "Chevrolet",
+     "model": "Master Deluxe",
+     "sale_price": 34100,
+     "sold_date": "2025-12-06",
+     "listing_url": "https://www.mecum.com/lots/1162214/1935-chevrolet-master-deluxe-coupe/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1936,
+     "make": "Chevrolet",
+     "model": "Master Deluxe",
+     "sale_price": 13250,
+     "sold_date": "2025-12-02",
+     "listing_url": "https://bringatrailer.com/listing/1936-chevrolet-master-deluxe-5/",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1937,
+     "make": "Chevrolet",
+     "model": "Sedan",
+     "sale_price": 20000,
+     "sold_date": "2015-06-26",
+     "listing_url": "https://www.mecum.com/lots/215587/1937-chevrolet-sedan-street-rod/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1936,
+     "make": "Chevrolet",
+     "model": "Master",
+     "sale_price": 26400,
+     "sold_date": "2025-10-02",
+     "listing_url": "https://www.mecum.com/lots/1155253/1936-chevrolet-master-deluxe-sedan/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1938,
+     "make": "Chevrolet",
+     "model": "Master Deluxe",
+     "sale_price": 54000,
+     "sold_date": "2017-09-08",
+     "listing_url": "https://www.mecum.com/lots/293640/1938-chevrolet-master-deluxe-street-rod/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1939,
+     "make": "Chevrolet",
+     "model": "Master Deluxe",
+     "sale_price": 21000,
+     "sold_date": "2013-12-06",
+     "listing_url": "https://www.mecum.com/lots/169425/1939-chevrolet-master-deluxe-sedan/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1939,
+     "make": "Chevrolet",
+     "model": "Master Deluxe",
+     "sale_price": 8800,
+     "sold_date": "2025-07-23",
+     "listing_url": "https://www.mecum.com/lots/1152163/1939-chevrolet-master-deluxe-sedan/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    }
+   ],
+   "red_flags": [
+    "Value comes from comparable sales.",
+    "Comparable sales are adjusted for date, venue and mileage.",
+    "Value range comes from the last 12 months of similar sales.",
+    "TMU: seller states true mileage is unknown",
+    "Missing: Service records",
+    "Missing: Underbody inspection"
+   ],
+   "matched_asset_id": "5373feed-36a1-4031-b32c-23435e447b54",
+   "listing": {
+    "url": "https://bringatrailer.com/listing/1937-chevrolet-master-7/",
+    "title": "26-Years-Owned 1937 Chevrolet Master Deluxe 2-Door Sedan w/Fuel-Injected 350",
+    "ask": null,
+    "listing_kind": "auction_live",
+    "current_bid": 13777,
+    "auction_end_at": "2026-11-23T19:30:00.000Z",
+    "year": 1937,
+    "make": "Chevrolet",
+    "model": "Master Deluxe 2-Door Sedan w/Fuel-Injected 350",
+    "mileage": 29000,
+    "transmission": "3-Speed Automatic",
+    "photo_count": 24,
+    "price_kind": "current_bid",
+    "price": 13777,
+    "price_label": "current bid $13,777",
+    "price_basis": "hammer",
+    "price_basis_note": "BaT publishes the winning / high bid; the buyer fee is charged on top (hammer basis)",
+    "currency": "USD",
+    "sold_price": null,
+    "high_bid": null,
+    "end_at": "2026-11-23T19:30:00.000Z",
+    "mileage_tmu": true,
+    "mileage_km": null,
+    "mileage_text": "29k Miles Shown, TMU",
+    "mileage_source": "page_listing_details"
+   },
+   "subject_sale": null,
+   "all_in": {
+    "status": "recorded",
+    "label": "all-in if the auction closed at the current bid",
+    "currency": "USD",
+    "price": 13777,
+    "price_kind": "current_bid",
+    "price_basis": "hammer",
+    "price_citation": {
+     "source_name": "bat",
+     "source_url": "https://bringatrailer.com/listing/1937-chevrolet-master-7/"
+    },
+    "buyer_fee": {
+     "amount": 689,
+     "rate": 0.05,
+     "min": 250,
+     "cap": 7500,
+     "currency": "USD",
+     "citation": {
+      "source_name": "the platform's published buyer-fee schedule",
+      "fee_schedule_id": 2,
+      "source_url": "https://bringatrailer.com/policies/",
+      "valid_from": "2024-01-30T06:00:00+00:00",
+      "valid_to": null
+     }
+    },
+    "transport": {
+     "amount": 1800,
+     "estimate": true,
+     "citation": {
+      "source_url": "https://www.roadrunnerautotransport.com/",
+      "note": "enclosed national average, same as budget_options"
+     }
+    },
+    "paperwork": {
+     "amount": 600,
+     "estimate": true,
+     "citation": {
+      "source_name": "budget_options assumption",
+      "note": "title/registration estimate"
+     }
+    },
+    "total": 16866,
+    "total_note": null
+   },
+   "position": {
+    "status": "recorded",
+    "price": 13777,
+    "price_kind": "current_bid",
+    "percentile": 20,
+    "n": 10,
+    "min": 8800,
+    "median": 28050,
+    "max": 54000,
+    "note": "current bid is above 2 of 10 comparable sales shown"
+   },
+   "trend": {
+    "window_recent": {
+     "from": "2025-11-22",
+     "to": "2026-11-22",
+     "n": 5,
+     "median": 31900
+    },
+    "window_prior": {
+     "from": "2024-11-22",
+     "to": "2025-11-22",
+     "n": 2,
+     "median": 17600
+    },
+    "change_pct": null,
+    "direction": null,
+    "status": "not_recorded_insufficient_n",
+    "note": "Fewer than 3 dated sold comps in one of the windows; no trend claimed",
+    "price_basis": "hammer"
+   },
+   "ingest": null,
+   "stored_bid": {
+    "auction_event_id": "5078b0ad-7d8b-4810-a433-1148e5924087",
+    "stored_high_bid": 13777,
+    "stored_updated_at": "2026-11-22T12:32:27.387805+00:00",
+    "page_bid": 13777,
+    "behind": false,
+    "stored_age_hours": 5.6,
+    "refresh": "not_needed",
+    "note": "Stored bid matches the page"
+   }
+  }
+ },
+ "live_nobid": {
+  "isError": false,
+  "structuredContent": {
+   "asset_type": "vehicle",
+   "asset_id": "db8db7f2-c1f1-4f35-874a-cff9adf10304",
+   "tool": "evaluate_listing",
+   "as_of": "2026-11-22T18:05:27.092Z",
+   "verdict": "2011 Porsche 911 Turbo S Coupe: similar cars sold $91,408\u2013$160,000 (confidence 0.29) \u00b7 auction live, no bids yet, ends 2026-11-27 \u00b7 6 red flag(s)",
+   "value": {
+    "low": 91408.46,
+    "high": 160000,
+    "confidence": 0.29,
+    "basis": "Nuke's value for this car from comparable sales",
+    "n": 15,
+    "subject_variant": "turbo_s",
+    "flags": [
+     "Value comes from comparable sales.",
+     "Comparable sales are adjusted for date, venue and mileage.",
+     "Value range comes from the last 12 months of similar sales."
+    ],
+    "price_basis": "hammer"
+   },
+   "prior_sales": [],
+   "comps": [
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S Coupe",
+     "sale_price": 160000,
+     "sold_date": "2026-10-22",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-coupe-68",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S Coupe",
+     "sale_price": 225000,
+     "sold_date": "2026-10-13",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-coupe-69",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S Coupe",
+     "sale_price": 140000,
+     "sold_date": "2026-09-22",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-coupe-65",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S Coupe",
+     "sale_price": 127500,
+     "sold_date": "2026-08-20",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-coupe-64",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S",
+     "sale_price": 115000,
+     "sold_date": "2026-08-07",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-22",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S Coupe",
+     "sale_price": 91408.46,
+     "sold_date": "2026-04-28",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-49",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S Coupe",
+     "sale_price": 168000,
+     "sold_date": "2026-02-26",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-coupe-58",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S Coupe",
+     "sale_price": 91000,
+     "sold_date": "2025-12-26",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-coupe-57",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S",
+     "sale_price": 75000,
+     "sold_date": "2019-02-08",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-8",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    },
+    {
+     "year": 2011,
+     "make": "Porsche",
+     "model": "911 Turbo S Coupe",
+     "sale_price": 74000,
+     "sold_date": "2024-11-14",
+     "listing_url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-coupe-43",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "turbo_s"
+    }
+   ],
+   "red_flags": [
+    "Value comes from comparable sales.",
+    "Comparable sales are adjusted for date, venue and mileage.",
+    "Value range comes from the last 12 months of similar sales.",
+    "Missing: Service records",
+    "Missing: Underbody inspection"
+   ],
+   "matched_asset_id": "db8db7f2-c1f1-4f35-874a-cff9adf10304",
+   "listing": {
+    "url": "https://bringatrailer.com/listing/2011-porsche-911-turbo-s-coupe-70/",
+    "title": "Modified 2011 Porsche 911 Turbo S Coupe",
+    "ask": null,
+    "listing_kind": "auction_live",
+    "current_bid": 0,
+    "auction_end_at": "2026-11-27T20:22:00.000Z",
+    "year": 2011,
+    "make": "Porsche",
+    "model": "911 Turbo S Coupe",
+    "mileage": 73000,
+    "transmission": "7-Speed PDK Dual-Clutch",
+    "photo_count": 24,
+    "price_kind": "current_bid",
+    "price": 0,
+    "price_label": "current bid $0",
+    "price_basis": null,
+    "price_basis_note": null,
+    "currency": "USD",
+    "sold_price": null,
+    "high_bid": null,
+    "end_at": "2026-11-27T20:22:00.000Z",
+    "mileage_tmu": false,
+    "mileage_km": null,
+    "mileage_text": "73k Miles",
+    "mileage_source": "page_listing_details"
+   },
+   "subject_sale": null,
+   "all_in": {
+    "status": "not_recorded",
+    "reason": "no price on the listing page",
+    "total": null
+   },
+   "position": {
+    "status": "not_recorded",
+    "reason": "only 10 comp(s) shown (need 3)",
+    "percentile": null,
+    "n": 10
+   },
+   "trend": {
+    "window_recent": {
+     "from": "2025-11-22",
+     "to": "2026-11-22",
+     "n": 8,
+     "median": 133750
+    },
+    "window_prior": {
+     "from": "2024-11-22",
+     "to": "2025-11-22",
+     "n": 9,
+     "median": 114111
+    },
+    "change_pct": 17.2,
+    "direction": "up",
+    "status": "recorded",
+    "note": "Median of variant-matched, junk-filtered sold comps (hammer basis); same cohort as the comps shown",
+    "price_basis": "hammer"
+   },
+   "ingest": null,
+   "stored_bid": null
+  }
+ },
+ "unpriced": {
+  "isError": false,
+  "structuredContent": {
+   "asset_type": "vehicle",
+   "asset_id": null,
+   "tool": "evaluate_listing",
+   "as_of": "2026-11-22T18:06:06.536Z",
+   "verdict": "1965 Chevrolet: current bid $2,500: value not recorded \u2014 identity or comps insufficient.",
+   "value": {
+    "low": null,
+    "high": null,
+    "confidence": 0.15,
+    "basis": "identity_not_recorded"
+   },
+   "prior_sales": [],
+   "comps": [],
+   "red_flags": [
+    "Identity (year/make/model) not recorded from listing HTML or matched asset"
+   ],
+   "matched_asset_id": null,
+   "listing": {
+    "url": "https://bringatrailer.com/listing/go-kart-210/",
+    "title": "Rupp Monza Junior High-Back Go-Kart",
+    "ask": null,
+    "listing_kind": "auction_live",
+    "current_bid": 2500,
+    "auction_end_at": "2026-11-23T20:17:00.000Z",
+    "year": 1965,
+    "make": "Chevrolet",
+    "model": null,
+    "mileage": null,
+    "transmission": null,
+    "photo_count": 24,
+    "price_kind": "current_bid",
+    "price": 2500,
+    "price_label": "current bid $2,500",
+    "price_basis": "hammer",
+    "price_basis_note": "BaT publishes the winning / high bid; the buyer fee is charged on top (hammer basis)",
+    "currency": "USD",
+    "sold_price": null,
+    "high_bid": null,
+    "end_at": "2026-11-23T20:17:00.000Z",
+    "mileage_tmu": false,
+    "mileage_km": null,
+    "mileage_text": null,
+    "mileage_source": null
+   },
+   "ingest": null
+  }
+ },
+ "low": {
+  "isError": false,
+  "structuredContent": {
+   "asset_type": "vehicle",
+   "asset_id": "8ee5f876-e4e9-4dd3-b1ad-00c40e7b2fbd",
+   "tool": "evaluate_listing",
+   "as_of": "2026-11-22T18:05:05.901Z",
+   "verdict": "1985 BMW 323i Coupe: similar cars sold $9,885\u2013$16,790 (confidence 0.30) \u00b7 auction live, current bid $6,323 \u2014 below what similar cars sold for so far, ends 2026-11-25 \u00b7 6 red flag(s)",
+   "value": {
+    "low": 9885,
+    "high": 16790,
+    "confidence": 0.3,
+    "basis": "Nuke's value for this car from comparable sales",
+    "n": 4,
+    "subject_variant": "base",
+    "flags": [
+     "Value comes from comparable sales.",
+     "Comparable sales are adjusted for date, venue and mileage."
+    ],
+    "price_basis": "hammer"
+   },
+   "prior_sales": [],
+   "comps": [
+    {
+     "year": 1985,
+     "make": "BMW",
+     "model": "323i",
+     "sale_price": 19250,
+     "sold_date": "2026-03-08",
+     "listing_url": "https://bringatrailer.com/listing/1985-bmw-323i-10",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1985,
+     "make": "BMW",
+     "model": "323i Coupe 5-Speed",
+     "sale_price": 40000,
+     "sold_date": "2026-07-24",
+     "listing_url": "https://bringatrailer.com/listing/1985-bmw-323i-11-2",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1985,
+     "make": "BMW",
+     "model": "323i",
+     "sale_price": 16500,
+     "sold_date": "2023-01-05",
+     "listing_url": "https://www.mecum.com/lots/532382/1985-bmw-323i-baur-tc/",
+     "platform": "mecum",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1985,
+     "make": "BMW",
+     "model": "323i 5-Speed",
+     "sale_price": 11500,
+     "sold_date": "2025-01-28",
+     "listing_url": "https://bringatrailer.com/listing/1985-bmw-323i-9",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    }
+   ],
+   "red_flags": [
+    "Value comes from comparable sales.",
+    "Comparable sales are adjusted for date, venue and mileage.",
+    "TMU: seller states true mileage is unknown",
+    "Missing: Service records",
+    "Missing: Underbody inspection"
+   ],
+   "matched_asset_id": "8ee5f876-e4e9-4dd3-b1ad-00c40e7b2fbd",
+   "listing": {
+    "url": "https://bringatrailer.com/listing/1985-bmw-323i-12/",
+    "title": "Euro 1985 BMW 323i Coupe 5-Speed",
+    "ask": null,
+    "listing_kind": "auction_live",
+    "current_bid": 6323,
+    "auction_end_at": "2026-11-25T20:20:00.000Z",
+    "year": 1985,
+    "make": "BMW",
+    "model": "323i Coupe",
+    "mileage": 261000,
+    "transmission": "manual",
+    "photo_count": 24,
+    "price_kind": "current_bid",
+    "price": 6323,
+    "price_label": "current bid $6,323",
+    "price_basis": "hammer",
+    "price_basis_note": "BaT publishes the winning / high bid; the buyer fee is charged on top (hammer basis)",
+    "currency": "USD",
+    "sold_price": null,
+    "high_bid": null,
+    "end_at": "2026-11-25T20:20:00.000Z",
+    "mileage_tmu": true,
+    "mileage_km": null,
+    "mileage_text": "261k Miles Shown, TMU",
+    "mileage_source": "page_listing_details"
+   },
+   "subject_sale": null,
+   "all_in": {
+    "status": "recorded",
+    "label": "all-in if the auction closed at the current bid",
+    "currency": "USD",
+    "price": 6323,
+    "price_kind": "current_bid",
+    "price_basis": "hammer",
+    "price_citation": {
+     "source_name": "bat",
+     "source_url": "https://bringatrailer.com/listing/1985-bmw-323i-12/"
+    },
+    "buyer_fee": {
+     "amount": 316,
+     "rate": 0.05,
+     "min": 250,
+     "cap": 7500,
+     "currency": "USD",
+     "citation": {
+      "source_name": "the platform's published buyer-fee schedule",
+      "fee_schedule_id": 2,
+      "source_url": "https://bringatrailer.com/policies/",
+      "valid_from": "2024-01-30T06:00:00+00:00",
+      "valid_to": null
+     }
+    },
+    "transport": {
+     "amount": 1800,
+     "estimate": true,
+     "citation": {
+      "source_url": "https://www.roadrunnerautotransport.com/",
+      "note": "enclosed national average, same as budget_options"
+     }
+    },
+    "paperwork": {
+     "amount": 600,
+     "estimate": true,
+     "citation": {
+      "source_name": "budget_options assumption",
+      "note": "title/registration estimate"
+     }
+    },
+    "total": 9039,
+    "total_note": null
+   },
+   "position": {
+    "status": "recorded",
+    "price": 6323,
+    "price_kind": "current_bid",
+    "percentile": 0,
+    "n": 4,
+    "min": 11500,
+    "median": 17875,
+    "max": 40000,
+    "note": "current bid is above 0 of 4 comparable sales shown"
+   },
+   "trend": {
+    "window_recent": {
+     "from": "2025-11-22",
+     "to": "2026-11-22",
+     "n": 2,
+     "median": 29625
+    },
+    "window_prior": {
+     "from": "2024-11-22",
+     "to": "2025-11-22",
+     "n": 1,
+     "median": 11500
+    },
+    "change_pct": null,
+    "direction": null,
+    "status": "not_recorded_insufficient_n",
+    "note": "Fewer than 3 dated sold comps in one of the windows; no trend claimed",
+    "price_basis": "hammer"
+   },
+   "ingest": null,
+   "stored_bid": {
+    "auction_event_id": "b0b8cb4e-b2dc-4de5-a092-f0d2ed2e3862",
+    "stored_high_bid": 6323,
+    "stored_updated_at": "2026-11-22T01:27:11.03+00:00",
+    "page_bid": 6323,
+    "behind": false,
+    "stored_age_hours": 16.6,
+    "refresh": "not_needed",
+    "note": "Stored bid matches the page"
+   }
+  }
+ }
+}

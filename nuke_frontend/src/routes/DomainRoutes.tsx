@@ -6,6 +6,8 @@ import { warmJobRoute } from '../pages/jobs/jobWarm';
 
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
+// Public paste-a-listing check (T8): one BaT link in, one card out, from the public advisor scope
+const CheckPage = React.lazy(() => import('../pages/check/CheckPage'));
 const NotFound = React.lazy(() => import('../pages/NotFound'));
 const PrivacyPolicy = React.lazy(() => import('../pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('../pages/TermsOfService'));
@@ -157,6 +159,7 @@ export const DomainRoutes = () => {
 
         {/* ── Static / legal ────────────────────────────────────────────── */}
         <Route path="/about" element={<About />} />
+        <Route path="/check" element={<CheckPage />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/eula" element={<EULA />} />
