@@ -42,7 +42,7 @@ CREATE TABLE public.vehicle_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, kind text NOT NULL,
   property_id uuid, extraction_method text, structured_data jsonb NOT NULL DEFAULT '{}'::jsonb,
   content_text text, confidence_score numeric, observed_at timestamptz NOT NULL,
-  ingested_at timestamptz, is_superseded boolean DEFAULT false,
+  ingested_at timestamptz,   is_superseded boolean DEFAULT false, superseded_by uuid, superseded_at timestamptz,
   subject_type text NOT NULL DEFAULT 'vehicle', analysis_deferred boolean NOT NULL DEFAULT false,
   rank text NOT NULL DEFAULT 'normal'
 );
@@ -111,6 +111,20 @@ SELECT public.assert(
     SELECT 1 FROM jsonb_array_elements(j->'components') c
      WHERE c->>'component' = 'engine_block' AND c->>'category' = 'period_correct_substitute'
   ), 'engine 9799140/YH is period_correct_substitute vs SD target') FROM ra;
+SELECT public.assert(
+  (SELECT evidence ? 'casting' AND NOT (evidence ? 'case_cast')
+     FROM vehicle_replica_component_decisions
+    WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a1'
+      AND component_key = 'engine_block'
+      AND coalesce(is_superseded, false) IS NOT TRUE),
+  'engine decision evidence is engine-only');
+SELECT public.assert(
+  (SELECT evidence ? 'sight_count' AND NOT (evidence ? 'casting')
+     FROM vehicle_replica_component_decisions
+    WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a1'
+      AND component_key = 'hood_scoop'
+      AND coalesce(is_superseded, false) IS NOT TRUE),
+  'appearance decision evidence is not drivetrain snapshot');
 SELECT public.assert(
   EXISTS (
     SELECT 1 FROM jsonb_array_elements(j->'components') c

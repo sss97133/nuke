@@ -65,6 +65,8 @@ CREATE TABLE public.vehicle_observations (
   observed_at timestamptz NOT NULL,
   ingested_at timestamptz,
   is_superseded boolean DEFAULT false,
+  superseded_by uuid,
+  superseded_at timestamptz,
   subject_type text NOT NULL DEFAULT 'vehicle',
   analysis_deferred boolean NOT NULL DEFAULT false,
   rank text NOT NULL DEFAULT 'normal'
@@ -142,6 +144,31 @@ SELECT public.assert(
   (public.fold_byok_component_observations('00000000-0000-0000-0000-0000000000a1', false)
     ->>'claims_unchanged')::int >= 6,
   'second apply reports unchanged');
+
+-- Value change for same image+property supersedes prior current row.
+UPDATE vehicle_images
+   SET ai_scan_metadata = jsonb_set(
+     ai_scan_metadata,
+     '{byok_deep_analysis,components_seen}',
+     '[{"label":"Plain steel road wheel and tire","confidence":0.9}]'::jsonb
+   )
+ WHERE id = '00000000-0000-0000-0000-0000000000d1';
+SELECT public.fold_byok_component_observations('00000000-0000-0000-0000-0000000000a1', false);
+SELECT public.assert(
+  (SELECT count(*) FROM vehicle_observations vo
+    JOIN observation_properties op ON op.id = vo.property_id
+   WHERE op.property_key = 'image_visible_wheel_style'
+     AND vo.structured_data->>'image_id' = '00000000-0000-0000-0000-0000000000d1'
+     AND coalesce(vo.is_superseded, false) IS NOT TRUE) = 1
+  AND EXISTS (
+    SELECT 1 FROM vehicle_observations vo
+    JOIN observation_properties op ON op.id = vo.property_id
+   WHERE op.property_key = 'image_visible_wheel_style'
+     AND vo.structured_data->>'image_id' = '00000000-0000-0000-0000-0000000000d1'
+     AND vo.is_superseded IS TRUE
+     AND vo.superseded_by IS NOT NULL
+  ),
+  'changed wheel value supersedes prior current claim');
 
 SELECT public.assert(
   (public.group_vehicle_images_for_reading('00000000-0000-0000-0000-0000000000a1', true)

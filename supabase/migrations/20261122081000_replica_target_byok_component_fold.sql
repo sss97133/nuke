@@ -502,6 +502,17 @@ BEGIN
           unchanged := unchanged + 1;
         ELSE
           new_obs_id := gen_random_uuid();
+          -- Same image+property+method with a different value: supersede prior current rows.
+          UPDATE vehicle_observations vo
+             SET is_superseded = true,
+                 superseded_by = new_obs_id,
+                 superseded_at = now()
+           WHERE vo.vehicle_id = p_vehicle_id
+             AND vo.property_id = prop_id
+             AND coalesce(vo.is_superseded, false) IS NOT TRUE
+             AND vo.extraction_method = version
+             AND vo.structured_data->>'image_id' = img.image_id::text
+             AND vo.structured_data->> (norm->>'property_key') IS DISTINCT FROM norm->>'value';
           INSERT INTO vehicle_observations (
             id, vehicle_id, kind, property_id, extraction_method,
             structured_data, content_text, confidence_score,
@@ -586,6 +597,7 @@ DECLARE
   sight_count int;
   evid_imgs uuid[];
   evid_obs uuid[];
+  evid jsonb;
   actions jsonb := '[]'::jsonb;
   new_id uuid;
   old_id uuid;
@@ -661,9 +673,20 @@ BEGIN
   LOOP
     evid_imgs := '{}';
     evid_obs := '{}';
+    evid := '{}'::jsonb;
     cat := 'unknown';
 
     IF spec.component_key = 'engine_block' THEN
+      SELECT coalesce((SELECT array_agg(x ORDER BY x) FROM (
+               SELECT DISTINCT vo.id AS x
+                 FROM vehicle_observations vo
+                 JOIN observation_properties op ON op.id = vo.property_id
+                WHERE vo.vehicle_id = p_vehicle_id
+                  AND coalesce(vo.is_superseded, false) IS NOT TRUE
+                  AND op.property_key IN ('engine_block_casting', 'engine_code_stamp')
+             ) s), '{}')
+        INTO evid_obs;
+      evid := jsonb_build_object('casting', casting, 'stamp', stamp);
       IF casting IS NULL AND stamp IS NULL THEN
         cat := 'unknown';
       ELSIF casting IS NOT NULL
@@ -681,6 +704,16 @@ BEGIN
       END IF;
 
     ELSIF spec.component_key = 'transmission' THEN
+      SELECT coalesce((SELECT array_agg(x ORDER BY x) FROM (
+               SELECT DISTINCT vo.id AS x
+                 FROM vehicle_observations vo
+                 JOIN observation_properties op ON op.id = vo.property_id
+                WHERE vo.vehicle_id = p_vehicle_id
+                  AND coalesce(vo.is_superseded, false) IS NOT TRUE
+                  AND op.property_key IN ('transmission_case_casting', 'transmission_id_stamp')
+             ) s), '{}')
+        INTO evid_obs;
+      evid := jsonb_build_object('case_cast', case_cast, 'id_stamp', id_stamp);
       IF case_cast IS NULL AND id_stamp IS NULL THEN
         cat := 'unknown';
       ELSIF case_cast IS NOT NULL
@@ -787,9 +820,14 @@ BEGIN
       ELSE
         cat := 'unknown';
       END IF;
+      evid := jsonb_build_object(
+        'sight_count', sight_count,
+        'component_key', spec.component_key
+      );
 
     ELSE
       cat := 'unknown';
+      evid := jsonb_build_object('note', 'no match rules evaluated for this component yet');
     END IF;
 
     actions := actions || jsonb_build_object(
@@ -798,6 +836,7 @@ BEGIN
       'category', cat,
       'sourced_spec', spec.sourced,
       'factory_value', spec.factory_value,
+      'evidence', evid,
       'evidence_image_ids', to_jsonb(evid_imgs),
       'evidence_observation_ids', to_jsonb(evid_obs)
     );
@@ -815,6 +854,7 @@ BEGIN
            AND d.logic_version = version
            AND d.evidence_observation_ids IS NOT DISTINCT FROM evid_obs
            AND d.evidence_image_ids IS NOT DISTINCT FROM evid_imgs
+           AND d.evidence IS NOT DISTINCT FROM evid
       ) THEN
         NULL; -- unchanged category and evidence
       ELSE
@@ -838,8 +878,7 @@ BEGIN
         ) VALUES (
           new_id, p_vehicle_id, v_target_key, spec.component_key, cat,
           CASE cat WHEN 'unknown' THEN NULL ELSE 0.7 END,
-          evid_obs, evid_imgs,
-          jsonb_build_object('casting', casting, 'stamp', stamp, 'case_cast', case_cast, 'id_stamp', id_stamp),
+          evid_obs, evid_imgs, evid,
           'decide_replica_components', version
         );
       END IF;
