@@ -234,7 +234,7 @@ function Card({ card, photo }: { card: CheckCard; photo: string | null }) {
             <dt><Text role="label">{card.priceKind === 'sold' ? 'All-in paid' : 'All-in at this bid'}</Text></dt>
             <dd>
               <details className="check-more check-more--inline">
-                <summary><Text role="measure">{money(card.allIn.total, card.currency)}</Text><Text role="caption"> bid + fee + delivery</Text></summary>
+                <summary><Text role="measure">{money(card.allIn.total, card.currency)}</Text><Text role="caption">{card.allIn.lines.some(l => l.estimate) ? ' bid + fee + delivery' : ' bid + fee'}</Text></summary>
                 <ul className="check-lines">
                   {card.allIn.lines.map(l => (
                     <li key={l.label}>
