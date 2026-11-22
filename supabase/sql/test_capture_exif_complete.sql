@@ -46,7 +46,7 @@ SELECT t_assert(NOT has_function_privilege('authenticated', 'public.capture_exif
   AND has_function_privilege('service_role', 'public.capture_exif_complete_v1(uuid,uuid,uuid,jsonb,boolean)', 'EXECUTE'),
   'grants: service_role only');
 
-\set fields '{"Make": "Apple", "Model": "iPhone X", "Software": "12.2", "LensModel": "iPhone X back dual camera 4mm f/1.8", "ContentIdentifier": "B779EAE5-3FDE-4B40-8815-886D036B41E9", "RunTimeFlags": 1, "RunTimeValue": 90083159473458, "RunTimeEpoch": 0, "RunTimeScale": 1000000000, "capture_session": {"boot_at": "2019-04-27T22:57:10.000Z", "uptime_s": 90083, "basis": "DateTimeOriginal - RunTimeValue/RunTimeScale"}, "DateTimeOriginal": "2019:04:28 17:00:00", "GPSLatitude": 1.5, "capture_clock": {"at": "x"}, "taken_at": "2001-01-01"}'
+\set fields '{"Make": "Apple", "Model": "iPhone X", "Software": "12.2", "LensModel": "iPhone X back dual camera 4mm f/1.8", "ContentIdentifier": "B779EAE5-3FDE-4B40-8815-886D036B41E9", "RunTimeFlags": 1, "RunTimeValue": 90083159473458, "RunTimeEpoch": 0, "RunTimeScale": 1000000000, "capture_session": {"anchor_at": "2019-04-27T22:57:10.000Z", "uptime_s": 90083, "basis": "DateTimeOriginal - RunTimeValue/RunTimeScale; RunTime pauses in sleep"}, "DateTimeOriginal": "2019:04:28 17:00:00", "GPSLatitude": 1.5, "capture_clock": {"at": "x"}, "taken_at": "2001-01-01"}'
 CREATE TEMP TABLE t_items AS SELECT jsonb_agg(jsonb_build_object('image_id', id, 'fields', CASE WHEN id::text LIKE '%8' THEN '{}'::jsonb ELSE :'fields'::jsonb END)) AS j
   FROM vehicle_images;
 
@@ -71,7 +71,7 @@ SELECT t_assert(true, 'cap: more than 50 items refused');
 
 CREATE TEMP TABLE t_live AS SELECT capture_exif_complete_v1(:u, 'b0000000-0000-4000-8000-000000000001', :g, (SELECT j FROM t_items), false) AS r;
 SELECT t_assert((SELECT (r ->> 'with_new_keys')::int = 2 FROM t_live), 'live: two rows gain keys');
-SELECT t_assert((SELECT exif_data - 'exif_completeness' = '{"uuid": "A1", "camera_make": "Apple", "Make": "Apple", "Model": "iPhone X", "Software": "12.2", "LensModel": "iPhone X back dual camera 4mm f/1.8", "ContentIdentifier": "B779EAE5-3FDE-4B40-8815-886D036B41E9", "RunTimeFlags": 1, "RunTimeValue": 90083159473458, "RunTimeEpoch": 0, "RunTimeScale": 1000000000, "capture_session": {"boot_at": "2019-04-27T22:57:10.000Z", "uptime_s": 90083, "basis": "DateTimeOriginal - RunTimeValue/RunTimeScale"}}'::jsonb
+SELECT t_assert((SELECT exif_data - 'exif_completeness' = '{"uuid": "A1", "camera_make": "Apple", "Make": "Apple", "Model": "iPhone X", "Software": "12.2", "LensModel": "iPhone X back dual camera 4mm f/1.8", "ContentIdentifier": "B779EAE5-3FDE-4B40-8815-886D036B41E9", "RunTimeFlags": 1, "RunTimeValue": 90083159473458, "RunTimeEpoch": 0, "RunTimeScale": 1000000000, "capture_session": {"anchor_at": "2019-04-27T22:57:10.000Z", "uptime_s": 90083, "basis": "DateTimeOriginal - RunTimeValue/RunTimeScale; RunTime pauses in sleep"}}'::jsonb
   AND exif_data #>> '{exif_completeness,signature}' = 'capture_exif_complete_v1/b0000000-0000-4000-8000-000000000001'
   AND exif_data #>> '{exif_completeness,granted_by}' = '00000000-0000-4000-8000-000000000002'
   FROM vehicle_images WHERE id = 'a0000000-0000-4000-8000-000000000001'), 'live: the camera fields and session are added with a signed marker');

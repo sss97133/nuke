@@ -8,8 +8,8 @@
 -- Change: capture_exif_complete_v1(user, run, granted_by, items, dry) takes what derive-image-exif (mode "complete")
 -- read from each file and adds it to the row's existing exif_data column. Only these keys: Make, Model, Software,
 -- LensMake, LensModel, ContentIdentifier, BurstUUID, RunTimeFlags, RunTimeValue, RunTimeEpoch, RunTimeScale and
--- capture_session ({boot_at, uptime_s, basis}: the file's capture clock minus the phone's uptime, i.e. when that phone
--- last booted). A key the row already has is never overwritten. taken_at, DateTimeOriginal, offsets, capture_clock and
+-- capture_session ({anchor_at, uptime_s, basis}: the file's capture clock minus the phone's uptime; RunTime pauses
+-- while the phone sleeps, so within one boot the uptime only grows and a reboot resets it). A key the row already has is never overwritten. taken_at, DateTimeOriginal, offsets, capture_clock and
 -- any GPS key are never written (admission and capture clocks are other producers' work). Every row it examines gets
 -- exif_data.exif_completeness = {run, granted_by, at, keys, signature}, so a row is examined once and a run can be
 -- reverted. Skipped, never written: another owner's row, a row without a stored picture (empty image_url, the privacy
@@ -57,8 +57,8 @@ BEGIN
     v_add := '{}'; v_keys := '{}';
     FOR k, v IN SELECT key, value FROM jsonb_each(coalesce(it -> 'fields', '{}'::jsonb)) LOOP
       CONTINUE WHEN NOT k = ANY (v_allowed) OR coalesce(v_row.exif_data, '{}'::jsonb) ? k;
-      CONTINUE WHEN k = 'capture_session' AND (jsonb_typeof(v) <> 'object' OR (v ->> 'boot_at') IS NULL
-                                              OR (v - 'boot_at' - 'uptime_s' - 'basis') <> '{}'::jsonb);
+      CONTINUE WHEN k = 'capture_session' AND (jsonb_typeof(v) <> 'object' OR (v ->> 'anchor_at') IS NULL
+                                              OR (v - 'anchor_at' - 'uptime_s' - 'basis') <> '{}'::jsonb);
       CONTINUE WHEN k <> 'capture_session' AND (jsonb_typeof(v) NOT IN ('string', 'number') OR length(v #>> '{}') > 200);
       v_add := v_add || jsonb_build_object(k, v);
       v_keys := v_keys || k;

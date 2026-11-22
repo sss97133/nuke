@@ -116,7 +116,7 @@ Deno.test("a JPEG yields camera, lens, software, ContentIdentifier, RunTime and 
     RunTimeFlags: 1, RunTimeValue: 8156691884708, RunTimeEpoch: 0, RunTimeScale: 1000000000,
     ContentIdentifier: "3083D92A-C756-4206-A3D0-A16E0B7104B5",
     // 2017-10-11 01:29:16 -07:00 = 08:29:16Z, minus 8156.69 s of uptime
-    capture_session: { boot_at: "2017-10-11T06:13:19.000Z", uptime_s: 8157, basis: "DateTimeOriginal - RunTimeValue/RunTimeScale" },
+    capture_session: { anchor_at: "2017-10-11T06:13:19.000Z", uptime_s: 8157, basis: "DateTimeOriginal - RunTimeValue/RunTimeScale; RunTime pauses in sleep" },
   });
 });
 

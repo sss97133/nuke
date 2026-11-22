@@ -229,20 +229,22 @@ export function readCamera(b: Uint8Array): CameraRead | null {
 }
 
 /**
- * The handset session: when the phone last booted, as the file's own capture clock minus the phone's uptime
- * (RunTimeValue / RunTimeScale; RunTimeFlags bit 0 = valid). Photos from one boot of one phone share it (within the
- * drift of the uptime clock). Null without a valid RunTime or a readable DateTimeOriginal: nothing is invented.
+ * The handset session anchor: the file's own capture clock minus the phone's uptime (RunTimeValue / RunTimeScale;
+ * RunTimeFlags bit 0 = valid). iOS's RunTime pauses while the phone sleeps, so within one boot the uptime only grows
+ * and the anchor only moves forward (by the time the phone slept); a reboot resets the uptime. Photos whose uptime
+ * grows by no more than the clock between them belong to one boot of one phone. Null without a valid RunTime or a
+ * readable DateTimeOriginal: nothing is invented.
  */
-export function bootSession(r: CameraRead): { boot_at: string; uptime_s: number } | null {
+export function bootSession(r: CameraRead): { anchor_at: string; uptime_s: number } | null {
   const f = r.fields;
   if (!r.dateTimeOriginal || !f.RunTimeValue || !f.RunTimeScale || ((f.RunTimeFlags ?? 0) & 1) !== 1) return null;
   const at = exifDateToIso(r.dateTimeOriginal, r.offsetTimeOriginal);
   if (!at) return null;
   const uptime = f.RunTimeValue / f.RunTimeScale;
   if (!(uptime > 0) || uptime > 400 * 86400) return null;
-  const boot = new Date(Date.parse(at) - Math.round(uptime * 1000));
-  boot.setUTCMilliseconds(0);
-  return { boot_at: boot.toISOString(), uptime_s: Math.round(uptime) };
+  const anchor = new Date(Date.parse(at) - Math.round(uptime * 1000));
+  anchor.setUTCMilliseconds(0);
+  return { anchor_at: anchor.toISOString(), uptime_s: Math.round(uptime) };
 }
 
 /** The keys this pass may add to vehicle_images.exif_data (never a clock, never GPS). */
@@ -255,7 +257,7 @@ export const COMPLETE_KEYS = [
 export function completeFields(r: CameraRead): Record<string, unknown> {
   const out: Record<string, unknown> = { ...r.fields };
   const s = bootSession(r);
-  if (s) out.capture_session = { boot_at: s.boot_at, uptime_s: s.uptime_s, basis: "DateTimeOriginal - RunTimeValue/RunTimeScale" };
+  if (s) out.capture_session = { anchor_at: s.anchor_at, uptime_s: s.uptime_s, basis: "DateTimeOriginal - RunTimeValue/RunTimeScale; RunTime pauses in sleep" };
   for (const k of Object.keys(out)) if (!(COMPLETE_KEYS as readonly string[]).includes(k) || out[k] === undefined) delete out[k];
   return out;
 }
