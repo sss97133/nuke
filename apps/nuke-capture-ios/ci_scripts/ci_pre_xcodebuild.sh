@@ -27,3 +27,10 @@ BUILD_NUM=$(date +%s)
 echo "▸ Setting CFBundleVersion to $BUILD_NUM in $PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" "$PLIST"
 echo "▸ CFBundleVersion now: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
+
+# The widget extension (the Live Activity) must carry the SAME build number as its host app.
+WIDGET_PLIST="Generated/NukeCaptureWidgets-Info.plist"
+if [ -f "$WIDGET_PLIST" ]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" "$WIDGET_PLIST"
+  echo "▸ Widget CFBundleVersion now: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$WIDGET_PLIST")"
+fi
