@@ -102,6 +102,8 @@ struct ExploreTuningSheet: View {
     @State private var finding = false
     @State private var placeError: String?
     @Environment(\.dismiss) private var dismiss
+    /// Absent key = on, the same rule ExploreSignalLog.uploadEnabled reads.
+    @AppStorage(ExploreSignalLog.uploadFlagKey) private var shareSignals = true
 
     init(current: ExploreTuning, onApply: @escaping (ExploreTuning) -> Void) {
         _draft = State(initialValue: current)
@@ -175,6 +177,14 @@ struct ExploreTuningSheet: View {
                 Section("Price") {
                     TextField("Lowest", value: $draft.priceMin, format: .number).keyboardType(.numberPad)
                     TextField("Highest", value: $draft.priceMax, format: .number).keyboardType(.numberPad)
+                }
+
+                Section {
+                    Toggle("Use my Explore activity", isOn: $shareSignals)
+                } header: {
+                    Text("Recommendations")
+                } footer: {
+                    Text("Which cards you viewed, for how long, how far you swiped, what you opened and your more or less choices, saved to your account to rank Browse. No one else can read them. Off keeps them on this phone only.")
                 }
 
                 if draft.isActive {
