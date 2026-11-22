@@ -1248,5 +1248,257 @@
     "note": "Stored bid matches the page"
    }
   }
+ },
+ "live_gbp": {
+  "isError": false,
+  "structuredContent": {
+   "asset_type": "vehicle",
+   "asset_id": "b616dc86-7c37-4043-b978-1cb58758e9fa",
+   "tool": "evaluate_listing",
+   "as_of": "2026-11-22T18:05:13.139Z",
+   "verdict": "2000 Mazda MX-5: similar cars sold $8,697\u2013$10,693 (confidence 0.55) \u00b7 auction live, current bid $200 \u2014 below what similar cars sold for so far, ends 2026-11-24 \u00b7 5 red flag(s)",
+   "value": {
+    "low": 8697,
+    "high": 10693,
+    "confidence": 0.55,
+    "basis": "Nuke's value for this car from comparable sales",
+    "n": 15,
+    "subject_variant": "base",
+    "flags": [
+     "Value comes from comparable sales.",
+     "Comparable sales are adjusted for date, venue and mileage."
+    ],
+    "price_basis": "hammer"
+   },
+   "prior_sales": [],
+   "comps": [
+    {
+     "year": 2000,
+     "make": "Mazda",
+     "model": "MX-5 Miata Special Edition 6-Speed",
+     "sale_price": 10100,
+     "sold_date": "2026-04-12",
+     "listing_url": "https://bringatrailer.com/listing/2000-mazda-mx-5-miata-special-edition-18",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 2000,
+     "make": "Mazda",
+     "model": "MX-5 Miata 6-Speed",
+     "sale_price": 10500,
+     "sold_date": "2025-03-18",
+     "listing_url": "https://bringatrailer.com/listing/2000-mazda-mx-5-miata-78",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 2000,
+     "make": "Mazda",
+     "model": "MX-5 Miata 5-Speed",
+     "sale_price": 10500,
+     "sold_date": "2021-12-08",
+     "listing_url": "https://bringatrailer.com/listing/2000-mazda-mx-5-miata-53",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 2000,
+     "make": "Mazda",
+     "model": "MX-5 Miata",
+     "sale_price": 6169,
+     "sold_date": "2020-11-12",
+     "listing_url": "https://bringatrailer.com/listing/2000-mazda-mx-5-miata-30",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 2000,
+     "make": "Mazda",
+     "model": "MX-5 Miata 5-Speed",
+     "sale_price": 6300,
+     "sold_date": "2019-03-15",
+     "listing_url": "https://bringatrailer.com/listing/2000-mazda-mx-5-miata-12",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 2000,
+     "make": "Mazda",
+     "model": "MX-5 Miata 5-Speed",
+     "sale_price": 9900,
+     "sold_date": "2023-05-03",
+     "listing_url": "https://bringatrailer.com/listing/2000-mazda-mx-5-miata-2-2",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 2001,
+     "make": "Mazda",
+     "model": "MX-5 Miata LS 5-Speed",
+     "sale_price": 9600,
+     "sold_date": "2026-04-04",
+     "listing_url": "https://bringatrailer.com/listing/2001-mazda-mx-5-miata-ls-26",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 2001,
+     "make": "Mazda",
+     "model": "MX-5 Miata LS 6-Speed",
+     "sale_price": 13250,
+     "sold_date": "2026-01-21",
+     "listing_url": "https://bringatrailer.com/listing/2001-mazda-mx-5-miata-77",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1999,
+     "make": "Mazda",
+     "model": "MX-5 Miata 10th Anniversary 6-Speed",
+     "sale_price": 12500,
+     "sold_date": "2025-12-28",
+     "listing_url": "https://bringatrailer.com/listing/1999-mazda-mx-5-miata-10th-anniversary-23",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    },
+    {
+     "year": 1999,
+     "make": "Mazda",
+     "model": "MX-5 Miata 5-Speed",
+     "sale_price": 8963,
+     "sold_date": "2025-08-29",
+     "listing_url": "https://bringatrailer.com/listing/1999-mazda-mx-5-miata-207",
+     "platform": "bat",
+     "result_type": "sold",
+     "price_basis": "hammer",
+     "variant": "base"
+    }
+   ],
+   "red_flags": [
+    "Value comes from comparable sales.",
+    "Comparable sales are adjusted for date, venue and mileage.",
+    "Missing: Service records",
+    "Missing: Underbody inspection"
+   ],
+   "matched_asset_id": "b616dc86-7c37-4043-b978-1cb58758e9fa",
+   "listing": {
+    "url": "https://bringatrailer.com/listing/2000-mazda-mx-5-2/",
+    "title": "2000 Mazda MX-5 5-Speed",
+    "ask": null,
+    "listing_kind": "auction_live",
+    "current_bid": 200,
+    "auction_end_at": "2026-11-24T19:01:00.000Z",
+    "year": 2000,
+    "make": "Mazda",
+    "model": "MX-5",
+    "mileage": 92000,
+    "transmission": "manual",
+    "photo_count": 24,
+    "price_kind": "current_bid",
+    "price": 200,
+    "price_label": "current bid $200",
+    "price_basis": "hammer",
+    "price_basis_note": "BaT publishes the winning / high bid; the buyer fee is charged on top (hammer basis)",
+    "currency": "GBP",
+    "sold_price": null,
+    "high_bid": null,
+    "end_at": "2026-11-24T19:01:00.000Z",
+    "mileage_tmu": false,
+    "mileage_km": null,
+    "mileage_text": "92k Miles Shown on Replacement Cluster",
+    "mileage_source": "page_listing_details"
+   },
+   "subject_sale": null,
+   "all_in": {
+    "status": "recorded",
+    "label": "all-in if the auction closed at the current bid",
+    "currency": "GBP",
+    "price": 200,
+    "price_kind": "current_bid",
+    "price_basis": "hammer",
+    "price_citation": {
+     "source_name": "bat",
+     "source_url": "https://bringatrailer.com/listing/2000-mazda-mx-5-2/"
+    },
+    "buyer_fee": {
+     "amount": 250,
+     "rate": 0.05,
+     "min": 250,
+     "cap": 6000,
+     "currency": "GBP",
+     "citation": {
+      "source_name": "the platform's published buyer-fee schedule",
+      "fee_schedule_id": 71,
+      "source_url": "https://bringatrailer.com/2025/02/03/site-update-new-features-for-international-listings-and-bidders/",
+      "valid_from": "2025-02-03T08:00:00+00:00",
+      "valid_to": null
+     }
+    },
+    "transport": null,
+    "paperwork": null,
+    "total": 450,
+    "total_note": "transport/paperwork estimates are USD-only and were not added"
+   },
+   "position": {
+    "status": "recorded",
+    "price": 200,
+    "price_kind": "current_bid",
+    "percentile": 0,
+    "n": 10,
+    "min": 6169,
+    "median": 10000,
+    "max": 13250,
+    "note": "current bid is above 0 of 10 comparable sales shown"
+   },
+   "trend": {
+    "window_recent": {
+     "from": "2025-11-22",
+     "to": "2026-11-22",
+     "n": 10,
+     "median": 12875
+    },
+    "window_prior": {
+     "from": "2024-11-22",
+     "to": "2025-11-22",
+     "n": 11,
+     "median": 8963
+    },
+    "change_pct": 43.6,
+    "direction": "up",
+    "status": "recorded",
+    "note": "Median of variant-matched, junk-filtered sold comps (hammer basis); same cohort as the comps shown",
+    "price_basis": "hammer"
+   },
+   "ingest": null,
+   "stored_bid": {
+    "auction_event_id": "2dc26732-900c-4139-b0af-5fe80a760cbe",
+    "stored_high_bid": 200,
+    "stored_updated_at": "2026-11-22T01:57:21.537725+00:00",
+    "page_bid": 200,
+    "behind": false,
+    "stored_age_hours": 16.1,
+    "refresh": "not_needed",
+    "note": "Stored bid matches the page"
+   }
+  }
  }
 }

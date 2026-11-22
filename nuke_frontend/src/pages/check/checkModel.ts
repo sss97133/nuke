@@ -25,6 +25,8 @@ export type CheckCard = {
   details: string[];
   priceKind: PriceKind;
   price: number | null;
+  /** The listing's own currency (BaT UK lots bid in GBP). Comps and the range are USD. */
+  currency: string;
   priceDate: string | null;
   endsAt: string | null;
   band: { low: number; high: number; confidence: number | null; n: number | null } | null;
@@ -121,7 +123,9 @@ export function toCheckOutcome(result: { structuredContent?: unknown; isError?: 
     platform: str(c.platform) ?? 'bat',
   }));
   const lowConfidence = !band || (confidence != null && confidence < LOW_CONFIDENCE) || (n ?? comps.length) < MIN_COMPS;
-  const relation = band && price != null && price > 0 && priceKind !== 'none' ? relationOf(price, band.low, band.high) : null;
+  const currency = (str(listing.currency) ?? 'USD').toUpperCase();
+  // A GBP bid is not compared with a USD range: no conversion is recorded, so no call is made.
+  const relation = band && currency === 'USD' && price != null && price > 0 && priceKind !== 'none' ? relationOf(price, band.low, band.high) : null;
 
   const pos = obj(sc.position);
   const position = pos && str(pos.status) === 'recorded' && num(pos.percentile) != null && num(pos.n) ? {
@@ -176,6 +180,7 @@ export function toCheckOutcome(result: { structuredContent?: unknown; isError?: 
     details,
     priceKind,
     price: price != null && price > 0 ? price : null,
+    currency,
     priceDate: str(obj(sc.subject_sale)?.on) ?? (priceKind === 'sold' || priceKind === 'rnm' ? str(listing.end_at)?.slice(0, 10) ?? str(listing.auction_end_at)?.slice(0, 10) ?? null : null),
     endsAt: priceKind === 'live' ? str(listing.auction_end_at) ?? str(listing.end_at) : null,
     band,
@@ -193,7 +198,8 @@ export function toCheckOutcome(result: { structuredContent?: unknown; isError?: 
 }
 
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-export const money = (n: number) => usd.format(n);
+export const money = (n: number, currency = 'USD') =>
+  currency === 'USD' ? usd.format(n) : new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
 export function moneyShort(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 2).replace(/\.?0+$/, '')}M`;
   if (n >= 10_000) return `$${Math.round(n / 1000)}k`;
@@ -211,6 +217,7 @@ export function thinReason(c: CheckCard): string {
 
 /** The headline sentence: what the price is, against the range; or that there is no call to make. */
 export function verdictLine(c: CheckCard): string {
+  if (c.currency !== 'USD' && c.price != null && c.band && !c.lowConfidence) return `Bid is in ${c.currency}; similar sales are in USD, so Nuke won't compare them`;
   if (c.lowConfidence) return c.band ? 'Not enough close sales to call this one' : 'Not enough sales to price this one';
   const where = c.relation === 'below' ? 'below' : c.relation === 'above' ? 'above' : 'within';
   if (c.priceKind === 'sold') return `Sold ${where} what similar cars sold for`;
@@ -240,7 +247,7 @@ export function endsIn(iso: string | null, now = Date.now()): string | null {
 
 /** 0–100 position of a value on the rail spanning the comps and the range. */
 export function railSpan(c: CheckCard): { min: number; max: number } | null {
-  const vals = [...c.comps.map(x => x.price), c.band?.low, c.band?.high, c.price].filter((v): v is number => typeof v === 'number' && v > 0);
+  const vals = [...c.comps.map(x => x.price), c.band?.low, c.band?.high, c.currency === 'USD' ? c.price : null].filter((v): v is number => typeof v === 'number' && v > 0);
   if (vals.length < 2) return null;
   const min = Math.min(...vals), max = Math.max(...vals);
   return max > min ? { min, max } : null;

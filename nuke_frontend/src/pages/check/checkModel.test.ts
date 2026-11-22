@@ -68,6 +68,12 @@ describe('toCheckOutcome', () => {
     expect(c.relation).toBeNull();
     expect(verdictLine(c)).toBe('Not enough close sales to call this one');
   });
+  it('a GBP bid (UK lot) is shown in pounds and not compared with the USD range', () => {
+    const c = card('live_gbp');
+    expect(c.currency).toBe('GBP');
+    expect(c.relation).toBeNull();
+    expect(verdictLine(c)).toMatch(/in GBP/);
+  });
   it('few comps (n=4) is low confidence, and the reasons differ for few vs scattered sales', () => {
     expect(card('low').lowConfidence).toBe(true);
     expect(thinReason(card('low'))).toMatch(/only 4 close sales/);

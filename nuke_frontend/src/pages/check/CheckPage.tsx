@@ -169,7 +169,7 @@ function Card({ card, photo }: { card: CheckCard; photo: string | null }) {
       <div className="check-money">
         <div>
           <Text role="label" as="p">{priceLabel(card)}</Text>
-          <Text role="figure" as="p">{card.price != null ? money(card.price) : card.priceKind === 'live' ? 'No bids yet' : '—'}</Text>
+          <Text role="figure" as="p">{card.price != null ? money(card.price, card.currency) : card.priceKind === 'live' ? 'No bids yet' : '—'}</Text>
           <Text role="caption" as="p">{card.priceKind === 'live' ? [ends ?? 'live', card.relation === 'below' ? 'bids usually climb near the end' : null].filter(Boolean).join(' · ') : card.priceDate ?? ''}</Text>
         </div>
         {card.band && !card.lowConfidence && (
@@ -205,14 +205,14 @@ function Card({ card, photo }: { card: CheckCard; photo: string | null }) {
             {card.comps.map((c, i) => (
               <line key={i} className="check-rail__dot" x1={railPct(c.price, span)} x2={railPct(c.price, span)} y1="6" y2="14" vectorEffect="non-scaling-stroke" />
             ))}
-            {card.price != null && (
+            {card.price != null && card.currency === 'USD' && (
               <line className="check-rail__this" x1={railPct(card.price, span)} x2={railPct(card.price, span)} y1="0" y2="20" vectorEffect="non-scaling-stroke" />
             )}
           </svg>
           <figcaption>
             <Text role="caption">{moneyShort(span.min)}</Text>
             <Text role="caption">
-              {card.position && card.price != null ? positionText(card) : `${card.comps.length} comparable sales`}
+              {card.position && card.price != null && card.currency === 'USD' ? positionText(card) : `${card.comps.length} comparable sales`}
             </Text>
             <Text role="caption">{moneyShort(span.max)}</Text>
           </figcaption>
@@ -234,12 +234,12 @@ function Card({ card, photo }: { card: CheckCard; photo: string | null }) {
             <dt><Text role="label">{card.priceKind === 'sold' ? 'All-in paid' : 'All-in at this bid'}</Text></dt>
             <dd>
               <details className="check-more check-more--inline">
-                <summary><Text role="measure">{money(card.allIn.total)}</Text><Text role="caption"> bid + fee + delivery</Text></summary>
+                <summary><Text role="measure">{money(card.allIn.total, card.currency)}</Text><Text role="caption"> bid + fee + delivery</Text></summary>
                 <ul className="check-lines">
                   {card.allIn.lines.map(l => (
                     <li key={l.label}>
                       <Text role="caption">{l.sourceUrl ? <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer">{l.label}</a> : l.label}</Text>
-                      <Text role="measure" dense>{money(l.amount)}</Text>
+                      <Text role="measure" dense>{money(l.amount, card.currency)}</Text>
                     </li>
                   ))}
                 </ul>
