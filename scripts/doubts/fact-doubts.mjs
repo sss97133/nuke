@@ -85,6 +85,37 @@ export function frameEligible(x) {
     && x.is_document !== true && (x.redaction_level ?? 'none') === 'none'
     && !['product_screenshot', 'cross_reference', 'receipt_document', 'hand_drawn_diagram'].includes(x.scene_type ?? '');
 }
+// Where an existing reading of a photograph names the part it shows. A close-up names its subject in the framing line or
+// an open question as often as in the notes, so a term search over the notes alone finds no frame for a photographed part.
+export const FRAME_TERM_FIELDS = ['structured_data->>agent_notes', 'structured_data->>narrative_one_line',
+  'structured_data->camera_pose->>framing', 'structured_data->>open_questions', 'structured_data->>components_seen'];
+// PostgREST or-filter body: any term in any of those fields, case-insensitive.
+export function frameTermFilter(terms) {
+  return terms.flatMap((t) => FRAME_TERM_FIELDS.map((f) => `${f}.ilike.*${encodeURIComponent(t)}*`)).join(',');
+}
+
+// Enlargement boxes for one photograph, from where an existing reading located text (its text_regions bboxes, 0..1000 on both
+// axes). Only the positions are used, never the text read there, so the task stays blind. Each box is grown by `margin` of its
+// own size (at least `min` units), boxes that then overlap are merged, and at most `cap` are returned, largest first.
+export const CLOSEUP_CAP = 3;
+export function closeupBoxes(regions, { margin = 0.6, min = 60, cap = CLOSEUP_CAP } = {}) {
+  const clamp = (v) => Math.max(0, Math.min(1000, v));
+  let boxes = (Array.isArray(regions) ? regions : []).map((r) => r?.bbox)
+    .filter((b) => Array.isArray(b) && b.length === 4 && b.every((v) => Number.isFinite(v)) && b[2] > b[0] && b[3] > b[1] && b[0] >= 0 && b[3] <= 1000 && b[2] <= 1000)
+    .map(([x0, y0, x1, y1]) => { const mx = Math.max(min, (x1 - x0) * margin); const my = Math.max(min, (y1 - y0) * margin); return [clamp(x0 - mx), clamp(y0 - my), clamp(x1 + mx), clamp(y1 + my)]; });
+  for (let merged = true; merged;) {
+    merged = false;
+    outer: for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i]; const b = boxes[j];
+      if (a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3]) {
+        boxes[i] = [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]; boxes.splice(j, 1); merged = true; break outer;
+      }
+    }
+  }
+  const area = (b) => (b[2] - b[0]) * (b[3] - b[1]);
+  return boxes.sort((a, b) => area(b) - area(a) || a[0] - b[0] || a[1] - b[1]).slice(0, cap);
+}
+
 export function pickFrames(candidates, cap = FRAME_CAP) {
   const tier = { witness: 0, role: 1, text: 2 };
   const seen = new Set();

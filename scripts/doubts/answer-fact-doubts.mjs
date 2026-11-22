@@ -5,6 +5,7 @@
 // locally, and submits through answer_evidence_judgment. It never lands a fact and writes nowhere else.
 //   cd ~/nuke && dotenvx run --quiet -- node scripts/doubts/answer-fact-doubts.mjs --vehicle <uuid> [--limit N]
 //        [--provider api|subscription|gemini] [--model id] [--key-env NAME] [--reclaim-minutes N] [--second-reader] [--dry-run]
+//        [--closeups]  subscription reader only: also give full-resolution enlargements of where text sits in each cited frame
 // Providers: api (Anthropic key; default when a key env is set), subscription (`claude -p` under the owner's login, no key,
 // cost 0), gemini (REST, key in the x-goog-api-key header). --second-reader reopens the vehicle's singly-read doubts through
 // reopen_evidence_judgment_answers so the chosen provider answers them blind (the first answer moves to answer_history and is
@@ -19,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { producerVersion } from '../garage/derivation-evidence.mjs';
 import { client, arg } from './db.mjs';
-import { DEPARTMENT, QUESTION, ANSWER_SCHEMA, buildBlindTask, buildExportTask, validateAnswer, closedAnswer } from './fact-doubts.mjs';
+import { DEPARTMENT, QUESTION, ANSWER_SCHEMA, buildBlindTask, buildExportTask, validateAnswer, closedAnswer, closeupBoxes } from './fact-doubts.mjs';
 import { AGENTS, GEMINI_KEY_ENVS, selectProvider, runClaudeCli, readCliResult, answerJsonFrom, pickGeminiModel, geminiRequest, readGeminiResponse, isUsageLimit, GEMINI_HOST } from './readers.mjs';
 
 export const SCRIPT = 'scripts/doubts/answer-fact-doubts.mjs';
@@ -80,7 +81,7 @@ async function blindTaskFor(db, reg, q) {
 }
 
 // Frames as base64 jpegs keyed by image id, at the given long edge.
-async function fetchFrames(db, params, edge) {
+export async function fetchFrames(db, params, edge) {
   const { fetchImage } = await import('../photo-work-ledger/read-photos.mjs');
   const images = new Map();
   if (params.cited_image_ids.length) {
@@ -90,14 +91,57 @@ async function fetchFrames(db, params, edge) {
   return images;
 }
 
+// Full-resolution enlargements of where an existing reading located text in the cited frames: { image_id: [base64 jpeg] }.
+// A marking a few dozen pixels tall in a whole frame is unreadable once the frame is shrunk for a reader; the enlargement is
+// cut from the original bytes. Positions only are read from the earlier reading (closeupBoxes), never its text.
+export const CLOSEUP_EDGE = 1568;
+export async function fetchCloseups(db, vehicleId, params, total = 8) {
+  const ids = params.cited_image_ids ?? []; const out = new Map();
+  if (!ids.length) return out;
+  const { default: sharp } = await import('sharp');
+  const { execFile } = await import('node:child_process'); const { promisify } = await import('node:util'); const run = promisify(execFile);
+  const rows = await db.req(`vehicle_observations?select=image_id:structured_data->>image_id,regions:structured_data->text_regions&vehicle_id=eq.${vehicleId}&is_superseded=not.is.true&kind=eq.condition&structured_data->>image_id=in.(${ids.join(',')})&limit=200`);
+  const regions = new Map();
+  for (const r of rows) if (Array.isArray(r.regions)) regions.set(r.image_id, [...(regions.get(r.image_id) ?? []), ...r.regions]);
+  const urls = new Map((await db.req(`vehicle_images?select=id,image_url&id=in.(${ids.join(',')})`)).map((r) => [r.id, r.image_url]));
+  let n = 0;
+  for (const id of ids) {
+    const boxes = closeupBoxes(regions.get(id)); if (!boxes.length || !urls.get(id) || n >= total) continue;
+    const res = await fetch(urls.get(id), { signal: AbortSignal.timeout(60000) }); if (!res.ok) continue;
+    let buf = Buffer.from(await res.arrayBuffer());
+    try { buf = await sharp(buf, { failOn: 'none' }).rotate().jpeg({ quality: 92 }).toBuffer(); }
+    catch (e) {
+      if (process.platform !== 'darwin') continue; // this sharp build cannot decode HEIC; sips can
+      const dir = mkdtempSync(join(tmpdir(), 'fact-doubt-full-'));
+      try { writeFileSync(join(dir, 'in'), buf); await run('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '92', join(dir, 'in'), '--out', join(dir, 'out.jpg')], { timeout: 60000 }); buf = await sharp(readFileSync(join(dir, 'out.jpg'))).rotate().toBuffer(); }
+      finally { rmSync(dir, { recursive: true, force: true }); }
+    }
+    const { width, height } = await sharp(buf).metadata(); const crops = [];
+    for (const [x0, y0, x1, y1] of boxes) {
+      if (n >= total) break;
+      const left = Math.round(x0 / 1000 * width); const top = Math.round(y0 / 1000 * height);
+      const w = Math.max(1, Math.min(width - left, Math.round((x1 - x0) / 1000 * width))); const h = Math.max(1, Math.min(height - top, Math.round((y1 - y0) / 1000 * height)));
+      crops.push((await sharp(buf).extract({ left, top, width: w, height: h }).resize({ width: CLOSEUP_EDGE, height: CLOSEUP_EDGE, fit: 'inside' }).normalise().sharpen().jpeg({ quality: 90 }).toBuffer()).toString('base64')); n++;
+    }
+    if (crops.length) out.set(id, crops);
+  }
+  return out;
+}
+
 // Write task.json and frame-N.jpg into dir (the blind task as files); returns the frame list.
-function writeTaskDir(dir, task, params, images) {
+export function writeTaskDir(dir, task, params, images, closeups = new Map()) {
   mkdirSync(dir, { recursive: true });
   const frames = [];
   for (const id of params.cited_image_ids) {
-    const file = `frame-${frames.length + 1}.jpg`;
+    const base = frames.filter((f) => !f.enlargement_of).length + 1;
+    const file = `frame-${base}.jpg`;
     writeFileSync(join(dir, file), Buffer.from(images.get(id), 'base64'));
     frames.push({ file, image_id: id });
+    for (const [k, b64] of (closeups.get(id) ?? []).entries()) {
+      const cf = `frame-${base}-closeup-${k + 1}.jpg`;
+      writeFileSync(join(dir, cf), Buffer.from(b64, 'base64'));
+      frames.push({ file: cf, image_id: id, enlargement_of: file, note: 'enlarged, contrast-stretched region of the same photograph; cite its image_id' });
+    }
   }
   writeFileSync(join(dir, 'task.json'), JSON.stringify(buildExportTask({ task, params, frames }), null, 1));
   return frames;
@@ -145,7 +189,7 @@ async function makeReader({ provider, argv, env, db, version, usage }) {
   return { agent: AGENTS.subscription, async read(task, q) {
     const dir = mkdtempSync(join(tmpdir(), 'fact-doubt-'));
     try {
-      writeTaskDir(dir, task, q.params, await fetchFrames(db, q.params, 1600));
+      writeTaskDir(dir, task, q.params, await fetchFrames(db, q.params, 1600), argv.includes('--closeups') ? await fetchCloseups(db, q.vehicle_id, q.params) : new Map());
       const r = readCliResult(await runClaudeCli(dir, env));
       if (r.error) throw Object.assign(new Error(r.error), { stop: r.stop });
       return r;

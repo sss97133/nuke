@@ -36,8 +36,9 @@ struct MainTabView: View {
     @State private var fullAccess = (Self.currentPhotoStatus() == .authorized)
     @State private var tab: Tab = .explore
     @ObservedObject private var inboxBadge = InboxBadgeStore.shared
-    /// Live per-photo progress for this shooting session (the slim bar at the top).
+    /// Live per-photo progress for this shooting session (feeds the Live Activity).
     @StateObject private var ingest = CaptureIngestStore()
+    @ObservedObject private var workRoute = WorkProgressRoute.shared
 
     enum Tab: Hashable { case library, garage, profile, explore, today }
 
@@ -85,17 +86,26 @@ struct MainTabView: View {
                     .badge(inboxBadge.badge)
             }
         }
-        // The live ingest status bar: pinned above every tab, hidden when nothing to show.
-        // Conditionally apply safeAreaInset only when bar has content — otherwise it reserves
-        // space even when empty, blocking under the Dynamic Island.
-        .modifier(ConditionalTopInset(showBar: session.isSignedIn && !ingest.isHidden) {
+        // Photo work in motion shows as a Live Activity (Dynamic Island + Lock Screen), driven by
+        // WorkLiveActivityController, not as a bar over the app. Only when the user has switched
+        // Live Activities off does the in-app bar return, and then only while work is actually
+        // moving (WorkLiveProgress.liveRows), never for rows that finished or stalled.
+        .modifier(ConditionalTopInset(showBar: showsFallbackBar) {
             CaptureIngestBar(store: ingest)
         })
+        // The Live Activity's tap opens the per-photo list here.
+        .sheet(isPresented: $workRoute.showList) {
+            CaptureIngestListSheet(store: ingest)
+        }
         .task(id: accountScope) {
-            guard session.isSignedIn, let uid = SupabaseService.currentUserId else { return }
+            guard session.isSignedIn, let uid = SupabaseService.currentUserId else {
+                WorkLiveActivityController.shared.detach()
+                return
+            }
             #if DEBUG
             if FixtureBackend.isActive { return }   // UI tests run on a fake host; no Realtime there
             #endif
+            WorkLiveActivityController.shared.attach(store: ingest)
             await ingest.run(userId: uid)
         }
         // Discard another account's navigation and private screen state. Merely
@@ -115,6 +125,14 @@ struct MainTabView: View {
                 Task { await ingest.refresh() }
             }
         }
+    }
+
+    /// The in-app bar is only the fallback for a phone with Live Activities switched off, and only
+    /// while photo work is live.
+    private var showsFallbackBar: Bool {
+        guard session.isSignedIn, !ingest.isHidden else { return false }
+        guard !WorkLiveActivityController.shared.activitiesEnabled else { return false }
+        return !WorkLiveProgress.liveRows(ingest.rows, now: Date()).isEmpty
     }
 
     /// The Garage tab exists only for a signed-in account; elsewhere the profile pushes the Garage screen.
