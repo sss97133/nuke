@@ -21,7 +21,7 @@ final class NavigationUITests: XCTestCase {
         let garage = app.tabBars.buttons["Garage"].firstMatch
         XCTAssertTrue(garage.waitForExistence(timeout: 12)); garage.tap()
         let search = app.searchFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("1234567\n")
+        XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("1973 Coupe\n")
         let vehicle = app.staticTexts["1973 Fixture Coupe"].firstMatch
         XCTAssertTrue(vehicle.waitForExistence(timeout: 10)); vehicle.tap()
         let timeline = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Build timeline")).firstMatch
@@ -52,7 +52,7 @@ final class NavigationUITests: XCTestCase {
         app.buttons["Done"].firstMatch.tap()
         let back = app.navigationBars.buttons["Garage"].firstMatch
         XCTAssertTrue(back.waitForExistence(timeout: 5)); back.tap()
-        XCTAssertTrue((app.searchFields.firstMatch.value as? String)?.contains("1234567") == true)
+        XCTAssertTrue((app.searchFields.firstMatch.value as? String)?.contains("1973 Coupe") == true)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 
@@ -124,7 +124,7 @@ final class NavigationUITests: XCTestCase {
         app.buttons["Done"].firstMatch.tap()
         let back = app.navigationBars.buttons["Garage"].firstMatch
         XCTAssertTrue(back.waitForExistence(timeout: 5)); back.tap()
-        XCTAssertTrue((app.searchFields.firstMatch.value as? String)?.contains("1234567") == true)
+        XCTAssertTrue((app.searchFields.firstMatch.value as? String)?.contains("1973 Coupe") == true)
         XCTAssertEqual(app.descendants(matching: .any)["fixture.writes"].label, "no writes")
     }
 
