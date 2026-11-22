@@ -85,10 +85,10 @@ LANGUAGE sql AS $$ SELECT ROW(p_vehicle_id, 5, 'A', 4, 6, 'low', true, 0, '{}'::
 \ir ../migrations/20261122032000_vehicle_documented_spend_replica_accuracy.sql
 
 INSERT INTO observation_properties(id, property_key) VALUES
-  ('00000000-0000-0000-0000-0000000000p1', 'engine_block_casting'),
-  ('00000000-0000-0000-0000-0000000000p2', 'engine_code_stamp'),
-  ('00000000-0000-0000-0000-0000000000p6', 'body_tag_option_codes'),
-  ('00000000-0000-0000-0000-0000000000p7', 'body_tag_style');
+  ('00000000-0000-0000-0000-0000000000d1', 'engine_block_casting'),
+  ('00000000-0000-0000-0000-0000000000d2', 'engine_code_stamp'),
+  ('00000000-0000-0000-0000-0000000000d6', 'body_tag_option_codes'),
+  ('00000000-0000-0000-0000-0000000000d7', 'body_tag_style');
 
 -- Non-replica → not applicable.
 INSERT INTO vehicles(id, make, model, year, vin, is_replica)
@@ -103,13 +103,13 @@ VALUES ('00000000-0000-0000-0000-0000000000a1', 'Pontiac', 'Firebird', 1973, '2S
 
 INSERT INTO vehicle_observations(vehicle_id, kind, extraction_method, property_id, structured_data) VALUES
  ('00000000-0000-0000-0000-0000000000a1', 'specification', 'engine_block_decode_v1',
-  '00000000-0000-0000-0000-0000000000p1', '{"engine_block_casting":"9799140"}'),
+  '00000000-0000-0000-0000-0000000000d1', '{"engine_block_casting":"9799140"}'),
  ('00000000-0000-0000-0000-0000000000a1', 'specification', 'engine_block_decode_v1',
-  '00000000-0000-0000-0000-0000000000p2', '{"engine_code_stamp":"YH"}'),
+  '00000000-0000-0000-0000-0000000000d2', '{"engine_code_stamp":"YH"}'),
  ('00000000-0000-0000-0000-0000000000a1', 'specification', 'cowl_tag_decode_v1',
-  '00000000-0000-0000-0000-0000000000p7', '{"body_tag_style":"2FS87"}'),
+  '00000000-0000-0000-0000-0000000000d7', '{"body_tag_style":"2FS87"}'),
  ('00000000-0000-0000-0000-0000000000a1', 'specification', 'cowl_tag_decode_v1',
-  '00000000-0000-0000-0000-0000000000p6',
+  '00000000-0000-0000-0000-0000000000d6',
   '{"body_tag_option_codes":[],"absent_codes_checked":["WS4","W66"]}');
 
 CREATE TEMP TABLE ra AS

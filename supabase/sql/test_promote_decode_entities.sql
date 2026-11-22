@@ -105,13 +105,13 @@ $$;
 \ir ../migrations/20261122032000_vehicle_documented_spend_replica_accuracy.sql
 
 INSERT INTO observation_properties(id, property_key) VALUES
-  ('00000000-0000-0000-0000-0000000000p1', 'engine_block_casting'),
-  ('00000000-0000-0000-0000-0000000000p2', 'engine_code_stamp'),
-  ('00000000-0000-0000-0000-0000000000p3', 'transmission_case_casting'),
-  ('00000000-0000-0000-0000-0000000000p4', 'transmission_id_stamp'),
-  ('00000000-0000-0000-0000-0000000000p5', 'transmission_tailhousing_casting'),
-  ('00000000-0000-0000-0000-0000000000p6', 'body_tag_option_codes'),
-  ('00000000-0000-0000-0000-0000000000p7', 'body_tag_style');
+  ('00000000-0000-0000-0000-0000000000d1', 'engine_block_casting'),
+  ('00000000-0000-0000-0000-0000000000d2', 'engine_code_stamp'),
+  ('00000000-0000-0000-0000-0000000000d3', 'transmission_case_casting'),
+  ('00000000-0000-0000-0000-0000000000d4', 'transmission_id_stamp'),
+  ('00000000-0000-0000-0000-0000000000d5', 'transmission_tailhousing_casting'),
+  ('00000000-0000-0000-0000-0000000000d6', 'body_tag_option_codes'),
+  ('00000000-0000-0000-0000-0000000000d7', 'body_tag_style');
 
 INSERT INTO vehicles(id, make, model, year, vin, is_replica, replica_quote)
 VALUES ('00000000-0000-0000-0000-0000000000a1', 'Pontiac', 'Firebird', 1973, '2S87D3N143591', true,
@@ -122,25 +122,25 @@ VALUES ('block_casting', '9799140', '{"displacement_ci":455}', 'https://example.
 
 INSERT INTO vehicle_observations(id, vehicle_id, kind, extraction_method, property_id, structured_data) VALUES
  ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1', 'specification',
-  'engine_block_decode_v1', '00000000-0000-0000-0000-0000000000p1',
+  'engine_block_decode_v1', '00000000-0000-0000-0000-0000000000d1',
   '{"engine_block_casting":"9799140","claim_role":"engine_block_casting"}'),
  ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000a1', 'specification',
-  'engine_block_decode_v1', '00000000-0000-0000-0000-0000000000p2',
+  'engine_block_decode_v1', '00000000-0000-0000-0000-0000000000d2',
   '{"engine_code_stamp":"YH","claim_role":"engine_code_stamp"}'),
- ('00000000-0000-0000-0000-0000000000t1', '00000000-0000-0000-0000-0000000000a1', 'specification',
-  'trans_id_stamp_decode_v1', '00000000-0000-0000-0000-0000000000p3',
+ ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000a1', 'specification',
+  'trans_id_stamp_decode_v1', '00000000-0000-0000-0000-0000000000d3',
   '{"transmission_case_casting":"3851325","claim_role":"transmission_case_model"}'),
- ('00000000-0000-0000-0000-0000000000t2', '00000000-0000-0000-0000-0000000000a1', 'specification',
-  'trans_id_stamp_decode_v1', '00000000-0000-0000-0000-0000000000p4',
+ ('00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000a1', 'specification',
+  'trans_id_stamp_decode_v1', '00000000-0000-0000-0000-0000000000d4',
   '{"transmission_id_stamp":"P0118","claim_role":"transmission_id_stamp"}'),
- ('00000000-0000-0000-0000-0000000000t3', '00000000-0000-0000-0000-0000000000a1', 'specification',
-  'trans_id_stamp_decode_v1', '00000000-0000-0000-0000-0000000000p5',
+ ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000a1', 'specification',
+  'trans_id_stamp_decode_v1', '00000000-0000-0000-0000-0000000000d5',
   '{"transmission_tailhousing_casting":"3857584","claim_role":"transmission_tailhousing"}'),
  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1', 'specification',
-  'cowl_tag_decode_v1', '00000000-0000-0000-0000-0000000000p6',
+  'cowl_tag_decode_v1', '00000000-0000-0000-0000-0000000000d6',
   '{"body_tag_option_codes":[],"absent_codes_checked":["WS4","W66"],"claim_role":"cowl_tag_option_codes"}'),
  ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000a1', 'specification',
-  'cowl_tag_decode_v1', '00000000-0000-0000-0000-0000000000p7',
+  'cowl_tag_decode_v1', '00000000-0000-0000-0000-0000000000d7',
   '{"body_tag_style":"2FS87","claim_role":"cowl_tag_style"}');
 
 -- Dry run writes nothing.
