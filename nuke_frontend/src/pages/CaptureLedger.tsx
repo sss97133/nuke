@@ -14,9 +14,11 @@ import { getVehiclePrimaryName } from '../utils/vehicleDisplayName';
 import { Text, plural } from '../kit';
 import './capture-ledger.css';
 
-type State = 'on_vehicle' | 'unverified' | 'duplicate' | 'waiting' | 'held' | 'pulled' | 'private' | 'unsorted' | 'failed';
+type State = 'on_vehicle' | 'unverified' | 'duplicate' | 'waiting' | 'held' | 'pulled' | 'private' | 'unsorted' | 'failed' | 'no_file' | 'non_vehicle' | 'junk';
 type DayRow = { day: string; taken: number; on_vehicle: number; unverified: number; waiting: number; held: number; pulled: number;
-  private: number; unsorted: number; failed: number; duplicate?: number; skipped: number; vehicles: { vehicle_id: string; name: string; n: number }[];
+  private: number; unsorted: number; failed: number; duplicate?: number; skipped: number;
+  // optional until the reader sends them; a missing key is 0
+  no_file?: number; non_vehicle?: number; junk?: number; vehicles: { vehicle_id: string; name: string; n: number }[];
   held_reasons: Record<string, number>; skip_reasons: Record<string, number> };
 type Rescan = { id: string; requested_at: string; acked_at: string | null; device: string | null; finished_at: string | null; result: Record<string, unknown> | null };
 type Ledger = { generated_at: string; tz: string; days: DayRow[]; days_total: number; totals: Omit<DayRow, 'day' | 'vehicles' | 'held_reasons' | 'skip_reasons'>;
@@ -71,6 +73,10 @@ export function stageLabel(f: Frame): string {
     case 'pulled': return `Taken back off${f.vehicle ? ` ${f.vehicle}` : ''}`;
     case 'private': return 'Kept private';
     case 'failed': return `Didn't work: ${words(FAILURE, f.reason, 'something went wrong')}`;
+    // the phone sent the time and a rough place only; a reason is named only when it is one the phone reports
+    case 'no_file': return `Picture kept on the phone${f.reason && Object.hasOwn(SKIP, f.reason) ? `: ${SKIP[f.reason]}` : ''}`;
+    case 'non_vehicle': return 'Not a vehicle photo';
+    case 'junk': return 'Not a photo';
     default: return 'Not sorted yet';
   }
 }
@@ -83,8 +89,16 @@ export function liveLine(f: Frame): string {
   }
   if (f.state === 'waiting') return `${name} · a viewed sample decides the set`;
   if (f.state === 'unsorted') return `${name} · not scored yet`;
+  if (f.state === 'no_file') return `${name} · ${timeLabel(f.taken_at)} · only the time and rough place were sent`;
+  if (f.state === 'non_vehicle') return `${name} · ${timeLabel(f.taken_at)} · checked: no vehicle in it`;
+  if (f.state === 'junk') return `${name} · ${timeLabel(f.taken_at)} · no stored picture`;
   return `${name} · ${timeLabel(f.taken_at)}${f.source ? ` · ${f.source.replace(/_/g, ' ')}` : ''}`;
 }
+// The three states nothing more happens to, in the same words in the summary and the day pills.
+const settledParts = (t: Pick<DayRow, 'no_file' | 'non_vehicle' | 'junk'>) => [
+  t.no_file ? `${n(t.no_file)} kept on the phone` : '',
+  t.non_vehicle ? plural(t.non_vehicle, 'not a vehicle photo', 'not vehicle photos') : '',
+  t.junk ? plural(t.junk, 'not a photo', 'not photos') : ''].filter(Boolean);
 // "12 photos · 9 on 1973 Firebird · 2 held · 1 skipped on the phone · 1 failed", zero parts dropped except the first.
 export function summaryLine(t: Ledger['totals'], vehicles: { name: string; n: number }[]): string {
   const parts = [plural(t.taken, 'photo')];
@@ -99,6 +113,7 @@ export function summaryLine(t: Ledger['totals'], vehicles: { name: string; n: nu
   if (t.pulled) parts.push(`${n(t.pulled)} taken back off`);
   if (t.private) parts.push(`${n(t.private)} kept private`);
   if (t.skipped) parts.push(`${n(t.skipped)} skipped on the phone`);
+  parts.push(...settledParts(t));
   if (t.failed) parts.push(`${n(t.failed)} failed`);
   return parts.join(' · ');
 }
@@ -127,6 +142,8 @@ export function dayItems(frames: Frame[]): DayItem[] {
 }
 const carLabel = (c: Pick<OwnCar, 'year' | 'make' | 'model'>) =>
   getVehiclePrimaryName({ year: c.year ?? 0, make: c.make ?? '', model: c.model ?? undefined }) || 'Vehicle';
+// the "Another vehicle" filter: a car shows when its name holds what he typed
+const matches = (c: OwnCar, query: string) => carLabel(c).toLowerCase().includes(query.trim().toLowerCase());
 // The result line after File. `still`: how many of the photos sent still ask below (null when the day could not be read again).
 export function filedLine(filed: number, sent: number, car: string, still: number | null = null): string {
   if (filed >= sent) return `Filed ${plural(filed, 'photo')} to ${car}.`;
@@ -157,7 +174,9 @@ const Icon = ({ kind, className }: { kind: 'up' | 'warn' | 'check' | 'check-fill
     default: return <svg {...common}><circle cx="12" cy="12" r="9.5" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></svg>;
   }
 };
-const frameIcon = (s: State) => s === 'on_vehicle' ? 'check-fill' : s === 'failed' || s === 'pulled' ? 'warn' : s === 'private' ? 'lock' : s === 'unverified' || s === 'duplicate' ? 'check' : s === 'waiting' || s === 'held' || s === 'unsorted' ? 'dots' : 'up';
+// no_file, non_vehicle and junk: nothing more happens to them, so an empty circle, not the pending dots
+const SETTLED: ReadonlySet<State> = new Set(['no_file', 'non_vehicle', 'junk']);
+const frameIcon = (s: State) => SETTLED.has(s) ? 'circle' : s === 'on_vehicle' ? 'check-fill' : s === 'failed' || s === 'pulled' ? 'warn' : s === 'private' ? 'lock' : s === 'unverified' || s === 'duplicate' ? 'check' : s === 'waiting' || s === 'held' || s === 'unsorted' ? 'dots' : 'up';
 
 function DayPills({ d }: { d: DayRow }) {
   const pills: { key: string; text: string; tone?: string }[] = [];
@@ -171,14 +190,17 @@ function DayPills({ d }: { d: DayRow }) {
   if (d.pulled) pills.push({ key: 'pulled', text: `${n(d.pulled)} taken off`, tone: 'pulled' });
   if (d.private) pills.push({ key: 'private', text: `${n(d.private)} private` });
   if (d.skipped) pills.push({ key: 'skipped', text: `${n(d.skipped)} skipped` });
+  for (const text of settledParts(d)) pills.push({ key: text, text });
   if (d.failed) pills.push({ key: 'failed', text: `${n(d.failed)} failed`, tone: 'failed' });
   return <span className="cl-day__pills">{pills.map(p => <span key={p.key} className={`cl-pill${p.tone ? ` cl-pill--${p.tone}` : ''}`}><Text role="label">{p.text}</Text></span>)}</span>;
 }
 
 function FrameRow({ f }: { f: Frame }) {
+  // a junk frame's thumb is an address that is not a stored picture: never asked for. A kept-on-the-phone frame's thumb
+  // is the empty address the record holds (blank, not null), so a blank address draws the placeholder too.
   return <li><div className={`cl-frame cl-frame--${f.state}`}>
-    {f.thumb ? <img className="cl-frame__thumb" src={optimizeImageUrl(f.thumb, 'thumbnail') ?? f.thumb} alt="" width={56} height={56} loading="lazy" decoding="async" />
-      : <span className="cl-frame__thumb" aria-hidden="true"><Icon kind={f.state === 'private' ? 'lock' : 'dots'} /></span>}
+    {f.thumb?.trim() && f.state !== 'junk' ? <img className="cl-frame__thumb" src={optimizeImageUrl(f.thumb, 'thumbnail') ?? f.thumb} alt="" width={56} height={56} loading="lazy" decoding="async" />
+      : <span className="cl-frame__thumb" aria-hidden="true"><Icon kind={f.state === 'private' ? 'lock' : SETTLED.has(f.state) ? 'circle' : 'dots'} /></span>}
     <Icon kind={frameIcon(f.state)} className="cl-frame__icon" />
     <span className="cl-frame__text"><Text role="body">{stageLabel(f)}</Text><Text role="caption">{liveLine(f)}</Text></span>
     {f.vehicle_id && (f.state === 'on_vehicle' || f.state === 'unverified') && <Link className="cl-frame__open" to={`/vehicle/${f.vehicle_id}?day=${f.taken_at.slice(0, 10)}`} aria-label={`Open ${f.vehicle ?? 'the vehicle'} on this day`}><Text role="label">Open</Text></Link>}
@@ -234,10 +256,7 @@ function HeldSet({ setKey, frames, garage, filing, onFile, onRetryGarage }: { se
     : garage === 'error' ? candidates.filter(c => c.name).map(c => ({ id: c.vehicle_id, label: c.name!, picture: null })) : [], [candidates, cars, byId, garage]);
   const notMine = cars ? candidates.filter(c => !byId.has(c.vehicle_id) && c.name).map(c => ({ id: c.vehicle_id, name: c.name! })) : [];
   const listOpen = all ?? Boolean(cars && tappable.length === 0);
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return !cars ? [] : q ? cars.filter(c => carLabel(c).toLowerCase().includes(q)) : cars;
-  }, [cars, query]);
+  const shown = useMemo(() => !cars ? [] : cars.filter(c => matches(c, query)), [cars, query]);
   const included = frames.filter(f => !out.has(f.image_id));
   const first = frames[0], last = frames[frames.length - 1];
   const span = timeLabel(first.taken_at) === timeLabel(last.taken_at) ? timeLabel(first.taken_at) : `${timeLabel(first.taken_at)} to ${timeLabel(last.taken_at)}`;
@@ -257,6 +276,11 @@ function HeldSet({ setKey, frames, garage, filing, onFile, onRetryGarage }: { se
   // when he opened it: a list open by default stays where it is, so opening the day never scrolls the question away.
   useEffect(() => { if (all) reveal(box.current?.querySelector('.cl-ask__filter')); }, [all, garage]);
   const cancel = () => { setPicked(null); setFailure(null); pickedEl.current?.focus({ preventScroll: true }); };
+  // A car picked from his list carries its confirm line in its row: when the filter hides that row, or the list is
+  // closed, the pick goes with it, so File never waits off screen and clearing the filter brings nothing back.
+  const hidePick = (stillShown: boolean) => { if (picked?.where === 'all' && !stillShown) { setPicked(null); setFailure(null); } };
+  const filterBy = (q: string) => { setQuery(q); hidePick(Boolean(cars?.some(c => c.id === picked?.id && matches(c, q)))); };
+  const toggleList = () => { setAll(!listOpen); hidePick(!listOpen); };
   const file = async () => {
     if (!picked || included.length === 0) return;
     setFailure(null);
@@ -298,13 +322,13 @@ function HeldSet({ setKey, frames, garage, filing, onFile, onRetryGarage }: { se
         {confirm(c.id, 'closest')}
       </li>)}
       {notMine.length > 0 && <li><p className="cl-ask__hint"><Text role="caption">{notLinkedLine(notMine.map(c => c.name))}</Text></p></li>}
-      {garage !== 'error' && garage !== null && <li><button type="button" className="cl-ask__choice cl-ask__more" aria-expanded={listOpen} disabled={filing} onClick={() => setAll(!listOpen)}>
+      {garage !== 'error' && garage !== null && <li><button type="button" className="cl-ask__choice cl-ask__more" aria-expanded={listOpen} disabled={filing} onClick={toggleList}>
         <Text role="body">Another vehicle</Text><Icon kind="chevron" className="cl-ask__chevron" /></button></li>}
     </ul>
     {garage === 'error' && <div className="cl-ask__retry"><p><Text role="caption">{tappable.length ? "Couldn't read your other vehicles. Pick from the closest matches, or try again." : "Couldn't read your vehicles. Try again."}</Text></p>
       <button type="button" className="cl-more cl-more--inline" disabled={filing} onClick={onRetryGarage}><Text role="label">Try again</Text></button></div>}
     {listOpen && cars && <div className="cl-ask__all">
-      <input className="form-input cl-ask__filter" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Year, make or model" aria-label="Find a vehicle: year, make or model" disabled={filing} />
+      <input className="form-input cl-ask__filter" type="search" value={query} onChange={e => filterBy(e.target.value)} placeholder="Year, make or model" aria-label="Find a vehicle: year, make or model" disabled={filing} />
       {shown.length === 0 ? <p className="cl-ask__hint"><Text role="caption">No vehicle matches. If it's not here, </Text><Link className="cl-ask__add" to="/vehicle/add"><Text role="caption">add it</Text></Link><Text role="caption"> first.</Text></p>
         : <ul className="cl-ask__choices">{shown.map(c => { const label = carLabel(c); return <li key={c.id}>
           <CarChoice label={label} picture={c.primary_image_url} selected={picked?.id === c.id} disabled={filing} onPick={el => pick(c.id, label, 'all', el)} />
