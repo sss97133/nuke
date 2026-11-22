@@ -271,15 +271,27 @@ BEGIN
            AND e.status = 'answered'
            AND e.superseded_by IS NULL
            AND e.answer->>'installed' = 'yes'
+         ORDER BY e.id
       LOOP
         evid_ids := array_append(evid_ids, piece.judgment_id);
+        -- Never return gallery-ineligible / sensitive image ids (anon can feed them to
+        -- get_image_deep_analysis). Judgment ids remain; witness image id is gated.
+        img_id := NULL;
+        IF nullif(piece.image_id, '') IS NOT NULL THEN
+          SELECT vi.id INTO img_id
+            FROM vehicle_images vi
+           WHERE vi.id = piece.image_id::uuid
+             AND vi.vehicle_id = p_vehicle_id
+             AND public.vehicle_image_gallery_eligible(vi)
+             AND coalesce(vi.is_sensitive, false) = false;
+        END IF;
         op_code := public.receipt_line_labor_operation(piece.description);
         IF op_code IS NULL THEN
           unmatched_n := unmatched_n + 1;
           pieces_unmatched := pieces_unmatched || jsonb_build_object(
             'judgment_id', piece.judgment_id,
             'item_id', piece.item_id,
-            'image_id', nullif(piece.image_id, '')::uuid,
+            'image_id', img_id,
             'hours', NULL,
             'reason', 'no book operation'
           );
@@ -295,7 +307,7 @@ BEGIN
             pieces_unmatched := pieces_unmatched || jsonb_build_object(
               'judgment_id', piece.judgment_id,
               'item_id', piece.item_id,
-              'image_id', nullif(piece.image_id, '')::uuid,
+              'image_id', img_id,
               'operation_code', op_code,
               'hours', NULL,
               'reason', 'no book operation'
@@ -306,7 +318,7 @@ BEGIN
             pieces_matched := pieces_matched || jsonb_build_object(
               'judgment_id', piece.judgment_id,
               'item_id', piece.item_id,
-              'image_id', nullif(piece.image_id, '')::uuid,
+              'image_id', img_id,
               'operation_code', op_code,
               'hours', base_h
             );
@@ -392,15 +404,21 @@ BEGIN
             'hours_typical', est.hours_typical,
             'hours_max', est.hours_max
           );
-          -- Stage sample image ids (no free text).
-          SELECT coalesce(array_agg(DISTINCT (samp->>'image_id')::uuid), evid_ids)
+          -- Stage sample image ids (no free text). Re-check gallery gate even though
+          -- vehicle_build_reconstruction already filters samples for visitors.
+          SELECT coalesce(evid_ids || array_agg(DISTINCT vi.id), evid_ids)
             INTO evid_ids
             FROM jsonb_array_elements(coalesce(recon->'systems', '[]'::jsonb)) sys
             CROSS JOIN LATERAL jsonb_array_elements(coalesce(sys->'stages', '[]'::jsonb)) s
             CROSS JOIN LATERAL jsonb_array_elements(coalesce(s->'sample', '[]'::jsonb)) samp
+            JOIN vehicle_images vi
+              ON vi.id = nullif(samp->>'image_id', '')::uuid
+             AND vi.vehicle_id = p_vehicle_id
            WHERE sys->>'system_key' = 'paint'
              AND s->>'phase' = step_j->>'photo_phase'
-             AND nullif(samp->>'image_id', '') IS NOT NULL;
+             AND nullif(samp->>'image_id', '') IS NOT NULL
+             AND public.vehicle_image_gallery_eligible(vi)
+             AND coalesce(vi.is_sensitive, false) = false;
         ELSE
           unsupported_steps := unsupported_steps || jsonb_build_object(
             'from_stage', step_j->>'from_stage',
@@ -549,12 +567,14 @@ BEGIN
         END IF;
 
       ELSIF cond->>'type' = 'image_scene' THEN
+        -- Same public-frame predicates as vehicle_build_reconstruction /
+        -- vehicle_open_questions: gallery eligible and not sensitive.
         min_n := coalesce((cond->>'min')::int, 1);
         SELECT count(*)::int INTO cnt
           FROM vehicle_images vi
          WHERE vi.vehicle_id = p_vehicle_id
-           AND coalesce(vi.is_superseded, false) IS NOT TRUE
-           AND coalesce(vi.is_duplicate, false) IS NOT TRUE
+           AND public.vehicle_image_gallery_eligible(vi)
+           AND coalesce(vi.is_sensitive, false) = false
            AND vi.ai_scan_metadata#>>'{byok_deep_analysis,scene_type}' = cond->>'scene_type';
         IF coalesce(cnt, 0) < min_n THEN
           ok := false;
@@ -564,8 +584,8 @@ BEGIN
             FROM (
               SELECT vi.id FROM vehicle_images vi
                WHERE vi.vehicle_id = p_vehicle_id
-                 AND coalesce(vi.is_superseded, false) IS NOT TRUE
-                 AND coalesce(vi.is_duplicate, false) IS NOT TRUE
+                 AND public.vehicle_image_gallery_eligible(vi)
+                 AND coalesce(vi.is_sensitive, false) = false
                  AND vi.ai_scan_metadata#>>'{byok_deep_analysis,scene_type}' = cond->>'scene_type'
                LIMIT 20
             ) vi;

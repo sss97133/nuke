@@ -125,8 +125,23 @@ CREATE TABLE public.evidence_judgment_requests (
 CREATE TABLE public.vehicle_images (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vehicle_id uuid, ai_scan_metadata jsonb,
-  is_superseded boolean DEFAULT false, is_duplicate boolean DEFAULT false
+  is_superseded boolean DEFAULT false, is_duplicate boolean DEFAULT false,
+  is_sensitive boolean DEFAULT false, is_document boolean DEFAULT false,
+  image_url text DEFAULT 'https://example.test/img.jpg',
+  vision_gate_status text DEFAULT 'approved',
+  source text, image_vehicle_match_status text
 );
+-- Mirror the public-frame predicates sibling readers use.
+CREATE FUNCTION public.vehicle_image_gallery_eligible(vi public.vehicle_images)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT coalesce(($1).is_document, false) = false
+     AND coalesce(($1).is_duplicate, false) = false
+     AND coalesce(($1).is_superseded, false) = false
+     AND nullif(btrim(($1).image_url), '') IS NOT NULL
+     AND (($1).source IS NULL OR ($1).source <> 'e2e_test')
+     AND coalesce(($1).image_vehicle_match_status, '') NOT IN ('mismatch', 'unrelated')
+     AND (($1).vision_gate_status IS NULL OR ($1).vision_gate_status = 'approved')
+$$;
 
 -- Stubs filled per vehicle below.
 CREATE FUNCTION public.vehicle_build_reconstruction(p_vehicle_id uuid) RETURNS jsonb
@@ -194,11 +209,27 @@ INSERT INTO _fixture_receipt_lines(vehicle_id, item_id, line_kind, description, 
   ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000008', 'part', 'rad support', NULL),
   ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000009', 'part', 'seat foam', NULL);
 
-INSERT INTO vehicle_images(id, vehicle_id, ai_scan_metadata) VALUES
+INSERT INTO vehicle_images(id, vehicle_id, ai_scan_metadata, is_sensitive, vision_gate_status) VALUES
+  -- Eligible interior scenes (satisfy image_scene min=2).
   ('a0000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000001',
-   '{"byok_deep_analysis":{"scene_type":"body_interior"}}'::jsonb),
+   '{"byok_deep_analysis":{"scene_type":"body_interior"}}'::jsonb, false, 'approved'),
   ('a0000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001',
-   '{"byok_deep_analysis":{"scene_type":"body_interior"}}'::jsonb);
+   '{"byok_deep_analysis":{"scene_type":"body_interior"}}'::jsonb, false, 'approved'),
+  -- Sensitive / review-held frames must not count or leak as evidence ids.
+  ('a0000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000001',
+   '{"byok_deep_analysis":{"scene_type":"body_interior"}}'::jsonb, true, 'approved'),
+  ('a0000000-0000-0000-0000-000000000013', '10000000-0000-0000-0000-000000000001',
+   '{"byok_deep_analysis":{"scene_type":"body_interior"}}'::jsonb, false, 'review_needed'),
+  -- Paint stage samples referenced by recon.
+  ('a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+   '{}'::jsonb, false, 'approved'),
+  ('a0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
+   '{}'::jsonb, false, 'approved'),
+  -- Reassembly witness frames: one eligible, one sensitive.
+  ('a0000000-0000-0000-0000-000000000020', '10000000-0000-0000-0000-000000000001',
+   '{}'::jsonb, false, 'approved'),
+  ('a0000000-0000-0000-0000-000000000021', '10000000-0000-0000-0000-000000000001',
+   '{}'::jsonb, true, 'approved');
 
 INSERT INTO evidence_judgment_requests(id, vehicle_id, question_kind, status, params, answer) VALUES
   ('d0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
@@ -268,6 +299,30 @@ BEGIN
   PERFORM public.assert((reass#>>'{reassembly,unmatched_count}')::int = 1, 'one unmatched piece');
   PERFORM public.assert((reass->>'hours_typical')::numeric = 2.5, 'matched book hours only');
   PERFORM public.assert(reass#>>'{reassembly,unmatched,0,reason}' = 'no book operation', 'unmatched reason');
+  -- Eligible witness image id is returned; sensitive witness is nulled.
+  PERFORM public.assert(
+    reass#>>'{reassembly,matched,0,image_id}' = 'a0000000-0000-0000-0000-000000000020',
+    'matched piece keeps gallery-eligible image_id');
+  PERFORM public.assert(
+    reass#>>'{reassembly,unmatched,0,image_id}' IS NULL,
+    'sensitive reassembly image_id is gated to null');
+
+  -- Interior evidence ids must not include sensitive / review-held frames.
+  SELECT value INTO miss FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'interior';
+  PERFORM public.assert(miss->>'status' = 'ok', 'interior ok with two eligible scenes');
+  PERFORM public.assert(
+    NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements_text(miss->'evidence_ids') x
+       WHERE x IN (
+         'a0000000-0000-0000-0000-000000000012',
+         'a0000000-0000-0000-0000-000000000013'
+       )
+    ),
+    'interior evidence_ids omit gated frames');
+  PERFORM public.assert(
+    (SELECT count(*) FROM jsonb_array_elements_text(miss->'evidence_ids') x
+      WHERE x IN ('a0000000-0000-0000-0000-000000000010','a0000000-0000-0000-0000-000000000011')) = 2,
+    'interior cites the two eligible scene images');
 
   -- Totals equal segment sums (non-null hours only).
   PERFORM public.assert(
