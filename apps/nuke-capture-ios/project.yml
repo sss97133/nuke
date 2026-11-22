@@ -144,7 +144,9 @@ targets:
   # The widget extension: draws the photo-work Live Activity on the Lock Screen and in the Dynamic
   # Island. Drawing only; the app starts, updates and ends the activity (WorkLiveActivity.swift).
   # No App Group, no entitlements: ActivityKit carries the state. Its bundle id is a child of the
-  # app's (ag.nuke.capture.widgets); automatic signing registers it.
+  # app's (ag.nuke.capture.widgets). Xcode Cloud's automatic signing CANNOT register a new bundle id
+  # (build 169, 2026-11-22: "Automatic signing cannot register bundle identifier"); it must exist as an
+  # explicit App ID on team JZ28MFU3VB first. Any new target's id must be registered before its first archive.
   NukeCaptureWidgets:
     type: app-extension
     platform: iOS
