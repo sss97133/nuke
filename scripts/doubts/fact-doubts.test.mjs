@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveDoubts, doubtsFromReaderFile, pickFrames, frameTermFilter, FRAME_TERM_FIELDS, buildQuestionRow, buildBlindTask, buildExportTask, plainDefinition, validateAnswer, closedAnswer, ITEM_MAP } from './fact-doubts.mjs';
+import { deriveDoubts, doubtsFromReaderFile, pickFrames, frameTermFilter, FRAME_TERM_FIELDS, closeupBoxes, buildQuestionRow, buildBlindTask, buildExportTask, plainDefinition, validateAnswer, closedAnswer, ITEM_MAP } from './fact-doubts.mjs';
 import { requestParams } from './answer-fact-doubts.mjs';
 
 const V = { id: '20d21fb0-4651-4469-a0ba-e751309a1e54', user_id: '0b9f107a-d124-49de-9ded-94698f63c1c4' };
@@ -188,4 +188,15 @@ test('frame search looks wherever a reading names the part, not only the notes',
   assert.ok(parts.includes('structured_data->>open_questions.ilike.*cylinder%20head*'));
   assert.ok(parts.includes('structured_data->>agent_notes.ilike.*cylinder%20head*'));
   assert.equal(frameTermFilter([]), '');
+});
+
+test('closeup boxes come from text positions only: grown, merged, capped', () => {
+  const regions = [{ bbox: [188, 449, 343, 516], text: 'SECRET' }, { bbox: [300, 450, 360, 520] }, { bbox: [665, 443, 704, 519] }, { bbox: [1, 2] }, { bbox: [900, 900, 800, 950] }];
+  const boxes = closeupBoxes(regions);
+  assert.equal(boxes.length, 2);
+  assert.deepEqual(boxes[0], [95, 389, 436, 580]);
+  assert.deepEqual(boxes[1], [605, 383, 764, 579]);
+  assert.ok(!JSON.stringify(boxes).includes('SECRET'));
+  assert.equal(closeupBoxes(null).length, 0);
+  assert.equal(closeupBoxes([{ bbox: [0, 0, 10, 10] }, { bbox: [500, 500, 510, 510] }, { bbox: [900, 0, 910, 10] }, { bbox: [0, 900, 10, 910] }]).length, 3);
 });
