@@ -146,3 +146,11 @@ Sample request/response (Karmann Ghia BaT sale): `fixtures/advisor-sample-respon
 ## budget_options
 
 `budget_options { budget_usd, limit? }` ranks make x era segments whose typical all-in cost (hammer + 5% buyer fee capped $7,500 + $1,800 enclosed transport + $600 paperwork) is 45-100% of the budget. Data: `market_segment_stats` (latest run). Market temperature comes from `market_signal` as a heating/cooling/flat label only (the timing model failed its backtest gate). Options, not financial advice.
+
+## Comps: hard variants
+
+A comp must carry the same hard-variant tags as the subject (`hardVariantTags` in `advisor/variants.ts`, read from title / model / URL only): RS, GT2, Turbo S, Weissach, Clubsport, Speedster, Cup, **RUF** (RUF-built or RUF-modified), and **engine_swap** (`<engine>-Powered`, `-Swapped`, `engine swap` in the title). A swapped car with no swapped comps gets no value range ("not recorded") rather than a stock-car band.
+
+## Regression harness
+
+`advisor/regression/run_bat_regression.ts` scores 20 fixed BaT URLs against goldens, read-only (see the file header). `--public` scores the answer a visitor gets (public scope + public answer); `--remote https://nuke.ag/mcp/advisor` scores the deployed function (it sends no credential, so it exercises the public path once deployed).
