@@ -56,12 +56,13 @@ struct GarageSections {
     }
 
     /// Search the records already read for this account, including zero-photo
-    /// profiles. Titles and stored identifiers are search keys, not proof.
+    /// profiles, by year, make, model and relationship. The VIN is not a search key: the garage is
+    /// browsed by what the car is, not looked up by serial.
     static func matching(_ vehicles: [GarageVehicle], query: String) -> [GarageVehicle] {
         let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !words.isEmpty else { return vehicles }
         return vehicles.filter { vehicle in
-            let text = [vehicle.title, vehicle.vin ?? "", vehicle.relationshipLabel].joined(separator: " ")
+            let text = [vehicle.title, vehicle.relationshipLabel].joined(separator: " ")
             return words.allSatisfy { text.localizedStandardContains($0) }
         }
     }
