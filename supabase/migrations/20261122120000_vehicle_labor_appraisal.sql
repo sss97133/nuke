@@ -219,10 +219,16 @@ BEGIN
   EXCEPTION WHEN undefined_function THEN
     statements := jsonb_build_object('statements', '[]'::jsonb);
   END;
-  SELECT coalesce(array_agg((s->>'id')::uuid), '{}'::uuid[])
+  -- vehicle_statements emits statement_id only for tied viewers; anon still sees
+  -- the statement row (role/kind/said_on) with a null id. Presence uses the array;
+  -- citeable evidence ids are the non-null statement_ids only.
+  SELECT coalesce(array_agg(sid), '{}'::uuid[])
     INTO statement_ids
-    FROM jsonb_array_elements(coalesce(statements->'statements', '[]'::jsonb)) s
-   WHERE nullif(s->>'id', '') IS NOT NULL;
+    FROM (
+      SELECT nullif(coalesce(s->>'statement_id', s->>'id'), '')::uuid AS sid
+        FROM jsonb_array_elements(coalesce(statements->'statements', '[]'::jsonb)) s
+    ) x
+   WHERE sid IS NOT NULL;
 
   FOR rule IN
     SELECT * FROM labor_stage_rules
@@ -507,11 +513,13 @@ BEGIN
         END IF;
 
       ELSIF cond->>'type' = 'statement_present' THEN
-        IF coalesce(array_length(statement_ids, 1), 0) = 0 THEN
+        IF jsonb_array_length(coalesce(statements->'statements', '[]'::jsonb)) = 0 THEN
           ok := false;
           missing := array_append(missing, 'statement_present');
         ELSE
-          evid_ids := evid_ids || statement_ids;
+          IF coalesce(array_length(statement_ids, 1), 0) > 0 THEN
+            evid_ids := evid_ids || statement_ids;
+          END IF;
           evid_grade := coalesce(rule.evidence_requirements->>'evidence_grade', 'statement');
         END IF;
 

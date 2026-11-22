@@ -195,7 +195,7 @@ INSERT INTO _fixture_facets(vehicle_id, payload) VALUES ('10000000-0000-0000-000
 
 INSERT INTO _fixture_statements(vehicle_id, payload) VALUES ('10000000-0000-0000-0000-000000000001',
   jsonb_build_object('tied', true, 'statements', jsonb_build_array(
-    jsonb_build_object('id','b0000000-0000-0000-0000-000000000001','statement_kind','assertion')
+    jsonb_build_object('statement_id','b0000000-0000-0000-0000-000000000001','statement_kind','assertion')
   )));
 
 INSERT INTO _fixture_receipt_lines(vehicle_id, item_id, line_kind, description, printed_hours) VALUES
@@ -259,6 +259,21 @@ INSERT INTO _fixture_statements(vehicle_id, payload) VALUES
 INSERT INTO _fixture_receipt_lines(vehicle_id, item_id, line_kind, description) VALUES
   ('10000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000099', 'part', 'clutch kit');
 
+-- Untied viewer shape: statement rows present, statement_id null (anon public read).
+INSERT INTO vehicles(id, year, make, model, is_public)
+VALUES ('10000000-0000-0000-0000-000000000004', 1973, 'Pontiac', 'Firebird', true);
+INSERT INTO _fixture_recon(vehicle_id, payload) VALUES
+  ('10000000-0000-0000-0000-000000000004', '{"systems":[]}'::jsonb);
+INSERT INTO _fixture_facets(vehicle_id, payload) VALUES
+  ('10000000-0000-0000-0000-000000000004', '{"engine":[]}'::jsonb);
+INSERT INTO _fixture_statements(vehicle_id, payload) VALUES
+  ('10000000-0000-0000-0000-000000000004',
+   jsonb_build_object('tied', false, 'statements', jsonb_build_array(
+     jsonb_build_object('statement_id', NULL, 'statement_kind', 'assertion', 'speaker_role', 'shop')
+   )));
+INSERT INTO _fixture_receipt_lines(vehicle_id, item_id, line_kind, description) VALUES
+  ('10000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000098', 'part', 'clutch kit');
+
 SET ROLE anon;
 SET test.auth_role = 'anon';
 
@@ -286,6 +301,12 @@ BEGIN
   PERFORM public.assert(gear->>'status' = 'ok', 'gearbox ok');
   PERFORM public.assert(gear->>'evidence_grade' = 'statement', 'gearbox statement grade');
   PERFORM public.assert((gear->>'hours_typical')::numeric = 12, 'gearbox typical');
+  PERFORM public.assert(
+    EXISTS (
+      SELECT 1 FROM jsonb_array_elements_text(gear->'evidence_ids') x
+       WHERE x = 'b0000000-0000-0000-0000-000000000001'
+    ),
+    'gearbox cites statement_id from vehicle_statements');
 
   SELECT value INTO paint FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'paint';
   PERFORM public.assert(paint->>'status' = 'ok', 'paint ok');
@@ -293,6 +314,10 @@ BEGIN
   PERFORM public.assert((paint->>'hours_typical')::numeric = 21, 'paint supported typical 16+5');
   PERFORM public.assert((paint->>'hours_max')::numeric = 32, 'paint supported max 24+8');
   PERFORM public.assert(jsonb_array_length(paint->'unsupported_steps') = 2, 'two unsupported paint steps');
+  PERFORM public.assert(
+    (SELECT count(*) FROM jsonb_array_elements_text(paint->'evidence_ids') x
+      WHERE x IN ('a0000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000002')) = 2,
+    'paint evidence_ids keep both photographed stage samples');
 
   SELECT value INTO reass FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'reassembly';
   PERFORM public.assert((reass#>>'{reassembly,matched_count}')::int = 1, 'one matched piece');
@@ -339,6 +364,19 @@ BEGIN
   SELECT value INTO miss FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'gearbox';
   PERFORM public.assert(miss->>'status' = 'no evidence', 'gearbox without statement is no evidence');
   PERFORM public.assert(miss->>'hours_min' IS NULL, 'no hours without evidence');
+
+  -- Untied statement presence (null statement_id) still grades gearbox via part-line evidence ids.
+  j := public.vehicle_labor_appraisal('10000000-0000-0000-0000-000000000004');
+  SELECT value INTO gear FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'gearbox';
+  PERFORM public.assert(gear->>'status' = 'ok', 'untied statement presence still ok');
+  PERFORM public.assert(gear->>'evidence_grade' = 'statement', 'untied grade remains statement');
+  PERFORM public.assert((gear->>'hours_typical')::numeric = 12, 'untied gearbox hours');
+  PERFORM public.assert(
+    NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements_text(gear->'evidence_ids') x
+       WHERE x = 'null' OR x = ''
+    ),
+    'untied path does not invent a statement evidence id');
 
   -- Private car hidden from anon.
   PERFORM public.assert(
