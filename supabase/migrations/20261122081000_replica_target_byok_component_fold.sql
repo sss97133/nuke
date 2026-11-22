@@ -1383,10 +1383,12 @@ BEGIN
       'vehicle_id', p_vehicle_id,
       'applicable', false,
       'reason', 'vehicle is not declared is_replica',
-      'logic_version', 'vehicle_replica_accuracy/20261122081000'
+      'logic_version', 'vehicle_replica_accuracy/20261122091000'
     );
   END IF;
 
+  -- Match target_key from withheld replica_quote internally only; never return the quote text
+  -- (column is ungranted to anon/authenticated; this SECURITY DEFINER must not bypass that).
   v_target_key := CASE
     WHEN v.replica_quote ILIKE '%SD-455%' OR v.replica_quote ILIKE '%SD455%'
       THEN '1973_trans_am_sd455'
@@ -1397,8 +1399,8 @@ BEGIN
     RETURN jsonb_build_object(
       'vehicle_id', p_vehicle_id,
       'applicable', false,
-      'reason', 'no replica_target_specs key for replica_quote',
-      'logic_version', 'vehicle_replica_accuracy/20261122081000'
+      'reason', 'no replica_target_specs key for declared replica target',
+      'logic_version', 'vehicle_replica_accuracy/20261122091000'
     );
   END IF;
 
@@ -1475,7 +1477,13 @@ BEGIN
     'target_key', v_target_key,
     'target', jsonb_build_object(
       'key', v_target_key,
-      'label', coalesce(nullif(btrim(v.replica_quote), ''), 'declared replica'),
+      'label', coalesce(
+        (SELECT nullif(btrim(s.trim_label), '')
+           FROM replica_target_specs s
+          WHERE s.target_key = v_target_key
+          LIMIT 1),
+        v_target_key
+      ),
       'basis', 'replica_target_specs + vehicles.is_replica'
     ),
     'base_chassis', base_chassis,
@@ -1487,7 +1495,7 @@ BEGIN
       THEN round(unknown_weight / total_weight, 4) ELSE NULL END,
     'accuracy_score_known_only', score,
     'distinct_from', 'originality_score',
-    'logic_version', 'vehicle_replica_accuracy/20261122081000',
+    'logic_version', 'vehicle_replica_accuracy/20261122091000',
     'as_of', now()
   );
 END
@@ -1496,7 +1504,8 @@ $fn$;
 COMMENT ON FUNCTION public.vehicle_replica_accuracy(uuid) IS
   'Replica accuracy from replica_target_specs + current vehicle_replica_component_decisions. '
   'base_chassis (identity/cowl) is reported but excluded from the score. Unknown share always '
-  'reported; never guesses. Public undeleted (or tied/service) only.';
+  'reported; never guesses. Public undeleted (or tied/service) only. Does not return '
+  'vehicles.replica_quote (ungranted free text); target.label is catalog trim_label.';
 
 REVOKE ALL ON FUNCTION public.vehicle_replica_accuracy(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_replica_accuracy(uuid) TO anon, authenticated, service_role;

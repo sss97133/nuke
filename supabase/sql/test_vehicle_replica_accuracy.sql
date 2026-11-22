@@ -103,6 +103,13 @@ CREATE TEMP TABLE ra AS
 
 SELECT public.assert((j->>'applicable')::boolean, 'replica applicable') FROM ra;
 SELECT public.assert(j->>'distinct_from' = 'originality_score', 'distinct from originality') FROM ra;
+SELECT public.assert(
+  (j->'target'->>'label') IS DISTINCT FROM 'Built as a Trans Am SD-455 clone'
+  AND (j->'target'->>'label') = 'Trans Am SD-455',
+  'target.label is catalog trim_label, not withheld replica_quote') FROM ra;
+SELECT public.assert(
+  position('Built as a Trans Am' in j::text) = 0,
+  'accuracy payload never embeds vehicles.replica_quote free text') FROM ra;
 SELECT public.assert((j->'base_chassis'->>'excluded_from_score')::boolean IS TRUE,
   'base chassis excluded from score') FROM ra;
 SELECT public.assert(
