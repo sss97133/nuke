@@ -255,19 +255,20 @@ SELECT public.assert(
   EXISTS (
     SELECT 1 FROM vehicle_observations vo
     WHERE vo.structured_data->>'image_id' = '00000000-0000-0000-0000-0000000000d1'
-      AND vo.source_event_time_precision = 'unknown'
+      AND vo.source_event_time_precision IS NULL
       AND vo.source_event_at IS NULL
-      AND vo.observed_at_basis = 'source_capture_time'
-  ), 'no-EXIF fold writes precision unknown with allowed basis');
+      AND vo.observed_at_basis IS NULL
+      AND vo.structured_data->>'capture_clock_source' = 'none'
+  ), 'no-EXIF fold leaves source_event and basis null (not fold-time capture)');
 SELECT public.assert(
   EXISTS (
     SELECT 1 FROM vehicle_observations vo
     WHERE vo.structured_data->>'image_id' = '00000000-0000-0000-0000-0000000000d4'
       AND vo.source_event_time_precision = 'exact'
       AND vo.source_event_at IS NOT NULL
-      AND vo.observed_at_basis = 'event_time'
+      AND vo.observed_at_basis = 'source_capture_time'
       AND vo.structured_data->>'capture_clock_source' = 'exif_DateTimeOriginal'
-  ), 'EXIF fold writes source_event_at exact with event_time basis');
+  ), 'EXIF fold writes source_event_at exact with source_capture_time basis');
 
 -- Idempotent re-apply.
 SELECT public.assert(

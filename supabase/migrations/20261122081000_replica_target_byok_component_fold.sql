@@ -857,12 +857,14 @@ BEGIN
     produced_this_image := false;
     v_event_at := public.byok_real_capture_at(img.exif_data, img.occurred_at);
     IF v_event_at IS NOT NULL THEN
+      -- Photo EXIF/occurred_at is the source capture clock (not an event_time).
       v_event_precision := 'exact';
-      -- Closed enum: event_time | source_capture_time | source_publication_time
-      v_event_basis := 'event_time';
-    ELSE
-      v_event_precision := 'unknown';
       v_event_basis := 'source_capture_time';
+    ELSE
+      -- No real capture clock: leave source_event_* and observed_at_basis NULL.
+      -- Do not stamp fold-time now() as source_capture_time.
+      v_event_precision := NULL;
+      v_event_basis := NULL;
       v_event_at := NULL;
     END IF;
 
@@ -897,14 +899,16 @@ BEGIN
         'build_phase', public.byok_normalize_build_phase(
            img.byok->>'scene_type', img.byok->>'build_phase_guess', img.byok->'text_regions'),
         'area_key', public.byok_infer_image_area(img.byok->>'scene_type'),
-        'source_event_time_precision', v_event_precision,
         'capture_clock_source', CASE
           WHEN img.occurred_at IS NOT NULL THEN 'image_occurred_at'
           WHEN v_event_at IS NOT NULL THEN 'exif_DateTimeOriginal'
           ELSE 'none'
         END,
         'limitation', 'Deterministic parse of stored byok components_seen label. Not originality or whole-vehicle completeness.'
-      );
+      )
+      || CASE WHEN v_event_precision IS NOT NULL
+              THEN jsonb_build_object('source_event_time_precision', v_event_precision)
+              ELSE '{}'::jsonb END;
 
       claims := claims || jsonb_build_object(
         'image_id', img.image_id,
@@ -915,6 +919,7 @@ BEGIN
         'property_id', prop_id,
         'source_event_at', v_event_at,
         'source_event_time_precision', v_event_precision,
+        'observed_at_basis', v_event_basis,
         'structured_data', sd
       );
 
@@ -962,7 +967,7 @@ BEGIN
             format('byok fold: %s=%s from label %s', norm->>'property_key', norm->>'value', coalesce(lab->>'label', lab->>'name')),
             least(0.95, greatest(0.5, coalesce((lab->>'confidence')::numeric, 0.7))),
             coalesce(v_event_at, now()),
-            v_event_basis,
+            v_event_basis,  -- NULL when no real capture; never invent source_capture_time at fold time
             v_event_at,
             v_event_precision,
             now(), false
