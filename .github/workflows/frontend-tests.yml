@@ -677,6 +677,8 @@ jobs:
         run: deno test --node-modules-dir=none supabase/functions/map-vehicles/cells.test.ts
       - name: Verify the one map's areas and area reads come from map_facts only, bounded and shaped whole
         run: deno test --node-modules-dir=none supabase/functions/map-vehicles/facts.test.ts
+      - name: Verify derive-image-exif reads clocks and camera fields from JPEG and HEIC heads, never a clock or GPS key
+        run: deno test --node-modules-dir=none supabase/functions/derive-image-exif/exif_test.ts supabase/functions/derive-image-exif/camera_test.ts
       - name: Verify archiveFetch cache hits any successful snapshot and does not archive large lot pages as login walls
         run: deno test --no-check --node-modules-dir=none --allow-env --allow-net --allow-read supabase/functions/_shared/archiveFetch.cache.test.ts supabase/functions/_shared/archiveFetch.nul.test.ts supabase/functions/_shared/archiveFetch.retention.test.ts supabase/functions/_shared/firecrawlGate.test.ts supabase/functions/_shared/firecrawlMeter.test.ts supabase/functions/index-reference-document/catalogStockImage.test.ts supabase/functions/_shared/batFetcher.test.ts
       - name: Verify maximum stock image within a bounded heap

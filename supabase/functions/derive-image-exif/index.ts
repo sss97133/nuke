@@ -24,12 +24,21 @@
 //
 // Contract (invoked by derive-dispatch):
 //   POST { user_id, image_id?, limit?, dry_run? }  → { derived: [...], skipped: [...] }
+//
+// Mode "complete" (20261122210000): rows that already have a clock but whose exif_data was never completed from the
+// file. POST { user_id, mode: "complete", run_id, granted_by?, limit? (<= 50), dry_run? (default true), after_id? }.
+// Reads camera make/model/software/lens and Apple's ContentIdentifier, BurstUUID and RunTime (camera.ts) and hands
+// them to capture_exif_complete_v1, which adds only absent keys to exif_data, marks the row examined and never writes
+// taken_at, a clock or GPS. A live run needs granted_by. Revert: capture_exif_complete_revert_v1(user, run_id).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { parseExif, exifDateToIso } from "./exif.ts";
+import { completeFields, readCamera } from "./camera.ts";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
@@ -57,6 +66,7 @@ Deno.serve(async (req) => {
     if (!userId) return json({ error: "Invalid session" }, 401);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, projectSecretKey()!);
+    if (body.mode === "complete") return json(await complete(admin, userId, body));
     const dryRun = body.dry_run === true;
     const limit = Math.min(Math.max(Number(body.limit) || 20, 1), 100);
 
@@ -114,6 +124,71 @@ Deno.serve(async (req) => {
     return json({ error: String(e instanceof Error ? e.message : e) }, 500);
   }
 });
+
+// deno-lint-ignore no-explicit-any
+async function complete(admin: any, userId: string, body: Record<string, unknown>) {
+  const dryRun = body.dry_run !== false;
+  const runId = String(body.run_id ?? "");
+  const grantedBy = body.granted_by == null ? null : String(body.granted_by);
+  if (!UUID_RE.test(runId)) return { error: "run_id (uuid) required" };
+  if (!dryRun && !(grantedBy && UUID_RE.test(grantedBy))) return { error: "granted_by (uuid) required for a live run" };
+  const limit = Math.min(Math.max(Number(body.limit) || 20, 1), 50);
+
+  // Rows with a stored picture whose exif_data was never examined by this pass, never a sensitive, rejected_personal
+  // or privacy-held row (their files are not fetched at all). capture_exif_complete_v1 re-checks ownership, privacy
+  // and the marker; this is only the work list. after_id pages past rows left unmarked (unreadable files).
+  let q = admin.from("vehicle_images")
+    .select("id, image_url")
+    .eq("user_id", userId)
+    .not("image_url", "is", null)
+    .neq("image_url", "")
+    .or("is_sensitive.is.null,is_sensitive.eq.false")
+    .or("vision_gate_status.is.null,vision_gate_status.neq.rejected_personal")
+    .is("exif_data->exif_completeness", null)
+    .order("id")
+    .limit(limit);
+  if (body.image_id) q = q.eq("id", body.image_id);
+  if (body.after_id && UUID_RE.test(String(body.after_id))) q = q.gt("id", String(body.after_id));
+  const { data: picked, error } = await q;
+  if (error) throw error;
+  const nextAfterId = picked?.length ? picked[picked.length - 1].id : null;
+  const held = new Set<string>();
+  if (picked?.length) {
+    const { data: ex, error: exErr } = await admin.from("capture_privacy_promote_exclude")
+      .select("image_id").in("image_id", picked.map((r: { id: string }) => r.id));
+    if (exErr) throw exErr;
+    for (const e of ex ?? []) held.add(e.image_id);
+  }
+  const rows = (picked ?? []).filter((r: { id: string }) => !held.has(r.id));
+
+  const items: { image_id: string; fields: Record<string, unknown> }[] = [];
+  const unread: { image_id: string; reason: string }[] = [];
+  const containers: Record<string, number> = {};
+  for (const r of rows ?? []) {
+    try {
+      const res = await fetch(r.image_url, { headers: { Range: "bytes=0-262143" } });
+      if (!res.ok && res.status !== 206) { unread.push({ image_id: r.id, reason: `fetch ${res.status}` }); continue; }
+      const cam = readCamera(new Uint8Array(await res.arrayBuffer()));
+      const c = cam?.container ?? "none";
+      containers[c] = (containers[c] ?? 0) + 1;
+      // A file without readable camera fields is still examined (empty fields), so it is not fetched again.
+      items.push({ image_id: r.id, fields: cam ? completeFields(cam) : {} });
+    } catch (e) {
+      unread.push({ image_id: r.id, reason: String(e instanceof Error ? e.message : e) });   // fetched again next time
+    }
+  }
+  if (!items.length) {
+    return { mode: "complete", dry_run: dryRun, run_id: runId, selected: picked?.length ?? 0, privacy_held: held.size, unread,
+             next_after_id: nextAfterId, result: null };
+  }
+  const { data: result, error: rpcErr } = await admin.rpc("capture_exif_complete_v1", {
+    p_user: userId, p_run: runId, p_granted_by: grantedBy, p_items: items, p_dry: dryRun,
+  });
+  if (rpcErr) throw rpcErr;
+  return { mode: "complete", dry_run: dryRun, run_id: runId, selected: picked?.length ?? 0, privacy_held: held.size, containers,
+           unread, next_after_id: nextAfterId, result,
+           credential: "none (pure function)" };
+}
 
 function roleOf(authHeader: string | null): string | null {
   try {
