@@ -91,8 +91,9 @@ struct AskFairBoard: Equatable {
         vehicleId.flatMap { byId[$0.uuidString.lowercased()] }
     }
 
-    /// The reader takes at most 60 ids a call.
-    static let chunk = 60
+    /// The reader takes at most 60 ids a call, but a cold read of 40 has taken over 15 s (anon's statement timeout),
+    /// so the phone sends 20 at a time, side by side (draft validation, PR #3717, 2026-11-22).
+    static let chunk = 20
 
     private struct Params: Encodable { let p_vehicle_ids: [String] }
 
@@ -100,19 +101,23 @@ struct AskFairBoard: Equatable {
     static func fetch(vehicleIds: [UUID]) async -> AskFairBoard? {
         let ids = Array(Set(vehicleIds.map { $0.uuidString.lowercased() })).sorted()
         guard !ids.isEmpty else { return nil }
-        var byId: [String: AskFairRange] = [:]
-        var asOf: Date?
-        var anyRead = false
-        for start in stride(from: 0, to: ids.count, by: chunk) {
-            let part = Array(ids[start..<min(start + chunk, ids.count)])
-            guard let res = try? await SupabaseService.client
-                .rpc("ask_close_comps", params: Params(p_vehicle_ids: part)).execute(),
-                  let board = decode(res.data) else { continue }
-            anyRead = true
-            asOf = asOf ?? board.asOf
-            byId.merge(board.byId) { a, _ in a }
+        let parts = stride(from: 0, to: ids.count, by: chunk).map { Array(ids[$0..<min($0 + chunk, ids.count)]) }
+        let boards: [AskFairBoard] = await withTaskGroup(of: AskFairBoard?.self) { group in
+            for part in parts {
+                group.addTask {
+                    guard let res = try? await SupabaseService.client
+                        .rpc("ask_close_comps", params: Params(p_vehicle_ids: part)).execute() else { return nil }
+                    return decode(res.data)
+                }
+            }
+            var out: [AskFairBoard] = []
+            for await b in group { if let b { out.append(b) } }
+            return out
         }
-        return anyRead ? AskFairBoard(asOf: asOf, byId: byId) : nil
+        guard !boards.isEmpty else { return nil }
+        var byId: [String: AskFairRange] = [:]
+        for b in boards { byId.merge(b.byId) { a, _ in a } }
+        return AskFairBoard(asOf: boards.compactMap(\.asOf).min(), byId: byId)
     }
 
     // MARK: Decoding (lossy: a malformed row is skipped, a malformed field is absent)

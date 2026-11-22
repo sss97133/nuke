@@ -174,6 +174,8 @@ enum ExploreWhyStack {
     static func dollars(_ v: Double?) -> String? { v.flatMap { $0.isFinite && $0 > 0 ? AskPlacement.dollars($0) : nil } }
 
     static let noAdjustments = "None. Close sales are shown as sold, not adjusted for condition or mileage."
+    /// What every price in the range is (ask_close_comps reads gross sale prices only, never mixing bases).
+    static let basis = "Sold at auction, what the buyer paid with premium, in US dollars"
 
     /// "Jan 6, 2026" from the reader's ISO day; the raw text when it is not a day.
     static func day(_ s: String?) -> String? {
@@ -217,6 +219,7 @@ enum ExploreWhyStack {
                     out.append(ExploreWhyRow(label: "Close-sale median", value: m))
                 }
                 if let place = fair.askPlacement(item.amount) { out.append(ExploreWhyRow(label: "This ask", value: place)) }
+                out.append(ExploreWhyRow(label: "Basis", value: basis))
                 out.append(ExploreWhyRow(label: "Adjustments", value: noAdjustments))
                 var conf = ["\(fair.n.formatted()) close sale" + (fair.n == 1 ? "" : "s")]
                 if !fair.venues.isEmpty {
@@ -299,7 +302,7 @@ struct ExploreWhySheet: View {
                 } footer: {
                     Text(why.item.kind == .live
                          ? "A projection from comparable finished lots, not a guarantee. No price zone for where bidding heats up is drawn: no reader for it has passed validation."
-                         : "Built only from close comparable sales. An asking price is not a sale.")
+                         : "Built only from close comparable auction sales: where cars like this sold, not what this one is worth. An asking price is not a sale.")
                 }
                 if why.item.kind == .classified, let fair = why.fair, !fair.comps.isEmpty {
                     Section("Close sales") {
