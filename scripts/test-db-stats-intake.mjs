@@ -356,6 +356,8 @@ function queueHandler({ controls = {}, items = [], result = {}, landed = [] } = 
       if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'configured' };
       if (name.endsWith('/writeResult.ts')) return { mustWrite: (_label, result) => result, softWrite: () => null };
       if (name.endsWith('/ledger.ts')) return intakeLedger;
+      // BaT shortlink resolution has its own tests (process-import-queue/batShortlink.test.ts); null = route as before.
+      if (name.endsWith('/batShortlink.ts')) return { resolveBatQueueUrl: async () => null };
       throw new Error(`Unexpected queue import: ${name}`);
     },
   });

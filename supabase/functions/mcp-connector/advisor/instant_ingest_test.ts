@@ -153,6 +153,16 @@ const PAGE =
     Math.floor(Date.now() / 1000) + 6 * 86400
   }"></span>Place Bid</body></html>`;
 
+/** Exact-host check (no substring match) for the stubbed BaT fetch. */
+function isBatHostUrl(input: RequestInfo | URL): boolean {
+  try {
+    const h = new URL(input instanceof Request ? input.url : String(input)).hostname;
+    return h === "bringatrailer.com" || h === "www.bringatrailer.com";
+  } catch {
+    return false;
+  }
+}
+
 function withPage<T>(
   status: number,
   finalUrl: string,
@@ -160,7 +170,7 @@ function withPage<T>(
 ): Promise<T> {
   const real = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL) => {
-    if (String(input).includes("bringatrailer.com")) {
+    if (isBatHostUrl(input)) {
       const r = new Response(
         status === 200
           ? PAGE
@@ -452,7 +462,7 @@ Deno.test("a just-listed lot with no bids reads 'no bids yet', not 'current bid 
   const real = globalThis.fetch;
   globalThis.fetch =
     ((i: RequestInfo | URL) =>
-      String(i).includes("bringatrailer.com")
+      isBatHostUrl(i)
         ? Promise.resolve(new Response(html, { status: 200 }))
         : Promise.reject(new Error("no network"))) as typeof fetch;
   try {
