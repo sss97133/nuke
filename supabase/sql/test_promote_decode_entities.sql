@@ -28,10 +28,13 @@ CREATE FUNCTION public.receipt_doc_kind_excluded(k public.receipt_doc_kind) RETU
 LANGUAGE sql IMMUTABLE AS $$ SELECT false $$;
 
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, make text, model text, year int, vin text, is_replica boolean,
-  replica_quote text, is_public boolean DEFAULT true, listing_kind text, value_score numeric,
-  value_breakdown jsonb, color text, engine_size text, transmission text
+  id uuid PRIMARY KEY, user_id uuid, owner_id uuid, uploaded_by uuid, make text, model text,
+  year int, vin text, is_replica boolean, replica_quote text, is_public boolean DEFAULT true,
+  deleted_at timestamptz, listing_kind text, value_score numeric, value_breakdown jsonb,
+  color text, engine_size text, transmission text
 );
+CREATE FUNCTION public.vehicle_user_has_access(p_vehicle_id uuid, p_user_id uuid) RETURNS boolean
+LANGUAGE sql STABLE AS $$ SELECT false $$;
 CREATE TABLE public.timeline_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, cost_amount numeric, created_at timestamptz DEFAULT now());
 CREATE TABLE public.work_order_parts (timeline_event_id uuid, total_price numeric);
 CREATE TABLE public.work_order_labor (timeline_event_id uuid, total_cost numeric);

@@ -33,7 +33,9 @@ SET search_path = public;
 -- 1. One money fold
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION public.vehicle_documented_spend(p_vehicle_id uuid)
+-- Unmasked fold for sibling SECURITY DEFINER writers (grades / value / invested).
+-- No EXECUTE grant: only same-owner definer functions may call it.
+CREATE OR REPLACE FUNCTION public._vehicle_documented_spend_unmasked(p_vehicle_id uuid)
 RETURNS jsonb
 LANGUAGE sql
 STABLE
@@ -41,7 +43,6 @@ SECURITY DEFINER
 SET search_path = public
 AS $fn$
   WITH candidate AS (
-    -- Active link wins; otherwise scope/vehicle_id fallback when no active link row exists.
     SELECT l.receipt_id AS id
       FROM receipt_vehicle_links l
      WHERE l.vehicle_id = p_vehicle_id
@@ -68,7 +69,6 @@ AS $fn$
        AND NOT public.receipt_doc_kind_quoted(r.document_kind)
        AND coalesce(r.total_amount, r.total) IS NOT NULL
   ),
-  -- Non-superseded work_record money not already represented by a receipt id citation.
   work_money AS (
     SELECT vo.id,
            CASE
@@ -100,9 +100,7 @@ AS $fn$
       FROM eligible
   ),
   work_totals AS (
-    SELECT
-      coalesce(sum(amt), 0) AS work_net,
-      count(*) AS work_count
+    SELECT coalesce(sum(amt), 0) AS work_net, count(*) AS work_count
       FROM work_eligible
   )
   SELECT jsonb_build_object(
@@ -115,6 +113,7 @@ AS $fn$
     'charge_count', t.charge_count,
     'credit_count', t.credit_count,
     'work_record_count', w.work_count,
+    'amounts_visible', true,
     'basis', 'receipt_vehicle_links+scope_fallback+work_record_uncited',
     'as_of', now(),
     'logic_version', 'vehicle_documented_spend/20261122032000'
@@ -122,10 +121,71 @@ AS $fn$
   FROM totals t, work_totals w;
 $fn$;
 
+REVOKE ALL ON FUNCTION public._vehicle_documented_spend_unmasked(uuid) FROM PUBLIC;
+
+-- Public reader: same fold, with public-vehicle gate and tied-viewer money mask
+-- (receipts_public_summary / vehicle_build_reconstruction pattern).
+CREATE OR REPLACE FUNCTION public.vehicle_documented_spend(p_vehicle_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  v_tied boolean;
+  v_visible boolean;
+  raw jsonb;
+BEGIN
+  SELECT
+    (auth.role() = 'service_role'
+      OR (auth.uid() IS NOT NULL AND (
+            v.user_id = auth.uid() OR v.owner_id = auth.uid()
+            OR v.uploaded_by = auth.uid()
+            OR public.vehicle_user_has_access(v.id, auth.uid())))) IS TRUE,
+    v.deleted_at IS NULL
+      AND (v.is_public IS TRUE OR auth.role() = 'service_role'
+           OR (auth.uid() IS NOT NULL AND (
+                 v.user_id = auth.uid() OR v.owner_id = auth.uid()
+                 OR v.uploaded_by = auth.uid()
+                 OR public.vehicle_user_has_access(v.id, auth.uid()))))
+  INTO v_tied, v_visible
+  FROM public.vehicles v
+  WHERE v.id = p_vehicle_id;
+
+  IF NOT FOUND OR v_visible IS NOT TRUE THEN
+    RETURN NULL;
+  END IF;
+
+  raw := public._vehicle_documented_spend_unmasked(p_vehicle_id);
+  IF v_tied THEN
+    RETURN raw;
+  END IF;
+
+  -- Stranger on a public vehicle: counts yes, amounts NULL (2026-11-09 money mask).
+  RETURN jsonb_build_object(
+    'vehicle_id', p_vehicle_id,
+    'net_spend', NULL,
+    'gross_charges', NULL,
+    'credits', NULL,
+    'work_record_net', NULL,
+    'receipt_count', raw->>'receipt_count',
+    'charge_count', raw->>'charge_count',
+    'credit_count', raw->>'credit_count',
+    'work_record_count', raw->>'work_record_count',
+    'amounts_visible', false,
+    'basis', raw->>'basis',
+    'as_of', raw->>'as_of',
+    'logic_version', raw->>'logic_version'
+  );
+END
+$fn$;
+
 COMMENT ON FUNCTION public.vehicle_documented_spend(uuid) IS
   'Single documented-spend fold: linked/scoped non-quote receipts with verified|plausible amounts, '
-  'netting credits (negative totals), plus uncited work_record amounts. Grades, value_breakdown and '
-  'get_vehicle_total_invested read this number. Never invents amounts.';
+  'netting credits, plus uncited work_record amounts. Public undeleted vehicles only for strangers; '
+  'amounts only for a tied viewer or service_role (amounts_visible). Null when the caller may not '
+  'see the vehicle. Grades/value/invested use _vehicle_documented_spend_unmasked.';
 
 REVOKE ALL ON FUNCTION public.vehicle_documented_spend(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_documented_spend(uuid) TO anon, authenticated, service_role;
@@ -153,7 +213,7 @@ AS $fn$
        WHERE vehicle_id = p_vehicle_id AND cost_amount IS NOT NULL AND cost_amount > 0
     ),
     spend AS (
-      SELECT public.vehicle_documented_spend(p_vehicle_id) AS j
+      SELECT public._vehicle_documented_spend_unmasked(p_vehicle_id) AS j
     ),
     rcpts AS (
       SELECT coalesce((j->>'net_spend')::numeric, 0) AS total,
@@ -214,7 +274,7 @@ BEGIN
     recent_events := 0;
   END IF;
 
-  spend := public.vehicle_documented_spend(p_vehicle_id);
+  spend := public._vehicle_documented_spend_unmasked(p_vehicle_id);
   receipts_total := coalesce((spend->>'net_spend')::numeric, 0);
 
   SELECT coalesce(is_public, true) INTO public_flag
@@ -280,7 +340,7 @@ DECLARE
            + coalesce((spend_fold->>'work_record_count')::int, 0),
          coalesce((spend_fold->>'net_spend')::numeric, 0)
   INTO rec_count, cost_documented
-  FROM (SELECT public.vehicle_documented_spend(p_vehicle_id) AS spend_fold) s;$a$;
+  FROM (SELECT public._vehicle_documented_spend_unmasked(p_vehicle_id) AS spend_fold) s;$a$;
   anchor2 text := $a$dim.notes := FORMAT('VIN: %s | Mileage: %s | Service records: %s | Documented spend: $%s',$a$;
   repl2 text := $a$dim.notes := FORMAT('VIN: %s | Mileage: %s | Receipts: %s | Documented spend: $%s',$a$;
 BEGIN
@@ -290,8 +350,9 @@ BEGIN
   END IF;
   def := pg_get_functiondef('public.compute_vehicle_grade(uuid)'::regprocedure);
   -- Already patched (replay).
-  IF position('vehicle_documented_spend(p_vehicle_id)' IN def) > 0 THEN
-    RAISE NOTICE 'compute_vehicle_grade already uses vehicle_documented_spend; skip';
+  IF position('_vehicle_documented_spend_unmasked(p_vehicle_id)' IN def) > 0
+     OR position('vehicle_documented_spend(p_vehicle_id)' IN def) > 0 THEN
+    RAISE NOTICE 'compute_vehicle_grade already uses documented spend fold; skip';
     RETURN;
   END IF;
   IF position('FROM service_records' IN def) > 0
@@ -807,6 +868,8 @@ SET search_path = public
 AS $fn$
 DECLARE
   v record;
+  v_tied boolean;
+  v_visible boolean;
   target jsonb;
   components jsonb := '[]'::jsonb;
   w_engine numeric := 40;
@@ -826,9 +889,29 @@ DECLARE
   cat text;
   score numeric;
 BEGIN
-  SELECT * INTO v FROM vehicles WHERE id = p_vehicle_id;
-  IF v IS NULL THEN
+  SELECT *
+  INTO v
+  FROM vehicles
+  WHERE id = p_vehicle_id;
+
+  IF NOT FOUND THEN
     RETURN jsonb_build_object('error', 'vehicle_not_found');
+  END IF;
+
+  v_tied := (auth.role() = 'service_role'
+    OR (auth.uid() IS NOT NULL AND (
+          v.user_id = auth.uid() OR v.owner_id = auth.uid()
+          OR v.uploaded_by = auth.uid()
+          OR public.vehicle_user_has_access(v.id, auth.uid())))) IS TRUE;
+  v_visible := v.deleted_at IS NULL
+    AND (v.is_public IS TRUE OR auth.role() = 'service_role'
+         OR (auth.uid() IS NOT NULL AND (
+               v.user_id = auth.uid() OR v.owner_id = auth.uid()
+               OR v.uploaded_by = auth.uid()
+               OR public.vehicle_user_has_access(v.id, auth.uid()))));
+
+  IF v_visible IS NOT TRUE THEN
+    RETURN NULL;
   END IF;
   IF coalesce(v.is_replica, false) IS NOT TRUE THEN
     RETURN jsonb_build_object(
@@ -1026,7 +1109,8 @@ COMMENT ON FUNCTION public.vehicle_replica_accuracy(uuid) IS
   'Replica-accuracy fold for vehicles with is_replica. Scores components against the declared '
   'target (replica_quote tokens). Categories: factory_correct, correct_reproduction, '
   'period_correct_substitute, non_correct, unknown. Unknown share is always reported; never guesses. '
-  'Distinct from originality_score (P factory-original).';
+  'Distinct from originality_score (P factory-original). Public undeleted vehicles (or tied / '
+  'service_role) only; null when the caller may not see the vehicle.';
 
 REVOKE ALL ON FUNCTION public.vehicle_replica_accuracy(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_replica_accuracy(uuid) TO anon, authenticated, service_role;

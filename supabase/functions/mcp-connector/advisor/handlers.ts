@@ -1453,7 +1453,8 @@ async function handleGetAsset(
   }
 
   // Documented spend from the single money fold (receipts net of credits; same number as grades/value_breakdown).
-  if (documentedSpend && documentedSpend.net_spend != null) {
+  // Amounts are tied-viewer / service only (amounts_visible); strangers get not recorded.
+  if (documentedSpend && documentedSpend.amounts_visible === true && documentedSpend.net_spend != null) {
     claims.push(
       recordedClaim("documented_spend", documentedSpend.net_spend, {
         confidence: 0.9,
@@ -1548,10 +1549,11 @@ async function handleGetAsset(
       history,
       documented_spend: documentedSpend
         ? {
-            net_spend: documentedSpend.net_spend ?? null,
-            gross_charges: documentedSpend.gross_charges ?? null,
-            credits: documentedSpend.credits ?? null,
+            net_spend: documentedSpend.amounts_visible === true ? (documentedSpend.net_spend ?? null) : null,
+            gross_charges: documentedSpend.amounts_visible === true ? (documentedSpend.gross_charges ?? null) : null,
+            credits: documentedSpend.amounts_visible === true ? (documentedSpend.credits ?? null) : null,
             receipt_count: documentedSpend.receipt_count ?? null,
+            amounts_visible: documentedSpend.amounts_visible ?? false,
             basis: documentedSpend.basis ?? null,
             as_of: documentedSpend.as_of ?? null,
             logic_version: documentedSpend.logic_version ?? null,
@@ -2264,7 +2266,7 @@ async function handleValueAsset(
 
   const { data: spendForValue } = await sb.rpc("vehicle_documented_spend", { p_vehicle_id: vid });
   const documentedSpendValue = (spendForValue ?? null) as Record<string, unknown> | null;
-  if (documentedSpendValue && documentedSpendValue.net_spend != null) {
+  if (documentedSpendValue && documentedSpendValue.amounts_visible === true && documentedSpendValue.net_spend != null) {
     claims.push(
       recordedClaim("documented_spend", documentedSpendValue.net_spend, {
         confidence: 0.9,

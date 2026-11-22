@@ -6,4 +6,5 @@ DROP FUNCTION IF EXISTS public.reconcile_identity_field_provenance(uuid, boolean
 DROP FUNCTION IF EXISTS public.identity_source_rank(text);
 DROP FUNCTION IF EXISTS public.promote_vehicle_decode_entities(uuid, boolean);
 DROP FUNCTION IF EXISTS public.vehicle_documented_spend(uuid);
+DROP FUNCTION IF EXISTS public._vehicle_documented_spend_unmasked(uuid);
 -- Provenance columns left in place (nullable / defaulted); dropping them risks entity rows.

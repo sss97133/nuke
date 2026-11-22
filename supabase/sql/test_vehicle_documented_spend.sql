@@ -33,11 +33,14 @@ CREATE FUNCTION public.receipt_doc_kind_excluded(k public.receipt_doc_kind) RETU
 LANGUAGE sql IMMUTABLE AS $$ SELECT false $$;
 
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, user_id uuid, owner_id uuid, make text, model text, year int,
+  id uuid PRIMARY KEY, user_id uuid, owner_id uuid, uploaded_by uuid, make text, model text, year int,
   vin text, color text, engine_size text, transmission text, is_public boolean DEFAULT true,
-  listing_kind text, value_score numeric, value_breakdown jsonb, primary_image_url text,
-  title_status text, mileage int, condition_rating numeric, data_quality_score numeric
+  deleted_at timestamptz, listing_kind text, value_score numeric, value_breakdown jsonb,
+  primary_image_url text, title_status text, mileage int, condition_rating numeric,
+  data_quality_score numeric
 );
+CREATE FUNCTION public.vehicle_user_has_access(p_vehicle_id uuid, p_user_id uuid) RETURNS boolean
+LANGUAGE sql STABLE AS $$ SELECT false $$;
 CREATE TABLE public.timeline_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, cost_amount numeric,
   event_type text, event_date date, mileage_at_event int, created_at timestamptz DEFAULT now()
@@ -83,7 +86,7 @@ CREATE TYPE public.grade_result AS (
   confidence text, is_gradeable boolean, total_evidence integer, dimensions public.grade_dimension[],
   calculated_at timestamptz);
 
--- Minimal compute_vehicle_grade that uses the same spend fold the production patch installs.
+-- Minimal compute_vehicle_grade that uses the same unmasked fold the production patch installs.
 CREATE FUNCTION public.compute_vehicle_grade(p_vehicle_id uuid) RETURNS public.grade_result
 LANGUAGE plpgsql STABLE AS $$
 DECLARE
@@ -99,7 +102,7 @@ BEGIN
            + coalesce((spend_fold->>'work_record_count')::int, 0),
          coalesce((spend_fold->>'net_spend')::numeric, 0)
   INTO rec_count, cost_documented
-  FROM (SELECT public.vehicle_documented_spend(p_vehicle_id) AS spend_fold) s;
+  FROM (SELECT public._vehicle_documented_spend_unmasked(p_vehicle_id) AS spend_fold) s;
   dim.dimension := 'documentation';
   dim.raw_score := 5;
   dim.weight := 0.2;
@@ -140,18 +143,35 @@ INSERT INTO public.receipts(id, user_id, vehicle_id, scope_type, scope_id, total
 INSERT INTO public.receipt_vehicle_links(receipt_id, vehicle_id, status, user_id, basis)
 SELECT id, vehicle_id, 'linked', user_id, 'test' FROM public.receipts;
 
+-- Unmasked fold (sibling writers / service path).
 SELECT public.assert(
-  (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'net_spend')::numeric = 90,
-  'net_spend nets credits and ignores quotes');
+  (public._vehicle_documented_spend_unmasked('00000000-0000-0000-0000-0000000000a1')->>'net_spend')::numeric = 90,
+  'unmasked net_spend nets credits and ignores quotes');
 SELECT public.assert(
-  (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'gross_charges')::numeric = 100,
+  (public._vehicle_documented_spend_unmasked('00000000-0000-0000-0000-0000000000a1')->>'gross_charges')::numeric = 100,
   'gross_charges is positives only');
 SELECT public.assert(
-  (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'credits')::numeric = -10,
+  (public._vehicle_documented_spend_unmasked('00000000-0000-0000-0000-0000000000a1')->>'credits')::numeric = -10,
   'credits are negative');
 SELECT public.assert(
-  (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'receipt_count')::int = 2,
+  (public._vehicle_documented_spend_unmasked('00000000-0000-0000-0000-0000000000a1')->>'receipt_count')::int = 2,
   'quote excluded from receipt_count');
+
+-- Anon stranger on a public vehicle: counts yes, amounts NULL.
+SELECT set_config('test.auth_role', 'anon', false);
+SELECT set_config('test.auth_uid', '', false);
+SELECT public.assert(
+  (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'amounts_visible')::boolean IS FALSE
+  AND public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'net_spend' IS NULL
+  AND (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'receipt_count')::int = 2,
+  'anon sees receipt_count but not amounts');
+
+-- Service role sees amounts.
+SELECT set_config('test.auth_role', 'service_role', false);
+SELECT public.assert(
+  (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'net_spend')::numeric = 90
+  AND (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'amounts_visible')::boolean IS TRUE,
+  'service_role sees amounts');
 
 SELECT public.assert(
   (public.get_vehicle_total_invested('00000000-0000-0000-0000-0000000000a1') #>> '{breakdown,receipts}')::numeric = 90,
@@ -171,11 +191,17 @@ SELECT public.assert(
     LIKE '%Documented spend: $90%',
   'grades Documented spend reads the fold, not service_records');
 
--- Positive-only discrepancy case: 100 charge, no credit → invested equals net.
--- With credit, old amount>0 path would have been 100; fold is 90.
 SELECT public.assert(
-  (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'net_spend')::numeric
-    < (public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1')->>'gross_charges')::numeric,
+  (public._vehicle_documented_spend_unmasked('00000000-0000-0000-0000-0000000000a1')->>'net_spend')::numeric
+    < (public._vehicle_documented_spend_unmasked('00000000-0000-0000-0000-0000000000a1')->>'gross_charges')::numeric,
   'net < gross when credits exist (explains 21161.81 vs 21213.41 on the proof vehicle)');
+
+-- Private / deleted vehicle hidden from anon.
+UPDATE public.vehicles SET is_public = false
+ WHERE id = '00000000-0000-0000-0000-0000000000a1';
+SELECT set_config('test.auth_role', 'anon', false);
+SELECT public.assert(
+  public.vehicle_documented_spend('00000000-0000-0000-0000-0000000000a1') IS NULL,
+  'anon cannot read spend on a private vehicle');
 
 SELECT public.assert(true, 'vehicle_documented_spend contract complete');
