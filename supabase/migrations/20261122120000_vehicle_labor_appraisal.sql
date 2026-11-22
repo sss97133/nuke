@@ -1,17 +1,21 @@
 -- Database-computed labor appraisal from evidence-gated stage rules.
 -- Replaces hand-typed stage assignment. Hours come only from
--- stage_transition_labor_map / estimate_labor_from_delta, shop paper hours,
--- or labor_operations.base_hours for matched reassembly pieces — never invented.
+-- stage_transition_labor_map (via estimate_labor_from_delta), shop paper hours,
+-- or labor_operations.base_hours for matched reassembly pieces; never typed here.
+--
+-- Rules key on the shared line classifiers (receipt_line_system,
+-- receipt_line_labor_operation), the reconstruction's keyed systems and phases,
+-- and keyed photo scenes, so any vehicle's paper and photos can satisfy them.
+-- No rule carries a description regex and no rule carries an hour number.
 --
 -- Contracts: supabase/sql/test_vehicle_labor_appraisal.sql
--- No production apply without owner approval.
 
 SET lock_timeout = '5s';
 SET statement_timeout = '120s';
 SET search_path = public;
 
 -- =============================================================================
--- 1. labor_stage_rules — evidence condition → stage transition + times
+-- 1. labor_stage_rules: evidence condition -> stage transition
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.labor_stage_rules (
@@ -22,9 +26,6 @@ CREATE TABLE IF NOT EXISTS public.labor_stage_rules (
   from_stage text NOT NULL,
   to_stage text NOT NULL,
   evidence_requirements jsonb NOT NULL DEFAULT '{}'::jsonb,
-  hours_min numeric,
-  hours_typical numeric,
-  hours_max numeric,
   citation text NOT NULL,
   sort_order int NOT NULL DEFAULT 100,
   active boolean NOT NULL DEFAULT true,
@@ -33,9 +34,15 @@ CREATE TABLE IF NOT EXISTS public.labor_stage_rules (
 );
 
 COMMENT ON TABLE public.labor_stage_rules IS
-  'Evidence-gated stage transitions for vehicle_labor_appraisal. Hours cite '
-  'stage_transition_labor_map (or are looked up at read time). No free-text '
-  'photo vocabulary; requirements are closed JSON condition kinds.';
+  'Evidence-gated stage transitions read by vehicle_labor_appraisal. Requirements are closed '
+  'JSON condition kinds over shared keys (receipt_line_system, receipt_line_labor_operation, '
+  'reconstruction systems/phases, photo scene_type). Hours are never stored here: they come '
+  'from stage_transition_labor_map at read time.';
+
+ALTER TABLE public.labor_stage_rules ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS labor_stage_rules_read ON public.labor_stage_rules;
+CREATE POLICY labor_stage_rules_read ON public.labor_stage_rules
+  FOR SELECT TO anon, authenticated USING (true);
 
 REVOKE ALL ON TABLE public.labor_stage_rules FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.labor_stage_rules TO anon, authenticated, service_role;
@@ -43,48 +50,36 @@ GRANT INSERT, UPDATE, DELETE ON TABLE public.labor_stage_rules TO service_role;
 
 INSERT INTO public.labor_stage_rules (
   segment_key, category, zone_pattern, from_stage, to_stage,
-  evidence_requirements, hours_min, hours_typical, hours_max, citation, sort_order
+  evidence_requirements, citation, sort_order
 ) VALUES
   ('engine', 'powertrain', '*', 'none', 'rebuilt_original',
    '{"all":[
-      {"type":"reconstruction_paper_lines","system_key":"machining","min":1},
-      {"type":"facet_truthy","key":"engine.derived.changed"}
+      {"type":"reconstruction_paper_lines","system_key":"machining","min":1}
     ],
     "paper_hours_system":"machining"}'::jsonb,
-   20, 32, 50,
-   'stage_transition_labor_map:powertrain none→rebuilt_original', 10),
+   'stage_transition_labor_map:powertrain none->rebuilt_original; machining paper hours win', 10),
   ('gearbox', 'powertrain', '*', 'none', 'trans_rebuild',
    '{"all":[
-      {"type":"statement_present"},
-      {"type":"part_line_match","description_regex":"clutch|pressure plate|flywheel|linkage","min":1}
-    ],
-    "evidence_grade":"statement"}'::jsonb,
-   8, 12, 16,
-   'stage_transition_labor_map:powertrain none→trans_rebuild', 20),
+      {"type":"part_line_operation","operations":["MECH-TRANS-RR"],"min":1}
+    ]}'::jsonb,
+   'stage_transition_labor_map:powertrain none->trans_rebuild', 20),
   ('chassis', 'chassis', '*', 'stock', 'refreshed',
    '{"all":[
-      {"type":"part_line_system","systems":["suspension","steering","brakes"],"min":1},
-      {"type":"part_line_match","description_regex":"front end","line_kinds":["labor","service","note","part"],"min":1}
+      {"type":"part_line_system","systems":["suspension","steering","brakes"],
+       "line_kinds":["part","labor","note"],"min":3,"min_distinct":2}
     ]}'::jsonb,
-   8, 14, 24,
-   'stage_transition_labor_map:chassis stock→refreshed', 30),
+   'stage_transition_labor_map:chassis stock->refreshed', 30),
   ('electrical', 'electrical', '*', 'original', 'rewire',
    '{"all":[
-      {"type":"facet_truthy","key":"engine.derived.changed"},
-      {"type":"part_line_match","description_regex":"harness|hrns","min":1},
-      {"type":"statement_present"}
-    ],
-    "evidence_grade":"statement"}'::jsonb,
-   8, 14, 20,
-   'stage_transition_labor_map:electrical original→rewire', 40),
-  ('body_metal', 'body', 'panel_tail', 'stripped', 'fabricated',
+      {"type":"part_line_operation","operations":["ELEC-WIRING-HARNESS"],"min":2}
+    ]}'::jsonb,
+   'stage_transition_labor_map:electrical original->rewire', 40),
+  ('body_metal', 'body', 'panel_*', 'stripped', 'fabricated',
    '{"all":[
-      {"type":"part_line_match","description_regex":"tail panel|rad(iator)? support|rr bdy pnl|deck fllr","min":1}
+      {"type":"part_line_operation","operations":["BODY-RUST-PANEL"],"min":1}
     ],
-    "panel_multiplier_regex":"tail panel|rad(iator)? support|rr bdy pnl|deck fllr",
-    "panel_multiplier_cap":2}'::jsonb,
-   4, 6, 12,
-   'stage_transition_labor_map:body panel_* stripped→fabricated (×evidenced panels)', 50),
+    "panel_multiplier":{"operations":["BODY-RUST-PANEL"]}}'::jsonb,
+   'stage_transition_labor_map:body panel_* stripped->fabricated x distinct evidenced panel lines', 50),
   ('paint', 'body', '*', 'fabricated', 'clearcoated',
    '{"paint_chain":[
       {"from_stage":"fabricated","to_stage":"primed","photo_phase":null},
@@ -92,19 +87,18 @@ INSERT INTO public.labor_stage_rules (
       {"from_stage":"blocked","to_stage":"basecoated","photo_phase":"paint_application"},
       {"from_stage":"basecoated","to_stage":"clearcoated","photo_phase":null}
     ]}'::jsonb,
-   NULL, NULL, NULL,
    'stage_transition_labor_map:body paint chain; charge only photographed steps', 60),
   ('reassembly', 'body', '*', 'clearcoated', 'assembled',
    '{"reassembly_pieces":true}'::jsonb,
-   NULL, NULL, NULL,
    'labor_operations via receipt_part_visible installed=yes + receipt_line_labor_operation', 70),
   ('interior', 'interior', '*', 'needs_work', 'recovered',
    '{"all":[
-      {"type":"part_line_system","systems":["interior"],"min":1},
+      {"type":"part_line_operation",
+       "operations":["INT-SEATS-RR","INT-CARPET-RR","INT-HEADLINER-RR","INT-DOOR-PANELS"],
+       "min":2,"min_distinct":2},
       {"type":"image_scene","scene_type":"body_interior","min":2}
     ]}'::jsonb,
-   16, 24, 40,
-   'stage_transition_labor_map:interior needs_work→recovered', 80)
+   'stage_transition_labor_map:interior needs_work->recovered', 80)
 ON CONFLICT (segment_key, from_stage, to_stage, zone_pattern) DO NOTHING;
 
 -- =============================================================================
@@ -119,7 +113,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $fn$
 DECLARE
-  version text := 'vehicle_labor_appraisal/20261122120000';
+  version text := 'vehicle_labor_appraisal/20261122120000.2';
   v record;
   v_visible boolean;
   recon jsonb;
@@ -174,6 +168,14 @@ DECLARE
   paint_supported_typ numeric;
   paint_supported_max numeric;
   unsupported_steps jsonb;
+  lines jsonb := '[]'::jsonb;
+  distinct_n int;
+  ops text[];
+  book_min numeric;
+  book_typ numeric;
+  book_max numeric;
+  hours_basis text;
+  panel_count int;
 BEGIN
   SELECT * INTO v FROM vehicles WHERE id = p_vehicle_id;
   IF NOT FOUND THEN
@@ -195,40 +197,66 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  -- Flatten facet items across top-level arrays into key → item.
-  BEGIN
-    facet_blob := public.vehicle_facet_items(p_vehicle_id);
-  EXCEPTION WHEN undefined_function THEN
-    facet_blob := '{}'::jsonb;
-  END;
-  IF jsonb_typeof(facet_blob) = 'object' THEN
-    FOR facet_arr IN
-      SELECT value FROM jsonb_each(facet_blob) WHERE jsonb_typeof(value) = 'array'
-    LOOP
-      FOR cond IN SELECT value FROM jsonb_array_elements(facet_arr)
+  -- Receipt lines are read once, projected to keys only. Descriptions never leave
+  -- this statement: later conditions see the shared classifier outputs
+  -- (system, labor operation) and an opaque distinctness hash.
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+           'item_id', w.item_id,
+           'line_kind', w.line_kind,
+           'system', public.receipt_line_system(w.description),
+           'op', public.receipt_line_labor_operation(w.description),
+           'dk', md5(coalesce(nullif(btrim(w.part_number), ''), lower(btrim(coalesce(w.description, '')))))
+         )), '[]'::jsonb)
+    INTO lines
+    FROM public.receipt_work_lines(p_vehicle_id) w
+   WHERE w.item_id IS NOT NULL;
+
+  -- Facets and statements are read only when an active rule asks for them.
+  IF EXISTS (
+    SELECT 1 FROM labor_stage_rules r,
+           jsonb_array_elements(coalesce(r.evidence_requirements->'all', '[]'::jsonb)) c
+     WHERE r.active AND c->>'type' = 'facet_truthy'
+  ) THEN
+    BEGIN
+      facet_blob := public.vehicle_facet_items(p_vehicle_id);
+    EXCEPTION WHEN undefined_function THEN
+      facet_blob := '{}'::jsonb;
+    END;
+    IF jsonb_typeof(facet_blob) = 'object' THEN
+      FOR facet_arr IN
+        SELECT value FROM jsonb_each(facet_blob) WHERE jsonb_typeof(value) = 'array'
       LOOP
-        IF cond ? 'key' THEN
-          facets := facets || jsonb_build_object(cond->>'key', cond);
-        END IF;
+        FOR cond IN SELECT value FROM jsonb_array_elements(facet_arr)
+        LOOP
+          IF cond ? 'key' THEN
+            facets := facets || jsonb_build_object(cond->>'key', cond);
+          END IF;
+        END LOOP;
       END LOOP;
-    END LOOP;
+    END IF;
   END IF;
 
-  BEGIN
-    statements := public.vehicle_statements(p_vehicle_id);
-  EXCEPTION WHEN undefined_function THEN
-    statements := jsonb_build_object('statements', '[]'::jsonb);
-  END;
-  -- vehicle_statements emits statement_id only for tied viewers; anon still sees
-  -- the statement row (role/kind/said_on) with a null id. Presence uses the array;
-  -- citeable evidence ids are the non-null statement_ids only.
-  SELECT coalesce(array_agg(sid), '{}'::uuid[])
-    INTO statement_ids
-    FROM (
-      SELECT nullif(coalesce(s->>'statement_id', s->>'id'), '')::uuid AS sid
-        FROM jsonb_array_elements(coalesce(statements->'statements', '[]'::jsonb)) s
-    ) x
-   WHERE sid IS NOT NULL;
+  statements := jsonb_build_object('statements', '[]'::jsonb);
+  IF EXISTS (
+    SELECT 1 FROM labor_stage_rules r,
+           jsonb_array_elements(coalesce(r.evidence_requirements->'all', '[]'::jsonb)) c
+     WHERE r.active AND c->>'type' = 'statement_present'
+  ) THEN
+    BEGIN
+      statements := public.vehicle_statements(p_vehicle_id);
+    EXCEPTION WHEN undefined_function THEN
+      statements := jsonb_build_object('statements', '[]'::jsonb);
+    END;
+    -- vehicle_statements emits statement_id only for tied viewers; anon sees the
+    -- row with a null id. Presence uses the array; citeable ids are non-null only.
+    SELECT coalesce(array_agg(sid), '{}'::uuid[])
+      INTO statement_ids
+      FROM (
+        SELECT nullif(coalesce(s->>'statement_id', s->>'id'), '')::uuid AS sid
+          FROM jsonb_array_elements(coalesce(statements->'statements', '[]'::jsonb)) s
+      ) x
+     WHERE sid IS NOT NULL;
+  END IF;
 
   FOR rule IN
     SELECT * FROM labor_stage_rules
@@ -255,6 +283,9 @@ BEGIN
     paint_supported_typ := 0;
     paint_supported_max := 0;
     unsupported_steps := '[]'::jsonb;
+    book_min := NULL; book_typ := NULL; book_max := NULL;
+    hours_basis := NULL;
+    panel_count := NULL;
 
     -- ----- Reassembly: per-piece book hours only -----
     IF coalesce((rule.evidence_requirements->>'reassembly_pieces')::boolean, false) THEN
@@ -496,11 +527,10 @@ BEGIN
         ELSE
           SELECT coalesce(evid_ids || array_agg(w.item_id), evid_ids) INTO evid_ids
             FROM (
-              SELECT w.item_id
-                FROM public.receipt_work_lines(p_vehicle_id) w
-               WHERE public.receipt_line_system(w.description) = sys_key
-                 AND w.line_kind IN ('labor', 'service', 'note', 'part')
-                 AND w.item_id IS NOT NULL
+              SELECT (l->>'item_id')::uuid AS item_id
+                FROM jsonb_array_elements(lines) l
+               WHERE l->>'system' = sys_key
+                 AND l->>'line_kind' IN ('labor', 'service', 'note', 'part')
                LIMIT 50
             ) w;
         END IF;
@@ -523,53 +553,36 @@ BEGIN
           evid_grade := coalesce(rule.evidence_requirements->>'evidence_grade', 'statement');
         END IF;
 
-      ELSIF cond->>'type' = 'part_line_match' THEN
-        regex := cond->>'description_regex';
-        min_n := coalesce((cond->>'min')::int, 1);
+      ELSIF cond->>'type' IN ('part_line_system', 'part_line_operation') THEN
+        -- Closed keys only: the shared classifiers' system or labor operation code.
+        IF cond->>'type' = 'part_line_system' THEN
+          SELECT array_agg(x) INTO ops FROM jsonb_array_elements_text(cond->'systems') x;
+        ELSE
+          SELECT array_agg(x) INTO ops FROM jsonb_array_elements_text(cond->'operations') x;
+        END IF;
         IF cond ? 'line_kinds' THEN
-          SELECT array_agg(x) INTO line_kinds
-            FROM jsonb_array_elements_text(cond->'line_kinds') x;
+          SELECT array_agg(x) INTO line_kinds FROM jsonb_array_elements_text(cond->'line_kinds') x;
         ELSE
           line_kinds := ARRAY['part'];
         END IF;
-        SELECT count(*)::int INTO cnt
-          FROM public.receipt_work_lines(p_vehicle_id) w
-         WHERE w.line_kind = ANY (line_kinds)
-           AND lower(coalesce(w.description, '')) ~ regex;
-        IF coalesce(cnt, 0) < min_n THEN
-          ok := false;
-          missing := array_append(missing, format('part_line_match:%s', regex));
-        ELSE
-          SELECT coalesce(evid_ids || array_agg(w.item_id), evid_ids) INTO evid_ids
-            FROM (
-              SELECT w.item_id
-                FROM public.receipt_work_lines(p_vehicle_id) w
-               WHERE w.line_kind = ANY (line_kinds)
-                 AND lower(coalesce(w.description, '')) ~ regex
-                 AND w.item_id IS NOT NULL
-               LIMIT 50
-            ) w;
-        END IF;
-
-      ELSIF cond->>'type' = 'part_line_system' THEN
-        SELECT array_agg(x) INTO systems
-          FROM jsonb_array_elements_text(cond->'systems') x;
         min_n := coalesce((cond->>'min')::int, 1);
-        SELECT count(*)::int INTO cnt
-          FROM public.receipt_work_lines(p_vehicle_id) w
-         WHERE w.line_kind = 'part'
-           AND public.receipt_line_system(w.description) = ANY (systems);
-        IF coalesce(cnt, 0) < min_n THEN
+        SELECT count(*)::int,
+               count(DISTINCT CASE WHEN cond->>'type' = 'part_line_system' THEN l->>'system' ELSE l->>'op' END)::int
+          INTO cnt, distinct_n
+          FROM jsonb_array_elements(lines) l
+         WHERE l->>'line_kind' = ANY (line_kinds)
+           AND (CASE WHEN cond->>'type' = 'part_line_system' THEN l->>'system' ELSE l->>'op' END) = ANY (ops);
+        IF coalesce(cnt, 0) < min_n
+           OR coalesce(distinct_n, 0) < coalesce((cond->>'min_distinct')::int, 1) THEN
           ok := false;
-          missing := array_append(missing, format('part_line_system:%s', array_to_string(systems, ',')));
+          missing := array_append(missing, format('%s:%s', cond->>'type', array_to_string(ops, ',')));
         ELSE
           SELECT coalesce(evid_ids || array_agg(w.item_id), evid_ids) INTO evid_ids
             FROM (
-              SELECT w.item_id
-                FROM public.receipt_work_lines(p_vehicle_id) w
-               WHERE w.line_kind = 'part'
-                 AND public.receipt_line_system(w.description) = ANY (systems)
-                 AND w.item_id IS NOT NULL
+              SELECT (l->>'item_id')::uuid AS item_id
+                FROM jsonb_array_elements(lines) l
+               WHERE l->>'line_kind' = ANY (line_kinds)
+                 AND (CASE WHEN cond->>'type' = 'part_line_system' THEN l->>'system' ELSE l->>'op' END) = ANY (ops)
                LIMIT 50
             ) w;
         END IF;
@@ -627,44 +640,34 @@ BEGIN
       CONTINUE;
     END IF;
 
-    -- Hours from map (prefer live estimate; fall back to rule seed).
+    -- Book hours come from the map only. No map row: the segment says so.
     SELECT * INTO est
       FROM public.estimate_labor_from_delta(
         p_vehicle_id, rule.zone_pattern, rule.from_stage, rule.to_stage
       );
-    hours_min := coalesce(est.hours_min, rule.hours_min);
-    hours_typ := coalesce(est.hours_typical, rule.hours_typical);
-    hours_max := coalesce(est.hours_max, rule.hours_max);
+    book_min := est.hours_min;
+    book_typ := est.hours_typical;
+    book_max := est.hours_max;
+    IF book_typ IS NULL THEN
+      status := 'no book hours';
+    END IF;
 
-    -- Body metal: multiply by evidenced panel count (cap 2).
-    IF rule.evidence_requirements ? 'panel_multiplier_regex' THEN
-      regex := rule.evidence_requirements->>'panel_multiplier_regex';
-      SELECT count(*)::int INTO panel_n
-        FROM public.receipt_work_lines(p_vehicle_id) w
-       WHERE w.line_kind = 'part'
-         AND lower(coalesce(w.description, '')) ~ regex;
-      mult := least(
-        greatest(coalesce(panel_n, 1), 1),
-        coalesce((rule.evidence_requirements->>'panel_multiplier_cap')::int, 2)
-      );
-      -- Prefer distinct panel families when ≥2 families present.
-      SELECT count(DISTINCT CASE
-               WHEN lower(w.description) ~ 'tail panel|rr bdy pnl|deck fllr' THEN 'tail'
-               WHEN lower(w.description) ~ 'rad(iator)? support' THEN 'radiator_support'
-               ELSE 'other'
-             END)::int INTO panel_n
-        FROM public.receipt_work_lines(p_vehicle_id) w
-       WHERE w.line_kind = 'part'
-         AND lower(coalesce(w.description, '')) ~ regex;
-      mult := least(greatest(coalesce(panel_n, 1), 1),
-                    coalesce((rule.evidence_requirements->>'panel_multiplier_cap')::int, 2));
-      hours_min := hours_min * mult;
-      hours_typ := hours_typ * mult;
-      hours_max := hours_max * mult;
+    -- Body metal: book hours per panel x distinct evidenced panel lines.
+    IF rule.evidence_requirements ? 'panel_multiplier' THEN
+      SELECT array_agg(x) INTO ops
+        FROM jsonb_array_elements_text(rule.evidence_requirements#>'{panel_multiplier,operations}') x;
+      SELECT count(DISTINCT l->>'dk')::int INTO panel_count
+        FROM jsonb_array_elements(lines) l
+       WHERE l->>'line_kind' = 'part' AND l->>'op' = ANY (ops);
+      mult := greatest(coalesce(panel_count, 1), 1);
+      book_min := book_min * mult;
+      book_typ := book_typ * mult;
+      book_max := book_max * mult;
       steps_j := jsonb_build_array(jsonb_build_object(
         'from_stage', rule.from_stage,
         'to_stage', rule.to_stage,
         'zone', rule.zone_pattern,
+        'panel_count', panel_count,
         'panel_multiplier', mult
       ));
     ELSE
@@ -675,15 +678,25 @@ BEGIN
       ));
     END IF;
 
-    -- Paper hours win when above stored max (never clip).
+    hours_min := book_min;
+    hours_typ := book_typ;
+    hours_max := book_max;
+    hours_basis := CASE WHEN book_typ IS NOT NULL THEN 'book' END;
+
+    -- Shop paper wins and is never clipped: no hour figure sits below the paper.
     IF rule.evidence_requirements ? 'paper_hours_system' THEN
       sys_key := rule.evidence_requirements->>'paper_hours_system';
       SELECT (s->'paper'->>'hours')::numeric INTO paper_h
         FROM jsonb_array_elements(coalesce(recon->'systems', '[]'::jsonb)) s
        WHERE s->>'system_key' = sys_key
        LIMIT 1;
-      IF paper_h IS NOT NULL AND hours_max IS NOT NULL AND paper_h > hours_max THEN
-        range_below := true;
+      IF paper_h IS NOT NULL THEN
+        range_below := book_max IS NOT NULL AND paper_h > book_max;
+        hours_min := greatest(coalesce(book_min, paper_h), paper_h);
+        hours_typ := greatest(coalesce(book_typ, paper_h), paper_h);
+        hours_max := greatest(coalesce(book_max, paper_h), paper_h);
+        hours_basis := CASE WHEN book_typ IS NULL OR range_below THEN 'shop_paper' ELSE 'book_at_or_above_paper' END;
+        IF status = 'no book hours' THEN status := 'ok'; END IF;
       END IF;
     END IF;
 
@@ -704,6 +717,9 @@ BEGIN
       'hours_min', hours_min,
       'hours_typical', hours_typ,
       'hours_max', hours_max,
+      'hours_basis', hours_basis,
+      'book_hours', CASE WHEN book_typ IS NULL THEN NULL ELSE jsonb_build_object(
+        'hours_min', book_min, 'hours_typical', book_typ, 'hours_max', book_max) END,
       'paper_hours', paper_h,
       'range_below_paper', range_below,
       'evidence_ids', to_jsonb(evid_ids),

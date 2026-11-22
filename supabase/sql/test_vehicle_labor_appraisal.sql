@@ -1,7 +1,11 @@
 -- Disposable PG17: vehicle_labor_appraisal evidence-gated stage rules.
--- Covers: engine (paper + facet, paper above max), gearbox (statement grade),
--- paint (only photographed steps charged), reassembly per-piece match/gap,
--- and no-evidence when required proof is missing. Synthetic fixtures only.
+-- Covers: engine (machining paper wins over the book range), keyed line rules
+-- (gearbox, chassis, electrical, body panels, interior), paint (only photographed
+-- steps charged), reassembly per-piece match/gap, a negative car whose thin paper
+-- must not open segments, a rule with no map row, and that no line text leaves
+-- the reader. The line classifiers are copies of the live definitions
+-- (receipt_line_system, receipt_line_labor_operation, read 2026-11-22), so the
+-- rules are tested against the keys production assigns. Synthetic fixtures only.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -79,32 +83,73 @@ INSERT INTO labor_operations(code, name, base_hours, system) VALUES
   ('MECH-BRAKES-FRONT', 'Front brakes', 2.5, 'mechanical'),
   ('INT-SEATS-RR', 'Seat recover', 4.0, 'interior');
 
-CREATE FUNCTION public.receipt_line_labor_operation(p_text text) RETURNS text
-LANGUAGE sql IMMUTABLE AS $$
+CREATE OR REPLACE FUNCTION public.receipt_line_system(p_text text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'pg_catalog'
+AS $function$
   SELECT CASE
-    WHEN lower(coalesce(p_text,'')) ~ 'brake|caliper|pad' THEN 'MECH-BRAKES-FRONT'
-    WHEN lower(coalesce(p_text,'')) ~ 'seat foam|seat uph' THEN 'INT-SEATS-RR'
-    ELSE NULL
+    WHEN t ~ '\y(shop towels?|shop supplies|colormaxx|key ?chain|gloves|rags?|masking tape|sandpaper)\y' THEN 'supplies'
+    WHEN t ~ '(brakefld|brake fluid)' THEN 'brakes'
+    WHEN t ~ '(antifrez|antifreeze|stoplk|htr core|heater core)' THEN 'cooling'
+    WHEN t ~ '\y(surface heads?|surfacing heads|resurfacing|surface block|hang pistons?|polish crank|valve job|valve grinding|springs and valve|block package|magnaflux|mag block|hot ?tank|bore cylinders?|bor(e|ing) (bar|stand)|hone|chamfer|grind block|deck(ing)? block|balanc(e|ing) (rotating|assembly)|press (pistons|pins)|cam bearings?)' THEN 'machining'
+    WHEN t ~ '\y(decal|decl|dcl|deca|letters)\y' THEN 'trim'
+    WHEN t ~ '\y(harness|hrns|hrness|wiring|grnd strps?|ground straps?)\y' THEN 'electrical'
+    WHEN t ~ '\y(air cl(ea)?n(e)?r|shkr air)' THEN 'engine'
+    WHEN t ~ '\y(rear ?end|ring (and |& ?)?pinion|posi(traction)?|differential|axle|axel|carrier bearing|pinion (seal|bearing))\y' THEN 'axle'
+    WHEN t ~ '\y((tail|bdy|body|deck|cowl|shlf|shelf|quarter|qtr|floor|rocker|trunk|roof|fllr|filler) ?(/cowl )?(pnl|panel)|tail panel|rad(iator)? (core )?support|shaker hood|hood (assembly|hinge|panel)|fender|bump brace|bumper brace|door skin|patch panel|core support)' THEN 'body'
+    WHEN t ~ '\y(glass|gls|wndshld|windshield (mou?lding|seal|gasket|trim)|back ?lite|window (regulator|channel|felt))' THEN 'glass'
+    WHEN t ~ '\y(console|glove ?box|glv box|carpet|cpt|seat|uph|upholstery|headliner|sail panels?|door (panel|pnl|sill|lock)|dr pnl|lwr door pnl|sde pnl|shi?ft boot|shift (tunnel|knob)|grshft|knobs?|window crank|wndow crnk|sun ?visors?|snvsr|insulation|firewall pad|frwall|horn (cap|button)|hrn btn|radio|grab ha?ndle|grb hndl|innr hndl|inner (door )?handle|rear ?view|rr view|interi(or)?|trunk divider|package tray|seat shelf|strng col|steering column cover|htr ctrl|heater control|dash filler|instrument pnl emb|instrument panel emblem|mirror bezel|arm ?rest|kick panel|seat ?belt)' THEN 'interior'
+    WHEN t ~ '\y(harness|hrns|hrness|wiring|bulbs?|sealed beam|headl(amp|ight)|battery|batt|starter|alternator|gauge|tach(ometer)?|speedo(meter)?|sending uni|printed circuit|mrkr lmp|marker lamp|dome|grnd strps?|ground straps?|neutral safety|turn signal|horn contact|cluster lens|light switch|lamp switch|fuse|relay|voltage regulator|ignition (switch|coil)|distributor|hei)\y' THEN 'electrical'
+    WHEN t ~ '\y(radiator (hose|cap|drain|overflow)|radiator hose|rad overflw|radiator$|radiator \(|water pump|wp stud|thermostat|fan (clutch|shroud|blade)|water neck|antifre|anti-?freeze|coolant|petcock|stoplk|stop ?leak|heater (core|hose)|htr core)' THEN 'cooling'
+    WHEN t ~ '\y(fuel|mech pump|carb(uretor)?|gas tank|tank (strap|sending)|choke|throttle (cable|linkage))' THEN 'fuel'
+    WHEN t ~ '\y(brake|brakefld|semi-met pad|brake pads?|calipers?|non-brkt cal|rotor|bstr/mc|master cyl|whe?e?l (bearing|seal|cyl)|bearing set|drum|proportioning)' THEN 'brakes'
+    WHEN t ~ '\y(power steering|p/s ?fluid|p/sfluid|pwr stg|steering (pump|box|gear|coupler)|tie rods?|idler arm|pitman|drag link|center link)' THEN 'steering'
+    WHEN t ~ '\y(shocks?|caster shim|ball joints?|control[- ]arm|coil springs?|leaf springs?|suspension|alignment|sway bar|stabilizer|bushing kit|front end .*rebuild)' THEN 'suspension'
+    WHEN t ~ '\y(exhaust|muffler|tail ?pipe|header|h-pipe|x-pipe)' THEN 'exhaust'
+    WHEN t ~ '\y(clutch|flywhl|flywheel|rev(erse)? lock ?out|pivot ball|trans(mission)? mount|pedal pad|bellcrank|z-bar|shifter|shift (rod|linkage)|pressure plate|throw ?out|pilot bearing|speedometer gear|driveshaft|u-joint)' THEN 'transmission'
+    WHEN t ~ '\y(decal|decl|dcl|deca|emblem|letters|spoiler|splr|bumper|weatherstrip|wstrps?|door handle|dr handle|dr hng|door hinge|mirror|wiper|fstnrs|fasteners|jacking|tail la?mp|tail light|tl lmp|grille|mou?ldings?|mldgs?|nameplate|badge|stripe)' THEN 'trim'
+    WHEN t ~ '\y(engine|spark plugs?|plug wire|oil|pcv|air cl(ea)?n(e)?r|air filter|motor mount|mount bolt|dipstick|v-belt|belt|vac(uum)?|pistons?|rings|cam(shaft)?|lifters?|pushrods?|gasket|valve cover|timing|intake|crank|rod bearings?|main bearings?|freeze plugs?)' THEN 'engine'
+    WHEN t ~ '\y(washers?|hex bolts?|bolts?|nuts?|screws?|clamps?|clips?|rivets?|studs?)\y' THEN 'hardware'
   END
-$$;
+  FROM (SELECT lower(coalesce(p_text, '')) AS t) s
+$function$;
+CREATE OR REPLACE FUNCTION public.receipt_line_labor_operation(p_text text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'pg_catalog'
+AS $function$
+  SELECT CASE
+    WHEN t ~ '\y(harness|hrns|hrness)\y' THEN 'ELEC-WIRING-HARNESS'
+    WHEN t ~ '\y(gauge|tach(ometer)?/clock|printed circuit|cluster lens)' THEN 'ELEC-GAUGES'
+    WHEN t ~ '\y(sealed beam|headl(amp|ight))' THEN 'ELEC-HEADLIGHTS'
+    WHEN t ~ '\y(tail la?mp (housing|lens)|tail light lens)' THEN 'ELEC-TAILLIGHTS'
+    WHEN t ~ '\y(carpet|cpt/und)' THEN 'INT-CARPET-RR'
+    WHEN t ~ '\yheadliner' THEN 'INT-HEADLINER-RR'
+    WHEN t ~ '\y(door pa?ne?l kit|lwr door pnl|door panel \(pr\))' THEN 'INT-DOOR-PANELS'
+    WHEN t ~ '\y(seat foam|f/s uph|seat uph|upholstery set)' THEN 'INT-SEATS-RR'
+    WHEN t ~ '\y(dr glass|door glass)' THEN 'GLASS-DOOR'
+    WHEN t ~ '\yradiator( assembly)?$' THEN 'MECH-RADIATOR-RR'
+    WHEN t ~ '\y(brake rotor|non-brkt cal|calipers?|semi-met pad|brake pads?)' THEN 'MECH-BRAKES-FRONT'
+    WHEN t ~ '\y(front end suspension rebuild|ball joints?|control[- ]arm shaft)' THEN 'MECH-SUSPENSION-FRONT'
+    WHEN t ~ '\y(clutch (kit|disc)|pressure plate|flywhl|flywheel)' THEN 'MECH-TRANS-RR'
+    WHEN t ~ '\yrear bumper\y' THEN 'TRIM-BUMPERS-REAR'
+    WHEN t ~ '\yfro?nt bumper\y' THEN 'TRIM-BUMPERS-FRONT'
+    WHEN t ~ '\ygrille' THEN 'TRIM-GRILLE'
+    WHEN t ~ '\y(outer|outside|door) mirror' THEN 'TRIM-MIRRORS'
+    WHEN t ~ '\y(shaker hood|hood assembly)' THEN 'BODY-REPLACE-HOOD'
+    WHEN t ~ '\yfender( assembly)?$' THEN 'BODY-REPLACE-FENDER'
+    WHEN t ~ '\y(tail panel|rr bdy pnl|deck fllr pnl|deck filler panel|dash/cowl pnl|cowl panel|shlf pnl|quarter panel|floor pan|trunk (floor|pan))' THEN 'BODY-RUST-PANEL'
+  END
+  FROM (SELECT lower(coalesce(p_text, '')) AS t) s
+$function$;
 
-CREATE FUNCTION public.receipt_line_system(p_text text) RETURNS text
-LANGUAGE sql IMMUTABLE AS $$
-  SELECT CASE
-    WHEN lower(coalesce(p_text,'')) ~ 'machine|crank|valve job' THEN 'machining'
-    WHEN lower(coalesce(p_text,'')) ~ 'clutch|flywheel' THEN 'transmission'
-    WHEN lower(coalesce(p_text,'')) ~ 'ball joint|shock|bushing' THEN 'suspension'
-    WHEN lower(coalesce(p_text,'')) ~ 'steering' THEN 'steering'
-    WHEN lower(coalesce(p_text,'')) ~ 'brake' THEN 'brakes'
-    WHEN lower(coalesce(p_text,'')) ~ 'harness' THEN 'electrical'
-    WHEN lower(coalesce(p_text,'')) ~ 'tail panel|radiator support' THEN 'body'
-    WHEN lower(coalesce(p_text,'')) ~ 'seat|carpet|headliner' THEN 'interior'
-    ELSE 'unplaced'
-  END
-$$;
 
 CREATE TABLE public._fixture_receipt_lines (
-  vehicle_id uuid, item_id uuid, line_kind text, description text, printed_hours numeric
+  vehicle_id uuid, item_id uuid, line_kind text, description text, printed_hours numeric,
+  part_number text
 );
 CREATE FUNCTION public.receipt_work_lines(p_vehicle_id uuid, p_window_days int DEFAULT 90, p_max_images int DEFAULT 8)
 RETURNS TABLE (
@@ -112,7 +157,7 @@ RETURNS TABLE (
   description text, part_number text, total_price numeric, printed_hours numeric, printed_performer text
 ) LANGUAGE sql STABLE AS $$
   SELECT f.item_id, NULL::uuid, f.line_kind, CURRENT_DATE, NULL::text,
-         f.description, NULL::text, NULL::numeric, f.printed_hours, NULL::text
+         f.description, f.part_number, NULL::numeric, f.printed_hours, NULL::text
     FROM public._fixture_receipt_lines f WHERE f.vehicle_id = p_vehicle_id
 $$;
 
@@ -199,15 +244,20 @@ INSERT INTO _fixture_statements(vehicle_id, payload) VALUES ('10000000-0000-0000
   )));
 
 INSERT INTO _fixture_receipt_lines(vehicle_id, item_id, line_kind, description, printed_hours) VALUES
-  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'labor', 'machine work valve job', 20),
+  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'labor', 'valve job', 20),
   ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'labor', 'polish crank', 10),
   ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000003', 'part', 'clutch kit', NULL),
   ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000004', 'part', 'ball joint', NULL),
-  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000005', 'labor', 'front end rebuild', NULL),
+  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000005', 'labor', 'front end suspension rebuild', NULL),
+  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000012', 'part', 'front brake pads', NULL),
   ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000006', 'part', 'wiring harness', NULL),
+  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000013', 'part', 'dash harness', NULL),
   ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000007', 'part', 'tail panel', NULL),
+  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000014', 'part', 'deck filler panel', NULL),
+  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000015', 'part', 'tail panel', NULL),
   ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000008', 'part', 'rad support', NULL),
-  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000009', 'part', 'seat foam', NULL);
+  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000009', 'part', 'seat foam', NULL),
+  ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000016', 'part', 'carpet set', NULL);
 
 INSERT INTO vehicle_images(id, vehicle_id, ai_scan_metadata, is_sensitive, vision_gate_status) VALUES
   -- Eligible interior scenes (satisfy image_scene min=2).
@@ -247,32 +297,17 @@ VALUES ('10000000-0000-0000-0000-000000000002', 1973, 'Pontiac', 'Firebird', fal
 INSERT INTO _fixture_recon(vehicle_id, payload) VALUES
   ('10000000-0000-0000-0000-000000000002', '{"systems":[]}'::jsonb);
 
--- Car missing gearbox statement.
+-- Thin-paper car: one brake pad, one harness, a fan clutch, one seat line and
+-- no paper. None of these may open a segment.
 INSERT INTO vehicles(id, year, make, model, is_public)
-VALUES ('10000000-0000-0000-0000-000000000003', 1973, 'Pontiac', 'Firebird', true);
+VALUES ('10000000-0000-0000-0000-000000000003', 1966, 'Ford', 'Mustang', true);
 INSERT INTO _fixture_recon(vehicle_id, payload) VALUES
   ('10000000-0000-0000-0000-000000000003', '{"systems":[]}'::jsonb);
-INSERT INTO _fixture_facets(vehicle_id, payload) VALUES
-  ('10000000-0000-0000-0000-000000000003', '{"engine":[]}'::jsonb);
-INSERT INTO _fixture_statements(vehicle_id, payload) VALUES
-  ('10000000-0000-0000-0000-000000000003', '{"tied":true,"statements":[]}'::jsonb);
 INSERT INTO _fixture_receipt_lines(vehicle_id, item_id, line_kind, description) VALUES
-  ('10000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000099', 'part', 'clutch kit');
-
--- Untied viewer shape: statement rows present, statement_id null (anon public read).
-INSERT INTO vehicles(id, year, make, model, is_public)
-VALUES ('10000000-0000-0000-0000-000000000004', 1973, 'Pontiac', 'Firebird', true);
-INSERT INTO _fixture_recon(vehicle_id, payload) VALUES
-  ('10000000-0000-0000-0000-000000000004', '{"systems":[]}'::jsonb);
-INSERT INTO _fixture_facets(vehicle_id, payload) VALUES
-  ('10000000-0000-0000-0000-000000000004', '{"engine":[]}'::jsonb);
-INSERT INTO _fixture_statements(vehicle_id, payload) VALUES
-  ('10000000-0000-0000-0000-000000000004',
-   jsonb_build_object('tied', false, 'statements', jsonb_build_array(
-     jsonb_build_object('statement_id', NULL, 'statement_kind', 'assertion', 'speaker_role', 'shop')
-   )));
-INSERT INTO _fixture_receipt_lines(vehicle_id, item_id, line_kind, description) VALUES
-  ('10000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000098', 'part', 'clutch kit');
+  ('10000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000091', 'part', 'brake pads'),
+  ('10000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000092', 'part', 'tail light harness'),
+  ('10000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000093', 'part', 'fan clutch'),
+  ('10000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000094', 'part', 'seat foam');
 
 SET ROLE anon;
 SET test.auth_role = 'anon';
@@ -291,22 +326,32 @@ BEGIN
 
   SELECT value INTO eng FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'engine';
   PERFORM public.assert(eng->>'status' = 'ok', format('engine ok; got %s', eng));
-  PERFORM public.assert((eng->>'hours_min')::numeric = 20, 'engine book min');
-  PERFORM public.assert((eng->>'hours_max')::numeric = 50, 'engine book max');
+  PERFORM public.assert((eng#>>'{book_hours,hours_min}')::numeric = 20, 'engine book min kept beside');
+  PERFORM public.assert((eng#>>'{book_hours,hours_max}')::numeric = 50, 'engine book max kept beside');
   PERFORM public.assert((eng->>'paper_hours')::numeric = 53.75, 'engine paper hours');
   PERFORM public.assert((eng->>'range_below_paper')::boolean IS TRUE, 'paper above max flagged');
-  PERFORM public.assert((eng->>'evidence_count')::int > 0, 'engine has evidence ids');
+  PERFORM public.assert((eng->>'hours_min')::numeric = 53.75 AND (eng->>'hours_max')::numeric = 53.75,
+    format('paper wins, never clipped; got %s', eng));
+  PERFORM public.assert(eng->>'hours_basis' = 'shop_paper', 'engine basis is shop paper');
+  PERFORM public.assert((eng->>'evidence_count')::int = 2, 'engine cites the two machining lines');
 
   SELECT value INTO gear FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'gearbox';
-  PERFORM public.assert(gear->>'status' = 'ok', 'gearbox ok');
-  PERFORM public.assert(gear->>'evidence_grade' = 'statement', 'gearbox statement grade');
+  PERFORM public.assert(gear->>'status' = 'ok', format('gearbox ok; got %s', gear));
   PERFORM public.assert((gear->>'hours_typical')::numeric = 12, 'gearbox typical');
-  PERFORM public.assert(
-    EXISTS (
-      SELECT 1 FROM jsonb_array_elements_text(gear->'evidence_ids') x
-       WHERE x = 'b0000000-0000-0000-0000-000000000001'
-    ),
-    'gearbox cites statement_id from vehicle_statements');
+  PERFORM public.assert(gear->'evidence_ids' = '["c0000000-0000-0000-0000-000000000003"]'::jsonb, 'gearbox cites the clutch line only');
+
+  SELECT value INTO miss FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'chassis';
+  PERFORM public.assert(miss->>'status' = 'ok', format('chassis ok; got %s', miss));
+  PERFORM public.assert((miss->>'evidence_count')::int = 3, 'chassis cites three lines over two systems');
+
+  SELECT value INTO miss FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'electrical';
+  PERFORM public.assert(miss->>'status' = 'ok', format('electrical ok; got %s', miss));
+
+  SELECT value INTO miss FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'body_metal';
+  PERFORM public.assert(miss->>'status' = 'ok', format('body ok; got %s', miss));
+  PERFORM public.assert((miss#>>'{stage_steps,0,panel_count}')::int = 2,
+    format('two distinct panel lines (repeat tail panel counted once, rad support has no panel op); got %s', miss));
+  PERFORM public.assert((miss->>'hours_typical')::numeric = 12, 'panel book 6 x 2');
 
   SELECT value INTO paint FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'paint';
   PERFORM public.assert(paint->>'status' = 'ok', 'paint ok');
@@ -359,24 +404,18 @@ BEGIN
   -- No dollar figures.
   PERFORM public.assert(j::text !~ 'materials|\$|dollars?', 'no dollar figures in reader');
 
-  -- Missing statement → gearbox no evidence.
-  j := public.vehicle_labor_appraisal('10000000-0000-0000-0000-000000000003');
-  SELECT value INTO miss FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'gearbox';
-  PERFORM public.assert(miss->>'status' = 'no evidence', 'gearbox without statement is no evidence');
-  PERFORM public.assert(miss->>'hours_min' IS NULL, 'no hours without evidence');
+  -- No receipt line text leaves the reader.
+  PERFORM public.assert(j::text !~* 'valve job|crank|clutch|ball joint|harness|tail panel|deck filler|rad support|seat foam|carpet|brake pads',
+    'no line descriptions in output');
 
-  -- Untied statement presence (null statement_id) still grades gearbox via part-line evidence ids.
-  j := public.vehicle_labor_appraisal('10000000-0000-0000-0000-000000000004');
-  SELECT value INTO gear FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'gearbox';
-  PERFORM public.assert(gear->>'status' = 'ok', 'untied statement presence still ok');
-  PERFORM public.assert(gear->>'evidence_grade' = 'statement', 'untied grade remains statement');
-  PERFORM public.assert((gear->>'hours_typical')::numeric = 12, 'untied gearbox hours');
+  -- Thin paper opens nothing.
+  j := public.vehicle_labor_appraisal('10000000-0000-0000-0000-000000000003');
   PERFORM public.assert(
-    NOT EXISTS (
-      SELECT 1 FROM jsonb_array_elements_text(gear->'evidence_ids') x
-       WHERE x = 'null' OR x = ''
-    ),
-    'untied path does not invent a statement evidence id');
+    (SELECT count(*) FROM jsonb_array_elements(j->'segments') s
+      WHERE s->>'segment' IN ('engine','gearbox','chassis','electrical','body_metal','interior')
+        AND s->>'status' = 'no evidence' AND s->>'hours_min' IS NULL) = 6,
+    format('thin-paper car opens no line segment; got %s', j->'segments'));
+  PERFORM public.assert((j#>>'{totals,hours_typical}')::numeric = 0, 'thin-paper car totals zero');
 
   -- Private car hidden from anon.
   PERFORM public.assert(
@@ -385,4 +424,24 @@ BEGIN
 END $$;
 
 RESET ROLE;
+
+-- A rule whose transition has no map row returns null hours and says why.
+INSERT INTO labor_stage_rules(segment_key, category, from_stage, to_stage, evidence_requirements, citation, sort_order)
+VALUES ('test_unmapped', 'powertrain', 'none', 'unmapped_stage',
+        '{"all":[{"type":"part_line_operation","operations":["MECH-TRANS-RR"],"min":1}]}'::jsonb, 'test', 999);
+DO $$
+DECLARE seg jsonb;
+BEGIN
+  SELECT value INTO seg
+    FROM jsonb_array_elements(public.vehicle_labor_appraisal('10000000-0000-0000-0000-000000000001')->'segments') s
+   WHERE s->>'segment' = 'test_unmapped';
+  PERFORM public.assert(seg->>'status' = 'no book hours', format('unmapped rule says no book hours; got %s', seg));
+  PERFORM public.assert(seg->>'hours_typical' IS NULL, 'unmapped rule has no hours');
+END $$;
+DELETE FROM labor_stage_rules WHERE segment_key = 'test_unmapped';
+
+-- The rules table has row level security on.
+DO $$ BEGIN
+  PERFORM public.assert((SELECT relrowsecurity FROM pg_class WHERE oid = 'public.labor_stage_rules'::regclass), 'rls on');
+END $$;
 \echo vehicle_labor_appraisal: ok
