@@ -107,7 +107,7 @@ final class WorkLiveActivityTests: XCTestCase {
     }
 
     func testOneVehicleDetail() throws {
-        let rows = [row("a", stage: "attached", createdMinAgo: 5, attached: true, vehicle: "v1"),
+        let rows = [row("a", stage: "attached", createdMinAgo: 3, attached: true, vehicle: "v1"),
                     row("b", stage: "classifying", createdMinAgo: 4)]
         let state = try XCTUnwrap(WorkLiveProgress.state(rows: rows, names: ["v1": "1973 Firebird"],
                                                          uploads: .idle, since: nil, now: now))
