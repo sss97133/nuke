@@ -174,5 +174,15 @@ SELECT public.assert(
   (public.group_vehicle_images_for_reading('00000000-0000-0000-0000-0000000000a1', true)
     ->>'group_count')::int >= 1,
   'grouping returns at least one group');
+SELECT public.assert(
+  (public.read_vehicle_image_group('00000000-0000-0000-0000-0000000000a1')
+    ->>'group_count')::int >= 1,
+  'group-level read returns combined labels');
+SELECT public.assert(
+  (public.gap_vs_build_replica_components('00000000-0000-0000-0000-0000000000a1', true)
+    ->>'gap_count')::int >= 1
+  OR (public.gap_vs_build_replica_components('00000000-0000-0000-0000-0000000000a1', true)
+    ->>'build_count')::int >= 1,
+  'gap_vs_build classifies target components');
 
 SELECT public.assert(true, 'fold_byok_component_observations contract complete');

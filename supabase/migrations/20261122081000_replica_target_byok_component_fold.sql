@@ -1096,3 +1096,246 @@ COMMENT ON FUNCTION public.vehicle_replica_accuracy(uuid) IS
 
 REVOKE ALL ON FUNCTION public.vehicle_replica_accuracy(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vehicle_replica_accuracy(uuid) TO anon, authenticated, service_role;
+
+-- =============================================================================
+-- 10. Read a group together (combine byok labels across member images)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.read_vehicle_image_group(
+  p_vehicle_id uuid,
+  p_group_key text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+SET timezone TO 'UTC'
+AS $fn$
+DECLARE
+  version text := 'read_vehicle_image_group/20261122081000';
+  groups jsonb := '[]'::jsonb;
+  g record;
+  combined jsonb;
+  labels jsonb;
+  parsed jsonb;
+BEGIN
+  FOR g IN
+    SELECT
+      coalesce(byok->>'scene_type', 'unknown') AS scene_type,
+      coalesce(byok->>'build_phase_guess', 'unknown') AS build_phase,
+      to_char(
+        date_trunc('hour', coalesce(vi.taken_at, vi.created_at)) AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+      ) AS hour_key,
+      array_agg(vi.id ORDER BY coalesce(vi.taken_at, vi.created_at), vi.id) AS member_ids,
+      jsonb_agg(DISTINCT coalesce(byok->>'scene_type', 'unknown')) AS scenes
+    FROM vehicle_images vi
+    CROSS JOIN LATERAL (SELECT vi.ai_scan_metadata->'byok_deep_analysis' AS byok) b
+    WHERE vi.vehicle_id = p_vehicle_id
+      AND coalesce(vi.is_superseded, false) IS NOT TRUE
+      AND coalesce(vi.is_duplicate, false) IS NOT TRUE
+      AND vi.ai_scan_metadata ? 'byok_deep_analysis'
+      AND (
+        p_group_key IS NULL
+        OR format('%s|%s|%s',
+             coalesce(byok->>'scene_type', 'unknown'),
+             coalesce(byok->>'build_phase_guess', 'unknown'),
+             to_char(date_trunc('hour', coalesce(vi.taken_at, vi.created_at)) AT TIME ZONE 'UTC',
+                     'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+           ) = p_group_key
+      )
+    GROUP BY 1, 2, 3
+  LOOP
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+             'image_id', x.image_id,
+             'label', x.lab,
+             'confidence', x.conf,
+             'normalized', public.normalize_byok_component_label(x.lab)
+           ) ORDER BY x.image_id, x.lab), '[]'::jsonb)
+      INTO labels
+      FROM (
+        SELECT vi.id AS image_id,
+               lower(coalesce(c->>'label', c->>'name', '')) AS lab,
+               (c->>'confidence')::numeric AS conf
+          FROM vehicle_images vi
+          CROSS JOIN LATERAL jsonb_array_elements(
+            coalesce(vi.ai_scan_metadata->'byok_deep_analysis'->'components_seen', '[]'::jsonb)
+          ) c
+         WHERE vi.id = ANY (g.member_ids)
+      ) x
+     WHERE x.lab <> '';
+
+    SELECT coalesce(jsonb_agg(DISTINCT jsonb_build_object(
+             'property_key', n->>'property_key',
+             'value', n->>'value',
+             'component_key', n->>'component_key'
+           )), '[]'::jsonb)
+      INTO parsed
+      FROM jsonb_array_elements(labels) e
+      CROSS JOIN LATERAL (SELECT e.value->'normalized' AS n) n
+     WHERE n.n IS NOT NULL;
+
+    combined := jsonb_build_object(
+      'group_key', format('%s|%s|%s', g.scene_type, g.build_phase, g.hour_key),
+      'scene_type', g.scene_type,
+      'build_phase', g.build_phase,
+      'member_image_ids', to_jsonb(g.member_ids),
+      'member_count', coalesce(array_length(g.member_ids, 1), 0),
+      'labels', labels,
+      'parsed_claims', parsed,
+      'read_mode', 'group_together'
+    );
+    groups := groups || combined;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'vehicle_id', p_vehicle_id,
+    'group_count', jsonb_array_length(groups),
+    'groups', groups,
+    'logic_version', version,
+    'as_of', now()
+  );
+END
+$fn$;
+
+COMMENT ON FUNCTION public.read_vehicle_image_group(uuid, text) IS
+  'Combine stored byok components_seen across an image group so evidence from multiple '
+  'shots of the same scene/phase/hour is read together. Does not invent new photo readings.';
+
+REVOKE ALL ON FUNCTION public.read_vehicle_image_group(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.read_vehicle_image_group(uuid, text) TO service_role;
+
+-- =============================================================================
+-- 11. Gap vs build: untouched components → query; decided → reinforce/supersede
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.gap_vs_build_replica_components(
+  p_vehicle_id uuid,
+  p_dry_run boolean DEFAULT true
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  version text := 'gap_vs_build_replica_components/20261122081000';
+  v record;
+  v_target_key text;
+  gaps jsonb := '[]'::jsonb;
+  builds jsonb := '[]'::jsonb;
+  spec record;
+  has_keyed boolean;
+  cur_cat text;
+  cur_id uuid;
+  action text;
+BEGIN
+  SELECT * INTO v FROM vehicles WHERE id = p_vehicle_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('error', 'vehicle_not_found');
+  END IF;
+  IF coalesce(v.is_replica, false) IS NOT TRUE THEN
+    RETURN jsonb_build_object('applicable', false, 'reason', 'not is_replica');
+  END IF;
+
+  v_target_key := CASE
+    WHEN v.replica_quote ILIKE '%SD-455%' OR v.replica_quote ILIKE '%SD455%'
+      THEN '1973_trans_am_sd455'
+    ELSE NULL
+  END;
+  IF v_target_key IS NULL THEN
+    RETURN jsonb_build_object('applicable', false, 'reason', 'no matching replica_target_specs key');
+  END IF;
+
+  FOR spec IN
+    SELECT * FROM replica_target_specs WHERE replica_target_specs.target_key = v_target_key
+  LOOP
+    SELECT d.id, d.category INTO cur_id, cur_cat
+      FROM vehicle_replica_component_decisions d
+     WHERE d.vehicle_id = p_vehicle_id
+       AND d.target_key = v_target_key
+       AND d.component_key = spec.component_key
+       AND coalesce(d.is_superseded, false) IS NOT TRUE
+     LIMIT 1;
+
+    SELECT EXISTS (
+      SELECT 1
+        FROM vehicle_observations vo
+        JOIN observation_properties op ON op.id = vo.property_id
+       WHERE vo.vehicle_id = p_vehicle_id
+         AND coalesce(vo.is_superseded, false) IS NOT TRUE
+         AND (
+           (spec.component_key = 'engine_block'
+              AND op.property_key IN ('engine_block_casting', 'engine_code_stamp'))
+           OR (spec.component_key = 'transmission'
+              AND op.property_key IN ('transmission_case_casting', 'transmission_id_stamp'))
+           OR (spec.component_key = 'hood_scoop'
+              AND op.property_key = 'image_visible_hood_scoop_style')
+           OR (spec.component_key = 'hood_bird_decal'
+              AND op.property_key = 'image_visible_hood_bird_decal')
+           OR (spec.component_key = 'rear_spoiler'
+              AND op.property_key = 'image_visible_rear_spoiler')
+           OR (spec.component_key = 'wheels'
+              AND op.property_key = 'image_visible_wheel_style')
+           OR (spec.component_key = 'brakes'
+              AND op.property_key = 'image_visible_brake_booster')
+           OR (spec.component_key = 'intake_carb'
+              AND op.property_key IN ('image_visible_intake_manifold', 'image_visible_carburetor'))
+           OR (spec.component_key = 'interior' AND false)
+           OR (spec.component_key IN ('engine_heads', 'rear_axle') AND false)
+         )
+    ) INTO has_keyed;
+
+    IF cur_id IS NULL AND has_keyed IS NOT TRUE THEN
+      gaps := gaps || jsonb_build_object(
+        'component_key', spec.component_key,
+        'mode', 'gap',
+        'action', 'query',
+        'prompt', format(
+          'Target %s needs evidence for %s (factory %s). No current decision and no keyed observations.',
+          v_target_key, spec.component_key, coalesce(spec.factory_value, 'unspecified')
+        ),
+        'weight', spec.weight
+      );
+    ELSE
+      action := CASE
+        WHEN cur_id IS NULL AND has_keyed THEN 'decide_from_keyed'
+        WHEN cur_cat = 'unknown' AND has_keyed THEN 'raise_confidence_or_recategorize'
+        WHEN cur_id IS NOT NULL AND has_keyed THEN 'add_evidence'
+        WHEN cur_id IS NOT NULL AND has_keyed IS NOT TRUE THEN 'hold_decision_seek_evidence'
+        ELSE 'inspect'
+      END;
+      builds := builds || jsonb_build_object(
+        'component_key', spec.component_key,
+        'mode', 'build',
+        'action', action,
+        'current_category', cur_cat,
+        'has_keyed_observations', has_keyed,
+        'decision_id', cur_id,
+        'note', 'Never silently overwrite; decide_replica_components supersedes with a reason',
+        'weight', spec.weight
+      );
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'vehicle_id', p_vehicle_id,
+    'dry_run', p_dry_run,
+    'target_key', v_target_key,
+    'gap_count', jsonb_array_length(gaps),
+    'build_count', jsonb_array_length(builds),
+    'gaps', gaps,
+    'builds', builds,
+    'logic_version', version,
+    'as_of', now()
+  );
+END
+$fn$;
+
+COMMENT ON FUNCTION public.gap_vs_build_replica_components(uuid, boolean) IS
+  'Per target-spec component: untouched → gap/query prompt; already decided or keyed → build '
+  '(add evidence / raise confidence / supersede with reason). dry_run default true; writes nothing.';
+
+REVOKE ALL ON FUNCTION public.gap_vs_build_replica_components(uuid, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.gap_vs_build_replica_components(uuid, boolean) TO service_role;
