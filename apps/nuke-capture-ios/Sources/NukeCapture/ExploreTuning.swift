@@ -103,7 +103,8 @@ struct ExploreTuningSheet: View {
     @State private var placeError: String?
     @Environment(\.dismiss) private var dismiss
     /// Absent key = on, the same rule ExploreSignalLog.uploadEnabled reads.
-    @AppStorage(ExploreSignalLog.uploadFlagKey) private var shareSignals = true
+    // Held with the rest of the sheet: written on Apply, dropped on Cancel.
+    @State private var shareSignals = ExploreSignalLog.uploadEnabled(.standard)
 
     init(current: ExploreTuning, onApply: @escaping (ExploreTuning) -> Void) {
         _draft = State(initialValue: current)
@@ -198,7 +199,10 @@ struct ExploreTuningSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Apply") { onApply(draft); dismiss() }
+                    Button("Apply") {
+                        UserDefaults.standard.set(shareSignals, forKey: ExploreSignalLog.uploadFlagKey)
+                        onApply(draft); dismiss()
+                    }
                 }
             }
         }
