@@ -17,6 +17,8 @@ import Supabase
 struct ExploreSignalEvent: Codable, Equatable {
     enum Kind: String, Codable, Equatable {
         case impression, dwell, page, photo, press, choice, follow, share
+        /// A Browse tuning change; `tuned` names the filters that changed, never their values.
+        case tune
         case openListing = "open_listing"
         case openProfile = "open_profile"
         case commentOpen = "comment_open"
@@ -40,9 +42,11 @@ struct ExploreSignalEvent: Codable, Equatable {
     var choice: Choice? = nil
     /// The card's index in the feed when the event was made.
     var position: Int? = nil
+    /// For kind "tune": comma-separated filter names (place, radius, era, make, price).
+    var tuned: String? = nil
 
     private enum CodingKeys: String, CodingKey {
-        case id, at, source, kind, choice, position
+        case id, at, source, kind, choice, position, tuned
         case sessionId = "session_id"
         case itemId = "item_id"
         case vehicleId = "vehicle_id"
@@ -58,6 +62,13 @@ struct ExploreSignalEvent: Codable, Equatable {
                            sessionId: ExploreSignalLog.sessionID, itemId: item.id,
                            vehicleId: item.vehicleId?.uuidString.lowercased(), source: item.source,
                            kind: kind, position: position)
+    }
+
+    /// A tuning change: no card, so the item id is the sheet's name.
+    static func makeTune(_ fields: [String], now: Date = Date()) -> ExploreSignalEvent {
+        ExploreSignalEvent(id: UUID().uuidString.lowercased(), at: now.formatted(.iso8601),
+                           sessionId: ExploreSignalLog.sessionID, itemId: "browse-tuning", vehicleId: nil,
+                           source: "explore", kind: .tune, tuned: fields.joined(separator: ","))
     }
 }
 

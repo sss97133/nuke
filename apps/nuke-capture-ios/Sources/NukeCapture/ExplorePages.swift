@@ -26,15 +26,18 @@ enum ExplorePagePlan {
 
     /// The kinds of page for a card, in order. Photos always lead (the cover is on every card).
     /// - location: only with coordinates (classified rows carry them rounded to 0.01°; a live lot has none).
-    /// - analytics: a classified always has one (it places the ask or says it cannot); a live lot only when
-    ///   the record has something the photo page does not say (its listed date).
+    /// - analytics: the listing's clock, when the record has one (a classified's age; a live lot's listed date).
+    ///   The ask's place among sales is on the price rail and its stack, not repeated here.
     /// - listing: only with a link.
     static func kinds(for item: ExploreFeedItem, now: Date = Date()) -> [ExplorePageKind] {
         var out: [ExplorePageKind] = [.photos]
         if hasCoordinates(item) { out.append(.location) }
+        // The cohort evidence is served on the price rail and its "why" stack; this page keeps only the
+        // listing's own clock: a classified's age, a lot's listed date.
+        let reading = ExploreAnalytics.reading(for: item, now: now)
         switch item.kind {
-        case .classified: out.append(.analytics)
-        case .live: if ExploreAnalytics.reading(for: item, now: now).listed != nil { out.append(.analytics) }
+        case .classified: if reading.age != nil { out.append(.analytics) }
+        case .live: if reading.listed != nil { out.append(.analytics) }
         }
         if item.link != nil { out.append(.listing) }
         return out

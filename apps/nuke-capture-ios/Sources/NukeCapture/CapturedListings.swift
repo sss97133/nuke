@@ -193,6 +193,9 @@ struct AskPosition: Decodable, Equatable {
         let venues: [String: Venue]?
         let offered: Int?
         let conflicts: Int?
+        /// The cohort's first and last sale day (yyyy-MM-dd) when the read carries them.
+        var first_on: String? = nil
+        var last_on: String? = nil
 
         var yearSpan: String? {
             guard let yf = year_from, let yt = year_to else { return nil }
@@ -538,13 +541,16 @@ struct AskBoard: Decodable, Equatable {
         let p_offset: Int
     }
 
-    static func fetch(hours: Int = 72, tier: AskTier? = nil, band: Bool = false, sort: AskSort = .newest, limit: Int = 60, offset: Int = 0) async throws -> AskBoard {
+    /// `lat`, `lng` and `radiusMiles` narrow the read to a place (the RPC's p_lat / p_lng / p_radius_mi); all
+    /// three nil is the whole market, as before.
+    static func fetch(hours: Int = 72, tier: AskTier? = nil, band: Bool = false, sort: AskSort = .newest, limit: Int = 60, offset: Int = 0,
+                      lat: Double? = nil, lng: Double? = nil, radiusMiles: Int? = nil) async throws -> AskBoard {
         try await SupabaseService.client
             .rpc("classified_ask_board", params: Params(
                 p_hours: hours,
-                p_lat: nil,
-                p_lng: nil,
-                p_radius_mi: nil,
+                p_lat: lat,
+                p_lng: lng,
+                p_radius_mi: radiusMiles,
                 p_min_taste: band ? 60 : nil,
                 p_tier: tier?.rawValue,
                 p_sort: sort.rawValue,

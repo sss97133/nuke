@@ -3,8 +3,8 @@
 //   photos   → every photo of the vehicle (cover first, read on the first swipe, at most 60), the price and
 //              the doors (clock, bid) stay on each photo; "n / N" shows once N is known
 //   location → a still map centred on the listing's rounded coordinates (classified rows that have them)
-//   analytics→ the buyer's reading, served once (ExploreAnalytics: the ask's place among recorded sales,
-//              listing age, mileage against the cohort; a live lot shows only what the photo page does not)
+//   analytics→ the listing's own clock (a classified's age; a lot's listed date and length). The cohort and
+//              projection evidence is on the price rail and its long-press stack, not repeated here
 //   listing  → the source's mark and "Opening <Source>…"; settling here opens the original listing and
 //              the pager returns to the page before it
 //
@@ -61,9 +61,14 @@ struct ExplorePagerCard: View {
     /// The card's index in the feed, for the signal log.
     let position: Int
     var hasBidReading = false
+    /// This lot's projected-hammer reading from the feed's single board read, and whether that board is fresh.
+    var finish: FinishEstimate? = nil
+    var finishFresh = false
     let onDrill: (ExploreCardDrill) -> Void
     let onOpenProfile: (ExploreFeedItem) -> Void
     let onChoice: (ExploreSignalEvent.Choice, ExploreFeedItem) -> Void
+    /// Opens the "why this range" stack for this card.
+    let onWhy: (ExploreFeedItem) -> Void
 
     private enum PageID: Hashable {
         case photo(Int), waiting, location, analytics, listing
@@ -194,7 +199,9 @@ struct ExplorePagerCard: View {
                     .allowsHitTesting(false)
             }
             .overlay(alignment: .bottomLeading) {
-                ExploreCardOverlay(item: item, hasBidReading: hasBidReading, onDrill: onDrill)
+                ExploreCardOverlay(item: item, hasBidReading: hasBidReading, onDrill: onDrill,
+                                   rail: ExplorePriceRail.make(item: item, estimate: finish, fresh: finishFresh),
+                                   onWhy: whyAction)
                     .padding(NukeSpace.lg)
             }
             .contentShape(Rectangle())
@@ -241,23 +248,17 @@ struct ExplorePagerCard: View {
 
     // MARK: Analytics page
 
+    /// The listing's own clock only (a classified's age; a lot's listed date and length). The cohort evidence
+    /// is on the price rail and its stack, so it is not repeated here.
     private var analyticsPage: some View {
         let reading = ExploreAnalytics.reading(for: item, now: Date())
         var rows: [(symbol: String, text: String)] = []
         if let t = reading.age { rows.append(("clock", t)) }
-        if let t = reading.mileage { rows.append(("speedometer", t)) }
         if let t = reading.listed { rows.append(("calendar", t)) }
         if let t = reading.length { rows.append(("hourglass", "Auction length \(t)")) }
         return VStack(alignment: .leading, spacing: NukeSpace.md) {
-            if let place = reading.placement {
-                Text(place.headline).font(.nukeHeadline).lineLimit(3).minimumScaleFactor(0.85)
-                AskPriceStripView(place: place)
-                Text(place.spreadLine).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-            } else if let note = reading.placementNote {
-                Label(note, systemImage: "chart.bar").font(.nukeDetail).foregroundStyle(.secondary)
-            }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                Label(row.text, systemImage: row.symbol).font(.nukeDetail).lineLimit(2)
+                Label(row.text, systemImage: row.symbol).font(.nukeHeadline).lineLimit(2)
             }
             Spacer(minLength: 0)
         }
@@ -361,6 +362,9 @@ struct ExplorePagerCard: View {
 
     @ViewBuilder private var menu: some View {
         let hasTaste = ExplorePreferences.key(item) != nil
+        if item.amount != nil {
+            Button { showWhy() } label: { Label("Why this range", systemImage: "chart.bar.doc.horizontal") }
+        }
         Button { choose(.more) } label: { Label("Show more like this", systemImage: "hand.thumbsup") }
             .disabled(!hasTaste)
         Button { choose(.less) } label: { Label("Show less like this", systemImage: "hand.thumbsdown") }
@@ -379,6 +383,17 @@ struct ExplorePagerCard: View {
     }
 
     // MARK: Actions
+
+    /// A long press on the price opens the stack, when the card has a price.
+    private var whyAction: (() -> Void)? {
+        guard item.amount != nil else { return nil }
+        return { showWhy() }
+    }
+
+    private func showWhy() {
+        record(.press)
+        onWhy(item)
+    }
 
     private func openProfile() {
         record(.openProfile)

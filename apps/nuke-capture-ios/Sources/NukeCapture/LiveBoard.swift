@@ -261,6 +261,10 @@ struct FinishEstimate: Equatable {
     let estimatedAt: Date
     let bidAtEstimate: Double?
     let compsThrough: String?
+    /// The estimating model's name or number as the board reports it (nil when the column is absent).
+    var model: String? = nil
+    /// The factor breakdown as plain "name: value" lines, in the board's own terms.
+    var factors: [String] = []
 }
 
 struct FinishAnalog: Equatable, Identifiable {
@@ -323,11 +327,48 @@ struct FinishBoard: Equatable {
                     sentence: str(get("sentence")),
                     estimatedAt: estAt,
                     bidAtEstimate: num(get("bid_at_estimate")),
-                    compsThrough: str(get("comps_through"))
+                    compsThrough: str(get("comps_through")),
+                    model: modelText(get("model")),
+                    factors: factorLines(get("factors"))
                 )
             }
         }
         return FinishBoard(fresh: fresh, writerAt: writerAt, byId: byId)
+    }
+
+    static func modelText(_ raw: Any?) -> String? {
+        if let s = raw as? String {
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        if let i = raw as? Int { return String(i) }
+        return nil
+    }
+
+    /// The factor column as "name: value" lines. A dictionary of scalars is read in key order; an array holds
+    /// strings or objects with a name and a value. Anything else reads as no factors.
+    static func factorLines(_ raw: Any?) -> [String] {
+        func scalar(_ x: Any?) -> String? {
+            if let d = x as? Double, d.isFinite { return d.formatted(.number.precision(.fractionLength(0...3))) }
+            if let i = x as? Int { return String(i) }
+            if let s = x as? String, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return s }
+            return nil
+        }
+        func pretty(_ k: String) -> String { k.replacingOccurrences(of: "_", with: " ") }
+        if let d = raw as? [String: Any] {
+            return d.keys.sorted().compactMap { k in scalar(d[k]).map { "\(pretty(k)): \($0)" } }
+        }
+        if let a = raw as? [Any] {
+            return a.compactMap { e -> String? in
+                if let s = e as? String, !s.isEmpty { return s }
+                guard let o = e as? [String: Any] else { return nil }
+                let name = (o["name"] as? String) ?? (o["factor"] as? String) ?? (o["label"] as? String)
+                let value = scalar(o["value"] ?? o["effect"] ?? o["weight"])
+                guard let name else { return nil }
+                return value.map { "\(pretty(name)): \($0)" } ?? pretty(name)
+            }
+        }
+        return []
     }
 
     static func decodeAnalogs(_ data: Data, vehicleId: String) -> [FinishAnalog] {

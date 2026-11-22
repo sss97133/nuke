@@ -39,6 +39,13 @@ struct ExploreFeedItem: Identifiable, Equatable {
     var lng: Double? = nil
     /// The row's cohort placement (classified rows only); the buyer's page reads it through ExploreAnalytics.
     var position: AskPosition? = nil
+    /// When the read that produced this classified card was made (the board's as_of), for the "why" stack.
+    var asOf: Date? = nil
+
+    /// The vehicle id a live lot's finish estimate is keyed by (the card id without its "live:" prefix).
+    var lotId: String? {
+        kind == .live && id.hasPrefix("live:") ? String(id.dropFirst(5)) : nil
+    }
 
     /// Round-robin merge so neither population buries the other; order inside each
     /// population is kept as its read returned it. Rows without a photo are dropped —
@@ -116,14 +123,59 @@ struct ExploreFeedView: View {
     @State private var drill: ExploreCardDrill?
     /// A tap on a photo or the comments button; pushes the same profile the card has always opened.
     @State private var openVehicle: VehicleHeaderRow?
+    /// Browse's explicit filters (kept on the phone) and the sheet that sets them.
+    @State private var tuning = ExploreTuning.load()
+    @State private var showTune = false
+    /// The projected-hammer board, read once per feed load; each lot's reading is looked up in it.
+    @State private var finish: FinishBoard?
+    @State private var why: ExploreWhy?
+    @State private var openCohort: CohortTarget?
 
     var body: some View {
+        VStack(spacing: 0) {
+            if loaded { tuneBar }
+            content
+        }
+        .sheet(isPresented: $showTune) {
+            ExploreTuningSheet(current: tuning, onApply: applyTuning)
+        }
+        .sheet(item: $why) { w in
+            ExploreWhySheet(why: w, onCohort: showCohort)
+        }
+    }
+
+    /// A slider icon above the cards; a dot says a filter is on.
+    private var tuneBar: some View {
+        HStack {
+            Spacer()
+            Button { showTune = true } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 18))
+                    if tuning.isActive {
+                        Circle().fill(Color.accentColor).frame(width: 8, height: 8).offset(x: 5, y: -3)
+                    }
+                }
+                .frame(width: NukeSize.minTap, height: NukeSize.minTap)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Tune Browse"))
+            .accessibilityValue(Text(tuning.isActive ? "Filters on" : "No filters"))
+        }
+        .padding(.horizontal, NukeSpace.lg)
+    }
+
+    @ViewBuilder private var content: some View {
         Group {
             if !loaded {
                 // Shimmering cards in the shape of the real ones: the page looks alive while it loads.
                 NukeFeedSkeleton(message: "Finding cars for you…")
             } else if feed.isEmpty {
-                if liveFailed && askFailed {
+                if tuning.isActive && !(liveFailed && askFailed) {
+                    NukeEmptyState(icon: "slider.horizontal.3", title: "Nothing matches your tuning",
+                                   message: "Widen the place, era or price, or clear them.",
+                                   actionTitle: "Clear tuning") { applyTuning(ExploreTuning()) }
+                } else if liveFailed && askFailed {
                     NukeEmptyState(icon: "wifi.exclamationmark", title: "We couldn't load cars",
                                    message: "Check your connection, then try again.",
                                    actionTitle: "Try again") { Task { await load() } }
@@ -137,7 +189,10 @@ struct ExploreFeedView: View {
                     LazyVStack(spacing: NukeSpace.xl) {
                         ForEach(Array(feed.enumerated()), id: \.element.id) { idx, item in
                             ExplorePagerCard(item: item, position: idx, hasBidReading: lots[item.id] != nil,
-                                             onDrill: openDrill, onOpenProfile: openProfile, onChoice: choose)
+                                             finish: item.lotId.flatMap { finish?.byId[$0] },
+                                             finishFresh: finish?.fresh == true,
+                                             onDrill: openDrill, onOpenProfile: openProfile, onChoice: choose,
+                                             onWhy: openWhy)
                                 .onAppear { prefetch(after: idx) }
                         }
                         if !footer.isEmpty {
@@ -156,6 +211,10 @@ struct ExploreFeedView: View {
                     VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
                                       embedInNavigationStack: false).environment(\.vehicleListingContext, true)
                 }
+                .navigationDestination(item: $openCohort) { c in
+                    // The existing cohort instrument, as ExploreView's CohortTarget destination builds it.
+                    CohortTerminalView(make: c.make, model: c.model, year: c.year)
+                }
                 .onDisappear { Task { await ExploreSignalLog.shared.flushIfEnabled() } }
             }
         }
@@ -170,6 +229,30 @@ struct ExploreFeedView: View {
     }
 
     private func openDrill(_ d: ExploreCardDrill) { drill = d }
+
+    private func openWhy(_ item: ExploreFeedItem) {
+        why = ExploreWhy(item: item, estimate: item.lotId.flatMap { finish?.byId[$0] }, fresh: finish?.fresh == true)
+    }
+
+    /// The stack's cohort row: close the sheet, then push the cohort page.
+    private func showCohort(_ target: CohortTarget) {
+        why = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            openCohort = target
+        }
+    }
+
+    /// A changed filter is kept, reloads the reads and is logged by name (never by value).
+    private func applyTuning(_ new: ExploreTuning) {
+        let changed = new.changedFields(from: tuning)
+        guard !changed.isEmpty else { return }
+        tuning = new
+        new.save()
+        let event = ExploreSignalEvent.makeTune(changed)
+        Task { await ExploreSignalLog.shared.append(event) }
+        Task { await load() }
+    }
 
     /// Opens the car's profile when the card has a vehicle; otherwise the card's own listing link (as before).
     private func openProfile(_ item: ExploreFeedItem) {
@@ -214,14 +297,17 @@ struct ExploreFeedView: View {
     }
 
     private func load() async {
+        let tune = tuning
         async let l = Self.readLive()
-        async let a = Self.readClassified()
-        let (lr, ar) = await (l, a)
+        async let a = Self.readClassified(tune)
+        async let f = FinishBoard.fetch()
+        let (lr, ar, fb) = await (l, a, f)
+        finish = fb
         liveFailed = lr == nil
         askFailed = ar == nil
         lots = Dictionary((lr ?? []).map { ($0.item.id, $0.lot) }, uniquingKeysWith: { first, _ in first })
-        live = lr?.map { $0.item } ?? []
-        classified = ar ?? []
+        live = tune.apply(lr?.map { $0.item } ?? [])
+        classified = tune.apply(ar ?? [])
         feed = ExplorePreferences.apply(ExploreFeedItem.interleave(live: live, classified: classified), prefs)
         loaded = true
     }
@@ -233,9 +319,17 @@ struct ExploreFeedView: View {
             .prefix(40).map { (ExploreFeedItem.from($0), $0) }
     }
 
-    private static func readClassified() async -> [ExploreFeedItem]? {
-        guard let board = try? await AskBoard.fetch(hours: 72, sort: .newest, limit: 40) else { return nil }
-        return board.rows.map(ExploreFeedItem.from)
+    private static func readClassified(_ tune: ExploreTuning) async -> [ExploreFeedItem]? {
+        let place = tune.place
+        // A filter applied here to rows already read needs more rows to land on.
+        guard let board = try? await AskBoard.fetch(hours: 72, sort: .newest, limit: tune.hasLocalFilters ? 100 : 40,
+                                                    lat: place?.lat, lng: place?.lng, radiusMiles: place?.radius) else { return nil }
+        let asOf = ProfileClock.date(board.as_of)
+        return board.rows.map { row -> ExploreFeedItem in
+            var card = ExploreFeedItem.from(row)
+            card.asOf = asOf
+            return card
+        }
     }
 }
 
@@ -245,14 +339,17 @@ struct ExploreCardOverlay: View {
     let item: ExploreFeedItem
     var hasBidReading = false
     var onDrill: ((ExploreCardDrill) -> Void)? = nil
+    /// The price rail for the amount (nil keeps the bare amount) and what a long press on it does.
+    var rail: ExplorePriceRail? = nil
+    var onWhy: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .bottom) {
             if let amt = item.amount {
                 if let onDrill, hasBidReading, item.kind == .live {
-                    ExploreDoor(kind: .bid, item: item, open: onDrill) { amount(amt) }
+                    ExploreDoor(kind: .bid, item: item, open: onDrill) { price(amt) }
                 } else {
-                    amount(amt)
+                    price(amt)
                 }
             }
             Spacer(minLength: NukeSpace.sm)
@@ -267,6 +364,19 @@ struct ExploreCardOverlay: View {
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder private func price(_ amt: Double) -> some View {
+        if let rail {
+            if let onWhy {
+                ExplorePriceRailView(item: item, rail: rail)
+                    .highPriorityGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onWhy() })
+            } else {
+                ExplorePriceRailView(item: item, rail: rail)
+            }
+        } else {
+            amount(amt)
         }
     }
 
