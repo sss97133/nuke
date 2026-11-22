@@ -317,13 +317,16 @@ final class NavigationUITests: XCTestCase {
         XCTAssertEqual(seen, headings, "one list in date order, the undated car last")
         let bottom = XCTAttachment(screenshot: app.screenshot()); bottom.name = "garage-cards-bottom"; bottom.lifetime = .keepAlways; add(bottom)
         for _ in 0..<14 where !(first.exists && first.isHittable) { app.swipeDown() }
-        first.press(forDuration: 1.2)
-        let log = app.buttons["Log book"].firstMatch
-        // On a loaded CI simulator the first press can land while the list is still settling; press once more.
-        if !log.waitForExistence(timeout: 5) {
-            for _ in 0..<4 where !(first.exists && first.isHittable && first.frame.minY > 0) { app.swipeDown() }
-            first.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).press(forDuration: 1.5)
+        // Back at the top the card can sit mostly under the tab bar; bring its photo between the bars, as above,
+        // then hold the photo so the press lands on the card itself.
+        for _ in 0..<8 where !(photo.exists && photo.frame.minY > screen.minY + 120 && photo.frame.maxY < screen.maxY - 100) {
+            let down = photo.exists && photo.frame.minY <= screen.minY + 120
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.35 : 0.6))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.55 : 0.4)))
         }
+        let log = app.buttons["Log book"].firstMatch
+        photo.press(forDuration: 1.2)
+        if !log.waitForExistence(timeout: 5) { photo.press(forDuration: 1.5) }
         XCTAssertTrue(log.waitForExistence(timeout: 5)); log.tap()
         XCTAssertTrue(app.staticTexts["Fixture note: rear end rebuilt over the winter."].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["2026-11-18 · owner · recollection"].waitForExistence(timeout: 5))
