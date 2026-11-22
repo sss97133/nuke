@@ -47,7 +47,9 @@ COMMENT ON TABLE public.replica_target_specs IS
   'acceptable match categories live here; vehicle_replica_accuracy reads them. '
   'sourced=false means the factory_value is provisional / unsourced.';
 
-REVOKE ALL ON TABLE public.replica_target_specs FROM PUBLIC;
+-- Default privileges grant ALL to anon/authenticated at CREATE; REVOKE FROM PUBLIC alone
+-- does not drop those. Explicit revoke, then re-grant the intended surface.
+REVOKE ALL ON TABLE public.replica_target_specs FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.replica_target_specs TO anon, authenticated, service_role;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.replica_target_specs TO service_role;
 
@@ -137,10 +139,12 @@ COMMENT ON TABLE public.vehicle_image_groups IS
   'Coherent image sets for group-level reading (scene/phase/session). Stores member_image_ids; '
   'does not store photo readings (those stay on vehicle_observations).';
 
-REVOKE ALL ON TABLE public.vehicle_image_groups FROM PUBLIC;
--- service_role only: no authenticated table SELECT (avoids cross-vehicle image id leak).
+REVOKE ALL ON TABLE public.vehicle_image_groups FROM PUBLIC, anon, authenticated;
+-- service_role only: no anon/authenticated table access (avoids cross-vehicle image id leak).
 -- Public/tied callers read via vehicle_replica_accuracy / group RPCs, not raw table grants.
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.vehicle_image_groups TO service_role;
+ALTER TABLE public.vehicle_image_groups ENABLE ROW LEVEL SECURITY;
+-- No policies for anon/authenticated: defense in depth if a grant is re-added.
 
 -- =============================================================================
 -- 3. Component decisions (append-only via supersession)
@@ -175,9 +179,11 @@ COMMENT ON TABLE public.vehicle_replica_component_decisions IS
   'Current and superseded replica-component decisions. Later passes supersede with a reason; '
   'never silently overwrite. vehicle_replica_accuracy reads current rows only.';
 
-REVOKE ALL ON TABLE public.vehicle_replica_component_decisions FROM PUBLIC;
+REVOKE ALL ON TABLE public.vehicle_replica_component_decisions FROM PUBLIC, anon, authenticated;
 -- service_role only: decisions carry castings/stamps/image ids; public read is vehicle_replica_accuracy.
 GRANT SELECT, INSERT, UPDATE ON TABLE public.vehicle_replica_component_decisions TO service_role;
+ALTER TABLE public.vehicle_replica_component_decisions ENABLE ROW LEVEL SECURITY;
+-- No policies for anon/authenticated: defense in depth if a grant is re-added.
 
 -- =============================================================================
 -- 4. Observation properties for keyed byok component sightings
@@ -260,7 +266,8 @@ BEGIN
   END IF;
 
   -- Road wheel / tire only — not flywheel, steering wheel, wheel well, etc.
-  IF lab ~ '(^| )(front|rear|left|right).*(wheel and|wheel)|wheel and (white-letter|tire)|rally II|rally wheel'
+  -- lab is already lower(); use 'rally ii' not 'rally II'.
+  IF lab ~ '(^| )(front|rear|left|right).*(wheel and|wheel)|wheel and (white-letter|tire)|rally ii|rally wheel'
      AND lab !~ 'flywheel|steering wheel|wheel well|handwheel' THEN
     RETURN jsonb_build_object(
       'property_key', 'image_visible_wheel_style',
@@ -312,18 +319,24 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
+SET timezone TO 'UTC'
 AS $fn$
 DECLARE
   groups jsonb := '[]'::jsonb;
   g record;
   new_id uuid;
   version text := 'group_vehicle_images_for_reading/20261122081000';
+  v_group_key text;
 BEGIN
   FOR g IN
     SELECT
       coalesce(byok->>'scene_type', 'unknown') AS scene_type,
       coalesce(byok->>'build_phase_guess', 'unknown') AS build_phase,
       date_trunc('hour', coalesce(vi.taken_at, vi.created_at)) AS hour_bucket,
+      to_char(
+        date_trunc('hour', coalesce(vi.taken_at, vi.created_at)) AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+      ) AS hour_key,
       array_agg(vi.id ORDER BY coalesce(vi.taken_at, vi.created_at), vi.id) AS member_ids,
       count(*)::int AS n
     FROM vehicle_images vi
@@ -332,10 +345,11 @@ BEGIN
       AND coalesce(vi.is_superseded, false) IS NOT TRUE
       AND coalesce(vi.is_duplicate, false) IS NOT TRUE
       AND vi.ai_scan_metadata ? 'byok_deep_analysis'
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2, 3, 4
   LOOP
+    v_group_key := format('%s|%s|%s', g.scene_type, g.build_phase, g.hour_key);
     groups := groups || jsonb_build_object(
-      'group_key', format('%s|%s|%s', g.scene_type, g.build_phase, g.hour_bucket),
+      'group_key', v_group_key,
       'scene_type', g.scene_type,
       'build_phase', g.build_phase,
       'hour_bucket', g.hour_bucket,
@@ -348,8 +362,7 @@ BEGIN
         id, vehicle_id, group_key, scene_type, build_phase, member_image_ids,
         grouping_method, grouping_version
       ) VALUES (
-        new_id, p_vehicle_id,
-        format('%s|%s|%s', g.scene_type, g.build_phase, g.hour_bucket),
+        new_id, p_vehicle_id, v_group_key,
         g.scene_type, g.build_phase, g.member_ids,
         'scene_phase_hour_bucket', version
       )

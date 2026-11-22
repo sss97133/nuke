@@ -107,6 +107,9 @@ SELECT public.assert(
 SELECT public.assert(
   (public.normalize_byok_component_label('Left front wheel and white-letter tire')->>'value') = 'rally',
   'road wheel + white-letter maps to rally');
+SELECT public.assert(
+  (public.normalize_byok_component_label('Rally II wheels')->>'value') = 'rally',
+  'rally ii (lowercased) maps after lower()');
 
 -- Dry-run proposes claims without writing.
 SELECT public.assert(
