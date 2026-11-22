@@ -218,6 +218,7 @@ END $$;
 CREATE TABLE public._fixture_statements (vehicle_id uuid PRIMARY KEY, payload jsonb);
 
 \ir ../migrations/20261122120000_vehicle_labor_appraisal.sql
+\ir ../migrations/20261122203000_vehicle_labor_appraisal_no_double_count.sql
 
 -- Public car with full evidence for five rules.
 INSERT INTO vehicles(id, year, make, model, is_public)
@@ -290,7 +291,11 @@ INSERT INTO evidence_judgment_requests(id, vehicle_id, question_kind, status, pa
   ('d0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001',
    'receipt_part_visible', 'answered',
    '{"description":"console lid black","item_id":"c0000000-0000-0000-0000-000000000011"}'::jsonb,
-   '{"installed":"yes","image_id":"a0000000-0000-0000-0000-000000000021"}'::jsonb);
+   '{"installed":"yes","image_id":"a0000000-0000-0000-0000-000000000021"}'::jsonb),
+  ('d0000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001',
+   'receipt_part_visible', 'answered',
+   '{"description":"seat foam","item_id":"c0000000-0000-0000-0000-000000000009"}'::jsonb,
+   '{"installed":"yes","image_id":"a0000000-0000-0000-0000-000000000020"}'::jsonb);
 
 -- Private car.
 INSERT INTO vehicles(id, year, make, model, is_public)
@@ -366,9 +371,14 @@ BEGIN
     'paint evidence_ids keep both photographed stage samples');
 
   SELECT value INTO reass FROM jsonb_array_elements(j->'segments') s WHERE s->>'segment' = 'reassembly';
-  PERFORM public.assert((reass#>>'{reassembly,matched_count}')::int = 1, 'one matched piece');
+  PERFORM public.assert((reass#>>'{reassembly,matched_count}')::int = 2, 'two matched pieces');
   PERFORM public.assert((reass#>>'{reassembly,unmatched_count}')::int = 1, 'one unmatched piece');
-  PERFORM public.assert((reass->>'hours_typical')::numeric = 2.5, 'matched book hours only');
+  -- Both matched pieces are work an open segment already prices: the brake pads (line system brakes) in chassis,
+  -- the seat foam (INT-SEATS-RR) in interior. They stay listed, counted there, and leave reassembly's hours.
+  PERFORM public.assert((reass->>'hours_typical')::numeric = 0 AND (reass->>'hours_counted_elsewhere')::numeric = 6.5,
+    format('pieces priced by open segments are not counted twice; got %s', reass));
+  PERFORM public.assert(reass#>>'{reassembly,matched,0,counted_in}' = 'chassis', format('brake pads counted in chassis; got %s', reass->'reassembly'));
+  PERFORM public.assert(reass#>>'{reassembly,matched,1,counted_in}' = 'interior', format('seat foam counted in interior; got %s', reass->'reassembly'));
   PERFORM public.assert(reass#>>'{reassembly,unmatched,0,reason}' = 'no book operation', 'unmatched reason');
   -- Eligible witness image id is returned; sensitive witness is nulled.
   PERFORM public.assert(
