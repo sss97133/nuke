@@ -48,6 +48,34 @@ REVOKE ALL ON TABLE public.labor_stage_rules FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.labor_stage_rules TO anon, authenticated, service_role;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.labor_stage_rules TO service_role;
 
+-- Book transitions used by the seed rules. Body paint/metal rows already ship in
+-- 20260227290000; powertrain/chassis/electrical/interior lived only in prod until
+-- this migration. ON CONFLICT keeps a fresh DB and live in sync without overwrite.
+ALTER TABLE public.stage_transition_labor_map
+  ADD COLUMN IF NOT EXISTS category text;
+
+INSERT INTO public.stage_transition_labor_map (
+  from_stage, to_stage, zone_pattern, category, description,
+  estimated_hours_min, estimated_hours_typical, estimated_hours_max,
+  materials_cost_min, materials_cost_max, confidence
+) VALUES
+  ('none', 'rebuilt_original', '*', 'powertrain',
+   'Rebuild matching-numbers engine — machine work, gaskets, assembly',
+   20, 32, 50, 2000, 5000, 'low'),
+  ('none', 'trans_rebuild', '*', 'powertrain',
+   'Transmission rebuild or replacement — remove, rebuild/source, install',
+   8, 12, 16, 800, 3500, 'low'),
+  ('stock', 'refreshed', '*', 'chassis',
+   'Brake rebuild, shocks, bushings, steering — standard chassis refresh',
+   8, 14, 24, 800, 3500, 'low'),
+  ('original', 'rewire', '*', 'electrical',
+   'Full rewire — new harness for engine swap or modernization',
+   8, 14, 20, 500, 2500, 'low'),
+  ('needs_work', 'recovered', '*', 'interior',
+   'Seat recover, carpet, headliner — standard upholstery refresh',
+   16, 24, 40, 1500, 5000, 'low')
+ON CONFLICT (from_stage, to_stage, zone_pattern) DO NOTHING;
+
 INSERT INTO public.labor_stage_rules (
   segment_key, category, zone_pattern, from_stage, to_stage,
   evidence_requirements, citation, sort_order
@@ -113,7 +141,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $fn$
 DECLARE
-  version text := 'vehicle_labor_appraisal/20261122120000.2';
+  version text := 'vehicle_labor_appraisal/20261122120000.3';
   v record;
   v_visible boolean;
   recon jsonb;
@@ -617,7 +645,9 @@ BEGIN
       END IF;
     END LOOP;
 
-    IF (NOT ok) OR coalesce(array_length(evid_ids, 1), 0) = 0 THEN
+    -- Citeable evidence ids are required unless statement presence already
+    -- set evid_grade for an untied viewer (vehicle_statements withholds statement_id).
+    IF (NOT ok) OR (coalesce(array_length(evid_ids, 1), 0) = 0 AND evid_grade IS NULL) THEN
       status := 'no evidence';
       seg := jsonb_build_object(
         'segment', rule.segment_key,
@@ -700,7 +730,7 @@ BEGIN
       END IF;
     END IF;
 
-    IF coalesce(array_length(evid_ids, 1), 0) = 0 THEN
+    IF coalesce(array_length(evid_ids, 1), 0) = 0 AND evid_grade IS NULL THEN
       status := 'no evidence';
       hours_min := NULL; hours_typ := NULL; hours_max := NULL;
     END IF;

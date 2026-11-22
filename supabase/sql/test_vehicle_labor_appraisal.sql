@@ -40,7 +40,8 @@ CREATE TABLE public.stage_transition_labor_map (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   from_stage text, to_stage text, zone_pattern text, category text, description text,
   estimated_hours_min numeric, estimated_hours_typical numeric, estimated_hours_max numeric,
-  materials_cost_min numeric, materials_cost_max numeric, confidence text
+  materials_cost_min numeric, materials_cost_max numeric, confidence text,
+  UNIQUE (from_stage, to_stage, zone_pattern)
 );
 INSERT INTO stage_transition_labor_map
   (from_stage, to_stage, zone_pattern, category, description,
@@ -439,6 +440,36 @@ BEGIN
   PERFORM public.assert(seg->>'hours_typical' IS NULL, 'unmapped rule has no hours');
 END $$;
 DELETE FROM labor_stage_rules WHERE segment_key = 'test_unmapped';
+
+-- Untied statement presence (null statement_id) still grades without inventing an id.
+INSERT INTO vehicles(id, year, make, model, is_public)
+VALUES ('10000000-0000-0000-0000-000000000004', 1973, 'Pontiac', 'Firebird', true);
+INSERT INTO _fixture_recon(vehicle_id, payload) VALUES
+  ('10000000-0000-0000-0000-000000000004', '{"systems":[]}'::jsonb);
+INSERT INTO _fixture_statements(vehicle_id, payload) VALUES
+  ('10000000-0000-0000-0000-000000000004',
+   jsonb_build_object('tied', false, 'statements', jsonb_build_array(
+     jsonb_build_object('statement_id', NULL, 'statement_kind', 'assertion', 'speaker_role', 'shop')
+   )));
+INSERT INTO labor_stage_rules(segment_key, category, from_stage, to_stage, evidence_requirements, citation, sort_order)
+VALUES ('test_statement', 'powertrain', 'none', 'trans_rebuild',
+        '{"all":[{"type":"statement_present"}],"evidence_grade":"statement"}'::jsonb, 'test', 998);
+SET ROLE anon;
+SET test.auth_role = 'anon';
+DO $$
+DECLARE seg jsonb;
+BEGIN
+  SELECT value INTO seg
+    FROM jsonb_array_elements(public.vehicle_labor_appraisal('10000000-0000-0000-0000-000000000004')->'segments') s
+   WHERE s->>'segment' = 'test_statement';
+  PERFORM public.assert(seg->>'status' = 'ok', format('untied statement presence ok; got %s', seg));
+  PERFORM public.assert(seg->>'evidence_grade' = 'statement', 'untied grade is statement');
+  PERFORM public.assert((seg->>'hours_typical')::numeric = 12, 'untied statement uses book hours');
+  PERFORM public.assert(coalesce(jsonb_array_length(seg->'evidence_ids'), 0) = 0,
+    'untied statement does not invent a statement_id');
+END $$;
+RESET ROLE;
+DELETE FROM labor_stage_rules WHERE segment_key = 'test_statement';
 
 -- The rules table has row level security on.
 DO $$ BEGIN
