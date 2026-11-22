@@ -1,4 +1,4 @@
--- Revert of 20261122232000_land_child_vehicle_sync: removes the a08 trigger, the sync, backfill and angle functions,
+-- Revert of 20261122232000_land_child_vehicle_sync and its follow-ups 20261122234500 and 20261122235500: removes the a08 trigger, the sync, backfill and angle functions,
 -- restores photo_land_classification(uuid, boolean) to its previous body (six-label angle map, no sync) and removes
 -- the three angle_taxonomy rows when no observation uses them.
 -- Rows are not touched here: first revert each producer run with land_child_vehicle_sync_revert_v1('<run uuid>')

@@ -100,6 +100,7 @@ CREATE TEMP VIEW t_now AS
 
 \ir ../migrations/20261122232000_land_child_vehicle_sync.sql
 \ir ../migrations/20261122234500_land_child_vehicle_sync_angle_needs_vehicle.sql
+\ir ../migrations/20261122235500_land_child_vehicle_sync_revert_latest_first.sql
 SELECT t_assert(NOT has_function_privilege('authenticated', 'public.land_child_vehicle_sync_v1(uuid,integer,integer,boolean)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.land_child_vehicle_sync_revert_v1(text)', 'EXECUTE')
   AND NOT has_table_privilege('authenticated', 'public.land_child_vehicle_sync_log', 'SELECT')
@@ -178,6 +179,19 @@ SELECT t_assert((SELECT vehicle_id FROM photo_extracted_fields WHERE image_id = 
 UPDATE vehicle_images SET vehicle_id = :v1 WHERE id = 'a0000000-0000-4000-8000-000000000002';
 SELECT t_assert((SELECT vehicle_id FROM photo_extracted_fields WHERE image_id = 'a0000000-0000-4000-8000-000000000002') = :v1, 'live: back on v1');
 
+-- a 'live' revert walks a row's moves back newest first: p1's text line went v1 -> NULL -> v2 -> NULL (pulled) -> v1
+-- above; to check the order, move it once more (v1 -> v2) and revert: every entry must unwind, ending on v1.
+UPDATE vehicle_images SET vehicle_id = :v2 WHERE id = 'a0000000-0000-4000-8000-000000000001';
+SELECT t_assert((SELECT count(*) FROM land_child_vehicle_sync_log l JOIN photo_text_lines c ON c.id = l.row_id
+  WHERE l.run_id = 'live' AND l.state = 'applied') = 5, 'live: five moves of the text line logged');
+SELECT land_child_vehicle_sync_revert_v1('live');
+SELECT t_assert((SELECT vehicle_id FROM photo_text_lines) = :v1
+  AND (SELECT count(*) FROM land_child_vehicle_sync_log l JOIN photo_text_lines c ON c.id = l.row_id
+        WHERE l.run_id = 'live' AND l.state = 'reverted') = 5,
+  'live revert: all five moves unwound newest first, back to the value before the first live change');
+UPDATE vehicle_images SET vehicle_id = :v1 WHERE id = 'a0000000-0000-4000-8000-000000000001';
+SELECT land_child_vehicle_sync_image(id, 'resync') FROM vehicle_images;
+
 -- re-land updates vehicle_id
 UPDATE photo_extracted_fields SET vehicle_id = :v2 WHERE image_id = 'a0000000-0000-4000-8000-000000000002';
 CREATE TEMP TABLE t_reland AS SELECT photo_land_classification('a0000000-0000-4000-8000-000000000002', true) AS r;
@@ -205,8 +219,9 @@ SELECT t_assert((SELECT (r ->> 'angles')::int FROM t_land8) = 1
   AND (SELECT a.canonical_key FROM image_angle_observations o JOIN angle_taxonomy a USING (angle_id) WHERE o.image_id = 'a0000000-0000-4000-8000-000000000008') = 'exterior.three_quarter.unknown',
   'landing: exterior_three_quarter now lands an angle');
 
--- the follow-up is re-runnable; the revert file removes both
+-- the follow-ups are re-runnable; the revert file removes all three files' functions
 \ir ../migrations/20261122234500_land_child_vehicle_sync_angle_needs_vehicle.sql
+\ir ../migrations/20261122235500_land_child_vehicle_sync_revert_latest_first.sql
 \ir revert_20261122232000_land_child_vehicle_sync.sql
 SELECT t_assert(to_regproc('public.land_child_vehicle_sync_v1') IS NULL AND to_regproc('public.photo_land_angle_key') IS NULL
   AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'a08_trg_land_child_vehicle_sync')
