@@ -146,12 +146,13 @@ final class GarageCardTests: XCTestCase {
     func testRecordLineStatesSpanAndOnlyNonZeroCounts() throws {
         let map = try timelines()
         XCTAssertEqual(GarageCardText.span(map[GarageCardFixtures.owned]), "Mar 2021 – Nov 2026")
-        XCTAssertEqual(GarageCardText.counts(map[GarageCardFixtures.owned], imageCount: 240),
-                       ["240 photos", "7 work days", "4 events", "3 papers"])
+        // The card's photo count is the day reader's, never the stored image_count (240 in the fixture).
+        XCTAssertEqual(GarageCardText.counts(map[GarageCardFixtures.owned]),
+                       ["234 dated photos", "7 work days", "4 events", "3 papers"])
         XCTAssertEqual(GarageCardText.span(map[GarageCardFixtures.older]), "May 2024")
-        XCTAssertEqual(GarageCardText.counts(map[GarageCardFixtures.older], imageCount: 0), ["12 photos"])
-        XCTAssertEqual(GarageCardText.counts(nil, imageCount: 1), ["1 photo"])
-        XCTAssertEqual(GarageCardText.counts(nil, imageCount: 0), [])
+        XCTAssertEqual(GarageCardText.counts(map[GarageCardFixtures.older]), ["12 dated photos"])
+        // Before the day reader answers, no count: the stored column is not a fallback.
+        XCTAssertEqual(GarageCardText.counts(nil), [])
     }
 
     // MARK: Header and reel

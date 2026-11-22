@@ -243,8 +243,8 @@ final class NavigationUITests: XCTestCase {
         let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         search.tap()
-        search.typeText("1234567\n")
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "stored VIN suffix must find the existing record")
+        search.typeText("1973 Coupe\n")
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "year and model must find the existing record")
         row.tap()
         let profile = app.descendants(matching: .any).matching(identifier: "garage.vehicle.profile.00000000-0000-4000-8000-00000000c001").firstMatch
         XCTAssertTrue(profile.waitForExistence(timeout: 10), "the primary row must open the actual vehicle profile")
@@ -256,7 +256,7 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         back.tap()
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        XCTAssertTrue((search.value as? String)?.contains("1234567") == true, "returning must retain the Garage search")
+        XCTAssertTrue((search.value as? String)?.contains("1973 Coupe") == true, "returning must retain the Garage search")
     }
 
     /// The garage cards (garage-cards fixture): newest activity first under year headings, the undated car last,

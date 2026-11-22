@@ -5,8 +5,8 @@
 // glasses. Garage is the direct route to the account's vehicle profiles, with
 // no Photos grant required. Library is shown only with full Photos access.
 //
-//   GARAGE   the signed-in account's vehicle records, searchable by vehicle or
-//            VIN. A row opens the full profile, including zero-photo records.
+//   GARAGE   the signed-in account's vehicle records, searchable by year, make
+//            or model. A row opens the full profile, including zero-photo records.
 //   EXPLORE  the signed-out front door. The populated world of vehicles + the
 //            cohort market terminal — reachable signed-out, no wall. An anon
 //            visitor lands here; "not signing in" is never a dead end (Sign In

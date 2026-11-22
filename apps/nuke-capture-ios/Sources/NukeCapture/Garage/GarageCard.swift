@@ -68,9 +68,9 @@ struct GarageCard: View {
             .aspectRatio(4.0 / 3.0, contentMode: .fit)
             .overlay {
                 if pages.isEmpty {
-                    if vehicle.image_count == 0 {
-                        Text("No photo yet").font(.caption).foregroundStyle(.secondary)
-                    }
+                    // No cover was read. The stored image_count can't say whether the car has photos, so the
+                    // card says only what it knows.
+                    Text("No cover photo").font(.caption).foregroundStyle(.secondary)
                 } else {
                     TabView(selection: $page) {
                         ForEach(Array(pages.enumerated()), id: \.element.url) { i, p in
@@ -207,7 +207,7 @@ struct GarageCard: View {
 
     @ViewBuilder private var record: some View {
         let span = GarageCardText.span(timeline)
-        let counts = GarageCardText.counts(timeline, imageCount: vehicle.image_count)
+        let counts = GarageCardText.counts(timeline)
         if span != nil || !counts.isEmpty {
             // Wraps like the web's record line instead of cutting the last count.
             let spanText = Text(span ?? "").foregroundStyle(.primary)
