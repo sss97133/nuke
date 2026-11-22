@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveDoubts, doubtsFromReaderFile, pickFrames, buildQuestionRow, buildBlindTask, buildExportTask, plainDefinition, validateAnswer, closedAnswer, ITEM_MAP } from './fact-doubts.mjs';
+import { deriveDoubts, doubtsFromReaderFile, pickFrames, frameTermFilter, FRAME_TERM_FIELDS, buildQuestionRow, buildBlindTask, buildExportTask, plainDefinition, validateAnswer, closedAnswer, ITEM_MAP } from './fact-doubts.mjs';
 import { requestParams } from './answer-fact-doubts.mjs';
 
 const V = { id: '20d21fb0-4651-4469-a0ba-e751309a1e54', user_id: '0b9f107a-d124-49de-9ded-94698f63c1c4' };
@@ -178,4 +178,14 @@ test('second reader task never carries the first answer, even from a reopened ro
   const task = buildBlindTask({ params: row.params, registryRow: { label: 'Bellhousing casting number' } });
   const wire = JSON.stringify(geminiRequest({ model: 'm', task, images: new Map([[I1, 'A']]), key: 'k' }).body) + JSON.stringify(buildExportTask({ task, params: row.params, frames: [] }));
   assert.ok(!wire.includes(SECRET) && !wire.includes('blind-photo-reader') && !wire.includes('answer_history'));
+});
+
+test('frame search looks wherever a reading names the part, not only the notes', () => {
+  const f = frameTermFilter(ITEM_MAP['engine.current.heads'].terms);
+  const parts = f.split(',');
+  assert.equal(parts.length, ITEM_MAP['engine.current.heads'].terms.length * FRAME_TERM_FIELDS.length);
+  assert.ok(parts.includes('structured_data->camera_pose->>framing.ilike.*head%20casting*'));
+  assert.ok(parts.includes('structured_data->>open_questions.ilike.*cylinder%20head*'));
+  assert.ok(parts.includes('structured_data->>agent_notes.ilike.*cylinder%20head*'));
+  assert.equal(frameTermFilter([]), '');
 });

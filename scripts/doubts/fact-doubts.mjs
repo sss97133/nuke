@@ -85,6 +85,15 @@ export function frameEligible(x) {
     && x.is_document !== true && (x.redaction_level ?? 'none') === 'none'
     && !['product_screenshot', 'cross_reference', 'receipt_document', 'hand_drawn_diagram'].includes(x.scene_type ?? '');
 }
+// Where an existing reading of a photograph names the part it shows. A close-up names its subject in the framing line or
+// an open question as often as in the notes, so a term search over the notes alone finds no frame for a photographed part.
+export const FRAME_TERM_FIELDS = ['structured_data->>agent_notes', 'structured_data->>narrative_one_line',
+  'structured_data->camera_pose->>framing', 'structured_data->>open_questions', 'structured_data->>components_seen'];
+// PostgREST or-filter body: any term in any of those fields, case-insensitive.
+export function frameTermFilter(terms) {
+  return terms.flatMap((t) => FRAME_TERM_FIELDS.map((f) => `${f}.ilike.*${encodeURIComponent(t)}*`)).join(',');
+}
+
 export function pickFrames(candidates, cap = FRAME_CAP) {
   const tier = { witness: 0, role: 1, text: 2 };
   const seen = new Set();

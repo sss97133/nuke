@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { producerVersion } from '../garage/derivation-evidence.mjs';
 import { client, arg } from './db.mjs';
-import { HEADER_DIMENSIONS, QUESTION, deriveDoubts, doubtsFromReaderFile, pickFrames, buildQuestionRow } from './fact-doubts.mjs';
+import { HEADER_DIMENSIONS, QUESTION, deriveDoubts, doubtsFromReaderFile, pickFrames, frameTermFilter, buildQuestionRow } from './fact-doubts.mjs';
 
 export const SCRIPT = 'scripts/doubts/raise-fact-doubts.mjs';
 const inList = (ids) => `in.(${ids.join(',')})`;
@@ -26,7 +26,7 @@ async function candidateFrames(db, vehicleId, d) {
     for (const r of rows) add(r.image_id, 'role');
   }
   if (d.terms.length) {
-    const or = d.terms.map((t) => `structured_data->>agent_notes.ilike.*${encodeURIComponent(t)}*`).join(',');
+    const or = frameTermFilter(d.terms);
     const rows = await db.req(`vehicle_observations?select=image_id:structured_data->>image_id&vehicle_id=eq.${vehicleId}&is_superseded=not.is.true&or=(${or})&limit=200`);
     for (const r of rows) add(r.image_id, 'text');
   }
