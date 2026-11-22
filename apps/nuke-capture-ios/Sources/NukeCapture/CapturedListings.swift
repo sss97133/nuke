@@ -193,6 +193,9 @@ struct AskPosition: Decodable, Equatable {
         let venues: [String: Venue]?
         let offered: Int?
         let conflicts: Int?
+        /// The cohort's first and last sale day (yyyy-MM-dd) when the read carries them.
+        var first_on: String? = nil
+        var last_on: String? = nil
 
         var yearSpan: String? {
             guard let yf = year_from, let yt = year_to else { return nil }
@@ -345,6 +348,9 @@ struct AskRow: Decodable, Equatable, Identifiable {
     var region: String? = nil
     var taste: Int? = nil
     var in_band: Bool? = nil
+    /// Where the listing is, rounded to 0.01° (about a kilometre) by the read; nil when the row has none.
+    var lat: Double? = nil
+    var lng: Double? = nil
     let position: AskPosition?
 
     private enum CodingKeys: String, CodingKey {
@@ -352,6 +358,7 @@ struct AskRow: Decodable, Equatable, Identifiable {
         case year, make, model, title, ask, asking_price
         case miles, mileage, listing_mileage, read_miles
         case odometer, condition, title_status, image, location, city, region, taste, in_band, position
+        case lat, lng
     }
 
     init(from decoder: Decoder) throws {
@@ -395,6 +402,8 @@ struct AskRow: Decodable, Equatable, Identifiable {
         self.taste = try? c.decodeIfPresent(Int.self, forKey: .taste)
         self.in_band = try? c.decodeIfPresent(Bool.self, forKey: .in_band)
         self.position = try? c.decodeIfPresent(AskPosition.self, forKey: .position)
+        self.lat = (try? c.decodeIfPresent(Double.self, forKey: .lat)) ?? nil
+        self.lng = (try? c.decodeIfPresent(Double.self, forKey: .lng)) ?? nil
     }
 
     var id: String { event_id }
@@ -532,13 +541,16 @@ struct AskBoard: Decodable, Equatable {
         let p_offset: Int
     }
 
-    static func fetch(hours: Int = 72, tier: AskTier? = nil, band: Bool = false, sort: AskSort = .newest, limit: Int = 60, offset: Int = 0) async throws -> AskBoard {
+    /// `lat`, `lng` and `radiusMiles` narrow the read to a place (the RPC's p_lat / p_lng / p_radius_mi); all
+    /// three nil is the whole market, as before.
+    static func fetch(hours: Int = 72, tier: AskTier? = nil, band: Bool = false, sort: AskSort = .newest, limit: Int = 60, offset: Int = 0,
+                      lat: Double? = nil, lng: Double? = nil, radiusMiles: Int? = nil) async throws -> AskBoard {
         try await SupabaseService.client
             .rpc("classified_ask_board", params: Params(
                 p_hours: hours,
-                p_lat: nil,
-                p_lng: nil,
-                p_radius_mi: nil,
+                p_lat: lat,
+                p_lng: lng,
+                p_radius_mi: radiusMiles,
                 p_min_taste: band ? 60 : nil,
                 p_tier: tier?.rawValue,
                 p_sort: sort.rawValue,
