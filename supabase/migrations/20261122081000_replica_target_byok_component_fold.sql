@@ -138,8 +138,9 @@ COMMENT ON TABLE public.vehicle_image_groups IS
   'does not store photo readings (those stay on vehicle_observations).';
 
 REVOKE ALL ON TABLE public.vehicle_image_groups FROM PUBLIC;
-GRANT SELECT ON TABLE public.vehicle_image_groups TO authenticated, service_role;
-GRANT INSERT, UPDATE, DELETE ON TABLE public.vehicle_image_groups TO service_role;
+-- service_role only: no authenticated table SELECT (avoids cross-vehicle image id leak).
+-- Public/tied callers read via vehicle_replica_accuracy / group RPCs, not raw table grants.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.vehicle_image_groups TO service_role;
 
 -- =============================================================================
 -- 3. Component decisions (append-only via supersession)
@@ -175,8 +176,8 @@ COMMENT ON TABLE public.vehicle_replica_component_decisions IS
   'never silently overwrite. vehicle_replica_accuracy reads current rows only.';
 
 REVOKE ALL ON TABLE public.vehicle_replica_component_decisions FROM PUBLIC;
-GRANT SELECT ON TABLE public.vehicle_replica_component_decisions TO authenticated, service_role;
-GRANT INSERT, UPDATE ON TABLE public.vehicle_replica_component_decisions TO service_role;
+-- service_role only: decisions carry castings/stamps/image ids; public read is vehicle_replica_accuracy.
+GRANT SELECT, INSERT, UPDATE ON TABLE public.vehicle_replica_component_decisions TO service_role;
 
 -- =============================================================================
 -- 4. Observation properties for keyed byok component sightings
@@ -258,17 +259,12 @@ BEGIN
       'component_key', 'rear_spoiler');
   END IF;
 
-  IF lab ~ 'wheel' AND lab ~ 'white-letter|rally' THEN
+  -- Road wheel / tire only — not flywheel, steering wheel, wheel well, etc.
+  IF lab ~ '(^| )(front|rear|left|right).*(wheel and|wheel)|wheel and (white-letter|tire)|rally II|rally wheel'
+     AND lab !~ 'flywheel|steering wheel|wheel well|handwheel' THEN
     RETURN jsonb_build_object(
       'property_key', 'image_visible_wheel_style',
-      'value', 'rally',
-      'component_key', 'wheels');
-  END IF;
-
-  IF lab ~ 'wheel' THEN
-    RETURN jsonb_build_object(
-      'property_key', 'image_visible_wheel_style',
-      'value', 'other',
+      'value', CASE WHEN lab ~ 'white-letter|rally' THEN 'rally' ELSE 'other' END,
       'component_key', 'wheels');
   END IF;
 
@@ -589,9 +585,9 @@ BEGIN
     RETURN jsonb_build_object('applicable', false, 'reason', 'not is_replica');
   END IF;
 
+  -- Require SD-455 token; bare "Trans Am" is not enough (wrong-year/non-SD targets).
   v_target_key := CASE
     WHEN v.replica_quote ILIKE '%SD-455%' OR v.replica_quote ILIKE '%SD455%'
-         OR v.replica_quote ILIKE '%Trans Am%'
       THEN '1973_trans_am_sd455'
     ELSE NULL
   END;
@@ -657,30 +653,93 @@ BEGIN
     IF spec.component_key = 'engine_block' THEN
       IF casting IS NULL AND stamp IS NULL THEN
         cat := 'unknown';
-      ELSIF casting = ANY (ARRAY(SELECT jsonb_array_elements_text(spec.match_rules->'castings_factory'))) THEN
+      ELSIF casting IS NOT NULL
+            AND casting = ANY (ARRAY(SELECT jsonb_array_elements_text(spec.match_rules->'castings_factory'))) THEN
         cat := 'factory_correct';
-      ELSIF casting = ANY (ARRAY(SELECT jsonb_array_elements_text(spec.match_rules->'castings_period_455'))) THEN
+      ELSIF (casting IS NOT NULL
+             AND casting = ANY (ARRAY(SELECT jsonb_array_elements_text(spec.match_rules->'castings_period_455'))))
+         OR (stamp IS NOT NULL
+             AND stamp = ANY (ARRAY(SELECT jsonb_array_elements_text(spec.match_rules->'stamps_period')))) THEN
         cat := 'period_correct_substitute';
+      ELSIF casting IS NOT NULL THEN
+        cat := 'non_correct'; -- known casting outside factory/period lists
       ELSE
-        cat := 'non_correct';
+        cat := 'unknown'; -- stamp present but not in stamps_period; do not guess
       END IF;
 
     ELSIF spec.component_key = 'transmission' THEN
       IF case_cast IS NULL AND id_stamp IS NULL THEN
         cat := 'unknown';
-      ELSIF case_cast = ANY (ARRAY(SELECT jsonb_array_elements_text(spec.match_rules->'case_castings_period'))) THEN
+      ELSIF case_cast IS NOT NULL
+            AND case_cast = ANY (ARRAY(SELECT jsonb_array_elements_text(spec.match_rules->'case_castings_period'))) THEN
         cat := 'period_correct_substitute';
-      ELSIF id_stamp IS NOT NULL THEN
+      ELSIF id_stamp IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM jsonb_array_elements_text(spec.match_rules->'id_stamp_prefix') p
+               WHERE id_stamp ILIKE (p || '%')
+            ) THEN
         cat := 'period_correct_substitute';
       ELSE
-        cat := 'unknown';
+        cat := 'unknown'; -- evidence present but not matched; never invent period_correct
       END IF;
 
     ELSIF spec.component_key IN ('hood_scoop','hood_bird_decal','rear_spoiler','wheels','brakes','intake_carb','interior') THEN
       SELECT count(*),
-             coalesce(array_agg(DISTINCT (vo.structured_data->>'image_id')::uuid)
-                        FILTER (WHERE vo.structured_data->>'image_id' IS NOT NULL), '{}'),
-             coalesce(array_agg(DISTINCT vo.id), '{}')
+             coalesce((
+               SELECT array_agg(x ORDER BY x)
+                 FROM (
+                   SELECT DISTINCT (vo2.structured_data->>'image_id')::uuid AS x
+                     FROM vehicle_observations vo2
+                     JOIN observation_properties op2 ON op2.id = vo2.property_id
+                    WHERE vo2.vehicle_id = p_vehicle_id
+                      AND coalesce(vo2.is_superseded, false) IS NOT TRUE
+                      AND vo2.structured_data->>'image_id' IS NOT NULL
+                      AND (
+                        (spec.component_key = 'hood_scoop' AND op2.property_key = 'image_visible_hood_scoop_style'
+                           AND vo2.structured_data->>'image_visible_hood_scoop_style' = 'shaker')
+                        OR (spec.component_key = 'hood_bird_decal' AND op2.property_key = 'image_visible_hood_bird_decal'
+                           AND vo2.structured_data->>'image_visible_hood_bird_decal' = 'present')
+                        OR (spec.component_key = 'rear_spoiler' AND op2.property_key = 'image_visible_rear_spoiler'
+                           AND vo2.structured_data->>'image_visible_rear_spoiler' = 'present')
+                        OR (spec.component_key = 'wheels' AND op2.property_key = 'image_visible_wheel_style'
+                           AND vo2.structured_data->>'image_visible_wheel_style' = 'rally')
+                        OR (spec.component_key = 'brakes' AND op2.property_key = 'image_visible_brake_booster'
+                           AND vo2.structured_data->>'image_visible_brake_booster' = 'present')
+                        OR (spec.component_key = 'intake_carb' AND op2.property_key IN (
+                              'image_visible_intake_manifold','image_visible_carburetor')
+                           AND (vo2.structured_data->>'image_visible_intake_manifold' = 'present'
+                                OR vo2.structured_data->>'image_visible_carburetor' = 'present'))
+                        OR (spec.component_key = 'interior' AND false)
+                      )
+                 ) s
+             ), '{}'),
+             coalesce((
+               SELECT array_agg(x ORDER BY x)
+                 FROM (
+                   SELECT DISTINCT vo2.id AS x
+                     FROM vehicle_observations vo2
+                     JOIN observation_properties op2 ON op2.id = vo2.property_id
+                    WHERE vo2.vehicle_id = p_vehicle_id
+                      AND coalesce(vo2.is_superseded, false) IS NOT TRUE
+                      AND (
+                        (spec.component_key = 'hood_scoop' AND op2.property_key = 'image_visible_hood_scoop_style'
+                           AND vo2.structured_data->>'image_visible_hood_scoop_style' = 'shaker')
+                        OR (spec.component_key = 'hood_bird_decal' AND op2.property_key = 'image_visible_hood_bird_decal'
+                           AND vo2.structured_data->>'image_visible_hood_bird_decal' = 'present')
+                        OR (spec.component_key = 'rear_spoiler' AND op2.property_key = 'image_visible_rear_spoiler'
+                           AND vo2.structured_data->>'image_visible_rear_spoiler' = 'present')
+                        OR (spec.component_key = 'wheels' AND op2.property_key = 'image_visible_wheel_style'
+                           AND vo2.structured_data->>'image_visible_wheel_style' = 'rally')
+                        OR (spec.component_key = 'brakes' AND op2.property_key = 'image_visible_brake_booster'
+                           AND vo2.structured_data->>'image_visible_brake_booster' = 'present')
+                        OR (spec.component_key = 'intake_carb' AND op2.property_key IN (
+                              'image_visible_intake_manifold','image_visible_carburetor')
+                           AND (vo2.structured_data->>'image_visible_intake_manifold' = 'present'
+                                OR vo2.structured_data->>'image_visible_carburetor' = 'present'))
+                        OR (spec.component_key = 'interior' AND false)
+                      )
+                 ) s
+             ), '{}')
         INTO sight_count, evid_imgs, evid_obs
         FROM vehicle_observations vo
         JOIN observation_properties op ON op.id = vo.property_id
@@ -694,7 +753,7 @@ BEGIN
            OR (spec.component_key = 'rear_spoiler' AND op.property_key = 'image_visible_rear_spoiler'
               AND vo.structured_data->>'image_visible_rear_spoiler' = 'present')
            OR (spec.component_key = 'wheels' AND op.property_key = 'image_visible_wheel_style'
-              AND vo.structured_data->>'image_visible_wheel_style' IN ('rally','other'))
+              AND vo.structured_data->>'image_visible_wheel_style' = 'rally')
            OR (spec.component_key = 'brakes' AND op.property_key = 'image_visible_brake_booster'
               AND vo.structured_data->>'image_visible_brake_booster' = 'present')
            OR (spec.component_key = 'intake_carb' AND op.property_key IN (
@@ -741,14 +800,22 @@ BEGIN
         SELECT 1 FROM vehicle_replica_component_decisions d
          WHERE d.id = old_id AND d.category = cat
            AND d.logic_version = version
+           AND d.evidence_observation_ids IS NOT DISTINCT FROM evid_obs
+           AND d.evidence_image_ids IS NOT DISTINCT FROM evid_imgs
       ) THEN
-        NULL; -- unchanged
+        NULL; -- unchanged category and evidence
       ELSE
         new_id := gen_random_uuid();
         IF old_id IS NOT NULL THEN
           UPDATE vehicle_replica_component_decisions
              SET is_superseded = true, superseded_by = new_id, superseded_at = now(),
-                 supersede_reason = 'newer decide_replica_components pass'
+                 supersede_reason = CASE
+                   WHEN EXISTS (
+                     SELECT 1 FROM vehicle_replica_component_decisions d
+                      WHERE d.id = old_id AND d.category IS NOT DISTINCT FROM cat
+                   ) THEN 'same category; evidence set changed'
+                   ELSE 'category or logic_version changed'
+                 END
            WHERE id = old_id;
         END IF;
         INSERT INTO vehicle_replica_component_decisions (
@@ -766,29 +833,40 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- Persist base_chassis decision too.
+  -- Persist base_chassis decision too (skip when unchanged).
   IF NOT p_dry_run THEN
     SELECT id INTO old_id FROM vehicle_replica_component_decisions
      WHERE vehicle_id = p_vehicle_id AND target_key = v_target_key
        AND component_key = 'base_chassis'
        AND coalesce(is_superseded, false) IS NOT TRUE
      LIMIT 1;
-    new_id := gen_random_uuid();
-    IF old_id IS NOT NULL THEN
-      UPDATE vehicle_replica_component_decisions
-         SET is_superseded = true, superseded_by = new_id, superseded_at = now(),
-             supersede_reason = 'newer decide_replica_components pass'
-       WHERE id = old_id;
+    IF old_id IS NOT NULL AND EXISTS (
+      SELECT 1 FROM vehicle_replica_component_decisions d
+       WHERE d.id = old_id
+         AND d.category = 'base_chassis'
+         AND d.logic_version = version
+         AND d.evidence IS NOT DISTINCT FROM jsonb_build_object(
+               'body_tag_style', style, 'absent_codes', to_jsonb(absents))
+    ) THEN
+      NULL; -- unchanged
+    ELSE
+      new_id := gen_random_uuid();
+      IF old_id IS NOT NULL THEN
+        UPDATE vehicle_replica_component_decisions
+           SET is_superseded = true, superseded_by = new_id, superseded_at = now(),
+               supersede_reason = 'newer decide_replica_components pass'
+         WHERE id = old_id;
+      END IF;
+      INSERT INTO vehicle_replica_component_decisions (
+        id, vehicle_id, target_key, component_key, category, confidence,
+        evidence_observation_ids, evidence_image_ids, evidence, method, logic_version
+      ) VALUES (
+        new_id, p_vehicle_id, v_target_key, 'base_chassis', 'base_chassis', 0.9,
+        '{}', '{}',
+        jsonb_build_object('body_tag_style', style, 'absent_codes', to_jsonb(absents)),
+        'decide_replica_components', version
+      );
     END IF;
-    INSERT INTO vehicle_replica_component_decisions (
-      id, vehicle_id, target_key, component_key, category, confidence,
-      evidence_observation_ids, evidence_image_ids, evidence, method, logic_version
-    ) VALUES (
-      new_id, p_vehicle_id, v_target_key, 'base_chassis', 'base_chassis', 0.9,
-      '{}', '{}',
-      jsonb_build_object('body_tag_style', style, 'absent_codes', to_jsonb(absents)),
-      'decide_replica_components', version
-    );
   END IF;
 
   RETURN jsonb_build_object(
@@ -855,7 +933,6 @@ BEGIN
 
   v_target_key := CASE
     WHEN v.replica_quote ILIKE '%SD-455%' OR v.replica_quote ILIKE '%SD455%'
-         OR v.replica_quote ILIKE '%Trans Am%'
       THEN '1973_trans_am_sd455'
     ELSE NULL
   END;

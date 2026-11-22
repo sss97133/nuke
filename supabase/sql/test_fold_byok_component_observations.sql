@@ -98,6 +98,15 @@ SELECT public.assert(
 SELECT public.assert(
   public.normalize_byok_component_label('Unrelated chrome trim bit') IS NULL,
   'unknown label stays null (never invent)');
+SELECT public.assert(
+  public.normalize_byok_component_label('Exposed flywheel teeth') IS NULL,
+  'flywheel does not map to road wheel');
+SELECT public.assert(
+  public.normalize_byok_component_label('Steering wheel') IS NULL,
+  'steering wheel does not map to road wheel');
+SELECT public.assert(
+  (public.normalize_byok_component_label('Left front wheel and white-letter tire')->>'value') = 'rally',
+  'road wheel + white-letter maps to rally');
 
 -- Dry-run proposes claims without writing.
 SELECT public.assert(

@@ -127,4 +127,20 @@ SELECT public.assert(
   (j->>'accuracy_score_known_only')::numeric > 33.8,
   'reworked score exceeds prior 33.8 identity-penalty figure') FROM ra;
 
+-- Bare Trans Am (no SD-455) must not map to the SD target.
+INSERT INTO vehicles(id, make, model, year, vin, is_replica, replica_quote, is_public)
+VALUES ('00000000-0000-0000-0000-0000000000a2', 'Pontiac', 'Firebird', 1973, '2S87D3N000002', true,
+        'Built as a Trans Am clone', true);
+SELECT public.assert(
+  (public.vehicle_replica_accuracy('00000000-0000-0000-0000-0000000000a2')->>'applicable')::boolean IS FALSE,
+  'bare Trans Am quote is not SD-455 target');
+
+-- Second decide pass must not rewrite base_chassis when unchanged.
+SELECT public.decide_replica_components('00000000-0000-0000-0000-0000000000a1', false);
+SELECT public.assert(
+  (SELECT count(*) FROM vehicle_replica_component_decisions
+    WHERE vehicle_id = '00000000-0000-0000-0000-0000000000a1'
+      AND component_key = 'base_chassis') = 1,
+  'unchanged base_chassis is not rewritten');
+
 SELECT public.assert(true, 'vehicle_replica_accuracy contract complete');
